@@ -5,6 +5,7 @@
 #include <dxgi.h>
 #include <cmath>
 #include <utility>
+#include <algorithm>
 
 // 声明ImGui的Win32消息处理函数
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -20,6 +21,9 @@ GuiManager::GuiManager()
     , mirrorY(false)
     , windowWidth(0)
     , windowHeight(0)
+    , scaleRatio(1.0f)
+    , baseTextureWidth(0)
+    , baseTextureHeight(0)
     , initialized(false)
 {
 }
@@ -135,7 +139,7 @@ void GuiManager::Render(ID3D11Texture2D* texture)
 
             // 计算旋转和镜像后的四个角点
             ImVec2 pos[4];
-            float width = windowWidth;   // 使用窗口尺寸而不是纹理尺寸
+            float width = windowWidth;
             float height = windowHeight;
 
             // 90度旋转
@@ -328,8 +332,36 @@ ID3D11ShaderResourceView* GuiManager::CreateTextureView(ID3D11Texture2D* texture
 
 void GuiManager::AdjustWindowForRotation(UINT textureWidth, UINT textureHeight)
 {
-    // 90度旋转后，宽高互换
-    if (windowWidth != textureHeight || windowHeight != textureWidth) {
-        SetSize(textureHeight, textureWidth);
+    // 首次设置基础尺寸
+    if (baseTextureWidth == 0 || baseTextureHeight == 0) {
+        baseTextureWidth = textureHeight;  // 注意：因为旋转90度，所以宽高互换
+        baseTextureHeight = textureWidth;
+        scaleRatio = 1.0f;
     }
+    
+    UpdateWindowSize();
+}
+
+void GuiManager::UpdateWindowSize()
+{
+    // 计算缩放后的尺寸
+    int newWidth = static_cast<int>(baseTextureWidth * scaleRatio);
+    int newHeight = static_cast<int>(baseTextureHeight * scaleRatio);
+    
+    if (windowWidth != newWidth || windowHeight != newHeight) {
+        SetSize(newWidth, newHeight);
+    }
+}
+
+void GuiManager::OnMouseWheel(float delta)
+{
+    // 计算新的缩放比例
+    const float scaleSpeed = 0.1f;
+    const float minScale = 0.5f;
+    const float maxScale = 2.0f;
+    
+    scaleRatio += delta * scaleSpeed;
+    scaleRatio = (std::max)(minScale, (std::min)(maxScale, scaleRatio));
+    
+    UpdateWindowSize();
 } 

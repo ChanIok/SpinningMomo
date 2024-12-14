@@ -18,12 +18,14 @@ public:
     void OnResize(UINT width, UINT height);
     void SetPosition(int x, int y);
     void SetSize(int width, int height);
+    void OnMouseWheel(float delta);
 
 private:
     bool CreateRenderTarget();
     void CleanupRenderTarget();
     ID3D11ShaderResourceView* CreateTextureView(ID3D11Texture2D* texture);
     void AdjustWindowForRotation(UINT textureWidth, UINT textureHeight);
+    void UpdateWindowSize();
 
     HWND hwnd;
     ID3D11Device* d3dDevice;
@@ -38,5 +40,8 @@ private:
     
     int windowWidth;
     int windowHeight;
+    float scaleRatio;
+    int baseTextureWidth;
+    int baseTextureHeight;
     bool initialized;
 }; 

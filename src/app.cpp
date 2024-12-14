@@ -135,6 +135,13 @@ LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         }
         return 0;
 
+    case WM_MOUSEWHEEL:
+        if (app->guiManager) {
+            float delta = GET_WHEEL_DELTA_WPARAM(wParam) / (float)WHEEL_DELTA;
+            app->guiManager->OnMouseWheel(delta);
+        }
+        return 0;
+
     case WM_LBUTTONDOWN:
         // 左键按下时开始拖动窗口
         SetCapture(hwnd);
