@@ -28,6 +28,10 @@ private:
     bool running;
     std::wstring targetWindowTitle;
 
+    // 窗口拖动相关
+    POINT dragStartPoint;
+    RECT dragStartRect;
+
     // 禁止拷贝
     App(const App&) = delete;
     App& operator=(const App&) = delete;

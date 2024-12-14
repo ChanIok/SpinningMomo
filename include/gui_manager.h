@@ -1,9 +1,9 @@
 #pragma once
 #include <windows.h>
 #include <d3d11.h>
-#include "imgui.h"
-#include "imgui_impl_win32.h"
-#include "imgui_impl_dx11.h"
+#include <imgui.h>
+#include <imgui_impl_win32.h>
+#include <imgui_impl_dx11.h>
 
 class GuiManager {
 public:
@@ -22,11 +22,19 @@ public:
 private:
     bool CreateRenderTarget();
     void CleanupRenderTarget();
+    ID3D11ShaderResourceView* CreateTextureView(ID3D11Texture2D* texture);
+    void AdjustWindowForRotation(UINT textureWidth, UINT textureHeight);
 
     HWND hwnd;
     ID3D11Device* d3dDevice;
     ID3D11DeviceContext* d3dContext;
     ID3D11RenderTargetView* mainRenderTargetView;
+    IDXGISwapChain* swapChain;
+    
+    // 纹理相关
+    ID3D11ShaderResourceView* textureView;
+    bool mirrorX;  // 水平镜像
+    bool mirrorY;  // 垂直镜像
     
     int windowWidth;
     int windowHeight;

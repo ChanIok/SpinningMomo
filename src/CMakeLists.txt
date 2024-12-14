@@ -7,12 +7,14 @@ add_executable(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/third_party
+    ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     imgui::imgui
-    imgui_impl
     Microsoft::DirectX-Headers
     Microsoft::DirectXTK
+    d3d11.lib
+    dxgi.lib
+    d3dcompiler.lib
 ) 

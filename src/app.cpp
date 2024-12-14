@@ -7,6 +7,9 @@ static App* g_AppInstance = nullptr;
 // 窗口类名
 const wchar_t* WINDOW_CLASS_NAME = L"NikkiLensWindow";
 
+// 声明ImGui的Win32消息处理函数
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 App::App()
     : hwnd(nullptr)
     , windowCapture(std::make_unique<WindowCapture>())
@@ -37,12 +40,25 @@ App& App::GetInstance()
 
 bool App::Initialize()
 {
+    // 初始化窗口捕获
+    if (!windowCapture->Initialize()) {
+        return false;
+    }
+
+    // 创建主窗口
     if (!CreateMainWindow()) {
         return false;
     }
 
-    if (!windowCapture->Initialize()) {
+    // 初始化GUI管理器
+    if (!guiManager->Initialize(hwnd, windowCapture->GetDevice(), windowCapture->GetContext())) {
         return false;
+    }
+
+    // 查找目标窗口
+    if (!windowCapture->CaptureWindow(targetWindowTitle)) {
+        // 目标窗口未找到，但不阻止程序运行
+        OutputDebugStringW(L"Target window not found\n");
     }
 
     // 显示窗口
@@ -57,9 +73,19 @@ void App::Run()
     running = true;
     while (running) {
         ProcessMessages();
-        // 更新窗口
-        InvalidateRect(hwnd, NULL, TRUE);
-        UpdateWindow(hwnd);
+
+        // 捕获并显示画面
+        ID3D11Texture2D* texture = nullptr;
+        if (windowCapture->GetFrame(&texture)) {
+            guiManager->Render(texture);
+            texture->Release();  // 释放纹理
+        } else {
+            // 如果获取画面失败，仍然需要渲染GUI
+            guiManager->Render(nullptr);
+        }
+
+        // 限制帧率
+        Sleep(16);  // 约60FPS
     }
 }
 
@@ -80,6 +106,10 @@ void App::Cleanup()
 
 LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+    // 首先处理ImGui的消息
+    if (ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam))
+        return true;
+
     // 获取App实例指针
     App* app = g_AppInstance;
     if (!app) return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -93,22 +123,6 @@ LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         PostQuitMessage(0);
         return 0;
 
-    case WM_PAINT:
-    {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-        
-        // 使用深灰色填充窗口背景
-        RECT rect;
-        GetClientRect(hwnd, &rect);
-        HBRUSH brush = CreateSolidBrush(RGB(64, 64, 64));
-        FillRect(hdc, &rect, brush);
-        DeleteObject(brush);
-        
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-
     case WM_SIZE:
         if (app->guiManager) {
             app->guiManager->OnResize(LOWORD(lParam), HIWORD(lParam));
@@ -121,9 +135,36 @@ LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         }
         return 0;
 
-    case WM_NCHITTEST:
-        // 允许通过点击窗口任意位置来拖动窗口
-        return HTCAPTION;
+    case WM_LBUTTONDOWN:
+        // 左键按下时开始拖动窗口
+        SetCapture(hwnd);
+        GetCursorPos(&app->dragStartPoint);
+        GetWindowRect(hwnd, &app->dragStartRect);
+        return 0;
+
+    case WM_MOUSEMOVE:
+        // 如果正在拖动窗口
+        if (GetCapture() == hwnd)
+        {
+            POINT currentPoint;
+            GetCursorPos(&currentPoint);
+            int deltaX = currentPoint.x - app->dragStartPoint.x;
+            int deltaY = currentPoint.y - app->dragStartPoint.y;
+            
+            SetWindowPos(hwnd, nullptr,
+                app->dragStartRect.left + deltaX,
+                app->dragStartRect.top + deltaY,
+                0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        }
+        return 0;
+
+    case WM_LBUTTONUP:
+        // 释放鼠标捕获
+        if (GetCapture() == hwnd)
+        {
+            ReleaseCapture();
+        }
+        return 0;
     }
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -162,8 +203,13 @@ bool App::CreateMainWindow()
         return false;
     }
 
-    // 设置窗口透明度
-    SetLayeredWindowAttributes(hwnd, 0, 200, LWA_ALPHA);  // 调整透明度为200
+    // 设置窗口透明度和像素格式
+    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);  // 不透明度设为255（完全不透明）
+
+    // 获取窗口大小
+    RECT rect;
+    GetClientRect(hwnd, &rect);
+    guiManager->OnResize(rect.right - rect.left, rect.bottom - rect.top);
 
     return true;
 }

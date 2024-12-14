@@ -16,17 +16,14 @@ if(MSVC)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 endif()
 
-# vcpkg配置 - 使用本地路径
+# vcpkg配置
 set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
     CACHE STRING "Vcpkg toolchain file")
 
 # 查找依赖包
 find_package(imgui CONFIG REQUIRED)
-find_package(DirectX-Headers CONFIG REQUIRED)
+find_package(directx-headers CONFIG REQUIRED)
 find_package(DirectXTK CONFIG REQUIRED)
-
-# 添加第三方库目录
-add_subdirectory(third_party)
 
 # 添加源代码目录
 add_subdirectory(src)
@@ -35,4 +32,4 @@ add_subdirectory(src)
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib) 
+    ARCHIVE DESTINATION lib)
