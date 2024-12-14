@@ -357,7 +357,7 @@ void GuiManager::OnMouseWheel(float delta)
 {
     // 计算新的缩放比例
     const float scaleSpeed = 0.1f;
-    const float minScale = 0.5f;
+    const float minScale = 0.1f; 
     const float maxScale = 2.0f;
     
     scaleRatio += delta * scaleSpeed;

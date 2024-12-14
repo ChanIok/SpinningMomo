@@ -15,6 +15,7 @@ App::App()
     , windowCapture(std::make_unique<WindowCapture>())
     , guiManager(std::make_unique<GuiManager>())
     , running(false)
+    , isVisible(true)
     , targetWindowTitle(L"无限暖暖")
 {
     if (g_AppInstance) {
@@ -65,6 +66,22 @@ bool App::Initialize()
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
 
+    // 注册全局热键 (Ctrl + Shift + P)
+    if (!RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'P')) {
+        DWORD error = GetLastError();
+        wchar_t debugMsg[256];
+        swprintf_s(debugMsg, L"Failed to register hotkey. Error code: %d\n", error);
+        OutputDebugStringW(debugMsg);
+    } else {
+        OutputDebugStringW(L"Hotkey registered successfully\n");
+    }
+
+    // 创建托盘图标
+    if (!CreateTrayIcon()) {
+        OutputDebugStringW(L"Failed to create tray icon\n");
+        // 继续运行，但托盘功能不可用
+    }
+
     return true;
 }
 
@@ -74,23 +91,27 @@ void App::Run()
     while (running) {
         ProcessMessages();
 
-        // 捕获并显示画面
-        ID3D11Texture2D* texture = nullptr;
-        if (windowCapture->GetFrame(&texture)) {
-            guiManager->Render(texture);
-            texture->Release();  // 释放纹理
-        } else {
-            // 如果获取画面失败，仍然需要渲染GUI
-            guiManager->Render(nullptr);
+        // 只在窗口可见时进行捕获和渲染
+        if (isVisible) {
+            ID3D11Texture2D* texture = nullptr;
+            if (windowCapture->GetFrame(&texture)) {
+                guiManager->Render(texture);
+                texture->Release();
+            } else {
+                guiManager->Render(nullptr);
+            }
         }
 
-        // 限制帧率
-        Sleep(16);  // 约60FPS
+        // 在隐藏状态下降低CPU使用率
+        Sleep(isVisible ? 16 : 100);
     }
 }
 
 void App::Cleanup()
 {
+    RemoveTrayIcon();
+    UnregisterHotKey(nullptr, ID_HOTKEY_TOGGLE);
+
     if (guiManager) {
         guiManager->Cleanup();
     }
@@ -102,6 +123,59 @@ void App::Cleanup()
         hwnd = nullptr;
     }
     running = false;
+}
+
+bool App::CreateTrayIcon()
+{
+    ZeroMemory(&nid, sizeof(NOTIFYICONDATAW));
+    nid.cbSize = sizeof(NOTIFYICONDATAW);
+    nid.hWnd = hwnd;
+    nid.uID = ID_TRAYICON;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = WM_TRAYICON;
+    nid.hIcon = LoadIcon(GetModuleHandle(nullptr), IDI_APPLICATION);
+    lstrcpyW(nid.szTip, L"NikkiLens");
+
+    return Shell_NotifyIconW(NIM_ADD, &nid);
+}
+
+void App::RemoveTrayIcon()
+{
+    Shell_NotifyIconW(NIM_DELETE, &nid);
+}
+
+void App::UpdateTrayIcon()
+{
+    Shell_NotifyIconW(NIM_MODIFY, &nid);
+}
+
+void App::ShowTrayMenu()
+{
+    POINT pt;
+    GetCursorPos(&pt);
+
+    HMENU hMenu = CreatePopupMenu();
+    AppendMenuW(hMenu, MF_STRING | (isVisible ? MF_CHECKED : MF_UNCHECKED), ID_TRAY_TOGGLE, L"显示窗口");
+    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"退出");
+
+    // 确保窗口在前台
+    SetForegroundWindow(hwnd);
+
+    // 显示菜单
+    TrackPopupMenu(hMenu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd, nullptr);
+
+    DestroyMenu(hMenu);
+}
+
+void App::ToggleVisibility()
+{
+    isVisible = !isVisible;
+    ShowWindow(hwnd, isVisible ? SW_SHOW : SW_HIDE);
+    
+    // 更新托盘图标提示文本
+    lstrcpyW(nid.szTip, isVisible ? L"NikkiLens (显示)" : L"NikkiLens (隐藏)");
+    UpdateTrayIcon();
 }
 
 LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -172,6 +246,35 @@ LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
             ReleaseCapture();
         }
         return 0;
+
+    case WM_HOTKEY:
+        OutputDebugStringW(L"WM_HOTKEY received\n");
+        if (wParam == ID_HOTKEY_TOGGLE) {
+            OutputDebugStringW(L"Toggle hotkey triggered\n");
+            app->ToggleVisibility();
+            return 0;
+        }
+        break;
+
+    case WM_TRAYICON:
+        if (lParam == WM_RBUTTONUP) {
+            app->ShowTrayMenu();
+        } else if (lParam == WM_LBUTTONUP) {
+            app->ToggleVisibility();
+        }
+        return 0;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case ID_TRAY_TOGGLE:
+            app->ToggleVisibility();
+            return 0;
+        case ID_TRAY_EXIT:
+            PostQuitMessage(0);
+            return 0;
+        }
+        break;
     }
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
