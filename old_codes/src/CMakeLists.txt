@@ -3,6 +3,7 @@ add_executable(${PROJECT_NAME}
     window_capture.cpp
     gui_manager.cpp
     app.cpp
+    capture_test.cpp
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
@@ -17,6 +18,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     d3d11.lib
     dxgi.lib
     d3dcompiler.lib
-    windowsapp.lib
     RuntimeObject.lib
+    dwmapi.lib
+    windowsapp.lib
+)
+
+target_compile_options(${PROJECT_NAME} PRIVATE /EHsc /await)
+target_compile_definitions(${PROJECT_NAME} PRIVATE 
+    WINVER=0x0A00 
+    _WIN32_WINNT=0x0A00
 ) 
