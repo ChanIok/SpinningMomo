@@ -41,6 +41,12 @@ App& App::GetInstance()
 
 bool App::Initialize()
 {
+    // 初始化配置管理器
+    if (!ConfigManager::Instance().LoadConfig()) {
+        OutputDebugStringW(L"Failed to load configuration\n");
+        // 继续执行，因为会使用默认配置
+    }
+
     // 初始化窗口捕获
     if (!windowCapture->Initialize()) {
         return false;
@@ -109,6 +115,9 @@ void App::Run()
 
 void App::Cleanup()
 {
+    // 保存配置
+    ConfigManager::Instance().SaveConfig();
+
     RemoveTrayIcon();
     UnregisterHotKey(nullptr, ID_HOTKEY_TOGGLE);
 
@@ -159,7 +168,7 @@ void App::ShowTrayMenu()
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"退出");
 
-    // 确保��口在前台
+    // 确保口在前台
     SetForegroundWindow(hwnd);
 
     // 显示菜单
@@ -303,7 +312,7 @@ bool App::CreateMainWindow()
         WS_POPUP | WS_VISIBLE,            // 窗口样式：无边框，创建时显示
         100, 100,                         // 初始位置
         400, 300,                         // 初始大小
-        nullptr,                          // 父窗���
+        nullptr,                          // 父窗
         nullptr,                          // 菜单
         GetModuleHandle(nullptr),         // 实例句柄
         nullptr                           // 额外参数

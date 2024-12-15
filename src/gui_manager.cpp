@@ -22,7 +22,7 @@ GuiManager::GuiManager()
     , mirrorY(false)
     , windowWidth(0)
     , windowHeight(0)
-    , scaleRatio(1.0f)
+    , scaleRatio(0.0f)
     , baseTextureWidth(0)
     , baseTextureHeight(0)
     , initialized(false)
@@ -43,7 +43,10 @@ bool GuiManager::Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext
     this->d3dContext = context;
     this->windowCapture = capture;
 
-    // 创建渲染目标视图
+    // 加载配置
+    LoadConfigValues();
+
+    // 创建渲染标视图
     if (!CreateRenderTarget()) {
         OutputDebugStringW(L"Failed to create render target\n");
         return false;
@@ -91,6 +94,23 @@ bool GuiManager::Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext
     return true;
 }
 
+void GuiManager::LoadConfigValues()
+{
+    auto& config = ConfigManager::Instance().GetConfig();
+    mirrorX = config.window.mirrorX;
+    mirrorY = config.window.mirrorY;
+    scaleRatio = config.window.scaleRatio;
+}
+
+void GuiManager::SaveConfigValues()
+{
+    auto& config = ConfigManager::Instance().GetConfig();
+    config.window.mirrorX = mirrorX;
+    config.window.mirrorY = mirrorY;
+    config.window.scaleRatio = scaleRatio;
+    ConfigManager::Instance().SaveConfig();
+}
+
 void GuiManager::Render(ID3D11Texture2D* texture)
 {
     if (!initialized) {
@@ -113,7 +133,7 @@ void GuiManager::Render(ID3D11Texture2D* texture)
     // 如果有捕获的纹理，显示它
     if (texture)
     {
-        // 创建或更新纹理视图
+        // 创建或更新纹视图
         if (textureView) {
             textureView->Release();
             textureView = nullptr;
@@ -185,11 +205,23 @@ void GuiManager::Render(ID3D11Texture2D* texture)
 
             if (ImGui::BeginPopup("ContextMenu"))
             {
-                if (ImGui::MenuItem("水平翻转", nullptr, &mirrorX)) {}
-                if (ImGui::MenuItem("垂直翻转", nullptr, &mirrorY)) {}
+                bool mirrorXChanged = false;
+                bool mirrorYChanged = false;
+
+                if (ImGui::MenuItem("水平翻转", nullptr, &mirrorX)) {
+                    mirrorXChanged = true;
+                }
+                if (ImGui::MenuItem("垂直翻转", nullptr, &mirrorY)) {
+                    mirrorYChanged = true;
+                }
                 ImGui::Separator();
                 if (ImGui::MenuItem("退出程序")) PostQuitMessage(0);
                 ImGui::EndPopup();
+
+                // 如果镜像状态改变，保存配置
+                if (mirrorXChanged || mirrorYChanged) {
+                    SaveConfigValues();
+                }
             }
 
             // 显示帧率
@@ -212,7 +244,7 @@ void GuiManager::Render(ID3D11Texture2D* texture)
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    // 呈现���换链
+    // 呈现换链
     HRESULT hr = swapChain->Present(1, 0);
     if (FAILED(hr)) {
         OutputDebugStringW(L"Failed to present swap chain\n");
@@ -281,6 +313,9 @@ void GuiManager::CleanupRenderTarget()
 
 void GuiManager::Cleanup()
 {
+    // 保存配置
+    SaveConfigValues();
+
     if (initialized) {
         ImGui_ImplDX11_Shutdown();
         ImGui_ImplWin32_Shutdown();
@@ -350,7 +385,10 @@ void GuiManager::AdjustWindowForRotation(UINT textureWidth, UINT textureHeight)
     if (baseTextureWidth == 0 || baseTextureHeight == 0) {
         baseTextureWidth = textureHeight;  // 注意：因为旋转90度，所以宽高互换
         baseTextureHeight = textureWidth;
-        scaleRatio = 0.4f;
+        // 只有在没有加载配置的情况下才设置默认的缩放比例
+        if (scaleRatio <= 0.0f) {
+            scaleRatio = 0.4f;
+        }
     }
     
     UpdateWindowSize();
@@ -378,4 +416,7 @@ void GuiManager::OnMouseWheel(float delta)
     scaleRatio = (std::max)(minScale, (std::min)(maxScale, scaleRatio));
     
     UpdateWindowSize();
+    
+    // 保存新的缩放比例
+    SaveConfigValues();
 } 

@@ -26,6 +26,7 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems
 find_package(imgui CONFIG REQUIRED)
 find_package(directx-headers CONFIG REQUIRED)
 find_package(DirectXTK CONFIG REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
 
 # 添加源代码目录
 add_subdirectory(src)

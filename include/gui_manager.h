@@ -5,6 +5,7 @@
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
 #include "window_capture.h"
+#include "config_manager.h"
 
 class GuiManager {
 public:
@@ -20,6 +21,10 @@ public:
     void SetPosition(int x, int y);
     void SetSize(int width, int height);
     void OnMouseWheel(float delta);
+
+    // 配置相关方法
+    void LoadConfigValues();
+    void SaveConfigValues();
 
 private:
     bool CreateRenderTarget();

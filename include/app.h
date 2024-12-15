@@ -3,6 +3,7 @@
 #include <shellapi.h>
 #include "window_capture.h"
 #include "gui_manager.h"
+#include "config_manager.h"
 #include <memory>
 #include <string>
 
