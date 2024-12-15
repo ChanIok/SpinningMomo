@@ -5,7 +5,7 @@
 static App* g_AppInstance = nullptr;
 
 // 窗口类名
-const wchar_t* WINDOW_CLASS_NAME = L"NikkiLensWindow";
+const wchar_t* WINDOW_CLASS_NAME = L"SpinningMomoWindow";
 
 // 声明ImGui的Win32消息处理函数
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -174,7 +174,7 @@ bool App::CreateTrayIcon()
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
     nid.hIcon = LoadIcon(GetModuleHandle(nullptr), IDI_APPLICATION);
-    lstrcpyW(nid.szTip, L"NikkiLens");
+    lstrcpyW(nid.szTip, L"SpinningMomo");
 
     return Shell_NotifyIconW(NIM_ADD, &nid);
 }
@@ -214,7 +214,7 @@ void App::ToggleVisibility()
     ShowWindow(hwnd, isVisible ? SW_SHOW : SW_HIDE);
     
     // 更新托盘图标提示文本
-    lstrcpyW(nid.szTip, isVisible ? L"NikkiLens (显示)" : L"NikkiLens (隐藏)");
+    lstrcpyW(nid.szTip, isVisible ? L"SpinningMomo (显示)" : L"SpinningMomo (隐藏)");
     UpdateTrayIcon();
 }
 
@@ -336,7 +336,7 @@ bool App::CreateMainWindow()
     hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_LAYERED,    // 扩展样式：总在最前，支持透明
         WINDOW_CLASS_NAME,                 // 窗口类名
-        L"NikkiLens",                     // 窗口标题
+        L"SpinningMomo",                     // 窗口标题
         WS_POPUP | WS_VISIBLE,            // 窗口样式：无边框，创建时显示
         100, 100,                         // 初始位置
         400, 300,                         // 初始大小

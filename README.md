@@ -1,6 +1,7 @@
 # 旋转吧大喵
 
-旋转吧大喵（NikkiLens） 是一个为 《无限暖暖》 游戏开发的实时画面旋转工具，旨在帮助玩家更方便地进行竖构图拍摄。
+![示例图片](./docs/2024-12-16_03-51-01.jpg)
+旋转吧大喵（SpinningMomo） 是一个为 《无限暖暖》 游戏开发的实时画面旋转工具，旨在帮助玩家更方便地进行竖构图拍摄。
 
 ## 功能特点
 
@@ -19,7 +20,6 @@
    - 启动程序后，会自动查找并捕获游戏窗口
    - 使用鼠标滚轮调整窗口大小
    - 拖动窗口任意位置可移动窗口
-   - 按 ESC 键退出程序
 
 2. 右键菜单功能：
    - 水平翻转：切换水平镜像
@@ -57,8 +57,6 @@
 ## 系统要求
 
 - Windows 10 1809 或更高版本
-- 支持 DirectX 11 的显卡
-- 管理员权限（用于捕获游戏窗口）
 
 ## 构建指南
 
@@ -79,8 +77,8 @@
 
    方式一：在项目目录下安装vcpkg（推荐）
    ```batch
-   git clone https://github.com/yourusername/NikkiLens.git
-   cd NikkiLens
+   git clone https://github.com/chaniok/SpinningMomo.git
+   cd SpinningMomo
    git clone https://github.com/Microsoft/vcpkg.git
    cd vcpkg
    bootstrap-vcpkg.bat
@@ -105,7 +103,7 @@
    vcpkg install nlohmann-json:x64-windows
    
    # 3. 克隆项目
-   git clone https://github.com/yourusername/NikkiLens.git
+   git clone https://github.com/chaniok/SpinningMomo.git
    ```
 
 ### 使用 Visual Studio 2022 构建
@@ -113,7 +111,7 @@
 1. 使用 Visual Studio 2022 打开项目：
    - 启动 Visual Studio 2022
    - 选择"打开本地文件夹"
-   - 选择克隆的 NikkiLens 文件夹
+   - 选择克隆的 SpinningMomo 文件夹
 
 2. 配置 CMake（仅当使用方式二时需要）：
    - 在 Visual Studio 中，右键点击 CMakeLists.txt
