@@ -16,7 +16,7 @@ App::App()
     , guiManager(std::make_unique<GuiManager>())
     , running(false)
     , isVisible(true)
-    , targetWindowTitle(L"任务管理器")
+    , targetWindowTitle(L"无限暖暖  ")
 {
     if (g_AppInstance) {
         throw std::runtime_error("Application instance already exists!");
@@ -52,7 +52,7 @@ bool App::Initialize()
     }
 
     // 初始化GUI管理器
-    if (!guiManager->Initialize(hwnd, windowCapture->GetDevice(), windowCapture->GetContext())) {
+    if (!guiManager->Initialize(hwnd, windowCapture->GetDevice(), windowCapture->GetContext(), windowCapture.get())) {
         return false;
     }
 
@@ -102,8 +102,8 @@ void App::Run()
             }
         }
 
-        // 在隐藏状态下降低CPU使用率
-        Sleep(isVisible ? 16 : 100);
+        // 在隐藏状态下降低CPU使用率，可见时使用更短的Sleep时间以提高帧率
+        Sleep(isVisible ? 1 : 100);  // 从16ms改为1ms
     }
 }
 
@@ -159,7 +159,7 @@ void App::ShowTrayMenu()
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, ID_TRAY_EXIT, L"退出");
 
-    // 确保窗口在前台
+    // 确保��口在前台
     SetForegroundWindow(hwnd);
 
     // 显示菜单
@@ -303,7 +303,7 @@ bool App::CreateMainWindow()
         WS_POPUP | WS_VISIBLE,            // 窗口样式：无边框，创建时显示
         100, 100,                         // 初始位置
         400, 300,                         // 初始大小
-        nullptr,                          // 父窗口
+        nullptr,                          // 父窗���
         nullptr,                          // 菜单
         GetModuleHandle(nullptr),         // 实例句柄
         nullptr                           // 额外参数

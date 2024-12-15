@@ -36,9 +36,17 @@ WindowCapture::WindowCapture()
     , d3dContext(nullptr)
     , stagingTexture(nullptr)
     , initialized(false)
+    , targetFPS(60)
+    , currentFPS(0.0f)
+    , frameCount(0)
+    , frameTimeAccumulator(0.0f)
 {
     // 初始化WinRT
     winrt::init_apartment(winrt::apartment_type::single_threaded);
+    
+    // 初始化性能计数器
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&lastFrameTime);
 }
 
 WindowCapture::~WindowCapture()
@@ -126,6 +134,33 @@ bool WindowCapture::InitializeGraphicsCapture()
     }
 }
 
+void WindowCapture::SetTargetFrameRate(int fps)
+{
+    targetFPS = fps;
+}
+
+void WindowCapture::UpdateFrameStatistics()
+{
+    frameCount++;
+    
+    LARGE_INTEGER currentTime;
+    QueryPerformanceCounter(&currentTime);
+    
+    // 计算距离上一帧的时间（秒）
+    float deltaTime = float(currentTime.QuadPart - lastFrameTime.QuadPart) / frequency.QuadPart;
+    frameTimeAccumulator += deltaTime;
+    
+    // 每秒更新一次FPS
+    if (frameTimeAccumulator >= 1.0f)
+    {
+        currentFPS = static_cast<float>(frameCount) / frameTimeAccumulator;
+        frameCount = 0;
+        frameTimeAccumulator = 0.0f;
+    }
+    
+    lastFrameTime = currentTime;
+}
+
 bool WindowCapture::CaptureWindow(const std::wstring& windowTitle)
 {
     if (!initialized) return false;
@@ -148,16 +183,23 @@ bool WindowCapture::CaptureWindow(const std::wstring& windowTitle)
 
         captureItem = item;
 
-        // 创建帧池
+        // 创建帧池，增加缓冲区大小以提高帧率
         framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
             winrtDevice,
             winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-            2,
+            4,  // 增加缓冲区数量到4
             item.Size()
         );
 
         // 创建捕获会话
         captureSession = framePool.CreateCaptureSession(captureItem);
+
+        // 设置不捕获鼠标
+        captureSession.IsCursorCaptureEnabled(false);
+
+        // 设置仅捕获客户区
+        captureSession.IsBorderRequired(false);
+
         captureSession.StartCapture();
 
         return true;
@@ -179,11 +221,14 @@ bool WindowCapture::GetFrame(ID3D11Texture2D** texture)
     if (!initialized || !texture || !captureSession) return false;
 
     try {
-        // 尝试获取下一帧
+        // 尝��获取下一帧
         auto frame = framePool.TryGetNextFrame();
         if (!frame) {
             return false;
         }
+
+        // 更新帧率统计
+        UpdateFrameStatistics();
 
         // 获取帧的纹理
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
@@ -192,9 +237,18 @@ bool WindowCapture::GetFrame(ID3D11Texture2D** texture)
         D3D11_TEXTURE2D_DESC desc;
         frameTexture->GetDesc(&desc);
 
-        // 创建目标纹理
-        ID3D11Texture2D* destTexture = nullptr;
-        {
+        // 创建目标纹理（如果需要）
+        static ID3D11Texture2D* destTexture = nullptr;
+        static UINT lastWidth = 0;
+        static UINT lastHeight = 0;
+
+        // 只在尺寸变化时重新创建纹理
+        if (!destTexture || lastWidth != desc.Width || lastHeight != desc.Height) {
+            if (destTexture) {
+                destTexture->Release();
+                destTexture = nullptr;
+            }
+
             D3D11_TEXTURE2D_DESC destDesc = desc;
             destDesc.Usage = D3D11_USAGE_DEFAULT;
             destDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -204,12 +258,16 @@ bool WindowCapture::GetFrame(ID3D11Texture2D** texture)
             if (FAILED(d3dDevice->CreateTexture2D(&destDesc, nullptr, &destTexture))) {
                 return false;
             }
+
+            lastWidth = desc.Width;
+            lastHeight = desc.Height;
         }
 
         // 复制纹理内容
         d3dContext->CopyResource(destTexture, frameTexture.get());
 
         *texture = destTexture;
+        (*texture)->AddRef();  // 增加引用计数，因为我们保持了一个静态引用
         return true;
     }
     catch (winrt::hresult_error const& ex) {

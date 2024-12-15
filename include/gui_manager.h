@@ -4,13 +4,14 @@
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
+#include "window_capture.h"
 
 class GuiManager {
 public:
     GuiManager();
     ~GuiManager();
 
-    bool Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext* context);
+    bool Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext* context, WindowCapture* capture);
     void Render(ID3D11Texture2D* texture);
     void Cleanup();
 
@@ -44,4 +45,5 @@ private:
     int baseTextureWidth;
     int baseTextureHeight;
     bool initialized;
+    WindowCapture* windowCapture;
 }; 

@@ -17,6 +17,7 @@ GuiManager::GuiManager()
     , mainRenderTargetView(nullptr)
     , swapChain(nullptr)
     , textureView(nullptr)
+    , windowCapture(nullptr)
     , mirrorX(false)
     , mirrorY(false)
     , windowWidth(0)
@@ -33,13 +34,14 @@ GuiManager::~GuiManager()
     Cleanup();
 }
 
-bool GuiManager::Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext* context)
+bool GuiManager::Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext* context, WindowCapture* capture)
 {
     if (initialized) return true;
 
     this->hwnd = hwnd;
     this->d3dDevice = device;
     this->d3dContext = context;
+    this->windowCapture = capture;
 
     // 创建渲染目标视图
     if (!CreateRenderTarget()) {
@@ -190,6 +192,18 @@ void GuiManager::Render(ID3D11Texture2D* texture)
                 ImGui::EndPopup();
             }
 
+            // 显示帧率
+            ImGui::SetNextWindowPos(ImVec2(10, 10));
+            ImGui::SetNextWindowBgAlpha(0.3f);
+            ImGui::Begin("Stats", nullptr, 
+                ImGuiWindowFlags_NoDecoration | 
+                ImGuiWindowFlags_AlwaysAutoResize | 
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_NoNav);
+            ImGui::Text("FPS: %.1f", windowCapture->GetCurrentFrameRate());
+            ImGui::End();
+
             ImGui::End();
         }
     }
@@ -336,7 +350,7 @@ void GuiManager::AdjustWindowForRotation(UINT textureWidth, UINT textureHeight)
     if (baseTextureWidth == 0 || baseTextureHeight == 0) {
         baseTextureWidth = textureHeight;  // 注意：因为旋转90度，所以宽高互换
         baseTextureHeight = textureWidth;
-        scaleRatio = 1.0f;
+        scaleRatio = 0.4f;
     }
     
     UpdateWindowSize();

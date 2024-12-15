@@ -25,12 +25,17 @@ public:
     ID3D11Device* GetDevice() const { return d3dDevice; }
     ID3D11DeviceContext* GetContext() const { return d3dContext; }
 
+    // 帧率控制
+    void SetTargetFrameRate(int fps);
+    float GetCurrentFrameRate() const { return currentFPS; }
+
 private:
     bool InitializeD3D();
     bool InitializeGraphicsCapture();
     bool FindTargetWindow(const std::wstring& windowTitle);
     bool CheckStagingTextureSize(UINT width, UINT height);
     winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice CreateD3DDevice(ID3D11Device* device);
+    void UpdateFrameStatistics();
 
     HWND targetWindow;
     ID3D11Device* d3dDevice;
@@ -42,6 +47,14 @@ private:
     winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool framePool{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureSession captureSession{ nullptr };
     winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrtDevice{ nullptr };
+    
+    // 帧率控制相关
+    int targetFPS;
+    float currentFPS;
+    LARGE_INTEGER lastFrameTime;
+    LARGE_INTEGER frequency;
+    int frameCount;
+    float frameTimeAccumulator;
     
     bool initialized;
 }; 
