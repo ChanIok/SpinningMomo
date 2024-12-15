@@ -72,14 +72,10 @@ bool App::Initialize()
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
 
-    // 注册全局热键 (Ctrl + Shift + P)
-    if (!RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'P')) {
-        DWORD error = GetLastError();
-        wchar_t debugMsg[256];
-        swprintf_s(debugMsg, L"Failed to register hotkey. Error code: %d\n", error);
-        OutputDebugStringW(debugMsg);
-    } else {
-        OutputDebugStringW(L"Hotkey registered successfully\n");
+    // 注册热键
+    if (!RegisterToggleHotkey()) {
+        OutputDebugStringW(L"Failed to register hotkey\n");
+        // 继续运行，但热键功能不可用
     }
 
     // 创建托盘图标
@@ -89,6 +85,40 @@ bool App::Initialize()
     }
 
     return true;
+}
+
+bool App::RegisterToggleHotkey()
+{
+    const auto& config = ConfigManager::Instance().GetConfig();
+    UINT modifiers = 0;
+    
+    if (config.hotkey.ctrl) {
+        modifiers |= MOD_CONTROL;
+    }
+    if (config.hotkey.shift) {
+        modifiers |= MOD_SHIFT;
+    }
+    if (config.hotkey.alt) {
+        modifiers |= MOD_ALT;
+    }
+    
+    modifiers |= MOD_NOREPEAT;  // 防止按住键时重复触发
+    
+    if (!RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE, modifiers, config.hotkey.key)) {
+        DWORD error = GetLastError();
+        wchar_t debugMsg[256];
+        swprintf_s(debugMsg, L"Failed to register hotkey. Error code: %d\n", error);
+        OutputDebugStringW(debugMsg);
+        return false;
+    }
+    
+    OutputDebugStringW(L"Hotkey registered successfully\n");
+    return true;
+}
+
+void App::UnregisterToggleHotkey()
+{
+    UnregisterHotKey(hwnd, ID_HOTKEY_TOGGLE);
 }
 
 void App::Run()
@@ -118,8 +148,9 @@ void App::Cleanup()
     // 保存配置
     ConfigManager::Instance().SaveConfig();
 
+    // 注销热键和托盘图标
+    UnregisterToggleHotkey();
     RemoveTrayIcon();
-    UnregisterHotKey(nullptr, ID_HOTKEY_TOGGLE);
 
     if (guiManager) {
         guiManager->Cleanup();

@@ -42,6 +42,10 @@ private:
     void UpdateTrayIcon();
     void ShowTrayMenu();
 
+    // 热键相关
+    bool RegisterToggleHotkey();
+    void UnregisterToggleHotkey();
+
     // 窗口和设备
     HWND hwnd;
     std::unique_ptr<WindowCapture> windowCapture;

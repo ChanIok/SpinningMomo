@@ -11,6 +11,7 @@ public:
         struct {
             bool ctrl{true};
             bool shift{true};
+            bool alt{false};  // 添加 Alt 键支持
             UINT key{'P'};  // 默认为P键
         } hotkey;
 

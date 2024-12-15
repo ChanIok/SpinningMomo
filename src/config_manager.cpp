@@ -30,7 +30,7 @@ bool ConfigManager::LoadConfig()
     }
 
     try {
-        std::ifstream file(configPath);
+        std::ifstream file(GetConfigPath());
         if (!file.is_open()) {
             return false;
         }
@@ -42,6 +42,7 @@ bool ConfigManager::LoadConfig()
         if (j.contains("hotkey")) {
             config.hotkey.ctrl = j["hotkey"]["ctrl"].get<bool>();
             config.hotkey.shift = j["hotkey"]["shift"].get<bool>();
+            config.hotkey.alt = j["hotkey"]["alt"].get<bool>();
             config.hotkey.key = j["hotkey"]["key"].get<UINT>();
         }
 
@@ -69,6 +70,7 @@ bool ConfigManager::SaveConfig()
         // 保存热键配置
         j["hotkey"]["ctrl"] = config.hotkey.ctrl;
         j["hotkey"]["shift"] = config.hotkey.shift;
+        j["hotkey"]["alt"] = config.hotkey.alt;
         j["hotkey"]["key"] = config.hotkey.key;
 
         // 保存窗口配置
