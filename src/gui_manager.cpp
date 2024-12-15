@@ -70,8 +70,8 @@ bool GuiManager::Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext
         return false;
     }
 
-    // 构建字体
-    io.Fonts->AddFontDefault();
+    // 构建中文字体
+    io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\msyh.ttc", 16.0f, nullptr, io.Fonts->GetGlyphRangesChineseFull());
     if (!io.Fonts->Build()) {
         OutputDebugStringW(L"Failed to build font\n");
         return false;
@@ -183,10 +183,10 @@ void GuiManager::Render(ID3D11Texture2D* texture)
 
             if (ImGui::BeginPopup("ContextMenu"))
             {
-                if (ImGui::MenuItem("Flip Vertical", nullptr, &mirrorX)) {}
-                if (ImGui::MenuItem("Flip Horizontal", nullptr, &mirrorY)) {}
+                if (ImGui::MenuItem("水平翻转", nullptr, &mirrorX)) {}
+                if (ImGui::MenuItem("垂直翻转", nullptr, &mirrorY)) {}
                 ImGui::Separator();
-                if (ImGui::MenuItem("Exit")) PostQuitMessage(0);
+                if (ImGui::MenuItem("退出程序")) PostQuitMessage(0);
                 ImGui::EndPopup();
             }
 
@@ -198,7 +198,7 @@ void GuiManager::Render(ID3D11Texture2D* texture)
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    // 呈现交换链
+    // 呈现���换链
     HRESULT hr = swapChain->Present(1, 0);
     if (FAILED(hr)) {
         OutputDebugStringW(L"Failed to present swap chain\n");

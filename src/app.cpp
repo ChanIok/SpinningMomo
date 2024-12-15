@@ -16,7 +16,7 @@ App::App()
     , guiManager(std::make_unique<GuiManager>())
     , running(false)
     , isVisible(true)
-    , targetWindowTitle(L"无限暖暖")
+    , targetWindowTitle(L"任务管理器")
 {
     if (g_AppInstance) {
         throw std::runtime_error("Application instance already exists!");
