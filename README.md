@@ -1,122 +1,107 @@
 # NikkiLens
 
-NikkiLens 是一个为《无限暖暖》游戏开发的实时画面旋转工具，旨在帮助玩家更方便地进行竖构图拍摄。
+一个用于捕获和显示游戏窗口的工具，专为《无限暖暖》设计。使用 Windows Graphics Capture API 实现高性能窗口捕获。
 
-## 功能特性
+## 功能特点
 
-- 实时捕获游戏窗口画面
-- 90度画面旋转
-- 可拖拽的悬浮窗口
-- 置顶显示
-- 性能优化，低资源占用
-- 快捷键支持
+- 使用 Windows Graphics Capture API 实现高性能窗口捕获
+- 支持捕获 DirectX 游戏画面
+- 可调节窗口大小和缩放比例
+- 支持水平和垂直镜像
+- 全局热键快速切换显示/隐藏
+- 系统托盘支持
+- 可配置的帧率和缓冲设置
 
-## 技术方案
+## 构建指南
 
-### 核心技术栈
-- 开发语言：C++
-- GUI框架：Dear ImGui
-- 图形API：DirectX/GDI+
-- 构建工具：Visual Studio 2022
-- 依赖管理：vcpkg
+### 环境要求
 
-### 主要模块
-1. **窗口捕获模块**
-   - Windows GDI/GDI+ 捕获
-   - DirectX Desktop Duplication API
+- Windows 10 1809 或更高版本
+- Visual Studio 2022（需要安装"使用 C++ 的桌面开发"工作负载）
 
-2. **图像处理模块**
-   - 实时画面旋转
-   - 图像缩放
-   - SIMD 优化
+### 准备工作
 
-3. **GUI渲染模块**
-   - Dear ImGui 界面
-   - 半透明悬浮窗
-   - 拖拽支持
+1. **安装 Visual Studio 2022**
+   - 下载并安装 [Visual Studio 2022](https://visualstudio.microsoft.com/vs/)
+   - 在安装程序中选择"使用 C++ 的桌面开发"工作负载
+   - 确保安装了 CMake 工具（Visual Studio 安装程序中默认包含）
 
-4. **配置管理模块**
-   - 窗口位置记忆
-   - 快捷键配置
-   - 性能设置
+2. **获取代码和依赖**（选择以下任一方式）
 
-## 开发环境配置
+   方式一：在项目目录下安装vcpkg（推荐）
+   ```batch
+   git clone https://github.com/yourusername/NikkiLens.git
+   cd NikkiLens
+   git clone https://github.com/Microsoft/vcpkg.git
+   cd vcpkg
+   bootstrap-vcpkg.bat
+   cd ..
+   vcpkg\vcpkg install imgui:x64-windows
+   vcpkg\vcpkg install directx-headers:x64-windows
+   vcpkg\vcpkg install directxtk:x64-windows
+   vcpkg\vcpkg install nlohmann-json:x64-windows
+   ```
 
-### 必需软件
-1. **Visual Studio 2022**
-   - Community 版本即可
-   - [下载链接](https://visualstudio.microsoft.com/vs/community/)
+   方式二：使用全局vcpkg
+   ```batch
+   # 1. 安装vcpkg（如果尚未安装）
+   git clone https://github.com/Microsoft/vcpkg.git D:\vcpkg
+   cd D:\vcpkg
+   bootstrap-vcpkg.bat
+   
+   # 2. 安装依赖
+   vcpkg install imgui:x64-windows
+   vcpkg install directx-headers:x64-windows
+   vcpkg install directxtk:x64-windows
+   vcpkg install nlohmann-json:x64-windows
+   
+   # 3. 克隆项目
+   git clone https://github.com/yourusername/NikkiLens.git
+   ```
 
-### Visual Studio 组件
-必须安装以下工作负载和组件：
+### 使用 Visual Studio 2022 构建
 
-1. **工作负载**
-   - 使��� C++ 的桌面开发
-   - 通用 Windows 平台开发
+1. 使用 Visual Studio 2022 打开项目：
+   - 启动 Visual Studio 2022
+   - 选择"打开本地文件夹"
+   - 选择克隆的 NikkiLens 文件夹
 
-2. **组件详情**
-   - Windows 10/11 SDK（最新版本）
-   - 适用于最新 v143 生成工具的 C++ ATL
-   - 适用于最新 v143 生成工具的 C++ MFC
-   - C++ 核心功能
-   - MSVC v143 - VS 2022 C++ x64/x86 生成工具
+2. 配置 CMake（仅当使用方式二时需要）：
+   - 在 Visual Studio 中，右键点击 CMakeLists.txt
+   - 选择"CMake 设置"
+   - 在 CMake 命令参数中添加：
+     ```
+     -DCMAKE_TOOLCHAIN_FILE=D:/vcpkg/scripts/buildsystems/vcpkg.cmake
+     ```
 
-### 项目结构
-```
-NikkiLens/
-├── src/              # 源代码
-├── include/          # 头文件
-├── resources/        # 资源文件
-├── libs/             # 第三方库
-└── build/            # 构建输出
-```
+3. 生成解决方案：
+   - 选择 x64-Debug 或 x64-Release 配置
+   - 点击"生成">"全部生成"
 
-## 性能优化策略
+编译完成后，可执行文件将位于 `out/build/x64-[配置类型]/bin` 目录下。
 
-1. **CPU优化**
-   - SIMD 指令集优化图像处理
-   - 多线程处理
-   - 帧率限制
+## 使用说明
 
-2. **内存优化**
-   - 内存池管理
-   - 图像缓存机制
-   - 资源复用
+1. 运行程序后，会自动查找并捕获游戏窗口
+2. 使用鼠标滚轮调整窗口大小
+3. 右键菜单可以：
+   - 切换水平/垂直镜像
+   - 退出程序
+4. 使用全局热键 Ctrl + Shift + P 快速显示/隐藏窗口
+5. 可以通过系统托盘图标管理程序
 
-3. **渲染优化**
-   - Direct2D 硬件加速
-   - 局部更新策略
-   - 垂直同步控制
+## 注意事项
 
-## 开发计划
-
-1. **Phase 1: 基础框架**
-   - 项目初始化
-   - 基本窗口捕获
-   - GUI框架搭建
-
-2. **Phase 2: 核心功能**
-   - 实时画面旋转
-   - 窗口管理
-   - 基础交互
-
-3. **Phase 3: 功能完善**
-   - 配置系统
-   - 快捷键支持
-   - 性能优化
-
-4. **Phase 4: 优化与测试**
-   - 性能测试
-   - 稳定性优化
-   - 用户反馈改进
-
-## 贡献指南
-
-1. Fork 本仓库
-2. 创建特性分支
-3. 提交更改
-4. 发起 Pull Request
+- 程序需要管理员权限才能捕获部分游戏窗口
+- 确保游戏窗口标题与配置文件中的设置匹配
+- 如果遇到性能问题，可以尝试调整帧率和缓冲设置
 
 ## 许可证
 
-[MIT License](LICENSE) 
+[待定]
+
+## 致谢
+
+- 99.9% 的代码由 Cursor AI 编写（不愧是你）
+- 剩下的 0.1% 代码也是在 AI 的指导下完成的
+- 项目所有者只是个调试工程师和项目经理 😂
