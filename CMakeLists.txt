@@ -10,11 +10,15 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
-# 设置Windows子系统、字符集和WinRT支持
+# 设置Windows子系统和字符集
 if(MSVC)
-    add_compile_options(/utf-8 /ZW /EHsc)
-    add_compile_definitions(WINRT_LEAN_AND_MEAN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /await")
+    # 使用 UTF-8 编码
+    add_compile_options(/utf-8 /EHsc)
+    
+    # 定义 WIN32_LEAN_AND_MEAN 来减少 Windows 头文件包含
+    add_compile_definitions(WIN32_LEAN_AND_MEAN)
+    
+    # 设置为 Windows 子系统，但不使用 WinRT 编译
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 endif()
 

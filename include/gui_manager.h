@@ -25,8 +25,15 @@ public:
     // 配置相关方法
     void LoadConfigValues();
     void SaveConfigValues();
+    bool GetShowFPS() const { return showFPS; }
+    void SetShowFPS(bool value) { showFPS = value; SaveConfigValues(); }
 
 private:
+    // 默认窗口尺寸
+    static constexpr int DEFAULT_WIDTH = 640;   // 默认宽度
+    static constexpr int DEFAULT_HEIGHT = 480;  // 默认高度
+    static constexpr float DEFAULT_SCALE = 0.4f; // 默认缩放比例
+
     bool CreateRenderTarget();
     void CleanupRenderTarget();
     ID3D11ShaderResourceView* CreateTextureView(ID3D11Texture2D* texture);
@@ -43,6 +50,7 @@ private:
     ID3D11ShaderResourceView* textureView;
     bool mirrorX;  // 水平镜像
     bool mirrorY;  // 垂直镜像
+    bool showFPS;  // 是否显示FPS
     
     int windowWidth;
     int windowHeight;

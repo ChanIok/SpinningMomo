@@ -20,6 +20,7 @@ public:
             bool mirrorX{false};
             bool mirrorY{false};
             float scaleRatio{0.4f};
+            bool showFPS{false};  // 是否显示FPS，默认不显示
         } window;
     };
 

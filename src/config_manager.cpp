@@ -51,6 +51,7 @@ bool ConfigManager::LoadConfig()
             config.window.mirrorX = j["window"]["mirrorX"].get<bool>();
             config.window.mirrorY = j["window"]["mirrorY"].get<bool>();
             config.window.scaleRatio = j["window"]["scaleRatio"].get<float>();
+            config.window.showFPS = j["window"]["showFPS"].get<bool>();
         }
 
         return true;
@@ -77,6 +78,7 @@ bool ConfigManager::SaveConfig()
         j["window"]["mirrorX"] = config.window.mirrorX;
         j["window"]["mirrorY"] = config.window.mirrorY;
         j["window"]["scaleRatio"] = config.window.scaleRatio;
+        j["window"]["showFPS"] = config.window.showFPS;
 
         std::ofstream file(GetConfigPath());
         if (!file.is_open()) {

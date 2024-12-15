@@ -244,9 +244,6 @@ LRESULT CALLBACK App::WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
         return 0;
 
     case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) {
-            PostQuitMessage(0);
-        }
         return 0;
 
     case WM_MOUSEWHEEL:

@@ -20,9 +20,10 @@ GuiManager::GuiManager()
     , windowCapture(nullptr)
     , mirrorX(false)
     , mirrorY(false)
-    , windowWidth(0)
-    , windowHeight(0)
-    , scaleRatio(0.0f)
+    , showFPS(false)
+    , windowWidth(DEFAULT_WIDTH)
+    , windowHeight(DEFAULT_HEIGHT)
+    , scaleRatio(DEFAULT_SCALE)
     , baseTextureWidth(0)
     , baseTextureHeight(0)
     , initialized(false)
@@ -43,7 +44,7 @@ bool GuiManager::Initialize(HWND hwnd, ID3D11Device* device, ID3D11DeviceContext
     this->d3dContext = context;
     this->windowCapture = capture;
 
-    // 加载配置
+    // 加��配置
     LoadConfigValues();
 
     // 创建渲染标视图
@@ -100,6 +101,7 @@ void GuiManager::LoadConfigValues()
     mirrorX = config.window.mirrorX;
     mirrorY = config.window.mirrorY;
     scaleRatio = config.window.scaleRatio;
+    showFPS = config.window.showFPS;
 }
 
 void GuiManager::SaveConfigValues()
@@ -108,6 +110,7 @@ void GuiManager::SaveConfigValues()
     config.window.mirrorX = mirrorX;
     config.window.mirrorY = mirrorY;
     config.window.scaleRatio = scaleRatio;
+    config.window.showFPS = showFPS;
     ConfigManager::Instance().SaveConfig();
 }
 
@@ -130,10 +133,20 @@ void GuiManager::Render(ID3D11Texture2D* texture)
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
+    // 创建全屏窗口
+    ImGui::SetNextWindowPos(ImVec2(0, 0));
+    ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight));
+    ImGui::Begin("GameWindow", nullptr, 
+        ImGuiWindowFlags_NoDecoration | 
+        ImGuiWindowFlags_NoMove | 
+        ImGuiWindowFlags_NoResize | 
+        ImGuiWindowFlags_NoBackground |
+        ImGuiWindowFlags_NoBringToFrontOnFocus);
+
     // 如果有捕获的纹理，显示它
     if (texture)
     {
-        // 创建或更新纹视图
+        // 创建或更新纹理视图
         if (textureView) {
             textureView->Release();
             textureView = nullptr;
@@ -146,18 +159,8 @@ void GuiManager::Render(ID3D11Texture2D* texture)
             D3D11_TEXTURE2D_DESC texDesc;
             texture->GetDesc(&texDesc);
 
-            // 调整窗口大小以适应旋转后的纹理
+            // 调整窗口大小适应旋转后的纹理
             AdjustWindowForRotation(texDesc.Width, texDesc.Height);
-
-            // 创建全屏窗口来显示纹理
-            ImGui::SetNextWindowPos(ImVec2(0, 0));
-            ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight));
-            ImGui::Begin("GameWindow", nullptr, 
-                ImGuiWindowFlags_NoDecoration | 
-                ImGuiWindowFlags_NoMove | 
-                ImGuiWindowFlags_NoResize | 
-                ImGuiWindowFlags_NoBackground |
-                ImGuiWindowFlags_NoBringToFrontOnFocus);
 
             // 计算旋转和镜像后的四个角点
             ImVec2 pos[4];
@@ -196,55 +199,62 @@ void GuiManager::Render(ID3D11Texture2D* texture)
                 pos[0], pos[1], pos[2], pos[3],
                 uv[0], uv[1], uv[2], uv[3]
             );
-
-            // 处理右键菜单
-            if (ImGui::IsMouseClicked(1) && ImGui::IsWindowHovered())
-            {
-                ImGui::OpenPopup("ContextMenu");
-            }
-
-            if (ImGui::BeginPopup("ContextMenu"))
-            {
-                bool mirrorXChanged = false;
-                bool mirrorYChanged = false;
-
-                if (ImGui::MenuItem("水平翻转", nullptr, &mirrorX)) {
-                    mirrorXChanged = true;
-                }
-                if (ImGui::MenuItem("垂直翻转", nullptr, &mirrorY)) {
-                    mirrorYChanged = true;
-                }
-                ImGui::Separator();
-                if (ImGui::MenuItem("退出程序")) PostQuitMessage(0);
-                ImGui::EndPopup();
-
-                // 如果镜像状态改变，保存配置
-                if (mirrorXChanged || mirrorYChanged) {
-                    SaveConfigValues();
-                }
-            }
-
-            // 显示帧率
-            ImGui::SetNextWindowPos(ImVec2(10, 10));
-            ImGui::SetNextWindowBgAlpha(0.3f);
-            ImGui::Begin("Stats", nullptr, 
-                ImGuiWindowFlags_NoDecoration | 
-                ImGuiWindowFlags_AlwaysAutoResize | 
-                ImGuiWindowFlags_NoSavedSettings |
-                ImGuiWindowFlags_NoFocusOnAppearing |
-                ImGuiWindowFlags_NoNav);
-            ImGui::Text("FPS: %.1f", windowCapture->GetCurrentFrameRate());
-            ImGui::End();
-
-            ImGui::End();
         }
     }
+
+    // 理右键菜单（无论是否有纹理）
+    if (ImGui::IsMouseClicked(1) && ImGui::IsWindowHovered())
+    {
+        ImGui::OpenPopup("ContextMenu");
+    }
+
+    if (ImGui::BeginPopup("ContextMenu"))
+    {
+        bool mirrorXChanged = false;
+        bool mirrorYChanged = false;
+        bool showFPSChanged = false;
+
+        if (ImGui::MenuItem("水平翻转", nullptr, &mirrorX)) {
+            mirrorXChanged = true;
+        }
+        if (ImGui::MenuItem("垂直翻转", nullptr, &mirrorY)) {
+            mirrorYChanged = true;
+        }
+        if (ImGui::MenuItem("显示帧率", nullptr, &showFPS)) {
+            showFPSChanged = true;
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("退出程序")) PostQuitMessage(0);
+        ImGui::EndPopup();
+
+        // 如果配置改变，保存配置
+        if (mirrorXChanged || mirrorYChanged || showFPSChanged) {
+            SaveConfigValues();
+        }
+    }
+
+    // 只在启用时显示帧率
+    if (showFPS)
+    {
+        ImGui::SetNextWindowPos(ImVec2(10, 10));
+        ImGui::SetNextWindowBgAlpha(0.3f);
+        ImGui::Begin("Stats", nullptr, 
+            ImGuiWindowFlags_NoDecoration | 
+            ImGuiWindowFlags_AlwaysAutoResize | 
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing |
+            ImGuiWindowFlags_NoNav);
+        ImGui::Text("FPS: %.1f", windowCapture->GetCurrentFrameRate());
+        ImGui::End();
+    }
+
+    ImGui::End();
 
     // 渲染 ImGui
     ImGui::Render();
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    // 呈现换链
+    // 呈现交换链
     HRESULT hr = swapChain->Present(1, 0);
     if (FAILED(hr)) {
         OutputDebugStringW(L"Failed to present swap chain\n");
@@ -281,7 +291,7 @@ bool GuiManager::CreateRenderTarget()
 
     factory->Release();
 
-    // 获取后备缓冲区
+    // 获取后备冲区
     ID3D11Texture2D* backBuffer = nullptr;
     HRESULT hr = swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
     if (FAILED(hr)) {
@@ -381,14 +391,11 @@ ID3D11ShaderResourceView* GuiManager::CreateTextureView(ID3D11Texture2D* texture
 
 void GuiManager::AdjustWindowForRotation(UINT textureWidth, UINT textureHeight)
 {
-    // 首次设置基础尺寸
+    // 首次设置基础纹理尺寸
     if (baseTextureWidth == 0 || baseTextureHeight == 0) {
         baseTextureWidth = textureHeight;  // 注意：因为旋转90度，所以宽高互换
         baseTextureHeight = textureWidth;
-        // 只有在没有加载配置的情况下才设置默认的缩放比例
-        if (scaleRatio <= 0.0f) {
-            scaleRatio = 0.4f;
-        }
+        // scaleRatio 已经在构造函数中初始化，这里不需要设置默认值
     }
     
     UpdateWindowSize();
@@ -397,8 +404,21 @@ void GuiManager::AdjustWindowForRotation(UINT textureWidth, UINT textureHeight)
 void GuiManager::UpdateWindowSize()
 {
     // 计算缩放后的尺寸
-    int newWidth = static_cast<int>(baseTextureWidth * scaleRatio);
-    int newHeight = static_cast<int>(baseTextureHeight * scaleRatio);
+    int newWidth, newHeight;
+    
+    if (baseTextureWidth > 0 && baseTextureHeight > 0) {
+        // 如果有有效的纹理尺寸，使用纹理尺寸计算
+        newWidth = static_cast<int>(baseTextureWidth * scaleRatio);
+        newHeight = static_cast<int>(baseTextureHeight * scaleRatio);
+    } else {
+        // 如果没有有效的纹理尺寸，使用默认尺寸
+        newWidth = static_cast<int>(DEFAULT_WIDTH * scaleRatio);
+        newHeight = static_cast<int>(DEFAULT_HEIGHT * scaleRatio);
+    }
+    
+    // 确保窗口尺寸不会小于最小值
+    newWidth = (std::max)(newWidth, DEFAULT_WIDTH / 4);
+    newHeight = (std::max)(newHeight, DEFAULT_HEIGHT / 4);
     
     if (windowWidth != newWidth || windowHeight != newHeight) {
         SetSize(newWidth, newHeight);
