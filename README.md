@@ -1,6 +1,6 @@
 <div align="center">
   <h1 align="center">
-   <img src="./docs/logo.jpg" width="200">
+   <img src="./docs/logo.png" width="200">
     <br/>
     🎮 旋转吧大喵
     <br/>
@@ -9,15 +9,14 @@
 
   <p>
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" />
-    <img alt="Release" src="https://img.shields.io/badge/release-v0.3.0-brightgreen?style=flat-square" />
+    <img alt="Release" src="https://img.shields.io/github/v/release/ChanIok/SpinningMomo?style=flat-square&color=brightgreen" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-orange?style=flat-square" />
   </p>
 
   <p>
     <a href="#项目说明">项目说明</a> •
     <a href="#功能特点">功能特点</a> •
-    <a href="#使用方法">使用方法</a> •
-    <a href="#更新历史">更新历史</a>
+    <a href="#使用方法">使用方法</a>
   </p>
 </div>
 
