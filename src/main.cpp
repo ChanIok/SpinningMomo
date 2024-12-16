@@ -253,7 +253,7 @@ public:
 
         // 显示启动提示
         m_trayIcon->ShowBalloon(Constants::APP_NAME, 
-            TEXT("屏幕旋转工具已在后台运行。\n按 Ctrl+Shift+P 切换屏幕方向。"));
+            TEXT("屏幕旋转工具已在后台运行。\n按 Ctrl+Alt+R 切换屏幕方向。"));
 
         return true;
     }
@@ -381,8 +381,8 @@ public:
                             app->SaveHotkeyConfig();
                         } else {
                             // 注册失败，恢复默认热键
-                            app->m_hotkeyModifiers = MOD_CONTROL | MOD_SHIFT;
-                            app->m_hotkeyKey = 'P';
+                            app->m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;
+                            app->m_hotkeyKey = 'R';
                             RegisterHotKey(hwnd, Constants::ID_TRAYICON, 
                                         app->m_hotkeyModifiers, app->m_hotkeyKey);
                             app->m_trayIcon->ShowBalloon(Constants::APP_NAME, 
@@ -469,8 +469,8 @@ private:
     std::unique_ptr<TrayIcon> m_trayIcon;    // 托盘图标管理器
     std::vector<DisplayInfo> m_displays;      // 所有显示器信息
     std::wstring m_currentDisplay;            // 当前选中的显示器
-    UINT m_hotkeyModifiers = MOD_CONTROL | MOD_SHIFT;  // 热键修饰键
-    UINT m_hotkeyKey = 'P';                            // 热键主键
+    UINT m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;   // 热键修饰键
+    UINT m_hotkeyKey = 'R';                           // 热键主键
     bool m_hotkeySettingMode = false;                  // 是否处于热键设置模式
     std::wstring m_configPath;                         // 配置文件完整路径
 

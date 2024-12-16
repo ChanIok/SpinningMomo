@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(SpinningMomoV2)
+project(SpinningMomo)
 
 # 设置C++标准
 set(CMAKE_CXX_STANDARD 17)
@@ -11,7 +11,7 @@ if(MSVC)
 endif()
 
 # 创建Windows GUI应用程序
-add_executable(screen_rotator WIN32 src/main.cpp)
+add_executable(SpinningMomo WIN32 src/main.cpp)
 
 # 添加Windows库
-target_link_libraries(screen_rotator shell32)
+target_link_libraries(SpinningMomo shell32)
