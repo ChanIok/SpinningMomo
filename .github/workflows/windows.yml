@@ -46,20 +46,23 @@ jobs:
 
     - name: Create ZIP archive
       run: |
-        Compress-Archive -Path "${{github.workspace}}/release/*" -DestinationPath "${{github.workspace}}/SpinningMomo-${{github.ref_name}}.zip"
+        $VERSION = "${{github.ref_name}}"
+        $ARTIFACT_NAME = "SpinningMomo-$VERSION.zip"
+        Compress-Archive -Path "${{github.workspace}}/release/*" -DestinationPath "${{github.workspace}}/$ARTIFACT_NAME"
+        echo "ARTIFACT_NAME=$ARTIFACT_NAME" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
       with:
         name: SpinningMomo-${{env.BUILD_TYPE}}
-        path: ${{github.workspace}}/SpinningMomo-v${{github.ref_name}}.zip
+        path: ${{github.workspace}}/${{env.ARTIFACT_NAME}}
         retention-days: 5  # 构建产物保留 5 天
 
     - name: Create Release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')  # 只在推送标签时创建发布
       with:
-        files: ${{github.workspace}}/SpinningMomo-${{github.ref_name}}.zip
+        files: ${{github.workspace}}/${{env.ARTIFACT_NAME}}
         draft: false  # 直接发布，不是草稿
         prerelease: false  # 正式版本，不是预发布
         generate_release_notes: true  # 自动生成发布说明
