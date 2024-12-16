@@ -48,10 +48,19 @@ jobs:
       run: |
         $VERSION = "${{github.ref_name}}"
         $ARTIFACT_NAME = "SpinningMomo-$VERSION.zip"
-        $ARTIFACT_PATH = Join-Path ${{github.workspace}} $ARTIFACT_NAME
+        # 使用 PowerShell 的 Join-Path，但输出转换为 posix 风格的路径
+        $ARTIFACT_PATH = (Join-Path ${{github.workspace}} $ARTIFACT_NAME).Replace('\', '/')
         Compress-Archive -Path "${{github.workspace}}/release/*" -DestinationPath $ARTIFACT_PATH
+        # 将路径保存为环境变量
         echo "ARTIFACT_PATH=$ARTIFACT_PATH" | Out-File -FilePath $env:GITHUB_ENV -Append
         echo "ARTIFACT_NAME=$ARTIFACT_NAME" | Out-File -FilePath $env:GITHUB_ENV -Append
+        # 验证文件是否存在
+        if (Test-Path $ARTIFACT_PATH) {
+          echo "ZIP file created successfully at: $ARTIFACT_PATH"
+        } else {
+          echo "::error::Failed to create ZIP file at: $ARTIFACT_PATH"
+          exit 1
+        }
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
