@@ -46,7 +46,7 @@ jobs:
 
     - name: Create ZIP archive
       run: |
-        Compress-Archive -Path "${{github.workspace}}/release/*" -DestinationPath "${{github.workspace}}/SpinningMomo-v${{github.ref_name}}.zip"
+        Compress-Archive -Path "${{github.workspace}}/release/*" -DestinationPath "${{github.workspace}}/SpinningMomo-${{github.ref_name}}.zip"
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
@@ -59,7 +59,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')  # 只在推送标签时创建发布
       with:
-        files: ${{github.workspace}}/SpinningMomo-v${{github.ref_name}}.zip
+        files: ${{github.workspace}}/SpinningMomo-${{github.ref_name}}.zip
         draft: false  # 直接发布，不是草稿
         prerelease: false  # 正式版本，不是预发布
         generate_release_notes: true  # 自动生成发布说明
