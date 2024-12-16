@@ -1,59 +1,33 @@
 # Build directories
-build/
 out/
-bin/
-lib/
+[Bb]uild/
+[Dd]ebug/
+[Rr]elease/
 
-# vcpkg
-vcpkg/
-!vcpkg.json
-
-# IDE specific files
+# Visual Studio files
 .vs/
-.vscode/
 *.user
 *.suo
 *.sdf
 *.opensdf
 *.VC.db
-*.VC.VC.opendb
+*.VC.opendb
+
+# Compiled files
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.obj
+*.idb
+*.pch
 
 # CMake generated files
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
-install_manifest.txt
-
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
-
-# Debug files
-*.pdb
-*.ilk
-*.exp
+compile_commands.json
 
 # OS generated files
 .DS_Store

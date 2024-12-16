@@ -1,141 +1,65 @@
 # 旋转吧大喵
 
-![示例图片](./docs/2024-12-16_04-19-41.jpg)
-旋转吧大喵（SpinningMomo） 是一个为 《无限暖暖》 游戏开发的实时画面旋转工具，旨在帮助玩家更方便地进行竖构图拍摄。
+旋转吧大喵（SpinningMomo）最初是为了解决《无限暖暖》游戏拍摄竖构图的问题而开发的工具。
+
+事实上，我确实先实现了一个使用 Windows Graphics Capture API 的高性能实时画面捕获和旋转方案（可以在 v0.1.0 分支找到这个版本）。但后来转念一想：等等，为什么要这么复杂？直接旋转屏幕不就好了？🤔
+
+所以...是的，主分支上这个版本本质上就是个快捷键屏幕旋转工具 😂
 
 ## 功能特点
 
-- 使用 Windows Graphics Capture API 实现高性能窗口捕获
-- 支持捕获 DirectX 游戏画面
-- 可调节窗口大小和缩放比例
-- 支持水平和垂直镜像
-- 全局热键快速切换显示/隐藏
-- 系统托盘支持
-- 可配置的帧率显示
-- 所有设置自动保存
+- 支持多显示器，可自由切换控制的显示器
+- 系统托盘常驻，操作便捷
+- 全局热键支持（默认 Ctrl + Shift + P）
+- 自动保存配置，包括：
+  - 上次选择的显示器
+  - 自定义热键设置
+- 轻量级设计，资源占用极低
 
 ## 使用说明
 
 1. 基本操作：
-   - 启动程序后，会自动查找并捕获游戏窗口
-   - 使用鼠标滚轮调整窗口大小
-   - 拖动窗口任意位置可移动窗口
+   - 启动后程序将在系统托盘区显示图标
+   - 使用热键（默认 Ctrl + Shift + P）快速切换当前显示器方向
+   - 右键点击托盘图标可显示菜单
 
-2. 右键菜单功能：
-   - 水平翻转：切换水平镜像
-   - 垂直翻转：切换垂直镜像
-   - 显示帧率：切换 FPS 显示
-   - 退出程序
+2. 托盘菜单功能：
+   - 选择显示器：切换要控制的显示器
+   - 切换方向：在横向/纵向模式间切换
+   - 修改热键：自定义全局热键
+   - 退出：关闭程序
 
-3. 全局热键：
-   - 默认使用 Ctrl + Shift + P 快速显示/隐藏窗口
-   - 可通过配置文件自定义组合键
-
-4. 系统托盘：
-   - 左键点击：切换窗口显示/隐藏
-   - 右键菜单：显示/隐藏窗口、退出程序
-
-5. 配置文件：
-   程序会在同目录下自动创建 `config.json` 配置文件，可以手动修改以下设置：
-   ```json
-   {
-     "hotkey": {
-       "ctrl": true,    // 是否使用 Ctrl 键
-       "shift": true,   // 是否使用 Shift 键
-       "alt": false,    // 是否使用 Alt 键
-       "key": 80        // 热键代码（80 为 P 键）
-     },
-     "window": {
-       "mirrorX": false,     // 水平镜像
-       "mirrorY": false,     // 垂直镜像
-       "scaleRatio": 0.4,    // 缩放比例
-       "showFPS": false      // 显示帧率
-     }
-   }
-   ```
+3. 配置文件：
+   程序会在同目录下自动创建 `config.ini` 配置文件，保存以下设置：
+   - 热键设置
+   - 上次选择的显示器
 
 ## 系统要求
 
-- Windows 10 1809 或更高版本
+- Windows 10 或更高版本
 
 ## 构建指南
 
 ### 环境要求
 
-- Windows 10 1809 或更高版本
-- Visual Studio 2022（需要安装"使用 C++ 的桌面开发"工作负载）
-- CMake 3.20 或更高版本
+- Visual Studio 2019 或更高版本
+- Windows SDK 10.0.17763.0 或更高版本
 
-### 准备工作
+### 构建步骤
 
-1. **安装 Visual Studio 2022**
-   - 下载并安装 [Visual Studio 2022](https://visualstudio.microsoft.com/vs/)
-   - 在安装程序中选择"使用 C++ 的桌面开发"工作负载
-   - 确保安装了 CMake 工具
-
-2. **获取代码和依赖**（选择以下任一方式）
-
-   方式一：在项目目录下安装vcpkg（推荐）
-   ```batch
-   git clone https://github.com/chaniok/SpinningMomo.git
-   cd SpinningMomo
-   git clone https://github.com/Microsoft/vcpkg.git
-   cd vcpkg
-   bootstrap-vcpkg.bat
-   cd ..
-   vcpkg\vcpkg install imgui:x64-windows
-   vcpkg\vcpkg install directx-headers:x64-windows
-   vcpkg\vcpkg install directxtk:x64-windows
-   vcpkg\vcpkg install nlohmann-json:x64-windows
-   ```
-
-   方式二：使用全局vcpkg
-   ```batch
-   # 1. 安装vcpkg（如果尚未安装）
-   git clone https://github.com/Microsoft/vcpkg.git D:\vcpkg
-   cd D:\vcpkg
-   bootstrap-vcpkg.bat
-   
-   # 2. 安装依赖
-   vcpkg install imgui:x64-windows
-   vcpkg install directx-headers:x64-windows
-   vcpkg install directxtk:x64-windows
-   vcpkg install nlohmann-json:x64-windows
-   
-   # 3. 克隆项目
-   git clone https://github.com/chaniok/SpinningMomo.git
-   ```
-
-### 使用 Visual Studio 2022 构建
-
-1. 使用 Visual Studio 2022 打开项目：
-   - 启动 Visual Studio 2022
-   - 选择"打开本地文件夹"
-   - 选择克隆的 SpinningMomo 文件夹
-
-2. 配置 CMake（仅当使用方式二时需要）：
-   - 在 Visual Studio 中，右键点击 CMakeLists.txt
-   - 选择"CMake 设置"
-   - 在 CMake 命令参数中添加：
-     ```
-     -DCMAKE_TOOLCHAIN_FILE=D:/vcpkg/scripts/buildsystems/vcpkg.cmake
-     ```
-
-3. 生成解决方案：
-   - 选择 x64-Release 配置
-   - 点击"生成">"全部生成"
-
-编译完成后，可执行文件将位于 `out/build/x64-Release/bin` 目录下。
+1. 使用 Visual Studio 打开项目
+2. 选择 Release/x64 配置
+3. 生成解决方案
 
 ## 注意事项
 
-- 首次运行时会自动创建默认配置文件
-- 修改配置文件后需要重启程序才能生效
-- 如果无法捕获游戏窗口，请尝试以管理员身份运行
+- 首次运行时会自动创建配置文件
+- 修改热键后会立即生效
+- 程序需要管理员权限才能修改显示器设置
 
 ## 许可证
 
-[待定]
+MIT License - 查看 [LICENSE](LICENSE) 文件了解更多信息
 
 ## 致谢
 
