@@ -49,9 +49,13 @@ public:
         int newLeft = centerX - newWidth / 2;
         int newTop = centerY - newHeight / 2;
 
-        // 设置新的窗口大小和位置
-        if (!SetWindowPos(hwnd, NULL, newLeft, newTop, newWidth, newHeight, 
-                         SWP_NOZORDER | SWP_NOACTIVATE)) {
+        // 根据新的宽高比决定是否置顶
+        // 如果高度大于宽度，设置为置顶；否则取消置顶
+        HWND insertAfter = (newHeight > newWidth) ? HWND_TOPMOST : HWND_NOTOPMOST;
+
+        // 设置新的窗口大小和位置，并根据条件设置置顶状态
+        if (!SetWindowPos(hwnd, insertAfter, newLeft, newTop, newWidth, newHeight, 
+                         SWP_NOACTIVATE)) {
             return false;
         }
 
@@ -130,7 +134,7 @@ public:
 
         // 注册热键 (Ctrl + Alt + R)
         if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, MOD_CONTROL | MOD_ALT, 'R')) {
-            MessageBox(NULL, TEXT("热键注册失败。程序仍可使���，但快捷键将不可用。"),
+            MessageBox(NULL, TEXT("热键注册失败。程序仍可使用，但快捷键将不可用。"),
                       Constants::APP_NAME, MB_ICONWARNING);
         }
 
