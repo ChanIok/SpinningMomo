@@ -10,6 +10,7 @@
 #include <vector>
 #include <dwmapi.h>
 
+#define IDI_ICON1 101  // 添加图标ID定义
 
 // 常量定义
 namespace Constants {
@@ -43,7 +44,14 @@ public:
         m_nid.uID = Constants::ID_TRAYICON;
         m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         m_nid.uCallbackMessage = Constants::WM_TRAYICON;
-        m_nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+        
+        // 使用自定义图标
+        HINSTANCE hInstance = GetModuleHandle(NULL);
+        m_nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+        if (!m_nid.hIcon) {
+            // 如果加载失败，使用系统默认图标
+            m_nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+        }
         
         StringCchCopy(m_nid.szTip, _countof(m_nid.szTip), Constants::APP_NAME);
     }
@@ -102,7 +110,7 @@ public:
         // 计算原始宽高比
         double aspectRatio = static_cast<double>(currentWidth) / currentHeight;
         
-        // 保持高度不变，根据宽高比计算新的宽度
+        // ��持高度不变，根据宽高比计算新的宽度
         int newHeight = currentHeight;  // 保持高度不变
         int newWidth = static_cast<int>(newHeight / aspectRatio);
 
@@ -243,7 +251,7 @@ public:
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, 
                   TEXT("修改热键"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_notifyEnabled ? MF_CHECKED : 0), 
-                  Constants::ID_NOTIFY, TEXT("显示提示"));
+                  Constants::ID_NOTIFY, TEXT("显示旋转提示"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_taskbarAutoHide ? MF_CHECKED : 0),
                   Constants::ID_TASKBAR, TEXT("自动隐藏任务栏"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -445,6 +453,8 @@ private:
         wc.lpfnWndProc = WindowProc;
         wc.hInstance = hInstance;
         wc.lpszClassName = Constants::WINDOW_CLASS;
+        wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));        // 添加大图标
+        wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));      // 添加小图标
         return RegisterClassEx(&wc) != 0;
     }
 

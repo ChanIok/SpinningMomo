@@ -11,7 +11,10 @@ if(MSVC)
 endif()
 
 # 创建Windows GUI应用程序
-add_executable(SpinningMomo WIN32 src/main.cpp)
+add_executable(SpinningMomo WIN32 
+    src/main.cpp
+    src/resource.rc  # 添加资源文件
+)
 
 # 添加Windows库
 target_link_libraries(SpinningMomo shell32)
