@@ -44,6 +44,10 @@ namespace Constants {
     constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
     constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
     constexpr size_t DEFAULT_RATIO_INDEX = 11;  // 9:16 的索引位置
+    constexpr UINT ID_SIZE_BASE = 5000;          // 固定尺寸菜单项的基础ID
+    constexpr UINT ID_SIZE_CUSTOM = 5999;        // 自定义尺寸菜单项ID
+    const TCHAR* CUSTOM_SIZE_SECTION = TEXT("CustomSize");   // 自定义尺寸配置节名
+    const TCHAR* CUSTOM_SIZE_LIST = TEXT("SizeList");        // 自定义尺寸列表配置项
 }
 
 // 添加比例结构体定义
@@ -53,6 +57,16 @@ struct AspectRatio {
     
     AspectRatio(const std::wstring& n, double r) 
         : name(n), ratio(r) {}
+};
+
+// 添加固定尺寸结构体定义
+struct FixedSize {
+    std::wstring name;     // 显示名称
+    int width;            // 宽度
+    int height;           // 高度
+    
+    FixedSize(const std::wstring& n, int w, int h) 
+        : name(n), width(w), height(h) {}
 };
 
 // 系统托盘图标管理类
@@ -217,6 +231,9 @@ public:
         // 加载配置
         LoadConfig();
         InitializeRatios();
+        InitializeFixedSizes();
+        LoadCustomRatios();
+        LoadCustomSizes();
     }
 
     ~WindowResizerApp() {
@@ -562,6 +579,8 @@ public:
                 WORD cmd = LOWORD(wParam);
                 if (cmd >= Constants::ID_RATIO_BASE && cmd <= Constants::ID_RATIO_CUSTOM) {
                     app->HandleRatioSelect(cmd);
+                } else if (cmd >= Constants::ID_SIZE_BASE && cmd <= Constants::ID_SIZE_CUSTOM) {
+                    app->HandleSizeSelect(cmd);
                 } else if (cmd >= Constants::ID_WINDOW_BASE && cmd <= Constants::ID_WINDOW_MAX) {
                     app->HandleWindowSelect(cmd);
                 } else {
@@ -650,26 +669,27 @@ private:
     bool m_quickSelectEnabled = true;  // 快捷选择模式是否启用，默认开启
     bool m_useScreenSize = true;    // 是否使用屏幕尺寸计算，默认开启
     bool m_windowModified = false;  // 窗口是否被修改过
+    std::vector<FixedSize> m_sizes;  // 固定尺寸列表
 
     void InitializeRatios() {
         // 横屏比例（从宽到窄）
         m_ratios.emplace_back(TEXT("32:9"), 32.0/9.0);
         m_ratios.emplace_back(TEXT("21:9"), 21.0/9.0);
         m_ratios.emplace_back(TEXT("16:9"), 16.0/9.0);
-        m_ratios.emplace_back(TEXT("16:10"), 16.0/10.0);
-        m_ratios.emplace_back(TEXT("5:4"), 5.0/4.0);
-        m_ratios.emplace_back(TEXT("4:3"), 4.0/3.0);
         m_ratios.emplace_back(TEXT("3:2"), 3.0/2.0);
         m_ratios.emplace_back(TEXT("1:1"), 1.0/1.0);
         
         // 竖屏比例（从窄到宽）
         m_ratios.emplace_back(TEXT("2:3"), 2.0/3.0);
-        m_ratios.emplace_back(TEXT("3:4"), 3.0/4.0);
-        m_ratios.emplace_back(TEXT("4:5"), 4.0/5.0);
         m_ratios.emplace_back(TEXT("9:16"), 9.0/16.0);
+    }
 
-        // 加载自定义比例
-        LoadCustomRatios();
+    void InitializeFixedSizes() {
+        // 添加预设尺寸
+        m_sizes.emplace_back(TEXT("7680×4320 16:9"), 7680, 4320);
+        m_sizes.emplace_back(TEXT("4320×7680 9:16"), 4320, 7680);
+        m_sizes.emplace_back(TEXT("8192×5464 3:2"), 8192, 5464); 
+        m_sizes.emplace_back(TEXT("5464×8192 2:3"), 5464, 8192);
     }
 
     void LoadConfig() {
@@ -683,6 +703,7 @@ private:
             WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::QUICK_SELECT_SECTION, Constants::QUICK_SELECT_ENABLED, TEXT("1"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
+            WritePrivateProfileString(Constants::CUSTOM_SIZE_SECTION, Constants::CUSTOM_SIZE_LIST, TEXT(""), m_configPath.c_str());
         }
 
         // 加载各项配置
@@ -789,19 +810,7 @@ private:
     }
 
     void ResetWindowSize() {
-        HWND gameWindow = NULL;
-        
-        // 查找目标窗口
-        if (!m_windowTitle.empty()) {
-            auto windows = WindowResizer::GetWindows();
-            for (const auto& window : windows) {
-                if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
-                    gameWindow = window.first;
-                    break;
-                }
-            }
-        }
-        
+        HWND gameWindow = FindTargetWindow();
         if (gameWindow) {
             // 创建一个比例对象用于重置为屏幕大小
             AspectRatio resetRatio(TEXT("重置"), 
@@ -834,6 +843,15 @@ private:
             }
             InsertMenu(hMenu, -1, flags,
                       Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
+        }
+
+        // 添加分隔线
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+        // 添加固定尺寸选项
+        for (size_t i = 0; i < m_sizes.size(); ++i) {
+            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING,
+                      Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
         }
 
         // 添加分隔线
@@ -991,6 +1009,134 @@ private:
         }
         
         return text;
+    }
+
+    void HandleSizeSelect(UINT id) {
+        size_t index = id - Constants::ID_SIZE_BASE;
+        if (index < m_sizes.size()) {
+            HWND gameWindow = FindTargetWindow();
+            if (gameWindow) {
+                if (ResizeWindowToFixedSize(gameWindow, m_sizes[index])) {
+                    m_windowModified = true;
+                    ShowNotification(Constants::APP_NAME, 
+                        TEXT("窗口尺寸调整成功！"), true);
+                } else {
+                    ShowNotification(Constants::APP_NAME, 
+                        TEXT("窗口尺寸调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
+                }
+            } else {
+                ShowNotification(Constants::APP_NAME, 
+                    TEXT("未找到目标窗口，请确保窗口已启动。"));
+            }
+        }
+    }
+
+    bool ResizeWindowToFixedSize(HWND hwnd, const FixedSize& size) {
+        if (!hwnd || !IsWindow(hwnd)) return false;
+
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+        // 计算屏幕中心位置
+        int newLeft = (screenWidth - size.width) / 2;
+        int newTop = (screenHeight - size.height) / 2;
+
+        // 设置窗口置顶状态
+        HWND insertAfter = m_topmostEnabled ? HWND_TOPMOST : HWND_NOTOPMOST;
+        SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+        // 直接设置指定的宽高
+        return SetWindowPos(hwnd, NULL, newLeft, newTop, size.width, size.height, 
+                           SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+    }
+
+    HWND FindTargetWindow() {
+        HWND gameWindow = NULL;
+        
+        // 查找目标窗口
+        if (!m_windowTitle.empty()) {
+            auto windows = WindowResizer::GetWindows();
+            for (const auto& window : windows) {
+                if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
+                    gameWindow = window.first;
+                    break;
+                }
+            }
+        }
+        
+        if (!gameWindow) {
+            gameWindow = WindowResizer::FindGameWindow();
+        }
+
+        return gameWindow;
+    }
+
+    bool AddCustomSize(const std::wstring& sizeStr) {
+        size_t xPos = sizeStr.find(TEXT("x"));
+        if (xPos == std::wstring::npos) return false;
+        
+        try {
+            int width = std::stoi(sizeStr.substr(0, xPos));
+            int height = std::stoi(sizeStr.substr(xPos + 1));
+            if (width <= 0 || height <= 0) return false;
+            
+            m_sizes.emplace_back(sizeStr, width, height);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    void LoadCustomSizes() {
+        try {
+            TCHAR buffer[1024];
+            if (GetPrivateProfileString(Constants::CUSTOM_SIZE_SECTION,
+                                      Constants::CUSTOM_SIZE_LIST,
+                                      TEXT(""), buffer, _countof(buffer),
+                                      m_configPath.c_str()) > 0) {
+                std::wstring sizes = buffer;
+                if (sizes.empty()) return;
+
+                bool hasError = false;
+                std::wstring errorDetails;
+                
+                // 分割并处理每个尺寸
+                size_t start = 0, end = 0;
+                while ((end = sizes.find(TEXT(","), start)) != std::wstring::npos) {
+                    std::wstring size = sizes.substr(start, end - start);
+                    if (!AddCustomSize(size)) {
+                        hasError = true;
+                        errorDetails += size + TEXT("\n");
+                    }
+                    start = end + 1;
+                }
+                
+                // 处理最后一个尺寸
+                if (start < sizes.length()) {
+                    std::wstring size = sizes.substr(start);
+                    if (!AddCustomSize(size)) {
+                        hasError = true;
+                        errorDetails += size;
+                    }
+                }
+
+                if (hasError) {
+                    std::wstring errorMsg = TEXT("以下自定义尺寸格式错误：\n\n") + 
+                                          errorDetails + TEXT("\n\n") +
+                                          TEXT("请确保：\n") +
+                                          TEXT("1. 使用英文字母 \"x\" 分隔宽高\n") +
+                                          TEXT("2. 使用英文逗号 \",\" 分隔多个尺寸\n") +
+                                          TEXT("3. 只输入数字，例如：1920x1080,2560x1440");
+                    
+                    MessageBox(NULL, errorMsg.c_str(), Constants::APP_NAME, 
+                              MB_ICONWARNING | MB_OK);
+                }
+            }
+        } catch (...) {
+            MessageBox(NULL, 
+                TEXT("加载自定义尺寸时发生错误。\n请检查配置文件格式是否正确。"), 
+                Constants::APP_NAME, MB_ICONERROR | MB_OK);
+        }
     }
 
 public:
