@@ -41,7 +41,9 @@ namespace Constants {
     const TCHAR* QUICK_SELECT_ENABLED = TEXT("Enabled");      // 快捷选择开关配置项
     constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
     constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
-    constexpr size_t DEFAULT_RATIO_INDEX = 4;  // 9:16 的索引位置
+    constexpr size_t DEFAULT_RATIO_INDEX = 11;  // 9:16 的索引位置
+    const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
+    const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
 }
 
 // 添加比例结构体定义
@@ -362,6 +364,20 @@ public:
     }
 
     void HandleRatioSelect(UINT id) {
+        if (id == Constants::ID_RATIO_CUSTOM) {
+            // 打开配置文件
+            ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
+                        m_configPath.c_str(), NULL, SW_SHOW);
+            
+            // 显示提示
+            ShowNotification(Constants::APP_NAME, 
+                TEXT("添加自定义比例步骤：\n"
+                     "1. 找到 [CustomRatio] 节\n"
+                     "2. 在 RatioList 后添加比例\n"
+                     "3. 保存并重启软件"));
+            return;
+        }
+
         size_t index = id - Constants::ID_RATIO_BASE;
         if (index < m_ratios.size()) {
             m_currentRatioIndex = index;
@@ -398,10 +414,6 @@ public:
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("未找到目标窗口，请确保窗口已启动。"));
             }
-        } else if (id == Constants::ID_RATIO_CUSTOM) {
-            // TODO: 实现自定义比例对话框
-            MessageBox(m_hwnd, TEXT("自定义比例功能即将推出..."), 
-                      Constants::APP_NAME, MB_ICONINFORMATION);
         }
     }
 
@@ -649,9 +661,25 @@ private:
         m_ratios.emplace_back(TEXT("3:4"), 3.0/4.0);
         m_ratios.emplace_back(TEXT("4:5"), 4.0/5.0);
         m_ratios.emplace_back(TEXT("9:16"), 9.0/16.0);
+
+        // 加载自定义比例
+        LoadCustomRatios();
     }
 
     void LoadConfig() {
+        // 检查配置文件是否存在
+        if (GetFileAttributes(m_configPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
+            // 创建默认配置文件
+            WritePrivateProfileString(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, TEXT(""), m_configPath.c_str());
+            WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, TEXT("3"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::NOTIFY_SECTION, Constants::NOTIFY_ENABLED, TEXT("0"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::TASKBAR_SECTION, Constants::TASKBAR_AUTO_HIDE, TEXT("0"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::QUICK_SELECT_SECTION, Constants::QUICK_SELECT_ENABLED, TEXT("0"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
+        }
+
+        // 加载各项配置
         LoadHotkeyConfig();
         LoadWindowConfig();
         LoadNotifyConfig();
@@ -847,6 +875,55 @@ private:
             if (GetWindowRect(gameWindow, &rect)) {
                 m_originalWidth = rect.right - rect.left;
                 m_originalHeight = rect.bottom - rect.top;
+            }
+        }
+    }
+
+    bool AddCustomRatio(const std::wstring& ratio) {
+        size_t colonPos = ratio.find(TEXT(":"));
+        if (colonPos == std::wstring::npos) return false;
+        
+        try {
+            double width = std::stod(ratio.substr(0, colonPos));
+            double height = std::stod(ratio.substr(colonPos + 1));
+            if (height <= 0) return false;
+            
+            m_ratios.emplace_back(ratio, width/height);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    void LoadCustomRatios() {
+        TCHAR buffer[1024];
+        if (GetPrivateProfileString(Constants::CUSTOM_RATIO_SECTION,
+                                  Constants::CUSTOM_RATIO_LIST,
+                                  TEXT(""), buffer, _countof(buffer),
+                                  m_configPath.c_str()) > 0) {
+            std::wstring ratios = buffer;
+            size_t pos = 0;
+            std::wstring token;
+            bool hasError = false;
+            
+            while ((pos = ratios.find(TEXT(","))) != std::wstring::npos) {
+                token = ratios.substr(0, pos);
+                if (!AddCustomRatio(token)) {
+                    hasError = true;
+                }
+                ratios.erase(0, pos + 1);
+            }
+            
+            // 处理最后一个比例
+            if (!ratios.empty() && !AddCustomRatio(ratios)) {
+                hasError = true;
+            }
+
+            if (hasError) {
+                ShowNotification(Constants::APP_NAME, 
+                    TEXT("部分自定义比例格式错误。\n"
+                         "请确保每个比例的格式为 数字:数字\n"
+                         "多个比例用英文逗号分隔"));
             }
         }
     }
