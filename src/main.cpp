@@ -25,7 +25,7 @@ namespace Constants {
     const TCHAR* APP_NAME = TEXT("旋转吧大喵");          
     const TCHAR* WINDOW_CLASS = TEXT("SpinningMomoClass");  
     const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
-    const TCHAR* WINDOW_SECTION = TEXT("Window");      // 窗口配置���名
+    const TCHAR* WINDOW_SECTION = TEXT("Window");      // 窗口配置
     const TCHAR* WINDOW_TITLE = TEXT("Title");        // 窗口标题配置项
     const TCHAR* HOTKEY_SECTION = TEXT("Hotkey");      // 热键配置节名
     const TCHAR* HOTKEY_MODIFIERS = TEXT("Modifiers"); // 修饰键配置项
@@ -34,18 +34,23 @@ namespace Constants {
     const TCHAR* NOTIFY_ENABLED = TEXT("Enabled");     // 提示开关配置项
     const TCHAR* TASKBAR_SECTION = TEXT("Taskbar");    // 任务栏配置节名
     const TCHAR* TASKBAR_AUTO_HIDE = TEXT("AutoHide"); // 任务栏自动隐藏配置项
-    constexpr UINT ID_RATIO_BASE = 3000;          // 比例菜单项的基础ID
-    constexpr UINT ID_RATIO_CUSTOM = 3999;        // 自定义比例菜单项ID
+    constexpr UINT ID_RATIO_BASE = 4000;          // 比例菜单项的基础ID
+    constexpr UINT ID_RATIO_CUSTOM = 4999;        // 自定义比例菜单项ID
+    constexpr UINT ID_QUICK_SELECT = 2007;           // 快捷选择模式菜单项ID
+    const TCHAR* QUICK_SELECT_SECTION = TEXT("QuickSelect");  // 快捷选择配置节名
+    const TCHAR* QUICK_SELECT_ENABLED = TEXT("Enabled");      // 快捷选择开关配置项
+    constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
+    constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
+    constexpr size_t DEFAULT_RATIO_INDEX = 4;  // 9:16 的索引位置
 }
 
 // 添加比例结构体定义
 struct AspectRatio {
     std::wstring name;     // 比例名称
     double ratio;          // 宽高比值
-    bool isFlip;          // 是否是翻转模式
     
-    AspectRatio(const std::wstring& n, double r, bool f = false) 
-        : name(n), ratio(r), isFlip(f) {}
+    AspectRatio(const std::wstring& n, double r) 
+        : name(n), ratio(r) {}
 };
 
 // 系统托盘图标管理类
@@ -109,7 +114,8 @@ public:
         return TrimRight(title1) == TrimRight(title2);
     }
 
-    static bool RotateWindow(HWND hwnd, const AspectRatio& ratio, bool shouldHideTaskbar) {
+    static bool RotateWindow(HWND hwnd, const AspectRatio& ratio, bool shouldHideTaskbar, 
+                            int originalWidth = 0, int originalHeight = 0) {
         if (!hwnd || !IsWindow(hwnd)) return false;
 
         RECT rect;
@@ -118,33 +124,27 @@ public:
         int currentWidth = rect.right - rect.left;
         int currentHeight = rect.bottom - rect.top;
 
-        int newWidth = currentWidth;
-        int newHeight = currentHeight;
+        // 如果没有提供原始尺寸，使用当前尺寸
+        if (originalWidth == 0 || originalHeight == 0) {
+            originalWidth = currentWidth;
+            originalHeight = currentHeight;
+        }
 
-        if (ratio.isFlip) {
-            // 翻转模式
-            double aspectRatio = static_cast<double>(currentWidth) / currentHeight;
-            newHeight = currentHeight;
-            newWidth = static_cast<int>(newHeight / aspectRatio);
+        int newWidth = originalWidth;
+        int newHeight = originalHeight;
+
+        // 固定比例模式
+        double originalRatio = static_cast<double>(originalWidth) / originalHeight;
+        double targetRatio = ratio.ratio;
+
+        if (targetRatio > originalRatio) {
+            // 以宽度为基准
+            newWidth = originalWidth;
+            newHeight = static_cast<int>(newWidth / targetRatio);
         } else {
-            // 固定比例模式
-            if (ratio.ratio < 1.0) {  // 竖屏比例
-                if (currentWidth >= currentHeight) {
-                    newHeight = currentHeight;
-                    newWidth = static_cast<int>(newHeight * ratio.ratio);
-                } else {
-                    newWidth = currentWidth;
-                    newHeight = static_cast<int>(newWidth / ratio.ratio);
-                }
-            } else {  // 横屏比例
-                if (currentWidth >= currentHeight) {
-                    newWidth = currentWidth;
-                    newHeight = static_cast<int>(newWidth / ratio.ratio);
-                } else {
-                    newHeight = currentHeight;
-                    newWidth = static_cast<int>(newHeight * ratio.ratio);
-                }
-            }
+            // 以高度为基准
+            newHeight = originalHeight;
+            newWidth = static_cast<int>(newHeight * targetRatio);
         }
 
         // 计算屏幕中心位置
@@ -251,12 +251,12 @@ public:
         HMENU hMenu = CreatePopupMenu();
         if (!hMenu) return;
 
-        // 创建窗口选择子菜单
+        // 1. 窗口选择（最基础的功能）
         HMENU hWindowMenu = CreatePopupMenu();
         if (hWindowMenu) {
             // 获取所有窗口
             auto windows = WindowRotator::GetWindows();
-            int id = 3000;
+            int id = Constants::ID_WINDOW_BASE;
             for (const auto& window : windows) {
                 UINT flags = MF_BYPOSITION | MF_STRING;
                 if (WindowRotator::CompareWindowTitle(window.second, m_windowTitle)) {
@@ -274,7 +274,7 @@ public:
             m_windows = std::move(windows);
         }
 
-        // 创建比例选择子菜单
+        // 2. 比例选择
         HMENU hRatioMenu = CreatePopupMenu();
         if (hRatioMenu) {
             for (size_t i = 0; i < m_ratios.size(); ++i) {
@@ -284,11 +284,6 @@ public:
                 }
                 InsertMenu(hRatioMenu, -1, flags,
                           Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
-                
-                // 在翻转比例后添加分隔线
-                if (i == 0) {
-                    InsertMenu(hRatioMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-                }
             }
             
             // 添加分隔线和自定义比例选项
@@ -300,21 +295,34 @@ public:
                       (UINT_PTR)hRatioMenu, TEXT("窗口比例"));
         }
 
-        // 添加重置菜单项
+        // 3. 重置选项
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
                   Constants::ID_RESET, TEXT("重置窗口尺寸"));
+
+        // 第一个分隔线
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 添加其他菜单项
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, 
-                  TEXT("修改热键"));
+        // 4. 操作模式设置
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_quickSelectEnabled ? MF_CHECKED : 0),
+                  Constants::ID_QUICK_SELECT, TEXT("快捷选择模式"));
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
+                  Constants::ID_HOTKEY, TEXT("修改热键"));
+
+        // 第二个分隔线
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+        // 5. 其他设置
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_notifyEnabled ? MF_CHECKED : 0), 
                   Constants::ID_NOTIFY, TEXT("显示旋转提示"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_taskbarAutoHide ? MF_CHECKED : 0),
                   Constants::ID_TASKBAR, TEXT("自动隐藏任务栏"));
+
+        // 最后的分隔线
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, 
-                  TEXT("退出"));
+
+        // 6. 退出选项（永远放在最后）
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
+                  Constants::ID_EXIT, TEXT("退出"));
 
         // 显示菜单
         POINT pt;
@@ -327,13 +335,23 @@ public:
     }
 
     void HandleWindowSelect(int id) {
-        int index = id - 3000;
+        int index = id - Constants::ID_WINDOW_BASE;
         if (index >= 0 && index < m_windows.size()) {
             m_windowTitle = m_windows[index].second;
             SaveConfig();
+
+            // 获取新选择窗口的原始尺寸
+            HWND hwnd = m_windows[index].first;
+            RECT rect;
+            if (GetWindowRect(hwnd, &rect)) {
+                m_originalWidth = rect.right - rect.left;
+                m_originalHeight = rect.bottom - rect.top;
+                m_windowModified = false;  // 重置修改状态
+            }
             
             // 立即旋转选中的窗口
-            if (WindowRotator::RotateWindow(m_windows[index].first, m_ratios[m_currentRatioIndex], m_taskbarAutoHide)) {
+            if (WindowRotator::RotateWindow(hwnd, m_ratios[m_currentRatioIndex], m_taskbarAutoHide, 
+                                          m_originalWidth, m_originalHeight)) {
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口旋转成功！"), true);  // 成功提示
             } else {
@@ -347,7 +365,39 @@ public:
         size_t index = id - Constants::ID_RATIO_BASE;
         if (index < m_ratios.size()) {
             m_currentRatioIndex = index;
-            RotateGameWindow();
+            
+            HWND gameWindow = NULL;
+            if (!m_windowTitle.empty()) {
+                auto windows = WindowRotator::GetWindows();
+                for (const auto& window : windows) {
+                    if (WindowRotator::CompareWindowTitle(window.second, m_windowTitle)) {
+                        gameWindow = window.first;
+                        break;
+                    }
+                }
+            }
+            
+            if (!gameWindow) {
+                gameWindow = WindowRotator::FindGameWindow();
+            }
+
+            if (gameWindow) {
+                // 初始化原始尺寸
+                InitializeOriginalSize(gameWindow);
+
+                if (WindowRotator::RotateWindow(gameWindow, m_ratios[m_currentRatioIndex], 
+                                              m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
+                    m_windowModified = true;
+                    ShowNotification(Constants::APP_NAME, 
+                        TEXT("窗口旋转成功！"), true);
+                } else {
+                    ShowNotification(Constants::APP_NAME, 
+                        TEXT("窗口旋转失败。可能需要管理员权限，或窗口不支持调整大小。"));
+                }
+            } else {
+                ShowNotification(Constants::APP_NAME, 
+                    TEXT("未找到目标窗口，请确保窗口已启动。"));
+            }
         } else if (id == Constants::ID_RATIO_CUSTOM) {
             // TODO: 实现自定义比例对话框
             MessageBox(m_hwnd, TEXT("自定义比例功能即将推出..."), 
@@ -374,37 +424,31 @@ public:
         }
 
         if (gameWindow) {
-            // 获取当前窗口尺寸
-            RECT rect;
-            if (GetWindowRect(gameWindow, &rect)) {
-                // 如果是首次获取或需要重置
-                if (m_originalWidth == 0 || m_originalHeight == 0) {
-                    m_originalWidth = rect.right - rect.left;
-                    m_originalHeight = rect.bottom - rect.top;
-                }
+            // 初始化原始尺寸
+            InitializeOriginalSize(gameWindow);
 
-                // 如果窗口已被修改，先重置窗口
-                if (m_windowModified) {
-                    AspectRatio resetRatio(TEXT("重置"), 
-                                         static_cast<double>(m_originalWidth) / m_originalHeight);
-                    if (WindowRotator::RotateWindow(gameWindow, resetRatio, m_taskbarAutoHide)) {
-                        m_windowModified = false;
-                        ShowNotification(Constants::APP_NAME, 
-                            TEXT("窗口已重置为原始尺寸。"), true);
-                        return;
-                    }
+            // 如果窗口已被修改，先重置窗口
+            if (m_windowModified) {
+                AspectRatio resetRatio(TEXT("重置"), 
+                                     static_cast<double>(m_originalWidth) / m_originalHeight);
+                if (WindowRotator::RotateWindow(gameWindow, resetRatio, m_taskbarAutoHide, 
+                                              m_originalWidth, m_originalHeight)) {
+                    m_windowModified = false;
+                    ShowNotification(Constants::APP_NAME, 
+                        TEXT("窗口已重置为原始尺寸。"), true);
+                    return;
                 }
+            }
 
-                // 应用选择的比例
-                if (WindowRotator::RotateWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                              m_taskbarAutoHide)) {
-                    m_windowModified = true;
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口旋转成功！"), true);
-                } else {
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口旋转失败。可能需要管理员权限，或窗口不支持调整大小。"));
-                }
+            // 应用选择的比例
+            if (WindowRotator::RotateWindow(gameWindow, m_ratios[m_currentRatioIndex], 
+                                          m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
+                m_windowModified = true;
+                ShowNotification(Constants::APP_NAME, 
+                    TEXT("窗口旋转成功！"), true);
+            } else {
+                ShowNotification(Constants::APP_NAME, 
+                    TEXT("窗口旋转失败。可能需要管理员权限，或窗口不支持调整大小。"));
             }
         } else {
             ShowNotification(Constants::APP_NAME, 
@@ -499,7 +543,7 @@ public:
                 WORD cmd = LOWORD(wParam);
                 if (cmd >= Constants::ID_RATIO_BASE && cmd <= Constants::ID_RATIO_CUSTOM) {
                     app->HandleRatioSelect(cmd);
-                } else if (cmd >= 3000 && cmd < 4000) {
+                } else if (cmd >= Constants::ID_WINDOW_BASE && cmd <= Constants::ID_WINDOW_MAX) {
                     app->HandleWindowSelect(cmd);
                 } else {
                     switch (cmd) {
@@ -518,6 +562,9 @@ public:
                         case Constants::ID_RESET:
                             app->ResetWindowSize();
                             break;
+                        case Constants::ID_QUICK_SELECT:
+                            app->ToggleQuickSelect();
+                            break;
                     }
                 }
                 return 0;
@@ -532,7 +579,13 @@ public:
 
             case WM_HOTKEY: {
                 if (app && wParam == Constants::ID_TRAYICON) {
-                    app->RotateGameWindow();
+                    if (app->IsQuickSelectEnabled()) {
+                        POINT pt;
+                        GetCursorPos(&pt);
+                        app->ShowRatioSelectionMenu(pt);
+                    } else {
+                        app->RotateGameWindow();
+                    }
                 }
                 return 0;
             }
@@ -574,16 +627,27 @@ private:
     bool m_notifyEnabled = false;                      // 是否显示提示，默认关闭
     bool m_taskbarAutoHide = false;                    // 是否自动隐藏任务栏，默认关闭
     std::vector<AspectRatio> m_ratios;
-    size_t m_currentRatioIndex = 0;  // 当前选择的比例索引
+    size_t m_currentRatioIndex = Constants::DEFAULT_RATIO_INDEX;  // 使用常量初始化
     int m_originalWidth = 0;   // 原始窗口宽度
     int m_originalHeight = 0;  // 原始窗口高度
     bool m_windowModified = false;  // 窗口是否被修改过
+    bool m_quickSelectEnabled = false;  // 快捷选择模式是否启用
 
     void InitializeRatios() {
-        // 将翻转比例放在第一位
-        m_ratios.emplace_back(TEXT("翻转比例"), 0.0, true);
+        // 横屏比例（从宽到窄）
+        m_ratios.emplace_back(TEXT("32:9"), 32.0/9.0);
         m_ratios.emplace_back(TEXT("21:9"), 21.0/9.0);
         m_ratios.emplace_back(TEXT("16:9"), 16.0/9.0);
+        m_ratios.emplace_back(TEXT("16:10"), 16.0/10.0);
+        m_ratios.emplace_back(TEXT("5:4"), 5.0/4.0);
+        m_ratios.emplace_back(TEXT("4:3"), 4.0/3.0);
+        m_ratios.emplace_back(TEXT("3:2"), 3.0/2.0);
+        m_ratios.emplace_back(TEXT("1:1"), 1.0/1.0);
+        
+        // 竖屏比例（从窄到宽）
+        m_ratios.emplace_back(TEXT("2:3"), 2.0/3.0);
+        m_ratios.emplace_back(TEXT("3:4"), 3.0/4.0);
+        m_ratios.emplace_back(TEXT("4:5"), 4.0/5.0);
         m_ratios.emplace_back(TEXT("9:16"), 9.0/16.0);
     }
 
@@ -592,6 +656,7 @@ private:
         LoadWindowConfig();
         LoadNotifyConfig();
         LoadTaskbarConfig();
+        LoadQuickSelectConfig();
     }
 
     void SaveConfig() {
@@ -599,6 +664,7 @@ private:
         SaveWindowConfig();
         SaveNotifyConfig();
         SaveTaskbarConfig();
+        SaveQuickSelectConfig();
     }
 
     void LoadHotkeyConfig() {
@@ -717,7 +783,7 @@ private:
             AspectRatio resetRatio(TEXT("重置"), 
                                  static_cast<double>(m_originalWidth) / m_originalHeight);
             
-            if (WindowRotator::RotateWindow(gameWindow, resetRatio, m_taskbarAutoHide)) {
+            if (WindowRotator::RotateWindow(gameWindow, resetRatio, m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口已重置为原始尺寸。"), true);
             } else {
@@ -728,6 +794,66 @@ private:
             ShowNotification(Constants::APP_NAME, 
                 TEXT("未找到目标窗口，请确保窗口已启动。"));
         }
+    }
+
+    void ShowRatioSelectionMenu(const POINT& pt) {
+        HMENU hMenu = CreatePopupMenu();
+        if (!hMenu) return;
+
+        // 添加比例选项
+        for (size_t i = 0; i < m_ratios.size(); ++i) {
+            UINT flags = MF_BYPOSITION | MF_STRING;
+            if (i == m_currentRatioIndex) {
+                flags |= MF_CHECKED;
+            }
+            InsertMenu(hMenu, -1, flags,
+                      Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
+        }
+
+        // 显示菜单
+        SetForegroundWindow(m_hwnd);
+        TrackPopupMenu(hMenu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_RIGHTBUTTON,
+                      pt.x, pt.y, 0, m_hwnd, NULL);
+
+        DestroyMenu(hMenu);
+    }
+
+    void ToggleQuickSelect() {
+        m_quickSelectEnabled = !m_quickSelectEnabled;
+        SaveQuickSelectConfig();
+    }
+
+    void LoadQuickSelectConfig() {
+        TCHAR buffer[32];
+        if (GetPrivateProfileString(Constants::QUICK_SELECT_SECTION,
+                                  Constants::QUICK_SELECT_ENABLED,
+                                  TEXT("0"), buffer, _countof(buffer),
+                                  m_configPath.c_str()) > 0) {
+            m_quickSelectEnabled = (_wtoi(buffer) != 0);
+        }
+    }
+
+    void SaveQuickSelectConfig() {
+        WritePrivateProfileString(Constants::QUICK_SELECT_SECTION,
+                                Constants::QUICK_SELECT_ENABLED,
+                                m_quickSelectEnabled ? TEXT("1") : TEXT("0"),
+                                m_configPath.c_str());
+    }
+
+    // 新增方法：初始化原始窗口尺寸
+    void InitializeOriginalSize(HWND gameWindow) {
+        if (!m_windowModified) {  // 只在窗口未被修改时初始化
+            RECT rect;
+            if (GetWindowRect(gameWindow, &rect)) {
+                m_originalWidth = rect.right - rect.left;
+                m_originalHeight = rect.bottom - rect.top;
+            }
+        }
+    }
+
+public:
+    bool IsQuickSelectEnabled() const {
+        return m_quickSelectEnabled;
     }
 };
 
