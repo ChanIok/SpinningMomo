@@ -34,15 +34,15 @@
   <table>
     <tr>
       <td align="center">🎮 <b>完美竖拍支持</b><br/>支持游戏竖拍UI和相册功能</td>
-      <td align="center">⚡ <b>双模式切换</b><br/>快捷选择/常规模式随心切换</td>
+      <td align="center">📸 <b>原生输出</b><br/>不影响游戏照片输出质量</td>
     </tr>
     <tr>
+      <td align="center">⚡ <b>双模式切换</b><br/>快捷选择/常规模式随心切换</td>
       <td align="center">📐 <b>灵活比例调整</b><br/>多种预设和自定义比例</td>
-      <td align="center">⌨️ <b>快捷键支持</b><br/>可自定义热键(默认Ctrl+Alt+R)</td>
     </tr>
     <tr>
       <td align="center">🚀 <b>轻量运行</b><br/>占用极低，性能优先</td>
-      <td align="center">⚙️ <b>双计算模式</b><br/>基于屏幕/窗口灵活计算</td>
+      <td align="center">⌨️ <b>快捷键支持</b><br/>可自定义热键(默认Ctrl+Alt+R)</td>
     </tr>
   </table>
 </div>
