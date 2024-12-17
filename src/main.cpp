@@ -303,7 +303,7 @@ public:
 
         // 3. 重置选项
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
-                  Constants::ID_RESET, TEXT("重置窗口尺寸"));
+                  Constants::ID_RESET, TEXT("重置窗口"));
 
         // 第一个分隔线
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -601,7 +601,7 @@ public:
                     if (app->IsQuickSelectEnabled()) {
                         POINT pt;
                         GetCursorPos(&pt);
-                        app->ShowRatioSelectionMenu(pt);
+                        app->ShowQuickMenu(pt);
                     } else {
                         app->ResizeGameWindow();
                     }
@@ -822,7 +822,7 @@ private:
         }
     }
 
-    void ShowRatioSelectionMenu(const POINT& pt) {
+    void ShowQuickMenu(const POINT& pt) {
         HMENU hMenu = CreatePopupMenu();
         if (!hMenu) return;
 
@@ -835,6 +835,15 @@ private:
             InsertMenu(hMenu, -1, flags,
                       Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
         }
+
+        // 添加分隔线
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+        // 添加重置和置顶选项
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
+                  Constants::ID_RESET, TEXT("重置窗口"));
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
+                  Constants::ID_TASKBAR, TEXT("窗口置顶"));
 
         // 显示菜单
         SetForegroundWindow(m_hwnd);
