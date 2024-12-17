@@ -100,7 +100,7 @@ private:
 };
 
 // 窗口旋转器类
-class WindowRotator {
+class WindowResizer {
 public:
     // 添加查找指定标题窗口的方法
     static HWND FindGameWindow() {
@@ -116,7 +116,7 @@ public:
         return TrimRight(title1) == TrimRight(title2);
     }
 
-    static bool RotateWindow(HWND hwnd, const AspectRatio& ratio, bool shouldHideTaskbar, 
+    static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldHideTaskbar, 
                             int originalWidth = 0, int originalHeight = 0) {
         if (!hwnd || !IsWindow(hwnd)) return false;
 
@@ -196,9 +196,9 @@ public:
 };
 
 // 主应用程序类
-class WindowRotatorApp {
+class WindowResizerApp {
 public:
-    WindowRotatorApp() {
+    WindowResizerApp() {
         // 获取程序所在目录
         TCHAR exePath[MAX_PATH];
         GetModuleFileName(NULL, exePath, MAX_PATH);
@@ -216,7 +216,7 @@ public:
         InitializeRatios();
     }
 
-    ~WindowRotatorApp() {
+    ~WindowResizerApp() {
         SaveConfig();
     }
 
@@ -235,7 +235,7 @@ public:
 
         // 显示启动提示
         ShowNotification(Constants::APP_NAME, 
-            TEXT("窗口旋转工具已在后台运行。\n按 Ctrl+Alt+R 旋转游戏窗口。"));
+            TEXT("窗口比例调整工具已在后台运行。\n按 Ctrl+Alt+R 调整窗口比例。"));
 
         return true;
     }
@@ -257,11 +257,11 @@ public:
         HMENU hWindowMenu = CreatePopupMenu();
         if (hWindowMenu) {
             // 获取所有窗口
-            auto windows = WindowRotator::GetWindows();
+            auto windows = WindowResizer::GetWindows();
             int id = Constants::ID_WINDOW_BASE;
             for (const auto& window : windows) {
                 UINT flags = MF_BYPOSITION | MF_STRING;
-                if (WindowRotator::CompareWindowTitle(window.second, m_windowTitle)) {
+                if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
                     flags |= MF_CHECKED;
                 }
                 InsertMenu(hWindowMenu, -1, flags, id++, 
@@ -349,17 +349,10 @@ public:
                 m_originalWidth = rect.right - rect.left;
                 m_originalHeight = rect.bottom - rect.top;
                 m_windowModified = false;  // 重置修改状态
+                ShowNotification(Constants::APP_NAME, 
+                        TEXT("已选择窗口并重置窗口尺寸记录"));
             }
             
-            // 立即旋转选中的窗口
-            if (WindowRotator::RotateWindow(hwnd, m_ratios[m_currentRatioIndex], m_taskbarAutoHide, 
-                                          m_originalWidth, m_originalHeight)) {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口旋转成功！"), true);  // 成功提示
-            } else {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口旋转失败。可能需要管理员权限，或窗口不支持调整大小。"));
-            }
         }
     }
 
@@ -384,9 +377,9 @@ public:
             
             HWND gameWindow = NULL;
             if (!m_windowTitle.empty()) {
-                auto windows = WindowRotator::GetWindows();
+                auto windows = WindowResizer::GetWindows();
                 for (const auto& window : windows) {
-                    if (WindowRotator::CompareWindowTitle(window.second, m_windowTitle)) {
+                    if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
                         gameWindow = window.first;
                         break;
                     }
@@ -394,21 +387,21 @@ public:
             }
             
             if (!gameWindow) {
-                gameWindow = WindowRotator::FindGameWindow();
+                gameWindow = WindowResizer::FindGameWindow();
             }
 
             if (gameWindow) {
                 // 初始化原始尺寸
                 InitializeOriginalSize(gameWindow);
 
-                if (WindowRotator::RotateWindow(gameWindow, m_ratios[m_currentRatioIndex], 
+                if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
                                               m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
                     m_windowModified = true;
                     ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口旋转成功！"), true);
+                        TEXT("窗口比例调整成功！"), true);
                 } else {
                     ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口旋转失败。可能需要管理员权限，或窗口不支持调整大小。"));
+                        TEXT("窗口比例调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
                 }
             } else {
                 ShowNotification(Constants::APP_NAME, 
@@ -417,14 +410,14 @@ public:
         }
     }
 
-    void RotateGameWindow() {
+    void ResizeGameWindow() {
         HWND gameWindow = NULL;
         
         // 查找目标窗口
         if (!m_windowTitle.empty()) {
-            auto windows = WindowRotator::GetWindows();
+            auto windows = WindowResizer::GetWindows();
             for (const auto& window : windows) {
-                if (WindowRotator::CompareWindowTitle(window.second, m_windowTitle)) {
+                if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
                     gameWindow = window.first;
                     break;
                 }
@@ -432,7 +425,7 @@ public:
         }
         
         if (!gameWindow) {
-            gameWindow = WindowRotator::FindGameWindow();
+            gameWindow = WindowResizer::FindGameWindow();
         }
 
         if (gameWindow) {
@@ -443,7 +436,7 @@ public:
             if (m_windowModified) {
                 AspectRatio resetRatio(TEXT("重置"), 
                                      static_cast<double>(m_originalWidth) / m_originalHeight);
-                if (WindowRotator::RotateWindow(gameWindow, resetRatio, m_taskbarAutoHide, 
+                if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_taskbarAutoHide, 
                                               m_originalWidth, m_originalHeight)) {
                     m_windowModified = false;
                     ShowNotification(Constants::APP_NAME, 
@@ -453,14 +446,14 @@ public:
             }
 
             // 应用选择的比例
-            if (WindowRotator::RotateWindow(gameWindow, m_ratios[m_currentRatioIndex], 
+            if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
                                           m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
                 m_windowModified = true;
                 ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口旋转成功！"), true);
+                    TEXT("窗口比例调整成功！"), true);
             } else {
                 ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口旋转失败。可能需要管理员权限，或窗口不支持调整大小。"));
+                    TEXT("窗口比例调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
             }
         } else {
             ShowNotification(Constants::APP_NAME, 
@@ -502,7 +495,7 @@ public:
     }
 
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-        WindowRotatorApp* app = reinterpret_cast<WindowRotatorApp*>(
+        WindowResizerApp* app = reinterpret_cast<WindowResizerApp*>(
             GetWindowLongPtr(hwnd, GWLP_USERDATA));
 
         switch (msg) {
@@ -596,7 +589,7 @@ public:
                         GetCursorPos(&pt);
                         app->ShowRatioSelectionMenu(pt);
                     } else {
-                        app->RotateGameWindow();
+                        app->ResizeGameWindow();
                     }
                 }
                 return 0;
@@ -793,9 +786,9 @@ private:
         
         // 查找目标窗口
         if (!m_windowTitle.empty()) {
-            auto windows = WindowRotator::GetWindows();
+            auto windows = WindowResizer::GetWindows();
             for (const auto& window : windows) {
-                if (WindowRotator::CompareWindowTitle(window.second, m_windowTitle)) {
+                if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
                     gameWindow = window.first;
                     break;
                 }
@@ -803,7 +796,7 @@ private:
         }
         
         if (!gameWindow) {
-            gameWindow = WindowRotator::FindGameWindow();
+            gameWindow = WindowResizer::FindGameWindow();
         }
 
         if (gameWindow) {
@@ -811,7 +804,7 @@ private:
             AspectRatio resetRatio(TEXT("重置"), 
                                  static_cast<double>(m_originalWidth) / m_originalHeight);
             
-            if (WindowRotator::RotateWindow(gameWindow, resetRatio, m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
+            if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口已重置为原始尺寸。"), true);
             } else {
@@ -935,7 +928,7 @@ public:
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    WindowRotatorApp app;
+    WindowResizerApp app;
     
     if (!app.Initialize(hInstance)) {
         MessageBox(NULL, TEXT("应用程序初始化失败"), 
