@@ -86,12 +86,21 @@ public:
     }
 
     void ShowBalloon(const TCHAR* title, const TCHAR* message) {
-        m_nid.uFlags = NIF_INFO;
-        StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), title);
-        StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), message);
-        m_nid.dwInfoFlags = NIIF_INFO;
-        Shell_NotifyIcon(NIM_MODIFY, &m_nid);
-        m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        try {
+            m_nid.uFlags = NIF_INFO;
+            if (FAILED(StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), title)) ||
+                FAILED(StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), message))) {
+                // 如果复制失败，使用安全的默认消息
+                StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), TEXT("提示"));
+                StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), TEXT("发生错误"));
+            }
+            m_nid.dwInfoFlags = NIIF_INFO;
+            Shell_NotifyIcon(NIM_MODIFY, &m_nid);
+            m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        } catch (...) {
+            // 确保即使出错也能恢复正常状态
+            m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+        }
     }
 
 private:
@@ -889,35 +898,56 @@ private:
     }
 
     void LoadCustomRatios() {
-        TCHAR buffer[1024];
-        if (GetPrivateProfileString(Constants::CUSTOM_RATIO_SECTION,
-                                  Constants::CUSTOM_RATIO_LIST,
-                                  TEXT(""), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            std::wstring ratios = buffer;
-            size_t pos = 0;
-            std::wstring token;
-            bool hasError = false;
-            
-            while ((pos = ratios.find(TEXT(","))) != std::wstring::npos) {
-                token = ratios.substr(0, pos);
-                if (!AddCustomRatio(token)) {
-                    hasError = true;
-                }
-                ratios.erase(0, pos + 1);
-            }
-            
-            // 处理最后一个比例
-            if (!ratios.empty() && !AddCustomRatio(ratios)) {
-                hasError = true;
-            }
+        try {
+            TCHAR buffer[1024];
+            if (GetPrivateProfileString(Constants::CUSTOM_RATIO_SECTION,
+                                      Constants::CUSTOM_RATIO_LIST,
+                                      TEXT(""), buffer, _countof(buffer),
+                                      m_configPath.c_str()) > 0) {
+                std::wstring ratios = buffer;
+                if (ratios.empty()) return;
 
-            if (hasError) {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("部分自定义比例格式错误。\n"
-                         "请确保每个比例的格式为 数字:数字\n"
-                         "多个比例用英文逗号分隔"));
+                bool hasError = false;
+                std::wstring errorDetails;
+                
+                // 分割并处理每个比例
+                size_t start = 0, end = 0;
+                while ((end = ratios.find(TEXT(","), start)) != std::wstring::npos) {
+                    std::wstring ratio = ratios.substr(start, end - start);
+                    if (!AddCustomRatio(ratio)) {
+                        hasError = true;
+                        errorDetails += ratio + TEXT("\n");
+                    }
+                    start = end + 1;
+                }
+                
+                // 处理最后一个比例
+                if (start < ratios.length()) {
+                    std::wstring ratio = ratios.substr(start);
+                    if (!AddCustomRatio(ratio)) {
+                        hasError = true;
+                        errorDetails += ratio;
+                    }
+                }
+
+                if (hasError) {
+                    // 使用 MessageBox 而不是通知来显示错误
+                    std::wstring errorMsg = TEXT("以下自定义比例格式错误：\n\n") + 
+                                          errorDetails + TEXT("\n\n") +
+                                          TEXT("请确保：\n") +
+                                          TEXT("1. 使用英文冒号 \":\" 分隔数字\n") +
+                                          TEXT("2. 使用英文逗号 \",\" 分隔多个比例\n") +
+                                          TEXT("3. 只输入数字，例如：16:10,17:10");
+                    
+                    MessageBox(NULL, errorMsg.c_str(), Constants::APP_NAME, 
+                              MB_ICONWARNING | MB_OK);
+                }
             }
+        } catch (...) {
+            // 如果发生任何错误，显示一个通用错误消息
+            MessageBox(NULL, 
+                TEXT("加载自定义比例时发生错误。\n请检查配置文件格式是否正确。"), 
+                Constants::APP_NAME, MB_ICONERROR | MB_OK);
         }
     }
 
