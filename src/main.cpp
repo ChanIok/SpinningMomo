@@ -37,16 +37,13 @@ namespace Constants {
     constexpr UINT ID_RATIO_BASE = 4000;          // 比例菜单项的基础ID
     constexpr UINT ID_RATIO_CUSTOM = 4999;        // 自定义比例菜单项ID
     constexpr UINT ID_QUICK_SELECT = 2007;           // 快捷选择模式菜单项ID
-    constexpr UINT ID_SIZE_MODE = 2008;              // 尺寸模式菜单项ID
     const TCHAR* QUICK_SELECT_SECTION = TEXT("QuickSelect");  // 快捷选择配置节名
     const TCHAR* QUICK_SELECT_ENABLED = TEXT("Enabled");      // 快捷选择开关配置项
-    const TCHAR* SIZE_MODE_SECTION = TEXT("SizeMode");        // 尺寸模式配置节名
-    const TCHAR* USE_SCREEN_SIZE = TEXT("UseScreenSize");     // 使用屏幕尺寸配置项
+    const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
+    const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
     constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
     constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
     constexpr size_t DEFAULT_RATIO_INDEX = 11;  // 9:16 的索引位置
-    const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
-    const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
 }
 
 // 添加比例结构体定义
@@ -128,42 +125,25 @@ public:
         return TrimRight(title1) == TrimRight(title2);
     }
 
-    static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldTopmost, 
-                            int originalWidth = 0, int originalHeight = 0, bool useScreenSize = false) {
+    static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldTopmost) {
         if (!hwnd || !IsWindow(hwnd)) return false;
 
+        // 使用屏幕尺寸作为基准
         int screenWidth = GetSystemMetrics(SM_CXSCREEN);
         int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-        int baseWidth, baseHeight;
-        if (useScreenSize) {
-            // 使用屏幕尺寸作为基准
-            baseWidth = screenWidth;
-            baseHeight = screenHeight;
-        } else {
-            // 使用原始窗口尺寸作为基准
-            if (originalWidth == 0 || originalHeight == 0) {
-                RECT rect;
-                if (!GetWindowRect(hwnd, &rect)) return false;
-                baseWidth = rect.right - rect.left;
-                baseHeight = rect.bottom - rect.top;
-            } else {
-                baseWidth = originalWidth;
-                baseHeight = originalHeight;
-            }
-        }
+        double screenRatio = static_cast<double>(screenWidth) / screenHeight;
 
         int newWidth, newHeight;
-        double originalRatio = static_cast<double>(baseWidth) / baseHeight;
         double targetRatio = ratio.ratio;
 
-        if (targetRatio > originalRatio) {
+        // 计算新尺寸，始终基于屏幕尺寸
+        if (targetRatio > screenRatio) {
             // 以宽度为基准
-            newWidth = baseWidth;
+            newWidth = screenWidth;
             newHeight = static_cast<int>(newWidth / targetRatio);
         } else {
             // 以高度为基准
-            newHeight = baseHeight;
+            newHeight = screenHeight;
             newWidth = static_cast<int>(newHeight * targetRatio);
         }
 
@@ -331,8 +311,6 @@ public:
         // 4. 操作模式设置
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_quickSelectEnabled ? MF_CHECKED : 0),
                   Constants::ID_QUICK_SELECT, TEXT("快捷选择模式"));
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_useScreenSize ? MF_CHECKED : 0),
-                  Constants::ID_SIZE_MODE, TEXT("基于屏幕尺寸"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
                   Constants::ID_HOTKEY, TEXT("修改热键"));
 
@@ -368,17 +346,8 @@ public:
             m_windowTitle = m_windows[index].second;
             SaveConfig();
 
-            // 获取新选择窗口的原始尺寸
-            HWND hwnd = m_windows[index].first;
-            RECT rect;
-            if (GetWindowRect(hwnd, &rect)) {
-                m_originalWidth = rect.right - rect.left;
-                m_originalHeight = rect.bottom - rect.top;
-                m_windowModified = false;  // 重置修改状态
-                ShowNotification(Constants::APP_NAME, 
-                        TEXT("已选择窗口并重置窗口尺寸记录"));
-            }
-            
+            ShowNotification(Constants::APP_NAME, 
+                    TEXT("已选择窗口"));
         }
     }
 
@@ -417,11 +386,8 @@ public:
             }
 
             if (gameWindow) {
-                // 初始化原始尺寸
-                InitializeOriginalSize(gameWindow);
-
                 if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                              m_topmostEnabled, m_originalWidth, m_originalHeight, m_useScreenSize)) {
+                                              m_topmostEnabled)) {
                     m_windowModified = true;
                     ShowNotification(Constants::APP_NAME, 
                         TEXT("窗口比例调整成功！"), true);
@@ -455,25 +421,22 @@ public:
         }
 
         if (gameWindow) {
-            // 初始化原始尺寸
-            InitializeOriginalSize(gameWindow);
-
             // 如果窗口已修改，先重置窗口
             if (m_windowModified) {
                 AspectRatio resetRatio(TEXT("重置"), 
-                                     static_cast<double>(m_originalWidth) / m_originalHeight);
-                if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled, 
-                                              m_originalWidth, m_originalHeight, m_useScreenSize)) {
+                                     static_cast<double>(GetSystemMetrics(SM_CXSCREEN)) / 
+                                     GetSystemMetrics(SM_CYSCREEN));
+                if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled)) {
                     m_windowModified = false;
                     ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口已重置为原始尺寸。"), true);
+                        TEXT("窗口已重置为屏幕大小。"), true);
                     return;
                 }
             }
 
             // 应用选择的比例
             if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                          m_topmostEnabled, m_originalWidth, m_originalHeight, m_useScreenSize)) {
+                                          m_topmostEnabled)) {
                 m_windowModified = true;
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口比例调整成功！"), true);
@@ -621,9 +584,6 @@ public:
                         case Constants::ID_QUICK_SELECT:
                             app->ToggleQuickSelect();
                             break;
-                        case Constants::ID_SIZE_MODE:
-                            app->ToggleSizeMode();
-                            break;
                     }
                 }
                 return 0;
@@ -687,11 +647,9 @@ private:
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     std::vector<AspectRatio> m_ratios;
     size_t m_currentRatioIndex = Constants::DEFAULT_RATIO_INDEX;  // 使用常量初始化
-    int m_originalWidth = 0;   // 原始窗口宽度
-    int m_originalHeight = 0;  // 原始窗口高度
-    bool m_windowModified = false;  // 窗口是否被修改过
     bool m_quickSelectEnabled = true;  // 快捷选择模式是否启用，默认开启
     bool m_useScreenSize = true;    // 是否使用屏幕尺寸计算，默认开启
+    bool m_windowModified = false;  // 窗口是否被修改过
 
     void InitializeRatios() {
         // 横屏比例（从宽到窄）
@@ -725,7 +683,6 @@ private:
             WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::QUICK_SELECT_SECTION, Constants::QUICK_SELECT_ENABLED, TEXT("1"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
-            WritePrivateProfileString(Constants::SIZE_MODE_SECTION, Constants::USE_SCREEN_SIZE, TEXT("1"), m_configPath.c_str());
         }
 
         // 加载各项配置
@@ -734,7 +691,6 @@ private:
         LoadNotifyConfig();
         LoadTopmostConfig();
         LoadQuickSelectConfig();
-        LoadSizeModeConfig();
     }
 
     void SaveConfig() {
@@ -743,7 +699,6 @@ private:
         SaveNotifyConfig();
         SaveTopmostConfig();
         SaveQuickSelectConfig();
-        SaveSizeModeConfig();
     }
 
     void LoadHotkeyConfig() {
@@ -834,12 +789,6 @@ private:
     }
 
     void ResetWindowSize() {
-        if (m_originalWidth == 0 || m_originalHeight == 0) {
-            ShowNotification(Constants::APP_NAME, 
-                TEXT("没有保存的原始窗口尺寸。"));
-            return;
-        }
-
         HWND gameWindow = NULL;
         
         // 查找目标窗口
@@ -853,18 +802,16 @@ private:
             }
         }
         
-        if (!gameWindow) {
-            gameWindow = WindowResizer::FindGameWindow();
-        }
-
         if (gameWindow) {
-            // 创建一个特殊的比例对象用于重置
+            // 创建一个比例对象用于重置为屏幕大小
             AspectRatio resetRatio(TEXT("重置"), 
-                                 static_cast<double>(m_originalWidth) / m_originalHeight);
+                                 static_cast<double>(GetSystemMetrics(SM_CXSCREEN)) / 
+                                 GetSystemMetrics(SM_CYSCREEN));
             
-            if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled, m_originalWidth, m_originalHeight)) {
+            if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled)) {
+                m_windowModified = true;  // 保持窗口修改状态的跟踪
                 ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口已重置为原始尺寸。"), true);
+                    TEXT("窗口已重置为屏幕大小。"), true);
             } else {
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("重置窗口尺寸失败。"));
@@ -917,39 +864,6 @@ private:
                                 Constants::QUICK_SELECT_ENABLED,
                                 m_quickSelectEnabled ? TEXT("1") : TEXT("0"),
                                 m_configPath.c_str());
-    }
-
-    void LoadSizeModeConfig() {
-        TCHAR buffer[32];
-        if (GetPrivateProfileString(Constants::SIZE_MODE_SECTION,
-                                  Constants::USE_SCREEN_SIZE,
-                                  TEXT("0"), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_useScreenSize = (_wtoi(buffer) != 0);
-        }
-    }
-
-    void SaveSizeModeConfig() {
-        WritePrivateProfileString(Constants::SIZE_MODE_SECTION,
-                                Constants::USE_SCREEN_SIZE,
-                                m_useScreenSize ? TEXT("1") : TEXT("0"),
-                                m_configPath.c_str());
-    }
-
-    void ToggleSizeMode() {
-        m_useScreenSize = !m_useScreenSize;
-        SaveSizeModeConfig();
-    }
-
-    // 新增方法：初始化原始窗口尺寸
-    void InitializeOriginalSize(HWND gameWindow) {
-        if (!m_windowModified) {  // 只在窗口未被修改时初始化
-            RECT rect;
-            if (GetWindowRect(gameWindow, &rect)) {
-                m_originalWidth = rect.right - rect.left;
-                m_originalHeight = rect.bottom - rect.top;
-            }
-        }
     }
 
     bool AddCustomRatio(const std::wstring& ratio) {
