@@ -37,8 +37,11 @@ namespace Constants {
     constexpr UINT ID_RATIO_BASE = 4000;          // 比例菜单项的基础ID
     constexpr UINT ID_RATIO_CUSTOM = 4999;        // 自定义比例菜单项ID
     constexpr UINT ID_QUICK_SELECT = 2007;           // 快捷选择模式菜单项ID
+    constexpr UINT ID_SIZE_MODE = 2008;              // 尺寸模式菜单项ID
     const TCHAR* QUICK_SELECT_SECTION = TEXT("QuickSelect");  // 快捷选择配置节名
     const TCHAR* QUICK_SELECT_ENABLED = TEXT("Enabled");      // 快捷选择开关配置项
+    const TCHAR* SIZE_MODE_SECTION = TEXT("SizeMode");        // 尺寸模式配置节名
+    const TCHAR* USE_SCREEN_SIZE = TEXT("UseScreenSize");     // 使用屏幕尺寸配置项
     constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
     constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
     constexpr size_t DEFAULT_RATIO_INDEX = 11;  // 9:16 的索引位置
@@ -126,41 +129,55 @@ public:
     }
 
     static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldHideTaskbar, 
-                            int originalWidth = 0, int originalHeight = 0) {
+                            int originalWidth = 0, int originalHeight = 0, bool useScreenSize = false) {
         if (!hwnd || !IsWindow(hwnd)) return false;
 
-        RECT rect;
-        if (!GetWindowRect(hwnd, &rect)) return false;
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-        int currentWidth = rect.right - rect.left;
-        int currentHeight = rect.bottom - rect.top;
-
-        // 如果没有提供原始尺寸，使用当前尺寸
-        if (originalWidth == 0 || originalHeight == 0) {
-            originalWidth = currentWidth;
-            originalHeight = currentHeight;
+        int baseWidth, baseHeight;
+        if (useScreenSize) {
+            // 使用屏幕尺寸作为基准
+            baseWidth = screenWidth;
+            baseHeight = screenHeight;
+        } else {
+            // 使用原始窗口尺寸作为基准
+            if (originalWidth == 0 || originalHeight == 0) {
+                RECT rect;
+                if (!GetWindowRect(hwnd, &rect)) return false;
+                baseWidth = rect.right - rect.left;
+                baseHeight = rect.bottom - rect.top;
+            } else {
+                baseWidth = originalWidth;
+                baseHeight = originalHeight;
+            }
         }
 
-        int newWidth = originalWidth;
-        int newHeight = originalHeight;
-
-        // 固定比例模式
-        double originalRatio = static_cast<double>(originalWidth) / originalHeight;
+        int newWidth, newHeight;
+        double originalRatio = static_cast<double>(baseWidth) / baseHeight;
         double targetRatio = ratio.ratio;
 
         if (targetRatio > originalRatio) {
             // 以宽度为基准
-            newWidth = originalWidth;
+            newWidth = baseWidth;
             newHeight = static_cast<int>(newWidth / targetRatio);
         } else {
             // 以高度为基准
-            newHeight = originalHeight;
+            newHeight = baseHeight;
+            newWidth = static_cast<int>(newHeight * targetRatio);
+        }
+
+        // 确保窗口不会超出屏幕
+        if (newWidth > screenWidth) {
+            newWidth = screenWidth;
+            newHeight = static_cast<int>(newWidth / targetRatio);
+        }
+        if (newHeight > screenHeight) {
+            newHeight = screenHeight;
             newWidth = static_cast<int>(newHeight * targetRatio);
         }
 
         // 计算屏幕中心位置
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
         int newLeft = (screenWidth - newWidth) / 2;
         int newTop = (screenHeight - newHeight) / 2;
 
@@ -243,8 +260,9 @@ public:
         }
 
         // 显示启动提示
-        ShowNotification(Constants::APP_NAME, 
-            TEXT("窗口比例调整工具已在后台运行。\n按 Ctrl+Alt+R 调整窗口比例。"));
+        std::wstring hotkeyText = GetHotkeyText();
+        std::wstring message = TEXT("窗口比例调整工具已在后台运行。\n按 ") + hotkeyText + TEXT(" 调整窗口比例。");
+        ShowNotification(Constants::APP_NAME, message.c_str());
 
         return true;
     }
@@ -316,6 +334,8 @@ public:
         // 4. 操作模式设置
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_quickSelectEnabled ? MF_CHECKED : 0),
                   Constants::ID_QUICK_SELECT, TEXT("快捷选择模式"));
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_useScreenSize ? MF_CHECKED : 0),
+                  Constants::ID_SIZE_MODE, TEXT("基于屏幕尺寸"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
                   Constants::ID_HOTKEY, TEXT("修改热键"));
 
@@ -404,7 +424,7 @@ public:
                 InitializeOriginalSize(gameWindow);
 
                 if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                              m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
+                                              m_taskbarAutoHide, m_originalWidth, m_originalHeight, m_useScreenSize)) {
                     m_windowModified = true;
                     ShowNotification(Constants::APP_NAME, 
                         TEXT("窗口比例调整成功！"), true);
@@ -441,12 +461,12 @@ public:
             // 初始化原始尺寸
             InitializeOriginalSize(gameWindow);
 
-            // 如果窗口已被修改，先重置窗口
+            // 如果窗口已修改，先重置窗口
             if (m_windowModified) {
                 AspectRatio resetRatio(TEXT("重置"), 
                                      static_cast<double>(m_originalWidth) / m_originalHeight);
                 if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_taskbarAutoHide, 
-                                              m_originalWidth, m_originalHeight)) {
+                                              m_originalWidth, m_originalHeight, m_useScreenSize)) {
                     m_windowModified = false;
                     ShowNotification(Constants::APP_NAME, 
                         TEXT("窗口已重置为原始尺寸。"), true);
@@ -456,7 +476,7 @@ public:
 
             // 应用选择的比例
             if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                          m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
+                                          m_taskbarAutoHide, m_originalWidth, m_originalHeight, m_useScreenSize)) {
                 m_windowModified = true;
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口比例调整成功！"), true);
@@ -532,8 +552,9 @@ public:
 
                         // 尝试注册新热键
                         if (RegisterHotKey(hwnd, Constants::ID_TRAYICON, modifiers, static_cast<UINT>(wParam))) {
-                            app->ShowNotification(Constants::APP_NAME, 
-                                TEXT("热键设置成功！"));
+                            std::wstring hotkeyText = app->GetHotkeyText();
+                            std::wstring message = TEXT("热键已设置为：") + hotkeyText;
+                            app->ShowNotification(Constants::APP_NAME, message.c_str());
                             // 保存新的热键配置
                             app->SaveHotkeyConfig();
                         } else {
@@ -578,6 +599,9 @@ public:
                             break;
                         case Constants::ID_QUICK_SELECT:
                             app->ToggleQuickSelect();
+                            break;
+                        case Constants::ID_SIZE_MODE:
+                            app->ToggleSizeMode();
                             break;
                     }
                 }
@@ -645,7 +669,8 @@ private:
     int m_originalWidth = 0;   // 原始窗口宽度
     int m_originalHeight = 0;  // 原始窗口高度
     bool m_windowModified = false;  // 窗口是否被修改过
-    bool m_quickSelectEnabled = false;  // 快捷选择模式是否启用
+    bool m_quickSelectEnabled = true;  // 快捷选择模式是否启用，默认开启
+    bool m_useScreenSize = true;    // 是否使用屏幕尺寸计算，默认开启
 
     void InitializeRatios() {
         // 横屏比例（从宽到窄）
@@ -677,8 +702,9 @@ private:
             WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
             WritePrivateProfileString(Constants::NOTIFY_SECTION, Constants::NOTIFY_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::TASKBAR_SECTION, Constants::TASKBAR_AUTO_HIDE, TEXT("0"), m_configPath.c_str());
-            WritePrivateProfileString(Constants::QUICK_SELECT_SECTION, Constants::QUICK_SELECT_ENABLED, TEXT("0"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::QUICK_SELECT_SECTION, Constants::QUICK_SELECT_ENABLED, TEXT("1"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
+            WritePrivateProfileString(Constants::SIZE_MODE_SECTION, Constants::USE_SCREEN_SIZE, TEXT("1"), m_configPath.c_str());
         }
 
         // 加载各项配置
@@ -687,6 +713,7 @@ private:
         LoadNotifyConfig();
         LoadTaskbarConfig();
         LoadQuickSelectConfig();
+        LoadSizeModeConfig();
     }
 
     void SaveConfig() {
@@ -695,6 +722,7 @@ private:
         SaveNotifyConfig();
         SaveTaskbarConfig();
         SaveQuickSelectConfig();
+        SaveSizeModeConfig();
     }
 
     void LoadHotkeyConfig() {
@@ -870,6 +898,28 @@ private:
                                 m_configPath.c_str());
     }
 
+    void LoadSizeModeConfig() {
+        TCHAR buffer[32];
+        if (GetPrivateProfileString(Constants::SIZE_MODE_SECTION,
+                                  Constants::USE_SCREEN_SIZE,
+                                  TEXT("0"), buffer, _countof(buffer),
+                                  m_configPath.c_str()) > 0) {
+            m_useScreenSize = (_wtoi(buffer) != 0);
+        }
+    }
+
+    void SaveSizeModeConfig() {
+        WritePrivateProfileString(Constants::SIZE_MODE_SECTION,
+                                Constants::USE_SCREEN_SIZE,
+                                m_useScreenSize ? TEXT("1") : TEXT("0"),
+                                m_configPath.c_str());
+    }
+
+    void ToggleSizeMode() {
+        m_useScreenSize = !m_useScreenSize;
+        SaveSizeModeConfig();
+    }
+
     // 新增方法：初始化原始窗口尺寸
     void InitializeOriginalSize(HWND gameWindow) {
         if (!m_windowModified) {  // 只在窗口未被修改时初始化
@@ -949,6 +999,54 @@ private:
                 TEXT("加载自定义比例时发生错误。\n请检查配置文件格式是否正确。"), 
                 Constants::APP_NAME, MB_ICONERROR | MB_OK);
         }
+    }
+
+    std::wstring GetHotkeyText() {
+        std::wstring text;
+        
+        // 添加修饰键
+        if (m_hotkeyModifiers & MOD_CONTROL) text += TEXT("Ctrl+");
+        if (m_hotkeyModifiers & MOD_ALT) text += TEXT("Alt+");
+        if (m_hotkeyModifiers & MOD_SHIFT) text += TEXT("Shift+");
+        
+        // 添加主键
+        if (m_hotkeyKey >= 'A' && m_hotkeyKey <= 'Z') {
+            text += static_cast<TCHAR>(m_hotkeyKey);
+        } else {
+            // 处理特殊键
+            switch (m_hotkeyKey) {
+                case VK_F1: text += TEXT("F1"); break;
+                case VK_F2: text += TEXT("F2"); break;
+                case VK_F3: text += TEXT("F3"); break;
+                case VK_F4: text += TEXT("F4"); break;
+                case VK_F5: text += TEXT("F5"); break;
+                case VK_F6: text += TEXT("F6"); break;
+                case VK_F7: text += TEXT("F7"); break;
+                case VK_F8: text += TEXT("F8"); break;
+                case VK_F9: text += TEXT("F9"); break;
+                case VK_F10: text += TEXT("F10"); break;
+                case VK_F11: text += TEXT("F11"); break;
+                case VK_F12: text += TEXT("F12"); break;
+                case VK_NUMPAD0: text += TEXT("Num0"); break;
+                case VK_NUMPAD1: text += TEXT("Num1"); break;
+                case VK_NUMPAD2: text += TEXT("Num2"); break;
+                case VK_NUMPAD3: text += TEXT("Num3"); break;
+                case VK_NUMPAD4: text += TEXT("Num4"); break;
+                case VK_NUMPAD5: text += TEXT("Num5"); break;
+                case VK_NUMPAD6: text += TEXT("Num6"); break;
+                case VK_NUMPAD7: text += TEXT("Num7"); break;
+                case VK_NUMPAD8: text += TEXT("Num8"); break;
+                case VK_NUMPAD9: text += TEXT("Num9"); break;
+                case VK_MULTIPLY: text += TEXT("Num*"); break;
+                case VK_ADD: text += TEXT("Num+"); break;
+                case VK_SUBTRACT: text += TEXT("Num-"); break;
+                case VK_DECIMAL: text += TEXT("Num."); break;
+                case VK_DIVIDE: text += TEXT("Num/"); break;
+                default: text += static_cast<TCHAR>(m_hotkeyKey); break;
+            }
+        }
+        
+        return text;
     }
 
 public:
