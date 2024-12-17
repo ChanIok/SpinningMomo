@@ -19,7 +19,7 @@ namespace Constants {
     constexpr UINT ID_ROTATE = 2001;             
     constexpr UINT ID_HOTKEY = 2002;             // 修改热键菜单项ID
     constexpr UINT ID_NOTIFY = 2003;             // 提示开关菜单项ID
-    constexpr UINT ID_TASKBAR = 2004;            // 任务栏控制菜单项ID
+    constexpr UINT ID_TASKBAR = 2004;            // 窗口置顶菜单项ID
     constexpr UINT ID_EXIT = 2005;               // 退出菜单项ID
     constexpr UINT ID_RESET = 2006;               // 重置窗口尺寸菜单项ID
     const TCHAR* APP_NAME = TEXT("旋转吧大喵");          
@@ -32,8 +32,8 @@ namespace Constants {
     const TCHAR* HOTKEY_KEY = TEXT("Key");            // 主键配置项
     const TCHAR* NOTIFY_SECTION = TEXT("Notify");      // 提示配置节名
     const TCHAR* NOTIFY_ENABLED = TEXT("Enabled");     // 提示开关配置项
-    const TCHAR* TASKBAR_SECTION = TEXT("Taskbar");    // 任务栏配置节名
-    const TCHAR* TASKBAR_AUTO_HIDE = TEXT("AutoHide"); // 任务栏自动隐藏配置项
+    const TCHAR* TOPMOST_SECTION = TEXT("Topmost");    // 置顶配置节名
+    const TCHAR* TOPMOST_ENABLED = TEXT("Enabled");    // 窗口置顶配置项
     constexpr UINT ID_RATIO_BASE = 4000;          // 比例菜单项的基础ID
     constexpr UINT ID_RATIO_CUSTOM = 4999;        // 自定义比例菜单项ID
     constexpr UINT ID_QUICK_SELECT = 2007;           // 快捷选择模式菜单项ID
@@ -111,7 +111,7 @@ private:
     NOTIFYICONDATA m_nid = {0};
 };
 
-// 窗口旋转器类
+// 窗口调整器类
 class WindowResizer {
 public:
     // 添加查找指定标题窗口的方法
@@ -128,7 +128,7 @@ public:
         return TrimRight(title1) == TrimRight(title2);
     }
 
-    static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldHideTaskbar, 
+    static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldTopmost, 
                             int originalWidth = 0, int originalHeight = 0, bool useScreenSize = false) {
         if (!hwnd || !IsWindow(hwnd)) return false;
 
@@ -181,18 +181,15 @@ public:
         int newLeft = (screenWidth - newWidth) / 2;
         int newTop = (screenHeight - newHeight) / 2;
 
+        // 设置窗口置顶状态
+        HWND insertAfter = shouldTopmost ? HWND_TOPMOST : HWND_NOTOPMOST;
+        UINT flags = SWP_NOMOVE | SWP_NOSIZE;
+        SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, flags);
+
         // 设置新的窗口大小和位置
         if (!SetWindowPos(hwnd, NULL, newLeft, newTop, newWidth, newHeight, 
                          SWP_NOZORDER | SWP_NOACTIVATE)) {
             return false;
-        }
-
-        // 根据配置控制任务栏显示/隐藏
-        if (shouldHideTaskbar) {
-            HWND hTaskBar = FindWindow(TEXT("Shell_TrayWnd"), NULL);
-            if (hTaskBar) {
-                ShowWindow(hTaskBar, newHeight > newWidth ? SW_HIDE : SW_SHOW);
-            }
         }
 
         return true;
@@ -344,9 +341,9 @@ public:
 
         // 5. 其他设置
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_notifyEnabled ? MF_CHECKED : 0), 
-                  Constants::ID_NOTIFY, TEXT("显示旋转提示"));
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_taskbarAutoHide ? MF_CHECKED : 0),
-                  Constants::ID_TASKBAR, TEXT("自动隐藏任务栏"));
+                  Constants::ID_NOTIFY, TEXT("显示操作提示"));
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
+                  Constants::ID_TASKBAR, TEXT("窗口置顶"));
 
         // 最后的分隔线
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -424,7 +421,7 @@ public:
                 InitializeOriginalSize(gameWindow);
 
                 if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                              m_taskbarAutoHide, m_originalWidth, m_originalHeight, m_useScreenSize)) {
+                                              m_topmostEnabled, m_originalWidth, m_originalHeight, m_useScreenSize)) {
                     m_windowModified = true;
                     ShowNotification(Constants::APP_NAME, 
                         TEXT("窗口比例调整成功！"), true);
@@ -465,7 +462,7 @@ public:
             if (m_windowModified) {
                 AspectRatio resetRatio(TEXT("重置"), 
                                      static_cast<double>(m_originalWidth) / m_originalHeight);
-                if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_taskbarAutoHide, 
+                if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled, 
                                               m_originalWidth, m_originalHeight, m_useScreenSize)) {
                     m_windowModified = false;
                     ShowNotification(Constants::APP_NAME, 
@@ -476,7 +473,7 @@ public:
 
             // 应用选择的比例
             if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                          m_taskbarAutoHide, m_originalWidth, m_originalHeight, m_useScreenSize)) {
+                                          m_topmostEnabled, m_originalWidth, m_originalHeight, m_useScreenSize)) {
                 m_windowModified = true;
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口比例调整成功！"), true);
@@ -503,7 +500,7 @@ public:
     }
 
     void ShowNotification(const TCHAR* title, const TCHAR* message, bool isSuccess = false) {
-        // 如果是成功提示，则根据开关控制；其他提示始终显示
+        // 如果是成功提示，则根据关控制；其他提示始终显示
         if (!isSuccess || m_notifyEnabled) {
             m_trayIcon->ShowBalloon(title, message);
         }
@@ -514,13 +511,37 @@ public:
         SaveNotifyConfig();
     }
 
-    void ToggleTaskbarAutoHide() {
-        m_taskbarAutoHide = !m_taskbarAutoHide;
-        SaveTaskbarConfig();
+    void ToggleTopmost() {
+        m_topmostEnabled = !m_topmostEnabled;
+        SaveTopmostConfig();
+
+        // 立即应用置顶状态到当前窗口
+        HWND gameWindow = NULL;
+        
+        // 查找目标窗口
+        if (!m_windowTitle.empty()) {
+            auto windows = WindowResizer::GetWindows();
+            for (const auto& window : windows) {
+                if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
+                    gameWindow = window.first;
+                    break;
+                }
+            }
+        }
+        
+        if (!gameWindow) {
+            gameWindow = WindowResizer::FindGameWindow();
+        }
+
+        if (gameWindow) {
+            // 设置窗口置顶状态
+            HWND insertAfter = m_topmostEnabled ? HWND_TOPMOST : HWND_NOTOPMOST;
+            SetWindowPos(gameWindow, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
     }
 
-    bool IsTaskbarAutoHideEnabled() const {
-        return m_taskbarAutoHide;
+    bool IsTopmostEnabled() const {
+        return m_topmostEnabled;
     }
 
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -589,7 +610,7 @@ public:
                             app->ToggleNotification();
                             break;
                         case Constants::ID_TASKBAR:
-                            app->ToggleTaskbarAutoHide();
+                            app->ToggleTopmost();
                             break;
                         case Constants::ID_EXIT:
                             DestroyWindow(hwnd);
@@ -663,7 +684,7 @@ private:
     UINT m_hotkeyKey = 'R';                           // 热键主键
     bool m_hotkeySettingMode = false;                  // 是否处于热键设置模式
     bool m_notifyEnabled = false;                      // 是否显示提示，默认关闭
-    bool m_taskbarAutoHide = false;                    // 是否自动隐藏任务栏，默认关闭
+    bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     std::vector<AspectRatio> m_ratios;
     size_t m_currentRatioIndex = Constants::DEFAULT_RATIO_INDEX;  // 使用常量初始化
     int m_originalWidth = 0;   // 原始窗口宽度
@@ -701,7 +722,7 @@ private:
             WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, TEXT("3"), m_configPath.c_str());
             WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
             WritePrivateProfileString(Constants::NOTIFY_SECTION, Constants::NOTIFY_ENABLED, TEXT("0"), m_configPath.c_str());
-            WritePrivateProfileString(Constants::TASKBAR_SECTION, Constants::TASKBAR_AUTO_HIDE, TEXT("0"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::QUICK_SELECT_SECTION, Constants::QUICK_SELECT_ENABLED, TEXT("1"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::SIZE_MODE_SECTION, Constants::USE_SCREEN_SIZE, TEXT("1"), m_configPath.c_str());
@@ -711,7 +732,7 @@ private:
         LoadHotkeyConfig();
         LoadWindowConfig();
         LoadNotifyConfig();
-        LoadTaskbarConfig();
+        LoadTopmostConfig();
         LoadQuickSelectConfig();
         LoadSizeModeConfig();
     }
@@ -720,7 +741,7 @@ private:
         SaveHotkeyConfig();
         SaveWindowConfig();
         SaveNotifyConfig();
-        SaveTaskbarConfig();
+        SaveTopmostConfig();
         SaveQuickSelectConfig();
         SaveSizeModeConfig();
     }
@@ -795,20 +816,20 @@ private:
                                 m_configPath.c_str());
     }
 
-    void LoadTaskbarConfig() {
+    void LoadTopmostConfig() {
         TCHAR buffer[32];
-        if (GetPrivateProfileString(Constants::TASKBAR_SECTION,
-                                  Constants::TASKBAR_AUTO_HIDE,
+        if (GetPrivateProfileString(Constants::TOPMOST_SECTION,
+                                  Constants::TOPMOST_ENABLED,
                                   TEXT("0"), buffer, _countof(buffer),
                                   m_configPath.c_str()) > 0) {
-            m_taskbarAutoHide = (_wtoi(buffer) != 0);
+            m_topmostEnabled = (_wtoi(buffer) != 0);
         }
     }
 
-    void SaveTaskbarConfig() {
-        WritePrivateProfileString(Constants::TASKBAR_SECTION,
-                                Constants::TASKBAR_AUTO_HIDE,
-                                m_taskbarAutoHide ? TEXT("1") : TEXT("0"),
+    void SaveTopmostConfig() {
+        WritePrivateProfileString(Constants::TOPMOST_SECTION,
+                                Constants::TOPMOST_ENABLED,
+                                m_topmostEnabled ? TEXT("1") : TEXT("0"),
                                 m_configPath.c_str());
     }
 
@@ -841,7 +862,7 @@ private:
             AspectRatio resetRatio(TEXT("重置"), 
                                  static_cast<double>(m_originalWidth) / m_originalHeight);
             
-            if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_taskbarAutoHide, m_originalWidth, m_originalHeight)) {
+            if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled, m_originalWidth, m_originalHeight)) {
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口已重置为原始尺寸。"), true);
             } else {
