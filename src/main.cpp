@@ -139,10 +139,26 @@ public:
         return TrimRight(title1) == TrimRight(title2);
     }
 
-    static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldTopmost) {
+    static bool ResizeWindow(HWND hwnd, int width, int height, bool shouldTopmost) {
         if (!hwnd || !IsWindow(hwnd)) return false;
 
-        // 使用屏幕尺寸作为基准
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+        // 计算屏幕中心位置
+        int newLeft = (screenWidth - width) / 2;
+        int newTop = (screenHeight - height) / 2;
+
+        // 设置窗口置顶状态
+        HWND insertAfter = shouldTopmost ? HWND_TOPMOST : HWND_NOTOPMOST;
+        SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
+        // 设置新的窗口大小和位置
+        return SetWindowPos(hwnd, NULL, newLeft, newTop, width, height, 
+                          SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+    }
+
+    static bool ResizeWindow(HWND hwnd, const AspectRatio& ratio, bool shouldTopmost) {
         int screenWidth = GetSystemMetrics(SM_CXSCREEN);
         int screenHeight = GetSystemMetrics(SM_CYSCREEN);
         double screenRatio = static_cast<double>(screenWidth) / screenHeight;
@@ -152,41 +168,14 @@ public:
 
         // 计算新尺寸，始终基于屏幕尺寸
         if (targetRatio > screenRatio) {
-            // 以宽度为基准
             newWidth = screenWidth;
             newHeight = static_cast<int>(newWidth / targetRatio);
         } else {
-            // 以高度为基准
             newHeight = screenHeight;
             newWidth = static_cast<int>(newHeight * targetRatio);
         }
 
-        // 确保窗口不会超出屏幕
-        if (newWidth > screenWidth) {
-            newWidth = screenWidth;
-            newHeight = static_cast<int>(newWidth / targetRatio);
-        }
-        if (newHeight > screenHeight) {
-            newHeight = screenHeight;
-            newWidth = static_cast<int>(newHeight * targetRatio);
-        }
-
-        // 计算屏幕中心位置
-        int newLeft = (screenWidth - newWidth) / 2;
-        int newTop = (screenHeight - newHeight) / 2;
-
-        // 设置窗口置顶状态
-        HWND insertAfter = shouldTopmost ? HWND_TOPMOST : HWND_NOTOPMOST;
-        UINT flags = SWP_NOMOVE | SWP_NOSIZE;
-        SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, flags);
-
-        // 设置新的窗口大小和位置
-        if (!SetWindowPos(hwnd, NULL, newLeft, newTop, newWidth, newHeight, 
-                         SWP_NOZORDER | SWP_NOACTIVATE)) {
-            return false;
-        }
-
-        return true;
+        return ResizeWindow(hwnd, newWidth, newHeight, shouldTopmost);
     }
 
     static BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
@@ -274,10 +263,9 @@ public:
         HMENU hMenu = CreatePopupMenu();
         if (!hMenu) return;
 
-        // 1. 窗口选择（最基础的功能）
+        // 窗口选择
         HMENU hWindowMenu = CreatePopupMenu();
         if (hWindowMenu) {
-            // 获取所有窗口
             auto windows = WindowResizer::GetWindows();
             int id = Constants::ID_WINDOW_BASE;
             for (const auto& window : windows) {
@@ -285,19 +273,16 @@ public:
                 if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
                     flags |= MF_CHECKED;
                 }
-                InsertMenu(hWindowMenu, -1, flags, id++, 
-                          window.second.c_str());
+                InsertMenu(hWindowMenu, -1, flags, id++, window.second.c_str());
             }
 
-            // 将窗口选择子菜单添加到主菜单
             InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
                       (UINT_PTR)hWindowMenu, TEXT("选择窗口"));
 
-            // 保存窗口列表以供后续使用
             m_windows = std::move(windows);
         }
 
-        // 2. 比例选择
+        // 比例选择
         HMENU hRatioMenu = CreatePopupMenu();
         if (hRatioMenu) {
             for (size_t i = 0; i < m_ratios.size(); ++i) {
@@ -305,47 +290,33 @@ public:
                 if (i == m_currentRatioIndex) {
                     flags |= MF_CHECKED;
                 }
-                InsertMenu(hRatioMenu, -1, flags,
-                          Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
+                InsertMenu(hRatioMenu, -1, flags, Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
             }
             
-            // 添加分隔线和自定义比例选项
             InsertMenu(hRatioMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(hRatioMenu, -1, MF_BYPOSITION | MF_STRING,
-                      Constants::ID_RATIO_CUSTOM, TEXT("添加自定义比例..."));
-                      
-            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP,
-                      (UINT_PTR)hRatioMenu, TEXT("窗口比例"));
+            InsertMenu(hRatioMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_RATIO_CUSTOM, TEXT("添加自定义比例..."));
+            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)hRatioMenu, TEXT("窗口比例"));
         }
 
-        // 3. 重置选项
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
-                  Constants::ID_RESET, TEXT("重置窗口"));
-
-        // 第一个分隔线
+        // 重置选项
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_RESET, TEXT("重置窗口"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 4. 操作模式设置
+        // 操作模式设置
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_quickSelectEnabled ? MF_CHECKED : 0),
                   Constants::ID_QUICK_SELECT, TEXT("快捷选择模式"));
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
-                  Constants::ID_HOTKEY, TEXT("修改热键"));
-
-        // 第二个分隔线
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, TEXT("修改热键"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 5. 其他设置
+        // 其他设置
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_notifyEnabled ? MF_CHECKED : 0), 
                   Constants::ID_NOTIFY, TEXT("显示操作提示"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
                   Constants::ID_TASKBAR, TEXT("窗口置顶"));
-
-        // 最后的分隔线
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 6. 退出选项（永远放在最后）
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
-                  Constants::ID_EXIT, TEXT("退出"));
+        // 退出选项
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, TEXT("退出"));
 
         // 显示菜单
         POINT pt;
@@ -1032,22 +1003,7 @@ private:
     }
 
     bool ResizeWindowToFixedSize(HWND hwnd, const FixedSize& size) {
-        if (!hwnd || !IsWindow(hwnd)) return false;
-
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-        // 计算屏幕中心位置
-        int newLeft = (screenWidth - size.width) / 2;
-        int newTop = (screenHeight - size.height) / 2;
-
-        // 设置窗口置顶状态
-        HWND insertAfter = m_topmostEnabled ? HWND_TOPMOST : HWND_NOTOPMOST;
-        SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-
-        // 直接设置指定的宽高
-        return SetWindowPos(hwnd, NULL, newLeft, newTop, size.width, size.height, 
-                           SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+        return WindowResizer::ResizeWindow(hwnd, size.width, size.height, m_topmostEnabled);
     }
 
     HWND FindTargetWindow() {
