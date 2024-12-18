@@ -154,19 +154,33 @@ public:
     static bool ResizeWindow(HWND hwnd, int width, int height, bool shouldTopmost) {
         if (!hwnd || !IsWindow(hwnd)) return false;
 
+        // 获取窗口样式
+        DWORD style = GetWindowLong(hwnd, GWL_STYLE);
+        DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+
+        // 计算包含边框的完整窗口大小
+        RECT rect = {0, 0, width, height};
+        AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+        
+        // 使用 rect 的 left 和 top 值来调整位置，这些值通常是负数
+        int totalWidth = rect.right - rect.left;
+        int totalHeight = rect.bottom - rect.top;
+        int borderOffsetX = rect.left;  // 左边框的偏移量（负值）
+        int borderOffsetY = rect.top;   // 顶部边框的偏移量（负值）
+
         int screenWidth = GetSystemMetrics(SM_CXSCREEN);
         int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-        // 计算屏幕中心位置
-        int newLeft = (screenWidth - width) / 2;
-        int newTop = (screenHeight - height) / 2;
+        // 计算屏幕中心位置，考虑边框偏移
+        int newLeft = (screenWidth - width) / 2 + borderOffsetX;
+        int newTop = (screenHeight - height) / 2 + borderOffsetY;
 
         // 设置窗口置顶状态
         HWND insertAfter = shouldTopmost ? HWND_TOPMOST : HWND_NOTOPMOST;
         SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
         // 设置新的窗口大小和位置
-        return SetWindowPos(hwnd, NULL, newLeft, newTop, width, height, 
+        return SetWindowPos(hwnd, NULL, newLeft, newTop, totalWidth, totalHeight, 
                           SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
     }
 
