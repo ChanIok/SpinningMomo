@@ -14,37 +14,52 @@
 
 // 常量定义
 namespace Constants {
-    static const UINT WM_TRAYICON = WM_USER + 1;    // 自定义托盘图标消息
-    constexpr UINT ID_TRAYICON = 1;              
-    constexpr UINT ID_ROTATE = 2001;             
-    constexpr UINT ID_HOTKEY = 2002;             // 修改热键菜单项ID
-    constexpr UINT ID_NOTIFY = 2003;             // 提示开关菜单项ID
-    constexpr UINT ID_TASKBAR = 2004;            // 窗口置顶菜单项ID
-    constexpr UINT ID_EXIT = 2005;               // 退出菜单项ID
-    constexpr UINT ID_RESET = 2006;               // 重置窗口尺寸菜单项ID
+    // 应用程序基本信息
     const TCHAR* APP_NAME = TEXT("旋转吧大喵");          
     const TCHAR* WINDOW_CLASS = TEXT("SpinningMomoClass");  
+    
+    // 消息和ID定义
+    static const UINT WM_TRAYICON = WM_USER + 1;    // 自定义托盘图标消息
+    constexpr UINT ID_TRAYICON = 1;              
+    
+    // 菜单项ID定义
+    constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
+    constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
+    constexpr UINT ID_RATIO_BASE = 4000;     // 比例菜单项的基础ID
+    constexpr UINT ID_SIZE_BASE = 5000;      // 固定尺寸菜单项的基础ID
+    constexpr UINT ID_SIZE_CUSTOM = 5999;    // 自定义尺寸菜单项ID
+    
+    // 功能菜单项ID
+    constexpr UINT ID_ROTATE = 2001;         
+    constexpr UINT ID_HOTKEY = 2002;         // 修改热键菜单项ID
+    constexpr UINT ID_NOTIFY = 2003;         // 提示开关菜单项ID
+    constexpr UINT ID_TASKBAR = 2004;        // 窗口置顶菜单项ID
+    constexpr UINT ID_EXIT = 2005;           // 退出菜单项ID
+    constexpr UINT ID_RESET = 2006;          // 重置窗口尺寸菜单项ID
+    constexpr UINT ID_CONFIG = 2009;         // 打开配置文件菜单项ID
+    
+    // 配置文件相关
     const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
+    
+    // 配置节和配置项
     const TCHAR* WINDOW_SECTION = TEXT("Window");      // 窗口配置
-    const TCHAR* WINDOW_TITLE = TEXT("Title");        // 窗口标题配置项
+    const TCHAR* WINDOW_TITLE = TEXT("Title");         // 窗口标题配置项
+    
     const TCHAR* HOTKEY_SECTION = TEXT("Hotkey");      // 热键配置节名
     const TCHAR* HOTKEY_MODIFIERS = TEXT("Modifiers"); // 修饰键配置项
     const TCHAR* HOTKEY_KEY = TEXT("Key");            // 主键配置项
+    
     const TCHAR* NOTIFY_SECTION = TEXT("Notify");      // 提示配置节名
     const TCHAR* NOTIFY_ENABLED = TEXT("Enabled");     // 提示开关配置项
+    
     const TCHAR* TOPMOST_SECTION = TEXT("Topmost");    // 置顶配置节名
     const TCHAR* TOPMOST_ENABLED = TEXT("Enabled");    // 窗口置顶配置项
-    constexpr UINT ID_RATIO_BASE = 4000;          // 比例菜单项的基础ID
-    constexpr UINT ID_CONFIG = 2009;              // 打开配置文件菜单项ID
+    
     const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
     const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
-    constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
-    constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
-    constexpr size_t DEFAULT_RATIO_INDEX = 11;  // 9:16 的索引位置
-    constexpr UINT ID_SIZE_BASE = 5000;          // 固定尺寸菜单项的基础ID
-    constexpr UINT ID_SIZE_CUSTOM = 5999;        // 自定义尺寸菜单项ID
-    const TCHAR* CUSTOM_SIZE_SECTION = TEXT("CustomSize");   // 自定义尺寸配置节名
-    const TCHAR* CUSTOM_SIZE_LIST = TEXT("SizeList");        // 自定义尺寸列表配置项
+    
+    const TCHAR* CUSTOM_SIZE_SECTION = TEXT("CustomSize");    // 自定义尺寸配置节名
+    const TCHAR* CUSTOM_SIZE_LIST = TEXT("SizeList");         // 自定义尺寸列表配置项
 }
 
 // 添加比例结构体定义
@@ -298,8 +313,11 @@ public:
         HMENU hSizeMenu = CreatePopupMenu();
         if (hSizeMenu) {
             for (size_t i = 0; i < m_sizes.size(); ++i) {
-                InsertMenu(hSizeMenu, -1, MF_BYPOSITION | MF_STRING,
-                          Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
+                UINT flags = MF_BYPOSITION | MF_STRING;
+                if (i == m_currentSizeIndex) {
+                    flags |= MF_CHECKED;
+                }
+                InsertMenu(hSizeMenu, -1, flags, Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
             }
             
             InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
@@ -349,39 +367,12 @@ public:
     }
 
     void HandleRatioSelect(UINT id) {
-        if (id == Constants::ID_CONFIG) {
-            // 打开配置文件
-            ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
-                        m_configPath.c_str(), NULL, SW_SHOW);
-            
-            // 显示提示
-            ShowNotification(Constants::APP_NAME, 
-                TEXT("添加自定义比例步骤：\n"
-                     "1. 找到 [CustomRatio] 节\n"
-                     "2. 在 RatioList 后添加比例\n"
-                     "3. 保存并重启软件"));
-            return;
-        }
-
         size_t index = id - Constants::ID_RATIO_BASE;
         if (index < m_ratios.size()) {
             m_currentRatioIndex = index;
+            m_currentSizeIndex = SIZE_MAX;  // 清除尺寸选择
             
-            HWND gameWindow = NULL;
-            if (!m_windowTitle.empty()) {
-                auto windows = WindowResizer::GetWindows();
-                for (const auto& window : windows) {
-                    if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
-                        gameWindow = window.first;
-                        break;
-                    }
-                }
-            }
-            
-            if (!gameWindow) {
-                gameWindow = WindowResizer::FindGameWindow();
-            }
-
+            HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
                 if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
                                               m_topmostEnabled)) {
@@ -391,6 +382,29 @@ public:
                 } else {
                     ShowNotification(Constants::APP_NAME, 
                         TEXT("窗口比例调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
+                }
+            } else {
+                ShowNotification(Constants::APP_NAME, 
+                    TEXT("未找到目标窗口，请确保窗口已启动。"));
+            }
+        }
+    }
+
+    void HandleSizeSelect(UINT id) {
+        size_t index = id - Constants::ID_SIZE_BASE;
+        if (index < m_sizes.size()) {
+            m_currentSizeIndex = index;
+            m_currentRatioIndex = SIZE_MAX;  // 清除比例选择
+            
+            HWND gameWindow = FindTargetWindow();
+            if (gameWindow) {
+                if (ResizeWindowToFixedSize(gameWindow, m_sizes[index])) {
+                    m_windowModified = true;
+                    ShowNotification(Constants::APP_NAME, 
+                        TEXT("窗口尺寸调整成功！"), true);
+                } else {
+                    ShowNotification(Constants::APP_NAME, 
+                        TEXT("窗口尺寸调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
                 }
             } else {
                 ShowNotification(Constants::APP_NAME, 
@@ -593,7 +607,8 @@ private:
     bool m_notifyEnabled = false;                      // 是否显示提示，默认关闭
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     std::vector<AspectRatio> m_ratios;
-    size_t m_currentRatioIndex = Constants::DEFAULT_RATIO_INDEX;  // 使用常量初始化
+    size_t m_currentRatioIndex = SIZE_MAX;  // 修改：初始值表示未选择
+    size_t m_currentSizeIndex = SIZE_MAX;   // 添加：当前选择的尺寸索引
     bool m_useScreenSize = true;    // 是否使用屏幕尺寸计算，默认开启
     bool m_windowModified = false;  // 窗口是否被修改过
     std::vector<FixedSize> m_sizes;  // 固定尺寸列表
@@ -742,7 +757,9 @@ private:
                                  GetSystemMetrics(SM_CYSCREEN));
             
             if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled)) {
-                m_windowModified = true;  // 保持窗口修改状态的跟踪
+                m_windowModified = true;
+                m_currentRatioIndex = SIZE_MAX;  // 清除选择状态
+                m_currentSizeIndex = SIZE_MAX;
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("窗口已重置为屏幕大小。"), true);
             } else {
@@ -774,7 +791,11 @@ private:
 
         // 添加固定尺寸选项
         for (size_t i = 0; i < m_sizes.size(); ++i) {
-            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING,
+            UINT flags = MF_BYPOSITION | MF_STRING;
+            if (i == m_currentSizeIndex) {
+                flags |= MF_CHECKED;
+            }
+            InsertMenu(hMenu, -1, flags,
                       Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
         }
 
@@ -911,26 +932,6 @@ private:
         }
         
         return text;
-    }
-
-    void HandleSizeSelect(UINT id) {
-        size_t index = id - Constants::ID_SIZE_BASE;
-        if (index < m_sizes.size()) {
-            HWND gameWindow = FindTargetWindow();
-            if (gameWindow) {
-                if (ResizeWindowToFixedSize(gameWindow, m_sizes[index])) {
-                    m_windowModified = true;
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口尺寸调整成功！"), true);
-                } else {
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口尺寸调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
-                }
-            } else {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("未找到目标窗口，请确保窗口已启动。"));
-            }
-        }
     }
 
     bool ResizeWindowToFixedSize(HWND hwnd, const FixedSize& size) {
