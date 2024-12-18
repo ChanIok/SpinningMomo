@@ -36,9 +36,6 @@ namespace Constants {
     const TCHAR* TOPMOST_ENABLED = TEXT("Enabled");    // 窗口置顶配置项
     constexpr UINT ID_RATIO_BASE = 4000;          // 比例菜单项的基础ID
     constexpr UINT ID_CONFIG = 2009;              // 打开配置文件菜单项ID
-    constexpr UINT ID_QUICK_SELECT = 2007;           // 快捷选择模式菜单项ID
-    const TCHAR* QUICK_SELECT_SECTION = TEXT("QuickSelect");  // 快捷选择配置节名
-    const TCHAR* QUICK_SELECT_ENABLED = TEXT("Enabled");      // 快捷选择开关配置项
     const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
     const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
     constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
@@ -244,7 +241,7 @@ public:
 
         // 显示启动提示
         std::wstring hotkeyText = GetHotkeyText();
-        std::wstring message = TEXT("窗口比例调整工具已在后台运行。\n按 ") + hotkeyText + TEXT(" 调整窗口比例。");
+        std::wstring message = TEXT("窗口比例调整工具已在后台运行。\n按 ") + hotkeyText + TEXT(" 打开调整菜单。");
         ShowNotification(Constants::APP_NAME, message.c_str());
 
         return true;
@@ -313,9 +310,6 @@ public:
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_RESET, TEXT("重置窗口"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 操作模式设置
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_quickSelectEnabled ? MF_CHECKED : 0),
-                  Constants::ID_QUICK_SELECT, TEXT("快捷选择模式"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, TEXT("修改热键"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
@@ -402,55 +396,6 @@ public:
                 ShowNotification(Constants::APP_NAME, 
                     TEXT("未找到目标窗口，请确保窗口已启动。"));
             }
-        }
-    }
-
-    // 非快捷选择模式触发的窗口调整
-    void ResizeGameWindow() {
-        HWND gameWindow = NULL;
-        
-        // 查找目标窗口
-        if (!m_windowTitle.empty()) {
-            auto windows = WindowResizer::GetWindows();
-            for (const auto& window : windows) {
-                if (WindowResizer::CompareWindowTitle(window.second, m_windowTitle)) {
-                    gameWindow = window.first;
-                    break;
-                }
-            }
-        }
-        
-        if (!gameWindow) {
-            gameWindow = WindowResizer::FindGameWindow();
-        }
-
-        if (gameWindow) {
-            // 如果窗口已修改，先重置窗口
-            if (m_windowModified) {
-                AspectRatio resetRatio(TEXT("重置"), 
-                                     static_cast<double>(GetSystemMetrics(SM_CXSCREEN)) / 
-                                     GetSystemMetrics(SM_CYSCREEN));
-                if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled)) {
-                    m_windowModified = false;
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口已重置为屏幕大小。"), true);
-                    return;
-                }
-            }
-
-            // 应用选择的比例
-            if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                          m_topmostEnabled)) {
-                m_windowModified = true;
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口比例调整成功！"), true);
-            } else {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口比例调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
-            }
-        } else {
-            ShowNotification(Constants::APP_NAME, 
-                TEXT("未找到目标窗口，请确保窗口已启动。"));
         }
     }
 
@@ -590,9 +535,6 @@ public:
                         case Constants::ID_RESET:
                             app->ResetWindowSize();
                             break;
-                        case Constants::ID_QUICK_SELECT:
-                            app->ToggleQuickSelect();
-                            break;
                     }
                 }
                 return 0;
@@ -607,13 +549,9 @@ public:
 
             case WM_HOTKEY: {
                 if (app && wParam == Constants::ID_TRAYICON) {
-                    if (app->IsQuickSelectEnabled()) {
-                        POINT pt;
-                        GetCursorPos(&pt);
-                        app->ShowQuickMenu(pt);
-                    } else {
-                        app->ResizeGameWindow();
-                    }
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    app->ShowQuickMenu(pt);
                 }
                 return 0;
             }
@@ -656,7 +594,6 @@ private:
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     std::vector<AspectRatio> m_ratios;
     size_t m_currentRatioIndex = Constants::DEFAULT_RATIO_INDEX;  // 使用常量初始化
-    bool m_quickSelectEnabled = true;  // 快捷选择模式是否启用，默认开启
     bool m_useScreenSize = true;    // 是否使用屏幕尺寸计算，默认开启
     bool m_windowModified = false;  // 窗口是否被修改过
     std::vector<FixedSize> m_sizes;  // 固定尺寸列表
@@ -691,7 +628,6 @@ private:
             WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
             WritePrivateProfileString(Constants::NOTIFY_SECTION, Constants::NOTIFY_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
-            WritePrivateProfileString(Constants::QUICK_SELECT_SECTION, Constants::QUICK_SELECT_ENABLED, TEXT("1"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_SIZE_SECTION, Constants::CUSTOM_SIZE_LIST, TEXT(""), m_configPath.c_str());
         }
@@ -701,7 +637,6 @@ private:
         LoadWindowConfig();
         LoadNotifyConfig();
         LoadTopmostConfig();
-        LoadQuickSelectConfig();
     }
 
     void SaveConfig() {
@@ -709,7 +644,6 @@ private:
         SaveWindowConfig();
         SaveNotifyConfig();
         SaveTopmostConfig();
-        SaveQuickSelectConfig();
     }
 
     void LoadHotkeyConfig() {
@@ -859,28 +793,6 @@ private:
                       pt.x, pt.y, 0, m_hwnd, NULL);
 
         DestroyMenu(hMenu);
-    }
-
-    void ToggleQuickSelect() {
-        m_quickSelectEnabled = !m_quickSelectEnabled;
-        SaveQuickSelectConfig();
-    }
-
-    void LoadQuickSelectConfig() {
-        TCHAR buffer[32];
-        if (GetPrivateProfileString(Constants::QUICK_SELECT_SECTION,
-                                  Constants::QUICK_SELECT_ENABLED,
-                                  TEXT("0"), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_quickSelectEnabled = (_wtoi(buffer) != 0);
-        }
-    }
-
-    void SaveQuickSelectConfig() {
-        WritePrivateProfileString(Constants::QUICK_SELECT_SECTION,
-                                Constants::QUICK_SELECT_ENABLED,
-                                m_quickSelectEnabled ? TEXT("1") : TEXT("0"),
-                                m_configPath.c_str());
     }
 
     bool AddCustomRatio(const std::wstring& ratio) {
@@ -1125,11 +1037,6 @@ private:
                  "1. [CustomRatio] 节用于添加自定义比例\n"
                  "2. [CustomSize] 节用于添加自定义尺寸\n"
                  "3. 保存后重启软件生效"));
-    }
-
-public:
-    bool IsQuickSelectEnabled() const {
-        return m_quickSelectEnabled;
     }
 };
 
