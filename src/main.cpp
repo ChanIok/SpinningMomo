@@ -293,7 +293,20 @@ public:
                 InsertMenu(hRatioMenu, -1, flags, Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
             }
             
-            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)hRatioMenu, TEXT("窗口比例"));
+            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
+                      (UINT_PTR)hRatioMenu, TEXT("窗口比例"));
+        }
+
+        // 固定尺寸选择
+        HMENU hSizeMenu = CreatePopupMenu();
+        if (hSizeMenu) {
+            for (size_t i = 0; i < m_sizes.size(); ++i) {
+                InsertMenu(hSizeMenu, -1, MF_BYPOSITION | MF_STRING,
+                          Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
+            }
+            
+            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
+                      (UINT_PTR)hSizeMenu, TEXT("固定尺寸"));
         }
 
         // 重置选项
@@ -392,6 +405,7 @@ public:
         }
     }
 
+    // 非快捷选择模式触发的窗口调整
     void ResizeGameWindow() {
         HWND gameWindow = NULL;
         
