@@ -35,7 +35,7 @@ namespace Constants {
     const TCHAR* TOPMOST_SECTION = TEXT("Topmost");    // 置顶配置节名
     const TCHAR* TOPMOST_ENABLED = TEXT("Enabled");    // 窗口置顶配置项
     constexpr UINT ID_RATIO_BASE = 4000;          // 比例菜单项的基础ID
-    constexpr UINT ID_RATIO_CUSTOM = 4999;        // 自定义比例菜单项ID
+    constexpr UINT ID_CONFIG = 2009;              // 打开配置文件菜单项ID
     constexpr UINT ID_QUICK_SELECT = 2007;           // 快捷选择模式菜单项ID
     const TCHAR* QUICK_SELECT_SECTION = TEXT("QuickSelect");  // 快捷选择配置节名
     const TCHAR* QUICK_SELECT_ENABLED = TEXT("Enabled");      // 快捷选择开关配置项
@@ -293,8 +293,6 @@ public:
                 InsertMenu(hRatioMenu, -1, flags, Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
             }
             
-            InsertMenu(hRatioMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(hRatioMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_RATIO_CUSTOM, TEXT("添加自定义比例..."));
             InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)hRatioMenu, TEXT("窗口比例"));
         }
 
@@ -313,6 +311,10 @@ public:
                   Constants::ID_NOTIFY, TEXT("显示操作提示"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
                   Constants::ID_TASKBAR, TEXT("窗口置顶"));
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+        // 添加打开配置文件选项
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CONFIG, TEXT("打开配置文件"));
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
         // 退出选项
@@ -340,7 +342,7 @@ public:
     }
 
     void HandleRatioSelect(UINT id) {
-        if (id == Constants::ID_RATIO_CUSTOM) {
+        if (id == Constants::ID_CONFIG) {
             // 打开配置文件
             ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
                         m_configPath.c_str(), NULL, SW_SHOW);
@@ -548,7 +550,7 @@ public:
             case WM_COMMAND: {
                 if (!app) return 0;
                 WORD cmd = LOWORD(wParam);
-                if (cmd >= Constants::ID_RATIO_BASE && cmd <= Constants::ID_RATIO_CUSTOM) {
+                if (cmd >= Constants::ID_RATIO_BASE && cmd < Constants::ID_RATIO_BASE + 1000) {  // 修改：使用范围检查
                     app->HandleRatioSelect(cmd);
                 } else if (cmd >= Constants::ID_SIZE_BASE && cmd <= Constants::ID_SIZE_CUSTOM) {
                     app->HandleSizeSelect(cmd);
@@ -556,6 +558,9 @@ public:
                     app->HandleWindowSelect(cmd);
                 } else {
                     switch (cmd) {
+                        case Constants::ID_CONFIG:  // 添加：新的配置文件处理
+                            app->OpenConfigFile();
+                            break;
                         case Constants::ID_HOTKEY:
                             app->SetHotkey();
                             break;
@@ -580,7 +585,7 @@ public:
             }
 
             case WM_USER + 1: {  // Constants::WM_TRAYICON
-                if (app && lParam == WM_RBUTTONUP) {
+                if (app && (lParam == WM_RBUTTONUP || lParam == WM_LBUTTONUP)) {
                     app->ShowWindowSelectionMenu();
                 }
                 return 0;
@@ -1093,6 +1098,19 @@ private:
                 TEXT("加载自定义尺寸时发生错误。\n请检查配置文件格式是否正确。"), 
                 Constants::APP_NAME, MB_ICONERROR | MB_OK);
         }
+    }
+
+    void OpenConfigFile() {
+        // 打开配置文件
+        ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
+                    m_configPath.c_str(), NULL, SW_SHOW);
+        
+        // 显示提示
+        ShowNotification(Constants::APP_NAME, 
+            TEXT("配置文件说明：\n"
+                 "1. [CustomRatio] 节用于添加自定义比例\n"
+                 "2. [CustomSize] 节用于添加自定义尺寸\n"
+                 "3. 保存后重启软件生效"));
     }
 
 public:
