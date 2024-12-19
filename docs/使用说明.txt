@@ -85,5 +85,6 @@
 如果遇到问题或有建议，欢迎通过以下方式反馈：
 - GitHub 仓库：https://github.com/chaniok/SpinningMomo
 - 提交 Issue：https://github.com/chaniok/SpinningMomo/issues
+- 如果觉得这个工具对你有帮助，欢迎点个 Star ⭐ 支持一下~
 
 开源协议：MIT 

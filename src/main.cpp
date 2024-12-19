@@ -117,6 +117,10 @@ struct LocalizedStrings {
     std::wstring CHINESE;
     std::wstring ENGLISH;
     std::wstring HOTKEY_REGISTER_FAILED; 
+    std::wstring CONFIG_FORMAT_ERROR;      // 添加格式错误提示
+    std::wstring RATIO_FORMAT_EXAMPLE;     // 添加比例格式示例
+    std::wstring SIZE_FORMAT_EXAMPLE;      // 添加尺寸格式示例
+    std::wstring LOAD_CONFIG_FAILED;       // 添加加载失败提示
 };
 
 // 中文字符串
@@ -145,7 +149,11 @@ const LocalizedStrings ZH_CN = {
     TEXT("语言"),
     TEXT("中文"),
     TEXT("English"),
-    TEXT("热键注册失败。程序仍可使用，但快捷键将不可用。")
+    TEXT("热键注册失败。程序仍可使用，但快捷键将不可用。"),
+    TEXT("格式错误："),
+    TEXT("请使用正确格式，如：16:10,17:10"),
+    TEXT("请使用正确格式，如：1920x1080,2560x1440"),
+    TEXT("加载配置失败，请检查配置文件。")
 };
 
 // 英文字符串
@@ -174,7 +182,11 @@ const LocalizedStrings EN_US = {
     TEXT("Language"),
     TEXT("中文"),
     TEXT("English"),
-    TEXT("Failed to register hotkey. Program can still be used, but hotkey will be unavailable.")
+    TEXT("Failed to register hotkey. Program can still be used, but hotkey will be unavailable."),
+    TEXT("Format error: "),
+    TEXT("Please use correct format, e.g.: 16:10,17:10"),
+    TEXT("Please use correct format, e.g.: 1920x1080,2560x1440"),
+    TEXT("Failed to load config, please check the config file.")
 };
 
 // 系统托盘图标管理类
@@ -1017,7 +1029,7 @@ private:
                     std::wstring ratio = ratios.substr(start, end - start);
                     if (!AddCustomRatio(ratio)) {
                         hasError = true;
-                        errorDetails += ratio + TEXT("\n");
+                        errorDetails += ratio + TEXT(", ");
                     }
                     start = end + 1;
                 }
@@ -1032,23 +1044,77 @@ private:
                 }
 
                 if (hasError) {
-                    // 使用 MessageBox 而不是通知来显示错误
-                    std::wstring errorMsg = TEXT("以下自定义比例格式错误：\n\n") + 
-                                          errorDetails + TEXT("\n\n") +
-                                          TEXT("请确保：\n") +
-                                          TEXT("1. 使用英文冒号 \":\" 分隔数字\n") +
-                                          TEXT("2. 使用英文逗号 \",\" 分隔多个比例\n") +
-                                          TEXT("3. 只输入数字，例如：16:10,17:10");
-                    
-                    MessageBox(NULL, errorMsg.c_str(), Constants::APP_NAME, 
+                    std::wstring errorMsg = m_strings.CONFIG_FORMAT_ERROR + errorDetails + 
+                                          TEXT("\n") + m_strings.RATIO_FORMAT_EXAMPLE;
+                    MessageBox(NULL, errorMsg.c_str(), m_strings.APP_NAME.c_str(), 
                               MB_ICONWARNING | MB_OK);
                 }
             }
         } catch (...) {
-            // 如果发生任何错误，显示一个通用错误消息
-            MessageBox(NULL, 
-                TEXT("加载自定义比例时发生错误。\n请检查配置文件格式是否正确。"), 
-                Constants::APP_NAME, MB_ICONERROR | MB_OK);
+            MessageBox(NULL, m_strings.LOAD_CONFIG_FAILED.c_str(), 
+                m_strings.APP_NAME.c_str(), MB_ICONERROR | MB_OK);
+        }
+    }
+    
+    bool AddCustomSize(const std::wstring& sizeStr) {
+        size_t xPos = sizeStr.find(TEXT("x"));
+        if (xPos == std::wstring::npos) return false;
+        
+        try {
+            int width = std::stoi(sizeStr.substr(0, xPos));
+            int height = std::stoi(sizeStr.substr(xPos + 1));
+            if (width <= 0 || height <= 0) return false;
+            
+            m_sizes.emplace_back(sizeStr, width, height);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+
+    void LoadCustomSizes() {
+        try {
+            TCHAR buffer[1024];
+            if (GetPrivateProfileString(Constants::CUSTOM_SIZE_SECTION,
+                                      Constants::CUSTOM_SIZE_LIST,
+                                      TEXT(""), buffer, _countof(buffer),
+                                      m_configPath.c_str()) > 0) {
+                std::wstring sizes = buffer;
+                if (sizes.empty()) return;
+
+                bool hasError = false;
+                std::wstring errorDetails;
+                
+                // 分割并处理每个尺寸
+                size_t start = 0, end = 0;
+                while ((end = sizes.find(TEXT(","), start)) != std::wstring::npos) {
+                    std::wstring size = sizes.substr(start, end - start);
+                    if (!AddCustomSize(size)) {
+                        hasError = true;
+                        errorDetails += size + TEXT(", ");
+                    }
+                    start = end + 1;
+                }
+                
+                // 处理最后一个尺寸
+                if (start < sizes.length()) {
+                    std::wstring size = sizes.substr(start);
+                    if (!AddCustomSize(size)) {
+                        hasError = true;
+                        errorDetails += size;
+                    }
+                }
+
+                if (hasError) {
+                    std::wstring errorMsg = m_strings.CONFIG_FORMAT_ERROR + errorDetails + 
+                                          TEXT("\n") + m_strings.SIZE_FORMAT_EXAMPLE;
+                    MessageBox(NULL, errorMsg.c_str(), m_strings.APP_NAME.c_str(), 
+                              MB_ICONWARNING | MB_OK);
+                }
+            }
+        } catch (...) {
+            MessageBox(NULL, m_strings.LOAD_CONFIG_FAILED.c_str(), 
+                m_strings.APP_NAME.c_str(), MB_ICONERROR | MB_OK);
         }
     }
 
@@ -1125,74 +1191,6 @@ private:
         return gameWindow;
     }
 
-    bool AddCustomSize(const std::wstring& sizeStr) {
-        size_t xPos = sizeStr.find(TEXT("x"));
-        if (xPos == std::wstring::npos) return false;
-        
-        try {
-            int width = std::stoi(sizeStr.substr(0, xPos));
-            int height = std::stoi(sizeStr.substr(xPos + 1));
-            if (width <= 0 || height <= 0) return false;
-            
-            m_sizes.emplace_back(sizeStr, width, height);
-            return true;
-        } catch (...) {
-            return false;
-        }
-    }
-
-    void LoadCustomSizes() {
-        try {
-            TCHAR buffer[1024];
-            if (GetPrivateProfileString(Constants::CUSTOM_SIZE_SECTION,
-                                      Constants::CUSTOM_SIZE_LIST,
-                                      TEXT(""), buffer, _countof(buffer),
-                                      m_configPath.c_str()) > 0) {
-                std::wstring sizes = buffer;
-                if (sizes.empty()) return;
-
-                bool hasError = false;
-                std::wstring errorDetails;
-                
-                // 分割并处理每个尺寸
-                size_t start = 0, end = 0;
-                while ((end = sizes.find(TEXT(","), start)) != std::wstring::npos) {
-                    std::wstring size = sizes.substr(start, end - start);
-                    if (!AddCustomSize(size)) {
-                        hasError = true;
-                        errorDetails += size + TEXT("\n");
-                    }
-                    start = end + 1;
-                }
-                
-                // 处理最后一个尺寸
-                if (start < sizes.length()) {
-                    std::wstring size = sizes.substr(start);
-                    if (!AddCustomSize(size)) {
-                        hasError = true;
-                        errorDetails += size;
-                    }
-                }
-
-                if (hasError) {
-                    std::wstring errorMsg = TEXT("以下自定义尺寸格式错误：\n\n") + 
-                                          errorDetails + TEXT("\n\n") +
-                                          TEXT("请确保：\n") +
-                                          TEXT("1. 使用英文字母 \"x\" 分隔宽高\n") +
-                                          TEXT("2. 使用英文逗号 \",\" 分隔多个尺寸\n") +
-                                          TEXT("3. 只输入数字，例如：1920x1080,2560x1440");
-                    
-                    MessageBox(NULL, errorMsg.c_str(), Constants::APP_NAME, 
-                              MB_ICONWARNING | MB_OK);
-                }
-            }
-        } catch (...) {
-            MessageBox(NULL, 
-                TEXT("加载自定义尺寸时发生错误。\n请检查配置文件格式是否正确。"), 
-                Constants::APP_NAME, MB_ICONERROR | MB_OK);
-        }
-    }
-
     void OpenConfigFile() {
         ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
                     m_configPath.c_str(), NULL, SW_SHOW);
@@ -1202,11 +1200,15 @@ private:
     }
 };
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(
+    _In_ HINSTANCE hInstance,
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPSTR lpCmdLine,
+    _In_ int nCmdShow) {
     WindowResizerApp app;
     
     if (!app.Initialize(hInstance)) {
-        MessageBox(NULL, TEXT("应用程序初始化失败"), 
+        MessageBox(NULL, TEXT("Application initialization failed."), 
                   Constants::APP_NAME, MB_ICONERROR);
         return 1;
     }

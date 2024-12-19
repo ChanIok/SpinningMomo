@@ -17,6 +17,16 @@
   <img src="../docs/README.jpg" alt="Screenshot" >
 </div>
 
+## 🎯 Project Introduction
+
+SpinningMomo was initially developed to solve the portrait photography issue in the game "Infinity Nikki".
+
+It allows you to easily switch window ratios and sizes using hotkeys, perfectly meeting various composition needs. Whether it's portrait photography, album browsing, or photo booth, you can achieve the best display effect.
+
+You can even break through the game and device resolution limits to output ultra-high resolution photos in 8K or even 12K+!
+
+> If you find this tool helpful, please consider giving it a Star ⭐!
+
 ## ✨ Features
 
 <div align="center">
