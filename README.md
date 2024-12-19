@@ -3,8 +3,10 @@
     <img src="./docs/logo.png" width="200" alt="SpinningMomo Logo">
     <br/>
     🎮 旋转吧大喵
+    <br/><br/>
+    <sup>一个为 《无限暖暖》 提升摄影体验的窗口调整工具</sup>
     <br/>
-    <sup>优雅的 《无限暖暖》 窗口比例和尺寸调整工具</sup>
+
   </h1>
 
   <p>
@@ -17,7 +19,8 @@
     <b>
       <a href="#-特色功能">特色功能</a> •
       <a href="#-使用指南">使用指南</a> •
-      <a href="#️-构建指南">构建指南</a> 
+      <a href="#️-构建指南">构建指南</a> •
+      <a href="./docs/README_EN.md">English</a>
     </b>
   </p>
 

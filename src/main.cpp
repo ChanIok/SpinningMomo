@@ -60,6 +60,15 @@ namespace Constants {
     
     const TCHAR* CUSTOM_SIZE_SECTION = TEXT("CustomSize");    // 自定义尺寸配置节名
     const TCHAR* CUSTOM_SIZE_LIST = TEXT("SizeList");         // 自定义尺寸列表配置项
+    
+    // 语言相关
+    const TCHAR* LANG_SECTION = TEXT("Language");     // 语言配置节名
+    const TCHAR* LANG_CURRENT = TEXT("Current");      // 当前语言配置项
+    const TCHAR* LANG_ZH_CN = TEXT("zh-CN");         // 中文
+    const TCHAR* LANG_EN_US = TEXT("en-US");         // 英文
+    
+    constexpr UINT ID_LANG_ZH_CN = 2010;    // 中文选项ID
+    constexpr UINT ID_LANG_EN_US = 2011;    // 英文选项ID
 }
 
 // 添加比例结构体定义
@@ -79,6 +88,93 @@ struct FixedSize {
     
     FixedSize(const std::wstring& n, int w, int h) 
         : name(n), width(w), height(h) {}
+};
+
+// 添加字符串资源结构体
+struct LocalizedStrings {
+    std::wstring APP_NAME;
+    std::wstring SELECT_WINDOW;
+    std::wstring WINDOW_RATIO;
+    std::wstring FIXED_SIZE;
+    std::wstring RESET_WINDOW;
+    std::wstring MODIFY_HOTKEY;
+    std::wstring SHOW_TIPS;
+    std::wstring WINDOW_TOPMOST;
+    std::wstring OPEN_CONFIG;
+    std::wstring EXIT;
+    std::wstring WINDOW_SELECTED;
+    std::wstring ADJUST_SUCCESS;
+    std::wstring ADJUST_FAILED;
+    std::wstring WINDOW_NOT_FOUND;
+    std::wstring RESET_SUCCESS;
+    std::wstring RESET_FAILED;
+    std::wstring HOTKEY_SETTING;
+    std::wstring HOTKEY_SET_SUCCESS;
+    std::wstring HOTKEY_SET_FAILED;
+    std::wstring CONFIG_HELP;
+    std::wstring STARTUP_MESSAGE;
+    std::wstring LANGUAGE;
+    std::wstring CHINESE;
+    std::wstring ENGLISH;
+    std::wstring HOTKEY_REGISTER_FAILED; 
+};
+
+// 中文字符串
+const LocalizedStrings ZH_CN = {
+    TEXT("旋转吧大喵"),
+    TEXT("选择窗口"),
+    TEXT("窗口比例"),
+    TEXT("固定尺寸"),
+    TEXT("重置窗口"),
+    TEXT("修改热键"),
+    TEXT("显示操作提示"),
+    TEXT("窗口置顶"),
+    TEXT("打开配置文件"),
+    TEXT("退出"),
+    TEXT("已选择窗口"),
+    TEXT("窗口调整成功！"),
+    TEXT("窗口调整失败。可能需要管理员权限，或窗口不支持调整大小。"),
+    TEXT("未找到目标窗口，请确保窗口已启动。"),
+    TEXT("窗口已重置为屏幕大小。"),
+    TEXT("重置窗口尺寸失败。"),
+    TEXT("请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键"),
+    TEXT("热键已设置为："),
+    TEXT("热键设置失败，已恢复默认热键。"),
+    TEXT("配置文件说明：\n1. [CustomRatio] 节用于添加自定义比例\n2. [CustomSize] 节用于添加自定义尺寸\n3. 保存后重启软件生效"),
+    TEXT("窗口比例调整工具已在后台运行。\n按 "),
+    TEXT("语言"),
+    TEXT("中文"),
+    TEXT("English"),
+    TEXT("热键注册失败。程序仍可使用，但快捷键将不可用。")
+};
+
+// 英文字符串
+const LocalizedStrings EN_US = {
+    TEXT("SpinningMomo"),
+    TEXT("Select Window"),
+    TEXT("Window Ratio"),
+    TEXT("Fixed Size"),
+    TEXT("Reset Window"),
+    TEXT("Modify Hotkey"),
+    TEXT("Show Tips"),
+    TEXT("Window Topmost"),
+    TEXT("Open Config"),
+    TEXT("Exit"),
+    TEXT("Window Selected"),
+    TEXT("Window adjusted successfully!"),
+    TEXT("Failed to adjust window. May need administrator privileges, or window doesn't support resizing."),
+    TEXT("Target window not found. Please make sure the window is running."),
+    TEXT("Window has been reset to screen size."),
+    TEXT("Failed to reset window size."),
+    TEXT("Press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys"),
+    TEXT("Hotkey set to: "),
+    TEXT("Hotkey setting failed, restored to default."),
+    TEXT("Config File Help:\n1. [CustomRatio] section for custom ratios\n2. [CustomSize] section for custom sizes\n3. Save and restart to apply"),
+    TEXT("Window ratio adjustment tool is running.\nPress "),
+    TEXT("Language"),
+    TEXT("中文"),
+    TEXT("English"),
+    TEXT("Failed to register hotkey. Program can still be used, but hotkey will be unavailable.")
 };
 
 // 系统托盘图标管理类
@@ -127,6 +223,11 @@ public:
             // 确保即使出错也能恢复正常状态
             m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
         }
+    }
+
+    void UpdateTip(const TCHAR* tip) {
+        StringCchCopy(m_nid.szTip, _countof(m_nid.szTip), tip);
+        Shell_NotifyIcon(NIM_MODIFY, &m_nid);
     }
 
 private:
@@ -264,14 +365,14 @@ public:
 
         // 注册热键
         if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, m_hotkeyModifiers, m_hotkeyKey)) {
-            ShowNotification(Constants::APP_NAME, 
-                TEXT("热键注册失败。程序仍可使用，但快捷键将不可用。"));
+            ShowNotification(m_strings.APP_NAME.c_str(), 
+                m_strings.HOTKEY_REGISTER_FAILED.c_str());
         }
 
         // 显示启动提示
         std::wstring hotkeyText = GetHotkeyText();
-        std::wstring message = TEXT("窗口比例调整工具已在后台运行。\n按 ") + hotkeyText + TEXT(" 打开调整菜单。");
-        ShowNotification(Constants::APP_NAME, message.c_str());
+        std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText;
+        ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
 
         return true;
     }
@@ -303,12 +404,13 @@ public:
             }
 
             InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
-                      (UINT_PTR)hWindowMenu, TEXT("选择窗口"));
+                      (UINT_PTR)hWindowMenu, m_strings.SELECT_WINDOW.c_str());
+            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
             m_windows = std::move(windows);
         }
 
-        // 比例选择
+        // 窗口操作组
         HMENU hRatioMenu = CreatePopupMenu();
         if (hRatioMenu) {
             for (size_t i = 0; i < m_ratios.size(); ++i) {
@@ -320,10 +422,9 @@ public:
             }
             
             InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
-                      (UINT_PTR)hRatioMenu, TEXT("窗口比例"));
+                      (UINT_PTR)hRatioMenu, m_strings.WINDOW_RATIO.c_str());
         }
 
-        // 固定尺寸选择
         HMENU hSizeMenu = CreatePopupMenu();
         if (hSizeMenu) {
             for (size_t i = 0; i < m_sizes.size(); ++i) {
@@ -335,29 +436,41 @@ public:
             }
             
             InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
-                      (UINT_PTR)hSizeMenu, TEXT("固定尺寸"));
+                      (UINT_PTR)hSizeMenu, m_strings.FIXED_SIZE.c_str());
         }
 
-        // 重置选项
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_RESET, TEXT("重置窗口"));
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_RESET, m_strings.RESET_WINDOW.c_str());
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, TEXT("修改热键"));
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-
-        // 其他设置
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_notifyEnabled ? MF_CHECKED : 0), 
-                  Constants::ID_NOTIFY, TEXT("显示操作提示"));
+        // 窗口置顶选项
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
-                  Constants::ID_TASKBAR, TEXT("窗口置顶"));
+                  Constants::ID_TASKBAR, m_strings.WINDOW_TOPMOST.c_str());
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 添加打开配置文件选项
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CONFIG, TEXT("打开配置文件"));
+        // 设置组
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_notifyEnabled ? MF_CHECKED : 0), 
+                  Constants::ID_NOTIFY, m_strings.SHOW_TIPS.c_str());
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, m_strings.MODIFY_HOTKEY.c_str());
+
+        // 语言选择
+        HMENU hLangMenu = CreatePopupMenu();
+        if (hLangMenu) {
+            InsertMenu(hLangMenu, -1, MF_BYPOSITION | MF_STRING | 
+                      (m_language == Constants::LANG_ZH_CN ? MF_CHECKED : 0),
+                      Constants::ID_LANG_ZH_CN, m_strings.CHINESE.c_str());
+            InsertMenu(hLangMenu, -1, MF_BYPOSITION | MF_STRING |
+                      (m_language == Constants::LANG_EN_US ? MF_CHECKED : 0),
+                      Constants::ID_LANG_EN_US, m_strings.ENGLISH.c_str());
+
+            InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP,
+                      (UINT_PTR)hLangMenu, m_strings.LANGUAGE.c_str());
+        }
+
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CONFIG, m_strings.OPEN_CONFIG.c_str());
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
         // 退出选项
-        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, TEXT("退出"));
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, m_strings.EXIT.c_str());
 
         // 显示菜单
         POINT pt;
@@ -375,8 +488,8 @@ public:
             m_windowTitle = m_windows[index].second;
             SaveConfig();
 
-            ShowNotification(Constants::APP_NAME, 
-                    TEXT("已选择窗口"));
+            ShowNotification(m_strings.APP_NAME.c_str(), 
+                    m_strings.WINDOW_SELECTED.c_str());
         }
     }
 
@@ -391,15 +504,12 @@ public:
                 if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
                                               m_topmostEnabled)) {
                     m_windowModified = true;
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口比例调整成功！"), true);
+                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
                 } else {
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口比例调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
+                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
                 }
             } else {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("未找到目标窗口，请确保窗口已启动。"));
+                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
         }
     }
@@ -414,29 +524,21 @@ public:
             if (gameWindow) {
                 if (ResizeWindowToFixedSize(gameWindow, m_sizes[index])) {
                     m_windowModified = true;
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口尺寸调整成功！"), true);
+                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
                 } else {
-                    ShowNotification(Constants::APP_NAME, 
-                        TEXT("窗口尺寸调整失败。可能需要管理员权限，或窗口不支持调整大小。"));
+                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
                 }
             } else {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("未找到目标窗口，请确保窗口已启动。"));
+                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
         }
     }
 
     void SetHotkey() {
-        // 注销现有热键
         UnregisterHotKey(m_hwnd, Constants::ID_TRAYICON);
-        
-        // 进入热键设置模式
         m_hotkeySettingMode = true;
-        
-        // 显示提示
-        ShowNotification(Constants::APP_NAME, 
-            TEXT("请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键"));
+        ShowNotification(m_strings.APP_NAME.c_str(), 
+            m_strings.HOTKEY_SETTING.c_str());
     }
 
     void ShowNotification(const TCHAR* title, const TCHAR* message, bool isSuccess = false) {
@@ -497,9 +599,8 @@ public:
             }
 
             case WM_KEYDOWN: {
-                // 处理热键设置
                 if (app && app->m_hotkeySettingMode) {
-                    // 获取修饰键状态
+                    // 获取修饰��状态
                     UINT modifiers = 0;
                     if (GetAsyncKeyState(VK_CONTROL) & 0x8000) modifiers |= MOD_CONTROL;
                     if (GetAsyncKeyState(VK_SHIFT) & 0x8000) modifiers |= MOD_SHIFT;
@@ -514,19 +615,16 @@ public:
                         // 尝试注册新热键
                         if (RegisterHotKey(hwnd, Constants::ID_TRAYICON, modifiers, static_cast<UINT>(wParam))) {
                             std::wstring hotkeyText = app->GetHotkeyText();
-                            std::wstring message = TEXT("热键已设置为：") + hotkeyText;
-                            app->ShowNotification(Constants::APP_NAME, message.c_str());
-                            // 保存新的热键配置
+                            std::wstring message = app->m_strings.HOTKEY_SET_SUCCESS + hotkeyText;
+                            app->ShowNotification(app->m_strings.APP_NAME.c_str(), message.c_str());
                             app->SaveHotkeyConfig();
                         } else {
-                            // 注册失败，恢复默认热键
                             app->m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;
                             app->m_hotkeyKey = 'R';
                             RegisterHotKey(hwnd, Constants::ID_TRAYICON, 
                                         app->m_hotkeyModifiers, app->m_hotkeyKey);
-                            app->ShowNotification(Constants::APP_NAME, 
-                                TEXT("热键设置失败，已恢复默认热键。"));
-                            // 保存默认热键配置
+                            app->ShowNotification(app->m_strings.APP_NAME.c_str(), 
+                                app->m_strings.HOTKEY_SET_FAILED.c_str());
                             app->SaveHotkeyConfig();
                         }
                     }
@@ -562,6 +660,12 @@ public:
                             break;
                         case Constants::ID_RESET:
                             app->ResetWindowSize();
+                            break;
+                        case Constants::ID_LANG_ZH_CN:
+                            app->ChangeLanguage(Constants::LANG_ZH_CN);
+                            break;
+                        case Constants::ID_LANG_EN_US:
+                            app->ChangeLanguage(Constants::LANG_EN_US);
                             break;
                     }
                 }
@@ -626,6 +730,8 @@ private:
     bool m_useScreenSize = true;    // 是否使用屏幕尺寸计算，默认开启
     bool m_windowModified = false;  // 窗口是否被修改过
     std::vector<FixedSize> m_sizes;  // 固定尺寸列表
+    LocalizedStrings m_strings;     // 当前语言的字符串
+    std::wstring m_language;        // 当前语言设置
 
     void InitializeRatios() {
         // 横屏比例（从宽到窄）
@@ -666,6 +772,7 @@ private:
         LoadWindowConfig();
         LoadNotifyConfig();
         LoadTopmostConfig();
+        LoadLanguageConfig();
     }
 
     void SaveConfig() {
@@ -673,6 +780,7 @@ private:
         SaveWindowConfig();
         SaveNotifyConfig();
         SaveTopmostConfig();
+        SaveLanguageConfig();
     }
 
     void LoadHotkeyConfig() {
@@ -762,27 +870,71 @@ private:
                                 m_configPath.c_str());
     }
 
+    void LoadLanguageConfig() {
+        TCHAR buffer[32];
+        if (GetPrivateProfileString(Constants::LANG_SECTION,
+                                  Constants::LANG_CURRENT,
+                                  TEXT(""), buffer, _countof(buffer),  // 注意这里改为空字符串
+                                  m_configPath.c_str()) > 0) {
+            // 配置文件中有语言设置，直接使用
+            m_language = buffer;
+        } else {
+            // 配置文件中没有语言设置，根据系统语言选择默认值
+            LANGID langId = GetUserDefaultUILanguage();
+            WORD primaryLangId = PRIMARYLANGID(langId);
+            
+            // 如果是中文，使用中文，否则使用英文
+            m_language = (primaryLangId == LANG_CHINESE) ? 
+                Constants::LANG_ZH_CN : Constants::LANG_EN_US;
+            
+            // 保存默认语言设置
+            SaveLanguageConfig();
+        }
+
+        // 加载对应语言的字符串
+        m_strings = (m_language == Constants::LANG_EN_US) ? EN_US : ZH_CN;
+    }
+
+    void SaveLanguageConfig() {
+        WritePrivateProfileString(Constants::LANG_SECTION,
+                                Constants::LANG_CURRENT,
+                                m_language.c_str(),
+                                m_configPath.c_str());
+    }
+
+    void ChangeLanguage(const std::wstring& lang) {
+        if (m_language != lang) {
+            m_language = lang;
+            m_strings = (lang == Constants::LANG_EN_US) ? EN_US : ZH_CN;
+            SaveLanguageConfig();
+            
+            // 更新托盘图标提示文本
+            if (m_trayIcon) {
+                m_trayIcon->UpdateTip(m_strings.APP_NAME.c_str());
+            }
+        }
+    }
+
     void ResetWindowSize() {
         HWND gameWindow = FindTargetWindow();
         if (gameWindow) {
-            // 创建一个比例对象用于重置为屏幕大小
-            AspectRatio resetRatio(TEXT("重置"), 
+            AspectRatio resetRatio(m_strings.RESET_WINDOW, 
                                  static_cast<double>(GetSystemMetrics(SM_CXSCREEN)) / 
                                  GetSystemMetrics(SM_CYSCREEN));
             
             if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled)) {
                 m_windowModified = true;
-                m_currentRatioIndex = SIZE_MAX;  // 清除选择状态
+                m_currentRatioIndex = SIZE_MAX;
                 m_currentSizeIndex = SIZE_MAX;
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("窗口已重置为屏幕大小。"), true);
+                ShowNotification(m_strings.APP_NAME.c_str(), 
+                    m_strings.RESET_SUCCESS.c_str(), true);
             } else {
-                ShowNotification(Constants::APP_NAME, 
-                    TEXT("重置窗口尺寸失败。"));
+                ShowNotification(m_strings.APP_NAME.c_str(), 
+                    m_strings.RESET_FAILED.c_str());
             }
         } else {
-            ShowNotification(Constants::APP_NAME, 
-                TEXT("未找到目标窗口，请确保窗口已启动。"));
+            ShowNotification(m_strings.APP_NAME.c_str(), 
+                m_strings.WINDOW_NOT_FOUND.c_str());
         }
     }
 
@@ -790,7 +942,7 @@ private:
         HMENU hMenu = CreatePopupMenu();
         if (!hMenu) return;
 
-        // 添加比例选项
+        // 比例选项
         for (size_t i = 0; i < m_ratios.size(); ++i) {
             UINT flags = MF_BYPOSITION | MF_STRING;
             if (i == m_currentRatioIndex) {
@@ -800,10 +952,9 @@ private:
                       Constants::ID_RATIO_BASE + i, m_ratios[i].name.c_str());
         }
 
-        // 添加分隔线
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 添加固定尺寸选项
+        // 固定尺寸选项
         for (size_t i = 0; i < m_sizes.size(); ++i) {
             UINT flags = MF_BYPOSITION | MF_STRING;
             if (i == m_currentSizeIndex) {
@@ -813,14 +964,15 @@ private:
                       Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
         }
 
-        // 添加分隔线
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-        // 添加重置和置顶选项
+        // 重置和置顶选项
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
-                  Constants::ID_RESET, TEXT("重置窗口"));
+                  Constants::ID_RESET, m_strings.RESET_WINDOW.c_str());
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
-                  Constants::ID_TASKBAR, TEXT("窗口置顶"));
+                  Constants::ID_TASKBAR, m_strings.WINDOW_TOPMOST.c_str());
 
         // 显示菜单
         SetForegroundWindow(m_hwnd);
@@ -1042,16 +1194,11 @@ private:
     }
 
     void OpenConfigFile() {
-        // 打开配置文件
         ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
                     m_configPath.c_str(), NULL, SW_SHOW);
         
-        // 显示提示
-        ShowNotification(Constants::APP_NAME, 
-            TEXT("配置文件说明：\n"
-                 "1. [CustomRatio] 节用于添加自定义比例\n"
-                 "2. [CustomSize] 节用于添加自定义尺寸\n"
-                 "3. 保存后重启软件生效"));
+        ShowNotification(m_strings.APP_NAME.c_str(), 
+            m_strings.CONFIG_HELP.c_str());
     }
 };
 
