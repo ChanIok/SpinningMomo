@@ -70,6 +70,8 @@ You can even break through the game and device resolution limits to output ultra
   - Press space to capture
   - Reset window when done
   - Get 8K+ resolution photos
+- Note:
+  - If photo quality is set to 4K, the output image ratio will be limited to your monitor's native aspect ratio and its vertical orientation
 
 ## ⚙️ Preset Options
 
