@@ -82,6 +82,7 @@ You can even break through the game and device resolution limits to output ultra
 
 ## 📌 Requirements
 
+- Windows 10 or above
 - [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 
 ## 📄 License

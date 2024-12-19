@@ -127,6 +127,7 @@
 
 ### 注意事项
 
+- 系统要求：Windows 10 及以上版本
 - [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
   - 如果运行时提示缺少 DLL，请安装此运行时库
 

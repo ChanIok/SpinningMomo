@@ -9,6 +9,8 @@
 #include <strsafe.h>
 #include <vector>
 #include <dwmapi.h>
+#include <ShellScalingApi.h>
+#pragma comment(lib, "Shcore.lib")
 
 #define IDI_ICON1 101  // 添加图标ID定义
 
@@ -1210,6 +1212,10 @@ int WINAPI WinMain(
     _In_opt_ HINSTANCE hPrevInstance,
     _In_ LPSTR lpCmdLine,
     _In_ int nCmdShow) {
+    
+    // 设置 DPI 感知
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    
     WindowResizerApp app;
     
     if (!app.Initialize(hInstance)) {
