@@ -19,7 +19,7 @@
 
 ## 🎯 Project Introduction
 
-SpinningMomo was initially developed to solve the vertical composition issue in the game "Infinity Nikki".
+SpinningMomo was initially developed to solve the portrait photography issue in the game "Infinity Nikki".
 
 It allows you to easily switch window ratios and sizes using hotkeys, perfectly meeting various composition needs. Whether it's vertical shooting, album browsing, or snapshot hourglass, you can achieve the best display effect.
 
@@ -32,7 +32,7 @@ You can even break through the game and device resolution limits to output ultra
 <div align="center">
   <table>
     <tr>
-      <td align="center">🎮 <b>Vertical Mode</b><br/>Perfect support for vertical UI</td>
+      <td align="center">🎮 <b>Portrait Mode</b><br/>Perfect support for vertical UI</td>
       <td align="center">📸 <b>Ultra-High Resolution</b><br/>Support 8K+ photo output</td>
     </tr>
     <tr>
