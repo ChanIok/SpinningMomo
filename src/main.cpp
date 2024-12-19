@@ -252,7 +252,12 @@ class WindowResizer {
 public:
     // 添加查找指定标题窗口的方法
     static HWND FindGameWindow() {
-        return FindWindow(NULL, TEXT("无限暖暖  "));  // 修正为正确的空格数量（两个空格）
+        // 先尝试查找中文标题
+        HWND hwnd = FindWindow(NULL, TEXT("无限暖暖  "));
+        if (hwnd) return hwnd;
+        
+        // 如果找不到中文标题，尝试英文标题
+        return FindWindow(NULL, TEXT("Infinity Nikki  "));
     }
 
     static std::wstring TrimRight(const std::wstring& str) {
