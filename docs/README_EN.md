@@ -46,7 +46,7 @@ It can even break through the original resolution limitations of the game and de
       <td align="center">📸 <b>Ultra-High Resolution</b><br/>Support photo output beyond game and device resolution limits</td>
     </tr>
     <tr>
-      <td align="center">📐 <b>Flexible Adjustment</b><br/>Multiple presets, custom ratios and scale factors</td>
+      <td align="center">📐 <b>Flexible Adjustment</b><br/>Multiple presets, custom ratios and resolutions</td>
       <td align="center">⌨️ <b>Hotkey Support</b><br/>Customizable hotkey (default: Ctrl+Alt+R)</td>
     </tr>
     <tr>
@@ -62,7 +62,7 @@ It can even break through the original resolution limitations of the game and de
 
 1. Run the program as **Administrator**
 2. Press the hotkey (default: Ctrl+Alt+R) to open the adjustment menu
-3. Select desired ratio or scale factor
+3. Select desired ratio and resolution
 4. Use reset option to restore window after shooting
 
 ### Photography Mode Selection
@@ -73,13 +73,13 @@ It can even break through the original resolution limitations of the game and de
      * Photo Quality: Window Resolution
    - Steps:
      1. Use ratio options to adjust composition (e.g., 16:9, 3:2, 9:16)
-     2. For higher resolution, use scale factor options (e.g., 1.5x, 2.0x, 3.0x)
+     2. Select desired resolution preset (4K, 6K, 8K, 12K)
      3. Press space to capture
      4. Click reset window after shooting
    - Advantages:
-     * Support ultra-high resolution output (up to 8K and beyond)
+     * Support ultra-high resolution output (up to 12K and beyond)
      * Sharp image quality with rich details
-     * Freely adjustable ratio and scale factor
+     * Freely adjustable ratio and resolution
 
 2. Quick Mode
    - Game Settings:
@@ -89,17 +89,16 @@ It can even break through the original resolution limitations of the game and de
      * Advantages: Convenient operation, suitable for daily shooting and preview
      * Disadvantages:
        - Outputs pseudo-4K images, actual rendering quality is lower than window resolution option at the same size
-       - **Can only adjust ratio, cannot adjust scale factor**
+       - **Can only adjust ratio, cannot adjust resolution**
      * Suggestion: Sufficient for daily use if image quality is not a priority
 
 ### Resolution Explanation
 - Resolution calculation process:
-  1. First calculate base size according to ratio and monitor size
-     - Example: On a 2560×1440 monitor, selecting 9:16 vertical ratio
-     - Base size = 810×1440 (keeping monitor height, width calculated by ratio)
-  2. Then multiply base size by scale factor to get final output size
-     - Example: When selecting 2.0x scale factor
-     - Final output = 1620×2880 (810×1440 × 2.0)
+  1. First determine total pixel count based on selected resolution preset (e.g., 4K, 8K)
+  2. Calculate final width and height based on selected ratio
+     - Example: When selecting 8K (about 33.2M pixels) and 9:16 ratio
+     - Results in 4320x7680 output resolution (4320x7680=33.2M pixels)
+     - Ensures total pixel count matches preset value
 
 ### Tray Features
 
@@ -107,11 +106,11 @@ Right or left click the tray icon to:
 
 - 🎯 Select Target Window: Choose window to adjust from submenu
 - 📐 Window Ratio: Select preset ratios or custom ratio
-- 📏 Scale Factor: Choose preset scale factors or custom value
+- 📏 Resolution: Select preset resolution or custom resolution
 - ⌨️ Modify Hotkey: Set new hotkey combination (1-2 second delay for success message)
 - 🔔 Show Tips: Enable/disable operation tips
 - 📌 Keep Window Topmost: Keep window always on top
-- ⚙️ Open Config File: Customize ratios and scale factors
+- ⚙️ Open Config File: Customize ratios and resolutions
 - ❌ Exit: Close program
 
 ### Custom Settings
@@ -120,14 +119,18 @@ Right or left click the tray icon to:
 2. Add in config file:
    - Custom ratios: Add "16:10,17:10" after RatioList in [CustomRatio] section
      - Use colon(:) for width:height, comma(,) to separate multiple ratios
-   - Custom scale factors: Add "1.5,2.0,2.5" after ScaleList in [CustomScale] section
-     - Use comma(,) to separate multiple factors
+   - Custom resolutions: Add "6000x4000,7680x4320" after ResolutionList in [CustomResolution] section
+     - Use letter x to connect width and height, comma(,) to separate multiple resolutions
 3. Save and restart software to apply changes
 
 ### Preset Options
 
 - **Ratios**: 32:9, 21:9, 16:9, 3:2, 1:1, 2:3, 9:16
-- **Scale Factors**: 1.0x, 1.5x, 2.0x, 3.0x, 4.0x
+- **Resolutions**:
+  - 4K (3840×2160, about 8.3M pixels)
+  - 6K (5760×3240, about 18.7M pixels)
+  - 8K (7680×4320, about 33.2M pixels)
+  - 12K (11520×6480, about 74.6M pixels)
 
 ### Requirements
 
@@ -139,7 +142,7 @@ Right or left click the tray icon to:
   1. Although the output resolution reaches 4K, the actual rendering quality is lower than the window resolution option at the same size
   2. In fullscreen window mode, the output image ratio will be limited to the monitor's native ratio and its corresponding vertical ratio
   3. For best image quality, it's recommended to use fullscreen window mode + window resolution
-- Higher scale factors may affect game performance, please adjust according to your device capabilities
+- Higher resolutions may affect game performance, please adjust according to your device capabilities
 - It's recommended to test quality comparison before shooting to choose the most suitable settings
 
 ## 📄 License
