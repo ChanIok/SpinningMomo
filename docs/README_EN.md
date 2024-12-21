@@ -88,7 +88,7 @@ It can even break through the original resolution limitations of the game and de
    - Notes:
      * Advantages: Convenient operation, suitable for daily shooting and preview
      * Disadvantages:
-       - Outputs pseudo-4K images, actual rendering quality is lower than fullscreen window mode
+       - Outputs pseudo-4K images, actual rendering quality is lower than window resolution option at the same size
        - **Can only adjust ratio, cannot adjust scale factor**
      * Suggestion: Sufficient for daily use if image quality is not a priority
 
@@ -133,6 +133,14 @@ Right or left click the tray icon to:
 
 - System: Windows 10 or above
 - [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+
+### Notes
+- About 4K Photo Quality:
+  1. Although the output resolution reaches 4K, the actual rendering quality is lower than the window resolution option at the same size
+  2. In fullscreen window mode, the output image ratio will be limited to the monitor's native ratio and its corresponding vertical ratio
+  3. For best image quality, it's recommended to use fullscreen window mode + window resolution
+- Higher scale factors may affect game performance, please adjust according to your device capabilities
+- It's recommended to test quality comparison before shooting to choose the most suitable settings
 
 ## 📄 License
 
