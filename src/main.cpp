@@ -28,8 +28,8 @@ namespace Constants {
     constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID
     constexpr UINT ID_WINDOW_MAX = 3999;     // 窗口选择菜单项的最大ID
     constexpr UINT ID_RATIO_BASE = 4000;     // 比例菜单项的基础ID
-    constexpr UINT ID_SIZE_BASE = 5000;      // 固定尺寸菜单项的基础ID
-    constexpr UINT ID_SIZE_CUSTOM = 5999;    // 自定义尺寸菜单项ID
+    constexpr UINT ID_SCALE_BASE = 5000;     // 放大倍数菜单项的基础ID
+    constexpr UINT ID_SCALE_CUSTOM = 5999;   // 自定义放大倍数菜单项ID
     
     // 功能菜单项ID
     constexpr UINT ID_ROTATE = 2001;         
@@ -60,8 +60,8 @@ namespace Constants {
     const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
     const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
     
-    const TCHAR* CUSTOM_SIZE_SECTION = TEXT("CustomSize");    // 自定义尺寸配置节名
-    const TCHAR* CUSTOM_SIZE_LIST = TEXT("SizeList");         // 自定义尺寸列表配置项
+    const TCHAR* CUSTOM_SCALE_SECTION = TEXT("CustomScale");    // 自定义放大倍数配置节名
+    const TCHAR* CUSTOM_SCALE_LIST = TEXT("ScaleList");         // 自定义放大倍数列表配置项
     
     // 语言相关
     const TCHAR* LANG_SECTION = TEXT("Language");     // 语言配置节名
@@ -83,13 +83,12 @@ struct AspectRatio {
 };
 
 // 添加固定尺寸结构体定义
-struct FixedSize {
+struct ScaleSize {
     std::wstring name;     // 显示名称
-    int width;            // 宽度
-    int height;           // 高度
+    double scale;          // 放大倍数
     
-    FixedSize(const std::wstring& n, int w, int h) 
-        : name(n), width(w), height(h) {}
+    ScaleSize(const std::wstring& n, double s) 
+        : name(n), scale(s) {}
 };
 
 // 添加字符串资源结构体
@@ -130,7 +129,7 @@ const LocalizedStrings ZH_CN = {
     TEXT("旋转吧大喵"),
     TEXT("选择窗口"),
     TEXT("窗口比例"),
-    TEXT("固定尺寸"),
+    TEXT("放大倍数"),
     TEXT("重置窗口"),
     TEXT("修改热键"),
     TEXT("显示操作提示"),
@@ -146,7 +145,7 @@ const LocalizedStrings ZH_CN = {
     TEXT("请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键"),
     TEXT("热键已设置为："),
     TEXT("热键设置失败，已恢复默认热键。"),
-    TEXT("配置文件说明：\n1. [CustomRatio] 节用于添加自定义比例\n2. [CustomSize] 节用于添加自定义尺寸\n3. 保存后重启软件生效"),
+    TEXT("配置文件说明：\n1. [CustomRatio] 节用于添加自定义比例\n2. [CustomScale] 节用于添加自定义放大倍数\n3. 保存后重启软件生效"),
     TEXT("窗口比例调整工具已在后台运行。\n按 "),
     TEXT("语言"),
     TEXT("中文"),
@@ -154,7 +153,7 @@ const LocalizedStrings ZH_CN = {
     TEXT("热键注册失败。程序仍可使用，但快捷键将不可用。"),
     TEXT("格式错误："),
     TEXT("请使用正确格式，如：16:10,17:10"),
-    TEXT("请使用正确格式，如：1920x1080,2560x1440"),
+    TEXT("请使用正确格式，如：1.5,2.0,2.5"),
     TEXT("加载配置失败，请检查配置文件。")
 };
 
@@ -163,7 +162,7 @@ const LocalizedStrings EN_US = {
     TEXT("SpinningMomo"),
     TEXT("Select Window"),
     TEXT("Window Ratio"),
-    TEXT("Fixed Size"),
+    TEXT("Scale Factor"),
     TEXT("Reset Window"),
     TEXT("Modify Hotkey"),
     TEXT("Show Tips"),
@@ -179,7 +178,7 @@ const LocalizedStrings EN_US = {
     TEXT("Press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys"),
     TEXT("Hotkey set to: "),
     TEXT("Hotkey setting failed, restored to default."),
-    TEXT("Config File Help:\n1. [CustomRatio] section for custom ratios\n2. [CustomSize] section for custom sizes\n3. Save and restart to apply"),
+    TEXT("Config File Help:\n1. [CustomRatio] section for custom ratios\n2. [CustomScale] section for custom scale factors\n3. Save and restart to apply"),
     TEXT("Window ratio adjustment tool is running.\nPress "),
     TEXT("Language"),
     TEXT("中文"),
@@ -187,7 +186,7 @@ const LocalizedStrings EN_US = {
     TEXT("Failed to register hotkey. Program can still be used, but hotkey will be unavailable."),
     TEXT("Format error: "),
     TEXT("Please use correct format, e.g.: 16:10,17:10"),
-    TEXT("Please use correct format, e.g.: 1920x1080,2560x1440"),
+    TEXT("Please use correct format, e.g.: 1.5,2.0,2.5"),
     TEXT("Failed to load config, please check the config file.")
 };
 
@@ -366,7 +365,7 @@ public:
         // 加载配置
         LoadConfig();
         InitializeRatios();
-        InitializeFixedSizes();
+        InitializeScaleSizes();
         LoadCustomRatios();
         LoadCustomSizes();
     }
@@ -448,10 +447,10 @@ public:
         if (hSizeMenu) {
             for (size_t i = 0; i < m_sizes.size(); ++i) {
                 UINT flags = MF_BYPOSITION | MF_STRING;
-                if (i == m_currentSizeIndex) {
+                if (i == m_currentScaleIndex) {
                     flags |= MF_CHECKED;
                 }
-                InsertMenu(hSizeMenu, -1, flags, Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
+                InsertMenu(hSizeMenu, -1, flags, Constants::ID_SCALE_BASE + i, m_sizes[i].name.c_str());
             }
             
             InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
@@ -516,37 +515,24 @@ public:
         size_t index = id - Constants::ID_RATIO_BASE;
         if (index < m_ratios.size()) {
             m_currentRatioIndex = index;
-            m_currentSizeIndex = SIZE_MAX;  // 清除尺寸选择
             
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
-                if (WindowResizer::ResizeWindow(gameWindow, m_ratios[m_currentRatioIndex], 
-                                              m_topmostEnabled)) {
-                    m_windowModified = true;
-                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
-                } else {
-                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
-                }
+                ApplyWindowTransform(gameWindow);
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
         }
     }
 
-    void HandleSizeSelect(UINT id) {
-        size_t index = id - Constants::ID_SIZE_BASE;
+    void HandleScaleSelect(UINT id) {
+        size_t index = id - Constants::ID_SCALE_BASE;
         if (index < m_sizes.size()) {
-            m_currentSizeIndex = index;
-            m_currentRatioIndex = SIZE_MAX;  // 清除比例选择
+            m_currentScaleIndex = index;
             
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
-                if (ResizeWindowToFixedSize(gameWindow, m_sizes[index])) {
-                    m_windowModified = true;
-                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
-                } else {
-                    ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
-                }
+                ApplyWindowTransform(gameWindow);
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
@@ -619,7 +605,7 @@ public:
 
             case WM_KEYDOWN: {
                 if (app && app->m_hotkeySettingMode) {
-                    // 获取修饰��状态
+                    // 获取修饰键状态
                     UINT modifiers = 0;
                     if (GetAsyncKeyState(VK_CONTROL) & 0x8000) modifiers |= MOD_CONTROL;
                     if (GetAsyncKeyState(VK_SHIFT) & 0x8000) modifiers |= MOD_SHIFT;
@@ -656,8 +642,8 @@ public:
                 WORD cmd = LOWORD(wParam);
                 if (cmd >= Constants::ID_RATIO_BASE && cmd < Constants::ID_RATIO_BASE + 1000) {  // 修改：使用范围检查
                     app->HandleRatioSelect(cmd);
-                } else if (cmd >= Constants::ID_SIZE_BASE && cmd <= Constants::ID_SIZE_CUSTOM) {
-                    app->HandleSizeSelect(cmd);
+                } else if (cmd >= Constants::ID_SCALE_BASE && cmd <= Constants::ID_SCALE_CUSTOM) {
+                    app->HandleScaleSelect(cmd);
                 } else if (cmd >= Constants::ID_WINDOW_BASE && cmd <= Constants::ID_WINDOW_MAX) {
                     app->HandleWindowSelect(cmd);
                 } else {
@@ -740,15 +726,15 @@ private:
     std::wstring m_windowTitle;                        // 保存的窗口标题
     UINT m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;   // 热键修饰键
     UINT m_hotkeyKey = 'R';                           // 热键主键
-    bool m_hotkeySettingMode = false;                  // 是否处于热键设置模式
-    bool m_notifyEnabled = false;                      // 是否显示提示，默认关闭
+    bool m_hotkeySettingMode = false;                 // 是否处于热键设置模式
+    bool m_notifyEnabled = false;                     // 是否显示提示，默认关闭
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     std::vector<AspectRatio> m_ratios;
-    size_t m_currentRatioIndex = SIZE_MAX;  // 修改：初始值表示未选择
-    size_t m_currentSizeIndex = SIZE_MAX;   // 添加：当前选择的尺寸索引
-    bool m_useScreenSize = true;    // 是否使用屏幕尺寸计算，默认开启
-    bool m_windowModified = false;  // 窗口是否被修改过
-    std::vector<FixedSize> m_sizes;  // 固定尺寸列表
+    size_t m_currentRatioIndex = SIZE_MAX;           // 当前选择的比例索引
+    size_t m_currentScaleIndex = 0;                  // 当前选择的放大倍数索引，默认为1.0x
+    bool m_useScreenSize = true;                     // 是否使用屏幕尺寸计算，默认开启
+    bool m_windowModified = false;                   // 窗口是否被修改过
+    std::vector<ScaleSize> m_sizes;                  // 放大倍数列表
     LocalizedStrings m_strings;     // 当前语言的字符串
     std::wstring m_language;        // 当前语言设置
 
@@ -765,12 +751,13 @@ private:
         m_ratios.emplace_back(TEXT("9:16"), 9.0/16.0);
     }
 
-    void InitializeFixedSizes() {
-        // 添加预设尺寸
-        m_sizes.emplace_back(TEXT("7680×4320 16:9"), 7680, 4320);
-        m_sizes.emplace_back(TEXT("4320×7680 9:16"), 4320, 7680);
-        m_sizes.emplace_back(TEXT("8192×5464 3:2"), 8192, 5464); 
-        m_sizes.emplace_back(TEXT("5464×8192 2:3"), 5464, 8192);
+    void InitializeScaleSizes() {
+        // 添加预设放大倍数
+        m_sizes.emplace_back(TEXT("1.0x"), 1.0);
+        m_sizes.emplace_back(TEXT("1.5x"), 1.5);
+        m_sizes.emplace_back(TEXT("2.0x"), 2.0);
+        m_sizes.emplace_back(TEXT("3.0x"), 3.0);
+        m_sizes.emplace_back(TEXT("4.0x"), 4.0);
     }
 
     void LoadConfig() {
@@ -783,7 +770,7 @@ private:
             WritePrivateProfileString(Constants::NOTIFY_SECTION, Constants::NOTIFY_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
-            WritePrivateProfileString(Constants::CUSTOM_SIZE_SECTION, Constants::CUSTOM_SIZE_LIST, TEXT(""), m_configPath.c_str());
+            WritePrivateProfileString(Constants::CUSTOM_SCALE_SECTION, Constants::CUSTOM_SCALE_LIST, TEXT(""), m_configPath.c_str());
         }
 
         // 加载各项配置
@@ -937,19 +924,12 @@ private:
     void ResetWindowSize() {
         HWND gameWindow = FindTargetWindow();
         if (gameWindow) {
-            AspectRatio resetRatio(m_strings.RESET_WINDOW, 
-                                 static_cast<double>(GetSystemMetrics(SM_CXSCREEN)) / 
-                                 GetSystemMetrics(SM_CYSCREEN));
+            m_currentRatioIndex = SIZE_MAX;  // 使用屏幕原始比例
+            m_currentScaleIndex = 0;         // 重置为1.0倍
             
-            if (WindowResizer::ResizeWindow(gameWindow, resetRatio, m_topmostEnabled)) {
-                m_windowModified = true;
-                m_currentRatioIndex = SIZE_MAX;
-                m_currentSizeIndex = SIZE_MAX;
+            if (ApplyWindowTransform(gameWindow)) {
                 ShowNotification(m_strings.APP_NAME.c_str(), 
                     m_strings.RESET_SUCCESS.c_str(), true);
-            } else {
-                ShowNotification(m_strings.APP_NAME.c_str(), 
-                    m_strings.RESET_FAILED.c_str());
             }
         } else {
             ShowNotification(m_strings.APP_NAME.c_str(), 
@@ -976,11 +956,11 @@ private:
         // 固定尺寸选项
         for (size_t i = 0; i < m_sizes.size(); ++i) {
             UINT flags = MF_BYPOSITION | MF_STRING;
-            if (i == m_currentSizeIndex) {
+            if (i == m_currentScaleIndex) {
                 flags |= MF_CHECKED;
             }
             InsertMenu(hMenu, -1, flags,
-                      Constants::ID_SIZE_BASE + i, m_sizes[i].name.c_str());
+                      Constants::ID_SCALE_BASE + i, m_sizes[i].name.c_str());
         }
 
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -1064,15 +1044,12 @@ private:
     }
     
     bool AddCustomSize(const std::wstring& sizeStr) {
-        size_t xPos = sizeStr.find(TEXT("x"));
-        if (xPos == std::wstring::npos) return false;
-        
         try {
-            int width = std::stoi(sizeStr.substr(0, xPos));
-            int height = std::stoi(sizeStr.substr(xPos + 1));
-            if (width <= 0 || height <= 0) return false;
+            double scale = std::stod(sizeStr);
+            if (scale <= 0) return false;
             
-            m_sizes.emplace_back(sizeStr, width, height);
+            std::wstring name = sizeStr + TEXT("x");
+            m_sizes.emplace_back(name, scale);
             return true;
         } catch (...) {
             return false;
@@ -1082,8 +1059,8 @@ private:
     void LoadCustomSizes() {
         try {
             TCHAR buffer[1024];
-            if (GetPrivateProfileString(Constants::CUSTOM_SIZE_SECTION,
-                                      Constants::CUSTOM_SIZE_LIST,
+            if (GetPrivateProfileString(Constants::CUSTOM_SCALE_SECTION,
+                                      Constants::CUSTOM_SCALE_LIST,
                                       TEXT(""), buffer, _countof(buffer),
                                       m_configPath.c_str()) > 0) {
                 std::wstring sizes = buffer;
@@ -1173,8 +1150,47 @@ private:
         return text;
     }
 
-    bool ResizeWindowToFixedSize(HWND hwnd, const FixedSize& size) {
-        return WindowResizer::ResizeWindow(hwnd, size.width, size.height, m_topmostEnabled);
+    bool ApplyWindowTransform(HWND hwnd) {
+        if (!hwnd) return false;
+
+        // 获取屏幕尺寸（只计算一次）
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+        // 获取当前的放大倍数
+        double scale = (m_currentScaleIndex < m_sizes.size()) ? 
+                      m_sizes[m_currentScaleIndex].scale : 1.0;
+
+        int finalWidth, finalHeight;
+        
+        // 如果选择了特定比例
+        if (m_currentRatioIndex != SIZE_MAX && m_currentRatioIndex < m_ratios.size()) {
+            double targetRatio = m_ratios[m_currentRatioIndex].ratio;
+            double screenRatio = static_cast<double>(screenWidth) / screenHeight;
+
+            // 计算基准尺寸
+            if (targetRatio > screenRatio) {
+                finalWidth = static_cast<int>(screenWidth * scale);
+                finalHeight = static_cast<int>(finalWidth / targetRatio);
+            } else {
+                finalHeight = static_cast<int>(screenHeight * scale);
+                finalWidth = static_cast<int>(finalHeight * targetRatio);
+            }
+        } else {
+            // 直接使用屏幕比例
+            finalWidth = static_cast<int>(screenWidth * scale);
+            finalHeight = static_cast<int>(screenHeight * scale);
+        }
+
+        // 直接调用 ResizeWindow
+        if (WindowResizer::ResizeWindow(hwnd, finalWidth, finalHeight, m_topmostEnabled)) {
+            m_windowModified = true;
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
+            return true;
+        } else {
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
+            return false;
+        }
     }
 
     HWND FindTargetWindow() {
