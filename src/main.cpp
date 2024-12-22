@@ -12,6 +12,7 @@
 #include <dwmapi.h>
 #include <ShellScalingApi.h>
 #pragma comment(lib, "Shcore.lib")
+#pragma comment(lib, "Shell32.lib")  // 添加 Shell32.lib 链接器指令
 
 #define IDI_ICON1 101  // 添加图标ID定义
 
@@ -39,6 +40,7 @@ namespace Constants {
     constexpr UINT ID_EXIT = 2005;           // 退出菜单项ID
     constexpr UINT ID_RESET = 2006;          // 重置窗口尺寸菜单项ID
     constexpr UINT ID_CONFIG = 2009;         // 打开配置文件菜单项ID
+    constexpr UINT ID_AUTOHIDE_TASKBAR = 2007;    // 任务栏自动隐藏菜单项ID
     
     // 配置文件相关
     const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -68,6 +70,9 @@ namespace Constants {
     const TCHAR* LANG_CURRENT = TEXT("Current");      // 当前语言配置项
     const TCHAR* LANG_ZH_CN = TEXT("zh-CN");         // 中文
     const TCHAR* LANG_EN_US = TEXT("en-US");         // 英文
+    
+    const TCHAR* TASKBAR_SECTION = TEXT("Taskbar");    // 任务栏配置节名
+    const TCHAR* TASKBAR_AUTOHIDE = TEXT("AutoHide");  // 任务栏自动隐藏配置项
     
     constexpr UINT ID_LANG_ZH_CN = 2010;    // 中文选项ID
     constexpr UINT ID_LANG_EN_US = 2011;    // 英文选项ID
@@ -125,6 +130,7 @@ struct LocalizedStrings {
     std::wstring RATIO_FORMAT_EXAMPLE;     // 添加比例格式示例
     std::wstring RESOLUTION_FORMAT_EXAMPLE;  
     std::wstring LOAD_CONFIG_FAILED;       // 添加加载失败提示
+    std::wstring TASKBAR_AUTOHIDE;
 };
 
 // 中文字符串
@@ -157,7 +163,8 @@ const LocalizedStrings ZH_CN = {
     TEXT("格式错误："),
     TEXT("请使用正确格式，如：16:10,17:10"),
     TEXT("请使用正确格式，如：3840x2160,7680x4320"),
-    TEXT("加载配置失败，请检查配置文件。")
+    TEXT("加载配置失败，请检查配置文件。"),
+    TEXT("任务栏自动隐藏")
 };
 
 // 英文字符串
@@ -190,7 +197,8 @@ const LocalizedStrings EN_US = {
     TEXT("Format error: "),
     TEXT("Please use correct format, e.g.: 16:10,17:10"),
     TEXT("Please use correct format, e.g.: 3840x2160,7680x4320"),
-    TEXT("Failed to load config, please check the config file.")
+    TEXT("Failed to load config, please check the config file."),
+    TEXT("Auto-hide Taskbar")
 };
 
 // 系统托盘图标管理类
@@ -254,7 +262,24 @@ private:
 // 菜单窗口类
 class MenuWindow {
 public:
-    MenuWindow(HINSTANCE hInstance) : m_hInstance(hInstance) {
+    // 列表项类型
+    enum class ItemType {
+        Ratio,
+        Resolution,
+        Topmost,
+        TaskbarAutoHide,  // 添加任务栏自动隐藏类型
+        Reset
+    };
+
+    // 列表项结构
+    struct MenuItem {
+        std::wstring text;
+        ItemType type;
+        int index;  // 在对应类型中的索引
+    };
+
+    MenuWindow(HINSTANCE hInstance) 
+        : m_hInstance(hInstance) {
         RegisterWindowClass();
 
         // 获取系统 DPI
@@ -266,23 +291,27 @@ public:
     }
 
     bool Create(HWND parent, const std::vector<AspectRatio>& ratios, 
-                const std::vector<ResolutionPreset>& resolutions) {
+                const std::vector<ResolutionPreset>& resolutions,
+                const LocalizedStrings& strings) {
         m_hwndParent = parent;
         m_ratioItems = ratios;
         m_resolutionItems = resolutions;
         
-        // 计算DPI缩放后的窗口大小
-        float dpiScale = static_cast<float>(m_dpi) / 96.0f;
-        int scaledWidth = static_cast<int>(250 * dpiScale);
-        int scaledHeight = static_cast<int>(400 * dpiScale);
+        // 初始化列表项
+        InitializeItems(strings);
+        
+        // 计算总窗口宽度（三列之和）
+        int totalWidth = m_ratioColumnWidth + m_resolutionColumnWidth + m_settingsColumnWidth;
+        // 使用计算的高度
+        int windowHeight = CalculateWindowHeight();
         
         // 获取主显示器工作区
         RECT workArea;
         SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
         
-        // 计算窗口位置（屏幕右下角）
-        int xPos = workArea.right - scaledWidth - 20;  // 20像素的边距
-        int yPos = workArea.bottom - scaledHeight - 20;
+        // 计算窗口位置（屏幕中央）
+        int xPos = (workArea.right - workArea.left - totalWidth) / 2;
+        int yPos = (workArea.bottom - workArea.top - windowHeight) / 2;
         
         // 创建窗口
         m_hwnd = CreateWindowEx(
@@ -290,8 +319,8 @@ public:
             MENU_WINDOW_CLASS,
             TEXT("SpinningMomo"),
             WS_POPUP | WS_CLIPCHILDREN,
-            xPos, yPos,  // 使用计算的位置
-            scaledWidth, scaledHeight,
+            xPos, yPos,
+            totalWidth, windowHeight,
             parent,
             NULL,
             m_hInstance,
@@ -302,9 +331,6 @@ public:
 
         // 设置窗口透明度
         SetLayeredWindowAttributes(m_hwnd, 0, 230, LWA_ALPHA);
-
-        // 初始化列表项
-        InitializeItems();
 
         return true;
     }
@@ -341,22 +367,45 @@ public:
         }
     }
 
+    void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true) {
+        m_items.clear();
+        // 使用新的字符串引用初始化菜单项
+        InitializeItems(strings);
+        if (m_hwnd && forceRedraw) {
+            InvalidateRect(m_hwnd, NULL, TRUE);
+        }
+    }
+
+    HWND GetHwnd() const { return m_hwnd; }
+
 private:
     static constexpr const TCHAR* MENU_WINDOW_CLASS = TEXT("SpinningMomoMenuClass");
-    static constexpr int BASE_ITEM_HEIGHT = 24;        // 基础列表项高度（96 DPI）
-    static constexpr int BASE_TITLE_HEIGHT = 26;       // 基础标题栏高度（96 DPI）
-    static constexpr int BASE_SEPARATOR_HEIGHT = 1;    // 基础分隔线高度（96 DPI）
-    static constexpr int BASE_FONT_SIZE = 12;          // 基础字体大小（96 DPI）
-    static constexpr int BASE_TEXT_PADDING = 12;       // 基础文本内边距（96 DPI）
-    static constexpr int BASE_INDICATOR_WIDTH = 3;     // 基础指示器宽度（96 DPI）
+    // 基础尺寸（96 DPI）
+    static constexpr int BASE_ITEM_HEIGHT = 24;        // 列表项高度
+    static constexpr int BASE_TITLE_HEIGHT = 26;       // 标题栏高度
+    static constexpr int BASE_SEPARATOR_HEIGHT = 1;    // 分隔线高度
+    static constexpr int BASE_FONT_SIZE = 12;          // 字体大小
+    static constexpr int BASE_TEXT_PADDING = 12;       // 文本内边距
+    static constexpr int BASE_INDICATOR_WIDTH = 3;     // 指示器宽度
     
-    UINT m_dpi = 96;                                   // 当前 DPI 值
-    int m_itemHeight = BASE_ITEM_HEIGHT;               // 当前列表项高度
-    int m_titleHeight = BASE_TITLE_HEIGHT;             // 当前标题栏高度
-    int m_separatorHeight = BASE_SEPARATOR_HEIGHT;      // 当前分隔线高度
-    int m_fontSize = BASE_FONT_SIZE;                   // 当前字体大小
-    int m_textPadding = BASE_TEXT_PADDING;             // 当前文本内边距
-    int m_indicatorWidth = BASE_INDICATOR_WIDTH;       // 当前指示器宽度
+    // 添加列宽常量
+    static constexpr int BASE_RATIO_COLUMN_WIDTH = 60;      // 比例列宽度
+    static constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120; // 分辨率列宽度
+    static constexpr int BASE_SETTINGS_COLUMN_WIDTH = 90;   // 设置列宽度
+    
+    // DPI相关的尺寸变量
+    UINT m_dpi = 96;
+    int m_itemHeight = BASE_ITEM_HEIGHT;
+    int m_titleHeight = BASE_TITLE_HEIGHT;
+    int m_separatorHeight = BASE_SEPARATOR_HEIGHT;
+    int m_fontSize = BASE_FONT_SIZE;
+    int m_textPadding = BASE_TEXT_PADDING;
+    int m_indicatorWidth = BASE_INDICATOR_WIDTH;
+    
+    // 添加列宽变量
+    int m_ratioColumnWidth = BASE_RATIO_COLUMN_WIDTH;
+    int m_resolutionColumnWidth = BASE_RESOLUTION_COLUMN_WIDTH;
+    int m_settingsColumnWidth = BASE_SETTINGS_COLUMN_WIDTH;
 
     HWND m_hwnd = NULL;
     HWND m_hwndParent = NULL;
@@ -367,25 +416,9 @@ private:
     bool m_topmostEnabled = false;               // 窗口置顶状态
     std::vector<AspectRatio> m_ratioItems;       // 添加比例项列表
     std::vector<ResolutionPreset> m_resolutionItems;  // 添加分辨率选项引用
+    std::vector<MenuItem> m_items;               // 所有列表项
 
-    // 列表项类型
-    enum class ItemType {
-        Ratio,
-        Resolution,
-        Topmost,
-        Reset
-    };
-
-    // 列表项结构
-    struct MenuItem {
-        std::wstring text;
-        ItemType type;
-        int index;  // 在对应类型中的索引
-    };
-
-    std::vector<MenuItem> m_items;  // 所有列表项
-
-    void InitializeItems() {
+    void InitializeItems(const LocalizedStrings& strings) {
         // 添加比例选项
         for (size_t i = 0; i < m_ratioItems.size(); i++) {
             m_items.push_back({m_ratioItems[i].name, ItemType::Ratio, static_cast<int>(i)});
@@ -399,8 +432,9 @@ private:
         }
 
         // 添加设置选项
-        m_items.push_back({TEXT("窗口置顶"), ItemType::Topmost, 0});
-        m_items.push_back({TEXT("重置窗口"), ItemType::Reset, 0});
+        m_items.push_back({strings.WINDOW_TOPMOST, ItemType::Topmost, 0});
+        m_items.push_back({strings.TASKBAR_AUTOHIDE, ItemType::TaskbarAutoHide, 0});  // 添加任务栏自动隐藏选项
+        m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
     }
 
     void RegisterWindowClass() {
@@ -440,14 +474,25 @@ private:
                 m_dpi = HIWORD(wParam);
                 UpdateDpiDependentResources();
                 
-                // 获取建议的新窗口位置和大小
-                RECT* const prcNewWindow = (RECT*)lParam;
+                // 计算新的窗口大小
+                int totalWidth = m_ratioColumnWidth + m_resolutionColumnWidth + m_settingsColumnWidth;
+                int windowHeight = CalculateWindowHeight();
+                
+                // 获取当前窗口位置
+                RECT currentRect;
+                GetWindowRect(hwnd, &currentRect);
+                
+                // 保持窗口中心点不变
+                int newX = currentRect.left;
+                int newY = currentRect.top;
+                
+                // 设置新的窗口位置和大小
                 SetWindowPos(hwnd, 
                            NULL, 
-                           prcNewWindow->left, 
-                           prcNewWindow->top, 
-                           prcNewWindow->right - prcNewWindow->left, 
-                           prcNewWindow->bottom - prcNewWindow->top, 
+                           newX, 
+                           newY, 
+                           totalWidth,
+                           windowHeight,
                            SWP_NOZORDER | SWP_NOACTIVATE);
                 return 0;
             }
@@ -530,27 +575,50 @@ private:
         DrawText(memDC, TEXT("SpinningMomo"), -1, &titleRect, 
                 DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOCLIP);
 
-        // 绘制列表项
-        int y = m_titleHeight;
-        int currentSection = -1;
+        // 绘制分隔线
+        RECT sepRect = {rect.left, m_titleHeight, rect.right, m_titleHeight + m_separatorHeight};
+        HBRUSH hSepBrush = CreateSolidBrush(RGB(60, 60, 60));
+        FillRect(memDC, &sepRect, hSepBrush);
+
+        // 计算列宽和位置
+        int ratioColumnRight = m_ratioColumnWidth;
+        int resolutionColumnRight = ratioColumnRight + m_resolutionColumnWidth;
         
+        // 绘制垂直分隔线
+        RECT vSepRect1 = {ratioColumnRight, m_titleHeight, ratioColumnRight + m_separatorHeight, rect.bottom};
+        RECT vSepRect2 = {resolutionColumnRight, m_titleHeight, resolutionColumnRight + m_separatorHeight, rect.bottom};
+        FillRect(memDC, &vSepRect1, hSepBrush);
+        FillRect(memDC, &vSepRect2, hSepBrush);
+        DeleteObject(hSepBrush);
+
+        // 绘制列表项
+        int y = m_titleHeight + m_separatorHeight;  // 直接从分隔线下方开始
+        int settingsY = y;  // 为设置列单独维护一个Y坐标
+        
+        // 遍历所有项目并根据类型分配到不同列
         for (size_t i = 0; i < m_items.size(); i++) {
             const auto& item = m_items[i];
+            RECT itemRect;
             
-            // 检查是否需要添加分隔线
-            int newSection = static_cast<int>(item.type);
-            if (newSection != currentSection && currentSection != -1) {
-                RECT sepRect = {rect.left, y, rect.right, y + m_separatorHeight};
-                HBRUSH hSepBrush = CreateSolidBrush(RGB(60, 60, 60));
-                FillRect(memDC, &sepRect, hSepBrush);
-                DeleteObject(hSepBrush);
-                y += m_separatorHeight;
+            // 根据项目类型确定绘制位置
+            switch (item.type) {
+                case ItemType::Ratio:
+                    itemRect = {0, y, ratioColumnRight, y + m_itemHeight};
+                    break;
+                case ItemType::Resolution:
+                    itemRect = {ratioColumnRight + m_separatorHeight, y, 
+                              resolutionColumnRight, y + m_itemHeight};
+                    break;
+                case ItemType::Topmost:
+                case ItemType::Reset:
+                    itemRect = {resolutionColumnRight + m_separatorHeight, settingsY, 
+                              rect.right, settingsY + m_itemHeight};
+                    settingsY += m_itemHeight;  // 设置列的项目总是递增Y坐标
+                    break;
+                default:
+                    continue;
             }
-            currentSection = newSection;
 
-            // 绘制列表项
-            RECT itemRect = {rect.left, y, rect.right, y + m_itemHeight};
-            
             // 绘制悬停背景
             if (static_cast<int>(i) == m_hoverIndex) {
                 HBRUSH hHoverBrush = CreateSolidBrush(RGB(45, 45, 45));
@@ -569,7 +637,8 @@ private:
             }
 
             if (isSelected) {
-                RECT indicatorRect = {rect.left, y, rect.left + m_indicatorWidth, y + m_itemHeight};
+                RECT indicatorRect = {itemRect.left, itemRect.top, 
+                                    itemRect.left + m_indicatorWidth, itemRect.bottom};
                 HBRUSH hIndicatorBrush = CreateSolidBrush(RGB(0, 122, 204));
                 FillRect(memDC, &indicatorRect, hIndicatorBrush);
                 DeleteObject(hIndicatorBrush);
@@ -580,7 +649,17 @@ private:
             DrawText(memDC, item.text.c_str(), -1, &itemRect, 
                     DT_SINGLELINE | DT_VCENTER | DT_LEFT);
 
-            y += m_itemHeight;
+            // 只有在同一列中才增加y坐标
+            if ((i + 1 < m_items.size()) && (m_items[i + 1].type == item.type)) {
+                if (item.type != ItemType::Topmost && item.type != ItemType::Reset) {
+                    y += m_itemHeight;
+                }
+            } else if (i + 1 < m_items.size() && m_items[i + 1].type != item.type) {
+                // 如果下一项是不同类型，重置y坐标到列表顶部
+                if (m_items[i + 1].type != ItemType::Topmost && m_items[i + 1].type != ItemType::Reset) {
+                    y = m_titleHeight + m_separatorHeight;  // 重置到分隔线下方
+                }
+            }
         }
 
         // 复制到屏幕
@@ -640,6 +719,9 @@ private:
                     InvalidateRect(m_hwnd, NULL, TRUE);
                     SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_TASKBAR, 0);
                     break;
+                case ItemType::TaskbarAutoHide:  // 添加任务栏自动隐藏处理
+                    SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_AUTOHIDE_TASKBAR, 0);
+                    break;
                 case ItemType::Reset:
                     SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_RESET, 0);
                     break;
@@ -648,26 +730,44 @@ private:
     }
 
     int GetItemIndexFromPoint(int x, int y) {
-        if (y < m_titleHeight) return -1;
-        
-        int itemY = m_titleHeight;
-        int currentSection = -1;
-        
+        // 检查是否在标题栏或分隔线区域
+        if (y < m_titleHeight + m_separatorHeight) return -1;
+
+        // 计算列的边界
+        int ratioColumnRight = m_ratioColumnWidth;
+        int resolutionColumnRight = ratioColumnRight + m_resolutionColumnWidth;
+
+        // 确定点击的是哪一列
+        ItemType targetType;
+        if (x < ratioColumnRight) {
+            targetType = ItemType::Ratio;
+        } else if (x < resolutionColumnRight) {
+            targetType = ItemType::Resolution;
+        } else {
+            // 设置列的特殊处理
+            int settingsY = m_titleHeight + m_separatorHeight;
+            for (size_t i = 0; i < m_items.size(); i++) {
+                const auto& item = m_items[i];
+                if (item.type == ItemType::Topmost || item.type == ItemType::Reset) {
+                    if (y >= settingsY && y < settingsY + m_itemHeight) {
+                        return static_cast<int>(i);
+                    }
+                    settingsY += m_itemHeight;
+                }
+            }
+            return -1;
+        }
+
+        // 处理比例和分辨率列
+        int itemY = m_titleHeight + m_separatorHeight;
         for (size_t i = 0; i < m_items.size(); i++) {
             const auto& item = m_items[i];
-            
-            // 检查是否需要添加分隔线
-            int newSection = static_cast<int>(item.type);
-            if (newSection != currentSection && currentSection != -1) {
-                itemY += m_separatorHeight;
+            if (item.type == targetType) {
+                if (y >= itemY && y < itemY + m_itemHeight) {
+                    return static_cast<int>(i);
+                }
+                itemY += m_itemHeight;
             }
-            currentSection = newSection;
-
-            if (y >= itemY && y < itemY + m_itemHeight) {
-                return static_cast<int>(i);
-            }
-            
-            itemY += m_itemHeight;
         }
         
         return -1;
@@ -684,6 +784,47 @@ private:
         m_fontSize = static_cast<int>(BASE_FONT_SIZE * dpiScale);
         m_textPadding = static_cast<int>(BASE_TEXT_PADDING * dpiScale);
         m_indicatorWidth = static_cast<int>(BASE_INDICATOR_WIDTH * dpiScale);
+        
+        // 更新列宽
+        m_ratioColumnWidth = static_cast<int>(BASE_RATIO_COLUMN_WIDTH * dpiScale);
+        m_resolutionColumnWidth = static_cast<int>(BASE_RESOLUTION_COLUMN_WIDTH * dpiScale);
+        m_settingsColumnWidth = static_cast<int>(BASE_SETTINGS_COLUMN_WIDTH * dpiScale);
+    }
+
+    int CalculateWindowHeight() {
+        // 计算每列的项目数量
+        int ratioCount = 0;
+        int resolutionCount = 0;
+        int settingsCount = 0;
+
+        for (const auto& item : m_items) {
+            switch (item.type) {
+                case ItemType::Ratio:
+                    ratioCount++;
+                    break;
+                case ItemType::Resolution:
+                    resolutionCount++;
+                    break;
+                case ItemType::Topmost:
+                case ItemType::TaskbarAutoHide:
+                case ItemType::Reset:
+                    settingsCount++;
+                    break;
+            }
+        }
+
+        // 计算每列的高度
+        int ratioHeight = ratioCount * m_itemHeight;
+        int resolutionHeight = resolutionCount * m_itemHeight;
+        int settingsHeight = settingsCount * m_itemHeight;
+
+        // 找出最大高度
+        int maxColumnHeight = ratioHeight;
+        if (resolutionHeight > maxColumnHeight) maxColumnHeight = resolutionHeight;
+        if (settingsHeight > maxColumnHeight) maxColumnHeight = settingsHeight;
+
+        // 返回总高度
+        return m_titleHeight + m_separatorHeight + maxColumnHeight;
     }
 };
 
@@ -803,7 +944,7 @@ public:
 
         // 创建菜单窗口，传入比例和分辨率选项
         m_menuWindow = std::make_unique<MenuWindow>(hInstance);
-        if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions)) return false;
+        if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings)) return false;
 
         // 注册热键
         if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, m_hotkeyModifiers, m_hotkeyKey)) {
@@ -894,6 +1035,10 @@ public:
         // 置顶选项
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
                   Constants::ID_TASKBAR, m_strings.WINDOW_TOPMOST.c_str());
+        
+        // 添加任务栏自动隐藏选项
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_taskbarAutoHide ? MF_CHECKED : 0),
+                  Constants::ID_AUTOHIDE_TASKBAR, m_strings.TASKBAR_AUTOHIDE.c_str());
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
         // 设置组
@@ -1108,6 +1253,9 @@ public:
                         case Constants::ID_LANG_EN_US:
                             app->ChangeLanguage(Constants::LANG_EN_US);
                             break;
+                        case Constants::ID_AUTOHIDE_TASKBAR:
+                            app->ToggleTaskbarAutoHide();
+                            break;
                     }
                 }
                 return 0;
@@ -1176,6 +1324,7 @@ private:
     size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选择的分辨率索引，默认不选择
     HINSTANCE m_hInstance = NULL;  // 添加这行
     std::unique_ptr<MenuWindow> m_menuWindow;  // 添加这行
+    bool m_taskbarAutoHide = false;                    // 任务栏自动隐藏状态
 
     void InitializeRatios() {
         // 横屏比例（从宽到窄）
@@ -1239,6 +1388,7 @@ private:
         LoadNotifyConfig();
         LoadTopmostConfig();
         LoadLanguageConfig();
+        LoadTaskbarConfig();
     }
 
     void SaveConfig() {
@@ -1247,6 +1397,7 @@ private:
         SaveNotifyConfig();
         SaveTopmostConfig();
         SaveLanguageConfig();
+        SaveTaskbarConfig(); 
     }
 
     void LoadHotkeyConfig() {
@@ -1378,6 +1529,11 @@ private:
             if (m_trayIcon) {
                 m_trayIcon->UpdateTip(m_strings.APP_NAME.c_str());
             }
+
+            // 更新菜单窗口的文本
+            if (m_menuWindow) {
+                m_menuWindow->UpdateMenuItems(m_strings);
+            }
         }
     }
 
@@ -1435,8 +1591,13 @@ private:
                   Constants::ID_RESET, m_strings.RESET_WINDOW.c_str());
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
+        // 设置选项组
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_topmostEnabled ? MF_CHECKED : 0),
                   Constants::ID_TASKBAR, m_strings.WINDOW_TOPMOST.c_str());
+
+        // 添加任务栏自动隐藏选项
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_taskbarAutoHide ? MF_CHECKED : 0),
+                  Constants::ID_AUTOHIDE_TASKBAR, m_strings.TASKBAR_AUTOHIDE.c_str());
 
         // 显示菜单
         SetForegroundWindow(m_hwnd);
@@ -1686,6 +1847,40 @@ private:
         
         ShowNotification(m_strings.APP_NAME.c_str(), 
             m_strings.CONFIG_HELP.c_str());
+    }
+
+    void LoadTaskbarConfig() {
+        TCHAR buffer[32];
+        if (GetPrivateProfileString(Constants::TASKBAR_SECTION,
+                                  Constants::TASKBAR_AUTOHIDE,
+                                  TEXT("0"), buffer, _countof(buffer),
+                                  m_configPath.c_str()) > 0) {
+            m_taskbarAutoHide = (_wtoi(buffer) != 0);
+        }
+    }
+
+    void SaveTaskbarConfig() {
+        WritePrivateProfileString(Constants::TASKBAR_SECTION,
+                                Constants::TASKBAR_AUTOHIDE,
+                                m_taskbarAutoHide ? TEXT("1") : TEXT("0"),
+                                m_configPath.c_str());
+    }
+
+    void ToggleTaskbarAutoHide() {
+        APPBARDATA abd = {0};
+        abd.cbSize = sizeof(APPBARDATA);
+        
+        // 获取当前状态
+        UINT state = (UINT)SHAppBarMessage(ABM_GETSTATE, &abd);
+        bool currentAutoHide = (state & ABS_AUTOHIDE) != 0;
+        
+        // 切换状态
+        abd.lParam = currentAutoHide ? 0 : ABS_AUTOHIDE;
+        SHAppBarMessage(ABM_SETSTATE, &abd);
+        
+        // 更新状态并保存配置
+        m_taskbarAutoHide = !currentAutoHide;
+        SaveTaskbarConfig();
     }
 };
 
