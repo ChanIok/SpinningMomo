@@ -2,6 +2,7 @@
 #define _UNICODE
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <windowsx.h>
 #include <shellapi.h>
 #include <memory>
 #include <string>
@@ -250,6 +251,442 @@ private:
     NOTIFYICONDATA m_nid = {0};
 };
 
+// 菜单窗口类
+class MenuWindow {
+public:
+    MenuWindow(HINSTANCE hInstance) : m_hInstance(hInstance) {
+        RegisterWindowClass();
+
+        // 获取系统 DPI
+        HDC hdc = GetDC(NULL);
+        m_dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+        ReleaseDC(NULL, hdc);
+
+        UpdateDpiDependentResources();
+    }
+
+    bool Create(HWND parent, const std::vector<AspectRatio>& ratios, 
+                const std::vector<ResolutionPreset>& resolutions) {
+        m_hwndParent = parent;
+        m_ratioItems = ratios;
+        m_resolutionItems = resolutions;
+        
+        // 计算DPI缩放后的窗口大小
+        float dpiScale = static_cast<float>(m_dpi) / 96.0f;
+        int scaledWidth = static_cast<int>(250 * dpiScale);
+        int scaledHeight = static_cast<int>(400 * dpiScale);
+        
+        // 获取主显示器工作区
+        RECT workArea;
+        SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+        
+        // 计算窗口位置（屏幕右下角）
+        int xPos = workArea.right - scaledWidth - 20;  // 20像素的边距
+        int yPos = workArea.bottom - scaledHeight - 20;
+        
+        // 创建窗口
+        m_hwnd = CreateWindowEx(
+            WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+            MENU_WINDOW_CLASS,
+            TEXT("SpinningMomo"),
+            WS_POPUP | WS_CLIPCHILDREN,
+            xPos, yPos,  // 使用计算的位置
+            scaledWidth, scaledHeight,
+            parent,
+            NULL,
+            m_hInstance,
+            this
+        );
+
+        if (!m_hwnd) return false;
+
+        // 设置窗口透明度
+        SetLayeredWindowAttributes(m_hwnd, 0, 230, LWA_ALPHA);
+
+        // 初始化列表项
+        InitializeItems();
+
+        return true;
+    }
+
+    void Show() {
+        if (m_hwnd) {
+            ShowWindow(m_hwnd, SW_SHOW);
+            UpdateWindow(m_hwnd);
+        }
+    }
+
+    void Hide() {
+        if (m_hwnd) {
+            ShowWindow(m_hwnd, SW_HIDE);
+        }
+    }
+
+    bool IsVisible() const {
+        return m_hwnd && IsWindowVisible(m_hwnd);
+    }
+
+    void ToggleVisibility() {
+        if (IsVisible()) {
+            Hide();
+        } else {
+            Show();
+        }
+    }
+
+    void SetCurrentRatio(size_t index) {
+        if (index < m_ratioItems.size()) {
+            m_currentRatioIndex = index;
+            InvalidateRect(m_hwnd, NULL, TRUE);
+        }
+    }
+
+private:
+    static constexpr const TCHAR* MENU_WINDOW_CLASS = TEXT("SpinningMomoMenuClass");
+    static constexpr int BASE_ITEM_HEIGHT = 24;        // 基础列表项高度（96 DPI）
+    static constexpr int BASE_TITLE_HEIGHT = 26;       // 基础标题栏高度（96 DPI）
+    static constexpr int BASE_SEPARATOR_HEIGHT = 1;    // 基础分隔线高度（96 DPI）
+    static constexpr int BASE_FONT_SIZE = 12;          // 基础字体大小（96 DPI）
+    static constexpr int BASE_TEXT_PADDING = 12;       // 基础文本内边距（96 DPI）
+    static constexpr int BASE_INDICATOR_WIDTH = 3;     // 基础指示器宽度（96 DPI）
+    
+    UINT m_dpi = 96;                                   // 当前 DPI 值
+    int m_itemHeight = BASE_ITEM_HEIGHT;               // 当前列表项高度
+    int m_titleHeight = BASE_TITLE_HEIGHT;             // 当前标题栏高度
+    int m_separatorHeight = BASE_SEPARATOR_HEIGHT;      // 当前分隔线高度
+    int m_fontSize = BASE_FONT_SIZE;                   // 当前字体大小
+    int m_textPadding = BASE_TEXT_PADDING;             // 当前文本内边距
+    int m_indicatorWidth = BASE_INDICATOR_WIDTH;       // 当前指示器宽度
+
+    HWND m_hwnd = NULL;
+    HWND m_hwndParent = NULL;
+    HINSTANCE m_hInstance = NULL;
+    int m_hoverIndex = -1;                       // 当前鼠标悬停项
+    size_t m_currentRatioIndex = SIZE_MAX;       // 当前选中的比例索引
+    size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选中的分辨率索引
+    bool m_topmostEnabled = false;               // 窗口置顶状态
+    std::vector<AspectRatio> m_ratioItems;       // 添加比例项列表
+    std::vector<ResolutionPreset> m_resolutionItems;  // 添加分辨率选项引用
+
+    // 列表项类型
+    enum class ItemType {
+        Ratio,
+        Resolution,
+        Topmost,
+        Reset
+    };
+
+    // 列表项结构
+    struct MenuItem {
+        std::wstring text;
+        ItemType type;
+        int index;  // 在对应类型中的索引
+    };
+
+    std::vector<MenuItem> m_items;  // 所有列表项
+
+    void InitializeItems() {
+        // 添加比例选项
+        for (size_t i = 0; i < m_ratioItems.size(); i++) {
+            m_items.push_back({m_ratioItems[i].name, ItemType::Ratio, static_cast<int>(i)});
+        }
+
+        // 添加分辨率选项
+        for (size_t i = 0; i < m_resolutionItems.size(); i++) {
+            std::wstring displayText = m_resolutionItems[i].name + 
+                TEXT("  (") + std::to_wstring(m_resolutionItems[i].totalPixels / 1000000) + TEXT("M)");
+            m_items.push_back({displayText, ItemType::Resolution, static_cast<int>(i)});
+        }
+
+        // 添加设置选项
+        m_items.push_back({TEXT("窗口置顶"), ItemType::Topmost, 0});
+        m_items.push_back({TEXT("重置窗口"), ItemType::Reset, 0});
+    }
+
+    void RegisterWindowClass() {
+        WNDCLASSEX wc = {0};
+        wc.cbSize = sizeof(WNDCLASSEX);
+        wc.lpfnWndProc = MenuWindowProc;
+        wc.hInstance = m_hInstance;
+        wc.lpszClassName = MENU_WINDOW_CLASS;
+        wc.hbrBackground = NULL;  // 移除背景画刷，避免闪烁
+        wc.style = CS_HREDRAW | CS_VREDRAW;  // 添加这个样式以确保正确重绘
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        RegisterClassEx(&wc);
+    }
+
+    static LRESULT CALLBACK MenuWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+        MenuWindow* window = nullptr;
+
+        if (msg == WM_NCCREATE) {
+            CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+            window = reinterpret_cast<MenuWindow*>(cs->lpCreateParams);
+            SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(window));
+        } else {
+            window = reinterpret_cast<MenuWindow*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+        }
+
+        if (window) {
+            return window->HandleMessage(hwnd, msg, wParam, lParam);
+        }
+
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+
+    LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+        switch (msg) {
+            case WM_DPICHANGED: {
+                // 处理 DPI 变化
+                m_dpi = HIWORD(wParam);
+                UpdateDpiDependentResources();
+                
+                // 获取建议的新窗口位置和大小
+                RECT* const prcNewWindow = (RECT*)lParam;
+                SetWindowPos(hwnd, 
+                           NULL, 
+                           prcNewWindow->left, 
+                           prcNewWindow->top, 
+                           prcNewWindow->right - prcNewWindow->left, 
+                           prcNewWindow->bottom - prcNewWindow->top, 
+                           SWP_NOZORDER | SWP_NOACTIVATE);
+                return 0;
+            }
+
+            case WM_PAINT: {
+                PAINTSTRUCT ps;
+                HDC hdc = BeginPaint(hwnd, &ps);
+                OnPaint(hdc);
+                EndPaint(hwnd, &ps);
+                return 0;
+            }
+
+            case WM_MOUSEMOVE: {
+                int xPos = GET_X_LPARAM(lParam);
+                int yPos = GET_Y_LPARAM(lParam);
+                OnMouseMove(xPos, yPos);
+                return 0;
+            }
+
+            case WM_MOUSELEAVE: {
+                OnMouseLeave();
+                return 0;
+            }
+
+            case WM_LBUTTONDOWN: {
+                int xPos = GET_X_LPARAM(lParam);
+                int yPos = GET_Y_LPARAM(lParam);
+                OnLButtonDown(xPos, yPos);
+                return 0;
+            }
+
+            case WM_NCHITTEST: {
+                POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                ScreenToClient(hwnd, &pt);
+                
+                if (pt.y < m_titleHeight) {
+                    return HTCAPTION;
+                }
+                return HTCLIENT;
+            }
+
+            case WM_CLOSE:
+                Hide();
+                return 0;
+        }
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+
+    void OnPaint(HDC hdc) {
+        RECT rect;
+        GetClientRect(m_hwnd, &rect);
+
+        // 创建双缓冲
+        HDC memDC = CreateCompatibleDC(hdc);
+        HBITMAP memBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+        HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
+
+        // 设置文本属性，使用 DPI 感知的字体大小
+        SetBkMode(memDC, TRANSPARENT);
+        HFONT hFont = CreateFont(-m_fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+                               DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+                               CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("Segoe UI"));
+        HFONT oldFont = (HFONT)SelectObject(memDC, hFont);
+
+        // 绘制背景
+        HBRUSH hBackBrush = CreateSolidBrush(RGB(37, 37, 38));
+        FillRect(memDC, &rect, hBackBrush);
+        DeleteObject(hBackBrush);
+
+        // 绘制标题栏
+        RECT titleRect = rect;
+        titleRect.bottom = m_titleHeight;
+        HBRUSH hTitleBrush = CreateSolidBrush(RGB(45, 45, 45));
+        FillRect(memDC, &titleRect, hTitleBrush);
+        DeleteObject(hTitleBrush);
+
+        // 绘制标题文本
+        SetTextColor(memDC, RGB(204, 204, 204));
+        titleRect.left += m_textPadding;
+        DrawText(memDC, TEXT("SpinningMomo"), -1, &titleRect, 
+                DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOCLIP);
+
+        // 绘制列表项
+        int y = m_titleHeight;
+        int currentSection = -1;
+        
+        for (size_t i = 0; i < m_items.size(); i++) {
+            const auto& item = m_items[i];
+            
+            // 检查是否需要添加分隔线
+            int newSection = static_cast<int>(item.type);
+            if (newSection != currentSection && currentSection != -1) {
+                RECT sepRect = {rect.left, y, rect.right, y + m_separatorHeight};
+                HBRUSH hSepBrush = CreateSolidBrush(RGB(60, 60, 60));
+                FillRect(memDC, &sepRect, hSepBrush);
+                DeleteObject(hSepBrush);
+                y += m_separatorHeight;
+            }
+            currentSection = newSection;
+
+            // 绘制列表项
+            RECT itemRect = {rect.left, y, rect.right, y + m_itemHeight};
+            
+            // 绘制悬停背景
+            if (static_cast<int>(i) == m_hoverIndex) {
+                HBRUSH hHoverBrush = CreateSolidBrush(RGB(45, 45, 45));
+                FillRect(memDC, &itemRect, hHoverBrush);
+                DeleteObject(hHoverBrush);
+            }
+
+            // 绘制选中指示器
+            bool isSelected = false;
+            if (item.type == ItemType::Ratio && item.index == m_currentRatioIndex) {
+                isSelected = true;
+            } else if (item.type == ItemType::Resolution && item.index == m_currentResolutionIndex) {
+                isSelected = true;
+            } else if (item.type == ItemType::Topmost && m_topmostEnabled) {
+                isSelected = true;
+            }
+
+            if (isSelected) {
+                RECT indicatorRect = {rect.left, y, rect.left + m_indicatorWidth, y + m_itemHeight};
+                HBRUSH hIndicatorBrush = CreateSolidBrush(RGB(0, 122, 204));
+                FillRect(memDC, &indicatorRect, hIndicatorBrush);
+                DeleteObject(hIndicatorBrush);
+            }
+
+            // 绘制文本
+            itemRect.left += m_textPadding + m_indicatorWidth;
+            DrawText(memDC, item.text.c_str(), -1, &itemRect, 
+                    DT_SINGLELINE | DT_VCENTER | DT_LEFT);
+
+            y += m_itemHeight;
+        }
+
+        // 复制到屏幕
+        BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
+
+        // 清理
+        SelectObject(memDC, oldFont);
+        DeleteObject(hFont);
+        SelectObject(memDC, oldBitmap);
+        DeleteObject(memBitmap);
+        DeleteDC(memDC);
+    }
+
+    void OnMouseMove(int x, int y) {
+        // 计算鼠标悬停的项
+        int newHoverIndex = GetItemIndexFromPoint(x, y);
+        if (newHoverIndex != m_hoverIndex) {
+            m_hoverIndex = newHoverIndex;
+            InvalidateRect(m_hwnd, NULL, TRUE);
+
+            // 确保能收到 WM_MOUSELEAVE 消息
+            TRACKMOUSEEVENT tme = {0};
+            tme.cbSize = sizeof(TRACKMOUSEEVENT);
+            tme.dwFlags = TME_LEAVE;
+            tme.hwndTrack = m_hwnd;
+            TrackMouseEvent(&tme);
+        }
+    }
+
+    void OnMouseLeave() {
+        if (m_hoverIndex != -1) {
+            m_hoverIndex = -1;
+            InvalidateRect(m_hwnd, NULL, TRUE);
+        }
+    }
+
+    void OnLButtonDown(int x, int y) {
+        // 获取点击的项
+        int index = GetItemIndexFromPoint(x, y);
+        if (index >= 0 && index < m_items.size()) {
+            const auto& item = m_items[index];
+            switch (item.type) {
+                case ItemType::Ratio:
+                    m_currentRatioIndex = item.index;
+                    InvalidateRect(m_hwnd, NULL, TRUE);
+                    SendMessage(m_hwndParent, WM_COMMAND, 
+                              Constants::ID_RATIO_BASE + item.index, 0);
+                    break;
+                case ItemType::Resolution:
+                    m_currentResolutionIndex = item.index;
+                    InvalidateRect(m_hwnd, NULL, TRUE);
+                    SendMessage(m_hwndParent, WM_COMMAND, 
+                              Constants::ID_RESOLUTION_BASE + item.index, 0);
+                    break;
+                case ItemType::Topmost:
+                    m_topmostEnabled = !m_topmostEnabled;  // 切换状态
+                    InvalidateRect(m_hwnd, NULL, TRUE);
+                    SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_TASKBAR, 0);
+                    break;
+                case ItemType::Reset:
+                    SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_RESET, 0);
+                    break;
+            }
+        }
+    }
+
+    int GetItemIndexFromPoint(int x, int y) {
+        if (y < m_titleHeight) return -1;
+        
+        int itemY = m_titleHeight;
+        int currentSection = -1;
+        
+        for (size_t i = 0; i < m_items.size(); i++) {
+            const auto& item = m_items[i];
+            
+            // 检查是否需要添加分隔线
+            int newSection = static_cast<int>(item.type);
+            if (newSection != currentSection && currentSection != -1) {
+                itemY += m_separatorHeight;
+            }
+            currentSection = newSection;
+
+            if (y >= itemY && y < itemY + m_itemHeight) {
+                return static_cast<int>(i);
+            }
+            
+            itemY += m_itemHeight;
+        }
+        
+        return -1;
+    }
+
+    void UpdateDpiDependentResources() {
+        // 计算 DPI 缩放比例
+        float dpiScale = static_cast<float>(m_dpi) / 96.0f;
+        
+        // 更新所有与 DPI 相关的尺寸
+        m_itemHeight = static_cast<int>(BASE_ITEM_HEIGHT * dpiScale);
+        m_titleHeight = static_cast<int>(BASE_TITLE_HEIGHT * dpiScale);
+        m_separatorHeight = static_cast<int>(BASE_SEPARATOR_HEIGHT * dpiScale);
+        m_fontSize = static_cast<int>(BASE_FONT_SIZE * dpiScale);
+        m_textPadding = static_cast<int>(BASE_TEXT_PADDING * dpiScale);
+        m_indicatorWidth = static_cast<int>(BASE_INDICATOR_WIDTH * dpiScale);
+    }
+};
+
 // 窗口调整器类
 class WindowResizer {
 public:
@@ -357,11 +794,16 @@ public:
     }
 
     bool Initialize(HINSTANCE hInstance) {
+        m_hInstance = hInstance;
         if (!RegisterWindowClass(hInstance)) return false;
         if (!CreateAppWindow(hInstance)) return false;
         
         m_trayIcon = std::make_unique<TrayIcon>(m_hwnd);
         if (!m_trayIcon->Create()) return false;
+
+        // 创建菜单窗口，传入比例和分辨率选项
+        m_menuWindow = std::make_unique<MenuWindow>(hInstance);
+        if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions)) return false;
 
         // 注册热键
         if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, m_hotkeyModifiers, m_hotkeyKey)) {
@@ -504,6 +946,11 @@ public:
         size_t index = id - Constants::ID_RATIO_BASE;
         if (index < m_ratios.size()) {
             m_currentRatioIndex = index;
+            
+            // 更新菜单窗口中的单选按钮状态
+            if (m_menuWindow) {
+                m_menuWindow->SetCurrentRatio(index);
+            }
             
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
@@ -675,9 +1122,10 @@ public:
 
             case WM_HOTKEY: {
                 if (app && wParam == Constants::ID_TRAYICON) {
-                    POINT pt;
-                    GetCursorPos(&pt);
-                    app->ShowQuickMenu(pt);
+                    // 修改热键行为：切换菜单显示状态
+                    if (app->m_menuWindow) {
+                        app->m_menuWindow->ToggleVisibility();
+                    }
                 }
                 return 0;
             }
@@ -726,6 +1174,8 @@ private:
     std::wstring m_language;        // 当前语言设置
     std::vector<ResolutionPreset> m_resolutions;
     size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选择的分辨率索引，默认不选择
+    HINSTANCE m_hInstance = NULL;  // 添加这行
+    std::unique_ptr<MenuWindow> m_menuWindow;  // 添加这行
 
     void InitializeRatios() {
         // 横屏比例（从宽到窄）
