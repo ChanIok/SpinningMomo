@@ -13,6 +13,9 @@ endif()
 # 创建Windows GUI应用程序
 add_executable(SpinningMomo WIN32 
     src/main.cpp
+    src/constants.cpp
+    src/window_utils.cpp
+    src/ui_manager.cpp
     src/resource.rc  # 添加资源文件
 )
 
