@@ -50,7 +50,7 @@ It can even break through the original resolution limitations of the game and de
       <td align="center">⌨️ <b>Hotkey Support</b><br/>Customizable hotkey (default: Ctrl+Alt+R)</td>
     </tr>
     <tr>
-      <td align="center">⚙️ <b>Multiple Modes</b><br/>Support window and fullscreen window modes</td>
+      <td align="center">⚙️ <b>Floating Window</b><br/>Optional floating menu for convenient window adjustment</td>
       <td align="center">🚀 <b>Lightweight</b><br/>Minimal resource usage, performance priority</td>
     </tr>
   </table>
@@ -109,7 +109,9 @@ Right or left click the tray icon to:
 - 📏 Resolution: Select preset resolution or custom resolution
 - ⌨️ Modify Hotkey: Set new hotkey combination (1-2 second delay for success message)
 - 🔔 Show Tips: Enable/disable operation tips
-- 📌 Keep Window Topmost: Keep window always on top
+- 📌 Keep Window Topmost: Keep game window always on top to prevent taskbar overlap
+- 🔽 Auto-hide Taskbar: Automatically hide taskbar to prevent overlap
+- 📱 Floating Window: Set hotkey to toggle floating menu for quick window adjustments
 - ⚙️ Open Config File: Customize ratios and resolutions
 - ❌ Exit: Close program
 

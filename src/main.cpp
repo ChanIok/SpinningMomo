@@ -57,7 +57,9 @@ public:
 
         // 创建菜单窗口
         m_menuWindow = std::make_unique<MenuWindow>(hInstance);
-        if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings)) {
+        if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
+                                m_currentRatioIndex, m_currentResolutionIndex,
+                                m_taskbarAutoHide)) {
             return false;
         }
 
@@ -161,6 +163,11 @@ public:
         if (index < m_resolutions.size()) {
             m_currentResolutionIndex = index;
             
+            // 更新菜单窗口中的单选按钮状态
+            if (m_menuWindow) {
+                m_menuWindow->SetCurrentResolution(index);
+            }
+            
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
                 ApplyWindowTransform(gameWindow);
@@ -182,7 +189,7 @@ public:
             WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION, Constants::CUSTOM_RESOLUTION_LIST, TEXT(""), m_configPath.c_str());
-            WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("0"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
         }
 
         // 加载各项配置
@@ -363,7 +370,7 @@ private:
     bool m_notifyEnabled = false;                     // 是否显示提示，默认关闭
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     bool m_taskbarAutoHide = false;                   // 任务栏自动隐藏状态
-    bool m_useFloatingWindow = false;                 // 是否使用浮动窗口，默认关闭
+    bool m_useFloatingWindow = true;                 // 是否使用浮动窗口，默认开启
     
     // 窗口变换相关
     std::vector<AspectRatio> m_ratios;                // 预设的宽高比列表
@@ -371,7 +378,7 @@ private:
     bool m_useScreenSize = true;                     // 是否使用屏幕尺寸计算，默认开启
     bool m_windowModified = false;                   // 窗口是否被修改过
     std::vector<ResolutionPreset> m_resolutions;     // 预设的分辨率列表
-    size_t m_currentResolutionIndex = SIZE_MAX;      // 当前选择的分辨率索引，默认不选择
+    size_t m_currentResolutionIndex = 0;             // 当前选择的分辨率索引，默认选择第一个（Default）
     
     // 语言相关
     LocalizedStrings m_strings;                      // 当前语言的字符串
@@ -596,6 +603,11 @@ private:
         SHAppBarMessage(ABM_SETSTATE, &abd);
         m_taskbarAutoHide = !currentAutoHide;
         SaveTaskbarConfig();
+
+        // 更新菜单窗口中的状态
+        if (m_menuWindow) {
+            m_menuWindow->SetTaskbarAutoHide(m_taskbarAutoHide);
+        }
     }
 
     // 切换界面语言
@@ -619,7 +631,14 @@ private:
         HWND gameWindow = FindTargetWindow();
         if (gameWindow) {
             m_currentRatioIndex = SIZE_MAX;
-            m_currentResolutionIndex = SIZE_MAX;
+            m_currentResolutionIndex = 0;  // 重置为默认分辨率选项
+            
+            // 更新菜单窗口中的状态
+            if (m_menuWindow) {
+                m_menuWindow->SetCurrentRatio(m_currentRatioIndex);
+                m_menuWindow->SetCurrentResolution(m_currentResolutionIndex);
+            }
+            
             if (ApplyWindowTransform(gameWindow)) {
                 ShowNotification(m_strings.APP_NAME.c_str(), 
                     m_strings.RESET_SUCCESS.c_str(), true);

@@ -122,6 +122,7 @@ struct LocalizedStrings {
     std::wstring LOAD_CONFIG_FAILED;
     std::wstring TASKBAR_AUTOHIDE;
     std::wstring FLOATING_WINDOW;  // 浮动窗口选项文本
+    std::wstring CLOSE_WINDOW;     // 关闭浮窗选项文本
 };
 
 // 中文字符串

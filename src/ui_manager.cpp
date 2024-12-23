@@ -37,8 +37,8 @@ void TrayIcon::ShowBalloon(const TCHAR* title, const TCHAR* message) {
         if (FAILED(StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), title)) ||
             FAILED(StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), message))) {
             // 如果复制失败，使用安全的默认消息
-            StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), TEXT("提示"));
-            StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), TEXT("发生错误"));
+            StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), TEXT("Notice"));
+            StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), TEXT("An error occurred"));
         }
         m_nid.dwInfoFlags = NIIF_INFO;
         Shell_NotifyIcon(NIM_MODIFY, &m_nid);
@@ -341,12 +341,17 @@ void MenuWindow::RegisterWindowClass() {
 bool MenuWindow::Create(HWND parent, 
                        std::vector<AspectRatio>& ratios,
                        std::vector<ResolutionPreset>& resolutions,
-                       const LocalizedStrings& strings) {
+                       const LocalizedStrings& strings,
+                       size_t currentRatioIndex,
+                       size_t currentResolutionIndex,
+                       bool taskbarAutoHide) {
     m_hwndParent = parent;
     m_ratioItems = &ratios;
     m_resolutionItems = &resolutions;
     m_strings = &strings;
-    m_currentResolutionIndex = SIZE_MAX;  // 初始化为未选择状态
+    m_currentRatioIndex = currentRatioIndex;
+    m_currentResolutionIndex = currentResolutionIndex;
+    m_taskbarAutoHide = taskbarAutoHide;
     
     InitializeItems(strings);
     
@@ -377,7 +382,7 @@ bool MenuWindow::Create(HWND parent,
 
     if (!m_hwnd) return false;
 
-    SetLayeredWindowAttributes(m_hwnd, 0, 230, LWA_ALPHA);
+    SetLayeredWindowAttributes(m_hwnd, 0, 204, LWA_ALPHA);
     
     // 设置窗口圆角和阴影
     MARGINS margins = {1, 1, 1, 1};  // 四边均匀阴影效果
@@ -422,10 +427,8 @@ void MenuWindow::ToggleVisibility() {
 }
 
 void MenuWindow::SetCurrentRatio(size_t index) {
-    if (index < m_ratioItems->size()) {
-        m_currentRatioIndex = index;
-        InvalidateRect(m_hwnd, NULL, TRUE);
-    }
+    m_currentRatioIndex = index;
+    InvalidateRect(m_hwnd, NULL, TRUE);
 }
 
 void MenuWindow::SetCurrentResolution(size_t index) {
@@ -433,6 +436,11 @@ void MenuWindow::SetCurrentResolution(size_t index) {
         m_currentResolutionIndex = index;
         InvalidateRect(m_hwnd, NULL, TRUE);
     }
+}
+
+void MenuWindow::SetTaskbarAutoHide(bool enabled) {
+    m_taskbarAutoHide = enabled;
+    InvalidateRect(m_hwnd, NULL, TRUE);
 }
 
 void MenuWindow::UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw) {
@@ -470,9 +478,9 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
     }
 
     // 添加设置选项
-    m_items.push_back({strings.WINDOW_TOPMOST, ItemType::Topmost, 0});
     m_items.push_back({strings.TASKBAR_AUTOHIDE, ItemType::TaskbarAutoHide, 0});
     m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
+    m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
 }
 
 LRESULT CALLBACK MenuWindow::MenuWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -579,20 +587,6 @@ void MenuWindow::OnPaint(HDC hdc) {
     FillRect(memDC, &rect, hBackBrush);
     DeleteObject(hBackBrush);
 
-    // 绘制窗口边框
-    HPEN hBorderPen = CreatePen(PS_SOLID, 1, RGB(229, 229, 229));
-    HPEN oldPen = (HPEN)SelectObject(memDC, hBorderPen);
-    POINT points[] = {
-        {rect.left, rect.top},
-        {rect.right - 1, rect.top},
-        {rect.right - 1, rect.bottom - 1},
-        {rect.left, rect.bottom - 1},
-        {rect.left, rect.top}
-    };
-    Polyline(memDC, points, 5);
-    SelectObject(memDC, oldPen);
-    DeleteObject(hBorderPen);
-
     // 绘制标题栏
     RECT titleRect = rect;
     titleRect.bottom = m_titleHeight;
@@ -640,9 +634,9 @@ void MenuWindow::OnPaint(HDC hdc) {
                 itemRect = {ratioColumnRight + m_separatorHeight, y, 
                           resolutionColumnRight, y + m_itemHeight};
                 break;
-            case ItemType::Topmost:
             case ItemType::TaskbarAutoHide:
             case ItemType::Reset:
+            case ItemType::Close:  // 添加 Close 类型
                 itemRect = {resolutionColumnRight + m_separatorHeight, settingsY, 
                           rect.right, settingsY + m_itemHeight};
                 settingsY += m_itemHeight;  // 设置列的项目总是递增Y坐标
@@ -664,34 +658,34 @@ void MenuWindow::OnPaint(HDC hdc) {
             isSelected = true;
         } else if (item.type == ItemType::Resolution && item.index == m_currentResolutionIndex) {
             isSelected = true;
-        } else if (item.type == ItemType::Topmost && m_topmostEnabled) {
-            isSelected = true;
         } else if (item.type == ItemType::TaskbarAutoHide && m_taskbarAutoHide) {
             isSelected = true;
         }
 
         if (isSelected) {
+            // 使用专门的比例组指示器宽度
+            int indicatorWidth = (item.type == ItemType::Ratio) ? m_ratioIndicatorWidth : m_indicatorWidth;
             RECT indicatorRect = {itemRect.left, itemRect.top, 
-                               itemRect.left + m_indicatorWidth, itemRect.bottom};
-            HBRUSH hIndicatorBrush = CreateSolidBrush(RGB(0, 120, 215));
+                               itemRect.left + indicatorWidth, itemRect.bottom};
+            HBRUSH hIndicatorBrush = CreateSolidBrush(RGB(255, 160, 80));
             FillRect(memDC, &indicatorRect, hIndicatorBrush);
             DeleteObject(hIndicatorBrush);
         }
 
         // 绘制文本
-        itemRect.left += m_textPadding + m_indicatorWidth;
+        itemRect.left += m_textPadding + ((item.type == ItemType::Ratio) ? m_ratioIndicatorWidth : m_indicatorWidth);
         SetTextColor(memDC, RGB(51, 51, 51));
         DrawText(memDC, item.text.c_str(), -1, &itemRect, 
                 DT_SINGLELINE | DT_VCENTER | DT_LEFT);
 
         // 只有在同一列中才增加y坐标
         if ((i + 1 < m_items.size()) && (m_items[i + 1].type == item.type)) {
-            if (item.type != ItemType::Topmost && item.type != ItemType::Reset) {
+            if (item.type != ItemType::Reset) {
                 y += m_itemHeight;
             }
         } else if (i + 1 < m_items.size() && m_items[i + 1].type != item.type) {
             // 如果下一项是不同类型，重置y坐标到列表顶部
-            if (m_items[i + 1].type != ItemType::Topmost && m_items[i + 1].type != ItemType::Reset) {
+            if (m_items[i + 1].type != ItemType::Reset) {
                 y = m_titleHeight + m_separatorHeight;  // 重置到分隔线下方
             }
         }
@@ -743,14 +737,14 @@ void MenuWindow::OnLButtonDown(int x, int y) {
                 SendMessage(m_hwndParent, WM_COMMAND, 
                           Constants::ID_RESOLUTION_BASE + item.index, 0);
                 break;
-            case ItemType::Topmost:
-                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_TASKBAR, 0);
-                break;
             case ItemType::TaskbarAutoHide:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_AUTOHIDE_TASKBAR, 0);
                 break;
             case ItemType::Reset:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_RESET, 0);
+                break;
+            case ItemType::Close:
+                Hide();  // 直接调用Hide函数关闭窗口
                 break;
         }
     }
@@ -765,6 +759,7 @@ void MenuWindow::UpdateDpiDependentResources() {
     m_fontSize = static_cast<int>(BASE_FONT_SIZE * scale);
     m_textPadding = static_cast<int>(BASE_TEXT_PADDING * scale);
     m_indicatorWidth = static_cast<int>(BASE_INDICATOR_WIDTH * scale);
+    m_ratioIndicatorWidth = static_cast<int>(BASE_RATIO_INDICATOR_WIDTH * scale);
     
     // 更新列宽
     m_ratioColumnWidth = static_cast<int>(BASE_RATIO_COLUMN_WIDTH * scale);
@@ -786,9 +781,9 @@ int MenuWindow::CalculateWindowHeight() {
             case ItemType::Resolution:
                 resolutionCount++;
                 break;
-            case ItemType::Topmost:
             case ItemType::TaskbarAutoHide:
             case ItemType::Reset:
+            case ItemType::Close:
                 settingsCount++;
                 break;
         }
@@ -827,7 +822,9 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
         int settingsY = m_titleHeight + m_separatorHeight;
         for (size_t i = 0; i < m_items.size(); i++) {
             const auto& item = m_items[i];
-            if (item.type == ItemType::Topmost || item.type == ItemType::TaskbarAutoHide || item.type == ItemType::Reset) {
+            if (item.type == ItemType::TaskbarAutoHide || 
+                item.type == ItemType::Reset ||
+                item.type == ItemType::Close) {
                 if (y >= settingsY && y < settingsY + m_itemHeight) {
                     return static_cast<int>(i);
                 }

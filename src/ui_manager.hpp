@@ -90,9 +90,9 @@ public:
     enum class ItemType {
         Ratio,
         Resolution,
-        Topmost,
-        TaskbarAutoHide,  // 添加任务栏自动隐藏类型
-        Reset
+        TaskbarAutoHide,
+        Reset,
+        Close
     };
 
     // 列表项结构
@@ -107,7 +107,10 @@ public:
     bool Create(HWND parent, 
                std::vector<AspectRatio>& ratios,           // 使用引用
                std::vector<ResolutionPreset>& resolutions, // 使用引用
-               const LocalizedStrings& strings);           // 字符串只读，保持const
+               const LocalizedStrings& strings,            // 字符串只读，保持const
+               size_t currentRatioIndex,                   // 添加初始比例索引
+               size_t currentResolutionIndex,              // 添加初始分辨率索引
+               bool taskbarAutoHide);                      // 添加初始任务栏自动隐藏状态
     
     void Show();
     void Hide();
@@ -115,6 +118,7 @@ public:
     void ToggleVisibility();
     void SetCurrentRatio(size_t index);
     void SetCurrentResolution(size_t index);
+    void SetTaskbarAutoHide(bool enabled);
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
 
@@ -127,6 +131,7 @@ private:
     static constexpr int BASE_FONT_SIZE = 12;          // 字体大小
     static constexpr int BASE_TEXT_PADDING = 12;       // 文本内边距
     static constexpr int BASE_INDICATOR_WIDTH = 3;     // 指示器宽度
+    static constexpr int BASE_RATIO_INDICATOR_WIDTH = 4;  // 比例组指示器宽度
     
     // 添加列宽常量
     static constexpr int BASE_RATIO_COLUMN_WIDTH = 60;      // 比例列宽度
@@ -141,6 +146,7 @@ private:
     int m_fontSize = BASE_FONT_SIZE;
     int m_textPadding = BASE_TEXT_PADDING;
     int m_indicatorWidth = BASE_INDICATOR_WIDTH;
+    int m_ratioIndicatorWidth = BASE_RATIO_INDICATOR_WIDTH;
     
     // 添加列宽变量
     int m_ratioColumnWidth = BASE_RATIO_COLUMN_WIDTH;
@@ -153,7 +159,6 @@ private:
     int m_hoverIndex = -1;                       // 当前鼠标停项
     size_t m_currentRatioIndex = SIZE_MAX;       // 当前选中的比例索引
     size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选中的分辨率索引
-    bool m_topmostEnabled = false;               // 窗口置顶状态
     bool m_taskbarAutoHide = false;              // 任务栏自动隐藏状态
     std::vector<AspectRatio>* m_ratioItems = nullptr;       // 使用指针
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
