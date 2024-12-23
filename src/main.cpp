@@ -100,7 +100,8 @@ public:
             m_topmostEnabled,
             m_taskbarAutoHide,
             m_notifyEnabled,
-            m_language
+            m_language,
+            m_useFloatingWindow
         );
     }
 
@@ -181,6 +182,7 @@ public:
             WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION, Constants::CUSTOM_RESOLUTION_LIST, TEXT(""), m_configPath.c_str());
+            WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("0"), m_configPath.c_str());
         }
 
         // 加载各项配置
@@ -190,6 +192,7 @@ public:
         LoadTopmostConfig();
         LoadLanguageConfig();
         LoadTaskbarConfig();
+        LoadMenuConfig();
     }
 
     void SaveConfig() {
@@ -199,6 +202,7 @@ public:
         SaveTopmostConfig();
         SaveLanguageConfig();
         SaveTaskbarConfig(); 
+        SaveMenuConfig();
     }
 
     // 工具函数
@@ -277,7 +281,7 @@ public:
                     app->HandleWindowSelect(cmd);
                 } else {
                     switch (cmd) {
-                        case Constants::ID_CONFIG:  // 添加：新的配置文件处理
+                        case Constants::ID_CONFIG:
                             app->OpenConfigFile();
                             break;
                         case Constants::ID_HOTKEY:
@@ -304,6 +308,9 @@ public:
                         case Constants::ID_AUTOHIDE_TASKBAR:
                             app->ToggleTaskbarAutoHide();
                             break;
+                        case Constants::ID_FLOATING_WINDOW:
+                            app->ToggleFloatingWindow();
+                            break;
                     }
                 }
                 return 0;
@@ -318,13 +325,15 @@ public:
 
             case WM_HOTKEY: {
                 if (app && wParam == Constants::ID_TRAYICON) {
-                    // 修改热键行为：切换菜单显示状态
-                    // if (app->m_menuWindow) {
-                    //     app->m_menuWindow->ToggleVisibility();
-                    // }
-                    POINT pt;
-                    GetCursorPos(&pt);
-                    app->ShowQuickMenu(pt);
+                    if (app->m_useFloatingWindow) {
+                        if (app->m_menuWindow) {
+                            app->m_menuWindow->ToggleVisibility();
+                        }
+                    } else {
+                        POINT pt;
+                        GetCursorPos(&pt);
+                        app->ShowQuickMenu(pt);
+                    }
                 }
                 return 0;
             }
@@ -354,6 +363,7 @@ private:
     bool m_notifyEnabled = false;                     // 是否显示提示，默认关闭
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     bool m_taskbarAutoHide = false;                   // 任务栏自动隐藏状态
+    bool m_useFloatingWindow = false;                 // 是否使用浮动窗口，默认关闭
     
     // 窗口变换相关
     std::vector<AspectRatio> m_ratios;                // 预设的宽高比列表
@@ -383,6 +393,7 @@ private:
     // 初始化预设的分辨率列表
     void InitializeResolutions() {
         m_resolutions = {
+            {TEXT("Default"), 0, 0},         // 默认选项，使用屏幕尺寸计算
             {TEXT("4K"), 3840, 2160},     // 8.3M pixels
             {TEXT("6K"), 5760, 3240},     // 18.7M pixels
             {TEXT("8K"), 7680, 4320},     // 33.2M pixels
@@ -530,6 +541,25 @@ private:
                                 m_configPath.c_str());
     }
 
+    // 从配置文件加载菜单设置
+    void LoadMenuConfig() {
+        TCHAR buffer[32];
+        if (GetPrivateProfileString(Constants::MENU_SECTION,
+                                  Constants::MENU_FLOATING,
+                                  TEXT("0"), buffer, _countof(buffer),
+                                  m_configPath.c_str()) > 0) {
+            m_useFloatingWindow = (_wtoi(buffer) != 0);
+        }
+    }
+
+    // 保存菜单设置到配置文件
+    void SaveMenuConfig() {
+        WritePrivateProfileString(Constants::MENU_SECTION,
+                                Constants::MENU_FLOATING,
+                                m_useFloatingWindow ? TEXT("1") : TEXT("0"),
+                                m_configPath.c_str());
+    }
+
     // 进入热键设置模式
     void SetHotkey() {
         UnregisterHotKey(m_hwnd, Constants::ID_TRAYICON);
@@ -641,7 +671,12 @@ private:
         WindowUtils::Resolution targetRes;
         if (m_currentResolutionIndex != SIZE_MAX && m_currentResolutionIndex < m_resolutions.size()) {
             const auto& preset = m_resolutions[m_currentResolutionIndex];
-            targetRes = WindowUtils::CalculateResolution(preset.totalPixels, ratio);
+            if (preset.baseWidth == 0 && preset.baseHeight == 0) {
+                // 如果是默认选项，使用屏幕尺寸计算
+                targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
+            } else {
+                targetRes = WindowUtils::CalculateResolution(preset.totalPixels, ratio);
+            }
         } else {
             targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
         }
@@ -817,6 +852,12 @@ private:
                           MB_ICONWARNING | MB_OK);
             }
         }
+    }
+
+    // 切换浮动窗口状态
+    void ToggleFloatingWindow() {
+        m_useFloatingWindow = !m_useFloatingWindow;
+        SaveMenuConfig();
     }
 };
 

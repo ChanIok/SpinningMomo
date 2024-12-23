@@ -67,7 +67,8 @@ void TrayIcon::ShowContextMenu(
     bool topmostEnabled,
     bool taskbarAutoHide,
     bool notifyEnabled,
-    const std::wstring& language) {
+    const std::wstring& language,
+    bool menuResident) {
     
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
@@ -99,7 +100,7 @@ void TrayIcon::ShowContextMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
     // 添加设置选项
-    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, notifyEnabled, strings);
+    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, notifyEnabled, menuResident, strings);
 
     // 添加语言子菜单
     HMENU hLangMenu = CreateLanguageSubmenu(language, strings);
@@ -157,9 +158,14 @@ void TrayIcon::ShowQuickMenu(
         for (size_t i = 0; i < resolutions.size(); ++i) {
             const auto& preset = resolutions[i];
             TCHAR menuText[256];
-            _stprintf_s(menuText, _countof(menuText), TEXT("%s (%.1fM)"), 
-                preset.name.c_str(), 
-                preset.totalPixels / 1000000.0);
+            if (preset.baseWidth == 0 && preset.baseHeight == 0) {
+                // 如果是默认选项，不显示像素数
+                _stprintf_s(menuText, _countof(menuText), TEXT("%s"), preset.name.c_str());
+            } else {
+                _stprintf_s(menuText, _countof(menuText), TEXT("%s (%.1fM)"), 
+                    preset.name.c_str(), 
+                    preset.totalPixels / 1000000.0);
+            }
             
             UINT flags = MF_BYPOSITION | MF_STRING;
             if (i == currentResolutionIndex) {
@@ -243,9 +249,14 @@ HMENU TrayIcon::CreateResolutionSubmenu(
     for (size_t i = 0; i < resolutions.size(); ++i) {
         const auto& preset = resolutions[i];
         TCHAR menuText[256];
-        _stprintf_s(menuText, _countof(menuText), TEXT("%s (%.1fM)"), 
-            preset.name.c_str(), 
-            preset.totalPixels / 1000000.0);
+        if (preset.baseWidth == 0 && preset.baseHeight == 0) {
+            // 如果是默认选项，不显示像素数
+            _stprintf_s(menuText, _countof(menuText), TEXT("%s"), preset.name.c_str());
+        } else {
+            _stprintf_s(menuText, _countof(menuText), TEXT("%s (%.1fM)"), 
+                preset.name.c_str(), 
+                preset.totalPixels / 1000000.0);
+        }
         
         UINT flags = MF_BYPOSITION | MF_STRING;
         if (i == currentResolutionIndex) {
@@ -279,6 +290,7 @@ void TrayIcon::AddSettingsItems(
     bool topmostEnabled,
     bool taskbarAutoHide,
     bool notifyEnabled,
+    bool useFloatingWindow,
     const LocalizedStrings& strings) {
     
     // 置顶选项
@@ -294,6 +306,10 @@ void TrayIcon::AddSettingsItems(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (notifyEnabled ? MF_CHECKED : 0), 
               Constants::ID_NOTIFY, strings.SHOW_TIPS.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, strings.MODIFY_HOTKEY.c_str());
+
+    // 浮动窗口选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (useFloatingWindow ? MF_CHECKED : 0),
+              Constants::ID_FLOATING_WINDOW, strings.FLOATING_WINDOW.c_str());
 }
 
 // MenuWindow的静态成员定义
@@ -441,8 +457,15 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
 
     // 添加分辨率选项
     for (size_t i = 0; i < m_resolutionItems->size(); i++) {
-        std::wstring displayText = (*m_resolutionItems)[i].name + 
-            TEXT("  (") + std::to_wstring((*m_resolutionItems)[i].totalPixels / 1000000) + TEXT("M)");
+        std::wstring displayText;
+        const auto& preset = (*m_resolutionItems)[i];
+        if (preset.baseWidth == 0 && preset.baseHeight == 0) {
+            // 如果是默认选项，不显示像素数
+            displayText = preset.name;
+        } else {
+            displayText = preset.name + 
+                TEXT(" (") + std::to_wstring(preset.totalPixels / 1000000) + TEXT("M)");
+        }
         m_items.push_back({displayText, ItemType::Resolution, static_cast<int>(i)});
     }
 

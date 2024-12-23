@@ -9,7 +9,7 @@ const LocalizedStrings ZH_CN = {
     TEXT("重置窗口"),
     TEXT("修改热键"),
     TEXT("显示操作提示"),
-    TEXT("窗口置顶"),
+    TEXT("游戏置顶"),
     TEXT("打开配置文件"),
     TEXT("退出"),
     TEXT("已选择窗口"),
@@ -31,7 +31,8 @@ const LocalizedStrings ZH_CN = {
     TEXT("请使用正确格式，如：16:10,17:10"),
     TEXT("请使用正确格式，如：3840x2160,7680x4320"),
     TEXT("加载配置失败，请检查配置文件。"),
-    TEXT("任务栏自动隐藏")
+    TEXT("隐藏任务栏"),
+    TEXT("浮动窗口")
 };
 
 // 英文字符串
@@ -43,7 +44,7 @@ const LocalizedStrings EN_US = {
     TEXT("Reset Window"),
     TEXT("Modify Hotkey"),
     TEXT("Show Tips"),
-    TEXT("Window Topmost"),
+    TEXT("Game Topmost"),
     TEXT("Open Config"),
     TEXT("Exit"),
     TEXT("Window Selected"),
@@ -65,5 +66,6 @@ const LocalizedStrings EN_US = {
     TEXT("Please use correct format, e.g.: 16:10,17:10"),
     TEXT("Please use correct format, e.g.: 3840x2160,7680x4320"),
     TEXT("Failed to load config, please check the config file."),
-    TEXT("Auto-hide Taskbar")
+    TEXT("Hide Taskbar"),
+    TEXT("Floating Window")
 }; 

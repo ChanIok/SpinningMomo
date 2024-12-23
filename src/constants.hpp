@@ -27,6 +27,7 @@ namespace Constants {
     constexpr UINT ID_RESET = 2006;          // 重置窗口尺寸菜单项ID
     constexpr UINT ID_CONFIG = 2009;         // 打开配置文件菜单项ID
     constexpr UINT ID_AUTOHIDE_TASKBAR = 2007;    // 任务栏自动隐藏菜单项ID
+    constexpr UINT ID_FLOATING_WINDOW = 2012;    // 浮动窗口选项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -59,6 +60,9 @@ namespace Constants {
     
     inline const TCHAR* TASKBAR_SECTION = TEXT("Taskbar");    // 任务栏配置节名
     inline const TCHAR* TASKBAR_AUTOHIDE = TEXT("AutoHide");  // 任务栏自动隐藏配置项
+    
+    inline const TCHAR* MENU_SECTION = TEXT("Menu");      // 菜单配置节名
+    inline const TCHAR* MENU_FLOATING = TEXT("Floating");  // 浮动窗口配置项
     
     constexpr UINT ID_LANG_ZH_CN = 2010;    // 中文选项ID
     constexpr UINT ID_LANG_EN_US = 2011;    // 英文选项ID
@@ -117,6 +121,7 @@ struct LocalizedStrings {
     std::wstring RESOLUTION_FORMAT_EXAMPLE;
     std::wstring LOAD_CONFIG_FAILED;
     std::wstring TASKBAR_AUTOHIDE;
+    std::wstring FLOATING_WINDOW;  // 浮动窗口选项文本
 };
 
 // 中文字符串

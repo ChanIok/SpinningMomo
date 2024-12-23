@@ -37,7 +37,8 @@ public:
         bool topmostEnabled,
         bool taskbarAutoHide,
         bool notifyEnabled,
-        const std::wstring& language);
+        const std::wstring& language,
+        bool menuResident);
     // 新增：显示快捷菜单
     void ShowQuickMenu(
         const POINT& pt,
@@ -78,6 +79,7 @@ private:
         bool topmostEnabled,
         bool taskbarAutoHide,
         bool notifyEnabled,
+        bool useFloatingWindow,
         const LocalizedStrings& strings);
 };
 
@@ -128,8 +130,8 @@ private:
     
     // 添加列宽常量
     static constexpr int BASE_RATIO_COLUMN_WIDTH = 60;      // 比例列宽度
-    static constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 130; // 分辨率列宽度
-    static constexpr int BASE_SETTINGS_COLUMN_WIDTH = 90;   // 设置列宽度
+    static constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120; // 分辨率列宽度
+    static constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;   // 设置列宽度
 
     // DPI相关的尺寸变量
     UINT m_dpi = 96;
