@@ -38,7 +38,17 @@ public:
         bool taskbarAutoHide,
         bool notifyEnabled,
         const std::wstring& language);
-
+    // 新增：显示快捷菜单
+    void ShowQuickMenu(
+        const POINT& pt,
+        const std::vector<AspectRatio>& ratios,
+        size_t currentRatioIndex,
+        const std::vector<ResolutionPreset>& resolutions,
+        size_t currentResolutionIndex,
+        const LocalizedStrings& strings,
+        bool topmostEnabled,
+        bool taskbarAutoHide);
+        
 private:
     HWND m_hwnd;
     NOTIFYICONDATA m_nid{};
@@ -111,7 +121,7 @@ private:
     // 基础尺寸（96 DPI）
     static constexpr int BASE_ITEM_HEIGHT = 24;        // 列表项高度
     static constexpr int BASE_TITLE_HEIGHT = 26;       // 标题栏高度
-    static constexpr int BASE_SEPARATOR_HEIGHT = 1;    // 分隔线高��
+    static constexpr int BASE_SEPARATOR_HEIGHT = 1;    // 分隔线高度
     static constexpr int BASE_FONT_SIZE = 12;          // 字体大小
     static constexpr int BASE_TEXT_PADDING = 12;       // 文本内边距
     static constexpr int BASE_INDICATOR_WIDTH = 3;     // 指示器宽度

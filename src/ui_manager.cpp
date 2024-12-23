@@ -123,6 +123,76 @@ void TrayIcon::ShowContextMenu(
     DestroyMenu(hMenu);
 }
 
+void TrayIcon::ShowQuickMenu(
+    const POINT& pt,
+    const std::vector<AspectRatio>& ratios,
+    size_t currentRatioIndex,
+    const std::vector<ResolutionPreset>& resolutions,
+    size_t currentResolutionIndex,
+    const LocalizedStrings& strings,
+    bool topmostEnabled,
+    bool taskbarAutoHide) {
+    
+    HMENU hMenu = CreatePopupMenu();
+    if (!hMenu) return;
+
+    // 添加比例子菜单
+    HMENU hRatioMenu = CreateRatioSubmenu(ratios, currentRatioIndex, strings);
+    if (hRatioMenu) {
+        for (size_t i = 0; i < ratios.size(); ++i) {
+            UINT flags = MF_BYPOSITION | MF_STRING;
+            if (i == currentRatioIndex) {
+                flags |= MF_CHECKED;
+            }
+            InsertMenu(hMenu, -1, flags,
+                      Constants::ID_RATIO_BASE + i, ratios[i].name.c_str());
+        }
+    }
+
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+    // 添加分辨率子菜单
+    HMENU hSizeMenu = CreateResolutionSubmenu(resolutions, currentResolutionIndex, strings);
+    if (hSizeMenu) {
+        for (size_t i = 0; i < resolutions.size(); ++i) {
+            const auto& preset = resolutions[i];
+            TCHAR menuText[256];
+            _stprintf_s(menuText, _countof(menuText), TEXT("%s (%.1fM)"), 
+                preset.name.c_str(), 
+                preset.totalPixels / 1000000.0);
+            
+            UINT flags = MF_BYPOSITION | MF_STRING;
+            if (i == currentResolutionIndex) {
+                flags |= MF_CHECKED;
+            }
+            InsertMenu(hMenu, -1, flags,
+                      Constants::ID_RESOLUTION_BASE + i, menuText);
+        }
+    }
+
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+    // 添加重置选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
+              Constants::ID_RESET, strings.RESET_WINDOW.c_str());
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+    // 添加设置选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (topmostEnabled ? MF_CHECKED : 0),
+              Constants::ID_TASKBAR, strings.WINDOW_TOPMOST.c_str());
+
+    // 添加任务栏自动隐藏选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarAutoHide ? MF_CHECKED : 0),
+              Constants::ID_AUTOHIDE_TASKBAR, strings.TASKBAR_AUTOHIDE.c_str());
+
+    // 显示菜单
+    SetForegroundWindow(m_hwnd);
+    TrackPopupMenu(hMenu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_RIGHTBUTTON,
+                  pt.x, pt.y, 0, m_hwnd, NULL);
+
+    DestroyMenu(hMenu);
+}
+
 HMENU TrayIcon::CreateWindowSelectionSubmenu(
     const std::vector<std::pair<HWND, std::wstring>>& windows,
     const std::wstring& currentWindowTitle,
