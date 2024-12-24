@@ -155,8 +155,8 @@
 
 ### 环境要求
 
-- Visual Studio 2019+
-- Windows SDK 10.0.17763.0+
+- Visual Studio 2022+
+- Windows SDK 10.0.22621.0+（Windows 11 SDK）
 - CMake 3.15+
 
 ### 构建步骤
