@@ -12,7 +12,6 @@ on:
 
 env:
   BUILD_TYPE: Release
-  WINDOWS_SDK_VERSION: 10.0.22621.0  # 指定 Windows SDK 版本
 
 jobs:
   build:
@@ -36,7 +35,8 @@ jobs:
       run: |
         cmake -B ${{github.workspace}}/build `
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} `
-          -DCMAKE_SYSTEM_VERSION=${{env.WINDOWS_SDK_VERSION}}
+          -DCMAKE_GENERATOR_PLATFORM=x64 `
+          -DCMAKE_SYSTEM_VERSION="10.0.22621.0"
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
