@@ -134,18 +134,24 @@ Right-click or left-click the tray icon to:
   - 8K (7680×4320, about 33.2M pixels)
   - 12K (11520×6480, about 74.6M pixels)
 
-### Requirements
-
-- System: Windows 10 or above
-- [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-
 ### Notes
+
+- System Requirements: Windows 10 or above
+- [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+  - Install this runtime if you encounter missing DLL errors
 - About 4K Photo Quality:
   1. Although the output resolution reaches 4K, the actual rendering quality is lower than the window resolution option at the same size
   2. In fullscreen window mode, the output image ratio will be limited to the monitor's native ratio and its corresponding vertical ratio
   3. For best image quality, it's recommended to use fullscreen window mode + window resolution
 - Higher resolutions may affect game performance, please adjust according to your device capabilities
 - It's recommended to test quality comparison before shooting to choose the most suitable settings
+
+### Security Statement
+
+This program uses Windows standard window management APIs, working similarly to:
+- Manually resizing windows by dragging
+- Window auto-adjustment when changing system resolution
+- Window rearrangement when rotating screen
 
 ## 📄 License
 
