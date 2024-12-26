@@ -32,7 +32,8 @@ const LocalizedStrings ZH_CN = {
     TEXT("请使用正确格式，如：3840x2160,7680x4320"),
     TEXT("加载配置失败，请检查配置文件。"),
     TEXT("隐藏任务栏"),
-    TEXT("浮动窗口"),
+    TEXT("浮窗模式"),
+    TEXT("显示浮窗"),
     TEXT("关闭浮窗")
 };
 
@@ -68,6 +69,7 @@ const LocalizedStrings EN_US = {
     TEXT("Please use correct format, e.g.: 3840x2160,7680x4320"),
     TEXT("Failed to load config, please check the config file."),
     TEXT("Hide Taskbar"),
-    TEXT("Floating Window"),
+    TEXT("Floating Mode"),
+    TEXT("Show Window"),
     TEXT("Close Window")
 }; 

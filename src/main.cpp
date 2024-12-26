@@ -63,6 +63,11 @@ public:
             return false;
         }
 
+        // 如果启用了浮动窗口，则默认显示
+        if (m_useFloatingWindow && m_menuWindow) {
+            m_menuWindow->Show();
+        }
+
         // 注册热键
         if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, m_hotkeyModifiers, m_hotkeyKey)) {
             ShowNotification(m_strings.APP_NAME.c_str(), 
@@ -103,7 +108,8 @@ public:
             m_taskbarAutoHide,
             m_notifyEnabled,
             m_language,
-            m_useFloatingWindow
+            m_useFloatingWindow,
+            m_menuWindow && m_menuWindow->IsVisible()
         );
     }
 
@@ -317,6 +323,11 @@ public:
                             break;
                         case Constants::ID_FLOATING_WINDOW:
                             app->ToggleFloatingWindow();
+                            break;
+                        case Constants::ID_TOGGLE_WINDOW_VISIBILITY:
+                            if (app->m_menuWindow) {
+                                app->m_menuWindow->ToggleVisibility();
+                            }
                             break;
                     }
                 }
@@ -875,8 +886,19 @@ private:
 
     // 切换浮动窗口状态
     void ToggleFloatingWindow() {
+        bool wasEnabled = m_useFloatingWindow;
         m_useFloatingWindow = !m_useFloatingWindow;
         SaveMenuConfig();
+
+        if (m_menuWindow) {
+            if (m_useFloatingWindow && !wasEnabled) {
+                // 如果开启浮窗模式，且之前是关闭的，则显示窗口
+                m_menuWindow->Show();
+            } else if (!m_useFloatingWindow && m_menuWindow->IsVisible()) {
+                // 如果关闭浮窗模式，且窗口当前是显示的，则隐藏窗口
+                m_menuWindow->Hide();
+            }
+        }
     }
 };
 

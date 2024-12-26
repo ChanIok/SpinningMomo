@@ -38,7 +38,8 @@ public:
         bool taskbarAutoHide,
         bool notifyEnabled,
         const std::wstring& language,
-        bool menuResident);
+        bool useFloatingWindow,
+        bool isWindowVisible);
     // 新增：显示快捷菜单
     void ShowQuickMenu(
         const POINT& pt,
@@ -80,6 +81,7 @@ private:
         bool taskbarAutoHide,
         bool notifyEnabled,
         bool useFloatingWindow,
+        bool isWindowVisible,
         const LocalizedStrings& strings);
 };
 

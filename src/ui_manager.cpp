@@ -68,7 +68,8 @@ void TrayIcon::ShowContextMenu(
     bool taskbarAutoHide,
     bool notifyEnabled,
     const std::wstring& language,
-    bool menuResident) {
+    bool useFloatingWindow,
+    bool isWindowVisible) {
     
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
@@ -100,7 +101,8 @@ void TrayIcon::ShowContextMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
     // 添加设置选项
-    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, notifyEnabled, menuResident, strings);
+    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, notifyEnabled, 
+                    useFloatingWindow, isWindowVisible, strings);
 
     // 添加语言子菜单
     HMENU hLangMenu = CreateLanguageSubmenu(language, strings);
@@ -291,6 +293,7 @@ void TrayIcon::AddSettingsItems(
     bool taskbarAutoHide,
     bool notifyEnabled,
     bool useFloatingWindow,
+    bool isWindowVisible,
     const LocalizedStrings& strings) {
     
     // 置顶选项
@@ -307,9 +310,16 @@ void TrayIcon::AddSettingsItems(
               Constants::ID_NOTIFY, strings.SHOW_TIPS.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, strings.MODIFY_HOTKEY.c_str());
 
-    // 浮动窗口选项
+    // 浮窗模式选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (useFloatingWindow ? MF_CHECKED : 0),
-              Constants::ID_FLOATING_WINDOW, strings.FLOATING_WINDOW.c_str());
+              Constants::ID_FLOATING_WINDOW, strings.FLOATING_MODE.c_str());
+
+    // 如果启用了浮窗模式，添加浮窗显示/隐藏控制选项
+    if (useFloatingWindow) {
+        InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING,
+                  Constants::ID_TOGGLE_WINDOW_VISIBILITY,
+                  (isWindowVisible ? strings.CLOSE_WINDOW.c_str() : strings.SHOW_WINDOW.c_str()));
+    }
 }
 
 // MenuWindow的静态成员定义

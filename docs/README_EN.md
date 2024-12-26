@@ -61,8 +61,8 @@ It can even break through the original resolution limitations of the game and de
 ### Quick Start
 
 1. Run the program as **Administrator**
-2. Press the hotkey (default: Ctrl+Alt+R) to open the adjustment menu
-3. Select desired ratio and resolution
+2. A floating window will appear after startup, where you can adjust aspect ratio and resolution directly
+3. Use hotkey (default Ctrl+Alt+R) to show/hide the floating window
 4. Use reset option to restore window after shooting
 
 ### Photography Mode Selection
@@ -102,18 +102,18 @@ It can even break through the original resolution limitations of the game and de
 
 ### Tray Features
 
-Right or left click the tray icon to:
+Right-click or left-click the tray icon to:
 
-- 🎯 Select Target Window: Choose window to adjust from submenu
-- 📐 Window Ratio: Select preset ratios or custom ratio
-- 📏 Resolution: Select preset resolution or custom resolution
-- ⌨️ Modify Hotkey: Set new hotkey combination (1-2 second delay for success message)
-- 🔔 Show Tips: Enable/disable operation tips
-- 📌 Keep Window Topmost: Keep game window always on top to prevent taskbar overlap
-- 🔽 Auto-hide Taskbar: Automatically hide taskbar to prevent overlap
-- 📱 Floating Window: Set hotkey to toggle floating menu for quick window adjustments
-- ⚙️ Open Config File: Customize ratios and resolutions
-- ❌ Exit: Close program
+- 🎯 Select Window: Choose the target window from the submenu
+- 📐 Window Ratio: Select from preset ratios or custom ratios
+- 📏 Resolution: Select from preset resolutions or custom resolutions
+- ⌨️ Modify Hotkey: Set a new shortcut combination (there may be a 1-2 second delay before the success prompt appears)
+- 🔔 Show Tips: Enable/disable operation prompts
+- 📍 Keep Window Topmost: Keep the game always on top to prevent taskbar overlap
+- 🔽 Auto-hide Taskbar: Automatically hide the taskbar to prevent overlap
+- 📱 Floating Mode: Enabled by default, you can enable/disable the floating menu here. When disabled, use hotkey (default Ctrl+Alt+R) to open the adjustment menu
+- ⚙️ Open Config: Customize ratios and resolutions
+- ❌ Exit: Close the program
 
 ### Custom Settings
 
