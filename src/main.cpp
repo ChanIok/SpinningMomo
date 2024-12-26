@@ -76,7 +76,7 @@ public:
 
         // 显示启动提示
         std::wstring hotkeyText = GetHotkeyText();
-        std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText;
+        std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
         ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
 
         return true;

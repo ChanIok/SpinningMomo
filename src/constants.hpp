@@ -113,6 +113,7 @@ struct LocalizedStrings {
     std::wstring HOTKEY_SET_FAILED;
     std::wstring CONFIG_HELP;
     std::wstring STARTUP_MESSAGE;
+    std::wstring STARTUP_MESSAGE_SUFFIX;  // 启动消息的后缀
     std::wstring LANGUAGE;
     std::wstring CHINESE;
     std::wstring ENGLISH;
