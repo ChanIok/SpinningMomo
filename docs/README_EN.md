@@ -105,13 +105,15 @@ It can even break through the original resolution limitations of the game and de
 Right-click or left-click the tray icon to:
 
 - 🎯 Select Window: Choose the target window from the submenu
-- 📐 Window Ratio: Select from preset ratios or custom ratios
+- 📐 Window Ratio: Select from preset ratios or custom ratios 
 - 📏 Resolution: Select from preset resolutions or custom resolutions
-- ⌨️ Modify Hotkey: Set a new shortcut combination (there may be a 1-2 second delay before the success prompt appears)
+- 📍 Game Topmost: Keep the game always on top to prevent taskbar overlap
+- 🔽 Hide Taskbar: Hide the taskbar to prevent overlap
+- ⬇️ Lower Taskbar When Resizing: Lower taskbar when resizing window to prevent overlap
 - 🔔 Show Tips: Enable/disable operation prompts
-- 📍 Keep Window Topmost: Keep the game always on top to prevent taskbar overlap
-- 🔽 Auto-hide Taskbar: Automatically hide the taskbar to prevent overlap
-- 📱 Floating Mode: Enabled by default, you can enable/disable the floating menu here. When disabled, use hotkey (default Ctrl+Alt+R) to open the adjustment menu
+- ⌨️ Modify Hotkey: Set a new shortcut combination (may have 5 second delay before success prompt)
+- 📱 Floating Mode: Enabled by default, can enable/disable floating menu here. When disabled, use hotkey (default Ctrl+Alt+R) to open adjustment menu
+- 🌐 Language: Switch language
 - ⚙️ Open Config: Customize ratios and resolutions
 - ❌ Exit: Close the program
 

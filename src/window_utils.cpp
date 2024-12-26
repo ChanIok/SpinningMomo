@@ -21,7 +21,7 @@ bool WindowUtils::CompareWindowTitle(const std::wstring& title1, const std::wstr
 }
 
 // 窗口操作
-bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool shouldTopmost) {
+bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool topmost, bool taskbarLower) {
     if (!hwnd || !IsWindow(hwnd)) return false;
 
     // 获取窗口样式
@@ -46,12 +46,21 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool shouldTopm
     int newTop = (screenHeight - height) / 2 + borderOffsetY;
 
     // 设置窗口置顶状态
-    HWND insertAfter = shouldTopmost ? HWND_TOPMOST : HWND_NOTOPMOST;
+    HWND insertAfter = topmost ? HWND_TOPMOST : HWND_NOTOPMOST;
     SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
     // 设置新的窗口大小和位置
-    return SetWindowPos(hwnd, NULL, newLeft, newTop, totalWidth, totalHeight, 
-                       SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+    bool success = SetWindowPos(hwnd, NULL, newLeft, newTop, totalWidth, totalHeight, 
+                              SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+
+    // 如果窗口调整成功且需要置底任务栏，则执行置底操作
+    if (success && taskbarLower) {
+        if (HWND taskbar = FindWindow(TEXT("Shell_TrayWnd"), NULL)) {
+            SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    }
+
+    return success;
 }
 
 // 回调函数

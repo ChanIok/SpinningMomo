@@ -27,6 +27,7 @@ namespace Constants {
     constexpr UINT ID_RESET = 2006;          // 重置窗口尺寸菜单项ID
     constexpr UINT ID_CONFIG = 2009;         // 打开配置文件菜单项ID
     constexpr UINT ID_AUTOHIDE_TASKBAR = 2007;    // 任务栏自动隐藏菜单项ID
+    constexpr UINT ID_LOWER_TASKBAR = 2008;       // 调整时置底任务栏菜单项ID
     constexpr UINT ID_FLOATING_WINDOW = 2012;    // 浮窗模式选项ID
     constexpr UINT ID_TOGGLE_WINDOW_VISIBILITY = 2013;  // 浮窗显示控制ID
     
@@ -61,6 +62,7 @@ namespace Constants {
     
     inline const TCHAR* TASKBAR_SECTION = TEXT("Taskbar");    // 任务栏配置节名
     inline const TCHAR* TASKBAR_AUTOHIDE = TEXT("AutoHide");  // 任务栏自动隐藏配置项
+    inline const TCHAR* TASKBAR_LOWER = TEXT("LowerOnResize"); // 调整时置底任务栏配置项
     
     inline const TCHAR* MENU_SECTION = TEXT("Menu");      // 菜单配置节名
     inline const TCHAR* MENU_FLOATING = TEXT("Floating");  // 浮动窗口配置项
@@ -123,6 +125,7 @@ struct LocalizedStrings {
     std::wstring RESOLUTION_FORMAT_EXAMPLE;
     std::wstring LOAD_CONFIG_FAILED;
     std::wstring TASKBAR_AUTOHIDE;
+    std::wstring TASKBAR_LOWER;     // 调整时置底任务栏选项文本
     std::wstring FLOATING_MODE;     // 浮窗模式选项文本
     std::wstring SHOW_WINDOW;       // 显示浮窗选项文本
     std::wstring CLOSE_WINDOW;      // 关闭浮窗选项文本

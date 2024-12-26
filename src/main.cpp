@@ -106,6 +106,7 @@ public:
             m_strings,
             m_topmostEnabled,
             m_taskbarAutoHide,
+            m_taskbarLower,
             m_notifyEnabled,
             m_language,
             m_useFloatingWindow,
@@ -321,6 +322,9 @@ public:
                         case Constants::ID_AUTOHIDE_TASKBAR:
                             app->ToggleTaskbarAutoHide();
                             break;
+                        case Constants::ID_LOWER_TASKBAR:
+                            app->ToggleTaskbarLower();
+                            break;
                         case Constants::ID_FLOATING_WINDOW:
                             app->ToggleFloatingWindow();
                             break;
@@ -381,6 +385,7 @@ private:
     bool m_notifyEnabled = false;                     // 是否显示提示，默认关闭
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     bool m_taskbarAutoHide = false;                   // 任务栏自动隐藏状态
+    bool m_taskbarLower = true;                      // 调整时置底任务栏状态
     bool m_useFloatingWindow = true;                 // 是否使用浮动窗口，默认开启
     
     // 窗口变换相关
@@ -549,6 +554,13 @@ private:
                                   m_configPath.c_str()) > 0) {
             m_taskbarAutoHide = (_wtoi(buffer) != 0);
         }
+        
+        if (GetPrivateProfileString(Constants::TASKBAR_SECTION,
+                                  Constants::TASKBAR_LOWER,
+                                  TEXT("1"), buffer, _countof(buffer),
+                                  m_configPath.c_str()) > 0) {
+            m_taskbarLower = (_wtoi(buffer) != 0);
+        }
     }
 
     // 保存任务栏设置到配置文件
@@ -556,6 +568,11 @@ private:
         WritePrivateProfileString(Constants::TASKBAR_SECTION,
                                 Constants::TASKBAR_AUTOHIDE,
                                 m_taskbarAutoHide ? TEXT("1") : TEXT("0"),
+                                m_configPath.c_str());
+                                
+        WritePrivateProfileString(Constants::TASKBAR_SECTION,
+                                Constants::TASKBAR_LOWER,
+                                m_taskbarLower ? TEXT("1") : TEXT("0"),
                                 m_configPath.c_str());
     }
 
@@ -711,7 +728,7 @@ private:
             targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
         }
 
-        if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, m_topmostEnabled)) {
+        if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, m_topmostEnabled, m_taskbarLower)) {
             m_windowModified = true;
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
             return true;
@@ -899,6 +916,12 @@ private:
                 m_menuWindow->Hide();
             }
         }
+    }
+
+    // 切换任务栏置底状态
+    void ToggleTaskbarLower() {
+        m_taskbarLower = !m_taskbarLower;
+        SaveTaskbarConfig();
     }
 };
 

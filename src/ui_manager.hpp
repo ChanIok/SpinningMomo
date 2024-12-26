@@ -28,7 +28,7 @@ public:
     // 新增：显示上下文菜单
     void ShowContextMenu(
         const std::vector<std::pair<HWND, std::wstring>>& windows,
-        const std::wstring& currentWindowTitle,
+        const std::wstring& currentTitle,
         const std::vector<AspectRatio>& ratios,
         size_t currentRatioIndex,
         const std::vector<ResolutionPreset>& resolutions,
@@ -36,10 +36,11 @@ public:
         const LocalizedStrings& strings,
         bool topmostEnabled,
         bool taskbarAutoHide,
+        bool taskbarLower,
         bool notifyEnabled,
         const std::wstring& language,
         bool useFloatingWindow,
-        bool isWindowVisible);
+        bool isFloatingWindowVisible);
     // 新增：显示快捷菜单
     void ShowQuickMenu(
         const POINT& pt,
@@ -58,7 +59,7 @@ private:
     // 新增：私有辅助方法
     HMENU CreateWindowSelectionSubmenu(
         const std::vector<std::pair<HWND, std::wstring>>& windows,
-        const std::wstring& currentWindowTitle,
+        const std::wstring& currentTitle,
         const LocalizedStrings& strings);
         
     HMENU CreateRatioSubmenu(
@@ -79,9 +80,10 @@ private:
         HMENU hMenu,
         bool topmostEnabled,
         bool taskbarAutoHide,
+        bool taskbarLower,
         bool notifyEnabled,
         bool useFloatingWindow,
-        bool isWindowVisible,
+        bool isFloatingWindowVisible,
         const LocalizedStrings& strings);
 };
 

@@ -58,7 +58,7 @@ void TrayIcon::UpdateTip(const TCHAR* tip) {
 // 新增：TrayIcon的菜单相关方法实现
 void TrayIcon::ShowContextMenu(
     const std::vector<std::pair<HWND, std::wstring>>& windows,
-    const std::wstring& currentWindowTitle,
+    const std::wstring& currentTitle,
     const std::vector<AspectRatio>& ratios,
     size_t currentRatioIndex,
     const std::vector<ResolutionPreset>& resolutions,
@@ -66,16 +66,17 @@ void TrayIcon::ShowContextMenu(
     const LocalizedStrings& strings,
     bool topmostEnabled,
     bool taskbarAutoHide,
+    bool taskbarLower,
     bool notifyEnabled,
     const std::wstring& language,
     bool useFloatingWindow,
-    bool isWindowVisible) {
+    bool isFloatingWindowVisible) {
     
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
 
     // 添加窗口选择子菜单
-    HMENU hWindowMenu = CreateWindowSelectionSubmenu(windows, currentWindowTitle, strings);
+    HMENU hWindowMenu = CreateWindowSelectionSubmenu(windows, currentTitle, strings);
     if (hWindowMenu) {
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, 
                   (UINT_PTR)hWindowMenu, strings.SELECT_WINDOW.c_str());
@@ -101,8 +102,8 @@ void TrayIcon::ShowContextMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
     // 添加设置选项
-    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, notifyEnabled, 
-                    useFloatingWindow, isWindowVisible, strings);
+    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, taskbarLower, notifyEnabled, 
+                    useFloatingWindow, isFloatingWindowVisible, strings);
 
     // 添加语言子菜单
     HMENU hLangMenu = CreateLanguageSubmenu(language, strings);
@@ -291,9 +292,10 @@ void TrayIcon::AddSettingsItems(
     HMENU hMenu,
     bool topmostEnabled,
     bool taskbarAutoHide,
+    bool taskbarLower,
     bool notifyEnabled,
     bool useFloatingWindow,
-    bool isWindowVisible,
+    bool isFloatingWindowVisible,
     const LocalizedStrings& strings) {
     
     // 置顶选项
@@ -303,6 +305,11 @@ void TrayIcon::AddSettingsItems(
     // 任务栏自动隐藏选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarAutoHide ? MF_CHECKED : 0),
               Constants::ID_AUTOHIDE_TASKBAR, strings.TASKBAR_AUTOHIDE.c_str());
+              
+    // 任务栏置底选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarLower ? MF_CHECKED : 0),
+              Constants::ID_LOWER_TASKBAR, strings.TASKBAR_LOWER.c_str());
+              
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
     // 通知设置
@@ -318,7 +325,7 @@ void TrayIcon::AddSettingsItems(
     if (useFloatingWindow) {
         InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING,
                   Constants::ID_TOGGLE_WINDOW_VISIBILITY,
-                  (isWindowVisible ? strings.CLOSE_WINDOW.c_str() : strings.SHOW_WINDOW.c_str()));
+                  (isFloatingWindowVisible ? strings.CLOSE_WINDOW.c_str() : strings.SHOW_WINDOW.c_str()));
     }
 }
 
