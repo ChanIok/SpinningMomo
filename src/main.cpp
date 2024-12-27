@@ -728,6 +728,8 @@ private:
             targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
         }
 
+        OutputDebugString((TEXT("Width: ") + std::to_wstring(targetRes.width) + TEXT(", Height: ") + std::to_wstring(targetRes.height) + TEXT("\n")).c_str());
+        
         if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, m_topmostEnabled, m_taskbarLower)) {
             m_windowModified = true;
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
