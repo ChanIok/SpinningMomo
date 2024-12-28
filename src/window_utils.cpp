@@ -27,6 +27,15 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool topmost, b
     // 获取窗口样式
     DWORD style = GetWindowLong(hwnd, GWL_STYLE);
     DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    
+    // 如果是有边框窗口且需要超出屏幕尺寸，转换为无边框
+    if ((style & WS_OVERLAPPEDWINDOW) && (width > screenWidth || height > screenHeight)) {
+        style &= ~(WS_OVERLAPPEDWINDOW);
+        style |= WS_POPUP;
+        SetWindowLong(hwnd, GWL_STYLE, style);
+    }
 
     // 调整窗口大小
     RECT rect = { 0, 0, width, height };
@@ -37,9 +46,6 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool topmost, b
     int totalHeight = rect.bottom - rect.top;
     int borderOffsetX = rect.left;  // 左边框的偏移量（负值）
     int borderOffsetY = rect.top;   // 顶部边框的偏移量（负值）
-
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
     // 计算屏幕中心位置，考虑边框偏移
     int newLeft = (screenWidth - width) / 2 + borderOffsetX;
