@@ -67,30 +67,54 @@ It can even break through the original resolution limitations of the game and de
 
 ### Photography Mode Selection
 
-1. High Quality Mode (Recommended)
-   - Game Settings:
-     * Display Mode: Fullscreen Window
-     * Photo Quality: Window Resolution
-   - Steps:
-     1. Use ratio options to adjust composition (e.g., 16:9, 3:2, 9:16)
-     2. Select desired resolution preset (4K, 6K, 8K, 12K)
-     3. Press space to capture
-     4. Click reset window after shooting
-   - Advantages:
-     * Support ultra-high resolution output (up to 12K and beyond)
-     * Sharp image quality with rich details
-     * Freely adjustable ratio and resolution
-
-2. Quick Mode
-   - Game Settings:
-     * Display Mode: Window Mode
-     * Photo Quality: 4K
-   - Notes:
-     * Advantages: Convenient operation, suitable for daily shooting and preview
-     * Disadvantages:
-       - Outputs pseudo-4K images, actual rendering quality is lower than window resolution option at the same size
-       - **Can only adjust ratio, cannot adjust resolution**
-     * Suggestion: Sufficient for daily use if image quality is not a priority
+<div align="center">
+  <table>
+    <tr>
+      <th align="center">📸 Window Resolution Mode (Recommended)</th>
+      <th align="center">🎯 Standard Mode</th>
+    </tr>
+    <tr>
+      <td>
+        <b>Game Settings</b><br/>
+        ▫️ Display Mode: <b>Fullscreen Window (Recommended)</b> / Window Mode<br/>
+        ▫️ Photo Quality: <b>Window Resolution</b>
+      </td>
+      <td>
+        <b>Game Settings</b><br/>
+        ▫️ Display Mode: <b>Window Mode</b> / Fullscreen Window (ratio limited)<br/>
+        ▫️ Photo Quality: <b>4K</b>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <b>Steps</b><br/>
+        1️⃣ Use ratio options to adjust composition<br/>
+        2️⃣ Select desired resolution preset (4K~12K)<br/>
+        3️⃣ Screen will exceed display bounds, press space to capture<br/>
+        4️⃣ Click reset window after shooting
+      </td>
+      <td>
+        <b>Notes</b><br/>
+        ✅ Convenient operation, suitable for daily shooting and preview<br/>
+        ❗ Can only adjust ratio, cannot adjust resolution<br/>
+        ❗ Outputs pseudo-4K, quality lower than window resolution<br/>
+        ❗ In fullscreen window mode, output limited by monitor's native ratio
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <b>Advantages</b><br/>
+        ⭐ Support ultra-high resolution (up to 12K+)<br/>
+        ⭐ Freely adjustable ratio and resolution
+      </td>
+      <td>
+        <b>Best For</b><br/>
+        ⭐ Quick composition check<br/>
+        ⭐ When image quality is not priority<br/>
+      </td>
+    </tr>
+  </table>
+</div>
 
 ### Resolution Explanation
 - Resolution calculation process:
@@ -107,8 +131,7 @@ Right-click or left-click the tray icon to:
 - 🎯 Select Window: Choose the target window from the submenu
 - 📐 Window Ratio: Select from preset ratios or custom ratios 
 - 📏 Resolution: Select from preset resolutions or custom resolutions
-- 📍 Game Topmost: Keep the game always on top to prevent taskbar overlap
-- 🔽 Hide Taskbar: Hide the taskbar to prevent overlap
+- 📍 Hide Taskbar: Hide the taskbar to prevent overlap
 - ⬇️ Lower Taskbar When Resizing: Lower taskbar when resizing window to prevent overlap
 - 🔔 Show Tips: Enable/disable operation prompts
 - ⌨️ Modify Hotkey: Set a new shortcut combination (may have 5 second delay before success prompt)
@@ -141,20 +164,17 @@ Right-click or left-click the tray icon to:
 - System Requirements: Windows 10 or above
 - [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
   - Install this runtime if you encounter missing DLL errors
-- About 4K Photo Quality:
-  1. Although the output resolution reaches 4K, the actual rendering quality is lower than the window resolution option at the same size
-  2. In fullscreen window mode, the output image ratio will be limited to the monitor's native ratio and its corresponding vertical ratio
-  3. For best image quality, it's recommended to use fullscreen window mode + window resolution
+- Due to Windows limitations, when using "Window Mode" and the window size needs to exceed the screen range, the program will automatically switch to borderless style, which can be restored through game settings
 - Higher resolutions may affect game performance, please adjust according to your device capabilities
 - It's recommended to test quality comparison before shooting to choose the most suitable settings
 
 ### Security Statement
 
-This program uses Windows standard window management APIs, working similarly to:
-- Manually resizing windows by dragging
+This program only sends requests through Windows standard window management APIs, with all adjustments executed by the Windows system itself, working similarly to:
 - Window auto-adjustment when changing system resolution
 - Window rearrangement when rotating screen
+- Window movement in multi-display setups
 
 ## 📄 License
 
-This project is licensed under the [MIT License](../LICENSE).
+This project is licensed under the [MIT License](../LICENSE). The project icon is from the game "Infinity Nikki" and copyrighted by the game developer.
