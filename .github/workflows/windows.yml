@@ -19,6 +19,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取所有历史记录和标签
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v1.3
@@ -76,12 +78,53 @@ jobs:
         path: ${{env.ARTIFACT_PATH}}
         retention-days: 5  # 构建产物保留 5 天
 
+    - name: Generate Release Notes
+      if: startsWith(github.ref, 'refs/tags/')
+      id: release_notes
+      run: |
+        # 获取当前标签和上一个标签
+        $CURRENT_TAG = "${{github.ref_name}}"
+        $PREV_TAG = $(git describe --tags --abbrev=0 "$CURRENT_TAG^" 2>$null)
+        
+        if (-not $PREV_TAG) {
+          # 如果没有上一个标签，获取所有提交
+          $COMMITS = $(git log --pretty=format:"%s|%b" --no-merges)
+        } else {
+          # 获取从上一个标签到当前标签的所有提交
+          $COMMITS = $(git log "$PREV_TAG..$CURRENT_TAG" --pretty=format:"%s|%b" --no-merges)
+        }
+        
+        $FORMATTED_COMMITS = $COMMITS -split "`n" | ForEach-Object {
+          $parts = $_ -split '\|'
+          $title = $parts[0].Trim()
+          $body = if ($parts.Length -gt 1) { $parts[1].Trim() } else { "" }
+          
+          $output = "- $title"
+          if ($body) {
+            $output += "`n  $($body -replace "`n", "`n  ")"
+          }
+          $output
+        }
+        
+        $NOTES = @"
+        ## 更新内容
+
+        $($FORMATTED_COMMITS -join "`n")
+        "@
+        
+        # 使用环境文件来存储多行内容
+        $NOTES | Out-File -FilePath release_notes.txt -Encoding utf8
+        echo "RELEASE_NOTES<<EOF" >> $env:GITHUB_ENV
+        Get-Content release_notes.txt | ForEach-Object { echo $_ >> $env:GITHUB_ENV }
+        echo "EOF" >> $env:GITHUB_ENV
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
-      if: startsWith(github.ref, 'refs/tags/')  # 只在推送标签时创建发布
+      if: startsWith(github.ref, 'refs/tags/')
       with:
         files: ${{env.ARTIFACT_PATH}}
-        draft: false  # 直接发布，不是草稿
-        prerelease: false  # 正式版本，不是预发布
-        generate_release_notes: true  # 自动生成发布说明
-        token: ${{ secrets.GITHUB_TOKEN }}  # 使用 GitHub 自动提供的 token
+        draft: false
+        prerelease: false
+        body: ${{ env.RELEASE_NOTES }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+
