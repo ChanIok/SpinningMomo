@@ -50,7 +50,7 @@ jobs:
         
         # 复制主程序和文档
         copy ${{github.workspace}}/build/Release/SpinningMomo.exe ${{github.workspace}}/release/
-        copy ${{github.workspace}}/docs/使用说明.txt ${{github.workspace}}/release/
+        copy ${{github.workspace}}/docs/使用说明.html ${{github.workspace}}/release/
         copy ${{github.workspace}}/LICENSE ${{github.workspace}}/release/
 
     - name: Create ZIP archive
