@@ -333,6 +333,9 @@ public:
                                 app->m_menuWindow->ToggleVisibility();
                             }
                             break;
+                        case Constants::ID_CAPTURE_WINDOW:
+                            app->HandleScreenshot();
+                            break;
                     }
                 }
                 return 0;
@@ -924,6 +927,31 @@ private:
     void ToggleTaskbarLower() {
         m_taskbarLower = !m_taskbarLower;
         SaveTaskbarConfig();
+    }
+
+    // 处理截图功能
+    void HandleScreenshot() {
+        HWND gameWindow = FindTargetWindow();
+        if (!gameWindow) {
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
+        }
+
+        // 生成文件名（时间戳）
+        auto now = std::chrono::system_clock::now();
+        std::wstring filename = L"Screenshot_" + 
+            std::to_wstring(std::chrono::system_clock::to_time_t(now)) + L".png";
+        
+        // 保存到ScreenShot文件夹
+        std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
+        
+        if (WindowUtils::CaptureWindow(gameWindow, savePath)) {
+            // 显示成功通知
+            ShowNotification(
+                m_strings.APP_NAME.c_str(),
+                (m_strings.CAPTURE_SUCCESS + savePath).c_str()
+            );
+        }
     }
 };
 

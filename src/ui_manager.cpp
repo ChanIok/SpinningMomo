@@ -114,6 +114,10 @@ void TrayIcon::ShowContextMenu(
 
     // 添加配置和退出选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CONFIG, strings.OPEN_CONFIG.c_str());
+    
+    // 添加截图选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CAPTURE_WINDOW, strings.CAPTURE_WINDOW.c_str());
+    
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, strings.EXIT.c_str());
 

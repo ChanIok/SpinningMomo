@@ -30,6 +30,7 @@ namespace Constants {
     constexpr UINT ID_LOWER_TASKBAR = 2008;       // 调整时置底任务栏菜单项ID
     constexpr UINT ID_FLOATING_WINDOW = 2012;    // 浮窗模式选项ID
     constexpr UINT ID_TOGGLE_WINDOW_VISIBILITY = 2013;  // 浮窗显示控制ID
+    constexpr UINT ID_CAPTURE_WINDOW = 2014;     // 截图菜单项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -115,7 +116,7 @@ struct LocalizedStrings {
     std::wstring HOTKEY_SET_FAILED;
     std::wstring CONFIG_HELP;
     std::wstring STARTUP_MESSAGE;
-    std::wstring STARTUP_MESSAGE_SUFFIX;  // 启动消息的后缀
+    std::wstring STARTUP_MESSAGE_SUFFIX;
     std::wstring LANGUAGE;
     std::wstring CHINESE;
     std::wstring ENGLISH;
@@ -125,10 +126,12 @@ struct LocalizedStrings {
     std::wstring RESOLUTION_FORMAT_EXAMPLE;
     std::wstring LOAD_CONFIG_FAILED;
     std::wstring TASKBAR_AUTOHIDE;
-    std::wstring TASKBAR_LOWER;     // 调整时置底任务栏选项文本
-    std::wstring FLOATING_MODE;     // 浮窗模式选项文本
-    std::wstring SHOW_WINDOW;       // 显示浮窗选项文本
-    std::wstring CLOSE_WINDOW;      // 关闭浮窗选项文本
+    std::wstring TASKBAR_LOWER;
+    std::wstring FLOATING_MODE;
+    std::wstring SHOW_WINDOW;
+    std::wstring CLOSE_WINDOW;
+    std::wstring CAPTURE_WINDOW;
+    std::wstring CAPTURE_SUCCESS;
 };
 
 // 中文字符串

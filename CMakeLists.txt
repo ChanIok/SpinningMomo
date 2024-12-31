@@ -20,4 +20,9 @@ add_executable(SpinningMomo WIN32
 )
 
 # 添加Windows库
-target_link_libraries(SpinningMomo shell32)
+target_link_libraries(SpinningMomo PRIVATE
+    windowsapp    # Windows Runtime API
+    d3d11        # Direct3D 11
+    dwmapi       # DWM API
+    shell32      # Windows Shell API
+)

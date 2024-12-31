@@ -1,5 +1,7 @@
 #include "window_utils.hpp"
-#include <algorithm>
+#include <wincodec.h>
+#include <windows.graphics.capture.interop.h>
+#include <windows.graphics.directx.direct3d11.interop.h>
 
 // 窗口查找
 HWND WindowUtils::FindGameWindow() {
@@ -126,4 +128,308 @@ WindowUtils::Resolution WindowUtils::CalculateResolutionByScreen(double targetRa
         // 否则使用方案1
         return WindowUtils::Resolution(screenWidth, height1);
     }
+}
+
+
+// 匿名命名空间：内部实现，只在当前文件可见
+namespace {
+    // RAII 封装：自动管理 COM 初始化/清理
+    class ComInitializer {
+    public:
+        ComInitializer() : initialized_(SUCCEEDED(CoInitialize(nullptr))) {}
+        ~ComInitializer() { if (initialized_) CoUninitialize(); }
+        bool isInitialized() const { return initialized_; }
+    private:
+        bool initialized_;
+    };
+
+    // RAII 封装：自动管理截图会话
+    class CaptureSession {
+    public:
+        CaptureSession(winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool& pool,
+                      winrt::Windows::Graphics::Capture::GraphicsCaptureItem& item)
+            : session_(pool.CreateCaptureSession(item)) {
+            if (session_) session_.StartCapture();
+        }
+        ~CaptureSession() { if (session_) session_.Close(); }
+        operator bool() const { return session_ != nullptr; }
+    private:
+        winrt::Windows::Graphics::Capture::GraphicsCaptureSession session_;
+    };
+
+    // RAII 包装器：管理暂存纹理的映射状态
+    class StagingTextureMapper {
+    public:
+        StagingTextureMapper(ID3D11DeviceContext* context, ID3D11Texture2D* texture)
+            : m_context(context), m_texture(texture), m_mapped{} {
+            m_success = SUCCEEDED(context->Map(texture, 0, D3D11_MAP_READ, 0, &m_mapped));
+        }
+        
+        ~StagingTextureMapper() {
+            if (m_success && m_context && m_texture) {
+                m_context->Unmap(m_texture, 0);
+            }
+        }
+
+        bool IsValid() const { return m_success; }
+        const D3D11_MAPPED_SUBRESOURCE& GetMapped() const { return m_mapped; }
+
+    private:
+        ID3D11DeviceContext* m_context;
+        ID3D11Texture2D* m_texture;
+        D3D11_MAPPED_SUBRESOURCE m_mapped;
+        bool m_success;
+    };
+
+    // RAII 包装器：管理 WIC 编码过程
+    class WICImageEncoder {
+    public:
+        WICImageEncoder(const std::wstring& filePath) : m_success(false) {
+            // 创建 WIC 工厂
+            if (FAILED(CoCreateInstance(CLSID_WICImagingFactory2, nullptr,
+                CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_factory)))) {
+                return;
+            }
+
+            // 创建编码器
+            if (FAILED(m_factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &m_encoder))) {
+                return;
+            }
+
+            // 创建流
+            if (FAILED(m_factory->CreateStream(&m_stream))) {
+                return;
+            }
+
+            // 初始化流
+            if (FAILED(m_stream->InitializeFromFilename(filePath.c_str(), GENERIC_WRITE))) {
+                return;
+            }
+
+            // 初始化编码器
+            if (FAILED(m_encoder->Initialize(m_stream.Get(), WICBitmapEncoderNoCache))) {
+                return;
+            }
+
+            // 创建帧
+            if (FAILED(m_encoder->CreateNewFrame(&m_frame, nullptr))) {
+                return;
+            }
+
+            // 初始化帧
+            if (FAILED(m_frame->Initialize(nullptr))) {
+                return;
+            }
+
+            m_success = true;
+        }
+
+        bool IsValid() const { return m_success; }
+
+        bool SetSize(UINT width, UINT height) {
+            return SUCCEEDED(m_frame->SetSize(width, height));
+        }
+
+        bool SetPixelFormat() {
+            WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
+            return SUCCEEDED(m_frame->SetPixelFormat(&format));
+        }
+
+        bool WritePixels(UINT height, UINT stride, UINT bufferSize, BYTE* data) {
+            return SUCCEEDED(m_frame->WritePixels(height, stride, bufferSize, data));
+        }
+
+        bool Commit() {
+            if (FAILED(m_frame->Commit())) return false;
+            return SUCCEEDED(m_encoder->Commit());
+        }
+
+    private:
+        Microsoft::WRL::ComPtr<IWICImagingFactory2> m_factory;
+        Microsoft::WRL::ComPtr<IWICBitmapEncoder> m_encoder;
+        Microsoft::WRL::ComPtr<IWICStream> m_stream;
+        Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> m_frame;
+        bool m_success;
+    };
+}
+
+// 保存帧缓冲为文件
+bool WindowUtils::SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath) {
+    // 获取纹理描述
+    D3D11_TEXTURE2D_DESC desc;
+    texture->GetDesc(&desc);
+
+    // 获取设备和上下文
+    Microsoft::WRL::ComPtr<ID3D11Device> device;
+    texture->GetDevice(&device);
+    if (!device) return false;
+
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+    device->GetImmediateContext(&context);
+    if (!context) return false;
+
+    // 创建暂存纹理
+    D3D11_TEXTURE2D_DESC stagingDesc = desc;
+    stagingDesc.Usage = D3D11_USAGE_STAGING;
+    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    stagingDesc.BindFlags = 0;
+    stagingDesc.MiscFlags = 0;
+    stagingDesc.ArraySize = 1;
+    stagingDesc.MipLevels = 1;
+
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> stagingTexture;
+    if (FAILED(device->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture))) {
+        return false;
+    }
+
+    // 复制纹理数据
+    context->CopyResource(stagingTexture.Get(), texture);
+
+    // 创建 WIC 编码器并设置参数
+    WICImageEncoder encoder(filePath);
+    if (!encoder.IsValid()) return false;
+    
+    if (!encoder.SetSize(desc.Width, desc.Height)) return false;
+    if (!encoder.SetPixelFormat()) return false;
+
+    // 映射纹理并写入数据
+    {
+        StagingTextureMapper mapper(context.Get(), stagingTexture.Get());
+        if (!mapper.IsValid()) return false;
+
+        const auto& mapped = mapper.GetMapped();
+        if (!encoder.WritePixels(desc.Height, mapped.RowPitch, mapped.RowPitch * desc.Height,
+            static_cast<BYTE*>(mapped.pData))) {
+            return false;
+        }
+    }
+
+    // 提交更改
+    return encoder.Commit();
+}
+
+// 捕获窗口截图并保存到文件
+bool WindowUtils::CaptureWindow(HWND hwnd, const std::wstring& savePath) {
+    if (!hwnd) return false;
+    
+    // 使用 RAII 管理 COM 初始化
+    ComInitializer com;
+    if (!com.isInitialized()) return false;
+
+    // 创建 D3D 设备和上下文
+    Microsoft::WRL::ComPtr<ID3D11Device> d3dDevice;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> d3dContext;
+    
+    HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
+        D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
+        &d3dDevice, nullptr, &d3dContext);
+    if (FAILED(hr)) return false;
+
+    // 创建 WinRT D3D 设备
+    auto d3dDeviceWinRT = CreateDirect3DDevice(d3dDevice.Get());
+    if (!d3dDeviceWinRT) return false;
+
+    // 获取窗口尺寸
+    RECT windowRect;
+    if (!GetWindowRect(hwnd, &windowRect)) return false;
+
+    // 创建窗口捕获项
+    auto captureItem = CreateCaptureItemForWindow(hwnd);
+    if (!captureItem) return false;
+
+    // 设置帧缓冲池
+    winrt::Windows::Graphics::SizeInt32 size{
+        windowRect.right - windowRect.left,
+        windowRect.bottom - windowRect.top
+    };
+
+    // 创建帧池，用于捕获窗口内容
+    auto framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
+        d3dDeviceWinRT,
+        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
+        1, size);
+    if (!framePool) return false;
+
+    // 创建并启动捕获会话
+    CaptureSession session(framePool, captureItem);
+    if (!session) return false;
+
+    // 获取捕获的帧（尝试最多3次，每次等待100ms）
+    auto frame = framePool.TryGetNextFrame();
+    int retryCount = 0;
+    while (!frame && retryCount < 3) {
+        Sleep(100);
+        frame = framePool.TryGetNextFrame();
+        retryCount++;
+    }
+    
+    if (!frame) return false;
+
+    // 获取帧表面
+    auto frameSurface = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
+    if (!frameSurface) return false;
+
+    // 保存帧
+    bool success = SaveFrameToFile(frameSurface.Get(), savePath);
+
+    // 清理资源
+    framePool.Close();
+    return success;
+}
+
+// 创建 Windows Runtime Direct3D 设备
+winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice WindowUtils::CreateDirect3DDevice(ID3D11Device* d3dDevice) {
+    // 获取DXGI设备接口
+    Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
+    HRESULT hr = d3dDevice->QueryInterface(IID_PPV_ARGS(&dxgiDevice));
+    if (FAILED(hr)) return nullptr;
+    
+    // 创建WinRT设备
+    winrt::com_ptr<::IInspectable> device;
+    hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), device.put());
+    if (FAILED(hr)) return nullptr;
+    
+    return device.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
+}
+
+// 创建窗口捕获项
+winrt::Windows::Graphics::Capture::GraphicsCaptureItem WindowUtils::CreateCaptureItemForWindow(HWND hwnd) {
+    // 获取工厂接口
+    auto factory = winrt::get_activation_factory<
+        winrt::Windows::Graphics::Capture::GraphicsCaptureItem,
+        IGraphicsCaptureItemInterop>();
+    
+    // 创建捕获项
+    winrt::Windows::Graphics::Capture::GraphicsCaptureItem captureItem = { nullptr };
+    HRESULT hr = factory->CreateForWindow(
+        hwnd,
+        winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
+        reinterpret_cast<void**>(winrt::put_abi(captureItem)));
+    
+    if (FAILED(hr)) return nullptr;
+    return captureItem;
+}
+
+
+std::wstring WindowUtils::GetScreenshotPath() {
+    const wchar_t* SCREENSHOT_DIR = L"ScreenShot";
+    
+    // 首选：程序所在目录
+    wchar_t exePath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, exePath, MAX_PATH) != 0) {
+        std::wstring fullPath(exePath);
+        std::wstring exeDir = fullPath.substr(0, fullPath.find_last_of(L"\\/"));
+        std::wstring primaryPath = exeDir + L"\\" + SCREENSHOT_DIR;
+        
+        // 尝试在程序目录创建文件夹
+        if (CreateDirectoryW(primaryPath.c_str(), NULL) || 
+            GetLastError() == ERROR_ALREADY_EXISTS) {
+            return primaryPath;
+        }
+    }
+    
+    // 备选：当前目录
+    std::wstring fallbackPath = L".\\" + std::wstring(SCREENSHOT_DIR);
+    CreateDirectoryW(fallbackPath.c_str(), NULL);  // 尝试创建，忽略结果
+    return fallbackPath;
 } 

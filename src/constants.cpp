@@ -36,7 +36,9 @@ const LocalizedStrings ZH_CN = {
     TEXT("调整时置底任务栏"),
     TEXT("浮窗模式"),
     TEXT("显示浮窗"),
-    TEXT("关闭浮窗")
+    TEXT("关闭浮窗"),
+    TEXT("截图"),
+    TEXT("截图成功，已保存至: ")
 };
 
 // 英文字符串
@@ -75,5 +77,7 @@ const LocalizedStrings EN_US = {
     TEXT("Lower Taskbar When Resizing"),
     TEXT("Floating Mode"),
     TEXT("Show Window"),
-    TEXT("Close Window")
+    TEXT("Close Window"),
+    TEXT("Screenshot"),
+    TEXT("Screenshot saved to: ")
 }; 

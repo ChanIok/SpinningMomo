@@ -1,7 +1,12 @@
 #pragma once
 #include "win_config.hpp"
+#include <winrt/Windows.Graphics.Capture.h>
+#include <winrt/Windows.Foundation.h>
+#include <windows.graphics.capture.interop.h>
+#include <d3d11.h>
 #include <string>
 #include <vector>
+#include <wrl/client.h>
 
 class WindowUtils {
 public:
@@ -30,7 +35,23 @@ public:
     static Resolution CalculateResolution(UINT64 totalPixels, double ratio);
     static Resolution CalculateResolutionByScreen(double targetRatio);
 
+    // 截图相关函数
+    static bool CaptureWindow(HWND hwnd, const std::wstring& savePath);
+    static std::wstring GetScreenshotPath();
+
 private:
     // 回调函数
     static BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
+    static winrt::Windows::Graphics::Capture::GraphicsCaptureItem CreateCaptureItemForWindow(HWND hwnd);
+    
+    // 截图辅助函数
+    static winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice CreateDirect3DDevice(ID3D11Device* d3dDevice);
+    static bool SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath);
+    template<typename T>
+    static Microsoft::WRL::ComPtr<T> GetDXGIInterfaceFromObject(winrt::Windows::Foundation::IInspectable const& object) {
+        auto access = object.as<Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();
+        Microsoft::WRL::ComPtr<T> result;
+        winrt::check_hresult(access->GetInterface(IID_PPV_ARGS(&result)));
+        return result;
+    }
 }; 
