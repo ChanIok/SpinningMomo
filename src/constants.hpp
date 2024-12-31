@@ -31,6 +31,7 @@ namespace Constants {
     constexpr UINT ID_FLOATING_WINDOW = 2012;    // 浮窗模式选项ID
     constexpr UINT ID_TOGGLE_WINDOW_VISIBILITY = 2013;  // 浮窗显示控制ID
     constexpr UINT ID_CAPTURE_WINDOW = 2014;     // 截图菜单项ID
+    constexpr UINT ID_PREVIEW_WINDOW = 2015;     // 预览窗口菜单项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -132,6 +133,7 @@ struct LocalizedStrings {
     std::wstring CLOSE_WINDOW;
     std::wstring CAPTURE_WINDOW;
     std::wstring CAPTURE_SUCCESS;
+    std::wstring PREVIEW_WINDOW;
 };
 
 // 中文字符串

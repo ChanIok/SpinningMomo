@@ -40,7 +40,8 @@ public:
         bool notifyEnabled,
         const std::wstring& language,
         bool useFloatingWindow,
-        bool isFloatingWindowVisible);
+        bool isFloatingWindowVisible,
+        bool previewEnabled);
     // 新增：显示快捷菜单
     void ShowQuickMenu(
         const POINT& pt,
@@ -50,7 +51,8 @@ public:
         size_t currentResolutionIndex,
         const LocalizedStrings& strings,
         bool topmostEnabled,
-        bool taskbarAutoHide);
+        bool taskbarAutoHide,
+        bool previewEnabled);
         
 private:
     HWND m_hwnd;
@@ -84,6 +86,7 @@ private:
         bool notifyEnabled,
         bool useFloatingWindow,
         bool isFloatingWindowVisible,
+        bool previewEnabled,
         const LocalizedStrings& strings);
 };
 
@@ -95,6 +98,7 @@ public:
         Ratio,
         Resolution,
         TaskbarAutoHide,
+        PreviewWindow,
         Reset,
         Close
     };
@@ -114,7 +118,8 @@ public:
                const LocalizedStrings& strings,            // 字符串只读，保持const
                size_t currentRatioIndex,                   // 添加初始比例索引
                size_t currentResolutionIndex,              // 添加初始分辨率索引
-               bool taskbarAutoHide);                      // 添加初始任务栏自动隐藏状态
+               bool taskbarAutoHide,                       // 添加初始任务栏自动隐藏状态
+               bool previewEnabled);                       // 添加初始预览窗口状态
     
     void Show();
     void Hide();
@@ -123,6 +128,7 @@ public:
     void SetCurrentRatio(size_t index);
     void SetCurrentResolution(size_t index);
     void SetTaskbarAutoHide(bool enabled);
+    void SetPreviewEnabled(bool enabled);  // 添加设置预览窗口状态的函数
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
 
@@ -164,6 +170,7 @@ private:
     size_t m_currentRatioIndex = SIZE_MAX;       // 当前选中的比例索引
     size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选中的分辨率索引
     bool m_taskbarAutoHide = false;              // 任务栏自动隐藏状态
+    bool m_previewEnabled = false;               // 预览窗口状态
     std::vector<AspectRatio>* m_ratioItems = nullptr;       // 使用指针
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
     std::vector<MenuItem> m_items;               // 所有列表项

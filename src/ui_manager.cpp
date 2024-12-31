@@ -70,7 +70,8 @@ void TrayIcon::ShowContextMenu(
     bool notifyEnabled,
     const std::wstring& language,
     bool useFloatingWindow,
-    bool isFloatingWindowVisible) {
+    bool isFloatingWindowVisible,
+    bool previewEnabled) {
     
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
@@ -103,7 +104,7 @@ void TrayIcon::ShowContextMenu(
 
     // 添加设置选项
     AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, taskbarLower, notifyEnabled, 
-                    useFloatingWindow, isFloatingWindowVisible, strings);
+                    useFloatingWindow, isFloatingWindowVisible, previewEnabled, strings);
 
     // 添加语言子菜单
     HMENU hLangMenu = CreateLanguageSubmenu(language, strings);
@@ -139,7 +140,8 @@ void TrayIcon::ShowQuickMenu(
     size_t currentResolutionIndex,
     const LocalizedStrings& strings,
     bool topmostEnabled,
-    bool taskbarAutoHide) {
+    bool taskbarAutoHide,
+    bool previewEnabled) {
     
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
@@ -197,6 +199,10 @@ void TrayIcon::ShowQuickMenu(
     // 添加任务栏自动隐藏选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarAutoHide ? MF_CHECKED : 0),
               Constants::ID_AUTOHIDE_TASKBAR, strings.TASKBAR_AUTOHIDE.c_str());
+
+    // 添加预览窗口选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (previewEnabled ? MF_CHECKED : 0),
+              Constants::ID_PREVIEW_WINDOW, strings.PREVIEW_WINDOW.c_str());
 
     // 显示菜单
     SetForegroundWindow(m_hwnd);
@@ -300,6 +306,7 @@ void TrayIcon::AddSettingsItems(
     bool notifyEnabled,
     bool useFloatingWindow,
     bool isFloatingWindowVisible,
+    bool previewEnabled,
     const LocalizedStrings& strings) {
     
     // 置顶选项
@@ -321,6 +328,10 @@ void TrayIcon::AddSettingsItems(
               Constants::ID_NOTIFY, strings.SHOW_TIPS.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, strings.MODIFY_HOTKEY.c_str());
 
+    // 预览窗口选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (previewEnabled ? MF_CHECKED : 0),
+              Constants::ID_PREVIEW_WINDOW, strings.PREVIEW_WINDOW.c_str());
+              
     // 浮窗模式选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (useFloatingWindow ? MF_CHECKED : 0),
               Constants::ID_FLOATING_WINDOW, strings.FLOATING_MODE.c_str());
@@ -365,7 +376,8 @@ bool MenuWindow::Create(HWND parent,
                        const LocalizedStrings& strings,
                        size_t currentRatioIndex,
                        size_t currentResolutionIndex,
-                       bool taskbarAutoHide) {
+                       bool taskbarAutoHide,
+                       bool previewEnabled) {
     m_hwndParent = parent;
     m_ratioItems = &ratios;
     m_resolutionItems = &resolutions;
@@ -373,6 +385,7 @@ bool MenuWindow::Create(HWND parent,
     m_currentRatioIndex = currentRatioIndex;
     m_currentResolutionIndex = currentResolutionIndex;
     m_taskbarAutoHide = taskbarAutoHide;
+    m_previewEnabled = previewEnabled;
     
     InitializeItems(strings);
     
@@ -499,7 +512,8 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
     }
 
     // 添加设置选项
-    m_items.push_back({strings.TASKBAR_AUTOHIDE, ItemType::TaskbarAutoHide, 0});
+    m_items.push_back({strings.TASKBAR_AUTOHIDE, ItemType::TaskbarAutoHide, m_taskbarAutoHide ? 1 : 0});
+    m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
     m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
     m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
 }
@@ -656,11 +670,12 @@ void MenuWindow::OnPaint(HDC hdc) {
                           resolutionColumnRight, y + m_itemHeight};
                 break;
             case ItemType::TaskbarAutoHide:
+            case ItemType::PreviewWindow:
             case ItemType::Reset:
-            case ItemType::Close:  // 添加 Close 类型
+            case ItemType::Close:
                 itemRect = {resolutionColumnRight + m_separatorHeight, settingsY, 
                           rect.right, settingsY + m_itemHeight};
-                settingsY += m_itemHeight;  // 设置列的项目总是递增Y坐标
+                settingsY += m_itemHeight;
                 break;
             default:
                 continue;
@@ -680,6 +695,8 @@ void MenuWindow::OnPaint(HDC hdc) {
         } else if (item.type == ItemType::Resolution && item.index == m_currentResolutionIndex) {
             isSelected = true;
         } else if (item.type == ItemType::TaskbarAutoHide && m_taskbarAutoHide) {
+            isSelected = true;
+        } else if (item.type == ItemType::PreviewWindow && m_previewEnabled) {
             isSelected = true;
         }
 
@@ -761,6 +778,9 @@ void MenuWindow::OnLButtonDown(int x, int y) {
             case ItemType::TaskbarAutoHide:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_AUTOHIDE_TASKBAR, 0);
                 break;
+            case ItemType::PreviewWindow:
+                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_PREVIEW_WINDOW, 0);
+                break;
             case ItemType::Reset:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_RESET, 0);
                 break;
@@ -803,6 +823,7 @@ int MenuWindow::CalculateWindowHeight() {
                 resolutionCount++;
                 break;
             case ItemType::TaskbarAutoHide:
+            case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
                 settingsCount++;
@@ -845,6 +866,7 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
             const auto& item = m_items[i];
             if (item.type == ItemType::TaskbarAutoHide || 
                 item.type == ItemType::Reset ||
+                item.type == ItemType::PreviewWindow ||
                 item.type == ItemType::Close) {
                 if (y >= settingsY && y < settingsY + m_itemHeight) {
                     return static_cast<int>(i);
@@ -868,4 +890,9 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
     }
     
     return -1;
+}
+
+void MenuWindow::SetPreviewEnabled(bool enabled) {
+    m_previewEnabled = enabled;
+    InvalidateRect(m_hwnd, NULL, TRUE);
 }

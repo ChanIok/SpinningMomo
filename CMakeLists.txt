@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 设置源文件的编码为UTF-8
 if(MSVC)
-    add_compile_options(/utf-8)
+    add_compile_options(/utf-8 /EHsc /await)
+    add_compile_definitions(WINRT_LEAN_AND_MEAN)
 endif()
 
 # 创建Windows GUI应用程序
@@ -16,6 +17,7 @@ add_executable(SpinningMomo WIN32
     src/constants.cpp
     src/window_utils.cpp
     src/ui_manager.cpp
+    src/preview_window.cpp
     src/resource.rc  # 添加资源文件
 )
 
@@ -25,4 +27,7 @@ target_link_libraries(SpinningMomo PRIVATE
     d3d11        # Direct3D 11
     dwmapi       # DWM API
     shell32      # Windows Shell API
+    dxgi         # DXGI
+    RuntimeObject # WinRT support
+    d3dcompiler  # D3D Compiler
 )

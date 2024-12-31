@@ -11,6 +11,7 @@
 #include "constants.hpp"
 #include "window_utils.hpp"
 #include "ui_manager.hpp"
+#include "preview_window.hpp"
 
 #pragma comment(lib, "Shcore.lib")
 #pragma comment(lib, "Shell32.lib")  // 添加 Shell32.lib 链接器指令
@@ -59,7 +60,14 @@ public:
         m_menuWindow = std::make_unique<MenuWindow>(hInstance);
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
                                 m_currentRatioIndex, m_currentResolutionIndex,
-                                m_taskbarAutoHide)) {
+                                m_taskbarAutoHide, m_isPreviewEnabled)) {
+            return false;
+        }
+
+        // 创建预览窗口
+        m_previewWindow = std::make_unique<PreviewWindow>();
+        if (!m_previewWindow->Initialize(hInstance)) {
+            MessageBoxW(NULL, L"预览窗口初始化失败", L"错误", MB_OK);
             return false;
         }
 
@@ -110,7 +118,8 @@ public:
             m_notifyEnabled,
             m_language,
             m_useFloatingWindow,
-            m_menuWindow && m_menuWindow->IsVisible()
+            m_menuWindow && m_menuWindow->IsVisible(),
+            m_isPreviewEnabled
         );
     }
 
@@ -123,7 +132,8 @@ public:
             m_currentResolutionIndex,
             m_strings,
             m_topmostEnabled,
-            m_taskbarAutoHide
+            m_taskbarAutoHide,
+            m_isPreviewEnabled
         );
     }
 
@@ -159,6 +169,11 @@ public:
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
                 ApplyWindowTransform(gameWindow);
+                
+                // 如果预览窗口已启用，重新开始捕获以更新尺寸
+                if (m_isPreviewEnabled && m_previewWindow) {
+                    m_previewWindow->StartCapture(gameWindow);
+                }
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
@@ -178,6 +193,11 @@ public:
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
                 ApplyWindowTransform(gameWindow);
+                
+                // 如果预览窗口已启用，重新开始捕获以更新尺寸
+                if (m_isPreviewEnabled && m_previewWindow) {
+                    m_previewWindow->StartCapture(gameWindow);
+                }
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
@@ -336,6 +356,9 @@ public:
                         case Constants::ID_CAPTURE_WINDOW:
                             app->HandleScreenshot();
                             break;
+                        case Constants::ID_PREVIEW_WINDOW:
+                            app->TogglePreviewWindow();
+                            break;
                     }
                 }
                 return 0;
@@ -371,12 +394,58 @@ public:
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 
+    // 处理截图功能
+    void HandleScreenshot() {
+        HWND gameWindow = FindTargetWindow();
+        if (!gameWindow) {
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
+        }
+
+        // 生成文件名（时间戳）
+        auto now = std::chrono::system_clock::now();
+        std::wstring filename = L"Screenshot_" + 
+            std::to_wstring(std::chrono::system_clock::to_time_t(now)) + L".png";
+        
+        // 保存到ScreenShot文件夹
+        std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
+        
+        if (WindowUtils::CaptureWindow(gameWindow, savePath)) {
+            // 显示成功通知
+            ShowNotification(
+                m_strings.APP_NAME.c_str(),
+                (m_strings.CAPTURE_SUCCESS + savePath).c_str()
+            );
+        }
+    }
+
+    // 切换预览窗口
+    void TogglePreviewWindow() {
+        m_isPreviewEnabled = !m_isPreviewEnabled;
+        
+        if (m_isPreviewEnabled) {
+            // 如果有选中的窗口，立即开始预览
+            if (HWND gameWindow = FindTargetWindow()) {
+                m_previewWindow->StartCapture(gameWindow);
+            }
+        } else {
+            // 隐藏预览窗口
+            m_previewWindow->StopCapture();
+        }
+        
+        // 更新菜单窗口中的状态
+        if (m_menuWindow) {
+            m_menuWindow->SetPreviewEnabled(m_isPreviewEnabled);
+        }
+    }
+
 private:
     // 窗口和UI相关
     HWND m_hwnd = NULL;                                  // 主窗口句柄
     HINSTANCE m_hInstance = NULL;                        // 应用程序实例句柄
     std::unique_ptr<TrayIcon> m_trayIcon;               // 托盘图标
     std::unique_ptr<MenuWindow> m_menuWindow;           // 菜单窗口
+    std::unique_ptr<PreviewWindow> m_previewWindow;     // 预览窗口
     std::vector<std::pair<HWND, std::wstring>> m_windows;  // 存储窗口列表
     
     // 配置相关
@@ -389,7 +458,8 @@ private:
     bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     bool m_taskbarAutoHide = false;                   // 任务栏自动隐藏状态
     bool m_taskbarLower = true;                      // 调整时置底任务栏状态
-    bool m_useFloatingWindow = true;                 // 是否使用浮动窗口，默认开启
+    bool m_useFloatingWindow = true;                 // 是否使用浮动窗口
+    bool m_isPreviewEnabled = false;                  // 预览窗口状态
     
     // 窗口变换相关
     std::vector<AspectRatio> m_ratios;                // 预设的宽高比列表
@@ -671,6 +741,11 @@ private:
             }
             
             if (ApplyWindowTransform(gameWindow)) {
+                // 开始捕获
+                if (m_isPreviewEnabled && m_previewWindow) {
+                    m_previewWindow->StartCapture(gameWindow);
+                }
+                
                 ShowNotification(m_strings.APP_NAME.c_str(), 
                     m_strings.RESET_SUCCESS.c_str(), true);
             }
@@ -929,30 +1004,7 @@ private:
         SaveTaskbarConfig();
     }
 
-    // 处理截图功能
-    void HandleScreenshot() {
-        HWND gameWindow = FindTargetWindow();
-        if (!gameWindow) {
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
-        }
 
-        // 生成文件名（时间戳）
-        auto now = std::chrono::system_clock::now();
-        std::wstring filename = L"Screenshot_" + 
-            std::to_wstring(std::chrono::system_clock::to_time_t(now)) + L".png";
-        
-        // 保存到ScreenShot文件夹
-        std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
-        
-        if (WindowUtils::CaptureWindow(gameWindow, savePath)) {
-            // 显示成功通知
-            ShowNotification(
-                m_strings.APP_NAME.c_str(),
-                (m_strings.CAPTURE_SUCCESS + savePath).c_str()
-            );
-        }
-    }
 };
 
 int WINAPI WinMain(
