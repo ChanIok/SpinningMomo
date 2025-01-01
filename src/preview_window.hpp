@@ -82,6 +82,7 @@ private:
     
     RECT m_viewportRect{};          // 视口框位置和大小
     bool m_viewportVisible = true;  // 是否显示视口框
+    bool m_isGameWindowFullyVisible = false;  // 游戏窗口是否完全可见
     POINT m_gameWindowPos{};        // 游戏窗口当前位置
     
     // 视口框渲染资源

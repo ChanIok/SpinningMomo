@@ -7,13 +7,11 @@
 #include <dwmapi.h>
 #include "constants.hpp"
 
-#pragma comment(lib, "Dwmapi.lib")  // 链接dwmapi库
+#define IDI_ICON1 101  // 从main_old.cpp迁移图标ID定义
 
 // 前向声明
 struct AspectRatio;
 struct ResolutionPreset;
-
-#define IDI_ICON1 101  // 从main_old.cpp迁移图标ID定义
 
 // 系统托盘图标管理类
 class TrayIcon {

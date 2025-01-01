@@ -579,8 +579,6 @@ bool PreviewWindow::CreateViewportResources() {
 }
 
 void PreviewWindow::UpdateViewportRect() {
-    if (!m_viewportVisible) return;
-
     // 获取预览窗口客户区大小
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
@@ -602,6 +600,19 @@ void PreviewWindow::UpdateViewportRect() {
     float gameHeight = static_cast<float>(m_gameWindowRect.bottom - m_gameWindowRect.top);
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // 判断游戏窗口是否完全可见
+    m_isGameWindowFullyVisible = (gameWidth <= screenWidth && gameHeight <= screenHeight &&
+                                m_gameWindowRect.left >= 0 && m_gameWindowRect.top >= 0 &&
+                                m_gameWindowRect.right <= screenWidth && m_gameWindowRect.bottom <= screenHeight);
+    
+    // 更新视口可见性
+    m_viewportVisible = !m_isGameWindowFullyVisible;
+
+    // 如果游戏窗口完全可见，不需要更新视口矩形
+    if (m_isGameWindowFullyVisible) {
+        return;
+    }
 
     // 计算缩放比例
     float scaleX = previewWidth / gameWidth;
@@ -648,7 +659,6 @@ void PreviewWindow::UpdateViewportRect() {
 
 void PreviewWindow::RenderViewport() {
     if (!m_viewportVisible || !m_viewportVertexBuffer) {
-        OutputDebugStringW(L"[RenderViewport] Skipped: viewport not visible or buffer not created\n");
         return;
     }
 
@@ -832,6 +842,14 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             
             // 如果点击在标题栏，保持原有的拖拽行为
             if (pt.y < instance->TITLE_HEIGHT) {
+                instance->isDragging = true;
+                instance->dragStart = pt;
+                SetCapture(hwnd);
+                return 0;
+            }
+
+            // 如果游戏窗口完全可见，整个预览窗口都可以用来拖拽
+            if (instance->m_isGameWindowFullyVisible) {
                 instance->isDragging = true;
                 instance->dragStart = pt;
                 SetCapture(hwnd);
