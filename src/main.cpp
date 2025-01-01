@@ -60,7 +60,7 @@ public:
         m_menuWindow = std::make_unique<MenuWindow>(hInstance);
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
                                 m_currentRatioIndex, m_currentResolutionIndex,
-                                m_taskbarAutoHide, m_isPreviewEnabled)) {
+                                m_isPreviewEnabled)) {
             return false;
         }
 
@@ -704,11 +704,6 @@ private:
         SHAppBarMessage(ABM_SETSTATE, &abd);
         m_taskbarAutoHide = !currentAutoHide;
         SaveTaskbarConfig();
-
-        // 更新菜单窗口中的状态
-        if (m_menuWindow) {
-            m_menuWindow->SetTaskbarAutoHide(m_taskbarAutoHide);
-        }
     }
 
     // 切换界面语言

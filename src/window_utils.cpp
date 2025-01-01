@@ -136,11 +136,28 @@ namespace {
     // RAII 封装：自动管理 COM 初始化/清理
     class ComInitializer {
     public:
-        ComInitializer() : initialized_(SUCCEEDED(CoInitialize(nullptr))) {}
-        ~ComInitializer() { if (initialized_) CoUninitialize(); }
+        ComInitializer() {
+            APTTYPE aptType;
+            APTTYPEQUALIFIER aptQualifier;
+            if (SUCCEEDED(CoGetApartmentType(&aptType, &aptQualifier))) {
+                // COM已经初始化，不需要再次初始化
+                initialized_ = true;
+                should_uninitialize_ = false;
+            } else {
+                // COM未初始化，尝试初始化
+                initialized_ = SUCCEEDED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED));
+                should_uninitialize_ = initialized_;
+            }
+        }
+        ~ComInitializer() { 
+            if (initialized_ && should_uninitialize_) {
+                CoUninitialize(); 
+            }
+        }
         bool isInitialized() const { return initialized_; }
     private:
         bool initialized_;
+        bool should_uninitialize_;
     };
 
     // RAII 封装：自动管理截图会话
@@ -312,30 +329,50 @@ bool WindowUtils::SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& 
 bool WindowUtils::CaptureWindow(HWND hwnd, const std::wstring& savePath) {
     if (!hwnd) return false;
     
-    // 使用 RAII 管理 COM 初始化
-    ComInitializer com;
-    if (!com.isInitialized()) return false;
+    // 检查COM状态
+    APTTYPE aptType;
+    APTTYPEQUALIFIER aptQualifier;
+    HRESULT hr = CoGetApartmentType(&aptType, &aptQualifier);
+    bool needUninitialize = false;
+    
+    if (FAILED(hr)) {
+        hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        if (FAILED(hr)) return false;
+        needUninitialize = true;
+    }
 
     // 创建 D3D 设备和上下文
     Microsoft::WRL::ComPtr<ID3D11Device> d3dDevice;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> d3dContext;
     
-    HRESULT hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
+    hr = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
         D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION,
         &d3dDevice, nullptr, &d3dContext);
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
     // 创建 WinRT D3D 设备
     auto d3dDeviceWinRT = CreateDirect3DDevice(d3dDevice.Get());
-    if (!d3dDeviceWinRT) return false;
+    if (!d3dDeviceWinRT) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
     // 获取窗口尺寸
     RECT windowRect;
-    if (!GetWindowRect(hwnd, &windowRect)) return false;
+    if (!GetWindowRect(hwnd, &windowRect)) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
     // 创建窗口捕获项
     auto captureItem = CreateCaptureItemForWindow(hwnd);
-    if (!captureItem) return false;
+    if (!captureItem) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
     // 设置帧缓冲池
     winrt::Windows::Graphics::SizeInt32 size{
@@ -343,18 +380,24 @@ bool WindowUtils::CaptureWindow(HWND hwnd, const std::wstring& savePath) {
         windowRect.bottom - windowRect.top
     };
 
-    // 创建帧池，用于捕获窗口内容
+    // 创建帧池
     auto framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
         d3dDeviceWinRT,
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         1, size);
-    if (!framePool) return false;
+    if (!framePool) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
     // 创建并启动捕获会话
     CaptureSession session(framePool, captureItem);
-    if (!session) return false;
+    if (!session) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
-    // 获取捕获的帧（尝试最多3次，每次等待100ms）
+    // 获取捕获的帧
     auto frame = framePool.TryGetNextFrame();
     int retryCount = 0;
     while (!frame && retryCount < 3) {
@@ -363,17 +406,28 @@ bool WindowUtils::CaptureWindow(HWND hwnd, const std::wstring& savePath) {
         retryCount++;
     }
     
-    if (!frame) return false;
+    if (!frame) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
     // 获取帧表面
     auto frameSurface = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
-    if (!frameSurface) return false;
+    if (!frameSurface) {
+        if (needUninitialize) CoUninitialize();
+        return false;
+    }
 
     // 保存帧
     bool success = SaveFrameToFile(frameSurface.Get(), savePath);
 
     // 清理资源
     framePool.Close();
+    
+    if (needUninitialize) {
+        CoUninitialize();
+    }
+
     return success;
 }
 

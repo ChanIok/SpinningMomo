@@ -102,6 +102,10 @@ void TrayIcon::ShowContextMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_RESET, strings.RESET_WINDOW.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
+    // 添加截图选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CAPTURE_WINDOW, strings.CAPTURE_WINDOW.c_str());
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+    
     // 添加设置选项
     AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, taskbarLower, notifyEnabled, 
                     useFloatingWindow, isFloatingWindowVisible, previewEnabled, strings);
@@ -115,9 +119,6 @@ void TrayIcon::ShowContextMenu(
 
     // 添加配置和退出选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CONFIG, strings.OPEN_CONFIG.c_str());
-    
-    // 添加截图选项
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CAPTURE_WINDOW, strings.CAPTURE_WINDOW.c_str());
     
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, strings.EXIT.c_str());
@@ -376,7 +377,6 @@ bool MenuWindow::Create(HWND parent,
                        const LocalizedStrings& strings,
                        size_t currentRatioIndex,
                        size_t currentResolutionIndex,
-                       bool taskbarAutoHide,
                        bool previewEnabled) {
     m_hwndParent = parent;
     m_ratioItems = &ratios;
@@ -384,7 +384,6 @@ bool MenuWindow::Create(HWND parent,
     m_strings = &strings;
     m_currentRatioIndex = currentRatioIndex;
     m_currentResolutionIndex = currentResolutionIndex;
-    m_taskbarAutoHide = taskbarAutoHide;
     m_previewEnabled = previewEnabled;
     
     InitializeItems(strings);
@@ -472,11 +471,6 @@ void MenuWindow::SetCurrentResolution(size_t index) {
     }
 }
 
-void MenuWindow::SetTaskbarAutoHide(bool enabled) {
-    m_taskbarAutoHide = enabled;
-    InvalidateRect(m_hwnd, NULL, TRUE);
-}
-
 void MenuWindow::UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw) {
     m_items.clear();
     InitializeItems(strings);
@@ -512,7 +506,7 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
     }
 
     // 添加设置选项
-    m_items.push_back({strings.TASKBAR_AUTOHIDE, ItemType::TaskbarAutoHide, m_taskbarAutoHide ? 1 : 0});
+    m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});  // 添加截图选项作为设置组的第一个选项
     m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
     m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
     m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
@@ -669,7 +663,7 @@ void MenuWindow::OnPaint(HDC hdc) {
                 itemRect = {ratioColumnRight + m_separatorHeight, y, 
                           resolutionColumnRight, y + m_itemHeight};
                 break;
-            case ItemType::TaskbarAutoHide:
+            case ItemType::CaptureWindow:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
@@ -693,8 +687,6 @@ void MenuWindow::OnPaint(HDC hdc) {
         if (item.type == ItemType::Ratio && item.index == m_currentRatioIndex) {
             isSelected = true;
         } else if (item.type == ItemType::Resolution && item.index == m_currentResolutionIndex) {
-            isSelected = true;
-        } else if (item.type == ItemType::TaskbarAutoHide && m_taskbarAutoHide) {
             isSelected = true;
         } else if (item.type == ItemType::PreviewWindow && m_previewEnabled) {
             isSelected = true;
@@ -775,8 +767,8 @@ void MenuWindow::OnLButtonDown(int x, int y) {
                 SendMessage(m_hwndParent, WM_COMMAND, 
                           Constants::ID_RESOLUTION_BASE + item.index, 0);
                 break;
-            case ItemType::TaskbarAutoHide:
-                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_AUTOHIDE_TASKBAR, 0);
+            case ItemType::CaptureWindow:
+                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_CAPTURE_WINDOW, 0);
                 break;
             case ItemType::PreviewWindow:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_PREVIEW_WINDOW, 0);
@@ -822,7 +814,7 @@ int MenuWindow::CalculateWindowHeight() {
             case ItemType::Resolution:
                 resolutionCount++;
                 break;
-            case ItemType::TaskbarAutoHide:
+            case ItemType::CaptureWindow:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
@@ -864,9 +856,9 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
         int settingsY = m_titleHeight + m_separatorHeight;
         for (size_t i = 0; i < m_items.size(); i++) {
             const auto& item = m_items[i];
-            if (item.type == ItemType::TaskbarAutoHide || 
-                item.type == ItemType::Reset ||
+            if (item.type == ItemType::CaptureWindow ||
                 item.type == ItemType::PreviewWindow ||
+                item.type == ItemType::Reset ||
                 item.type == ItemType::Close) {
                 if (y >= settingsY && y < settingsY + m_itemHeight) {
                     return static_cast<int>(i);
