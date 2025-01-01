@@ -69,7 +69,33 @@ private:
     // 窗口比例相关
     float m_aspectRatio;  // 当前窗口比例
     RECT m_gameWindowRect = {};         // 游戏窗口的尺寸
+    HWND m_gameWindow = nullptr;        // 游戏窗口句柄
 
     // 互斥锁保护渲染目标访问
     std::mutex renderTargetMutex;
+
+    // 视口框相关
+    struct ViewportVertex {
+        DirectX::XMFLOAT2 pos;
+        DirectX::XMFLOAT4 color;
+    };
+    
+    RECT m_viewportRect{};          // 视口框位置和大小
+    bool m_viewportVisible = true;  // 是否显示视口框
+    POINT m_gameWindowPos{};        // 游戏窗口当前位置
+    
+    // 视口框渲染资源
+    Microsoft::WRL::ComPtr<ID3D11Buffer> m_viewportVertexBuffer;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_viewportVS;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_viewportPS;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_viewportInputLayout;
+    
+    // 视口框相关方法
+    bool CreateViewportResources();  // 创建视口框渲染资源
+    void UpdateViewportRect();       // 更新视口框位置
+    void RenderViewport();          // 渲染视口框
+
+    bool m_viewportDragging = false;  // 是否正在拖拽视口
+    POINT m_viewportDragStart = {0, 0};  // 拖拽开始时的鼠标位置
+    POINT m_viewportDragOffset = {0, 0};  // 拖拽开始时视口相对于鼠标的偏移
 }; 

@@ -33,6 +33,9 @@ PreviewWindow::~PreviewWindow() {
 
 bool PreviewWindow::StartCapture(HWND targetWindow) {
     if (!targetWindow) return false;
+    
+    // 保存游戏窗口句柄
+    m_gameWindow = targetWindow;
 
     // 首次启动预览时初始化 D3D
     if (!device && !InitializeD3D()) {
@@ -42,6 +45,7 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
     // 获取游戏窗口的实际尺寸（包括溢出屏幕的部分）
     RECT windowRect;
     GetWindowRect(targetWindow, &windowRect);
+    m_gameWindowRect = windowRect;  // 保存游戏窗口尺寸
     
     // 获取窗口客户区的实际尺寸
     RECT clientRect;
@@ -213,10 +217,14 @@ void PreviewWindow::OnFrameArrived() {
             float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
             context->OMSetBlendState(blendState.Get(), blendFactor, 0xffffffff);
 
-            // 绘制
+            // 绘制游戏画面
             context->Draw(4, 0);
 
-            // 显示，不等待垂直同步
+            // 在渲染游戏画面之后，更新并渲染视口框
+            UpdateViewportRect();
+            RenderViewport();
+
+            // 显示
             swapChain->Present(0, 0);
         }
     }
@@ -376,12 +384,18 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance) {
     }
 
     // 设置窗口透明度
-    SetLayeredWindowAttributes(hwnd, 0, 204, LWA_ALPHA);
+    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
 
     return true;
 }
 
 void PreviewWindow::Cleanup() {
+    // 清理视口框资源
+    m_viewportVertexBuffer.Reset();
+    m_viewportVS.Reset();
+    m_viewportPS.Reset();
+    m_viewportInputLayout.Reset();
+
     if (hwnd) {
         DestroyWindow(hwnd);
         hwnd = nullptr;
@@ -430,6 +444,11 @@ bool PreviewWindow::InitializeD3D() {
         return false;
     }
 
+    // 创建视口框资源
+    if (!CreateViewportResources()) {
+        return false;
+    }
+
     return true;
 }
 
@@ -448,6 +467,219 @@ bool PreviewWindow::CreateRenderTarget() {
     }
 
     return true;
+}
+
+bool PreviewWindow::CreateViewportResources() {
+    // 着色器代码
+    const char* viewportVSCode = R"(
+        struct VS_INPUT {
+            float2 pos : POSITION;
+            float4 color : COLOR;
+        };
+        
+        struct PS_INPUT {
+            float4 pos : SV_POSITION;
+            float4 color : COLOR;
+        };
+        
+        PS_INPUT main(VS_INPUT input) {
+            PS_INPUT output;
+            output.pos = float4(input.pos.x * 2 - 1, -(input.pos.y * 2 - 1), 0, 1);
+            output.color = input.color;
+            return output;
+        }
+    )";
+
+    const char* viewportPSCode = R"(
+        struct PS_INPUT {
+            float4 pos : SV_POSITION;
+            float4 color : COLOR;
+        };
+        
+        float4 main(PS_INPUT input) : SV_Target {
+            return input.color;
+        }
+    )";
+
+    // 编译着色器
+    Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, psBlob, errorBlob;
+    UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+#ifdef _DEBUG
+    compileFlags |= D3DCOMPILE_DEBUG;
+#endif
+
+    if (FAILED(D3DCompile(viewportVSCode, strlen(viewportVSCode), nullptr, nullptr, nullptr,
+        "main", "vs_4_0", compileFlags, 0, &vsBlob, &errorBlob))) {
+        return false;
+    }
+
+    if (FAILED(D3DCompile(viewportPSCode, strlen(viewportPSCode), nullptr, nullptr, nullptr,
+        "main", "ps_4_0", compileFlags, 0, &psBlob, &errorBlob))) {
+        return false;
+    }
+
+    // 创建着色器
+    if (FAILED(device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
+        nullptr, &m_viewportVS))) {
+        return false;
+    }
+
+    if (FAILED(device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(),
+        nullptr, &m_viewportPS))) {
+        return false;
+    }
+
+    // 创建输入布局
+    D3D11_INPUT_ELEMENT_DESC layout[] = {
+        { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+        { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+    };
+
+    if (FAILED(device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
+        vsBlob->GetBufferSize(), &m_viewportInputLayout))) {
+        return false;
+    }
+
+    // 创建顶点缓冲区
+    D3D11_BUFFER_DESC bufferDesc = {};
+    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    bufferDesc.ByteWidth = sizeof(ViewportVertex) * 5;  // 5个顶点绘制矩形框
+    bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    if (FAILED(device->CreateBuffer(&bufferDesc, nullptr, &m_viewportVertexBuffer))) {
+        return false;
+    }
+
+    return true;
+}
+
+void PreviewWindow::UpdateViewportRect() {
+    if (!m_viewportVisible) return;
+
+    // 获取预览窗口客户区大小
+    RECT clientRect;
+    GetClientRect(hwnd, &clientRect);
+    float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
+    float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - TITLE_HEIGHT);
+
+    // 获取游戏窗口当前位置和尺寸
+    RECT gameRect;
+    GetWindowRect(m_gameWindow, &gameRect);
+    m_gameWindowRect = gameRect;  // 更新游戏窗口位置
+
+    // 确保游戏窗口尺寸有效
+    if (m_gameWindowRect.right <= m_gameWindowRect.left || m_gameWindowRect.bottom <= m_gameWindowRect.top) {
+        return;
+    }
+
+    // 计算游戏窗口和屏幕的尺寸
+    float gameWidth = static_cast<float>(m_gameWindowRect.right - m_gameWindowRect.left);
+    float gameHeight = static_cast<float>(m_gameWindowRect.bottom - m_gameWindowRect.top);
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // 计算缩放比例
+    float scaleX = previewWidth / gameWidth;
+    float scaleY = previewHeight / gameHeight;
+
+    // 计算游戏窗口相对于屏幕的位置（考虑负值）
+    float gameLeft = static_cast<float>(m_gameWindowRect.left);
+    float gameTop = static_cast<float>(m_gameWindowRect.top);
+
+    // 计算视口在预览窗口中的位置
+    float viewportLeft = (-gameLeft / gameWidth) * previewWidth;
+    float viewportTop = (-gameTop / gameHeight) * previewHeight;
+
+    // 设置视口矩形位置
+    m_viewportRect.left = static_cast<LONG>(viewportLeft);
+    m_viewportRect.top = static_cast<LONG>(viewportTop) + TITLE_HEIGHT;
+    m_viewportRect.right = m_viewportRect.left + static_cast<LONG>(screenWidth * scaleX);
+    m_viewportRect.bottom = m_viewportRect.top + static_cast<LONG>(screenHeight * scaleY);
+
+    // 更新顶点缓冲区
+    D3D11_MAPPED_SUBRESOURCE mappedResource;
+    if (SUCCEEDED(context->Map(m_viewportVertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource))) {
+        ViewportVertex* vertices = static_cast<ViewportVertex*>(mappedResource.pData);
+        
+        // 转换到归一化坐标 (0-1)
+        float left = static_cast<float>(m_viewportRect.left) / previewWidth;
+        float top = static_cast<float>(m_viewportRect.top - TITLE_HEIGHT) / previewHeight;
+        float right = static_cast<float>(m_viewportRect.right) / previewWidth;
+        float bottom = static_cast<float>(m_viewportRect.bottom - TITLE_HEIGHT) / previewHeight;
+        
+        // 设置颜色 RGB(255, 160, 80)
+        DirectX::XMFLOAT4 color = {255.0f/255.0f, 160.0f/255.0f, 80.0f/255.0f, 1.0f};
+        
+        // 设置顶点数据（线段条带）
+        vertices[0] = {{left,  top},    color};     // 左上
+        vertices[1] = {{right, top},    color};     // 右上
+        vertices[2] = {{right, bottom}, color};     // 右下
+        vertices[3] = {{left,  bottom}, color};     // 左下
+        vertices[4] = {{left,  top},    color};     // 回到左上
+        
+        context->Unmap(m_viewportVertexBuffer.Get(), 0);
+    }
+}
+
+void PreviewWindow::RenderViewport() {
+    if (!m_viewportVisible || !m_viewportVertexBuffer) {
+        OutputDebugStringW(L"[RenderViewport] Skipped: viewport not visible or buffer not created\n");
+        return;
+    }
+
+    // 设置渲染状态
+    UINT stride = sizeof(ViewportVertex);
+    UINT offset = 0;
+    context->IASetInputLayout(m_viewportInputLayout.Get());
+    context->IASetVertexBuffers(0, 1, m_viewportVertexBuffer.GetAddressOf(), &stride, &offset);
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+    context->VSSetShader(m_viewportVS.Get(), nullptr, 0);
+    context->PSSetShader(m_viewportPS.Get(), nullptr, 0);
+
+    // 创建并设置光栅化状态
+    D3D11_RASTERIZER_DESC rasterizerDesc = {};
+    rasterizerDesc.FillMode = D3D11_FILL_SOLID;
+    rasterizerDesc.CullMode = D3D11_CULL_NONE;
+    rasterizerDesc.FrontCounterClockwise = FALSE;
+    rasterizerDesc.DepthBias = 0;
+    rasterizerDesc.SlopeScaledDepthBias = 0.0f;
+    rasterizerDesc.DepthBiasClamp = 0.0f;
+    rasterizerDesc.DepthClipEnable = TRUE;
+    rasterizerDesc.ScissorEnable = FALSE;
+    rasterizerDesc.MultisampleEnable = TRUE;
+    rasterizerDesc.AntialiasedLineEnable = TRUE;
+
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState;
+    device->CreateRasterizerState(&rasterizerDesc, &rasterizerState);
+    context->RSSetState(rasterizerState.Get());
+
+    // 获取当前视口设置
+    D3D11_VIEWPORT viewport;
+    UINT numViewports = 1;
+    context->RSGetViewports(&numViewports, &viewport);
+
+    // 多次绘制，每次略微偏移视口位置
+    const float offset_pixels = 0.5f;  // 偏移量（像素）
+    const int num_draws = 5;           // 绘制次数
+
+    for (int i = 0; i < num_draws; ++i) {
+        // 计算当前偏移
+        float offset_x = (i % 2) * offset_pixels;
+        float offset_y = ((i + 1) % 2) * offset_pixels;
+
+        // 设置偏移后的视口
+        D3D11_VIEWPORT offsetViewport = viewport;
+        offsetViewport.TopLeftX += offset_x;
+        offsetViewport.TopLeftY += offset_y;
+        context->RSSetViewports(1, &offsetViewport);
+
+        // 绘制
+        context->Draw(5, 0);
+    }
+
+    // 恢复原始视口
+    context->RSSetViewports(1, &viewport);
 }
 
 LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -593,12 +825,75 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             return TRUE;
         }
 
-        case WM_LBUTTONDOWN:
-            instance->isDragging = true;
-            instance->dragStart.x = LOWORD(lParam);
-            instance->dragStart.y = HIWORD(lParam);
+        case WM_LBUTTONDOWN: {
+            POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            
+            // 如果点击在标题栏，保持原有的拖拽行为
+            if (pt.y < TITLE_HEIGHT) {
+                instance->isDragging = true;
+                instance->dragStart = pt;
+                SetCapture(hwnd);
+                return 0;
+            }
+
+            // 获取预览窗口客户区大小
+            RECT clientRect;
+            GetClientRect(hwnd, &clientRect);
+            float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
+            float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - TITLE_HEIGHT);
+
+            // 检查是否点击在视口矩形上
+            bool isOnViewport = (pt.x >= instance->m_viewportRect.left && pt.x <= instance->m_viewportRect.right &&
+                               pt.y >= instance->m_viewportRect.top && pt.y <= instance->m_viewportRect.bottom);
+
+            // 计算点击位置相对于预览区域的比例（0.0 - 1.0）
+            float relativeX = static_cast<float>(pt.x) / previewWidth;
+            float relativeY = static_cast<float>(pt.y - TITLE_HEIGHT) / previewHeight;
+
+            // 获取屏幕尺寸
+            int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+            int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+            // 计算游戏窗口尺寸
+            float gameWidth = static_cast<float>(instance->m_gameWindowRect.right - instance->m_gameWindowRect.left);
+            float gameHeight = static_cast<float>(instance->m_gameWindowRect.bottom - instance->m_gameWindowRect.top);
+
+            if (!isOnViewport) {
+                // 如果点击在视口外，先移动游戏窗口使得点击位置成为屏幕中心
+                float targetX = -(relativeX * gameWidth - screenWidth / 2.0f);
+                float targetY = -(relativeY * gameHeight - screenHeight / 2.0f);
+
+                // 限制边界，确保游戏窗口不会超出屏幕太多
+                targetX = max(targetX, -gameWidth + screenWidth);
+                targetX = min(targetX, 0.0f);
+                targetY = max(targetY, -gameHeight + screenHeight);
+                targetY = min(targetY, 0.0f);
+
+                // 移动游戏窗口
+                SetWindowPos(instance->m_gameWindow, nullptr,
+                    static_cast<int>(targetX),
+                    static_cast<int>(targetY),
+                    0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER);
+
+                // 等待一帧以确保视口矩形位置更新
+                instance->UpdateViewportRect();
+            }
+
+            // 开始拖拽视口（无论是点击在视口上还是视口外）
+            instance->m_viewportDragging = true;
+            instance->m_viewportDragStart = pt;
+            // 如果点击在视口外，计算新的拖拽偏移（相对于视口中心）
+            if (!isOnViewport) {
+                instance->m_viewportDragOffset.x = static_cast<LONG>(screenWidth * previewWidth / (2 * gameWidth));
+                instance->m_viewportDragOffset.y = static_cast<LONG>(screenHeight * previewHeight / (2 * gameHeight));
+            } else {
+                instance->m_viewportDragOffset.x = pt.x - instance->m_viewportRect.left;
+                instance->m_viewportDragOffset.y = pt.y - instance->m_viewportRect.top;
+            }
             SetCapture(hwnd);
             return 0;
+        }
 
         case WM_MOUSEMOVE:
             if (instance->isDragging) {
@@ -614,11 +909,51 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     0, 0,
                     SWP_NOSIZE | SWP_NOZORDER);
             }
+            else if (instance->m_viewportDragging) {
+                POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+                
+                // 获取预览窗口客户区大小
+                RECT clientRect;
+                GetClientRect(hwnd, &clientRect);
+                float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
+                float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - TITLE_HEIGHT);
+
+                // 计算新的相对位置
+                float relativeX = static_cast<float>(pt.x - instance->m_viewportDragOffset.x) / previewWidth;
+                float relativeY = static_cast<float>(pt.y - instance->m_viewportDragOffset.y - TITLE_HEIGHT) / previewHeight;
+
+                // 获取屏幕和游戏窗口尺寸
+                int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+                int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+                float gameWidth = static_cast<float>(instance->m_gameWindowRect.right - instance->m_gameWindowRect.left);
+                float gameHeight = static_cast<float>(instance->m_gameWindowRect.bottom - instance->m_gameWindowRect.top);
+
+                // 计算新的游戏窗口位置
+                float targetX = -(relativeX * gameWidth);
+                float targetY = -(relativeY * gameHeight);
+
+                // 限制边界
+                targetX = max(targetX, -gameWidth + screenWidth);
+                targetX = min(targetX, 0.0f);
+                targetY = max(targetY, -gameHeight + screenHeight);
+                targetY = min(targetY, 0.0f);
+
+                // 移动游戏窗口
+                SetWindowPos(instance->m_gameWindow, nullptr,
+                    static_cast<int>(targetX),
+                    static_cast<int>(targetY),
+                    0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER);
+            }
             return 0;
 
         case WM_LBUTTONUP:
             if (instance->isDragging) {
                 instance->isDragging = false;
+                ReleaseCapture();
+            }
+            else if (instance->m_viewportDragging) {
+                instance->m_viewportDragging = false;
                 ReleaseCapture();
             }
             return 0;
