@@ -6,12 +6,13 @@
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
 #include <mutex>
 #include <atomic>
+#include <dwmapi.h>
 
 class PreviewWindow {
 public:
-    static constexpr int MIN_WIDTH = 100;           // 最小宽度
-    static constexpr int MIN_HEIGHT = 100;          // 最小高度
-    static constexpr int TITLE_HEIGHT = 24;         // 标题栏高度
+    static constexpr int BASE_TITLE_HEIGHT = 24;    // 基础标题栏高度（96 DPI）
+    static constexpr int BASE_FONT_SIZE = 12;       // 基础字体大小（96 DPI）
+    static constexpr int BASE_BORDER_WIDTH = 8;     // 基础边框宽度（96 DPI）
 
     PreviewWindow();
     ~PreviewWindow();
@@ -39,7 +40,6 @@ private:
     HWND hwnd;
     static PreviewWindow* instance;
     bool m_isFirstShow = true;  // 控制是否是首次显示
-    int m_idealSize;            // 理想尺寸（基于屏幕高度计算）
 
     // D3D资源
     Microsoft::WRL::ComPtr<ID3D11Device> device;
@@ -98,4 +98,17 @@ private:
     bool m_viewportDragging = false;  // 是否正在拖拽视口
     POINT m_viewportDragStart = {0, 0};  // 拖拽开始时的鼠标位置
     POINT m_viewportDragOffset = {0, 0};  // 拖拽开始时视口相对于鼠标的偏移
+
+    // DPI相关
+    UINT m_dpi = 96;                    // 当前DPI值
+    int TITLE_HEIGHT = BASE_TITLE_HEIGHT; // 当前DPI下的标题栏高度
+    int FONT_SIZE = BASE_FONT_SIZE;     // 当前DPI下的字体大小
+    int BORDER_WIDTH = BASE_BORDER_WIDTH; // 当前DPI下的边框宽度
+
+    void UpdateDpiDependentResources();  // 更新DPI相关资源
+
+    // 窗口尺寸相关
+    int m_minIdealSize;  // 最小理想尺寸（屏幕短边的1/10）
+    int m_maxIdealSize;  // 最大理想尺寸（屏幕长边）
+    int m_idealSize;     // 当前理想尺寸
 }; 

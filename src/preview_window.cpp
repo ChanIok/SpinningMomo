@@ -23,6 +23,20 @@ PreviewWindow* PreviewWindow::instance = nullptr;
 PreviewWindow::PreviewWindow() : hwnd(nullptr), isDragging(false) {
     instance = this;
     winrt::init_apartment();
+
+    // 获取系统 DPI
+    HDC hdc = GetDC(NULL);
+    m_dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+    ReleaseDC(NULL, hdc);
+
+    // 计算理想尺寸范围
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    m_minIdealSize = min(screenWidth, screenHeight) / 10;
+    m_maxIdealSize = max(screenWidth, screenHeight);
+    m_idealSize = screenHeight / 2;  // 初始值设为屏幕高度的一半
+
+    UpdateDpiDependentResources();
 }
 
 PreviewWindow::~PreviewWindow() {
@@ -56,21 +70,17 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
     int height = clientRect.bottom - clientRect.top;
     m_aspectRatio = static_cast<float>(height) / width;
 
-    // 计算预览窗口的实际尺寸
+    // 根据宽高比计算实际窗口尺寸
     int actualWidth, actualHeight;
-    if (width >= height) {
-        // 宽屏，使用理想尺寸作为宽度上限
-        actualWidth = m_idealSize;
-        actualHeight = static_cast<int>(m_idealSize * m_aspectRatio);
-    } else {
-        // 窄屏，使用理想尺寸作为高度上限
+    if (m_aspectRatio >= 1.0f) {
+        // 高度大于等于宽度，使用理想尺寸作为高度
         actualHeight = m_idealSize;
-        actualWidth = static_cast<int>(m_idealSize / m_aspectRatio);
+        actualWidth = static_cast<int>(actualHeight / m_aspectRatio);
+    } else {
+        // 宽度大于高度，使用理想尺寸作为宽度
+        actualWidth = m_idealSize;
+        actualHeight = static_cast<int>(actualWidth * m_aspectRatio);
     }
-
-    // 确保不小于最小尺寸
-    actualWidth = max(actualWidth, MIN_WIDTH);
-    actualHeight = max(actualHeight, MIN_HEIGHT);
 
     // 如果是首次显示，设置默认位置（左上角）
     if (m_isFirstShow) {
@@ -386,6 +396,20 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance) {
     // 设置窗口透明度
     SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
 
+    // 设置窗口圆角和阴影
+    MARGINS margins = {1, 1, 1, 1};  // 四边均匀阴影效果
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
+    
+    DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
+    DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
+    
+    BOOL value = TRUE;
+    DwmSetWindowAttribute(hwnd, DWMWA_ALLOW_NCPAINT, &value, sizeof(value));
+    
+    // Windows 11 风格的圆角
+    DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;  // 使用小圆角
+    DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+
     return true;
 }
 
@@ -685,37 +709,19 @@ void PreviewWindow::RenderViewport() {
 LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
     if (instance) {
         switch (message) {
-        case WM_NCHITTEST: {
-            POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
-            ScreenToClient(hwnd, &pt);
-            
-            // 获取窗口客户区大小
-            RECT rc;
-            GetClientRect(hwnd, &rc);
-            
-            // 定义边框感应区域宽度
-            const int BORDER_WIDTH = 8;
-            
-            // 如果在标题栏区域
-            if (pt.y < TITLE_HEIGHT) {
-                return HTCAPTION;
-            }
-            
-            // 检查边框区域
-            if (pt.x <= BORDER_WIDTH) {
-                if (pt.y <= BORDER_WIDTH) return HTTOPLEFT;
-                if (pt.y >= rc.bottom - BORDER_WIDTH) return HTBOTTOMLEFT;
-                return HTLEFT;
-            }
-            if (pt.x >= rc.right - BORDER_WIDTH) {
-                if (pt.y <= BORDER_WIDTH) return HTTOPRIGHT;
-                if (pt.y >= rc.bottom - BORDER_WIDTH) return HTBOTTOMRIGHT;
-                return HTRIGHT;
-            }
-            if (pt.y <= BORDER_WIDTH) return HTTOP;
-            if (pt.y >= rc.bottom - BORDER_WIDTH) return HTBOTTOM;
-            
-            return HTCLIENT;
+        case WM_DPICHANGED: {
+            // 处理 DPI 变化
+            instance->m_dpi = HIWORD(wParam);
+            instance->UpdateDpiDependentResources();
+
+            // 使用系统建议的新窗口位置
+            RECT* const prcNewWindow = (RECT*)lParam;
+            SetWindowPos(hwnd, nullptr,
+                prcNewWindow->left, prcNewWindow->top,
+                prcNewWindow->right - prcNewWindow->left,
+                prcNewWindow->bottom - prcNewWindow->top,
+                SWP_NOZORDER | SWP_NOACTIVATE);
+            return 0;
         }
 
         case WM_PAINT: {
@@ -727,7 +733,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             GetClientRect(hwnd, &rc);
             
             // 绘制标题栏背景
-            RECT titleRect = { 0, 0, rc.right, TITLE_HEIGHT };
+            RECT titleRect = { 0, 0, rc.right, instance->TITLE_HEIGHT };  // 使用DPI感知的高度
             HBRUSH titleBrush = CreateSolidBrush(RGB(240, 240, 240));
             FillRect(hdc, &titleRect, titleBrush);
             DeleteObject(titleBrush);
@@ -735,19 +741,19 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             // 绘制标题文本
             SetBkMode(hdc, TRANSPARENT);
             SetTextColor(hdc, RGB(51, 51, 51));
-            HFONT hFont = CreateFont(-12, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            HFONT hFont = CreateFont(-instance->FONT_SIZE, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,  // 使用DPI感知的字体大小
                                    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                                    CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("微软雅黑"));
             HFONT oldFont = (HFONT)SelectObject(hdc, hFont);
             
-            titleRect.left += 12; // 文本左边距
+            titleRect.left += instance->FONT_SIZE;  // 使用字体大小作为文本左边距
             DrawTextW(hdc, L"预览窗口", -1, &titleRect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
             
             SelectObject(hdc, oldFont);
             DeleteObject(hFont);
 
             // 绘制分隔线
-            RECT sepRect = { 0, TITLE_HEIGHT - 1, rc.right, TITLE_HEIGHT };
+            RECT sepRect = { 0, instance->TITLE_HEIGHT - 1, rc.right, instance->TITLE_HEIGHT };  // 使用DPI感知的高度
             HBRUSH sepBrush = CreateSolidBrush(RGB(229, 229, 229));
             FillRect(hdc, &sepRect, sepBrush);
             DeleteObject(sepBrush);
@@ -764,39 +770,33 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
         case WM_SIZING: {
             RECT* rect = (RECT*)lParam;
             int width = rect->right - rect->left;
-            int height = rect->bottom - rect->top - TITLE_HEIGHT;  // 减去标题栏高度得到客户区高度
+            int height = rect->bottom - rect->top - instance->TITLE_HEIGHT;  // 减去标题栏高度得到客户区高度
             
             // 根据拖动方向调整大小
             switch (wParam) {
                 case WMSZ_LEFT:
                 case WMSZ_RIGHT:
                     // 用户调整宽度，相应调整高度
-                    width = max(width, MIN_WIDTH);
                     height = static_cast<int>(width * instance->m_aspectRatio);
-                    height = max(height, MIN_HEIGHT);  // 确保高度不小于最小值
-                    rect->bottom = rect->top + height + TITLE_HEIGHT;  // 加回标题栏高度
-                    rect->right = rect->left + static_cast<int>(height / instance->m_aspectRatio);
+                    rect->bottom = rect->top + height + instance->TITLE_HEIGHT;  // 加回标题栏高度
+                    rect->right = rect->left + width;
                     break;
 
                 case WMSZ_TOP:
                 case WMSZ_BOTTOM:
                     // 用户调整高度，相应调整宽度
-                    height = max(height, MIN_HEIGHT);  // 确保客户区高度不小于最小值
                     width = static_cast<int>(height / instance->m_aspectRatio);
-                    width = max(width, MIN_WIDTH);  // 确保宽度不小于最小值
                     
                     if (wParam == WMSZ_BOTTOM) {
-                        rect->bottom = rect->top + height + TITLE_HEIGHT;  // 加回标题栏高度
+                        rect->bottom = rect->top + height + instance->TITLE_HEIGHT;  // 加回标题栏高度
                     } else {
-                        rect->top = rect->bottom - (height + TITLE_HEIGHT);  // 从底部向上调整
+                        rect->top = rect->bottom - (height + instance->TITLE_HEIGHT);  // 从底部向上调整
                     }
                     
-                    if (width > MIN_WIDTH) {
-                        if (wParam == WMSZ_BOTTOM) {
-                            rect->right = rect->left + width;
-                        } else {
-                            rect->left = rect->right - width;
-                        }
+                    if (wParam == WMSZ_BOTTOM) {
+                        rect->right = rect->left + width;
+                    } else {
+                        rect->left = rect->right - width;
                     }
                     break;
 
@@ -805,14 +805,12 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 case WMSZ_BOTTOMLEFT:
                 case WMSZ_BOTTOMRIGHT:
                     // 对角调整时，以宽度为准
-                    width = max(width, MIN_WIDTH);
                     height = static_cast<int>(width * instance->m_aspectRatio);
-                    height = max(height, MIN_HEIGHT);  // 确保高度不小于最小值
                     
                     if (wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_BOTTOMRIGHT) {
-                        rect->bottom = rect->top + height + TITLE_HEIGHT;
+                        rect->bottom = rect->top + height + instance->TITLE_HEIGHT;
                     } else {
-                        rect->top = rect->bottom - (height + TITLE_HEIGHT);
+                        rect->top = rect->bottom - (height + instance->TITLE_HEIGHT);
                     }
                     
                     if (wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT) {
@@ -822,6 +820,10 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     }
                     break;
             }
+
+            // 更新理想尺寸（取新窗口宽高的较大值）
+            instance->m_idealSize = max(width, height);
+
             return TRUE;
         }
 
@@ -829,7 +831,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
             
             // 如果点击在标题栏，保持原有的拖拽行为
-            if (pt.y < TITLE_HEIGHT) {
+            if (pt.y < instance->TITLE_HEIGHT) {
                 instance->isDragging = true;
                 instance->dragStart = pt;
                 SetCapture(hwnd);
@@ -840,7 +842,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             RECT clientRect;
             GetClientRect(hwnd, &clientRect);
             float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
-            float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - TITLE_HEIGHT);
+            float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - instance->TITLE_HEIGHT);
 
             // 检查是否点击在视口矩形上
             bool isOnViewport = (pt.x >= instance->m_viewportRect.left && pt.x <= instance->m_viewportRect.right &&
@@ -848,7 +850,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
 
             // 计算点击位置相对于预览区域的比例（0.0 - 1.0）
             float relativeX = static_cast<float>(pt.x) / previewWidth;
-            float relativeY = static_cast<float>(pt.y - TITLE_HEIGHT) / previewHeight;
+            float relativeY = static_cast<float>(pt.y - instance->TITLE_HEIGHT) / previewHeight;
 
             // 获取屏幕尺寸
             int screenWidth = GetSystemMetrics(SM_CXSCREEN);
@@ -916,11 +918,11 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 RECT clientRect;
                 GetClientRect(hwnd, &clientRect);
                 float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
-                float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - TITLE_HEIGHT);
+                float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - instance->TITLE_HEIGHT);
 
                 // 计算新的相对位置
                 float relativeX = static_cast<float>(pt.x - instance->m_viewportDragOffset.x) / previewWidth;
-                float relativeY = static_cast<float>(pt.y - instance->m_viewportDragOffset.y - TITLE_HEIGHT) / previewHeight;
+                float relativeY = static_cast<float>(pt.y - instance->m_viewportDragOffset.y - instance->TITLE_HEIGHT) / previewHeight;
 
                 // 获取屏幕和游戏窗口尺寸
                 int screenWidth = GetSystemMetrics(SM_CXSCREEN);
@@ -971,6 +973,13 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 // 调整交换链大小
                 RECT clientRect;
                 GetClientRect(hwnd, &clientRect);
+                int width = clientRect.right - clientRect.left;
+                int height = clientRect.bottom - clientRect.top - instance->TITLE_HEIGHT;  // 减去标题栏高度
+
+                // 更新理想尺寸（取当前窗口宽高的较大值）
+                instance->m_idealSize = max(width, height);
+
+                // 调整交换链大小
                 HRESULT hr = instance->swapChain->ResizeBuffers(
                     0,  // 保持当前缓冲区数量
                     clientRect.right - clientRect.left,
@@ -987,7 +996,123 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             
             return 0;
         }
+
+        case WM_NCHITTEST: {
+            POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            ScreenToClient(hwnd, &pt);
+            
+            // 获取窗口客户区大小
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            
+            // 如果在标题栏区域
+            if (pt.y < instance->TITLE_HEIGHT) {
+                return HTCAPTION;
+            }
+            
+            // 检查边框区域
+            if (pt.x <= instance->BORDER_WIDTH) {
+                if (pt.y <= instance->BORDER_WIDTH) return HTTOPLEFT;
+                if (pt.y >= rc.bottom - instance->BORDER_WIDTH) return HTBOTTOMLEFT;
+                return HTLEFT;
+            }
+            if (pt.x >= rc.right - instance->BORDER_WIDTH) {
+                if (pt.y <= instance->BORDER_WIDTH) return HTTOPRIGHT;
+                if (pt.y >= rc.bottom - instance->BORDER_WIDTH) return HTBOTTOMRIGHT;
+                return HTRIGHT;
+            }
+            if (pt.y <= instance->BORDER_WIDTH) return HTTOP;
+            if (pt.y >= rc.bottom - instance->BORDER_WIDTH) return HTBOTTOM;
+            
+            return HTCLIENT;
+        }
+
+        case WM_MOUSEWHEEL: {
+            // 如果鼠标在标题栏，不处理缩放
+            POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+            ScreenToClient(hwnd, &pt);
+            if (pt.y < instance->TITLE_HEIGHT) {
+                return 0;
+            }
+
+            // 获取滚轮增量
+            int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+            
+            // 计算新的理想尺寸（每次改变10%）
+            int oldIdealSize = instance->m_idealSize;
+            int newIdealSize = static_cast<int>(oldIdealSize * (1.0f + (delta > 0 ? 0.1f : -0.1f)));
+            
+            // 限制在最小最大理想尺寸范围内
+            newIdealSize = std::clamp(newIdealSize, instance->m_minIdealSize, instance->m_maxIdealSize);
+            
+            if (newIdealSize != oldIdealSize) {
+                // 保存新的理想尺寸
+                instance->m_idealSize = newIdealSize;
+                
+                // 根据宽高比计算实际窗口尺寸
+                int newWidth, newHeight;
+                if (instance->m_aspectRatio >= 1.0f) {
+                    // 高度大于等于宽度，使用理想尺寸作为高度
+                    newHeight = newIdealSize;
+                    newWidth = static_cast<int>(newHeight / instance->m_aspectRatio);
+                } else {
+                    // 宽度大于高度，使用理想尺寸作为宽度
+                    newWidth = newIdealSize;
+                    newHeight = static_cast<int>(newWidth * instance->m_aspectRatio);
+                }
+                
+                // 获取当前窗口位置
+                RECT windowRect;
+                GetWindowRect(hwnd, &windowRect);
+                
+                // 计算鼠标相对于窗口的位置（0-1范围）
+                RECT clientRect;
+                GetClientRect(hwnd, &clientRect);
+                float relativeX = static_cast<float>(pt.x) / (clientRect.right - clientRect.left);
+                float relativeY = static_cast<float>(pt.y - instance->TITLE_HEIGHT) / 
+                                (clientRect.bottom - clientRect.top - instance->TITLE_HEIGHT);
+                
+                // 计算新的窗口位置（保持鼠标指向的点不变）
+                int deltaWidth = newWidth - (windowRect.right - windowRect.left);
+                int deltaHeight = newHeight - (windowRect.bottom - windowRect.top);
+                int newX = windowRect.left - static_cast<int>(deltaWidth * relativeX);
+                int newY = windowRect.top - static_cast<int>(deltaHeight * relativeY);
+                
+                // 更新窗口位置和大小
+                SetWindowPos(hwnd, nullptr,
+                    newX, newY,
+                    newWidth, newHeight + instance->TITLE_HEIGHT,
+                    SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            return 0;
+        }
         }
     }
     return DefWindowProcW(hwnd, message, wParam, lParam);
+} 
+
+void PreviewWindow::UpdateDpiDependentResources() {
+    // 计算DPI缩放因子
+    float dpiScale = static_cast<float>(m_dpi) / 96.0f;
+
+    // 更新所有DPI相关的尺寸
+    TITLE_HEIGHT = static_cast<int>(BASE_TITLE_HEIGHT * dpiScale);
+    FONT_SIZE = static_cast<int>(BASE_FONT_SIZE * dpiScale);
+    BORDER_WIDTH = static_cast<int>(BASE_BORDER_WIDTH * dpiScale);
+
+    // 如果窗口已创建，更新窗口
+    if (hwnd) {
+        // 获取当前窗口位置和大小
+        RECT rect;
+        GetWindowRect(hwnd, &rect);
+        int width = rect.right - rect.left;
+        int height = rect.bottom - rect.top;
+
+        // 更新窗口大小
+        SetWindowPos(hwnd, nullptr, 0, 0, width, height,
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+        // 强制重绘
+        InvalidateRect(hwnd, nullptr, TRUE);
+    }
 } 
