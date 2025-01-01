@@ -52,12 +52,36 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
     int height = clientRect.bottom - clientRect.top;
     m_aspectRatio = static_cast<float>(height) / width;
 
-    // 调整预览窗口大小以匹配比例
-    RECT previewRect;
-    GetWindowRect(hwnd, &previewRect);
-    int previewWidth = previewRect.right - previewRect.left;
-    int newHeight = static_cast<int>(previewWidth * m_aspectRatio);
-    SetWindowPos(hwnd, nullptr, 0, 0, previewWidth, newHeight, SWP_NOMOVE | SWP_NOZORDER);
+    // 计算预览窗口的实际尺寸
+    int actualWidth, actualHeight;
+    if (width >= height) {
+        // 宽屏，使用理想尺寸作为宽度上限
+        actualWidth = m_idealSize;
+        actualHeight = static_cast<int>(m_idealSize * m_aspectRatio);
+    } else {
+        // 窄屏，使用理想尺寸作为高度上限
+        actualHeight = m_idealSize;
+        actualWidth = static_cast<int>(m_idealSize / m_aspectRatio);
+    }
+
+    // 确保不小于最小尺寸
+    actualWidth = max(actualWidth, MIN_WIDTH);
+    actualHeight = max(actualHeight, MIN_HEIGHT);
+
+    // 如果是首次显示，设置默认位置（左上角）
+    if (m_isFirstShow) {
+        m_isFirstShow = false;  // 标记为非首次显示
+        int x = 20;  // 距离左边缘20像素
+        int y = 20;  // 距离上边缘20像素
+        SetWindowPos(hwnd, nullptr, x, y, actualWidth, actualHeight + TITLE_HEIGHT, 
+                    SWP_NOZORDER | SWP_SHOWWINDOW);
+    } else {
+        // 如果窗口已经显示，只更新尺寸保持位置不变
+        RECT previewRect;
+        GetWindowRect(hwnd, &previewRect);
+        SetWindowPos(hwnd, nullptr, 0, 0, actualWidth, actualHeight + TITLE_HEIGHT, 
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
+    }
 
     // 停止现有的捕获
     StopCapture();
@@ -125,6 +149,14 @@ void PreviewWindow::StopCapture() {
 }
 
 void PreviewWindow::OnFrameArrived() {
+    // 获取互斥锁
+    std::lock_guard<std::mutex> lock(renderTargetMutex);
+    
+    // 如果渲染目标无效，跳过这一帧
+    if (!renderTarget) {
+        return;
+    }
+
     if (auto frame = framePool.TryGetNextFrame()) {
         // 获取帧的纹理
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
@@ -147,7 +179,7 @@ void PreviewWindow::OnFrameArrived() {
         }
 
         // 渲染帧
-        if (shaderResourceView) {
+        if (shaderResourceView && renderTarget) {  // 添加renderTarget检查
             // 清除背景
             float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
             context->ClearRenderTargetView(renderTarget.Get(), clearColor);
@@ -323,13 +355,9 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance) {
         return false;
     }
 
-    // 获取屏幕尺寸
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    // 计算理想尺寸（屏幕高度的50%）
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-    // 计算窗口位置（右上角）
-    int windowX = screenWidth - DEFAULT_WIDTH - 20;
-    int windowY = 20;
+    m_idealSize = static_cast<int>(screenHeight * 0.5);
 
     // 创建窗口，但初始不显示
     hwnd = CreateWindowExW(
@@ -337,8 +365,8 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance) {
         L"PreviewWindowClass",
         L"预览窗口",
         WS_POPUP,  // 移除 WS_VISIBLE
-        windowX, windowY,
-        DEFAULT_WIDTH, DEFAULT_HEIGHT + TITLE_HEIGHT,
+        0, 0,  // 初始位置不重要，会在 StartCapture 中设置
+        m_idealSize, m_idealSize + TITLE_HEIGHT,  // 初始尺寸为理想尺寸
         nullptr, nullptr,
         hInstance, nullptr
     );
@@ -348,7 +376,7 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance) {
     }
 
     // 设置窗口透明度
-    SetLayeredWindowAttributes(hwnd, 0, 240, LWA_ALPHA);
+    SetLayeredWindowAttributes(hwnd, 0, 204, LWA_ALPHA);
 
     return true;
 }
@@ -364,8 +392,8 @@ bool PreviewWindow::InitializeD3D() {
     // 创建交换链描述
     DXGI_SWAP_CHAIN_DESC scd = {};
     scd.BufferCount = 2;  // 使用双缓冲
-    scd.BufferDesc.Width = DEFAULT_WIDTH;
-    scd.BufferDesc.Height = DEFAULT_HEIGHT;
+    scd.BufferDesc.Width = m_idealSize;
+    scd.BufferDesc.Height = m_idealSize;
     scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     scd.BufferDesc.RefreshRate.Numerator = 0;
     scd.BufferDesc.RefreshRate.Denominator = 1;
@@ -462,8 +490,12 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hwnd, &ps);
             
+            // 获取窗口客户区大小
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+            
             // 绘制标题栏背景
-            RECT titleRect = { 0, 0, DEFAULT_WIDTH, TITLE_HEIGHT };
+            RECT titleRect = { 0, 0, rc.right, TITLE_HEIGHT };
             HBRUSH titleBrush = CreateSolidBrush(RGB(240, 240, 240));
             FillRect(hdc, &titleRect, titleBrush);
             DeleteObject(titleBrush);
@@ -483,7 +515,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             DeleteObject(hFont);
 
             // 绘制分隔线
-            RECT sepRect = { 0, TITLE_HEIGHT - 1, DEFAULT_WIDTH, TITLE_HEIGHT };
+            RECT sepRect = { 0, TITLE_HEIGHT - 1, rc.right, TITLE_HEIGHT };
             HBRUSH sepBrush = CreateSolidBrush(RGB(229, 229, 229));
             FillRect(hdc, &sepRect, sepBrush);
             DeleteObject(sepBrush);
@@ -500,26 +532,62 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
         case WM_SIZING: {
             RECT* rect = (RECT*)lParam;
             int width = rect->right - rect->left;
-            int height = rect->bottom - rect->top;
+            int height = rect->bottom - rect->top - TITLE_HEIGHT;  // 减去标题栏高度得到客户区高度
             
             // 根据拖动方向调整大小
             switch (wParam) {
                 case WMSZ_LEFT:
                 case WMSZ_RIGHT:
                     // 用户调整宽度，相应调整高度
-                    rect->bottom = rect->top + static_cast<int>(width * instance->m_aspectRatio);
+                    width = max(width, MIN_WIDTH);
+                    height = static_cast<int>(width * instance->m_aspectRatio);
+                    height = max(height, MIN_HEIGHT);  // 确保高度不小于最小值
+                    rect->bottom = rect->top + height + TITLE_HEIGHT;  // 加回标题栏高度
+                    rect->right = rect->left + static_cast<int>(height / instance->m_aspectRatio);
                     break;
+
                 case WMSZ_TOP:
                 case WMSZ_BOTTOM:
                     // 用户调整高度，相应调整宽度
-                    rect->right = rect->left + static_cast<int>(height / instance->m_aspectRatio);
+                    height = max(height, MIN_HEIGHT);  // 确保客户区高度不小于最小值
+                    width = static_cast<int>(height / instance->m_aspectRatio);
+                    width = max(width, MIN_WIDTH);  // 确保宽度不小于最小值
+                    
+                    if (wParam == WMSZ_BOTTOM) {
+                        rect->bottom = rect->top + height + TITLE_HEIGHT;  // 加回标题栏高度
+                    } else {
+                        rect->top = rect->bottom - (height + TITLE_HEIGHT);  // 从底部向上调整
+                    }
+                    
+                    if (width > MIN_WIDTH) {
+                        if (wParam == WMSZ_BOTTOM) {
+                            rect->right = rect->left + width;
+                        } else {
+                            rect->left = rect->right - width;
+                        }
+                    }
                     break;
+
                 case WMSZ_TOPLEFT:
                 case WMSZ_TOPRIGHT:
                 case WMSZ_BOTTOMLEFT:
                 case WMSZ_BOTTOMRIGHT:
                     // 对角调整时，以宽度为准
-                    rect->bottom = rect->top + static_cast<int>(width * instance->m_aspectRatio);
+                    width = max(width, MIN_WIDTH);
+                    height = static_cast<int>(width * instance->m_aspectRatio);
+                    height = max(height, MIN_HEIGHT);  // 确保高度不小于最小值
+                    
+                    if (wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_BOTTOMRIGHT) {
+                        rect->bottom = rect->top + height + TITLE_HEIGHT;
+                    } else {
+                        rect->top = rect->bottom - (height + TITLE_HEIGHT);
+                    }
+                    
+                    if (wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT) {
+                        rect->left = rect->right - width;
+                    } else {
+                        rect->right = rect->left + width;
+                    }
                     break;
             }
             return TRUE;
@@ -558,24 +626,30 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
         case WM_SIZE: {
             if (!instance->device) return 0;
             
-            // 释放旧的渲染目标
-            instance->renderTarget = nullptr;
+            {
+                // 获取互斥锁
+                std::lock_guard<std::mutex> lock(instance->renderTargetMutex);
+                
+                // 释放旧的渲染目标
+                instance->renderTarget = nullptr;
 
-            // 调整交换链大小
-            RECT clientRect;
-            GetClientRect(hwnd, &clientRect);
-            HRESULT hr = instance->swapChain->ResizeBuffers(
-                0,  // 保持当前缓冲区数量
-                clientRect.right - clientRect.left,
-                clientRect.bottom - clientRect.top,
-                DXGI_FORMAT_UNKNOWN,  // 保持当前格式
-                0
-            );
+                // 调整交换链大小
+                RECT clientRect;
+                GetClientRect(hwnd, &clientRect);
+                HRESULT hr = instance->swapChain->ResizeBuffers(
+                    0,  // 保持当前缓冲区数量
+                    clientRect.right - clientRect.left,
+                    clientRect.bottom - clientRect.top,
+                    DXGI_FORMAT_UNKNOWN,  // 保持当前格式
+                    0
+                );
 
-            if (SUCCEEDED(hr)) {
-                // 重新创建渲染目标
-                instance->CreateRenderTarget();
+                if (SUCCEEDED(hr)) {
+                    // 重新创建渲染目标
+                    instance->CreateRenderTarget();
+                }
             }
+            
             return 0;
         }
         }
