@@ -87,13 +87,13 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
         m_isFirstShow = false;  // 标记为非首次显示
         int x = 20;  // 距离左边缘20像素
         int y = 20;  // 距离上边缘20像素
-        SetWindowPos(hwnd, nullptr, x, y, actualWidth, actualHeight + TITLE_HEIGHT, 
+        SetWindowPos(hwnd, nullptr, x, y, actualWidth, actualHeight, 
                     SWP_NOZORDER | SWP_SHOWWINDOW);
     } else {
         // 如果窗口已经显示，只更新尺寸保持位置不变
         RECT previewRect;
         GetWindowRect(hwnd, &previewRect);
-        SetWindowPos(hwnd, nullptr, 0, 0, actualWidth, actualHeight + TITLE_HEIGHT, 
+        SetWindowPos(hwnd, nullptr, 0, 0, actualWidth, actualHeight, 
                     SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
     }
 
@@ -208,6 +208,8 @@ void PreviewWindow::OnFrameArrived() {
             GetClientRect(hwnd, &clientRect);
             viewport.Width = static_cast<float>(clientRect.right - clientRect.left);
             viewport.Height = static_cast<float>(clientRect.bottom - clientRect.top);
+            viewport.TopLeftX = 0.0f;
+            viewport.TopLeftY = 0.0f;  // 从窗口顶部开始渲染
             viewport.MinDepth = 0.0f;
             viewport.MaxDepth = 1.0f;
             context->RSSetViewports(1, &viewport);
@@ -780,33 +782,37 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
         case WM_SIZING: {
             RECT* rect = (RECT*)lParam;
             int width = rect->right - rect->left;
-            int height = rect->bottom - rect->top - instance->TITLE_HEIGHT;  // 减去标题栏高度得到客户区高度
+            int height = rect->bottom - rect->top;  // 不再减去标题栏高度
             
             // 根据拖动方向调整大小
             switch (wParam) {
                 case WMSZ_LEFT:
                 case WMSZ_RIGHT:
                     // 用户调整宽度，相应调整高度
+                    width = max(width, instance->m_minIdealSize);  // 应用最小尺寸限制
                     height = static_cast<int>(width * instance->m_aspectRatio);
-                    rect->bottom = rect->top + height + instance->TITLE_HEIGHT;  // 加回标题栏高度
-                    rect->right = rect->left + width;
+                    if (wParam == WMSZ_LEFT) {
+                        rect->left = rect->right - width;
+                    } else {
+                        rect->right = rect->left + width;
+                    }
+                    rect->bottom = rect->top + height;
                     break;
 
                 case WMSZ_TOP:
                 case WMSZ_BOTTOM:
                     // 用户调整高度，相应调整宽度
+                    height = max(height, instance->m_minIdealSize);  // 应用最小尺寸限制
                     width = static_cast<int>(height / instance->m_aspectRatio);
-                    
-                    if (wParam == WMSZ_BOTTOM) {
-                        rect->bottom = rect->top + height + instance->TITLE_HEIGHT;  // 加回标题栏高度
+                    if (wParam == WMSZ_TOP) {
+                        rect->top = rect->bottom - height;
                     } else {
-                        rect->top = rect->bottom - (height + instance->TITLE_HEIGHT);  // 从底部向上调整
+                        rect->bottom = rect->top + height;
                     }
-                    
-                    if (wParam == WMSZ_BOTTOM) {
-                        rect->right = rect->left + width;
-                    } else {
+                    if (wParam == WMSZ_TOP) {
                         rect->left = rect->right - width;
+                    } else {
+                        rect->right = rect->left + width;
                     }
                     break;
 
@@ -815,18 +821,19 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 case WMSZ_BOTTOMLEFT:
                 case WMSZ_BOTTOMRIGHT:
                     // 对角调整时，以宽度为准
+                    width = max(width, instance->m_minIdealSize);  // 应用最小尺寸限制
                     height = static_cast<int>(width * instance->m_aspectRatio);
-                    
-                    if (wParam == WMSZ_BOTTOMLEFT || wParam == WMSZ_BOTTOMRIGHT) {
-                        rect->bottom = rect->top + height + instance->TITLE_HEIGHT;
-                    } else {
-                        rect->top = rect->bottom - (height + instance->TITLE_HEIGHT);
-                    }
                     
                     if (wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT) {
                         rect->left = rect->right - width;
                     } else {
                         rect->right = rect->left + width;
+                    }
+                    
+                    if (wParam == WMSZ_TOPLEFT || wParam == WMSZ_TOPRIGHT) {
+                        rect->top = rect->bottom - height;
+                    } else {
+                        rect->bottom = rect->top + height;
                     }
                     break;
             }
@@ -992,7 +999,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 RECT clientRect;
                 GetClientRect(hwnd, &clientRect);
                 int width = clientRect.right - clientRect.left;
-                int height = clientRect.bottom - clientRect.top - instance->TITLE_HEIGHT;  // 减去标题栏高度
+                int height = clientRect.bottom - clientRect.top;  // 不再减去标题栏高度
 
                 // 更新理想尺寸（取当前窗口宽高的较大值）
                 instance->m_idealSize = max(width, height);
@@ -1099,7 +1106,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 // 更新窗口位置和大小
                 SetWindowPos(hwnd, nullptr,
                     newX, newY,
-                    newWidth, newHeight + instance->TITLE_HEIGHT,
+                    newWidth, newHeight,
                     SWP_NOZORDER | SWP_NOACTIVATE);
             }
             return 0;
