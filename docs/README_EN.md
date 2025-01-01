@@ -137,7 +137,7 @@ Right-click or left-click the tray icon to:
 - 🔔 Show Tips: Enable/disable window operation prompts
 - ⌨️ Modify Hotkey: Set a new shortcut combination (may have 5 second delay before success prompt)
 - 🔍 Preview Window: Similar to Photoshop's navigator, provides real-time preview and navigation when window exceeds screen bounds (optional feature)
-  - Support dragging the top area to move position, mouse wheel to zoom preview size
+  - Support dragging window top area to move position, mouse wheel to zoom window size
 - 📱 Floating Mode: Enabled by default, can enable/disable floating menu here. When disabled, use hotkey (default Ctrl+Alt+R) to open adjustment menu
 - 🌐 Language: Switch language
 - ⚙️ Open Config: Customize ratios and resolutions
