@@ -134,7 +134,6 @@ Right-click or left-click the tray icon to:
 - 📍 Screenshot: Save lossless screenshots to the ScreenShot folder in program directory, mainly for debugging and games that don't support screenshots
 - 🔽 Hide Taskbar: Hide the taskbar to prevent overlap
 - ⬇️ Lower Taskbar When Resizing: Lower taskbar when resizing window to prevent overlap
-- 🔔 Show Tips: Enable/disable window operation prompts
 - ⌨️ Modify Hotkey: Set a new shortcut combination (may have 5 second delay before success prompt)
 - 🔍 Preview Window: Similar to Photoshop's navigator, provides real-time preview and navigation when window exceeds screen bounds (optional feature)
   - Support dragging window top area to move position, mouse wheel to zoom window size

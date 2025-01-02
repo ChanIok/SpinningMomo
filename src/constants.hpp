@@ -21,7 +21,6 @@ namespace Constants {
     // 功能菜单项ID
     constexpr UINT ID_ROTATE = 2001;         
     constexpr UINT ID_HOTKEY = 2002;         // 修改热键菜单项ID
-    constexpr UINT ID_NOTIFY = 2003;         // 提示开关菜单项ID
     constexpr UINT ID_TASKBAR = 2004;        // 窗口置顶菜单项ID
     constexpr UINT ID_EXIT = 2005;           // 退出菜单项ID
     constexpr UINT ID_RESET = 2006;          // 重置窗口尺寸菜单项ID
@@ -43,9 +42,6 @@ namespace Constants {
     inline const TCHAR* HOTKEY_SECTION = TEXT("Hotkey");      // 热键配置节名
     inline const TCHAR* HOTKEY_MODIFIERS = TEXT("Modifiers"); // 修饰键配置项
     inline const TCHAR* HOTKEY_KEY = TEXT("Key");            // 主键配置项
-    
-    inline const TCHAR* NOTIFY_SECTION = TEXT("Notify");      // 提示配置节名
-    inline const TCHAR* NOTIFY_ENABLED = TEXT("Enabled");     // 提示开关配置项
     
     inline const TCHAR* TOPMOST_SECTION = TEXT("Topmost");    // 置顶配置节名
     inline const TCHAR* TOPMOST_ENABLED = TEXT("Enabled");    // 窗口置顶配置项
@@ -102,7 +98,6 @@ struct LocalizedStrings {
     std::wstring RESOLUTION;
     std::wstring RESET_WINDOW;
     std::wstring MODIFY_HOTKEY;
-    std::wstring SHOW_TIPS;
     std::wstring WINDOW_TOPMOST;
     std::wstring OPEN_CONFIG;
     std::wstring EXIT;

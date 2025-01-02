@@ -67,7 +67,6 @@ void TrayIcon::ShowContextMenu(
     bool topmostEnabled,
     bool taskbarAutoHide,
     bool taskbarLower,
-    bool notifyEnabled,
     const std::wstring& language,
     bool useFloatingWindow,
     bool isFloatingWindowVisible,
@@ -107,8 +106,8 @@ void TrayIcon::ShowContextMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     
     // 添加设置选项
-    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, taskbarLower, notifyEnabled, 
-                    useFloatingWindow, isFloatingWindowVisible, previewEnabled, strings);
+    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, taskbarLower, useFloatingWindow, 
+                    isFloatingWindowVisible, previewEnabled, strings);
 
     // 添加语言子菜单
     HMENU hLangMenu = CreateLanguageSubmenu(language, strings);
@@ -304,7 +303,6 @@ void TrayIcon::AddSettingsItems(
     bool topmostEnabled,
     bool taskbarAutoHide,
     bool taskbarLower,
-    bool notifyEnabled,
     bool useFloatingWindow,
     bool isFloatingWindowVisible,
     bool previewEnabled,
@@ -324,9 +322,7 @@ void TrayIcon::AddSettingsItems(
               
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-    // 通知设置
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (notifyEnabled ? MF_CHECKED : 0), 
-              Constants::ID_NOTIFY, strings.SHOW_TIPS.c_str());
+    // 热键设置
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, strings.MODIFY_HOTKEY.c_str());
 
     // 预览窗口选项
