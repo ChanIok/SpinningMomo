@@ -18,16 +18,19 @@ add_executable(SpinningMomo WIN32
     src/window_utils.cpp
     src/ui_manager.cpp
     src/preview_window.cpp
+    src/notification_window.cpp
+    src/notification_manager.cpp
     src/resource.rc  # 添加资源文件
 )
 
 # 添加Windows库
 target_link_libraries(SpinningMomo PRIVATE
-    windowsapp    # Windows Runtime API
-    d3d11        # Direct3D 11
     dwmapi       # DWM API
+    windowsapp   # Windows Runtime API
+    d3d11        # Direct3D 11
     shell32      # Windows Shell API
     dxgi         # DXGI
     RuntimeObject # WinRT support
     d3dcompiler  # D3D Compiler
+    Shcore       # Shell Core API
 )

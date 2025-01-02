@@ -12,11 +12,7 @@
 #include "window_utils.hpp"
 #include "ui_manager.hpp"
 #include "preview_window.hpp"
-
-#pragma comment(lib, "Shcore.lib")
-#pragma comment(lib, "Shell32.lib")  // 添加 Shell32.lib 链接器指令
-
-class MenuWindow;  // 前向声明
+#include "notification_manager.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -41,6 +37,8 @@ public:
         LoadCustomRatios();
         InitializeResolutions();
         LoadCustomResolutions();
+
+        m_notificationManager = std::make_unique<NotificationManager>(m_hInstance);
     }
 
     ~SpinningMomoApp() {
@@ -137,11 +135,13 @@ public:
         );
     }
 
-    void ShowNotification(const TCHAR* title, const TCHAR* message, bool isSuccess = false) {
-        // 如果是成功提示，则根据关控制；其他提示始终显示
-        if (!isSuccess || m_notifyEnabled) {
-            m_trayIcon->ShowBalloon(title, message);
-        }
+    void ShowNotification(const TCHAR* title, const TCHAR* message, bool isError = false) {
+        m_notificationManager->ShowNotification(
+            title, 
+            message, 
+            isError ? NotificationWindow::NotificationType::Error 
+                   : NotificationWindow::NotificationType::Info
+        );
     }
 
     // 事件处理函数
@@ -473,6 +473,9 @@ private:
     LocalizedStrings m_strings;                      // 当前语言的字符串
     std::wstring m_language;                         // 当前语言设置
 
+    // 替换为通知管理器
+    std::unique_ptr<NotificationManager> m_notificationManager;
+
     // 初始化预设的宽高比列表
     void InitializeRatios() {
         m_ratios = {
@@ -740,9 +743,7 @@ private:
                 if (m_isPreviewEnabled && m_previewWindow) {
                     m_previewWindow->StartCapture(gameWindow);
                 }
-                
-                ShowNotification(m_strings.APP_NAME.c_str(), 
-                    m_strings.RESET_SUCCESS.c_str(), true);
+
             }
         } else {
             ShowNotification(m_strings.APP_NAME.c_str(), 
@@ -805,7 +806,7 @@ private:
         
         if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, m_topmostEnabled, m_taskbarLower)) {
             m_windowModified = true;
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
+            // ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_SUCCESS.c_str(), true);
             return true;
         } else {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
