@@ -31,6 +31,7 @@ namespace Constants {
     constexpr UINT ID_TOGGLE_WINDOW_VISIBILITY = 2013;  // 浮窗显示控制ID
     constexpr UINT ID_CAPTURE_WINDOW = 2014;     // 截图菜单项ID
     constexpr UINT ID_PREVIEW_WINDOW = 2015;     // 预览窗口菜单项ID
+    constexpr UINT ID_OPEN_SCREENSHOT = 2016;    // 打开相册菜单项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -129,6 +130,7 @@ struct LocalizedStrings {
     std::wstring CAPTURE_WINDOW;
     std::wstring CAPTURE_SUCCESS;
     std::wstring PREVIEW_WINDOW;
+    std::wstring OPEN_SCREENSHOT;
 };
 
 // 中文字符串

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <wrl/client.h>
+#include <Shlwapi.h>
 
 class WindowUtils {
 public:
@@ -38,6 +39,7 @@ public:
     // 截图相关函数
     static bool CaptureWindow(HWND hwnd, const std::wstring& savePath);
     static std::wstring GetScreenshotPath();
+    static std::wstring GetGameScreenshotPath(HWND hwnd);
 
 private:
     // 回调函数

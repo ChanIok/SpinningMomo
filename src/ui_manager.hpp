@@ -94,6 +94,7 @@ public:
         Ratio,
         Resolution,
         CaptureWindow,
+        OpenScreenshot,
         PreviewWindow,
         Reset,
         Close

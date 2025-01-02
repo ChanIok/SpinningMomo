@@ -33,4 +33,5 @@ target_link_libraries(SpinningMomo PRIVATE
     RuntimeObject # WinRT support
     d3dcompiler  # D3D Compiler
     Shcore       # Shell Core API
+    Shlwapi      # Shell Light-Weight API
 )

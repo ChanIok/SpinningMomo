@@ -349,6 +349,9 @@ public:
                         case Constants::ID_CAPTURE_WINDOW:
                             app->HandleScreenshot();
                             break;
+                        case Constants::ID_OPEN_SCREENSHOT:
+                            app->HandleOpenScreenshot();
+                            break;
                         case Constants::ID_PREVIEW_WINDOW:
                             app->TogglePreviewWindow();
                             break;
@@ -409,6 +412,20 @@ public:
                 m_strings.APP_NAME.c_str(),
                 (m_strings.CAPTURE_SUCCESS + savePath).c_str()
             );
+        }
+    }
+
+    // 处理打开相册功能
+    void HandleOpenScreenshot() {
+        HWND gameWindow = FindTargetWindow();
+        if (!gameWindow) {
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
+        }
+
+        std::wstring path = WindowUtils::GetGameScreenshotPath(gameWindow);
+        if (!path.empty()) {
+            ShellExecuteW(NULL, L"explore", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
         }
     }
 

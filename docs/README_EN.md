@@ -131,7 +131,8 @@ Right-click or left-click the tray icon to:
 - 🎯 Select Window: Choose the target window from the submenu
 - 📐 Window Ratio: Select from preset ratios or custom ratios 
 - 📏 Resolution: Select from preset resolutions or custom resolutions
-- 📍 Screenshot: Save lossless screenshots to the ScreenShot folder in program directory, mainly for debugging and games that don't support screenshots
+- 📍 Screenshot: Save lossless screenshots to the ScreenShot folder in program directory, mainly for debugging and games that don't support screenshots (normally not used)
+- 📂 Open Screenshot Folder: Open the game screenshot directory, for viewing and opening game screenshots
 - 🔽 Hide Taskbar: Hide the taskbar to prevent overlap
 - ⬇️ Lower Taskbar When Resizing: Lower taskbar when resizing window to prevent overlap
 - ⌨️ Modify Hotkey: Set a new shortcut combination (may have 5 second delay before success prompt)

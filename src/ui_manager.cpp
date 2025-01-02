@@ -103,6 +103,7 @@ void TrayIcon::ShowContextMenu(
 
     // 添加截图选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CAPTURE_WINDOW, strings.CAPTURE_WINDOW.c_str());
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_OPEN_SCREENSHOT, strings.OPEN_SCREENSHOT.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     
     // 添加设置选项
@@ -503,6 +504,7 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
 
     // 添加设置选项
     m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});  // 添加截图选项作为设置组的第一个选项
+    m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});  // 添加打开相册选项
     m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
     m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
     m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
@@ -660,6 +662,7 @@ void MenuWindow::OnPaint(HDC hdc) {
                           resolutionColumnRight, y + m_itemHeight};
                 break;
             case ItemType::CaptureWindow:
+            case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
@@ -766,6 +769,9 @@ void MenuWindow::OnLButtonDown(int x, int y) {
             case ItemType::CaptureWindow:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_CAPTURE_WINDOW, 0);
                 break;
+            case ItemType::OpenScreenshot:
+                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_OPEN_SCREENSHOT, 0);
+                break;
             case ItemType::PreviewWindow:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_PREVIEW_WINDOW, 0);
                 break;
@@ -811,6 +817,7 @@ int MenuWindow::CalculateWindowHeight() {
                 resolutionCount++;
                 break;
             case ItemType::CaptureWindow:
+            case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
@@ -853,6 +860,7 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
         for (size_t i = 0; i < m_items.size(); i++) {
             const auto& item = m_items[i];
             if (item.type == ItemType::CaptureWindow ||
+                item.type == ItemType::OpenScreenshot ||
                 item.type == ItemType::PreviewWindow ||
                 item.type == ItemType::Reset ||
                 item.type == ItemType::Close) {

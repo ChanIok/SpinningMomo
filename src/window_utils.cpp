@@ -486,4 +486,37 @@ std::wstring WindowUtils::GetScreenshotPath() {
     std::wstring fallbackPath = L".\\" + std::wstring(SCREENSHOT_DIR);
     CreateDirectoryW(fallbackPath.c_str(), NULL);  // 尝试创建，忽略结果
     return fallbackPath;
+}
+
+std::wstring WindowUtils::GetGameScreenshotPath(HWND hwnd) {
+    if (!hwnd) return L"";
+
+    // 获取进程ID
+    DWORD processId;
+    GetWindowThreadProcessId(hwnd, &processId);
+    if (processId == 0) return L"";
+
+    // 打开进程
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
+    if (!hProcess) return L"";
+
+    // 获取进程路径
+    wchar_t processPath[MAX_PATH];
+    DWORD size = MAX_PATH;
+    BOOL success = QueryFullProcessImageNameW(hProcess, 0, processPath, &size);
+    CloseHandle(hProcess);
+    
+    if (!success) return L"";
+
+    // 构建相册路径
+    std::wstring path = processPath;
+    size_t binPos = path.find(L"\\Binaries\\Win64");
+    if (binPos != std::wstring::npos) {
+        path = path.substr(0, binPos) + L"\\ScreenShot";
+        if (PathFileExistsW(path.c_str())) {
+            return path;
+        }
+    }
+
+    return L"";
 } 
