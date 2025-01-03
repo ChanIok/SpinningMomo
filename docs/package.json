@@ -1,7 +1,7 @@
 {
   "name": "docs",
   "version": "1.0.0",
-  "description": "SpinningMomo 文档",
+  "description": "SpinningMomo Docs",
   "type": "module",
   "scripts": {
     "dev": "vitepress dev",
