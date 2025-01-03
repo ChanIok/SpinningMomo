@@ -8,8 +8,8 @@ export default defineConfig({
   base: '/SpinningMomo/',
 
   head: [
-    ['link', { rel: 'icon', href: '/logo.png' }],
-    ['link', { rel: 'apple-touch-icon', href: '/logo.png' }],
+    ['link', { rel: 'icon', href: '/SpinningMomo/logo.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/SpinningMomo/logo.png' }],
   ],
 
   // 忽略死链接检查
