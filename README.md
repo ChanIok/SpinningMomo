@@ -1,6 +1,6 @@
 <div align="center">
   <h1>
-    <img src="./docs/logo.png" width="200" alt="SpinningMomo Logo">
+    <img src="./docs/public/logo.png" width="200" alt="SpinningMomo Logo">
     <br/>
     🎮 旋转吧大喵
     <br/><br/>
@@ -17,14 +17,15 @@
 
   <p>
     <b>
-      <a href="#-特色功能">特色功能</a> •
-      <a href="#-使用指南">使用指南</a> •
-      <a href="#️-构建指南">构建指南</a> •
-      <a href="./docs/README_EN.md">English</a>
+      <a href="https://chaniok.github.io/SpinningMomo">📖 使用文档</a> •
+      <a href="#-特色功能">✨ 特色功能</a> •
+      <a href="#-使用指南">🚀 使用指南</a> •
+      <a href="#️-构建指南">🛠️ 构建指南</a> •
+      <a href="./docs/README_EN.md">🌐 English</a>
     </b>
   </p>
 
-  <img src="./docs/README.jpg" alt="Screenshot" >
+  <img src="./docs/public/README.jpg" alt="Screenshot" >
 </div>
 
 ## 🎯 项目简介
@@ -34,6 +35,8 @@
 通过快捷键让您能够轻松切换游戏窗口的比例和尺寸，完美满足各种构图需求。无论是竖构图拍摄、相册浏览还是留影沙漏，都能获得最佳的显示效果。
 
 甚至能突破游戏和设备原有的限制，输出 8K 甚至 12K 以上超高分辨率照片！
+
+📖 查看[使用文档](https://chaniok.github.io/SpinningMomo)了解更多详细信息。
 
 > 如果觉得这个工具对你有帮助，欢迎点个 Star ⭐ 支持一下~
 

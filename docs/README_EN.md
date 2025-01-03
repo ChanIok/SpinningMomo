@@ -1,7 +1,7 @@
 > *English README translated by Claude AI*
 <div align="center">
   <h1>
-    <img src="../docs/logo.png" width="200" alt="SpinningMomo Logo">
+    <img src="./public/logo.png" width="200" alt="SpinningMomo Logo">
     <br/>
     🎮 SpinningMomo
     <br/><br/>
@@ -17,14 +17,14 @@
 
   <p>
     <b>
-      <a href="#-features">Features</a> •
-      <a href="#-user-guide">User Guide</a> •
-      <a href="#️-build-guide">Build Guide</a> •
-      <a href="../README.md">中文</a>
+      <a href="#-features">✨ Features</a> •
+      <a href="#-user-guide">🚀 User Guide</a> •
+      <a href="#️-build-guide">🛠️ Build Guide</a> •
+      <a href="../README.md">🇨🇳 中文</a>
     </b>
   </p>
 
-  <img src="./README.jpg" alt="Screenshot" >
+  <img src="./public/README.jpg" alt="Screenshot" >
 </div>
 
 ## 🎯 Introduction

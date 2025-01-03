@@ -1,0 +1,41 @@
+:root {
+  --vp-c-brand: #ff9f4f;
+  --vp-c-brand-light: #ffb06a;
+  --vp-c-brand-lighter: #ffc088;
+  --vp-c-brand-dark: #f59440;
+  --vp-c-brand-darker: #e68a3c;
+
+  --vp-c-text-1: #333;
+  --vp-c-text-2: #444;
+  --vp-c-text-3: #666;
+
+  --vp-c-bg: #fff;
+  --vp-c-bg-soft: #f8f9fa;
+  --vp-c-bg-mute: #f1f1f1;
+
+  --vp-c-border: #eee;
+  --vp-c-divider: #eee;
+
+  --vp-button-brand-border: var(--vp-c-brand);
+  --vp-button-brand-text: #fff;
+  --vp-button-brand-bg: var(--vp-c-brand);
+  
+  --vp-button-brand-hover-border: var(--vp-c-brand-light);
+  --vp-button-brand-hover-text: #fff;
+  --vp-button-brand-hover-bg: var(--vp-c-brand-light);
+  
+  --vp-button-brand-active-border: var(--vp-c-brand-dark);
+  --vp-button-brand-active-text: #fff;
+  --vp-button-brand-active-bg: var(--vp-c-brand-dark);
+
+  --vp-custom-block-tip-bg: #fff3e6;
+  --vp-custom-block-tip-border: var(--vp-c-brand);
+
+  --vp-code-block-bg: #f8f9fa;
+
+  --vp-home-hero-name-color: var(--vp-c-brand);
+  
+  --vp-nav-height: 64px;
+  --vp-nav-bg-color: rgba(255, 255, 255, 0.95);
+  --vp-c-brand-active: var(--vp-c-brand);
+} 

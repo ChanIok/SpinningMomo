@@ -29,6 +29,12 @@ CMakeFiles/
 cmake_install.cmake
 compile_commands.json
 
+# VitePress docs
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+docs/node_modules/
+docs/package-lock.json
+
 # OS generated files
 .DS_Store
 .DS_Store?
