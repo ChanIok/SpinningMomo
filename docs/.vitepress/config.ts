@@ -4,10 +4,16 @@ export default defineConfig({
   title: 'SpinningMomo',
   description: '一个为《无限暖暖》提升摄影体验的窗口调整工具',
 
+  // 设置基础路径为仓库名
+  base: '/SpinningMomo/',
+
   head: [
     ['link', { rel: 'icon', href: '/logo.png' }],
     ['link', { rel: 'apple-touch-icon', href: '/logo.png' }],
   ],
+
+  // 忽略死链接检查
+  ignoreDeadLinks: true,
 
   locales: {
     root: {

@@ -1,12 +1,20 @@
 # 工作流名称
 name: Deploy VitePress Documentation
 
-# 触发条件：在 master 分支的 push 事件，且仅当 docs 目录有变更时
+# 触发条件：在 main 分支的 push 事件，且仅当 docs 目录有变更时
+# 同时支持手动触发
 on:
   push:
     branches: [master]
     paths:
       - 'docs/**'
+  # 添加手动触发
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: '触发原因（可选）'
+        required: false
+        type: string
 
 # 设置 GITHUB_TOKEN 的权限
 permissions:
@@ -45,7 +53,7 @@ jobs:
       - name: Build
         run: |
           cd docs
-          npm run docs:build
+          npm run build
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
@@ -63,4 +71,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2 
+        uses: actions/deploy-pages@v2
