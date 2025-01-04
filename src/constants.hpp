@@ -44,9 +44,6 @@ namespace Constants {
     inline const TCHAR* HOTKEY_MODIFIERS = TEXT("Modifiers"); // 修饰键配置项
     inline const TCHAR* HOTKEY_KEY = TEXT("Key");            // 主键配置项
     
-    inline const TCHAR* TOPMOST_SECTION = TEXT("Topmost");    // 置顶配置节名
-    inline const TCHAR* TOPMOST_ENABLED = TEXT("Enabled");    // 窗口置顶配置项
-    
     inline const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
     inline const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
     
@@ -99,7 +96,6 @@ struct LocalizedStrings {
     std::wstring RESOLUTION;
     std::wstring RESET_WINDOW;
     std::wstring MODIFY_HOTKEY;
-    std::wstring WINDOW_TOPMOST;
     std::wstring OPEN_CONFIG;
     std::wstring EXIT;
     std::wstring WINDOW_SELECTED;

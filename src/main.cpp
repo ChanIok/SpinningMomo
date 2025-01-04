@@ -110,7 +110,6 @@ public:
             m_resolutions,
             m_currentResolutionIndex,
             m_strings,
-            m_topmostEnabled,
             m_taskbarAutoHide,
             m_taskbarLower,
             m_language,
@@ -128,7 +127,6 @@ public:
             m_resolutions,
             m_currentResolutionIndex,
             m_strings,
-            m_topmostEnabled,
             m_taskbarAutoHide,
             m_isPreviewEnabled
         );
@@ -211,7 +209,6 @@ public:
             WritePrivateProfileString(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, TEXT("3"), m_configPath.c_str());
             WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
-            WritePrivateProfileString(Constants::TOPMOST_SECTION, Constants::TOPMOST_ENABLED, TEXT("0"), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION, Constants::CUSTOM_RESOLUTION_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
@@ -220,7 +217,6 @@ public:
         // 加载各项配置
         LoadHotkeyConfig();
         LoadWindowConfig();
-        LoadTopmostConfig();
         LoadLanguageConfig();
         LoadTaskbarConfig();
         LoadMenuConfig();
@@ -229,7 +225,6 @@ public:
     void SaveConfig() {
         SaveHotkeyConfig();
         SaveWindowConfig();
-        SaveTopmostConfig();
         SaveLanguageConfig();
         SaveTaskbarConfig(); 
         SaveMenuConfig();
@@ -316,9 +311,6 @@ public:
                             break;
                         case Constants::ID_HOTKEY:
                             app->SetHotkey();
-                            break;
-                        case Constants::ID_TASKBAR:
-                            app->ToggleTopmost();
                             break;
                         case Constants::ID_EXIT:
                             DestroyWindow(hwnd);
@@ -464,7 +456,6 @@ private:
     UINT m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;   // 热键修饰键
     UINT m_hotkeyKey = 'R';                           // 热键主键
     bool m_hotkeySettingMode = false;                 // 是否处于热键设置模式
-    bool m_topmostEnabled = false;                    // 是否窗口置顶，默认关闭
     bool m_taskbarAutoHide = false;                   // 任务栏自动隐藏状态
     bool m_taskbarLower = true;                      // 调整时置底任务栏状态
     bool m_useFloatingWindow = true;                 // 是否使用浮动窗口
@@ -566,25 +557,6 @@ private:
         }
     }
 
-    // 从配置文件加载置顶设置
-    void LoadTopmostConfig() {
-        TCHAR buffer[32];
-        if (GetPrivateProfileString(Constants::TOPMOST_SECTION,
-                                  Constants::TOPMOST_ENABLED,
-                                  TEXT("0"), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_topmostEnabled = (_wtoi(buffer) != 0);
-        }
-    }
-
-    // 保存置顶设置到配置文件
-    void SaveTopmostConfig() {
-        WritePrivateProfileString(Constants::TOPMOST_SECTION,
-                                Constants::TOPMOST_ENABLED,
-                                m_topmostEnabled ? TEXT("1") : TEXT("0"),
-                                m_configPath.c_str());
-    }
-
     // 从配置文件加载语言设置
     void LoadLanguageConfig() {
         TCHAR buffer[32];
@@ -667,18 +639,6 @@ private:
         m_hotkeySettingMode = true;
         ShowNotification(m_strings.APP_NAME.c_str(), 
             m_strings.HOTKEY_SETTING.c_str());
-    }
-
-    // 切换窗口置顶状态
-    void ToggleTopmost() {
-        m_topmostEnabled = !m_topmostEnabled;
-        SaveTopmostConfig();
-
-        HWND gameWindow = FindTargetWindow();
-        if (gameWindow) {
-            HWND insertAfter = m_topmostEnabled ? HWND_TOPMOST : HWND_NOTOPMOST;
-            SetWindowPos(gameWindow, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-        }
     }
 
     // 切换任务栏自动隐藏状态
@@ -788,7 +748,7 @@ private:
 
         OutputDebugString((TEXT("Width: ") + std::to_wstring(targetRes.width) + TEXT(", Height: ") + std::to_wstring(targetRes.height) + TEXT("\n")).c_str());
         
-        if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, m_topmostEnabled, m_taskbarLower)) {
+        if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, m_taskbarLower)) {
             m_windowModified = true;
             return true;
         } else {

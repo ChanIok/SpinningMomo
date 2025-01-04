@@ -23,7 +23,7 @@ bool WindowUtils::CompareWindowTitle(const std::wstring& title1, const std::wstr
 }
 
 // 窗口操作
-bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool topmost, bool taskbarLower) {
+bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower) {
     if (!hwnd || !IsWindow(hwnd)) return false;
 
     // 获取窗口样式
@@ -52,10 +52,6 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool topmost, b
     // 计算屏幕中心位置，考虑边框偏移
     int newLeft = (screenWidth - width) / 2 + borderOffsetX;
     int newTop = (screenHeight - height) / 2 + borderOffsetY;
-
-    // 设置窗口置顶状态
-    HWND insertAfter = topmost ? HWND_TOPMOST : HWND_NOTOPMOST;
-    SetWindowPos(hwnd, insertAfter, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
     // 设置新的窗口大小和位置
     bool success = SetWindowPos(hwnd, NULL, newLeft, newTop, totalWidth, totalHeight, 

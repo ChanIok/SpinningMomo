@@ -27,7 +27,7 @@ public:
     static bool CompareWindowTitle(const std::wstring& title1, const std::wstring& title2);
     
     // 窗口操作
-    static bool ResizeWindow(HWND hwnd, int width, int height, bool topmost = false, bool taskbarLower = true);
+    static bool ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower = true);
     
     // 辅助方法
     static std::wstring TrimRight(const std::wstring& str);

@@ -32,7 +32,6 @@ public:
         const std::vector<ResolutionPreset>& resolutions,
         size_t currentResolutionIndex,
         const LocalizedStrings& strings,
-        bool topmostEnabled,
         bool taskbarAutoHide,
         bool taskbarLower,
         const std::wstring& language,
@@ -47,7 +46,6 @@ public:
         const std::vector<ResolutionPreset>& resolutions,
         size_t currentResolutionIndex,
         const LocalizedStrings& strings,
-        bool topmostEnabled,
         bool taskbarAutoHide,
         bool previewEnabled);
         
@@ -77,7 +75,6 @@ private:
         
     void AddSettingsItems(
         HMENU hMenu,
-        bool topmostEnabled,
         bool taskbarAutoHide,
         bool taskbarLower,
         bool useFloatingWindow,

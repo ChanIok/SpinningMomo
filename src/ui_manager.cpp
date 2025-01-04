@@ -64,7 +64,6 @@ void TrayIcon::ShowContextMenu(
     const std::vector<ResolutionPreset>& resolutions,
     size_t currentResolutionIndex,
     const LocalizedStrings& strings,
-    bool topmostEnabled,
     bool taskbarAutoHide,
     bool taskbarLower,
     const std::wstring& language,
@@ -107,7 +106,7 @@ void TrayIcon::ShowContextMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     
     // 添加设置选项
-    AddSettingsItems(hMenu, topmostEnabled, taskbarAutoHide, taskbarLower, useFloatingWindow, 
+    AddSettingsItems(hMenu, taskbarAutoHide, taskbarLower, useFloatingWindow, 
                     isFloatingWindowVisible, previewEnabled, strings);
 
     // 添加语言子菜单
@@ -140,7 +139,6 @@ void TrayIcon::ShowQuickMenu(
     const std::vector<ResolutionPreset>& resolutions,
     size_t currentResolutionIndex,
     const LocalizedStrings& strings,
-    bool topmostEnabled,
     bool taskbarAutoHide,
     bool previewEnabled) {
     
@@ -192,10 +190,6 @@ void TrayIcon::ShowQuickMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
               Constants::ID_RESET, strings.RESET_WINDOW.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-
-    // 添加设置选项
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (topmostEnabled ? MF_CHECKED : 0),
-              Constants::ID_TASKBAR, strings.WINDOW_TOPMOST.c_str());
 
     // 添加任务栏自动隐藏选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarAutoHide ? MF_CHECKED : 0),
@@ -301,17 +295,12 @@ HMENU TrayIcon::CreateLanguageSubmenu(
 
 void TrayIcon::AddSettingsItems(
     HMENU hMenu,
-    bool topmostEnabled,
     bool taskbarAutoHide,
     bool taskbarLower,
     bool useFloatingWindow,
     bool isFloatingWindowVisible,
     bool previewEnabled,
     const LocalizedStrings& strings) {
-    
-    // 置顶选项
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (topmostEnabled ? MF_CHECKED : 0),
-              Constants::ID_TASKBAR, strings.WINDOW_TOPMOST.c_str());
     
     // 任务栏自动隐藏选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarAutoHide ? MF_CHECKED : 0),
