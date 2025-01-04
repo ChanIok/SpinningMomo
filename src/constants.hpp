@@ -32,9 +32,13 @@ namespace Constants {
     constexpr UINT ID_CAPTURE_WINDOW = 2014;     // 截图菜单项ID
     constexpr UINT ID_PREVIEW_WINDOW = 2015;     // 预览窗口菜单项ID
     constexpr UINT ID_OPEN_SCREENSHOT = 2016;    // 打开相册菜单项ID
+    constexpr UINT ID_USER_GUIDE = 2017;         // 使用指南菜单项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
+    
+    // 项目文档URL
+    inline const TCHAR* DOC_URL = TEXT("https://chaniok.github.io/SpinningMomo/");
     
     // 配置节和配置项
     inline const TCHAR* WINDOW_SECTION = TEXT("Window");      // 窗口配置
@@ -127,6 +131,7 @@ struct LocalizedStrings {
     std::wstring CAPTURE_SUCCESS;
     std::wstring PREVIEW_WINDOW;
     std::wstring OPEN_SCREENSHOT;
+    std::wstring ABOUT;
 };
 
 // 中文字符串

@@ -38,7 +38,8 @@ const LocalizedStrings ZH_CN = {
     TEXT("截图"),
     TEXT("截图成功，已保存至: "),
     TEXT("预览窗口"),
-    TEXT("打开相册")
+    TEXT("打开相册"),
+    TEXT("使用指南")
 };
 
 // 英文字符串
@@ -79,5 +80,6 @@ const LocalizedStrings EN_US = {
     TEXT("Screenshot"),
     TEXT("Screenshot saved to: "),
     TEXT("Preview Window"),
-    TEXT("Open Screenshot Folder")
+    TEXT("Open Screenshot Folder"),
+    TEXT("User Guide")
 }; 

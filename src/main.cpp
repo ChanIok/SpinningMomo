@@ -347,6 +347,10 @@ public:
                         case Constants::ID_PREVIEW_WINDOW:
                             app->TogglePreviewWindow();
                             break;
+                        case Constants::ID_USER_GUIDE:
+                            ShellExecute(NULL, TEXT("open"), Constants::DOC_URL, 
+                                       NULL, NULL, SW_SHOWNORMAL);
+                            break;
                     }
                 }
                 return 0;
