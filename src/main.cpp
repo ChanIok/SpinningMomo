@@ -10,7 +10,8 @@
 #include <ShellScalingApi.h>
 #include "constants.hpp"
 #include "window_utils.hpp"
-#include "ui_manager.hpp"
+#include "tray_icon.hpp"
+#include "menu_window.hpp"
 #include "preview_window.hpp"
 #include "notification_manager.hpp"
 

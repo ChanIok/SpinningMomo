@@ -16,7 +16,8 @@ add_executable(SpinningMomo WIN32
     src/main.cpp
     src/constants.cpp
     src/window_utils.cpp
-    src/ui_manager.cpp
+    src/tray_icon.cpp
+    src/menu_window.cpp
     src/preview_window.cpp
     src/notification_window.cpp
     src/notification_manager.cpp
