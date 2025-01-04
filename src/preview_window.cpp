@@ -137,7 +137,18 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
     // 开始捕获
     captureSession = framePool.CreateCaptureSession(captureItem);
     captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
-    captureSession.IsBorderRequired(false);        // 禁用边框
+    
+    // 安全地尝试设置 IsBorderRequired
+    try {
+        auto session3 = captureSession.try_as<winrt::Windows::Graphics::Capture::IGraphicsCaptureSession3>();
+        if (session3) {
+            session3.IsBorderRequired(false);
+        }
+    }
+    catch (...) {
+        // 忽略任何错误，继续执行
+    }
+    
     captureSession.StartCapture();
 
     // 显示窗口
