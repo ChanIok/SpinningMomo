@@ -39,7 +39,8 @@ const LocalizedStrings ZH_CN = {
     TEXT("截图成功，已保存至: "),
     TEXT("预览窗口"),
     TEXT("打开相册"),
-    TEXT("使用指南")
+    TEXT("使用指南"),
+    TEXT("此功能需要 Windows 10 1803 或更高版本，已自动禁用。")
 };
 
 // 英文字符串
@@ -81,5 +82,6 @@ const LocalizedStrings EN_US = {
     TEXT("Screenshot saved to: "),
     TEXT("Preview Window"),
     TEXT("Open Screenshot Folder"),
-    TEXT("User Guide")
+    TEXT("User Guide"),
+    TEXT("This feature requires Windows 10 1803 or higher and has been disabled.")
 }; 

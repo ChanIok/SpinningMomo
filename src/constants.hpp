@@ -133,7 +133,8 @@ struct LocalizedStrings {
     std::wstring CAPTURE_SUCCESS;
     std::wstring PREVIEW_WINDOW;
     std::wstring OPEN_SCREENSHOT;
-    std::wstring ABOUT;
+    std::wstring USER_GUIDE;
+    std::wstring FEATURE_NOT_SUPPORTED;  // 功能不支持的提示
 };
 
 // 中文字符串

@@ -119,7 +119,7 @@ void TrayIcon::ShowContextMenu(
     
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     // 添加使用指南选项
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_USER_GUIDE, strings.ABOUT.c_str());
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_USER_GUIDE, strings.USER_GUIDE.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, strings.EXIT.c_str());
 

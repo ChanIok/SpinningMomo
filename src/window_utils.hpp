@@ -21,6 +21,20 @@ public:
             : width(w), height(h), totalPixels(static_cast<UINT64>(w) * h) {}
     };
 
+    // 功能检查
+    static bool IsWindowsCaptureSupported() {
+        try {
+            winrt::Windows::Graphics::Capture::GraphicsCaptureItem item{ nullptr };
+            auto factory = winrt::get_activation_factory<
+                winrt::Windows::Graphics::Capture::GraphicsCaptureItem,
+                IGraphicsCaptureItemInterop>();
+            return factory != nullptr;
+        }
+        catch (...) {
+            return false;
+        }
+    }
+
     // 窗口查找
     static HWND FindGameWindow();
     static std::vector<std::pair<HWND, std::wstring>> GetWindows();

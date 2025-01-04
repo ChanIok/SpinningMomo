@@ -49,6 +49,10 @@ public:
     // 初始化相关函数
     bool Initialize(HINSTANCE hInstance) {
         m_hInstance = hInstance;
+        
+        // 检查屏幕捕获功能是否可用
+        m_isScreenCaptureSupported = WindowUtils::IsWindowsCaptureSupported();
+        
         if (!RegisterWindowClass(hInstance)) return false;
         if (!CreateAppWindow(hInstance)) return false;
         
@@ -66,7 +70,6 @@ public:
         // 创建预览窗口
         m_previewWindow = std::make_unique<PreviewWindow>();
         if (!m_previewWindow->Initialize(hInstance)) {
-            MessageBoxW(NULL, L"预览窗口初始化失败", L"错误", MB_OK);
             return false;
         }
 
@@ -392,6 +395,12 @@ public:
 
     // 处理截图功能
     void HandleScreenshot() {
+        if (!m_isScreenCaptureSupported) {
+            ShowNotification(m_strings.APP_NAME.c_str(),
+                m_strings.FEATURE_NOT_SUPPORTED.c_str());
+            return;
+        }
+
         HWND gameWindow = FindTargetWindow();
         if (!gameWindow) {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
@@ -442,6 +451,12 @@ public:
 
     // 切换预览窗口
     void TogglePreviewWindow() {
+        if (!m_isScreenCaptureSupported) {
+            ShowNotification(m_strings.APP_NAME.c_str(),
+                m_strings.FEATURE_NOT_SUPPORTED.c_str());
+            return;
+        }
+
         m_isPreviewEnabled = !m_isPreviewEnabled;
         
         if (m_isPreviewEnabled) {
@@ -468,6 +483,7 @@ private:
     std::unique_ptr<MenuWindow> m_menuWindow;           // 菜单窗口
     std::unique_ptr<PreviewWindow> m_previewWindow;     // 预览窗口
     std::vector<std::pair<HWND, std::wstring>> m_windows;  // 存储窗口列表
+    bool m_isScreenCaptureSupported;                    // 是否支持屏幕捕获
     
     // 配置相关
     std::wstring m_configPath;                         // 配置文件完整路径
