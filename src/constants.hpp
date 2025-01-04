@@ -27,6 +27,8 @@ namespace Constants {
     constexpr UINT ID_CONFIG = 2009;         // 打开配置文件菜单项ID
     constexpr UINT ID_AUTOHIDE_TASKBAR = 2007;    // 任务栏自动隐藏菜单项ID
     constexpr UINT ID_LOWER_TASKBAR = 2008;       // 调整时置底任务栏菜单项ID
+    constexpr UINT ID_LANG_ZH_CN = 2010;    // 中文选项ID
+    constexpr UINT ID_LANG_EN_US = 2011;    // 英文选项ID
     constexpr UINT ID_FLOATING_WINDOW = 2012;    // 浮窗模式选项ID
     constexpr UINT ID_TOGGLE_WINDOW_VISIBILITY = 2013;  // 浮窗显示控制ID
     constexpr UINT ID_CAPTURE_WINDOW = 2014;     // 截图菜单项ID
@@ -43,6 +45,9 @@ namespace Constants {
     // 配置节和配置项
     inline const TCHAR* WINDOW_SECTION = TEXT("Window");      // 窗口配置
     inline const TCHAR* WINDOW_TITLE = TEXT("Title");         // 窗口标题配置项
+
+    inline const TCHAR* SCREENSHOT_SECTION = TEXT("Screenshot");  // 截图配置节名
+    inline const TCHAR* SCREENSHOT_PATH = TEXT("GameAlbumPath"); // 游戏相册路径配置项
 
     inline const TCHAR* HOTKEY_SECTION = TEXT("Hotkey");      // 热键配置节名
     inline const TCHAR* HOTKEY_MODIFIERS = TEXT("Modifiers"); // 修饰键配置项
@@ -66,9 +71,6 @@ namespace Constants {
     
     inline const TCHAR* MENU_SECTION = TEXT("Menu");      // 菜单配置节名
     inline const TCHAR* MENU_FLOATING = TEXT("Floating");  // 浮动窗口配置项
-    
-    constexpr UINT ID_LANG_ZH_CN = 2010;    // 中文选项ID
-    constexpr UINT ID_LANG_EN_US = 2011;    // 英文选项ID
 }
 
 // 比例结构体定义

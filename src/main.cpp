@@ -213,6 +213,7 @@ public:
             WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION, Constants::CUSTOM_RESOLUTION_LIST, TEXT(""), m_configPath.c_str());
             WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
+            WritePrivateProfileString(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, TEXT(""), m_configPath.c_str());
         }
 
         // 加载各项配置
@@ -221,6 +222,7 @@ public:
         LoadLanguageConfig();
         LoadTaskbarConfig();
         LoadMenuConfig();
+        LoadGameAlbumConfig();
     }
 
     void SaveConfig() {
@@ -229,6 +231,7 @@ public:
         SaveLanguageConfig();
         SaveTaskbarConfig(); 
         SaveMenuConfig();
+        SaveGameAlbumConfig();
     }
 
     // 工具函数
@@ -414,15 +417,26 @@ public:
 
     // 处理打开相册功能
     void HandleOpenScreenshot() {
-        HWND gameWindow = FindTargetWindow();
-        if (!gameWindow) {
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
+        std::wstring albumPath = m_gameAlbumPath;
+        
+        // 如果保存的路径无效或为空，尝试查找
+        if (albumPath.empty() || !PathFileExistsW(albumPath.c_str())) {
+            HWND gameWindow = FindTargetWindow();
+            if (!gameWindow) {
+                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+                return;
+            }
+
+            albumPath = WindowUtils::GetGameScreenshotPath(gameWindow);
+            if (!albumPath.empty()) {
+                // 保存新找到的路径
+                m_gameAlbumPath = albumPath;
+                SaveGameAlbumConfig();
+            }
         }
 
-        std::wstring path = WindowUtils::GetGameScreenshotPath(gameWindow);
-        if (!path.empty()) {
-            ShellExecuteW(NULL, L"explore", path.c_str(), NULL, NULL, SW_SHOWNORMAL);
+        if (!albumPath.empty()) {
+            ShellExecuteW(NULL, L"explore", albumPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
         }
     }
 
@@ -458,6 +472,7 @@ private:
     // 配置相关
     std::wstring m_configPath;                         // 配置文件完整路径
     std::wstring m_windowTitle;                        // 保存的窗口标题
+    std::wstring m_gameAlbumPath;                      // 游戏相册路径
     UINT m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;   // 热键修饰键
     UINT m_hotkeyKey = 'R';                           // 热键主键
     bool m_hotkeySettingMode = false;                 // 是否处于热键设置模式
@@ -948,6 +963,26 @@ private:
         SaveTaskbarConfig();
     }
 
+    // 加载游戏相册路径
+    void LoadGameAlbumConfig() {
+        TCHAR buffer[MAX_PATH];
+        if (GetPrivateProfileString(Constants::SCREENSHOT_SECTION,
+                                  Constants::SCREENSHOT_PATH,
+                                  TEXT(""), buffer, MAX_PATH,
+                                  m_configPath.c_str()) > 0) {
+            m_gameAlbumPath = buffer;
+        }
+    }
+
+    // 保存游戏相册路径
+    void SaveGameAlbumConfig() {
+        if (!m_gameAlbumPath.empty()) {
+            WritePrivateProfileString(Constants::SCREENSHOT_SECTION,
+                                    Constants::SCREENSHOT_PATH,
+                                    m_gameAlbumPath.c_str(),
+                                    m_configPath.c_str());
+        }
+    }
 
 };
 
