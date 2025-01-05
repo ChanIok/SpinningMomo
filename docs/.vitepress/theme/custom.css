@@ -35,7 +35,30 @@
 
   --vp-home-hero-name-color: var(--vp-c-brand);
   
-  --vp-nav-height: 64px;
   --vp-nav-bg-color: rgba(255, 255, 255, 0.95);
   --vp-c-brand-active: var(--vp-c-brand);
+}
+
+:root.dark {
+  --vp-c-text-1: #f0f0f0;
+  --vp-c-text-2: #e0e0e0;
+  --vp-c-text-3: #aaaaaa;
+
+  --vp-c-bg: #1a1a1a;
+  --vp-c-bg-soft: #242424;
+  --vp-c-bg-mute: #2f2f2f;
+
+  --vp-c-border: #333333;
+  --vp-c-divider: #333333;
+
+  --vp-button-brand-border: var(--vp-c-brand);
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-bg: var(--vp-c-brand);
+
+  --vp-custom-block-tip-bg: rgba(255, 159, 79, 0.1);
+  --vp-custom-block-tip-border: var(--vp-c-brand);
+
+  --vp-code-block-bg: #242424;
+
+  --vp-nav-bg-color: rgba(26, 26, 26, 0.95);
 } 

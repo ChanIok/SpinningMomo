@@ -47,8 +47,7 @@
 如果您遇到的问题在此页面没有找到解决方案，您可以：
 
 ::: tip 寻求帮助的方式
-1. 在 [GitHub Issues](https://github.com/ChanIok/SpinningMomo/issues) 提交问题
-2. 通过 [Discussions](https://github.com/ChanIok/SpinningMomo/discussions) 与社区交流
+- 在 [GitHub Issues](https://github.com/ChanIok/SpinningMomo/issues) 提交问题
 :::
 
 ::: warning 提交问题时请注意

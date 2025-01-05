@@ -60,23 +60,6 @@ export default defineConfig({
             { text: '常见问题', link: '/zh/advanced/troubleshooting' },
           ]
         }
-      ],
-      '/en/': [
-        {
-          text: 'Guide',
-          items: [
-            { text: 'Introduction', link: '/en/guide/introduction' },
-            { text: 'Getting Started', link: '/en/guide/getting-started' },
-            { text: 'Features', link: '/en/guide/features' },
-          ]
-        },
-        {
-          text: 'Advanced',
-          items: [
-            { text: 'Custom Settings', link: '/en/advanced/custom-settings' },
-            { text: 'Troubleshooting', link: '/en/advanced/troubleshooting' },
-          ]
-        }
       ]
     }
   }

@@ -93,17 +93,39 @@
             width: 100%;
             border-collapse: collapse;
             margin: 20px 0;
-        }
-
-        .mode-table th, .mode-table td {
-            padding: 12px;
-            border: 1px solid var(--border-color);
-            text-align: left;
+            background: white;
         }
 
         .mode-table th {
             background: #f8f9fa;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid var(--border-color);
             font-weight: bold;
+        }
+
+        .mode-table td {
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+
+        .mode-table h5 {
+            color: var(--primary-color);
+            margin: 15px 0 10px;
+            font-size: 1.1em;
+        }
+
+        .mode-table ul, .mode-table ol {
+            margin: 10px 0 10px 20px;
+        }
+
+        .mode-table li {
+            margin: 5px 0;
+        }
+
+        .mode-table td:first-child h5:first-child {
+            margin-top: 0;
         }
 
         .download-links {
@@ -160,17 +182,86 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .danger {
+            background-color: #fef0f0;
+            border: 1px solid #fde2e2;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+        .danger strong {
+            color: #f56c6c;
+        }
+        .hotkey-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        .hotkey-table th, .hotkey-table td {
+            border: 1px solid #ddd;
+            padding: 0.5rem;
+            text-align: left;
+        }
+        .hotkey-table th {
+            background-color: #f8f9fa;
+        }
+        code {
+            background-color: #f8f9fa;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        .doc-link {
+            text-align: center;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .doc-link a {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.8rem 1.5rem;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(255, 159, 79, 0.2);
+        }
+        .doc-link a:hover {
+            background: var(--hover-color);
+            color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 159, 79, 0.3);
+        }
+        .doc-link .icon {
+            font-size: 1.2em;
+        }
+        .doc-link .arrow {
+            font-size: 1.2em;
+            transition: transform 0.3s ease;
+        }
+        .doc-link a:hover .arrow {
+            transform: translateX(4px);
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>🎮 旋转吧大喵</h1>
         <p>一个为《无限暖暖》提升摄影体验的窗口调整工具</p>
-        <p style="margin-top: 10px;">
-            <a href="https://chaniok.github.io/SpinningMomo/" target="_blank" style="color: var(--primary-color); text-decoration: none;">
-                👉 查看完整使用文档
-            </a>
-        </p>
+    </div>
+
+    <div class="doc-link">
+        <a href="https://chaniok.github.io/SpinningMomo/" target="_blank">
+            <span class="icon">📖</span>
+            <span class="text">查看完整使用文档</span>
+            <span class="arrow">→</span>
+        </a>
     </div>
 
     <div class="feature-grid">
@@ -207,63 +298,120 @@
         <p>• 百度网盘：<a href="https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo" target="_blank">点击下载</a>（提取码：momo）</p>
     </div>
 
-    <h2>🚀 快速开始</h2>
-    <div class="steps">
-        <ol>
-            <li>【重要】请右键点击程序，选择"以管理员身份运行"</li>
-            <li>程序启动后会显示浮动窗口，在窗口中可以直接调整比例和分辨率</li>
-            <li>使用热键（默认 Ctrl+Alt+R）可以显示/隐藏浮动窗口</li>
-            <li>拍摄完成后可使用重置选项恢复窗口</li>
-        </ol>
+    <h2>🚀 使用说明</h2>
+
+    <h3>1️⃣ 启动程序</h3>
+
+    <div class="danger">
+        <strong>重要</strong>
+        <p>必须以<strong>管理员身份</strong>运行程序！</p>
     </div>
 
-    <h2>📸 拍照模式选择</h2>
+    <h4>两种授权方式：</h4>
+    <ul>
+        <li><strong>临时授权</strong>：右键程序 → 选择"以管理员身份运行"</li>
+        <li><strong>永久授权</strong>：右键程序 → 属性 → 兼容性 → 勾选"以管理员身份运行此程序" → 应用</li>
+    </ul>
+
+    <h4>启动后：</h4>
+    <ul>
+        <li>系统托盘会显示程序图标</li>
+        <li>默认显示浮动窗口，可直接调整窗口</li>
+    </ul>
+
+    <h3>2️⃣ 快捷键</h3>
+
+    <table class="hotkey-table">
+        <tr>
+            <th>功能</th>
+            <th>快捷键</th>
+            <th>说明</th>
+        </tr>
+        <tr>
+            <td>显示/隐藏浮窗</td>
+            <td><code>Ctrl + Alt + R</code></td>
+            <td>默认快捷键，可在托盘菜单中修改</td>
+        </tr>
+    </table>
+
+    <h3>3️⃣ 拍照模式</h3>
+
     <table class="mode-table">
         <tr>
-            <th>📸 窗口分辨率模式（推荐）</th>
-            <th>🎯 标准模式</th>
+            <th>🌟 窗口分辨率模式（推荐）</th>
+            <th>📷 标准模式</th>
         </tr>
         <tr>
             <td>
-                <h3>游戏设置</h3>
+                <h5>游戏设置：</h5>
                 <ul>
-                    <li>显示模式：<strong>全屏窗口模式（推荐）</strong> / 窗口模式</li>
+                    <li>显示模式：<strong>全屏窗口模式</strong>（推荐）或窗口模式</li>
                     <li>拍照画质：<strong>窗口分辨率</strong></li>
                 </ul>
-                <h3>使用步骤</h3>
+                <h5>使用步骤：</h5>
                 <ol>
                     <li>使用程序的比例选项调整构图</li>
                     <li>选择需要的分辨率预设（4K~12K）</li>
                     <li>画面会溢出屏幕，此时按空格拍照</li>
                     <li>拍摄完成后点击重置窗口</li>
                 </ol>
-                <h3>优势特点</h3>
+                <h5>优势特点：</h5>
                 <ul>
-                    <li>⭐ 支持超高分辨率（最高12K+）</li>
-                    <li>⭐ 可自由调整比例和分辨率</li>
+                    <li>✨ 支持超高分辨率（最高12K+）</li>
+                    <li>✨ 可自由调整比例和分辨率</li>
                 </ul>
             </td>
             <td>
-                <h3>游戏设置</h3>
+                <h5>游戏设置：</h5>
                 <ul>
-                    <li>显示模式：<strong>窗口模式</strong> / 全屏窗口模式（比例受限）</li>
+                    <li>显示模式：<strong>窗口模式</strong> 或 全屏窗口模式（比例受限）</li>
                     <li>拍照画质：<strong>4K</strong></li>
                 </ul>
-                <h3>使用说明</h3>
+                <h5>特点说明：</h5>
                 <ul>
                     <li>✅ 操作便捷，适合日常拍摄和预览</li>
                     <li>❗ 只能调整比例，无法调整分辨率</li>
                     <li>❗ 输出为伪4K，画质不如窗口分辨率</li>
                     <li>❗ 全屏窗口模式下输出受限于显示器原始比例</li>
                 </ul>
-                <h3>适用场景</h3>
-                <ul>
-                    <li>⭐ 需要快速取景时</li>
-                    <li>⭐ 不追求极致画质时</li>
-                </ul>
             </td>
         </tr>
     </table>
+
+    <style>
+    .mode-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background: white;
+    }
+    .mode-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: center;
+        border: 1px solid var(--border-color);
+        font-weight: bold;
+    }
+    .mode-table td {
+        padding: 20px;
+        border: 1px solid var(--border-color);
+        vertical-align: top;
+    }
+    .mode-table h5 {
+        color: var(--primary-color);
+        margin: 15px 0 10px;
+        font-size: 1.1em;
+    }
+    .mode-table ul, .mode-table ol {
+        margin: 10px 0 10px 20px;
+    }
+    .mode-table li {
+        margin: 5px 0;
+    }
+    .mode-table td:first-child h5:first-child {
+        margin-top: 0;
+    }
+    </style>
 
     <h2>📏 分辨率说明</h2>
     <div class="note">
