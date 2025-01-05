@@ -40,7 +40,8 @@ namespace Constants {
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
     
     // 项目文档URL
-    inline const TCHAR* DOC_URL = TEXT("https://chaniok.github.io/SpinningMomo/");
+    inline const TCHAR* DOC_URL_ZH = TEXT("https://chaniok.github.io/SpinningMomo/");
+    inline const TCHAR* DOC_URL_EN = TEXT("https://chaniok.github.io/SpinningMomo/en/");
     
     // 配置节和配置项
     inline const TCHAR* WINDOW_SECTION = TEXT("Window");      // 窗口配置

@@ -23,7 +23,12 @@ export default defineConfig({
     en: {
       label: 'English',
       lang: 'en-US',
-      link: '/en/'
+      link: '/en/',
+      // 添加重定向配置
+      themeConfig: {
+        nav: [],
+        sidebar: []
+      }
     }
   },
 

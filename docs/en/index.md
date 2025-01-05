@@ -4,7 +4,7 @@ layout: doc
 
 <div class="center">
   <div class="logo-container">
-    <img src="../public/logo.png" width="200" alt="SpinningMomo Logo" />
+    <img src="/logo.png" width="200" alt="SpinningMomo Logo" />
   </div>
 
   <h1 class="title">🎮 SpinningMomo</h1>
@@ -23,7 +23,7 @@ layout: doc
   </div>
 
   <div class="screenshot-container">
-    <img src="../public/README.jpg" alt="Screenshot" />
+    <img src="/README.jpg" alt="Screenshot" />
   </div>
 </div>
 
@@ -79,7 +79,7 @@ Two ways to grant administrator privileges:
 - **Permanent**: Right-click the program → Properties → Compatibility → Check "Run this program as an administrator" → Apply
 
 After startup:
-- Program icon <img src="../public/logo.png" style="display: inline; height: 1em; vertical-align: text-bottom;" /> will appear in system tray
+- Program icon <img src="/logo.png" style="display: inline; height: 1em; vertical-align: text-bottom;" /> will appear in system tray
 - Floating window is shown by default for direct window adjustment
 
 ### 2️⃣ Hotkeys
@@ -186,67 +186,70 @@ This program only sends requests through Windows standard window management APIs
 This project is licensed under the [MIT License](https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE). The project icon is from the game "Infinity Nikki" and copyrighted by the game developer.
 
 <style>
-.center {
-  text-align: center;
-  max-width: 100%;
-  margin: 0 auto;
-}
-.logo-container {
-  display: flex;
-  justify-content: center;
-  margin: 2rem auto;
-}
-.logo-container img {
-  display: block;
-  margin: 0 auto;
-}
-.title {
-  font-size: 2.5rem;
-  margin: 1rem 0;
-}
-.description {
-  font-size: 1.2rem;
-  color: var(--vp-c-text-2);
-  margin: 1rem 0;
-}
-.badges {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  margin: 1rem 0;
-}
-.badges img {
-  display: inline-block;
-}
-.nav-links {
-  margin: 1.5rem 0;
-}
-.nav-links a {
-  text-decoration: none;
-  font-weight: 500;
-}
-.screenshot-container {
-  max-width: 100%;
-  margin: 2rem auto;
-}
-.screenshot-container img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin: 2rem 0;
-}
-.feature-item {
-  padding: 1rem;
-  border: 1px solid var(--vp-c-divider);
-  border-radius: 8px;
-}
-.feature-item h3 {
-  margin-top: 0;
+/* 添加命名空间，限制样式只在文档内容区域生效 */
+.vp-doc {
+  .center {
+    text-align: center;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  .logo-container {
+    display: flex;
+    justify-content: center;
+    margin: 2rem auto;
+  }
+  .logo-container img {
+    display: block;
+    margin: 0 auto;
+  }
+  h1.title {  /* 修改选择器，使其更具体 */
+    font-size: 2.5rem;
+    margin: 1rem 0;
+  }
+  .description {
+    font-size: 1.2rem;
+    color: var(--vp-c-text-2);
+    margin: 1rem 0;
+  }
+  .badges {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+  }
+  .badges img {
+    display: inline-block;
+  }
+  .nav-links {
+    margin: 1.5rem 0;
+  }
+  .nav-links a {
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .screenshot-container {
+    max-width: 100%;
+    margin: 2rem auto;
+  }
+  .screenshot-container img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+  .feature-item {
+    padding: 1rem;
+    border: 1px solid var(--vp-c-divider);
+    border-radius: 8px;
+  }
+  .feature-item h3 {
+    margin-top: 0;
+  }
 }
 </style> 

@@ -355,8 +355,9 @@ public:
                             app->TogglePreviewWindow();
                             break;
                         case Constants::ID_USER_GUIDE:
-                            ShellExecute(NULL, TEXT("open"), Constants::DOC_URL, 
-                                       NULL, NULL, SW_SHOWNORMAL);
+                            ShellExecute(NULL, TEXT("open"), 
+                                (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,
+                                NULL, NULL, SW_SHOWNORMAL);
                             break;
                     }
                 }
