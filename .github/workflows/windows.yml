@@ -6,9 +6,13 @@ on:
       - 'v*'  # 只在推送版本标签时触发
     branches:
       - master  # 在推送到 master 分支时也触发
+    paths-ignore:
+      - 'docs/**'
   pull_request:
     branches:
       - master  # 在提交 PR 到 master 分支时触发
+    paths-ignore:
+      - 'docs/**'
 
 env:
   BUILD_TYPE: Release
