@@ -55,7 +55,7 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLow
 
     // 设置新的窗口大小和位置
     bool success = SetWindowPos(hwnd, NULL, newLeft, newTop, totalWidth, totalHeight, 
-                              SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
+                              SWP_NOZORDER) != FALSE;
 
     // 如果窗口调整成功且需要置底任务栏，则执行置底操作
     if (success && taskbarLower) {
