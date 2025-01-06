@@ -88,13 +88,13 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
         int x = 20;  // 距离左边缘20像素
         int y = 20;  // 距离上边缘20像素
         SetWindowPos(hwnd, nullptr, x, y, actualWidth, actualHeight, 
-                    SWP_NOZORDER | SWP_SHOWWINDOW);
+                    SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     } else {
         // 如果窗口已经显示，只更新尺寸保持位置不变
         RECT previewRect;
         GetWindowRect(hwnd, &previewRect);
         SetWindowPos(hwnd, nullptr, 0, 0, actualWidth, actualHeight, 
-                    SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
+                    SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     }
 
     // 停止现有的捕获
@@ -152,7 +152,7 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
     captureSession.StartCapture();
 
     // 显示窗口
-    ShowWindow(hwnd, SW_SHOW);
+    ShowWindow(hwnd, SW_SHOWNA);
     UpdateWindow(hwnd);
 
     return true;
