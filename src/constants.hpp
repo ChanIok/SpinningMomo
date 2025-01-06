@@ -10,7 +10,9 @@ namespace Constants {
     
     // 消息和ID定义
     static const UINT WM_TRAYICON = WM_USER + 1;    // 自定义托盘图标消息
-    constexpr UINT ID_TRAYICON = 1;              
+    static const UINT WM_SHOW_PENDING_NOTIFICATIONS = WM_USER + 100;  // 显示待处理通知消息
+    constexpr UINT ID_TRAYICON = 1;
+    constexpr UINT NOTIFICATION_TIMER_ID = 2;  // 通知显示定时器ID
     
     // 菜单项ID定义
     constexpr UINT ID_WINDOW_BASE = 3000;    // 窗口选择菜单项的基础ID

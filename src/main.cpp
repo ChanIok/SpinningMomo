@@ -75,22 +75,27 @@ public:
         }
 
         // 注册热键
-        if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, 
+        bool hotkeyRegistered = RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, 
                           m_configManager->GetHotkeyModifiers(), 
-                          m_configManager->GetHotkeyKey())) {
+                          m_configManager->GetHotkeyKey());
+        
+        if (!hotkeyRegistered) {
             ShowNotification(m_strings.APP_NAME.c_str(), 
                 m_strings.HOTKEY_REGISTER_FAILED.c_str());
+        } else {
+            // 只在热键注册成功时显示启动提示
+            std::wstring hotkeyText = GetHotkeyText();
+            std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
+            ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
         }
-
-        // 显示启动提示
-        std::wstring hotkeyText = GetHotkeyText();
-        std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
-        ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
 
         return true;
     }
 
     int Run() {
+        m_messageLoopStarted = true;  // 设置消息循环开始标记
+        PostMessage(m_hwnd, Constants::WM_SHOW_PENDING_NOTIFICATIONS, 0, 0);
+
         MSG msg;
         while (GetMessage(&msg, NULL, 0, 0)) {
             TranslateMessage(&msg);
@@ -101,10 +106,9 @@ public:
 
     // 处理窗口选择
     void HandleWindowSelect(int id) {
-        auto windows = WindowUtils::GetWindows();
         int index = id - Constants::ID_WINDOW_BASE;
-        if (index >= 0 && index < windows.size()) {
-            m_configManager->SetWindowTitle(windows[index].second);
+        if (index >= 0 && index < m_windows.size()) {
+            m_configManager->SetWindowTitle(m_windows[index].second);
             m_configManager->SaveWindowConfig();
             ShowNotification(m_strings.APP_NAME.c_str(), 
                     m_strings.WINDOW_SELECTED.c_str());
@@ -315,10 +319,11 @@ public:
 
     // 菜单相关方法
     void ShowWindowSelectionMenu() {
-        auto windows = WindowUtils::GetWindows();
+        // 更新窗口列表
+        m_windows = WindowUtils::GetWindows();
         
         m_trayIcon->ShowContextMenu(
-            windows,
+            m_windows,
             m_configManager->GetWindowTitle(),
             m_ratios,
             m_currentRatioIndex,
@@ -480,12 +485,12 @@ public:
                 return 0;
             }
 
-            case WM_SHOW_PENDING_NOTIFICATIONS: {
+            case Constants::WM_SHOW_PENDING_NOTIFICATIONS: {
                 if (app) {
                     // 开始显示通知的索引
                     app->m_currentNotificationIndex = 0;
                     // 设置定时器，每隔一段时间显示一个通知
-                    SetTimer(app->m_hwnd, NOTIFICATION_TIMER_ID, 1000, NULL);
+                    SetTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID, 1000, NULL);
                 }
                 return 0;
             }
@@ -493,7 +498,7 @@ public:
             case WM_TIMER: {
                 if (!app) return 0;
 
-                if (wParam == NOTIFICATION_TIMER_ID) {
+                if (wParam == Constants::NOTIFICATION_TIMER_ID) {
                     if (app->m_currentNotificationIndex < app->m_pendingNotifications.size()) {
                         const auto& notification = app->m_pendingNotifications[app->m_currentNotificationIndex];
                         if (app->m_notificationManager) {
@@ -506,7 +511,7 @@ public:
                         app->m_currentNotificationIndex++;
                     } else {
                         // 所有通知已显示，停止定时器
-                        KillTimer(app->m_hwnd, NOTIFICATION_TIMER_ID);
+                        KillTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID);
                         app->m_pendingNotifications.clear();
                     }
                     return 0;
@@ -534,8 +539,10 @@ private:
     // 应用状态
     bool m_isPreviewEnabled = false;
     bool m_hotkeySettingMode = false;
+    bool m_messageLoopStarted = false;
     size_t m_currentRatioIndex = SIZE_MAX;
     size_t m_currentResolutionIndex = 0;
+    std::vector<std::pair<HWND, std::wstring>> m_windows;
     
     // 预设数据
     std::vector<AspectRatio> m_ratios;
@@ -545,18 +552,14 @@ private:
     LocalizedStrings m_strings;
     std::wstring m_language;
 
-    // 添加待显示通知队列
+    // 待显示通知队列
     struct PendingNotification {
         std::wstring title;
         std::wstring message;
         NotificationWindow::NotificationType type;
     };
     std::vector<PendingNotification> m_pendingNotifications;
-    static const UINT WM_SHOW_PENDING_NOTIFICATIONS = WM_USER + 100;
-
-    // 添加通知索引
     size_t m_currentNotificationIndex = 0;
-    static const UINT NOTIFICATION_TIMER_ID = 2;  // 使用不同于其他定时器的ID
 
     // 初始化预设的宽高比列表
     void InitializeRatios() {
@@ -610,11 +613,6 @@ private:
     bool CreateAppWindow(HINSTANCE hInstance) {
         m_hwnd = CreateWindow(Constants::WINDOW_CLASS, Constants::APP_NAME,
                             WS_POPUP, 0, 0, 0, 0, NULL, NULL, hInstance, this);
-        
-        if (m_hwnd) {
-            // 窗口创建成功后，发送消息以显示待处理的通知
-            PostMessage(m_hwnd, WM_SHOW_PENDING_NOTIFICATIONS, 0, 0);
-        }
         return m_hwnd != NULL;
     }
 
@@ -658,6 +656,13 @@ private:
                 case VK_SUBTRACT: text += TEXT("Num-"); break;
                 case VK_DECIMAL: text += TEXT("Num."); break;
                 case VK_DIVIDE: text += TEXT("Num/"); break;
+                case VK_HOME: text += TEXT("Home"); break;
+                case VK_END: text += TEXT("End"); break;
+                case VK_PRIOR: text += TEXT("PageUp"); break;
+                case VK_NEXT: text += TEXT("PageDown"); break;
+                case VK_INSERT: text += TEXT("Insert"); break;
+                case VK_DELETE: text += TEXT("Delete"); break;
+                case VK_OEM_3: text += TEXT("`"); break;
                 default: text += static_cast<TCHAR>(key); break;
             }
         }
@@ -669,7 +674,7 @@ private:
         if (!m_notificationManager) return;
         
         // 如果消息循环还没开始，将通知加入待显示队列
-        if (!IsWindow(m_hwnd)) {
+        if (!m_messageLoopStarted) {
             m_pendingNotifications.push_back({
                 title,
                 message,
