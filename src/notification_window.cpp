@@ -74,17 +74,17 @@ void NotificationWindow::Show(const std::wstring& title, const std::wstring& mes
     // 根据消息内容计算窗口高度
     m_windowHeight = CalculateWindowHeight(message);
     
-    // 更新窗口大小
-    SetWindowPos(m_hwnd, NULL, 0, 0, m_windowWidth, m_windowHeight, 
-                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-
     m_isActive = true;
     m_animState = AnimationState::SLIDING_IN;
-    UpdateWindowPosition();
-    StartAnimation();
     
-    ShowWindow(m_hwnd, SW_SHOWNOACTIVATE);
-    UpdateWindow(m_hwnd);
+    // 先计算位置
+    UpdateWindowPosition();
+    
+    // 更新窗口大小和位置
+    SetWindowPos(m_hwnd, NULL, m_startPos.x, m_startPos.y, m_windowWidth, m_windowHeight, 
+                SWP_NOZORDER | SWP_NOACTIVATE);
+    
+    StartAnimation();
 }
 
 void NotificationWindow::StartFadeOut() {

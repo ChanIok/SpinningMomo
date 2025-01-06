@@ -85,7 +85,7 @@ public:
         // 显示启动提示
         std::wstring hotkeyText = GetHotkeyText();
         std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
-        // ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
+        ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
 
         return true;
     }
@@ -480,6 +480,40 @@ public:
                 return 0;
             }
 
+            case WM_SHOW_PENDING_NOTIFICATIONS: {
+                if (app) {
+                    // 开始显示通知的索引
+                    app->m_currentNotificationIndex = 0;
+                    // 设置定时器，每隔一段时间显示一个通知
+                    SetTimer(app->m_hwnd, NOTIFICATION_TIMER_ID, 1000, NULL);
+                }
+                return 0;
+            }
+
+            case WM_TIMER: {
+                if (!app) return 0;
+
+                if (wParam == NOTIFICATION_TIMER_ID) {
+                    if (app->m_currentNotificationIndex < app->m_pendingNotifications.size()) {
+                        const auto& notification = app->m_pendingNotifications[app->m_currentNotificationIndex];
+                        if (app->m_notificationManager) {
+                            app->m_notificationManager->ShowNotification(
+                                notification.title.c_str(),
+                                notification.message.c_str(),
+                                notification.type
+                            );
+                        }
+                        app->m_currentNotificationIndex++;
+                    } else {
+                        // 所有通知已显示，停止定时器
+                        KillTimer(app->m_hwnd, NOTIFICATION_TIMER_ID);
+                        app->m_pendingNotifications.clear();
+                    }
+                    return 0;
+                }
+                return 0;
+            }
+
             case WM_DESTROY: {
                 PostQuitMessage(0);
                 return 0;
@@ -510,6 +544,19 @@ private:
     // 界面文本
     LocalizedStrings m_strings;
     std::wstring m_language;
+
+    // 添加待显示通知队列
+    struct PendingNotification {
+        std::wstring title;
+        std::wstring message;
+        NotificationWindow::NotificationType type;
+    };
+    std::vector<PendingNotification> m_pendingNotifications;
+    static const UINT WM_SHOW_PENDING_NOTIFICATIONS = WM_USER + 100;
+
+    // 添加通知索引
+    size_t m_currentNotificationIndex = 0;
+    static const UINT NOTIFICATION_TIMER_ID = 2;  // 使用不同于其他定时器的ID
 
     // 初始化预设的宽高比列表
     void InitializeRatios() {
@@ -563,6 +610,11 @@ private:
     bool CreateAppWindow(HINSTANCE hInstance) {
         m_hwnd = CreateWindow(Constants::WINDOW_CLASS, Constants::APP_NAME,
                             WS_POPUP, 0, 0, 0, 0, NULL, NULL, hInstance, this);
+        
+        if (m_hwnd) {
+            // 窗口创建成功后，发送消息以显示待处理的通知
+            PostMessage(m_hwnd, WM_SHOW_PENDING_NOTIFICATIONS, 0, 0);
+        }
         return m_hwnd != NULL;
     }
 
@@ -614,15 +666,26 @@ private:
 
     // 显示通知
     void ShowNotification(const TCHAR* title, const TCHAR* message, bool isError = false) {
-        if (m_notificationManager) {
-            OutputDebugString(message);
-            m_notificationManager->ShowNotification(
-                title, 
-                message, 
+        if (!m_notificationManager) return;
+        
+        // 如果消息循环还没开始，将通知加入待显示队列
+        if (!IsWindow(m_hwnd)) {
+            m_pendingNotifications.push_back({
+                title,
+                message,
                 isError ? NotificationWindow::NotificationType::Error 
                        : NotificationWindow::NotificationType::Info
-            );
+            });
+            return;
         }
+
+        // 否则直接显示通知
+        m_notificationManager->ShowNotification(
+            title, 
+            message, 
+            isError ? NotificationWindow::NotificationType::Error 
+                   : NotificationWindow::NotificationType::Info
+        );
     }
 
     // 查找目标窗口
