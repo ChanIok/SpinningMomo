@@ -21,6 +21,7 @@ add_executable(SpinningMomo WIN32
     src/preview_window.cpp
     src/notification_window.cpp
     src/notification_manager.cpp
+    src/config_manager.cpp
     src/resource.rc  # 添加资源文件
 )
 

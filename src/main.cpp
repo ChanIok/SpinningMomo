@@ -14,58 +14,46 @@
 #include "menu_window.hpp"
 #include "preview_window.hpp"
 #include "notification_manager.hpp"
+#include "config_manager.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
 public:
-    // 构造函数和析构函数
-    SpinningMomoApp() {
-        // 获取程序所在目录
-        TCHAR exePath[MAX_PATH];
-        GetModuleFileName(NULL, exePath, MAX_PATH);
-        
-        // 获取程序所在目录
-        m_configPath = exePath;
-        size_t lastSlash = m_configPath.find_last_of(TEXT("\\"));
-        if (lastSlash != std::wstring::npos) {
-            m_configPath = m_configPath.substr(0, lastSlash + 1);
+    SpinningMomoApp() = default;
+    ~SpinningMomoApp() {
+        if (m_configManager) {
+            m_configManager->SaveAllConfigs();
         }
-        m_configPath += Constants::CONFIG_FILE;
+        UnregisterHotKey(m_hwnd, 1);
+    }
 
+    bool Initialize(HINSTANCE hInstance) {
+        m_configManager = std::make_unique<ConfigManager>();
+        m_configManager->Initialize();
+        
         // 加载配置
-        LoadConfig();
+        m_configManager->LoadAllConfigs();
+
+        // 创建通知管理器
+        m_notificationManager = std::make_unique<NotificationManager>(hInstance);
+
+        // 初始化字符串
+        m_language = m_configManager->GetLanguage();
+        m_strings = (m_language == Constants::LANG_EN_US) ? EN_US : ZH_CN;
+
+        // 初始化预设数据
         InitializeRatios();
         LoadCustomRatios();
         InitializeResolutions();
         LoadCustomResolutions();
 
-        m_notificationManager = std::make_unique<NotificationManager>(m_hInstance);
-    }
-
-    ~SpinningMomoApp() {
-        SaveConfig();
-    }
-
-    // 初始化相关函数
-    bool Initialize(HINSTANCE hInstance) {
-        m_hInstance = hInstance;
-        
-        // 检查屏幕捕获功能是否可用
-        m_isScreenCaptureSupported = WindowUtils::IsWindowsCaptureSupported();
-        
+        // 初始化UI组件
         if (!RegisterWindowClass(hInstance)) return false;
         if (!CreateAppWindow(hInstance)) return false;
-        
+
+        // 创建托盘图标
         m_trayIcon = std::make_unique<TrayIcon>(m_hwnd);
         if (!m_trayIcon->Create()) return false;
-
-        // 创建菜单窗口
-        m_menuWindow = std::make_unique<MenuWindow>(hInstance);
-        if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
-                                m_currentRatioIndex, m_currentResolutionIndex,
-                                m_isPreviewEnabled)) {
-            return false;
-        }
 
         // 创建预览窗口
         m_previewWindow = std::make_unique<PreviewWindow>();
@@ -73,13 +61,23 @@ public:
             return false;
         }
 
+        // 创建菜单窗口
+        m_menuWindow = std::make_unique<MenuWindow>(hInstance);
+        if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
+                               m_currentRatioIndex, m_currentResolutionIndex,
+                               m_isPreviewEnabled)) {
+            return false;
+        }
+
         // 如果启用了浮动窗口，则默认显示
-        if (m_useFloatingWindow && m_menuWindow) {
+        if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
             m_menuWindow->Show();
         }
 
         // 注册热键
-        if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, m_hotkeyModifiers, m_hotkeyKey)) {
+        if (!RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, 
+                          m_configManager->GetHotkeyModifiers(), 
+                          m_configManager->GetHotkeyKey())) {
             ShowNotification(m_strings.APP_NAME.c_str(), 
                 m_strings.HOTKEY_REGISTER_FAILED.c_str());
         }
@@ -87,7 +85,7 @@ public:
         // 显示启动提示
         std::wstring hotkeyText = GetHotkeyText();
         std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
-        ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
+        // ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
 
         return true;
     }
@@ -101,62 +99,19 @@ public:
         return (int)msg.wParam;
     }
 
-    // 核心功能函数
-    void ShowWindowSelectionMenu() {
-        // 更新窗口列表
-        m_windows = WindowUtils::GetWindows();
-        
-        m_trayIcon->ShowContextMenu(
-            m_windows,
-            m_windowTitle,
-            m_ratios,
-            m_currentRatioIndex,
-            m_resolutions,
-            m_currentResolutionIndex,
-            m_strings,
-            m_taskbarAutoHide,
-            m_taskbarLower,
-            m_language,
-            m_useFloatingWindow,
-            m_menuWindow && m_menuWindow->IsVisible(),
-            m_isPreviewEnabled
-        );
-    }
-
-    void ShowQuickMenu(const POINT& pt) {
-        m_trayIcon->ShowQuickMenu(
-            pt,
-            m_ratios,
-            m_currentRatioIndex,
-            m_resolutions,
-            m_currentResolutionIndex,
-            m_strings,
-            m_taskbarAutoHide,
-            m_isPreviewEnabled
-        );
-    }
-
-    void ShowNotification(const TCHAR* title, const TCHAR* message, bool isError = false) {
-        m_notificationManager->ShowNotification(
-            title, 
-            message, 
-            isError ? NotificationWindow::NotificationType::Error 
-                   : NotificationWindow::NotificationType::Info
-        );
-    }
-
-    // 事件处理函数
+    // 处理窗口选择
     void HandleWindowSelect(int id) {
+        auto windows = WindowUtils::GetWindows();
         int index = id - Constants::ID_WINDOW_BASE;
-        if (index >= 0 && index < m_windows.size()) {
-            m_windowTitle = m_windows[index].second;
-            SaveConfig();
-
+        if (index >= 0 && index < windows.size()) {
+            m_configManager->SetWindowTitle(windows[index].second);
+            m_configManager->SaveWindowConfig();
             ShowNotification(m_strings.APP_NAME.c_str(), 
                     m_strings.WINDOW_SELECTED.c_str());
         }
     }
 
+    // 处理宽高比选择
     void HandleRatioSelect(UINT id) {
         size_t index = id - Constants::ID_RATIO_BASE;
         if (index < m_ratios.size()) {
@@ -181,6 +136,7 @@ public:
         }
     }
 
+    // 处理分辨率选择
     void HandleResolutionSelect(UINT id) {
         size_t index = id - Constants::ID_RESOLUTION_BASE;
         if (index < m_resolutions.size()) {
@@ -205,54 +161,190 @@ public:
         }
     }
 
-    // 配置相关函数
-    void LoadConfig() {
-        // 检查配置文件是否存在
-        if (GetFileAttributes(m_configPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
-            // 创建默认配置文件
-            WritePrivateProfileString(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, TEXT(""), m_configPath.c_str());
-            WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, TEXT("3"), m_configPath.c_str());
-            WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
-            WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
-            WritePrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION, Constants::CUSTOM_RESOLUTION_LIST, TEXT(""), m_configPath.c_str());
-            WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
-            WritePrivateProfileString(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, TEXT(""), m_configPath.c_str());
+    // 处理截图
+    void HandleScreenshot() {
+        HWND gameWindow = FindTargetWindow();
+        if (!gameWindow) {
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
         }
 
-        // 加载各项配置
-        LoadHotkeyConfig();
-        LoadWindowConfig();
-        LoadLanguageConfig();
-        LoadTaskbarConfig();
-        LoadMenuConfig();
-        LoadGameAlbumConfig();
+        auto now = std::chrono::system_clock::now();
+        std::wstring filename = L"Screenshot_" + 
+            std::to_wstring(std::chrono::system_clock::to_time_t(now)) + L".png";
+        
+        std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
+        
+        if (WindowUtils::CaptureWindow(gameWindow, savePath)) {
+            ShowNotification(
+                m_strings.APP_NAME.c_str(),
+                (m_strings.CAPTURE_SUCCESS + savePath).c_str()
+            );
+        }
     }
 
-    void SaveConfig() {
-        SaveHotkeyConfig();
-        SaveWindowConfig();
-        SaveLanguageConfig();
-        SaveTaskbarConfig(); 
-        SaveMenuConfig();
-        SaveGameAlbumConfig();
+    // 处理打开截图
+    void HandleOpenScreenshot() {
+        std::wstring albumPath = m_configManager->GetGameAlbumPath();
+        
+        if (albumPath.empty() || !PathFileExistsW(albumPath.c_str())) {
+            HWND gameWindow = FindTargetWindow();
+            if (!gameWindow) {
+                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+                return;
+            }
+
+            albumPath = WindowUtils::GetGameScreenshotPath(gameWindow);
+            if (!albumPath.empty()) {
+                m_configManager->SetGameAlbumPath(albumPath);
+                m_configManager->SaveGameAlbumConfig();
+            }
+        }
+
+        if (!albumPath.empty()) {
+            ShellExecuteW(NULL, L"explore", albumPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
+        }
     }
 
-    // 工具函数
-    bool RegisterWindowClass(HINSTANCE hInstance) {
-        WNDCLASSEX wc = {0};
-        wc.cbSize = sizeof(WNDCLASSEX);
-        wc.lpfnWndProc = WindowProc;
-        wc.hInstance = hInstance;
-        wc.lpszClassName = Constants::WINDOW_CLASS;
-        wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));        // 添加大图标
-        wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));      // 添加小图标
-        return RegisterClassEx(&wc) != 0;
+    // 设置热键
+    void SetHotkey() {
+        UnregisterHotKey(m_hwnd, Constants::ID_TRAYICON);
+        m_hotkeySettingMode = true;
+        ShowNotification(m_strings.APP_NAME.c_str(), 
+            m_strings.HOTKEY_SETTING.c_str());
     }
 
-    bool CreateAppWindow(HINSTANCE hInstance) {
-        m_hwnd = CreateWindow(Constants::WINDOW_CLASS, Constants::APP_NAME,
-                            WS_POPUP, 0, 0, 0, 0, NULL, NULL, hInstance, this);
-        return m_hwnd != NULL;
+    // 切换任务栏自动隐藏
+    void ToggleTaskbarAutoHide() {
+        APPBARDATA abd = {0};
+        abd.cbSize = sizeof(APPBARDATA);
+        UINT state = (UINT)SHAppBarMessage(ABM_GETSTATE, &abd);
+        bool currentAutoHide = (state & ABS_AUTOHIDE) != 0;
+        abd.lParam = currentAutoHide ? 0 : ABS_AUTOHIDE;
+        SHAppBarMessage(ABM_SETSTATE, &abd);
+        m_configManager->SetTaskbarAutoHide(!currentAutoHide);
+        m_configManager->SaveTaskbarConfig();
+    }
+
+    // 切换任务栏是否在底部
+    void ToggleTaskbarLower() {
+        m_configManager->SetTaskbarLower(!m_configManager->GetTaskbarLower());
+        m_configManager->SaveTaskbarConfig();
+    }
+
+    // 切换浮动窗口
+    void ToggleFloatingWindow() {
+        bool wasEnabled = m_configManager->GetUseFloatingWindow();
+        bool newState = !wasEnabled;
+        m_configManager->SetUseFloatingWindow(newState);
+        m_configManager->SaveMenuConfig();
+
+        if (m_menuWindow) {
+            if (newState && !wasEnabled) {
+                m_menuWindow->Show();
+            } else if (!newState && m_menuWindow->IsVisible()) {
+                m_menuWindow->Hide();
+            }
+        }
+    }
+
+    // 切换预览窗口
+    void TogglePreviewWindow() {
+        m_isPreviewEnabled = !m_isPreviewEnabled;
+        
+        if (m_isPreviewEnabled) {
+            if (HWND gameWindow = FindTargetWindow()) {
+                m_previewWindow->StartCapture(gameWindow);
+            }
+        } else {
+            m_previewWindow->StopCapture();
+        }
+        
+        if (m_menuWindow) {
+            m_menuWindow->SetPreviewEnabled(m_isPreviewEnabled);
+        }
+    }
+
+    // 切换语言
+    void ChangeLanguage(const std::wstring& lang) {
+        if (m_language != lang) {
+            m_language = lang;
+            m_strings = (lang == Constants::LANG_EN_US) ? EN_US : ZH_CN;
+            m_configManager->SetLanguage(m_language);
+            m_configManager->SaveLanguageConfig();
+            
+            if (m_trayIcon) {
+                m_trayIcon->UpdateTip(m_strings.APP_NAME.c_str());
+            }
+            if (m_menuWindow) {
+                m_menuWindow->UpdateMenuItems(m_strings);
+            }
+        }
+    }
+
+    // 重置窗口大小
+    void ResetWindowSize() {
+        HWND gameWindow = FindTargetWindow();
+        if (gameWindow) {
+            m_currentRatioIndex = SIZE_MAX;
+            m_currentResolutionIndex = 0;
+            
+            if (m_menuWindow) {
+                m_menuWindow->SetCurrentRatio(m_currentRatioIndex);
+                m_menuWindow->SetCurrentResolution(m_currentResolutionIndex);
+            }
+            
+            if (ApplyWindowTransform(gameWindow)) {
+                if (m_isPreviewEnabled && m_previewWindow) {
+                    m_previewWindow->StartCapture(gameWindow);
+                }
+            }
+        } else {
+            ShowNotification(m_strings.APP_NAME.c_str(), 
+                m_strings.WINDOW_NOT_FOUND.c_str());
+        }
+    }
+
+    // 打开配置文件
+    void OpenConfigFile() {
+        ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
+                    m_configManager->GetConfigPath().c_str(), NULL, SW_SHOW);
+        ShowNotification(m_strings.APP_NAME.c_str(), 
+            m_strings.CONFIG_HELP.c_str());
+    }
+
+    // 菜单相关方法
+    void ShowWindowSelectionMenu() {
+        auto windows = WindowUtils::GetWindows();
+        
+        m_trayIcon->ShowContextMenu(
+            windows,
+            m_configManager->GetWindowTitle(),
+            m_ratios,
+            m_currentRatioIndex,
+            m_resolutions,
+            m_currentResolutionIndex,
+            m_strings,
+            m_configManager->GetTaskbarAutoHide(),
+            m_configManager->GetTaskbarLower(),
+            m_language,
+            m_configManager->GetUseFloatingWindow(),
+            m_menuWindow && m_menuWindow->IsVisible(),
+            m_isPreviewEnabled
+        );
+    }
+
+    void ShowQuickMenu(const POINT& pt) {
+        m_trayIcon->ShowQuickMenu(
+            pt,
+            m_ratios,
+            m_currentRatioIndex,
+            m_resolutions,
+            m_currentResolutionIndex,
+            m_strings,
+            m_configManager->GetTaskbarAutoHide(),
+            m_isPreviewEnabled
+        );
     }
 
     // 窗口过程函数
@@ -278,24 +370,26 @@ public:
 
                     // 如果按下了非修饰键
                     if (wParam != VK_CONTROL && wParam != VK_SHIFT && wParam != VK_MENU) {
-                        app->m_hotkeyModifiers = modifiers;
-                        app->m_hotkeyKey = static_cast<UINT>(wParam);
                         app->m_hotkeySettingMode = false;
 
                         // 尝试注册新热键
                         if (RegisterHotKey(hwnd, Constants::ID_TRAYICON, modifiers, static_cast<UINT>(wParam))) {
+                            app->m_configManager->SetHotkeyModifiers(modifiers);
+                            app->m_configManager->SetHotkeyKey(static_cast<UINT>(wParam));
+                            app->m_configManager->SaveHotkeyConfig();
+                            
                             std::wstring hotkeyText = app->GetHotkeyText();
                             std::wstring message = app->m_strings.HOTKEY_SET_SUCCESS + hotkeyText;
                             app->ShowNotification(app->m_strings.APP_NAME.c_str(), message.c_str());
-                            app->SaveHotkeyConfig();
                         } else {
-                            app->m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;
-                            app->m_hotkeyKey = 'R';
-                            RegisterHotKey(hwnd, Constants::ID_TRAYICON, 
-                                        app->m_hotkeyModifiers, app->m_hotkeyKey);
+                            UINT defaultModifiers = MOD_CONTROL | MOD_ALT;
+                            UINT defaultKey = 'R';
+                            RegisterHotKey(hwnd, Constants::ID_TRAYICON, defaultModifiers, defaultKey);
+                            app->m_configManager->SetHotkeyModifiers(defaultModifiers);
+                            app->m_configManager->SetHotkeyKey(defaultKey);
+                            app->m_configManager->SaveHotkeyConfig();
                             app->ShowNotification(app->m_strings.APP_NAME.c_str(), 
                                 app->m_strings.HOTKEY_SET_FAILED.c_str());
-                            app->SaveHotkeyConfig();
                         }
                     }
                 }
@@ -373,7 +467,7 @@ public:
 
             case WM_HOTKEY: {
                 if (app && wParam == Constants::ID_TRAYICON) {
-                    if (app->m_useFloatingWindow) {
+                    if (app->m_configManager->GetUseFloatingWindow()) {
                         if (app->m_menuWindow) {
                             app->m_menuWindow->ToggleVisibility();
                         }
@@ -394,124 +488,28 @@ public:
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 
-    // 处理截图功能
-    void HandleScreenshot() {
-        if (!m_isScreenCaptureSupported) {
-            ShowNotification(m_strings.APP_NAME.c_str(),
-                m_strings.FEATURE_NOT_SUPPORTED.c_str());
-            return;
-        }
-
-        HWND gameWindow = FindTargetWindow();
-        if (!gameWindow) {
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
-        }
-
-        // 生成文件名（时间戳）
-        auto now = std::chrono::system_clock::now();
-        std::wstring filename = L"Screenshot_" + 
-            std::to_wstring(std::chrono::system_clock::to_time_t(now)) + L".png";
-        
-        // 保存到ScreenShot文件夹
-        std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
-        
-        if (WindowUtils::CaptureWindow(gameWindow, savePath)) {
-            // 显示成功通知
-            ShowNotification(
-                m_strings.APP_NAME.c_str(),
-                (m_strings.CAPTURE_SUCCESS + savePath).c_str()
-            );
-        }
-    }
-
-    // 处理打开相册功能
-    void HandleOpenScreenshot() {
-        std::wstring albumPath = m_gameAlbumPath;
-        
-        // 如果保存的路径无效或为空，尝试查找
-        if (albumPath.empty() || !PathFileExistsW(albumPath.c_str())) {
-            HWND gameWindow = FindTargetWindow();
-            if (!gameWindow) {
-                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-                return;
-            }
-
-            albumPath = WindowUtils::GetGameScreenshotPath(gameWindow);
-            if (!albumPath.empty()) {
-                // 保存新找到的路径
-                m_gameAlbumPath = albumPath;
-                SaveGameAlbumConfig();
-            }
-        }
-
-        if (!albumPath.empty()) {
-            ShellExecuteW(NULL, L"explore", albumPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
-        }
-    }
-
-    // 切换预览窗口
-    void TogglePreviewWindow() {
-        if (!m_isScreenCaptureSupported) {
-            ShowNotification(m_strings.APP_NAME.c_str(),
-                m_strings.FEATURE_NOT_SUPPORTED.c_str());
-            return;
-        }
-
-        m_isPreviewEnabled = !m_isPreviewEnabled;
-        
-        if (m_isPreviewEnabled) {
-            // 如果有选中的窗口，立即开始预览
-            if (HWND gameWindow = FindTargetWindow()) {
-                m_previewWindow->StartCapture(gameWindow);
-            }
-        } else {
-            // 隐藏预览窗口
-            m_previewWindow->StopCapture();
-        }
-        
-        // 更新菜单窗口中的状态
-        if (m_menuWindow) {
-            m_menuWindow->SetPreviewEnabled(m_isPreviewEnabled);
-        }
-    }
-
 private:
-    // 窗口和UI相关
-    HWND m_hwnd = NULL;                                  // 主窗口句柄
-    HINSTANCE m_hInstance = NULL;                        // 应用程序实例句柄
-    std::unique_ptr<TrayIcon> m_trayIcon;               // 托盘图标
-    std::unique_ptr<MenuWindow> m_menuWindow;           // 菜单窗口
-    std::unique_ptr<PreviewWindow> m_previewWindow;     // 预览窗口
-    std::vector<std::pair<HWND, std::wstring>> m_windows;  // 存储窗口列表
-    bool m_isScreenCaptureSupported;                    // 是否支持屏幕捕获
-    
-    // 配置相关
-    std::wstring m_configPath;                         // 配置文件完整路径
-    std::wstring m_windowTitle;                        // 保存的窗口标题
-    std::wstring m_gameAlbumPath;                      // 游戏相册路径
-    UINT m_hotkeyModifiers = MOD_CONTROL | MOD_ALT;   // 热键修饰键
-    UINT m_hotkeyKey = 'R';                           // 热键主键
-    bool m_hotkeySettingMode = false;                 // 是否处于热键设置模式
-    bool m_taskbarAutoHide = false;                   // 任务栏自动隐藏状态
-    bool m_taskbarLower = true;                      // 调整时置底任务栏状态
-    bool m_useFloatingWindow = true;                 // 是否使用浮动窗口
-    bool m_isPreviewEnabled = false;                  // 预览窗口状态
-    
-    // 窗口变换相关
-    std::vector<AspectRatio> m_ratios;                // 预设的宽高比列表
-    size_t m_currentRatioIndex = SIZE_MAX;           // 当前选择的比例索引
-    bool m_useScreenSize = true;                     // 是否使用屏幕尺寸计算，默认开启
-    bool m_windowModified = false;                   // 窗口是否被修改过
-    std::vector<ResolutionPreset> m_resolutions;     // 预设的分辨率列表
-    size_t m_currentResolutionIndex = 0;             // 当前选择的分辨率索引，默认选择第一个（Default）
-    
-    // 语言相关
-    LocalizedStrings m_strings;                      // 当前语言的字符串
-    std::wstring m_language;                         // 当前语言设置
-
-    // 替换为通知管理器
+    // 窗口和UI组件
+    HWND m_hwnd = NULL;
+    std::unique_ptr<TrayIcon> m_trayIcon;
+    std::unique_ptr<MenuWindow> m_menuWindow;
+    std::unique_ptr<PreviewWindow> m_previewWindow;
     std::unique_ptr<NotificationManager> m_notificationManager;
+    std::unique_ptr<ConfigManager> m_configManager;
+
+    // 应用状态
+    bool m_isPreviewEnabled = false;
+    bool m_hotkeySettingMode = false;
+    size_t m_currentRatioIndex = SIZE_MAX;
+    size_t m_currentResolutionIndex = 0;
+    
+    // 预设数据
+    std::vector<AspectRatio> m_ratios;
+    std::vector<ResolutionPreset> m_resolutions;
+    
+    // 界面文本
+    LocalizedStrings m_strings;
+    std::wstring m_language;
 
     // 初始化预设的宽高比列表
     void InitializeRatios() {
@@ -529,224 +527,112 @@ private:
     // 初始化预设的分辨率列表
     void InitializeResolutions() {
         m_resolutions = {
-            {TEXT("Default"), 0, 0},         // 默认选项，使用屏幕尺寸计算
-            {TEXT("4K"), 3840, 2160},     // 8.3M pixels
-            {TEXT("6K"), 5760, 3240},     // 18.7M pixels
-            {TEXT("8K"), 7680, 4320},     // 33.2M pixels
-            {TEXT("12K"), 11520, 6480}    // 74.6M pixels
+            {TEXT("Default"), 0, 0},    // 默认选项，使用屏幕尺寸计算
+            {TEXT("4K"), 3840, 2160},   // 8.3M pixels
+            {TEXT("6K"), 5760, 3240},   // 18.7M pixels
+            {TEXT("8K"), 7680, 4320},   // 33.2M pixels
+            {TEXT("12K"), 11520, 6480}  // 74.6M pixels
         };
     }
 
-    // 从配置文件加载热键设置
-    void LoadHotkeyConfig() {
-        TCHAR buffer[32];
-        // 读取修饰键
-        if (GetPrivateProfileString(Constants::HOTKEY_SECTION, 
-                                  Constants::HOTKEY_MODIFIERS,
-                                  TEXT(""), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_hotkeyModifiers = _wtoi(buffer);
-        }
-
-        // 读取主键
-        if (GetPrivateProfileString(Constants::HOTKEY_SECTION,
-                                  Constants::HOTKEY_KEY,
-                                  TEXT(""), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_hotkeyKey = _wtoi(buffer);
+    void LoadCustomRatios() {
+        auto result = m_configManager->LoadCustomRatios(m_ratios, m_strings);
+        if (!result.success) {
+            ShowNotification(m_strings.APP_NAME.c_str(), result.errorDetails.c_str(), true);
         }
     }
 
-    // 保存热键设置到配置文件
-    void SaveHotkeyConfig() {
-        TCHAR buffer[32];
-        // 保存修饰键
-        _stprintf_s(buffer, _countof(buffer), TEXT("%u"), m_hotkeyModifiers);
-        WritePrivateProfileString(Constants::HOTKEY_SECTION,
-                                Constants::HOTKEY_MODIFIERS,
-                                buffer, m_configPath.c_str());
-
-        // 保存主键
-        _stprintf_s(buffer, _countof(buffer), TEXT("%u"), m_hotkeyKey);
-        WritePrivateProfileString(Constants::HOTKEY_SECTION,
-                                Constants::HOTKEY_KEY,
-                                buffer, m_configPath.c_str());
-    }
-
-    // 从配置文件加载窗口设置
-    void LoadWindowConfig() {
-        TCHAR buffer[256];
-        if (GetPrivateProfileString(Constants::WINDOW_SECTION,
-                                  Constants::WINDOW_TITLE,
-                                  TEXT(""), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_windowTitle = buffer;
+    void LoadCustomResolutions() {
+        auto result = m_configManager->LoadCustomResolutions(m_resolutions, m_strings);
+        if (!result.success) {
+            ShowNotification(m_strings.APP_NAME.c_str(), result.errorDetails.c_str(), true);
         }
     }
 
-    // 保存窗口设置到配置文件
-    void SaveWindowConfig() {
-        if (!m_windowTitle.empty()) {
-            WritePrivateProfileString(Constants::WINDOW_SECTION,
-                                    Constants::WINDOW_TITLE,
-                                    m_windowTitle.c_str(),
-                                    m_configPath.c_str());
-        }
+    bool RegisterWindowClass(HINSTANCE hInstance) {
+        WNDCLASSEX wc = {0};
+        wc.cbSize = sizeof(WNDCLASSEX);
+        wc.lpfnWndProc = WindowProc;
+        wc.hInstance = hInstance;
+        wc.lpszClassName = Constants::WINDOW_CLASS;
+        wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+        wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+        return RegisterClassEx(&wc) != 0;
     }
 
-    // 从配置文件加载语言设置
-    void LoadLanguageConfig() {
-        TCHAR buffer[32];
-        if (GetPrivateProfileString(Constants::LANG_SECTION,
-                                  Constants::LANG_CURRENT,
-                                  TEXT(""), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_language = buffer;
-        } else {
-            LANGID langId = GetUserDefaultUILanguage();
-            WORD primaryLangId = PRIMARYLANGID(langId);
-            m_language = (primaryLangId == LANG_CHINESE) ? 
-                Constants::LANG_ZH_CN : Constants::LANG_EN_US;
-            SaveLanguageConfig();
-        }
-        m_strings = (m_language == Constants::LANG_EN_US) ? EN_US : ZH_CN;
+    bool CreateAppWindow(HINSTANCE hInstance) {
+        m_hwnd = CreateWindow(Constants::WINDOW_CLASS, Constants::APP_NAME,
+                            WS_POPUP, 0, 0, 0, 0, NULL, NULL, hInstance, this);
+        return m_hwnd != NULL;
     }
 
-    // 保存语言设置到配置文件
-    void SaveLanguageConfig() {
-        WritePrivateProfileString(Constants::LANG_SECTION,
-                                Constants::LANG_CURRENT,
-                                m_language.c_str(),
-                                m_configPath.c_str());
-    }
+    std::wstring GetHotkeyText() {
+        std::wstring text;
+        UINT modifiers = m_configManager->GetHotkeyModifiers();
+        UINT key = m_configManager->GetHotkeyKey();
 
-    // 从配置文件加载任务栏设置
-    void LoadTaskbarConfig() {
-        TCHAR buffer[32];
-        if (GetPrivateProfileString(Constants::TASKBAR_SECTION,
-                                  Constants::TASKBAR_AUTOHIDE,
-                                  TEXT("0"), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_taskbarAutoHide = (_wtoi(buffer) != 0);
-        }
+        if (modifiers & MOD_CONTROL) text += TEXT("Ctrl+");
+        if (modifiers & MOD_ALT) text += TEXT("Alt+");
+        if (modifiers & MOD_SHIFT) text += TEXT("Shift+");
         
-        if (GetPrivateProfileString(Constants::TASKBAR_SECTION,
-                                  Constants::TASKBAR_LOWER,
-                                  TEXT("1"), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_taskbarLower = (_wtoi(buffer) != 0);
-        }
-    }
-
-    // 保存任务栏设置到配置文件
-    void SaveTaskbarConfig() {
-        WritePrivateProfileString(Constants::TASKBAR_SECTION,
-                                Constants::TASKBAR_AUTOHIDE,
-                                m_taskbarAutoHide ? TEXT("1") : TEXT("0"),
-                                m_configPath.c_str());
-                                
-        WritePrivateProfileString(Constants::TASKBAR_SECTION,
-                                Constants::TASKBAR_LOWER,
-                                m_taskbarLower ? TEXT("1") : TEXT("0"),
-                                m_configPath.c_str());
-    }
-
-    // 从配置文件加载菜单设置
-    void LoadMenuConfig() {
-        TCHAR buffer[32];
-        if (GetPrivateProfileString(Constants::MENU_SECTION,
-                                  Constants::MENU_FLOATING,
-                                  TEXT("0"), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            m_useFloatingWindow = (_wtoi(buffer) != 0);
-        }
-    }
-
-    // 保存菜单设置到配置文件
-    void SaveMenuConfig() {
-        WritePrivateProfileString(Constants::MENU_SECTION,
-                                Constants::MENU_FLOATING,
-                                m_useFloatingWindow ? TEXT("1") : TEXT("0"),
-                                m_configPath.c_str());
-    }
-
-    // 进入热键设置模式
-    void SetHotkey() {
-        UnregisterHotKey(m_hwnd, Constants::ID_TRAYICON);
-        m_hotkeySettingMode = true;
-        ShowNotification(m_strings.APP_NAME.c_str(), 
-            m_strings.HOTKEY_SETTING.c_str());
-    }
-
-    // 切换任务栏自动隐藏状态
-    void ToggleTaskbarAutoHide() {
-        APPBARDATA abd = {0};
-        abd.cbSize = sizeof(APPBARDATA);
-        UINT state = (UINT)SHAppBarMessage(ABM_GETSTATE, &abd);
-        bool currentAutoHide = (state & ABS_AUTOHIDE) != 0;
-        abd.lParam = currentAutoHide ? 0 : ABS_AUTOHIDE;
-        SHAppBarMessage(ABM_SETSTATE, &abd);
-        m_taskbarAutoHide = !currentAutoHide;
-        SaveTaskbarConfig();
-    }
-
-    // 切换界面语言
-    void ChangeLanguage(const std::wstring& lang) {
-        if (m_language != lang) {
-            m_language = lang;
-            m_strings = (lang == Constants::LANG_EN_US) ? EN_US : ZH_CN;
-            SaveLanguageConfig();
-            
-            if (m_trayIcon) {
-                m_trayIcon->UpdateTip(m_strings.APP_NAME.c_str());
-            }
-            if (m_menuWindow) {
-                m_menuWindow->UpdateMenuItems(m_strings);
-            }
-        }
-    }
-
-    // 重置窗口大小到原始状态
-    void ResetWindowSize() {
-        HWND gameWindow = FindTargetWindow();
-        if (gameWindow) {
-            m_currentRatioIndex = SIZE_MAX;
-            m_currentResolutionIndex = 0;  // 重置为默认分辨率选项
-            
-            // 更新菜单窗口中的状态
-            if (m_menuWindow) {
-                m_menuWindow->SetCurrentRatio(m_currentRatioIndex);
-                m_menuWindow->SetCurrentResolution(m_currentResolutionIndex);
-            }
-            
-            if (ApplyWindowTransform(gameWindow)) {
-                // 开始捕获
-                if (m_isPreviewEnabled && m_previewWindow) {
-                    m_previewWindow->StartCapture(gameWindow);
-                }
-
-            }
+        if (key >= 'A' && key <= 'Z') {
+            text += static_cast<TCHAR>(key);
         } else {
-            ShowNotification(m_strings.APP_NAME.c_str(), 
-                m_strings.WINDOW_NOT_FOUND.c_str());
+            switch (key) {
+                case VK_F1: text += TEXT("F1"); break;
+                case VK_F2: text += TEXT("F2"); break;
+                case VK_F3: text += TEXT("F3"); break;
+                case VK_F4: text += TEXT("F4"); break;
+                case VK_F5: text += TEXT("F5"); break;
+                case VK_F6: text += TEXT("F6"); break;
+                case VK_F7: text += TEXT("F7"); break;
+                case VK_F8: text += TEXT("F8"); break;
+                case VK_F9: text += TEXT("F9"); break;
+                case VK_F10: text += TEXT("F10"); break;
+                case VK_F11: text += TEXT("F11"); break;
+                case VK_F12: text += TEXT("F12"); break;
+                case VK_NUMPAD0: text += TEXT("Num0"); break;
+                case VK_NUMPAD1: text += TEXT("Num1"); break;
+                case VK_NUMPAD2: text += TEXT("Num2"); break;
+                case VK_NUMPAD3: text += TEXT("Num3"); break;
+                case VK_NUMPAD4: text += TEXT("Num4"); break;
+                case VK_NUMPAD5: text += TEXT("Num5"); break;
+                case VK_NUMPAD6: text += TEXT("Num6"); break;
+                case VK_NUMPAD7: text += TEXT("Num7"); break;
+                case VK_NUMPAD8: text += TEXT("Num8"); break;
+                case VK_NUMPAD9: text += TEXT("Num9"); break;
+                case VK_MULTIPLY: text += TEXT("Num*"); break;
+                case VK_ADD: text += TEXT("Num+"); break;
+                case VK_SUBTRACT: text += TEXT("Num-"); break;
+                case VK_DECIMAL: text += TEXT("Num."); break;
+                case VK_DIVIDE: text += TEXT("Num/"); break;
+                default: text += static_cast<TCHAR>(key); break;
+            }
         }
+        return text;
     }
 
-    // 打开配置文件
-    void OpenConfigFile() {
-        ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
-                    m_configPath.c_str(), NULL, SW_SHOW);
-        ShowNotification(m_strings.APP_NAME.c_str(), 
-            m_strings.CONFIG_HELP.c_str());
+    // 显示通知
+    void ShowNotification(const TCHAR* title, const TCHAR* message, bool isError = false) {
+        if (m_notificationManager) {
+            OutputDebugString(message);
+            m_notificationManager->ShowNotification(
+                title, 
+                message, 
+                isError ? NotificationWindow::NotificationType::Error 
+                       : NotificationWindow::NotificationType::Info
+            );
+        }
     }
 
     // 查找目标窗口
     HWND FindTargetWindow() {
         HWND gameWindow = NULL;
-        if (!m_windowTitle.empty()) {
+        std::wstring windowTitle = m_configManager->GetWindowTitle();
+        if (!windowTitle.empty()) {
             auto windows = WindowUtils::GetWindows();
             for (const auto& window : windows) {
-                if (WindowUtils::CompareWindowTitle(window.second, m_windowTitle)) {
+                if (WindowUtils::CompareWindowTitle(window.second, windowTitle)) {
                     gameWindow = window.first;
                     break;
                 }
@@ -783,221 +669,12 @@ private:
             targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
         }
 
-        OutputDebugString((TEXT("Width: ") + std::to_wstring(targetRes.width) + TEXT(", Height: ") + std::to_wstring(targetRes.height) + TEXT("\n")).c_str());
-        
-        if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, m_taskbarLower)) {
-            m_windowModified = true;
+        if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
+                                    m_configManager->GetTaskbarLower())) {
             return true;
         } else {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
             return false;
-        }
-    }
-
-    // 获取热键文本描述
-    std::wstring GetHotkeyText() {
-        std::wstring text;
-        if (m_hotkeyModifiers & MOD_CONTROL) text += TEXT("Ctrl+");
-        if (m_hotkeyModifiers & MOD_ALT) text += TEXT("Alt+");
-        if (m_hotkeyModifiers & MOD_SHIFT) text += TEXT("Shift+");
-        
-        if (m_hotkeyKey >= 'A' && m_hotkeyKey <= 'Z') {
-            text += static_cast<TCHAR>(m_hotkeyKey);
-        } else {
-            switch (m_hotkeyKey) {
-                case VK_F1: text += TEXT("F1"); break;
-                case VK_F2: text += TEXT("F2"); break;
-                case VK_F3: text += TEXT("F3"); break;
-                case VK_F4: text += TEXT("F4"); break;
-                case VK_F5: text += TEXT("F5"); break;
-                case VK_F6: text += TEXT("F6"); break;
-                case VK_F7: text += TEXT("F7"); break;
-                case VK_F8: text += TEXT("F8"); break;
-                case VK_F9: text += TEXT("F9"); break;
-                case VK_F10: text += TEXT("F10"); break;
-                case VK_F11: text += TEXT("F11"); break;
-                case VK_F12: text += TEXT("F12"); break;
-                case VK_NUMPAD0: text += TEXT("Num0"); break;
-                case VK_NUMPAD1: text += TEXT("Num1"); break;
-                case VK_NUMPAD2: text += TEXT("Num2"); break;
-                case VK_NUMPAD3: text += TEXT("Num3"); break;
-                case VK_NUMPAD4: text += TEXT("Num4"); break;
-                case VK_NUMPAD5: text += TEXT("Num5"); break;
-                case VK_NUMPAD6: text += TEXT("Num6"); break;
-                case VK_NUMPAD7: text += TEXT("Num7"); break;
-                case VK_NUMPAD8: text += TEXT("Num8"); break;
-                case VK_NUMPAD9: text += TEXT("Num9"); break;
-                case VK_MULTIPLY: text += TEXT("Num*"); break;
-                case VK_ADD: text += TEXT("Num+"); break;
-                case VK_SUBTRACT: text += TEXT("Num-"); break;
-                case VK_DECIMAL: text += TEXT("Num."); break;
-                case VK_DIVIDE: text += TEXT("Num/"); break;
-                default: text += static_cast<TCHAR>(m_hotkeyKey); break;
-            }
-        }
-        return text;
-    }
-
-    // 添加自定义宽高比
-    bool AddCustomRatio(const std::wstring& ratio) {
-        size_t colonPos = ratio.find(TEXT(":"));
-        if (colonPos == std::wstring::npos) return false;
-        
-        try {
-            double width = std::stod(ratio.substr(0, colonPos));
-            double height = std::stod(ratio.substr(colonPos + 1));
-            if (height <= 0) return false;
-            
-            m_ratios.emplace_back(ratio, width/height);
-            return true;
-        } catch (...) {
-            return false;
-        }
-    }
-
-    // 加载自定义宽高比
-    void LoadCustomRatios() {
-        try {
-            TCHAR buffer[1024];
-            if (GetPrivateProfileString(Constants::CUSTOM_RATIO_SECTION,
-                                      Constants::CUSTOM_RATIO_LIST,
-                                      TEXT(""), buffer, _countof(buffer),
-                                      m_configPath.c_str()) > 0) {
-                std::wstring ratios = buffer;
-                if (ratios.empty()) return;
-
-                bool hasError = false;
-                std::wstring errorDetails;
-                
-                size_t start = 0, end = 0;
-                while ((end = ratios.find(TEXT(","), start)) != std::wstring::npos) {
-                    std::wstring ratio = ratios.substr(start, end - start);
-                    if (!AddCustomRatio(ratio)) {
-                        hasError = true;
-                        errorDetails += ratio + TEXT(", ");
-                    }
-                    start = end + 1;
-                }
-                
-                if (start < ratios.length()) {
-                    std::wstring ratio = ratios.substr(start);
-                    if (!AddCustomRatio(ratio)) {
-                        hasError = true;
-                        errorDetails += ratio;
-                    }
-                }
-
-                if (hasError) {
-                    std::wstring errorMsg = m_strings.CONFIG_FORMAT_ERROR + errorDetails + 
-                                          TEXT("\n") + m_strings.RATIO_FORMAT_EXAMPLE;
-                    MessageBox(NULL, errorMsg.c_str(), m_strings.APP_NAME.c_str(), 
-                              MB_ICONWARNING | MB_OK);
-                }
-            }
-        } catch (...) {
-            MessageBox(NULL, m_strings.LOAD_CONFIG_FAILED.c_str(), 
-                m_strings.APP_NAME.c_str(), MB_ICONERROR | MB_OK);
-        }
-    }
-
-    // 添加自定义分辨率
-    bool AddCustomResolution(const std::wstring& resolution) {
-        try {
-            size_t xPos = resolution.find(TEXT("x"));
-            if (xPos == std::wstring::npos) return false;
-
-            int width = std::stoi(resolution.substr(0, xPos));
-            int height = std::stoi(resolution.substr(xPos + 1));
-
-            if (width <= 0 || height <= 0) return false;
-
-            std::wstring name = resolution;
-            m_resolutions.emplace_back(name, width, height);
-            return true;
-        } catch (...) {
-            return false;
-        }
-    }
-
-    // 加载自定义分辨率
-    void LoadCustomResolutions() {
-        TCHAR buffer[1024];
-        if (GetPrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION,
-                                  Constants::CUSTOM_RESOLUTION_LIST,
-                                  TEXT(""), buffer, _countof(buffer),
-                                  m_configPath.c_str()) > 0) {
-            std::wstring resolutions = buffer;
-            if (resolutions.empty()) return;
-
-            bool hasError = false;
-            std::wstring errorDetails;
-
-            size_t start = 0, end = 0;
-            while ((end = resolutions.find(TEXT(","), start)) != std::wstring::npos) {
-                if (!AddCustomResolution(resolutions.substr(start, end - start))) {
-                    hasError = true;
-                    errorDetails += resolutions.substr(start, end - start) + TEXT(", ");
-                }
-                start = end + 1;
-            }
-            
-            if (start < resolutions.length()) {
-                if (!AddCustomResolution(resolutions.substr(start))) {
-                    hasError = true;
-                    errorDetails += resolutions.substr(start);
-                }
-            }
-
-            if (hasError) {
-                std::wstring errorMsg = m_strings.CONFIG_FORMAT_ERROR + errorDetails + 
-                                      TEXT("\n") + m_strings.RESOLUTION_FORMAT_EXAMPLE;
-                MessageBox(NULL, errorMsg.c_str(), m_strings.APP_NAME.c_str(), 
-                          MB_ICONWARNING | MB_OK);
-            }
-        }
-    }
-
-    // 切换浮动窗口状态
-    void ToggleFloatingWindow() {
-        bool wasEnabled = m_useFloatingWindow;
-        m_useFloatingWindow = !m_useFloatingWindow;
-        SaveMenuConfig();
-
-        if (m_menuWindow) {
-            if (m_useFloatingWindow && !wasEnabled) {
-                // 如果开启浮窗模式，且之前是关闭的，则显示窗口
-                m_menuWindow->Show();
-            } else if (!m_useFloatingWindow && m_menuWindow->IsVisible()) {
-                // 如果关闭浮窗模式，且窗口当前是显示的，则隐藏窗口
-                m_menuWindow->Hide();
-            }
-        }
-    }
-
-    // 切换任务栏置底状态
-    void ToggleTaskbarLower() {
-        m_taskbarLower = !m_taskbarLower;
-        SaveTaskbarConfig();
-    }
-
-    // 加载游戏相册路径
-    void LoadGameAlbumConfig() {
-        TCHAR buffer[MAX_PATH];
-        if (GetPrivateProfileString(Constants::SCREENSHOT_SECTION,
-                                  Constants::SCREENSHOT_PATH,
-                                  TEXT(""), buffer, MAX_PATH,
-                                  m_configPath.c_str()) > 0) {
-            m_gameAlbumPath = buffer;
-        }
-    }
-
-    // 保存游戏相册路径
-    void SaveGameAlbumConfig() {
-        if (!m_gameAlbumPath.empty()) {
-            WritePrivateProfileString(Constants::SCREENSHOT_SECTION,
-                                    Constants::SCREENSHOT_PATH,
-                                    m_gameAlbumPath.c_str(),
-                                    m_configPath.c_str());
         }
     }
 
