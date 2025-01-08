@@ -160,8 +160,9 @@ namespace {
     class CaptureSession {
     public:
         CaptureSession(winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool& pool,
-                      winrt::Windows::Graphics::Capture::GraphicsCaptureItem& item)
-            : session_(pool.CreateCaptureSession(item)) {
+                      winrt::Windows::Graphics::Capture::GraphicsCaptureItem& item,
+                      winrt::Windows::Graphics::Capture::GraphicsCaptureSession& session)
+            : session_(session) {
             if (session_) session_.StartCapture();
         }
         ~CaptureSession() { if (session_) session_.Close(); }
@@ -386,8 +387,12 @@ bool WindowUtils::CaptureWindow(HWND hwnd, const std::wstring& savePath) {
         return false;
     }
 
-    // 创建并启动捕获会话
-    CaptureSession session(framePool, captureItem);
+    // 创建捕获会话
+    auto captureSession = framePool.CreateCaptureSession(captureItem);
+    captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
+
+    // 创建会话包装器并启动捕获
+    CaptureSession session(framePool, captureItem, captureSession);
     if (!session) {
         if (needUninitialize) CoUninitialize();
         return false;
