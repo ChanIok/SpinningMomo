@@ -57,7 +57,7 @@ public:
 
         // 创建预览窗口
         m_previewWindow = std::make_unique<PreviewWindow>();
-        if (!m_previewWindow->Initialize(hInstance)) {
+        if (!m_previewWindow->Initialize(hInstance, m_hwnd)) {
             return false;
         }
 
@@ -521,6 +521,15 @@ public:
 
             case WM_DESTROY: {
                 PostQuitMessage(0);
+                return 0;
+            }
+
+            case Constants::WM_PREVIEW_RCLICK: {
+                if (app) {
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    app->ShowQuickMenu(pt);
+                }
                 return 0;
             }
         }

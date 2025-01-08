@@ -1,5 +1,6 @@
 #pragma once
 #include "win_config.hpp"
+#include "constants.hpp"
 #include <d3d11.h>
 #include <wrl/client.h>
 #include <winrt/Windows.Graphics.Capture.h>
@@ -17,7 +18,7 @@ public:
     PreviewWindow();
     ~PreviewWindow();
 
-    bool Initialize(HINSTANCE hInstance);
+    bool Initialize(HINSTANCE hInstance, HWND mainHwnd);
     void Cleanup();
     bool StartCapture(HWND targetWindow);
     void StopCapture();
@@ -112,4 +113,7 @@ private:
     int m_minIdealSize;  // 最小理想尺寸（屏幕短边的1/10）
     int m_maxIdealSize;  // 最大理想尺寸（屏幕长边）
     int m_idealSize;     // 当前理想尺寸
+
+    // 主窗口句柄
+    HWND m_mainHwnd = nullptr;
 }; 

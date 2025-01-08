@@ -371,7 +371,10 @@ bool PreviewWindow::CreateShaderResources() {
     return true;
 }
 
-bool PreviewWindow::Initialize(HINSTANCE hInstance) {
+bool PreviewWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
+    // 设置主窗口句柄
+    m_mainHwnd = mainHwnd;
+
     // 注册窗口类
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -1119,6 +1122,13 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     newX, newY,
                     newWidth, newHeight,
                     SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            return 0;
+        }
+
+        case WM_RBUTTONUP: {
+            if (instance) {
+                PostMessage(instance->m_mainHwnd, Constants::WM_PREVIEW_RCLICK, 0, 0);
             }
             return 0;
         }
