@@ -187,18 +187,18 @@ void TrayIcon::ShowQuickMenu(
 
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-    // 添加重置选项
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
-              Constants::ID_RESET, strings.RESET_WINDOW.c_str());
+    // 添加截图选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_CAPTURE_WINDOW, strings.CAPTURE_WINDOW.c_str());
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-
-    // 添加任务栏自动隐藏选项
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarAutoHide ? MF_CHECKED : 0),
-              Constants::ID_AUTOHIDE_TASKBAR, strings.TASKBAR_AUTOHIDE.c_str());
 
     // 添加预览窗口选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (previewEnabled ? MF_CHECKED : 0),
               Constants::ID_PREVIEW_WINDOW, strings.PREVIEW_WINDOW.c_str());
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+    // 添加重置选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, 
+              Constants::ID_RESET, strings.RESET_WINDOW.c_str());
 
     // 显示菜单
     SetForegroundWindow(m_hwnd);
