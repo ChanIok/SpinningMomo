@@ -114,8 +114,8 @@ Game Settings:
 
 Notes:
 - ✅ Convenient operation, suitable for daily shooting and preview
-- ❗ Can only adjust ratio, cannot adjust resolution
-- ❗ Outputs pseudo-4K, quality lower than window resolution
+- ✅ Always runs smoothly, no extra performance overhead
+- ❗ Can only adjust ratio, resolution based on game's 4K setting
 - ❗ In fullscreen window mode, output limited by monitor's native ratio
 
 ### Resolution Explanation
