@@ -224,14 +224,14 @@ public:
         if (albumPath.empty() || !PathFileExistsW(albumPath.c_str())) {
             HWND gameWindow = FindTargetWindow();
             if (!gameWindow) {
-                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-                return;
-            }
-
-            albumPath = WindowUtils::GetGameScreenshotPath(gameWindow);
-            if (!albumPath.empty()) {
-                m_configManager->SetGameAlbumPath(albumPath);
-                m_configManager->SaveGameAlbumConfig();
+                // 如果找不到游戏窗口，打开程序的截图目录
+                albumPath = WindowUtils::GetScreenshotPath();
+            } else {
+                albumPath = WindowUtils::GetGameScreenshotPath(gameWindow);
+                if (!albumPath.empty()) {
+                    m_configManager->SetGameAlbumPath(albumPath);
+                    m_configManager->SaveGameAlbumConfig();
+                }
             }
         }
 
