@@ -41,6 +41,9 @@ public:
         m_language = m_configManager->GetLanguage();
         m_strings = (m_language == Constants::LANG_EN_US) ? EN_US : ZH_CN;
 
+        // 检查屏幕捕获功能是否可用
+        m_isScreenCaptureSupported = WindowUtils::IsWindowsCaptureSupported();
+
         // 初始化预设数据
         InitializeRatios();
         LoadCustomRatios();
@@ -166,8 +169,21 @@ public:
     }
     // 处理截图
     void HandleScreenshot() {
+        // 检查屏幕捕获功能是否可用
+        if (!m_isScreenCaptureSupported) {
+            ShowNotification(m_strings.APP_NAME.c_str(),
+                m_strings.FEATURE_NOT_SUPPORTED.c_str());
+            return;
+        }
+
         HWND gameWindow = FindTargetWindow();
         if (!gameWindow) {
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
+        }
+
+        // 检查窗口是否最小化
+        if (IsIconic(gameWindow)) {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             return;
         }
@@ -268,6 +284,12 @@ public:
 
     // 切换预览窗口
     void TogglePreviewWindow() {
+        if (!m_isScreenCaptureSupported) {
+            ShowNotification(m_strings.APP_NAME.c_str(),
+                m_strings.FEATURE_NOT_SUPPORTED.c_str());
+            return;
+        }
+    
         m_isPreviewEnabled = !m_isPreviewEnabled;
         
         if (m_isPreviewEnabled) {
@@ -563,6 +585,7 @@ private:
     bool m_isPreviewEnabled = false;
     bool m_hotkeySettingMode = false;
     bool m_messageLoopStarted = false;
+    bool m_isScreenCaptureSupported = false;
     size_t m_currentRatioIndex = SIZE_MAX;
     size_t m_currentResolutionIndex = 0;
     std::vector<std::pair<HWND, std::wstring>> m_windows;

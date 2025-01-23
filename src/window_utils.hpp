@@ -25,11 +25,7 @@ public:
     // 功能检查
     static bool IsWindowsCaptureSupported() {
         try {
-            winrt::Windows::Graphics::Capture::GraphicsCaptureItem item{ nullptr };
-            auto factory = winrt::get_activation_factory<
-                winrt::Windows::Graphics::Capture::GraphicsCaptureItem,
-                IGraphicsCaptureItemInterop>();
-            return factory != nullptr;
+            return winrt::Windows::Graphics::Capture::GraphicsCaptureSession::IsSupported();
         }
         catch (...) {
             return false;
