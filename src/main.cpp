@@ -164,7 +164,6 @@ public:
             }
         }
     }
-
     // 处理截图
     void HandleScreenshot() {
         HWND gameWindow = FindTargetWindow();
@@ -173,17 +172,32 @@ public:
             return;
         }
 
+        // 使用当前时间生成格式化的文件名
         auto now = std::chrono::system_clock::now();
-        std::wstring filename = L"Screenshot_" + 
-            std::to_wstring(std::chrono::system_clock::to_time_t(now)) + L".png";
+        auto time = std::chrono::system_clock::to_time_t(now);
+        auto local_time = std::localtime(&time);
+        
+        wchar_t timestamp[32];
+        std::wcsftime(timestamp, sizeof(timestamp)/sizeof(wchar_t), 
+                     L"%Y%m%d_%H%M%S", local_time);
+        
+        // 添加毫秒
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()).count() % 1000;
+        std::wstring filename = std::wstring(timestamp) + 
+                               L"_" + std::to_wstring(ms) + L".png";
         
         std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
         
-        if (WindowUtils::CaptureWindow(gameWindow, savePath)) {
-            ShowNotification(
-                m_strings.APP_NAME.c_str(),
-                (m_strings.CAPTURE_SUCCESS + savePath).c_str()
-            );
+        if (!WindowUtils::CaptureWindow(gameWindow, [this, savePath](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
+            if (WindowUtils::SaveFrameToFile(texture.Get(), savePath)) {
+                ShowNotification(
+                    m_strings.APP_NAME.c_str(),
+                    (m_strings.CAPTURE_SUCCESS + savePath).c_str()
+                );
+            }
+        })) {
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
         }
     }
 

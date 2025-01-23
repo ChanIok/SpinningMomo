@@ -8,6 +8,7 @@
 #include <vector>
 #include <wrl/client.h>
 #include <Shlwapi.h>
+#include "window_capturer.hpp"
 
 class WindowUtils {
 public:
@@ -50,22 +51,23 @@ public:
     static Resolution CalculateResolutionByScreen(double targetRatio);
 
     // 截图相关函数
-    static bool CaptureWindow(HWND hwnd, const std::wstring& savePath);
     static std::wstring GetScreenshotPath();
     static std::wstring GetGameScreenshotPath(HWND hwnd);
+    static bool CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback);
+    static bool SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath);
+
+    // D3D资源管理
+    static bool EnsureD3DResources();
+    static ID3D11Device* GetDevice() { return s_device.Get(); }
+    static ID3D11DeviceContext* GetContext() { return s_context.Get(); }
+    static winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice GetWinRTDevice() { return s_winrtDevice; }
 
 private:
-    // 回调函数
-    static winrt::Windows::Graphics::Capture::GraphicsCaptureItem CreateCaptureItemForWindow(HWND hwnd);
-    
-    // 截图辅助函数
-    static winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice CreateDirect3DDevice(ID3D11Device* d3dDevice);
-    static bool SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath);
-    template<typename T>
-    static Microsoft::WRL::ComPtr<T> GetDXGIInterfaceFromObject(winrt::Windows::Foundation::IInspectable const& object) {
-        auto access = object.as<Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();
-        Microsoft::WRL::ComPtr<T> result;
-        winrt::check_hresult(access->GetInterface(IID_PPV_ARGS(&result)));
-        return result;
-    }
+    // 静态捕获器实例
+    static std::unique_ptr<WindowCapturer> s_capturer;
+
+    // 静态D3D资源
+    static Microsoft::WRL::ComPtr<ID3D11Device> s_device;
+    static Microsoft::WRL::ComPtr<ID3D11DeviceContext> s_context;
+    static winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice s_winrtDevice;
 }; 
