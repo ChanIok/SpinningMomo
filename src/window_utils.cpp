@@ -4,22 +4,42 @@
 #include <windows.graphics.directx.direct3d11.interop.h>
 
 // 窗口查找
-HWND WindowUtils::FindGameWindow() {
-    // 先尝试查找中文标题
-    HWND hwnd = FindWindow(NULL, TEXT("无限暖暖  "));
-    if (hwnd) return hwnd;
+HWND WindowUtils::FindTargetWindow(const std::wstring& configuredTitle) {
+    HWND gameWindow = NULL;
     
-    // 如果找不到中文标题，尝试英文标题
-    return FindWindow(NULL, TEXT("Infinity Nikki  "));
-}
-
-std::wstring WindowUtils::TrimRight(const std::wstring& str) {
-    size_t end = str.find_last_not_of(L' ');
-    return (end == std::wstring::npos) ? L"" : str.substr(0, end + 1);
-}
-
-bool WindowUtils::CompareWindowTitle(const std::wstring& title1, const std::wstring& title2) {
-    return TrimRight(title1) == TrimRight(title2);
+    // 辅助函数：去除字符串右侧空格
+    auto trimRight = [](const std::wstring& str) -> std::wstring {
+        size_t end = str.find_last_not_of(L' ');
+        return (end == std::wstring::npos) ? L"" : str.substr(0, end + 1);
+    };
+    
+    // 辅助函数：比较窗口标题
+    auto compareWindowTitle = [&trimRight](const std::wstring& title1, const std::wstring& title2) -> bool {
+        return trimRight(title1) == trimRight(title2);
+    };
+    
+    // 1. 如果有配置的标题，先尝试使用配置的标题查找
+    if (!configuredTitle.empty()) {
+        auto windows = GetWindows();
+        for (const auto& window : windows) {
+            if (compareWindowTitle(window.second, configuredTitle)) {
+                gameWindow = window.first;
+                break;
+            }
+        }
+    }
+    
+    // 2. 如果找不到，尝试预设的游戏窗口标题
+    if (!gameWindow) {
+        // 先尝试查找中文标题
+        gameWindow = FindWindow(NULL, TEXT("无限暖暖  "));
+        if (!gameWindow) {
+            // 如果找不到中文标题，尝试英文标题
+            gameWindow = FindWindow(NULL, TEXT("Infinity Nikki  "));
+        }
+    }
+    
+    return gameWindow;
 }
 
 // 窗口操作
@@ -67,28 +87,29 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLow
     return success;
 }
 
-// 回调函数
-BOOL CALLBACK WindowUtils::EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-    TCHAR className[256];
-    TCHAR windowText[256];
-    
-    if (!IsWindowVisible(hwnd)) return TRUE;
-    if (!GetClassName(hwnd, className, 256)) return TRUE;
-    if (!GetWindowText(hwnd, windowText, 256)) return TRUE;
-
-    auto windows = reinterpret_cast<std::vector<std::pair<HWND, std::wstring>>*>(lParam);
-    if (windowText[0] != '\0') {  // 只收集有标题的窗口
-        std::pair<HWND, std::wstring> item(hwnd, windowText);
-        windows->push_back(item);
-    }
-
-    return TRUE;
-}
-
 // 获取窗口列表
 std::vector<std::pair<HWND, std::wstring>> WindowUtils::GetWindows() {
     std::vector<std::pair<HWND, std::wstring>> windows;
-    EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&windows));
+    
+    // 回调函数
+    auto enumWindowsProc = [](HWND hwnd, LPARAM lParam) -> BOOL {
+        TCHAR className[256];
+        TCHAR windowText[256];
+        
+        if (!IsWindowVisible(hwnd)) return TRUE;
+        if (!GetClassName(hwnd, className, 256)) return TRUE;
+        if (!GetWindowText(hwnd, windowText, 256)) return TRUE;
+
+        auto windows = reinterpret_cast<std::vector<std::pair<HWND, std::wstring>>*>(lParam);
+        if (windowText[0] != '\0') {  // 只收集有标题的窗口
+            std::pair<HWND, std::wstring> item(hwnd, windowText);
+            windows->push_back(item);
+        }
+
+        return TRUE;
+    };
+
+    EnumWindows(enumWindowsProc, reinterpret_cast<LPARAM>(&windows));
     return windows;
 }
 

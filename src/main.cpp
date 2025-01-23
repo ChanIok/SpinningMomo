@@ -704,21 +704,7 @@ private:
 
     // 查找目标窗口
     HWND FindTargetWindow() {
-        HWND gameWindow = NULL;
-        std::wstring windowTitle = m_configManager->GetWindowTitle();
-        if (!windowTitle.empty()) {
-            auto windows = WindowUtils::GetWindows();
-            for (const auto& window : windows) {
-                if (WindowUtils::CompareWindowTitle(window.second, windowTitle)) {
-                    gameWindow = window.first;
-                    break;
-                }
-            }
-        }
-        if (!gameWindow) {
-            gameWindow = WindowUtils::FindGameWindow();
-        }
-        return gameWindow;
+         return WindowUtils::FindTargetWindow(m_configManager->GetWindowTitle());
     }
 
     // 应用窗口变换

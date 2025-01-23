@@ -36,9 +36,8 @@ public:
     }
 
     // 窗口查找
-    static HWND FindGameWindow();
     static std::vector<std::pair<HWND, std::wstring>> GetWindows();
-    static bool CompareWindowTitle(const std::wstring& title1, const std::wstring& title2);
+    static HWND FindTargetWindow(const std::wstring& configuredTitle = L"");
     
     // 窗口操作
     static bool ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower = true);
@@ -57,7 +56,6 @@ public:
 
 private:
     // 回调函数
-    static BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam);
     static winrt::Windows::Graphics::Capture::GraphicsCaptureItem CreateCaptureItemForWindow(HWND hwnd);
     
     // 截图辅助函数
