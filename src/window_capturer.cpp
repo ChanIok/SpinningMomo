@@ -86,28 +86,91 @@ bool WindowCapturer::CreateCaptureSession() {
     m_captureItem = CreateCaptureItemForWindow(m_hwnd);
     if (!m_captureItem) return false;
 
+    // 确定帧池大小（总是使用完整窗口大小）
+    int poolWidth = windowRect.right - windowRect.left;
+    int poolHeight = windowRect.bottom - windowRect.top;
+    
     // 创建帧池
     m_framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
         WindowUtils::GetWinRTDevice(),
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         2,  // 使用2个缓冲区
-        { windowRect.right - windowRect.left, windowRect.bottom - windowRect.top }
+        { poolWidth, poolHeight }
     );
     if (!m_framePool) return false;
 
     // 设置帧到达回调
-    m_frameArrivedToken = m_framePool.FrameArrived([this](Direct3D11CaptureFramePool const& sender, 
+    m_frameArrivedToken = m_framePool.FrameArrived([this, poolWidth, poolHeight](Direct3D11CaptureFramePool const& sender, 
         winrt::Windows::Foundation::IInspectable const&) {
         auto frame = sender.TryGetNextFrame();
-        if (frame) {
-            auto surface = frame.Surface();
-            if (surface) {
-                auto texture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surface);
-                if (texture) {
-                    ProcessFrameArrived(texture.get());
-                }
-            }
+        if (!frame) return;
+
+        auto surface = frame.Surface();
+        if (!surface) return;
+
+        auto texture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(surface);
+        if (!texture) return;
+
+        // 如果不需要裁剪，直接使用原始纹理
+        if (!m_needsCropping) {
+            ProcessFrameArrived(texture.get());
+            return;
         }
+
+        // 验证裁剪区域是否有效
+        if (m_cropRegion.left < 0 || m_cropRegion.top < 0 ||
+            m_cropRegion.right > poolWidth || m_cropRegion.bottom > poolHeight) {
+            OutputDebugStringA("Invalid crop region, using full texture\n");
+            ProcessFrameArrived(texture.get());
+            return;
+        }
+        
+        // 创建裁剪纹理描述
+        D3D11_TEXTURE2D_DESC desc;
+        texture->GetDesc(&desc);
+        desc.Width = m_cropRegion.right - m_cropRegion.left;
+        desc.Height = m_cropRegion.bottom - m_cropRegion.top;
+
+        // 获取设备并创建裁剪纹理
+        Microsoft::WRL::ComPtr<ID3D11Device> device;
+        texture->GetDevice(&device);
+        if (!device) {
+            ProcessFrameArrived(texture.get());
+            return;
+        }
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> croppedTexture;
+        HRESULT hr = device->CreateTexture2D(&desc, nullptr, &croppedTexture);
+        if (FAILED(hr)) {
+            ProcessFrameArrived(texture.get());
+            return;
+        }
+
+        // 获取上下文并执行裁剪
+        Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+        device->GetImmediateContext(&context);
+        if (!context) {
+            ProcessFrameArrived(texture.get());
+            return;
+        }
+
+        // 设置复制区域
+        D3D11_BOX sourceBox = {
+            static_cast<UINT>(m_cropRegion.left),
+            static_cast<UINT>(m_cropRegion.top),
+            0,  // front
+            static_cast<UINT>(m_cropRegion.right),
+            static_cast<UINT>(m_cropRegion.bottom),
+            1   // back
+        };
+
+        // 复制指定区域
+        context->CopySubresourceRegion(
+            croppedTexture.Get(), 0, 0, 0, 0,
+            texture.get(), 0, &sourceBox
+        );
+
+        ProcessFrameArrived(croppedTexture.Get());
     });
 
     // 创建捕获会话

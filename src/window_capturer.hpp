@@ -27,6 +27,11 @@ public:
     void StartCapture();
     void StopCapture();
 
+    void SetCropRegion(const RECT& region) {
+        m_cropRegion = region;
+        m_needsCropping = true;
+    }
+
 private:
     // 确保D3D资源已初始化
     bool EnsureD3DResources();
@@ -52,4 +57,8 @@ private:
     // 状态标志
     bool m_isInitialized = false;
     bool m_isCapturing = false;
+
+    // 裁剪区域支持
+    RECT m_cropRegion{};
+    bool m_needsCropping = false;
 }; 

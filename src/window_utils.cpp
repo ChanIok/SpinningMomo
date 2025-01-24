@@ -445,11 +445,16 @@ std::wstring WindowUtils::GetGameScreenshotPath(HWND hwnd) {
 } 
 
 // 捕获窗口截图
-bool WindowUtils::CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback) {
+bool WindowUtils::CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback, const RECT* cropRegion) {
     if (!hwnd || !callback) return false;
     
     // 确保捕获器已初始化
     if (!s_capturer->Initialize(hwnd)) return false;
+
+    // 如果提供了裁剪区域，则设置裁剪
+    if (cropRegion) {
+        s_capturer->SetCropRegion(*cropRegion);
+    }
 
     // 设置回调并等待捕获
     bool result = s_capturer->CaptureScreenshot([callback, capturer = s_capturer.get()](ID3D11Texture2D* texture) {
@@ -460,7 +465,6 @@ bool WindowUtils::CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::Co
         if (SUCCEEDED(texture->QueryInterface(capturedTexture.GetAddressOf()))) {
             callback(capturedTexture);
         }
-
     });
 
     // 如果成功设置回调，开始捕获

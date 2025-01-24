@@ -49,7 +49,7 @@ public:
     // 截图相关函数
     static std::wstring GetScreenshotPath();
     static std::wstring GetGameScreenshotPath(HWND hwnd);
-    static bool CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback);
+    static bool CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback, const RECT* cropRegion = nullptr);
     static bool SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath);
 
     // D3D资源管理

@@ -15,6 +15,7 @@
 #include "preview_window.hpp"
 #include "notification_manager.hpp"
 #include "config_manager.hpp"
+#include "parameter_tracker.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -71,6 +72,9 @@ public:
                                m_isPreviewEnabled)) {
             return false;
         }
+
+        // 初始化参数追踪器
+        if (!ParameterTracker::Initialize(FindTargetWindow())) return false;
 
         // 如果启用了浮动窗口，则默认显示
         if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
