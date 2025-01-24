@@ -4,6 +4,7 @@
 #include <functional>
 #include <wrl/client.h>
 #include <wincodec.h>
+#include <d3d11.h>
 #include <memory>
 #include <chrono>
 #include <mutex>
@@ -12,6 +13,7 @@
 #include <future>
 #include <thread>
 #include <string>
+#include "window_utils.hpp"
 
 class ParameterTracker {
 public:
@@ -49,13 +51,15 @@ private:
         const RECT& GetRegion() const { return m_region; }
         int GetCaptureCount() const { return m_captureCount; }
         void SetActive(bool active) { m_isActive = active; }
-        void ProcessCapture(Microsoft::WRL::ComPtr<IWICBitmapSource> bitmap);
 
         // 新增：获取和增加捕获计数的方法
         void IncrementCaptureCount() { ++m_captureCount; }
 
+        // 新增：处理捕获的方法
+        void ProcessCapture(Microsoft::WRL::ComPtr<ID3D11Texture2D> texture, std::chrono::high_resolution_clock::time_point startTime);
+
         // 常量
-        static constexpr int MAX_CAPTURES = 30;  // 最大连续捕获次数
+        static constexpr int MAX_CAPTURES = 2;  // 最大连续捕获次数
         static constexpr int CAPTURE_INTERVAL_MS = 1;
         
     private:
@@ -76,9 +80,18 @@ private:
     static std::atomic<bool> s_threadRunning;
     static constexpr wchar_t* WORKER_WINDOW_CLASS = L"CaptureWorkerWindow";
     
+    // 钩子线程相关
+    static std::unique_ptr<std::thread> s_hookThread;
+    static HWND s_hookWindow;
+    static constexpr wchar_t* HOOK_WINDOW_CLASS = L"CaptureHookWindow";
+    
     // 工作线程函数
     static void WorkerThreadProc();
     static LRESULT CALLBACK WorkerWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+    
+    // 钩子线程函数
+    static void HookThreadProc();
+    static LRESULT CALLBACK HookWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
     
     // 鼠标钩子回调
     static LRESULT CALLBACK MouseProc(int code, WPARAM wParam, LPARAM lParam);
@@ -96,4 +109,21 @@ private:
     static constexpr double AREA_WIDTH_RATIO = 0.425;   // 非宽幅时，区域宽度占窗口宽度的固定比例约为42.5%
     static constexpr double AREA_HEIGHT_RATIO = 0.475;  // 宽幅时，区域高度占窗口高度的固定比例约为47.5%
     static constexpr double AREA_ASPECT_RATIO = 1.585;  // 区域的宽高比固定约为1.585:1
+
+    // Helper structures for value region tracking
+    struct ValueRegion {
+        int y;          // Center y coordinate
+        RECT bounds;    // Crop bounds
+    };
+
+    // Image processing helper functions
+    static HRESULT ConvertToGrayscale(IWICBitmapSource* source, Microsoft::WRL::ComPtr<IWICBitmapSource>& result);
+    static HRESULT ResizeTo512LongEdge(IWICBitmapSource* source, Microsoft::WRL::ComPtr<IWICBitmapSource>& result);
+    static HRESULT Binarize(IWICBitmapSource* source, BYTE threshold, Microsoft::WRL::ComPtr<IWICBitmapSource>& result);
+    static HRESULT Trinarize(IWICBitmapSource* source, BYTE lowerThreshold, BYTE upperThreshold, Microsoft::WRL::ComPtr<IWICBitmapSource>& result);
+    static HRESULT CropScrollbarRegion(IWICBitmapSource* source, Microsoft::WRL::ComPtr<IWICBitmapSource>& result);
+    static bool DetectScrollbarPosition(IWICBitmapSource* binary, int& centerY);
+    static bool GetValueRegions(IWICBitmapSource* binary, int scrollbarCenterY, std::vector<ValueRegion>& regions);
+    static HRESULT CropValueRegion(IWICBitmapSource* source, const ValueRegion& region, Microsoft::WRL::ComPtr<IWICBitmapSource>& result);
+    static HRESULT CropNumberRegion(IWICBitmapSource* source, Microsoft::WRL::ComPtr<IWICBitmapSource>& result);
 }; 

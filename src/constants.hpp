@@ -14,7 +14,8 @@ namespace Constants {
     static const UINT WM_SHOW_PENDING_NOTIFICATIONS = WM_USER + 100;  // 显示待处理通知消息
     static const UINT WM_PARAMETER_START_CAPTURE = WM_USER + 201;  // 参数捕获开始消息
     static const UINT WM_PARAMETER_CAPTURE_TIMER = WM_USER + 202;  // 参数捕获定时器消息
-    
+    static const UINT WM_USER_START_CAPTURE = WM_USER + 203;  // 用户开始捕获消息
+
     constexpr UINT ID_TRAYICON = 1;
     constexpr UINT NOTIFICATION_TIMER_ID = 2;  // 通知显示定时器ID
     

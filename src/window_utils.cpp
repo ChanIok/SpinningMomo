@@ -653,3 +653,93 @@ bool WindowUtils::RequestNextFrame(std::function<void(Microsoft::WRL::ComPtr<ID3
 bool WindowUtils::HasActiveSession() {
     return s_capturer && s_capturer->HasActiveSession();
 }
+
+// 缩放WIC位图
+Microsoft::WRL::ComPtr<IWICBitmapSource> WindowUtils::ResizeWICBitmap(
+    IWICBitmapSource* bitmap,
+    UINT targetWidth,
+    UINT targetHeight,
+    WICBitmapInterpolationMode interpolationMode) {
+    
+    if (!bitmap) return nullptr;
+
+    try {
+        // 使用RAII包装器创建WIC工厂
+        WICFactory factory;
+        if (!factory.IsValid()) {
+            throw std::runtime_error("Failed to create WIC factory");
+        }
+
+        // 创建缩放器
+        Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
+        HRESULT hr = factory.Get()->CreateBitmapScaler(&scaler);
+        if (FAILED(hr)) throw std::runtime_error("Failed to create bitmap scaler");
+
+        // 初始化缩放器
+        hr = scaler->Initialize(
+            bitmap,
+            targetWidth,
+            targetHeight,
+            interpolationMode
+        );
+        if (FAILED(hr)) throw std::runtime_error("Failed to initialize bitmap scaler");
+
+        return scaler;
+    } catch (const std::exception& e) {
+        OutputDebugStringA(("ResizeWICBitmap failed: " + std::string(e.what()) + "\n").c_str());
+        return nullptr;
+    }
+}
+
+// 按长边缩放WIC位图
+Microsoft::WRL::ComPtr<IWICBitmapSource> WindowUtils::ResizeWICBitmapByLongEdge(
+    IWICBitmapSource* bitmap,
+    UINT longEdgeLength,
+    WICBitmapInterpolationMode interpolationMode) {
+    
+    if (!bitmap) return nullptr;
+
+    try {
+        // 获取原始尺寸
+        UINT originalWidth = 0, originalHeight = 0;
+        HRESULT hr = bitmap->GetSize(&originalWidth, &originalHeight);
+        if (FAILED(hr)) throw std::runtime_error("Failed to get bitmap size");
+
+        // 计算目标尺寸
+        UINT targetWidth, targetHeight;
+        if (originalWidth > originalHeight) {
+            targetWidth = longEdgeLength;
+            targetHeight = static_cast<UINT>((longEdgeLength * originalHeight) / static_cast<float>(originalWidth));
+        } else {
+            targetHeight = longEdgeLength;
+            targetWidth = static_cast<UINT>((longEdgeLength * originalWidth) / static_cast<float>(originalHeight));
+        }
+
+        return ResizeWICBitmap(bitmap, targetWidth, targetHeight, interpolationMode);
+    } catch (const std::exception& e) {
+        OutputDebugStringA(("ResizeWICBitmapByLongEdge failed: " + std::string(e.what()) + "\n").c_str());
+        return nullptr;
+    }
+}
+
+// 裁剪WIC位图
+Microsoft::WRL::ComPtr<IWICBitmapSource> WindowUtils::CropWICBitmap(
+    IWICBitmapSource* source, int x, int y, int width, int height) {
+    if (!source) return nullptr;
+
+    // 创建WIC工厂
+    WICFactory factory;
+    if (!factory.IsValid()) return nullptr;
+
+    // 创建裁剪器
+    Microsoft::WRL::ComPtr<IWICBitmapClipper> clipper;
+    HRESULT hr = factory.Get()->CreateBitmapClipper(&clipper);
+    if (FAILED(hr)) return nullptr;
+
+    // 设置裁剪区域
+    WICRect rect = { x, y, width, height };
+    hr = clipper->Initialize(source, &rect);
+    if (FAILED(hr)) return nullptr;
+
+    return clipper;
+} 
