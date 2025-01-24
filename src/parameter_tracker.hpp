@@ -1,6 +1,7 @@
 #pragma once
 #include "win_config.hpp"
 #include "constants.hpp"
+#include "parameter_ocr.hpp"
 #include <functional>
 #include <wrl/client.h>
 #include <wincodec.h>
@@ -40,6 +41,10 @@ private:
 
     // 当前参数状态（工作线程独占访问，不需要互斥锁）
     static AllParameters s_currentParams;
+
+    // OCR相关
+    static std::unique_ptr<ParameterOCR> s_ocr;
+    static std::wstring s_modelPath;
 
     // 内部类：捕获序列管理器
     class CaptureSequence {

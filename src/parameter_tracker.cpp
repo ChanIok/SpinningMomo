@@ -15,10 +15,31 @@ HWND ParameterTracker::s_workerWindow = NULL;
 HWND ParameterTracker::s_hookWindow = NULL;
 std::atomic<bool> ParameterTracker::s_threadRunning{false};
 ParameterTracker::AllParameters ParameterTracker::s_currentParams;
+std::unique_ptr<ParameterOCR> ParameterTracker::s_ocr;
+std::wstring ParameterTracker::s_modelPath = L"models/model.onnx";
 
 // 初始化参数追踪器
 bool ParameterTracker::Initialize(HWND targetWindow) {
     s_targetWindow = targetWindow;
+    
+    // 检查模型文件是否存在
+    DWORD attrs = GetFileAttributesW(s_modelPath.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        OutputDebugStringA("OCR模型文件不存在: ");
+        OutputDebugStringW(s_modelPath.c_str());
+        OutputDebugStringA("\n");
+        return false;
+    }
+    
+    // 初始化OCR
+    try {
+        s_ocr = std::make_unique<ParameterOCR>(s_modelPath);
+    } catch (const std::exception& e) {
+        OutputDebugStringA("OCR初始化失败: ");
+        OutputDebugStringA(e.what());
+        OutputDebugStringA("\n");
+        return false;
+    }
     
     // 启动工作线程
     s_threadRunning = true;
@@ -363,36 +384,47 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
         L"_" + std::to_wstring(m_captureCount);
     std::wstring outputDir = WindowUtils::GetScreenshotPath();
 
-    for (size_t i = 0; i < valueRegions.size(); ++i) {
-        const auto& region = valueRegions[i];
+    // OCR处理
+    try {
+        for (size_t i = 0; i < valueRegions.size(); ++i) {
+            const auto& region = valueRegions[i];
 
-        // 裁剪值区域
-        Microsoft::WRL::ComPtr<IWICBitmapSource> croppedRegion;
-        if (FAILED(CropValueRegion(trinaryBitmap.Get(), region, croppedRegion))) {
-            continue;
+            // 裁剪值区域
+            Microsoft::WRL::ComPtr<IWICBitmapSource> croppedRegion;
+            if (FAILED(CropValueRegion(trinaryBitmap.Get(), region, croppedRegion))) {
+                continue;
+            }
+
+            // 精确裁剪
+            Microsoft::WRL::ComPtr<IWICBitmapSource> finalRegion;
+            if (FAILED(CropNumberRegion(croppedRegion.Get(), finalRegion))) {
+                continue;
+            }
+
+            // 缩放到24x10
+            Microsoft::WRL::ComPtr<IWICBitmapSource> resizedRegion = WindowUtils::ResizeWICBitmap(finalRegion.Get(), 24, 10);
+            if (!resizedRegion) {
+                OutputDebugStringA("缩放图像失败\n");
+                continue;
+            }
+
+            // 预处理图像数据
+            std::vector<float> preprocessed_data = s_ocr->preprocess_image(resizedRegion.Get());
+
+            // 执行OCR预测
+            auto prediction = s_ocr->predict(preprocessed_data);
+
+            // 输出调试信息
+            std::string debug_msg = "OCR Result for region " + std::to_string(i) + 
+                                  " (y=" + std::to_string(region.y) + "): " +
+                                  prediction.value + " (type: " + prediction.type + 
+                                  ", confidence: " + std::to_string(prediction.confidence) + ")\n";
+            OutputDebugStringA(debug_msg.c_str());
         }
-
-        // 保存裁剪后的图像
-        {
-            std::wstring croppedFileName = baseName + L"_value_" + 
-                std::to_wstring(i) + L"_" + std::to_wstring(region.y) + L".png";
-            std::wstring croppedPath = outputDir + L"\\" + croppedFileName;
-            WindowUtils::SaveWICBitmapToFile(croppedRegion.Get(), croppedPath);
-        }
-
-        // 精确裁剪
-        Microsoft::WRL::ComPtr<IWICBitmapSource> finalRegion;
-        if (FAILED(CropNumberRegion(croppedRegion.Get(), finalRegion))) {
-            continue;
-        }
-
-        // 生成输出文件名
-        std::wstring filename = baseName + L"_value_" + 
-            std::to_wstring(i) + L"_" + std::to_wstring(region.y) + L".png";
-        std::wstring outputPath = outputDir + L"\\" + filename;
-
-        // 保存图片
-        WindowUtils::SaveWICBitmapToFile(finalRegion.Get(), outputPath);
+    } catch (const std::exception& e) {
+        OutputDebugStringA("OCR处理错误: ");
+        OutputDebugStringA(e.what());
+        OutputDebugStringA("\n");
     }
 
     // 增加捕获计数
