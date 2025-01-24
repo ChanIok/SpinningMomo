@@ -37,6 +37,7 @@ add_executable(SpinningMomo WIN32
     src/window_capturer.cpp
     src/parameter_tracker.cpp
     src/parameter_ocr.cpp
+    src/image_processor.cpp
     src/resource.rc  # 添加资源文件
 )
 

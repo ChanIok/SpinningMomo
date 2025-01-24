@@ -58,7 +58,6 @@ public:
     static bool CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback, const RECT *cropRegion = nullptr);
     static bool SaveFrameToFile(ID3D11Texture2D *texture, const std::wstring &filePath);
     static HRESULT TextureToWICBitmap(ID3D11Texture2D *texture, Microsoft::WRL::ComPtr<IWICBitmapSource> &outBitmap);
-    static bool SaveWICBitmapToFile(IWICBitmapSource *bitmap, const std::wstring &filePath);
 
     // 新增：会话控制方法
     static bool BeginCaptureSession(HWND hwnd, const RECT *cropRegion = nullptr);
@@ -71,23 +70,6 @@ public:
     static ID3D11Device *GetDevice() { return s_device.Get(); }
     static ID3D11DeviceContext *GetContext() { return s_context.Get(); }
     static winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice GetWinRTDevice() { return s_winrtDevice; }
-
-    // 缩放WIC位图到指定大小
-    static Microsoft::WRL::ComPtr<IWICBitmapSource> ResizeWICBitmap(
-        IWICBitmapSource *bitmap,
-        UINT targetWidth,
-        UINT targetHeight,
-        WICBitmapInterpolationMode interpolationMode = WICBitmapInterpolationModeCubic);
-
-    // 按长边缩放WIC位图
-    static Microsoft::WRL::ComPtr<IWICBitmapSource> ResizeWICBitmapByLongEdge(
-        IWICBitmapSource *bitmap,
-        UINT longEdgeLength,
-        WICBitmapInterpolationMode interpolationMode = WICBitmapInterpolationModeCubic);
-
-    // 裁剪WIC位图
-    static Microsoft::WRL::ComPtr<IWICBitmapSource> CropWICBitmap(
-        IWICBitmapSource *source, int x, int y, int width, int height);
 
 private:
     // 静态捕获器实例

@@ -1,6 +1,7 @@
 #include "parameter_tracker.hpp"
 #include "window_utils.hpp"
 #include "parameter_ocr.hpp"
+#include "image_processor.hpp"
 #include <thread>
 #include <fstream>
 
@@ -402,7 +403,7 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
             }
 
             // 缩放到24x10
-            Microsoft::WRL::ComPtr<IWICBitmapSource> resizedRegion = WindowUtils::ResizeWICBitmap(finalRegion.Get(), 24, 10);
+            Microsoft::WRL::ComPtr<IWICBitmapSource> resizedRegion = ImageProcessor::Resize(finalRegion.Get(), 24, 10);
             if (!resizedRegion) {
                 OutputDebugStringA("缩放图像失败\n");
                 continue;
@@ -477,36 +478,8 @@ bool ParameterTracker::IsInParameterArea(const POINT& pt) {
 
 // 灰度转换实现
 HRESULT ParameterTracker::ConvertToGrayscale(IWICBitmapSource* source, Microsoft::WRL::ComPtr<IWICBitmapSource>& result) {
-    if (!source) return E_INVALIDARG;
-
-    // 创建WIC工厂
-    Microsoft::WRL::ComPtr<IWICImagingFactory2> factory;
-    HRESULT hr = CoCreateInstance(
-        CLSID_WICImagingFactory2,
-        nullptr,
-        CLSCTX_INPROC_SERVER,
-        IID_PPV_ARGS(&factory)
-    );
-    if (FAILED(hr)) return hr;
-
-    // 创建颜色转换器
-    Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
-    hr = factory->CreateFormatConverter(&converter);
-    if (FAILED(hr)) return hr;
-
-    // 初始化转换器为灰度格式
-    hr = converter->Initialize(
-        source,                          // 输入源
-        GUID_WICPixelFormat8bppGray,    // 目标格式：8位灰度
-        WICBitmapDitherTypeNone,        // 不使用抖动
-        nullptr,                         // 不使用调色板
-        0.0f,                           // 透明度阈值
-        WICBitmapPaletteTypeCustom      // 自定义调色板
-    );
-    if (FAILED(hr)) return hr;
-
-    // 返回结果
-    return converter.As(&result);
+    result = ImageProcessor::ConvertToGrayscale(source);
+    return result ? S_OK : E_FAIL;
 }
 
 // 缩放到512长边实现
@@ -528,119 +501,21 @@ HRESULT ParameterTracker::ResizeTo512LongEdge(IWICBitmapSource* source, Microsof
         targetWidth = static_cast<UINT>((512.0 * originalWidth) / originalHeight);
     }
 
-    // 使用WindowUtils的缩放功能
-    result = WindowUtils::ResizeWICBitmap(source, targetWidth, targetHeight);
+    // 使用ImageProcessor的缩放功能
+    result = ImageProcessor::Resize(source, targetWidth, targetHeight);
     return result ? S_OK : E_FAIL;
 }
 
 // 二值化实现
 HRESULT ParameterTracker::Binarize(IWICBitmapSource* source, BYTE threshold, Microsoft::WRL::ComPtr<IWICBitmapSource>& result) {
-    if (!source) return E_INVALIDARG;
-
-    // 获取源图像尺寸
-    UINT width = 0, height = 0;
-    HRESULT hr = source->GetSize(&width, &height);
-    if (FAILED(hr)) return hr;
-
-    // 创建WIC工厂
-    Microsoft::WRL::ComPtr<IWICImagingFactory2> factory;
-    hr = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
-    if (FAILED(hr)) return hr;
-
-    // 创建新的位图
-    Microsoft::WRL::ComPtr<IWICBitmap> binaryBitmap;
-    hr = factory->CreateBitmap(width, height, GUID_WICPixelFormat8bppGray, WICBitmapCacheOnLoad, &binaryBitmap);
-    if (FAILED(hr)) return hr;
-
-    // 读取源数据
-    UINT sourceStride = ((width * 8 + 31) / 32) * 4; // 8bpp的stride计算
-    std::vector<BYTE> sourceBuffer(sourceStride * height);
-    hr = source->CopyPixels(nullptr, sourceStride, sourceStride * height, sourceBuffer.data());
-    if (FAILED(hr)) return hr;
-
-    // 锁定目标位图进行写入
-    WICRect lockRect = { 0, 0, static_cast<INT>(width), static_cast<INT>(height) };
-    Microsoft::WRL::ComPtr<IWICBitmapLock> lock;
-    hr = binaryBitmap->Lock(&lockRect, WICBitmapLockWrite, &lock);
-    if (FAILED(hr)) return hr;
-
-    // 获取目标数据指针和步长
-    UINT targetStride = 0;
-    UINT bufferSize = 0;
-    BYTE* targetData = nullptr;
-    hr = lock->GetStride(&targetStride);
-    if (FAILED(hr)) return hr;
-    hr = lock->GetDataPointer(&bufferSize, &targetData);
-    if (FAILED(hr)) return hr;
-
-    // 执行二值化
-    for (UINT y = 0; y < height; ++y) {
-        for (UINT x = 0; x < width; ++x) {
-            BYTE sourceValue = sourceBuffer[y * sourceStride + x];
-            targetData[y * targetStride + x] = (sourceValue > threshold) ? 255 : 0;
-        }
-    }
-
-    // 返回结果
-    return binaryBitmap.As(&result);
+    result = ImageProcessor::Binarize(source, threshold);
+    return result ? S_OK : E_FAIL;
 }
 
 // 三值化实现
 HRESULT ParameterTracker::Trinarize(IWICBitmapSource* source, BYTE lowerThreshold, BYTE upperThreshold, Microsoft::WRL::ComPtr<IWICBitmapSource>& result) {
-    if (!source) return E_INVALIDARG;
-
-    // 获取源图像尺寸
-    UINT width = 0, height = 0;
-    HRESULT hr = source->GetSize(&width, &height);
-    if (FAILED(hr)) return hr;
-
-    // 创建WIC工厂
-    Microsoft::WRL::ComPtr<IWICImagingFactory2> factory;
-    hr = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
-    if (FAILED(hr)) return hr;
-
-    // 创建新的位图
-    Microsoft::WRL::ComPtr<IWICBitmap> trinaryBitmap;
-    hr = factory->CreateBitmap(width, height, GUID_WICPixelFormat8bppGray, WICBitmapCacheOnLoad, &trinaryBitmap);
-    if (FAILED(hr)) return hr;
-
-    // 读取源数据
-    UINT sourceStride = ((width * 8 + 31) / 32) * 4; // 8bpp的stride计算
-    std::vector<BYTE> sourceBuffer(sourceStride * height);
-    hr = source->CopyPixels(nullptr, sourceStride, sourceStride * height, sourceBuffer.data());
-    if (FAILED(hr)) return hr;
-
-    // 锁定目标位图进行写入
-    WICRect lockRect = { 0, 0, static_cast<INT>(width), static_cast<INT>(height) };
-    Microsoft::WRL::ComPtr<IWICBitmapLock> lock;
-    hr = trinaryBitmap->Lock(&lockRect, WICBitmapLockWrite, &lock);
-    if (FAILED(hr)) return hr;
-
-    // 获取目标数据指针和步长
-    UINT targetStride = 0;
-    UINT bufferSize = 0;
-    BYTE* targetData = nullptr;
-    hr = lock->GetStride(&targetStride);
-    if (FAILED(hr)) return hr;
-    hr = lock->GetDataPointer(&bufferSize, &targetData);
-    if (FAILED(hr)) return hr;
-
-    // 执行三值化
-    for (UINT y = 0; y < height; ++y) {
-        for (UINT x = 0; x < width; ++x) {
-            BYTE sourceValue = sourceBuffer[y * sourceStride + x];
-            if (sourceValue > upperThreshold) {
-                targetData[y * targetStride + x] = 255;  // 白色
-            } else if (sourceValue > lowerThreshold) {
-                targetData[y * targetStride + x] = 128;  // 灰色
-            } else {
-                targetData[y * targetStride + x] = 0;    // 黑色
-            }
-        }
-    }
-
-    // 返回结果
-    return trinaryBitmap.As(&result);
+    result = ImageProcessor::Trinarize(source, lowerThreshold, upperThreshold);
+    return result ? S_OK : E_FAIL;
 }
 
 // 滚动条位置检测实现
@@ -776,293 +651,30 @@ bool ParameterTracker::GetValueRegions(IWICBitmapSource* binary, int scrollbarCe
 
 // 裁剪值区域实现
 HRESULT ParameterTracker::CropValueRegion(IWICBitmapSource* source, const ValueRegion& region, Microsoft::WRL::ComPtr<IWICBitmapSource>& result) {
-    if (!source) {
-        return E_INVALIDARG;
-    }
+    if (!source) return E_INVALIDARG;
 
-    // 获取源图像尺寸
-    UINT width = 0, height = 0;
-    HRESULT hr = source->GetSize(&width, &height);
-    if (FAILED(hr)) {
-        return hr;
-    }
-
-    // 验证裁剪区域是否有效
-    if (region.bounds.left < 0 || region.bounds.top < 0 ||
-        region.bounds.right > static_cast<int>(width) ||
-        region.bounds.bottom > static_cast<int>(height) ||
-        region.bounds.left >= region.bounds.right ||
-        region.bounds.top >= region.bounds.bottom) {
-        return E_INVALIDARG;
-    }
-
-    // 创建WIC工厂
-    Microsoft::WRL::ComPtr<IWICImagingFactory2> factory;
-    hr = CoCreateInstance(
-        CLSID_WICImagingFactory2,
-        nullptr,
-        CLSCTX_INPROC_SERVER,
-        IID_PPV_ARGS(&factory)
-    );
-    if (FAILED(hr)) {
-        return hr;
-    }
-
-    // 创建裁剪器
-    Microsoft::WRL::ComPtr<IWICBitmapClipper> clipper;
-    hr = factory->CreateBitmapClipper(&clipper);
-    if (FAILED(hr)) {
-        return hr;
-    }
-
-    // 设置裁剪区域
-    WICRect rect = {
-        region.bounds.left,
-        region.bounds.top,
-        region.bounds.right - region.bounds.left,
-        region.bounds.bottom - region.bounds.top
-    };
-
-    // 初始化裁剪器
-    hr = clipper->Initialize(source, &rect);
-    if (FAILED(hr)) {
-        return hr;
-    }
-
-    // 返回结果
-    hr = clipper.As(&result);
-    if (FAILED(hr)) {
-        return hr;
-    }
-
-    return S_OK;
+    result = ImageProcessor::Crop(source, region.bounds);
+    return result ? S_OK : E_FAIL;
 }
 
 // 精确裁剪数字区域实现
 HRESULT ParameterTracker::CropNumberRegion(IWICBitmapSource* source, Microsoft::WRL::ComPtr<IWICBitmapSource>& result) {
-    if (!source) {
-        return E_INVALIDARG;
-    }
-
-    // 获取源图像尺寸
-    UINT width = 0, height = 0;
-    HRESULT hr = source->GetSize(&width, &height);
-    if (FAILED(hr)) {
-        return hr;
-    }
-
-    // 读取图像数据
-    std::vector<BYTE> buffer(width * height);
-    hr = source->CopyPixels(nullptr, width, width * height, buffer.data());
-    if (FAILED(hr)) {
-        return hr;
-    }
-
-    // 计算水平投影
-    std::vector<int> hProjection(height, 0);
-    for (UINT y = 0; y < height; ++y) {
-        for (UINT x = 0; x < width; ++x) {
-            if (buffer[y * width + x] == 255) {  // 白色像素
-                hProjection[y]++;
-            }
-        }
-    }
-
-    // 初始化边界
-    int top = 0, bottom = height;
-    int fullWhite = width * 255;  // 全白行的投影值
-    
-    // 计算中心点
-    int center = (top + bottom) / 2;
-    
-    // 从中心向两边寻找全黑或全白行
-    int newTop = top, newBottom = bottom;
-    
-    // 向上寻找全黑或全白行
-    for (int i = center; i >= top; --i) {
-        if (hProjection[i] == 0 || hProjection[i] == fullWhite) {
-            newTop = i + 1;
-            break;
-        }
-    }
-    
-    // 向下寻找全黑或全白行
-    for (int i = center; i < bottom; ++i) {
-        if (hProjection[i] == 0 || hProjection[i] == fullWhite) {
-            newBottom = i;
-            break;
-        }
-    }
-    
-    // 如果裁剪后高度仍然大于12px，寻找局部最小值进行进一步裁剪
-    if (newBottom - newTop > 12) {
-        // 收集所有非全白行的投影值和索引
-        std::vector<std::pair<int, int>> candidates;  // (投影值, 索引)
-        for (int i = newTop; i < newBottom; ++i) {
-            if (hProjection[i] != fullWhite) {
-                candidates.push_back({hProjection[i], i});
-            }
-        }
-        
-        // 按投影值从小到大排序
-        std::sort(candidates.begin(), candidates.end());
-        
-        // 尝试每个候选点作为分割点
-        for (const auto& candidate : candidates) {
-            int projVal = candidate.first;
-            int idx = candidate.second;
-            
-            // 如果在中心点上方
-            if (idx < center) {
-                int potentialTop = idx + 1;
-                if (newBottom - potentialTop >= 9) {  // 确保裁剪后高度不小于9px
-                    newTop = potentialTop;
-                    break;
-                }
-            }
-            // 如果在中心点下方
-            else {
-                int potentialBottom = idx;
-                if (potentialBottom - newTop >= 9) {  // 确保裁剪后高度不小于9px
-                    newBottom = potentialBottom;
-                    break;
-                }
-            }
-        }
-    }
-    
-    // 在确定的上下边界区域内计算垂直投影
-    std::vector<int> vProjection(width, 0);
-    for (UINT x = 0; x < width; ++x) {
-        for (int y = newTop; y < newBottom; ++y) {
-            if (buffer[y * width + x] == 255) {  // 白色像素
-                vProjection[x]++;
-            }
-        }
-    }
-    
-    // 计算水平中心点和偏移区域
-    int centerX = width / 2;
-    int offset = 3;  // 中心偏移像素数
-    int leftCenter = centerX - offset;
-    int rightCenter = centerX + offset;
-    
-    // 第一步：从左向右找起始边界（完全黑色的列）
-    int left = 0;
-    while (left < width / 2 && vProjection[left] == 0) {
-        left++;
-    }
-    
-    // 第二步：从右向左找结束边界（完全黑色的列）
-    int right = width - 1;
-    while (right >= width / 2 && vProjection[right] == 0) {
-        right--;
-    }
-    
-    // 第三步：从中心向左寻找连续黑色区域
-    int leftFromCenter = leftCenter;
-    while (leftFromCenter > left) {
-        // 检查连续黑色列数
-        int blackCount = 0;
-        int j = leftFromCenter;
-        while (j > left && vProjection[j] == 0) {
-            blackCount++;
-            j--;
-        }
-        
-        if (blackCount >= 5) {  // 如果有5列及以上的黑色
-            left = j + 1;  // 设置为连续黑色区域的起始位置
-            break;
-        }
-        leftFromCenter--;
-    }
-    
-    // 第四步：从中心向右寻找连续黑色区域
-    int rightFromCenter = rightCenter;
-    while (rightFromCenter < right) {
-        // 检查连续黑色列数
-        int blackCount = 0;
-        int j = rightFromCenter;
-        while (j < right && vProjection[j] == 0) {
-            blackCount++;
-            j++;
-        }
-        
-        if (blackCount >= 5) {  // 如果有5列及以上的黑色
-            right = j - blackCount;  // 设置为连续黑色区域的前一个位置
-            break;
-        }
-        rightFromCenter++;
-    }
-
-    // 验证边界有效性
-    if (left >= right || newTop >= newBottom || 
-        left < 0 || right >= static_cast<int>(width) ||
-        newTop < 0 || newBottom > static_cast<int>(height)) {
-        return E_FAIL;
-    }
-
-    // 创建WIC工厂
-    Microsoft::WRL::ComPtr<IWICImagingFactory2> factory;
-    hr = CoCreateInstance(
-        CLSID_WICImagingFactory2,
-        nullptr,
-        CLSCTX_INPROC_SERVER,
-        IID_PPV_ARGS(&factory)
-    );
-    if (FAILED(hr)) return hr;
-
-    // 创建裁剪器
-    Microsoft::WRL::ComPtr<IWICBitmapClipper> clipper;
-    hr = factory->CreateBitmapClipper(&clipper);
-    if (FAILED(hr)) return hr;
-
-    // 设置裁剪区域
-    WICRect rect = {
-        left,
-        newTop,
-        right - left + 1,
-        newBottom - newTop
-    };
-
-    // 初始化裁剪器
-    hr = clipper->Initialize(source, &rect);
-    if (FAILED(hr)) return hr;
-
-    // 返回结果
-    return clipper.As(&result);
+    result = ImageProcessor::AutoCropNumber(source);
+    return result ? S_OK : E_FAIL;
 }
 
 // 裁剪滚动条区域实现
 HRESULT ParameterTracker::CropScrollbarRegion(IWICBitmapSource* source, Microsoft::WRL::ComPtr<IWICBitmapSource>& result) {
     if (!source) return E_INVALIDARG;
 
-    // 获取源图像尺寸
-    UINT width = 0, height = 0;
-    HRESULT hr = source->GetSize(&width, &height);
-    if (FAILED(hr)) return hr;
-
-    // 创建WIC工厂
-    Microsoft::WRL::ComPtr<IWICImagingFactory2> factory;
-    hr = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
-    if (FAILED(hr)) return hr;
-
-    // 创建裁剪器
-    Microsoft::WRL::ComPtr<IWICBitmapClipper> clipper;
-    hr = factory->CreateBitmapClipper(&clipper);
-    if (FAILED(hr)) return hr;
-
-    WICRect rect = {
-        504,              // left
-        92,                        // top
-        7,          // width
-        227  // height
+    // 固定的滚动条区域
+    RECT rect = {
+        504,  // left
+        92,   // top
+        511,  // right (504 + 7)
+        319   // bottom (92 + 227)
     };
 
-    // 初始化裁剪器
-    hr = clipper->Initialize(source, &rect);
-    if (FAILED(hr)) return hr;
-
-    // 返回结果
-    return clipper.As(&result);
+    result = ImageProcessor::Crop(source, rect);
+    return result ? S_OK : E_FAIL;
 }

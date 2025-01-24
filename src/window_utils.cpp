@@ -1,4 +1,5 @@
 #include "window_utils.hpp"
+#include "image_processor.hpp"
 #include <wincodec.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
@@ -107,118 +108,6 @@ namespace {
         ID3D11DeviceContext* m_context;
         ID3D11Texture2D* m_texture;
         D3D11_MAPPED_SUBRESOURCE m_mapped;
-        bool m_success;
-    };
-
-    // RAII 包装器：管理 WIC 工厂
-    class WICFactory {
-    public:
-        WICFactory() : m_factory(nullptr) {
-            CoCreateInstance(
-                CLSID_WICImagingFactory2,
-                nullptr,
-                CLSCTX_INPROC_SERVER,
-                IID_PPV_ARGS(&m_factory)
-            );
-        }
-
-        IWICImagingFactory2* Get() const { return m_factory.Get(); }
-        bool IsValid() const { return m_factory != nullptr; }
-
-    private:
-        Microsoft::WRL::ComPtr<IWICImagingFactory2> m_factory;
-    };
-
-    // RAII 包装器：管理 WIC 编码过程
-    class WICImageEncoder {
-    public:
-        WICImageEncoder(const std::wstring& filePath) : m_success(false) {
-            // 创建 WIC 工厂
-            if (FAILED(CoCreateInstance(CLSID_WICImagingFactory2, nullptr,
-                CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_factory)))) {
-                return;
-            }
-
-            // 创建编码器
-            if (FAILED(m_factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &m_encoder))) {
-                return;
-            }
-
-            // 创建流
-            if (FAILED(m_factory->CreateStream(&m_stream))) {
-                return;
-            }
-
-            // 初始化流
-            if (FAILED(m_stream->InitializeFromFilename(filePath.c_str(), GENERIC_WRITE))) {
-                return;
-            }
-
-            // 初始化编码器
-            if (FAILED(m_encoder->Initialize(m_stream.Get(), WICBitmapEncoderNoCache))) {
-                return;
-            }
-
-            // 创建帧
-            if (FAILED(m_encoder->CreateNewFrame(&m_frame, nullptr))) {
-                return;
-            }
-
-            // 初始化帧
-            if (FAILED(m_frame->Initialize(nullptr))) {
-                return;
-            }
-
-            m_success = true;
-        }
-
-        bool IsValid() const { return m_success; }
-
-        bool SetSize(UINT width, UINT height) {
-            return SUCCEEDED(m_frame->SetSize(width, height));
-        }
-
-        bool SetPixelFormat() {
-            WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
-            return SUCCEEDED(m_frame->SetPixelFormat(&format));
-        }
-
-        bool WritePixels(UINT height, UINT stride, UINT bufferSize, BYTE* data) {
-            return SUCCEEDED(m_frame->WritePixels(height, stride, bufferSize, data));
-        }
-
-        // 新增：直接从 IWICBitmapSource 写入
-        bool WriteSource(IWICBitmapSource* bitmap) {
-            if (!bitmap || !m_frame) return false;
-            
-            // 获取位图大小
-            UINT width = 0, height = 0;
-            HRESULT hr = bitmap->GetSize(&width, &height);
-            if (FAILED(hr)) return false;
-
-            // 设置帧大小
-            hr = m_frame->SetSize(width, height);
-            if (FAILED(hr)) return false;
-
-            // 设置像素格式
-            WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
-            hr = m_frame->SetPixelFormat(&format);
-            if (FAILED(hr)) return false;
-
-            // 写入图像数据
-            return SUCCEEDED(m_frame->WriteSource(bitmap, nullptr));
-        }
-
-        bool Commit() {
-            if (FAILED(m_frame->Commit())) return false;
-            return SUCCEEDED(m_encoder->Commit());
-        }
-
-    private:
-        Microsoft::WRL::ComPtr<IWICImagingFactory2> m_factory;
-        Microsoft::WRL::ComPtr<IWICBitmapEncoder> m_encoder;
-        Microsoft::WRL::ComPtr<IWICStream> m_stream;
-        Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> m_frame;
         bool m_success;
     };
 }
@@ -477,149 +366,22 @@ bool WindowUtils::CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::Co
 
 // 保存帧缓冲为文件
 bool WindowUtils::SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath) {
-    // 获取纹理描述
-    D3D11_TEXTURE2D_DESC desc;
-    texture->GetDesc(&desc);
+    if (!texture) return false;
 
-    // 获取设备和上下文
-    Microsoft::WRL::ComPtr<ID3D11Device> device;
-    texture->GetDevice(&device);
-    if (!device) return false;
+    // 转换为WIC位图
+    auto wicBitmap = ImageProcessor::TextureToWICBitmap(texture);
+    if (!wicBitmap) return false;
 
-    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-    device->GetImmediateContext(&context);
-    if (!context) return false;
-
-    // 创建暂存纹理
-    D3D11_TEXTURE2D_DESC stagingDesc = desc;
-    stagingDesc.Usage = D3D11_USAGE_STAGING;
-    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    stagingDesc.BindFlags = 0;
-    stagingDesc.MiscFlags = 0;
-    stagingDesc.ArraySize = 1;
-    stagingDesc.MipLevels = 1;
-
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> stagingTexture;
-    if (FAILED(device->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture))) {
-        return false;
-    }
-
-    // 复制纹理数据
-    context->CopyResource(stagingTexture.Get(), texture);
-
-    // 创建 WIC 编码器并设置参数
-    WICImageEncoder encoder(filePath);
-    if (!encoder.IsValid()) return false;
-    
-    if (!encoder.SetSize(desc.Width, desc.Height)) return false;
-    if (!encoder.SetPixelFormat()) return false;
-
-    // 映射纹理并写入数据
-    {
-        StagingTextureMapper mapper(context.Get(), stagingTexture.Get());
-        if (!mapper.IsValid()) return false;
-
-        const auto& mapped = mapper.GetMapped();
-        if (!encoder.WritePixels(desc.Height, mapped.RowPitch, mapped.RowPitch * desc.Height,
-            static_cast<BYTE*>(mapped.pData))) {
-            return false;
-        }
-    }
-
-    // 提交更改
-    return encoder.Commit();
+    // 保存到文件
+    return ImageProcessor::SaveToFile(wicBitmap.Get(), filePath);
 }
 
 // 转换纹理到WIC位图
 HRESULT WindowUtils::TextureToWICBitmap(ID3D11Texture2D* texture, Microsoft::WRL::ComPtr<IWICBitmapSource>& outBitmap) {
     if (!texture) return E_INVALIDARG;
 
-    // 获取纹理描述
-    D3D11_TEXTURE2D_DESC desc;
-    texture->GetDesc(&desc);
-
-    // 获取设备和上下文
-    Microsoft::WRL::ComPtr<ID3D11Device> device;
-    texture->GetDevice(&device);
-    if (!device) return E_FAIL;
-
-    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-    device->GetImmediateContext(&context);
-    if (!context) return E_FAIL;
-
-    // 创建暂存纹理
-    D3D11_TEXTURE2D_DESC stagingDesc = desc;
-    stagingDesc.Usage = D3D11_USAGE_STAGING;
-    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-    stagingDesc.BindFlags = 0;
-    stagingDesc.MiscFlags = 0;
-    stagingDesc.ArraySize = 1;
-    stagingDesc.MipLevels = 1;
-
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> stagingTexture;
-    HRESULT hr = device->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture);
-    if (FAILED(hr)) return hr;
-
-    // 复制纹理数据
-    context->CopyResource(stagingTexture.Get(), texture);
-
-    // 创建WIC工厂
-    WICFactory factory;
-    if (!factory.IsValid()) return E_FAIL;
-
-    // 创建WIC位图
-    Microsoft::WRL::ComPtr<IWICBitmap> wicBitmap;
-    hr = factory.Get()->CreateBitmap(
-        desc.Width, desc.Height,
-        GUID_WICPixelFormat32bppBGRA,
-        WICBitmapCacheOnLoad,
-        &wicBitmap);
-    if (FAILED(hr)) return hr;
-
-    // 映射暂存纹理
-    {
-        StagingTextureMapper mapper(context.Get(), stagingTexture.Get());
-        if (!mapper.IsValid()) return E_FAIL;
-
-        const auto& mapped = mapper.GetMapped();
-
-        // 锁定WIC位图进行写入
-        WICRect rect = { 0, 0, static_cast<INT>(desc.Width), static_cast<INT>(desc.Height) };
-        Microsoft::WRL::ComPtr<IWICBitmapLock> lock;
-        hr = wicBitmap->Lock(&rect, WICBitmapLockWrite, &lock);
-        if (FAILED(hr)) return hr;
-
-        UINT stride = 0;
-        UINT bufferSize = 0;
-        BYTE* data = nullptr;
-        hr = lock->GetStride(&stride);
-        if (FAILED(hr)) return hr;
-        hr = lock->GetDataPointer(&bufferSize, &data);
-        if (FAILED(hr)) return hr;
-
-        // 复制数据
-        for (UINT i = 0; i < desc.Height; ++i) {
-            memcpy(
-                data + i * stride,
-                static_cast<BYTE*>(mapped.pData) + i * mapped.RowPitch,
-                min(stride, mapped.RowPitch)
-            );
-        }
-    }
-
-    // 返回结果
-    return wicBitmap.As(&outBitmap);
-}
-
-// 保存WIC位图到文件
-bool WindowUtils::SaveWICBitmapToFile(IWICBitmapSource* bitmap, const std::wstring& filePath) {
-    if (!bitmap) return false;
-
-    // 创建编码器并保存
-    WICImageEncoder encoder(filePath);
-    if (!encoder.IsValid()) return false;
-
-    return encoder.WriteSource(bitmap) && encoder.Commit();
+    outBitmap = ImageProcessor::TextureToWICBitmap(texture);
+    return outBitmap ? S_OK : E_FAIL;
 }
 
 // 开始捕获会话
@@ -653,93 +415,3 @@ bool WindowUtils::RequestNextFrame(std::function<void(Microsoft::WRL::ComPtr<ID3
 bool WindowUtils::HasActiveSession() {
     return s_capturer && s_capturer->HasActiveSession();
 }
-
-// 缩放WIC位图
-Microsoft::WRL::ComPtr<IWICBitmapSource> WindowUtils::ResizeWICBitmap(
-    IWICBitmapSource* bitmap,
-    UINT targetWidth,
-    UINT targetHeight,
-    WICBitmapInterpolationMode interpolationMode) {
-    
-    if (!bitmap) return nullptr;
-
-    try {
-        // 使用RAII包装器创建WIC工厂
-        WICFactory factory;
-        if (!factory.IsValid()) {
-            throw std::runtime_error("Failed to create WIC factory");
-        }
-
-        // 创建缩放器
-        Microsoft::WRL::ComPtr<IWICBitmapScaler> scaler;
-        HRESULT hr = factory.Get()->CreateBitmapScaler(&scaler);
-        if (FAILED(hr)) throw std::runtime_error("Failed to create bitmap scaler");
-
-        // 初始化缩放器
-        hr = scaler->Initialize(
-            bitmap,
-            targetWidth,
-            targetHeight,
-            interpolationMode
-        );
-        if (FAILED(hr)) throw std::runtime_error("Failed to initialize bitmap scaler");
-
-        return scaler;
-    } catch (const std::exception& e) {
-        OutputDebugStringA(("ResizeWICBitmap failed: " + std::string(e.what()) + "\n").c_str());
-        return nullptr;
-    }
-}
-
-// 按长边缩放WIC位图
-Microsoft::WRL::ComPtr<IWICBitmapSource> WindowUtils::ResizeWICBitmapByLongEdge(
-    IWICBitmapSource* bitmap,
-    UINT longEdgeLength,
-    WICBitmapInterpolationMode interpolationMode) {
-    
-    if (!bitmap) return nullptr;
-
-    try {
-        // 获取原始尺寸
-        UINT originalWidth = 0, originalHeight = 0;
-        HRESULT hr = bitmap->GetSize(&originalWidth, &originalHeight);
-        if (FAILED(hr)) throw std::runtime_error("Failed to get bitmap size");
-
-        // 计算目标尺寸
-        UINT targetWidth, targetHeight;
-        if (originalWidth > originalHeight) {
-            targetWidth = longEdgeLength;
-            targetHeight = static_cast<UINT>((longEdgeLength * originalHeight) / static_cast<float>(originalWidth));
-        } else {
-            targetHeight = longEdgeLength;
-            targetWidth = static_cast<UINT>((longEdgeLength * originalWidth) / static_cast<float>(originalHeight));
-        }
-
-        return ResizeWICBitmap(bitmap, targetWidth, targetHeight, interpolationMode);
-    } catch (const std::exception& e) {
-        OutputDebugStringA(("ResizeWICBitmapByLongEdge failed: " + std::string(e.what()) + "\n").c_str());
-        return nullptr;
-    }
-}
-
-// 裁剪WIC位图
-Microsoft::WRL::ComPtr<IWICBitmapSource> WindowUtils::CropWICBitmap(
-    IWICBitmapSource* source, int x, int y, int width, int height) {
-    if (!source) return nullptr;
-
-    // 创建WIC工厂
-    WICFactory factory;
-    if (!factory.IsValid()) return nullptr;
-
-    // 创建裁剪器
-    Microsoft::WRL::ComPtr<IWICBitmapClipper> clipper;
-    HRESULT hr = factory.Get()->CreateBitmapClipper(&clipper);
-    if (FAILED(hr)) return nullptr;
-
-    // 设置裁剪区域
-    WICRect rect = { x, y, width, height };
-    hr = clipper->Initialize(source, &rect);
-    if (FAILED(hr)) return nullptr;
-
-    return clipper;
-} 
