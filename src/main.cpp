@@ -235,6 +235,8 @@ public:
                 if (!albumPath.empty()) {
                     m_configManager->SetGameAlbumPath(albumPath);
                     m_configManager->SaveGameAlbumConfig();
+                } else {
+                    albumPath = WindowUtils::GetScreenshotPath();
                 }
             }
         }

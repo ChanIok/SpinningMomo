@@ -115,21 +115,57 @@ LRESULT CALLBACK ParameterTracker::WorkerWndProc(HWND hwnd, UINT msg, WPARAM wp,
     switch (msg) {
         case Constants::WM_PARAMETER_START_CAPTURE: {
             std::lock_guard<std::mutex> lock(s_sequenceMutex);
-            if (!s_currentSequence || !s_currentSequence->IsActive()) return 0;
+            if (!s_currentSequence || !s_currentSequence->IsActive()) {
+                return 0;
+            }
 
-            OutputDebugStringA("ParameterTracker::WorkerWndProc: WM_PARAMETER_START_CAPTURE\n");
-            
             // 获取当前序列的裁剪区域
             RECT cropRegion = s_currentSequence->GetRegion();
             
-            // 调用WindowUtils进行捕获
-            WindowUtils::CaptureWindow(s_targetWindow, 
-                [](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
-                    OutputDebugStringA("ParameterTracker: Capture callback executed\n");
-                    // TODO: 后续处理捕获的纹理
-                }, &cropRegion);
+            // 只在序列第一次捕获时初始化会话
+            if (s_currentSequence->GetCaptureCount() == 0) {
+                OutputDebugStringA("ParameterTracker: Starting new capture session\n");
+                if (!WindowUtils::BeginCaptureSession(s_targetWindow, &cropRegion)) {
+                    return 0;
+                }
+            }
+
+            // 记录开始时间
+            auto startTime = std::chrono::high_resolution_clock::now();
             
-            s_currentSequence->SetActive(false);
+            // 请求下一帧
+            WindowUtils::RequestNextFrame([startTime, sequence = s_currentSequence](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
+                // 计算耗时
+                auto endTime = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+                
+                // 转换为WIC位图
+                Microsoft::WRL::ComPtr<IWICBitmapSource> bitmap;
+                if (SUCCEEDED(WindowUtils::TextureToWICBitmap(texture.Get(), bitmap))) {
+                    // 生成文件名
+                    auto now = std::chrono::system_clock::now();
+                    std::wstring filename = L"Parameter_" + 
+                        std::to_wstring(std::chrono::system_clock::to_time_t(now)) + 
+                        L"_" + std::to_wstring(sequence->GetCaptureCount()) + L".png";
+                    std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
+                    
+                    // 保存图片
+                    WindowUtils::SaveWICBitmapToFile(bitmap.Get(), savePath);
+                }
+
+                // 增加捕获计数
+                sequence->IncrementCaptureCount();
+
+                // 如果还需要继续捕获，只设置定时器
+                if (sequence->IsActive() && sequence->GetCaptureCount() < CaptureSequence::MAX_CAPTURES) {
+                    SetTimer(s_workerWindow, 1, CaptureSequence::CAPTURE_INTERVAL_MS, nullptr);
+                } else {
+                    // 只在整个序列结束时才结束会话
+                    sequence->SetActive(false);
+                    WindowUtils::EndCaptureSession();
+                }
+            });
+            
             return 0;
         }
 
@@ -183,10 +219,12 @@ ParameterTracker::CaptureSequence::CaptureSequence(const RECT& region)
 
 // 捕获序列析构
 ParameterTracker::CaptureSequence::~CaptureSequence() {
-    SetActive(false);
+    if (m_isActive) {
+        OutputDebugStringA("ParameterTracker: CaptureSequence destructor - ending active session\n");
+        WindowUtils::EndCaptureSession();
+        m_isActive = false;
+    }
 }
-
-
 
 void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<IWICBitmapSource> bitmap) {
     if (!m_isActive) return;
@@ -203,7 +241,7 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<IW
     m_captureCount++;
     
     // 检查是否完成所有捕获
-    if (m_captureCount >= MAX_CAPTURES) {
+    if (m_captureCount >= CaptureSequence::MAX_CAPTURES) {
         m_isActive = false;
     }
 }

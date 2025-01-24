@@ -51,9 +51,12 @@ private:
         void SetActive(bool active) { m_isActive = active; }
         void ProcessCapture(Microsoft::WRL::ComPtr<IWICBitmapSource> bitmap);
 
+        // 新增：获取和增加捕获计数的方法
+        void IncrementCaptureCount() { ++m_captureCount; }
+
         // 常量
-        static constexpr int MAX_CAPTURES = 1;
-        static constexpr int CAPTURE_INTERVAL_MS = 1000;
+        static constexpr int MAX_CAPTURES = 30;  // 最大连续捕获次数
+        static constexpr int CAPTURE_INTERVAL_MS = 1;
         
     private:
         RECT m_region;

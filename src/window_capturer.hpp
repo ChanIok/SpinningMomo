@@ -27,6 +27,14 @@ public:
     void StartCapture();
     void StopCapture();
 
+    // 新增：会话控制方法
+    bool BeginCaptureSession(HWND hwnd, const RECT* cropRegion = nullptr);
+    void EndCaptureSession();
+    bool RequestNextFrame(std::function<void(ID3D11Texture2D*)> callback);
+
+    // 新增：会话状态查询方法
+    bool HasActiveSession() const { return m_hasActiveSession; }
+
     void SetCropRegion(const RECT& region) {
         m_cropRegion = region;
         m_needsCropping = true;
@@ -61,4 +69,8 @@ private:
     // 裁剪区域支持
     RECT m_cropRegion{};
     bool m_needsCropping = false;
+
+    // 新增：会话状态标志
+    bool m_hasActiveSession = false;
+    bool m_isSessionInitialized = false;
 }; 

@@ -529,3 +529,127 @@ bool WindowUtils::SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& 
     // 提交更改
     return encoder.Commit();
 }
+
+// 转换纹理到WIC位图
+HRESULT WindowUtils::TextureToWICBitmap(ID3D11Texture2D* texture, Microsoft::WRL::ComPtr<IWICBitmapSource>& outBitmap) {
+    if (!texture) return E_INVALIDARG;
+
+    // 获取纹理描述
+    D3D11_TEXTURE2D_DESC desc;
+    texture->GetDesc(&desc);
+
+    // 获取设备和上下文
+    Microsoft::WRL::ComPtr<ID3D11Device> device;
+    texture->GetDevice(&device);
+    if (!device) return E_FAIL;
+
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+    device->GetImmediateContext(&context);
+    if (!context) return E_FAIL;
+
+    // 创建暂存纹理
+    D3D11_TEXTURE2D_DESC stagingDesc = desc;
+    stagingDesc.Usage = D3D11_USAGE_STAGING;
+    stagingDesc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    stagingDesc.BindFlags = 0;
+    stagingDesc.MiscFlags = 0;
+    stagingDesc.ArraySize = 1;
+    stagingDesc.MipLevels = 1;
+
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> stagingTexture;
+    HRESULT hr = device->CreateTexture2D(&stagingDesc, nullptr, &stagingTexture);
+    if (FAILED(hr)) return hr;
+
+    // 复制纹理数据
+    context->CopyResource(stagingTexture.Get(), texture);
+
+    // 创建WIC工厂
+    WICFactory factory;
+    if (!factory.IsValid()) return E_FAIL;
+
+    // 创建WIC位图
+    Microsoft::WRL::ComPtr<IWICBitmap> wicBitmap;
+    hr = factory.Get()->CreateBitmap(
+        desc.Width, desc.Height,
+        GUID_WICPixelFormat32bppBGRA,
+        WICBitmapCacheOnLoad,
+        &wicBitmap);
+    if (FAILED(hr)) return hr;
+
+    // 映射暂存纹理
+    {
+        StagingTextureMapper mapper(context.Get(), stagingTexture.Get());
+        if (!mapper.IsValid()) return E_FAIL;
+
+        const auto& mapped = mapper.GetMapped();
+
+        // 锁定WIC位图进行写入
+        WICRect rect = { 0, 0, static_cast<INT>(desc.Width), static_cast<INT>(desc.Height) };
+        Microsoft::WRL::ComPtr<IWICBitmapLock> lock;
+        hr = wicBitmap->Lock(&rect, WICBitmapLockWrite, &lock);
+        if (FAILED(hr)) return hr;
+
+        UINT stride = 0;
+        UINT bufferSize = 0;
+        BYTE* data = nullptr;
+        hr = lock->GetStride(&stride);
+        if (FAILED(hr)) return hr;
+        hr = lock->GetDataPointer(&bufferSize, &data);
+        if (FAILED(hr)) return hr;
+
+        // 复制数据
+        for (UINT i = 0; i < desc.Height; ++i) {
+            memcpy(
+                data + i * stride,
+                static_cast<BYTE*>(mapped.pData) + i * mapped.RowPitch,
+                min(stride, mapped.RowPitch)
+            );
+        }
+    }
+
+    // 返回结果
+    return wicBitmap.As(&outBitmap);
+}
+
+// 保存WIC位图到文件
+bool WindowUtils::SaveWICBitmapToFile(IWICBitmapSource* bitmap, const std::wstring& filePath) {
+    if (!bitmap) return false;
+
+    // 创建编码器并保存
+    WICImageEncoder encoder(filePath);
+    if (!encoder.IsValid()) return false;
+
+    return encoder.WriteSource(bitmap) && encoder.Commit();
+}
+
+// 开始捕获会话
+bool WindowUtils::BeginCaptureSession(HWND hwnd, const RECT* cropRegion) {
+    if (!s_capturer) return false;
+    return s_capturer->BeginCaptureSession(hwnd, cropRegion);
+}
+
+// 结束捕获会话
+void WindowUtils::EndCaptureSession() {
+    if (s_capturer) {
+        s_capturer->EndCaptureSession();
+    }
+}
+
+// 请求下一帧
+bool WindowUtils::RequestNextFrame(std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback) {
+    if (!s_capturer || !callback) return false;
+    
+    return s_capturer->RequestNextFrame([callback](ID3D11Texture2D* texture) {
+        if (texture) {
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> texturePtr;
+            texture->AddRef();  // 增加引用计数而不是接管所有权
+            texturePtr.Attach(texture);
+            callback(texturePtr);
+        }
+    });
+}
+
+// 查询是否有活动会话
+bool WindowUtils::HasActiveSession() {
+    return s_capturer && s_capturer->HasActiveSession();
+}

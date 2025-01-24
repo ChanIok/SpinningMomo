@@ -8,6 +8,7 @@
 #include <vector>
 #include <wrl/client.h>
 #include <Shlwapi.h>
+#include <wincodec.h>
 #include "window_capturer.hpp"
 
 class WindowUtils {
@@ -51,6 +52,14 @@ public:
     static std::wstring GetGameScreenshotPath(HWND hwnd);
     static bool CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback, const RECT* cropRegion = nullptr);
     static bool SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath);
+    static HRESULT TextureToWICBitmap(ID3D11Texture2D* texture, Microsoft::WRL::ComPtr<IWICBitmapSource>& outBitmap);
+    static bool SaveWICBitmapToFile(IWICBitmapSource* bitmap, const std::wstring& filePath);
+
+    // 新增：会话控制方法
+    static bool BeginCaptureSession(HWND hwnd, const RECT* cropRegion = nullptr);
+    static void EndCaptureSession();
+    static bool RequestNextFrame(std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback);
+    static bool HasActiveSession();
 
     // D3D资源管理
     static bool EnsureD3DResources();
