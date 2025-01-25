@@ -25,6 +25,7 @@ public:
         if (m_configManager) {
             m_configManager->SaveAllConfigs();
         }
+        ParameterTracker::Cleanup();
         UnregisterHotKey(m_hwnd, 1);
     }
 

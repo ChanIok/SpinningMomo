@@ -2,7 +2,6 @@
 #include "window_utils.hpp"
 #include "parameter_ocr.hpp"
 #include "image_processor.hpp"
-#include <thread>
 #include <fstream>
 
 // 静态成员定义
@@ -10,8 +9,8 @@ HHOOK ParameterTracker::s_mouseHook = NULL;
 HWND ParameterTracker::s_targetWindow = NULL;
 std::shared_ptr<ParameterTracker::CaptureSequence> ParameterTracker::s_currentSequence;
 std::mutex ParameterTracker::s_sequenceMutex;
-std::unique_ptr<std::thread> ParameterTracker::s_workerThread;
-std::unique_ptr<std::thread> ParameterTracker::s_hookThread;
+ThreadRAII ParameterTracker::s_workerThread;
+ThreadRAII ParameterTracker::s_hookThread;
 HWND ParameterTracker::s_workerWindow = NULL;
 HWND ParameterTracker::s_hookWindow = NULL;
 std::atomic<bool> ParameterTracker::s_threadRunning{false};
@@ -44,55 +43,53 @@ bool ParameterTracker::Initialize(HWND targetWindow) {
     
     // 启动工作线程
     s_threadRunning = true;
-    s_workerThread = std::make_unique<std::thread>(&WorkerThreadProc);
-    
-    // 启动钩子线程
-    s_hookThread = std::make_unique<std::thread>(&HookThreadProc);
+    try {
+        s_workerThread = ThreadRAII(&WorkerThreadProc);
+        s_hookThread = ThreadRAII(&HookThreadProc);
+    } catch (const std::exception& e) {
+        OutputDebugStringA("线程启动失败: ");
+        OutputDebugStringA(e.what());
+        OutputDebugStringA("\n");
+        s_threadRunning = false;
+        return false;
+    }
 
     return true;
 }
 
 // 清理参数追踪器
 void ParameterTracker::Cleanup() {
-    // 清理鼠标钩子
+    // 1. 首先停止所有活动的捕获会话
+    {
+        std::lock_guard<std::mutex> lock(s_sequenceMutex);
+        if (s_currentSequence) {
+            s_currentSequence->SetActive(false);
+            s_currentSequence.reset();
+        }
+    }
+
+    // 2. 设置线程退出标志
+    s_threadRunning = false;
+
+    // 3. 清理鼠标钩子
     if (s_mouseHook) {
         UnhookWindowsHookEx(s_mouseHook);
         s_mouseHook = NULL;
     }
-    
-    // 清理工作线程
-    s_threadRunning = false;
-    if (s_workerWindow) {
-        PostMessage(s_workerWindow, WM_QUIT, 0, 0);
-    }
-    if (s_workerThread && s_workerThread->joinable()) {
-        s_workerThread->join();
-    }
-    s_workerThread.reset();
 
-    // 清理钩子线程
-    if (s_hookWindow) {
-        PostMessage(s_hookWindow, WM_QUIT, 0, 0);
+    // 4. 直接向线程发送退出消息
+    if (s_workerThread.get()) {
+        PostThreadMessage(s_workerThread.get_id(), WM_QUIT, 0, 0);
     }
-    if (s_hookThread && s_hookThread->joinable()) {
-        s_hookThread->join();
-    }
-    s_hookThread.reset();
-
-    // 清理窗口和COM
-    if (s_workerWindow) {
-        DestroyWindow(s_workerWindow);
-        s_workerWindow = NULL;
-        UnregisterClass(WORKER_WINDOW_CLASS, GetModuleHandle(NULL));
-    }
-    
-    if (s_hookWindow) {
-        DestroyWindow(s_hookWindow);
-        s_hookWindow = NULL;
-        UnregisterClass(HOOK_WINDOW_CLASS, GetModuleHandle(NULL));
+    if (s_hookThread.get()) {
+        PostThreadMessage(s_hookThread.get_id(), WM_QUIT, 0, 0);
     }
 
-    CoUninitialize();
+    // 5. 清理窗口句柄（这些窗口会在线程退出时自动销毁）
+    // s_workerWindow = NULL;
+    // s_hookWindow = NULL;
+
+    // 6. 清理其他资源
     s_targetWindow = NULL;
 }
 
@@ -150,7 +147,14 @@ void ParameterTracker::HookThreadProc() {
         UnhookWindowsHookEx(s_mouseHook);
         s_mouseHook = NULL;
     }
+
+    if (s_hookWindow) {
+        DestroyWindow(s_hookWindow);
+        s_hookWindow = NULL;
+        UnregisterClass(HOOK_WINDOW_CLASS, GetModuleHandle(NULL));
+    }
     
+    // COM 反初始化（确保在线程结束前调用）
     CoUninitialize();
 }
 
@@ -198,9 +202,16 @@ void ParameterTracker::WorkerThreadProc() {
         DispatchMessage(&msg);
     }
 
-    // 只设置线程状态
-    s_threadRunning = false;
+    // 清理窗口
+    if (s_workerWindow) {
+        DestroyWindow(s_workerWindow);
+        s_workerWindow = NULL;
+        UnregisterClass(WORKER_WINDOW_CLASS, GetModuleHandle(NULL));
+    }
+
+    // COM 反初始化（确保在线程结束前调用）
     CoUninitialize();
+    s_threadRunning = false;
 }
 
 // 工作线程消息处理

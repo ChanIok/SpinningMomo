@@ -2,6 +2,7 @@
 #include "win_config.hpp"
 #include "constants.hpp"
 #include "parameter_ocr.hpp"
+#include "thread_raii.hpp"
 #include <functional>
 #include <wrl/client.h>
 #include <wincodec.h>
@@ -12,7 +13,6 @@
 #include <vector>
 #include <atomic>
 #include <future>
-#include <thread>
 #include <string>
 #include "window_utils.hpp"
 
@@ -80,13 +80,13 @@ private:
     static std::mutex s_sequenceMutex;
     
     // 工作线程相关
-    static std::unique_ptr<std::thread> s_workerThread;
+    static ThreadRAII s_workerThread;
     static HWND s_workerWindow;
     static std::atomic<bool> s_threadRunning;
     static constexpr wchar_t* WORKER_WINDOW_CLASS = L"CaptureWorkerWindow";
     
     // 钩子线程相关
-    static std::unique_ptr<std::thread> s_hookThread;
+    static ThreadRAII s_hookThread;
     static HWND s_hookWindow;
     static constexpr wchar_t* HOOK_WINDOW_CLASS = L"CaptureHookWindow";
     

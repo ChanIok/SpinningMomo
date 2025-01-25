@@ -61,3 +61,11 @@ add_custom_command(TARGET SpinningMomo POST_BUILD
         "${ONNXRUNTIME_ROOT}/lib/onnxruntime.dll"
         $<TARGET_FILE_DIR:SpinningMomo>
 )
+
+# 复制ONNX模型文件到输出目录的models子目录
+add_custom_command(TARGET SpinningMomo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:SpinningMomo>/models
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/models/model.onnx"
+        $<TARGET_FILE_DIR:SpinningMomo>/models/model.onnx
+)
