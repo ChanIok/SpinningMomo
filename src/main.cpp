@@ -25,7 +25,6 @@ public:
         if (m_configManager) {
             m_configManager->SaveAllConfigs();
         }
-        ParameterTracker::Cleanup();
         UnregisterHotKey(m_hwnd, 1);
     }
 
@@ -75,7 +74,9 @@ public:
         }
 
         // 初始化参数追踪器
-        if (!ParameterTracker::Initialize(FindTargetWindow())) return false;
+        HWND targetWnd = WindowUtils::FindTargetWindow(m_configManager->GetWindowTitle());
+        m_parameterTracker = std::make_unique<ParameterTracker>(targetWnd);
+        if (!m_parameterTracker->Initialize()) return false;
 
         // 如果启用了浮动窗口，则默认显示
         if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
@@ -587,6 +588,7 @@ private:
     std::unique_ptr<PreviewWindow> m_previewWindow;
     std::unique_ptr<NotificationManager> m_notificationManager;
     std::unique_ptr<ConfigManager> m_configManager;
+    std::unique_ptr<ParameterTracker> m_parameterTracker;
 
     // 应用状态
     bool m_isPreviewEnabled = false;

@@ -5,92 +5,78 @@
 #include <fstream>
 
 // 静态成员定义
-HHOOK ParameterTracker::s_mouseHook = NULL;
-HWND ParameterTracker::s_targetWindow = NULL;
-std::shared_ptr<ParameterTracker::CaptureSequence> ParameterTracker::s_currentSequence;
-std::mutex ParameterTracker::s_sequenceMutex;
-ThreadRAII ParameterTracker::s_workerThread;
-ThreadRAII ParameterTracker::s_hookThread;
-HWND ParameterTracker::s_workerWindow = NULL;
-HWND ParameterTracker::s_hookWindow = NULL;
-std::atomic<bool> ParameterTracker::s_threadRunning{false};
-ParameterTracker::AllParameters ParameterTracker::s_currentParams;
-std::unique_ptr<ParameterOCR> ParameterTracker::s_ocr;
-std::wstring ParameterTracker::s_modelPath = L"models/model.onnx";
+ParameterTracker* ParameterTracker::s_instance = nullptr;
 
-// 初始化参数追踪器
-bool ParameterTracker::Initialize(HWND targetWindow) {
-    s_targetWindow = targetWindow;
-    
+ParameterTracker::ParameterTracker(HWND targetWindow)
+    : m_targetWindow(targetWindow)
+    , m_modelPath(L"models/model.onnx")
+{
+    s_instance = this;
+}
+
+ParameterTracker::~ParameterTracker() {
+    m_threadRunning = false;
+
+    // 清理当前捕获序列
+    {
+        std::lock_guard<std::mutex> lock(m_sequenceMutex);
+        if (m_currentSequence) {
+            m_currentSequence->SetActive(false);
+            m_currentSequence.reset();
+        }
+    }
+
+    // 清理鼠标钩子
+    if (m_mouseHook) {
+        UnhookWindowsHookEx(m_mouseHook);
+        m_mouseHook = nullptr;
+    }
+
+    // 向线程发送退出消息
+    if (m_workerThread.get()) {
+        PostThreadMessage(m_workerThread.get_id(), WM_QUIT, 0, 0);
+    }
+    if (m_hookThread.get()) {
+        PostThreadMessage(m_hookThread.get_id(), WM_QUIT, 0, 0);
+    }
+
+    s_instance = nullptr;
+}
+
+bool ParameterTracker::Initialize() {
     // 检查模型文件是否存在
-    DWORD attrs = GetFileAttributesW(s_modelPath.c_str());
+    DWORD attrs = GetFileAttributesW(m_modelPath.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES) {
         OutputDebugStringA("OCR模型文件不存在: ");
-        OutputDebugStringW(s_modelPath.c_str());
+        OutputDebugStringW(m_modelPath.c_str());
         OutputDebugStringA("\n");
         return false;
     }
-    
+
     // 初始化OCR
     try {
-        s_ocr = std::make_unique<ParameterOCR>(s_modelPath);
+        m_ocr = std::make_unique<ParameterOCR>(m_modelPath);
     } catch (const std::exception& e) {
         OutputDebugStringA("OCR初始化失败: ");
         OutputDebugStringA(e.what());
         OutputDebugStringA("\n");
         return false;
     }
-    
+
     // 启动工作线程
-    s_threadRunning = true;
+    m_threadRunning = true;
     try {
-        s_workerThread = ThreadRAII(&WorkerThreadProc);
-        s_hookThread = ThreadRAII(&HookThreadProc);
+        m_workerThread = ThreadRAII([this]() { this->WorkerThreadProc(); });
+        m_hookThread = ThreadRAII([this]() { this->HookThreadProc(); });
     } catch (const std::exception& e) {
         OutputDebugStringA("线程启动失败: ");
         OutputDebugStringA(e.what());
         OutputDebugStringA("\n");
-        s_threadRunning = false;
+        m_threadRunning = false;
         return false;
     }
 
     return true;
-}
-
-// 清理参数追踪器
-void ParameterTracker::Cleanup() {
-    // 1. 首先停止所有活动的捕获会话
-    {
-        std::lock_guard<std::mutex> lock(s_sequenceMutex);
-        if (s_currentSequence) {
-            s_currentSequence->SetActive(false);
-            s_currentSequence.reset();
-        }
-    }
-
-    // 2. 设置线程退出标志
-    s_threadRunning = false;
-
-    // 3. 清理鼠标钩子
-    if (s_mouseHook) {
-        UnhookWindowsHookEx(s_mouseHook);
-        s_mouseHook = NULL;
-    }
-
-    // 4. 直接向线程发送退出消息
-    if (s_workerThread.get()) {
-        PostThreadMessage(s_workerThread.get_id(), WM_QUIT, 0, 0);
-    }
-    if (s_hookThread.get()) {
-        PostThreadMessage(s_hookThread.get_id(), WM_QUIT, 0, 0);
-    }
-
-    // 5. 清理窗口句柄（这些窗口会在线程退出时自动销毁）
-    // s_workerWindow = NULL;
-    // s_hookWindow = NULL;
-
-    // 6. 清理其他资源
-    s_targetWindow = NULL;
 }
 
 // 钩子线程函数
@@ -111,25 +97,25 @@ void ParameterTracker::HookThreadProc() {
     RegisterClassEx(&wc);
     
     // 创建钩子线程的消息窗口
-    s_hookWindow = CreateWindowEx(
+    m_hookWindow = CreateWindowEx(
         0, HOOK_WINDOW_CLASS, L"HookWindow",
         WS_OVERLAPPED,
         0, 0, 0, 0,
         HWND_MESSAGE, nullptr, GetModuleHandle(NULL), nullptr
     );
 
-    if (!s_hookWindow) {
+    if (!m_hookWindow) {
         CoUninitialize();
         return;
     }
 
     // 安装鼠标钩子
-    s_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseProc, 
+    m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseProc, 
         GetModuleHandle(NULL), 0);
         
-    if (!s_mouseHook) {
-        DestroyWindow(s_hookWindow);
-        s_hookWindow = NULL;
+    if (!m_mouseHook) {
+        DestroyWindow(m_hookWindow);
+        m_hookWindow = NULL;
         UnregisterClass(HOOK_WINDOW_CLASS, GetModuleHandle(NULL));
         CoUninitialize();
         return;
@@ -143,14 +129,14 @@ void ParameterTracker::HookThreadProc() {
     }
 
     // 清理
-    if (s_mouseHook) {
-        UnhookWindowsHookEx(s_mouseHook);
-        s_mouseHook = NULL;
+    if (m_mouseHook) {
+        UnhookWindowsHookEx(m_mouseHook);
+        m_mouseHook = NULL;
     }
 
-    if (s_hookWindow) {
-        DestroyWindow(s_hookWindow);
-        s_hookWindow = NULL;
+    if (m_hookWindow) {
+        DestroyWindow(m_hookWindow);
+        m_hookWindow = NULL;
         UnregisterClass(HOOK_WINDOW_CLASS, GetModuleHandle(NULL));
     }
     
@@ -168,7 +154,7 @@ void ParameterTracker::WorkerThreadProc() {
     // 初始化COM
     HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(hr)) {
-        s_threadRunning = false;
+        m_threadRunning = false;
         return;
     }
 
@@ -182,16 +168,16 @@ void ParameterTracker::WorkerThreadProc() {
     RegisterClassEx(&wc);
     
     // 创建工作线程的消息窗口
-    s_workerWindow = CreateWindowEx(
+    m_workerWindow = CreateWindowEx(
         0, WORKER_WINDOW_CLASS, L"CaptureWorker",
         WS_OVERLAPPED,
         0, 0, 0, 0,
         HWND_MESSAGE, nullptr, GetModuleHandle(NULL), nullptr
     );
 
-    if (!s_workerWindow) {
+    if (!m_workerWindow) {
         CoUninitialize();
-        s_threadRunning = false;
+        m_threadRunning = false;
         return;
     }
 
@@ -203,61 +189,52 @@ void ParameterTracker::WorkerThreadProc() {
     }
 
     // 清理窗口
-    if (s_workerWindow) {
-        DestroyWindow(s_workerWindow);
-        s_workerWindow = NULL;
+    if (m_workerWindow) {
+        DestroyWindow(m_workerWindow);
+        m_workerWindow = NULL;
         UnregisterClass(WORKER_WINDOW_CLASS, GetModuleHandle(NULL));
     }
 
     // COM 反初始化（确保在线程结束前调用）
     CoUninitialize();
-    s_threadRunning = false;
+    m_threadRunning = false;
 }
 
 // 工作线程消息处理
 LRESULT CALLBACK ParameterTracker::WorkerWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    if (!s_instance) return DefWindowProc(hwnd, msg, wp, lp);
+    
     switch (msg) {
         case Constants::WM_USER_START_CAPTURE: {
-            // 获取窗口客户区大小
             RECT clientRect;
-            GetClientRect(s_targetWindow, &clientRect);
-
-            // 计算参数区域
-            RECT paramArea = CalculateParameterArea(clientRect);
-            
-            // 开始新的捕获序列
-            StartCaptureSequence(paramArea);
+            GetClientRect(s_instance->m_targetWindow, &clientRect);
+            RECT paramArea = s_instance->CalculateParameterArea(clientRect);
+            s_instance->StartCaptureSequence(paramArea);
             return 0;
         }
 
         case Constants::WM_PARAMETER_START_CAPTURE: {
-            std::lock_guard<std::mutex> lock(s_sequenceMutex);
-            if (!s_currentSequence || !s_currentSequence->IsActive()) {
+            std::lock_guard<std::mutex> lock(s_instance->m_sequenceMutex);
+            if (!s_instance->m_currentSequence || !s_instance->m_currentSequence->IsActive()) {
                 return 0;
             }
 
-            // 获取当前序列的裁剪区域
-            RECT cropRegion = s_currentSequence->GetRegion();
+            RECT cropRegion = s_instance->m_currentSequence->GetRegion();
             
-            // 只在序列第一次捕获时初始化会话
-            if (s_currentSequence->GetCaptureCount() == 0) {
-                if (!WindowUtils::BeginCaptureSession(s_targetWindow, &cropRegion)) {
+            if (s_instance->m_currentSequence->GetCaptureCount() == 0) {
+                if (!WindowUtils::BeginCaptureSession(s_instance->m_targetWindow, &cropRegion)) {
                     return 0;
                 }
             }
 
-            // 记录开始时间
             auto startTime = std::chrono::high_resolution_clock::now();
             
-            // 请求下一帧
-            WindowUtils::RequestNextFrame([startTime, sequence = s_currentSequence](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
+            WindowUtils::RequestNextFrame([startTime, sequence = s_instance->m_currentSequence](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
                 sequence->ProcessCapture(texture, startTime);
 
-                // 如果还需要继续捕获，只设置定时器
                 if (sequence->IsActive() && sequence->GetCaptureCount() < CaptureSequence::MAX_CAPTURES) {
-                    SetTimer(s_workerWindow, 1, CaptureSequence::CAPTURE_INTERVAL_MS, nullptr);
+                    SetTimer(s_instance->m_workerWindow, 1, CaptureSequence::CAPTURE_INTERVAL_MS, nullptr);
                 } else {
-                    // 只在整个序列结束时才结束会话
                     sequence->SetActive(false);
                     WindowUtils::EndCaptureSession();
                 }
@@ -268,8 +245,8 @@ LRESULT CALLBACK ParameterTracker::WorkerWndProc(HWND hwnd, UINT msg, WPARAM wp,
 
         case WM_TIMER: {
             KillTimer(hwnd, wp);
-            std::lock_guard<std::mutex> lock(s_sequenceMutex);
-            if (s_currentSequence && s_currentSequence->IsActive()) {
+            std::lock_guard<std::mutex> lock(s_instance->m_sequenceMutex);
+            if (s_instance->m_currentSequence && s_instance->m_currentSequence->IsActive()) {
                 PostMessage(hwnd, Constants::WM_PARAMETER_START_CAPTURE, 0, 0);
             }
             return 0;
@@ -282,30 +259,30 @@ LRESULT CALLBACK ParameterTracker::WorkerWndProc(HWND hwnd, UINT msg, WPARAM wp,
 
 // 鼠标钩子回调
 LRESULT CALLBACK ParameterTracker::MouseProc(int code, WPARAM wParam, LPARAM lParam) {
-    if (code >= 0 && wParam == WM_LBUTTONDOWN) {
+    if (code >= 0 && wParam == WM_LBUTTONDOWN && s_instance) {
         MSLLHOOKSTRUCT* hookStruct = (MSLLHOOKSTRUCT*)lParam;
         POINT pt = hookStruct->pt;
         
-        if (s_targetWindow && IsWindow(s_targetWindow) && IsInParameterArea(pt)) {
-            // 只发送消息到工作线程，立即返回
-            PostMessage(s_workerWindow, Constants::WM_USER_START_CAPTURE, 0, 0);
+        if (s_instance->m_targetWindow && IsWindow(s_instance->m_targetWindow) && 
+            s_instance->IsInParameterArea(pt)) {
+            PostMessage(s_instance->m_workerWindow, Constants::WM_USER_START_CAPTURE, 0, 0);
         }
     }
-    return CallNextHookEx(s_mouseHook, code, wParam, lParam);
+    return CallNextHookEx(nullptr, code, wParam, lParam);
 }
 
 // 开始新的捕获序列
 void ParameterTracker::StartCaptureSequence(const RECT& region) {
-    std::lock_guard<std::mutex> lock(s_sequenceMutex);
+    std::lock_guard<std::mutex> lock(m_sequenceMutex);
     
     // 如果当前有活动的序列且未完成，则忽略新的请求
-    if (s_currentSequence && s_currentSequence->IsActive()) {
+    if (m_currentSequence && m_currentSequence->IsActive()) {
         return;
     }
 
     // 创建并启动新的捕获序列
-    s_currentSequence = std::make_shared<CaptureSequence>(region);
-    s_currentSequence->Start();
+    m_currentSequence = std::make_shared<CaptureSequence>(region, this);
+    m_currentSequence->Start();
 }
 
 // 捕获序列启动
@@ -316,14 +293,16 @@ void ParameterTracker::CaptureSequence::Start() {
     m_captureCount = 0;
     
     // 发送开始捕获消息到工作线程
-    if (s_workerWindow) {
-        PostMessage(s_workerWindow, Constants::WM_PARAMETER_START_CAPTURE, 0, 0);
+    if (m_tracker->m_workerWindow) {
+        PostMessage(m_tracker->m_workerWindow, Constants::WM_PARAMETER_START_CAPTURE, 0, 0);
     }
 }
 
 // 捕获序列实现
-ParameterTracker::CaptureSequence::CaptureSequence(const RECT& region)
-    : m_region(region), m_captureCount(0) {
+ParameterTracker::CaptureSequence::CaptureSequence(const RECT& region, ParameterTracker* tracker)
+    : m_region(region)
+    , m_tracker(tracker)
+{
 }
 
 // 捕获序列析构
@@ -344,48 +323,48 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
 
     // 2. 转灰度并缩放到512长边
     Microsoft::WRL::ComPtr<IWICBitmapSource> grayBitmap;
-    if (FAILED(ConvertToGrayscale(originalBitmap.Get(), grayBitmap))) {
+    if (FAILED(m_tracker->ConvertToGrayscale(originalBitmap.Get(), grayBitmap))) {
         return;
     }
     
     Microsoft::WRL::ComPtr<IWICBitmapSource> resizedBitmap;
-    if (FAILED(ResizeTo512LongEdge(grayBitmap.Get(), resizedBitmap))) {
+    if (FAILED(m_tracker->ResizeTo512LongEdge(grayBitmap.Get(), resizedBitmap))) {
         return;
     }
 
     // 3. 二值化用于滚动条检测
     Microsoft::WRL::ComPtr<IWICBitmapSource> scrollbarBinary;
-    if (FAILED(Binarize(resizedBitmap.Get(), 210, scrollbarBinary))) {
+    if (FAILED(m_tracker->Binarize(resizedBitmap.Get(), 210, scrollbarBinary))) {
         return;
     }
 
     // 3.1 裁剪滚动条区域
     Microsoft::WRL::ComPtr<IWICBitmapSource> scrollbarCropped;
-    if (FAILED(CropScrollbarRegion(scrollbarBinary.Get(), scrollbarCropped))) {
+    if (FAILED(m_tracker->CropScrollbarRegion(scrollbarBinary.Get(), scrollbarCropped))) {
         return;
     }
 
     // 4. 检测滚动条位置
     int scrollbarCenterY;
-    if (!DetectScrollbarPosition(scrollbarCropped.Get(), scrollbarCenterY)) {
+    if (!m_tracker->DetectScrollbarPosition(scrollbarCropped.Get(), scrollbarCenterY)) {
         return;
     }
 
     // 5. 二值化用于菜单检测
     Microsoft::WRL::ComPtr<IWICBitmapSource> menuBinary;
-    if (FAILED(Binarize(resizedBitmap.Get(), 85, menuBinary))) {
+    if (FAILED(m_tracker->Binarize(resizedBitmap.Get(), 85, menuBinary))) {
         return;
     }
 
     // 6. 获取值区域位置
     std::vector<ValueRegion> valueRegions;
-    if (!GetValueRegions(menuBinary.Get(), scrollbarCenterY, valueRegions)) {
+    if (!m_tracker->GetValueRegions(menuBinary.Get(), scrollbarCenterY, valueRegions)) {
         return;
     }
 
     // 7. 三值化处理
     Microsoft::WRL::ComPtr<IWICBitmapSource> trinaryBitmap;
-    if (FAILED(Trinarize(resizedBitmap.Get(), 90, 110, trinaryBitmap))) {
+    if (FAILED(m_tracker->Trinarize(resizedBitmap.Get(), 90, 110, trinaryBitmap))) {
         return;
     }
 
@@ -403,13 +382,13 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
 
             // 裁剪值区域
             Microsoft::WRL::ComPtr<IWICBitmapSource> croppedRegion;
-            if (FAILED(CropValueRegion(trinaryBitmap.Get(), region, croppedRegion))) {
+            if (FAILED(m_tracker->CropValueRegion(trinaryBitmap.Get(), region, croppedRegion))) {
                 continue;
             }
 
             // 精确裁剪
             Microsoft::WRL::ComPtr<IWICBitmapSource> finalRegion;
-            if (FAILED(CropNumberRegion(croppedRegion.Get(), finalRegion))) {
+            if (FAILED(m_tracker->CropNumberRegion(croppedRegion.Get(), finalRegion))) {
                 continue;
             }
 
@@ -421,10 +400,10 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
             }
 
             // 预处理图像数据
-            std::vector<float> preprocessed_data = s_ocr->preprocess_image(resizedRegion.Get());
+            std::vector<float> preprocessed_data = m_tracker->m_ocr->preprocess_image(resizedRegion.Get());
 
             // 执行OCR预测
-            auto prediction = s_ocr->predict(preprocessed_data);
+            auto prediction = m_tracker->m_ocr->predict(preprocessed_data);
 
             // 输出调试信息
             std::string debug_msg = "OCR Result for region " + std::to_string(i) + 
@@ -470,15 +449,15 @@ RECT ParameterTracker::CalculateParameterArea(const RECT& clientRect) {
 }
 
 bool ParameterTracker::IsInParameterArea(const POINT& pt) {
-    if (!s_targetWindow || !IsWindow(s_targetWindow)) return false;
+    if (!m_targetWindow || !IsWindow(m_targetWindow)) return false;
 
     // 转换屏幕坐标到窗口坐标
     POINT clientPt = pt;
-    if (!ScreenToClient(s_targetWindow, &clientPt)) return false;
+    if (!ScreenToClient(m_targetWindow, &clientPt)) return false;
 
     // 获取窗口客户区大小
     RECT clientRect;
-    GetClientRect(s_targetWindow, &clientRect);
+    GetClientRect(m_targetWindow, &clientRect);
 
     // 计算参数区域
     RECT paramArea = CalculateParameterArea(clientRect);
