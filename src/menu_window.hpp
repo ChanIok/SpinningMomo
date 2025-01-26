@@ -24,6 +24,7 @@ public:
         OpenScreenshot,
         PreviewWindow,
         Reset,
+        ParameterTracking,  // 添加参数追踪类型
         Close
     };
 
@@ -58,6 +59,8 @@ public:
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
     void UpdateParameters(const Parameters& params);  // 添加参数更新方法
+    void SetParameterTrackingEnabled(bool enabled);
+    bool IsParameterTrackingEnabled() const { return m_parameterTrackingEnabled; }
 
 private:
     static const TCHAR* MENU_WINDOW_CLASS;  // 只声明
@@ -117,6 +120,7 @@ private:
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
     std::vector<MenuItem> m_items;               // 所有列表项
     const LocalizedStrings* m_strings = nullptr;            // 字符串只读
+    bool m_parameterTrackingEnabled = false;  // 参数追踪状态
 
     // 私有方法
     void InitializeItems(const LocalizedStrings& strings);

@@ -15,7 +15,6 @@ namespace Constants {
     static const UINT WM_PARAMETER_START_CAPTURE = WM_USER + 201;  // 参数捕获开始消息
     static const UINT WM_PARAMETER_CAPTURE_TIMER = WM_USER + 202;  // 参数捕获定时器消息
     static const UINT WM_USER_START_CAPTURE = WM_USER + 203;  // 用户开始捕获消息
-    static const UINT WM_PARAMETER_UPDATED = WM_USER + 204;  // 参数更新消息
 
     constexpr UINT ID_TRAYICON = 1;
     constexpr UINT NOTIFICATION_TIMER_ID = 2;  // 通知显示定时器ID
@@ -43,6 +42,7 @@ namespace Constants {
     constexpr UINT ID_PREVIEW_WINDOW = 2015;     // 预览窗口菜单项ID
     constexpr UINT ID_OPEN_SCREENSHOT = 2016;    // 打开相册菜单项ID
     constexpr UINT ID_USER_GUIDE = 2017;         // 使用指南菜单项ID
+    constexpr UINT ID_PARAMETER_TRACKING = 2018;  // 参数追踪菜单项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -144,6 +144,7 @@ struct LocalizedStrings {
     std::wstring OPEN_SCREENSHOT;
     std::wstring USER_GUIDE;
     std::wstring FEATURE_NOT_SUPPORTED;  // 功能不支持的提示
+    std::wstring PARAMETER_TRACKING;     // 参数追踪菜单项文本
 };
 
 // 中文字符串

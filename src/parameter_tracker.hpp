@@ -25,6 +25,7 @@ public:
     ~ParameterTracker();
     
     bool Initialize();
+    void Stop();
 
     // 添加参数访问接口
     const Parameters& GetParameters() const { return m_currentParams; }

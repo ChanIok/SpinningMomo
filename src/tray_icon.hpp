@@ -48,10 +48,15 @@ public:
         const LocalizedStrings& strings,
         bool taskbarAutoHide,
         bool previewEnabled);
-        
+
+    void SetParameterTrackingEnabled(bool enabled) {
+        m_parameterTrackingEnabled = enabled;
+    }
+
 private:
     HWND m_hwnd;
     NOTIFYICONDATA m_nid{};
+    bool m_parameterTrackingEnabled = false;
 
     // 新增：私有辅助方法
     HMENU CreateWindowSelectionSubmenu(

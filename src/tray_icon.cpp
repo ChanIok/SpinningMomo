@@ -330,4 +330,8 @@ void TrayIcon::AddSettingsItems(
                   Constants::ID_TOGGLE_WINDOW_VISIBILITY,
                   (isFloatingWindowVisible ? strings.CLOSE_WINDOW.c_str() : strings.SHOW_WINDOW.c_str()));
     }
+
+    // 添加参数追踪选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (m_parameterTrackingEnabled ? MF_CHECKED : 0),
+              Constants::ID_PARAMETER_TRACKING, strings.PARAMETER_TRACKING.c_str());
 } 

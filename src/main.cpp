@@ -74,11 +74,6 @@ public:
             return false;
         }
 
-        // 初始化参数追踪器
-        HWND targetWnd = WindowUtils::FindTargetWindow(m_configManager->GetWindowTitle());
-        m_parameterTracker = std::make_unique<ParameterTracker>(targetWnd);
-        if (!m_parameterTracker->Initialize()) return false;
-
         // 如果启用了浮动窗口，则默认显示
         if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
             m_menuWindow->Show();
@@ -397,6 +392,27 @@ public:
         );
     }
 
+    // 切换参数追踪
+    void ToggleParameterTracking() {
+        m_isParameterTrackingEnabled = !m_isParameterTrackingEnabled;
+        
+        if (m_isParameterTrackingEnabled) {
+            HWND targetWnd = WindowUtils::FindTargetWindow(m_configManager->GetWindowTitle());
+            m_parameterTracker = std::make_unique<ParameterTracker>(targetWnd);
+            if (!m_parameterTracker->Initialize()) {
+                m_parameterTracker.reset();
+                m_isParameterTrackingEnabled = false;
+                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.FEATURE_NOT_SUPPORTED.c_str());
+            }
+        } else {
+            m_parameterTracker.reset();
+        }
+        
+        if (m_menuWindow) {
+            m_menuWindow->SetParameterTrackingEnabled(m_isParameterTrackingEnabled);
+        }
+    }
+
     // 窗口过程函数
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         SpinningMomoApp* app = reinterpret_cast<SpinningMomoApp*>(
@@ -503,6 +519,9 @@ public:
                                 (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,
                                 NULL, NULL, SW_SHOWNORMAL);
                             break;
+                        case Constants::ID_PARAMETER_TRACKING:
+                            app->ToggleParameterTracking();
+                            break;
                     }
                 }
                 return 0;
@@ -593,6 +612,7 @@ private:
 
     // 应用状态
     bool m_isPreviewEnabled = false;
+    bool m_isParameterTrackingEnabled = false;
     bool m_hotkeySettingMode = false;
     bool m_messageLoopStarted = false;
     bool m_isScreenCaptureSupported = false;

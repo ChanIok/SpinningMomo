@@ -183,6 +183,7 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
     m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});  // 添加打开相册选项
     m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
     m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
+    m_items.push_back({strings.PARAMETER_TRACKING, ItemType::ParameterTracking, m_parameterTrackingEnabled ? 1 : 0});  // 添加参数追踪选项
     m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
 }
 
@@ -341,6 +342,7 @@ void MenuWindow::OnPaint(HDC hdc) {
             case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
+            case ItemType::ParameterTracking:
             case ItemType::Close:
                 itemRect = {resolutionColumnRight + m_separatorHeight, settingsY, 
                           rect.right, settingsY + m_itemHeight};
@@ -364,6 +366,8 @@ void MenuWindow::OnPaint(HDC hdc) {
         } else if (item.type == ItemType::Resolution && item.index == m_currentResolutionIndex) {
             isSelected = true;
         } else if (item.type == ItemType::PreviewWindow && m_previewEnabled) {
+            isSelected = true;
+        } else if (item.type == ItemType::ParameterTracking && m_parameterTrackingEnabled) {
             isSelected = true;
         }
 
@@ -457,6 +461,9 @@ void MenuWindow::OnLButtonDown(int x, int y) {
             case ItemType::Reset:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_RESET, 0);
                 break;
+            case ItemType::ParameterTracking:
+                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_PARAMETER_TRACKING, 0);
+                break;
             case ItemType::Close:
                 Hide();  // 直接调用Hide函数关闭窗口
                 break;
@@ -506,6 +513,7 @@ int MenuWindow::CalculateWindowHeight() {
             case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
+            case ItemType::ParameterTracking:
             case ItemType::Close:
                 settingsCount++;
                 break;
@@ -549,6 +557,7 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
                 item.type == ItemType::OpenScreenshot ||
                 item.type == ItemType::PreviewWindow ||
                 item.type == ItemType::Reset ||
+                item.type == ItemType::ParameterTracking ||
                 item.type == ItemType::Close) {
                 if (y >= settingsY && y < settingsY + m_itemHeight) {
                     return static_cast<int>(i);
@@ -576,6 +585,11 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
 
 void MenuWindow::SetPreviewEnabled(bool enabled) {
     m_previewEnabled = enabled;
+    InvalidateRect(m_hwnd, NULL, TRUE);
+}
+
+void MenuWindow::SetParameterTrackingEnabled(bool enabled) {
+    m_parameterTrackingEnabled = enabled;
     InvalidateRect(m_hwnd, NULL, TRUE);
 }
 

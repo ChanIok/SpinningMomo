@@ -15,6 +15,11 @@ ParameterTracker::ParameterTracker(HWND targetWindow)
 }
 
 ParameterTracker::~ParameterTracker() {
+    Stop();
+    s_instance = nullptr;
+}
+
+void ParameterTracker::Stop() {
     m_threadRunning = false;
 
     // 清理当前捕获序列
@@ -40,10 +45,16 @@ ParameterTracker::~ParameterTracker() {
         PostThreadMessage(m_hookThread.get_id(), WM_QUIT, 0, 0);
     }
 
-    s_instance = nullptr;
+    // 清理OCR
+    m_ocr.reset();
 }
 
 bool ParameterTracker::Initialize() {
+    // 如果已经在运行，先停止
+    if (m_threadRunning) {
+        Stop();
+    }
+
     // 检查模型文件是否存在
     DWORD attrs = GetFileAttributesW(m_modelPath.c_str());
     if (attrs == INVALID_FILE_ATTRIBUTES) {
@@ -73,6 +84,7 @@ bool ParameterTracker::Initialize() {
         OutputDebugStringA(e.what());
         OutputDebugStringA("\n");
         m_threadRunning = false;
+        Stop();  // 确保清理所有资源
         return false;
     }
 
@@ -259,13 +271,31 @@ LRESULT CALLBACK ParameterTracker::WorkerWndProc(HWND hwnd, UINT msg, WPARAM wp,
 
 // 鼠标钩子回调
 LRESULT CALLBACK ParameterTracker::MouseProc(int code, WPARAM wParam, LPARAM lParam) {
-    if (code >= 0 && wParam == WM_LBUTTONDOWN && s_instance) {
+    if (code >= 0 && s_instance) {
         MSLLHOOKSTRUCT* hookStruct = (MSLLHOOKSTRUCT*)lParam;
         POINT pt = hookStruct->pt;
         
+        // 检查是否在目标窗口的参数区域内
         if (s_instance->m_targetWindow && IsWindow(s_instance->m_targetWindow) && 
             s_instance->IsInParameterArea(pt)) {
-            PostMessage(s_instance->m_workerWindow, Constants::WM_USER_START_CAPTURE, 0, 0);
+
+            // 处理鼠标左键按下、移动和滚轮事件
+            switch (wParam) {
+                case WM_LBUTTONDOWN:
+                case WM_MOUSEMOVE:
+                    if (wParam == WM_MOUSEMOVE && !(GetAsyncKeyState(VK_LBUTTON) & 0x8000)) {
+                        // 如果是鼠标移动但没有按下左键，则忽略
+                        break;
+                    }
+                    PostMessage(s_instance->m_workerWindow, Constants::WM_USER_START_CAPTURE, 0, 0);
+                    break;
+                    
+                case WM_MOUSEWHEEL: {
+                    // 鼠标滚轮事件
+                    PostMessage(s_instance->m_workerWindow, Constants::WM_USER_START_CAPTURE, 0, 0);
+                    break;
+                }
+            }
         }
     }
     return CallNextHookEx(nullptr, code, wParam, lParam);

@@ -40,7 +40,8 @@ const LocalizedStrings ZH_CN = {
     TEXT("预览窗口"),
     TEXT("打开相册"),
     TEXT("使用指南"),
-    TEXT("此功能需要 Windows 10 1803 或更高版本，已自动禁用。")
+    TEXT("此功能需要 Windows 10 1803 或更高版本，已自动禁用。"),
+    TEXT("参数追踪")
 };
 
 // 英文字符串
@@ -83,5 +84,6 @@ const LocalizedStrings EN_US = {
     TEXT("Preview Window"),
     TEXT("Open Screenshot Folder"),
     TEXT("User Guide"),
-    TEXT("This feature requires Windows 10 1803 or higher and has been disabled.")
+    TEXT("This feature requires Windows 10 1803 or higher and has been disabled."),
+    TEXT("Parameter Tracking")
 }; 
