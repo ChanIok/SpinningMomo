@@ -395,7 +395,6 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
             // 缩放到24x10
             Microsoft::WRL::ComPtr<IWICBitmapSource> resizedRegion = ImageProcessor::Resize(finalRegion.Get(), 24, 10);
             if (!resizedRegion) {
-                OutputDebugStringA("缩放图像失败\n");
                 continue;
             }
 
@@ -405,12 +404,14 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
             // 执行OCR预测
             auto prediction = m_tracker->m_ocr->predict(preprocessed_data);
 
-            // 输出调试信息
-            std::string debug_msg = "OCR Result for region " + std::to_string(i) + 
-                                  " (y=" + std::to_string(region.y) + "): " +
-                                  prediction.value + " (type: " + prediction.type + 
-                                  ", confidence: " + std::to_string(prediction.confidence) + ")\n";
-            OutputDebugStringA(debug_msg.c_str());
+            try {
+                // 将预测结果转换为浮点数并更新参数
+                float value = std::stof(prediction.value);
+                m_tracker->UpdateParameter(region.type, value, prediction.confidence);
+            } catch (const std::exception& e) {
+                std::string error_msg = "Failed to parse OCR result: " + std::string(e.what()) + "\n";
+                OutputDebugStringA(error_msg.c_str());
+            }
         }
     } catch (const std::exception& e) {
         OutputDebugStringA("OCR处理错误: ");
@@ -598,7 +599,7 @@ bool ParameterTracker::GetValueRegions(IWICBitmapSource* binary, int scrollbarCe
     const double TOTAL_MENU_HEIGHT = 464.0;  // 总菜单高度（10个菜单项）
     const double VISIBLE_HEIGHT = 231.0;  // 可见区域高度（5个菜单项）
     const double FIRST_MENU_Y = 109.5;  // 第一个菜单项的中心y坐标（未滚动时）
-    const double TOLERANCE = 3.0;  // 容差值（像素）
+    const double TOLERANCE = 1.0;  // 容差值（像素）
 
     // 值区域的固定参数
     const int VALUE_X_START = 441;
@@ -609,30 +610,27 @@ bool ParameterTracker::GetValueRegions(IWICBitmapSource* binary, int scrollbarCe
     double scrollRatio = (scrollbarCenterY - SCROLL_TOP_Y) / SCROLL_RANGE;
     double scrollOffset = scrollRatio * (TOTAL_MENU_HEIGHT - VISIBLE_HEIGHT);
 
-    // 计算所有可能可见的菜单项位置
-    std::vector<int> menuPositions;
-    for (int i = 0; i < 12; ++i) {  // 多计算几个确保覆盖边界情况
+    // 计算所有可见的菜单项位置
+    regions.clear();
+    for (int i = 0; i < 10; ++i) {  // 精确遍历10个参数位置
         double menuY = FIRST_MENU_Y + i * MENU_ITEM_HEIGHT - scrollOffset;
+        
         // 检查y坐标是否在有效范围内
         if (menuY >= (FIRST_MENU_Y - TOLERANCE) && 
             menuY <= (height - MENU_ITEM_HEIGHT - TOLERANCE)) {
-            menuPositions.push_back(static_cast<int>(round(menuY)));
-        }
-    }
+            
+            ValueRegion region;
+            region.y = static_cast<int>(round(menuY));
+            region.type = static_cast<ParameterType>(i);  // 直接从索引转换为参数类型
+            region.bounds.left = VALUE_X_START;
+            region.bounds.right = VALUE_X_END;
+            region.bounds.top = region.y - VALUE_HEIGHT/2;
+            region.bounds.bottom = region.y + VALUE_HEIGHT/2;
 
-    // 创建值区域
-    regions.clear();
-    for (int y : menuPositions) {
-        ValueRegion region;
-        region.y = y;
-        region.bounds.left = VALUE_X_START;
-        region.bounds.right = VALUE_X_END;
-        region.bounds.top = y - VALUE_HEIGHT/2;
-        region.bounds.bottom = y + VALUE_HEIGHT/2;
-
-        // 确保裁剪区域不超出图片边界
-        if (region.bounds.top >= 0 && region.bounds.bottom < static_cast<int>(height)) {
-            regions.push_back(region);
+            // 确保裁剪区域不超出图片边界
+            if (region.bounds.top >= 0 && region.bounds.bottom < static_cast<int>(height)) {
+                regions.push_back(region);
+            }
         }
     }
 
@@ -667,4 +665,65 @@ HRESULT ParameterTracker::CropScrollbarRegion(IWICBitmapSource* source, Microsof
 
     result = ImageProcessor::Crop(source, rect);
     return result ? S_OK : E_FAIL;
+}
+
+// 更新参数值实现
+void ParameterTracker::UpdateParameter(ParameterType type, float raw_value, float confidence) {
+    auto& param = m_currentParams[type];
+    
+    // 根据参数类型和原始值确定最终值
+    float converted_value;
+    if (IsPercentageParameter(type)) {
+        // 对于百分比类型，raw_value就是正确的百分比值
+        converted_value = raw_value;
+    } else {
+        // 对于小数类型，raw_value已经是-1.0到1.0的值
+        converted_value = raw_value;
+    }
+
+    param.value = converted_value;
+    param.confidence = confidence;
+    param.is_valid = true;
+
+    // 输出调试信息
+    std::string value_str;
+    if (IsPercentageParameter(type)) {
+        // 百分比值取整，直接使用整数格式
+        value_str = std::to_string(static_cast<int>(converted_value)) + "%";
+    } else {
+        // 对于小数值，保留一位小数
+        char buffer[32];
+        snprintf(buffer, sizeof(buffer), "%.1f", converted_value);
+        value_str = buffer;
+    }
+
+    std::string debug_msg = "Parameter updated - Type: " + GetParameterTypeName(type) + 
+                           ", Value: " + value_str + 
+                           ", Confidence: " + std::to_string(confidence) + "\n";
+    OutputDebugStringA(debug_msg.c_str());
+}
+
+// 判断参数是否为百分比类型实现
+bool ParameterTracker::IsPercentageParameter(ParameterType type) const {
+    return type == ParameterType::Vignette ||
+           type == ParameterType::SoftLightIntensity ||
+           type == ParameterType::Brightness ||
+           type == ParameterType::Contrast;
+}
+
+// 获取参数类型名称实现
+std::string ParameterTracker::GetParameterTypeName(ParameterType type) const {
+    switch (type) {
+        case ParameterType::Vignette: return "Vignette";
+        case ParameterType::SoftLightIntensity: return "Soft Light Intensity";
+        case ParameterType::SoftLightRange: return "Soft Light Range";
+        case ParameterType::Brightness: return "Brightness";
+        case ParameterType::Exposure: return "Exposure";
+        case ParameterType::Contrast: return "Contrast";
+        case ParameterType::Saturation: return "Saturation";
+        case ParameterType::NaturalSaturation: return "Natural Saturation";
+        case ParameterType::Highlights: return "Highlights";
+        case ParameterType::Shadows: return "Shadows";
+        default: return "Unknown";
+    }
 }

@@ -15,6 +15,7 @@
 #include <future>
 #include <string>
 #include "window_utils.hpp"
+#include <array>
 
 class ParameterTracker {
 public:
@@ -24,25 +25,52 @@ public:
     bool Initialize();
 
 private:
+    // 参数类型枚举
+    enum class ParameterType {
+        Vignette = 0,
+        SoftLightIntensity = 1,
+        SoftLightRange = 2,
+        Brightness = 3,
+        Exposure = 4,
+        Contrast = 5,
+        Saturation = 6,
+        NaturalSaturation = 7,
+        Highlights = 8,
+        Shadows = 9
+    };
+
+    // 参数值结构体
+    struct ParameterValue {
+        float value = 0.0f;
+        float confidence = 0.0f;
+        bool is_valid = false;
+    };
+
     // 参数存储结构
-    struct SceneParameters {
-        float vignette = 0.0f;        // 晕影调节 (%)
-        float softLightIntensity = 0.0f;  // 柔光强度 (%)
-        float softLightRange = 0.0f;   // 柔光范围
-        float brightness = 0.0f;       // 亮度 (%)
-        float exposure = 0.0f;         // 曝光
-        float saturation = 0.0f;       // 饱和度
-        float naturalSaturation = 0.0f; // 自然饱和度
-        float highlight = 0.0f;        // 高光
-        float shadow = 0.0f;           // 阴影
+    struct Parameters {
+        std::array<ParameterValue, 10> values;  // 固定大小为10的数组
+
+        // 便捷访问方法
+        ParameterValue& operator[](ParameterType type) {
+            return values[static_cast<size_t>(type)];
+        }
+        
+        const ParameterValue& operator[](ParameterType type) const {
+            return values[static_cast<size_t>(type)];
+        }
     };
 
-    struct AllParameters {
-        SceneParameters scene;
-    };
+    // 当前参数状态
+    Parameters m_currentParams;
 
-    // 当前参数状态（工作线程独占访问，不需要互斥锁）
-    AllParameters m_currentParams;
+    // 更新参数值
+    void UpdateParameter(ParameterType type, float raw_value, float confidence);
+
+    // 判断参数是否为百分比类型
+    bool IsPercentageParameter(ParameterType type) const;
+
+    // 获取参数类型名称（用于调试输出）
+    std::string GetParameterTypeName(ParameterType type) const;
 
     // OCR相关
     std::unique_ptr<ParameterOCR> m_ocr;
@@ -110,6 +138,7 @@ private:
     struct ValueRegion {
         int y;
         RECT bounds;
+        ParameterType type;  // 添加参数类型字段
     };
 
     // 图像处理函数
