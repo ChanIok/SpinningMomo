@@ -78,6 +78,12 @@ public:
         m_parameterTracker = std::make_unique<ParameterTracker>(targetWnd);
         if (!m_parameterTracker->Initialize()) return false;
 
+        // 设置参数追踪器的通知窗口
+        if (m_menuWindow) {
+            m_parameterTracker->SetNotifyWindow(m_menuWindow->GetHwnd());
+            m_menuWindow->SetTracker(m_parameterTracker.get());
+        }
+
         // 如果启用了浮动窗口，则默认显示
         if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
             m_menuWindow->Show();

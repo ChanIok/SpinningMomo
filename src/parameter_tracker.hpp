@@ -2,6 +2,7 @@
 #include "win_config.hpp"
 #include "constants.hpp"
 #include "parameter_ocr.hpp"
+#include "parameter_types.hpp"
 #include "thread_raii.hpp"
 #include <functional>
 #include <wrl/client.h>
@@ -23,51 +24,18 @@ public:
     ~ParameterTracker();
     
     bool Initialize();
+    void SetNotifyWindow(HWND hwnd) { m_notifyWindow = hwnd; }
+
+    // 添加参数访问接口
+    const Parameters& GetParameters() const { return m_currentParams; }
+    bool IsPercentageParameter(ParameterType type) const;
 
 private:
-    // 参数类型枚举
-    enum class ParameterType {
-        Vignette = 0,
-        SoftLightIntensity = 1,
-        SoftLightRange = 2,
-        Brightness = 3,
-        Exposure = 4,
-        Contrast = 5,
-        Saturation = 6,
-        NaturalSaturation = 7,
-        Highlights = 8,
-        Shadows = 9
-    };
-
-    // 参数值结构体
-    struct ParameterValue {
-        float value = 0.0f;
-        float confidence = 0.0f;
-        bool is_valid = false;
-    };
-
-    // 参数存储结构
-    struct Parameters {
-        std::array<ParameterValue, 10> values;  // 固定大小为10的数组
-
-        // 便捷访问方法
-        ParameterValue& operator[](ParameterType type) {
-            return values[static_cast<size_t>(type)];
-        }
-        
-        const ParameterValue& operator[](ParameterType type) const {
-            return values[static_cast<size_t>(type)];
-        }
-    };
-
     // 当前参数状态
     Parameters m_currentParams;
 
     // 更新参数值
     void UpdateParameter(ParameterType type, float raw_value, float confidence);
-
-    // 判断参数是否为百分比类型
-    bool IsPercentageParameter(ParameterType type) const;
 
     // 获取参数类型名称（用于调试输出）
     std::string GetParameterTypeName(ParameterType type) const;
@@ -100,6 +68,7 @@ private:
     };
 
     // 成员变量
+    HWND m_notifyWindow = NULL;
     HHOOK m_mouseHook{nullptr};
     HWND m_targetWindow;
     std::shared_ptr<CaptureSequence> m_currentSequence;

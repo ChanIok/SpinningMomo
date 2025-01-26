@@ -6,10 +6,12 @@
 #include <string>
 #include <dwmapi.h>
 #include "constants.hpp"
+#include "parameter_types.hpp"  // 添加参数类型头文件
 
 // 前向声明
 struct AspectRatio;
 struct ResolutionPreset;
+class ParameterTracker;  // 添加前向声明
 
 // 菜单窗口类
 class MenuWindow {
@@ -51,6 +53,10 @@ public:
     void SetPreviewEnabled(bool enabled);  // 添加设置预览窗口状态的函数
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
+    void UpdateParameters(const Parameters& params);  // 添加参数更新方法
+
+    // 设置参数追踪器
+    void SetTracker(ParameterTracker* tracker) { m_tracker = tracker; }
 
 private:
     static const TCHAR* MENU_WINDOW_CLASS;  // 只声明
@@ -68,6 +74,13 @@ private:
     static constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120; // 分辨率列宽度
     static constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;   // 设置列宽度
 
+    // 添加参数区域相关常量
+    static constexpr int BASE_PARAMETER_AREA_HEIGHT = 150;   // 参数区域基础高度
+    static constexpr int BASE_PARAMETER_ITEM_HEIGHT = 24;    // 每个参数项基础高度
+    static constexpr int BASE_PARAMETER_COLUMN_WIDTH = 150;  // 每列基础宽度
+    static constexpr int BASE_PARAMETER_NAME_WIDTH = 60;     // 参数名称基础宽度
+    static constexpr int BASE_PARAMETER_VALUE_WIDTH = 50;    // 参数值基础宽度
+
     // DPI相关的尺寸变量
     UINT m_dpi = 96;
     int m_itemHeight = BASE_ITEM_HEIGHT;
@@ -83,6 +96,15 @@ private:
     int m_resolutionColumnWidth = BASE_RESOLUTION_COLUMN_WIDTH;
     int m_settingsColumnWidth = BASE_SETTINGS_COLUMN_WIDTH;
 
+    // 添加参数区域相关变量
+    int m_parameterAreaHeight = BASE_PARAMETER_AREA_HEIGHT;
+    int m_parameterItemHeight = BASE_PARAMETER_ITEM_HEIGHT;
+    int m_parameterColumnWidth = BASE_PARAMETER_COLUMN_WIDTH;
+    int m_parameterNameWidth = BASE_PARAMETER_NAME_WIDTH;
+    int m_parameterValueWidth = BASE_PARAMETER_VALUE_WIDTH;
+    RECT m_parameterRect;  // 参数区域矩形
+    Parameters m_currentParams;  // 当前参数值
+
     HWND m_hwnd = NULL;
     HWND m_hwndParent = NULL;
     HINSTANCE m_hInstance = NULL;
@@ -94,6 +116,9 @@ private:
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
     std::vector<MenuItem> m_items;               // 所有列表项
     const LocalizedStrings* m_strings = nullptr;            // 字符串只读
+
+    // 参数追踪器引用
+    ParameterTracker* m_tracker = nullptr;
 
     // 私有方法
     void InitializeItems(const LocalizedStrings& strings);
@@ -107,4 +132,12 @@ private:
     void UpdateDpiDependentResources();
     int CalculateWindowHeight();
     int GetItemIndexFromPoint(int x, int y);
+
+    // 添加参数区域相关方法
+    void DrawParameterArea(HDC hdc);
+    void DrawParameterItem(HDC hdc, const ParameterValue& value, 
+                         const std::wstring& name, const RECT& rect,
+                         ParameterType type);
+    bool IsPercentageParameter(ParameterType type) const;
+    void UpdateParameterRect();
 }; 

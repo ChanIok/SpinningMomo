@@ -617,7 +617,7 @@ bool ParameterTracker::GetValueRegions(IWICBitmapSource* binary, int scrollbarCe
         
         // 检查y坐标是否在有效范围内
         if (menuY >= (FIRST_MENU_Y - TOLERANCE) && 
-            menuY <= (height - MENU_ITEM_HEIGHT - TOLERANCE)) {
+            menuY <= (height - VALUE_HEIGHT/2 - TOLERANCE)) {
             
             ValueRegion region;
             region.y = static_cast<int>(round(menuY));
@@ -701,6 +701,11 @@ void ParameterTracker::UpdateParameter(ParameterType type, float raw_value, floa
                            ", Value: " + value_str + 
                            ", Confidence: " + std::to_string(confidence) + "\n";
     OutputDebugStringA(debug_msg.c_str());
+
+    // 通知菜单窗口参数已更新
+    if (m_notifyWindow && IsWindow(m_notifyWindow)) {
+        PostMessage(m_notifyWindow, Constants::WM_PARAMETER_UPDATED, 0, 0);
+    }
 }
 
 // 判断参数是否为百分比类型实现

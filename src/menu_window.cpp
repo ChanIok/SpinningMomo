@@ -1,5 +1,6 @@
 #include "menu_window.hpp"
 #include "window_utils.hpp"
+#include "parameter_tracker.hpp"
 #include <windowsx.h>
 #include <algorithm>
 #include <tchar.h>
@@ -251,6 +252,14 @@ LRESULT MenuWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         case WM_CLOSE:
             Hide();
             return 0;
+
+        case Constants::WM_PARAMETER_UPDATED: {
+            // 仅重绘参数区域
+            if (m_tracker) {
+                InvalidateRect(hwnd, &m_parameterRect, FALSE);
+            }
+            return 0;
+        }
     }
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }
@@ -382,6 +391,9 @@ void MenuWindow::OnPaint(HDC hdc) {
         }
     }
 
+    // 绘制参数区域
+    DrawParameterArea(memDC);
+
     // 复制到屏幕
     BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
 
@@ -462,6 +474,13 @@ void MenuWindow::UpdateDpiDependentResources() {
     m_ratioColumnWidth = static_cast<int>(BASE_RATIO_COLUMN_WIDTH * scale);
     m_resolutionColumnWidth = static_cast<int>(BASE_RESOLUTION_COLUMN_WIDTH * scale);
     m_settingsColumnWidth = static_cast<int>(BASE_SETTINGS_COLUMN_WIDTH * scale);
+
+    // 添加参数区域的 DPI 缩放
+    m_parameterAreaHeight = static_cast<int>(BASE_PARAMETER_AREA_HEIGHT * scale);
+    m_parameterItemHeight = static_cast<int>(BASE_PARAMETER_ITEM_HEIGHT * scale);
+    m_parameterColumnWidth = static_cast<int>(BASE_PARAMETER_COLUMN_WIDTH * scale);
+    m_parameterNameWidth = static_cast<int>(BASE_PARAMETER_NAME_WIDTH * scale);
+    m_parameterValueWidth = static_cast<int>(BASE_PARAMETER_VALUE_WIDTH * scale);
 }
 
 int MenuWindow::CalculateWindowHeight() {
@@ -498,8 +517,8 @@ int MenuWindow::CalculateWindowHeight() {
     if (resolutionHeight > maxColumnHeight) maxColumnHeight = resolutionHeight;
     if (settingsHeight > maxColumnHeight) maxColumnHeight = settingsHeight;
 
-    // 返回总高度
-    return m_titleHeight + m_separatorHeight + maxColumnHeight;
+    // 返回总高度（包含参数区域）
+    return m_titleHeight + m_separatorHeight + maxColumnHeight + m_parameterAreaHeight;
 }
 
 int MenuWindow::GetItemIndexFromPoint(int x, int y) {
@@ -553,4 +572,116 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
 void MenuWindow::SetPreviewEnabled(bool enabled) {
     m_previewEnabled = enabled;
     InvalidateRect(m_hwnd, NULL, TRUE);
+}
+
+// 添加参数区域矩形更新方法
+void MenuWindow::UpdateParameterRect() {
+    if (!m_hwnd) return;
+
+    RECT clientRect;
+    GetClientRect(m_hwnd, &clientRect);
+    
+    // 参数区域位于窗口底部
+    m_parameterRect.left = clientRect.left;
+    m_parameterRect.right = clientRect.right;
+    m_parameterRect.bottom = clientRect.bottom;
+    m_parameterRect.top = m_parameterRect.bottom - m_parameterAreaHeight;
+}
+
+// 实现参数区域绘制
+void MenuWindow::DrawParameterArea(HDC hdc) {
+    if (!m_tracker) return;  // 如果没有tracker，直接返回
+
+    // 更新参数区域矩形
+    UpdateParameterRect();
+
+    // 绘制参数区域背景
+    HBRUSH hParamBrush = CreateSolidBrush(RGB(245, 245, 245));
+    FillRect(hdc, &m_parameterRect, hParamBrush);
+    DeleteObject(hParamBrush);
+
+    // 绘制分隔线
+    HPEN hSepPen = CreatePen(PS_SOLID, 1, RGB(229, 229, 229));
+    HPEN oldPen = (HPEN)SelectObject(hdc, hSepPen);
+    MoveToEx(hdc, m_parameterRect.left, m_parameterRect.top, NULL);
+    LineTo(hdc, m_parameterRect.right, m_parameterRect.top);
+    SelectObject(hdc, oldPen);
+    DeleteObject(hSepPen);
+
+    // 计算每列的起始位置
+    int columnWidth = (m_parameterRect.right - m_parameterRect.left) / 2;
+    int x1 = m_parameterRect.left + m_textPadding;
+    int x2 = x1 + columnWidth;
+    int y = m_parameterRect.top + 5;  // 添加一些上边距
+
+    // 第一列参数
+    const std::pair<ParameterType, std::wstring> firstColumn[] = {
+        {ParameterType::Vignette, L"晕影"},
+        {ParameterType::SoftLightIntensity, L"柔光强度"},
+        {ParameterType::SoftLightRange, L"柔光范围"},
+        {ParameterType::Brightness, L"亮度"},
+        {ParameterType::Exposure, L"曝光"}
+    };
+
+    // 第二列参数
+    const std::pair<ParameterType, std::wstring> secondColumn[] = {
+        {ParameterType::Contrast, L"对比度"},
+        {ParameterType::Saturation, L"饱和度"},
+        {ParameterType::NaturalSaturation, L"自然饱和度"},
+        {ParameterType::Highlights, L"高光"},
+        {ParameterType::Shadows, L"阴影"}
+    };
+
+    // 获取当前参数值
+    const Parameters& params = m_tracker->GetParameters();
+
+    // 绘制第一列
+    for (const auto& param : firstColumn) {
+        RECT itemRect = {x1, y, x1 + columnWidth - m_textPadding, y + m_parameterItemHeight};
+        DrawParameterItem(hdc, params[param.first], param.second, itemRect, param.first);
+        y += m_parameterItemHeight;
+    }
+
+    // 重置y坐标，绘制第二列
+    y = m_parameterRect.top + 5;
+    for (const auto& param : secondColumn) {
+        RECT itemRect = {x2, y, x2 + columnWidth - m_textPadding, y + m_parameterItemHeight};
+        DrawParameterItem(hdc, params[param.first], param.second, itemRect, param.first);
+        y += m_parameterItemHeight;
+    }
+}
+
+// 实现参数项绘制
+void MenuWindow::DrawParameterItem(HDC hdc, const ParameterValue& value, 
+                                 const std::wstring& name, const RECT& rect,
+                                 ParameterType type) {
+    // 设置文本颜色（根据置信度调整）
+    COLORREF textColor = value.confidence > 0.8f ? RGB(51, 51, 51) : RGB(128, 128, 128);
+    SetTextColor(hdc, textColor);
+
+    // 绘制参数名称
+    RECT nameRect = rect;
+    nameRect.right = nameRect.left + m_parameterNameWidth;
+    DrawText(hdc, name.c_str(), -1, &nameRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
+    // 格式化参数值
+    std::wstring valueText;
+    if (IsPercentageParameter(type)) {
+        valueText = std::to_wstring(static_cast<int>(value.value)) + L"%";
+    } else {
+        wchar_t buffer[32];
+        swprintf_s(buffer, L"%.1f", value.value);
+        valueText = buffer;
+    }
+
+    // 绘制参数值
+    RECT valueRect = rect;
+    valueRect.left = nameRect.right + 5;
+    DrawText(hdc, valueText.c_str(), -1, &valueRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+}
+
+// 判断是否为百分比参数
+bool MenuWindow::IsPercentageParameter(ParameterType type) const {
+    if (!m_tracker) return false;
+    return m_tracker->IsPercentageParameter(type);
 } 
