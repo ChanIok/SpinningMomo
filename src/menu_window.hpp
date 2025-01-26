@@ -78,12 +78,12 @@ private:
     static constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120; // 分辨率列宽度
     static constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;   // 设置列宽度
 
-    // 添加参数区域相关常量
-    static constexpr int BASE_PARAMETER_AREA_HEIGHT = 150;   // 参数区域基础高度
+    // 参数区域相关常量
     static constexpr int BASE_PARAMETER_ITEM_HEIGHT = 24;    // 每个参数项基础高度
-    static constexpr int BASE_PARAMETER_COLUMN_WIDTH = 150;  // 每列基础宽度
-    static constexpr int BASE_PARAMETER_NAME_WIDTH = 60;     // 参数名称基础宽度
+    static constexpr int BASE_PARAMETER_NAME_WIDTH = 70;     // 参数名称基础宽度
     static constexpr int BASE_PARAMETER_VALUE_WIDTH = 50;    // 参数值基础宽度
+    static constexpr int PARAMETER_ITEMS_PER_COLUMN = 5;     // 每列参数项数量
+    static constexpr int PARAMETER_AREA_PADDING = 5;         // 参数区域上下边距
 
     // DPI相关的尺寸变量
     UINT m_dpi = 96;
@@ -100,10 +100,8 @@ private:
     int m_resolutionColumnWidth = BASE_RESOLUTION_COLUMN_WIDTH;
     int m_settingsColumnWidth = BASE_SETTINGS_COLUMN_WIDTH;
 
-    // 添加参数区域相关变量
-    int m_parameterAreaHeight = BASE_PARAMETER_AREA_HEIGHT;
+    // 参数区域相关变量
     int m_parameterItemHeight = BASE_PARAMETER_ITEM_HEIGHT;
-    int m_parameterColumnWidth = BASE_PARAMETER_COLUMN_WIDTH;
     int m_parameterNameWidth = BASE_PARAMETER_NAME_WIDTH;
     int m_parameterValueWidth = BASE_PARAMETER_VALUE_WIDTH;
     RECT m_parameterRect;  // 参数区域矩形

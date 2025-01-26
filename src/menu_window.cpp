@@ -400,8 +400,10 @@ void MenuWindow::OnPaint(HDC hdc) {
         }
     }
 
-    // 绘制参数区域
-    DrawParameterArea(memDC);
+    // 只有在参数追踪启用时才绘制参数区域
+    if (m_parameterTrackingEnabled) {
+        DrawParameterArea(memDC);
+    }
 
     // 复制到屏幕
     BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
@@ -487,10 +489,8 @@ void MenuWindow::UpdateDpiDependentResources() {
     m_resolutionColumnWidth = static_cast<int>(BASE_RESOLUTION_COLUMN_WIDTH * scale);
     m_settingsColumnWidth = static_cast<int>(BASE_SETTINGS_COLUMN_WIDTH * scale);
 
-    // 添加参数区域的 DPI 缩放
-    m_parameterAreaHeight = static_cast<int>(BASE_PARAMETER_AREA_HEIGHT * scale);
+    // 更新参数区域相关尺寸
     m_parameterItemHeight = static_cast<int>(BASE_PARAMETER_ITEM_HEIGHT * scale);
-    m_parameterColumnWidth = static_cast<int>(BASE_PARAMETER_COLUMN_WIDTH * scale);
     m_parameterNameWidth = static_cast<int>(BASE_PARAMETER_NAME_WIDTH * scale);
     m_parameterValueWidth = static_cast<int>(BASE_PARAMETER_VALUE_WIDTH * scale);
 }
@@ -530,8 +530,15 @@ int MenuWindow::CalculateWindowHeight() {
     if (resolutionHeight > maxColumnHeight) maxColumnHeight = resolutionHeight;
     if (settingsHeight > maxColumnHeight) maxColumnHeight = settingsHeight;
 
-    // 返回总高度（包含参数区域）
-    return m_titleHeight + m_separatorHeight + maxColumnHeight + m_parameterAreaHeight;
+    // 计算总高度（包含标题栏、分隔线和参数区域）
+    int totalHeight = m_titleHeight + m_separatorHeight + maxColumnHeight;
+    
+    // 只有在参数追踪启用时才加入参数区域高度
+    if (m_parameterTrackingEnabled) {
+        totalHeight += m_parameterItemHeight * PARAMETER_ITEMS_PER_COLUMN + PARAMETER_AREA_PADDING * 2;
+    }
+    
+    return totalHeight;
 }
 
 int MenuWindow::GetItemIndexFromPoint(int x, int y) {
@@ -589,8 +596,22 @@ void MenuWindow::SetPreviewEnabled(bool enabled) {
 }
 
 void MenuWindow::SetParameterTrackingEnabled(bool enabled) {
-    m_parameterTrackingEnabled = enabled;
-    InvalidateRect(m_hwnd, NULL, TRUE);
+    if (m_parameterTrackingEnabled != enabled) {
+        m_parameterTrackingEnabled = enabled;
+        
+        // 需要重新计算窗口大小
+        if (m_hwnd) {
+            RECT currentRect;
+            GetWindowRect(m_hwnd, &currentRect);
+            int newHeight = CalculateWindowHeight();
+            SetWindowPos(m_hwnd, NULL, 
+                currentRect.left, currentRect.top,
+                currentRect.right - currentRect.left, newHeight,
+                SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        
+        InvalidateRect(m_hwnd, NULL, TRUE);
+    }
 }
 
 // 添加参数区域矩形更新方法
@@ -600,11 +621,17 @@ void MenuWindow::UpdateParameterRect() {
     RECT clientRect;
     GetClientRect(m_hwnd, &clientRect);
     
-    // 参数区域位于窗口底部
-    m_parameterRect.left = clientRect.left;
-    m_parameterRect.right = clientRect.right;
-    m_parameterRect.bottom = clientRect.bottom;
-    m_parameterRect.top = m_parameterRect.bottom - m_parameterAreaHeight;
+    if (m_parameterTrackingEnabled) {
+        // 参数区域位于窗口底部
+        m_parameterRect.left = clientRect.left;
+        m_parameterRect.right = clientRect.right;
+        m_parameterRect.bottom = clientRect.bottom;
+        m_parameterRect.top = m_parameterRect.bottom - 
+            (m_parameterItemHeight * PARAMETER_ITEMS_PER_COLUMN + PARAMETER_AREA_PADDING * 2);
+    } else {
+        // 参数追踪未启用时，设置为空矩形
+        m_parameterRect = {0, 0, 0, 0};
+    }
 }
 
 // 实现参数区域绘制

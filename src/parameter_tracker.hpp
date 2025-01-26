@@ -59,7 +59,7 @@ private:
         void ProcessCapture(Microsoft::WRL::ComPtr<ID3D11Texture2D> texture, std::chrono::high_resolution_clock::time_point startTime);
 
         static constexpr int MAX_CAPTURES = 2;
-        static constexpr int CAPTURE_INTERVAL_MS = 1;
+        static constexpr int CAPTURE_INTERVAL_MS = 250;
         
     private:
         RECT m_region;

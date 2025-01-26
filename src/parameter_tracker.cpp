@@ -398,13 +398,6 @@ void ParameterTracker::CaptureSequence::ProcessCapture(Microsoft::WRL::ComPtr<ID
         return;
     }
 
-    // 8. 裁剪并保存值区域
-    auto now = std::chrono::system_clock::now();
-    std::wstring baseName = L"Parameter_" + 
-        std::to_wstring(std::chrono::system_clock::to_time_t(now)) + 
-        L"_" + std::to_wstring(m_captureCount);
-    std::wstring outputDir = WindowUtils::GetScreenshotPath();
-
     // OCR处理
     try {
         for (size_t i = 0; i < valueRegions.size(); ++i) {
@@ -726,11 +719,6 @@ void ParameterTracker::UpdateParameter(ParameterType type, float raw_value, floa
         snprintf(buffer, sizeof(buffer), "%.1f", converted_value);
         value_str = buffer;
     }
-
-    std::string debug_msg = "Parameter updated - Type: " + GetParameterTypeName(type) + 
-                           ", Value: " + value_str + 
-                           ", Confidence: " + std::to_string(confidence) + "\n";
-    OutputDebugStringA(debug_msg.c_str());
 
     // 使用消息中心发送参数更新消息
     MessageData msg{

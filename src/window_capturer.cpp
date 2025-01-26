@@ -60,16 +60,13 @@ bool WindowCapturer::Initialize(HWND hwnd) {
 }
 
 void WindowCapturer::Cleanup() {
-    OutputDebugStringA("WindowCapturer::Cleanup - Starting\n");
     if (m_framePool) {
         m_framePool.Close();
         m_framePool = nullptr;
-        OutputDebugStringA("WindowCapturer::Cleanup - Frame pool closed\n");
     }
     if (m_captureSession) {
         m_captureSession.Close();
         m_captureSession = nullptr;
-        OutputDebugStringA("WindowCapturer::Cleanup - Capture session closed\n");
     }
     m_captureItem = nullptr;
     m_isInitialized = false;
@@ -83,7 +80,6 @@ void WindowCapturer::Cleanup() {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         m_callbackQueue.swap(empty);
     }
-    OutputDebugStringA("WindowCapturer::Cleanup - Completed\n");
 }
 
 bool WindowCapturer::EnsureD3DResources() {
