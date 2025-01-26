@@ -4,6 +4,7 @@
 #include "parameter_ocr.hpp"
 #include "parameter_types.hpp"
 #include "thread_raii.hpp"
+#include "message_center.hpp"
 #include <functional>
 #include <wrl/client.h>
 #include <wincodec.h>
@@ -24,7 +25,6 @@ public:
     ~ParameterTracker();
     
     bool Initialize();
-    void SetNotifyWindow(HWND hwnd) { m_notifyWindow = hwnd; }
 
     // 添加参数访问接口
     const Parameters& GetParameters() const { return m_currentParams; }
@@ -68,7 +68,6 @@ private:
     };
 
     // 成员变量
-    HWND m_notifyWindow = NULL;
     HHOOK m_mouseHook{nullptr};
     HWND m_targetWindow;
     std::shared_ptr<CaptureSequence> m_currentSequence;

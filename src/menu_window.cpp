@@ -1,6 +1,5 @@
 #include "menu_window.hpp"
 #include "window_utils.hpp"
-#include "parameter_tracker.hpp"
 #include <windowsx.h>
 #include <algorithm>
 #include <tchar.h>
@@ -17,6 +16,20 @@ MenuWindow::MenuWindow(HINSTANCE hInstance) : m_hInstance(hInstance) {
     ReleaseDC(NULL, hdc);
 
     UpdateDpiDependentResources();
+
+    // 订阅参数更新消息
+    MessageCenter::Instance().Subscribe(
+        MessageType::ParameterUpdated,
+        this,
+        [this](const MessageData& msg) {
+            if (auto* data = std::get_if<ParameterUpdateData>(&msg.data)) {
+                // 更新参数值
+                m_currentParams[data->type] = ParameterValue{data->value, data->confidence};
+                // 重绘参数区域
+                InvalidateRect(m_hwnd, &m_parameterRect, FALSE);
+            }
+        }
+    );
 }
 
 void MenuWindow::RegisterWindowClass() {
@@ -252,14 +265,6 @@ LRESULT MenuWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
         case WM_CLOSE:
             Hide();
             return 0;
-
-        case Constants::WM_PARAMETER_UPDATED: {
-            // 仅重绘参数区域
-            if (m_tracker) {
-                InvalidateRect(hwnd, &m_parameterRect, FALSE);
-            }
-            return 0;
-        }
     }
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }
@@ -590,8 +595,6 @@ void MenuWindow::UpdateParameterRect() {
 
 // 实现参数区域绘制
 void MenuWindow::DrawParameterArea(HDC hdc) {
-    if (!m_tracker) return;  // 如果没有tracker，直接返回
-
     // 更新参数区域矩形
     UpdateParameterRect();
 
@@ -632,13 +635,10 @@ void MenuWindow::DrawParameterArea(HDC hdc) {
         {ParameterType::Shadows, L"阴影"}
     };
 
-    // 获取当前参数值
-    const Parameters& params = m_tracker->GetParameters();
-
     // 绘制第一列
     for (const auto& param : firstColumn) {
         RECT itemRect = {x1, y, x1 + columnWidth - m_textPadding, y + m_parameterItemHeight};
-        DrawParameterItem(hdc, params[param.first], param.second, itemRect, param.first);
+        DrawParameterItem(hdc, m_currentParams[param.first], param.second, itemRect, param.first);
         y += m_parameterItemHeight;
     }
 
@@ -646,7 +646,7 @@ void MenuWindow::DrawParameterArea(HDC hdc) {
     y = m_parameterRect.top + 5;
     for (const auto& param : secondColumn) {
         RECT itemRect = {x2, y, x2 + columnWidth - m_textPadding, y + m_parameterItemHeight};
-        DrawParameterItem(hdc, params[param.first], param.second, itemRect, param.first);
+        DrawParameterItem(hdc, m_currentParams[param.first], param.second, itemRect, param.first);
         y += m_parameterItemHeight;
     }
 }
@@ -682,6 +682,8 @@ void MenuWindow::DrawParameterItem(HDC hdc, const ParameterValue& value,
 
 // 判断是否为百分比参数
 bool MenuWindow::IsPercentageParameter(ParameterType type) const {
-    if (!m_tracker) return false;
-    return m_tracker->IsPercentageParameter(type);
+    return type == ParameterType::Vignette ||
+           type == ParameterType::SoftLightIntensity ||
+           type == ParameterType::Brightness ||
+           type == ParameterType::Contrast;
 } 

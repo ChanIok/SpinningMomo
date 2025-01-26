@@ -7,11 +7,11 @@
 #include <dwmapi.h>
 #include "constants.hpp"
 #include "parameter_types.hpp"  // 添加参数类型头文件
+#include "message_center.hpp"  // 添加消息中心头文件
 
 // 前向声明
 struct AspectRatio;
 struct ResolutionPreset;
-class ParameterTracker;  // 添加前向声明
 
 // 菜单窗口类
 class MenuWindow {
@@ -35,6 +35,10 @@ public:
     };
 
     MenuWindow(HINSTANCE hInstance);
+    ~MenuWindow() {
+        // 取消订阅消息
+        MessageCenter::Instance().Unsubscribe(MessageType::ParameterUpdated, this);
+    }
     
     bool Create(HWND parent, 
                std::vector<AspectRatio>& ratios,           // 使用引用
@@ -54,9 +58,6 @@ public:
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
     void UpdateParameters(const Parameters& params);  // 添加参数更新方法
-
-    // 设置参数追踪器
-    void SetTracker(ParameterTracker* tracker) { m_tracker = tracker; }
 
 private:
     static const TCHAR* MENU_WINDOW_CLASS;  // 只声明
@@ -116,9 +117,6 @@ private:
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
     std::vector<MenuItem> m_items;               // 所有列表项
     const LocalizedStrings* m_strings = nullptr;            // 字符串只读
-
-    // 参数追踪器引用
-    ParameterTracker* m_tracker = nullptr;
 
     // 私有方法
     void InitializeItems(const LocalizedStrings& strings);

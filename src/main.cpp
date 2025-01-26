@@ -16,6 +16,7 @@
 #include "notification_manager.hpp"
 #include "config_manager.hpp"
 #include "parameter_tracker.hpp"
+#include "message_center.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -77,12 +78,6 @@ public:
         HWND targetWnd = WindowUtils::FindTargetWindow(m_configManager->GetWindowTitle());
         m_parameterTracker = std::make_unique<ParameterTracker>(targetWnd);
         if (!m_parameterTracker->Initialize()) return false;
-
-        // 设置参数追踪器的通知窗口
-        if (m_menuWindow) {
-            m_parameterTracker->SetNotifyWindow(m_menuWindow->GetHwnd());
-            m_menuWindow->SetTracker(m_parameterTracker.get());
-        }
 
         // 如果启用了浮动窗口，则默认显示
         if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
