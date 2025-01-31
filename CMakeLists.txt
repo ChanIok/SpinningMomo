@@ -23,22 +23,33 @@ endif()
 include_directories(${ONNXRUNTIME_ROOT}/include)
 link_directories(${ONNXRUNTIME_ROOT}/lib)
 
+# 收集所有源文件
+file(GLOB_RECURSE CORE_SOURCES 
+    "src/core/*.cpp"
+)
+
+file(GLOB_RECURSE TRACKER_SOURCES 
+    "src/tracker/*.cpp"
+)
+
+file(GLOB MAIN_SOURCES
+    "src/main.cpp"
+    "src/constants.cpp"
+)
+
 # 创建Windows GUI应用程序
 add_executable(SpinningMomo WIN32 
-    src/main.cpp
-    src/constants.cpp
-    src/window_utils.cpp
-    src/tray_icon.cpp
-    src/menu_window.cpp
-    src/preview_window.cpp
-    src/notification_window.cpp
-    src/notification_manager.cpp
-    src/config_manager.cpp
-    src/window_capturer.cpp
-    src/parameter_tracker.cpp
-    src/parameter_ocr.cpp
-    src/image_processor.cpp
-    src/resource.rc  # 添加资源文件
+    ${MAIN_SOURCES}
+    ${CORE_SOURCES}
+    ${TRACKER_SOURCES}
+    src/resource.rc  # 资源文件
+)
+
+# 添加头文件搜索路径
+target_include_directories(SpinningMomo PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src          # 主目录
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core     # core模块目录
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tracker  # tracker模块目录
 )
 
 # 添加Windows库
