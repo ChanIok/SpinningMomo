@@ -19,6 +19,17 @@ SpinningMomo/
 │   ├── tracker/           # 参数追踪模块
 │   │   ├── parameter_tracker.hpp/cpp
 │   │   └── parameter_types.hpp
+│   ├── media/            # 相册管理模块
+│   │   ├── http/         # HTTP服务器相关
+│   │   │   ├── server.hpp/cpp
+│   │   │   └── routes.hpp/cpp
+│   │   ├── db/           # 数据库相关
+│   │   │   ├── database.hpp/cpp
+│   │   │   └── models.hpp/cpp
+│   │   ├── services/     # 业务逻辑
+│   │   │   ├── photo_service.hpp/cpp
+│   │   │   └── album_service.hpp/cpp
+│   │   └── tests/        # 测试代码
 │   ├── main.cpp          # 程序入口
 │   ├── resource.rc       # 资源文件
 │   └── icon.ico          # 应用图标

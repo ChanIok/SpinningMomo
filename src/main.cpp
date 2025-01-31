@@ -17,6 +17,9 @@
 #include "config_manager.hpp"
 #include "parameter_tracker.hpp"
 #include "message_center.hpp"
+#include "media/http/server.hpp"
+#include "media/utils/logger.hpp"
+#include "media/db/database.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -25,6 +28,9 @@ public:
     ~SpinningMomoApp() {
         if (m_configManager) {
             m_configManager->SaveAllConfigs();
+        }
+        if (m_httpServer) {
+            m_httpServer->Stop();
         }
         UnregisterHotKey(m_hwnd, 1);
     }
@@ -35,6 +41,13 @@ public:
         
         // 加载配置
         m_configManager->LoadAllConfigs();
+
+        // 初始化HTTP服务器
+        m_httpServer = std::make_unique<HttpServer>("localhost", 51206);
+        if (!m_httpServer->Start()) {
+            ShowNotification(m_strings.APP_NAME.c_str(), L"HTTP server failed to start", true);
+            return false;
+        }
 
         // 创建通知管理器
         m_notificationManager = std::make_unique<NotificationManager>(hInstance);
@@ -609,6 +622,7 @@ private:
     std::unique_ptr<NotificationManager> m_notificationManager;
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<ParameterTracker> m_parameterTracker;
+    std::unique_ptr<HttpServer> m_httpServer;
 
     // 应用状态
     bool m_isPreviewEnabled = false;
@@ -818,6 +832,27 @@ int WINAPI WinMain(
     
     // 设置 DPI 感知
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    
+    // 获取程序所在目录
+    wchar_t exePath[MAX_PATH];
+    GetModuleFileNameW(NULL, exePath, MAX_PATH);
+    std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+    SetCurrentDirectoryW(exeDir.c_str());
+    
+    // 初始化日志系统
+    Logger::get_instance().init();
+    spdlog::info("SpinningMomo starting up");
+    
+    try {
+        // 初始化数据库
+        Database::get_instance().init((std::filesystem::current_path() / "spinningmomo.db").string());
+        spdlog::info("Database initialized");
+    } catch (const DatabaseException& e) {
+        spdlog::error("Failed to initialize database: {}", e.what());
+        MessageBox(NULL, TEXT("Database initialization failed."), 
+                  Constants::APP_NAME, MB_ICONERROR);
+        return 1;
+    }
     
     SpinningMomoApp app;
     

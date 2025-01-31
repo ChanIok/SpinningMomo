@@ -2,15 +2,15 @@
 
 ## 数据库概述
 
-SpinningMomo项目使用SQLite3作为数据库管理系统。SQLite3是一个轻量级的、嵌入式的关系型数据库，非常适合桌面应用程序使用。
+SpinningMomo项目使用SQLite3作为数据库管理系统。SQLite3是一个轻量级的、嵌入式的关系型数据库，非常适合桌面应用程序使用。主要用于存储游戏截图的元数据和相册信息。
 
 ## 数据库表结构
 
-### 1. photos（照片表）
-存储照片的基本信息。
+### 1. screenshots（截图表）
+存储游戏截图的基本信息。注意：不存储实际图片文件，只存储元数据。
 
 ```sql
-CREATE TABLE photos (
+CREATE TABLE screenshots (
     id INTEGER PRIMARY KEY,
     filename TEXT NOT NULL,           -- 文件名
     filepath TEXT NOT NULL,           -- 文件路径
@@ -20,106 +20,62 @@ CREATE TABLE photos (
     file_size INTEGER NOT NULL,       -- 文件大小(bytes)
     metadata TEXT,                    -- 元数据(JSON格式)
     deleted_at DATETIME,              -- 软删除时间
-    updated_at DATETIME NOT NULL,     -- 更新时间
-    hash TEXT,                        -- 文件哈希值
-    thumbnail_path TEXT               -- 缩略图路径
+    updated_at DATETIME NOT NULL      -- 更新时间
 );
 
 -- 索引
-CREATE INDEX idx_photos_created_at ON photos(created_at);
-CREATE INDEX idx_photos_deleted_at ON photos(deleted_at);
-CREATE INDEX idx_photos_hash ON photos(hash);
+CREATE INDEX idx_screenshots_created_at ON screenshots(created_at);
+CREATE INDEX idx_screenshots_deleted_at ON screenshots(deleted_at);
 ```
 
-### 2. albums（相册表）
+### 2. screenshot_albums（相册表）
 存储相册信息。
 
 ```sql
-CREATE TABLE albums (
+CREATE TABLE screenshot_albums (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,               -- 相册名称
     description TEXT,                 -- 相册描述
-    cover_photo_id INTEGER,          -- 封面照片ID
+    cover_screenshot_id INTEGER,      -- 封面截图ID
     created_at DATETIME NOT NULL,     -- 创建时间
     updated_at DATETIME NOT NULL,     -- 更新时间
-    deleted_at DATETIME,             -- 软删除时间
-    FOREIGN KEY (cover_photo_id) REFERENCES photos(id)
+    deleted_at DATETIME,              -- 软删除时间
+    FOREIGN KEY (cover_screenshot_id) REFERENCES screenshots(id)
 );
 
 -- 索引
-CREATE INDEX idx_albums_created_at ON albums(created_at);
-CREATE INDEX idx_albums_deleted_at ON albums(deleted_at);
+CREATE INDEX idx_screenshot_albums_created_at ON screenshot_albums(created_at);
+CREATE INDEX idx_screenshot_albums_deleted_at ON screenshot_albums(deleted_at);
 ```
 
-### 3. album_photos（相册照片关联表）
-管理相册和照片的多对多关系。
+### 3. album_screenshots（相册截图关联表）
+管理相册和截图的多对多关系。
 
 ```sql
-CREATE TABLE album_photos (
+CREATE TABLE album_screenshots (
     album_id INTEGER NOT NULL,
-    photo_id INTEGER NOT NULL,
-    position INTEGER NOT NULL,        -- 照片在相册中的位置
-    created_at DATETIME NOT NULL,     -- 创建时间
-    FOREIGN KEY (album_id) REFERENCES albums(id) ON DELETE CASCADE,
-    FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE,
-    PRIMARY KEY (album_id, photo_id)
+    screenshot_id INTEGER NOT NULL,
+    position INTEGER NOT NULL,        -- 截图在相册中的位置
+    created_at DATETIME NOT NULL,     -- 添加时间
+    FOREIGN KEY (album_id) REFERENCES screenshot_albums(id) ON DELETE CASCADE,
+    FOREIGN KEY (screenshot_id) REFERENCES screenshots(id) ON DELETE CASCADE,
+    PRIMARY KEY (album_id, screenshot_id)
 );
 
 -- 索引
-CREATE INDEX idx_album_photos_album_id ON album_photos(album_id);
-CREATE INDEX idx_album_photos_photo_id ON album_photos(photo_id);
-CREATE INDEX idx_album_photos_position ON album_photos(position);
-```
-
-## 数据库关系图
-
-```mermaid
-erDiagram
-    photos ||--o{ album_photos : contains
-    photos ||--o{ albums : "is cover of"
-    albums ||--o{ album_photos : contains
-
-    photos {
-        integer id PK
-        text filename
-        text filepath
-        datetime created_at
-        integer width
-        integer height
-        integer file_size
-        text metadata
-        datetime deleted_at
-        datetime updated_at
-        text hash
-        text thumbnail_path
-    }
-
-    albums {
-        integer id PK
-        text name
-        text description
-        integer cover_photo_id FK
-        datetime created_at
-        datetime updated_at
-        datetime deleted_at
-    }
-
-    album_photos {
-        integer album_id FK
-        integer photo_id FK
-        integer position
-        datetime created_at
-    }
+CREATE INDEX idx_album_screenshots_album_id ON album_screenshots(album_id);
+CREATE INDEX idx_album_screenshots_screenshot_id ON album_screenshots(screenshot_id);
+CREATE INDEX idx_album_screenshots_position ON album_screenshots(position);
 ```
 
 ## 数据库迁移
 
 ### 迁移文件位置
 ```
-backend/database/migrations/
+src/media/database/migrations/
 ├── 001_initial_schema.sql
 ├── 002_add_indexes.sql
-└── 003_add_thumbnails.sql
+└── 003_add_game_parameters.sql
 ```
 
 ### 迁移命令
@@ -138,7 +94,7 @@ backend/database/migrations/
 
 ### 1. 备份策略
 - 自动备份：每天凌晨3点
-- 备份位置：`./backup/`
+- 备份位置：用户数据目录下的`backup/`
 - 保留时间：最近7天
 
 ### 2. 性能优化
@@ -155,22 +111,24 @@ backend/database/migrations/
 1. 外键约束
    - 使用ON DELETE CASCADE确保关联数据的一致性
    
-2. 唯一约束
-   - 文件哈希值用于去重
+2. 数据验证
+   - 文件路径必须存在
+   - 分辨率和比例设置必须有效
 
 ## 注意事项
 
-1. **事务处理**
+1. **文件管理**
+   - 数据库只存储文件路径，不存储实际文件
+   - 定期检查文件完整性
+   - 处理游戏删除截图的情况
+
+2. **事务处理**
    - 涉及多表操作时使用事务
    - 批量操作时使用事务提升性能
 
-2. **并发处理**
+3. **并发处理**
    - 使用事务确保数据一致性
    - 实现乐观锁避免并发冲突
-
-3. **数据迁移**
-   - 严格遵循迁移版本控制
-   - 保持迁移脚本的幂等性
 
 4. **性能监控**
    - 定期检查索引使用情况
@@ -179,16 +137,16 @@ backend/database/migrations/
 
 ## 常见问题
 
-### 1. 数据库锁定
-Q: 数据库出现锁定怎么办？
-A: 检查是否有长时间运行的事务，可以使用 `PRAGMA busy_timeout` 设置超时时间。
+### 1. 文件同步
+Q: 如何处理游戏删除截图的情况？
+A: 定期检查文件是否存在，如果不存在则标记为已删除（软删除）。
 
 ### 2. 性能问题
-Q: 查询性能下降怎么处理？
+Q: 大量截图时查询性能如何优化？
 A: 
-1. 检查索引使用情况
-2. 优化查询语句
-3. 使用EXPLAIN分析查询计划
+1. 使用分页加载
+2. 实现缓存机制
+3. 优化索引使用
 
 ### 3. 数据一致性
 Q: 如何确保数据一致性？

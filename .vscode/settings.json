@@ -94,6 +94,7 @@
         "valarray": "cpp",
         "variant": "cpp",
         "codecvt": "cpp",
-        "resumable": "cpp"
+        "resumable": "cpp",
+        "ranges": "cpp"
     }
 }
