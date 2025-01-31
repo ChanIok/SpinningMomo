@@ -4,23 +4,43 @@
 
 ```
 SpinningMomo/
-├── frontend/                # 前端项目目录
+├── src/                    # 主程序源代码
+│   ├── core/              # 核心功能模块
+│   │   ├── window/        # 窗口相关
+│   │   │   ├── menu_window.hpp/cpp
+│   │   │   ├── preview_window.hpp/cpp
+│   │   │   └── window_utils.hpp/cpp
+│   │   ├── system/        # 系统功能
+│   │   │   ├── tray_icon.hpp/cpp
+│   │   │   └── notification_manager.hpp/cpp
+│   │   ├── config_manager.hpp/cpp
+│   │   ├── image_processor.hpp/cpp
+│   │   └── constants.hpp/cpp
+│   ├── tracker/           # 参数追踪模块
+│   │   ├── parameter_tracker.hpp/cpp
+│   │   └── parameter_types.hpp
+│   ├── main.cpp          # 程序入口
+│   ├── resource.rc       # 资源文件
+│   └── icon.ico          # 应用图标
+├── frontend/             # 前端项目（Vue3 + Naive UI）
 │   ├── src/
-│   │   ├── views/          # 页面组件
-│   │   │   ├── Album/      # 相册相关页面
-│   │   │   └── Settings/   # 设置页面
-│   │   ├── components/     # 通用组件
-│   │   ├── api/           # API接口封装
-│   │   ├── store/         # 状态管理
-│   │   └── utils/         # 工具函数
-│   └── public/            # 静态资源
-├── backend/                # 后端项目目录
-│   ├── api/               # RESTful API处理
-│   ├── database/          # 数据库操作
-│   ├── models/            # 数据模型
-│   └── services/          # 业务逻辑
-├── src/                   # 原有的C++源代码
-└── docs/                  # 项目文档
+│   │   ├── views/        # 页面组件
+│   │   │   ├── Album/    # 相册相关页面
+│   │   │   └── Settings/ # 设置页面
+│   │   ├── components/   # 通用组件
+│   │   ├── api/         # API接口封装
+│   │   ├── store/       # 状态管理
+│   │   └── utils/       # 工具函数
+│   ├── public/          # 静态资源
+│   └── index.html       # 入口HTML
+├── docs/                # 项目文档
+├── models/              # ONNX模型文件
+├── tools/              # 工具脚本
+├── resources/          # 资源文件
+├── CMakeLists.txt      # CMake配置
+├── README.md           # 项目说明
+├── DEVELOPMENT.md      # 开发文档
+└── DATABASE.md         # 数据库文档
 ```
 
 ## 技术栈

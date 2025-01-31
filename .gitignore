@@ -34,6 +34,22 @@ docs/.vitepress/dist/
 docs/.vitepress/cache/
 docs/node_modules/
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.vite/
+frontend/coverage/
+frontend/*.local
+
+# Frontend logs
+frontend/logs/
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
 # OS generated files
 .DS_Store
 .DS_Store?
@@ -43,6 +59,7 @@ docs/node_modules/
 ehthumbs.db
 Thumbs.db 
 
+# Project specific
 test/
 onnxruntime/
 models/
