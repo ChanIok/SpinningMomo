@@ -27,8 +27,8 @@ export const useScreenshotStore = defineStore('screenshot', () => {
                 lastId: lastId.value,
                 limit: batchSize
             });
-
-            if (response.screenshots.length < batchSize) {
+            
+            if (!response.hasMore) {
                 reachedEnd.value = true;
             }
 

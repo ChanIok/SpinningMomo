@@ -11,9 +11,15 @@ import { NLayout, NLayoutContent } from 'naive-ui'
 </template>
 
 <style scoped>
+.app-content {
+  height: 100vh;
+}
+
 .content-container {
   height: 100%;
   padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   background-color: var(--n-color);

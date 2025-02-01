@@ -10,6 +10,7 @@
       :alt="screenshot.filename"
       object-fit="cover"
       preview-disabled
+      lazy
       class="screenshot-image"
     />
     <template #footer>

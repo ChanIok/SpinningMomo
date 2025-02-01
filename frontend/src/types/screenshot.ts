@@ -29,4 +29,14 @@ export interface Album {
     updated_at: string;
     screenshot_count: number;
     cover_screenshot_id?: number;
+}
+
+export interface ApiResponse<T> {
+    data: T;
+    success: boolean;
+}
+
+export interface ScreenshotListData {
+    screenshots: Screenshot[];
+    hasMore: boolean;
 } 
