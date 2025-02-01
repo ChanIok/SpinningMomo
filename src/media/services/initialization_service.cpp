@@ -8,6 +8,7 @@
 // 全局静态指针
 static InitializationService* g_instance = nullptr;
 
+// 获取单例实例
 InitializationService& InitializationService::get_instance() {
     if (!g_instance) {
         g_instance = new InitializationService();
@@ -15,6 +16,7 @@ InitializationService& InitializationService::get_instance() {
     return *g_instance;
 }
 
+// 执行整体初始化流程
 void InitializationService::initialize() {
     try {
         spdlog::info("Starting initialization process...");
@@ -31,6 +33,7 @@ void InitializationService::initialize() {
     }
 }
 
+// 确保必要的目录存在
 void InitializationService::ensure_directories() {
     spdlog::info("Ensuring directories exist...");
     
@@ -43,6 +46,7 @@ void InitializationService::ensure_directories() {
     }
 }
 
+// 同步文件系统中的截图到数据库
 void InitializationService::sync_screenshots() {
     spdlog::info("Syncing screenshots with database...");
     
@@ -85,6 +89,7 @@ void InitializationService::sync_screenshots() {
     spdlog::info("Processed {} files, added {} new screenshots", processed_count, new_screenshots.size());
 }
 
+// 为缺失缩略图的截图生成缩略图
 void InitializationService::generate_missing_thumbnails() {
     spdlog::info("Generating missing thumbnails...");
     
@@ -116,6 +121,7 @@ void InitializationService::generate_missing_thumbnails() {
     spdlog::info("Generated {} thumbnails, failed {}", generated_count, failed_count);
 }
 
+// 清理数据库中无效的截图记录
 void InitializationService::cleanup_invalid_data() {
     spdlog::info("Cleaning up invalid data...");
     

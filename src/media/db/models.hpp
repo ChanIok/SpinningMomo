@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <xxh3.h>
+#include "media/utils/time_utils.hpp"
 
 // 截图模型
 class Screenshot {
@@ -16,13 +17,13 @@ public:
     int64_t id = 0;
     std::string filename;
     std::string filepath;
-    int64_t created_at = 0;
+    int64_t created_at = 0;  // Unix时间戳
     UINT width = 0;
     UINT height = 0;
     int64_t file_size = 0;
     std::string metadata;
-    std::optional<int64_t> deleted_at;
-    int64_t updated_at = 0;
+    std::optional<int64_t> deleted_at;  // Unix时间戳
+    int64_t updated_at = 0;  // Unix时间戳
     bool thumbnail_generated = false;
 
     // 基本的CRUD操作

@@ -45,8 +45,10 @@ function handleClick() {
   emit('click', props.screenshot);
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString();
+function formatDate(date: string | number): string {
+  const timestamp = typeof date === 'string' ? parseInt(date) : date;
+  const dateObj = new Date(timestamp * 1000);
+  return `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}`;
 }
 
 function formatFileSize(bytes: number): string {

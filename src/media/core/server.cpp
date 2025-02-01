@@ -31,9 +31,7 @@ bool Server::Initialize() {
             
             // 初始化服务
             try {
-                OutputDebugStringA("Initializing services...\n");
                 InitializationService::get_instance().initialize();
-                OutputDebugStringA("Services initialized\n");
             } catch (const std::exception& e) {
                 spdlog::error("Failed to initialize services: {}", e.what());
                 m_isRunning = false;
@@ -42,22 +40,17 @@ bool Server::Initialize() {
             
             // 注册路由
             RouteManager::get_instance().register_routes(*app);
-            OutputDebugStringA("Routes registered\n");
             
             // 配置CORS
             SetupCors(*app);
-            OutputDebugStringA("CORS configured\n");
             
             // 启动监听
-            OutputDebugStringA("Starting uWS server...\n");
             app->listen(m_host, m_port, [this](auto* socket) {
                 if (socket) {
                     m_listenSocket = socket;
-                    OutputDebugStringA("Server listening socket created\n");
                     spdlog::info("Server is listening on {}:{}", 
                         m_host, m_port);
                 } else {
-                    OutputDebugStringA("Failed to create listen socket\n");
                     spdlog::error("Failed to listen on {}:{}", 
                         m_host, m_port);
                     m_isRunning = false;
@@ -66,9 +59,7 @@ bool Server::Initialize() {
 
             // 如果监听成功，运行事件循环
             if (m_isRunning) {
-                OutputDebugStringA("Entering uWS event loop\n");
                 app->run();
-                OutputDebugStringA("uWS event loop exited\n");
             }
             
             m_isRunning = false;
@@ -76,7 +67,6 @@ bool Server::Initialize() {
         
         return true;
     } catch (const std::exception& e) {
-        OutputDebugStringA("Failed to initialize server\n");
         spdlog::error("Failed to initialize server: {}", e.what());
         return false;
     }
