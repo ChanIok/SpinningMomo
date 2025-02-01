@@ -17,7 +17,7 @@
 #include "config_manager.hpp"
 #include "parameter_tracker.hpp"
 #include "message_center.hpp"
-#include "media/http/server.hpp"
+#include "media/core/server.hpp"
 #include "media/utils/logger.hpp"
 #include "media/db/database.hpp"
 #include <spdlog/spdlog.h>
@@ -44,7 +44,7 @@ public:
         m_configManager->LoadAllConfigs();
 
         // 初始化HTTP服务器
-        m_httpServer = std::make_unique<HttpServer>("localhost", 51205);
+        m_httpServer = std::make_unique<Server>("localhost", 51205);
         if (!m_httpServer->Start()) {
             ShowNotification(m_strings.APP_NAME.c_str(), L"HTTP server failed to start", true);
             return false;
@@ -623,7 +623,7 @@ private:
     std::unique_ptr<NotificationManager> m_notificationManager;
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<ParameterTracker> m_parameterTracker;
-    std::unique_ptr<HttpServer> m_httpServer;
+    std::unique_ptr<Server> m_httpServer;
 
     // 应用状态
     bool m_isPreviewEnabled = false;

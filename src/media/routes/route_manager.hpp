@@ -1,9 +1,10 @@
 #pragma once
 
-#include <httplib.h>
+#include <uwebsockets/App.h>
 #include <nlohmann/json.hpp>
 #include "album_routes.hpp"
 #include "screenshot_routes.hpp"
+#include "media/utils/response.hpp"
 
 /**
  * @brief 路由管理器类
@@ -22,21 +23,21 @@ public:
 
     /**
      * @brief 注册所有路由到HTTP服务器
-     * @param server HTTP服务器实例
+     * @param app uWebSockets应用实例
      */
-    void register_routes(httplib::Server& server) {
+    void register_routes(uWS::App& app) {
         // 注册健康检查路由
-        server.Get("/api/health", [](const httplib::Request& req, httplib::Response& res) {
+        app.get("/api/health", [](auto* res, auto* req) {
             nlohmann::json response = {
                 {"status", "ok"},
                 {"timestamp", std::time(nullptr)}
             };
-            res.set_content(response.dump(), "application/json");
+            Response::Success(res, response);
         });
 
         // 注册相册和截图相关路由
-        register_album_routes(server);
-        register_screenshot_routes(server);
+        register_album_routes(app);
+        register_screenshot_routes(app);
     }
 
 private:

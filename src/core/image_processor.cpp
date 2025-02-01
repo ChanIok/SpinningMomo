@@ -435,7 +435,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> ImageProcessor::TextureToWICBitmap(ID3D
         memcpy(
             targetData + i * targetStride,
             sourceData + i * sourceStride,
-            min(targetStride, sourceStride)
+            (std::min)(targetStride, sourceStride)
         );
     }
 

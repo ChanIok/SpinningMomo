@@ -1,6 +1,9 @@
 # ===== 基础配置 =====
 cmake_minimum_required(VERSION 3.10)
 
+# 导出编译命令
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # vcpkg配置
 set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake" 
     CACHE STRING "Vcpkg toolchain file")
@@ -15,6 +18,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(/utf-8 /EHsc /await)
     add_compile_definitions(
+        NOMINMAX
         WINRT_LEAN_AND_MEAN
         SPDLOG_WCHAR_TO_UTF8_SUPPORT
         SPDLOG_WCHAR_FILENAMES
@@ -33,7 +37,8 @@ include_directories(${ONNXRUNTIME_ROOT}/include)
 link_directories(${ONNXRUNTIME_ROOT}/lib)
 
 # vcpkg依赖
-find_package(httplib CONFIG REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(unofficial-uwebsockets CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -81,7 +86,8 @@ target_link_libraries(SpinningMomo PRIVATE
     
     # 第三方库
     onnxruntime              # ONNX Runtime
-    httplib::httplib         # HTTP库
+    unofficial::uwebsockets::uwebsockets # WebSocket库
+    ZLIB::ZLIB              # zlib压缩库
     nlohmann_json::nlohmann_json  # JSON库
     SQLite::SQLite3          # SQLite3
     spdlog::spdlog_header_only  # 使用 header-only 版本的 spdlog

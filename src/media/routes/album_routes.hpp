@@ -1,94 +1,102 @@
 #pragma once
 
-#include <httplib.h>
+#include <uwebsockets/App.h>
 #include <spdlog/spdlog.h>
 #include "media/utils/logger.hpp"
+#include "media/utils/response.hpp"
+#include "media/utils/request.hpp"
 #include "../services/service_manager.hpp"
 
 /**
  * @brief 注册相册相关的所有路由
- * @param server HTTP服务器实例
+ * @param app uWebSockets应用实例
  */
-inline void register_album_routes(httplib::Server& server) {
+inline void register_album_routes(uWS::App& app) {
     auto& album_service = AlbumService::get_instance();
 
     // GET /api/albums - 获取所有相册列表
-    server.Get("/api/albums", [&](const httplib::Request& req, httplib::Response& res) {
+    app.get("/api/albums", [&](auto* res, auto* req) {
         try {
             auto albums = album_service.get_albums();
             nlohmann::json json_array = nlohmann::json::array();
             for (const auto& album : albums) {
                 json_array.push_back(album.to_json());
             }
-            res.set_content(json_array.dump(), "application/json");
+            Response::Success(res, json_array);
         } catch (const std::exception& e) {
             spdlog::error("Failed to get albums: {}", e.what());
-            res.status = 500;
-            res.set_content(R"({"error":"Internal server error"})", "application/json");
+            Response::Error(res, "Internal server error", 500);
         }
     });
 
     // POST /api/albums - 创建新相册
-    server.Post("/api/albums", [&](const httplib::Request& req, httplib::Response& res) {
-        try {
-            auto json = nlohmann::json::parse(req.body);
-            auto album = album_service.create_album(
-                json["name"].get<std::string>(),
-                json.value("description", "")
-            );
-            res.set_content(album.to_json().dump(), "application/json");
-        } catch (const std::exception& e) {
-            spdlog::error("Failed to create album: {}", e.what());
-            res.status = 400;
-            res.set_content(R"({"error":")" + std::string(e.what()) + R"("})", "application/json");
-        }
+    app.post("/api/albums", [&](auto* res, auto* req) {
+        res->onData([res, &album_service](std::string_view body, bool last) {
+            if (!last) return;
+            
+            try {
+                auto json = Request::ParseJson(body);
+                auto album = album_service.create_album(
+                    json["name"].get<std::string>(),
+                    json.value("description", "")
+                );
+                Response::Success(res, album.to_json());
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to create album: {}", e.what());
+                Response::Error(res, e.what());
+            }
+        });
     });
 
     // GET /api/albums/:id - 获取单个相册详情
-    server.Get(R"(/api/albums/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
+    app.get("/api/albums/:id", [&](auto* res, auto* req) {
         try {
-            auto id = std::stoll(req.matches[1]);
+            auto id = std::stoll(Request::GetPathParam(req, 0));
             auto album = album_service.get_album(id);
-            res.set_content(album.to_json().dump(), "application/json");
+            Response::Success(res, album.to_json());
         } catch (const std::exception& e) {
-            spdlog::error("Failed to get album {}: {}", req.matches[1].str(), e.what());
-            res.status = 404;
-            res.set_content(R"({"error":"Album not found"})", "application/json");
+            spdlog::error("Failed to get album: {}", e.what());
+            Response::Error(res, "Album not found", 404);
         }
     });
 
     // PUT /api/albums/:id - 更新相册信息
-    server.Put(R"(/api/albums/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
-        try {
-            auto id = std::stoll(req.matches[1]);
-            auto json = nlohmann::json::parse(req.body);
-            auto album = album_service.get_album(id);
-            album.name = json["name"].get<std::string>();
-            album.description = json.value("description", album.description);
+    app.put("/api/albums/:id", [&](auto* res, auto* req) {
+        auto id = std::stoll(Request::GetPathParam(req, 0));
+        
+        res->onData([res, id, &album_service](std::string_view body, bool last) {
+            if (!last) return;
             
-            if (album_service.update_album(album)) {
-                res.set_content(album.to_json().dump(), "application/json");
-            } else {
-                spdlog::error("Album not found for update: {}", id);
-                res.status = 404;
-                res.set_content(R"({"error":"Album not found"})", "application/json");
+            try {
+                auto json = Request::ParseJson(body);
+                auto album = album_service.get_album(id);
+                album.name = json["name"].get<std::string>();
+                album.description = json.value("description", album.description);
+                
+                if (album_service.update_album(album)) {
+                    Response::Success(res, album.to_json());
+                } else {
+                    Response::Error(res, "Album not found", 404);
+                }
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to update album: {}", e.what());
+                Response::Error(res, e.what());
             }
-        } catch (const std::exception& e) {
-            spdlog::error("Failed to update album {}: {}", req.matches[1].str(), e.what());
-            res.status = 400;
-            res.set_content(R"({"error":")" + std::string(e.what()) + R"("})", "application/json");
-        }
+        });
     });
 
     // DELETE /api/albums/:id - 删除相册
-    server.Delete(R"(/api/albums/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
-        auto id = std::stoll(req.matches[1]);
-        if (album_service.delete_album(id)) {
-            res.status = 204;
-        } else {
-            spdlog::error("Album not found for deletion: {}", id);
-            res.status = 404;
-            res.set_content(R"({"error":"Album not found"})", "application/json");
+    app.del("/api/albums/:id", [&](auto* res, auto* req) {
+        try {
+            auto id = std::stoll(Request::GetPathParam(req, 0));
+            if (album_service.delete_album(id)) {
+                Response::NoContent(res);
+            } else {
+                Response::Error(res, "Album not found", 404);
+            }
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to delete album: {}", e.what());
+            Response::Error(res, e.what());
         }
     });
 } 

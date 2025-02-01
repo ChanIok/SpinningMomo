@@ -1,6 +1,6 @@
 #pragma once
 
-#include <windows.h>
+#include "win_config.hpp"
 #include <wincodec.h>
 #include <d3d11.h>
 #include <wrl/client.h>

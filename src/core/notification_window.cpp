@@ -171,7 +171,7 @@ void NotificationWindow::OnTimer(UINT_PTR timerId) {
     // 处理不同的动画状态
     switch (m_animState) {
         case AnimationState::SLIDING_IN: {
-            m_animProgress = min(1.0f, static_cast<float>(elapsedTime) / SLIDE_DURATION);
+            m_animProgress = (std::min)(1.0f, static_cast<float>(elapsedTime) / SLIDE_DURATION);
             float easedProgress = EaseOutCubic(m_animProgress);
             
             int newX = m_startPos.x + static_cast<int>((m_targetPos.x - m_startPos.x) * easedProgress);
@@ -189,7 +189,7 @@ void NotificationWindow::OnTimer(UINT_PTR timerId) {
         }
 
         case AnimationState::MOVING_UP: {
-            m_animProgress = min(1.0f, static_cast<float>(elapsedTime) / SLIDE_DURATION);
+            m_animProgress = (std::min)(1.0f, static_cast<float>(elapsedTime) / SLIDE_DURATION);
             float easedProgress = EaseOutCubic(m_animProgress);
             
             int newX = m_startPos.x + static_cast<int>((m_targetPos.x - m_startPos.x) * easedProgress);
@@ -214,7 +214,7 @@ void NotificationWindow::OnTimer(UINT_PTR timerId) {
         }
 
         case AnimationState::FADING_OUT: {
-            m_animProgress = min(1.0f, static_cast<float>(elapsedTime) / ANIMATION_DURATION);
+            m_animProgress = (std::min)(1.0f, static_cast<float>(elapsedTime) / ANIMATION_DURATION);
             m_currentNotification->opacity = 1.0f - EaseOutCubic(m_animProgress);
             
             if (m_animProgress >= 1.0f) {
@@ -504,7 +504,7 @@ void NotificationWindow::DrawCloseButton(HDC hdc, const RECT& rect) {
     SetROP2(hdc, R2_COPYPEN);
 
     // 根据DPI调整线条粗细
-    int penWidth = max(2, m_dpi / 48);  // 96 DPI时为2px，144 DPI时为3px，192 DPI时为4px
+    int penWidth = (std::max)(2, m_dpi / 48);  // 96 DPI时为2px，144 DPI时为3px，192 DPI时为4px
 
     // 创建画笔
     COLORREF closeColor = m_isCloseHovered ? CLOSE_HOVER_COLOR : CLOSE_NORMAL_COLOR;

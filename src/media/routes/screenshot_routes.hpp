@@ -1,29 +1,38 @@
 #pragma once
 
-#include <httplib.h>
+#include <uwebsockets/App.h>
 #include <spdlog/spdlog.h>
-#include "media/services/service_manager.hpp"
-#include "media/utils/logger.hpp"
 #include <filesystem>
+#include <fstream>
+#include <functional>
+#include <iterator>
+#include "media/utils/logger.hpp"
+#include "media/utils/response.hpp"
+#include "media/utils/request.hpp"
+#include "../services/service_manager.hpp"
+#include "../services/screenshot_service.hpp"
+#include "../db/models.hpp"
 
 // 注册截图相关路由
-inline void register_screenshot_routes(httplib::Server& server) {
+inline void register_screenshot_routes(uWS::App& app) {
     auto& screenshot_service = ScreenshotService::get_instance();
     
     // 使用filesystem::path来处理路径
     const std::filesystem::path SCREENSHOT_DIR = LR"(D:\Program Files\InfinityNikki Launcher\InfinityNikki\X6Game\ScreenShot)";
 
     // 获取截图列表（支持分页）
-    server.Get("/api/screenshots", [screenshot_dir = SCREENSHOT_DIR.wstring()](const httplib::Request& req, httplib::Response& res) {
+    app.get("/api/screenshots", [screenshot_dir = SCREENSHOT_DIR.wstring()](auto* res, auto* req) {
         try {
+            OutputDebugStringA("Get screenshots\n");
             // 获取查询参数
             int64_t last_id = 0;
             int limit = 20;
-            if (req.has_param("lastId")) {
-                last_id = std::stoll(req.get_param_value("lastId"));
+            
+            if (auto last_id_param = Request::GetQueryParam(req, "lastId")) {
+                last_id = std::stoll(*last_id_param);
             }
-            if (req.has_param("limit")) {
-                limit = std::stoi(req.get_param_value("limit"));
+            if (auto limit_param = Request::GetQueryParam(req, "limit")) {
+                limit = std::stoi(*limit_param);
             }
             
             // 获取截图列表
@@ -40,18 +49,17 @@ inline void register_screenshot_routes(httplib::Server& server) {
                 response["screenshots"].push_back(screenshot.to_json());
             }
             
-            res.set_content(response.dump(), "application/json");
+            Response::Success(res, response);
         } catch (const std::exception& e) {
             spdlog::error("Error getting screenshots: {}", e.what());
-            res.status = 500;
-            res.set_content(R"({"error":"Internal server error"})", "application/json");
+            Response::Error(res, "Internal server error", 500);
         }
     });
 
     // 获取单张截图
-    server.Get(R"(/api/screenshots/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
+    app.get("/api/screenshots/:id", [&](auto* res, auto* req) {
         try {
-            auto id = std::stoll(req.matches[1]);
+            auto id = std::stoll(Request::GetPathParam(req, 0));
             
             // 查找指定ID的截图
             auto screenshots = Screenshot::find_by_directory(SCREENSHOT_DIR.wstring());
@@ -59,22 +67,20 @@ inline void register_screenshot_routes(httplib::Server& server) {
                 [id](const Screenshot& s) { return s.id == id; });
             
             if (it != screenshots.end()) {
-                res.set_content(it->to_json().dump(), "application/json");
+                Response::Success(res, it->to_json());
             } else {
-                res.status = 404;
-                res.set_content(R"({"error":"Screenshot not found"})", "application/json");
+                Response::Error(res, "Screenshot not found", 404);
             }
         } catch (const std::exception& e) {
             spdlog::error("Error getting screenshot: {}", e.what());
-            res.status = 500;
-            res.set_content(R"({"error":"Internal server error"})", "application/json");
+            Response::Error(res, "Internal server error", 500);
         }
     });
 
     // 获取截图原始图片内容
-    server.Get(R"(/api/screenshots/(\d+)/raw)", [screenshot_dir = SCREENSHOT_DIR.wstring()](const httplib::Request& req, httplib::Response& res) {
+    app.get("/api/screenshots/:id/raw", [screenshot_dir = SCREENSHOT_DIR.wstring()](auto* res, auto* req) {
         try {
-            auto id = std::stoll(req.matches[1]);
+            auto id = std::stoll(Request::GetPathParam(req, 0));
             
             // 查找指定ID的截图
             auto screenshots = Screenshot::find_by_directory(screenshot_dir);
@@ -82,16 +88,14 @@ inline void register_screenshot_routes(httplib::Server& server) {
                 [id](const Screenshot& s) { return s.id == id; });
             
             if (it == screenshots.end()) {
-                res.status = 404;
-                res.set_content(R"({"error":"Screenshot not found"})", "application/json");
+                Response::Error(res, "Screenshot not found", 404);
                 return;
             }
             
             // 读取图片文件
             std::ifstream file(it->filepath, std::ios::binary);
             if (!file) {
-                res.status = 404;
-                res.set_content(R"({"error":"Image file not found"})", "application/json");
+                Response::Error(res, "Image file not found", 404);
                 return;
             }
 
@@ -110,21 +114,20 @@ inline void register_screenshot_routes(httplib::Server& server) {
             std::vector<char> buffer(std::istreambuf_iterator<char>(file), {});
             
             // 设置响应头和内容
-            res.set_header("Content-Type", content_type);
-            res.set_header("Cache-Control", "public, max-age=31536000");
-            res.body.assign(buffer.begin(), buffer.end());
+            res->writeHeader("Content-Type", content_type);
+            res->writeHeader("Cache-Control", "public, max-age=31536000");
+            res->end(std::string_view(buffer.data(), buffer.size()));
 
         } catch (const std::exception& e) {
             spdlog::error("Error serving raw image: {}", e.what());
-            res.status = 500;
-            res.set_content(R"({"error":"Internal server error"})", "application/json");
+            Response::Error(res, "Internal server error", 500);
         }
     });
 
     // 获取相册中的所有截图
-    server.Get(R"(/api/albums/(\d+)/screenshots)", [&](const httplib::Request& req, httplib::Response& res) {
+    app.get("/api/albums/:album_id/screenshots", [&](auto* res, auto* req) {
         try {
-            auto album_id = std::stoll(req.matches[1]);
+            auto album_id = std::stoll(Request::GetPathParam(req, 0));
             
             auto screenshots = Screenshot::find_by_directory(SCREENSHOT_DIR.wstring());
             
@@ -132,49 +135,53 @@ inline void register_screenshot_routes(httplib::Server& server) {
             for (const auto& screenshot : screenshots) {
                 json_array.push_back(screenshot.to_json());
             }
-            res.set_content(json_array.dump(), "application/json");
+            Response::Success(res, json_array.dump());
         } catch (const std::exception& e) {
             spdlog::error("Error getting album screenshots: {}", e.what());
-            res.status = 404;
-            res.set_content(R"({"error":"Album not found"})", "application/json");
+            Response::Error(res, "Album not found", 404);
         }
     });
 
     // 更新截图信息
-    server.Put(R"(/api/screenshots/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
-        try {
-            auto id = std::stoll(req.matches[1]);
+    app.put("/api/screenshots/:id", [&](auto* res, auto* req) {
+        auto id = std::stoll(Request::GetPathParam(req, 0));
+        
+        res->onData([res, id, &screenshot_service](std::string_view body, bool last) {
+            if (!last) return;
             
-            auto json = nlohmann::json::parse(req.body);
-            auto screenshot = screenshot_service.get_screenshot(id);
-            
-            // 只允许更新某些字段
-            if (json.contains("metadata")) {
-                screenshot.metadata = json["metadata"].get<std::string>();
+            try {
+                auto json = Request::ParseJson(body);
+                auto screenshot = screenshot_service.get_screenshot(id);
+                
+                // 只允许更新某些字段
+                if (json.contains("metadata")) {
+                    screenshot.metadata = json["metadata"].get<std::string>();
+                }
+                
+                if (screenshot_service.update_screenshot(screenshot)) {
+                    Response::Success(res, screenshot.to_json());
+                } else {
+                    Response::Error(res, "Screenshot not found", 404);
+                }
+            } catch (const std::exception& e) {
+                spdlog::error("Error updating screenshot: {}", e.what());
+                Response::Error(res, e.what());
             }
-            
-            if (screenshot_service.update_screenshot(screenshot)) {
-                res.set_content(screenshot.to_json().dump(), "application/json");
-            } else {
-                res.status = 404;
-                res.set_content(R"({"error":"Screenshot not found"})", "application/json");
-            }
-        } catch (const std::exception& e) {
-            spdlog::error("Error updating screenshot: {}", e.what());
-            res.status = 400;
-            res.set_content(R"({"error":")" + std::string(e.what()) + R"("})", "application/json");
-        }
+        });
     });
 
     // 删除截图
-    server.Delete(R"(/api/screenshots/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
-        auto id = std::stoll(req.matches[1]);
-        
-        if (screenshot_service.delete_screenshot(id)) {
-            res.status = 204;
-        } else {
-            res.status = 404;
-            res.set_content(R"({"error":"Screenshot not found"})", "application/json");
+    app.del("/api/screenshots/:id", [&](auto* res, auto* req) {
+        try {
+            auto id = std::stoll(Request::GetPathParam(req, 0));
+            if (screenshot_service.delete_screenshot(id)) {
+                Response::NoContent(res);
+            } else {
+                Response::Error(res, "Screenshot not found", 404);
+            }
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to delete screenshot: {}", e.what());
+            Response::Error(res, e.what());
         }
     });
 } 
