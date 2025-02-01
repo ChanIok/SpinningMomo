@@ -20,6 +20,9 @@ if(MSVC)
     add_compile_definitions(
         NOMINMAX
         WINRT_LEAN_AND_MEAN
+        WIN32_LEAN_AND_MEAN
+        UNICODE
+        _UNICODE
         SPDLOG_WCHAR_TO_UTF8_SUPPORT
         SPDLOG_WCHAR_FILENAMES
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG
