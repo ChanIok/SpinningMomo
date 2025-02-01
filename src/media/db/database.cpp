@@ -27,7 +27,7 @@ void Database::init(const std::string& db_path) {
     execute(R"(
         -- 截图表
         CREATE TABLE IF NOT EXISTS screenshots (
-            id INTEGER PRIMARY KEY,           -- 主键ID
+            id INTEGER PRIMARY KEY AUTOINCREMENT,  -- 主键ID (自增)
             filename TEXT NOT NULL,           -- 文件名
             filepath TEXT NOT NULL,           -- 文件路径
             created_at DATETIME NOT NULL,     -- 创建时间

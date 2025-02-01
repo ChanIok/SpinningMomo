@@ -8,7 +8,6 @@
 #include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
-#include <xxh3.h>
 #include "media/utils/time_utils.hpp"
 
 // 截图模型
@@ -37,17 +36,7 @@ public:
     static Screenshot from_file(const std::filesystem::path& file_path);
     bool save();
     bool remove();
-
-    // 生成唯一ID
-    static int64_t generate_id(const std::string& filepath, const std::string& filename) {
-        std::vector<uint8_t> file_tail = read_file_tail(filepath, 1024);
-        std::string unique_data = filename + std::string(file_tail.begin(), file_tail.end());
-        // 使用绝对值并限制范围在 [1, 9007199254740991] (JavaScript Number.MAX_SAFE_INTEGER)
-        int64_t hash = XXH3_64bits(unique_data.data(), unique_data.size());
-        hash = std::abs(hash);
-        if (hash == 0) hash = 1;  // 避免ID为0
-        return hash % 9007199254740991LL;  // 确保ID在JavaScript安全整数范围内
-    }
+    bool update_thumbnail_generated(bool generated);
 
     // 序列化方法
     nlohmann::json to_json() const {
@@ -80,23 +69,6 @@ public:
         screenshot.deleted_at = j.value("deleted_at", 0);
         screenshot.thumbnail_generated = j.value("thumbnail_generated", false);
         return screenshot;
-    }
-
-private:
-    static std::vector<uint8_t> read_file_tail(const std::string& filepath, size_t tail_size) {
-        std::ifstream file(filepath, std::ios::binary | std::ios::ate);
-        if (!file) {
-            throw std::runtime_error("无法打开文件: " + filepath);
-        }
-        
-        auto file_size = file.tellg();
-        auto read_size = std::min<size_t>(tail_size, file_size);
-        
-        std::vector<uint8_t> buffer(read_size);
-        file.seekg(-read_size, std::ios::end);
-        file.read(reinterpret_cast<char*>(buffer.data()), read_size);
-        
-        return buffer;
     }
 };
 

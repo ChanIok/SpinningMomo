@@ -21,9 +21,6 @@ Screenshot ScreenshotService::create_screenshot(const std::string& filepath) {
     screenshot.filepath = filepath;
     screenshot.filename = std::filesystem::path(filepath).filename().string();
     
-    // 生成唯一ID
-    screenshot.id = Screenshot::generate_id(filepath, screenshot.filename);
-    
     // 读取图片信息
     read_image_info(filepath, screenshot);
     

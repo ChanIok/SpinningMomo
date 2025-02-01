@@ -100,14 +100,19 @@ void InitializationService::generate_missing_thumbnails() {
     int generated_count = 0;
     int failed_count = 0;
     
-    for (const auto& screenshot : screenshots) {
+    for (auto& screenshot : screenshots) {
         if (!thumbnail_service.thumbnail_exists(screenshot)) {
             try {
                 if (thumbnail_service.generate_thumbnail(screenshot)) {
-            generated_count++;
-                    spdlog::debug("Generated thumbnail for: {}", screenshot.filename);
-        } else {
-            failed_count++;
+                    if (screenshot.update_thumbnail_generated(true)) {
+                        generated_count++;
+                        spdlog::debug("Generated thumbnail for: {}", screenshot.filename);
+                    } else {
+                        failed_count++;
+                        spdlog::error("Failed to update thumbnail_generated flag for: {}", screenshot.filename);
+                    }
+                } else {
+                    failed_count++;
                     spdlog::error("Failed to generate thumbnail for: {}", screenshot.filename);
                 }
             } catch (const std::exception& e) {

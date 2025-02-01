@@ -258,14 +258,14 @@ bool Screenshot::has_more(const std::wstring& dir_path, int64_t last_id) {
     if (!std::filesystem::exists(dir_path)) {
         return false;
     }
-
+    
     std::error_code ec;
     for (const auto& entry : std::filesystem::directory_iterator(dir_path, ec)) {
         if (ec) {
             spdlog::error("Error iterating directory: {}", ec.message());
             continue;
-        }
-
+    }
+    
         if (entry.is_regular_file()) {
             auto ext = entry.path().extension();
             if (ext == L".png" || ext == L".jpg" || ext == L".jpeg") {
@@ -298,8 +298,6 @@ Screenshot Screenshot::from_file(const std::filesystem::path& file_path) {
         screenshot.created_at = timestamp;
         screenshot.updated_at = timestamp;
         
-        // 生成唯一ID
-        screenshot.id = Screenshot::generate_id(screenshot.filepath, screenshot.filename);
         screenshot.file_size = std::filesystem::file_size(file_path);
         
         // 使用WIC读取图片信息
@@ -321,6 +319,22 @@ Screenshot Screenshot::from_file(const std::filesystem::path& file_path) {
     }
     
     return screenshot;
+}
+
+// 更新缩略图生成状态
+bool Screenshot::update_thumbnail_generated(bool generated) {
+    if (id == 0) return false;
+    
+    const char* sql = "UPDATE screenshots SET thumbnail_generated = ?, updated_at = ? WHERE id = ?";
+    auto stmt = prepare_statement(sql);
+    
+    sqlite3_bind_int(stmt, 1, generated ? 1 : 0);
+    sqlite3_bind_int64(stmt, 2, TimeUtils::now());
+    sqlite3_bind_int64(stmt, 3, id);
+    
+    bool success = execute_statement(stmt, "update thumbnail generated status");
+    sqlite3_finalize(stmt);
+    return success;
 }
 
 // Album类实现
