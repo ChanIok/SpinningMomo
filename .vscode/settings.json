@@ -95,6 +95,8 @@
         "variant": "cpp",
         "codecvt": "cpp",
         "resumable": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "expected": "cpp",
+        "source_location": "cpp"
     }
 }

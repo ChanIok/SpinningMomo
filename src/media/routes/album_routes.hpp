@@ -2,6 +2,7 @@
 
 #include <httplib.h>
 #include <spdlog/spdlog.h>
+#include "media/utils/logger.hpp"
 #include "../services/service_manager.hpp"
 
 /**
@@ -20,7 +21,6 @@ inline void register_album_routes(httplib::Server& server) {
                 json_array.push_back(album.to_json());
             }
             res.set_content(json_array.dump(), "application/json");
-            spdlog::info("Successfully retrieved {} albums", albums.size());
         } catch (const std::exception& e) {
             spdlog::error("Failed to get albums: {}", e.what());
             res.status = 500;
@@ -37,7 +37,6 @@ inline void register_album_routes(httplib::Server& server) {
                 json.value("description", "")
             );
             res.set_content(album.to_json().dump(), "application/json");
-            spdlog::info("Created new album: {}", album.name);
         } catch (const std::exception& e) {
             spdlog::error("Failed to create album: {}", e.what());
             res.status = 400;
@@ -51,7 +50,6 @@ inline void register_album_routes(httplib::Server& server) {
             auto id = std::stoll(req.matches[1]);
             auto album = album_service.get_album(id);
             res.set_content(album.to_json().dump(), "application/json");
-            spdlog::info("Retrieved album {}: {}", id, album.name);
         } catch (const std::exception& e) {
             spdlog::error("Failed to get album {}: {}", req.matches[1].str(), e.what());
             res.status = 404;
@@ -70,7 +68,6 @@ inline void register_album_routes(httplib::Server& server) {
             
             if (album_service.update_album(album)) {
                 res.set_content(album.to_json().dump(), "application/json");
-                spdlog::info("Updated album {}: {}", id, album.name);
             } else {
                 spdlog::error("Album not found for update: {}", id);
                 res.status = 404;
@@ -87,7 +84,6 @@ inline void register_album_routes(httplib::Server& server) {
     server.Delete(R"(/api/albums/(\d+))", [&](const httplib::Request& req, httplib::Response& res) {
         auto id = std::stoll(req.matches[1]);
         if (album_service.delete_album(id)) {
-            spdlog::info("Deleted album {}", id);
             res.status = 204;
         } else {
             spdlog::error("Album not found for deletion: {}", id);

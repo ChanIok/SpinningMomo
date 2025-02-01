@@ -1,6 +1,10 @@
 #include "models.hpp"
 #include "database.hpp"
 #include <sstream>
+#include <filesystem>
+#include <chrono>
+#include <spdlog/spdlog.h>
+#include "media/utils/logger.hpp"
 
 // Screenshot类实现
 Screenshot Screenshot::find_by_id(int64_t id) {
@@ -162,6 +166,116 @@ bool Screenshot::remove() {
     bool success = sqlite3_step(stmt) == SQLITE_DONE;
     sqlite3_finalize(stmt);
     return success;
+}
+
+std::vector<Screenshot> Screenshot::find_by_directory(const std::wstring& dir_path, int64_t last_id, int limit) {
+    try {
+        std::vector<Screenshot> screenshots;
+        
+        if (!std::filesystem::exists(dir_path)) {
+            // spdlog::warn("Directory does not exist: {}", dir_path);
+            return screenshots;
+        }
+
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::directory_iterator(dir_path, ec)) {
+            if (ec) {
+                spdlog::error("Error iterating directory: {}", ec.message());
+                continue;
+            }
+
+            if (entry.is_regular_file()) {
+                auto ext = entry.path().extension();
+                if (ext == L".png" || ext == L".jpg" || ext == L".jpeg") {
+                    try {
+                        auto screenshot = Screenshot::from_file(entry.path());
+                        if (last_id == 0 || screenshot.id > last_id) {
+                            screenshots.push_back(screenshot);
+                        }
+                    } catch (const std::exception& e) {
+                        spdlog::error("Error processing file {}: {}", entry.path().string(), e.what());
+                        continue;
+                    }
+                }
+            }
+        }
+        
+        // 按ID降序排序（最新的在前）
+        std::sort(screenshots.begin(), screenshots.end(), 
+                [](const Screenshot& a, const Screenshot& b) {
+                    return a.id > b.id;
+                });
+        
+        // 限制返回数量
+        if (screenshots.size() > static_cast<size_t>(limit)) {
+            screenshots.resize(limit);
+        }
+        
+        return screenshots;
+    } catch (const std::exception& e) {
+        spdlog::error("Unexpected error in find_by_directory: {}", e.what());
+        throw;
+    }
+}
+
+bool Screenshot::has_more(const std::wstring& dir_path, int64_t last_id) {
+    if (!std::filesystem::exists(dir_path)) {
+        // spdlog::warn("Directory does not exist: {}", dir_path);
+        return false;
+    }
+
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(dir_path, ec)) {
+        if (ec) {
+            spdlog::error("Error iterating directory: {}", ec.message());
+            continue;
+        }
+
+        if (entry.is_regular_file()) {
+            auto ext = entry.path().extension();
+            if (ext == L".png" || ext == L".jpg" || ext == L".jpeg") {
+                try {
+                    auto screenshot = Screenshot::from_file(entry.path());
+                    if (screenshot.id < last_id) {
+                        return true;
+                    }
+                } catch (const std::exception& e) {
+                    spdlog::error("Error processing file {}: {}", entry.path().string(), e.what());
+                    continue;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+Screenshot Screenshot::from_file(const std::filesystem::path& file_path) {
+    Screenshot screenshot;
+    try {
+        screenshot.filepath = file_path.string();
+        screenshot.filename = file_path.filename().string();
+        
+        // 使用文件属性作为ID和时间戳
+        auto last_write_time = std::filesystem::last_write_time(file_path);
+        auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+            last_write_time.time_since_epoch()).count();
+        
+        screenshot.id = timestamp;  // 使用时间戳作为ID
+        screenshot.created_at = timestamp;
+        screenshot.updated_at = timestamp;
+        
+        screenshot.file_size = std::filesystem::file_size(file_path);
+        
+        // 暂时使用默认值
+        screenshot.width = 1920;
+        screenshot.height = 1080;
+        
+    } catch (const std::exception& e) {
+        spdlog::error("Error creating screenshot from file {}: {}", file_path.string(), e.what());
+        throw;
+    }
+    
+    return screenshot;
 }
 
 // Album类实现

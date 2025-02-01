@@ -5,6 +5,7 @@
 #include <optional>
 #include <ctime>
 #include <nlohmann/json.hpp>
+#include <filesystem>
 
 // 截图模型
 class Screenshot {
@@ -23,6 +24,12 @@ public:
     // 基本的CRUD操作
     static Screenshot find_by_id(int64_t id);
     static std::vector<Screenshot> find_all(bool include_deleted = false);
+    // 基于目录的操作
+    static std::vector<Screenshot> find_by_directory(const std::wstring& dir_path, 
+                                                   int64_t last_id = 0,
+                                                   int limit = 20);
+    static bool has_more(const std::wstring& dir_path, int64_t last_id);
+    static Screenshot from_file(const std::filesystem::path& file_path);
     bool save();
     bool remove();
 

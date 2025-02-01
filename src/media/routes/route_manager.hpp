@@ -32,14 +32,11 @@ public:
                 {"timestamp", std::time(nullptr)}
             };
             res.set_content(response.dump(), "application/json");
-            spdlog::info("Health check request received");
         });
 
         // 注册相册和截图相关路由
         register_album_routes(server);
         register_screenshot_routes(server);
-        
-        spdlog::info("All routes registered successfully");
     }
 
 private:

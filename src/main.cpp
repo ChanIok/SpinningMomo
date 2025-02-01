@@ -20,6 +20,7 @@
 #include "media/http/server.hpp"
 #include "media/utils/logger.hpp"
 #include "media/db/database.hpp"
+#include <spdlog/spdlog.h>
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -43,7 +44,7 @@ public:
         m_configManager->LoadAllConfigs();
 
         // 初始化HTTP服务器
-        m_httpServer = std::make_unique<HttpServer>("localhost", 51206);
+        m_httpServer = std::make_unique<HttpServer>("localhost", 51205);
         if (!m_httpServer->Start()) {
             ShowNotification(m_strings.APP_NAME.c_str(), L"HTTP server failed to start", true);
             return false;

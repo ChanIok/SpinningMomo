@@ -14,7 +14,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(MSVC)
     add_compile_options(/utf-8 /EHsc /await)
-    add_compile_definitions(WINRT_LEAN_AND_MEAN)
+    add_compile_definitions(
+        WINRT_LEAN_AND_MEAN
+        SPDLOG_WCHAR_TO_UTF8_SUPPORT
+        SPDLOG_WCHAR_FILENAMES
+        SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG
+        SPDLOG_HEADER_ONLY
+    )
 endif()
 
 # ===== 依赖项配置 =====
@@ -31,6 +37,7 @@ find_package(httplib CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
 
 # ===== 源文件配置 =====
 # 收集源文件
@@ -77,7 +84,8 @@ target_link_libraries(SpinningMomo PRIVATE
     httplib::httplib         # HTTP库
     nlohmann_json::nlohmann_json  # JSON库
     SQLite::SQLite3          # SQLite3
-    spdlog::spdlog          # 日志库
+    spdlog::spdlog_header_only  # 使用 header-only 版本的 spdlog
+    fmt::fmt                 # fmt 库
 )
 
 # ===== 安装和部署配置 =====

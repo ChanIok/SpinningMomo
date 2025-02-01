@@ -17,14 +17,13 @@ HttpServer::~HttpServer() {
 
 bool HttpServer::Start() {
     if (m_isRunning) {
-        spdlog::info("Server is already running");
         return true;
     }
 
     // 启动服务器线程
     try {
         m_serverThread = ThreadRAII([this]() { this->ServerThreadProc(); });
-        spdlog::info("Server thread started successfully");
+        spdlog::info("Server started on {}:{}", m_host, m_port);
         return true;
     } catch (const std::exception& e) {
         spdlog::error("Failed to start server thread: {}", e.what());
@@ -37,15 +36,12 @@ void HttpServer::Stop() {
         return;
     }
 
-    spdlog::info("Stopping HTTP server...");
     m_isRunning = false;
 
     // 停止服务器
     if (m_server) {
         m_server->stop();
     }
-    
-    spdlog::info("HTTP server stopped");
 }
 
 void HttpServer::ServerThreadProc() {
@@ -57,7 +53,6 @@ void HttpServer::ServerThreadProc() {
     
     // 启动服务器
     m_isRunning = true;
-    spdlog::info("Starting HTTP server on {}:{}", m_host, m_port);
     
     if (!m_server->listen(m_host.c_str(), m_port)) {
         spdlog::error("Failed to start HTTP server on {}:{}", m_host, m_port);
@@ -82,6 +77,4 @@ void HttpServer::SetupCors() {
         }
         return httplib::Server::HandlerResponse::Unhandled;
     });
-    
-    spdlog::info("CORS configured successfully");
 } 
