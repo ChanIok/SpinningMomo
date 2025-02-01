@@ -71,6 +71,56 @@ inline void register_screenshot_routes(httplib::Server& server) {
         }
     });
 
+    // 获取截图原始图片内容
+    server.Get(R"(/api/screenshots/(\d+)/raw)", [screenshot_dir = SCREENSHOT_DIR.wstring()](const httplib::Request& req, httplib::Response& res) {
+        try {
+            auto id = std::stoll(req.matches[1]);
+            
+            // 查找指定ID的截图
+            auto screenshots = Screenshot::find_by_directory(screenshot_dir);
+            auto it = std::find_if(screenshots.begin(), screenshots.end(),
+                [id](const Screenshot& s) { return s.id == id; });
+            
+            if (it == screenshots.end()) {
+                res.status = 404;
+                res.set_content(R"({"error":"Screenshot not found"})", "application/json");
+                return;
+            }
+            
+            // 读取图片文件
+            std::ifstream file(it->filepath, std::ios::binary);
+            if (!file) {
+                res.status = 404;
+                res.set_content(R"({"error":"Image file not found"})", "application/json");
+                return;
+            }
+
+            // 获取文件扩展名并设置对应的Content-Type
+            auto ext = std::filesystem::path(it->filepath).extension().string();
+            std::string content_type;
+            if (ext == ".jpg" || ext == ".jpeg") {
+                content_type = "image/jpeg";
+            } else if (ext == ".png") {
+                content_type = "image/png";
+            } else {
+                content_type = "application/octet-stream";
+            }
+
+            // 读取文件内容
+            std::vector<char> buffer(std::istreambuf_iterator<char>(file), {});
+            
+            // 设置响应头和内容
+            res.set_header("Content-Type", content_type);
+            res.set_header("Cache-Control", "public, max-age=31536000");
+            res.body.assign(buffer.begin(), buffer.end());
+
+        } catch (const std::exception& e) {
+            spdlog::error("Error serving raw image: {}", e.what());
+            res.status = 500;
+            res.set_content(R"({"error":"Internal server error"})", "application/json");
+        }
+    });
+
     // 获取相册中的所有截图
     server.Get(R"(/api/albums/(\d+)/screenshots)", [&](const httplib::Request& req, httplib::Response& res) {
         try {
