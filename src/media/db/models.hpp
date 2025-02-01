@@ -28,6 +28,7 @@ public:
     // 基本的CRUD操作
     static Screenshot find_by_id(int64_t id);
     static std::vector<Screenshot> find_all(bool include_deleted = false);
+    static std::pair<std::vector<Screenshot>, bool> find_paginated(int64_t last_id, int limit);
     // 基于目录的操作
     static std::vector<Screenshot> find_by_directory(const std::wstring& dir_path, 
                                                    int64_t last_id = 0,

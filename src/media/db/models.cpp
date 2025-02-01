@@ -156,6 +156,46 @@ std::vector<Screenshot> Screenshot::find_all(bool include_deleted) {
     return screenshots;
 }
 
+// 获取分页的截图列表
+std::pair<std::vector<Screenshot>, bool> Screenshot::find_paginated(int64_t last_id, int limit) {
+    std::string sql = R"(
+        SELECT s.*
+        FROM screenshots s
+        WHERE deleted_at IS NULL
+    )";
+    
+    if (last_id > 0) {
+        sql += R"(
+            AND created_at < (
+                SELECT created_at 
+                FROM screenshots 
+                WHERE id = ? AND deleted_at IS NULL
+            )
+        )";
+    }
+    
+    sql += " ORDER BY created_at DESC LIMIT ? + 1";  // 多查询一条记录用于判断是否还有更多
+    
+    auto stmt = prepare_statement(sql.c_str());
+    int param_index = 1;
+    
+    if (last_id > 0) {
+        sqlite3_bind_int64(stmt, param_index++, last_id);
+    }
+    sqlite3_bind_int(stmt, param_index, limit);
+    
+    std::vector<Screenshot> screenshots;
+    while (sqlite3_step(stmt) == SQLITE_ROW && screenshots.size() < static_cast<size_t>(limit)) {
+        screenshots.push_back(read_screenshot_from_stmt(stmt));
+    }
+    
+    // 检查是否还有更多记录
+    bool has_more = sqlite3_step(stmt) == SQLITE_ROW;
+    
+    sqlite3_finalize(stmt);
+    return {screenshots, has_more};
+}
+
 // 保存截图
 bool Screenshot::save() {
     sqlite3* db = Database::get_instance().get_handle();

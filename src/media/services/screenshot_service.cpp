@@ -85,21 +85,7 @@ void ScreenshotService::read_image_info(const std::string& filepath, Screenshot&
 }
 
 std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_paginated(int64_t last_id, int limit) {
-    auto screenshots = get_screenshots(false);
-    
-    // 应用分页
-    auto start = screenshots.begin();
-    if (last_id > 0) {
-        start = std::find_if(screenshots.begin(), screenshots.end(),
-            [last_id](const Screenshot& s) { return s.id > last_id; });
-    }
-    
-    auto end = start;
-    std::advance(end, std::min<int>(limit, std::distance(start, screenshots.end())));
-    
-    bool has_more = end != screenshots.end();
-    
-    return {std::vector<Screenshot>(start, end), has_more};
+    return Screenshot::find_paginated(last_id, limit);
 }
 
 std::vector<Screenshot> ScreenshotService::get_screenshots_by_directory(const std::wstring& directory) {
