@@ -460,6 +460,78 @@ bool ImageProcessor::SaveToFile(IWICBitmapSource* bitmap, const std::wstring& fi
     return encoder.WriteSource(bitmap) && encoder.Commit();
 }
 
+bool ImageProcessor::SaveToJpegFile(IWICBitmapSource* bitmap, const std::wstring& filePath, float quality) {
+    if (!bitmap) return false;
+
+    // 创建WIC工厂
+    WICHelper::Factory factory;
+    if (!factory.IsValid()) return nullptr;
+
+    // 创建编码器
+    Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
+    HRESULT hr = factory.Get()->CreateEncoder(GUID_ContainerFormatJpeg, nullptr, &encoder);
+    if (FAILED(hr)) return false;
+
+    // 创建流
+    Microsoft::WRL::ComPtr<IWICStream> stream;
+    hr = factory.Get()->CreateStream(&stream);
+    if (FAILED(hr)) return false;
+
+    // 初始化流
+    hr = stream->InitializeFromFilename(filePath.c_str(), GENERIC_WRITE);
+    if (FAILED(hr)) return false;
+
+    // 初始化编码器
+    hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
+    if (FAILED(hr)) return false;
+
+    // 创建新帧
+    Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
+    Microsoft::WRL::ComPtr<IPropertyBag2> propertyBag;
+    hr = encoder->CreateNewFrame(&frame, &propertyBag);
+    if (FAILED(hr)) return false;
+
+    // 设置JPEG质量
+    PROPBAG2 option = { 0 };
+    option.pstrName = L"ImageQuality";
+    VARIANT value;
+    VariantInit(&value);
+    value.vt = VT_R4;
+    value.fltVal = quality;
+    hr = propertyBag->Write(1, &option, &value);
+    if (FAILED(hr)) return false;
+
+    // 初始化帧
+    hr = frame->Initialize(propertyBag.Get());
+    if (FAILED(hr)) return false;
+
+    // 获取图像尺寸
+    UINT width = 0, height = 0;
+    GetImageDimensions(bitmap, width, height);
+
+    // 设置帧大小
+    hr = frame->SetSize(width, height);
+    if (FAILED(hr)) return false;
+
+    // 设置像素格式
+    WICPixelFormatGUID format = GUID_WICPixelFormat32bppBGRA;
+    hr = frame->SetPixelFormat(&format);
+    if (FAILED(hr)) return false;
+
+    // 写入图像数据
+    hr = frame->WriteSource(bitmap, nullptr);
+    if (FAILED(hr)) return false;
+
+    // 提交帧和编码器
+    hr = frame->Commit();
+    if (FAILED(hr)) return false;
+
+    hr = encoder->Commit();
+    if (FAILED(hr)) return false;
+
+    return true;
+}
+
 // ==== 区域处理操作实现 ====
 Microsoft::WRL::ComPtr<IWICBitmapSource> ImageProcessor::Crop(
     IWICBitmapSource* source, 
@@ -675,4 +747,51 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> ImageProcessor::AutoCropNumber(IWICBitm
     };
 
     return Crop(source, cropRect);
+}
+
+Microsoft::WRL::ComPtr<IWICBitmapSource> ImageProcessor::LoadFromFile(const std::filesystem::path& path) {
+    if (!std::filesystem::exists(path)) return nullptr;
+
+    // 创建WIC工厂
+    WICHelper::Factory factory;
+    if (!factory.IsValid()) return nullptr;
+
+    // 创建解码器
+    Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+    HRESULT hr = factory.Get()->CreateDecoderFromFilename(
+        path.wstring().c_str(),
+        nullptr,
+        GENERIC_READ,
+        WICDecodeMetadataCacheOnLoad,
+        &decoder
+    );
+    if (FAILED(hr)) return nullptr;
+
+    // 获取第一帧
+    Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+    hr = decoder->GetFrame(0, &frame);
+    if (FAILED(hr)) return nullptr;
+
+    // 创建格式转换器
+    Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+    hr = factory.Get()->CreateFormatConverter(&converter);
+    if (FAILED(hr)) return nullptr;
+
+    // 初始化转换器为32位BGRA格式
+    hr = converter->Initialize(
+        frame.Get(),
+        GUID_WICPixelFormat32bppBGRA,
+        WICBitmapDitherTypeNone,
+        nullptr,
+        0.0f,
+        WICBitmapPaletteTypeCustom
+    );
+    if (FAILED(hr)) return nullptr;
+
+    // 返回转换后的位图
+    Microsoft::WRL::ComPtr<IWICBitmapSource> result;
+    hr = converter.As(&result);
+    if (FAILED(hr)) return nullptr;
+
+    return result;
 } 

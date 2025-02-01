@@ -5,6 +5,7 @@
 #include <chrono>
 #include <spdlog/spdlog.h>
 #include "media/utils/logger.hpp"
+#include "core/image_processor.hpp"
 
 // Screenshot类实现
 Screenshot Screenshot::find_by_id(int64_t id) {
@@ -95,33 +96,129 @@ bool Screenshot::save() {
         // 插入新记录
         const char* sql = R"(
             INSERT INTO screenshots (filename, filepath, created_at, width, height,
-                                  file_size, metadata, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                  file_size, metadata, updated_at, thumbnail_generated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         )";
         
         sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            std::string error_msg = sqlite3_errmsg(db);
+            spdlog::error("Failed to prepare SQL statement: {} (SQL: {})", error_msg, sql);
             return false;
         }
         
-        sqlite3_bind_text(stmt, 1, filename.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 2, filepath.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int64(stmt, 3, std::time(nullptr));
-        sqlite3_bind_int(stmt, 4, width);
-        sqlite3_bind_int(stmt, 5, height);
-        sqlite3_bind_int64(stmt, 6, file_size);
-        sqlite3_bind_text(stmt, 7, metadata.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int64(stmt, 8, std::time(nullptr));
+        // 绑定参数
+        int rc = SQLITE_OK;
+        rc = sqlite3_bind_text(stmt, 1, filename.c_str(), -1, SQLITE_STATIC);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_text(stmt, 2, filepath.c_str(), -1, SQLITE_STATIC);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int64(stmt, 3, std::time(nullptr));
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int(stmt, 4, width);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int(stmt, 5, height);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int64(stmt, 6, file_size);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_text(stmt, 7, metadata.c_str(), -1, SQLITE_STATIC);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int64(stmt, 8, std::time(nullptr));
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int(stmt, 9, thumbnail_generated ? 1 : 0);
+        if (rc != SQLITE_OK) goto bind_error;
         
-        bool success = sqlite3_step(stmt) == SQLITE_DONE;
-        if (success) {
-            id = sqlite3_last_insert_rowid(db);
+        // 执行SQL
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            std::string error_msg = sqlite3_errmsg(db);
+            spdlog::error("Failed to execute SQL: {} (SQL: {})", error_msg, sql);
+            sqlite3_finalize(stmt);
+            return false;
         }
         
+        id = sqlite3_last_insert_rowid(db);
         sqlite3_finalize(stmt);
-        return success;
+        spdlog::debug("Successfully saved screenshot: {} (ID: {})", filename, id);
+        return true;
+        
+    bind_error:
+        std::string error_msg = sqlite3_errmsg(db);
+        spdlog::error("Failed to bind parameter: {} (SQL: {})", error_msg, sql);
+        sqlite3_finalize(stmt);
+        return false;
     } else {
-        // 更新现有记录
+        // 先检查记录是否存在
+        const char* check_sql = "SELECT COUNT(*) FROM screenshots WHERE id = ?";
+        sqlite3_stmt* check_stmt;
+        if (sqlite3_prepare_v2(db, check_sql, -1, &check_stmt, nullptr) != SQLITE_OK) {
+            std::string error_msg = sqlite3_errmsg(db);
+            spdlog::error("Failed to prepare check SQL: {} (SQL: {})", error_msg, check_sql);
+            return false;
+        }
+        
+        sqlite3_bind_int64(check_stmt, 1, id);
+        
+        int count = 0;
+        if (sqlite3_step(check_stmt) == SQLITE_ROW) {
+            count = sqlite3_column_int(check_stmt, 0);
+        }
+        sqlite3_finalize(check_stmt);
+        
+        if (count == 0) {
+            // 记录不存在，执行插入
+            spdlog::debug("Record with ID {} does not exist, performing insert instead of update", id);
+            const char* sql = R"(
+                INSERT INTO screenshots (id, filename, filepath, created_at, width, height,
+                                      file_size, metadata, updated_at, thumbnail_generated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            )";
+            
+            sqlite3_stmt* stmt;
+            if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+                std::string error_msg = sqlite3_errmsg(db);
+                spdlog::error("Failed to prepare SQL statement: {} (SQL: {})", error_msg, sql);
+                return false;
+            }
+            
+            // 绑定参数
+            int rc = SQLITE_OK;
+            rc = sqlite3_bind_int64(stmt, 1, id);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_text(stmt, 2, filename.c_str(), -1, SQLITE_STATIC);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_text(stmt, 3, filepath.c_str(), -1, SQLITE_STATIC);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_int64(stmt, 4, created_at);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_int(stmt, 5, width);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_int(stmt, 6, height);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_int64(stmt, 7, file_size);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_text(stmt, 8, metadata.c_str(), -1, SQLITE_STATIC);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_int64(stmt, 9, updated_at);
+            if (rc != SQLITE_OK) goto bind_error;
+            rc = sqlite3_bind_int(stmt, 10, thumbnail_generated ? 1 : 0);
+            if (rc != SQLITE_OK) goto bind_error;
+            
+            // 执行SQL
+            rc = sqlite3_step(stmt);
+            if (rc != SQLITE_DONE) {
+                std::string error_msg = sqlite3_errmsg(db);
+                spdlog::error("Failed to execute SQL: {} (SQL: {})", error_msg, sql);
+                sqlite3_finalize(stmt);
+                return false;
+            }
+            
+            sqlite3_finalize(stmt);
+            spdlog::debug("Successfully saved screenshot: {} (ID: {})", filename, id);
+            return true;
+        }
+        
+        // 记录存在，执行更新
         const char* sql = R"(
             UPDATE screenshots 
             SET filename = ?, filepath = ?, width = ?, height = ?,
@@ -131,21 +228,42 @@ bool Screenshot::save() {
         
         sqlite3_stmt* stmt;
         if (sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr) != SQLITE_OK) {
+            std::string error_msg = sqlite3_errmsg(db);
+            spdlog::error("Failed to prepare SQL statement: {} (SQL: {})", error_msg, sql);
             return false;
         }
         
-        sqlite3_bind_text(stmt, 1, filename.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_text(stmt, 2, filepath.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int(stmt, 3, width);
-        sqlite3_bind_int(stmt, 4, height);
-        sqlite3_bind_int64(stmt, 5, file_size);
-        sqlite3_bind_text(stmt, 6, metadata.c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int64(stmt, 7, std::time(nullptr));
-        sqlite3_bind_int64(stmt, 8, id);
+        // 绑定参数
+        int rc = SQLITE_OK;
+        rc = sqlite3_bind_text(stmt, 1, filename.c_str(), -1, SQLITE_STATIC);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_text(stmt, 2, filepath.c_str(), -1, SQLITE_STATIC);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int(stmt, 3, width);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int(stmt, 4, height);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int64(stmt, 5, file_size);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_text(stmt, 6, metadata.c_str(), -1, SQLITE_STATIC);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int64(stmt, 7, updated_at);
+        if (rc != SQLITE_OK) goto bind_error;
+        rc = sqlite3_bind_int64(stmt, 8, id);
+        if (rc != SQLITE_OK) goto bind_error;
         
-        bool success = sqlite3_step(stmt) == SQLITE_DONE;
+        // 执行SQL
+        rc = sqlite3_step(stmt);
+        if (rc != SQLITE_DONE) {
+            std::string error_msg = sqlite3_errmsg(db);
+            spdlog::error("Failed to execute SQL: {} (SQL: {})", error_msg, sql);
+            sqlite3_finalize(stmt);
+            return false;
+        }
+        
         sqlite3_finalize(stmt);
-        return success;
+        spdlog::debug("Successfully updated screenshot: {} (ID: {})", filename, id);
+        return true;
     }
 }
 
@@ -260,15 +378,25 @@ Screenshot Screenshot::from_file(const std::filesystem::path& file_path) {
         auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
             last_write_time.time_since_epoch()).count();
         
-        screenshot.id = timestamp;  // 使用时间戳作为ID
+        // 生成唯一ID
+        screenshot.id = Screenshot::generate_id(screenshot.filepath, screenshot.filename);
         screenshot.created_at = timestamp;
         screenshot.updated_at = timestamp;
         
         screenshot.file_size = std::filesystem::file_size(file_path);
         
-        // 暂时使用默认值
-        screenshot.width = 1920;
-        screenshot.height = 1080;
+        // 使用WIC读取图片信息
+        auto source = ImageProcessor::LoadFromFile(file_path);
+        if (!source) {
+            throw std::runtime_error("无法读取图片: " + file_path.string());
+        }
+        
+        // 获取图片尺寸
+        ImageProcessor::GetImageDimensions(source.Get(), screenshot.width, screenshot.height);
+        
+        // 设置其他字段的默认值
+        screenshot.metadata = "{}";  // 空的JSON对象
+        screenshot.thumbnail_generated = false;
         
     } catch (const std::exception& e) {
         spdlog::error("Error creating screenshot from file {}: {}", file_path.string(), e.what());

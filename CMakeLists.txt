@@ -1,20 +1,15 @@
 # ===== 基础配置 =====
 cmake_minimum_required(VERSION 3.10)
+project(SpinningMomo)
 
 # 导出编译命令
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# vcpkg配置
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake" 
-    CACHE STRING "Vcpkg toolchain file")
-
-# 项目信息
-project(SpinningMomo)
 
 # ===== 编译器和语言设置 =====
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# MSVC 特定配置
 if(MSVC)
     add_compile_options(/utf-8 /EHsc /await)
     add_compile_definitions(
@@ -23,6 +18,7 @@ if(MSVC)
         WIN32_LEAN_AND_MEAN
         UNICODE
         _UNICODE
+        # spdlog配置
         SPDLOG_WCHAR_TO_UTF8_SUPPORT
         SPDLOG_WCHAR_FILENAMES
         SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_DEBUG
@@ -31,24 +27,41 @@ if(MSVC)
 endif()
 
 # ===== 依赖项配置 =====
-# ONNX Runtime
-set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/onnxruntime")
+# vcpkg配置
+set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake" 
+    CACHE STRING "Vcpkg toolchain file")
+
+# 设置第三方库根目录
+set(THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+
+# ONNX Runtime配置
+set(ONNXRUNTIME_ROOT "${THIRD_PARTY_DIR}/onnxruntime")
 if(NOT EXISTS "${ONNXRUNTIME_ROOT}")
     message(FATAL_ERROR "ONNX Runtime directory not found at ${ONNXRUNTIME_ROOT}")
 endif()
-include_directories(${ONNXRUNTIME_ROOT}/include)
-link_directories(${ONNXRUNTIME_ROOT}/lib)
 
-# vcpkg依赖
+# 添加第三方库头文件路径
+include_directories(
+    # ONNX Runtime
+    ${ONNXRUNTIME_ROOT}/include
+)
+
+# 添加第三方库链接路径
+link_directories(
+    ${ONNXRUNTIME_ROOT}/lib
+)
+
+# vcpkg依赖包
 find_package(ZLIB REQUIRED)
 find_package(unofficial-uwebsockets CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
+find_package(xxHash CONFIG REQUIRED)
 
 # ===== 源文件配置 =====
-# 收集源文件
+# 项目源文件
 file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
 file(GLOB_RECURSE TRACKER_SOURCES "src/tracker/*.cpp")
 file(GLOB_RECURSE MEDIA_SOURCES "src/media/**/*.cpp")
@@ -59,7 +72,7 @@ file(GLOB MAIN_SOURCES
 
 # ===== 目标配置 =====
 # 创建可执行文件
-add_executable(SpinningMomo WIN32 
+add_executable(${PROJECT_NAME} WIN32 
     ${MAIN_SOURCES}
     ${CORE_SOURCES}
     ${TRACKER_SOURCES}
@@ -67,15 +80,15 @@ add_executable(SpinningMomo WIN32
     src/resource.rc
 )
 
-# 添加头文件路径
-target_include_directories(SpinningMomo PRIVATE
+# 添加项目头文件路径
+target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src          # 主目录
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core     # core模块
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tracker  # tracker模块
 )
 
-# ===== 链接库配置 =====
-target_link_libraries(SpinningMomo PRIVATE
+# ===== 链接配置 =====
+target_link_libraries(${PROJECT_NAME} PRIVATE
     # Windows系统库
     dwmapi           # DWM API
     windowsapp       # Windows Runtime API
@@ -88,27 +101,36 @@ target_link_libraries(SpinningMomo PRIVATE
     Shlwapi          # Shell Light-Weight API
     
     # 第三方库
-    onnxruntime              # ONNX Runtime
+    onnxruntime                          # ONNX Runtime
     unofficial::uwebsockets::uwebsockets # WebSocket库
-    ZLIB::ZLIB              # zlib压缩库
-    nlohmann_json::nlohmann_json  # JSON库
-    SQLite::SQLite3          # SQLite3
-    spdlog::spdlog_header_only  # 使用 header-only 版本的 spdlog
-    fmt::fmt                 # fmt 库
+    ZLIB::ZLIB                          # zlib压缩库
+    nlohmann_json::nlohmann_json        # JSON库
+    SQLite::SQLite3                     # SQLite3
+    spdlog::spdlog_header_only         # spdlog (header-only)
+    fmt::fmt                           # fmt库
+    xxHash::xxhash                     # xxHash哈希库
 )
 
 # ===== 安装和部署配置 =====
-# 复制ONNX Runtime DLL
-add_custom_command(TARGET SpinningMomo POST_BUILD
+# 设置输出目录变量
+set(OUTPUT_DIR $<TARGET_FILE_DIR:${PROJECT_NAME}>)
+
+# 复制运行时依赖
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    # ONNX Runtime
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${ONNXRUNTIME_ROOT}/lib/onnxruntime.dll"
-        $<TARGET_FILE_DIR:SpinningMomo>
+        "${OUTPUT_DIR}"
 )
 
-# 复制ONNX模型文件
-add_custom_command(TARGET SpinningMomo POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:SpinningMomo>/models
+# 创建必要的目录结构
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    # 模型目录
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DIR}/models"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/models/model.onnx"
-        $<TARGET_FILE_DIR:SpinningMomo>/models/model.onnx
+        "${OUTPUT_DIR}/models/model.onnx"
+
+    # 数据目录
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DIR}/data/thumbnails"
 )

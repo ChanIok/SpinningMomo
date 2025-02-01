@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include "media/routes/route_manager.hpp"
+#include "media/services/initialization_service.hpp"
 #include <spdlog/spdlog.h>
 
 Server::Server(const std::string& host, int port)
@@ -27,6 +28,17 @@ bool Server::Initialize() {
             
             // 在线程内创建App实例
             auto app = std::make_unique<uWS::App>();
+            
+            // 初始化服务
+            try {
+                OutputDebugStringA("Initializing services...\n");
+                InitializationService::get_instance().initialize();
+                OutputDebugStringA("Services initialized\n");
+            } catch (const std::exception& e) {
+                spdlog::error("Failed to initialize services: {}", e.what());
+                m_isRunning = false;
+                return;
+            }
             
             // 注册路由
             RouteManager::get_instance().register_routes(*app);

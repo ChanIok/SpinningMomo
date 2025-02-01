@@ -39,7 +39,7 @@ const emit = defineEmits<{
   (e: 'click', screenshot: Screenshot): void;
 }>();
 
-const imageUrl = computed(() => `/api/screenshots/${props.screenshot.id}/raw`);
+const imageUrl = computed(() => `/api/screenshots/${props.screenshot.id}/thumbnail`);
 
 function handleClick() {
   emit('click', props.screenshot);

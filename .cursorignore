@@ -45,7 +45,7 @@ ehthumbs.db
 Thumbs.db 
 
 test/
-onnxruntime/
+third_party/
 models/
 vcpkg/
 WebView2Samples/

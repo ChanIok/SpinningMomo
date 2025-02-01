@@ -7,10 +7,12 @@
 #include <vector>
 #include <memory>
 #include <string>
+#include <filesystem>
 
 class ImageProcessor {
 public:
     // ==== 基础图像操作 ====
+    static Microsoft::WRL::ComPtr<IWICBitmapSource> LoadFromFile(const std::filesystem::path& path);
     static Microsoft::WRL::ComPtr<IWICBitmapSource> ConvertToGrayscale(IWICBitmapSource* source);
     static Microsoft::WRL::ComPtr<IWICBitmapSource> Resize(
         IWICBitmapSource* source, 
@@ -36,6 +38,10 @@ public:
     static bool SaveToFile(
         IWICBitmapSource* bitmap, 
         const std::wstring& filePath);
+    static bool SaveToJpegFile(
+        IWICBitmapSource* bitmap, 
+        const std::wstring& filePath,
+        float quality = 0.75f);
     
     // ==== 区域处理 ====
     static Microsoft::WRL::ComPtr<IWICBitmapSource> Crop(

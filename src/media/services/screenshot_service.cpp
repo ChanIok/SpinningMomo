@@ -1,4 +1,6 @@
 #include "screenshot_service.hpp"
+#include "thumbnail_service.hpp"
+#include <spdlog/spdlog.h>
 #include <filesystem>
 #include <stdexcept>
 
@@ -17,12 +19,20 @@ Screenshot ScreenshotService::create_screenshot(const std::string& filepath) {
     screenshot.filepath = filepath;
     screenshot.filename = std::filesystem::path(filepath).filename().string();
     
+    // 生成唯一ID
+    screenshot.id = Screenshot::generate_id(filepath, screenshot.filename);
+    
     // 读取图片信息
     read_image_info(filepath, screenshot);
     
     // 保存到数据库
     if (!screenshot.save()) {
         throw std::runtime_error("保存截图记录失败");
+    }
+    
+    // 生成缩略图
+    if (!ThumbnailService::get_instance().generate_thumbnail(screenshot)) {
+        spdlog::warn("生成缩略图失败: {}", filepath);
     }
     
     return screenshot;
