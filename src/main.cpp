@@ -45,7 +45,7 @@ public:
 
         // 初始化HTTP服务器
         m_httpServer = std::make_unique<Server>("localhost", 51205);
-        if (!m_httpServer->Start()) {
+        if (!m_httpServer->Initialize()) {
             ShowNotification(m_strings.APP_NAME.c_str(), L"HTTP server failed to start", true);
             return false;
         }

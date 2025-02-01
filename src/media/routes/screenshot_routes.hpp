@@ -23,7 +23,6 @@ inline void register_screenshot_routes(uWS::App& app) {
     // 获取截图列表（支持分页）
     app.get("/api/screenshots", [screenshot_dir = SCREENSHOT_DIR.wstring()](auto* res, auto* req) {
         try {
-            OutputDebugStringA("Get screenshots\n");
             // 获取查询参数
             int64_t last_id = 0;
             int limit = 20;

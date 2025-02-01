@@ -4,42 +4,68 @@
 
 Server::Server(const std::string& host, int port)
     : m_host(host)
-    , m_port(port)
-    , m_app(std::make_unique<uWS::App>()) {
+    , m_port(port) {
 }
 
 Server::~Server() {
     Stop();
 }
 
-bool Server::Start() {
+bool Server::Initialize() {
     if (m_isRunning) {
+        OutputDebugStringA("Server already running\n");
         return true;
     }
 
     try {
-        // 注册所有路由
-        RouteManager::get_instance().register_routes(*m_app);
-        
-        // 配置CORS
-        SetupCors();
-        
+        OutputDebugStringA("Initializing web server...\n");
         m_isRunning = true;
         
-        // 直接在当前线程启动服务器
-        m_app->listen(m_host, m_port, [this](auto* socket) {
-            if (socket) {
-                m_listenSocket = socket;
-                spdlog::info("Server is listening on {}:{}", m_host, m_port);
-            } else {
-                spdlog::error("Failed to listen on {}:{}", m_host, m_port);
-                m_isRunning = false;
-            }
-        }).run();  // 直接运行事件循环
+        // 在新线程中创建和运行服务器
+        m_serverThread = ThreadRAII([this]() {
+            OutputDebugStringA("Server thread starting...\n");
+            
+            // 在线程内创建App实例
+            auto app = std::make_unique<uWS::App>();
+            
+            // 注册路由
+            RouteManager::get_instance().register_routes(*app);
+            OutputDebugStringA("Routes registered\n");
+            
+            // 配置CORS
+            SetupCors(*app);
+            OutputDebugStringA("CORS configured\n");
+            
+            // 启动监听
+            OutputDebugStringA("Starting uWS server...\n");
+            app->listen(m_host, m_port, [this](auto* socket) {
+                if (socket) {
+                    m_listenSocket = socket;
+                    OutputDebugStringA("Server listening socket created\n");
+                    spdlog::info("Server is listening on {}:{}", 
+                        m_host, m_port);
+                } else {
+                    OutputDebugStringA("Failed to create listen socket\n");
+                    spdlog::error("Failed to listen on {}:{}", 
+                        m_host, m_port);
+                    m_isRunning = false;
+                }
+            });
 
+            // 如果监听成功，运行事件循环
+            if (m_isRunning) {
+                OutputDebugStringA("Entering uWS event loop\n");
+                app->run();
+                OutputDebugStringA("uWS event loop exited\n");
+            }
+            
+            m_isRunning = false;
+        });
+        
         return true;
     } catch (const std::exception& e) {
-        spdlog::error("Failed to start server: {}", e.what());
+        OutputDebugStringA("Failed to initialize server\n");
+        spdlog::error("Failed to initialize server: {}", e.what());
         return false;
     }
 }
@@ -49,18 +75,19 @@ void Server::Stop() {
         return;
     }
 
-    m_isRunning = false;
-
-    // 关闭监听socket
+    // 关闭监听socket会导致事件循环退出
     if (m_listenSocket) {
         us_listen_socket_close(0, m_listenSocket);
         m_listenSocket = nullptr;
     }
+    
+    // ThreadRAII的析构函数会自动等待线程结束
+    m_isRunning = false;
 }
 
-void Server::SetupCors() {
+void Server::SetupCors(uWS::App& app) {
     // 配置全局CORS中间件
-    m_app->options("/*", [](auto* res, auto* req) {
+    app.options("/*", [](auto* res, auto* req) {
         res->writeHeader("Access-Control-Allow-Origin", "*");
         res->writeHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
         res->writeHeader("Access-Control-Allow-Headers", "Content-Type");
