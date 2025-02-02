@@ -20,7 +20,7 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
     // Actions
     async function loadMore() {
         if (loading.value || !hasMore.value) return;
-
+        console.log('Loading more screenshots-store');
         loading.value = true;
         error.value = null;
 

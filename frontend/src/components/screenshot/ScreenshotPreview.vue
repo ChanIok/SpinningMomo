@@ -201,6 +201,11 @@ watch(currentIndex, () => {
   resetZoom();
 });
 
+// 获取当前截图
+const currentScreenshot = computed(() => {
+  return props.screenshots[currentIndex.value];
+});
+
 // 图片加载状态接口
 interface ImageLoadingState {
   loading: boolean;
@@ -221,7 +226,7 @@ const preloadImages = (screenshots: Screenshot[], currentIndex: number) => {
     }
   }
   
-  // 添加后两张
+  // 添加后三张
   for (let i = 1; i <= 3; i++) {
     if (currentIndex + i < screenshots.length) {
       indicesToLoad.push(currentIndex + i);

@@ -20,8 +20,8 @@ function formatMonth(year: number, month: number): string {
   <div class="month-card" @click="$emit('click')">
     <div class="cover-image">
       <n-image
-        v-if="stats.firstScreenshot"
-        :src="stats.firstScreenshot.thumbnailPath"
+        v-if="stats.first_screenshot_id"
+        :src="`/api/screenshots/${stats.first_screenshot_id}/thumbnail`"
         :alt="formatMonth(stats.year, stats.month)"
         object-fit="cover"
         preview-disabled
@@ -51,9 +51,17 @@ function formatMonth(year: number, month: number): string {
 }
 
 .cover-image {
-  aspect-ratio: 16/9;
+  aspect-ratio: 1/1;
   background: #f5f5f5;
   overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.cover-image :deep(.n-image) {
+  width: 100%;
+  height: 100%;
 }
 
 .cover-image :deep(img) {

@@ -44,10 +44,8 @@ onUnmounted(() => {
 // 处理加载更多的事件
 const handleLoadMore = () => {
   if (props.year && props.month) {
-    console.log('Loading screenshots for month:', props.year, props.month);
     listStore.loadByMonth(parseInt(props.year), parseInt(props.month));
   } else {
-    console.log('Loading more screenshots');
     listStore.loadMore();
   }
 };
@@ -62,9 +60,17 @@ watch(
     } else {
       listStore.loadMore();
     }
-  },
-  { immediate: true }
+  }
 );
+
+// 初始加载
+onMounted(() => {
+  if (props.year && props.month) {
+    listStore.loadByMonth(parseInt(props.year), parseInt(props.month), true);
+  } else {
+    listStore.loadMore();
+  }
+});
 </script>
 
 <template>

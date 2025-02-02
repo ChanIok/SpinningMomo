@@ -144,11 +144,18 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_paginated(in
     sqlite3_bind_int(stmt, param_index, limit);
     
     std::vector<Screenshot> screenshots;
-    while (sqlite3_step(stmt) == SQLITE_ROW && screenshots.size() < static_cast<size_t>(limit)) {
-        screenshots.push_back(read_screenshot_from_stmt(stmt));
-    }
+    bool has_more = false;
+    int count = 0;
     
-    bool has_more = sqlite3_step(stmt) == SQLITE_ROW;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (count < limit) {
+            screenshots.push_back(read_screenshot_from_stmt(stmt));
+        } else {
+            has_more = true;
+            break;
+        }
+        count++;
+    }
     
     sqlite3_finalize(stmt);
     return {screenshots, has_more};
