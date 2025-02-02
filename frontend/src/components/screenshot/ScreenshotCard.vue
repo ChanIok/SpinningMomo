@@ -3,25 +3,28 @@
     class="screenshot-card"
     :class="{ selected }"
     hoverable
+    :bordered="false"
     @click="handleClick"
   >
-    <n-image
-      :src="imageUrl"
-      :alt="screenshot.filename"
-      object-fit="cover"
-      preview-disabled
-      lazy
-      class="screenshot-image"
-    />
-    <template #footer>
-      <div class="screenshot-info">
-        <n-ellipsis>{{ screenshot.filename }}</n-ellipsis>
-        <div class="screenshot-metadata">
-          <span>{{ formatDate(screenshot.created_at) }}</span>
-          <span>{{ formatFileSize(screenshot.file_size) }}</span>
+    <div class="image-container">
+      <n-image
+        :src="imageUrl"
+        :alt="screenshot.filename"
+        object-fit="cover"
+        preview-disabled
+        lazy
+        class="screenshot-image"
+      />
+      <div class="info-overlay">
+        <div class="screenshot-info">
+          <n-ellipsis class="filename">{{ screenshot.filename }}</n-ellipsis>
+          <div class="screenshot-metadata">
+            <span>{{ formatDate(screenshot.created_at) }}</span>
+            <span>{{ formatFileSize(screenshot.file_size) }}</span>
+          </div>
         </div>
       </div>
-    </template>
+    </div>
   </n-card>
 </template>
 
@@ -69,6 +72,9 @@ function formatFileSize(bytes: number): string {
 .screenshot-card {
   cursor: pointer;
   transition: all 0.2s ease;
+  background: transparent;
+  border-radius: 4px;
+  overflow: hidden;
 }
 
 .screenshot-card:hover {
@@ -76,13 +82,45 @@ function formatFileSize(bytes: number): string {
 }
 
 .screenshot-card.selected {
-  border: 2px solid var(--n-primary-color);
+  box-shadow: 0 0 0 2px var(--n-primary-color);
+}
+
+.image-container {
+  position: relative;
+  width: 100%;
+  padding-bottom: 66.67%; /* 3:2 aspect ratio */
+  background-color: rgba(0, 0, 0, 0.03);
 }
 
 .screenshot-image {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
-  aspect-ratio: 16/9;
-  background-color: var(--n-card-color);
+  height: 100%;
+}
+
+.screenshot-image :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.info-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  padding: 12px;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.screenshot-card:hover .info-overlay {
+  opacity: 1;
 }
 
 .screenshot-info {
@@ -91,10 +129,16 @@ function formatFileSize(bytes: number): string {
   gap: 4px;
 }
 
+.filename {
+  font-size: 0.9em;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .screenshot-metadata {
   display: flex;
   gap: 8px;
-  font-size: 0.85em;
-  color: rgba(0, 0, 0, 0.45);
+  font-size: 0.8em;
+  opacity: 0.9;
 }
 </style> 

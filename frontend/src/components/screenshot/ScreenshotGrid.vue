@@ -28,9 +28,9 @@
       </n-button>
     </div>
 
-    <div ref="loadingRef" class="loading-trigger">
+    <!-- <div ref="loadingRef" class="loading-trigger">
       <n-spin v-if="loading" />
-    </div>
+    </div> -->
   </div>
 </template>
 

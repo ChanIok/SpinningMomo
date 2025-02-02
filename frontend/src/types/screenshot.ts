@@ -2,13 +2,15 @@ export interface Screenshot {
     id: number;
     filename: string;
     filepath: string;
-    created_at: string;
-    updated_at: string;
+    thumbnailPath: string;
+    file_size: number;
     width: number;
     height: number;
-    file_size: number;
-    metadata?: string;
-    deleted_at?: string;
+    created_at: number;
+    updated_at: number;
+    deleted_at: number;
+    thumbnail_generated: boolean;
+    metadata: string;
 }
 
 export interface ScreenshotResponse {

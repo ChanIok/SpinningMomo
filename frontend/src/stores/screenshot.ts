@@ -19,23 +19,35 @@ export const useScreenshotStore = defineStore('screenshot', () => {
 
     // Actions
     async function loadMoreScreenshots() {
-        if (loading.value || reachedEnd.value) return;
+        if (loading.value || reachedEnd.value) {
+            console.log('Skip loading - loading:', loading.value, 'reachedEnd:', reachedEnd.value);
+            return;
+        }
 
         loading.value = true;
         try {
+            console.log('Fetching screenshots with lastId:', lastId.value);
             const response = await screenshotAPI.getScreenshots({
                 lastId: lastId.value,
                 limit: batchSize
             });
             
-            if (!response.hasMore || response.screenshots.length < batchSize) {
-                reachedEnd.value = true;
-            }
-
+            console.log('API response:', {
+                hasMore: response.hasMore,
+                count: response.screenshots.length,
+                batchSize
+            });
+            
             if (response.screenshots.length > 0) {
                 screenshots.value.push(...response.screenshots);
                 lastId.value = response.screenshots[response.screenshots.length - 1].id;
+                console.log('Updated lastId:', lastId.value);
             }
+
+            // 只有当没有返回数据时才设置 reachedEnd 为 true
+            reachedEnd.value = response.screenshots.length === 0;
+            console.log('Updated reachedEnd:', reachedEnd.value);
+
         } catch (error) {
             console.error('Failed to load screenshots:', error);
         } finally {
