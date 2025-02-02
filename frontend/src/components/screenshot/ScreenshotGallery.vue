@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { Screenshot } from '@/types/screenshot';
 import { NImage, NEllipsis } from 'naive-ui';
+import ScreenshotPreview from './ScreenshotPreview.vue';
 
 // 布局配置常量
 const BASE_HEIGHT = 320;        // 基准行高
@@ -34,6 +35,16 @@ const props = defineProps<{
 const emit = defineEmits<{
   loadMore: []
 }>();
+
+// 预览相关的状态
+const showPreview = ref(false);
+const previewIndex = ref(0);
+
+// 处理图片点击事件
+const handleImageClick = (index: number) => {
+  previewIndex.value = index;
+  showPreview.value = true;
+};
 
 // 监听并更新容器宽度
 const updateContainerWidth = () => {
@@ -190,6 +201,14 @@ function formatFileSize(bytes: number): string {
     ref="containerRef"
     :style="{ height: layout.totalHeight + 'px' }"
   >
+    <!-- 预览组件 -->
+    <screenshot-preview
+      v-model="showPreview"
+      v-model:currentIndex="previewIndex"
+      :screenshots="props.screenshots"
+      :initial-index="previewIndex"
+    />
+
     <!-- 行容器 -->
     <div
       v-for="(row, rowIndex) in layout.rows"
@@ -210,6 +229,7 @@ function formatFileSize(bytes: number): string {
           height: `${item.height}px`,
           marginLeft: itemIndex > 0 ? `${SPACING}px` : '0'
         }"
+        @click="handleImageClick(props.screenshots.indexOf(item.screenshot))"
       >
         <!-- 图片 -->
         <n-image
@@ -255,6 +275,7 @@ function formatFileSize(bytes: number): string {
   overflow: hidden;
   background-color: rgba(0, 0, 0, 0.03);
   transition: transform 0.3s ease;
+  cursor: pointer;
 }
 
 /* 图片样式 */
