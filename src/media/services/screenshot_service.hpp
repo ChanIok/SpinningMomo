@@ -1,13 +1,14 @@
 #pragma once
 
 #include "media/db/models.hpp"
+#include "media/repositories/screenshot_repository.hpp"
 #include <string>
 #include <vector>
 #include <filesystem>
 #include <utility>
 #include <nlohmann/json.hpp>
 
-// 截图服务类
+// 截图服务类 - 处理业务逻辑
 class ScreenshotService {
 public:
     // 获取单例实例
@@ -15,6 +16,9 @@ public:
 
     // 创建新的截图记录
     Screenshot create_screenshot(const std::string& filepath);
+
+    // 从文件创建截图对象（不保存到数据库）
+    Screenshot create_from_file(const std::filesystem::path& filepath);
 
     // 获取截图列表
     std::vector<Screenshot> get_screenshots(bool include_deleted = false);
@@ -53,4 +57,7 @@ private:
 
     // 从文件中读取图片信息
     void read_image_info(const std::string& filepath, Screenshot& screenshot);
+
+    // 数据访问层
+    ScreenshotRepository& repository_ = ScreenshotRepository::get_instance();
 }; 

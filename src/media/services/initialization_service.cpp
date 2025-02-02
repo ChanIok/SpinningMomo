@@ -50,7 +50,7 @@ void InitializationService::ensure_directories() {
 void InitializationService::sync_screenshots() {
     spdlog::info("Syncing screenshots with database...");
     
-    std::vector<Screenshot> existing_screenshots = Screenshot::find_all(true);
+    std::vector<Screenshot> existing_screenshots = screenshot_repository_.find_all(true);
     spdlog::info("Found {} existing screenshots in database", existing_screenshots.size());
     
     std::vector<Screenshot> new_screenshots;
@@ -66,15 +66,17 @@ void InitializationService::sync_screenshots() {
         processed_count++;
         try {
             // 从文件创建Screenshot对象
-            auto screenshot = Screenshot::from_file(entry.path());
+            auto screenshot = ScreenshotService::get_instance().create_from_file(entry.path());
             
             // 检查是否已存在
             auto it = std::find_if(existing_screenshots.begin(), existing_screenshots.end(),
-                [&screenshot](const Screenshot& s) { return s.id == screenshot.id; });
+                [&screenshot](const Screenshot& s) { 
+                    return s.filepath == screenshot.filepath; 
+                });
             
             if (it == existing_screenshots.end()) {
                 // 新文件，保存到数据库
-                if (screenshot.save()) {
+                if (screenshot_repository_.save(screenshot)) {
                     new_screenshots.push_back(screenshot);
                     spdlog::info("Added new screenshot: {}", screenshot.filename);
                 } else {
@@ -94,7 +96,7 @@ void InitializationService::generate_missing_thumbnails() {
     spdlog::info("Generating missing thumbnails...");
     
     auto& thumbnail_service = ThumbnailService::get_instance();
-    auto screenshots = Screenshot::find_all(false);
+    auto screenshots = screenshot_repository_.find_all(false);
     spdlog::info("Found {} screenshots in database for thumbnail generation", screenshots.size());
     
     int generated_count = 0;
@@ -104,7 +106,7 @@ void InitializationService::generate_missing_thumbnails() {
         if (!thumbnail_service.thumbnail_exists(screenshot)) {
             try {
                 if (thumbnail_service.generate_thumbnail(screenshot)) {
-                    if (screenshot.update_thumbnail_generated(true)) {
+                    if (screenshot_repository_.update_thumbnail_generated(screenshot.id, true)) {
                         generated_count++;
                         spdlog::debug("Generated thumbnail for: {}", screenshot.filename);
                     } else {
@@ -130,12 +132,12 @@ void InitializationService::generate_missing_thumbnails() {
 void InitializationService::cleanup_invalid_data() {
     spdlog::info("Cleaning up invalid data...");
     
-    auto screenshots = Screenshot::find_all(true);
+    auto screenshots = screenshot_repository_.find_all(true);
     int removed_count = 0;
     
     for (auto& screenshot : screenshots) {
         if (!std::filesystem::exists(screenshot.filepath)) {
-            if (screenshot.remove()) {
+            if (screenshot_repository_.remove(screenshot.id)) {
                 removed_count++;
                 spdlog::debug("Removed invalid screenshot record: {}", screenshot.filename);
             }

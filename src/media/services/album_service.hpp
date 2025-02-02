@@ -1,10 +1,11 @@
 #pragma once
 
 #include "media/db/models.hpp"
+#include "media/repositories/album_repository.hpp"
 #include <string>
 #include <vector>
 
-// 相册服务类
+// 相册服务类 - 处理业务逻辑
 class AlbumService {
 public:
     // 获取单例实例
@@ -41,4 +42,7 @@ private:
 
     // 获取相册中最后一个位置编号
     int get_last_position(int64_t album_id);
+
+    // 数据访问层
+    AlbumRepository& repository_ = AlbumRepository::get_instance();
 }; 

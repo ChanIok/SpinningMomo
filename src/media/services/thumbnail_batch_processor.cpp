@@ -166,7 +166,7 @@ bool ThumbnailBatchProcessor::process_single(const Screenshot& screenshot) {
         
         // 更新数据库状态
         mutable_screenshot.thumbnail_generated = true;
-        return mutable_screenshot.save();
+        return repository_.save(mutable_screenshot);
         
     } catch (const std::exception& e) {
         spdlog::error("Error processing thumbnail for {}: {}", screenshot.filename, e.what());

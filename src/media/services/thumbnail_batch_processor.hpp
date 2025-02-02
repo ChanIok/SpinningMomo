@@ -11,6 +11,7 @@
 #include "media/db/models.hpp"
 #include "core/image_processor.hpp"
 #include "core/thread_raii.hpp"
+#include "media/repositories/screenshot_repository.hpp"
 
 class ThumbnailBatchProcessor {
 public:
@@ -62,4 +63,5 @@ private:
     static constexpr size_t MAX_THREADS = 4;        // 最大线程数
     static constexpr size_t BATCH_SIZE = 5;         // 每批处理数量
     static constexpr size_t QUEUE_SIZE_LIMIT = 50;  // 队列大小限制
+    ScreenshotRepository& repository_ = ScreenshotRepository::get_instance();
 }; 

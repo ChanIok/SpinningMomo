@@ -5,8 +5,10 @@
 #include "screenshot_service.hpp"
 #include "thumbnail_service.hpp"
 #include "thumbnail_batch_processor.hpp"
+#include "media/repositories/screenshot_repository.hpp"
 #include "media/db/models.hpp"
 
+// 初始化服务类 - 负责系统初始化和数据同步
 class InitializationService {
 public:
     static InitializationService& get_instance();
@@ -30,17 +32,13 @@ private:
     InitializationService(const InitializationService&) = delete;
     InitializationService& operator=(const InitializationService&) = delete;
     
-    // 确保目录存在
+    // 初始化步骤
     void ensure_directories();
-    
-    // 扫描目录并同步数据库
     void sync_screenshots();
-    
-    // 生成缺失的缩略图
     void generate_missing_thumbnails();
-    
-    // 清理无效数据
     void cleanup_invalid_data();
     
+    // 成员变量
     std::filesystem::path screenshot_directory_;
+    ScreenshotRepository& screenshot_repository_ = ScreenshotRepository::get_instance();
 }; 
