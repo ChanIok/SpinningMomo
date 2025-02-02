@@ -2,15 +2,14 @@ export interface Screenshot {
     id: number;
     filename: string;
     filepath: string;
-    thumbnailPath: string;
-    file_size: number;
     width: number;
     height: number;
+    file_size: number;
+    metadata: string;
     created_at: number;
     updated_at: number;
-    deleted_at: number;
-    thumbnail_generated: boolean;
-    metadata: string;
+    deleted_at?: number;
+    thumbnailPath?: string;
 }
 
 export interface ScreenshotResponse {
@@ -40,5 +39,18 @@ export interface ApiResponse<T> {
 
 export interface ScreenshotListData {
     screenshots: Screenshot[];
+    hasMore: boolean;
+}
+
+export interface MonthStats {
+    year: number;
+    month: number;
+    count: number;
+    first_screenshot_id: number;
+    firstScreenshot?: Screenshot;
+}
+
+export interface PaginatedResponse<T> {
+    items: T[];
     hasMore: boolean;
 } 

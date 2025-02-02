@@ -97,6 +97,20 @@
         "resumable": "cpp",
         "ranges": "cpp",
         "expected": "cpp",
-        "source_location": "cpp"
+        "source_location": "cpp",
+        "barrier": "cpp",
+        "csetjmp": "cpp",
+        "cuchar": "cpp",
+        "execution": "cpp",
+        "latch": "cpp",
+        "mdspan": "cpp",
+        "memory_resource": "cpp",
+        "numbers": "cpp",
+        "print": "cpp",
+        "semaphore": "cpp",
+        "shared_mutex": "cpp",
+        "strstream": "cpp",
+        "syncstream": "cpp",
+        "*.inc": "cpp"
     }
 }

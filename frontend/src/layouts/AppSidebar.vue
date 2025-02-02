@@ -66,12 +66,12 @@ function handleMenuSelect(key: string) {
     bordered
     collapse-mode="width"
     :collapsed-width="0"
-    :width="240"
+    :width="256"
     show-trigger
     class="app-sidebar"
   >
     <div class="sidebar-header">
-      <h1 class="app-title">SpinningMomo</h1>
+      <h1 class="app-title">Spinning Momo</h1>
     </div>
     <n-menu
       v-model:value="activeKey"
@@ -100,7 +100,7 @@ function handleMenuSelect(key: string) {
 
 .app-title {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: 1.2rem;
+  font-weight: 400;
 }
 </style> 

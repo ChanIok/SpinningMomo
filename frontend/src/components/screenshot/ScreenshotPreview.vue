@@ -161,11 +161,6 @@ watch(() => props.initialIndex, (newValue) => {
   }
 });
 
-const currentScreenshot = computed(() => {
-  console.log('Computing currentScreenshot - currentIndex:', currentIndex.value, 'screenshot:', props.screenshots[currentIndex.value]?.id);
-  return props.screenshots[currentIndex.value];
-});
-
 // 处理键盘事件
 const handleKeyDown = (e: KeyboardEvent) => {
   if (!isVisible.value) return;

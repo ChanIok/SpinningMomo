@@ -11,15 +11,23 @@ class ScreenshotRepository : public IRepository<Screenshot, int64_t> {
 public:
     static ScreenshotRepository& get_instance();
 
-    // IRepository implementation
+    // 基本查询
     Screenshot find_by_id(int64_t id) override;
     std::vector<Screenshot> find_all(bool include_deleted = false) override;
     bool save(Screenshot& screenshot) override;
     bool remove(int64_t id) override;
 
-    // Additional specific methods
+    // 分页查询
     std::pair<std::vector<Screenshot>, bool> find_paginated(int64_t last_id, int limit);
+    // 按目录查询
     std::vector<Screenshot> find_by_directory(const std::wstring& dir_path, int64_t last_id = 0, int limit = 20);
+    
+    // 获取月份统计信息
+    std::vector<MonthStats> get_month_statistics();
+    
+    // 获取指定月份的照片
+    std::pair<std::vector<Screenshot>, bool> find_by_month(int year, int month, int64_t last_id, int limit);
+
     bool update_thumbnail_generated(int64_t id, bool generated);
 
 private:

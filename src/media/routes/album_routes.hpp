@@ -20,7 +20,7 @@ inline void register_album_routes(uWS::App& app) {
             auto albums = album_service.get_albums();
             nlohmann::json json_array = nlohmann::json::array();
             for (const auto& album : albums) {
-                json_array.push_back(album.to_json());
+                json_array.push_back(album);
             }
             Response::Success(res, json_array);
         } catch (const std::exception& e) {
@@ -40,7 +40,7 @@ inline void register_album_routes(uWS::App& app) {
                     json["name"].get<std::string>(),
                     json.value("description", "")
                 );
-                Response::Success(res, album.to_json());
+                Response::Success(res, album);
             } catch (const std::exception& e) {
                 spdlog::error("Failed to create album: {}", e.what());
                 Response::Error(res, e.what());
@@ -53,7 +53,7 @@ inline void register_album_routes(uWS::App& app) {
         try {
             auto id = std::stoll(Request::GetPathParam(req, 0));
             auto album = album_service.get_album(id);
-            Response::Success(res, album.to_json());
+            Response::Success(res, album);
         } catch (const std::exception& e) {
             spdlog::error("Failed to get album: {}", e.what());
             Response::Error(res, "Album not found", 404);
@@ -74,7 +74,7 @@ inline void register_album_routes(uWS::App& app) {
                 album.description = json.value("description", album.description);
                 
                 if (album_service.update_album(album)) {
-                    Response::Success(res, album.to_json());
+                    Response::Success(res, album);
                 } else {
                     Response::Error(res, "Album not found", 404);
                 }

@@ -69,16 +69,18 @@ bool ScreenshotRepository::save(Screenshot& screenshot) {
     const char* sql = exists ? 
         R"(UPDATE screenshots 
            SET filename = ?, filepath = ?, created_at = ?, width = ?, height = ?,
-               file_size = ?, metadata = ?, updated_at = ?, deleted_at = NULL
+               file_size = ?, metadata = ?, photo_time = ?, updated_at = ?, 
+               thumbnail_generated = ?, deleted_at = NULL
            WHERE id = ?)" :
         R"(INSERT INTO screenshots (filename, filepath, created_at, width, height,
-                                  file_size, metadata, updated_at, deleted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL))";
+                                  file_size, metadata, photo_time, updated_at, 
+                                  thumbnail_generated, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL))";
     
     auto stmt = prepare_statement(sql);
     bind_screenshot_fields(stmt, screenshot, false);
     if (exists) {
-        sqlite3_bind_int64(stmt, 9, screenshot.id);
+        sqlite3_bind_int64(stmt, 11, screenshot.id);
     }
     
     bool success = sqlite3_step(stmt) == SQLITE_DONE;
@@ -111,20 +113,32 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_paginated(in
     
     if (last_id > 0) {
         sql += R"(
-            AND created_at < (
-                SELECT created_at 
-                FROM screenshots 
-                WHERE id = ? AND deleted_at IS NULL
+            AND (
+                COALESCE(photo_time, created_at) < (
+                    SELECT COALESCE(photo_time, created_at)
+                    FROM screenshots 
+                    WHERE id = ? AND deleted_at IS NULL
+                )
+                OR (
+                    COALESCE(photo_time, created_at) = (
+                        SELECT COALESCE(photo_time, created_at)
+                        FROM screenshots 
+                        WHERE id = ? AND deleted_at IS NULL
+                    )
+                    AND id < ?
+                )
             )
         )";
     }
     
-    sql += " ORDER BY created_at DESC LIMIT ? + 1";
+    sql += " ORDER BY COALESCE(photo_time, created_at) DESC, id DESC LIMIT ? + 1";
     
     auto stmt = prepare_statement(sql.c_str());
     int param_index = 1;
     
     if (last_id > 0) {
+        sqlite3_bind_int64(stmt, param_index++, last_id);
+        sqlite3_bind_int64(stmt, param_index++, last_id);
         sqlite3_bind_int64(stmt, param_index++, last_id);
     }
     sqlite3_bind_int(stmt, param_index, limit);
@@ -208,7 +222,13 @@ void ScreenshotRepository::bind_screenshot_fields(sqlite3_stmt* stmt, const Scre
     sqlite3_bind_int(stmt, idx++, screenshot.height);
     sqlite3_bind_int64(stmt, idx++, screenshot.file_size);
     sqlite3_bind_text(stmt, idx++, screenshot.metadata.c_str(), -1, SQLITE_STATIC);
+    if (screenshot.photo_time.has_value()) {
+        sqlite3_bind_int64(stmt, idx++, screenshot.photo_time.value());
+    } else {
+        sqlite3_bind_null(stmt, idx++);
+    }
     sqlite3_bind_int64(stmt, idx++, screenshot.updated_at);
+    sqlite3_bind_int(stmt, idx++, screenshot.thumbnail_generated ? 1 : 0);
 }
 
 Screenshot ScreenshotRepository::read_screenshot_from_stmt(sqlite3_stmt* stmt) {
@@ -226,10 +246,15 @@ Screenshot ScreenshotRepository::read_screenshot_from_stmt(sqlite3_stmt* stmt) {
     }
     idx++;
     if (sqlite3_column_type(stmt, idx) != SQLITE_NULL) {
+        screenshot.photo_time = sqlite3_column_int64(stmt, idx);
+    }
+    idx++;
+    if (sqlite3_column_type(stmt, idx) != SQLITE_NULL) {
         screenshot.deleted_at = sqlite3_column_int64(stmt, idx);
     }
     idx++;
     screenshot.updated_at = sqlite3_column_int64(stmt, idx);
+    screenshot.thumbnail_generated = sqlite3_column_int(stmt, idx) == 1;
     return screenshot;
 }
 
@@ -251,4 +276,88 @@ bool ScreenshotRepository::execute_statement(sqlite3_stmt* stmt, const std::stri
         return false;
     }
     return true;
+}
+
+// 获取月份统计信息
+std::vector<MonthStats> ScreenshotRepository::get_month_statistics() {
+    const char* sql = R"(
+        SELECT 
+            strftime('%Y', datetime(created_at, 'unixepoch')) as year,
+            strftime('%m', datetime(created_at, 'unixepoch')) as month,
+            COUNT(*) as count,
+            MIN(id) as first_screenshot_id
+        FROM screenshots
+        WHERE deleted_at IS NULL
+        GROUP BY year, month
+        ORDER BY year DESC, month DESC
+    )";
+    
+    auto stmt = prepare_statement(sql);
+    std::vector<MonthStats> stats;
+    
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        MonthStats stat;
+        stat.year = std::stoi(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+        stat.month = std::stoi(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1)));
+        stat.count = sqlite3_column_int(stmt, 2);
+        stat.first_screenshot_id = sqlite3_column_int64(stmt, 3);
+        stats.push_back(stat);
+    }
+    
+    sqlite3_finalize(stmt);
+    return stats;
+}
+
+std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_by_month(int year, int month, int64_t last_id, int limit) {
+    std::string sql = R"(
+        WITH target_screenshots AS (
+            SELECT *
+            FROM screenshots
+            WHERE deleted_at IS NULL
+            AND strftime('%Y', datetime(COALESCE(photo_time, created_at), 'unixepoch')) = ?
+            AND strftime('%m', datetime(COALESCE(photo_time, created_at), 'unixepoch')) = ?
+    )";
+    
+    if (last_id > 0) {
+        sql += R"(
+            AND COALESCE(photo_time, created_at) < (
+                SELECT COALESCE(photo_time, created_at)
+                FROM screenshots 
+                WHERE id = ? AND deleted_at IS NULL
+            )
+        )";
+    }
+    
+    sql += " ORDER BY COALESCE(photo_time, created_at) DESC, id DESC LIMIT ? + 1)";
+    sql += R"(
+        SELECT * FROM target_screenshots LIMIT ?
+    )";
+    
+    auto stmt = prepare_statement(sql.c_str());
+    int param_index = 1;
+    
+    // Bind year and month
+    std::string year_str = std::to_string(year);
+    std::string month_str = month < 10 ? "0" + std::to_string(month) : std::to_string(month);
+    sqlite3_bind_text(stmt, param_index++, year_str.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, param_index++, month_str.c_str(), -1, SQLITE_STATIC);
+    
+    // Bind last_id if provided
+    if (last_id > 0) {
+        sqlite3_bind_int64(stmt, param_index++, last_id);
+    }
+    
+    // Bind limit for both the inner and outer queries
+    sqlite3_bind_int(stmt, param_index++, limit);
+    sqlite3_bind_int(stmt, param_index++, limit);
+    
+    std::vector<Screenshot> screenshots;
+    while (sqlite3_step(stmt) == SQLITE_ROW && screenshots.size() < static_cast<size_t>(limit)) {
+        screenshots.push_back(read_screenshot_from_stmt(stmt));
+    }
+    
+    bool has_more = sqlite3_step(stmt) == SQLITE_ROW;
+    
+    sqlite3_finalize(stmt);
+    return {screenshots, has_more};
 } 

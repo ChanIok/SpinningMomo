@@ -8,9 +8,8 @@
 #include <nlohmann/json.hpp>
 #include <filesystem>
 
-// 截图模型 - 纯数据结构，不包含数据库操作
-class Screenshot {
-public:
+// 截图数据结构
+struct Screenshot {
     int64_t id = 0;                        // 唯一标识符
     std::string filename;                   // 文件名
     std::string filepath;                   // 文件路径
@@ -22,50 +21,13 @@ public:
     std::optional<int64_t> deleted_at;     // 删除时间（Unix时间戳）
     int64_t updated_at = 0;                // 更新时间（Unix时间戳）
     bool thumbnail_generated = false;       // 缩略图是否已生成
+    std::optional<int64_t> photo_time;     // 照片拍摄时间（Unix时间戳）
 
-    // 序列化方法
-    nlohmann::json to_json() const {
-        return {
-            {"id", id},
-            {"filename", filename},
-            {"filepath", filepath},
-            {"width", width},
-            {"height", height},
-            {"file_size", file_size},
-            {"metadata", metadata},
-            {"created_at", created_at},
-            {"updated_at", updated_at},
-            {"deleted_at", deleted_at.has_value() ? deleted_at.value() : 0},
-            {"thumbnail_generated", thumbnail_generated}
-        };
-    }
-
-    // 反序列化方法
-    static Screenshot from_json(const nlohmann::json& j) {
-        Screenshot screenshot;
-        screenshot.id = j["id"].get<int64_t>();
-        screenshot.filename = j["filename"].get<std::string>();
-        screenshot.filepath = j["filepath"].get<std::string>();
-        screenshot.width = j.value("width", 0);
-        screenshot.height = j.value("height", 0);
-        screenshot.file_size = j.value("file_size", 0);
-        screenshot.metadata = j.value("metadata", "");
-        screenshot.created_at = j.value("created_at", 0);
-        screenshot.updated_at = j.value("updated_at", 0);
-        screenshot.deleted_at = j.value("deleted_at", 0);
-        screenshot.thumbnail_generated = j.value("thumbnail_generated", false);
-        return screenshot;
-    }
-
-    // 基本验证方法
-    bool is_valid() const {
-        return !filename.empty() && !filepath.empty();
-    }
+    bool is_valid() const { return !filename.empty() && !filepath.empty(); }
 };
 
-// 相册模型 - 纯数据结构，不包含数据库操作
-class Album {
-public:
+// 相册数据结构
+struct Album {
     int64_t id = 0;                        // 唯一标识符
     std::string name;                      // 相册名称
     std::string description;               // 相册描述
@@ -74,34 +36,84 @@ public:
     std::time_t updated_at = 0;            // 更新时间
     std::optional<std::time_t> deleted_at; // 删除时间
 
-    // 序列化方法
-    nlohmann::json to_json() const {
-        return {
-            {"id", id},
-            {"name", name},
-            {"description", description},
-            {"cover_screenshot_id", cover_screenshot_id.has_value() ? cover_screenshot_id.value() : 0},
-            {"created_at", created_at},
-            {"updated_at", updated_at},
-            {"deleted_at", deleted_at.has_value() ? deleted_at.value() : 0}
-        };
-    }
+    bool is_valid() const { return !name.empty(); }
+};
 
-    // 反序列化方法
-    static Album from_json(const nlohmann::json& j) {
-        Album album;
-        album.id = j["id"].get<int64_t>();
-        album.name = j["name"].get<std::string>();
-        album.description = j.value("description", "");
-        album.cover_screenshot_id = j.value("cover_screenshot_id", 0);
-        album.created_at = j.value("created_at", 0);
-        album.updated_at = j.value("updated_at", 0);
-        album.deleted_at = j.value("deleted_at", 0);
-        return album;
-    }
+// 月份统计信息
+struct MonthStats {
+    int year;                   // 年份
+    int month;                  // 月份
+    int count;                  // 照片数量
+    int64_t first_screenshot_id;// 第一张照片ID
+};
 
-    // 基本验证方法
-    bool is_valid() const {
-        return !name.empty();
-    }
-}; 
+// JSON 序列化支持
+inline void to_json(nlohmann::json& j, const Screenshot& s) {
+    j = nlohmann::json{
+        {"id", s.id},
+        {"filename", s.filename},
+        {"filepath", s.filepath},
+        {"width", s.width},
+        {"height", s.height},
+        {"file_size", s.file_size},
+        {"metadata", s.metadata},
+        {"created_at", s.created_at},
+        {"updated_at", s.updated_at},
+        {"deleted_at", s.deleted_at.has_value() ? s.deleted_at.value() : 0},
+        {"thumbnail_generated", s.thumbnail_generated},
+        {"photo_time", s.photo_time.has_value() ? s.photo_time.value() : 0}
+    };
+}
+
+inline void from_json(const nlohmann::json& j, Screenshot& s) {
+    j.at("id").get_to(s.id);
+    j.at("filename").get_to(s.filename);
+    j.at("filepath").get_to(s.filepath);
+    s.width = j.value("width", 0);
+    s.height = j.value("height", 0);
+    s.file_size = j.value("file_size", 0);
+    s.metadata = j.value("metadata", "");
+    s.created_at = j.value("created_at", 0);
+    s.updated_at = j.value("updated_at", 0);
+    s.deleted_at = j.value("deleted_at", 0);
+    s.thumbnail_generated = j.value("thumbnail_generated", false);
+    s.photo_time = j.value("photo_time", 0);
+}
+
+inline void to_json(nlohmann::json& j, const Album& a) {
+    j = nlohmann::json{
+        {"id", a.id},
+        {"name", a.name},
+        {"description", a.description},
+        {"cover_screenshot_id", a.cover_screenshot_id.has_value() ? a.cover_screenshot_id.value() : 0},
+        {"created_at", a.created_at},
+        {"updated_at", a.updated_at},
+        {"deleted_at", a.deleted_at.has_value() ? a.deleted_at.value() : 0}
+    };
+}
+
+inline void from_json(const nlohmann::json& j, Album& a) {
+    j.at("id").get_to(a.id);
+    j.at("name").get_to(a.name);
+    a.description = j.value("description", "");
+    a.cover_screenshot_id = j.value("cover_screenshot_id", 0);
+    a.created_at = j.value("created_at", 0);
+    a.updated_at = j.value("updated_at", 0);
+    a.deleted_at = j.value("deleted_at", 0);
+}
+
+inline void to_json(nlohmann::json& j, const MonthStats& m) {
+    j = nlohmann::json{
+        {"year", m.year},
+        {"month", m.month},
+        {"count", m.count},
+        {"first_screenshot_id", m.first_screenshot_id}
+    };
+}
+
+inline void from_json(const nlohmann::json& j, MonthStats& m) {
+    j.at("year").get_to(m.year);
+    j.at("month").get_to(m.month);
+    j.at("count").get_to(m.count);
+    j.at("first_screenshot_id").get_to(m.first_screenshot_id);
+} 

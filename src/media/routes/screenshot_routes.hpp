@@ -38,7 +38,23 @@ inline void register_screenshot_routes(uWS::App& app) {
                 limit = std::stoi(*limit_param);
             }
             
-            auto [screenshots, has_more] = screenshot_service.get_screenshots_paginated(last_id, limit);
+            // 检查是否有年月参数
+            auto year_param = Request::GetQueryParam(req, "year");
+            auto month_param = Request::GetQueryParam(req, "month");
+            
+            std::pair<std::vector<Screenshot>, bool> result;
+            
+            if (year_param && month_param) {
+                // 如果有年月参数，使用按月份查询
+                int year = std::stoi(*year_param);
+                int month = std::stoi(*month_param);
+                result = screenshot_service.get_screenshots_by_month(year, month, last_id, limit);
+            } else {
+                // 否则使用普通分页查询
+                result = screenshot_service.get_screenshots_paginated(last_id, limit);
+            }
+            
+            auto [screenshots, has_more] = result;
             
             nlohmann::json response = {
                 {"screenshots", nlohmann::json::array()},
@@ -142,6 +158,17 @@ inline void register_screenshot_routes(uWS::App& app) {
         } catch (const std::exception& e) {
             spdlog::error("Failed to delete screenshot: {}", e.what());
             Response::Error(res, e.what());
+        }
+    });
+
+    // 获取月份统计信息
+    app.get("/api/screenshots/calendar", [&screenshot_service](auto* res, auto* req) {
+        try {
+            auto stats = screenshot_service.get_month_statistics();
+            Response::Success(res, stats);
+        } catch (const std::exception& e) {
+            spdlog::error("Error getting month statistics: {}", e.what());
+            Response::Error(res, "Failed to get month statistics", 500);
         }
     });
 

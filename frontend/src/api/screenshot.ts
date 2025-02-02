@@ -1,43 +1,46 @@
-import axios from 'axios';
-import type { Screenshot, ScreenshotParams, ScreenshotListData, ApiResponse, Album } from '../types/screenshot';
-
-// 创建带基础配置的 axios 实例
-const api = axios.create({
-    baseURL: '/api',
-    timeout: 10000,
-    headers: {
-        'Content-Type': 'application/json'
-    }
-});
+import type { Screenshot, ScreenshotParams, ScreenshotListData, ApiResponse, Album, MonthStats } from '../types/screenshot';
+import { http } from '@/utils/http';
 
 // 截图相关的 API 方法
 export const screenshotAPI = {
     // 获取截图列表（支持无限滚动）
     async getScreenshots(params: ScreenshotParams): Promise<ScreenshotListData> {
-        const response = await api.get<ApiResponse<ScreenshotListData>>('/screenshots', { params });
+        const response = await http.get<ApiResponse<ScreenshotListData>>('/screenshots', { params });
         return response.data.data;
     },
 
     // 通过 ID 获取单个截图
     async getScreenshot(id: number): Promise<Screenshot> {
-        const response = await api.get<ApiResponse<Screenshot>>(`/screenshots/${id}`);
+        const response = await http.get<ApiResponse<Screenshot>>(`/screenshots/${id}`);
         return response.data.data;
     },
 
     // 获取相册中的所有截图
     async getAlbumScreenshots(albumId: number): Promise<Screenshot[]> {
-        const response = await api.get<ApiResponse<Screenshot[]>>(`/albums/${albumId}/screenshots`);
+        const response = await http.get<ApiResponse<Screenshot[]>>(`/albums/${albumId}/screenshots`);
         return response.data.data;
     },
 
     // 更新截图信息
     async updateScreenshot(id: number, data: Partial<Screenshot>): Promise<Screenshot> {
-        const response = await api.put<ApiResponse<Screenshot>>(`/screenshots/${id}`, data);
+        const response = await http.put<ApiResponse<Screenshot>>(`/screenshots/${id}`, data);
         return response.data.data;
     },
 
     // 删除截图
     async deleteScreenshot(id: number): Promise<void> {
-        await api.delete(`/screenshots/${id}`);
+        await http.delete(`/screenshots/${id}`);
+    },
+
+    // 获取月份统计信息
+    async getMonthStatistics(): Promise<MonthStats[]> {
+        const response = await http.get<ApiResponse<MonthStats[]>>('/screenshots/calendar');
+        return response.data.data;
+    },
+
+    // 获取指定月份的照片
+    async getScreenshotsByMonth(params: { year: number; month: number; lastId?: number; limit?: number }): Promise<ScreenshotListData> {
+        const response = await http.get<ApiResponse<ScreenshotListData>>('/screenshots', { params });
+        return response.data.data;
     }
 }; 

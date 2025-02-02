@@ -3,10 +3,15 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { NSpace, NButton, NIcon } from 'naive-ui'
 import { GridOutline, ListOutline } from '@vicons/ionicons5'
 import ScreenshotGallery from '@/components/screenshot/ScreenshotGallery.vue'
-import { useScreenshotStore } from '@/stores/screenshot'
+import { useScreenshotListStore } from '@/stores/screenshot-list'
+
+const props = defineProps<{
+  year?: string;
+  month?: string;
+}>();
 
 const viewMode = ref<'grid' | 'list'>('grid')
-const screenshotStore = useScreenshotStore()
+const listStore = useScreenshotListStore()
 const browserContentRef = ref<HTMLElement | null>(null)
 
 // 检测滚动位置并触发加载更多
@@ -14,26 +19,10 @@ const handleScroll = () => {
   const container = browserContentRef.value;
   if (!container) return;
 
-  // 如果正在加载或没有更多内容，则不触发
-  if (screenshotStore.loading || screenshotStore.reachedEnd) {
-    console.log('跳过加载 - loading:', screenshotStore.loading, 'reachedEnd:', screenshotStore.reachedEnd);
-    return;
-  }
-
   const scrollBottom = container.scrollTop + container.clientHeight;
   const threshold = container.scrollHeight - 800; // 距离底部800px时加载更多
 
-  console.log('滚动指标:', {
-    scrollTop: container.scrollTop,
-    clientHeight: container.clientHeight,
-    scrollHeight: container.scrollHeight,
-    scrollBottom,
-    threshold,
-    diff: threshold - scrollBottom
-  });
-
   if (scrollBottom > threshold) {
-    console.log('触发加载更多');
     handleLoadMore();
   }
 };
@@ -54,26 +43,28 @@ onUnmounted(() => {
 
 // 处理加载更多的事件
 const handleLoadMore = () => {
-  console.log('loadMore triggered, store state:', {
-    loading: screenshotStore.loading,
-    reachedEnd: screenshotStore.reachedEnd,
-    screenshotsCount: screenshotStore.screenshots.length
-  });
-  screenshotStore.loadMoreScreenshots()
-}
+  if (props.year && props.month) {
+    console.log('Loading screenshots for month:', props.year, props.month);
+    listStore.loadByMonth(parseInt(props.year), parseInt(props.month));
+  } else {
+    console.log('Loading more screenshots');
+    listStore.loadMore();
+  }
+};
 
-// 监听 reachedEnd 的变化
-watch(() => screenshotStore.reachedEnd, (newVal) => {
-  console.log('reachedEnd changed:', newVal);
-});
-
-// 初始加载
-console.log('initial load, store state:', {
-  loading: screenshotStore.loading,
-  reachedEnd: screenshotStore.reachedEnd,
-  screenshotsCount: screenshotStore.screenshots.length
-});
-screenshotStore.loadMoreScreenshots()
+// 监听路由参数变化
+watch(
+  () => [props.year, props.month],
+  () => {
+    listStore.reset();
+    if (props.year && props.month) {
+      listStore.loadByMonth(parseInt(props.year), parseInt(props.month), true);
+    } else {
+      listStore.loadMore();
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -110,9 +101,9 @@ screenshotStore.loadMoreScreenshots()
     >
       <screenshot-gallery
         v-if="viewMode === 'grid'"
-        :screenshots="screenshotStore.screenshots"
-        :loading="screenshotStore.loading"
-        :has-more="!screenshotStore.reachedEnd"
+        :screenshots="listStore.screenshots"
+        :loading="listStore.loading"
+        :has-more="listStore.hasMore"
         @load-more="handleLoadMore"
       />
       <!-- 列表视图将在后续实现 -->

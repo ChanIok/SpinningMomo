@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { Screenshot } from '../types/screenshot';
+import type { Screenshot, MonthStats } from '../types/screenshot';
 import { screenshotAPI } from '../api/screenshot';
+import { http } from '@/utils/http';
 
 export const useScreenshotStore = defineStore('screenshot', () => {
     // State
@@ -10,6 +11,8 @@ export const useScreenshotStore = defineStore('screenshot', () => {
     const loading = ref(false);
     const reachedEnd = ref(false);
     const lastId = ref<number | null>(null);
+    const months = ref<MonthStats[]>([]);
+    const hasMore = ref(false);
     
     // 配置
     const batchSize = 50;
@@ -87,6 +90,51 @@ export const useScreenshotStore = defineStore('screenshot', () => {
         loading.value = false;
         reachedEnd.value = false;
         lastId.value = null;
+        months.value = [];
+        hasMore.value = false;
+    }
+
+    // 获取月份统计信息
+    async function fetchMonthStatistics(): Promise<MonthStats[]> {
+        const response = await http.get<MonthStats[]>('/api/screenshots/calendar');
+        // 获取每个月份的第一张照片信息
+        for (const month of response.data) {
+            const screenshot = await fetchScreenshot(month.first_screenshot_id);
+            month.firstScreenshot = screenshot;
+        }
+        months.value = response.data;
+        return response.data;
+    }
+
+    // 获取指定月份的照片
+    async function fetchScreenshotsByMonth(year: number, month: number, reset = false) {
+        if (reset) {
+            screenshots.value = [];
+            lastId.value = 0;
+            hasMore.value = true;
+        }
+
+        if (!hasMore.value || loading.value) return;
+
+        loading.value = true;
+        try {
+            const response = await http.get<{items: Screenshot[], hasMore: boolean}>('/api/screenshots', {
+                params: {
+                    year,
+                    month,
+                    lastId: lastId.value,
+                    limit: 20
+                }
+            });
+
+            screenshots.value.push(...response.data.items);
+            hasMore.value = response.data.hasMore;
+            if (response.data.items.length > 0) {
+                lastId.value = response.data.items[response.data.items.length - 1].id;
+            }
+        } finally {
+            loading.value = false;
+        }
     }
 
     return {
@@ -95,6 +143,8 @@ export const useScreenshotStore = defineStore('screenshot', () => {
         currentScreenshot,
         loading,
         reachedEnd,
+        months,
+        hasMore,
         
         // Getters
         hasScreenshots,
@@ -103,6 +153,8 @@ export const useScreenshotStore = defineStore('screenshot', () => {
         loadMoreScreenshots,
         fetchScreenshot,
         deleteScreenshot,
-        reset
+        reset,
+        fetchMonthStatistics,
+        fetchScreenshotsByMonth
     };
 }); 

@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <fstream>
 #include <algorithm>
+#include "core/win_config.hpp"
 
 ScreenshotService& ScreenshotService::get_instance() {
     static ScreenshotService instance;
@@ -36,19 +37,83 @@ Screenshot ScreenshotService::create_screenshot(const std::string& filepath) {
     return screenshot;
 }
 
+std::optional<int64_t> ScreenshotService::parse_photo_time_from_filename(const std::string& filename) {
+    // 分割文件名 2024_12_05_23_50_29_6626579.jpeg
+    std::vector<std::string> parts;
+    size_t start = 0;
+    size_t end = filename.find('_');
+    
+    while (end != std::string::npos) {
+        parts.push_back(filename.substr(start, end - start));
+        start = end + 1;
+        end = filename.find('_', start);
+    }
+    
+    // 如果格式不正确，返回空
+    if (parts.size() < 6) {
+        return std::nullopt;
+    }
+    
+    try {
+        // 解析时间组件
+        struct tm timeinfo = {};
+        timeinfo.tm_year = std::stoi(parts[0]) - 1900;  // 年份需要减去1900
+        timeinfo.tm_mon = std::stoi(parts[1]) - 1;      // 月份从0开始
+        timeinfo.tm_mday = std::stoi(parts[2]);
+        timeinfo.tm_hour = std::stoi(parts[3]);
+        timeinfo.tm_min = std::stoi(parts[4]);
+        timeinfo.tm_sec = std::stoi(parts[5]);
+        
+        // 转换为时间戳
+        return std::mktime(&timeinfo);
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
 Screenshot ScreenshotService::create_from_file(const std::filesystem::path& filepath) {
     Screenshot screenshot;
     // 确保使用UTF-8编码存储路径
     screenshot.filepath = wide_to_utf8(filepath.wstring());
     screenshot.filename = wide_to_utf8(filepath.filename().wstring());
     
-    // 获取文件时间并转换为Unix时间戳
-    auto last_write_time = std::filesystem::last_write_time(filepath);
-    auto timestamp = TimeUtils::file_time_to_timestamp(last_write_time);
+    // 获取文件创建时间
+    HANDLE hFile = CreateFileW(
+        filepath.c_str(),
+        GENERIC_READ,
+        FILE_SHARE_READ,
+        NULL,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
     
-    screenshot.created_at = timestamp;
-    screenshot.updated_at = timestamp;
+    if (hFile == INVALID_HANDLE_VALUE) {
+        throw std::runtime_error("Failed to open file: " + screenshot.filepath);
+    }
+    
+    FILETIME creationTime, lastAccessTime, lastWriteTime;
+    if (!GetFileTime(hFile, &creationTime, &lastAccessTime, &lastWriteTime)) {
+        CloseHandle(hFile);
+        throw std::runtime_error("Failed to get file times: " + screenshot.filepath);
+    }
+    CloseHandle(hFile);
+    
+    // 转换FILETIME到Unix时间戳
+    ULARGE_INTEGER uli;
+    uli.LowPart = creationTime.dwLowDateTime;
+    uli.HighPart = creationTime.dwHighDateTime;
+    // 从1601年到1970年的时间差（单位：100纳秒）
+    const uint64_t EPOCH_DIFFERENCE = 116444736000000000ULL;
+    // 转换为Unix时间戳（秒）
+    uint64_t timestamp = (uli.QuadPart - EPOCH_DIFFERENCE) / 10000000ULL;
+    
+    screenshot.created_at = static_cast<int64_t>(timestamp);
+    screenshot.updated_at = TimeUtils::now();
     screenshot.file_size = std::filesystem::file_size(filepath);
+    
+    // 从文件名解析照片时间
+    screenshot.photo_time = parse_photo_time_from_filename(screenshot.filename);
     
     // 使用WIC读取图片信息
     auto source = ImageProcessor::LoadFromFile(filepath);
@@ -151,7 +216,7 @@ std::pair<std::vector<char>, std::string> ScreenshotService::read_raw_image(cons
 }
 
 nlohmann::json ScreenshotService::get_screenshot_with_thumbnail(const Screenshot& screenshot) {
-    auto screenshot_json = screenshot.to_json();
+    nlohmann::json screenshot_json = screenshot;
     
     // 添加缩略图URL
     if (ThumbnailService::get_instance().thumbnail_exists(screenshot)) {
@@ -160,4 +225,12 @@ nlohmann::json ScreenshotService::get_screenshot_with_thumbnail(const Screenshot
     }
     
     return screenshot_json;
+}
+
+std::vector<MonthStats> ScreenshotService::get_month_statistics() {
+    return repository_.get_month_statistics();
+}
+
+std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_by_month(int year, int month, int64_t last_id, int limit) {
+    return repository_.find_by_month(year, month, last_id, limit);
 } 

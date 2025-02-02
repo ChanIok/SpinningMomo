@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <utility>
 #include <nlohmann/json.hpp>
+#include <optional>
 
 // 截图服务类 - 处理业务逻辑
 class ScreenshotService {
@@ -28,6 +29,12 @@ public:
 
     // 获取指定目录下的截图
     std::vector<Screenshot> get_screenshots_by_directory(const std::wstring& directory);
+
+    // 获取月份统计信息
+    std::vector<MonthStats> get_month_statistics();
+    
+    // 获取指定月份的照片
+    std::pair<std::vector<Screenshot>, bool> get_screenshots_by_month(int year, int month, int64_t last_id, int limit);
 
     // 获取单个截图
     Screenshot get_screenshot(int64_t id);
@@ -57,6 +64,9 @@ private:
 
     // 从文件中读取图片信息
     void read_image_info(const std::string& filepath, Screenshot& screenshot);
+
+    // 从文件名解析照片时间
+    std::optional<int64_t> parse_photo_time_from_filename(const std::string& filename);
 
     // 数据访问层
     ScreenshotRepository& repository_ = ScreenshotRepository::get_instance();

@@ -1,4 +1,6 @@
 #include "initialization_service.hpp"
+#include "screenshot_service.hpp"
+#include "media/utils/string_utils.hpp"
 #include <spdlog/spdlog.h>
 #include <filesystem>
 #include <vector>
@@ -136,7 +138,9 @@ void InitializationService::cleanup_invalid_data() {
     int removed_count = 0;
     
     for (auto& screenshot : screenshots) {
-        if (!std::filesystem::exists(screenshot.filepath)) {
+        // 将 UTF-8 路径转换为宽字符路径再检查文件是否存在
+        std::wstring wpath = utf8_to_wide(screenshot.filepath);
+        if (!std::filesystem::exists(wpath)) {
             if (screenshot_repository_.remove(screenshot.id)) {
                 removed_count++;
                 spdlog::debug("Removed invalid screenshot record: {}", screenshot.filename);

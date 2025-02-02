@@ -50,6 +50,7 @@ void Database::init(const std::string& db_path) {
             file_size INTEGER NOT NULL,       -- 文件大小(bytes)
             metadata TEXT,                    -- 元数据(JSON格式)
             thumbnail_generated INTEGER DEFAULT 0,  -- 缩略图是否已生成
+            photo_time INTEGER,               -- 照片拍摄时间（从文件名解析）
             deleted_at DATETIME,              -- 软删除时间
             updated_at DATETIME NOT NULL      -- 更新时间
         );

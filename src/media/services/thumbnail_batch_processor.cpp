@@ -133,7 +133,9 @@ bool ThumbnailBatchProcessor::process_single(const Screenshot& screenshot) {
         
         // 加载原图
         auto source = ImageProcessor::LoadFromFile(wide_path);
-        if (!source) return false;
+        if (!source) {
+            return false;
+        }
         
         // 获取原图尺寸
         UINT width = 0, height = 0;
@@ -150,7 +152,9 @@ bool ThumbnailBatchProcessor::process_single(const Screenshot& screenshot) {
             480,
             WICBitmapInterpolationModeHighQualityCubic
         );
-        if (!resized) return false;
+        if (!resized) {
+            return false;
+        }
         
         // 获取缩略图路径
         auto& thumbnail_service = ThumbnailService::get_instance();
@@ -165,8 +169,7 @@ bool ThumbnailBatchProcessor::process_single(const Screenshot& screenshot) {
         }
         
         // 更新数据库状态
-        mutable_screenshot.thumbnail_generated = true;
-        return repository_.save(mutable_screenshot);
+        return repository_.update_thumbnail_generated(screenshot.id, true);
         
     } catch (const std::exception& e) {
         spdlog::error("Error processing thumbnail for {}: {}", screenshot.filename, e.what());
