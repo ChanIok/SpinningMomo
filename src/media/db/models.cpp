@@ -7,6 +7,8 @@
 #include "media/utils/logger.hpp"
 #include "core/image_processor.hpp"
 #include "media/utils/time_utils.hpp"
+#include "win_config.hpp"
+#include "media/utils/string_utils.hpp"
 
 // 数据库操作辅助函数
 namespace {
@@ -271,7 +273,7 @@ std::vector<Screenshot> Screenshot::find_by_directory(const std::wstring& dir_pa
                             screenshots.push_back(screenshot);
                         }
                     } catch (const std::exception& e) {
-                        spdlog::error("Error processing file {}: {}", entry.path().string(), e.what());
+                        spdlog::error("Error processing file {}: {}", wide_to_utf8(entry.path().wstring()), e.what());
                     }
                 }
             }
@@ -328,8 +330,9 @@ bool Screenshot::has_more(const std::wstring& dir_path, int64_t last_id) {
 Screenshot Screenshot::from_file(const std::filesystem::path& file_path) {
     Screenshot screenshot;
     try {
-        screenshot.filepath = file_path.string();
-        screenshot.filename = file_path.filename().string();
+        // 确保使用UTF-8编码存储路径
+        screenshot.filepath = wide_to_utf8(file_path.wstring());
+        screenshot.filename = wide_to_utf8(file_path.filename().wstring());
         
         // 获取文件时间并转换为Unix时间戳
         auto last_write_time = std::filesystem::last_write_time(file_path);
@@ -343,7 +346,7 @@ Screenshot Screenshot::from_file(const std::filesystem::path& file_path) {
         // 使用WIC读取图片信息
         auto source = ImageProcessor::LoadFromFile(file_path);
         if (!source) {
-            throw std::runtime_error("无法读取图片: " + file_path.string());
+            throw std::runtime_error("无法读取图片: " + screenshot.filepath);
         }
         
         // 获取图片尺寸
@@ -354,7 +357,7 @@ Screenshot Screenshot::from_file(const std::filesystem::path& file_path) {
         screenshot.thumbnail_generated = false;
         
     } catch (const std::exception& e) {
-        spdlog::error("Error creating screenshot from file {}: {}", file_path.string(), e.what());
+        spdlog::error("Error creating screenshot from file {}: {}", wide_to_utf8(file_path.wstring()), e.what());
         throw;
     }
     

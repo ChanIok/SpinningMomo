@@ -1,6 +1,7 @@
 #include "thumbnail_batch_processor.hpp"
 #include "thumbnail_service.hpp"
 #include <spdlog/spdlog.h>
+#include "media/utils/string_utils.hpp"
 
 // 全局静态指针
 static ThumbnailBatchProcessor* g_instance = nullptr;
@@ -33,25 +34,32 @@ void ThumbnailBatchProcessor::start() {
 
 void ThumbnailBatchProcessor::stop() {
     m_running = false;
-    m_condition.notify_all();
+    // 通知所有等待的线程
+    m_not_empty.notify_all();
+    m_not_full.notify_all();
     
     // 清空线程池 - ThreadRAII 会自动处理线程的 join
     m_workers.clear();
 }
 
 void ThumbnailBatchProcessor::wait() {
-    std::unique_lock<std::mutex> lock(m_queue_mutex);
-    m_condition.wait(lock, [this]() { return m_tasks.empty(); });
+    std::unique_lock<std::mutex> lock(m_mutex);
+    m_not_empty.wait(lock, [this]() { return m_tasks.empty(); });
 }
 
 void ThumbnailBatchProcessor::add_task(const Screenshot& screenshot) {
-    std::unique_lock<std::mutex> lock(m_queue_mutex);
-    if (m_tasks.size() >= QUEUE_SIZE_LIMIT) {
-        spdlog::warn("Thumbnail task queue is full, skipping task");
-        return;
-    }
+    std::unique_lock<std::mutex> lock(m_mutex);
+    
+    // 等待队列有空间
+    m_not_full.wait(lock, [this]() { 
+        return m_tasks.size() < QUEUE_SIZE_LIMIT || !m_running; 
+    });
+    
+    if (!m_running) return;
+    
     m_tasks.push(screenshot);
-    m_condition.notify_one();
+    // 通知一个工作线程
+    m_not_empty.notify_one();
 }
 
 void ThumbnailBatchProcessor::add_tasks(const std::vector<Screenshot>& screenshots) {
@@ -59,29 +67,30 @@ void ThumbnailBatchProcessor::add_tasks(const std::vector<Screenshot>& screensho
         start();  // 确保处理器在运行
     }
     
-    std::unique_lock<std::mutex> lock(m_queue_mutex);
+    std::unique_lock<std::mutex> lock(m_mutex);
     size_t added = 0;
     
     for (const auto& screenshot : screenshots) {
-        // 如果队列已满，等待队列有空间
+        // 等待队列有空间
         while (m_tasks.size() >= QUEUE_SIZE_LIMIT && m_running) {
             spdlog::info("Queue full, waiting for space ({} tasks remaining)...", screenshots.size() - added);
-            m_condition.wait(lock);
+            m_not_full.wait(lock);
         }
         
-        if (!m_running) break;  // 如果处理器已停止，退出循环
+        if (!m_running) break;
         
         m_tasks.push(screenshot);
         added++;
         
-        if (added % 10 == 0) {  // 每添加10个任务通知一次，避免工作线程饥饿
-            m_condition.notify_all();
+        if (added % 10 == 0) {  // 每添加10个任务通知一次，因为有多个工作线程可以并行处理
+            m_not_empty.notify_all();
         }
     }
     
     if (added > 0) {
         spdlog::info("Added {} tasks to thumbnail generation queue", added);
-        m_condition.notify_all();
+        // 批量添加完成后通知所有工作线程
+        m_not_empty.notify_all();
     }
 }
 
@@ -91,10 +100,10 @@ void ThumbnailBatchProcessor::worker_thread() {
     
     while (m_running) {
         {
-            std::unique_lock<std::mutex> lock(m_queue_mutex);
+            std::unique_lock<std::mutex> lock(m_mutex);
             
             // 等待任务或停止信号
-            m_condition.wait(lock, [this]() {
+            m_not_empty.wait(lock, [this]() {
                 return !m_tasks.empty() || !m_running;
             });
             
@@ -104,6 +113,8 @@ void ThumbnailBatchProcessor::worker_thread() {
             while (!m_tasks.empty() && batch.size() < BATCH_SIZE) {
                 batch.push_back(m_tasks.front());
                 m_tasks.pop();
+                // 通知一个生产者线程
+                m_not_full.notify_one();
             }
         }
         
@@ -117,8 +128,11 @@ void ThumbnailBatchProcessor::worker_thread() {
 bool ThumbnailBatchProcessor::process_single(const Screenshot& screenshot) {
     try {
         Screenshot mutable_screenshot = screenshot;  // 创建可修改的副本
+        // 将UTF-8路径转换为宽字符串
+        std::wstring wide_path = utf8_to_wide(screenshot.filepath);
+        
         // 加载原图
-        auto source = ImageProcessor::LoadFromFile(screenshot.filepath);
+        auto source = ImageProcessor::LoadFromFile(wide_path);
         if (!source) return false;
         
         // 获取原图尺寸

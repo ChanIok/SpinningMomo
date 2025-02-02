@@ -11,8 +11,13 @@ void Database::init(const std::string& db_path) {
         return;
     }
     
-    // 打开数据库连接
-    int rc = sqlite3_open(db_path.c_str(), &db_handle_);
+    // 设置SQLite3多线程模式
+    sqlite3_config(SQLITE_CONFIG_SERIALIZED);  // 使用串行化模式，确保线程安全
+    sqlite3_initialize();
+    
+    // 打开数据库连接，使用UTF-8编码
+    int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX;  // 添加FULLMUTEX标志
+    int rc = sqlite3_open_v2(db_path.c_str(), &db_handle_, flags, nullptr);
     if (rc != SQLITE_OK) {
         std::string error_msg = sqlite3_errmsg(db_handle_);
         sqlite3_close(db_handle_);
@@ -22,6 +27,15 @@ void Database::init(const std::string& db_path) {
     
     // 启用外键约束
     execute("PRAGMA foreign_keys = ON;");
+    
+    // 设置数据库编码为UTF-8
+    execute("PRAGMA encoding = 'UTF-8';");
+    
+    // 设置日志模式为WAL（Write-Ahead Logging），提高并发性能
+    execute("PRAGMA journal_mode = WAL;");
+    
+    // 设置同步模式，在多线程环境下保持安全的同时优化性能
+    execute("PRAGMA synchronous = NORMAL;");
     
     // 创建数据表（如果不存在）
     execute(R"(

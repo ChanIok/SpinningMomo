@@ -4,6 +4,7 @@
 #include "media/db/database.hpp"
 #include "core/image_processor.hpp"
 #include "thumbnail_batch_processor.hpp"
+#include "media/utils/string_utils.hpp"
 
 ThumbnailService& ThumbnailService::get_instance() {
     static ThumbnailService instance;
@@ -15,8 +16,11 @@ bool ThumbnailService::generate_thumbnail(const Screenshot& screenshot) {
         spdlog::info("Adding thumbnail generation task for: {}", screenshot.filename);
         ensure_thumbnail_dir();
         
+        // 将UTF-8路径转换为宽字符串
+        std::wstring wide_path = utf8_to_wide(screenshot.filepath);
+        
         // 检查源文件是否存在
-        if (!std::filesystem::exists(screenshot.filepath)) {
+        if (!std::filesystem::exists(wide_path)) {
             spdlog::error("Source file does not exist: {}", screenshot.filepath);
             return false;
         }
@@ -27,6 +31,29 @@ bool ThumbnailService::generate_thumbnail(const Screenshot& screenshot) {
         
     } catch (const std::exception& e) {
         spdlog::error("Failed to generate thumbnail: {}", e.what());
+        return false;
+    }
+}
+
+bool ThumbnailService::generate_thumbnails(const std::vector<Screenshot>& screenshots) {
+    try {
+        ensure_thumbnail_dir();
+        
+        // 检查所有源文件是否存在
+        for (const auto& screenshot : screenshots) {
+            std::wstring wide_path = utf8_to_wide(screenshot.filepath);
+            if (!std::filesystem::exists(wide_path)) {
+                spdlog::error("Source file does not exist: {}", screenshot.filepath);
+                return false;
+            }
+        }
+        
+        // 批量添加到处理队列
+        ThumbnailBatchProcessor::get_instance().add_tasks(screenshots);
+        return true;
+        
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to generate thumbnails in batch: {}", e.what());
         return false;
     }
 }

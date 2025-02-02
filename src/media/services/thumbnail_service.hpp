@@ -12,6 +12,9 @@ public:
     // 生成缩略图
     bool generate_thumbnail(const Screenshot& screenshot);
     
+    // 批量生成缩略图
+    bool generate_thumbnails(const std::vector<Screenshot>& screenshots);
+    
     // 获取缩略图路径
     std::filesystem::path get_thumbnail_path(const Screenshot& screenshot) const;
     

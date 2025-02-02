@@ -49,8 +49,11 @@ private:
     
     // 任务队列
     std::queue<Screenshot> m_tasks;
-    std::mutex m_queue_mutex;
-    std::condition_variable m_condition;
+    std::mutex m_mutex;
+    
+    // 分离的条件变量
+    std::condition_variable m_not_full;     // 用于通知队列有空间
+    std::condition_variable m_not_empty;    // 用于通知队列有任务
     
     // 控制标志
     std::atomic<bool> m_running{false};

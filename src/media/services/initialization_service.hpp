@@ -22,7 +22,7 @@ public:
 private:
     InitializationService() {
         // 在构造函数中设置默认路径
-        screenshot_directory_ = LR"(D:\Program Files\InfinityNikki Launcher\InfinityNikki\X6Game\ScreenShot)";
+        screenshot_directory_ = LR"(D:\工程\2024\游戏\InfinityNikki\NikkiPhotos_HighQuality)";
     }
     ~InitializationService() = default;
     
