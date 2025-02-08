@@ -28,6 +28,7 @@ public:
 
     // 相册-截图关联操作
     bool add_screenshot_to_album(int64_t album_id, int64_t screenshot_id);
+    bool add_screenshots_to_album(int64_t album_id, const std::vector<int64_t>& screenshot_ids);
     bool remove_screenshot_from_album(int64_t album_id, int64_t screenshot_id);
     std::vector<Screenshot> get_album_screenshots(int64_t album_id);
     bool set_album_cover(int64_t album_id, int64_t screenshot_id);

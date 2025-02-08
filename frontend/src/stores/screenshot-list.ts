@@ -2,13 +2,15 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Screenshot } from '@/types/screenshot';
 import { screenshotAPI } from '@/api/screenshot';
+import { albumAPI } from '@/api/album';
 
 export const useScreenshotListStore = defineStore('screenshotList', () => {
     // State
     const screenshots = ref<Screenshot[]>([]);
     const loading = ref(false);
     const hasMore = ref(true);
-    const lastId = ref<number | undefined>(undefined);
+    const lastId = ref<number | null>(null);
+    const currentAlbumId = ref<number | null>(null);
     const error = ref<string | null>(null);
     
     // 配置
@@ -25,17 +27,14 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
         error.value = null;
 
         try {
-            const response = await screenshotAPI.getScreenshots({
-                lastId: lastId.value,
-                limit: batchSize
-            });
+            const response = await screenshotAPI.getScreenshots(lastId.value);
             
             if (response.screenshots.length > 0) {
                 screenshots.value.push(...response.screenshots);
-                lastId.value = response.screenshots[response.screenshots.length - 1].id;
+                lastId.value = screenshots.value[screenshots.value.length - 1].id;
             }
 
-            hasMore.value = response.hasMore;
+            hasMore.value = response.screenshots.length === 0;
         } catch (e) {
             error.value = e instanceof Error ? e.message : 'Failed to load screenshots';
             console.error('Failed to load screenshots:', e);
@@ -49,7 +48,7 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
 
         if (reset) {
             screenshots.value = [];
-            lastId.value = undefined;
+            lastId.value = null;
             hasMore.value = true;
         }
 
@@ -66,10 +65,10 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
 
             if (response.screenshots.length > 0) {
                 screenshots.value.push(...response.screenshots);
-                lastId.value = response.screenshots[response.screenshots.length - 1].id;
+                lastId.value = screenshots.value[screenshots.value.length - 1].id;
             }
 
-            hasMore.value = response.hasMore;
+            hasMore.value = response.screenshots.length === 0;
         } catch (e) {
             error.value = e instanceof Error ? e.message : 'Failed to load screenshots';
             console.error('Failed to load screenshots:', e);
@@ -82,8 +81,34 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
         screenshots.value = [];
         loading.value = false;
         hasMore.value = true;
-        lastId.value = undefined;
+        lastId.value = null;
+        currentAlbumId.value = null;
         error.value = null;
+    }
+
+    async function loadAlbumPhotos(albumId: number, reset = false) {
+        if (loading.value || (!hasMore.value && !reset)) return;
+
+        if (reset || currentAlbumId.value !== albumId) {
+            screenshots.value = [];
+            lastId.value = null;
+            hasMore.value = true;
+            currentAlbumId.value = albumId;
+        }
+
+        loading.value = true;
+        error.value = null;
+
+        try {
+            const photos = await albumAPI.getAlbumScreenshots(albumId);
+            screenshots.value = photos;
+            hasMore.value = false; // 相册照片暂时不支持分页
+        } catch (e) {
+            error.value = e instanceof Error ? e.message : 'Failed to load album screenshots';
+            console.error('Failed to load album screenshots:', e);
+        } finally {
+            loading.value = false;
+        }
     }
 
     return {
@@ -99,6 +124,7 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
         // Actions
         loadMore,
         loadByMonth,
-        reset
+        reset,
+        loadAlbumPhotos
     };
 }); 

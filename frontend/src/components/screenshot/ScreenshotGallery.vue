@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Screenshot } from '@/types/screenshot';
-import { NImage, NEllipsis } from 'naive-ui';
+import { NImage, NEllipsis, NButton, NIcon, useMessage, NSpace, NTooltip } from 'naive-ui';
+import { CheckmarkCircle, RadioButtonOff, Close, Albums } from '@vicons/ionicons5'
 import ScreenshotPreview from './ScreenshotPreview.vue';
+import { useSelectionStore } from '@/stores/screenshot-selection'
+import AlbumSelectionDialog from '../album/AlbumSelectionDialog.vue'
+import { albumAPI } from '@/api/album'
 
 // 布局配置常量
 const BASE_HEIGHT = 320;        // 基准行高
@@ -40,11 +44,34 @@ const emit = defineEmits<{
 const showPreview = ref(false);
 const previewIndex = ref(0);
 
-// 处理图片点击事件
+// 选择相关的状态
+const selectionStore = useSelectionStore()
+const showAlbumDialog = ref(false)
+const message = useMessage()
+
+// 处理照片点击
 const handleImageClick = (index: number) => {
-  previewIndex.value = index;
-  showPreview.value = true;
-};
+  const screenshot = props.screenshots[index]
+  if (selectionStore.isSelectionMode) {
+    selectionStore.toggleSelection(screenshot.id)
+  } else {
+    previewIndex.value = index
+    showPreview.value = true
+  }
+}
+
+// 处理添加到相册
+async function handleAddToAlbum(albumId: number) {
+  try {
+    const selectedIds = Array.from(selectionStore.selectedIds)
+    await albumAPI.addScreenshots(albumId, selectedIds)
+    message.success('已成功添加到相册')
+    selectionStore.exitSelectionMode()
+  } catch (error) {
+    console.error('Failed to add to album:', error)
+    message.error('添加到相册失败')
+  }
+}
 
 // 监听并更新容器宽度
 const updateContainerWidth = () => {
@@ -193,6 +220,15 @@ function formatFileSize(bytes: number): string {
   
   return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
+
+// 处理选择按钮点击
+const handleSelectButtonClick = (screenshot: Screenshot, event: Event) => {
+  event.stopPropagation() // 阻止事件冒泡
+  if (!selectionStore.isSelectionMode) {
+    selectionStore.enterSelectionMode()
+  }
+  selectionStore.toggleSelection(screenshot.id)
+}
 </script>
 
 <template>
@@ -201,6 +237,14 @@ function formatFileSize(bytes: number): string {
     ref="containerRef"
     :style="{ height: layout.totalHeight + 'px' }"
   >
+    <!-- 相册选择弹窗 -->
+    <album-selection-dialog
+      :show="showAlbumDialog"
+      :selected-count="selectionStore.selectedCount"
+      @update:show="showAlbumDialog = $event"
+      @select="handleAddToAlbum"
+    />
+
     <!-- 预览组件 -->
     <screenshot-preview
       v-model="showPreview"
@@ -208,6 +252,33 @@ function formatFileSize(bytes: number): string {
       :screenshots="props.screenshots"
       :initial-index="previewIndex"
     />
+
+    <!-- 多选模式下的底部工具栏 -->
+    <div
+      v-if="selectionStore.isSelectionMode"
+      class="selection-toolbar"
+    >
+      <n-space justify="space-between" align="center">
+        <span>已选择 {{ selectionStore.selectedCount }} 项</span>
+        <n-space>
+          <n-button @click="selectionStore.exitSelectionMode" secondary circle>
+            <template #icon>
+              <n-icon><Close /></n-icon>
+            </template>
+          </n-button>
+          <n-button
+            type="primary"
+            :disabled="selectionStore.selectedCount === 0"
+            @click="showAlbumDialog = true"
+          >
+            <template #icon>
+              <n-icon><Albums /></n-icon>
+            </template>
+            添加到相册
+          </n-button>
+        </n-space>
+      </n-space>
+    </div>
 
     <!-- 行容器 -->
     <div
@@ -224,6 +295,7 @@ function formatFileSize(bytes: number): string {
         v-for="(item, itemIndex) in row.items"
         :key="item.screenshot.id"
         class="gallery-item"
+        :class="{ 'is-selected': selectionStore.isSelected(item.screenshot.id) }"
         :style="{
           width: `${item.width}px`,
           height: `${item.height}px`,
@@ -231,6 +303,26 @@ function formatFileSize(bytes: number): string {
         }"
         @click="handleImageClick(props.screenshots.indexOf(item.screenshot))"
       >
+        <!-- 选择按钮 -->
+        <n-tooltip trigger="hover">
+          <template #trigger>
+            <div
+              class="selection-button"
+              :class="{ 
+                'is-visible': selectionStore.isSelectionMode,
+                'is-selected': selectionStore.isSelected(item.screenshot.id)
+              }"
+              @click="handleSelectButtonClick(item.screenshot, $event)"
+            >
+              <n-icon size="22">
+                <CheckmarkCircle v-if="selectionStore.isSelected(item.screenshot.id)" />
+                <RadioButtonOff v-else />
+              </n-icon>
+            </div>
+          </template>
+          {{ selectionStore.isSelectionMode ? '选择/取消选择' : '开始选择' }}
+        </n-tooltip>
+
         <!-- 图片 -->
         <n-image
           :src="item.screenshot.thumbnailPath"
@@ -326,6 +418,75 @@ function formatFileSize(bytes: number): string {
   display: flex;
   gap: 8px;
   font-size: 0.8em;
+  opacity: 0.9;
+}
+
+.selection-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 12px 16px;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.selection-button {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  opacity: 0;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #8a8a8a;
+}
+
+.selection-button:hover {
+  background: white;
+  transform: scale(1.1);
+  color: var(--primary-color);
+}
+
+.selection-button.is-selected {
+  color: var(--primary-color);
+  background: white;
+}
+
+.gallery-item:hover .selection-button {
+  opacity: 1;
+}
+
+.selection-button.is-visible {
+  opacity: 1;
+}
+
+.gallery-item.is-selected {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+.gallery-item.is-selected .gallery-image {
   opacity: 0.9;
 }
 </style> 

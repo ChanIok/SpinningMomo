@@ -18,6 +18,7 @@ import {
 
 const router = useRouter()
 const activeKey = ref<string | null>(null)
+const collapsed = ref(false)
 
 function renderIcon(icon: any) {
   return () => h(NIcon, null, { default: () => h(icon) })
@@ -65,18 +66,18 @@ function handleMenuSelect(key: string) {
   <n-layout-sider
     bordered
     collapse-mode="width"
-    :collapsed-width="0"
-    :width="256"
+    :collapsed-width="64"
+    :width="240"
     show-trigger
     class="app-sidebar"
+    @collapse="collapsed = true"
+    @expand="collapsed = false"
   >
-    <div class="sidebar-header">
-      <h1 class="app-title">Spinning Momo</h1>
-    </div>
     <n-menu
       v-model:value="activeKey"
       :options="menuOptions"
-      :collapsed-width="0"
+      :collapsed="collapsed"
+      :collapsed-width="64"
       :collapsed-icon-size="22"
       @update:value="handleMenuSelect"
     />

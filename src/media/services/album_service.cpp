@@ -84,6 +84,25 @@ bool AlbumService::set_album_cover(int64_t album_id, int64_t screenshot_id) {
     return repository_.save(album);
 }
 
+bool AlbumService::add_screenshots_to_album(int64_t album_id, const std::vector<int64_t>& screenshot_ids) {
+    Album album = repository_.find_by_id(album_id);
+    if (album.id == 0) {
+        return false;
+    }
+    
+    int position = get_last_position(album_id);
+    bool success = true;
+    
+    for (const auto& screenshot_id : screenshot_ids) {
+        if (!repository_.add_screenshot(album_id, screenshot_id, ++position)) {
+            success = false;
+            break;
+        }
+    }
+    
+    return success;
+}
+
 int AlbumService::get_last_position(int64_t album_id) {
     sqlite3* db = Database::get_instance().get_handle();
     const char* sql = R"(

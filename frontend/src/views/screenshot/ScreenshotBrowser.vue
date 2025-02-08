@@ -8,7 +8,17 @@ import { useScreenshotListStore } from '@/stores/screenshot-list'
 const props = defineProps<{
   year?: string;
   month?: string;
+  id?: string;  // 修改为id，匹配路由参数
 }>();
+
+// 添加props变化的调试输出
+watch(() => props, (newProps) => {
+  console.log('Props changed:', {
+    year: newProps.year,
+    month: newProps.month,
+    id: newProps.id
+  });
+}, { deep: true, immediate: true });
 
 const viewMode = ref<'grid' | 'list'>('grid')
 const listStore = useScreenshotListStore()
@@ -22,7 +32,7 @@ const handleScroll = () => {
   const scrollBottom = container.scrollTop + container.clientHeight;
   const threshold = container.scrollHeight - 800; // 距离底部800px时加载更多
 
-  if (scrollBottom > threshold) {
+  if (scrollBottom > threshold && !props.id) { // 使用id替代albumId
     handleLoadMore();
   }
 };
@@ -43,7 +53,13 @@ onUnmounted(() => {
 
 // 处理加载更多的事件
 const handleLoadMore = () => {
-  if (props.year && props.month) {
+  if (props.id) {
+    return;
+  } else if (props.year && props.month) {
+    console.log('Loading month data:', {
+      year: props.year,
+      month: props.month
+    });
     listStore.loadByMonth(parseInt(props.year), parseInt(props.month));
   } else {
     listStore.loadMore();
@@ -52,22 +68,39 @@ const handleLoadMore = () => {
 
 // 监听路由参数变化
 watch(
-  () => [props.year, props.month],
-  () => {
+  () => [props.year, props.month, props.id],
+  ([year, month, id]) => {
+    console.log('Route params changed:', { year, month, id });
     listStore.reset();
-    if (props.year && props.month) {
-      listStore.loadByMonth(parseInt(props.year), parseInt(props.month), true);
+    if (id) {
+      console.log('Loading album photos:', id);
+      listStore.loadAlbumPhotos(parseInt(id), true);
+    } else if (year && month) {
+      console.log('Loading month photos:', { year, month });
+      listStore.loadByMonth(parseInt(year), parseInt(month), true);
     } else {
+      console.log('Loading all photos');
       listStore.loadMore();
     }
-  }
+  },
+  { immediate: true }
 );
 
 // 初始加载
 onMounted(() => {
+  console.log('Component mounted with props:', {
+    year: props.year,
+    month: props.month,
+    id: props.id
+  });
   if (props.year && props.month) {
+    console.log('Initial month load:', {
+      year: props.year,
+      month: props.month
+    });
     listStore.loadByMonth(parseInt(props.year), parseInt(props.month), true);
   } else {
+    console.log('Initial default load');
     listStore.loadMore();
   }
 });

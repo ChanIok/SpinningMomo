@@ -31,19 +31,33 @@ inline void register_album_routes(uWS::App& app) {
 
     // POST /api/albums - 创建新相册
     app.post("/api/albums", [&](auto* res, auto* req) {
-        res->onData([res, &album_service](std::string_view body, bool last) {
+        // 使用智能指针来管理 res 的生命周期
+        struct Context {
+            uWS::HttpResponse<false>* response;
+            AlbumService& service;
+        };
+        
+        auto ctx = std::make_shared<Context>(Context{res, album_service});
+        
+        // 设置请求中止处理
+        res->onAborted([ctx]() {
+            spdlog::warn("Request aborted");
+        });
+        
+        // 使用 ctx 替代直接捕获 res 和 album_service
+        res->onData([ctx](std::string_view body, bool last) {
             if (!last) return;
             
             try {
                 auto json = Request::ParseJson(body);
-                auto album = album_service.create_album(
+                auto album = ctx->service.create_album(
                     json["name"].get<std::string>(),
                     json.value("description", "")
                 );
-                Response::Success(res, album);
+                Response::Success(ctx->response, album);
             } catch (const std::exception& e) {
                 spdlog::error("Failed to create album: {}", e.what());
-                Response::Error(res, e.what());
+                Response::Error(ctx->response, e.what());
             }
         });
     });
@@ -96,6 +110,45 @@ inline void register_album_routes(uWS::App& app) {
             }
         } catch (const std::exception& e) {
             spdlog::error("Failed to delete album: {}", e.what());
+            Response::Error(res, e.what());
+        }
+    });
+
+    // POST /api/albums/:id/screenshots - 添加截图到相册
+    app.post("/api/albums/:id/screenshots", [&](auto* res, auto* req) {
+        struct Context {
+            uWS::HttpResponse<false>* response;
+            AlbumService& service;
+            int64_t album_id;
+        };
+        
+        try {
+            auto album_id = std::stoll(Request::GetPathParam(req, 0));
+            auto ctx = std::make_shared<Context>(Context{res, album_service, album_id});
+            
+            res->onAborted([ctx]() {
+                spdlog::warn("Request aborted while adding screenshots to album");
+            });
+            
+            res->onData([ctx](std::string_view body, bool last) {
+                if (!last) return;
+                
+                try {
+                    auto json = Request::ParseJson(body);
+                    auto screenshot_ids = json["screenshot_ids"].get<std::vector<int64_t>>();
+                    
+                    if (ctx->service.add_screenshots_to_album(ctx->album_id, screenshot_ids)) {
+                        Response::Success(ctx->response, nlohmann::json::object());
+                    } else {
+                        Response::Error(ctx->response, "Failed to add screenshots to album", 400);
+                    }
+                } catch (const std::exception& e) {
+                    spdlog::error("Failed to add screenshots to album: {}", e.what());
+                    Response::Error(ctx->response, e.what());
+                }
+            });
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to parse album id: {}", e.what());
             Response::Error(res, e.what());
         }
     });
