@@ -42,3 +42,7 @@ docs/node_modules/
 .Trashes
 ehthumbs.db
 Thumbs.db 
+
+frontend/
+third_party/
+test/

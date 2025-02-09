@@ -51,6 +51,7 @@ public:
     void SetPreviewEnabled(bool enabled);  // 添加设置预览窗口状态的函数
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
+    void Activate();  // 添加激活窗口的方法
 
 private:
     static const TCHAR* MENU_WINDOW_CLASS;  // 只声明

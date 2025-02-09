@@ -500,8 +500,23 @@ public:
             }
 
             case WM_USER + 1: {  // Constants::WM_TRAYICON
-                if (app && (lParam == WM_RBUTTONUP || lParam == WM_LBUTTONUP)) {
-                    app->ShowWindowSelectionMenu();
+                if (app) {
+                    if (lParam == WM_LBUTTONDBLCLK) {
+                        app->HandleTrayIconDblClick();
+                        app->m_lastTrayClickTime = GetTickCount();
+                    } else if (lParam == WM_LBUTTONUP) {
+                        // 获取当前时间
+                        DWORD currentTime = GetTickCount();
+                        // 获取系统双击时间
+                        int doubleClickTime = GetDoubleClickTime();
+                        // 如果与上次点击时间间隔大于双击时间，才处理单击
+                        if (currentTime - app->m_lastTrayClickTime > (DWORD)doubleClickTime) {
+                            app->ShowWindowSelectionMenu();
+                        }
+                        app->m_lastTrayClickTime = currentTime;
+                    } else if (lParam == WM_RBUTTONUP) {
+                        app->ShowWindowSelectionMenu();
+                    }
                 }
                 return 0;
             }
@@ -572,6 +587,16 @@ public:
         return DefWindowProc(hwnd, msg, wParam, lParam);
     }
 
+    void HandleTrayIconDblClick() {
+        if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
+            if (!m_menuWindow->IsVisible()) {
+                m_menuWindow->Show();
+            } else {
+                m_menuWindow->Activate();
+            }
+        }
+    }
+
 private:
     // 窗口和UI组件
     HWND m_hwnd = NULL;
@@ -597,6 +622,9 @@ private:
     // 界面文本
     LocalizedStrings m_strings;
     std::wstring m_language;
+
+    // 记录最后一次托盘图标点击时间
+    DWORD m_lastTrayClickTime = 0;
 
     // 待显示通知队列
     struct PendingNotification {

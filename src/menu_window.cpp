@@ -106,6 +106,19 @@ void MenuWindow::Hide() {
     }
 }
 
+void MenuWindow::Activate() {
+    if (IsWindow(m_hwnd)) {
+        // 如果窗口被最小化，则还原
+        if (IsIconic(m_hwnd)) {
+            ShowWindow(m_hwnd, SW_RESTORE);
+        }
+        // 将窗口置于前台
+        SetForegroundWindow(m_hwnd);
+        // 设置焦点
+        SetFocus(m_hwnd);
+    }
+}
+
 bool MenuWindow::IsVisible() const {
     return m_hwnd && IsWindowVisible(m_hwnd);
 }
