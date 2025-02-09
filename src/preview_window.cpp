@@ -901,14 +901,26 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
 
             if (!isOnViewport) {
                 // 如果点击在视口外，先移动游戏窗口使得点击位置成为屏幕中心
-                float targetX = -(relativeX * gameWidth - screenWidth / 2.0f);
-                float targetY = -(relativeY * gameHeight - screenHeight / 2.0f);
+                // 计算新的游戏窗口位置
+                float targetX, targetY;
+                
+                // 水平方向
+                if (gameWidth <= screenWidth) {
+                    targetX = (screenWidth - gameWidth) / 2;  // 居中
+                } else {
+                    targetX = -(relativeX * gameWidth);       // 拖动位置
+                    targetX = max(targetX, -gameWidth + screenWidth);
+                    targetX = min(targetX, 0.0f);
+                }
 
-                // 限制边界，确保游戏窗口不会超出屏幕太多
-                targetX = max(targetX, -gameWidth + screenWidth);
-                targetX = min(targetX, 0.0f);
-                targetY = max(targetY, -gameHeight + screenHeight);
-                targetY = min(targetY, 0.0f);
+                // 垂直方向
+                if (gameHeight <= screenHeight) {
+                    targetY = (screenHeight - gameHeight) / 2; // 居中
+                } else {
+                    targetY = -(relativeY * gameHeight);      // 拖动位置
+                    targetY = max(targetY, -gameHeight + screenHeight);
+                    targetY = min(targetY, 0.0f);
+                }
 
                 // 移动游戏窗口
                 SetWindowPos(instance->m_gameWindow, nullptr,
@@ -970,14 +982,25 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 float gameHeight = static_cast<float>(instance->m_gameWindowRect.bottom - instance->m_gameWindowRect.top);
 
                 // 计算新的游戏窗口位置
-                float targetX = -(relativeX * gameWidth);
-                float targetY = -(relativeY * gameHeight);
+                float targetX, targetY;
+                
+                // 水平方向
+                if (gameWidth <= screenWidth) {
+                    targetX = (screenWidth - gameWidth) / 2;  // 居中
+                } else {
+                    targetX = -(relativeX * gameWidth);       // 拖动位置
+                    targetX = max(targetX, -gameWidth + screenWidth);
+                    targetX = min(targetX, 0.0f);
+                }
 
-                // 限制边界
-                targetX = max(targetX, -gameWidth + screenWidth);
-                targetX = min(targetX, 0.0f);
-                targetY = max(targetY, -gameHeight + screenHeight);
-                targetY = min(targetY, 0.0f);
+                // 垂直方向
+                if (gameHeight <= screenHeight) {
+                    targetY = (screenHeight - gameHeight) / 2; // 居中
+                } else {
+                    targetY = -(relativeY * gameHeight);      // 拖动位置
+                    targetY = max(targetY, -gameHeight + screenHeight);
+                    targetY = min(targetY, 0.0f);
+                }
 
                 // 移动游戏窗口
                 SetWindowPos(instance->m_gameWindow, nullptr,
