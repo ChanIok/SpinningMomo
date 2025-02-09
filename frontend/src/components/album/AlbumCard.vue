@@ -2,10 +2,14 @@
 import { NImage, NButton, NIcon } from 'naive-ui'
 import { CreateOutline as EditIcon } from '@vicons/ionicons5'
 import type { Album } from '@/types/album'
+import { useAlbumSelectionStore } from '@/stores/album-selection'
+import { CheckmarkCircle, RadioButtonOff } from '@vicons/ionicons5'
 
 const props = defineProps<{
   album: Album
 }>()
+
+const albumSelectionStore = useAlbumSelectionStore()
 
 const emit = defineEmits<{
   (e: 'click'): void
@@ -17,10 +21,43 @@ function handleEditClick(e: Event) {
   e.stopPropagation()
   emit('edit')
 }
+
+// 处理选择按钮点击
+function handleSelectButtonClick(e: Event) {
+  e.stopPropagation()
+  if (!albumSelectionStore.isSelectionMode) {
+    albumSelectionStore.enterSelectionMode()
+  }
+  albumSelectionStore.toggleSelection(props.album.id)
+}
 </script>
 
 <template>
-  <div class="album-card" @click="$emit('click')">
+  <div 
+    class="album-card" 
+    @click="$emit('click')"
+    :class="{ 'is-selected': albumSelectionStore.isSelected(album.id) }"
+  >
+    <!-- 选择按钮 -->
+    <n-tooltip trigger="hover">
+      <template #trigger>
+        <div
+          class="selection-button"
+          :class="{ 
+            'is-visible': albumSelectionStore.isSelectionMode,
+            'is-selected': albumSelectionStore.isSelected(album.id)
+          }"
+          @click="handleSelectButtonClick"
+        >
+          <n-icon size="24">
+            <CheckmarkCircle v-if="albumSelectionStore.isSelected(album.id)" />
+            <RadioButtonOff v-else />
+          </n-icon>
+        </div>
+      </template>
+      {{ albumSelectionStore.isSelectionMode ? '选择/取消选择' : '开始选择' }}
+    </n-tooltip>
+
     <div class="cover-image">
       <n-image
         v-if="album.cover_screenshot_id"
@@ -64,6 +101,7 @@ function handleEditClick(e: Event) {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
 }
 
 .album-card:hover {
@@ -146,5 +184,53 @@ function handleEditClick(e: Event) {
 
 .album-card:hover .edit-button {
   opacity: 1;
+}
+
+.selection-button {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  opacity: 0;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #8a8a8a;
+}
+
+.selection-button:hover {
+  background: white;
+  transform: scale(1.1);
+  color: var(--primary-color);
+}
+
+.selection-button.is-selected {
+  color: var(--primary-color);
+  background: white;
+}
+
+.album-card:hover .selection-button {
+  opacity: 1;
+}
+
+.selection-button.is-visible {
+  opacity: 1;
+}
+
+.album-card.is-selected {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+.album-card.is-selected .cover-image :deep(img) {
+  opacity: 0.9;
 }
 </style> 

@@ -152,4 +152,29 @@ inline void register_album_routes(uWS::App& app) {
             Response::Error(res, e.what());
         }
     });
+
+    // GET /api/albums/:id/screenshots - 获取相册中的截图（分页）
+    app.get("/api/albums/:id/screenshots", [&](auto* res, auto* req) {
+        try {
+            auto album_id = std::stoll(Request::GetPathParam(req, 0));
+            auto last_id = Request::GetQueryParam(req, "lastId");
+            auto limit = Request::GetQueryParam(req, "limit");
+
+            auto [screenshots, has_more] = ScreenshotService::get_instance().get_screenshots_by_album(
+                album_id,
+                !last_id.has_value() ? 0 : std::stoll(*last_id),
+                std::stoi(limit.value_or("20"))
+            );
+
+            nlohmann::json json_array = nlohmann::json::array();
+            for (const auto& screenshot : screenshots) {
+                json_array.push_back(
+                    ScreenshotService::get_instance().get_screenshot_with_thumbnail(screenshot));
+            }
+            Response::Success(res, json_array);
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to get album screenshots: {}", e.what());
+            Response::Error(res, e.what());
+        }
+    });
 } 

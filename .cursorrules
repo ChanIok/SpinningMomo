@@ -1,0 +1,75 @@
+## 项目结构
+
+```
+SpinningMomo/
+├── src/                    # 主程序源代码
+│   ├── core/              # 核心功能模块
+│   │   ├── window/        # 窗口相关
+│   │   │   ├── menu_window.hpp/cpp
+│   │   │   ├── preview_window.hpp/cpp
+│   │   │   └── window_utils.hpp/cpp
+│   │   ├── system/        # 系统功能
+│   │   │   ├── tray_icon.hpp/cpp
+│   │   │   └── notification_manager.hpp/cpp
+│   │   ├── config_manager.hpp/cpp
+│   │   ├── image_processor.hpp/cpp
+│   │   └── constants.hpp/cpp
+│   ├── tracker/           # 参数追踪模块
+│   │   ├── parameter_tracker.hpp/cpp
+│   │   └── parameter_types.hpp
+│   ├── media/            # 相册管理模块
+│   │   ├── core/         # HTTP服务器相关
+│   │   │   ├── server.hpp/cpp
+│   │   │   └── routes.hpp/cpp
+│   │   ├── db/           # 数据库相关
+│   │   │   ├── database.hpp/cpp
+│   │   │   └── models.hpp/cpp
+│   │   ├── repositories/   # 仓库
+│   │   │   ├── screenshot_repository.hpp/cpp
+│   │   │   └── album_repository.hpp/cpp
+│   │   ├── services/     # 业务逻辑
+│   │   │   ├── screenshot_service.hpp/cpp
+│   │   │   └── album_service.hpp/cpp
+│   │   └── routes/       # 路由
+│   │   │   ├── screenshot_routes.hpp/cpp
+│   │   │   └── album_routes.hpp/cpp
+
+│   ├── main.cpp          # 程序入口
+│   ├── resource.rc       # 资源文件
+│   └── icon.ico          # 应用图标
+├── frontend/             # 前端项目（Vue3 + Naive UI）
+│   ├── src/
+
+│   │   ├── views/        # 页面组件
+│   │   │   ├── Album/    # 相册相关页面
+│   │   │   └── Settings/ # 设置页面
+│   │   ├── components/   # 通用组件
+│   │   ├── api/         # API接口封装
+│   │   ├── store/       # 状态管理
+│   │   └── utils/       # 工具函数
+│   │   └── types/       # 类型定义
+│   │   └── router/      # 路由
+│   ├── public/          # 静态资源
+│   └── index.html       # 入口HTML
+├── docs/                # 项目文档
+├── models/              # ONNX模型文件
+├── tools/              # 工具脚本
+├── resources/          # 资源文件
+├── CMakeLists.txt      # CMake配置
+├── README.md           # 项目说明
+```
+
+## 技术栈
+
+### 前端
+- Vue 3 + TypeScript
+- Naive UI
+- Pinia (状态管理)
+- Vite (构建工具)
+
+### 后端
+- C++ 17
+- uWebSockets (HTTP服务器)
+- SQLite3 (数据库)
+- nlohmann/json (JSON处理)
+- spdlog (日志处理)

@@ -2,6 +2,7 @@
 #include "media/db/database.hpp"
 #include <sqlite3.h>
 #include <stdexcept>
+#include <spdlog/spdlog.h>
 
 AlbumService& AlbumService::get_instance() {
     static AlbumService instance;
@@ -85,11 +86,26 @@ bool AlbumService::set_album_cover(int64_t album_id, int64_t screenshot_id) {
 }
 
 bool AlbumService::add_screenshots_to_album(int64_t album_id, const std::vector<int64_t>& screenshot_ids) {
+    if (screenshot_ids.empty()) {
+        return false;
+    }
+
+    // 获取相册信息
     Album album = repository_.find_by_id(album_id);
     if (album.id == 0) {
         return false;
     }
-    
+
+    // 如果相册没有封面，设置第一张图片为封面
+    if (!album.cover_screenshot_id || album.cover_screenshot_id == 0) {
+        album.cover_screenshot_id = screenshot_ids[0];
+        if (!repository_.save(album)) {
+            spdlog::error("Failed to update album cover");
+            return false;
+        }
+    }
+
+    // 获取最后的位置编号并加1
     int position = get_last_position(album_id);
     bool success = true;
     

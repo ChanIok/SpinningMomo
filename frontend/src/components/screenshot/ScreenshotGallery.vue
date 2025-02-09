@@ -314,7 +314,7 @@ const handleSelectButtonClick = (screenshot: Screenshot, event: Event) => {
               }"
               @click="handleSelectButtonClick(item.screenshot, $event)"
             >
-              <n-icon size="22">
+              <n-icon size="28">
                 <CheckmarkCircle v-if="selectionStore.isSelected(item.screenshot.id)" />
                 <RadioButtonOff v-else />
               </n-icon>
@@ -452,8 +452,8 @@ const handleSelectButtonClick = (screenshot: Screenshot, event: Event) => {
   transition: all 0.2s ease;
   background: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;

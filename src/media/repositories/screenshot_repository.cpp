@@ -367,4 +367,51 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_by_month(int
     
     sqlite3_finalize(stmt);
     return {screenshots, has_more};
+}
+
+std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_by_album(int64_t album_id, int64_t last_id, int limit) {
+    std::string sql = R"(
+        WITH target_screenshots AS (
+            SELECT s.*
+            FROM screenshots s
+            JOIN album_screenshots a ON s.id = a.screenshot_id
+            WHERE s.deleted_at IS NULL
+            AND a.album_id = ?
+    )";
+    
+    if (last_id > 0) {
+        sql += R"(
+            AND s.id < ?
+        )";
+    }
+    
+    sql += " ORDER BY a.position ASC, s.id DESC LIMIT ? + 1)";
+    sql += R"(
+        SELECT * FROM target_screenshots LIMIT ?
+    )";
+    
+    auto stmt = prepare_statement(sql.c_str());
+    int param_index = 1;
+    
+    // Bind album_id
+    sqlite3_bind_int64(stmt, param_index++, album_id);
+    
+    // Bind last_id if provided
+    if (last_id > 0) {
+        sqlite3_bind_int64(stmt, param_index++, last_id);
+    }
+    
+    // Bind limit for both the inner and outer queries
+    sqlite3_bind_int(stmt, param_index++, limit);
+    sqlite3_bind_int(stmt, param_index++, limit);
+    
+    std::vector<Screenshot> screenshots;
+    while (sqlite3_step(stmt) == SQLITE_ROW && screenshots.size() < static_cast<size_t>(limit)) {
+        screenshots.push_back(read_screenshot_from_stmt(stmt));
+    }
+    
+    bool has_more = sqlite3_step(stmt) == SQLITE_ROW;
+    
+    sqlite3_finalize(stmt);
+    return {screenshots, has_more};
 } 

@@ -233,4 +233,8 @@ std::vector<MonthStats> ScreenshotService::get_month_statistics() {
 
 std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_by_month(int year, int month, int64_t last_id, int limit) {
     return repository_.find_by_month(year, month, last_id, limit);
+}
+
+std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_by_album(int64_t album_id, int64_t last_id, int limit) {
+    return repository_.find_by_album(album_id, last_id, limit);
 } 

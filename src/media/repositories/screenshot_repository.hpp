@@ -30,6 +30,9 @@ public:
 
     bool update_thumbnail_generated(int64_t id, bool generated);
 
+    // 添加获取相册照片的方法
+    std::pair<std::vector<Screenshot>, bool> find_by_album(int64_t album_id, int64_t last_id, int limit);
+
 private:
     ScreenshotRepository() = default;
     ~ScreenshotRepository() = default;

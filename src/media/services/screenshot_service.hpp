@@ -54,6 +54,9 @@ public:
     // 获取截图的完整信息（包含缩略图URL）
     nlohmann::json get_screenshot_with_thumbnail(const Screenshot& screenshot);
 
+    // 获取相册照片
+    std::pair<std::vector<Screenshot>, bool> get_screenshots_by_album(int64_t album_id, int64_t last_id, int limit);
+
 private:
     ScreenshotService() = default;
     ~ScreenshotService() = default;
