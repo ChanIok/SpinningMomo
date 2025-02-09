@@ -13,7 +13,8 @@ import {
   CalendarOutline as CalendarIcon,
   LocationOutline as LocationIcon,
   BookmarkOutline as TagIcon,
-  FolderOutline as FileIcon
+  FolderOutline as FileIcon,
+  SettingsOutline as SettingsIcon
 } from '@vicons/ionicons5'
 
 const router = useRouter()
@@ -54,6 +55,14 @@ const menuOptions: MenuOption[] = [
     label: '文件夹',
     key: 'folders',
     icon: renderIcon(FileIcon)
+  },
+  {
+    type: 'divider'
+  },
+  {
+    label: '设置',
+    key: 'settings',
+    icon: renderIcon(SettingsIcon)
   }
 ]
 

@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include "album_routes.hpp"
 #include "screenshot_routes.hpp"
+#include "settings_routes.hpp"
 #include "media/utils/response.hpp"
 
 /**
@@ -38,6 +39,9 @@ public:
         // 注册相册和截图相关路由
         register_album_routes(app);
         register_screenshot_routes(app);
+        
+        // 注册设置相关路由
+        register_settings_routes(app);
     }
 
 private:

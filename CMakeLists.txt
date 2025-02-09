@@ -62,6 +62,7 @@ find_package(xxHash CONFIG REQUIRED)
 
 # ===== 源文件配置 =====
 # 项目源文件
+file(GLOB_RECURSE SETTINGS_SOURCES "src/core/settings/*.cpp")
 file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
 file(GLOB_RECURSE TRACKER_SOURCES "src/tracker/*.cpp")
 file(GLOB_RECURSE MEDIA_SOURCES "src/media/**/*.cpp")
@@ -74,6 +75,7 @@ file(GLOB MAIN_SOURCES
 # 创建可执行文件
 add_executable(${PROJECT_NAME} WIN32 
     ${MAIN_SOURCES}
+    ${SETTINGS_SOURCES}
     ${CORE_SOURCES}
     ${TRACKER_SOURCES}
     ${MEDIA_SOURCES}
@@ -84,6 +86,7 @@ add_executable(${PROJECT_NAME} WIN32
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src          # 主目录
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core     # core模块
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/core/settings  # settings模块
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tracker  # tracker模块
 )
 

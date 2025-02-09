@@ -39,6 +39,11 @@ const router = createRouter({
           name: 'MonthView',
           component: () => import('@/views/screenshot/ScreenshotBrowser.vue'),
           props: true
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('@/views/settings/SettingsView.vue')
         }
       ]
     }
