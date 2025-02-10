@@ -4,9 +4,15 @@ import type {
     ThumbnailSettings, 
     InterfaceSettings, 
     PerformanceSettings,
-    ApiResponse 
+    ApiResponse,
+    MessageResponse
 } from '../types/settings'
 import { http } from '@/utils/http'
+
+interface FolderSelectResult {
+    path: string;
+    isAccessible: boolean;
+}
 
 export const settingsAPI = {
     // 获取所有设置
@@ -28,14 +34,15 @@ export const settingsAPI = {
     },
 
     // 添加监视文件夹
-    async addWatchedFolder(folder: WatchedFolder): Promise<WatchedFolder> {
+    async addWatchedFolder(folder: WatchedFolder): Promise<ApiResponse<WatchedFolder>> {
         const response = await http.post<ApiResponse<WatchedFolder>>('/settings/watched-folders', folder)
-        return response.data.data
+        return response.data
     },
 
     // 删除监视文件夹
-    async removeWatchedFolder(path: string): Promise<void> {
-        await http.delete(`/settings/watched-folders/${encodeURIComponent(path)}`)
+    async removeWatchedFolder(path: string): Promise<ApiResponse> {
+        const response = await http.delete<ApiResponse>(`/settings/watched-folders/${encodeURIComponent(path)}`)
+        return response.data
     },
 
     // 更新缩略图设置
@@ -53,6 +60,12 @@ export const settingsAPI = {
     // 更新性能设置
     async updatePerformanceSettings(settings: PerformanceSettings): Promise<PerformanceSettings> {
         const response = await http.put<ApiResponse<PerformanceSettings>>('/settings/performance', settings)
+        return response.data.data
+    },
+
+    // 选择文件夹
+    async selectFolder(): Promise<FolderSelectResult> {
+        const response = await http.post<ApiResponse<FolderSelectResult>>('/settings/select-folder')
         return response.data.data
     }
 } 

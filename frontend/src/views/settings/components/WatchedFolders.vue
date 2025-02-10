@@ -2,6 +2,7 @@
 import { ref, h } from 'vue'
 import type { WatchedFolder } from '@/types/settings'
 import { useSettingsStore } from '@/stores'
+import { settingsAPI } from '@/api/settings'
 import { 
     NSpace, 
     NButton, 
@@ -12,7 +13,6 @@ import {
     NFormItem,
     NInput,
     NSwitch,
-    NDynamicTags,
     useMessage,
     useDialog
 } from 'naive-ui'
@@ -39,13 +39,6 @@ const columns: DataTableColumns<WatchedFolder> = [
         width: 120,
         render(row) {
             return row.include_subfolders ? '是' : '否'
-        }
-    },
-    {
-        title: '文件类型',
-        key: 'file_types',
-        render(row) {
-            return row.file_types.join(', ')
         }
     },
     {
@@ -85,17 +78,20 @@ const showAddModal = ref(false)
 const newFolder = ref<WatchedFolder>({
     path: '',
     include_subfolders: true,
-    file_types: ['jpg', 'jpeg', 'png', 'gif'],
     last_scan: ''
 })
 
 // 删除文件夹
 async function handleDelete(path: string) {
+    console.log('Deleting folder, path:', path);
+    
     const result = await settingsStore.removeWatchedFolder(path)
     if (result.success) {
         message.success('文件夹已删除')
     } else {
         message.error(result.error || '删除文件夹失败')
+        // Add detailed error information
+        console.error('Failed to delete folder:', path, result);
     }
 }
 
@@ -114,7 +110,6 @@ async function handleAdd() {
         newFolder.value = {
             path: '',
             include_subfolders: true,
-            file_types: ['jpg', 'jpeg', 'png', 'gif'],
             last_scan: ''
         }
     } else {
@@ -125,25 +120,19 @@ async function handleAdd() {
 // 选择文件夹
 async function handleSelectFolder() {
     try {
-        // 调用后端API打开系统文件夹选择对话框
-        const response = await fetch('/api/settings/select-folder', {
-            method: 'POST'
-        })
-        
-        if (!response.ok) {
-            throw new Error('选择文件夹失败')
-        }
-        
-        const data = await response.json()
-        if (data.path) {
-            newFolder.value.path = data.path
+        const result = await settingsAPI.selectFolder();
+        console.log(result);
+        if (result.isAccessible) {
+            newFolder.value.path = result.path;
+        } else {
+            message.warning('所选文件夹无法访问，请选择其他文件夹');
         }
     } catch (error) {
         dialog.warning({
             title: '提示',
-            content: '暂不支持文件夹选择，请手动输入路径',
+            content: '选择文件夹失败，请手动输入路径',
             positiveText: '确定'
-        })
+        });
     }
 }
 </script>
@@ -186,10 +175,6 @@ async function handleSelectFolder() {
 
                 <n-form-item label="包含子文件夹">
                     <n-switch v-model:value="newFolder.include_subfolders" />
-                </n-form-item>
-
-                <n-form-item label="文件类型">
-                    <n-dynamic-tags v-model:value="newFolder.file_types" />
                 </n-form-item>
             </n-form>
         </n-modal>

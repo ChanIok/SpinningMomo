@@ -7,11 +7,10 @@
 struct WatchedFolder {
     std::string path;
     bool include_subfolders{true};
-    std::vector<std::string> file_types;
     std::string last_scan;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(WatchedFolder, 
-        path, include_subfolders, file_types, last_scan)
+        path, include_subfolders, last_scan)
 };
 
 struct ThumbnailSettings {

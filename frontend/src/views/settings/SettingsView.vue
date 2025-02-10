@@ -1,8 +1,9 @@
 #pragma once
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores'
+import { settingsAPI } from '@/api/settings'
 import { 
     NCard, 
     NTabs, 
@@ -20,54 +21,26 @@ import PerformanceSettings from '@/views/settings/components/PerformanceSettings
 const settingsStore = useSettingsStore()
 const message = useMessage()
 const activeTab = ref('folders')
-const autoSaveTimeout = ref<number | null>(null)
-const isInitialLoad = ref(true)
 
 // 加载设置
 onMounted(async () => {
     const result = await settingsStore.loadSettings()
-    console.log('加载设置结果:', result)
     if (!result.success) {
         message.error(result.error || '加载设置失败')
     }
-    isInitialLoad.value = false
 })
-
-// 监听设置变化，自动保存
-watch(
-    () => settingsStore.settings,
-    async () => {
-        if (isInitialLoad.value) {
-            return
-        }
-
-        if (autoSaveTimeout.value) {
-            window.clearTimeout(autoSaveTimeout.value)
-        }
-        
-        autoSaveTimeout.value = window.setTimeout(async () => {
-            const result = await settingsStore.saveSettings()
-            if (result.success) {
-                message.success('设置已自动保存')
-            } else {
-                message.error(result.error || '自动保存失败')
-            }
-        }, 1000)
-    },
-    { deep: true }
-)
 
 // 手动保存设置
 async function handleSave() {
-    if (autoSaveTimeout.value) {
-        window.clearTimeout(autoSaveTimeout.value)
-        autoSaveTimeout.value = null
-    }
-    const result = await settingsStore.saveSettings()
-    if (result.success) {
+    try {
+        if (!settingsStore.settings) {
+            message.error('没有可保存的设置')
+            return
+        }
+        const response = await settingsAPI.updateSettings(settingsStore.settings)
         message.success('设置已保存')
-    } else {
-        message.error(result.error || '保存设置失败')
+    } catch (error) {
+        message.error(error instanceof Error ? error.message : '保存设置失败')
     }
 }
 </script>

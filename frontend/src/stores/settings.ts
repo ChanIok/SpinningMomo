@@ -7,7 +7,8 @@ import { settingsAPI } from '@/api/settings'
 interface OperationResult<T = void> {
     success: boolean
     data?: T
-    error?: string
+    message?: string  // 成功时的消息
+    error?: string    // 失败时的消息
 }
 
 export const useSettingsStore = defineStore('settings', () => {
@@ -31,36 +32,19 @@ export const useSettingsStore = defineStore('settings', () => {
         }
     }
 
-    // 保存设置
-    async function saveSettings(): Promise<OperationResult<AppSettings>> {
-        if (!settings.value) {
-            return { success: false, error: '没有可保存的设置' }
-        }
-
-        try {
-            loading.value = true
-            const data = await settingsAPI.updateSettings(settings.value)
-            settings.value = data
-            return { success: true, data }
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error instanceof Error ? error.message : '保存设置失败'
-            }
-        } finally {
-            loading.value = false
-        }
-    }
-
     // 添加监视文件夹
     async function addWatchedFolder(folder: WatchedFolder): Promise<OperationResult<WatchedFolder>> {
         try {
             loading.value = true
-            const newFolder = await settingsAPI.addWatchedFolder(folder)
-            if (settings.value) {
-                settings.value.watched_folders.push(newFolder)
+            const response = await settingsAPI.addWatchedFolder(folder)
+            if (response.success && settings.value) {
+                settings.value.watched_folders.push(response.data)
+                return { success: true, data: response.data }
             }
-            return { success: true, data: newFolder }
+            return { 
+                success: false, 
+                error: '添加文件夹失败'
+            }
         } catch (error) {
             return { 
                 success: false, 
@@ -75,13 +59,24 @@ export const useSettingsStore = defineStore('settings', () => {
     async function removeWatchedFolder(path: string): Promise<OperationResult> {
         try {
             loading.value = true
-            await settingsAPI.removeWatchedFolder(path)
-            if (settings.value) {
-                settings.value.watched_folders = settings.value.watched_folders.filter(
-                    folder => folder.path !== path
-                )
+            const response = await settingsAPI.removeWatchedFolder(path)
+            
+            if (response.success) {
+                if (settings.value) {
+                    settings.value.watched_folders = settings.value.watched_folders.filter(
+                        folder => folder.path !== path
+                    )
+                }
+                return { 
+                    success: true, 
+                    message: response.data.message
+                }
+            } else {
+                return { 
+                    success: false, 
+                    error: response.data.message
+                }
             }
-            return { success: true }
         } catch (error) {
             return { 
                 success: false, 
@@ -96,7 +91,6 @@ export const useSettingsStore = defineStore('settings', () => {
         settings,
         loading,
         loadSettings,
-        saveSettings,
         addWatchedFolder,
         removeWatchedFolder
     }

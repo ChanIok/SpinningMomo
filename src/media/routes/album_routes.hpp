@@ -25,13 +25,12 @@ inline void register_album_routes(uWS::App& app) {
             Response::Success(res, json_array);
         } catch (const std::exception& e) {
             spdlog::error("Failed to get albums: {}", e.what());
-            Response::Error(res, "Internal server error", 500);
+            Response::Error(res, "Failed to get albums", 500);
         }
     });
 
     // POST /api/albums - 创建新相册
     app.post("/api/albums", [&](auto* res, auto* req) {
-        // 使用智能指针来管理 res 的生命周期
         struct Context {
             uWS::HttpResponse<false>* response;
             AlbumService& service;
@@ -39,12 +38,10 @@ inline void register_album_routes(uWS::App& app) {
         
         auto ctx = std::make_shared<Context>(Context{res, album_service});
         
-        // 设置请求中止处理
         res->onAborted([ctx]() {
-            spdlog::warn("Request aborted");
+            spdlog::warn("Request aborted while creating album");
         });
         
-        // 使用 ctx 替代直接捕获 res 和 album_service
         res->onData([ctx](std::string_view body, bool last) {
             if (!last) return;
             
@@ -57,7 +54,7 @@ inline void register_album_routes(uWS::App& app) {
                 Response::Success(ctx->response, album);
             } catch (const std::exception& e) {
                 spdlog::error("Failed to create album: {}", e.what());
-                Response::Error(ctx->response, e.what());
+                Response::Error(ctx->response, "Failed to create album");
             }
         });
     });
@@ -94,7 +91,7 @@ inline void register_album_routes(uWS::App& app) {
                 }
             } catch (const std::exception& e) {
                 spdlog::error("Failed to update album: {}", e.what());
-                Response::Error(res, e.what());
+                Response::Error(res, "Failed to update album");
             }
         });
     });
@@ -104,13 +101,13 @@ inline void register_album_routes(uWS::App& app) {
         try {
             auto id = std::stoll(Request::GetPathParam(req, 0));
             if (album_service.delete_album(id)) {
-                Response::NoContent(res);
+                Response::SuccessMessage(res, "Album deleted successfully");
             } else {
                 Response::Error(res, "Album not found", 404);
             }
         } catch (const std::exception& e) {
             spdlog::error("Failed to delete album: {}", e.what());
-            Response::Error(res, e.what());
+            Response::Error(res, "Failed to delete album");
         }
     });
 
@@ -138,22 +135,22 @@ inline void register_album_routes(uWS::App& app) {
                     auto screenshot_ids = json["screenshot_ids"].get<std::vector<int64_t>>();
                     
                     if (ctx->service.add_screenshots_to_album(ctx->album_id, screenshot_ids)) {
-                        Response::Success(ctx->response, nlohmann::json::object());
+                        Response::SuccessMessage(ctx->response, "Screenshots added to album successfully");
                     } else {
-                        Response::Error(ctx->response, "Failed to add screenshots to album", 400);
+                        Response::Error(ctx->response, "Failed to add screenshots to album");
                     }
                 } catch (const std::exception& e) {
                     spdlog::error("Failed to add screenshots to album: {}", e.what());
-                    Response::Error(ctx->response, e.what());
+                    Response::Error(ctx->response, "Failed to add screenshots to album");
                 }
             });
         } catch (const std::exception& e) {
             spdlog::error("Failed to parse album id: {}", e.what());
-            Response::Error(res, e.what());
+            Response::Error(res, "Invalid album ID");
         }
     });
 
-    // GET /api/albums/:id/screenshots - 获取相册中的截图（分页）
+    // GET /api/albums/:id/screenshots - 获取相册中的截图
     app.get("/api/albums/:id/screenshots", [&](auto* res, auto* req) {
         try {
             auto album_id = std::stoll(Request::GetPathParam(req, 0));
@@ -174,7 +171,7 @@ inline void register_album_routes(uWS::App& app) {
             Response::Success(res, json_array);
         } catch (const std::exception& e) {
             spdlog::error("Failed to get album screenshots: {}", e.what());
-            Response::Error(res, e.what());
+            Response::Error(res, "Failed to get album screenshots");
         }
     });
 } 

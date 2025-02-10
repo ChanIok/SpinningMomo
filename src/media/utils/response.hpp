@@ -10,7 +10,7 @@
 class Response {
 public:
     /**
-     * @brief 发送成功响应
+     * @brief 发送带数据的成功响应
      * @param res 响应对象
      * @param data 响应数据
      */
@@ -24,6 +24,21 @@ public:
     }
 
     /**
+     * @brief 发送只带消息的成功响应
+     * @param res 响应对象
+     * @param message 成功信息
+     */
+    static void SuccessMessage(uWS::HttpResponse<false>* res, const std::string& message) {
+        nlohmann::json response = {
+            {"success", true},
+            {"data", {
+                {"message", message}
+            }}
+        };
+        SendJson(res, 200, response);
+    }
+
+    /**
      * @brief 发送错误响应
      * @param res 响应对象
      * @param message 错误信息
@@ -32,18 +47,19 @@ public:
     static void Error(uWS::HttpResponse<false>* res, const std::string& message, int status = 400) {
         nlohmann::json response = {
             {"success", false},
-            {"error", message}
+            {"data", {
+                {"message", message}
+            }}
         };
         SendJson(res, status, response);
     }
 
     /**
-     * @brief 发送空响应（204 No Content）
+     * @brief 发送成功的空响应（替代 204 No Content）
      * @param res 响应对象
      */
     static void NoContent(uWS::HttpResponse<false>* res) {
-        res->writeStatus("204 No Content");
-        res->end();
+        SuccessMessage(res, "操作成功");
     }
 
 private:
@@ -78,4 +94,4 @@ private:
             default: return "Unknown";
         }
     }
-}; 
+};

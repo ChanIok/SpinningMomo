@@ -25,7 +25,7 @@ inline void register_screenshot_routes(uWS::App& app) {
     // 获取截图目录路径
     const auto& SCREENSHOT_DIR = init_service.get_screenshot_directory();
 
-    // 获取截图列表（支持分页）
+    // GET /api/screenshots - 获取截图列表
     app.get("/api/screenshots", [&screenshot_service](auto* res, auto* req) {
         try {
             int64_t last_id = 0;
@@ -38,19 +38,16 @@ inline void register_screenshot_routes(uWS::App& app) {
                 limit = std::stoi(*limit_param);
             }
             
-            // 检查是否有年月参数
             auto year_param = Request::GetQueryParam(req, "year");
             auto month_param = Request::GetQueryParam(req, "month");
             
             std::pair<std::vector<Screenshot>, bool> result;
             
             if (year_param && month_param) {
-                // 如果有年月参数，使用按月份查询
                 int year = std::stoi(*year_param);
                 int month = std::stoi(*month_param);
                 result = screenshot_service.get_screenshots_by_month(year, month, last_id, limit);
             } else {
-                // 否则使用普通分页查询
                 result = screenshot_service.get_screenshots_paginated(last_id, limit);
             }
             
@@ -69,11 +66,11 @@ inline void register_screenshot_routes(uWS::App& app) {
             Response::Success(res, response);
         } catch (const std::exception& e) {
             spdlog::error("Error getting screenshots: {}", e.what());
-            Response::Error(res, "Internal server error", 500);
+            Response::Error(res, "Failed to get screenshots", 500);
         }
     });
 
-    // 获取单张截图
+    // GET /api/screenshots/:id - 获取单张截图
     app.get("/api/screenshots/:id", [&screenshot_service](auto* res, auto* req) {
         try {
             auto id = std::stoll(Request::GetPathParam(req, 0));
@@ -85,7 +82,7 @@ inline void register_screenshot_routes(uWS::App& app) {
         }
     });
 
-    // 获取截图原始图片内容
+    // GET /api/screenshots/:id/raw - 获取截图原始图片内容
     app.get("/api/screenshots/:id/raw", [&screenshot_service](auto* res, auto* req) {
         try {
             auto id = std::stoll(Request::GetPathParam(req, 0));
@@ -103,7 +100,7 @@ inline void register_screenshot_routes(uWS::App& app) {
         }
     });
 
-    // 获取相册中的所有截图
+    // GET /api/albums/:album_id/screenshots - 获取相册中的所有截图
     app.get("/api/albums/:album_id/screenshots", [&screenshot_service, &SCREENSHOT_DIR](auto* res, auto* req) {
         try {
             auto screenshots = screenshot_service.get_screenshots_by_directory(SCREENSHOT_DIR.wstring());
@@ -119,7 +116,7 @@ inline void register_screenshot_routes(uWS::App& app) {
         }
     });
 
-    // 更新截图信息
+    // PUT /api/screenshots/:id - 更新截图信息
     app.put("/api/screenshots/:id", [&screenshot_service](auto* res, auto* req) {
         auto id = std::stoll(Request::GetPathParam(req, 0));
         
@@ -141,27 +138,27 @@ inline void register_screenshot_routes(uWS::App& app) {
                 }
             } catch (const std::exception& e) {
                 spdlog::error("Error updating screenshot: {}", e.what());
-                Response::Error(res, e.what());
+                Response::Error(res, "Failed to update screenshot");
             }
         });
     });
 
-    // 删除截图
+    // DELETE /api/screenshots/:id - 删除截图
     app.del("/api/screenshots/:id", [&screenshot_service](auto* res, auto* req) {
         try {
             auto id = std::stoll(Request::GetPathParam(req, 0));
             if (screenshot_service.delete_screenshot(id)) {
-                Response::NoContent(res);
+                Response::SuccessMessage(res, "Screenshot deleted successfully");
             } else {
                 Response::Error(res, "Screenshot not found", 404);
             }
         } catch (const std::exception& e) {
             spdlog::error("Failed to delete screenshot: {}", e.what());
-            Response::Error(res, e.what());
+            Response::Error(res, "Failed to delete screenshot");
         }
     });
 
-    // 获取月份统计信息
+    // GET /api/screenshots/calendar - 获取月份统计信息
     app.get("/api/screenshots/calendar", [&screenshot_service](auto* res, auto* req) {
         try {
             auto stats = screenshot_service.get_month_statistics();
@@ -172,7 +169,7 @@ inline void register_screenshot_routes(uWS::App& app) {
         }
     });
 
-    // 获取缩略图
+    // GET /api/screenshots/:id/thumbnail - 获取缩略图
     app.get("/api/screenshots/:id/thumbnail", [&screenshot_service, &thumbnail_service](auto* res, auto* req) {
         try {
             auto id = std::stoll(Request::GetPathParam(req, 0));
@@ -209,7 +206,7 @@ inline void register_screenshot_routes(uWS::App& app) {
             
         } catch (const std::exception& e) {
             spdlog::error("Error serving thumbnail: {}", e.what());
-            Response::Error(res, "Internal server error", 500);
+            Response::Error(res, "Failed to get thumbnail", 500);
         }
     });
 } 

@@ -19,6 +19,7 @@
 #include "media/core/server.hpp"
 #include "media/utils/logger.hpp"
 #include "media/db/database.hpp"
+#include "settings_manager.hpp"
 #include <spdlog/spdlog.h>
 
 // 主应用程序类
@@ -41,6 +42,20 @@ public:
         
         // 加载配置
         m_configManager->LoadAllConfigs();
+
+        // 初始化设置管理器
+        try {
+            if (!SettingsManager::get_instance().init((std::filesystem::current_path() / "settings.json").string())) {
+                spdlog::error("Failed to initialize settings manager");
+                ShowNotification(Constants::APP_NAME, TEXT("Settings initialization failed."), true);
+                return false;
+            }
+            spdlog::info("Settings manager initialized");
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to initialize settings manager: {}", e.what());
+            ShowNotification(Constants::APP_NAME, TEXT("Settings initialization failed."), true);
+            return false;
+        }
 
         // 初始化数据库
         try {

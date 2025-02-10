@@ -6,6 +6,7 @@
 #include "media/utils/response.hpp"
 #include "media/utils/request.hpp"
 #include "core/settings/settings_manager.hpp"
+#include "media/services/folder_service.hpp"
 
 /**
  * @brief 注册设置相关的所有路由
@@ -13,6 +14,7 @@
  */
 inline void register_settings_routes(uWS::App& app) {
     auto& settings_manager = SettingsManager::get_instance();
+    auto& folder_service = FolderService::get_instance();
 
     // GET /api/settings - 获取所有设置
     app.get("/api/settings", [&](auto* res, auto* req) {
@@ -21,7 +23,7 @@ inline void register_settings_routes(uWS::App& app) {
             Response::Success(res, settings);
         } catch (const std::exception& e) {
             spdlog::error("Failed to get settings: {}", e.what());
-            Response::Error(res, "Internal server error", 500);
+            Response::Error(res, "Failed to get settings", 500);
         }
     });
 
@@ -48,11 +50,11 @@ inline void register_settings_routes(uWS::App& app) {
                 if (ctx->manager.update_settings(settings)) {
                     Response::Success(ctx->response, settings);
                 } else {
-                    Response::Error(ctx->response, "Failed to update settings", 400);
+                    Response::Error(ctx->response, "Failed to update settings");
                 }
             } catch (const std::exception& e) {
                 spdlog::error("Failed to update settings: {}", e.what());
-                Response::Error(ctx->response, e.what());
+                Response::Error(ctx->response, "Failed to update settings");
             }
         });
     });
@@ -64,7 +66,7 @@ inline void register_settings_routes(uWS::App& app) {
             Response::Success(res, folders);
         } catch (const std::exception& e) {
             spdlog::error("Failed to get watched folders: {}", e.what());
-            Response::Error(res, "Internal server error", 500);
+            Response::Error(res, "Failed to get watched folders", 500);
         }
     });
 
@@ -77,6 +79,10 @@ inline void register_settings_routes(uWS::App& app) {
         
         auto ctx = std::make_shared<Context>(Context{res, settings_manager});
         
+        res->onAborted([ctx]() {
+            spdlog::warn("Request aborted while adding watched folder");
+        });
+        
         res->onData([ctx](std::string_view body, bool last) {
             if (!last) return;
             
@@ -87,11 +93,11 @@ inline void register_settings_routes(uWS::App& app) {
                 if (ctx->manager.add_watched_folder(folder)) {
                     Response::Success(ctx->response, folder);
                 } else {
-                    Response::Error(ctx->response, "Folder already exists", 400);
+                    Response::Error(ctx->response, "Folder already exists");
                 }
             } catch (const std::exception& e) {
                 spdlog::error("Failed to add watched folder: {}", e.what());
-                Response::Error(ctx->response, e.what());
+                Response::Error(ctx->response, "Failed to add watched folder");
             }
         });
     });
@@ -99,15 +105,27 @@ inline void register_settings_routes(uWS::App& app) {
     // DELETE /api/settings/watched-folders/:path - 删除监视文件夹
     app.del("/api/settings/watched-folders/:path", [&](auto* res, auto* req) {
         try {
-            auto path = Request::GetPathParam(req, 0);
+            auto encoded_path = Request::GetPathParam(req, 0);
+            spdlog::debug("Raw path parameter: {}", encoded_path);
+            
+            auto query = std::string("?path=") + std::string(encoded_path);
+            auto path = std::string(uWS::getDecodedQueryValue("path", query));
+            
+            spdlog::debug("Removing watched folder, received path: {}", path);
+            spdlog::debug("Current watched folders:");
+            for (const auto& folder : settings_manager.get_watched_folders()) {
+                spdlog::debug("- {}", folder.path);
+            }
+            
             if (settings_manager.remove_watched_folder(path)) {
-                Response::NoContent(res);
+                Response::SuccessMessage(res, "Folder removed successfully");
             } else {
+                spdlog::debug("No matching folder found for path: {}", path);
                 Response::Error(res, "Folder not found", 404);
             }
         } catch (const std::exception& e) {
             spdlog::error("Failed to remove watched folder: {}", e.what());
-            Response::Error(res, e.what());
+            Response::Error(res, "Failed to remove watched folder");
         }
     });
 
@@ -123,11 +141,11 @@ inline void register_settings_routes(uWS::App& app) {
                 if (settings_manager.update_thumbnail_settings(settings)) {
                     Response::Success(res, settings);
                 } else {
-                    Response::Error(res, "Failed to update thumbnail settings", 400);
+                    Response::Error(res, "Failed to update thumbnail settings");
                 }
             } catch (const std::exception& e) {
                 spdlog::error("Failed to update thumbnail settings: {}", e.what());
-                Response::Error(res, e.what());
+                Response::Error(res, "Failed to update thumbnail settings");
             }
         });
     });
@@ -144,11 +162,11 @@ inline void register_settings_routes(uWS::App& app) {
                 if (settings_manager.update_interface_settings(settings)) {
                     Response::Success(res, settings);
                 } else {
-                    Response::Error(res, "Failed to update interface settings", 400);
+                    Response::Error(res, "Failed to update interface settings");
                 }
             } catch (const std::exception& e) {
                 spdlog::error("Failed to update interface settings: {}", e.what());
-                Response::Error(res, e.what());
+                Response::Error(res, "Failed to update interface settings");
             }
         });
     });
@@ -165,12 +183,31 @@ inline void register_settings_routes(uWS::App& app) {
                 if (settings_manager.update_performance_settings(settings)) {
                     Response::Success(res, settings);
                 } else {
-                    Response::Error(res, "Failed to update performance settings", 400);
+                    Response::Error(res, "Failed to update performance settings");
                 }
             } catch (const std::exception& e) {
                 spdlog::error("Failed to update performance settings: {}", e.what());
-                Response::Error(res, e.what());
+                Response::Error(res, "Failed to update performance settings");
             }
         });
+    });
+
+    // POST /api/settings/select-folder - 打开文件夹选择对话框
+    app.post("/api/settings/select-folder", [&](auto* res, auto* req) {
+        try {
+            auto result = folder_service.show_folder_dialog();
+            if (result) {
+                nlohmann::json response = {
+                    {"path", *result},
+                    {"isAccessible", folder_service.validate_folder_access(*result)}
+                };
+                Response::Success(res, response);
+            } else {
+                Response::Error(res, "Failed to select folder");
+            }
+        } catch (const std::exception& e) {
+            spdlog::error("Error in folder selection: {}", e.what());
+            Response::Error(res, "Failed to select folder");
+        }
     });
 } 

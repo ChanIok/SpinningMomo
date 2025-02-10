@@ -50,9 +50,11 @@ private:
     bool create_default_settings();
     bool validate_settings() const;
     bool backup_settings() const;
+    bool persist_to_file(const nlohmann::json& json_data);
 
     std::string settings_path_;
     AppSettings settings_;
-    mutable std::mutex mutex_;
+    mutable std::mutex memory_mutex_;    // 保护内存数据
+    mutable std::mutex file_mutex_;      // 保护文件操作
     bool is_initialized_{false};
 }; 

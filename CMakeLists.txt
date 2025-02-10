@@ -83,6 +83,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     d3dcompiler      # D3D Compiler
     Shcore           # Shell Core API
     Shlwapi          # Shell Light-Weight API
+    ole32            # COM API
     
     # 第三方库
     unofficial::uwebsockets::uwebsockets # WebSocket库
