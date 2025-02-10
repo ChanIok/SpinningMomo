@@ -2,30 +2,21 @@
 #include <unordered_map>
 #include <functional>
 #include <variant>
-#include "parameter_types.hpp"
+#include <any>
+#include <string>
 
 // 消息类型枚举
 enum class MessageType {
-    ParameterUpdated,
     WindowResized,
     StatusChanged,
     ErrorOccurred
 };
 
-// 参数更新数据
-struct ParameterUpdateData {
-    ParameterType type;
-    float value;
-    float confidence;
-};
-
-// 消息数据结构
+// 通用消息数据结构
 struct MessageData {
     MessageType type;
-    std::variant<
-        std::monostate,
-        ParameterUpdateData
-    > data;
+    std::any data;           // 使用std::any来存储任意类型的数据
+    std::string description; // 可选的消息描述
 };
 
 // 消息中心类
@@ -50,6 +41,13 @@ public:
         }
     }
 
+    // 取消某个所有者的所有订阅
+    void UnsubscribeAll(void* owner) {
+        for (auto& [type, handlers] : m_handlers) {
+            handlers.erase(owner);
+        }
+    }
+
     // 发送消息
     void SendMessage(const MessageData& msg) {
         if (auto it = m_handlers.find(msg.type); it != m_handlers.end()) {
@@ -60,6 +58,11 @@ public:
     }
 
 private:
+    MessageCenter() = default;
+    ~MessageCenter() = default;
+    MessageCenter(const MessageCenter&) = delete;
+    MessageCenter& operator=(const MessageCenter&) = delete;
+
     std::unordered_map<
         MessageType,
         std::unordered_map<void*, MessageCallback>

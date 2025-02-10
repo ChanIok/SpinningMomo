@@ -34,23 +34,6 @@ set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems
 # 设置第三方库根目录
 set(THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
-# ONNX Runtime配置
-set(ONNXRUNTIME_ROOT "${THIRD_PARTY_DIR}/onnxruntime")
-if(NOT EXISTS "${ONNXRUNTIME_ROOT}")
-    message(FATAL_ERROR "ONNX Runtime directory not found at ${ONNXRUNTIME_ROOT}")
-endif()
-
-# 添加第三方库头文件路径
-include_directories(
-    # ONNX Runtime
-    ${ONNXRUNTIME_ROOT}/include
-)
-
-# 添加第三方库链接路径
-link_directories(
-    ${ONNXRUNTIME_ROOT}/lib
-)
-
 # vcpkg依赖包
 find_package(ZLIB REQUIRED)
 find_package(unofficial-uwebsockets CONFIG REQUIRED)
@@ -64,12 +47,12 @@ find_package(xxHash CONFIG REQUIRED)
 # 项目源文件
 file(GLOB_RECURSE SETTINGS_SOURCES "src/core/settings/*.cpp")
 file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
-file(GLOB_RECURSE TRACKER_SOURCES "src/tracker/*.cpp")
 file(GLOB_RECURSE MEDIA_SOURCES "src/media/**/*.cpp")
 file(GLOB MAIN_SOURCES 
     "src/main.cpp"
     "src/constants.cpp"
 )
+
 
 # ===== 目标配置 =====
 # 创建可执行文件
@@ -77,7 +60,6 @@ add_executable(${PROJECT_NAME} WIN32
     ${MAIN_SOURCES}
     ${SETTINGS_SOURCES}
     ${CORE_SOURCES}
-    ${TRACKER_SOURCES}
     ${MEDIA_SOURCES}
     src/resource.rc
 )
@@ -87,7 +69,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src          # 主目录
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core     # core模块
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/settings  # settings模块
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/tracker  # tracker模块
 )
 
 # ===== 链接配置 =====
@@ -104,7 +85,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     Shlwapi          # Shell Light-Weight API
     
     # 第三方库
-    onnxruntime                          # ONNX Runtime
     unofficial::uwebsockets::uwebsockets # WebSocket库
     ZLIB::ZLIB                          # zlib压缩库
     nlohmann_json::nlohmann_json        # JSON库
@@ -118,22 +98,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 # 设置输出目录变量
 set(OUTPUT_DIR $<TARGET_FILE_DIR:${PROJECT_NAME}>)
 
-# 复制运行时依赖
-add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    # ONNX Runtime
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${ONNXRUNTIME_ROOT}/lib/onnxruntime.dll"
-        "${OUTPUT_DIR}"
-)
-
 # 创建必要的目录结构
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-    # 模型目录
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DIR}/models"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_SOURCE_DIR}/models/model.onnx"
-        "${OUTPUT_DIR}/models/model.onnx"
-
     # 数据目录
     COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DIR}/data/thumbnails"
 )

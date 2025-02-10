@@ -16,20 +16,6 @@ MenuWindow::MenuWindow(HINSTANCE hInstance) : m_hInstance(hInstance) {
     ReleaseDC(NULL, hdc);
 
     UpdateDpiDependentResources();
-
-    // 订阅参数更新消息
-    MessageCenter::Instance().Subscribe(
-        MessageType::ParameterUpdated,
-        this,
-        [this](const MessageData& msg) {
-            if (auto* data = std::get_if<ParameterUpdateData>(&msg.data)) {
-                // 更新参数值
-                m_currentParams[data->type] = ParameterValue{data->value, data->confidence};
-                // 重绘参数区域
-                InvalidateRect(m_hwnd, &m_parameterRect, FALSE);
-            }
-        }
-    );
 }
 
 void MenuWindow::RegisterWindowClass() {
@@ -120,6 +106,19 @@ void MenuWindow::Hide() {
     }
 }
 
+void MenuWindow::Activate() {
+    if (IsWindow(m_hwnd)) {
+        // 如果窗口被最小化，则还原
+        if (IsIconic(m_hwnd)) {
+            ShowWindow(m_hwnd, SW_RESTORE);
+        }
+        // 将窗口置于前台
+        SetForegroundWindow(m_hwnd);
+        // 设置焦点
+        SetFocus(m_hwnd);
+    }
+}
+
 bool MenuWindow::IsVisible() const {
     return m_hwnd && IsWindowVisible(m_hwnd);
 }
@@ -183,7 +182,6 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
     m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});  // 添加打开相册选项
     m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
     m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
-    m_items.push_back({strings.PARAMETER_TRACKING, ItemType::ParameterTracking, m_parameterTrackingEnabled ? 1 : 0});  // 添加参数追踪选项
     m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
 }
 
@@ -342,7 +340,6 @@ void MenuWindow::OnPaint(HDC hdc) {
             case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
-            case ItemType::ParameterTracking:
             case ItemType::Close:
                 itemRect = {resolutionColumnRight + m_separatorHeight, settingsY, 
                           rect.right, settingsY + m_itemHeight};
@@ -366,8 +363,6 @@ void MenuWindow::OnPaint(HDC hdc) {
         } else if (item.type == ItemType::Resolution && item.index == m_currentResolutionIndex) {
             isSelected = true;
         } else if (item.type == ItemType::PreviewWindow && m_previewEnabled) {
-            isSelected = true;
-        } else if (item.type == ItemType::ParameterTracking && m_parameterTrackingEnabled) {
             isSelected = true;
         }
 
@@ -398,11 +393,6 @@ void MenuWindow::OnPaint(HDC hdc) {
                 y = m_titleHeight + m_separatorHeight;  // 重置到分隔线下方
             }
         }
-    }
-
-    // 只有在参数追踪启用时才绘制参数区域
-    if (m_parameterTrackingEnabled) {
-        DrawParameterArea(memDC);
     }
 
     // 复制到屏幕
@@ -463,9 +453,6 @@ void MenuWindow::OnLButtonDown(int x, int y) {
             case ItemType::Reset:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_RESET, 0);
                 break;
-            case ItemType::ParameterTracking:
-                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_PARAMETER_TRACKING, 0);
-                break;
             case ItemType::Close:
                 Hide();  // 直接调用Hide函数关闭窗口
                 break;
@@ -488,11 +475,6 @@ void MenuWindow::UpdateDpiDependentResources() {
     m_ratioColumnWidth = static_cast<int>(BASE_RATIO_COLUMN_WIDTH * scale);
     m_resolutionColumnWidth = static_cast<int>(BASE_RESOLUTION_COLUMN_WIDTH * scale);
     m_settingsColumnWidth = static_cast<int>(BASE_SETTINGS_COLUMN_WIDTH * scale);
-
-    // 更新参数区域相关尺寸
-    m_parameterItemHeight = static_cast<int>(BASE_PARAMETER_ITEM_HEIGHT * scale);
-    m_parameterNameWidth = static_cast<int>(BASE_PARAMETER_NAME_WIDTH * scale);
-    m_parameterValueWidth = static_cast<int>(BASE_PARAMETER_VALUE_WIDTH * scale);
 }
 
 int MenuWindow::CalculateWindowHeight() {
@@ -513,7 +495,6 @@ int MenuWindow::CalculateWindowHeight() {
             case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
-            case ItemType::ParameterTracking:
             case ItemType::Close:
                 settingsCount++;
                 break;
@@ -530,15 +511,8 @@ int MenuWindow::CalculateWindowHeight() {
     if (resolutionHeight > maxColumnHeight) maxColumnHeight = resolutionHeight;
     if (settingsHeight > maxColumnHeight) maxColumnHeight = settingsHeight;
 
-    // 计算总高度（包含标题栏、分隔线和参数区域）
-    int totalHeight = m_titleHeight + m_separatorHeight + maxColumnHeight;
-    
-    // 只有在参数追踪启用时才加入参数区域高度
-    if (m_parameterTrackingEnabled) {
-        totalHeight += m_parameterItemHeight * PARAMETER_ITEMS_PER_COLUMN + PARAMETER_AREA_PADDING * 2;
-    }
-    
-    return totalHeight;
+    // 返回总高度
+    return m_titleHeight + m_separatorHeight + maxColumnHeight;
 }
 
 int MenuWindow::GetItemIndexFromPoint(int x, int y) {
@@ -564,7 +538,6 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
                 item.type == ItemType::OpenScreenshot ||
                 item.type == ItemType::PreviewWindow ||
                 item.type == ItemType::Reset ||
-                item.type == ItemType::ParameterTracking ||
                 item.type == ItemType::Close) {
                 if (y >= settingsY && y < settingsY + m_itemHeight) {
                     return static_cast<int>(i);
@@ -593,138 +566,4 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
 void MenuWindow::SetPreviewEnabled(bool enabled) {
     m_previewEnabled = enabled;
     InvalidateRect(m_hwnd, NULL, TRUE);
-}
-
-void MenuWindow::SetParameterTrackingEnabled(bool enabled) {
-    if (m_parameterTrackingEnabled != enabled) {
-        m_parameterTrackingEnabled = enabled;
-        
-        // 需要重新计算窗口大小
-        if (m_hwnd) {
-            RECT currentRect;
-            GetWindowRect(m_hwnd, &currentRect);
-            int newHeight = CalculateWindowHeight();
-            SetWindowPos(m_hwnd, NULL, 
-                currentRect.left, currentRect.top,
-                currentRect.right - currentRect.left, newHeight,
-                SWP_NOZORDER | SWP_NOACTIVATE);
-        }
-        
-        InvalidateRect(m_hwnd, NULL, TRUE);
-    }
-}
-
-// 添加参数区域矩形更新方法
-void MenuWindow::UpdateParameterRect() {
-    if (!m_hwnd) return;
-
-    RECT clientRect;
-    GetClientRect(m_hwnd, &clientRect);
-    
-    if (m_parameterTrackingEnabled) {
-        // 参数区域位于窗口底部
-        m_parameterRect.left = clientRect.left;
-        m_parameterRect.right = clientRect.right;
-        m_parameterRect.bottom = clientRect.bottom;
-        m_parameterRect.top = m_parameterRect.bottom - 
-            (m_parameterItemHeight * PARAMETER_ITEMS_PER_COLUMN + PARAMETER_AREA_PADDING * 2);
-    } else {
-        // 参数追踪未启用时，设置为空矩形
-        m_parameterRect = {0, 0, 0, 0};
-    }
-}
-
-// 实现参数区域绘制
-void MenuWindow::DrawParameterArea(HDC hdc) {
-    // 更新参数区域矩形
-    UpdateParameterRect();
-
-    // 绘制参数区域背景
-    HBRUSH hParamBrush = CreateSolidBrush(RGB(245, 245, 245));
-    FillRect(hdc, &m_parameterRect, hParamBrush);
-    DeleteObject(hParamBrush);
-
-    // 绘制分隔线
-    HPEN hSepPen = CreatePen(PS_SOLID, 1, RGB(229, 229, 229));
-    HPEN oldPen = (HPEN)SelectObject(hdc, hSepPen);
-    MoveToEx(hdc, m_parameterRect.left, m_parameterRect.top, NULL);
-    LineTo(hdc, m_parameterRect.right, m_parameterRect.top);
-    SelectObject(hdc, oldPen);
-    DeleteObject(hSepPen);
-
-    // 计算每列的起始位置
-    int columnWidth = (m_parameterRect.right - m_parameterRect.left) / 2;
-    int x1 = m_parameterRect.left + m_textPadding;
-    int x2 = x1 + columnWidth;
-    int y = m_parameterRect.top + 5;  // 添加一些上边距
-
-    // 第一列参数
-    const std::pair<ParameterType, std::wstring> firstColumn[] = {
-        {ParameterType::Vignette, L"晕影"},
-        {ParameterType::SoftLightIntensity, L"柔光强度"},
-        {ParameterType::SoftLightRange, L"柔光范围"},
-        {ParameterType::Brightness, L"亮度"},
-        {ParameterType::Exposure, L"曝光"}
-    };
-
-    // 第二列参数
-    const std::pair<ParameterType, std::wstring> secondColumn[] = {
-        {ParameterType::Contrast, L"对比度"},
-        {ParameterType::Saturation, L"饱和度"},
-        {ParameterType::NaturalSaturation, L"自然饱和度"},
-        {ParameterType::Highlights, L"高光"},
-        {ParameterType::Shadows, L"阴影"}
-    };
-
-    // 绘制第一列
-    for (const auto& param : firstColumn) {
-        RECT itemRect = {x1, y, x1 + columnWidth - m_textPadding, y + m_parameterItemHeight};
-        DrawParameterItem(hdc, m_currentParams[param.first], param.second, itemRect, param.first);
-        y += m_parameterItemHeight;
-    }
-
-    // 重置y坐标，绘制第二列
-    y = m_parameterRect.top + 5;
-    for (const auto& param : secondColumn) {
-        RECT itemRect = {x2, y, x2 + columnWidth - m_textPadding, y + m_parameterItemHeight};
-        DrawParameterItem(hdc, m_currentParams[param.first], param.second, itemRect, param.first);
-        y += m_parameterItemHeight;
-    }
-}
-
-// 实现参数项绘制
-void MenuWindow::DrawParameterItem(HDC hdc, const ParameterValue& value, 
-                                 const std::wstring& name, const RECT& rect,
-                                 ParameterType type) {
-    // 设置文本颜色（根据置信度调整）
-    COLORREF textColor = value.confidence > 0.8f ? RGB(51, 51, 51) : RGB(128, 128, 128);
-    SetTextColor(hdc, textColor);
-
-    // 绘制参数名称
-    RECT nameRect = rect;
-    nameRect.right = nameRect.left + m_parameterNameWidth;
-    DrawText(hdc, name.c_str(), -1, &nameRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-
-    // 格式化参数值
-    std::wstring valueText;
-    if (IsPercentageParameter(type)) {
-        valueText = std::to_wstring(static_cast<int>(value.value)) + L"%";
-    } else {
-        wchar_t buffer[32];
-        swprintf_s(buffer, L"%.1f", value.value);
-        valueText = buffer;
-    }
-
-    // 绘制参数值
-    RECT valueRect = rect;
-    valueRect.left = nameRect.right + 5;
-    DrawText(hdc, valueText.c_str(), -1, &valueRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-}
-
-// 判断是否为百分比参数
-bool MenuWindow::IsPercentageParameter(ParameterType type) const {
-    return type == ParameterType::Vignette ||
-           type == ParameterType::SoftLightIntensity ||
-           type == ParameterType::Brightness ||
-           type == ParameterType::Contrast;
 } 

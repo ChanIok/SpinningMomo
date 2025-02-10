@@ -15,7 +15,6 @@
 #include "preview_window.hpp"
 #include "notification_manager.hpp"
 #include "config_manager.hpp"
-#include "parameter_tracker.hpp"
 #include "message_center.hpp"
 #include "media/core/server.hpp"
 #include "media/utils/logger.hpp"
@@ -42,6 +41,16 @@ public:
         
         // 加载配置
         m_configManager->LoadAllConfigs();
+
+        // 初始化数据库
+        try {
+            Database::get_instance().init((std::filesystem::current_path() / "spinningmomo.db").string());
+            spdlog::info("Database initialized");
+        } catch (const DatabaseException& e) {
+            spdlog::error("Failed to initialize database: {}", e.what());
+            ShowNotification(Constants::APP_NAME, TEXT("Database initialization failed."), true);
+            return false;
+        }
 
         // 初始化HTTP服务器
         m_httpServer = std::make_unique<Server>("localhost", 51205);
@@ -406,27 +415,6 @@ public:
         );
     }
 
-    // 切换参数追踪
-    void ToggleParameterTracking() {
-        m_isParameterTrackingEnabled = !m_isParameterTrackingEnabled;
-        
-        if (m_isParameterTrackingEnabled) {
-            HWND targetWnd = WindowUtils::FindTargetWindow(m_configManager->GetWindowTitle());
-            m_parameterTracker = std::make_unique<ParameterTracker>(targetWnd);
-            if (!m_parameterTracker->Initialize()) {
-                m_parameterTracker.reset();
-                m_isParameterTrackingEnabled = false;
-                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.FEATURE_NOT_SUPPORTED.c_str());
-            }
-        } else {
-            m_parameterTracker.reset();
-        }
-        
-        if (m_menuWindow) {
-            m_menuWindow->SetParameterTrackingEnabled(m_isParameterTrackingEnabled);
-        }
-    }
-
     // 窗口过程函数
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         SpinningMomoApp* app = reinterpret_cast<SpinningMomoApp*>(
@@ -533,9 +521,6 @@ public:
                                 (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,
                                 NULL, NULL, SW_SHOWNORMAL);
                             break;
-                        case Constants::ID_PARAMETER_TRACKING:
-                            app->ToggleParameterTracking();
-                            break;
                     }
                 }
                 return 0;
@@ -622,7 +607,6 @@ private:
     std::unique_ptr<PreviewWindow> m_previewWindow;
     std::unique_ptr<NotificationManager> m_notificationManager;
     std::unique_ptr<ConfigManager> m_configManager;
-    std::unique_ptr<ParameterTracker> m_parameterTracker;
     std::unique_ptr<Server> m_httpServer;
 
     // 应用状态
@@ -843,17 +827,6 @@ int WINAPI WinMain(
     // 初始化日志系统
     Logger::get_instance().init();
     spdlog::info("SpinningMomo starting up");
-    
-    try {
-        // 初始化数据库
-        Database::get_instance().init((std::filesystem::current_path() / "spinningmomo.db").string());
-        spdlog::info("Database initialized");
-    } catch (const DatabaseException& e) {
-        spdlog::error("Failed to initialize database: {}", e.what());
-        MessageBox(NULL, TEXT("Database initialization failed."), 
-                  Constants::APP_NAME, MB_ICONERROR);
-        return 1;
-    }
     
     SpinningMomoApp app;
     
