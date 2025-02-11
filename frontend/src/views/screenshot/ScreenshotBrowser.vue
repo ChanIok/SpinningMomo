@@ -8,7 +8,9 @@ import { useScreenshotListStore } from '@/stores/screenshot-list'
 const props = defineProps<{
   year?: string;
   month?: string;
-  id?: string;  // 修改为id，匹配路由参数
+  id?: string;
+  folderId?: string;
+  relativePath?: string;
 }>();
 
 // 添加props变化的调试输出
@@ -16,7 +18,9 @@ watch(() => props, (newProps) => {
   console.log('Props changed:', {
     year: newProps.year,
     month: newProps.month,
-    id: newProps.id
+    id: newProps.id,
+    folderId: newProps.folderId,
+    relativePath: newProps.relativePath
   });
 }, { deep: true, immediate: true });
 
@@ -53,13 +57,11 @@ onUnmounted(() => {
 
 // 处理加载更多的事件
 const handleLoadMore = () => {
-  if (props.id) {
-    return;
+  if (props.folderId) {
+    listStore.loadFolderPhotos(props.folderId, props.relativePath || '');
+  } else if (props.id) {
+    listStore.loadAlbumPhotos(parseInt(props.id));
   } else if (props.year && props.month) {
-    console.log('Loading month data:', {
-      year: props.year,
-      month: props.month
-    });
     listStore.loadByMonth(parseInt(props.year), parseInt(props.month));
   } else {
     listStore.loadMore();
@@ -68,11 +70,14 @@ const handleLoadMore = () => {
 
 // 监听路由参数变化
 watch(
-  () => [props.year, props.month, props.id],
-  ([year, month, id]) => {
-    console.log('Route params changed:', { year, month, id });
+  () => [props.year, props.month, props.id, props.folderId, props.relativePath],
+  ([year, month, id, folderId, relativePath]) => {
+    console.log('Route params changed:', { year, month, id, folderId, relativePath });
     listStore.reset();
-    if (id) {
+    if (folderId) {
+      console.log('Loading folder photos:', { folderId, relativePath });
+      listStore.loadFolderPhotos(folderId, relativePath || '', true);
+    } else if (id) {
       console.log('Loading album photos:', id);
       listStore.loadAlbumPhotos(parseInt(id), true);
     } else if (year && month) {
@@ -91,7 +96,9 @@ onMounted(() => {
   console.log('Component mounted with props:', {
     year: props.year,
     month: props.month,
-    id: props.id
+    id: props.id,
+    folderId: props.folderId,
+    relativePath: props.relativePath
   });
   if (props.year && props.month) {
     console.log('Initial month load:', {

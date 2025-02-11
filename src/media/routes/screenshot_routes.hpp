@@ -21,21 +21,26 @@ inline void register_screenshot_routes(uWS::App& app) {
     auto& screenshot_service = ScreenshotService::get_instance();
     auto& thumbnail_service = ThumbnailService::get_instance();
     auto& init_service = InitializationService::get_instance();
-    
-    // 获取截图目录路径
-    const auto& SCREENSHOT_DIR = init_service.get_screenshot_directory();
 
     // GET /api/screenshots - 获取截图列表
     app.get("/api/screenshots", [&screenshot_service](auto* res, auto* req) {
         try {
             int64_t last_id = 0;
             int limit = 20;
+            std::string folder_id;
+            std::string relative_path;
             
             if (auto last_id_param = Request::GetQueryParam(req, "lastId")) {
                 last_id = std::stoll(*last_id_param);
             }
             if (auto limit_param = Request::GetQueryParam(req, "limit")) {
                 limit = std::stoi(*limit_param);
+            }
+            if (auto folder_param = Request::GetQueryParam(req, "folderId")) {
+                folder_id = *folder_param;
+            }
+            if (auto path_param = Request::GetQueryParam(req, "relativePath")) {
+                relative_path = *path_param;
             }
             
             auto year_param = Request::GetQueryParam(req, "year");
@@ -48,7 +53,7 @@ inline void register_screenshot_routes(uWS::App& app) {
                 int month = std::stoi(*month_param);
                 result = screenshot_service.get_screenshots_by_month(year, month, last_id, limit);
             } else {
-                result = screenshot_service.get_screenshots_paginated(last_id, limit);
+                result = screenshot_service.get_screenshots_paginated(folder_id, relative_path, last_id, limit);
             }
             
             auto [screenshots, has_more] = result;
@@ -101,15 +106,31 @@ inline void register_screenshot_routes(uWS::App& app) {
     });
 
     // GET /api/albums/:album_id/screenshots - 获取相册中的所有截图
-    app.get("/api/albums/:album_id/screenshots", [&screenshot_service, &SCREENSHOT_DIR](auto* res, auto* req) {
+    app.get("/api/albums/:album_id/screenshots", [&screenshot_service](auto* res, auto* req) {
         try {
-            auto screenshots = screenshot_service.get_screenshots_by_directory(SCREENSHOT_DIR.wstring());
+            int64_t last_id = 0;
+            int limit = 20;
+            auto album_id = std::stoll(Request::GetPathParam(req, 0));
             
-            nlohmann::json json_array = nlohmann::json::array();
-            for (const auto& screenshot : screenshots) {
-                json_array.push_back(screenshot_service.get_screenshot_with_thumbnail(screenshot));
+            if (auto last_id_param = Request::GetQueryParam(req, "lastId")) {
+                last_id = std::stoll(*last_id_param);
             }
-            Response::Success(res, json_array);
+            if (auto limit_param = Request::GetQueryParam(req, "limit")) {
+                limit = std::stoi(*limit_param);
+            }
+            
+            auto [screenshots, has_more] = screenshot_service.get_screenshots_by_album(album_id, last_id, limit);
+            
+            nlohmann::json response = {
+                {"screenshots", nlohmann::json::array()},
+                {"hasMore", has_more}
+            };
+            
+            for (const auto& screenshot : screenshots) {
+                response["screenshots"].push_back(screenshot_service.get_screenshot_with_thumbnail(screenshot));
+            }
+            
+            Response::Success(res, response);
         } catch (const std::exception& e) {
             spdlog::error("Error getting album screenshots: {}", e.what());
             Response::Error(res, "Album not found", 404);
@@ -207,6 +228,17 @@ inline void register_screenshot_routes(uWS::App& app) {
         } catch (const std::exception& e) {
             spdlog::error("Error serving thumbnail: {}", e.what());
             Response::Error(res, "Failed to get thumbnail", 500);
+        }
+    });
+
+    // GET /api/folders/tree - 获取文件夹树结构
+    app.get("/api/folders/tree", [&screenshot_service](auto* res, auto* req) {
+        try {
+            auto tree = screenshot_service.get_folder_tree();
+            Response::Success(res, tree);
+        } catch (const std::exception& e) {
+            spdlog::error("Error getting folder tree: {}", e.what());
+            Response::Error(res, "Failed to get folder tree", 500);
         }
     });
 } 

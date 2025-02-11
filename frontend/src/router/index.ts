@@ -44,6 +44,11 @@ const router = createRouter({
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/settings/SettingsView.vue')
+        },
+        {
+          path: '/folders',
+          name: 'Folders',
+          component: () => import('@/views/folder/FolderView.vue')
         }
       ]
     }

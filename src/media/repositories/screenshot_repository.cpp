@@ -104,106 +104,6 @@ bool ScreenshotRepository::remove(int64_t id) {
     return success;
 }
 
-std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_paginated(int64_t last_id, int limit) {
-    std::string sql = R"(
-        SELECT s.*
-        FROM screenshots s
-        WHERE deleted_at IS NULL
-    )";
-    
-    if (last_id > 0) {
-        sql += R"(
-            AND (
-                COALESCE(photo_time, created_at) < (
-                    SELECT COALESCE(photo_time, created_at)
-                    FROM screenshots 
-                    WHERE id = ? AND deleted_at IS NULL
-                )
-                OR (
-                    COALESCE(photo_time, created_at) = (
-                        SELECT COALESCE(photo_time, created_at)
-                        FROM screenshots 
-                        WHERE id = ? AND deleted_at IS NULL
-                    )
-                    AND id < ?
-                )
-            )
-        )";
-    }
-    
-    sql += " ORDER BY COALESCE(photo_time, created_at) DESC, id DESC LIMIT ? + 1";
-    
-    auto stmt = prepare_statement(sql.c_str());
-    int param_index = 1;
-    
-    if (last_id > 0) {
-        sqlite3_bind_int64(stmt, param_index++, last_id);
-        sqlite3_bind_int64(stmt, param_index++, last_id);
-        sqlite3_bind_int64(stmt, param_index++, last_id);
-    }
-    sqlite3_bind_int(stmt, param_index, limit);
-    
-    std::vector<Screenshot> screenshots;
-    bool has_more = false;
-    int count = 0;
-    
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
-        if (count < limit) {
-            screenshots.push_back(read_screenshot_from_stmt(stmt));
-        } else {
-            has_more = true;
-            break;
-        }
-        count++;
-    }
-    
-    sqlite3_finalize(stmt);
-    return {screenshots, has_more};
-}
-
-std::vector<Screenshot> ScreenshotRepository::find_by_directory(const std::wstring& dir_path, int64_t last_id, int limit) {
-    std::vector<Screenshot> screenshots;
-    
-    if (!std::filesystem::exists(dir_path)) {
-        return screenshots;
-    }
-
-    for (const auto& entry : std::filesystem::directory_iterator(dir_path)) {
-        if (entry.is_regular_file()) {
-            auto ext = entry.path().extension();
-            if (ext == L".png" || ext == L".jpg" || ext == L".jpeg") {
-                try {
-                    const char* sql = "SELECT * FROM screenshots WHERE filepath = ? LIMIT 1";
-                    auto stmt = prepare_statement(sql);
-                    std::string filepath = wide_to_utf8(entry.path().wstring());
-                    sqlite3_bind_text(stmt, 1, filepath.c_str(), -1, SQLITE_STATIC);
-                    
-                    if (sqlite3_step(stmt) == SQLITE_ROW) {
-                        auto screenshot = read_screenshot_from_stmt(stmt);
-                        if (last_id == 0 || screenshot.id > last_id) {
-                            screenshots.push_back(screenshot);
-                        }
-                    }
-                    sqlite3_finalize(stmt);
-                } catch (const std::exception& e) {
-                    spdlog::error("Error processing file {}: {}", wide_to_utf8(entry.path().wstring()), e.what());
-                }
-            }
-        }
-    }
-    
-    std::sort(screenshots.begin(), screenshots.end(), 
-            [](const Screenshot& a, const Screenshot& b) {
-                return a.id > b.id;
-            });
-    
-    if (screenshots.size() > static_cast<size_t>(limit)) {
-        screenshots.resize(limit);
-    }
-    
-    return screenshots;
-}
-
 bool ScreenshotRepository::update_thumbnail_generated(int64_t id, bool generated) {
     const char* sql = "UPDATE screenshots SET thumbnail_generated = ?, updated_at = ? WHERE id = ?";
     auto stmt = prepare_statement(sql);
@@ -414,4 +314,115 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_by_album(int
     
     sqlite3_finalize(stmt);
     return {screenshots, has_more};
+}
+
+std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_paginated_by_folder(
+    const std::string& folder_id,
+    const std::string& relative_path,
+    int64_t last_id,
+    int limit
+) {
+    std::string sql = R"(
+        WITH target_screenshots AS (
+            SELECT s.*
+            FROM screenshots s
+            WHERE s.deleted_at IS NULL
+            AND s.folder_id = ?
+    )";
+    
+    if (!relative_path.empty()) {
+        sql += " AND s.relative_path = ?";
+    }
+    
+    if (last_id > 0) {
+        sql += R"(
+            AND (
+                COALESCE(s.photo_time, s.created_at) < (
+                    SELECT COALESCE(photo_time, created_at)
+                    FROM screenshots 
+                    WHERE id = ? AND deleted_at IS NULL
+                )
+                OR (
+                    COALESCE(s.photo_time, s.created_at) = (
+                        SELECT COALESCE(photo_time, created_at)
+                        FROM screenshots 
+                        WHERE id = ? AND deleted_at IS NULL
+                    )
+                    AND s.id < ?
+                )
+            )
+        )";
+    }
+    
+    sql += " ORDER BY COALESCE(s.photo_time, s.created_at) DESC, s.id DESC LIMIT ? + 1)";
+    sql += " SELECT * FROM target_screenshots LIMIT ?";
+    
+    auto stmt = prepare_statement(sql.c_str());
+    int param_index = 1;
+    
+    // Bind folder_id
+    sqlite3_bind_text(stmt, param_index++, folder_id.c_str(), -1, SQLITE_STATIC);
+    
+    // Bind relative_path if provided
+    if (!relative_path.empty()) {
+        sqlite3_bind_text(stmt, param_index++, relative_path.c_str(), -1, SQLITE_STATIC);
+    }
+    
+    // Bind last_id if provided
+    if (last_id > 0) {
+        sqlite3_bind_int64(stmt, param_index++, last_id);
+        sqlite3_bind_int64(stmt, param_index++, last_id);
+        sqlite3_bind_int64(stmt, param_index++, last_id);
+    }
+    
+    // Bind limit for both the inner and outer queries
+    sqlite3_bind_int(stmt, param_index++, limit);
+    sqlite3_bind_int(stmt, param_index++, limit);
+    
+    std::vector<Screenshot> screenshots;
+    while (sqlite3_step(stmt) == SQLITE_ROW && screenshots.size() < static_cast<size_t>(limit)) {
+        screenshots.push_back(read_screenshot_from_stmt(stmt));
+    }
+    
+    bool has_more = sqlite3_step(stmt) == SQLITE_ROW;
+    
+    sqlite3_finalize(stmt);
+    return {screenshots, has_more};
+}
+
+int ScreenshotRepository::count_by_folder(const std::string& folder_id, const std::string& relative_path) {
+    std::string sql = R"(
+        SELECT COUNT(*) 
+        FROM screenshots 
+        WHERE deleted_at IS NULL 
+        AND folder_id = ?
+    )";
+    
+    if (!relative_path.empty()) {
+        sql += " AND relative_path = ?";
+    }
+    
+    auto stmt = prepare_statement(sql.c_str());
+    sqlite3_bind_text(stmt, 1, folder_id.c_str(), -1, SQLITE_STATIC);
+    
+    if (!relative_path.empty()) {
+        sqlite3_bind_text(stmt, 2, relative_path.c_str(), -1, SQLITE_STATIC);
+    }
+    
+    int count = 0;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        count = sqlite3_column_int(stmt, 0);
+    }
+    
+    sqlite3_finalize(stmt);
+    return count;
+}
+
+bool ScreenshotRepository::exists_by_path(const std::string& filepath) {
+    const char* sql = "SELECT 1 FROM screenshots WHERE filepath = ? AND deleted_at IS NULL LIMIT 1";
+    auto stmt = prepare_statement(sql);
+    sqlite3_bind_text(stmt, 1, filepath.c_str(), -1, SQLITE_STATIC);
+    bool exists = sqlite3_step(stmt) == SQLITE_ROW;
+    sqlite3_finalize(stmt);
+    return exists;
 } 

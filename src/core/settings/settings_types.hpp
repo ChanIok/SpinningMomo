@@ -5,12 +5,12 @@
 #include <nlohmann/json.hpp>
 
 struct WatchedFolder {
+    std::string id;
     std::string path;
-    bool include_subfolders{true};
     std::string last_scan;
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(WatchedFolder, 
-        path, include_subfolders, last_scan)
+        id, path, last_scan)
 };
 
 struct ThumbnailSettings {

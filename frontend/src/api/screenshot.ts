@@ -1,5 +1,6 @@
 import type { Screenshot, ScreenshotParams, ScreenshotListData, ApiResponse, Album, MonthStats } from '../types/screenshot';
 import { http } from '@/utils/http';
+import type { FolderTreeNode } from '@/types/folder';
 
 // 截图相关的 API 方法
 export const screenshotAPI = {
@@ -41,6 +42,12 @@ export const screenshotAPI = {
     // 获取指定月份的照片
     async getScreenshotsByMonth(params: { year: number; month: number; lastId?: number; limit?: number }): Promise<ScreenshotListData> {
         const response = await http.get<ApiResponse<ScreenshotListData>>('/screenshots', { params });
+        return response.data.data;
+    },
+
+    // 获取文件夹树
+    async getFolderTree(): Promise<FolderTreeNode[]> {
+        const response = await http.get<ApiResponse<FolderTreeNode[]>>('/folders/tree');
         return response.data.data;
     }
 }; 

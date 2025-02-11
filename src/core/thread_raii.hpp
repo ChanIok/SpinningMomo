@@ -1,6 +1,7 @@
 #pragma once
 #include <thread>
 #include <memory>
+#include "win_config.hpp"
 
 class ThreadRAII {
 public:
@@ -49,8 +50,8 @@ public:
     }
 
     // 获取线程ID
-    DWORD get_id() const noexcept { 
-        return thread_ ? ::GetThreadId(thread_->native_handle()) : 0;
+    std::thread::id get_id() const noexcept { 
+        return thread_ ? thread_->get_id() : std::thread::id();
     }
 
 private:

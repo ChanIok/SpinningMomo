@@ -24,9 +24,10 @@ const activeTab = ref('folders')
 
 // 加载设置
 onMounted(async () => {
-    const result = await settingsStore.loadSettings()
-    if (!result.success) {
-        message.error(result.error || '加载设置失败')
+    try {
+        await settingsStore.loadSettings()
+    } catch (error) {
+        message.error(error instanceof Error ? error.message : '加载设置失败')
     }
 })
 
@@ -37,7 +38,7 @@ async function handleSave() {
             message.error('没有可保存的设置')
             return
         }
-        const response = await settingsAPI.updateSettings(settingsStore.settings)
+        await settingsAPI.updateSettings(settingsStore.settings)
         message.success('设置已保存')
     } catch (error) {
         message.error(error instanceof Error ? error.message : '保存设置失败')

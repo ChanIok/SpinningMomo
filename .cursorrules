@@ -4,19 +4,14 @@
 SpinningMomo/
 ├── src/                    # 主程序源代码
 │   ├── core/              # 核心功能模块
-│   │   ├── window/        # 窗口相关
-│   │   │   ├── menu_window.hpp/cpp
-│   │   │   ├── preview_window.hpp/cpp
-│   │   │   └── window_utils.hpp/cpp
-│   │   ├── system/        # 系统功能
-│   │   │   ├── tray_icon.hpp/cpp
-│   │   │   └── notification_manager.hpp/cpp
+│   │   ├── menu_window.hpp/cpp
+│   │   ├── preview_window.hpp/cpp
+│   │   ├── window_utils.hpp/cpp
+│   │   ├── tray_icon.hpp/cpp
+│   │   └── notification_manager.hpp/cpp
 │   │   ├── config_manager.hpp/cpp
 │   │   ├── image_processor.hpp/cpp
 │   │   └── constants.hpp/cpp
-│   ├── tracker/           # 参数追踪模块
-│   │   ├── parameter_tracker.hpp/cpp
-│   │   └── parameter_types.hpp
 │   ├── media/            # 相册管理模块
 │   │   ├── core/         # HTTP服务器相关
 │   │   │   ├── server.hpp/cpp
@@ -31,15 +26,13 @@ SpinningMomo/
 │   │   │   ├── screenshot_service.hpp/cpp
 │   │   │   └── album_service.hpp/cpp
 │   │   └── routes/       # 路由
-│   │   │   ├── screenshot_routes.hpp/cpp
-│   │   │   └── album_routes.hpp/cpp
-
+│   │       ├── screenshot_routes.hpp/cpp
+│   │       └── album_routes.hpp/cpp
 │   ├── main.cpp          # 程序入口
 │   ├── resource.rc       # 资源文件
 │   └── icon.ico          # 应用图标
 ├── frontend/             # 前端项目（Vue3 + Naive UI）
 │   ├── src/
-
 │   │   ├── views/        # 页面组件
 │   │   │   ├── Album/    # 相册相关页面
 │   │   │   └── Settings/ # 设置页面
@@ -52,7 +45,6 @@ SpinningMomo/
 │   ├── public/          # 静态资源
 │   └── index.html       # 入口HTML
 ├── docs/                # 项目文档
-├── models/              # ONNX模型文件
 ├── tools/              # 工具脚本
 ├── resources/          # 资源文件
 ├── CMakeLists.txt      # CMake配置
@@ -73,3 +65,28 @@ SpinningMomo/
 - SQLite3 (数据库)
 - nlohmann/json (JSON处理)
 - spdlog (日志处理)
+
+## 其他
+
+响应格式示例
+// Success - with data
+{
+    success: true,
+    data: { id: 1, name: "folder1" }
+}
+
+// Success - message only
+{
+    success: true,
+    data: {
+        message: "Folder deleted successfully"
+    }
+}
+
+// Failed
+{
+    success: false,
+    data: {
+        message: "Folder already exists"
+    }
+}

@@ -2,6 +2,9 @@
 #include <fstream>
 #include <filesystem>
 #include <spdlog/spdlog.h>
+#include <random>
+#include <iomanip>
+#include <sstream>
 
 namespace fs = std::filesystem;
 
@@ -264,4 +267,55 @@ bool SettingsManager::backup_settings() const {
         spdlog::error("Failed to backup settings: {}", e.what());
         return false;
     }
+}
+
+// 生成UUID
+std::string SettingsManager::generate_folder_id() const {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, 15);
+    
+    const char* hex_chars = "0123456789abcdef";
+    std::stringstream ss;
+    
+    for (int i = 0; i < 32; ++i) {
+        if (i == 8 || i == 12 || i == 16 || i == 20) {
+            ss << "-";
+        }
+        ss << hex_chars[dis(gen)];
+    }
+    
+    return ss.str();
+}
+
+// 获取文件夹ID到路径的映射
+std::unordered_map<std::string, std::string> SettingsManager::get_folder_id_map() const {
+    std::lock_guard<std::mutex> lock(memory_mutex_);
+    std::unordered_map<std::string, std::string> map;
+    for (const auto& folder : settings_.watched_folders) {
+        map[folder.id] = folder.path;
+    }
+    return map;
+}
+
+// 根据路径获取文件夹ID
+std::optional<std::string> SettingsManager::get_folder_id(const std::string& path) const {
+    std::lock_guard<std::mutex> lock(memory_mutex_);
+    for (const auto& folder : settings_.watched_folders) {
+        if (folder.path == path) {
+            return folder.id;
+        }
+    }
+    return std::nullopt;
+}
+
+// 根据ID获取文件夹信息
+std::optional<WatchedFolder> SettingsManager::get_folder_by_id(const std::string& id) const {
+    std::lock_guard<std::mutex> lock(memory_mutex_);
+    for (const auto& folder : settings_.watched_folders) {
+        if (folder.id == id) {
+            return folder;
+        }
+    }
+    return std::nullopt;
 } 

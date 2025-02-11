@@ -5,6 +5,7 @@
 #include "album_routes.hpp"
 #include "screenshot_routes.hpp"
 #include "settings_routes.hpp"
+#include "folder_routes.hpp"
 #include "media/utils/response.hpp"
 
 /**
@@ -42,6 +43,9 @@ public:
         
         // 注册设置相关路由
         register_settings_routes(app);
+
+        // 注册文件夹监控相关路由
+        register_folder_routes(app);
     }
 
 private:

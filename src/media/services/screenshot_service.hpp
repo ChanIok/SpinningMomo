@@ -25,16 +25,23 @@ public:
     std::vector<Screenshot> get_screenshots(bool include_deleted = false);
 
     // 获取分页后的截图列表
-    std::pair<std::vector<Screenshot>, bool> get_screenshots_paginated(int64_t last_id, int limit);
-
-    // 获取指定目录下的截图
-    std::vector<Screenshot> get_screenshots_by_directory(const std::wstring& directory);
+    std::pair<std::vector<Screenshot>, bool> get_screenshots_paginated(
+        const std::string& folder_id,
+        const std::string& relative_path,
+        int64_t last_id, 
+        int limit
+    );
 
     // 获取月份统计信息
     std::vector<MonthStats> get_month_statistics();
     
     // 获取指定月份的照片
-    std::pair<std::vector<Screenshot>, bool> get_screenshots_by_month(int year, int month, int64_t last_id, int limit);
+    std::pair<std::vector<Screenshot>, bool> get_screenshots_by_month(
+        int year, 
+        int month, 
+        int64_t last_id, 
+        int limit
+    );
 
     // 获取单个截图
     Screenshot get_screenshot(int64_t id);
@@ -55,7 +62,14 @@ public:
     nlohmann::json get_screenshot_with_thumbnail(const Screenshot& screenshot);
 
     // 获取相册照片
-    std::pair<std::vector<Screenshot>, bool> get_screenshots_by_album(int64_t album_id, int64_t last_id, int limit);
+    std::pair<std::vector<Screenshot>, bool> get_screenshots_by_album(
+        int64_t album_id, 
+        int64_t last_id, 
+        int limit
+    );
+
+    // 获取文件夹树结构
+    std::vector<FolderTreeNode> get_folder_tree();
 
 private:
     ScreenshotService() = default;
@@ -70,6 +84,12 @@ private:
 
     // 从文件名解析照片时间
     std::optional<int64_t> parse_photo_time_from_filename(const std::string& filename);
+
+    // 构建文件夹树
+    void build_folder_tree(FolderTreeNode& node, const std::string& path);
+
+    // 计算相对路径
+    std::string calculate_relative_path(const std::string& filepath, const std::string& base_path);
 
     // 数据访问层
     ScreenshotRepository& repository_ = ScreenshotRepository::get_instance();

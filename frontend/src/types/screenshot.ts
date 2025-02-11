@@ -20,6 +20,8 @@ export interface ScreenshotResponse {
 export interface ScreenshotParams {
     lastId?: number | null;
     limit?: number;
+    folderId?: string;
+    relativePath?: string;
 }
 
 export interface Album {

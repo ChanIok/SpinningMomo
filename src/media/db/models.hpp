@@ -22,8 +22,22 @@ struct Screenshot {
     int64_t updated_at = 0;                // 更新时间（Unix时间戳）
     bool thumbnail_generated = false;       // 缩略图是否已生成
     std::optional<int64_t> photo_time;     // 照片拍摄时间（Unix时间戳）
+    std::string folder_id;                 // 关联的监控文件夹ID
+    std::string relative_path;             // 相对于监控文件夹的路径
 
     bool is_valid() const { return !filename.empty() && !filepath.empty(); }
+};
+
+// 文件夹树节点结构
+struct FolderTreeNode {
+    std::string name;                      // 文件夹名称
+    std::string full_path;                 // 完整路径
+    std::string folder_id;                 // 根文件夹ID
+    int photo_count;                       // 该目录下的照片数量
+    std::vector<FolderTreeNode> children;  // 子文件夹
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(FolderTreeNode,
+        name, full_path, folder_id, photo_count, children)
 };
 
 // 相册数据结构
@@ -61,7 +75,9 @@ inline void to_json(nlohmann::json& j, const Screenshot& s) {
         {"updated_at", s.updated_at},
         {"deleted_at", s.deleted_at.has_value() ? s.deleted_at.value() : 0},
         {"thumbnail_generated", s.thumbnail_generated},
-        {"photo_time", s.photo_time.has_value() ? s.photo_time.value() : 0}
+        {"photo_time", s.photo_time.has_value() ? s.photo_time.value() : 0},
+        {"folder_id", s.folder_id},
+        {"relative_path", s.relative_path}
     };
 }
 
@@ -78,6 +94,8 @@ inline void from_json(const nlohmann::json& j, Screenshot& s) {
     s.deleted_at = j.value("deleted_at", 0);
     s.thumbnail_generated = j.value("thumbnail_generated", false);
     s.photo_time = j.value("photo_time", 0);
+    s.folder_id = j.value("folder_id", "");
+    s.relative_path = j.value("relative_path", "");
 }
 
 inline void to_json(nlohmann::json& j, const Album& a) {

@@ -17,21 +17,40 @@ public:
     bool save(Screenshot& screenshot) override;
     bool remove(int64_t id) override;
 
+    // 检查文件是否存在
+    bool exists_by_path(const std::string& filepath);
+
     // 分页查询
-    std::pair<std::vector<Screenshot>, bool> find_paginated(int64_t last_id, int limit);
-    // 按目录查询
-    std::vector<Screenshot> find_by_directory(const std::wstring& dir_path, int64_t last_id = 0, int limit = 20);
+    std::pair<std::vector<Screenshot>, bool> find_paginated_by_folder(
+        const std::string& folder_id,
+        const std::string& relative_path,
+        int64_t last_id,
+        int limit
+    );
     
     // 获取月份统计信息
     std::vector<MonthStats> get_month_statistics();
     
     // 获取指定月份的照片
-    std::pair<std::vector<Screenshot>, bool> find_by_month(int year, int month, int64_t last_id, int limit);
+    std::pair<std::vector<Screenshot>, bool> find_by_month(
+        int year, 
+        int month, 
+        int64_t last_id, 
+        int limit
+    );
 
+    // 更新缩略图状态
     bool update_thumbnail_generated(int64_t id, bool generated);
 
-    // 添加获取相册照片的方法
-    std::pair<std::vector<Screenshot>, bool> find_by_album(int64_t album_id, int64_t last_id, int limit);
+    // 获取相册照片
+    std::pair<std::vector<Screenshot>, bool> find_by_album(
+        int64_t album_id, 
+        int64_t last_id, 
+        int limit
+    );
+
+    // 统计文件夹中的照片数量
+    int count_by_folder(const std::string& folder_id, const std::string& relative_path);
 
 private:
     ScreenshotRepository() = default;
@@ -46,4 +65,4 @@ private:
     Screenshot read_screenshot_from_stmt(sqlite3_stmt* stmt);
     sqlite3_stmt* prepare_statement(const char* sql);
     bool execute_statement(sqlite3_stmt* stmt, const std::string& operation);
-}; 
+};

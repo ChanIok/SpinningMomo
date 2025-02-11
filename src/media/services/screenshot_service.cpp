@@ -9,6 +9,7 @@
 #include <fstream>
 #include <algorithm>
 #include "core/win_config.hpp"
+#include "core/settings/settings_manager.hpp"
 
 ScreenshotService& ScreenshotService::get_instance() {
     static ScreenshotService instance;
@@ -21,8 +22,27 @@ Screenshot ScreenshotService::create_screenshot(const std::string& filepath) {
         throw std::runtime_error("文件不存在: " + filepath);
     }
 
+    auto& settings = SettingsManager::get_instance();
+    
+    // 查找所属的监控文件夹
+    std::string folder_id;
+    std::string base_path;
+    for (const auto& folder : settings.get_watched_folders()) {
+        if (filepath.compare(0, folder.path.length(), folder.path) == 0) {
+            folder_id = folder.id;
+            base_path = folder.path;
+            break;
+        }
+    }
+
+    if (folder_id.empty()) {
+        throw std::runtime_error("文件不在任何监控文件夹中");
+    }
+
     // 创建截图对象
     auto screenshot = create_from_file(std::filesystem::path(filepath));
+    screenshot.folder_id = folder_id;
+    screenshot.relative_path = calculate_relative_path(filepath, base_path);
     
     // 保存到数据库
     if (!repository_.save(screenshot)) {
@@ -174,13 +194,15 @@ void ScreenshotService::read_image_info(const std::string& filepath, Screenshot&
     screenshot.height = 1080;
 }
 
-std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_paginated(int64_t last_id, int limit) {
-    return repository_.find_paginated(last_id, limit);
+std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_paginated(
+    const std::string& folder_id,
+    const std::string& relative_path,
+    int64_t last_id, 
+    int limit
+) {
+    return repository_.find_paginated_by_folder(folder_id, relative_path, last_id, limit);
 }
 
-std::vector<Screenshot> ScreenshotService::get_screenshots_by_directory(const std::wstring& directory) {
-    return repository_.find_by_directory(directory);
-}
 
 std::pair<std::vector<char>, std::string> ScreenshotService::read_raw_image(const Screenshot& screenshot) {
     // 将UTF-8路径转换为宽字符
@@ -237,4 +259,63 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_by_m
 
 std::pair<std::vector<Screenshot>, bool> ScreenshotService::get_screenshots_by_album(int64_t album_id, int64_t last_id, int limit) {
     return repository_.find_by_album(album_id, last_id, limit);
+}
+
+std::vector<FolderTreeNode> ScreenshotService::get_folder_tree() {
+    std::vector<FolderTreeNode> tree;
+    auto& settings = SettingsManager::get_instance();
+    
+    for (const auto& folder : settings.get_watched_folders()) {
+        FolderTreeNode node;
+        node.name = std::filesystem::path(folder.path).filename().string();
+        node.full_path = folder.path;
+        node.folder_id = folder.id;
+        node.photo_count = repository_.count_by_folder(folder.id, "");
+        
+        build_folder_tree(node, folder.path);
+        tree.push_back(std::move(node));
+    }
+    
+    return tree;
+}
+
+void ScreenshotService::build_folder_tree(FolderTreeNode& node, const std::string& path) {
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator(path)) {
+            if (entry.is_directory()) {
+                FolderTreeNode child;
+                child.name = entry.path().filename().string();
+                child.full_path = entry.path().string();
+                child.folder_id = node.folder_id;
+                
+                // 计算相对路径
+                std::string relative_path = calculate_relative_path(child.full_path, path);
+                child.photo_count = repository_.count_by_folder(node.folder_id, relative_path);
+                
+                build_folder_tree(child, entry.path().string());
+                if (child.photo_count > 0 || !child.children.empty()) {
+                    node.children.push_back(std::move(child));
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        spdlog::error("Error building folder tree for {}: {}", path, e.what());
+    }
+}
+
+std::string ScreenshotService::calculate_relative_path(
+    const std::string& filepath, 
+    const std::string& base_path
+) {
+    std::filesystem::path path(filepath);
+    std::filesystem::path base(base_path);
+    
+    // 如果是文件路径，获取其父目录
+    if (std::filesystem::is_regular_file(filepath)) {
+        path = path.parent_path();
+    }
+    
+    // 计算相对路径
+    auto rel_path = std::filesystem::relative(path, base);
+    return rel_path.string();
 } 

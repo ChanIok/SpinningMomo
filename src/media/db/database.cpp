@@ -52,12 +52,16 @@ void Database::init(const std::string& db_path) {
             thumbnail_generated INTEGER DEFAULT 0,  -- 缩略图是否已生成
             photo_time INTEGER,               -- 照片拍摄时间（从文件名解析）
             deleted_at DATETIME,              -- 软删除时间
-            updated_at DATETIME NOT NULL      -- 更新时间
+            updated_at DATETIME NOT NULL,     -- 更新时间
+            folder_id TEXT,                   -- 关联的监控文件夹ID
+            relative_path TEXT                -- 相对于监控文件夹的路径
         );
         
         -- 创建截图表索引
         CREATE INDEX IF NOT EXISTS idx_screenshots_created_at ON screenshots(created_at);
         CREATE INDEX IF NOT EXISTS idx_screenshots_deleted_at ON screenshots(deleted_at);
+        CREATE INDEX IF NOT EXISTS idx_screenshots_folder_id ON screenshots(folder_id);
+        CREATE INDEX IF NOT EXISTS idx_screenshots_relative_path ON screenshots(relative_path);
         
         -- 相册表
         CREATE TABLE IF NOT EXISTS screenshot_albums (

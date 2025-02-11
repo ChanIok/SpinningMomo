@@ -1,6 +1,6 @@
 #include "folder_service.hpp"
 #include <spdlog/spdlog.h>
-#include <windows.h>
+#include "core/win_config.hpp"
 #include <shobjidl.h> 
 #include <shlwapi.h>
 #include <fstream>

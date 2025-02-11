@@ -111,6 +111,35 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
         }
     }
 
+    // 添加文件夹相关方法
+    async function loadFolderPhotos(folderId: string, relativePath: string, reset = false) {
+        if (reset) {
+            screenshots.value = [];
+            lastId.value = 0;
+            hasMore.value = true;
+        }
+
+        if (!hasMore.value || loading.value) return;
+
+        loading.value = true;
+        try {
+            const response = await screenshotAPI.getScreenshots({
+                folderId,
+                relativePath,
+                lastId: lastId.value,
+                limit: 20
+            });
+
+            screenshots.value.push(...response.screenshots);
+            hasMore.value = response.hasMore;
+            if (response.screenshots.length > 0) {
+                lastId.value = response.screenshots[response.screenshots.length - 1].id;
+            }
+        } finally {
+            loading.value = false;
+        }
+    }
+
     return {
         // State
         screenshots,
@@ -125,6 +154,7 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
         loadMore,
         loadByMonth,
         reset,
-        loadAlbumPhotos
+        loadAlbumPhotos,
+        loadFolderPhotos
     };
 }); 
