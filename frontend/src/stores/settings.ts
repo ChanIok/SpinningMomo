@@ -1,57 +1,115 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { AppSettings, WatchedFolder } from '@/types/settings'
+import type { AppSettings } from '@/types/settings'
 import { settingsAPI } from '@/api/settings'
 
 export const useSettingsStore = defineStore('settings', () => {
+    // State
     const settings = ref<AppSettings | null>(null)
     const loading = ref(false)
 
-    // 加载设置
-    async function loadSettings(): Promise<void> {
+    // Actions
+    async function loadSettings() {
         try {
             loading.value = true
-            const response = await settingsAPI.getSettings()
-            settings.value = response
+            settings.value = await settingsAPI.getSettings()
+        } catch (error) {
+            throw error
         } finally {
             loading.value = false
         }
     }
 
-    // 添加监视文件夹
-    async function addWatchedFolder(folder: WatchedFolder): Promise<void> {
+    async function saveSettings() {
+        if (!settings.value) return
+
         try {
             loading.value = true
-            const response = await settingsAPI.addWatchedFolder(folder)
-            if (settings.value) {
-                settings.value.watched_folders.push(folder)
-            }
+            settings.value = await settingsAPI.updateSettings(settings.value)
+        } catch (error) {
+            throw error
         } finally {
             loading.value = false
         }
     }
 
-    // 删除监视文件夹
-    async function removeWatchedFolder(path: string): Promise<void> {
+    async function addWatchedFolder(path: string) {
+        if (!settings.value) return
+
+        try {
+            loading.value = true
+            const folder = await settingsAPI.addWatchedFolder({
+                path,
+                include_subfolders: true,
+                last_scan: new Date().toISOString()
+            })
+            settings.value.watched_folders.push(folder)
+        } catch (error) {
+            throw error
+        } finally {
+            loading.value = false
+        }
+    }
+
+    async function removeWatchedFolder(path: string) {
+        if (!settings.value) return
+
         try {
             loading.value = true
             await settingsAPI.removeWatchedFolder(path)
-            
-            if (settings.value) {
-                settings.value.watched_folders = settings.value.watched_folders.filter(
-                    folder => folder.path !== path
-                )
-            }
+            settings.value.watched_folders = settings.value.watched_folders.filter(
+                f => f.path !== path
+            )
+        } catch (error) {
+            throw error
         } finally {
             loading.value = false
         }
     }
 
+    function updateWatchedFolders(folders: AppSettings['watched_folders']) {
+        if (settings.value) {
+            settings.value.watched_folders = folders
+        }
+    }
+
+    function updateThumbnailSettings(thumbnailSettings: AppSettings['thumbnails']) {
+        if (settings.value) {
+            settings.value.thumbnails = thumbnailSettings
+        }
+    }
+
+    function updateInterfaceSettings(interfaceSettings: AppSettings['interface']) {
+        if (settings.value) {
+            settings.value.interface = interfaceSettings
+        }
+    }
+
+    function updatePerformanceSettings(performanceSettings: AppSettings['performance']) {
+        if (settings.value) {
+            settings.value.performance = performanceSettings
+        }
+    }
+
+    function reset() {
+        settings.value = null
+        loading.value = false
+    }
+
     return {
+        // State
         settings,
         loading,
+
+        // Actions
         loadSettings,
+        saveSettings,
         addWatchedFolder,
-        removeWatchedFolder
+        removeWatchedFolder,
+        updateWatchedFolders,
+        updateThumbnailSettings,
+        updateInterfaceSettings,
+        updatePerformanceSettings,
+        reset
     }
 }) 

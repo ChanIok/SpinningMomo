@@ -10,6 +10,7 @@
 #include <algorithm>
 #include "core/win_config.hpp"
 #include "core/settings/settings_manager.hpp"
+#include "media/services/folder_monitor/folder_processor.hpp"
 
 ScreenshotService& ScreenshotService::get_instance() {
     static ScreenshotService instance;
@@ -19,7 +20,7 @@ ScreenshotService& ScreenshotService::get_instance() {
 Screenshot ScreenshotService::create_screenshot(const std::string& filepath) {
     // 检查文件是否存在
     if (!std::filesystem::exists(filepath)) {
-        throw std::runtime_error("文件不存在: " + filepath);
+        throw std::runtime_error("File does not exist: " + filepath);
     }
 
     auto& settings = SettingsManager::get_instance();
@@ -36,25 +37,17 @@ Screenshot ScreenshotService::create_screenshot(const std::string& filepath) {
     }
 
     if (folder_id.empty()) {
-        throw std::runtime_error("文件不在任何监控文件夹中");
+        throw std::runtime_error("File is not in any monitored folder");
     }
 
-    // 创建截图对象
-    auto screenshot = create_from_file(std::filesystem::path(filepath));
-    screenshot.folder_id = folder_id;
-    screenshot.relative_path = calculate_relative_path(filepath, base_path);
-    
-    // 保存到数据库
-    if (!repository_.save(screenshot)) {
-        throw std::runtime_error("保存截图记录失败");
+    // 使用 FolderProcessor 处理文件
+    auto& folder_processor = FolderProcessor::get_instance();
+    if (!folder_processor.process_single_file(std::filesystem::path(filepath))) {
+        throw std::runtime_error("Failed to process file");
     }
-    
-    // 生成缩略图
-    if (!ThumbnailService::get_instance().generate_thumbnail(screenshot)) {
-        spdlog::warn("生成缩略图失败: {}", filepath);
-    }
-    
-    return screenshot;
+
+    // 返回创建的截图
+    return repository_.find_by_path(filepath);
 }
 
 std::optional<int64_t> ScreenshotService::parse_photo_time_from_filename(const std::string& filename) {

@@ -3,13 +3,12 @@ import type {
     WatchedFolder, 
     ThumbnailSettings, 
     InterfaceSettings, 
-    PerformanceSettings,
-    ApiResponse,
-    MessageResponse
-} from '../types/settings'
+    PerformanceSettings
+} from '@/types/settings'
+import type { ApiResponse } from '@/types/api'
 import { http } from '@/utils/http'
 
-interface FolderSelectResult {
+export interface FolderSelectResult {
     path: string;
     isAccessible: boolean;
 }
@@ -34,33 +33,29 @@ export const settingsAPI = {
     },
 
     // 添加监视文件夹
-    async addWatchedFolder(folder: WatchedFolder): Promise<ApiResponse<WatchedFolder>> {
+    async addWatchedFolder(folder: WatchedFolder): Promise<WatchedFolder> {
         const response = await http.post<ApiResponse<WatchedFolder>>('/settings/watched-folders', folder)
-        return response.data
+        return response.data.data
     },
 
     // 删除监视文件夹
-    async removeWatchedFolder(path: string): Promise<ApiResponse> {
-        const response = await http.delete<ApiResponse>(`/settings/watched-folders/${encodeURIComponent(path)}`)
-        return response.data
+    async removeWatchedFolder(path: string): Promise<void> {
+        await http.delete(`/settings/watched-folders/${encodeURIComponent(path)}`)
     },
 
     // 更新缩略图设置
-    async updateThumbnailSettings(settings: ThumbnailSettings): Promise<ThumbnailSettings> {
-        const response = await http.put<ApiResponse<ThumbnailSettings>>('/settings/thumbnail', settings)
-        return response.data.data
+    async updateThumbnailSettings(settings: ThumbnailSettings): Promise<void> {
+        await http.put('/settings/thumbnail', settings)
     },
 
     // 更新界面设置
-    async updateInterfaceSettings(settings: InterfaceSettings): Promise<InterfaceSettings> {
-        const response = await http.put<ApiResponse<InterfaceSettings>>('/settings/interface', settings)
-        return response.data.data
+    async updateInterfaceSettings(settings: InterfaceSettings): Promise<void> {
+        await http.put('/settings/interface', settings)
     },
 
     // 更新性能设置
-    async updatePerformanceSettings(settings: PerformanceSettings): Promise<PerformanceSettings> {
-        const response = await http.put<ApiResponse<PerformanceSettings>>('/settings/performance', settings)
-        return response.data.data
+    async updatePerformanceSettings(settings: PerformanceSettings): Promise<void> {
+        await http.put('/settings/performance', settings)
     },
 
     // 选择文件夹

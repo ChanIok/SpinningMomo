@@ -5,7 +5,7 @@
 #include <nlohmann/json.hpp>
 
 struct WatchedFolder {
-    std::string id;
+    int id{0};
     std::string path;
     std::string last_scan;
 

@@ -113,6 +113,7 @@ const newFolderPath = ref('')
 async function loadFolders() {
     try {
         folders.value = await folderAPI.getAllFolders()
+        console.log(folders.value)
     } catch (error) {
         message.error('加载文件夹列表失败')
     }

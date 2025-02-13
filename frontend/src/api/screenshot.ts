@@ -1,19 +1,20 @@
-import type { Screenshot, ScreenshotParams, ScreenshotListData, ApiResponse, Album, MonthStats } from '../types/screenshot';
-import { http } from '@/utils/http';
-import type { FolderTreeNode } from '@/types/folder';
+import type { Screenshot, ScreenshotParams, ScreenshotListData, MonthStats } from '@/types/screenshot'
+import type { ApiResponse } from '@/types/api'
+import type { FolderTreeNode } from '@/types/folder'
+import { http } from '@/utils/http'
 
 // 截图相关的 API 方法
 export const screenshotAPI = {
     // 获取截图列表（支持无限滚动）
     async getScreenshots(params: ScreenshotParams): Promise<ScreenshotListData> {
-        const response = await http.get<ApiResponse<ScreenshotListData>>('/screenshots', { params });
-        return response.data.data;
+        const response = await http.get<ApiResponse<ScreenshotListData>>('/screenshots', { params })
+        return response.data.data
     },
 
     // 通过 ID 获取单个截图
     async getScreenshot(id: number): Promise<Screenshot> {
-        const response = await http.get<ApiResponse<Screenshot>>(`/screenshots/${id}`);
-        return response.data.data;
+        const response = await http.get<ApiResponse<Screenshot>>(`/screenshots/${id}`)
+        return response.data.data
     },
 
     // 获取相册中的所有截图
@@ -30,24 +31,24 @@ export const screenshotAPI = {
 
     // 删除截图
     async deleteScreenshot(id: number): Promise<void> {
-        await http.delete(`/screenshots/${id}`);
+        await http.delete(`/screenshots/${id}`)
     },
 
     // 获取月份统计信息
     async getMonthStatistics(): Promise<MonthStats[]> {
-        const response = await http.get<ApiResponse<MonthStats[]>>('/screenshots/calendar');
-        return response.data.data;
+        const response = await http.get<ApiResponse<MonthStats[]>>('/screenshots/calendar')
+        return response.data.data
     },
 
     // 获取指定月份的照片
-    async getScreenshotsByMonth(params: { year: number; month: number; lastId?: number; limit?: number }): Promise<ScreenshotListData> {
-        const response = await http.get<ApiResponse<ScreenshotListData>>('/screenshots', { params });
-        return response.data.data;
+    async getScreenshotsByMonth(params: { year: number; month: number } & ScreenshotParams): Promise<ScreenshotListData> {
+        const response = await http.get<ApiResponse<ScreenshotListData>>('/screenshots', { params })
+        return response.data.data
     },
 
     // 获取文件夹树
     async getFolderTree(): Promise<FolderTreeNode[]> {
-        const response = await http.get<ApiResponse<FolderTreeNode[]>>('/folders/tree');
-        return response.data.data;
+        const response = await http.get<ApiResponse<FolderTreeNode[]>>('/folders/tree')
+        return response.data.data
     }
 }; 

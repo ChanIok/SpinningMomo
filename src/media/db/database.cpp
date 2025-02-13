@@ -53,7 +53,7 @@ void Database::init(const std::string& db_path) {
             photo_time INTEGER,               -- 照片拍摄时间（从文件名解析）
             deleted_at DATETIME,              -- 软删除时间
             updated_at DATETIME NOT NULL,     -- 更新时间
-            folder_id TEXT,                   -- 关联的监控文件夹ID
+            folder_id INTEGER,                -- 关联的监控文件夹ID
             relative_path TEXT                -- 相对于监控文件夹的路径
         );
         

@@ -1,3 +1,5 @@
+import type { ApiResponse } from './api'
+
 export interface WatchedFolder {
     path: string
     include_subfolders: boolean
@@ -37,9 +39,4 @@ export interface AppSettings {
 // API 响应类型
 export interface MessageResponse {
     message: string
-}
-
-export interface ApiResponse<T = MessageResponse> {
-    success: boolean
-    data: T
 } 

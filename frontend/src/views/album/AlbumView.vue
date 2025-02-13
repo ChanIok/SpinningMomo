@@ -2,80 +2,72 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMessage } from 'naive-ui'
-import type { Album } from '@/types/album'
-import { albumAPI } from '@/api/album'
-import AlbumCard from '@/components/album/AlbumCard.vue'
-import AlbumEditDialog from '@/components/album/AlbumEditDialog.vue'
+import { useAlbumStore } from '@/stores'
 import { useAlbumSelectionStore } from '@/stores/album-selection'
+import type { Album } from '@/types/album'
+import { 
+  NSpace, 
+  NButton, 
+  NIcon,
+  NModal
+} from 'naive-ui'
+import AlbumCard from '@/views/album/components/AlbumCard.vue'
+import AlbumEditDialog from '@/views/album/components/AlbumEditDialog.vue'
 import { Close, TrashBin } from '@vicons/ionicons5'
 
 const router = useRouter()
 const message = useMessage()
+const albumStore = useAlbumStore()
 const albumSelectionStore = useAlbumSelectionStore()
 
-const albums = ref<Album[]>([])
-const loading = ref(false)
-const editingAlbum = ref<Album | null>(null)
 const showEditDialog = ref(false)
 const showDeleteConfirm = ref(false)
 
 // 加载相册列表
-async function loadAlbums() {
+onMounted(async () => {
   try {
-    loading.value = true
-    albums.value = await albumAPI.getAlbums()
+    await albumStore.loadAlbums()
   } catch (error) {
-    console.error('Failed to load albums:', error)
     message.error('加载相册列表失败')
-  } finally {
-    loading.value = false
   }
-}
+})
 
 // 打开编辑对话框
 function handleEdit(album: Album) {
-  editingAlbum.value = album
+  albumStore.setEditingAlbum(album)
   showEditDialog.value = true
 }
 
 // 保存相册修改
 async function handleSave(data: { name: string; description?: string }) {
-  if (!editingAlbum.value) return
+  if (!albumStore.editingAlbum) return
   
   try {
-    await albumAPI.updateAlbum(editingAlbum.value.id, data)
+    await albumStore.updateAlbum(albumStore.editingAlbum.id, data)
     message.success('相册更新成功')
-    loadAlbums() // 重新加载列表
+    showEditDialog.value = false
   } catch (error) {
-    console.error('Failed to update album:', error)
     message.error('更新相册失败')
   }
 }
 
 // 查看相册详情
 function handleAlbumClick(album: Album) {
-  router.push(`/albums/${album.id}`)
+  if (!albumSelectionStore.isSelectionMode) {
+    router.push(`/albums/${album.id}`)
+  }
 }
 
 // 处理删除确认
 async function handleConfirmDelete() {
   try {
-    // 批量删除选中的相册
-    for (const id of albumSelectionStore.selectedIds) {
-      await albumAPI.deleteAlbum(id)
-    }
+    await albumStore.deleteAlbums(Array.from(albumSelectionStore.selectedIds))
     message.success('删除成功')
     albumSelectionStore.exitSelectionMode()
-    loadAlbums() // 重新加载列表
   } catch (error) {
-    console.error('Failed to delete albums:', error)
     message.error('删除失败')
   }
 }
-
-onMounted(() => {
-  loadAlbums()
-})
 </script>
 
 <template>
@@ -84,21 +76,24 @@ onMounted(() => {
       <h1>相册</h1>
     </div>
     
-    <div v-if="loading" class="loading-state">
+    <div v-if="albumStore.loading" class="loading-state">
       加载中...
     </div>
     
-    <div v-else-if="albums.length === 0" class="empty-state">
+    <div v-else-if="albumStore.albums.length === 0" class="empty-state">
       暂无相册
     </div>
     
     <div v-else class="album-grid">
       <album-card
-        v-for="album in albums"
+        v-for="album in albumStore.albums"
         :key="album.id"
         :album="album"
+        :selected="albumSelectionStore.isSelected(album.id)"
+        :selection-mode="albumSelectionStore.isSelectionMode"
         @click="handleAlbumClick(album)"
         @edit="handleEdit(album)"
+        @select="albumSelectionStore.toggleSelection(album.id)"
       />
     </div>
 
@@ -142,9 +137,9 @@ onMounted(() => {
     />
 
     <album-edit-dialog
-      v-if="editingAlbum"
+      v-if="albumStore.editingAlbum"
       v-model:show="showEditDialog"
-      :album="editingAlbum"
+      :album="albumStore.editingAlbum"
       @save="handleSave"
     />
   </div>
@@ -164,7 +159,7 @@ onMounted(() => {
 .header h1 {
   font-size: 2em;
   font-weight: 600;
-  color: #333;
+  color: var(--n-text-color-base);
   margin: 0;
 }
 
@@ -178,7 +173,7 @@ onMounted(() => {
 .empty-state {
   text-align: center;
   padding: 48px;
-  color: #666;
+  color: var(--n-text-color-disabled);
   font-size: 1.1em;
 }
 
@@ -187,7 +182,7 @@ onMounted(() => {
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--n-card-color);
   backdrop-filter: blur(10px);
   padding: 12px 16px;
   box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);

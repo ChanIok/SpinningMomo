@@ -36,7 +36,6 @@ void InitializationService::initialize() {
 // 初始化文件夹监控服务
 void InitializationService::init_folder_monitor() {
     try {
-        spdlog::info("Initializing folder monitor service...");
         if (!folder_monitor_service_.init()) {
             throw std::runtime_error("Failed to initialize folder monitor service");
         }

@@ -70,17 +70,17 @@ bool ScreenshotRepository::save(Screenshot& screenshot) {
         R"(UPDATE screenshots 
            SET filename = ?, filepath = ?, created_at = ?, width = ?, height = ?,
                file_size = ?, metadata = ?, photo_time = ?, updated_at = ?, 
-               thumbnail_generated = ?, deleted_at = NULL
+               thumbnail_generated = ?, folder_id = ?, relative_path = ?, deleted_at = NULL
            WHERE id = ?)" :
         R"(INSERT INTO screenshots (filename, filepath, created_at, width, height,
                                   file_size, metadata, photo_time, updated_at, 
-                                  thumbnail_generated, deleted_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL))";
+                                  thumbnail_generated, folder_id, relative_path, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL))";
     
     auto stmt = prepare_statement(sql);
     bind_screenshot_fields(stmt, screenshot, false);
     if (exists) {
-        sqlite3_bind_int64(stmt, 11, screenshot.id);
+        sqlite3_bind_int64(stmt, 13, screenshot.id);
     }
     
     bool success = sqlite3_step(stmt) == SQLITE_DONE;
@@ -136,6 +136,8 @@ void ScreenshotRepository::bind_screenshot_fields(sqlite3_stmt* stmt, const Scre
     }
     sqlite3_bind_int64(stmt, idx++, screenshot.updated_at);
     sqlite3_bind_int(stmt, idx++, screenshot.thumbnail_generated ? 1 : 0);
+    sqlite3_bind_int64(stmt, idx++, screenshot.folder_id);
+    sqlite3_bind_text(stmt, idx++, screenshot.relative_path.c_str(), -1, SQLITE_STATIC);
 }
 
 Screenshot ScreenshotRepository::read_screenshot_from_stmt(sqlite3_stmt* stmt) {
@@ -160,8 +162,12 @@ Screenshot ScreenshotRepository::read_screenshot_from_stmt(sqlite3_stmt* stmt) {
         screenshot.deleted_at = sqlite3_column_int64(stmt, idx);
     }
     idx++;
-    screenshot.updated_at = sqlite3_column_int64(stmt, idx);
-    screenshot.thumbnail_generated = sqlite3_column_int(stmt, idx) == 1;
+    screenshot.updated_at = sqlite3_column_int64(stmt, idx++);
+    screenshot.thumbnail_generated = sqlite3_column_int(stmt, idx++) == 1;
+    screenshot.folder_id = sqlite3_column_int64(stmt, idx++);
+    if (auto text = sqlite3_column_text(stmt, idx)) {
+        screenshot.relative_path = reinterpret_cast<const char*>(text);
+    }
     return screenshot;
 }
 
@@ -390,7 +396,7 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_paginated_by
     return {screenshots, has_more};
 }
 
-int ScreenshotRepository::count_by_folder(const std::string& folder_id, const std::string& relative_path) {
+int ScreenshotRepository::count_by_folder(int64_t folder_id, const std::string& relative_path) {
     std::string sql = R"(
         SELECT COUNT(*) 
         FROM screenshots 
@@ -403,7 +409,7 @@ int ScreenshotRepository::count_by_folder(const std::string& folder_id, const st
     }
     
     auto stmt = prepare_statement(sql.c_str());
-    sqlite3_bind_text(stmt, 1, folder_id.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int64(stmt, 1, folder_id);
     
     if (!relative_path.empty()) {
         sqlite3_bind_text(stmt, 2, relative_path.c_str(), -1, SQLITE_STATIC);
@@ -425,4 +431,26 @@ bool ScreenshotRepository::exists_by_path(const std::string& filepath) {
     bool exists = sqlite3_step(stmt) == SQLITE_ROW;
     sqlite3_finalize(stmt);
     return exists;
+}
+
+Screenshot ScreenshotRepository::find_by_path(const std::string& filepath) {
+    const char* sql = R"(
+        SELECT id, filename, filepath, created_at, width, height, 
+               file_size, metadata, deleted_at, updated_at, thumbnail_generated,
+               photo_time, folder_id, relative_path
+        FROM screenshots 
+        WHERE filepath = ? AND deleted_at IS NULL
+        LIMIT 1
+    )";
+    
+    auto stmt = prepare_statement(sql);
+    sqlite3_bind_text(stmt, 1, filepath.c_str(), -1, SQLITE_STATIC);
+    
+    Screenshot screenshot;
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        screenshot = read_screenshot_from_stmt(stmt);
+    }
+    
+    sqlite3_finalize(stmt);
+    return screenshot;
 } 

@@ -7,34 +7,32 @@ export interface ApiResponse<T> {
 }
 
 /**
- * 分页响应的通用接口
- * @template T 列表项的类型
+ * 分页数据的通用接口
  */
-export interface PaginatedResponse<T> {
-    /** 数据列表 */
+export interface PaginatedData<T> {
     items: T[];
-    /** 是否还有更多数据 */
-    has_more: boolean;
-    /** 总数（可选） */
+    hasMore: boolean;
     total?: number;
 }
 
 /**
- * 带消息的成功响应
+ * 分页请求参数
  */
-export interface SuccessResponse {
-    success: true;
-    data: {
-        message: string;
-    };
+export interface PaginationParams {
+    lastId?: number;
+    limit?: number;
 }
 
 /**
- * 错误响应
+ * 成功响应消息
+ */
+export interface SuccessResponse {
+    message: string;
+}
+
+/**
+ * 错误响应消息
  */
 export interface ErrorResponse {
-    success: false;
-    data: {
-        message: string;
-    };
+    message: string;
 } 

@@ -5,7 +5,7 @@ import { NImage, NEllipsis, NButton, NIcon, useMessage, NSpace, NTooltip } from 
 import { CheckmarkCircle, RadioButtonOff, Close, Albums } from '@vicons/ionicons5'
 import ScreenshotPreview from './ScreenshotPreview.vue';
 import { useSelectionStore } from '@/stores/screenshot-selection'
-import AlbumSelectionDialog from '../album/AlbumSelectionDialog.vue'
+import AlbumSelectionDialog from '@/views/album/components/AlbumSelectionDialog.vue'
 import { albumAPI } from '@/api/album'
 
 // 布局配置常量

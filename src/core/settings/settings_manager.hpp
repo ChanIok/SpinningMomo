@@ -45,10 +45,8 @@ public:
     bool update_performance_settings(const PerformanceSettings& settings);
 
     // 文件夹ID相关方法
-    std::string generate_folder_id() const;
-    std::unordered_map<std::string, std::string> get_folder_id_map() const;
-    std::optional<std::string> get_folder_id(const std::string& path) const;
-    std::optional<WatchedFolder> get_folder_by_id(const std::string& id) const;
+    int get_next_folder_id() const;
+    std::optional<WatchedFolder> get_folder_by_id(int id) const;
 
 private:
     SettingsManager() = default;

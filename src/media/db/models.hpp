@@ -10,19 +10,19 @@
 
 // 截图数据结构
 struct Screenshot {
-    int64_t id = 0;                        // 唯一标识符
+    int64_t id{0};                        // 唯一标识符
     std::string filename;                   // 文件名
     std::string filepath;                   // 文件路径
-    int64_t created_at = 0;                // 创建时间（Unix时间戳）
-    UINT width = 0;                        // 图片宽度
-    UINT height = 0;                       // 图片高度
-    int64_t file_size = 0;                 // 文件大小
+    int64_t created_at{0};                // 创建时间（Unix时间戳）
+    UINT width{0};                        // 图片宽度
+    UINT height{0};                       // 图片高度
+    int64_t file_size{0};                 // 文件大小
     std::string metadata;                  // 元数据（JSON格式）
     std::optional<int64_t> deleted_at;     // 删除时间（Unix时间戳）
-    int64_t updated_at = 0;                // 更新时间（Unix时间戳）
-    bool thumbnail_generated = false;       // 缩略图是否已生成
+    int64_t updated_at{0};                // 更新时间（Unix时间戳）
+    bool thumbnail_generated{false};       // 缩略图是否已生成
     std::optional<int64_t> photo_time;     // 照片拍摄时间（Unix时间戳）
-    std::string folder_id;                 // 关联的监控文件夹ID
+    int64_t folder_id{0};                  // 关联的监控文件夹ID
     std::string relative_path;             // 相对于监控文件夹的路径
 
     bool is_valid() const { return !filename.empty() && !filepath.empty(); }
@@ -32,8 +32,8 @@ struct Screenshot {
 struct FolderTreeNode {
     std::string name;                      // 文件夹名称
     std::string full_path;                 // 完整路径
-    std::string folder_id;                 // 根文件夹ID
-    int photo_count;                       // 该目录下的照片数量
+    int64_t folder_id{0};                 // 根文件夹ID
+    int photo_count{0};                   // 该目录下的照片数量
     std::vector<FolderTreeNode> children;  // 子文件夹
 
     NLOHMANN_DEFINE_TYPE_INTRUSIVE(FolderTreeNode,
@@ -42,12 +42,12 @@ struct FolderTreeNode {
 
 // 相册数据结构
 struct Album {
-    int64_t id = 0;                        // 唯一标识符
+    int64_t id{0};                        // 唯一标识符
     std::string name;                      // 相册名称
     std::string description;               // 相册描述
     std::optional<int64_t> cover_screenshot_id; // 封面截图ID
-    std::time_t created_at = 0;            // 创建时间
-    std::time_t updated_at = 0;            // 更新时间
+    std::time_t created_at{0};            // 创建时间
+    std::time_t updated_at{0};            // 更新时间
     std::optional<std::time_t> deleted_at; // 删除时间
 
     bool is_valid() const { return !name.empty(); }
@@ -55,10 +55,10 @@ struct Album {
 
 // 月份统计信息
 struct MonthStats {
-    int year;                   // 年份
-    int month;                  // 月份
-    int count;                  // 照片数量
-    int64_t first_screenshot_id;// 第一张照片ID
+    int year{0};                   // 年份
+    int month{0};                  // 月份
+    int count{0};                  // 照片数量
+    int64_t first_screenshot_id{0};// 第一张照片ID
 };
 
 // JSON 序列化支持
@@ -94,7 +94,7 @@ inline void from_json(const nlohmann::json& j, Screenshot& s) {
     s.deleted_at = j.value("deleted_at", 0);
     s.thumbnail_generated = j.value("thumbnail_generated", false);
     s.photo_time = j.value("photo_time", 0);
-    s.folder_id = j.value("folder_id", "");
+    s.folder_id = j.value("folder_id", 0);
     s.relative_path = j.value("relative_path", "");
 }
 

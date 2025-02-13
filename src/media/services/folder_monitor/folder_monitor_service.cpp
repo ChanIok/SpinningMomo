@@ -1,5 +1,6 @@
 #include "folder_monitor_service.hpp"
 #include <spdlog/spdlog.h>
+#include <nlohmann/json.hpp>
 
 // 全局静态指针
 static FolderMonitorService* g_instance = nullptr;
@@ -49,7 +50,10 @@ bool FolderMonitorService::add_folder(const std::string& path) {
 
         // 添加到设置
         WatchedFolder new_folder;
+        new_folder.id = m_settings_manager.get_next_folder_id();
         new_folder.path = path;
+        new_folder.last_scan = std::to_string(std::time(nullptr));
+        
         settings.watched_folders.push_back(new_folder);
         
         if (!m_settings_manager.update_settings(settings)) {
@@ -109,12 +113,15 @@ ProcessingProgress FolderMonitorService::get_folder_status(const std::string& pa
     return m_folder_processor.get_progress(path);
 }
 
-std::vector<std::pair<std::string, ProcessingProgress>> FolderMonitorService::get_all_folder_status() {
-    std::vector<std::pair<std::string, ProcessingProgress>> result;
+std::vector<nlohmann::json> FolderMonitorService::get_all_folder_status() {
+    std::vector<nlohmann::json> result;
     auto settings = m_settings_manager.get_settings();
     
     for (const auto& folder : settings.watched_folders) {
-        result.emplace_back(folder.path, get_folder_status(folder.path));
+        result.push_back({
+            {"path", folder.path},
+            {"progress", get_folder_status(folder.path)}
+        });
     }
     
     return result;

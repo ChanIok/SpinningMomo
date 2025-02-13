@@ -7,9 +7,3 @@ export interface Album {
   updated_at: number
   deleted_at?: number
 }
-
-export interface ApiResponse<T> {
-  code: number
-  message: string
-  data: T
-} 

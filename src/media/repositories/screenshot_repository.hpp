@@ -19,6 +19,9 @@ public:
 
     // 检查文件是否存在
     bool exists_by_path(const std::string& filepath);
+    
+    // 根据路径查找
+    Screenshot find_by_path(const std::string& filepath);
 
     // 分页查询
     std::pair<std::vector<Screenshot>, bool> find_paginated_by_folder(
@@ -50,7 +53,7 @@ public:
     );
 
     // 统计文件夹中的照片数量
-    int count_by_folder(const std::string& folder_id, const std::string& relative_path);
+    int count_by_folder(int64_t folder_id, const std::string& relative_path);
 
 private:
     ScreenshotRepository() = default;

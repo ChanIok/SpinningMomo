@@ -1,3 +1,5 @@
+import type { PaginatedData, ApiResponse, PaginationParams } from './api'
+
 export interface Screenshot {
     id: number;
     filename: string;
@@ -18,10 +20,13 @@ export interface ScreenshotResponse {
 }
 
 export interface ScreenshotParams {
-    lastId?: number | null;
-    limit?: number;
     folderId?: string;
-    relativePath?: string;
+    albumId?: number;
+    year?: number;
+    month?: number;
+    lastId?: string;
+    limit?: number;
+    reset?: boolean;
 }
 
 export interface Album {
@@ -34,15 +39,7 @@ export interface Album {
     cover_screenshot_id?: number;
 }
 
-export interface ApiResponse<T> {
-    data: T;
-    success: boolean;
-}
-
-export interface ScreenshotListData {
-    screenshots: Screenshot[];
-    hasMore: boolean;
-}
+export type ScreenshotListData = PaginatedData<Screenshot>
 
 export interface MonthStats {
     year: number;

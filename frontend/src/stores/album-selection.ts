@@ -30,7 +30,34 @@ export const useAlbumSelectionStore = defineStore('album-selection', {
         }
       } else {
         this.selectedIds.add(id)
+        if (!this.isSelectionMode) {
+          this.isSelectionMode = true
+        }
       }
+    },
+
+    selectMultiple(ids: number[]) {
+      ids.forEach(id => this.selectedIds.add(id))
+      if (ids.length > 0) {
+        this.isSelectionMode = true
+      }
+    },
+
+    deselectMultiple(ids: number[]) {
+      ids.forEach(id => this.selectedIds.delete(id))
+      if (this.selectedIds.size === 0) {
+        this.isSelectionMode = false
+      }
+    },
+
+    selectAll(ids: number[]) {
+      ids.forEach(id => this.selectedIds.add(id))
+      this.isSelectionMode = true
+    },
+
+    clearSelection() {
+      this.selectedIds.clear()
+      this.isSelectionMode = false
     },
 
     enterSelectionMode() {
@@ -38,8 +65,8 @@ export const useAlbumSelectionStore = defineStore('album-selection', {
     },
 
     exitSelectionMode() {
-      this.isSelectionMode = false
       this.selectedIds.clear()
+      this.isSelectionMode = false
     }
   }
 }) 

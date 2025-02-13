@@ -1,5 +1,6 @@
-import type { Album, ApiResponse } from '../types/album';
-import type { Screenshot } from '../types/screenshot';
+import type { Album } from '@/types/album';
+import type { Screenshot } from '@/types/screenshot';
+import type { ApiResponse } from '@/types/api';
 import { http } from '@/utils/http';
 
 export const albumAPI = {

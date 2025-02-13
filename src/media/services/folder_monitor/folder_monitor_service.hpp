@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <nlohmann/json.hpp>
 #include "folder_processor.hpp"
 #include "core/settings/settings_manager.hpp"
 #include "media/services/folder_service.hpp"
@@ -27,7 +28,7 @@ public:
     ProcessingProgress get_folder_status(const std::string& path);
     
     // 获取所有监控文件夹状态
-    std::vector<std::pair<std::string, ProcessingProgress>> get_all_folder_status();
+    std::vector<nlohmann::json> get_all_folder_status();
 
 private:
     FolderMonitorService() = default;
