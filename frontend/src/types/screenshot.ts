@@ -26,7 +26,6 @@ export interface ScreenshotParams {
     month?: number;
     lastId?: string;
     limit?: number;
-    reset?: boolean;
 }
 
 export interface Album {

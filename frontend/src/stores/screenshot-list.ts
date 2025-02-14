@@ -16,19 +16,19 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
 
     // Actions
     async function loadScreenshots(params?: Partial<ScreenshotParams>) {
-        if (loading.value || (!hasMore.value && !params?.reset)) return;
+        if (loading.value || (!hasMore.value && lastId.value !== null)) return;
 
         try {
             loading.value = true;
             error.value = null;
 
             const result = await screenshotAPI.getScreenshots({
-                lastId: params?.reset ? undefined : lastId.value?.toString(),
-                limit: 20,
+                lastId: lastId.value?.toString(),
+                limit: 50,
                 ...params
             });
 
-            if (params?.reset) {
+            if (lastId.value === null) {
                 screenshots.value = result.items;
             } else {
                 screenshots.value.push(...result.items);

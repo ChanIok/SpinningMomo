@@ -59,12 +59,12 @@ inline void register_screenshot_routes(uWS::App& app) {
             auto [screenshots, has_more] = result;
             
             nlohmann::json response = {
-                {"screenshots", nlohmann::json::array()},
+                {"items", nlohmann::json::array()},
                 {"hasMore", has_more}
             };
             
             for (const auto& screenshot : screenshots) {
-                response["screenshots"].push_back(
+                response["items"].push_back(
                     screenshot_service.get_screenshot_with_thumbnail(screenshot));
             }
             
@@ -122,12 +122,12 @@ inline void register_screenshot_routes(uWS::App& app) {
             auto [screenshots, has_more] = screenshot_service.get_screenshots_by_album(album_id, last_id, limit);
             
             nlohmann::json response = {
-                {"screenshots", nlohmann::json::array()},
+                {"items", nlohmann::json::array()},
                 {"hasMore", has_more}
             };
             
             for (const auto& screenshot : screenshots) {
-                response["screenshots"].push_back(screenshot_service.get_screenshot_with_thumbnail(screenshot));
+                response["items"].push_back(screenshot_service.get_screenshot_with_thumbnail(screenshot));
             }
             
             Response::Success(res, response);

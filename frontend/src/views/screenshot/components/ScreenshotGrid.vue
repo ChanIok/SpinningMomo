@@ -51,7 +51,7 @@ const emit = defineEmits<{
 }
 
 .screenshot-item {
-  aspect-ratio: 16/9;
+  aspect-ratio: 1;
   overflow: hidden;
   border-radius: 8px;
   background-color: var(--n-card-color);

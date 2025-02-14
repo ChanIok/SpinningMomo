@@ -20,14 +20,13 @@ const viewMode = ref<'grid' | 'list'>('grid')
 const browserContentRef = ref<HTMLElement | null>(null)
 
 // 加载截图
-async function loadScreenshots(reset = false) {
+async function loadScreenshots() {
   try {
     await store.loadScreenshots({
       folderId: props.folderId,
       albumId: props.albumId,
       year: props.year,
       month: props.month,
-      reset
     })
   } catch (error) {
     message.error('加载截图失败')
@@ -52,7 +51,7 @@ watch(
   () => [props.folderId, props.albumId, props.year, props.month],
   () => {
     store.reset()
-    loadScreenshots(true)
+    loadScreenshots()
   },
   { immediate: true }
 )

@@ -333,13 +333,18 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_paginated_by
             SELECT s.*
             FROM screenshots s
             WHERE s.deleted_at IS NULL
-            AND s.folder_id = ?
     )";
     
-    if (!relative_path.empty()) {
-        sql += " AND s.relative_path = ?";
+    // folder_id条件改为可选
+    if (!folder_id.empty()) {
+        sql += " AND s.folder_id = ?";
+        
+        // relative_path只在指定了folder_id时才有意义
+        if (!relative_path.empty()) {
+            sql += " AND s.relative_path = ?";
+        }
     }
-    
+
     if (last_id > 0) {
         sql += R"(
             AND (
@@ -367,11 +372,13 @@ std::pair<std::vector<Screenshot>, bool> ScreenshotRepository::find_paginated_by
     int param_index = 1;
     
     // Bind folder_id
-    sqlite3_bind_text(stmt, param_index++, folder_id.c_str(), -1, SQLITE_STATIC);
-    
-    // Bind relative_path if provided
-    if (!relative_path.empty()) {
-        sqlite3_bind_text(stmt, param_index++, relative_path.c_str(), -1, SQLITE_STATIC);
+    if (!folder_id.empty()) {
+        sqlite3_bind_text(stmt, param_index++, folder_id.c_str(), -1, SQLITE_STATIC);
+        
+        // 只在指定了folder_id时才绑定relative_path
+        if (!relative_path.empty()) {
+            sqlite3_bind_text(stmt, param_index++, relative_path.c_str(), -1, SQLITE_STATIC);
+        }
     }
     
     // Bind last_id if provided
