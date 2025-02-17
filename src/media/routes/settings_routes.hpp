@@ -6,7 +6,7 @@
 #include "media/utils/response.hpp"
 #include "media/utils/request.hpp"
 #include "core/settings/settings_manager.hpp"
-#include "media/services/folder_service.hpp"
+#include "media/services/folder/folder_service.hpp"
 
 /**
  * @brief 注册设置相关的所有路由

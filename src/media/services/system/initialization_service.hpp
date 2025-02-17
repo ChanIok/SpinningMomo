@@ -2,10 +2,10 @@
 
 #include <filesystem>
 #include <string>
-#include "screenshot_service.hpp"
-#include "thumbnail_service.hpp"
-#include "thumbnail_batch_processor.hpp"
-#include "folder_monitor/folder_monitor_service.hpp"
+#include "media/services/screenshot/screenshot_service.hpp"
+#include "media/services/screenshot/thumbnail_service.hpp"
+#include "media/services/screenshot/thumbnail_batch_processor.hpp"
+#include "media/services/folder/folder_monitor_service.hpp"
 #include "media/repositories/screenshot_repository.hpp"
 #include "media/db/models.hpp"
 

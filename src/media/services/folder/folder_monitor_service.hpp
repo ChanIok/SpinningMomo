@@ -4,9 +4,9 @@
 #include <vector>
 #include <unordered_map>
 #include <nlohmann/json.hpp>
-#include "folder_processor.hpp"
+#include "media/services/folder/folder_processor.hpp"
 #include "core/settings/settings_manager.hpp"
-#include "media/services/folder_service.hpp"
+#include "media/services/folder/folder_service.hpp"
 
 class FolderMonitorService {
 public:

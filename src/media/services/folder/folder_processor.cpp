@@ -1,9 +1,9 @@
-#include "folder_processor.hpp"
 #include <spdlog/spdlog.h>
-#include "media/utils/string_utils.hpp"
+#include "core/image_processor.hpp"
 #include "core/settings/settings_manager.hpp"
 #include "media/utils/time_utils.hpp"
-#include "core/image_processor.hpp"
+#include "media/utils/string_utils.hpp"
+#include "media/services/folder/folder_processor.hpp"
 
 // 全局静态指针
 static FolderProcessor* g_instance = nullptr;

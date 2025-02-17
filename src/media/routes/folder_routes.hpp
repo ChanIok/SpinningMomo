@@ -5,8 +5,8 @@
 #include "media/utils/logger.hpp"
 #include "media/utils/response.hpp"
 #include "media/utils/request.hpp"
-#include "media/services/folder_monitor/folder_monitor_service.hpp"
-#include "media/services/folder_service.hpp"
+#include "media/services/folder/folder_monitor_service.hpp"
+#include "media/services/folder/folder_service.hpp"
 
 /**
  * @brief 注册文件夹监控相关的所有路由

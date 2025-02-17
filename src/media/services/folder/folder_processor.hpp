@@ -8,7 +8,7 @@
 #include "processing_types.hpp"
 #include "core/thread_raii.hpp"
 #include "media/repositories/screenshot_repository.hpp"
-#include "media/services/thumbnail_service.hpp"
+#include "media/services/screenshot/thumbnail_service.hpp"
 
 class FolderProcessor {
 public:

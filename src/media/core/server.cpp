@@ -1,6 +1,6 @@
 #include "server.hpp"
 #include "media/routes/route_manager.hpp"
-#include "media/services/initialization_service.hpp"
+#include "media/services/system/initialization_service.hpp"
 #include <spdlog/spdlog.h>
 
 Server::Server(const std::string& host, int port)

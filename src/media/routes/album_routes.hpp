@@ -5,7 +5,8 @@
 #include "media/utils/logger.hpp"
 #include "media/utils/response.hpp"
 #include "media/utils/request.hpp"
-#include "../services/service_manager.hpp"
+#include "media/services/album/album_service.hpp"
+#include "media/services/screenshot/screenshot_service.hpp"
 
 /**
  * @brief 注册相册相关的所有路由

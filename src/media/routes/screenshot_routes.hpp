@@ -9,12 +9,11 @@
 #include "media/utils/logger.hpp"
 #include "media/utils/response.hpp"
 #include "media/utils/request.hpp"
-#include "../services/service_manager.hpp"
-#include "../services/screenshot_service.hpp"
-#include "../services/thumbnail_service.hpp"
-#include "../services/initialization_service.hpp"
-#include "../db/models.hpp"
-#include "../db/database.hpp"
+#include "media/services/screenshot/screenshot_service.hpp"
+#include "media/services/screenshot/thumbnail_service.hpp"
+#include "media/services/system/initialization_service.hpp"
+#include "media/db/models.hpp"
+#include "media/db/database.hpp"
 
 // 注册截图相关路由
 inline void register_screenshot_routes(uWS::App& app) {

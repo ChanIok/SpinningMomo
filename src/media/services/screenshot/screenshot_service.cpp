@@ -10,7 +10,7 @@
 #include <algorithm>
 #include "core/win_config.hpp"
 #include "core/settings/settings_manager.hpp"
-#include "media/services/folder_monitor/folder_processor.hpp"
+#include "media/services/folder/folder_processor.hpp"
 
 ScreenshotService& ScreenshotService::get_instance() {
     static ScreenshotService instance;
