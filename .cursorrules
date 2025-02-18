@@ -7,27 +7,56 @@ SpinningMomo/
 │   │   ├── menu_window.hpp/cpp
 │   │   ├── preview_window.hpp/cpp
 │   │   ├── window_utils.hpp/cpp
+│   │   ├── window_capturer.hpp/cpp
 │   │   ├── tray_icon.hpp/cpp
-│   │   └── notification_manager.hpp/cpp
+│   │   ├── notification_manager.hpp/cpp
+│   │   ├── notification_window.hpp/cpp
 │   │   ├── config_manager.hpp/cpp
 │   │   ├── image_processor.hpp/cpp
-│   │   └── constants.hpp/cpp
+│   │   ├── constants.hpp/cpp
+│   │   ├── message_center.hpp
+│   │   ├── thread_raii.hpp
+│   │   ├── win_config.hpp
+│   │   └── settings/
+│   │       ├── settings_manager.hpp/cpp
+│   │       └── settings_types.hpp
 │   ├── media/            # 相册管理模块
 │   │   ├── core/         # HTTP服务器相关
 │   │   │   ├── server.hpp/cpp
-│   │   │   └── routes.hpp/cpp
 │   │   ├── db/           # 数据库相关
 │   │   │   ├── database.hpp/cpp
-│   │   │   └── models.hpp/cpp
+│   │   │   └── models.hpp
 │   │   ├── repositories/   # 仓库
+│   │   │   ├── base_repository.hpp
 │   │   │   ├── screenshot_repository.hpp/cpp
 │   │   │   └── album_repository.hpp/cpp
 │   │   ├── services/     # 业务逻辑
-│   │   │   ├── screenshot_service.hpp/cpp
-│   │   │   └── album_service.hpp/cpp
-│   │   └── routes/       # 路由
-│   │       ├── screenshot_routes.hpp/cpp
-│   │       └── album_routes.hpp/cpp
+│   │   │   ├── screenshot/
+│   │   │   │   ├── screenshot_service.hpp/cpp
+│   │   │   │   ├── thumbnail_service.hpp/cpp
+│   │   │   │   └── thumbnail_batch_processor.hpp/cpp
+│   │   │   ├── album/
+│   │   │   │   └── album_service.hpp/cpp
+│   │   │   ├── folder/
+│   │   │   │   ├── folder_service.hpp/cpp
+│   │   │   │   ├── folder_monitor_service.hpp/cpp
+│   │   │   │   ├── folder_processor.hpp/cpp
+│   │   │   │   └── processing_types.hpp
+│   │   │   └── system/
+│   │   │       └── initialization_service.hpp/cpp
+│   │   ├── routes/       # 路由
+│   │   │   ├── route_manager.hpp
+│   │   │   ├── screenshot_routes.hpp
+│   │   │   ├── album_routes.hpp
+│   │   │   ├── folder_routes.hpp
+│   │   │   └── settings_routes.hpp
+│   │   └── utils/        # 工具类
+│   │       ├── logger.hpp
+│   │       ├── request.hpp
+│   │       ├── response.hpp
+│   │       ├── string_utils.hpp
+│   │       └── time_utils.hpp
+│   ├── sniffer/          # 嗅探器模块
 │   ├── main.cpp          # 程序入口
 │   ├── resource.rc       # 资源文件
 │   └── icon.ico          # 应用图标

@@ -27,15 +27,17 @@ if(MSVC)
 endif()
 
 # ===== 依赖项配置 =====
-# vcpkg配置
-set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake" 
-    CACHE STRING "Vcpkg toolchain file")
-
 # 设置第三方库根目录
 set(THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
+# WinDivert 配置
+set(WINDIVERT_DIR "${THIRD_PARTY_DIR}/WinDivert")
+set(WINDIVERT_INCLUDE_DIR "${WINDIVERT_DIR}/include")
+set(WINDIVERT_LIB_DIR "${WINDIVERT_DIR}/x64")
+
 # vcpkg依赖包
 find_package(ZLIB REQUIRED)
+find_package(OpenSSL REQUIRED)
 find_package(unofficial-uwebsockets CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(SQLite3 REQUIRED)
@@ -48,11 +50,11 @@ find_package(xxHash CONFIG REQUIRED)
 file(GLOB_RECURSE SETTINGS_SOURCES "src/core/settings/*.cpp")
 file(GLOB_RECURSE CORE_SOURCES "src/core/*.cpp")
 file(GLOB_RECURSE MEDIA_SOURCES "src/media/**/*.cpp")
+file(GLOB_RECURSE SNIFFER_SOURCES "src/sniffer/**/*.cpp")
 file(GLOB MAIN_SOURCES 
     "src/main.cpp"
     "src/constants.cpp"
 )
-
 
 # ===== 目标配置 =====
 # 创建可执行文件
@@ -61,6 +63,8 @@ add_executable(${PROJECT_NAME} WIN32
     ${SETTINGS_SOURCES}
     ${CORE_SOURCES}
     ${MEDIA_SOURCES}
+    ${SNIFFER_SOURCES}
+    src/sniffer/core/applink.c
     src/resource.rc
 )
 
@@ -69,6 +73,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src          # 主目录
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core     # core模块
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/settings  # settings模块
+    ${WINDIVERT_INCLUDE_DIR}                 # WinDivert头文件
 )
 
 # ===== 链接配置 =====
@@ -86,6 +91,8 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ole32            # COM API
     
     # 第三方库
+    OpenSSL::SSL                         # OpenSSL SSL库
+    OpenSSL::Crypto                      # OpenSSL Crypto库
     unofficial::uwebsockets::uwebsockets # WebSocket库
     ZLIB::ZLIB                          # zlib压缩库
     nlohmann_json::nlohmann_json        # JSON库
@@ -93,6 +100,9 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     spdlog::spdlog_header_only         # spdlog (header-only)
     fmt::fmt                           # fmt库
     xxHash::xxhash                     # xxHash哈希库
+    
+    # WinDivert
+    "${WINDIVERT_LIB_DIR}/WinDivert.lib"
 )
 
 # ===== 安装和部署配置 =====
@@ -103,4 +113,16 @@ set(OUTPUT_DIR $<TARGET_FILE_DIR:${PROJECT_NAME}>)
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     # 数据目录
     COMMAND ${CMAKE_COMMAND} -E make_directory "${OUTPUT_DIR}/data/thumbnails"
+    
+    # 复制 WinDivert DLL 和驱动文件到输出目录
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${WINDIVERT_LIB_DIR}/WinDivert.dll"
+        "${WINDIVERT_LIB_DIR}/WinDivert64.sys"
+        "${OUTPUT_DIR}"
+
+    # 复制 OpenSSL DLL 到输出目录
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:OpenSSL::SSL>
+        $<TARGET_FILE:OpenSSL::Crypto>
+        "${OUTPUT_DIR}"
 )

@@ -111,6 +111,14 @@
         "shared_mutex": "cpp",
         "strstream": "cpp",
         "syncstream": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "spanstream": "cpp",
+        "stacktrace": "cpp",
+        "stdfloat": "cpp",
+        "*.tcc": "cpp",
+        "netfwd": "cpp",
+        "string_view": "cpp",
+        "rope": "cpp",
+        "slist": "cpp"
     }
 }

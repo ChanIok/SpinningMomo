@@ -20,13 +20,18 @@
 #include "media/utils/logger.hpp"
 #include "media/db/database.hpp"
 #include "settings_manager.hpp"
+#include "sniffer/core/packet_redirector.hpp"
 #include <spdlog/spdlog.h>
+
 
 // 主应用程序类
 class SpinningMomoApp {
 public:
     SpinningMomoApp() = default;
     ~SpinningMomoApp() {
+        if (m_packetRedirector) {
+            m_packetRedirector->Stop();
+        }
         if (m_configManager) {
             m_configManager->SaveAllConfigs();
         }
@@ -72,6 +77,22 @@ public:
         if (!m_httpServer->Initialize()) {
             ShowNotification(m_strings.APP_NAME.c_str(), L"HTTP server failed to start", true);
             return false;
+        }
+
+        // 初始化数据包重定向器
+        try {
+            m_packetRedirector = std::make_unique<PacketRedirector>();
+            if (!m_packetRedirector->Start()) {
+                spdlog::warn("Failed to start packet redirector, HTTPS interception will not be available");
+                ShowNotification(Constants::APP_NAME, TEXT("HTTPS interception initialization failed."), true);
+                m_packetRedirector.reset();
+            } else {
+                spdlog::info("Packet redirector initialized");
+            }
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to initialize packet redirector: {}", e.what());
+            ShowNotification(Constants::APP_NAME, TEXT("HTTPS interception initialization failed."), true);
+            m_packetRedirector.reset();
         }
 
         // 创建通知管理器
@@ -623,6 +644,7 @@ private:
     std::unique_ptr<NotificationManager> m_notificationManager;
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<Server> m_httpServer;
+    std::unique_ptr<PacketRedirector> m_packetRedirector;
 
     // 应用状态
     bool m_isPreviewEnabled = false;
