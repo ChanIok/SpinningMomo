@@ -21,6 +21,12 @@ struct HttpMessage {
         content_length = 0;
         header_end = 0;
         data.clear();
+        // 预分配一定大小的缓冲区，避免频繁重分配
+        data.reserve(8192);  // 8KB 初始大小
+    }
+
+    HttpMessage() {
+        reset();
     }
 };
 
@@ -37,7 +43,6 @@ private:
     void HandleConnection(std::shared_ptr<ProxyConnectionConfig> config);
     void HandleProxyTransfer(std::shared_ptr<ProxyTransferConfig> config);
     bool InitializeSocket();
-    void LogDecryptedTraffic(const std::string& data, bool isRequest, const char* hostname);
     size_t ParseContentLength(const std::string& headers);
 
 private:

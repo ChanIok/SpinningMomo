@@ -369,9 +369,31 @@ void ProxyServer::HandleProxyTransfer(std::shared_ptr<ProxyTransferConfig> confi
                 size_t header_end = message.data.find("\r\n\r\n");
                 if (header_end != std::string::npos) {
                     message.header_end = header_end;
-                    std::string headers = message.data.substr(0, header_end);
-                    message.content_length = ParseContentLength(headers);
-                    message.header_parsed = true;
+                    // 解析 Content-Length
+                    const std::string content_length_header = "Content-Length: ";
+                    size_t pos = message.data.find(content_length_header);
+                    
+                    if (pos != std::string::npos && pos < header_end) {
+                        pos += content_length_header.length();
+                        size_t end_pos = message.data.find("\r\n", pos);
+                        
+                        if (end_pos != std::string::npos && end_pos <= header_end) {
+                            try {
+                                message.content_length = std::stoull(message.data.substr(pos, end_pos - pos));
+                                message.header_parsed = true;
+                            } catch (const std::exception& e) {
+                                if (m_logFile.is_open()) {
+                                    m_logFile << "\n[ERROR] Failed to parse Content-Length value: " << e.what() << "\n";
+                                    m_logFile.flush();
+                                }
+                            } catch (...) {
+                                if (m_logFile.is_open()) {
+                                    m_logFile << "\n[ERROR] Failed to parse Content-Length value with unknown error\n";
+                                    m_logFile.flush();
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -380,7 +402,20 @@ void ProxyServer::HandleProxyTransfer(std::shared_ptr<ProxyTransferConfig> confi
                 // 记录完整的HTTP消息
                 const char* hostname = config->ssl_s ? 
                     SSL_get_servername(config->ssl_s, TLSEXT_NAMETYPE_host_name) : "unknown";
-                LogDecryptedTraffic(message.data, !config->inbound, hostname);
+                
+                if (m_logFile.is_open()) {
+                    auto now = std::chrono::system_clock::now();
+                    auto time = std::chrono::system_clock::to_time_t(now);
+                    m_logFile << "\n[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") 
+                            << "] " << (!config->inbound ? "REQUEST" : "RESPONSE") 
+                            << " " << (hostname ? hostname : "unknown") << "\n";
+                    
+                    // 写入完整消息
+                    m_logFile.write(message.data.data(), message.data.length());
+                    m_logFile << "\n----------------------------------------\n";
+                    m_logFile.flush();
+                }
+                
                 message.reset();
             }
 
@@ -414,22 +449,3 @@ void ProxyServer::HandleProxyTransfer(std::shared_ptr<ProxyTransferConfig> confi
         shutdown(config->t, SD_BOTH);
     }
 }
-
-void ProxyServer::LogDecryptedTraffic(const std::string& data, bool isRequest, const char* hostname) {
-    if (!m_logFile.is_open()) return;
-
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    
-    // 写入时间戳、类型和域名
-    m_logFile << "\n[" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") 
-              << "] " << (isRequest ? "REQUEST" : "RESPONSE") 
-              << " " << (hostname ? hostname : "unknown") << "\n";
-    
-    // 写入完整HTTP数据
-    m_logFile << data;
-    
-    // 添加分隔线
-    m_logFile << "\n----------------------------------------\n";
-    m_logFile.flush();
-} 
