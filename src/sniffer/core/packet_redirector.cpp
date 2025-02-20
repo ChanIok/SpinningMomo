@@ -9,6 +9,7 @@
 #include <psapi.h>  // 用于获取进程信息
 #include "media/utils/logger.hpp"  // 添加日志头文件
 #include <TlHelp32.h>  // 添加 ToolHelp32 头文件
+#include "process_manager.hpp"
 
 PacketRedirector::PacketRedirector()
     : m_handle(INVALID_HANDLE_VALUE), m_socketHandle(INVALID_HANDLE_VALUE), m_running(false) {
@@ -228,7 +229,7 @@ void PacketRedirector::ProcessPacket(WINDIVERT_ADDRESS& addr,
     auto* conn = conn_mgr.getConnection(local_port);
 
     // 判断是否需要处理这个包
-    bool is_target = (conn && conn->is_target_process);
+    bool is_target = conn_mgr.hasConnection(local_port);
     bool is_proxy_related = (local_port == PROXY_PORT || local_port == ALT_PORT || 
                            dest_port == PROXY_PORT || dest_port == ALT_PORT);
     
@@ -285,73 +286,42 @@ void PacketRedirector::ProcessPacket(WINDIVERT_ADDRESS& addr,
     );
 }
 
-// 获取进程名称
-std::string GetProcessNameByPID(DWORD pid) {
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snapshot == INVALID_HANDLE_VALUE) {
-        return "";
-    }
-
-    PROCESSENTRY32W processEntry = { 0 };
-    processEntry.dwSize = sizeof(processEntry);
-
-    if (Process32FirstW(snapshot, &processEntry)) {
-        do {
-            if (processEntry.th32ProcessID == pid) {
-                CloseHandle(snapshot);
-                char process_name[MAX_PATH];
-                wcstombs(process_name, processEntry.szExeFile, MAX_PATH);
-                return std::string(process_name);
-            }
-        } while (Process32NextW(snapshot, &processEntry));
-    }
-
-    CloseHandle(snapshot);
-    return "";
-}
-
 // 处理SOCKET层事件
 void PacketRedirector::SocketEventLoop() {
+    auto& process_mgr = ProcessManager::getInstance();
+    auto& conn_mgr = ConnectionManager::getInstance();
+    
     spdlog::info("PacketRedirector: Socket event loop started");
-    WINDIVERT_ADDRESS addr;
     
     while (m_running) {
+        WINDIVERT_ADDRESS addr;
         if (!WinDivertRecv(m_socketHandle, NULL, 0, NULL, &addr)) {
             continue;
         }
         
         if (addr.Event == WINDIVERT_EVENT_SOCKET_CONNECT) {
-            // 获取进程信息
             DWORD process_id = addr.Socket.ProcessId;
-            std::string process_name = GetProcessNameByPID(process_id);
-            if (!process_name.empty()) {
-                bool is_target = (process_name == "X6Game-Win64-Shipping.exe" || process_name == "SpinningMomo.exe");
+            
+            // 快速判断是否为目标进程
+            if (process_mgr.isTargetProcess(process_id)) {
+                conn_mgr.addConnection(
+                    addr.Socket.LocalPort,
+                    addr.Socket.RemoteAddr[0],
+                    addr.Socket.RemotePort
+                );
                 
-                // 只有是目标进程才创建和存储连接信息
-                if (is_target) {
-                    ConnectionInfo info;
-                    info.process_id = process_id;
-                    info.local_port = addr.Socket.LocalPort;
-                    info.remote_port = addr.Socket.RemotePort;
-                    info.local_addr = addr.Socket.LocalAddr[0];
-                    info.remote_addr = addr.Socket.RemoteAddr[0];
-                    info.is_target_process = true;
-                    info.if_idx = addr.Network.IfIdx;
-                    info.sub_if_idx = addr.Network.SubIfIdx;
-                    info.process_name = process_name;
-
-                    // 添加到连接管理器
-                    ConnectionManager::getInstance().addConnection(info);
-                    
-                    spdlog::info("PacketRedirector: Target process connection added - Process: {}, Port: {}", 
-                                info.process_name, info.local_port);
-                }
+                spdlog::info("PacketRedirector: Target process connection added - Port: {}", 
+                            addr.Socket.LocalPort);
             }
         }
         else if (addr.Event == WINDIVERT_EVENT_SOCKET_CLOSE) {
-            // 从连接管理器中移除
-            ConnectionManager::getInstance().removeConnection(addr.Socket.LocalPort);
+            if (conn_mgr.hasConnection(addr.Socket.LocalPort)) {
+                conn_mgr.removeConnection(addr.Socket.LocalPort);
+                spdlog::debug("PacketRedirector: Connection removed - Port: {}", 
+                             addr.Socket.LocalPort);
+            }
         }
     }
+    
     spdlog::info("PacketRedirector: Socket event loop ended");
 }

@@ -24,21 +24,20 @@ void ConnectionManager::stop() {
     }
 }
 
-void ConnectionManager::addConnection(const ConnectionInfo& info) {
+void ConnectionManager::addConnection(uint16_t local_port, uint32_t remote_addr, uint16_t remote_port) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    auto& conn = m_connections[info.local_port];
-    conn = info;
+    auto& conn = m_connections[local_port];
+    conn.remote_addr = remote_addr;
+    conn.remote_port = remote_port;
     conn.last_activity = std::chrono::steady_clock::now();
-    spdlog::debug("ConnectionManager: Added new connection for port {}", 
-                 info.local_port);
+    spdlog::debug("ConnectionManager: Added new connection for port {}", local_port);
 }
 
 void ConnectionManager::updateConnection(uint16_t local_port) {
     std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_connections.find(local_port);
     if (it != m_connections.end()) {
-        auto& conn = it->second;
-        conn.last_activity = std::chrono::steady_clock::now();
+        it->second.last_activity = std::chrono::steady_clock::now();
     }
 }
 
@@ -47,10 +46,9 @@ void ConnectionManager::removeConnection(uint16_t local_port) {
     m_connections.erase(local_port);
 }
 
-bool ConnectionManager::isTargetProcessConnection(uint16_t local_port) {
+bool ConnectionManager::hasConnection(uint16_t local_port) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    auto it = m_connections.find(local_port);
-    return (it != m_connections.end() && it->second.is_target_process);
+    return m_connections.find(local_port) != m_connections.end();
 }
 
 ConnectionInfo* ConnectionManager::getConnection(uint16_t local_port) {

@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 #include <chrono>
+#include "process_manager.hpp"
 
 // OpenSSL环境管理
 class OpenSSLEnvironment {

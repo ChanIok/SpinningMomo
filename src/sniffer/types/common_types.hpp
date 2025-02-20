@@ -31,21 +31,12 @@ constexpr uint32_t CONNECTION_TIMEOUT = 60000;          // 连接超时时间（
 
 // 连接信息结构体
 struct ConnectionInfo {
-    uint32_t process_id;          // 进程ID
-    std::string process_name;     // 进程名称
-    uint16_t local_port;          // 本地端口
-    uint16_t remote_port;         // 远程端口
-    uint32_t local_addr;          // 本地地址
-    uint32_t remote_addr;         // 远程地址
-    uint32_t if_idx;             // 网络接口索引
-    uint32_t sub_if_idx;         // 子接口索引
-    bool is_target_process;       // 是否为目标进程
+    uint16_t remote_port;          // 远程端口
+    uint32_t remote_addr;          // 远程地址
     std::chrono::steady_clock::time_point last_activity; // 最后活动时间
     
     ConnectionInfo() : 
-        process_id(0), local_port(0), remote_port(0),
-        local_addr(0), remote_addr(0), if_idx(0),
-        sub_if_idx(0), is_target_process(false),
+        remote_port(0), remote_addr(0),
         last_activity(std::chrono::steady_clock::now()) {}
 };
 
