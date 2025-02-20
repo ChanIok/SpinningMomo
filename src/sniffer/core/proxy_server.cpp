@@ -155,28 +155,6 @@ void ProxyServer::HandleConnection(std::shared_ptr<ProxyConnectionConfig> config
         // 提取域名
         std::string hostname = SSLUtils::extractSNI(buffer, bytesRead);
         
-        // 检查是否是支持的域名
-        bool supported = false;
-        for (const auto& domain : SUPPORTED_DOMAINS) {
-            if (hostname == domain) {
-                supported = true;
-                break;
-            }
-        }
-        
-        if (!supported) {
-            if (m_logFile.is_open()) {
-                m_logFile << "Unsupported domain: " << hostname << std::endl;
-                m_logFile.flush();
-            }
-            throw std::runtime_error("Unsupported domain");
-        }
-
-        if (m_logFile.is_open()) {
-            m_logFile << "\nIntercepting connection to: " << hostname << std::endl;
-            m_logFile.flush();
-        }
-
         // 创建目标服务器套接字
         SOCKET target_socket = socket(AF_INET, SOCK_STREAM, 0);
         if (target_socket == INVALID_SOCKET) {
@@ -193,12 +171,6 @@ void ProxyServer::HandleConnection(std::shared_ptr<ProxyConnectionConfig> config
         addr.sin_port = htons(config->alt_port);
         addr.sin_addr = config->dest;
         
-        if (m_logFile.is_open()) {
-            m_logFile << "Connecting to target server: " 
-                     << inet_ntoa(addr.sin_addr) << ":" << config->alt_port << std::endl;
-            m_logFile.flush();
-        }
-
         // 连接到目标服务器
         if (connect(target_socket, reinterpret_cast<SOCKADDR*>(&addr), sizeof(addr)) == SOCKET_ERROR) {
             if (m_logFile.is_open()) {
@@ -207,6 +179,50 @@ void ProxyServer::HandleConnection(std::shared_ptr<ProxyConnectionConfig> config
             }
             closesocket(target_socket);
             throw std::runtime_error("Failed to connect to target server");
+        }
+
+        if (m_logFile.is_open()) {
+            m_logFile << "Connected to target server: " 
+                     << inet_ntoa(addr.sin_addr) << ":" << config->alt_port << std::endl;
+            m_logFile.flush();
+        }
+        
+        // 检查是否是支持的域名
+        bool supported = false;
+        for (const auto& domain : SUPPORTED_DOMAINS) {
+            if (hostname == domain) {
+                supported = true;
+                break;
+            }
+        }
+        
+        if (!supported) {
+            if (m_logFile.is_open()) {
+                m_logFile << "Bypassing non-supported domain: " << hostname << std::endl;
+                m_logFile.flush();
+            }
+
+            // 转发 ClientHello
+            send(target_socket, buffer, bytesRead, 0);
+
+            // 创建双向转发通道（不使用SSL）
+            auto config1 = std::make_shared<ProxyTransferConfig>(false, config->s, target_socket);
+            auto config2 = std::make_shared<ProxyTransferConfig>(true, target_socket, config->s);
+
+            // 启动数据转发
+            std::thread t1(&ProxyServer::HandleProxyTransfer, this, config1);
+            HandleProxyTransfer(config2);
+            t1.join();
+
+            // 清理资源
+            closesocket(config->s);
+            closesocket(target_socket);
+            return;
+        }
+
+        if (m_logFile.is_open()) {
+            m_logFile << "\nIntercepting connection to: " << hostname << std::endl;
+            m_logFile.flush();
         }
 
         // 获取SSL上下文

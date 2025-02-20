@@ -1,9 +1,12 @@
 #pragma once
+#include <winsock2.h>  // Windows headers should come first
+#include "core/win_config.hpp"
 #include <string>
 #include <vector>
-#include <winsock2.h>
+#include <chrono>
 #include <openssl/ssl.h>
-#include "core/win_config.hpp"
+#include "windivert.h"  // 添加 WinDivert 头文件
+
 
 // 常量定义
 constexpr uint16_t TARGET_PORT = 12101;
@@ -20,6 +23,30 @@ const char* const CA_KEY = "certs/ca-key.pem";
 const std::vector<std::string> SUPPORTED_DOMAINS = {
     "apm.papegames.com",
     "x6cn-clickhouse.nuanpaper.com"
+};
+
+// 连接管理相关常量
+constexpr uint32_t CONNECTION_CLEANUP_INTERVAL = 30000;  // 清理间隔（毫秒）
+constexpr uint32_t CONNECTION_TIMEOUT = 60000;          // 连接超时时间（毫秒）
+
+// 连接信息结构体
+struct ConnectionInfo {
+    uint32_t process_id;          // 进程ID
+    std::string process_name;     // 进程名称
+    uint16_t local_port;          // 本地端口
+    uint16_t remote_port;         // 远程端口
+    uint32_t local_addr;          // 本地地址
+    uint32_t remote_addr;         // 远程地址
+    uint32_t if_idx;             // 网络接口索引
+    uint32_t sub_if_idx;         // 子接口索引
+    bool is_target_process;       // 是否为目标进程
+    std::chrono::steady_clock::time_point last_activity; // 最后活动时间
+    
+    ConnectionInfo() : 
+        process_id(0), local_port(0), remote_port(0),
+        local_addr(0), remote_addr(0), if_idx(0),
+        sub_if_idx(0), is_target_process(false),
+        last_activity(std::chrono::steady_clock::now()) {}
 };
 
 // 自定义IO上下文
