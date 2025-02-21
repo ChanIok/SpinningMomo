@@ -6,9 +6,7 @@
 #include <thread>
 #include <chrono>
 #include <sstream>
-#include <psapi.h>  // 用于获取进程信息
 #include "media/utils/logger.hpp"  // 添加日志头文件
-#include <TlHelp32.h>  // 添加 ToolHelp32 头文件
 #include "process_manager.hpp"
 
 PacketRedirector::PacketRedirector()
