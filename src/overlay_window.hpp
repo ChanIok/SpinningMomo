@@ -13,7 +13,7 @@ public:
     OverlayWindow();
     ~OverlayWindow();
 
-    bool Initialize(HINSTANCE hInstance);
+    bool Initialize(HINSTANCE hInstance, HWND mainHwnd);
     bool StartCapture(HWND targetWindow);
     void StopCapture();
     void Cleanup();
@@ -22,6 +22,16 @@ public:
 private:
     static OverlayWindow* instance;
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static void CALLBACK WinEventProc(
+        HWINEVENTHOOK hook,
+        DWORD event,
+        HWND hwnd,
+        LONG idObject,
+        LONG idChild,
+        DWORD idEventThread,
+        DWORD dwmsEventTime
+    );
+
     std::atomic<bool> m_d3dInitialized{false};
     
     bool InitializeD3D();
@@ -71,17 +81,26 @@ private:
     bool m_isFirstShow = true;
     HWND m_gameWindow = nullptr;
 
+    // 主窗口句柄
+    HWND m_mainHwnd = nullptr;
+    HWND m_timerWindow = nullptr;  // 窗口管理线程的消息窗口
+
     // 添加线程相关成员
     ThreadRAII m_captureThread;
     ThreadRAII m_hookThread;
-    ThreadRAII m_positionThread;
+    ThreadRAII m_windowManagerThread;
     std::atomic<bool> m_running{false};
     POINT m_currentMousePos{0, 0};
     float m_scaleFactor{1.0f};
     HHOOK m_mouseHook{nullptr};
+    HWINEVENTHOOK m_eventHook = nullptr;
+    DWORD m_gameProcessId = 0;
 
     void CaptureThreadProc();
     void HookThreadProc();
-    void PositionUpdateThreadProc();
+    void WindowManagerThreadProc();
     static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam);
+
+    // 自定义消息定义
+    static const UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
 };

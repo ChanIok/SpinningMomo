@@ -67,7 +67,7 @@ public:
 
         // 创建叠加层窗口
         m_overlayWindow = std::make_unique<OverlayWindow>();
-        if (!m_overlayWindow->Initialize(hInstance)) {
+        if (!m_overlayWindow->Initialize(hInstance, m_hwnd)) {
             return false;
         }
 

@@ -57,7 +57,10 @@ OverlayWindow::~OverlayWindow() {
     instance = nullptr;
 }
 
-bool OverlayWindow::Initialize(HINSTANCE hInstance) {
+bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
+    // 设置主窗口句柄
+    m_mainHwnd = mainHwnd;
+
     // 注册窗口类
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -75,7 +78,7 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance) {
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
     m_hwnd = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | 
+        WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | 
         WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP,
         L"OverlayWindowClass",
         L"Overlay Window",
@@ -118,7 +121,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow) {
     try {
         m_captureThread = ThreadRAII([this]() { CaptureThreadProc(); });
         m_hookThread = ThreadRAII([this]() { HookThreadProc(); });
-        m_positionThread = ThreadRAII([this]() { PositionUpdateThreadProc(); });
+        m_windowManagerThread = ThreadRAII([this]() { WindowManagerThreadProc(); });
         return true;
     }
     catch (const std::exception& e) {
@@ -154,11 +157,30 @@ void OverlayWindow::CaptureThreadProc() {
 }
 
 void OverlayWindow::HookThreadProc() {
+    // 设置鼠标钩子
     m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, 
                                   GetModuleHandle(NULL), 0);
     if (!m_mouseHook) {
         OutputDebugStringA("Failed to set mouse hook\n");
         return;
+    }
+
+    // 获取游戏进程ID
+    GetWindowThreadProcessId(m_gameWindow, &m_gameProcessId);
+    
+    // 设置窗口事件钩子
+    m_eventHook = SetWinEventHook(
+        EVENT_SYSTEM_FOREGROUND,
+        EVENT_SYSTEM_FOREGROUND,
+        NULL,
+        WinEventProc,
+        m_gameProcessId,  // 只监控游戏进程
+        0,
+        WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS
+    );
+
+    if (!m_eventHook) {
+        OutputDebugStringA("Failed to set window event hook\n");
     }
     
     MSG msg;
@@ -167,27 +189,99 @@ void OverlayWindow::HookThreadProc() {
         DispatchMessage(&msg);
     }
     
+    // 清理钩子
     if (m_mouseHook) {
         UnhookWindowsHookEx(m_mouseHook);
         m_mouseHook = nullptr;
     }
+    if (m_eventHook) {
+        UnhookWinEvent(m_eventHook);
+        m_eventHook = nullptr;
+    }
 }
 
-void OverlayWindow::PositionUpdateThreadProc() {
-    while (m_running) {
-        if (m_gameWindow) {
-            POINT currentPos = m_currentMousePos;
-            
-            // 计算新的窗口位置
-            int gameX = static_cast<int>(currentPos.x * m_scaleFactor);
-            int gameY = static_cast<int>(currentPos.y * m_scaleFactor);
-            
-            int newWindowX = currentPos.x - gameX;
-            int newWindowY = currentPos.y - gameY;
-            
-            SetWindowPos(m_gameWindow, NULL, newWindowX, newWindowY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+void OverlayWindow::WindowManagerThreadProc() {
+    // 创建一个隐藏的窗口来处理定时器消息
+    WNDCLASSEXW wc = {};
+    wc.cbSize = sizeof(WNDCLASSEXW);
+    wc.lpfnWndProc = DefWindowProcW;
+    wc.hInstance = GetModuleHandle(NULL);
+    wc.lpszClassName = L"WindowManagerClass";
+    RegisterClassExW(&wc);
+
+    HWND timerWindow = CreateWindowExW(
+        0, L"WindowManagerClass", L"Timer Window",
+        WS_POPUP, 0, 0, 0, 0, NULL, NULL,
+        GetModuleHandle(NULL), NULL
+    );
+
+    if (!timerWindow) {
+        OutputDebugStringA("Failed to create timer window\n");
+        return;
+    }
+
+    // 保存窗口句柄供WinEventProc使用
+    m_timerWindow = timerWindow;
+
+    // 创建定时器，每10毫秒触发一次
+    SetTimer(timerWindow, 1, 10, NULL);
+
+    MSG msg;
+    while (m_running && GetMessage(&msg, NULL, 0, 0)) {
+        switch (msg.message) {
+        case WM_TIMER:
+            // 根据鼠标位置更新游戏窗口位置
+            if (m_gameWindow) {
+                POINT currentPos = m_currentMousePos;
+                
+                // 计算新的窗口位置
+                int gameX = static_cast<int>(currentPos.x * m_scaleFactor);
+                int gameY = static_cast<int>(currentPos.y * m_scaleFactor);
+                
+                int newWindowX = currentPos.x - gameX;
+                int newWindowY = currentPos.y - gameY;
+                
+                SetWindowPos(m_gameWindow, NULL, newWindowX, newWindowY, 
+                    0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            }
+            break;
+
+        case WM_GAME_WINDOW_FOREGROUND:
+            // 确保overlay窗口在游戏窗口上方
+            SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            SetWindowPos(m_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            SetWindowPos(m_gameWindow, m_hwnd, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            break;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // 清理资源
+    m_timerWindow = nullptr;  // 清除窗口句柄
+    KillTimer(timerWindow, 1);
+    DestroyWindow(timerWindow);
+    UnregisterClassW(L"WindowManagerClass", GetModuleHandle(NULL));
+}
+
+void CALLBACK OverlayWindow::WinEventProc(
+    HWINEVENTHOOK hook,
+    DWORD event,
+    HWND hwnd,
+    LONG idObject,
+    LONG idChild,
+    DWORD idEventThread,
+    DWORD dwmsEventTime
+) {
+    if (!instance || !instance->m_running || !instance->m_timerWindow) return;
+
+    // 当游戏窗口被激活时，发送消息到窗口管理线程
+    if (event == EVENT_SYSTEM_FOREGROUND) {
+        PostMessage(instance->m_timerWindow, WM_GAME_WINDOW_FOREGROUND, 0, 0);
     }
 }
 
@@ -274,6 +368,10 @@ bool OverlayWindow::InitializeCapture() {
     
     // 显示窗口
     ShowWindow(m_hwnd, SW_SHOWNA);
+    SetWindowPos(m_hwnd, m_gameWindow, 0, 0, 0, 0, 
+    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetWindowPos(m_gameWindow, m_hwnd, 0, 0, 0, 0, 
+    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     UpdateWindow(m_hwnd);
 
     return true;
@@ -290,8 +388,8 @@ void OverlayWindow::StopCapture() {
     if (m_captureThread.getId() != std::thread::id()) {
         PostThreadMessage(GetThreadId(m_captureThread.get()->native_handle()), WM_QUIT, 0, 0);
     }
-    if (m_positionThread.getId() != std::thread::id()) {
-        PostThreadMessage(GetThreadId(m_positionThread.get()->native_handle()), WM_QUIT, 0, 0);
+    if (m_windowManagerThread.getId() != std::thread::id()) {
+        PostThreadMessage(GetThreadId(m_windowManagerThread.get()->native_handle()), WM_QUIT, 0, 0);
     }
     
     if (m_captureThread.get() && m_captureThread.get()->joinable()) {
@@ -300,8 +398,8 @@ void OverlayWindow::StopCapture() {
     if (m_hookThread.get() && m_hookThread.get()->joinable()) {
         m_hookThread.get()->join();
     }
-    if (m_positionThread.get() && m_positionThread.get()->joinable()) {
-        m_positionThread.get()->join();
+    if (m_windowManagerThread.get() && m_windowManagerThread.get()->joinable()) {
+        m_windowManagerThread.get()->join();
     }
 
     if (captureSession) {
