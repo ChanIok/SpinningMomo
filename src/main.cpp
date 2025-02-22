@@ -15,6 +15,7 @@
 #include "preview_window.hpp"
 #include "notification_manager.hpp"
 #include "config_manager.hpp"
+#include "overlay_window.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -61,6 +62,12 @@ public:
         // 创建预览窗口
         m_previewWindow = std::make_unique<PreviewWindow>();
         if (!m_previewWindow->Initialize(hInstance, m_hwnd)) {
+            return false;
+        }
+
+        // 创建叠加层窗口
+        m_overlayWindow = std::make_unique<OverlayWindow>();
+        if (!m_overlayWindow->Initialize(hInstance)) {
             return false;
         }
 
@@ -133,10 +140,13 @@ public:
             if (gameWindow) {
                 ApplyWindowTransform(gameWindow);
                 
-                // 如果预览窗口已启用，重新开始捕获以更新尺寸
+                // 更新预览和叠加层窗口
                 if (m_isPreviewEnabled && m_previewWindow) {
                     m_previewWindow->StartCapture(gameWindow);
                 }
+                // if (m_overlayWindow) {
+                //     m_overlayWindow->StartCapture(gameWindow);
+                // }
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
@@ -162,6 +172,11 @@ public:
                 if (m_isPreviewEnabled && m_previewWindow) {
                     m_previewWindow->StartCapture(gameWindow);
                 }
+
+                // 更新叠加层窗口
+                if (m_overlayWindow) {
+                    m_overlayWindow->StartCapture(gameWindow);
+                }
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
@@ -177,6 +192,8 @@ public:
         }
 
         HWND gameWindow = FindTargetWindow();
+        m_overlayWindow->StartCapture(gameWindow);
+        return;
         if (!gameWindow) {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             return;
@@ -605,6 +622,7 @@ private:
     std::unique_ptr<PreviewWindow> m_previewWindow;
     std::unique_ptr<NotificationManager> m_notificationManager;
     std::unique_ptr<ConfigManager> m_configManager;
+    std::unique_ptr<OverlayWindow> m_overlayWindow;
 
     // 应用状态
     bool m_isPreviewEnabled = false;

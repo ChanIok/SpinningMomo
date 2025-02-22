@@ -92,6 +92,26 @@
         "typeindex": "cpp",
         "unordered_set": "cpp",
         "valarray": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "barrier": "cpp",
+        "codecvt": "cpp",
+        "csetjmp": "cpp",
+        "cuchar": "cpp",
+        "execution": "cpp",
+        "expected": "cpp",
+        "latch": "cpp",
+        "mdspan": "cpp",
+        "memory_resource": "cpp",
+        "numbers": "cpp",
+        "print": "cpp",
+        "ranges": "cpp",
+        "semaphore": "cpp",
+        "shared_mutex": "cpp",
+        "source_location": "cpp",
+        "spanstream": "cpp",
+        "stacktrace": "cpp",
+        "stdfloat": "cpp",
+        "strstream": "cpp",
+        "syncstream": "cpp"
     }
 }
