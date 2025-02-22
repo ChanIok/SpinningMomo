@@ -36,7 +36,8 @@ bool MenuWindow::Create(HWND parent,
                        const LocalizedStrings& strings,
                        size_t currentRatioIndex,
                        size_t currentResolutionIndex,
-                       bool previewEnabled) {
+                       bool previewEnabled,
+                       bool overlayEnabled) {
     m_hwndParent = parent;
     m_ratioItems = &ratios;
     m_resolutionItems = &resolutions;
@@ -44,6 +45,7 @@ bool MenuWindow::Create(HWND parent,
     m_currentRatioIndex = currentRatioIndex;
     m_currentResolutionIndex = currentResolutionIndex;
     m_previewEnabled = previewEnabled;
+    m_overlayEnabled = overlayEnabled;
     
     InitializeItems(strings);
     
@@ -180,6 +182,7 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
     // 添加设置选项
     m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});  // 添加截图选项作为设置组的第一个选项
     m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});  // 添加打开相册选项
+    m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});  // 添加叠加层窗口选项
     m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
     m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
     m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
@@ -339,6 +342,7 @@ void MenuWindow::OnPaint(HDC hdc) {
             case ItemType::CaptureWindow:
             case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
+            case ItemType::OverlayWindow:
             case ItemType::Reset:
             case ItemType::Close:
                 itemRect = {resolutionColumnRight + m_separatorHeight, settingsY, 
@@ -361,6 +365,8 @@ void MenuWindow::OnPaint(HDC hdc) {
         if (item.type == ItemType::Ratio && item.index == m_currentRatioIndex) {
             isSelected = true;
         } else if (item.type == ItemType::Resolution && item.index == m_currentResolutionIndex) {
+            isSelected = true;
+        } else if (item.type == ItemType::OverlayWindow && m_overlayEnabled) {
             isSelected = true;
         } else if (item.type == ItemType::PreviewWindow && m_previewEnabled) {
             isSelected = true;
@@ -447,6 +453,9 @@ void MenuWindow::OnLButtonDown(int x, int y) {
             case ItemType::OpenScreenshot:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_OPEN_SCREENSHOT, 0);
                 break;
+            case ItemType::OverlayWindow:
+                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_OVERLAY_WINDOW, 0);
+                break;
             case ItemType::PreviewWindow:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_PREVIEW_WINDOW, 0);
                 break;
@@ -493,6 +502,7 @@ int MenuWindow::CalculateWindowHeight() {
                 break;
             case ItemType::CaptureWindow:
             case ItemType::OpenScreenshot:
+            case ItemType::OverlayWindow:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
@@ -536,6 +546,7 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
             const auto& item = m_items[i];
             if (item.type == ItemType::CaptureWindow ||
                 item.type == ItemType::OpenScreenshot ||
+                item.type == ItemType::OverlayWindow ||
                 item.type == ItemType::PreviewWindow ||
                 item.type == ItemType::Reset ||
                 item.type == ItemType::Close) {
@@ -567,3 +578,8 @@ void MenuWindow::SetPreviewEnabled(bool enabled) {
     m_previewEnabled = enabled;
     InvalidateRect(m_hwnd, NULL, TRUE);
 } 
+
+void MenuWindow::SetOverlayEnabled(bool enabled) {
+    m_overlayEnabled = enabled;
+    InvalidateRect(m_hwnd, NULL, TRUE);
+}

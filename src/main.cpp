@@ -75,7 +75,7 @@ public:
         m_menuWindow = std::make_unique<MenuWindow>(hInstance);
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
                                m_currentRatioIndex, m_currentResolutionIndex,
-                               m_isPreviewEnabled)) {
+                               m_isPreviewEnabled, m_isOverlayEnabled)) {
             return false;
         }
 
@@ -144,9 +144,9 @@ public:
                 if (m_isPreviewEnabled && m_previewWindow) {
                     m_previewWindow->StartCapture(gameWindow);
                 }
-                // if (m_overlayWindow) {
-                //     m_overlayWindow->StartCapture(gameWindow);
-                // }
+                if (m_isOverlayEnabled && m_overlayWindow) {
+                    m_overlayWindow->StartCapture(gameWindow);
+                }
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             }
@@ -192,8 +192,6 @@ public:
         }
 
         HWND gameWindow = FindTargetWindow();
-        m_overlayWindow->StartCapture(gameWindow);
-        return;
         if (!gameWindow) {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
             return;
@@ -322,6 +320,29 @@ public:
         }
     }
 
+    // 切换叠加层窗口
+    void ToggleOverlayWindow() {
+        if (!m_isScreenCaptureSupported) {
+            ShowNotification(m_strings.APP_NAME.c_str(),
+                m_strings.FEATURE_NOT_SUPPORTED.c_str());
+            return;
+        }
+        
+        m_isOverlayEnabled = !m_isOverlayEnabled;
+        
+        if (m_isOverlayEnabled) {
+            if (HWND gameWindow = WindowUtils::FindTargetWindow()) {
+                m_overlayWindow->StartCapture(gameWindow);
+            }
+        } else {
+            m_overlayWindow->StopCapture();
+        }
+
+        if (m_menuWindow) {
+            m_menuWindow->SetOverlayEnabled(m_isOverlayEnabled);
+        }
+    }
+
     // 切换语言
     void ChangeLanguage(const std::wstring& lang) {
         if (m_language != lang) {
@@ -388,7 +409,8 @@ public:
             m_language,
             m_configManager->GetUseFloatingWindow(),
             m_menuWindow && m_menuWindow->IsVisible(),
-            m_isPreviewEnabled
+            m_isPreviewEnabled,
+            m_isOverlayEnabled
         );
     }
 
@@ -491,6 +513,9 @@ public:
                             break;
                         case Constants::ID_FLOATING_WINDOW:
                             app->ToggleFloatingWindow();
+                            break;
+                        case Constants::ID_OVERLAY_WINDOW:
+                            app->ToggleOverlayWindow();
                             break;
                         case Constants::ID_TOGGLE_WINDOW_VISIBILITY:
                             if (app->m_menuWindow) {
@@ -629,6 +654,7 @@ private:
     bool m_hotkeySettingMode = false;
     bool m_messageLoopStarted = false;
     bool m_isScreenCaptureSupported = false;
+    bool m_isOverlayEnabled = false;
     size_t m_currentRatioIndex = SIZE_MAX;
     size_t m_currentResolutionIndex = 0;
     std::vector<std::pair<HWND, std::wstring>> m_windows;

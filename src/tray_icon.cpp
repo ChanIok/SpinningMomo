@@ -67,7 +67,8 @@ void TrayIcon::ShowContextMenu(
     const std::wstring& language,
     bool useFloatingWindow,
     bool isFloatingWindowVisible,
-    bool previewEnabled) {
+    bool previewEnabled,
+    bool overlayEnabled) {
     
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
@@ -105,7 +106,7 @@ void TrayIcon::ShowContextMenu(
     
     // 添加设置选项
     AddSettingsItems(hMenu, taskbarAutoHide, taskbarLower, useFloatingWindow, 
-                    isFloatingWindowVisible, previewEnabled, strings);
+                    isFloatingWindowVisible, previewEnabled, overlayEnabled, strings);
 
     // 添加语言子菜单
     HMENU hLangMenu = CreateLanguageSubmenu(language, strings);
@@ -301,6 +302,7 @@ void TrayIcon::AddSettingsItems(
     bool useFloatingWindow,
     bool isFloatingWindowVisible,
     bool previewEnabled,
+    bool overlayEnabled,
     const LocalizedStrings& strings) {
     
     // 任务栏自动隐藏选项
@@ -319,7 +321,11 @@ void TrayIcon::AddSettingsItems(
     // 预览窗口选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (previewEnabled ? MF_CHECKED : 0),
               Constants::ID_PREVIEW_WINDOW, strings.PREVIEW_WINDOW.c_str());
-              
+
+    // 叠加层窗口选项    
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (overlayEnabled ? MF_CHECKED : 0),
+              Constants::ID_OVERLAY_WINDOW, strings.OVERLAY_WINDOW.c_str());
+
     // 浮窗模式选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (useFloatingWindow ? MF_CHECKED : 0),
               Constants::ID_FLOATING_WINDOW, strings.FLOATING_MODE.c_str());

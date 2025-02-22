@@ -37,7 +37,8 @@ public:
         const std::wstring& language,
         bool useFloatingWindow,
         bool isFloatingWindowVisible,
-        bool previewEnabled);
+        bool previewEnabled,
+        bool overlayEnabled);
     // 新增：显示快捷菜单
     void ShowQuickMenu(
         const POINT& pt,
@@ -80,5 +81,6 @@ private:
         bool useFloatingWindow,
         bool isFloatingWindowVisible,
         bool previewEnabled,
+        bool overlayEnabled,
         const LocalizedStrings& strings);
 }; 

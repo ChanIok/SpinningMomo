@@ -38,6 +38,7 @@ namespace Constants {
     constexpr UINT ID_PREVIEW_WINDOW = 2015;     // 预览窗口菜单项ID
     constexpr UINT ID_OPEN_SCREENSHOT = 2016;    // 打开相册菜单项ID
     constexpr UINT ID_USER_GUIDE = 2017;         // 使用指南菜单项ID
+    constexpr UINT ID_OVERLAY_WINDOW = 2018;     // 叠加层菜单项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -138,7 +139,8 @@ struct LocalizedStrings {
     std::wstring PREVIEW_WINDOW;
     std::wstring OPEN_SCREENSHOT;
     std::wstring USER_GUIDE;
-    std::wstring FEATURE_NOT_SUPPORTED;  // 功能不支持的提示
+    std::wstring FEATURE_NOT_SUPPORTED;
+    std::wstring OVERLAY_WINDOW;
 };
 
 // 中文字符串

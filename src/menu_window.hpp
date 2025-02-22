@@ -21,6 +21,7 @@ public:
         CaptureWindow,
         OpenScreenshot,
         PreviewWindow,
+        OverlayWindow,
         Reset,
         Close
     };
@@ -40,7 +41,8 @@ public:
                const LocalizedStrings& strings,            // 字符串只读，保持const
                size_t currentRatioIndex,                   // 添加初始比例索引
                size_t currentResolutionIndex,              // 添加初始分辨率索引
-               bool previewEnabled);                       // 添加初始预览窗口状态
+               bool previewEnabled,                       // 添加初始预览窗口状态
+               bool overlayEnabled);                       // 添加初始叠加层窗口状态
     
     void Show();
     void Hide();
@@ -48,7 +50,8 @@ public:
     void ToggleVisibility();
     void SetCurrentRatio(size_t index);
     void SetCurrentResolution(size_t index);
-    void SetPreviewEnabled(bool enabled);  // 添加设置预览窗口状态的函数
+    void SetPreviewEnabled(bool enabled);  // 设置预览窗口状态的函数
+    void SetOverlayEnabled(bool enabled);  // 设置叠加层窗口状态的函数
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
     void Activate();  // 添加激活窗口的方法
@@ -91,6 +94,7 @@ private:
     size_t m_currentRatioIndex = SIZE_MAX;       // 当前选中的比例索引
     size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选中的分辨率索引
     bool m_previewEnabled = false;               // 预览窗口状态
+    bool m_overlayEnabled = false;               // 叠加层窗口状态
     std::vector<AspectRatio>* m_ratioItems = nullptr;       // 使用指针
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
     std::vector<MenuItem> m_items;               // 所有列表项
