@@ -435,11 +435,6 @@ void OverlayWindow::StopCapture() {
 }
 
 void OverlayWindow::Cleanup() {
-    if (m_frameLatencyWaitableObject) {
-        CloseHandle(m_frameLatencyWaitableObject);
-        m_frameLatencyWaitableObject = nullptr;
-    }
-    
     if (m_hwnd) {
         DestroyWindow(m_hwnd);
         m_hwnd = nullptr;
@@ -653,7 +648,7 @@ bool OverlayWindow::CreateShaderResources() {
 
     hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_pixelShader);
     if (FAILED(hr)) return false;
-    OutputDebugStringA("CreateShaderResources!\n");
+
     // 创建输入布局
     D3D11_INPUT_ELEMENT_DESC layout[] = {
         { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
@@ -771,7 +766,6 @@ void OverlayWindow::OnFrameArrived() {
             std::lock_guard<std::mutex> lock(m_textureMutex);
             m_context->CopyResource(m_frameTexture.Get(), frameTexture.Get());
             m_hasNewFrame = true;
-            OutputDebugStringA("OnFrameArrived-copy!\n");
         }
         
         // 通知渲染线程
@@ -785,61 +779,76 @@ void OverlayWindow::RenderFrame() {
         return;
     }
 
-    // 等待新帧
-    {
-        std::unique_lock<std::mutex> lock(m_textureMutex);
-        if (!m_hasNewFrame) {
-            // 等待超时以防止无限等待
-            if (m_frameAvailable.wait_for(lock, std::chrono::milliseconds(16)) 
-                == std::cv_status::timeout) {
-                return;
-            }
-        }
-        
-        // 等待前一帧完成
-        if (m_frameLatencyWaitableObject) {
-            WaitForSingleObject(m_frameLatencyWaitableObject, INFINITE);
-        }
-
-        // 更新着色器资源视图
-        if (m_shaderResourceView) {
-            m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
-        }
-
-        // 渲染逻辑
-        float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
-        m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
-        
-        D3D11_VIEWPORT viewport = {};
-        viewport.Width = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
-        viewport.Height = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
-        viewport.MinDepth = 0.0f;
-        viewport.MaxDepth = 1.0f;
-        m_context->RSSetViewports(1, &viewport);
-        
-        // 设置渲染状态和资源
-        UINT stride = sizeof(Vertex);
-        UINT offset = 0;
-        m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
-        m_context->IASetInputLayout(m_inputLayout.Get());
-        m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-        m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-        m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-        m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
-        
-        float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-        m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
-        
-        // 绘制
-        m_context->Draw(4, 0);
-        
-        // 关闭VSync显示
-        m_swapChain->Present(0, 0);
-
-        // 重置新帧标志
-        m_hasNewFrame = false;
+    // 初始化渲染状态（只在第一次调用时执行）
+    if (!m_renderStatesInitialized) {
+        InitializeRenderStates();
     }
+
+    // 准备帧，检查是否有新帧需要渲染
+    if (!PrepareFrame()) {
+        return;  // 没有新帧，直接返回
+    }
+
+    // 执行渲染
+    PerformRendering();
+}
+
+void OverlayWindow::InitializeRenderStates() {
+    // 设置固定的渲染状态
+    UINT stride = sizeof(Vertex);
+    UINT offset = 0;
+    m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
+    m_context->IASetInputLayout(m_inputLayout.Get());
+    m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+    m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+    m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
+
+    // 设置视口（只需要设置一次）
+    D3D11_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
+    viewport.Height = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    m_context->RSSetViewports(1, &viewport);
+
+    // 设置混合状态（只需要设置一次）
+    float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
+
+    m_renderStatesInitialized = true;
+}
+
+bool OverlayWindow::PrepareFrame() {
+    std::unique_lock<std::mutex> lock(m_textureMutex);
+    if (!m_hasNewFrame) {
+        // 等待新帧，带超时
+        if (m_frameAvailable.wait_for(lock, std::chrono::milliseconds(16)) 
+            == std::cv_status::timeout) {
+            return false;
+        }
+    }
+
+    // 更新着色器资源视图（仅在有新帧时）
+    if (m_shaderResourceView) {
+        m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+    }
+
+    m_hasNewFrame = false;
+    return true;
+}
+
+void OverlayWindow::PerformRendering() {
+    // 清理渲染目标
+    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
+    m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
+
+    // 绘制
+    m_context->Draw(4, 0);
+    
+    // 呈现
+    m_swapChain->Present(0, 0);
 }
 
 void OverlayWindow::RenderThreadProc() {

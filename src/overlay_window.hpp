@@ -39,6 +39,9 @@ private:
     bool InitializeD3D();
     bool CreateRenderTarget();
     bool CreateShaderResources();
+    void InitializeRenderStates();
+    bool PrepareFrame();
+    void PerformRendering();
     void OnFrameArrived();
 
     bool InitializeCapture();
@@ -50,6 +53,7 @@ private:
     Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swapChain;
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_renderTarget;
     std::mutex m_renderTargetMutex;
+    bool m_renderStatesInitialized = false;
 
     // 捕获相关
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem captureItem{ nullptr };
