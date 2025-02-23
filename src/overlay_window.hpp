@@ -64,16 +64,18 @@ private:
     Microsoft::WRL::ComPtr<ID3D11InputLayout> m_inputLayout;
     Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler;
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendState;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_shaderResourceView;
     HANDLE m_frameLatencyWaitableObject{nullptr};  // 添加帧延迟等待对象
     
     // 缓存上一次的纹理描述符，用于优化SRV创建
     D3D11_TEXTURE2D_DESC m_lastTextureDesc{};
 
-    // 共享纹理相关
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_sharedTexture;
-    Microsoft::WRL::ComPtr<IDXGIKeyedMutex> m_sharedMutex;
-    HANDLE m_sharedHandle{nullptr};
+    // 纹理资源和同步相关
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_frameTexture;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_shaderResourceView;
+    std::mutex m_textureMutex;
+    std::condition_variable m_frameAvailable;
+    bool m_hasNewFrame{false};
+    bool m_recreateTextureFlag{false};
 
     // 顶点结构
     struct Vertex {
@@ -88,7 +90,6 @@ private:
     // 主窗口句柄
     HWND m_mainHwnd = nullptr;
     HWND m_timerWindow = nullptr;  // 窗口管理线程的消息窗口
-    HWND m_renderWindow = nullptr;  // 渲染线程的消息窗口
 
     // 添加线程相关成员
     ThreadRAII m_captureThread;
@@ -96,20 +97,17 @@ private:
     ThreadRAII m_windowManagerThread;
     ThreadRAII m_renderThread;
     std::atomic<bool> m_running{false};
-    std::atomic<bool> m_renderThreadRunning{false};
     POINT m_currentMousePos{0, 0};
     float m_scaleFactor{1.0f};
     HHOOK m_mouseHook{nullptr};
     HWINEVENTHOOK m_eventHook = nullptr;
     DWORD m_gameProcessId = 0;
 
-    std::atomic<bool> m_recreateTextureFlag{false};
-
     void CaptureThreadProc();
     void HookThreadProc();
     void WindowManagerThreadProc();
     void RenderThreadProc();
-    bool CreateSharedTexture(UINT width, UINT height);  // 共享纹理创建函数
+    bool CreateFrameTexture(UINT width, UINT height);
     void RenderFrame();  // 渲染函数
     static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam);
 

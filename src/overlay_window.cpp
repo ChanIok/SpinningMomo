@@ -48,7 +48,6 @@ OverlayWindow* OverlayWindow::instance = nullptr;
 
 OverlayWindow::OverlayWindow() {
     instance = this;
-    winrt::init_apartment();
 }
 
 OverlayWindow::~OverlayWindow() {
@@ -118,7 +117,6 @@ bool OverlayWindow::StartCapture(HWND targetWindow) {
                     GetSystemMetrics(SM_CXSCREEN);
     // 启动工作线程
     m_running = true;
-    m_renderThreadRunning = true;
     try {
         m_captureThread = ThreadRAII([this]() { CaptureThreadProc(); });
         m_hookThread = ThreadRAII([this]() { HookThreadProc(); });
@@ -380,7 +378,6 @@ bool OverlayWindow::InitializeCapture() {
 void OverlayWindow::StopCapture() {
     // 停止标志
     m_running = false;
-    m_renderThreadRunning = false;
     m_recreateTextureFlag = true;
 
     if(framePool){
@@ -397,25 +394,19 @@ void OverlayWindow::StopCapture() {
     if (m_windowManagerThread.getId() != std::thread::id()) {
         PostThreadMessage(GetThreadId(m_windowManagerThread.get()->native_handle()), WM_QUIT, 0, 0);
     }
-    if (m_renderThread.getId() != std::thread::id()) {
-        PostThreadMessage(GetThreadId(m_renderThread.get()->native_handle()), WM_QUIT, 0, 0);
-    }
-    OutputDebugStringA("StopCapture0!\n");
+
     if (m_captureThread.get() && m_captureThread.get()->joinable()) {
         m_captureThread.get()->join();
     }
-    OutputDebugStringA("StopCapture0.5!\n");
     if (m_hookThread.get() && m_hookThread.get()->joinable()) {
         m_hookThread.get()->join();
     }
     if (m_windowManagerThread.get() && m_windowManagerThread.get()->joinable()) {
         m_windowManagerThread.get()->join();
     }
-    OutputDebugStringA("StopCapture1!\n");
     if (m_renderThread.get() && m_renderThread.get()->joinable()) {
         m_renderThread.get()->join();
     }
-    OutputDebugStringA("StopCapture2!\n");
 
     if (captureSession) {
         captureSession.Close();
@@ -427,18 +418,18 @@ void OverlayWindow::StopCapture() {
     }
     captureItem = nullptr;  
 
-    // 清理共享纹理相关资源
-    if (m_sharedTexture) {
-        m_sharedTexture.Reset();
-        m_sharedMutex.Reset();
-        m_sharedHandle = nullptr;
+    // 清理纹理资源
+    {
+        std::lock_guard<std::mutex> lock(m_textureMutex);
+        m_frameTexture.Reset();
+        m_shaderResourceView.Reset();
     }
+
     if (m_frameLatencyWaitableObject) {
         CloseHandle(m_frameLatencyWaitableObject);
         m_frameLatencyWaitableObject = nullptr;
     }
 
-    OutputDebugStringA("StopCapture3!\n");
     // 隐藏窗口
     ShowWindow(m_hwnd, SW_HIDE);
 }
@@ -722,105 +713,14 @@ bool OverlayWindow::CreateShaderResources() {
     return true;
 }
 
-void OverlayWindow::OnFrameArrived() {
-    if (!m_running) return;
-    OutputDebugStringA("OnFrameArrived0!\n");
-    if (auto frame = framePool.TryGetNextFrame()) {
-        auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
+bool OverlayWindow::CreateFrameTexture(UINT width, UINT height) {
+    std::lock_guard<std::mutex> lock(m_textureMutex);
+    
+    // 释放旧资源
+    m_frameTexture.Reset();
+    m_shaderResourceView.Reset();
 
-        if (frameTexture) {
-            D3D11_TEXTURE2D_DESC desc;
-            frameTexture->GetDesc(&desc);
-
-            // 如果尺寸变化，重新创建共享纹理
-            if (m_recreateTextureFlag || 
-                desc.Width != m_lastTextureDesc.Width || 
-                desc.Height != m_lastTextureDesc.Height) {
-                CreateSharedTexture(desc.Width, desc.Height);
-                m_lastTextureDesc = desc;
-                m_recreateTextureFlag = false;
-                OutputDebugStringA("OnFrameArrived-change!\n");
-            }
-            OutputDebugStringA("OnFrameArrived1!\n");
-            // 获取互斥锁并复制纹理
-            if (m_running && m_sharedTexture && m_sharedMutex) {
-                OutputDebugStringA("OnFrameArrived2!\n");
-                HRESULT hr = m_sharedMutex->AcquireSync(0, 1000);
-                OutputDebugStringA("OnFrameArrived3!\n");
-                if (FAILED(hr)) return;
-                OutputDebugStringA("OnFrameArrived4!\n");
-                m_context->CopyResource(m_sharedTexture.Get(), frameTexture.Get());
-                m_context->Flush();
-                m_sharedMutex->ReleaseSync(1);
-                OutputDebugStringA("OnFrameArrived5!\n");
-                // 通知渲染线程
-                if (m_renderWindow) {
-                    PostMessage(m_renderWindow, WM_NEW_FRAME, 0, 0);
-                }
-            }
-        }
-    }
-}
-
-void OverlayWindow::RenderFrame() {
-    OutputDebugStringA("RenderFrame1!\n");
-    if (!m_sharedMutex || !m_renderTarget) return;
-    
-    // 获取互斥锁
-    HRESULT hr = m_sharedMutex->AcquireSync(1, INFINITE);
-    OutputDebugStringA("RenderFrame2!\n");
-    if (FAILED(hr)) return;
-    
-    // 等待前一帧完成
-    if (m_frameLatencyWaitableObject) {
-        WaitForSingleObject(m_frameLatencyWaitableObject, INFINITE);
-    }
-    
-    // 渲染逻辑
-    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
-    m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
-    
-    D3D11_VIEWPORT viewport = {};
-    viewport.Width = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
-    viewport.Height = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    m_context->RSSetViewports(1, &viewport);
-    
-    // 设置渲染状态和资源
-    UINT stride = sizeof(Vertex);
-    UINT offset = 0;
-    m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
-    m_context->IASetInputLayout(m_inputLayout.Get());
-    m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-    m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-    m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
-    m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
-    
-    float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
-    
-    // 绘制
-    m_context->Draw(4, 0);
-    
-    // 关闭VSync显示
-    m_swapChain->Present(0, 0);
-    
-    // 释放互斥锁
-    m_sharedMutex->ReleaseSync(0);
-    OutputDebugStringA("RenderFrame3!\n");
-}
-
-bool OverlayWindow::CreateSharedTexture(UINT width, UINT height) {
-    if (m_sharedTexture) {
-        m_sharedTexture.Reset();
-        m_sharedMutex.Reset();
-        m_sharedHandle = nullptr;
-        m_shaderResourceView.Reset();
-    }
-
+    // 创建新的纹理
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Width = width;
     desc.Height = height;
@@ -830,99 +730,123 @@ bool OverlayWindow::CreateSharedTexture(UINT width, UINT height) {
     desc.SampleDesc.Count = 1;
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
-    
-    HRESULT hr = m_device->CreateTexture2D(&desc, nullptr, &m_sharedTexture);
-    if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create shared texture\n");
-        return false;
-    }
-    
-    // 获取共享句柄
-    Microsoft::WRL::ComPtr<IDXGIResource> dxgiResource;
-    hr = m_sharedTexture.As(&dxgiResource);
-    if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get DXGI resource\n");
-        return false;
-    }
-    
-    hr = dxgiResource->GetSharedHandle(&m_sharedHandle);
-    if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get shared handle\n");
-        return false;
-    }
-    
-    // 获取同步互斥量
-    hr = m_sharedTexture.As(&m_sharedMutex);
-    if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get keyed mutex\n");
-        return false;
-    }
-    
-    // 创建SRV
+    desc.CPUAccessFlags = 0;
+
+    HRESULT hr = m_device->CreateTexture2D(&desc, nullptr, &m_frameTexture);
+    if (FAILED(hr)) return false;
+
+    // 创建着色器资源视图
     D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
     srvDesc.Format = desc.Format;
     srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = 1;
-    
-    hr = m_device->CreateShaderResourceView(
-        m_sharedTexture.Get(), 
-        &srvDesc, 
-        m_shaderResourceView.ReleaseAndGetAddressOf()
-    );
-    if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create shader resource view\n");
-        return false;
-    }
 
-    return true;
+    hr = m_device->CreateShaderResourceView(m_frameTexture.Get(), &srvDesc, &m_shaderResourceView);
+    return SUCCEEDED(hr);
 }
 
-void OverlayWindow::RenderThreadProc() {
-    winrt::init_apartment();
+void OverlayWindow::OnFrameArrived() {
+    if (!m_running) return;
+    if (!framePool) return;
     
-    // 创建渲染消息窗口
-    WNDCLASSEXW wc = {};
-    wc.cbSize = sizeof(WNDCLASSEXW);
-    wc.lpfnWndProc = RenderWndProc;
-    wc.hInstance = GetModuleHandle(NULL);
-    wc.lpszClassName = L"RenderWindowClass";
-    RegisterClassExW(&wc);
+    if (auto frame = framePool.TryGetNextFrame()) {
+        auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
+        if (!frameTexture) return;
 
-    m_renderWindow = CreateWindowExW(
-        0, L"RenderWindowClass", L"Render Window",
-        WS_POPUP, 0, 0, 0, 0, NULL, NULL,
-        GetModuleHandle(NULL), NULL
-    );
+        D3D11_TEXTURE2D_DESC desc;
+        frameTexture->GetDesc(&desc);
 
-    if (!m_renderWindow) {
-        OutputDebugStringA("Failed to create render window\n");
+        // 如果尺寸变化，重新创建纹理
+        if (m_recreateTextureFlag || 
+            desc.Width != m_lastTextureDesc.Width || 
+            desc.Height != m_lastTextureDesc.Height) {
+            CreateFrameTexture(desc.Width, desc.Height);
+            m_lastTextureDesc = desc;
+            m_recreateTextureFlag = false;
+            OutputDebugStringA("OnFrameArrived-change!\n");
+        }
+
+        // 使用互斥锁保护纹理更新
+        {
+            std::lock_guard<std::mutex> lock(m_textureMutex);
+            m_context->CopyResource(m_frameTexture.Get(), frameTexture.Get());
+            m_hasNewFrame = true;
+            OutputDebugStringA("OnFrameArrived-copy!\n");
+        }
+        
+        // 通知渲染线程
+        m_frameAvailable.notify_one();
+    }
+}
+
+void OverlayWindow::RenderFrame() {
+    if (!m_frameTexture || !m_renderTarget) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
         return;
     }
 
-    MSG msg;
-    while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
+    // 等待新帧
+    {
+        std::unique_lock<std::mutex> lock(m_textureMutex);
+        if (!m_hasNewFrame) {
+            // 等待超时以防止无限等待
+            if (m_frameAvailable.wait_for(lock, std::chrono::milliseconds(16)) 
+                == std::cv_status::timeout) {
+                return;
+            }
+        }
+        
+        // 等待前一帧完成
+        if (m_frameLatencyWaitableObject) {
+            WaitForSingleObject(m_frameLatencyWaitableObject, INFINITE);
+        }
 
-    // 清理
-    if (m_renderWindow) {
-        DestroyWindow(m_renderWindow);
-        m_renderWindow = nullptr;
+        // 更新着色器资源视图
+        if (m_shaderResourceView) {
+            m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+        }
+
+        // 渲染逻辑
+        float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
+        m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
+        
+        D3D11_VIEWPORT viewport = {};
+        viewport.Width = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
+        viewport.Height = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
+        viewport.MinDepth = 0.0f;
+        viewport.MaxDepth = 1.0f;
+        m_context->RSSetViewports(1, &viewport);
+        
+        // 设置渲染状态和资源
+        UINT stride = sizeof(Vertex);
+        UINT offset = 0;
+        m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
+        m_context->IASetInputLayout(m_inputLayout.Get());
+        m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+        m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+        m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+        m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
+        
+        float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+        m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
+        
+        // 绘制
+        m_context->Draw(4, 0);
+        
+        // 关闭VSync显示
+        m_swapChain->Present(0, 0);
+
+        // 重置新帧标志
+        m_hasNewFrame = false;
     }
-    UnregisterClassW(L"RenderWindowClass", GetModuleHandle(NULL));
 }
 
-LRESULT CALLBACK OverlayWindow::RenderWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    if (instance) {
-        switch (message) {
-            case WM_NEW_FRAME:
-                instance->RenderFrame();
-                return 0;
-        }
+void OverlayWindow::RenderThreadProc() {
+    // 渲染循环
+    while (m_running) {
+        RenderFrame();
     }
-    return DefWindowProcW(hwnd, message, wParam, lParam);
 }
 
 LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
