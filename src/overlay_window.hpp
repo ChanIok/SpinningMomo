@@ -1,7 +1,7 @@
 #pragma once
 #include "win_config.hpp"
 #include <d3d11.h>
-#include <dxgi1_5.h>
+#include <dxgi1_6.h>
 #include <winrt/base.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
@@ -47,7 +47,7 @@ private:
     HWND m_hwnd = nullptr;
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
-    Microsoft::WRL::ComPtr<IDXGISwapChain> m_swapChain;
+    Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swapChain;
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_renderTarget;
     std::mutex m_renderTargetMutex;
 
@@ -65,7 +65,6 @@ private:
     Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler;
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendState;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_shaderResourceView;
-    Microsoft::WRL::ComPtr<IDXGISwapChain3> m_swapChain3;  // 添加IDXGISwapChain3接口
     HANDLE m_frameLatencyWaitableObject{nullptr};  // 添加帧延迟等待对象
     
     // 缓存上一次的纹理描述符，用于优化SRV创建

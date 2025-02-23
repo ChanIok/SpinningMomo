@@ -497,7 +497,7 @@ bool OverlayWindow::InitializeD3D() {
         return false;
     }
 
-    // 检查是否支持可变刷新率
+    // 获取DXGI设备
     Microsoft::WRL::ComPtr<IDXGIDevice1> dxgiDevice;
     hr = m_device.As(&dxgiDevice);
     if (FAILED(hr)) {
@@ -512,37 +512,55 @@ bool OverlayWindow::InitializeD3D() {
         return false;
     }
 
-    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
-    hr = dxgiDevice->GetAdapter(&adapter);
+    // 获取DXGI Factory6
+    Microsoft::WRL::ComPtr<IDXGIFactory6> factory6;
+    hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&factory6));
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get adapter\n");
+        OutputDebugStringA("Failed to create DXGI Factory6\n");
         return false;
     }
 
-    Microsoft::WRL::ComPtr<IDXGIFactory5> factory5;
-    hr = adapter->GetParent(IID_PPV_ARGS(&factory5));
+    // 直接获取性能最好的适配器
+    Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter4;
+    hr = factory6->EnumAdapterByGpuPreference(
+        0,
+        DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+        IID_PPV_ARGS(&adapter4)
+    );
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to get high performance adapter\n");
+        return false;
+    }
+
+    // 获取适配器信息
+    DXGI_ADAPTER_DESC3 desc = {};
+    hr = adapter4->GetDesc3(&desc);
+    if (SUCCEEDED(hr)) {
+        OutputDebugStringW(L"Using graphics adapter: ");
+        OutputDebugStringW(desc.Description);
+        OutputDebugStringW(L"\n");
+    }
     
     BOOL allowTearing = FALSE;
     UINT tearingFlags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
     
-    if (SUCCEEDED(hr)) {
-        BOOL supportTearing = FALSE;
-        if (SUCCEEDED(factory5->CheckFeatureSupport(
-            DXGI_FEATURE_PRESENT_ALLOW_TEARING,
-            &supportTearing,
-            sizeof(supportTearing)))) {
-            allowTearing = supportTearing;
-            if (supportTearing) {
-                tearingFlags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-                OutputDebugStringA("Variable refresh rate is supported\n");
-            } else {
-                OutputDebugStringA("Variable refresh rate is not supported\n");
-            }
+    // 检查可变刷新率支持
+    BOOL supportTearing = FALSE;
+    if (SUCCEEDED(factory6->CheckFeatureSupport(
+        DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+        &supportTearing,
+        sizeof(supportTearing)))) {
+        allowTearing = supportTearing;
+        if (supportTearing) {
+            tearingFlags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+            OutputDebugStringA("Variable refresh rate is supported\n");
+        } else {
+            OutputDebugStringA("Variable refresh rate is not supported\n");
         }
-        
-        // 如果支持DXGI 1.5，添加帧延迟等待对象标志
-        tearingFlags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
     }
+    
+    // 添加帧延迟等待对象标志
+    tearingFlags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
 
     // 创建交换链描述
     DXGI_SWAP_CHAIN_DESC1 scd = {};
@@ -562,7 +580,7 @@ bool OverlayWindow::InitializeD3D() {
 
     // 创建交换链
     Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain1;
-    hr = factory5->CreateSwapChainForHwnd(
+    hr = factory6->CreateSwapChainForHwnd(
         m_device.Get(),
         m_hwnd,
         &scd,
@@ -576,27 +594,21 @@ bool OverlayWindow::InitializeD3D() {
         return false;
     }
 
-    // 获取基本的 IDXGISwapChain 接口
+    // 获取 IDXGISwapChain4 接口
     hr = swapChain1.As(&m_swapChain);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get IDXGISwapChain interface\n");
+        OutputDebugStringA("Failed to get IDXGISwapChain4 interface\n");
         return false;
     }
 
-    // 尝试获取 IDXGISwapChain3 接口
-    hr = swapChain1.As(&m_swapChain3);
-    if (SUCCEEDED(hr)) {
-        // 获取帧延迟等待对象
-        m_frameLatencyWaitableObject = m_swapChain3->GetFrameLatencyWaitableObject();
-        if (m_frameLatencyWaitableObject) {
-            OutputDebugStringA("Frame latency waitable object is supported\n");
-        }
-    } else {
-        OutputDebugStringA("IDXGISwapChain3 interface is not supported\n");
+    // 获取帧延迟等待对象
+    m_frameLatencyWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+    if (m_frameLatencyWaitableObject) {
+        OutputDebugStringA("Frame latency waitable object is supported\n");
     }
 
     // 禁用Alt+Enter全屏切换
-    factory5->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER);
+    factory6->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER);
 
     if (!CreateRenderTarget()) {
         OutputDebugStringA("Failed to create render target\n");
