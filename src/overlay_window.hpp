@@ -1,6 +1,7 @@
 #pragma once
 #include "win_config.hpp"
 #include <d3d11.h>
+#include <dxgi1_5.h>
 #include <winrt/base.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
@@ -22,6 +23,7 @@ public:
 private:
     static OverlayWindow* instance;
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK RenderWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static void CALLBACK WinEventProc(
         HWINEVENTHOOK hook,
         DWORD event,
@@ -54,8 +56,7 @@ private:
     winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool framePool{ nullptr };
     winrt::Windows::Graphics::Capture::GraphicsCaptureSession captureSession{ nullptr };
     winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrtDevice{ nullptr };
-
-        
+    winrt::event_token m_frameArrivedToken;
     // 渲染资源
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
     Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
@@ -64,12 +65,16 @@ private:
     Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler;
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendState;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_shaderResourceView;
+    Microsoft::WRL::ComPtr<IDXGISwapChain3> m_swapChain3;  // 添加IDXGISwapChain3接口
+    HANDLE m_frameLatencyWaitableObject{nullptr};  // 添加帧延迟等待对象
+    
+    // 缓存上一次的纹理描述符，用于优化SRV创建
+    D3D11_TEXTURE2D_DESC m_lastTextureDesc{};
 
-    // Windows.Graphics.Capture 资源
-    winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_captureItem{ nullptr };
-    winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool m_framePool{ nullptr };
-    winrt::Windows::Graphics::Capture::GraphicsCaptureSession m_captureSession{ nullptr };
-    winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice m_winrtDevice{ nullptr };
+    // 共享纹理相关
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> m_sharedTexture;
+    Microsoft::WRL::ComPtr<IDXGIKeyedMutex> m_sharedMutex;
+    HANDLE m_sharedHandle{nullptr};
 
     // 顶点结构
     struct Vertex {
@@ -84,23 +89,33 @@ private:
     // 主窗口句柄
     HWND m_mainHwnd = nullptr;
     HWND m_timerWindow = nullptr;  // 窗口管理线程的消息窗口
+    HWND m_renderWindow = nullptr;  // 渲染线程的消息窗口
 
     // 添加线程相关成员
     ThreadRAII m_captureThread;
     ThreadRAII m_hookThread;
     ThreadRAII m_windowManagerThread;
+    ThreadRAII m_renderThread;
     std::atomic<bool> m_running{false};
+    std::atomic<bool> m_renderThreadRunning{false};
     POINT m_currentMousePos{0, 0};
     float m_scaleFactor{1.0f};
     HHOOK m_mouseHook{nullptr};
     HWINEVENTHOOK m_eventHook = nullptr;
     DWORD m_gameProcessId = 0;
 
+    std::atomic<bool> m_recreateTextureFlag{false};
+
     void CaptureThreadProc();
     void HookThreadProc();
     void WindowManagerThreadProc();
+    void RenderThreadProc();
+    bool CreateSharedTexture(UINT width, UINT height);  // 共享纹理创建函数
+    void RenderFrame();  // 渲染函数
     static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam);
 
     // 自定义消息定义
     static const UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
+    static const UINT WM_NEW_FRAME = WM_USER + 2;
+    static const UINT WM_SHOW_OVERLAY = WM_USER + 3;
 };

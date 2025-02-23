@@ -34,6 +34,7 @@ target_link_libraries(SpinningMomo PRIVATE
     d3d11        # Direct3D 11
     shell32      # Windows Shell API
     dxgi         # DXGI
+    dxguid       # DXGI GUID definitions
     RuntimeObject # WinRT support
     d3dcompiler  # D3D Compiler
     Shcore       # Shell Core API

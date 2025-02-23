@@ -118,10 +118,12 @@ bool OverlayWindow::StartCapture(HWND targetWindow) {
                     GetSystemMetrics(SM_CXSCREEN);
     // 启动工作线程
     m_running = true;
+    m_renderThreadRunning = true;
     try {
         m_captureThread = ThreadRAII([this]() { CaptureThreadProc(); });
         m_hookThread = ThreadRAII([this]() { HookThreadProc(); });
         m_windowManagerThread = ThreadRAII([this]() { WindowManagerThreadProc(); });
+        m_renderThread = ThreadRAII([this]() { RenderThreadProc(); });
         return true;
     }
     catch (const std::exception& e) {
@@ -131,9 +133,9 @@ bool OverlayWindow::StartCapture(HWND targetWindow) {
     }
 }
 
-
 void OverlayWindow::CaptureThreadProc() {
     // 初始化 COM
+    OutputDebugStringA("CaptureThreadProc0!\n");
     winrt::init_apartment();
 
     // 检查 D3D 是否已初始化
@@ -141,13 +143,13 @@ void OverlayWindow::CaptureThreadProc() {
         OutputDebugStringA("D3D not initialized\n");
         return;
     }
-    OutputDebugStringA("CaptureThreadProc2!\n");
+    OutputDebugStringA("CaptureThreadProc1!\n");
     // 创建捕获资源
     if (!InitializeCapture()) {
         OutputDebugStringA("Failed to initialize capture\n");
         return;
     }
-    
+    OutputDebugStringA("CaptureThreadProc2!\n");
     // 使用消息循环保持线程活动
     MSG msg;
     while (m_running && GetMessage(&msg, NULL, 0, 0)) {
@@ -301,7 +303,6 @@ bool OverlayWindow::InitializeCapture() {
         OutputDebugStringA("Failed to get IDXGIDevice\n");
         return false;
     }
-
     // 创建 WinRT 设备
     winrt::com_ptr<::IInspectable> inspectable;
     hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), inspectable.put());
@@ -309,7 +310,6 @@ bool OverlayWindow::InitializeCapture() {
         OutputDebugStringA("Failed to create WinRT device\n");
         return false;
     }
-
     winrtDevice = inspectable.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
     if (!winrtDevice) {
         OutputDebugStringA("Failed to get WinRT device interface\n");
@@ -334,7 +334,6 @@ bool OverlayWindow::InitializeCapture() {
     GetClientRect(m_gameWindow, &clientRect);
     int width = clientRect.right - clientRect.left;
     int height = clientRect.bottom - clientRect.top;
-
     // 创建帧池
     framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
         winrtDevice,
@@ -344,7 +343,7 @@ bool OverlayWindow::InitializeCapture() {
     );
 
     // 设置帧到达回调
-    framePool.FrameArrived([this](auto&& sender, auto&&) {
+    m_frameArrivedToken = framePool.FrameArrived([this](auto&& sender, auto&&) {
         OnFrameArrived();
     });
 
@@ -363,23 +362,30 @@ bool OverlayWindow::InitializeCapture() {
         // 忽略任何错误，继续执行
     }
 
-    // 开始捕获
-    captureSession.StartCapture();
-    
-    // 显示窗口
-    ShowWindow(m_hwnd, SW_SHOWNA);
-    SetWindowPos(m_hwnd, m_gameWindow, 0, 0, 0, 0, 
-    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    SetWindowPos(m_gameWindow, m_hwnd, 0, 0, 0, 0, 
-    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    UpdateWindow(m_hwnd);
-
+    try {
+        // 开始捕获
+        captureSession.StartCapture();
+    }
+    catch (...) {
+        OutputDebugStringA("Unknown error occurred while starting capture session\n");
+        return false;
+    }
+    OutputDebugStringA("InitializeCapture1!\n");
+    // 发送消息给主线程显示窗口
+    PostMessage(m_hwnd, WM_SHOW_OVERLAY, 0, 0);
+    OutputDebugStringA("InitializeCapture2!\n");
     return true;
 }
 
 void OverlayWindow::StopCapture() {
-    // 首先设置停止标志，线程会在下一次循环中退出
+    // 停止标志
     m_running = false;
+    m_renderThreadRunning = false;
+    m_recreateTextureFlag = true;
+
+    if(framePool){
+        framePool.FrameArrived(m_frameArrivedToken);
+    }
 
     // 向线程发送退出消息
     if (m_hookThread.getId() != std::thread::id()) {
@@ -391,16 +397,25 @@ void OverlayWindow::StopCapture() {
     if (m_windowManagerThread.getId() != std::thread::id()) {
         PostThreadMessage(GetThreadId(m_windowManagerThread.get()->native_handle()), WM_QUIT, 0, 0);
     }
-    
+    if (m_renderThread.getId() != std::thread::id()) {
+        PostThreadMessage(GetThreadId(m_renderThread.get()->native_handle()), WM_QUIT, 0, 0);
+    }
+    OutputDebugStringA("StopCapture0!\n");
     if (m_captureThread.get() && m_captureThread.get()->joinable()) {
         m_captureThread.get()->join();
     }
+    OutputDebugStringA("StopCapture0.5!\n");
     if (m_hookThread.get() && m_hookThread.get()->joinable()) {
         m_hookThread.get()->join();
     }
     if (m_windowManagerThread.get() && m_windowManagerThread.get()->joinable()) {
         m_windowManagerThread.get()->join();
     }
+    OutputDebugStringA("StopCapture1!\n");
+    if (m_renderThread.get() && m_renderThread.get()->joinable()) {
+        m_renderThread.get()->join();
+    }
+    OutputDebugStringA("StopCapture2!\n");
 
     if (captureSession) {
         captureSession.Close();
@@ -410,36 +425,51 @@ void OverlayWindow::StopCapture() {
         framePool.Close();
         framePool = nullptr;
     }
-    captureItem = nullptr;
+    captureItem = nullptr;  
 
+    // 清理共享纹理相关资源
+    if (m_sharedTexture) {
+        m_sharedTexture.Reset();
+        m_sharedMutex.Reset();
+        m_sharedHandle = nullptr;
+    }
+    if (m_frameLatencyWaitableObject) {
+        CloseHandle(m_frameLatencyWaitableObject);
+        m_frameLatencyWaitableObject = nullptr;
+    }
+
+    OutputDebugStringA("StopCapture3!\n");
     // 隐藏窗口
     ShowWindow(m_hwnd, SW_HIDE);
 }
 
 void OverlayWindow::Cleanup() {
+    if (m_frameLatencyWaitableObject) {
+        CloseHandle(m_frameLatencyWaitableObject);
+        m_frameLatencyWaitableObject = nullptr;
+    }
+    
     if (m_hwnd) {
         DestroyWindow(m_hwnd);
         m_hwnd = nullptr;
     }
+    // 释放其他 Direct3D 资源
+    m_renderTarget.Reset();
+    m_swapChain.Reset();
+    m_vertexBuffer.Reset();
+    m_inputLayout.Reset();
+    m_vertexShader.Reset();
+    m_pixelShader.Reset();
+    m_sampler.Reset();
+    m_blendState.Reset();
+    m_shaderResourceView.Reset();
+
+    // 最后释放 context 和 device
+    m_context.Reset();
+    m_device.Reset();
 }
 
 bool OverlayWindow::InitializeD3D() {
-    // 创建交换链描述
-    DXGI_SWAP_CHAIN_DESC scd = {};
-    scd.BufferCount = 2;
-    scd.BufferDesc.Width = GetSystemMetrics(SM_CXSCREEN);
-    scd.BufferDesc.Height = GetSystemMetrics(SM_CYSCREEN);
-    scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    scd.BufferDesc.RefreshRate.Numerator = 0;
-    scd.BufferDesc.RefreshRate.Denominator = 1;
-    scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    scd.OutputWindow = m_hwnd;
-    scd.SampleDesc.Count = 1;
-    scd.SampleDesc.Quality = 0;
-    scd.Windowed = TRUE;
-    scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    scd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-
     // 创建设备和交换链
     UINT createDeviceFlags = 0;
 #ifdef _DEBUG
@@ -447,17 +477,126 @@ bool OverlayWindow::InitializeD3D() {
 #endif
 
     D3D_FEATURE_LEVEL featureLevel;
-
-    HRESULT hr = D3D11CreateDeviceAndSwapChain(
-        nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
-        createDeviceFlags, nullptr, 0, D3D11_SDK_VERSION,
-        &scd, &m_swapChain, &m_device, &featureLevel, &m_context
+    
+    // 首先创建设备
+    HRESULT hr = D3D11CreateDevice(
+        nullptr,
+        D3D_DRIVER_TYPE_HARDWARE,
+        nullptr,
+        createDeviceFlags,
+        nullptr,
+        0,
+        D3D11_SDK_VERSION,
+        &m_device,
+        &featureLevel,
+        &m_context
     );
 
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create device and swap chain\n");
+        OutputDebugStringA("Failed to create D3D11 device\n");
         return false;
     }
+
+    // 检查是否支持可变刷新率
+    Microsoft::WRL::ComPtr<IDXGIDevice1> dxgiDevice;
+    hr = m_device.As(&dxgiDevice);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to get DXGI device\n");
+        return false;
+    }
+
+    // 设置最大帧延迟为3
+    hr = dxgiDevice->SetMaximumFrameLatency(3);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to set maximum frame latency\n");
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+    hr = dxgiDevice->GetAdapter(&adapter);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to get adapter\n");
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IDXGIFactory5> factory5;
+    hr = adapter->GetParent(IID_PPV_ARGS(&factory5));
+    
+    BOOL allowTearing = FALSE;
+    UINT tearingFlags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    
+    if (SUCCEEDED(hr)) {
+        BOOL supportTearing = FALSE;
+        if (SUCCEEDED(factory5->CheckFeatureSupport(
+            DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+            &supportTearing,
+            sizeof(supportTearing)))) {
+            allowTearing = supportTearing;
+            if (supportTearing) {
+                tearingFlags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+                OutputDebugStringA("Variable refresh rate is supported\n");
+            } else {
+                OutputDebugStringA("Variable refresh rate is not supported\n");
+            }
+        }
+        
+        // 如果支持DXGI 1.5，添加帧延迟等待对象标志
+        tearingFlags |= DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+    }
+
+    // 创建交换链描述
+    DXGI_SWAP_CHAIN_DESC1 scd = {};
+    scd.Width = GetSystemMetrics(SM_CXSCREEN);
+    scd.Height = GetSystemMetrics(SM_CYSCREEN);
+    scd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    scd.BufferCount = 4;
+    scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    scd.SampleDesc.Count = 1;
+    scd.SampleDesc.Quality = 0;
+    scd.Scaling = DXGI_SCALING_STRETCH;
+    scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    scd.Flags = tearingFlags;
+
+    DXGI_SWAP_CHAIN_FULLSCREEN_DESC fsDesc = {};
+    fsDesc.Windowed = TRUE;
+
+    // 创建交换链
+    Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain1;
+    hr = factory5->CreateSwapChainForHwnd(
+        m_device.Get(),
+        m_hwnd,
+        &scd,
+        &fsDesc,
+        nullptr,
+        &swapChain1
+    );
+
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to create swap chain\n");
+        return false;
+    }
+
+    // 获取基本的 IDXGISwapChain 接口
+    hr = swapChain1.As(&m_swapChain);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to get IDXGISwapChain interface\n");
+        return false;
+    }
+
+    // 尝试获取 IDXGISwapChain3 接口
+    hr = swapChain1.As(&m_swapChain3);
+    if (SUCCEEDED(hr)) {
+        // 获取帧延迟等待对象
+        m_frameLatencyWaitableObject = m_swapChain3->GetFrameLatencyWaitableObject();
+        if (m_frameLatencyWaitableObject) {
+            OutputDebugStringA("Frame latency waitable object is supported\n");
+        }
+    } else {
+        OutputDebugStringA("IDXGISwapChain3 interface is not supported\n");
+    }
+
+    // 禁用Alt+Enter全屏切换
+    factory5->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER);
 
     if (!CreateRenderTarget()) {
         OutputDebugStringA("Failed to create render target\n");
@@ -572,72 +711,206 @@ bool OverlayWindow::CreateShaderResources() {
 }
 
 void OverlayWindow::OnFrameArrived() {
-    std::lock_guard<std::mutex> lock(m_renderTargetMutex);
-    
-    if (!m_renderTarget) return;
-
+    if (!m_running) return;
+    OutputDebugStringA("OnFrameArrived0!\n");
     if (auto frame = framePool.TryGetNextFrame()) {
-        // 从frame获取纹理
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
-        
+
         if (frameTexture) {
-            // 更新着色器资源视图
             D3D11_TEXTURE2D_DESC desc;
             frameTexture->GetDesc(&desc);
 
-            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = desc.Format;
-            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Texture2D.MostDetailedMip = 0;
-            srvDesc.Texture2D.MipLevels = 1;
-
-            Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newSRV;
-            if (SUCCEEDED(m_device->CreateShaderResourceView(frameTexture.Get(), &srvDesc, &newSRV))) {
-                m_shaderResourceView = newSRV;
+            // 如果尺寸变化，重新创建共享纹理
+            if (m_recreateTextureFlag || 
+                desc.Width != m_lastTextureDesc.Width || 
+                desc.Height != m_lastTextureDesc.Height) {
+                CreateSharedTexture(desc.Width, desc.Height);
+                m_lastTextureDesc = desc;
+                m_recreateTextureFlag = false;
+                OutputDebugStringA("OnFrameArrived-change!\n");
+            }
+            OutputDebugStringA("OnFrameArrived1!\n");
+            // 获取互斥锁并复制纹理
+            if (m_running && m_sharedTexture && m_sharedMutex) {
+                OutputDebugStringA("OnFrameArrived2!\n");
+                HRESULT hr = m_sharedMutex->AcquireSync(0, 1000);
+                OutputDebugStringA("OnFrameArrived3!\n");
+                if (FAILED(hr)) return;
+                OutputDebugStringA("OnFrameArrived4!\n");
+                m_context->CopyResource(m_sharedTexture.Get(), frameTexture.Get());
+                m_context->Flush();
+                m_sharedMutex->ReleaseSync(1);
+                OutputDebugStringA("OnFrameArrived5!\n");
+                // 通知渲染线程
+                if (m_renderWindow) {
+                    PostMessage(m_renderWindow, WM_NEW_FRAME, 0, 0);
+                }
             }
         }
+    }
+}
 
-        // 渲染帧
-        if (m_shaderResourceView) {
-            // 清除背景
-            float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
+void OverlayWindow::RenderFrame() {
+    OutputDebugStringA("RenderFrame1!\n");
+    if (!m_sharedMutex || !m_renderTarget) return;
+    
+    // 获取互斥锁
+    HRESULT hr = m_sharedMutex->AcquireSync(1, INFINITE);
+    OutputDebugStringA("RenderFrame2!\n");
+    if (FAILED(hr)) return;
+    
+    // 等待前一帧完成
+    if (m_frameLatencyWaitableObject) {
+        WaitForSingleObject(m_frameLatencyWaitableObject, INFINITE);
+    }
+    
+    // 渲染逻辑
+    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
+    m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
+    
+    D3D11_VIEWPORT viewport = {};
+    viewport.Width = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
+    viewport.Height = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    m_context->RSSetViewports(1, &viewport);
+    
+    // 设置渲染状态和资源
+    UINT stride = sizeof(Vertex);
+    UINT offset = 0;
+    m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
+    m_context->IASetInputLayout(m_inputLayout.Get());
+    m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+    m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+    m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+    m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
+    
+    float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
+    
+    // 绘制
+    m_context->Draw(4, 0);
+    
+    // 关闭VSync显示
+    m_swapChain->Present(0, 0);
+    
+    // 释放互斥锁
+    m_sharedMutex->ReleaseSync(0);
+    OutputDebugStringA("RenderFrame3!\n");
+}
 
-            // 设置渲染目标
-            m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
-            
-            // 添加视口设置
-            D3D11_VIEWPORT viewport = {};
-            viewport.Width = static_cast<float>(GetSystemMetrics(SM_CXSCREEN));
-            viewport.Height = static_cast<float>(GetSystemMetrics(SM_CYSCREEN));
-            viewport.MinDepth = 0.0f;
-            viewport.MaxDepth = 1.0f;
-            viewport.TopLeftX = 0.0f;
-            viewport.TopLeftY = 0.0f;
-            m_context->RSSetViewports(1, &viewport);
+bool OverlayWindow::CreateSharedTexture(UINT width, UINT height) {
+    if (m_sharedTexture) {
+        m_sharedTexture.Reset();
+        m_sharedMutex.Reset();
+        m_sharedHandle = nullptr;
+        m_shaderResourceView.Reset();
+    }
 
-            // 设置着色器和资源
-            UINT stride = sizeof(Vertex);
-            UINT offset = 0;
-            m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
-            m_context->IASetInputLayout(m_inputLayout.Get());
-            m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-            m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
-            m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
-            m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
-            m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width = width;
+    desc.Height = height;
+    desc.MipLevels = 1;
+    desc.ArraySize = 1;
+    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    desc.SampleDesc.Count = 1;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+    desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+    
+    HRESULT hr = m_device->CreateTexture2D(&desc, nullptr, &m_sharedTexture);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to create shared texture\n");
+        return false;
+    }
+    
+    // 获取共享句柄
+    Microsoft::WRL::ComPtr<IDXGIResource> dxgiResource;
+    hr = m_sharedTexture.As(&dxgiResource);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to get DXGI resource\n");
+        return false;
+    }
+    
+    hr = dxgiResource->GetSharedHandle(&m_sharedHandle);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to get shared handle\n");
+        return false;
+    }
+    
+    // 获取同步互斥量
+    hr = m_sharedTexture.As(&m_sharedMutex);
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to get keyed mutex\n");
+        return false;
+    }
+    
+    // 创建SRV
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.Format = desc.Format;
+    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    srvDesc.Texture2D.MipLevels = 1;
+    
+    hr = m_device->CreateShaderResourceView(
+        m_sharedTexture.Get(), 
+        &srvDesc, 
+        m_shaderResourceView.ReleaseAndGetAddressOf()
+    );
+    if (FAILED(hr)) {
+        OutputDebugStringA("Failed to create shader resource view\n");
+        return false;
+    }
 
-            // 设置混合状态
-            float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
+    return true;
+}
 
-            // 绘制
-            m_context->Draw(4, 0);
+void OverlayWindow::RenderThreadProc() {
+    winrt::init_apartment();
+    
+    // 创建渲染消息窗口
+    WNDCLASSEXW wc = {};
+    wc.cbSize = sizeof(WNDCLASSEXW);
+    wc.lpfnWndProc = RenderWndProc;
+    wc.hInstance = GetModuleHandle(NULL);
+    wc.lpszClassName = L"RenderWindowClass";
+    RegisterClassExW(&wc);
 
-            // 显示
-            m_swapChain->Present(1, 0);
+    m_renderWindow = CreateWindowExW(
+        0, L"RenderWindowClass", L"Render Window",
+        WS_POPUP, 0, 0, 0, 0, NULL, NULL,
+        GetModuleHandle(NULL), NULL
+    );
+
+    if (!m_renderWindow) {
+        OutputDebugStringA("Failed to create render window\n");
+        return;
+    }
+
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    // 清理
+    if (m_renderWindow) {
+        DestroyWindow(m_renderWindow);
+        m_renderWindow = nullptr;
+    }
+    UnregisterClassW(L"RenderWindowClass", GetModuleHandle(NULL));
+}
+
+LRESULT CALLBACK OverlayWindow::RenderWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (instance) {
+        switch (message) {
+            case WM_NEW_FRAME:
+                instance->RenderFrame();
+                return 0;
         }
     }
+    return DefWindowProcW(hwnd, message, wParam, lParam);
 }
 
 LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -653,6 +926,15 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     GetSystemMetrics(SM_CXSCREEN),
                     GetSystemMetrics(SM_CYSCREEN),
                     SWP_NOZORDER | SWP_NOACTIVATE);
+                return 0;
+
+            case WM_SHOW_OVERLAY:
+                ShowWindow(hwnd, SW_SHOWNA);    
+                SetWindowPos(hwnd, instance->m_gameWindow, 0, 0, 0, 0, 
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                SetWindowPos(instance->m_gameWindow, hwnd, 0, 0, 0, 0, 
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                UpdateWindow(hwnd);
                 return 0;
         }
     }
