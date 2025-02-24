@@ -851,8 +851,49 @@ void OverlayWindow::OnFrameArrived() {
             m_hasNewFrame = true;
         }
         
+        // 增加捕获帧计数
+        ++m_captureFrameCount;
+        
         // 通知渲染线程
         m_frameAvailable.notify_one();
+    }
+}
+
+void OverlayWindow::PerformRendering() {
+    // 清理渲染目标
+    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
+    m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
+
+    // 绘制
+    m_context->Draw(4, 0);
+    
+    // 呈现
+    m_swapChain->Present(0, 0);
+
+    // 增加渲染帧计数
+    ++m_renderFrameCount;
+}
+
+void OverlayWindow::UpdateFPS() {
+    auto currentTime = std::chrono::steady_clock::now();
+    auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+        currentTime - m_lastFPSUpdateTime).count() / 1000.0f;
+    
+    if (elapsedTime >= 1.0f) {  // 每秒更新一次
+        m_captureFPS = m_captureFrameCount / elapsedTime;
+        m_renderFPS = m_renderFrameCount / elapsedTime;
+        
+        // 输出调试信息
+        char debugStr[256];
+        sprintf_s(debugStr, "FPS - Capture: %.2f, Render: %.2f\n", 
+                 m_captureFPS, m_renderFPS);
+        OutputDebugStringA(debugStr);
+        
+        // 重置计数器和时间
+        m_captureFrameCount = 0;
+        m_renderFrameCount = 0;
+        m_lastFPSUpdateTime = currentTime;
     }
 }
 
@@ -865,6 +906,7 @@ void OverlayWindow::RenderFrame() {
     // 初始化渲染状态（只在第一次调用时执行）
     if (!m_renderStatesInitialized) {
         InitializeRenderStates();
+        m_lastFPSUpdateTime = std::chrono::steady_clock::now();  // 初始化FPS计时器
     }
 
     // 准备帧，检查是否有新帧需要渲染
@@ -874,6 +916,9 @@ void OverlayWindow::RenderFrame() {
 
     // 执行渲染
     PerformRendering();
+
+    // 更新FPS
+    UpdateFPS();
 }
 
 void OverlayWindow::InitializeRenderStates() {
@@ -919,19 +964,6 @@ bool OverlayWindow::PrepareFrame() {
 
     m_hasNewFrame = false;
     return true;
-}
-
-void OverlayWindow::PerformRendering() {
-    // 清理渲染目标
-    float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-    m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
-    m_context->OMSetRenderTargets(1, m_renderTarget.GetAddressOf(), nullptr);
-
-    // 绘制
-    m_context->Draw(4, 0);
-    
-    // 呈现
-    m_swapChain->Present(0, 0);
 }
 
 void OverlayWindow::RenderThreadProc() {

@@ -99,6 +99,14 @@ private:
     int m_windowWidth = 0;
     int m_windowHeight = 0;
 
+    // FPS统计相关
+    std::atomic<uint32_t> m_captureFrameCount{0};  // 捕获帧计数
+    std::atomic<uint32_t> m_renderFrameCount{0};   // 渲染帧计数
+    std::chrono::steady_clock::time_point m_lastFPSUpdateTime;  // 上次FPS更新时间
+    float m_captureFPS{0.0f};  // 捕获帧率
+    float m_renderFPS{0.0f};   // 渲染帧率
+    void UpdateFPS();  // FPS更新函数
+
     // 缓存的游戏窗口尺寸
     int m_cachedGameWidth = 0;
     int m_cachedGameHeight = 0;
