@@ -23,7 +23,6 @@ public:
 private:
     static OverlayWindow* instance;
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
-    static LRESULT CALLBACK RenderWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static void CALLBACK WinEventProc(
         HWINEVENTHOOK hook,
         DWORD event,
@@ -37,6 +36,7 @@ private:
     std::atomic<bool> m_d3dInitialized{false};
     
     bool InitializeD3D();
+    bool ResizeSwapChain();
     bool CreateRenderTarget();
     bool CreateShaderResources();
     void InitializeRenderStates();
@@ -95,6 +95,14 @@ private:
     HWND m_mainHwnd = nullptr;
     HWND m_timerWindow = nullptr;  // 窗口管理线程的消息窗口
 
+    // 窗口尺寸
+    int m_windowWidth = 0;
+    int m_windowHeight = 0;
+
+    // 缓存的游戏窗口尺寸
+    int m_cachedGameWidth = 0;
+    int m_cachedGameHeight = 0;
+
     // 添加线程相关成员
     ThreadRAII m_captureThread;
     ThreadRAII m_hookThread;
@@ -102,6 +110,7 @@ private:
     ThreadRAII m_renderThread;
     std::atomic<bool> m_running{false};
     POINT m_currentMousePos{0, 0};
+    POINT m_lastMousePos{0, 0};
     float m_scaleFactor{1.0f};
     HHOOK m_mouseHook{nullptr};
     HWINEVENTHOOK m_eventHook = nullptr;

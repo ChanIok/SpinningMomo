@@ -174,7 +174,7 @@ public:
                 }
 
                 // 更新叠加层窗口
-                if (m_overlayWindow) {
+                if (m_isOverlayEnabled && m_overlayWindow) {
                     m_overlayWindow->StartCapture(gameWindow);
                 }
             } else {
