@@ -1,4 +1,5 @@
 #include "overlay_window.hpp"
+#include <d3dkmthk.h>
 #include <windowsx.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
@@ -342,6 +343,30 @@ bool OverlayWindow::InitializeCapture() {
         OutputDebugStringA("Failed to get IDXGIDevice\n");
         return false;
     }
+    bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
+    // 设置进程调度优先级
+    NTSTATUS status = D3DKMTSetProcessSchedulingPriorityClass(
+        GetCurrentProcess(),
+        hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
+    if (status != 0) {
+        char buffer[128];
+        sprintf_s(buffer, "Failed to set process priority class: %d\n", status);
+        OutputDebugStringA(buffer);
+    } else {
+        OutputDebugStringA("Process priority class set successfully\n");
+    }
+
+    // 设置 GPU 线程优先级
+    hr = dxgiDevice->SetGPUThreadPriority(7);
+    if (SUCCEEDED(hr)) {
+        OutputDebugStringA("GPU priority setup success\n");
+    } else {
+        char buffer[128];
+        sprintf_s(buffer, "Failed to set GPU priority: 0x%08X\n", hr);
+        OutputDebugStringA(buffer);
+        // 优先级设置失败不影响主要功能，继续执行
+    }
+
     // 创建 WinRT 设备
     winrt::com_ptr<::IInspectable> inspectable;
     hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), inspectable.put());
@@ -369,7 +394,7 @@ bool OverlayWindow::InitializeCapture() {
     }
 
     // 创建帧池
-    framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
+    framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
         winrtDevice,
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         1,
@@ -601,16 +626,13 @@ bool OverlayWindow::InitializeD3D() {
     scd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     scd.Flags = tearingFlags;
 
-    DXGI_SWAP_CHAIN_FULLSCREEN_DESC fsDesc = {};
-    fsDesc.Windowed = TRUE;
-
     // 创建交换链
     Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain1;
     hr = factory6->CreateSwapChainForHwnd(
         m_device.Get(),
         m_hwnd,
         &scd,
-        &fsDesc,
+        nullptr,
         nullptr,
         &swapChain1
     );
