@@ -58,11 +58,9 @@ namespace Constants {
     inline const TCHAR* HOTKEY_MODIFIERS = TEXT("Modifiers"); // 修饰键配置项
     inline const TCHAR* HOTKEY_KEY = TEXT("Key");            // 主键配置项
     
-    inline const TCHAR* CUSTOM_RATIO_SECTION = TEXT("CustomRatio");  // 自定义比例配置节名
-    inline const TCHAR* CUSTOM_RATIO_LIST = TEXT("RatioList");       // 自定义比例列表配置项
-    
-    inline const TCHAR* CUSTOM_RESOLUTION_SECTION = TEXT("CustomResolution");  // 自定义分辨率配置节名
-    inline const TCHAR* CUSTOM_RESOLUTION_LIST = TEXT("ResolutionList");      // 自定义分辨率列表配置项
+    // 自定义比例和分辨率配置项（现在都在MENU_SECTION中）
+    inline const TCHAR* CUSTOM_RATIO_LIST = TEXT("CustomRatioList");       // 自定义比例列表配置项
+    inline const TCHAR* CUSTOM_RESOLUTION_LIST = TEXT("CustomResolutionList");      // 自定义分辨率列表配置项
     
     // 语言相关
     inline const TCHAR* LANG_SECTION = TEXT("Language");     // 语言配置节名
@@ -87,6 +85,19 @@ namespace Constants {
     
     // 菜单项配置
     inline const TCHAR* MENU_ITEMS = TEXT("MenuItems");  // 菜单项显示配置
+    
+    // 宽高比和分辨率配置
+    inline const TCHAR* ASPECT_RATIO_ITEMS = TEXT("AspectRatioItems");  // 宽高比项目显示配置
+    inline const TCHAR* RESOLUTION_ITEMS = TEXT("ResolutionItems");    // 分辨率项目显示配置
+    
+    // 预设分辨率名称
+    inline const TCHAR* RESOLUTION_DEFAULT = TEXT("Default");
+    inline const TCHAR* RESOLUTION_720P = TEXT("720P");
+    inline const TCHAR* RESOLUTION_1080P = TEXT("1080P");
+    inline const TCHAR* RESOLUTION_2K = TEXT("2K");
+    inline const TCHAR* RESOLUTION_4K = TEXT("4K");
+    inline const TCHAR* RESOLUTION_8K = TEXT("8K");
+    inline const TCHAR* RESOLUTION_12K = TEXT("12K");
 }
 
 // 比例结构体定义

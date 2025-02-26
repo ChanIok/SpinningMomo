@@ -25,12 +25,18 @@ void ConfigManager::Initialize() {
         WritePrivateProfileString(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, TEXT(""), m_configPath.c_str());
         WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, TEXT("3"), m_configPath.c_str());
         WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
-        WritePrivateProfileString(Constants::CUSTOM_RATIO_SECTION, Constants::CUSTOM_RATIO_LIST, TEXT(""), m_configPath.c_str());
-        WritePrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION, Constants::CUSTOM_RESOLUTION_LIST, TEXT(""), m_configPath.c_str());
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
         WritePrivateProfileString(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, TEXT(""), m_configPath.c_str());
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_ITEMS, 
                                 TEXT("CaptureWindow,OpenScreenshot,OverlayWindow,PreviewWindow,Reset,Close"), 
+                                m_configPath.c_str());
+        
+        // 添加默认的宽高比和分辨率配置
+        WritePrivateProfileString(Constants::MENU_SECTION, Constants::ASPECT_RATIO_ITEMS, 
+                                TEXT("32:9,21:9,16:9,3:2,1:1,2:3,9:16"), 
+                                m_configPath.c_str());
+        WritePrivateProfileString(Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS, 
+                                TEXT("Default,4K,6K,8K,12K"), 
                                 m_configPath.c_str());
     }
 }
@@ -159,12 +165,12 @@ void ConfigManager::SaveTaskbarConfig() {
 }
 
 void ConfigManager::LoadMenuConfig() {
-    TCHAR buffer[1024];  // 增加缓冲区大小，以支持多个菜单项
+    TCHAR buffer[1024];
     
-    // 读取浮动窗口配置
+    // 读取浮动窗口设置
     if (GetPrivateProfileString(Constants::MENU_SECTION,
                               Constants::MENU_FLOATING,
-                              TEXT("0"), buffer, _countof(buffer),
+                              TEXT("1"), buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
         m_useFloatingWindow = (_wtoi(buffer) != 0);
     }
@@ -174,69 +180,131 @@ void ConfigManager::LoadMenuConfig() {
                               Constants::MENU_ITEMS,
                               TEXT(""), buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        // 解析逗号分隔的菜单项类型
-        m_menuItemsToShow.clear();
         std::wstring itemsStr = buffer;
-        size_t pos = 0;
-        std::wstring token;
-        
-        while ((pos = itemsStr.find(TEXT(","))) != std::wstring::npos) {
-            token = itemsStr.substr(0, pos);
-            // 去除前后空格
-            token.erase(0, token.find_first_not_of(TEXT(" ")));
-            token.erase(token.find_last_not_of(TEXT(" ")) + 1);
-            if (!token.empty()) {
-                m_menuItemsToShow.push_back(token);
-            }
-            itemsStr.erase(0, pos + 1);
-        }
-        
-        // 处理最后一个项目
-        itemsStr.erase(0, itemsStr.find_first_not_of(TEXT(" ")));
-        itemsStr.erase(itemsStr.find_last_not_of(TEXT(" ")) + 1);
         if (!itemsStr.empty()) {
-            m_menuItemsToShow.push_back(itemsStr);
+            m_menuItemsToShow.clear();
+            
+            size_t start = 0, end = 0;
+            while ((end = itemsStr.find(TEXT(","), start)) != std::wstring::npos) {
+                std::wstring item = itemsStr.substr(start, end - start);
+                if (!item.empty()) {
+                    m_menuItemsToShow.push_back(item);
+                }
+                start = end + 1;
+            }
+            
+            if (start < itemsStr.length()) {
+                std::wstring item = itemsStr.substr(start);
+                if (!item.empty()) {
+                    m_menuItemsToShow.push_back(item);
+                }
+            }
         }
-    } else {
-        // 默认显示所有菜单项，按默认顺序
-        m_menuItemsToShow = {
-            Constants::MENU_ITEM_TYPE_CAPTURE,
-            Constants::MENU_ITEM_TYPE_SCREENSHOT,
-            Constants::MENU_ITEM_TYPE_OVERLAY,
-            Constants::MENU_ITEM_TYPE_PREVIEW,
-            Constants::MENU_ITEM_TYPE_RESET,
-            Constants::MENU_ITEM_TYPE_CLOSE
-        };
+    }
+    
+    // 读取宽高比项配置
+    if (GetPrivateProfileString(Constants::MENU_SECTION,
+                              Constants::ASPECT_RATIO_ITEMS,
+                              TEXT(""), buffer, _countof(buffer),
+                              m_configPath.c_str()) > 0) {
+        std::wstring ratioItemsStr = buffer;
+        if (!ratioItemsStr.empty()) {
+            m_aspectRatioItems.clear();
+            
+            size_t start = 0, end = 0;
+            while ((end = ratioItemsStr.find(TEXT(","), start)) != std::wstring::npos) {
+                std::wstring item = ratioItemsStr.substr(start, end - start);
+                if (!item.empty()) {
+                    m_aspectRatioItems.push_back(item);
+                }
+                start = end + 1;
+            }
+            
+            if (start < ratioItemsStr.length()) {
+                std::wstring item = ratioItemsStr.substr(start);
+                if (!item.empty()) {
+                    m_aspectRatioItems.push_back(item);
+                }
+            }
+        }
+    }
+    
+    // 读取分辨率项配置
+    if (GetPrivateProfileString(Constants::MENU_SECTION,
+                              Constants::RESOLUTION_ITEMS,
+                              TEXT(""), buffer, _countof(buffer),
+                              m_configPath.c_str()) > 0) {
+        std::wstring resolutionItemsStr = buffer;
+        if (!resolutionItemsStr.empty()) {
+            m_resolutionItems.clear();
+            
+            size_t start = 0, end = 0;
+            while ((end = resolutionItemsStr.find(TEXT(","), start)) != std::wstring::npos) {
+                std::wstring item = resolutionItemsStr.substr(start, end - start);
+                if (!item.empty()) {
+                    m_resolutionItems.push_back(item);
+                }
+                start = end + 1;
+            }
+            
+            if (start < resolutionItemsStr.length()) {
+                std::wstring item = resolutionItemsStr.substr(start);
+                if (!item.empty()) {
+                    m_resolutionItems.push_back(item);
+                }
+            }
+        }
     }
 }
 
 void ConfigManager::SaveMenuConfig() {
-    // 保存浮动窗口配置
+    // 保存浮动窗口设置
+    TCHAR buffer[32];
+    _stprintf_s(buffer, _countof(buffer), TEXT("%d"), m_useFloatingWindow ? 1 : 0);
     WritePrivateProfileString(Constants::MENU_SECTION,
                             Constants::MENU_FLOATING,
-                            m_useFloatingWindow ? TEXT("1") : TEXT("0"),
-                            m_configPath.c_str());
+                            buffer, m_configPath.c_str());
     
     // 保存菜单项显示配置
     if (!m_menuItemsToShow.empty()) {
-        std::wstring itemsStr;
+        std::wstring menuItemsStr;
         for (size_t i = 0; i < m_menuItemsToShow.size(); i++) {
-            itemsStr += m_menuItemsToShow[i];
+            menuItemsStr += m_menuItemsToShow[i];
             if (i < m_menuItemsToShow.size() - 1) {
-                itemsStr += TEXT(",");
+                menuItemsStr += TEXT(",");
             }
         }
-        
         WritePrivateProfileString(Constants::MENU_SECTION,
                                 Constants::MENU_ITEMS,
-                                itemsStr.c_str(),
-                                m_configPath.c_str());
-    } else {
-        // 如果为空，则写入空字符串，表示不显示任何菜单项
+                                menuItemsStr.c_str(), m_configPath.c_str());
+    }
+    
+    // 保存宽高比项配置
+    if (!m_aspectRatioItems.empty()) {
+        std::wstring ratioItemsStr;
+        for (size_t i = 0; i < m_aspectRatioItems.size(); i++) {
+            ratioItemsStr += m_aspectRatioItems[i];
+            if (i < m_aspectRatioItems.size() - 1) {
+                ratioItemsStr += TEXT(",");
+            }
+        }
         WritePrivateProfileString(Constants::MENU_SECTION,
-                                Constants::MENU_ITEMS,
-                                TEXT(""),
-                                m_configPath.c_str());
+                                Constants::ASPECT_RATIO_ITEMS,
+                                ratioItemsStr.c_str(), m_configPath.c_str());
+    }
+    
+    // 保存分辨率项配置
+    if (!m_resolutionItems.empty()) {
+        std::wstring resolutionItemsStr;
+        for (size_t i = 0; i < m_resolutionItems.size(); i++) {
+            resolutionItemsStr += m_resolutionItems[i];
+            if (i < m_resolutionItems.size() - 1) {
+                resolutionItemsStr += TEXT(",");
+            }
+        }
+        WritePrivateProfileString(Constants::MENU_SECTION,
+                                Constants::RESOLUTION_ITEMS,
+                                resolutionItemsStr.c_str(), m_configPath.c_str());
     }
 }
 
@@ -275,45 +343,24 @@ bool ConfigManager::AddCustomRatio(const std::wstring& ratio, std::vector<Aspect
     }
 }
 
-ConfigLoadResult ConfigManager::LoadCustomRatios(std::vector<AspectRatio>& ratios, const LocalizedStrings& strings) {
-    TCHAR buffer[1024];
-    if (GetPrivateProfileString(Constants::CUSTOM_RATIO_SECTION,
-                              Constants::CUSTOM_RATIO_LIST,
-                              TEXT(""), buffer, _countof(buffer),
-                              m_configPath.c_str()) > 0) {
-        std::wstring ratiosStr = buffer;
-        if (ratiosStr.empty()) return ConfigLoadResult();
-
-        bool hasError = false;
-        std::wstring errorDetails;
-        
-        size_t start = 0, end = 0;
-        while ((end = ratiosStr.find(TEXT(","), start)) != std::wstring::npos) {
-            std::wstring ratio = ratiosStr.substr(start, end - start);
-            if (!AddCustomRatio(ratio, ratios)) {
-                hasError = true;
-                errorDetails += ratio + TEXT(", ");
-            }
-            start = end + 1;
-        }
-        
-        if (start < ratiosStr.length()) {
-            std::wstring ratio = ratiosStr.substr(start);
-            if (!AddCustomRatio(ratio, ratios)) {
-                hasError = true;
-                errorDetails += ratio;
-            }
-        }
-
-        if (hasError) {
-            return ConfigLoadResult(strings.CONFIG_FORMAT_ERROR + errorDetails + TEXT("\n") + strings.RATIO_FORMAT_EXAMPLE);
-        }
-    }
-    return ConfigLoadResult();
-}
-
 bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vector<ResolutionPreset>& resolutions) {
     try {
+        // 处理常见分辨率标识符
+        if (resolution == TEXT("480P")) {
+            resolutions.emplace_back(resolution, 720, 480);
+            return true;
+        } else if (resolution == TEXT("720P")) {
+            resolutions.emplace_back(resolution, 1280, 720);
+            return true;
+        } else if (resolution == TEXT("1080P")) {
+            resolutions.emplace_back(resolution, 1920, 1080);
+            return true;
+        } else if (resolution == TEXT("2K")) {
+            resolutions.emplace_back(resolution, 2560, 1440);
+            return true;
+        }
+        
+        // 处理自定义分辨率格式 (例如 1920x1080)
         size_t xPos = resolution.find(TEXT("x"));
         if (xPos == std::wstring::npos) return false;
 
@@ -330,39 +377,108 @@ bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vec
     }
 }
 
-ConfigLoadResult ConfigManager::LoadCustomResolutions(std::vector<ResolutionPreset>& resolutions, const LocalizedStrings& strings) {
-    TCHAR buffer[1024];
-    if (GetPrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION,
-                              Constants::CUSTOM_RESOLUTION_LIST,
-                              TEXT(""), buffer, _countof(buffer),
-                              m_configPath.c_str()) > 0) {
-        std::wstring resolutionsStr = buffer;
-        if (resolutionsStr.empty()) return ConfigLoadResult();
-
-        bool hasError = false;
-        std::wstring errorDetails;
-
-        size_t start = 0, end = 0;
-        while ((end = resolutionsStr.find(TEXT(","), start)) != std::wstring::npos) {
-            std::wstring resolution = resolutionsStr.substr(start, end - start);
-            if (!AddCustomResolution(resolution, resolutions)) {
-                hasError = true;
-                errorDetails += resolution + TEXT(", ");
+ConfigLoadResult ConfigManager::BuildRatiosFromConfig(std::vector<AspectRatio>& ratios, 
+                                                    const std::vector<AspectRatio>& presets, 
+                                                    const LocalizedStrings& strings) {
+    // 获取配置的宽高比项
+    const auto& aspectRatioItems = GetAspectRatioItems();
+    if (aspectRatioItems.empty()) {
+        // 如果配置为空，使用预设列表
+        ratios = presets;
+        return ConfigLoadResult();
+    }
+    
+    // 根据配置构建新的宽高比列表
+    std::vector<AspectRatio> configuredRatios;
+    bool hasError = false;
+    std::wstring errorDetails;
+    
+    for (const auto& ratioName : aspectRatioItems) {
+        // 查找预设中是否有匹配的宽高比
+        bool found = false;
+        for (const auto& preset : presets) {
+            if (preset.name == ratioName) {
+                configuredRatios.push_back(preset);
+                found = true;
+                break;
             }
-            start = end + 1;
         }
         
-        if (start < resolutionsStr.length()) {
-            std::wstring resolution = resolutionsStr.substr(start);
-            if (!AddCustomResolution(resolution, resolutions)) {
+        // 如果预设中没有，尝试解析自定义宽高比
+        if (!found) {
+            if (!AddCustomRatio(ratioName, configuredRatios)) {
                 hasError = true;
-                errorDetails += resolution;
+                errorDetails += ratioName + TEXT(", ");
             }
         }
+    }
+    
+    // 如果有有效的配置项，则替换传入的列表
+    if (!configuredRatios.empty()) {
+        ratios = std::move(configuredRatios);
+    }
+    
+    // 如果有错误，返回错误信息
+    if (hasError) {
+        // 移除最后的逗号和空格
+        if (errorDetails.length() >= 2) {
+            errorDetails = errorDetails.substr(0, errorDetails.length() - 2);
+        }
+        return ConfigLoadResult(strings.CONFIG_FORMAT_ERROR + errorDetails + TEXT("\n") + strings.RATIO_FORMAT_EXAMPLE);
+    }
+    
+    return ConfigLoadResult();
+}
 
-        if (hasError) {
-            return ConfigLoadResult(strings.CONFIG_FORMAT_ERROR + errorDetails + TEXT("\n") + strings.RESOLUTION_FORMAT_EXAMPLE);
+ConfigLoadResult ConfigManager::BuildResolutionsFromConfig(std::vector<ResolutionPreset>& resolutions, 
+                                                         const std::vector<ResolutionPreset>& presets, 
+                                                         const LocalizedStrings& strings) {
+    // 获取配置的分辨率项
+    const auto& resolutionItems = GetResolutionItems();
+    if (resolutionItems.empty()) {
+        // 如果配置为空，使用预设列表
+        resolutions = presets;
+        return ConfigLoadResult();
+    }
+    
+    // 根据配置构建新的分辨率列表
+    std::vector<ResolutionPreset> configuredResolutions;
+    bool hasError = false;
+    std::wstring errorDetails;
+    
+    for (const auto& resName : resolutionItems) {
+        // 查找预设中是否有匹配的分辨率
+        bool found = false;
+        for (const auto& preset : presets) {
+            if (preset.name == resName) {
+                configuredResolutions.push_back(preset);
+                found = true;
+                break;
+            }
+        }
+        
+        // 如果预设中没有，尝试解析自定义分辨率
+        if (!found) {
+            if (!AddCustomResolution(resName, configuredResolutions)) {
+                hasError = true;
+                errorDetails += resName + TEXT(", ");
+            }
         }
     }
+    
+    // 如果有有效的配置项，则替换传入的列表
+    if (!configuredResolutions.empty()) {
+        resolutions = std::move(configuredResolutions);
+    }
+    
+    // 如果有错误，返回错误信息
+    if (hasError) {
+        // 移除最后的逗号和空格
+        if (errorDetails.length() >= 2) {
+            errorDetails = errorDetails.substr(0, errorDetails.length() - 2);
+        }
+        return ConfigLoadResult(strings.CONFIG_FORMAT_ERROR + errorDetails + TEXT("\n") + strings.RESOLUTION_FORMAT_EXAMPLE);
+    }
+    
     return ConfigLoadResult();
-} 
+}

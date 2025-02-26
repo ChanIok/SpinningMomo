@@ -139,7 +139,7 @@ void MenuWindow::SetCurrentRatio(size_t index) {
 }
 
 void MenuWindow::SetCurrentResolution(size_t index) {
-    if (index < m_resolutionItems->size()) {
+    if (index < (*m_resolutionItems).size()) {
         m_currentResolutionIndex = index;
         InvalidateRect(m_hwnd, NULL, TRUE);
     }
@@ -170,11 +170,16 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
         std::wstring displayText;
         const auto& preset = (*m_resolutionItems)[i];
         if (preset.baseWidth == 0 && preset.baseHeight == 0) {
-            // 如果是默认选项，不显示像素数
             displayText = preset.name;
         } else {
-            displayText = preset.name + 
-                TEXT(" (") + std::to_wstring(preset.totalPixels / 1000000) + TEXT("M)");
+            double megaPixels = preset.totalPixels / 1000000.0;
+            wchar_t buffer[16];
+            if (megaPixels < 10) {
+                swprintf(buffer, 16, L"%.1f", megaPixels);
+            } else {
+                swprintf(buffer, 16, L"%.0f", megaPixels);
+            }
+            displayText = preset.name + TEXT(" (") + buffer + TEXT("M)");
         }
         m_items.push_back({displayText, ItemType::Resolution, static_cast<int>(i)});
     }
@@ -580,7 +585,7 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
     }
 
     // 处理比例和分辨率列
-    int itemY = m_titleHeight + m_separatorHeight;
+    int itemY = m_titleHeight + m_separatorHeight;  // 直接从分隔线下方开始
     for (size_t i = 0; i < m_items.size(); i++) {
         const auto& item = m_items[i];
         if (item.type == targetType) {

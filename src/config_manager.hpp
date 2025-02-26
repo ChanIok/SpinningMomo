@@ -31,8 +31,6 @@ public:
     void LoadTaskbarConfig();
     void LoadMenuConfig();
     void LoadGameAlbumConfig();
-    ConfigLoadResult LoadCustomRatios(std::vector<AspectRatio>& ratios, const LocalizedStrings& strings);
-    ConfigLoadResult LoadCustomResolutions(std::vector<ResolutionPreset>& resolutions, const LocalizedStrings& strings);
     
     // 配置保存
     void SaveAllConfigs();
@@ -54,6 +52,16 @@ public:
     bool GetTaskbarLower() const { return m_taskbarLower; }
     bool GetUseFloatingWindow() const { return m_useFloatingWindow; }
     const std::vector<std::wstring>& GetMenuItemsToShow() const { return m_menuItemsToShow; }
+    const std::vector<std::wstring>& GetAspectRatioItems() const { return m_aspectRatioItems; }
+    const std::vector<std::wstring>& GetResolutionItems() const { return m_resolutionItems; }
+    
+    // 根据配置构建宽高比和分辨率列表
+    ConfigLoadResult BuildRatiosFromConfig(std::vector<AspectRatio>& ratios, 
+                                          const std::vector<AspectRatio>& presets, 
+                                          const LocalizedStrings& strings);
+    ConfigLoadResult BuildResolutionsFromConfig(std::vector<ResolutionPreset>& resolutions, 
+                                               const std::vector<ResolutionPreset>& presets, 
+                                               const LocalizedStrings& strings);
     
     // Setters
     void SetWindowTitle(const std::wstring& title) { m_windowTitle = title; }
@@ -65,10 +73,13 @@ public:
     void SetTaskbarLower(bool lower) { m_taskbarLower = lower; }
     void SetUseFloatingWindow(bool use) { m_useFloatingWindow = use; }
     void SetMenuItemsToShow(const std::vector<std::wstring>& items) { m_menuItemsToShow = items; }
+    void SetAspectRatioItems(const std::vector<std::wstring>& items) { m_aspectRatioItems = items; }
+    void SetResolutionItems(const std::vector<std::wstring>& items) { m_resolutionItems = items; }
 
 private:
     bool AddCustomRatio(const std::wstring& ratio, std::vector<AspectRatio>& ratios);
     bool AddCustomResolution(const std::wstring& resolution, std::vector<ResolutionPreset>& resolutions);
+    bool IsValidResolutionFormat(const std::wstring& resolution);
 
     std::wstring m_configPath;
     std::wstring m_windowTitle;
@@ -80,4 +91,6 @@ private:
     bool m_taskbarLower = true;
     bool m_useFloatingWindow = true;
     std::vector<std::wstring> m_menuItemsToShow;  // 要显示的菜单项类型
+    std::vector<std::wstring> m_aspectRatioItems; // 要显示的宽高比项
+    std::vector<std::wstring> m_resolutionItems;  // 要显示的分辨率项
 }; 

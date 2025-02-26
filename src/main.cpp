@@ -47,9 +47,18 @@ public:
 
         // 初始化预设数据
         InitializeRatios();
-        LoadCustomRatios();
         InitializeResolutions();
-        LoadCustomResolutions();
+        
+        // 根据配置重建宽高比和分辨率列表
+        ConfigLoadResult ratioResult = m_configManager->BuildRatiosFromConfig(m_ratios, m_ratios, m_strings);
+        if (!ratioResult.success) {
+            m_notificationManager->ShowNotification(m_strings.APP_NAME.c_str(), ratioResult.errorDetails);
+        }
+        
+        ConfigLoadResult resolutionResult = m_configManager->BuildResolutionsFromConfig(m_resolutions, m_resolutions, m_strings);
+        if (!resolutionResult.success) {
+            m_notificationManager->ShowNotification(m_strings.APP_NAME.c_str(), resolutionResult.errorDetails);
+        }
 
         // 初始化UI组件
         if (!RegisterWindowClass(hInstance)) return false;
@@ -703,20 +712,6 @@ private:
             {TEXT("8K"), 7680, 4320},   // 33.2M pixels
             {TEXT("12K"), 11520, 6480}  // 74.6M pixels
         };
-    }
-
-    void LoadCustomRatios() {
-        auto result = m_configManager->LoadCustomRatios(m_ratios, m_strings);
-        if (!result.success) {
-            ShowNotification(m_strings.APP_NAME.c_str(), result.errorDetails.c_str(), true);
-        }
-    }
-
-    void LoadCustomResolutions() {
-        auto result = m_configManager->LoadCustomResolutions(m_resolutions, m_strings);
-        if (!result.success) {
-            ShowNotification(m_strings.APP_NAME.c_str(), result.errorDetails.c_str(), true);
-        }
     }
 
     bool RegisterWindowClass(HINSTANCE hInstance) {

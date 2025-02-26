@@ -96,8 +96,8 @@ private:
     size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选中的分辨率索引
     bool m_previewEnabled = false;               // 预览窗口状态
     bool m_overlayEnabled = false;               // 叠加层窗口状态
-    std::vector<AspectRatio>* m_ratioItems = nullptr;       // 使用指针
-    std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
+    std::vector<AspectRatio>* m_ratioItems = nullptr;       // 使用指针，存储实际的宽高比数据
+    std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针，存储实际的分辨率数据
     std::vector<MenuItem> m_items;               // 所有列表项
     const LocalizedStrings* m_strings = nullptr;            // 字符串只读
     std::vector<std::wstring> m_menuItemsToShow;  // 要显示的菜单项类型
