@@ -3,11 +3,37 @@
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Metadata.h>
 #include <d3dcompiler.h>
 #include <stdexcept>
 
-using namespace winrt::Windows::Graphics::Capture;
-using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
+namespace {
+    // 着色器代码
+    const char* vertexShaderCode = R"(
+        struct VS_INPUT {
+            float2 pos : POSITION;
+            float2 tex : TEXCOORD;
+        };
+        struct PS_INPUT {
+            float4 pos : SV_POSITION;
+            float2 tex : TEXCOORD;
+        };
+        PS_INPUT main(VS_INPUT input) {
+            PS_INPUT output;
+            output.pos = float4(input.pos, 0.0f, 1.0f);
+            output.tex = input.tex;
+            return output;
+        }
+    )";
+
+    const char* pixelShaderCode = R"(
+        Texture2D tex : register(t0);
+        SamplerState samp : register(s0);
+        float4 main(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD) : SV_Target {
+            return tex.Sample(samp, texCoord);
+        }
+    )";
+}
 
 template<typename T>
 auto GetDXGIInterfaceFromObject(winrt::Windows::Foundation::IInspectable const& object)
@@ -20,7 +46,7 @@ auto GetDXGIInterfaceFromObject(winrt::Windows::Foundation::IInspectable const& 
 
 PreviewWindow* PreviewWindow::instance = nullptr;
 
-PreviewWindow::PreviewWindow() : hwnd(nullptr), isDragging(false) {
+PreviewWindow::PreviewWindow() : m_hwnd(nullptr), m_isDragging(false) {
     instance = this;
     winrt::init_apartment();
 
@@ -47,14 +73,17 @@ PreviewWindow::~PreviewWindow() {
 
 bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customHeight) {
     if (!targetWindow) return false;
-    
+
+    // 初始化 D3D 资源
+    if (!m_d3dInitialized) {
+        if (!InitializeD3D()) {
+            return false;
+        }
+        m_d3dInitialized = true;
+    }
+
     // 保存游戏窗口句柄
     m_gameWindow = targetWindow;
-
-    // 首次启动预览时初始化 D3D
-    if (!device && !InitializeD3D()) {
-        return false;
-    }
 
     // 计算实际的窗口尺寸
     int width, height;
@@ -90,102 +119,116 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
         m_isFirstShow = false;  // 标记为非首次显示
         int x = 20;  // 距离左边缘20像素
         int y = 20;  // 距离上边缘20像素
-        SetWindowPos(hwnd, nullptr, x, y, actualWidth, actualHeight, 
+        SetWindowPos(m_hwnd, nullptr, x, y, actualWidth, actualHeight, 
                     SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     } else {
         // 如果窗口已经显示，只更新尺寸保持位置不变
         RECT previewRect;
-        GetWindowRect(hwnd, &previewRect);
-        SetWindowPos(hwnd, nullptr, 0, 0, actualWidth, actualHeight, 
+        GetWindowRect(m_hwnd, &previewRect);
+        SetWindowPos(m_hwnd, nullptr, 0, 0, actualWidth, actualHeight,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     }
 
     // 停止现有的捕获
     StopCapture();
 
-    // 创建 WinRT D3D 设备
+    // 创建 DirectX 设备
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
-    HRESULT hr = device.As(&dxgiDevice);
+    HRESULT hr = m_device.As(&dxgiDevice);
     if (FAILED(hr)) return false;
 
+    // 创建 WinRT 设备
     winrt::com_ptr<::IInspectable> inspectable;
     hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), inspectable.put());
     if (FAILED(hr)) return false;
 
-    winrtDevice = inspectable.as<IDirect3DDevice>();
-    if (!winrtDevice) return false;
+    m_winrtDevice = inspectable.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
+    if (!m_winrtDevice) return false;
 
     // 创建捕获项
-    auto interop = winrt::get_activation_factory<GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
+    auto interop = winrt::get_activation_factory<winrt::Windows::Graphics::Capture::GraphicsCaptureItem, IGraphicsCaptureItemInterop>();
     hr = interop->CreateForWindow(
         targetWindow,
         winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
-        reinterpret_cast<void**>(winrt::put_abi(captureItem))
+        reinterpret_cast<void**>(winrt::put_abi(m_captureItem))
     );
     if (FAILED(hr)) return false;
 
     // 创建帧池，使用实际的窗口尺寸
-    framePool = Direct3D11CaptureFramePool::CreateFreeThreaded(
-        winrtDevice,
+    m_framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
+        m_winrtDevice,
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         1,
         { width, height }  // 使用实际的窗口尺寸
     );
 
     // 设置帧到达回调
-    framePool.FrameArrived([this](auto&& sender, auto&&) {
+    m_frameArrivedToken = m_framePool.FrameArrived([this](auto&& sender, auto&&) {
         OnFrameArrived();
     });
 
-    // 开始捕获
-    captureSession = framePool.CreateCaptureSession(captureItem);
-    captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
+    // 创建捕获会话
+    m_captureSession = m_framePool.CreateCaptureSession(m_captureItem);
+
+    // 安全地尝试设置 IsCursorCaptureEnabled
+    if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsCursorCaptureEnabled")) 
+    {
+        m_captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
+    }
     
-    // 安全地尝试设置 IsBorderRequired
+    // 尝试禁用边框 - 使用ApiInformation检查API是否可用
+    if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsBorderRequired")) 
+    {
+        // 从 Windows 10 2004 (20H1)版本开始提供
+        m_captureSession.IsBorderRequired(false);
+    }
+    
     try {
-        auto session3 = captureSession.try_as<winrt::Windows::Graphics::Capture::IGraphicsCaptureSession3>();
-        if (session3) {
-            session3.IsBorderRequired(false);
-        }
+        // 开始捕获
+        m_captureSession.StartCapture();
     }
     catch (...) {
-        // 忽略任何错误，继续执行
+        OutputDebugStringA("Unknown error occurred while starting capture session\n");
+        return false;
     }
-    
-    captureSession.StartCapture();
 
     // 显示窗口
-    ShowWindow(hwnd, SW_SHOWNA);
-    UpdateWindow(hwnd);
+    ShowWindow(m_hwnd, SW_SHOWNA);
+    UpdateWindow(m_hwnd);
 
     return true;
 }
 
 void PreviewWindow::StopCapture() {
-    if (captureSession) {
-        captureSession.Close();
-        captureSession = nullptr;
+    if (m_captureSession) {
+        m_captureSession.Close();
+        m_captureSession = nullptr;
     }
-    if (framePool) {
-        framePool.Close();
-        framePool = nullptr;
+    if (m_framePool) {
+        m_framePool.FrameArrived(m_frameArrivedToken);
+        m_framePool.Close();
+        m_framePool = nullptr;
     }
-    captureItem = nullptr;
+    m_captureItem = nullptr;
 
     // 隐藏窗口
-    ShowWindow(hwnd, SW_HIDE);
+    ShowWindow(m_hwnd, SW_HIDE);
 }
 
 void PreviewWindow::OnFrameArrived() {
     // 获取互斥锁
-    std::lock_guard<std::mutex> lock(renderTargetMutex);
+    std::lock_guard<std::mutex> lock(m_renderTargetMutex);
     
     // 如果渲染目标无效，跳过这一帧
-    if (!renderTarget) {
+    if (!m_renderTarget) {
         return;
     }
 
-    if (auto frame = framePool.TryGetNextFrame()) {
+    if (auto frame = m_framePool.TryGetNextFrame()) {
         // 获取帧的纹理
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
         
@@ -201,87 +244,59 @@ void PreviewWindow::OnFrameArrived() {
             srvDesc.Texture2D.MipLevels = 1;
 
             Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newSRV;
-            if (SUCCEEDED(device->CreateShaderResourceView(frameTexture.Get(), &srvDesc, &newSRV))) {
-                shaderResourceView = newSRV;
+            if (SUCCEEDED(m_device->CreateShaderResourceView(frameTexture.Get(), &srvDesc, &newSRV))) {
+                m_shaderResourceView = newSRV;
             }
         }
 
         // 渲染帧
-        if (shaderResourceView && renderTarget) {  // 添加renderTarget检查
+        if (m_shaderResourceView && m_renderTarget) {  // 添加renderTarget检查
             // 清除背景
             float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            context->ClearRenderTargetView(renderTarget.Get(), clearColor);
+            m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);
 
             // 设置渲染目标
-            ID3D11RenderTargetView* views[] = { renderTarget.Get() };
-            context->OMSetRenderTargets(1, views, nullptr);
+            ID3D11RenderTargetView* views[] = { m_renderTarget.Get() };
+            m_context->OMSetRenderTargets(1, views, nullptr);
 
             // 设置视口
             D3D11_VIEWPORT viewport = {};
             RECT clientRect;
-            GetClientRect(hwnd, &clientRect);
+            GetClientRect(m_hwnd, &clientRect);
             viewport.Width = static_cast<float>(clientRect.right - clientRect.left);
             viewport.Height = static_cast<float>(clientRect.bottom - clientRect.top);
             viewport.TopLeftX = 0.0f;
             viewport.TopLeftY = 0.0f;  // 从窗口顶部开始渲染
             viewport.MinDepth = 0.0f;
             viewport.MaxDepth = 1.0f;
-            context->RSSetViewports(1, &viewport);
+            m_context->RSSetViewports(1, &viewport);
 
             // 设置着色器和资源
-            context->IASetInputLayout(inputLayout.Get());
-            context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+            m_context->IASetInputLayout(m_inputLayout.Get());
+            m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
             UINT stride = sizeof(PreviewWindow::Vertex);
             UINT offset = 0;
-            context->IASetVertexBuffers(0, 1, vertexBuffer.GetAddressOf(), &stride, &offset);
-            context->VSSetShader(vertexShader.Get(), nullptr, 0);
-            context->PSSetShader(pixelShader.Get(), nullptr, 0);
-            context->PSSetShaderResources(0, 1, shaderResourceView.GetAddressOf());
-            context->PSSetSamplers(0, 1, sampler.GetAddressOf());
+            m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
+            m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
+            m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
+            m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+            m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
 
             // 设置混合状态
             float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-            context->OMSetBlendState(blendState.Get(), blendFactor, 0xffffffff);
+            m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
 
             // 绘制游戏画面
-            context->Draw(4, 0);
+            m_context->Draw(4, 0);
 
             // 在渲染游戏画面之后，更新并渲染视口框
             UpdateViewportRect();
             RenderViewport();
 
             // 显示
-            swapChain->Present(0, 0);
+            m_swapChain->Present(0, 0);
         }
     }
-}
-
-namespace {
-    // 着色器代码
-    const char* vertexShaderCode = R"(
-        struct VS_INPUT {
-            float2 pos : POSITION;
-            float2 tex : TEXCOORD;
-        };
-        struct PS_INPUT {
-            float4 pos : SV_POSITION;
-            float2 tex : TEXCOORD;
-        };
-        PS_INPUT main(VS_INPUT input) {
-            PS_INPUT output;
-            output.pos = float4(input.pos, 0.0f, 1.0f);
-            output.tex = input.tex;
-            return output;
-        }
-    )";
-
-    const char* pixelShaderCode = R"(
-        Texture2D tex : register(t0);
-        SamplerState samp : register(s0);
-        float4 main(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD) : SV_Target {
-            return tex.Sample(samp, texCoord);
-        }
-    )";
 }
 
 bool PreviewWindow::CreateShaderResources() {
@@ -302,12 +317,12 @@ bool PreviewWindow::CreateShaderResources() {
         return false;
     }
 
-    hr = device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &vertexShader);
+    hr = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vertexShader);
     if (FAILED(hr)) {
         return false;
     }
 
-    hr = device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &pixelShader);
+    hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_pixelShader);
     if (FAILED(hr)) {
         return false;
     }
@@ -317,8 +332,8 @@ bool PreviewWindow::CreateShaderResources() {
         { "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
         { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
-    hr = device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
-        vsBlob->GetBufferSize(), &inputLayout);
+    hr = m_device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
+        vsBlob->GetBufferSize(), &m_inputLayout);
     if (FAILED(hr)) {
         return false;
     }
@@ -339,7 +354,7 @@ bool PreviewWindow::CreateShaderResources() {
     D3D11_SUBRESOURCE_DATA initData = {};
     initData.pSysMem = vertices;
 
-    hr = device->CreateBuffer(&bd, &initData, &vertexBuffer);
+    hr = m_device->CreateBuffer(&bd, &initData, &m_vertexBuffer);
     if (FAILED(hr)) return false;
 
     // 创建采样器状态
@@ -352,7 +367,7 @@ bool PreviewWindow::CreateShaderResources() {
     samplerDesc.MinLOD = 0;
     samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-    if (FAILED(device->CreateSamplerState(&samplerDesc, &sampler))) {
+    if (FAILED(m_device->CreateSamplerState(&samplerDesc, &m_sampler))) {
         return false;
     }
 
@@ -367,7 +382,7 @@ bool PreviewWindow::CreateShaderResources() {
     blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
-    if (FAILED(device->CreateBlendState(&blendDesc, &blendState))) {
+    if (FAILED(m_device->CreateBlendState(&blendDesc, &m_blendState))) {
         return false;
     }
 
@@ -397,7 +412,7 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     m_idealSize = static_cast<int>(screenHeight * 0.5);
 
     // 创建窗口，但初始不显示
-    hwnd = CreateWindowExW(
+    m_hwnd = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED,
         L"PreviewWindowClass",
         L"预览窗口",
@@ -408,26 +423,26 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
         hInstance, nullptr
     );
 
-    if (!hwnd) {
+    if (!m_hwnd) {
         return false;
     }
 
     // 设置窗口透明度
-    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+    SetLayeredWindowAttributes(m_hwnd, 0, 255, LWA_ALPHA);
 
     // 设置窗口圆角和阴影
     MARGINS margins = {1, 1, 1, 1};  // 四边均匀阴影效果
-    DwmExtendFrameIntoClientArea(hwnd, &margins);
+    DwmExtendFrameIntoClientArea(m_hwnd, &margins);
     
     DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
-    DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
+    DwmSetWindowAttribute(m_hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
     
     BOOL value = TRUE;
-    DwmSetWindowAttribute(hwnd, DWMWA_ALLOW_NCPAINT, &value, sizeof(value));
+    DwmSetWindowAttribute(m_hwnd, DWMWA_ALLOW_NCPAINT, &value, sizeof(value));
     
     // Windows 11 风格的圆角
     DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;  // 使用小圆角
-    DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+    DwmSetWindowAttribute(m_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
 
     return true;
 }
@@ -439,9 +454,9 @@ void PreviewWindow::Cleanup() {
     m_viewportPS.Reset();
     m_viewportInputLayout.Reset();
 
-    if (hwnd) {
-        DestroyWindow(hwnd);
-        hwnd = nullptr;
+    if (m_hwnd) {
+        DestroyWindow(m_hwnd);
+        m_hwnd = nullptr;
     }
 }
 
@@ -455,7 +470,7 @@ bool PreviewWindow::InitializeD3D() {
     scd.BufferDesc.RefreshRate.Numerator = 0;
     scd.BufferDesc.RefreshRate.Denominator = 1;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    scd.OutputWindow = hwnd;
+    scd.OutputWindow = m_hwnd;
     scd.SampleDesc.Count = 1;
     scd.SampleDesc.Quality = 0;
     scd.Windowed = TRUE;
@@ -472,7 +487,7 @@ bool PreviewWindow::InitializeD3D() {
     HRESULT hr = D3D11CreateDeviceAndSwapChain(
         nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
         createDeviceFlags, nullptr, 0, D3D11_SDK_VERSION,
-        &scd, &swapChain, &device, &featureLevel, &context
+        &scd, &m_swapChain, &m_device, &featureLevel, &m_context
     );
 
     if (FAILED(hr)) {
@@ -498,13 +513,13 @@ bool PreviewWindow::InitializeD3D() {
 bool PreviewWindow::CreateRenderTarget() {
     // 获取后缓冲
     Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
-    HRESULT hr = swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
+    HRESULT hr = m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
     if (FAILED(hr)) {
         return false;
     }
 
     // 创建渲染目标视图
-    hr = device->CreateRenderTargetView(backBuffer.Get(), nullptr, &renderTarget);
+    hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, &m_renderTarget);
     if (FAILED(hr)) {
         return false;
     }
@@ -562,12 +577,12 @@ bool PreviewWindow::CreateViewportResources() {
     }
 
     // 创建着色器
-    if (FAILED(device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
+    if (FAILED(m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(),
         nullptr, &m_viewportVS))) {
         return false;
     }
 
-    if (FAILED(device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(),
+    if (FAILED(m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(),
         nullptr, &m_viewportPS))) {
         return false;
     }
@@ -578,7 +593,7 @@ bool PreviewWindow::CreateViewportResources() {
         { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0 }
     };
 
-    if (FAILED(device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
+    if (FAILED(m_device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
         vsBlob->GetBufferSize(), &m_viewportInputLayout))) {
         return false;
     }
@@ -590,7 +605,7 @@ bool PreviewWindow::CreateViewportResources() {
     bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    if (FAILED(device->CreateBuffer(&bufferDesc, nullptr, &m_viewportVertexBuffer))) {
+    if (FAILED(m_device->CreateBuffer(&bufferDesc, nullptr, &m_viewportVertexBuffer))) {
         return false;
     }
 
@@ -600,7 +615,7 @@ bool PreviewWindow::CreateViewportResources() {
 void PreviewWindow::UpdateViewportRect() {
     // 获取预览窗口客户区大小
     RECT clientRect;
-    GetClientRect(hwnd, &clientRect);
+    GetClientRect(m_hwnd, &clientRect);
     float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
     float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top - TITLE_HEIGHT);
 
@@ -653,7 +668,7 @@ void PreviewWindow::UpdateViewportRect() {
 
     // 更新顶点缓冲区
     D3D11_MAPPED_SUBRESOURCE mappedResource;
-    if (SUCCEEDED(context->Map(m_viewportVertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource))) {
+    if (SUCCEEDED(m_context->Map(m_viewportVertexBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource))) {
         ViewportVertex* vertices = static_cast<ViewportVertex*>(mappedResource.pData);
         
         // 转换到归一化坐标 (0-1)
@@ -672,7 +687,7 @@ void PreviewWindow::UpdateViewportRect() {
         vertices[3] = {{left,  bottom}, color};     // 左下
         vertices[4] = {{left,  top},    color};     // 回到左上
         
-        context->Unmap(m_viewportVertexBuffer.Get(), 0);
+        m_context->Unmap(m_viewportVertexBuffer.Get(), 0);
     }
 }
 
@@ -684,11 +699,11 @@ void PreviewWindow::RenderViewport() {
     // 设置渲染状态
     UINT stride = sizeof(ViewportVertex);
     UINT offset = 0;
-    context->IASetInputLayout(m_viewportInputLayout.Get());
-    context->IASetVertexBuffers(0, 1, m_viewportVertexBuffer.GetAddressOf(), &stride, &offset);
-    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
-    context->VSSetShader(m_viewportVS.Get(), nullptr, 0);
-    context->PSSetShader(m_viewportPS.Get(), nullptr, 0);
+    m_context->IASetInputLayout(m_viewportInputLayout.Get());
+    m_context->IASetVertexBuffers(0, 1, m_viewportVertexBuffer.GetAddressOf(), &stride, &offset);
+    m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
+    m_context->VSSetShader(m_viewportVS.Get(), nullptr, 0);
+    m_context->PSSetShader(m_viewportPS.Get(), nullptr, 0);
 
     // 创建并设置光栅化状态
     D3D11_RASTERIZER_DESC rasterizerDesc = {};
@@ -704,13 +719,13 @@ void PreviewWindow::RenderViewport() {
     rasterizerDesc.AntialiasedLineEnable = TRUE;
 
     Microsoft::WRL::ComPtr<ID3D11RasterizerState> rasterizerState;
-    device->CreateRasterizerState(&rasterizerDesc, &rasterizerState);
-    context->RSSetState(rasterizerState.Get());
+    m_device->CreateRasterizerState(&rasterizerDesc, &rasterizerState);
+    m_context->RSSetState(rasterizerState.Get());
 
     // 获取当前视口设置
     D3D11_VIEWPORT viewport;
     UINT numViewports = 1;
-    context->RSGetViewports(&numViewports, &viewport);
+    m_context->RSGetViewports(&numViewports, &viewport);
 
     // 多次绘制，每次略微偏移视口位置
     const float offset_pixels = 0.5f;  // 偏移量（像素）
@@ -725,14 +740,14 @@ void PreviewWindow::RenderViewport() {
         D3D11_VIEWPORT offsetViewport = viewport;
         offsetViewport.TopLeftX += offset_x;
         offsetViewport.TopLeftY += offset_y;
-        context->RSSetViewports(1, &offsetViewport);
+        m_context->RSSetViewports(1, &offsetViewport);
 
         // 绘制
-        context->Draw(5, 0);
+        m_context->Draw(5, 0);
     }
 
     // 恢复原始视口
-    context->RSSetViewports(1, &viewport);
+    m_context->RSSetViewports(1, &viewport);
 }
 
 LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -866,16 +881,16 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             
             // 如果点击在标题栏，保持原有的拖拽行为
             if (pt.y < instance->TITLE_HEIGHT) {
-                instance->isDragging = true;
-                instance->dragStart = pt;
+                instance->m_isDragging = true;
+                instance->m_dragStart = pt;
                 SetCapture(hwnd);
                 return 0;
             }
 
             // 如果游戏窗口完全可见，整个预览窗口都可以用来拖拽
             if (instance->m_isGameWindowFullyVisible) {
-                instance->isDragging = true;
-                instance->dragStart = pt;
+                instance->m_isDragging = true;
+                instance->m_dragStart = pt;
                 SetCapture(hwnd);
                 return 0;
             }
@@ -952,13 +967,13 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
         }
 
         case WM_MOUSEMOVE:
-            if (instance->isDragging) {
+            if (instance->m_isDragging) {
                 int xPos = LOWORD(lParam);
                 int yPos = HIWORD(lParam);
                 RECT rect;
                 GetWindowRect(hwnd, &rect);
-                int deltaX = xPos - instance->dragStart.x;
-                int deltaY = yPos - instance->dragStart.y;
+                int deltaX = xPos - instance->m_dragStart.x;
+                int deltaY = yPos - instance->m_dragStart.y;
                 SetWindowPos(hwnd, nullptr,
                     rect.left + deltaX,
                     rect.top + deltaY,
@@ -1015,8 +1030,8 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             return 0;
 
         case WM_LBUTTONUP:
-            if (instance->isDragging) {
-                instance->isDragging = false;
+            if (instance->m_isDragging) {
+                instance->m_isDragging = false;
                 ReleaseCapture();
             }
             else if (instance->m_viewportDragging) {
@@ -1026,14 +1041,14 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             return 0;
 
         case WM_SIZE: {
-            if (!instance->device) return 0;
+            if (!instance->m_device) return 0;
             
             {
                 // 获取互斥锁
-                std::lock_guard<std::mutex> lock(instance->renderTargetMutex);
+                std::lock_guard<std::mutex> lock(instance->m_renderTargetMutex);
                 
                 // 释放旧的渲染目标
-                instance->renderTarget = nullptr;
+                instance->m_renderTarget = nullptr;
 
                 // 调整交换链大小
                 RECT clientRect;
@@ -1045,7 +1060,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 instance->m_idealSize = max(width, height);
 
                 // 调整交换链大小
-                HRESULT hr = instance->swapChain->ResizeBuffers(
+                HRESULT hr = instance->m_swapChain->ResizeBuffers(
                     0,  // 保持当前缓冲区数量
                     clientRect.right - clientRect.left,
                     clientRect.bottom - clientRect.top,
@@ -1173,18 +1188,18 @@ void PreviewWindow::UpdateDpiDependentResources() {
     BORDER_WIDTH = static_cast<int>(BASE_BORDER_WIDTH * dpiScale);
 
     // 如果窗口已创建，更新窗口
-    if (hwnd) {
+    if (m_hwnd) {
         // 获取当前窗口位置和大小
         RECT rect;
-        GetWindowRect(hwnd, &rect);
+        GetWindowRect(m_hwnd, &rect);
         int width = rect.right - rect.left;
         int height = rect.bottom - rect.top;
 
         // 更新窗口大小
-        SetWindowPos(hwnd, nullptr, 0, 0, width, height,
+        SetWindowPos(m_hwnd, nullptr, 0, 0, width, height,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
         // 强制重绘
-        InvalidateRect(hwnd, nullptr, TRUE);
+        InvalidateRect(m_hwnd, nullptr, TRUE);
     }
 } 

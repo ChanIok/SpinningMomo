@@ -94,17 +94,20 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     // 设置窗口为完全透明但可见
     SetLayeredWindowAttributes(m_hwnd, 0, 255, LWA_ALPHA);
 
-    // 初始化 D3D 资源
-    if (!InitializeD3D()) {
-        return false;
-    }
-    m_d3dInitialized = true;
-
     return true;
 }
 
 bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     if (!targetWindow) return false;
+
+    // 初始化 D3D 资源
+    if (!m_d3dInitialized) {
+        if (!InitializeD3D()) {
+            return false;
+        }
+        m_d3dInitialized = true;
+    }
+
     m_gameWindow = targetWindow;
 
     // 停止现有的捕获
@@ -389,8 +392,8 @@ bool OverlayWindow::InitializeCapture() {
         OutputDebugStringA("Failed to create WinRT device\n");
         return false;
     }
-    winrtDevice = inspectable.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
-    if (!winrtDevice) {
+    m_winrtDevice = inspectable.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
+    if (!m_winrtDevice) {
         OutputDebugStringA("Failed to get WinRT device interface\n");
         return false;
     }
@@ -401,7 +404,7 @@ bool OverlayWindow::InitializeCapture() {
     hr = interop->CreateForWindow(
         m_gameWindow,
         winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
-        reinterpret_cast<void**>(winrt::put_abi(captureItem))
+        reinterpret_cast<void**>(winrt::put_abi(m_captureItem))
     );
     if (FAILED(hr)) {
         OutputDebugStringA("Failed to create capture item\n");
@@ -409,21 +412,29 @@ bool OverlayWindow::InitializeCapture() {
     }
 
     // 创建帧池
-    framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
-        winrtDevice,
+    m_framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
+        m_winrtDevice,
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         1,
         { m_cachedGameWidth, m_cachedGameHeight }
     );
 
     // 设置帧到达回调
-    m_frameArrivedToken = framePool.FrameArrived([this](auto&& sender, auto&&) {
+    m_frameArrivedToken = m_framePool.FrameArrived([this](auto&& sender, auto&&) {
         OnFrameArrived();
     });
 
     // 创建捕获会话
-    captureSession = framePool.CreateCaptureSession(captureItem);
-    captureSession.IsCursorCaptureEnabled(false);
+    m_captureSession = m_framePool.CreateCaptureSession(m_captureItem);
+
+
+    // 安全地尝试设置 IsCursorCaptureEnabled
+    if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsCursorCaptureEnabled")) 
+    {
+        m_captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
+    }
     
     // 尝试禁用边框 - 使用ApiInformation检查API是否可用
     if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
@@ -431,12 +442,12 @@ bool OverlayWindow::InitializeCapture() {
         L"IsBorderRequired")) 
     {
         // 从 Windows 10 2004 (20H1)版本开始提供
-        captureSession.IsBorderRequired(false);
+        m_captureSession.IsBorderRequired(false);
     }
 
     try {
         // 开始捕获
-        captureSession.StartCapture();
+        m_captureSession.StartCapture();
     }
     catch (...) {
         OutputDebugStringA("Unknown error occurred while starting capture session\n");
@@ -452,9 +463,9 @@ bool OverlayWindow::InitializeCapture() {
 void OverlayWindow::StopCapture() {
     // 停止标志
     m_running = false;
-    m_recreateTextureFlag = true;
-    if(framePool){
-        framePool.FrameArrived(m_frameArrivedToken);
+
+    if(m_framePool){
+        m_framePool.FrameArrived(m_frameArrivedToken);
     }
 
     // 向线程发送退出消息
@@ -479,15 +490,15 @@ void OverlayWindow::StopCapture() {
         m_windowManagerThread.get()->join();
     }
 
-    if (captureSession) {
-        captureSession.Close();
-        captureSession = nullptr;
+    if (m_captureSession) {
+        m_captureSession.Close();
+        m_captureSession = nullptr;
     }
-    if (framePool) {
-        framePool.Close();
-        framePool = nullptr;
+    if (m_framePool) {
+        m_framePool.Close();
+        m_framePool = nullptr;
     }
-    captureItem = nullptr;  
+    m_captureItem = nullptr;  
 
     // 清理纹理资源
     m_frameTexture.Reset();
@@ -854,9 +865,9 @@ bool OverlayWindow::CreateFrameTexture(UINT width, UINT height) {
 
 void OverlayWindow::OnFrameArrived() {
     if (!m_running) return;
-    if (!framePool) return;
+    if (!m_framePool) return;
     
-    if (auto frame = framePool.TryGetNextFrame()) {
+    if (auto frame = m_framePool.TryGetNextFrame()) {
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
         if (!frameTexture) return;
 

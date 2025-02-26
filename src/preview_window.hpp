@@ -22,7 +22,7 @@ public:
     void Cleanup();
     bool StartCapture(HWND targetWindow, int width = 0, int height = 0);
     void StopCapture();
-    HWND GetHwnd() const { return hwnd; }
+    HWND GetHwnd() const { return m_hwnd; }
     
     static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 
@@ -38,34 +38,36 @@ private:
         float u, v;
     };
 
-    HWND hwnd;
+    HWND m_hwnd;
     static PreviewWindow* instance;
     bool m_isFirstShow = true;  // 控制是否是首次显示
+    bool m_d3dInitialized = false;
 
     // D3D资源
-    Microsoft::WRL::ComPtr<ID3D11Device> device;
-    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-    Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain;
-    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTarget;
+    Microsoft::WRL::ComPtr<ID3D11Device> m_device;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
+    Microsoft::WRL::ComPtr<IDXGISwapChain> m_swapChain;
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> m_renderTarget;
 
     // 渲染资源
-    Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler;
-    Microsoft::WRL::ComPtr<ID3D11BlendState> blendState;
-    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shaderResourceView;
-    Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
-    Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
-    Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> inputLayout;
+    Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler;
+    Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendState;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> m_shaderResourceView;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vertexShader;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> m_pixelShader;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> m_inputLayout;
 
     // 捕获相关
-    winrt::Windows::Graphics::Capture::GraphicsCaptureItem captureItem{ nullptr };
-    winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool framePool{ nullptr };
-    winrt::Windows::Graphics::Capture::GraphicsCaptureSession captureSession{ nullptr };
-    winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrtDevice{ nullptr };
+    winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_captureItem{ nullptr };
+    winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool m_framePool{ nullptr };
+    winrt::Windows::Graphics::Capture::GraphicsCaptureSession m_captureSession{ nullptr };
+    winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice m_winrtDevice{ nullptr };
+    winrt::event_token m_frameArrivedToken;
 
     // 窗口拖拽相关
-    bool isDragging;
-    POINT dragStart;
+    bool m_isDragging;
+    POINT m_dragStart;
 
     // 窗口比例相关
     float m_aspectRatio;  // 当前窗口比例
@@ -73,7 +75,7 @@ private:
     HWND m_gameWindow = nullptr;        // 游戏窗口句柄
 
     // 互斥锁保护渲染目标访问
-    std::mutex renderTargetMutex;
+    std::mutex m_renderTargetMutex;
 
     // 视口框相关
     struct ViewportVertex {

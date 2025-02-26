@@ -33,7 +33,7 @@ private:
         DWORD dwmsEventTime
     );
 
-    std::atomic<bool> m_d3dInitialized{false};
+    bool m_d3dInitialized = false;
     
     bool InitializeD3D();
     bool ResizeSwapChain();
@@ -55,10 +55,10 @@ private:
     bool m_renderStatesInitialized = false;
 
     // 捕获相关
-    winrt::Windows::Graphics::Capture::GraphicsCaptureItem captureItem{ nullptr };
-    winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool framePool{ nullptr };
-    winrt::Windows::Graphics::Capture::GraphicsCaptureSession captureSession{ nullptr };
-    winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrtDevice{ nullptr };
+    winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_captureItem{ nullptr };
+    winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool m_framePool{ nullptr };
+    winrt::Windows::Graphics::Capture::GraphicsCaptureSession m_captureSession{ nullptr };
+    winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice m_winrtDevice{ nullptr };
     winrt::event_token m_frameArrivedToken;
     // 渲染资源
     Microsoft::WRL::ComPtr<ID3D11Buffer> m_vertexBuffer;
