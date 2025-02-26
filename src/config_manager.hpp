@@ -53,6 +53,7 @@ public:
     bool GetTaskbarAutoHide() const { return m_taskbarAutoHide; }
     bool GetTaskbarLower() const { return m_taskbarLower; }
     bool GetUseFloatingWindow() const { return m_useFloatingWindow; }
+    const std::vector<std::wstring>& GetMenuItemsToShow() const { return m_menuItemsToShow; }
     
     // Setters
     void SetWindowTitle(const std::wstring& title) { m_windowTitle = title; }
@@ -63,6 +64,7 @@ public:
     void SetTaskbarAutoHide(bool autoHide) { m_taskbarAutoHide = autoHide; }
     void SetTaskbarLower(bool lower) { m_taskbarLower = lower; }
     void SetUseFloatingWindow(bool use) { m_useFloatingWindow = use; }
+    void SetMenuItemsToShow(const std::vector<std::wstring>& items) { m_menuItemsToShow = items; }
 
 private:
     bool AddCustomRatio(const std::wstring& ratio, std::vector<AspectRatio>& ratios);
@@ -77,4 +79,5 @@ private:
     bool m_taskbarAutoHide = false;
     bool m_taskbarLower = true;
     bool m_useFloatingWindow = true;
+    std::vector<std::wstring> m_menuItemsToShow;  // 要显示的菜单项类型
 }; 

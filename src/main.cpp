@@ -73,6 +73,8 @@ public:
 
         // 创建菜单窗口
         m_menuWindow = std::make_unique<MenuWindow>(hInstance);
+        // 设置菜单项显示配置
+        m_menuWindow->SetMenuItemsToShow(m_configManager->GetMenuItemsToShow());
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
                                m_currentRatioIndex, m_currentResolutionIndex,
                                m_isPreviewEnabled, m_isOverlayEnabled)) {
@@ -871,4 +873,3 @@ int WINAPI WinMain(
 
     return app.Run();
 }
-

@@ -35,7 +35,6 @@ namespace {
     )";
 }
 
-// 添加新的实现
 template<typename T>
 auto GetDXGIInterfaceFromObject(winrt::Windows::Foundation::IInspectable const& object)
 {

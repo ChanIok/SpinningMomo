@@ -76,6 +76,17 @@ namespace Constants {
     
     inline const TCHAR* MENU_SECTION = TEXT("Menu");      // 菜单配置节名
     inline const TCHAR* MENU_FLOATING = TEXT("Floating");  // 浮动窗口配置项
+    
+    // 菜单项类型字符串
+    inline const TCHAR* MENU_ITEM_TYPE_CAPTURE = TEXT("CaptureWindow");
+    inline const TCHAR* MENU_ITEM_TYPE_SCREENSHOT = TEXT("OpenScreenshot");
+    inline const TCHAR* MENU_ITEM_TYPE_OVERLAY = TEXT("OverlayWindow");
+    inline const TCHAR* MENU_ITEM_TYPE_PREVIEW = TEXT("PreviewWindow");
+    inline const TCHAR* MENU_ITEM_TYPE_RESET = TEXT("Reset");
+    inline const TCHAR* MENU_ITEM_TYPE_CLOSE = TEXT("Close");
+    
+    // 菜单项配置
+    inline const TCHAR* MENU_ITEMS = TEXT("MenuItems");  // 菜单项显示配置
 }
 
 // 比例结构体定义

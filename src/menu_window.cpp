@@ -179,13 +179,33 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
         m_items.push_back({displayText, ItemType::Resolution, static_cast<int>(i)});
     }
 
-    // 添加设置选项
-    m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});  // 添加截图选项作为设置组的第一个选项
-    m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});  // 添加打开相册选项
-    m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});  // 添加叠加层窗口选项
-    m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
-    m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
-    m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
+    // 添加设置选项（第三列，根据配置显示）
+    if (!m_menuItemsToShow.empty()) {
+        // 按照配置的顺序添加菜单项
+        for (const auto& itemType : m_menuItemsToShow) {
+            if (itemType == Constants::MENU_ITEM_TYPE_CAPTURE) {
+                m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_SCREENSHOT) {
+                m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_OVERLAY) {
+                m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_PREVIEW) {
+                m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_RESET) {
+                m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_CLOSE) {
+                m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
+            }
+        }
+    } else {
+        // 如果配置为空，则使用默认顺序添加所有菜单项
+        m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});
+        m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});
+        m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});
+        m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
+        m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
+        m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
+    }
 }
 
 LRESULT CALLBACK MenuWindow::MenuWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {

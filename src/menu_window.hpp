@@ -52,6 +52,7 @@ public:
     void SetCurrentResolution(size_t index);
     void SetPreviewEnabled(bool enabled);  // 设置预览窗口状态的函数
     void SetOverlayEnabled(bool enabled);  // 设置叠加层窗口状态的函数
+    void SetMenuItemsToShow(const std::vector<std::wstring>& items) { m_menuItemsToShow = items; }  // 设置要显示的菜单项
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
     void Activate();  // 添加激活窗口的方法
@@ -99,6 +100,7 @@ private:
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针
     std::vector<MenuItem> m_items;               // 所有列表项
     const LocalizedStrings* m_strings = nullptr;            // 字符串只读
+    std::vector<std::wstring> m_menuItemsToShow;  // 要显示的菜单项类型
 
     // 私有方法
     void InitializeItems(const LocalizedStrings& strings);

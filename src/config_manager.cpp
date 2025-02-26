@@ -29,6 +29,9 @@ void ConfigManager::Initialize() {
         WritePrivateProfileString(Constants::CUSTOM_RESOLUTION_SECTION, Constants::CUSTOM_RESOLUTION_LIST, TEXT(""), m_configPath.c_str());
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
         WritePrivateProfileString(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, TEXT(""), m_configPath.c_str());
+        WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_ITEMS, 
+                                TEXT("CaptureWindow,OpenScreenshot,OverlayWindow,PreviewWindow,Reset,Close"), 
+                                m_configPath.c_str());
     }
 }
 
@@ -156,20 +159,85 @@ void ConfigManager::SaveTaskbarConfig() {
 }
 
 void ConfigManager::LoadMenuConfig() {
-    TCHAR buffer[32];
+    TCHAR buffer[1024];  // 增加缓冲区大小，以支持多个菜单项
+    
+    // 读取浮动窗口配置
     if (GetPrivateProfileString(Constants::MENU_SECTION,
                               Constants::MENU_FLOATING,
                               TEXT("0"), buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
         m_useFloatingWindow = (_wtoi(buffer) != 0);
     }
+    
+    // 读取菜单项显示配置
+    if (GetPrivateProfileString(Constants::MENU_SECTION,
+                              Constants::MENU_ITEMS,
+                              TEXT(""), buffer, _countof(buffer),
+                              m_configPath.c_str()) > 0) {
+        // 解析逗号分隔的菜单项类型
+        m_menuItemsToShow.clear();
+        std::wstring itemsStr = buffer;
+        size_t pos = 0;
+        std::wstring token;
+        
+        while ((pos = itemsStr.find(TEXT(","))) != std::wstring::npos) {
+            token = itemsStr.substr(0, pos);
+            // 去除前后空格
+            token.erase(0, token.find_first_not_of(TEXT(" ")));
+            token.erase(token.find_last_not_of(TEXT(" ")) + 1);
+            if (!token.empty()) {
+                m_menuItemsToShow.push_back(token);
+            }
+            itemsStr.erase(0, pos + 1);
+        }
+        
+        // 处理最后一个项目
+        itemsStr.erase(0, itemsStr.find_first_not_of(TEXT(" ")));
+        itemsStr.erase(itemsStr.find_last_not_of(TEXT(" ")) + 1);
+        if (!itemsStr.empty()) {
+            m_menuItemsToShow.push_back(itemsStr);
+        }
+    } else {
+        // 默认显示所有菜单项，按默认顺序
+        m_menuItemsToShow = {
+            Constants::MENU_ITEM_TYPE_CAPTURE,
+            Constants::MENU_ITEM_TYPE_SCREENSHOT,
+            Constants::MENU_ITEM_TYPE_OVERLAY,
+            Constants::MENU_ITEM_TYPE_PREVIEW,
+            Constants::MENU_ITEM_TYPE_RESET,
+            Constants::MENU_ITEM_TYPE_CLOSE
+        };
+    }
 }
 
 void ConfigManager::SaveMenuConfig() {
+    // 保存浮动窗口配置
     WritePrivateProfileString(Constants::MENU_SECTION,
                             Constants::MENU_FLOATING,
                             m_useFloatingWindow ? TEXT("1") : TEXT("0"),
                             m_configPath.c_str());
+    
+    // 保存菜单项显示配置
+    if (!m_menuItemsToShow.empty()) {
+        std::wstring itemsStr;
+        for (size_t i = 0; i < m_menuItemsToShow.size(); i++) {
+            itemsStr += m_menuItemsToShow[i];
+            if (i < m_menuItemsToShow.size() - 1) {
+                itemsStr += TEXT(",");
+            }
+        }
+        
+        WritePrivateProfileString(Constants::MENU_SECTION,
+                                Constants::MENU_ITEMS,
+                                itemsStr.c_str(),
+                                m_configPath.c_str());
+    } else {
+        // 如果为空，则写入空字符串，表示不显示任何菜单项
+        WritePrivateProfileString(Constants::MENU_SECTION,
+                                Constants::MENU_ITEMS,
+                                TEXT(""),
+                                m_configPath.c_str());
+    }
 }
 
 void ConfigManager::LoadGameAlbumConfig() {
