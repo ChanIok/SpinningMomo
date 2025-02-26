@@ -18,7 +18,7 @@ public:
     bool StartCapture(HWND targetWindow, int width = 0, int height = 0);
     void StopCapture();
     void Cleanup();
-    HWND GetHwnd() const { return m_hwnd; }  // 添加getter方法
+    HWND GetHwnd() const { return m_hwnd; }
 
 private:
     static OverlayWindow* instance;
@@ -46,8 +46,7 @@ private:
 
     bool InitializeCapture();
 
-    // 窗口和Direct3D资源
-    HWND m_hwnd = nullptr;
+    // Direct3D资源
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_context;
     Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swapChain;
@@ -88,52 +87,39 @@ private:
     };
 
     RECT m_gameWindowRect = {};
-    bool m_isFirstShow = true;
-    HWND m_gameWindow = nullptr;
-
-    // 主窗口句柄
+    
+    HWND m_hwnd = nullptr;
     HWND m_mainHwnd = nullptr;
+    HWND m_gameWindow = nullptr;
     HWND m_timerWindow = nullptr;  // 窗口管理线程的消息窗口
 
     // 窗口尺寸
     int m_windowWidth = 0;
     int m_windowHeight = 0;
 
-    // FPS统计相关
-    std::atomic<uint32_t> m_captureFrameCount{0};  // 捕获帧计数
-    std::atomic<uint32_t> m_renderFrameCount{0};   // 渲染帧计数
-    std::chrono::steady_clock::time_point m_lastFPSUpdateTime;  // 上次FPS更新时间
-    float m_captureFPS{0.0f};  // 捕获帧率
-    float m_renderFPS{0.0f};   // 渲染帧率
-    void UpdateFPS();  // FPS更新函数
-
     // 缓存的游戏窗口尺寸
     int m_cachedGameWidth = 0;
     int m_cachedGameHeight = 0;
 
     // 添加线程相关成员
-    ThreadRAII m_captureThread;
+    ThreadRAII m_captureAndRenderThread;
     ThreadRAII m_hookThread;
     ThreadRAII m_windowManagerThread;
-    ThreadRAII m_renderThread;
     std::atomic<bool> m_running{false};
     POINT m_currentMousePos{0, 0};
     POINT m_lastMousePos{0, 0};
-    float m_scaleFactor{1.0f};
+
     HHOOK m_mouseHook{nullptr};
     HWINEVENTHOOK m_eventHook = nullptr;
     DWORD m_gameProcessId = 0;
 
-    void CaptureThreadProc();
+    void CaptureAndRenderThreadProc();
     void HookThreadProc();
     void WindowManagerThreadProc();
-    void RenderThreadProc();
     bool CreateFrameTexture(UINT width, UINT height);
-    void RenderFrame();  // 渲染函数
     static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam);
 
     // 自定义消息定义
-    static const UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
-    static const UINT WM_NEW_FRAME = WM_USER + 2;
-    static const UINT WM_SHOW_OVERLAY = WM_USER + 3;
+    static const UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 21;
+    static const UINT WM_SHOW_OVERLAY = WM_USER + 22;
 };

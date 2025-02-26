@@ -4,11 +4,11 @@
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Metadata.h>
 #include <d3dcompiler.h>
 #include <dwmapi.h>
 
 namespace {
-    // 移动着色器代码到匿名命名空间
     const char* vertexShaderCode = R"(
         struct VS_INPUT {
             float2 pos : POSITION;
@@ -109,7 +109,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
 
     // 停止现有的捕获
     StopCapture();
-    
+
     // 获取游戏窗口尺寸并计算宽高比
     if (width <= 0 || height <= 0) {
         // 如果未提供有效的宽高，则通过GetWindowRect获取
@@ -129,6 +129,11 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
+    // 如果宽度和高度都小于屏幕尺寸，则不需要启动
+    if (m_cachedGameWidth < screenWidth && m_cachedGameHeight < screenHeight) {
+        return true;
+    }
+
     if (m_cachedGameWidth * screenHeight <= screenWidth * m_cachedGameHeight) {
         // 基于高度计算宽度
         m_windowHeight = screenHeight;
@@ -145,10 +150,9 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     // 启动工作线程
     m_running = true;
     try {
-        m_captureThread = ThreadRAII([this]() { CaptureThreadProc(); });
+        m_captureAndRenderThread = ThreadRAII([this]() { CaptureAndRenderThreadProc(); });
         m_hookThread = ThreadRAII([this]() { HookThreadProc(); });
         m_windowManagerThread = ThreadRAII([this]() { WindowManagerThreadProc(); });
-        m_renderThread = ThreadRAII([this]() { RenderThreadProc(); });
         return true;
     }
     catch (const std::exception& e) {
@@ -158,28 +162,32 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     }
 }
 
-void OverlayWindow::CaptureThreadProc() {
+// 线程处理函数
+void OverlayWindow::CaptureAndRenderThreadProc() {
     // 初始化 COM
-    OutputDebugStringA("CaptureThreadProc0!\n");
+    OutputDebugStringA("CaptureAndRenderThreadProc: Initializing...\n");
     winrt::init_apartment();
 
     if (!ResizeSwapChain()) {
         OutputDebugStringA("Failed to resize swap chain\n");
         return;
     }
-    OutputDebugStringA("CaptureThreadProc1!\n");
+    
     // 创建捕获资源
     if (!InitializeCapture()) {
         OutputDebugStringA("Failed to initialize capture\n");
         return;
     }
-    OutputDebugStringA("CaptureThreadProc2!\n");
-    // 使用消息循环保持线程活动
+
+    InitializeRenderStates();
+
+    // 消息处理和渲染循环
     MSG msg;
     while (m_running && GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+    OutputDebugStringA("CaptureAndRenderThreadProc: Exiting...\n");
 }
 
 void OverlayWindow::HookThreadProc() {
@@ -401,7 +409,7 @@ bool OverlayWindow::InitializeCapture() {
     }
 
     // 创建帧池
-    framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
+    framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
         winrtDevice,
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         1,
@@ -417,15 +425,13 @@ bool OverlayWindow::InitializeCapture() {
     captureSession = framePool.CreateCaptureSession(captureItem);
     captureSession.IsCursorCaptureEnabled(false);
     
-    // 尝试禁用边框
-    try {
-        auto session3 = captureSession.try_as<winrt::Windows::Graphics::Capture::IGraphicsCaptureSession3>();
-        if (session3) {
-            session3.IsBorderRequired(false);
-        }
-    }
-    catch (...) {
-        // 忽略任何错误，继续执行
+    // 尝试禁用边框 - 使用ApiInformation检查API是否可用
+    if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsBorderRequired")) 
+    {
+        // 从 Windows 10 2004 (20H1)版本开始提供
+        captureSession.IsBorderRequired(false);
     }
 
     try {
@@ -447,7 +453,6 @@ void OverlayWindow::StopCapture() {
     // 停止标志
     m_running = false;
     m_recreateTextureFlag = true;
-    m_renderStatesInitialized = false;
     if(framePool){
         framePool.FrameArrived(m_frameArrivedToken);
     }
@@ -456,24 +461,22 @@ void OverlayWindow::StopCapture() {
     if (m_hookThread.getId() != std::thread::id()) {
         PostThreadMessage(GetThreadId(m_hookThread.get()->native_handle()), WM_QUIT, 0, 0);
     }
-    if (m_captureThread.getId() != std::thread::id()) {
-        PostThreadMessage(GetThreadId(m_captureThread.get()->native_handle()), WM_QUIT, 0, 0);
+    if (m_captureAndRenderThread.getId() != std::thread::id()) {
+        PostThreadMessage(GetThreadId(m_captureAndRenderThread.get()->native_handle()), WM_QUIT, 0, 0);
     }
     if (m_windowManagerThread.getId() != std::thread::id()) {
         PostThreadMessage(GetThreadId(m_windowManagerThread.get()->native_handle()), WM_QUIT, 0, 0);
     }
 
-    if (m_captureThread.get() && m_captureThread.get()->joinable()) {
-        m_captureThread.get()->join();
+    // 等待线程结束
+    if (m_captureAndRenderThread.get() && m_captureAndRenderThread.get()->joinable()) {
+        m_captureAndRenderThread.get()->join();
     }
     if (m_hookThread.get() && m_hookThread.get()->joinable()) {
         m_hookThread.get()->join();
     }
     if (m_windowManagerThread.get() && m_windowManagerThread.get()->joinable()) {
         m_windowManagerThread.get()->join();
-    }
-    if (m_renderThread.get() && m_renderThread.get()->joinable()) {
-        m_renderThread.get()->join();
     }
 
     if (captureSession) {
@@ -487,11 +490,8 @@ void OverlayWindow::StopCapture() {
     captureItem = nullptr;  
 
     // 清理纹理资源
-    {
-        std::lock_guard<std::mutex> lock(m_textureMutex);
-        m_frameTexture.Reset();
-        m_shaderResourceView.Reset();
-    }
+    m_frameTexture.Reset();
+    m_shaderResourceView.Reset();
 
     if (m_frameLatencyWaitableObject) {
         CloseHandle(m_frameLatencyWaitableObject);
@@ -860,31 +860,26 @@ void OverlayWindow::OnFrameArrived() {
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
         if (!frameTexture) return;
 
+        // 直接为捕获的纹理创建 SRV
+        m_shaderResourceView.Reset(); // 释放之前的 SRV
+
         D3D11_TEXTURE2D_DESC desc;
         frameTexture->GetDesc(&desc);
 
-        // 如果尺寸变化，重新创建纹理
-        if (m_recreateTextureFlag || 
-            desc.Width != m_lastTextureDesc.Width || 
-            desc.Height != m_lastTextureDesc.Height) {
-            CreateFrameTexture(desc.Width, desc.Height);
-            m_lastTextureDesc = desc;
-            m_recreateTextureFlag = false;
-            OutputDebugStringA("OnFrameArrived-change!\n");
+        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+        srvDesc.Format = desc.Format;
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MipLevels = 1;
+
+        HRESULT hr = m_device->CreateShaderResourceView(
+            frameTexture.Get(), &srvDesc, &m_shaderResourceView);
+
+        // 设置着色器资源视图
+        if (SUCCEEDED(hr)) {
+            m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
         }
 
-        // 使用互斥锁保护纹理更新
-        {
-            std::lock_guard<std::mutex> lock(m_textureMutex);
-            m_context->CopyResource(m_frameTexture.Get(), frameTexture.Get());
-            m_hasNewFrame = true;
-        }
-        
-        // 增加捕获帧计数
-        ++m_captureFrameCount;
-        
-        // 通知渲染线程
-        m_frameAvailable.notify_one();
+        PerformRendering();
     }
 }
 
@@ -899,55 +894,6 @@ void OverlayWindow::PerformRendering() {
     
     // 呈现
     m_swapChain->Present(0, 0);
-
-    // 增加渲染帧计数
-    ++m_renderFrameCount;
-}
-
-void OverlayWindow::UpdateFPS() {
-    auto currentTime = std::chrono::steady_clock::now();
-    auto elapsedTime = std::chrono::duration_cast<std::chrono::milliseconds>(
-        currentTime - m_lastFPSUpdateTime).count() / 1000.0f;
-    
-    if (elapsedTime >= 1.0f) {  // 每秒更新一次
-        m_captureFPS = m_captureFrameCount / elapsedTime;
-        m_renderFPS = m_renderFrameCount / elapsedTime;
-        
-        // 输出调试信息
-        char debugStr[256];
-        sprintf_s(debugStr, "FPS - Capture: %.2f, Render: %.2f\n", 
-                 m_captureFPS, m_renderFPS);
-        OutputDebugStringA(debugStr);
-        
-        // 重置计数器和时间
-        m_captureFrameCount = 0;
-        m_renderFrameCount = 0;
-        m_lastFPSUpdateTime = currentTime;
-    }
-}
-
-void OverlayWindow::RenderFrame() {
-    if (!m_frameTexture || !m_renderTarget) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(16));
-        return;
-    }
-
-    // 初始化渲染状态（只在第一次调用时执行）
-    if (!m_renderStatesInitialized) {
-        InitializeRenderStates();
-        m_lastFPSUpdateTime = std::chrono::steady_clock::now();  // 初始化FPS计时器
-    }
-
-    // 准备帧，检查是否有新帧需要渲染
-    if (!PrepareFrame()) {
-        return;  // 没有新帧，直接返回
-    }
-
-    // 执行渲染
-    PerformRendering();
-
-    // 更新FPS
-    UpdateFPS();
 }
 
 void OverlayWindow::InitializeRenderStates() {
@@ -972,8 +918,6 @@ void OverlayWindow::InitializeRenderStates() {
     // 设置混合状态（只需要设置一次）
     float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
-
-    m_renderStatesInitialized = true;
 }
 
 bool OverlayWindow::PrepareFrame() {
@@ -993,13 +937,6 @@ bool OverlayWindow::PrepareFrame() {
 
     m_hasNewFrame = false;
     return true;
-}
-
-void OverlayWindow::RenderThreadProc() {
-    // 渲染循环
-    while (m_running) {
-        RenderFrame();
-    }
 }
 
 LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {

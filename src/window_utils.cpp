@@ -291,7 +291,7 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLow
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
     
     // 如果是有边框窗口且需要超出屏幕尺寸，转换为无边框
-    if ((style & WS_OVERLAPPEDWINDOW) && (width > screenWidth || height > screenHeight)) {
+    if ((style & WS_OVERLAPPEDWINDOW) && (width >= screenWidth || height >= screenHeight)) {
         style &= ~(WS_OVERLAPPEDWINDOW);
         style |= WS_POPUP;
         SetWindowLong(hwnd, GWL_STYLE, style);
