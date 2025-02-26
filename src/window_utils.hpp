@@ -37,7 +37,7 @@ public:
     static HWND FindTargetWindow(const std::wstring& configuredTitle = L"");
     
     // 窗口操作
-    static bool ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower = true);
+    static bool ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower = true, bool activate = true);
     
     // 辅助方法
     static std::wstring TrimRight(const std::wstring& str);

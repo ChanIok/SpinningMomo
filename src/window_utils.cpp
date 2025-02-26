@@ -281,7 +281,7 @@ HWND WindowUtils::FindTargetWindow(const std::wstring& configuredTitle) {
 }
 
 // 窗口操作
-bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower) {
+bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower, bool activate) {
     if (!hwnd || !IsWindow(hwnd)) return false;
 
     // 获取窗口样式
@@ -317,9 +317,14 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLow
     int newLeft = (screenWidth - width) / 2 + borderOffsetX;
     int newTop = (screenHeight - height) / 2 + borderOffsetY;
 
+    UINT flags = SWP_NOZORDER;
+    if (!activate) {
+        flags |= SWP_NOACTIVATE;
+    }
+
     // 设置新的窗口大小和位置
     bool success = SetWindowPos(hwnd, NULL, newLeft, newTop, totalWidth, totalHeight, 
-                              SWP_NOZORDER) != FALSE;
+                              flags) != FALSE;
 
     // 如果窗口调整成功且需要置底任务栏，则执行置底操作
     if (success && taskbarLower) {

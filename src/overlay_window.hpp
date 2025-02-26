@@ -16,8 +16,9 @@ public:
 
     bool Initialize(HINSTANCE hInstance, HWND mainHwnd);
     bool StartCapture(HWND targetWindow, int width = 0, int height = 0);
-    void StopCapture();
+    void StopCapture(bool hideWindow = true);
     void Cleanup();
+    void RestoreGameWindow();
     HWND GetHwnd() const { return m_hwnd; }
 
 private:
@@ -40,7 +41,6 @@ private:
     bool CreateRenderTarget();
     bool CreateShaderResources();
     void InitializeRenderStates();
-    bool PrepareFrame();
     void PerformRendering();
     void OnFrameArrived();
 
@@ -96,6 +96,8 @@ private:
     // 窗口尺寸
     int m_windowWidth = 0;
     int m_windowHeight = 0;
+    int m_screenWidth = 0;
+    int m_screenHeight = 0;
 
     // 缓存的游戏窗口尺寸
     int m_cachedGameWidth = 0;

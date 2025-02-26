@@ -139,27 +139,34 @@ public:
     // 处理宽高比选择
     void HandleRatioSelect(UINT id) {
         size_t index = id - Constants::ID_RATIO_BASE;
-        if (index < m_ratios.size()) {
-            m_currentRatioIndex = index;
-            
-            // 更新菜单窗口中的单选按钮状态
-            if (m_menuWindow) {
-                m_menuWindow->SetCurrentRatio(index);
+        if (index >= m_ratios.size()) {
+            return;
+        }
+    
+        m_currentRatioIndex = index;
+    
+        if (m_menuWindow) {
+            m_menuWindow->SetCurrentRatio(index);
+        }
+    
+        HWND gameWindow = FindTargetWindow();
+        if (!gameWindow) {
+            ShowNotification(m_strings.APP_NAME.c_str(), 
+                            m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
+        }
+    
+        if (m_isOverlayEnabled && m_overlayWindow) {
+            m_overlayWindow->StopCapture(false);
+        }
+    
+        int width = 0, height = 0;
+        if (ApplyWindowTransform(gameWindow, width, height)) {
+            if (m_isPreviewEnabled && m_previewWindow) {
+                m_previewWindow->StartCapture(gameWindow, width, height);
             }
-            
-            HWND gameWindow = FindTargetWindow();
-            if (gameWindow) {
-                int width = 0, height = 0;
-                if (ApplyWindowTransform(gameWindow, width, height)) {
-                    if (m_isPreviewEnabled && m_previewWindow) {
-                        m_previewWindow->StartCapture(gameWindow, width, height);
-                    }
-                    if (m_isOverlayEnabled && m_overlayWindow) {
-                        m_overlayWindow->StartCapture(gameWindow, width, height);
-                    }
-                }
-            } else {
-                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+            if (m_isOverlayEnabled && m_overlayWindow) {
+                m_overlayWindow->StartCapture(gameWindow, width, height);
             }
         }
     }
@@ -167,30 +174,39 @@ public:
     // 处理分辨率选择
     void HandleResolutionSelect(UINT id) {
         size_t index = id - Constants::ID_RESOLUTION_BASE;
-        if (index < m_resolutions.size()) {
-            m_currentResolutionIndex = index;
-            
-            // 更新菜单窗口中的单选按钮状态
-            if (m_menuWindow) {
-                m_menuWindow->SetCurrentResolution(index);
+        if (index >= m_resolutions.size()) {
+            return;
+        }
+    
+        m_currentResolutionIndex = index;
+    
+        if (m_menuWindow) {
+            m_menuWindow->SetCurrentResolution(index);
+        }
+    
+        HWND gameWindow = FindTargetWindow();
+        if (!gameWindow) {
+            ShowNotification(m_strings.APP_NAME.c_str(), 
+                            m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
+        }
+    
+        if (m_isOverlayEnabled && m_overlayWindow) {
+            m_overlayWindow->StopCapture(false);
+        }
+    
+        // 应用新分辨率
+        int width = 0, height = 0;
+        if (ApplyWindowTransform(gameWindow, width, height)) {
+            if (m_isPreviewEnabled && m_previewWindow) {
+                m_previewWindow->StartCapture(gameWindow, width, height);
             }
-            
-            HWND gameWindow = FindTargetWindow();
-            if (gameWindow) {
-                int width = 0, height = 0;
-                if (ApplyWindowTransform(gameWindow, width, height)) {
-                    if (m_isPreviewEnabled && m_previewWindow) {
-                        m_previewWindow->StartCapture(gameWindow, width, height);
-                    }
-                    if (m_isOverlayEnabled && m_overlayWindow) {
-                        m_overlayWindow->StartCapture(gameWindow, width, height);
-                    }
-                }
-            } else {
-                ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
+            if (m_isOverlayEnabled && m_overlayWindow) {
+                m_overlayWindow->StartCapture(gameWindow, width, height);
             }
         }
     }
+    
     // 处理截图
     void HandleScreenshot() {
         // 检查屏幕捕获功能是否可用
@@ -372,29 +388,34 @@ public:
     // 重置窗口大小
     void ResetWindowSize() {
         HWND gameWindow = FindTargetWindow();
-        if (gameWindow) {
-            m_currentRatioIndex = SIZE_MAX;
-            m_currentResolutionIndex = 0;
-            
-            if (m_menuWindow) {
-                m_menuWindow->SetCurrentRatio(m_currentRatioIndex);
-                m_menuWindow->SetCurrentResolution(m_currentResolutionIndex);
-            }
-            
-            int width = 0, height = 0;
-            if (ApplyWindowTransform(gameWindow, width, height)) {
-                if (m_isPreviewEnabled && m_previewWindow) {
-                    m_previewWindow->StartCapture(gameWindow, width, height);
-                }
-                if (m_isOverlayEnabled && m_overlayWindow) {
-                    m_overlayWindow->StartCapture(gameWindow, width, height);
-                }
-            }
-        } else {
+        if (!gameWindow) {
             ShowNotification(m_strings.APP_NAME.c_str(), 
-                m_strings.WINDOW_NOT_FOUND.c_str());
+                            m_strings.WINDOW_NOT_FOUND.c_str());
+            return;
         }
-    }
+        m_currentRatioIndex = SIZE_MAX;
+        m_currentResolutionIndex = 0;
+        
+        if (m_menuWindow) {
+            m_menuWindow->SetCurrentRatio(m_currentRatioIndex);
+            m_menuWindow->SetCurrentResolution(m_currentResolutionIndex);
+        }
+        if (m_isPreviewEnabled && m_previewWindow) {
+            m_previewWindow->StopCapture();
+        }
+        if (m_isOverlayEnabled && m_overlayWindow) {
+            m_overlayWindow->StopCapture();
+        }
+        int width = 0, height = 0;
+        if (ApplyWindowTransform(gameWindow, width, height)) {
+            if (m_isPreviewEnabled && m_previewWindow) {
+                m_previewWindow->StartCapture(gameWindow, width, height);
+            }
+            if (m_isOverlayEnabled && m_overlayWindow) {
+                m_overlayWindow->StartCapture(gameWindow, width, height);
+            }
+        }
+    } 
 
     // 打开配置文件
     void OpenConfigFile() {
@@ -843,8 +864,17 @@ private:
         swprintf_s(debugStr, L"Target Resolution: width=%d, height=%d\n", 
                   targetRes.width, targetRes.height);
         OutputDebugStringW(debugStr);
-        if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
-                                    m_configManager->GetTaskbarLower())) {
+
+        bool resizeSuccess;
+        if (m_isOverlayEnabled && m_overlayWindow) {
+            resizeSuccess = WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
+                m_configManager->GetTaskbarLower(), false);
+        } else {
+            resizeSuccess = WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
+                m_configManager->GetTaskbarLower());
+        }
+        
+        if (resizeSuccess) {
             outWidth = targetRes.width;
             outHeight = targetRes.height;
             return true;

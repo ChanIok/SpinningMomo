@@ -73,8 +73,8 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     }
 
     // 创建全屏窗口
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    m_screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    m_screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
     m_hwnd = CreateWindowExW(
         WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | 
@@ -82,7 +82,7 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
         L"OverlayWindowClass",
         L"Overlay Window",
         WS_POPUP,
-        0, 0, screenWidth, screenHeight,
+        0, 0, m_screenWidth, m_screenHeight,
         nullptr, nullptr,
         hInstance, nullptr
     );
@@ -100,18 +100,7 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
 bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     if (!targetWindow) return false;
 
-    // 初始化 D3D 资源
-    if (!m_d3dInitialized) {
-        if (!InitializeD3D()) {
-            return false;
-        }
-        m_d3dInitialized = true;
-    }
-
     m_gameWindow = targetWindow;
-
-    // 停止现有的捕获
-    StopCapture();
 
     // 获取游戏窗口尺寸并计算宽高比
     if (width <= 0 || height <= 0) {
@@ -128,28 +117,33 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
 
     double aspectRatio = static_cast<double>(m_cachedGameWidth) / m_cachedGameHeight;
 
-    // 计算适合屏幕的窗口尺寸
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
     // 如果宽度和高度都小于屏幕尺寸，则不需要启动
-    if (m_cachedGameWidth < screenWidth && m_cachedGameHeight < screenHeight) {
+    if (m_cachedGameWidth <= m_screenWidth && m_cachedGameHeight <= m_screenHeight) {
+        RestoreGameWindow();
         return true;
     }
 
-    if (m_cachedGameWidth * screenHeight <= screenWidth * m_cachedGameHeight) {
+    // 初始化 D3D 资源
+    if (!m_d3dInitialized) {
+        if (!InitializeD3D()) {
+            return false;
+        }
+        m_d3dInitialized = true;
+    }
+
+    if (m_cachedGameWidth * m_screenHeight <= m_screenWidth * m_cachedGameHeight) {
         // 基于高度计算宽度
-        m_windowHeight = screenHeight;
-        m_windowWidth = static_cast<int>(screenHeight * aspectRatio);
+        m_windowHeight = m_screenHeight;
+        m_windowWidth = static_cast<int>(m_screenHeight * aspectRatio);
     } else {
         // 基于宽度计算高度
-        m_windowWidth = screenWidth;
-        m_windowHeight = static_cast<int>(screenWidth / aspectRatio);
+        m_windowWidth = m_screenWidth;
+        m_windowHeight = static_cast<int>(m_screenWidth / aspectRatio);
     }
     char buffer[256];
     sprintf_s(buffer, "Resizing swap chain to %dx%d\n", m_windowWidth, m_windowHeight);
     OutputDebugStringA(buffer);
-
+    
     // 启动工作线程
     m_running = true;
     try {
@@ -171,18 +165,25 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
     OutputDebugStringA("CaptureAndRenderThreadProc: Initializing...\n");
     winrt::init_apartment();
 
+    // 延迟防止闪烁
+    if(IsWindowVisible(m_hwnd)){
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    
     if (!ResizeSwapChain()) {
         OutputDebugStringA("Failed to resize swap chain\n");
         return;
     }
     
+    InitializeRenderStates();
+
     // 创建捕获资源
     if (!InitializeCapture()) {
         OutputDebugStringA("Failed to initialize capture\n");
         return;
     }
 
-    InitializeRenderStates();
+    PostMessage(m_hwnd, WM_SHOW_OVERLAY, 0, 0);
 
     // 消息处理和渲染循环
     MSG msg;
@@ -257,9 +258,6 @@ void OverlayWindow::WindowManagerThreadProc() {
         return;
     }
 
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-
     // 保存窗口句柄供WinEventProc使用
     m_timerWindow = timerWindow;
 
@@ -277,8 +275,8 @@ void OverlayWindow::WindowManagerThreadProc() {
                 // 只有当鼠标位置发生变化时才更新窗口位置
                 if (currentPos.x != m_lastMousePos.x || currentPos.y != m_lastMousePos.y) {
                     // 计算叠加层窗口的位置
-                    int overlayLeft = (screenWidth - m_windowWidth) / 2;
-                    int overlayTop = (screenHeight - m_windowHeight) / 2;
+                    int overlayLeft = (m_screenWidth - m_windowWidth) / 2;
+                    int overlayTop = (m_screenHeight - m_windowHeight) / 2;
                     
                     // 检查鼠标是否在叠加层窗口范围内
                     if (currentPos.x >= overlayLeft && 
@@ -453,14 +451,11 @@ bool OverlayWindow::InitializeCapture() {
         OutputDebugStringA("Unknown error occurred while starting capture session\n");
         return false;
     }
-    OutputDebugStringA("InitializeCapture1!\n");
-    // 发送消息给主线程显示窗口
-    PostMessage(m_hwnd, WM_SHOW_OVERLAY, 0, 0);
-    OutputDebugStringA("InitializeCapture2!\n");
+    
     return true;
 }
 
-void OverlayWindow::StopCapture() {
+void OverlayWindow::StopCapture(bool hideWindow) {
     // 停止标志
     m_running = false;
 
@@ -500,22 +495,27 @@ void OverlayWindow::StopCapture() {
     }
     m_captureItem = nullptr;  
 
-    // 清理纹理资源
-    m_frameTexture.Reset();
-    m_shaderResourceView.Reset();
-
     if (m_frameLatencyWaitableObject) {
         CloseHandle(m_frameLatencyWaitableObject);
         m_frameLatencyWaitableObject = nullptr;
     }
 
     // 隐藏窗口
-    ShowWindow(m_hwnd, SW_HIDE);
+    if (hideWindow) {
+        RestoreGameWindow();
+    }
+}
 
+void OverlayWindow::RestoreGameWindow() {
+    ShowWindow(m_hwnd, SW_HIDE);
     LONG_PTR currentExStyle = GetWindowLongPtr(instance->m_gameWindow, GWL_EXSTYLE);
     currentExStyle &= ~WS_EX_LAYERED;
     SetWindowLongPtr(instance->m_gameWindow, GWL_EXSTYLE, currentExStyle);
+    int left = (instance->m_screenWidth - instance->m_cachedGameWidth) / 2;
+    int top = (instance->m_screenHeight - instance->m_cachedGameHeight) / 2;
+    SetWindowPos(instance->m_gameWindow, HWND_TOP, left, top, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
 }
+
 
 void OverlayWindow::Cleanup() {
     if (m_hwnd) {
@@ -633,8 +633,8 @@ bool OverlayWindow::InitializeD3D() {
 
     // 创建交换链描述
     DXGI_SWAP_CHAIN_DESC1 scd = {};
-    scd.Width = m_windowWidth > 0 ? m_windowWidth : GetSystemMetrics(SM_CXSCREEN);
-    scd.Height = m_windowHeight > 0 ? m_windowHeight : GetSystemMetrics(SM_CYSCREEN);
+    scd.Width = m_windowWidth > 0 ? m_windowWidth : m_screenWidth;
+    scd.Height = m_windowHeight > 0 ? m_windowHeight : m_screenHeight;
     scd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     scd.BufferCount = 4;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -711,8 +711,8 @@ bool OverlayWindow::ResizeSwapChain() {
     // 调整交换链缓冲区大小
     hr = m_swapChain->ResizeBuffers(
         4,
-        m_windowWidth > 0 ? m_windowWidth : GetSystemMetrics(SM_CXSCREEN),
-        m_windowHeight > 0 ? m_windowHeight : GetSystemMetrics(SM_CYSCREEN),
+        m_windowWidth > 0 ? m_windowWidth : m_screenWidth,
+        m_windowHeight > 0 ? m_windowHeight : m_screenHeight,
         DXGI_FORMAT_R8G8B8A8_UNORM,
         desc.Flags    // 保持原有标志
     );
@@ -831,38 +831,6 @@ bool OverlayWindow::CreateShaderResources() {
     return true;
 }
 
-bool OverlayWindow::CreateFrameTexture(UINT width, UINT height) {
-    std::lock_guard<std::mutex> lock(m_textureMutex);
-    
-    // 释放旧资源
-    m_frameTexture.Reset();
-    m_shaderResourceView.Reset();
-
-    // 创建新的纹理
-    D3D11_TEXTURE2D_DESC desc = {};
-    desc.Width = width;
-    desc.Height = height;
-    desc.MipLevels = 1;
-    desc.ArraySize = 1;
-    desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-    desc.SampleDesc.Count = 1;
-    desc.Usage = D3D11_USAGE_DEFAULT;
-    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    desc.CPUAccessFlags = 0;
-
-    HRESULT hr = m_device->CreateTexture2D(&desc, nullptr, &m_frameTexture);
-    if (FAILED(hr)) return false;
-
-    // 创建着色器资源视图
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Format = desc.Format;
-    srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = 1;
-
-    hr = m_device->CreateShaderResourceView(m_frameTexture.Get(), &srvDesc, &m_shaderResourceView);
-    return SUCCEEDED(hr);
-}
-
 void OverlayWindow::OnFrameArrived() {
     if (!m_running) return;
     if (!m_framePool) return;
@@ -920,8 +888,8 @@ void OverlayWindow::InitializeRenderStates() {
 
     // 设置视口（使用计算后的窗口尺寸）
     D3D11_VIEWPORT viewport = {};
-    viewport.Width = static_cast<float>(m_windowWidth > 0 ? m_windowWidth : GetSystemMetrics(SM_CXSCREEN));
-    viewport.Height = static_cast<float>(m_windowHeight > 0 ? m_windowHeight : GetSystemMetrics(SM_CYSCREEN));
+    viewport.Width = static_cast<float>(m_windowWidth > 0 ? m_windowWidth : m_screenWidth);
+    viewport.Height = static_cast<float>(m_windowHeight > 0 ? m_windowHeight : m_screenHeight);
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     m_context->RSSetViewports(1, &viewport);
@@ -931,65 +899,19 @@ void OverlayWindow::InitializeRenderStates() {
     m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
 }
 
-bool OverlayWindow::PrepareFrame() {
-    std::unique_lock<std::mutex> lock(m_textureMutex);
-    if (!m_hasNewFrame) {
-        // 等待新帧，带超时
-        if (m_frameAvailable.wait_for(lock, std::chrono::milliseconds(16)) 
-            == std::cv_status::timeout) {
-            return false;
-        }
-    }
-
-    // 更新着色器资源视图（仅在有新帧时）
-    if (m_shaderResourceView) {
-        m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
-    }
-
-    m_hasNewFrame = false;
-    return true;
-}
-
 LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
     if (instance) {
         switch (message) {
             case WM_DESTROY:
                 instance->Cleanup();
                 return 0;
-            
-            // 处理窗口大小调整，保持全屏
-            case WM_DISPLAYCHANGE: {
-                int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-                int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-                
-                // 重新计算窗口尺寸（保持当前比例）
-                if (instance->m_windowWidth > 0 && instance->m_windowHeight > 0) {
-                    double aspectRatio = static_cast<double>(instance->m_windowWidth) / instance->m_windowHeight;
-                    if (instance->m_windowWidth * screenHeight <= screenWidth * instance->m_windowHeight) {
-                        instance->m_windowHeight = screenHeight;
-                        instance->m_windowWidth = static_cast<int>(screenHeight * aspectRatio);
-                    } else {
-                        instance->m_windowWidth = screenWidth;
-                        instance->m_windowHeight = static_cast<int>(screenWidth / aspectRatio);
-                    }
-                }
-                
-                // 计算居中位置
-                int left = (screenWidth - instance->m_windowWidth) / 2;
-                int top = (screenHeight - instance->m_windowHeight) / 2;
-                
-                SetWindowPos(hwnd, nullptr, left, top,
-                    instance->m_windowWidth, instance->m_windowHeight,
-                    SWP_NOZORDER | SWP_NOACTIVATE);
-                return 0;
-            }
 
             case WM_SHOW_OVERLAY: {
                 ShowWindow(hwnd, SW_SHOWNA);
                 
                 // 计算居中位置
-                int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-                int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+                int screenWidth = instance->m_screenWidth;
+                int screenHeight = instance->m_screenHeight;
                 int left = (screenWidth - instance->m_windowWidth) / 2;
                 int top = (screenHeight - instance->m_windowHeight) / 2;
                 
@@ -997,8 +919,8 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 LONG exStyle = GetWindowLong(instance->m_gameWindow, GWL_EXSTYLE);
                 SetWindowLong(instance->m_gameWindow, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
                 
-                // 设置透明度 (完全透明，但仍可点击)
-                SetLayeredWindowAttributes(instance->m_gameWindow, 0, 1, LWA_ALPHA); // Alpha = 0 表示完全透明
+                // 设置透明度 (透明度1，但仍可点击)
+                SetLayeredWindowAttributes(instance->m_gameWindow, 0, 1, LWA_ALPHA);
 
                 // 设置窗口位置和大小
                 SetWindowPos(hwnd, nullptr,
@@ -1006,11 +928,8 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     instance->m_windowWidth, instance->m_windowHeight,
                     SWP_NOZORDER | SWP_NOACTIVATE);
                     
-                // 确保游戏窗口在叠加层之下
-                SetWindowPos(hwnd, instance->m_gameWindow, 0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
                 SetWindowPos(instance->m_gameWindow, hwnd, 0, 0, 0, 0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    SWP_NOMOVE | SWP_NOSIZE);
                     
                 UpdateWindow(hwnd);
                 return 0;
