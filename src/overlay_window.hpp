@@ -15,7 +15,7 @@ public:
     ~OverlayWindow();
 
     bool Initialize(HINSTANCE hInstance, HWND mainHwnd);
-    bool StartCapture(HWND targetWindow);
+    bool StartCapture(HWND targetWindow, int width = 0, int height = 0);
     void StopCapture();
     void Cleanup();
     HWND GetHwnd() const { return m_hwnd; }  // 添加getter方法

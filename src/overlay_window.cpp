@@ -103,18 +103,26 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     return true;
 }
 
-bool OverlayWindow::StartCapture(HWND targetWindow) {
+bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     if (!targetWindow) return false;
     m_gameWindow = targetWindow;
 
     // 停止现有的捕获
     StopCapture();
-    Sleep(400);
+    
     // 获取游戏窗口尺寸并计算宽高比
-    RECT gameRect;
-    GetWindowRect(targetWindow, &gameRect);
-    m_cachedGameWidth = gameRect.right - gameRect.left;
-    m_cachedGameHeight = gameRect.bottom - gameRect.top;
+    if (width <= 0 || height <= 0) {
+        // 如果未提供有效的宽高，则通过GetWindowRect获取
+        RECT gameRect;
+        GetWindowRect(targetWindow, &gameRect);
+        m_cachedGameWidth = gameRect.right - gameRect.left;
+        m_cachedGameHeight = gameRect.bottom - gameRect.top;
+    } else {
+        // 使用传入的宽高值
+        m_cachedGameWidth = width;
+        m_cachedGameHeight = height;
+    }
+
     double aspectRatio = static_cast<double>(m_cachedGameWidth) / m_cachedGameHeight;
 
     // 计算适合屏幕的窗口尺寸

@@ -45,7 +45,7 @@ PreviewWindow::~PreviewWindow() {
     instance = nullptr;
 }
 
-bool PreviewWindow::StartCapture(HWND targetWindow) {
+bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customHeight) {
     if (!targetWindow) return false;
     
     // 保存游戏窗口句柄
@@ -56,18 +56,21 @@ bool PreviewWindow::StartCapture(HWND targetWindow) {
         return false;
     }
 
-    // 获取游戏窗口的实际尺寸（包括溢出屏幕的部分）
-    RECT windowRect;
-    GetWindowRect(targetWindow, &windowRect);
-    m_gameWindowRect = windowRect;  // 保存游戏窗口尺寸
-    
-    // 获取窗口客户区的实际尺寸
-    RECT clientRect;
-    GetClientRect(targetWindow, &clientRect);
-    
     // 计算实际的窗口尺寸
-    int width = clientRect.right - clientRect.left;
-    int height = clientRect.bottom - clientRect.top;
+    int width, height;
+    
+    if (customWidth > 0 && customHeight > 0) {
+        // 如果提供了自定义尺寸，则使用它
+        width = customWidth;
+        height = customHeight;
+    } else {
+        // 否则，获取窗口客户区的实际尺寸
+        RECT clientRect;
+        GetClientRect(targetWindow, &clientRect);
+        width = clientRect.right - clientRect.left;
+        height = clientRect.bottom - clientRect.top;
+    }
+    
     m_aspectRatio = static_cast<float>(height) / width;
 
     // 根据宽高比计算实际窗口尺寸

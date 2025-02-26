@@ -20,7 +20,7 @@ public:
 
     bool Initialize(HINSTANCE hInstance, HWND mainHwnd);
     void Cleanup();
-    bool StartCapture(HWND targetWindow);
+    bool StartCapture(HWND targetWindow, int width = 0, int height = 0);
     void StopCapture();
     HWND GetHwnd() const { return hwnd; }
     

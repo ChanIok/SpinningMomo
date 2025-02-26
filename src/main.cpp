@@ -149,14 +149,14 @@ public:
             
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
-                ApplyWindowTransform(gameWindow);
-                
-                // 更新预览和叠加层窗口
-                if (m_isPreviewEnabled && m_previewWindow) {
-                    m_previewWindow->StartCapture(gameWindow);
-                }
-                if (m_isOverlayEnabled && m_overlayWindow) {
-                    m_overlayWindow->StartCapture(gameWindow);
+                int width = 0, height = 0;
+                if (ApplyWindowTransform(gameWindow, width, height)) {
+                    if (m_isPreviewEnabled && m_previewWindow) {
+                        m_previewWindow->StartCapture(gameWindow, width, height);
+                    }
+                    if (m_isOverlayEnabled && m_overlayWindow) {
+                        m_overlayWindow->StartCapture(gameWindow, width, height);
+                    }
                 }
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
@@ -177,16 +177,14 @@ public:
             
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
-                ApplyWindowTransform(gameWindow);
-                
-                // 如果预览窗口已启用，重新开始捕获以更新尺寸
-                if (m_isPreviewEnabled && m_previewWindow) {
-                    m_previewWindow->StartCapture(gameWindow);
-                }
-
-                // 更新叠加层窗口
-                if (m_isOverlayEnabled && m_overlayWindow) {
-                    m_overlayWindow->StartCapture(gameWindow);
+                int width = 0, height = 0;
+                if (ApplyWindowTransform(gameWindow, width, height)) {
+                    if (m_isPreviewEnabled && m_previewWindow) {
+                        m_previewWindow->StartCapture(gameWindow, width, height);
+                    }
+                    if (m_isOverlayEnabled && m_overlayWindow) {
+                        m_overlayWindow->StartCapture(gameWindow, width, height);
+                    }
                 }
             } else {
                 ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
@@ -383,9 +381,13 @@ public:
                 m_menuWindow->SetCurrentResolution(m_currentResolutionIndex);
             }
             
-            if (ApplyWindowTransform(gameWindow)) {
+            int width = 0, height = 0;
+            if (ApplyWindowTransform(gameWindow, width, height)) {
                 if (m_isPreviewEnabled && m_previewWindow) {
-                    m_previewWindow->StartCapture(gameWindow);
+                    m_previewWindow->StartCapture(gameWindow, width, height);
+                }
+                if (m_isOverlayEnabled && m_overlayWindow) {
+                    m_overlayWindow->StartCapture(gameWindow, width, height);
                 }
             }
         } else {
@@ -814,7 +816,7 @@ private:
     }
 
     // 应用窗口变换
-    bool ApplyWindowTransform(HWND hwnd) {
+    bool ApplyWindowTransform(HWND hwnd, int& outWidth, int& outHeight) {
         if (!hwnd) return false;
 
         int screenWidth = GetSystemMetrics(SM_CXSCREEN);
@@ -837,9 +839,14 @@ private:
         } else {
             targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
         }
-
+        wchar_t debugStr[256];
+        swprintf_s(debugStr, L"Target Resolution: width=%d, height=%d\n", 
+                  targetRes.width, targetRes.height);
+        OutputDebugStringW(debugStr);
         if (WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
                                     m_configManager->GetTaskbarLower())) {
+            outWidth = targetRes.width;
+            outHeight = targetRes.height;
             return true;
         } else {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());

@@ -296,6 +296,12 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLow
         style |= WS_POPUP;
         SetWindowLong(hwnd, GWL_STYLE, style);
     }
+    // 如果是无边框窗口且高度小于屏幕高度，转换为有边框
+    else if ((style & WS_POPUP) && width < screenWidth && height < screenHeight) {
+        style &= ~(WS_POPUP);
+        style |= WS_OVERLAPPEDWINDOW;
+        SetWindowLong(hwnd, GWL_STYLE, style);
+    }
 
     // 调整窗口大小
     RECT rect = { 0, 0, width, height };
