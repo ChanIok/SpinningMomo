@@ -16,6 +16,7 @@
 #include "notification_manager.hpp"
 #include "config_manager.hpp"
 #include "overlay_window.hpp"
+#include "logger.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -29,6 +30,12 @@ public:
     }
 
     bool Initialize(HINSTANCE hInstance) {
+        Logger::GetInstance().Initialize();
+        LOG_INFO("Program initialization started");
+
+        // 记录系统信息
+        LogSystemInfo();
+
         m_configManager = std::make_unique<ConfigManager>();
         m_configManager->Initialize();
         
@@ -44,6 +51,7 @@ public:
 
         // 检查屏幕捕获功能是否可用
         m_isScreenCaptureSupported = WindowUtils::IsWindowsCaptureSupported();
+        LOG_INFO("Screen capture feature is %s", m_isScreenCaptureSupported ? "available" : "not available");
 
         // 初始化预设数据
         InitializeRatios();
@@ -52,31 +60,44 @@ public:
         // 根据配置重建宽高比和分辨率列表
         ConfigLoadResult ratioResult = m_configManager->BuildRatiosFromConfig(m_ratios, m_ratios, m_strings);
         if (!ratioResult.success) {
+            LOG_ERROR("Failed to load aspect ratio configuration: %s", ratioResult.errorDetails.c_str());
             m_notificationManager->ShowNotification(m_strings.APP_NAME.c_str(), ratioResult.errorDetails);
         }
         
         ConfigLoadResult resolutionResult = m_configManager->BuildResolutionsFromConfig(m_resolutions, m_resolutions, m_strings);
         if (!resolutionResult.success) {
+            LOG_ERROR("Failed to load resolution configuration: %s", resolutionResult.errorDetails.c_str());
             m_notificationManager->ShowNotification(m_strings.APP_NAME.c_str(), resolutionResult.errorDetails);
         }
 
         // 初始化UI组件
-        if (!RegisterWindowClass(hInstance)) return false;
-        if (!CreateAppWindow(hInstance)) return false;
+        if (!RegisterWindowClass(hInstance)) {
+            LOG_ERROR("Failed to register window class");
+            return false;
+        }
+        if (!CreateAppWindow(hInstance)) {
+            LOG_ERROR("Failed to create application window");
+            return false;
+        }
 
         // 创建托盘图标
         m_trayIcon = std::make_unique<TrayIcon>(m_hwnd);
-        if (!m_trayIcon->Create()) return false;
+        if (!m_trayIcon->Create()) {
+            LOG_ERROR("Failed to create tray icon");
+            return false;
+        }
 
         // 创建预览窗口
         m_previewWindow = std::make_unique<PreviewWindow>();
         if (!m_previewWindow->Initialize(hInstance, m_hwnd)) {
+            LOG_ERROR("Failed to initialize preview window");
             return false;
         }
 
         // 创建叠加层窗口
         m_overlayWindow = std::make_unique<OverlayWindow>();
         if (!m_overlayWindow->Initialize(hInstance, m_hwnd)) {
+            LOG_ERROR("Failed to initialize overlay window");
             return false;
         }
 
@@ -85,8 +106,9 @@ public:
         // 设置菜单项显示配置
         m_menuWindow->SetMenuItemsToShow(m_configManager->GetMenuItemsToShow());
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
-                               m_currentRatioIndex, m_currentResolutionIndex,
-                               m_isPreviewEnabled, m_isOverlayEnabled)) {
+                            m_currentRatioIndex, m_currentResolutionIndex,
+                            m_isPreviewEnabled, m_isOverlayEnabled)) {
+            LOG_ERROR("Failed to create menu window");
             return false;
         }
 
@@ -101,6 +123,7 @@ public:
                           m_configManager->GetHotkeyKey());
         
         if (!hotkeyRegistered) {
+            LOG_ERROR("Failed to register global hotkey");
             ShowNotification(m_strings.APP_NAME.c_str(), 
                 m_strings.HOTKEY_REGISTER_FAILED.c_str());
         } else {
@@ -109,7 +132,7 @@ public:
             std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
             ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
         }
-
+        LOG_INFO("Program initialization completed successfully");
         return true;
     }
 
@@ -765,6 +788,51 @@ private:
         return m_hwnd != NULL;
     }
 
+    void LogSystemInfo() {
+        OSVERSIONINFOEXW osvi = {0};
+        osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
+        
+        // 使用RtlGetVersion
+        HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+        if (ntdll) {
+            typedef NTSTATUS(WINAPI* RtlGetVersionFunc)(OSVERSIONINFOEXW*);
+            RtlGetVersionFunc RtlGetVersion = (RtlGetVersionFunc)GetProcAddress(ntdll, "RtlGetVersion");
+            if (RtlGetVersion) {
+                RtlGetVersion(&osvi);
+                const char* windowsName = "Windows";
+                if (osvi.dwMajorVersion == 10) {
+                    if (osvi.dwBuildNumber >= 22000) {
+                        windowsName = "Windows 11";
+                    } else {
+                        windowsName = "Windows 10";
+                    }
+                } else {
+                    windowsName = "Windows";
+                }
+                
+                LOG_INFO("%s Version: %d.%d.%d",
+                    windowsName, osvi.dwMajorVersion, 
+                    osvi.dwMinorVersion, osvi.dwBuildNumber);
+            }
+        }
+    
+        // 获取显示器信息
+        int monitorCount = GetSystemMetrics(SM_CMONITORS);
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        LOG_INFO("Display: Monitors: %d, Primary screen: %dx%d", 
+            monitorCount, screenWidth, screenHeight);
+    
+        // 获取DPI设置
+        HDC hdc = GetDC(NULL);
+        if (hdc) {
+            int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+            int dpiY = GetDeviceCaps(hdc, LOGPIXELSY);
+            LOG_INFO("DPI Settings: %dx%d", dpiX, dpiY);
+            ReleaseDC(NULL, hdc);
+        }
+    }
+    
     std::wstring GetHotkeyText() {
         std::wstring text;
         UINT modifiers = m_configManager->GetHotkeyModifiers();
@@ -871,10 +939,8 @@ private:
         } else {
             targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
         }
-        wchar_t debugStr[256];
-        swprintf_s(debugStr, L"Target Resolution: width=%d, height=%d\n", 
-                  targetRes.width, targetRes.height);
-        OutputDebugStringW(debugStr);
+
+        LOG_INFO("Target resolution: width=%d, height=%d", targetRes.width, targetRes.height);
 
         bool resizeSuccess;
         if (m_isOverlayEnabled && m_overlayWindow) {

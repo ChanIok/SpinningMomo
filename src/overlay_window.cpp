@@ -7,6 +7,7 @@
 #include <winrt/Windows.Foundation.Metadata.h>
 #include <d3dcompiler.h>
 #include <dwmapi.h>
+#include "logger.hpp"
 
 namespace {
     const char* vertexShaderCode = R"(
@@ -69,6 +70,8 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     
     if (!RegisterClassExW(&wc)) {
+        DWORD error = GetLastError();
+        LOG_ERROR("Failed to register overlay window class. Error code: %d", error);
         return false;
     }
 
@@ -88,6 +91,8 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     );
 
     if (!m_hwnd) {
+        DWORD error = GetLastError();
+        LOG_ERROR("Failed to create overlay window. Error code: %d", error);
         return false;
     }
 
@@ -115,17 +120,21 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
         m_cachedGameHeight = height;
     }
 
+    LOG_DEBUG("Game window dimensions: %dx%d", m_cachedGameWidth, m_cachedGameHeight);
+
     double aspectRatio = static_cast<double>(m_cachedGameWidth) / m_cachedGameHeight;
 
     // 如果宽度和高度都小于屏幕尺寸，则不需要启动
     if (m_cachedGameWidth <= m_screenWidth && m_cachedGameHeight <= m_screenHeight) {
+        LOG_DEBUG("Game window fits within screen dimensions, no need for overlay");
         RestoreGameWindow();
         return true;
     }
-
+    
     // 初始化 D3D 资源
     if (!m_d3dInitialized) {
         if (!InitializeD3D()) {
+            LOG_ERROR("Failed to initialize Direct3D resources");
             return false;
         }
         m_d3dInitialized = true;
@@ -140,10 +149,9 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
         m_windowWidth = m_screenWidth;
         m_windowHeight = static_cast<int>(m_screenWidth / aspectRatio);
     }
-    char buffer[256];
-    sprintf_s(buffer, "Resizing swap chain to %dx%d\n", m_windowWidth, m_windowHeight);
-    OutputDebugStringA(buffer);
-    
+
+    LOG_DEBUG("Overlay window dimensions: %dx%d", m_windowWidth, m_windowHeight);
+
     // 启动工作线程
     m_running = true;
     try {
@@ -153,7 +161,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
         return true;
     }
     catch (const std::exception& e) {
-        OutputDebugStringA(("Thread creation failed: " + std::string(e.what()) + "\n").c_str());
+        LOG_ERROR("Thread creation failed: %s", e.what());
         StopCapture();
         return false;
     }
@@ -161,8 +169,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
 
 // 线程处理函数
 void OverlayWindow::CaptureAndRenderThreadProc() {
-    // 初始化 COM
-    OutputDebugStringA("CaptureAndRenderThreadProc: Initializing...\n");
+    LOG_DEBUG("Starting capture and render thread");
     winrt::init_apartment();
 
     // 延迟防止闪烁
@@ -171,7 +178,7 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
     }
     
     if (!ResizeSwapChain()) {
-        OutputDebugStringA("Failed to resize swap chain\n");
+        LOG_ERROR("Failed to resize swap chain");
         return;
     }
     
@@ -179,7 +186,7 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
 
     // 创建捕获资源
     if (!InitializeCapture()) {
-        OutputDebugStringA("Failed to initialize capture\n");
+        LOG_ERROR("Failed to initialize screen capture resources");
         return;
     }
 
@@ -191,7 +198,7 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-    OutputDebugStringA("CaptureAndRenderThreadProc: Exiting...\n");
+    LOG_DEBUG("Exiting capture and render thread");
 }
 
 void OverlayWindow::HookThreadProc() {
@@ -199,7 +206,8 @@ void OverlayWindow::HookThreadProc() {
     m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, 
                                   GetModuleHandle(NULL), 0);
     if (!m_mouseHook) {
-        OutputDebugStringA("Failed to set mouse hook\n");
+        DWORD error = GetLastError();
+        LOG_ERROR("Failed to set mouse hook. Error code: %d", error);
         return;
     }
 
@@ -218,7 +226,8 @@ void OverlayWindow::HookThreadProc() {
     );
 
     if (!m_eventHook) {
-        OutputDebugStringA("Failed to set window event hook\n");
+        DWORD error = GetLastError();
+        LOG_ERROR("Failed to set window event hook. Error code: %d", error);
     }
     
     MSG msg;
@@ -254,7 +263,8 @@ void OverlayWindow::WindowManagerThreadProc() {
     );
 
     if (!timerWindow) {
-        OutputDebugStringA("Failed to create timer window\n");
+        DWORD error = GetLastError();
+        LOG_ERROR("Failed to create timer window. Error code: %d", error);
         return;
     }
 
@@ -338,7 +348,7 @@ void CALLBACK OverlayWindow::WinEventProc(
 
     // 当游戏窗口被激活时，发送消息到窗口管理线程
     if (event == EVENT_SYSTEM_FOREGROUND) {
-        OutputDebugStringA("EVENT_SYSTEM_FOREGROUND\n");
+        LOG_DEBUG("Detected foreground window change. Window handle: 0x%p", hwnd);
         PostMessage(instance->m_timerWindow, WM_GAME_WINDOW_FOREGROUND, 0, 0);
     }
 }
@@ -352,34 +362,33 @@ LRESULT CALLBACK OverlayWindow::MouseHookProc(int code, WPARAM wParam, LPARAM lP
 }
 
 bool OverlayWindow::InitializeCapture() {
+    LOG_DEBUG("Initializing screen capture");
+
     // 创建 DirectX 设备
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
     HRESULT hr = m_device.As(&dxgiDevice);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get IDXGIDevice\n");
+        LOG_ERROR("Failed to get IDXGIDevice, HRESULT: 0x%08X", hr);
         return false;
     }
-    bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
+
     // 设置进程调度优先级
+    bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
     NTSTATUS status = D3DKMTSetProcessSchedulingPriorityClass(
         GetCurrentProcess(),
         hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
     if (status != 0) {
-        char buffer[128];
-        sprintf_s(buffer, "Failed to set process priority class: %d\n", status);
-        OutputDebugStringA(buffer);
+        LOG_ERROR("Failed to set process priority class. Status code: %d", status);
     } else {
-        OutputDebugStringA("Process priority class set successfully\n");
+        LOG_INFO("Process priority class set successfully");
     }
 
     // 设置 GPU 线程优先级
     hr = dxgiDevice->SetGPUThreadPriority(7);
     if (SUCCEEDED(hr)) {
-        OutputDebugStringA("GPU priority setup success\n");
+        LOG_DEBUG("GPU thread priority setup successful");
     } else {
-        char buffer[128];
-        sprintf_s(buffer, "Failed to set GPU priority: 0x%08X\n", hr);
-        OutputDebugStringA(buffer);
+        LOG_ERROR("Failed to set GPU thread priority. HRESULT: 0x%08X", hr);
         // 优先级设置失败不影响主要功能，继续执行
     }
 
@@ -387,12 +396,12 @@ bool OverlayWindow::InitializeCapture() {
     winrt::com_ptr<::IInspectable> inspectable;
     hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), inspectable.put());
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create WinRT device\n");
+        LOG_ERROR("Failed to create WinRT device. HRESULT: 0x%08X", hr);
         return false;
     }
     m_winrtDevice = inspectable.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
     if (!m_winrtDevice) {
-        OutputDebugStringA("Failed to get WinRT device interface\n");
+        LOG_ERROR("Failed to get WinRT device interface");
         return false;
     }
 
@@ -405,7 +414,7 @@ bool OverlayWindow::InitializeCapture() {
         reinterpret_cast<void**>(winrt::put_abi(m_captureItem))
     );
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create capture item\n");
+        LOG_ERROR("Failed to create capture item. HRESULT: 0x%08X", hr);
         return false;
     }
 
@@ -432,6 +441,8 @@ bool OverlayWindow::InitializeCapture() {
         L"IsCursorCaptureEnabled")) 
     {
         m_captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
+    } else {
+        LOG_INFO("Cursor capture setting not available on this Windows version");
     }
     
     // 尝试禁用边框 - 使用ApiInformation检查API是否可用
@@ -441,17 +452,24 @@ bool OverlayWindow::InitializeCapture() {
     {
         // 从 Windows 10 2004 (20H1)版本开始提供
         m_captureSession.IsBorderRequired(false);
+    } else {
+        LOG_INFO("Border requirement setting not available on this Windows version");
     }
 
     try {
         // 开始捕获
         m_captureSession.StartCapture();
     }
-    catch (...) {
-        OutputDebugStringA("Unknown error occurred while starting capture session\n");
+    catch (const winrt::hresult_error& e) {
+        LOG_ERROR("WinRT error occurred while starting capture session: %s", winrt::to_string(e.message()).c_str());
         return false;
     }
-    
+    catch (...) {
+        LOG_ERROR("Unknown error occurred while starting capture session");
+        return false;
+    }
+
+    LOG_DEBUG("Screen capture initialization completed successfully");
     return true;
 }
 
@@ -500,7 +518,7 @@ void OverlayWindow::StopCapture(bool hideWindow) {
         m_frameLatencyWaitableObject = nullptr;
     }
 
-    // 隐藏窗口
+    // 隐藏叠加层，恢复游戏窗口
     if (hideWindow) {
         RestoreGameWindow();
     }
@@ -513,7 +531,7 @@ void OverlayWindow::RestoreGameWindow() {
     SetWindowLongPtr(instance->m_gameWindow, GWL_EXSTYLE, currentExStyle);
     int left = (instance->m_screenWidth - instance->m_cachedGameWidth) / 2;
     int top = (instance->m_screenHeight - instance->m_cachedGameHeight) / 2;
-    SetWindowPos(instance->m_gameWindow, HWND_TOP, left, top, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(instance->m_gameWindow, HWND_TOP, left, top, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOZORDER);
 }
 
 
@@ -539,6 +557,8 @@ void OverlayWindow::Cleanup() {
 }
 
 bool OverlayWindow::InitializeD3D() {
+    LOG_DEBUG("Initializing Direct3D");
+
     // 创建设备和交换链
     UINT createDeviceFlags = 0;
 #ifdef _DEBUG
@@ -562,7 +582,7 @@ bool OverlayWindow::InitializeD3D() {
     );
 
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create D3D11 device\n");
+        LOG_ERROR("Failed to create D3D11 device, HRESULT: 0x%08X", hr);
         return false;
     }
 
@@ -570,14 +590,14 @@ bool OverlayWindow::InitializeD3D() {
     Microsoft::WRL::ComPtr<IDXGIDevice1> dxgiDevice;
     hr = m_device.As(&dxgiDevice);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get DXGI device\n");
+        LOG_ERROR("Failed to get DXGI device, HRESULT: 0x%08X", hr);
         return false;
     }
 
     // 设置最大帧延迟为3
     hr = dxgiDevice->SetMaximumFrameLatency(3);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to set maximum frame latency\n");
+        LOG_ERROR("Failed to set maximum frame latency, HRESULT: 0x%08X", hr);
         return false;
     }
 
@@ -585,7 +605,7 @@ bool OverlayWindow::InitializeD3D() {
     Microsoft::WRL::ComPtr<IDXGIFactory6> factory6;
     hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&factory6));
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create DXGI Factory6\n");
+        LOG_ERROR("Failed to create DXGI Factory6, HRESULT: 0x%08X", hr);
         return false;
     }
 
@@ -597,7 +617,7 @@ bool OverlayWindow::InitializeD3D() {
         IID_PPV_ARGS(&adapter4)
     );
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get high performance adapter\n");
+        LOG_ERROR("Failed to get high performance adapter, HRESULT: 0x%08X", hr);
         return false;
     }
 
@@ -605,9 +625,7 @@ bool OverlayWindow::InitializeD3D() {
     DXGI_ADAPTER_DESC3 desc = {};
     hr = adapter4->GetDesc3(&desc);
     if (SUCCEEDED(hr)) {
-        OutputDebugStringW(L"Using graphics adapter: ");
-        OutputDebugStringW(desc.Description);
-        OutputDebugStringW(L"\n");
+        LOG_INFO("Using graphics adapter: %ls", desc.Description);
     }
     
     BOOL allowTearing = FALSE;
@@ -622,10 +640,12 @@ bool OverlayWindow::InitializeD3D() {
         allowTearing = supportTearing;
         if (supportTearing) {
             tearingFlags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
-            OutputDebugStringA("Variable refresh rate is supported\n");
+            LOG_INFO("Variable refresh rate (VRR) is supported");
         } else {
-            OutputDebugStringA("Variable refresh rate is not supported\n");
+            LOG_INFO("Variable refresh rate (VRR) is not supported");
         }
+    } else {
+        LOG_INFO("Failed to check VRR support");
     }
     
     // 添加帧延迟等待对象标志
@@ -656,42 +676,45 @@ bool OverlayWindow::InitializeD3D() {
     );
 
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create swap chain\n");
+        LOG_ERROR("Failed to create swap chain, HRESULT: 0x%08X", hr);
         return false;
     }
 
     // 获取 IDXGISwapChain4 接口
     hr = swapChain1.As(&m_swapChain);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get IDXGISwapChain4 interface\n");
+        LOG_ERROR("Failed to get IDXGISwapChain4 interface, HRESULT: 0x%08X", hr);
         return false;
     }
 
     // 获取帧延迟等待对象
     m_frameLatencyWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
     if (m_frameLatencyWaitableObject) {
-        OutputDebugStringA("Frame latency waitable object is supported\n");
+        LOG_INFO("Frame latency waitable object is supported");
+    } else {
+        LOG_INFO("Frame latency waitable object is not supported");
     }
 
     // 禁用Alt+Enter全屏切换
     factory6->MakeWindowAssociation(m_hwnd, DXGI_MWA_NO_ALT_ENTER);
 
     if (!CreateRenderTarget()) {
-        OutputDebugStringA("Failed to create render target\n");
+        LOG_ERROR("Failed to create render target");
         return false;
     }
 
     if (!CreateShaderResources()) {
-        OutputDebugStringA("Failed to create shader resources\n");
+        LOG_ERROR("Failed to create shader resources");
         return false;
     }
 
+    LOG_DEBUG("Direct3D initialization completed successfully");
     return true;
 }
 
 bool OverlayWindow::ResizeSwapChain() {
     if (!m_swapChain) {
-        OutputDebugStringA("Swap chain not initialized\n");
+        LOG_ERROR("Swap chain not initialized");
         return false;
     }
 
@@ -704,7 +727,7 @@ bool OverlayWindow::ResizeSwapChain() {
     DXGI_SWAP_CHAIN_DESC1 desc = {};
     HRESULT hr = m_swapChain->GetDesc1(&desc);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to get swap chain description\n");
+        LOG_ERROR("Failed to get swap chain description, HRESULT: 0x%08X", hr);
         return false;
     }
 
@@ -718,17 +741,17 @@ bool OverlayWindow::ResizeSwapChain() {
     );
 
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to resize swap chain buffers\n");
+        LOG_ERROR("Failed to resize swap chain buffers, HRESULT: 0x%08X", hr);
         return false;
     }
 
     // 重新创建渲染目标
     if (!CreateRenderTarget()) {
-        OutputDebugStringA("Failed to recreate render target after resize\n");
+        LOG_ERROR("Failed to recreate render target after resize");
         return false;
     }
 
-    OutputDebugStringA("Swap chain resized successfully\n");
+    LOG_DEBUG("Swap chain resized successfully");
     return true;
 }
 
@@ -736,11 +759,17 @@ bool OverlayWindow::CreateRenderTarget() {
     // 获取后缓冲
     Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
     HRESULT hr = m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to get back buffer, HRESULT: 0x%08X", hr);
+        return false;
+    }
 
     // 创建渲染目标视图
     hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, &m_renderTarget);
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to create render target view, HRESULT: 0x%08X", hr);
+        return false;
+    }
 
     return true;
 }
@@ -751,26 +780,39 @@ bool OverlayWindow::CreateShaderResources() {
     HRESULT hr = D3DCompile(vertexShaderCode, strlen(vertexShaderCode), nullptr, nullptr, nullptr,
         "main", "vs_4_0", 0, 0, &vsBlob, &errorBlob);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to compile vertex shader\n");
+        std::string errorMsg = "Failed to compile vertex shader";
+        if (errorBlob) {
+            errorMsg += ": ";
+            errorMsg += static_cast<char*>(errorBlob->GetBufferPointer());
+        }
+        LOG_ERROR("%s", errorMsg.c_str());
         return false;
     }
 
     hr = D3DCompile(pixelShaderCode, strlen(pixelShaderCode), nullptr, nullptr, nullptr,
         "main", "ps_4_0", 0, 0, &psBlob, &errorBlob);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to compile pixel shader\n");
+        std::string errorMsg = "Failed to compile pixel shader";
+        if (errorBlob) {
+            errorMsg += ": ";
+            errorMsg += static_cast<char*>(errorBlob->GetBufferPointer());
+        }
+        LOG_ERROR("%s", errorMsg.c_str());
         return false;
     }
 
     // 创建着色器
     hr = m_device->CreateVertexShader(vsBlob->GetBufferPointer(), vsBlob->GetBufferSize(), nullptr, &m_vertexShader);
     if (FAILED(hr)) {
-        OutputDebugStringA("Failed to create vertex shader\n");
+        LOG_ERROR("Failed to create vertex shader, HRESULT: 0x%08X", hr);
         return false;
     }
 
     hr = m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, &m_pixelShader);
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to create pixel shader, HRESULT: 0x%08X", hr);
+        return false;
+    }
 
     // 创建输入布局
     D3D11_INPUT_ELEMENT_DESC layout[] = {
@@ -780,8 +822,10 @@ bool OverlayWindow::CreateShaderResources() {
     
     hr = m_device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
         vsBlob->GetBufferSize(), &m_inputLayout);
-    if (FAILED(hr)) return false;
-
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to create input layout, HRESULT: 0x%08X", hr);
+        return false;
+    }
     // 创建顶点缓冲
     Vertex vertices[] = {
         { -1.0f,  1.0f, 0.0f, 0.0f },
@@ -799,7 +843,10 @@ bool OverlayWindow::CreateShaderResources() {
     initData.pSysMem = vertices;
 
     hr = m_device->CreateBuffer(&bd, &initData, &m_vertexBuffer);
-    if (FAILED(hr)) return false;
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to create vertex buffer, HRESULT: 0x%08X", hr);
+        return false;
+    }
 
     // 创建采样器状态
     D3D11_SAMPLER_DESC samplerDesc = {};
@@ -812,8 +859,12 @@ bool OverlayWindow::CreateShaderResources() {
     samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
     hr = m_device->CreateSamplerState(&samplerDesc, &m_sampler);
-    if (FAILED(hr)) return false;
-    OutputDebugStringA("CreateSamplerState!\n");
+
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to create sampler state, HRESULT: 0x%08X", hr);
+        return false;
+    }
+
     // 创建混合状态
     D3D11_BLEND_DESC blendDesc = {};
     blendDesc.RenderTarget[0].BlendEnable = TRUE;
@@ -826,7 +877,11 @@ bool OverlayWindow::CreateShaderResources() {
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     hr = m_device->CreateBlendState(&blendDesc, &m_blendState);
-    if (FAILED(hr)) return false;
+    
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to create blend state, HRESULT: 0x%08X", hr);
+        return false;
+    }
 
     return true;
 }
