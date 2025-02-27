@@ -118,6 +118,48 @@ Notes:
 - ❗ Can only adjust ratio, resolution based on game's 4K setting
 - ❗ In fullscreen window mode, output limited by monitor's native ratio
 
+### 4️⃣ Optional Features
+
+<div align="center">
+  <table>
+    <tr>
+      <th align="center">🔍 Preview Window</th>
+      <th align="center">📺 Overlay Window</th>
+    </tr>
+    <tr>
+      <td>
+        <b>Function Description</b><br/>
+        ▫️ Similar to Photoshop's navigator feature<br/>
+        ▫️ Provides real-time preview when window exceeds screen
+      </td>
+      <td>
+        <b>Function Description</b><br/>
+        ▫️ Captures target window and renders it to a fullscreen overlay<br/>
+        ▫️ Consumes slightly more CPU resources than Preview Window
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <b>Use Cases</b><br/>
+        ✨ Viewing details when shooting at high resolution<br/>
+        ✨ Helps positioning when window exceeds screen
+      </td>
+      <td>
+        <b>Use Cases</b><br/>
+        ✨ Provides seamless zooming experience<br/>
+        ✨ Maintains good interaction even at ultra-high resolutions
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" align="center">
+        <b>💡 Performance Note</b><br/>
+        Thanks to efficient capture methods, these features cause almost no noticeable performance drop.<br/>
+        However, if your high resolution setting is already causing significant slowdown, consider disabling these features.
+      </td>
+    </tr>
+  </table>
+</div>
+
 ### Resolution Explanation
 - Resolution calculation process:
   1. First determine total pixel count based on selected resolution preset (e.g., 4K, 8K)
@@ -133,15 +175,16 @@ Right-click or left-click the tray icon to:
 - 🎯 **Select Window**: Choose the target window from the submenu
 - 📐 **Window Ratio**: Select from preset ratios or custom ratios 
 - 📏 **Resolution**: Select from preset resolutions or custom resolutions
-- 📍 **Screenshot**: Save lossless screenshots to the ScreenShot folder in program directory
+- 📍 **Screenshot**: Save lossless screenshots to the ScreenShot folder in program directory (mainly for debugging or games without screenshot support)
 - 📂 **Open Screenshot Folder**: Open the game screenshot directory
 - 🔽 **Hide Taskbar**: Hide the taskbar to prevent overlap
 - ⬇️ **Lower Taskbar When Resizing**: Lower taskbar when resizing window
 - ⌨️ **Modify Hotkey**: Set a new shortcut combination
-- 🔍 **Preview Window**: Similar to Photoshop's navigator
+- 🔍 **Preview Window**: Similar to Photoshop's navigator for real-time preview when window exceeds screen
   - Support dragging window top area to move position
   - Mouse wheel to zoom window size
-- 📱 **Floating Mode**: Toggle floating menu visibility
+- 🖼️ **Overlay Window**: Render the target window on a fullscreen overlay for seamless zooming experience
+- 📱 **Floating Window Mode**: Toggle floating menu visibility (enabled by default, use hotkey to open menu when disabled)
 - 🌐 **Language**: Switch language
 - ⚙️ **Open Config**: Customize ratios and resolutions
 - ❌ **Exit**: Close the program
@@ -149,28 +192,19 @@ Right-click or left-click the tray icon to:
 ### Custom Settings
 
 1. Right-click tray icon, select "Open Config File"
-2. Add in config file:
-   - Custom ratios: Add `16:10,17:10` after RatioList in [CustomRatio] section
-     - Use colon (`:`) for width:height, comma (`,`) to separate multiple ratios
-   - Custom resolutions: Add `6000x4000,7680x4320` after ResolutionList in [CustomResolution] section
-     - Use letter `x` to connect width and height, comma (`,`) to separate multiple resolutions
-3. Save and restart software to apply changes
-
-### Preset Options
-
-- **Ratios**: 32:9, 21:9, 16:9, 3:2, 1:1, 2:3, 9:16
-- **Resolutions**:
-  - 4K (3840×2160, about 8.3M pixels)
-  - 6K (5760×3240, about 18.7M pixels)
-  - 8K (7680×4320, about 33.2M pixels)
-  - 12K (11520×6480, about 74.6M pixels)
+2. In the config file, you can customize the following:
+   - **Custom ratios:** Add or modify in the `AspectRatioItems` entry under the `[Menu]` section, using comma-separated format, for example: `32:9,21:9,16:9,3:2,1:1,2:3,9:16,16:10`
+   - **Custom resolutions:** Add or modify in the `ResolutionItems` entry under the `[Menu]` section, using comma-separated format, for example: `Default,4K,6K,8K,12K,5120x2880`
+3. Resolution format guide:
+   - Supports common identifiers: `480P`, `720P`, `1080P`, `2K`, `4K`, `6K`, `8K`, etc.
+   - Custom format: `width x height`, for example `5120x2880`
+4. Save and restart software to apply changes
 
 ### Notes
 
 - System Requirements: Windows 10 or above
 - [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
   - Install this runtime if you encounter missing DLL errors
-- Due to Windows limitations, when using "Window Mode" and the window size needs to exceed the screen range, the program will automatically switch to borderless style, which can be restored through game settings
 - Higher resolutions may affect game performance, please adjust according to your device capabilities
 - It's recommended to test quality comparison before shooting to choose the most suitable settings
 

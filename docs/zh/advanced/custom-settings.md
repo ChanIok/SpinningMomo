@@ -49,48 +49,57 @@ Key=82
 
 ### 📐 自定义比例
 
-```ini
-[CustomRatio]
-# 用逗号分隔多个比例，比例用冒号连接
-# 例如：16:10,17:10,1.618:1
-RatioList=
-```
-
 格式说明：
 - 用冒号(`:`)连接宽高比
 - 用逗号(`,`)分隔多个比例
 - 比例值可以是整数或小数
+- 支持默认预设或自定义比例
 
 示例：
 ```ini
-# 单个比例
-RatioList=16:10
+# 使用默认预设并添加新的比例
+AspectRatioItems=32:9,21:9,16:9,3:2,1:1,2:3,9:16,16:10
 
-# 多个比例
-RatioList=16:10,17:10,18:10
+# 完全自定义比例列表
+AspectRatioItems=16:9,16:10,1.618:1,1:1
 ```
 
 ### 📏 自定义分辨率
 
-```ini
-[CustomResolution]
-# 用逗号分隔多个分辨率，宽高用x连接
-# 例如：6000x4000,7680x4320
-ResolutionList=
-```
-
 格式说明：
-- 用字母x或X连接宽高
+- 支持常见标识符：`Default`, `4K`, `6K`, `8K`, `12K`
+- 自定义格式：用字母`x`连接宽高，例如`5120x2880`
 - 用逗号(`,`)分隔多个分辨率
 - 分辨率必须是整数
 
 示例：
 ```ini
-# 单个分辨率
-ResolutionList=5120x2880
+# 使用默认预设并添加自定义分辨率
+ResolutionItems=Default,4K,6K,8K,12K,5120x2880
 
-# 多个分辨率
-ResolutionList=5120x2880,6000x4000,7680x4320
+# 添加常见分辨率标识符
+ResolutionItems=Default,480P,720P,1080P,2K,4K,8K
+```
+
+### 📋 自定义浮窗菜单项
+
+格式说明：
+- 用逗号(`,`)分隔多个菜单项
+- 可用项包括：
+  - `CaptureWindow`: 截图
+  - `OpenScreenshot`: 打开相册
+  - `PreviewWindow`: 预览窗
+  - `OverlayWindow`: 叠加层
+  - `Reset`: 重置窗口
+  - `Close`: 关闭菜单
+
+示例：
+```ini
+# 简化菜单（只保留常用选项）
+MenuItems=PreviewWindow,OverlayWindow,Reset,Close
+
+# 完整菜单
+MenuItems=CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,Reset,Close
 ```
 
 ### 📸 相册目录设置

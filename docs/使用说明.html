@@ -378,6 +378,51 @@
         </tr>
     </table>
 
+    <h3>4️⃣ 可选功能</h3>
+
+    <table class="mode-table">
+        <tr>
+            <th>🔍 预览窗</th>
+            <th>🖼️ 叠加层</th>
+        </tr>
+        <tr>
+            <td>
+                <h5>功能说明：</h5>
+                <ul>
+                    <li>类似 Photoshop 的导航器功能</li>
+                    <li>在窗口溢出屏幕时提供实时预览</li>
+                </ul>
+                <h5>使用场景：</h5>
+                <ul>
+                    <li>✨ 高分辨率拍摄时查看放大后的细节</li>
+                    <li>✨ 窗口溢出屏幕时辅助定位</li>
+                </ul>
+            </td>
+            <td>
+                <h5>功能说明：</h5>
+                <ul>
+                    <li>类似 Magpie 的反向缩小版</li>
+                    <li>将目标窗口捕获并渲染到全屏叠加层上</li>
+                    <li>⚠️ 比预览窗额外消耗一些CPU资源</li>
+                </ul>
+                <h5>使用场景：</h5>
+                <ul>
+                    <li>✨ 提供无感知放大的操作体验</li>
+                    <li>✨ 在超大分辨率下依然保持良好交互</li>
+                </ul>
+            </td>
+        </tr>
+        <tr>
+            <td colspan="2">
+                <div class="warning" style="text-align: center; background-color: #fdf6ec; border: 1px solid #faecd8; padding: 1rem; border-radius: 4px;">
+                    <strong style="color: #e6a23c;">💡 性能说明</strong>
+                    <p>得益于高效的捕获方式，这两种功能几乎不会造成明显的性能下降。<br/>
+                    但如果你选择的高分辨率已经让电脑卡成PPT了，建议暂时不要开启这些功能。</p>
+                </div>
+            </td>
+        </tr>
+    </table>
+
     <style>
     .mode-table {
         width: 100%;
@@ -437,12 +482,13 @@
         <li>📂 打开相册：打开游戏相册目录，用于查看和打开游戏截图</li>
         <li>🔽 隐藏任务栏：隐藏任务栏，用于防止任务栏遮挡</li>
         <li>⬇️ 调整时置底任务栏：调整窗口时将任务栏置底，用于防止任务栏遮挡</li>
-        <li>⌨️ 修改热键：设置新的快捷键组合（按下新组合后可能有 5 秒延迟才会显示设置成功提示）</li>
-        <li>🔍 预览窗口：类似 Photoshop 的导航器，在窗口溢出屏幕时提供实时预览和导航功能（可选功能）
+        <li>🔍 预览窗：类似 Photoshop 的导航器，在窗口溢出屏幕时提供实时预览和导航功能（可选功能）
             <ul>
                 <li>支持拖拽窗口顶部区域移动位置，滚轮缩放窗口大小</li>
             </ul>
         </li>
+        <li>🖼️ 叠加层：将目标窗口渲染到全屏叠加层上，提供无感知放大的操作体验（可选功能）</li>
+        <li>⌨️ 修改热键：设置新的快捷键组合</li>
         <li>📱 浮窗模式：默认开启，可以在此开启/关闭浮动菜单。关闭后可使用热键（默认 Ctrl+Alt+R）打开调整菜单</li>
         <li>🌐 语言：切换语言</li>
         <li>⚙️ 打开配置文件：自定义比例和分辨率</li>
@@ -453,31 +499,20 @@
     <div class="steps">
         <ol>
             <li>右键托盘图标，选择"打开配置文件"</li>
-            <li>在配置文件中添加：
+            <li>在配置文件中，您可以自定义以下内容：
                 <ul>
-                    <li>自定义比例：<code>[CustomRatio]</code> 节的 <code>RatioList</code> 后添加 <code>"16:10,17:10"</code></li>
-                    <li>自定义分辨率：<code>[CustomResolution]</code> 节的 <code>ResolutionList</code> 后添加 <code>"6000x4000,7680x4320"</code></li>
+                    <li><strong>自定义比例：</strong> 在 <code>[Menu]</code> 节的 <code>AspectRatioItems</code> 项中添加或修改，格式为逗号分隔的列表，例如：<code>32:9,21:9,16:9,3:2,1:1,2:3,9:16,16:10</code></li>
+                    <li><strong>自定义分辨率：</strong> 在 <code>[Menu]</code> 节的 <code>ResolutionItems</code> 项中添加或修改，格式为逗号分隔的列表，例如：<code>Default,4K,6K,8K,12K,5120x2880</code></li>
+                </ul>
+            </li>
+            <li>分辨率格式说明：
+                <ul>
+                    <li>支持常见标识符：<code>480P</code>, <code>720P</code>, <code>1080P</code>, <code>2K</code>, <code>4K</code>, <code>6K</code>, <code>8K</code> 等</li>
+                    <li>自定义格式：<code>宽度x高度</code>，例如 <code>5120x2880</code></li>
                 </ul>
             </li>
             <li>保存并重启软件后生效</li>
         </ol>
-    </div>
-
-    <h2>📋 预设选项</h2>
-    <div class="feature-grid">
-        <div class="feature-item">
-            <h3>比例预设</h3>
-            <p>32:9, 21:9, 16:9, 3:2, 1:1, 2:3, 9:16</p>
-        </div>
-        <div class="feature-item">
-            <h3>分辨率预设</h3>
-            <ul>
-                <li>4K (3840×2160, 约 830 万像素)</li>
-                <li>6K (5760×3240, 约 1870 万像素)</li>
-                <li>8K (7680×4320, 约 3320 万像素)</li>
-                <li>12K (11520×6480, 约 7460 万像素)</li>
-            </ul>
-        </div>
     </div>
 
     <h2>⚠️ 注意事项</h2>
@@ -489,7 +524,6 @@
                     <li>如果运行时提示缺少 DLL，请安装此运行库</li>
                 </ul>
             </li>
-            <li>由于 Windows 限制，当使用"窗口模式"且需要超出屏幕范围时，程序会自动切换为无边框样式，可通过游戏内设置或Alt+Enter恢复</li>
             <li>较高的分辨率可能会影响游戏性能，请根据设备性能适当调整</li>
             <li>建议在拍摄前先进行画质对比测试，选择最适合的设置</li>
         </ul>

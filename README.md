@@ -127,6 +127,49 @@
   </table>
 </div>
 
+### 4️⃣ 可选功能
+
+<div align="center">
+  <table>
+    <tr>
+      <th align="center"> 🔍 预览窗</th>
+      <th align="center"> 📺 叠加层</th>
+    </tr>
+    <tr>
+      <td>
+        <b>功能说明</b><br/>
+        ▫️ 类似 Photoshop 的导航器功能<br/>
+        ▫️ 在窗口溢出屏幕时提供实时预览
+      </td>
+      <td>
+        <b>功能说明</b><br/>
+        ▫️ 类似 Magpie 的反向缩小版<br/>
+        ▫️ 将目标窗口捕获并渲染到全屏叠加层上<br/>
+        ▫️ 比预览窗额外消耗一些CPU资源
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <b>使用场景</b><br/>
+        ✨ 高分辨率拍摄时查看放大后的细节<br/>
+        ✨ 窗口溢出屏幕时辅助定位
+      </td>
+      <td>
+        <b>使用场景</b><br/>
+        ✨ 提供无感知放大的操作体验<br/>
+        ✨ 在超大分辨率下依然保持良好交互
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" align="center">
+        <b>💡 性能说明</b><br/>
+        得益于高效的捕获方式，这两种功能几乎不会造成明显的性能下降。<br/>
+        但如果你选择的高分辨率已经让电脑卡成PPT了，建议暂时不要开启这些功能。
+      </td>
+    </tr>
+  </table>
+</div>
+
 ### 📥 下载地址
 
 - **GitHub Release**：[点击下载最新版本](https://github.com/ChanIok/SpinningMomo/releases/latest)
@@ -152,11 +195,9 @@
 
 ## ❤️ 致谢
 
-- 99.9% 的代码由 Cursor AI 编写（不愧是你）
+- 99.9% 的代码由 Claude 3.5 Sonnet 和 Claude 3.7 Sonnet 编写（不愧是你们）
 - 剩下的 0.1% 代码也是在 AI 的指导下完成的
 - 项目所有者只是个调试工程师和项目经理 😂
-- 感谢 Cursor AI 的强大能力，让这个项目能够不断进化和改进
-  - 上面这句话是 AI 写的，我可没说过
 
 ## 📄 开源协议
 
@@ -166,7 +207,7 @@
 <details>
 <summary><h3>折腾的经历</h3></summary>
 
-> _以下是 Cursor AI 生成的历史_
+> _以下是 Claude AI 生成的历史_
 
 ### v0.1.0 - 投屏大法好？
 
@@ -206,5 +247,12 @@
 于是我们又双叒叕用 DirectX 11 手搓了一个预览窗口...  
 拖拽、缩放、实时预览，完美复刻了 PS 的导航器！  
 [查看代码](https://github.com/ChanIok/SpinningMomo/tree/v0.6.0)
+
+### v0.7.0 - 真·大喵视野
+
+"猫咪视野可是 200°，我们的大喵凭什么只能看到一小部分？"  
+是叠加层魔法！让大喵毫不费力地跨越了显示器的边界线...  
+虽然CPU占用率曲线画出了猫抓板图案，但这就是突破次元壁的代价！  
+[查看代码](https://github.com/ChanIok/SpinningMomo/tree/v0.7.0)
 
 </details>
