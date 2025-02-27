@@ -192,10 +192,10 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
                 m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_SCREENSHOT) {
                 m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_PREVIEW) {
+                m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_OVERLAY) {
                 m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});
-            } else if (itemType == Constants::MENU_ITEM_TYPE_PREVIEW) {
-                m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_RESET) {
                 m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_CLOSE) {
@@ -206,8 +206,8 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
         // 如果配置为空，则使用默认顺序添加所有菜单项
         m_items.push_back({strings.CAPTURE_WINDOW, ItemType::CaptureWindow, 0});
         m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});
+        m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, 0});
         m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});
-        m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, m_previewEnabled ? 1 : 0});
         m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
         m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
     }
@@ -571,8 +571,8 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
             const auto& item = m_items[i];
             if (item.type == ItemType::CaptureWindow ||
                 item.type == ItemType::OpenScreenshot ||
-                item.type == ItemType::OverlayWindow ||
                 item.type == ItemType::PreviewWindow ||
+                item.type == ItemType::OverlayWindow ||
                 item.type == ItemType::Reset ||
                 item.type == ItemType::Close) {
                 if (y >= settingsY && y < settingsY + m_itemHeight) {

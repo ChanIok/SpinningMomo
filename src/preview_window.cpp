@@ -129,9 +129,6 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
                     SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     }
 
-    // 停止现有的捕获
-    StopCapture();
-
     // 创建 DirectX 设备
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
     HRESULT hr = m_device.As(&dxgiDevice);

@@ -163,6 +163,7 @@ struct LocalizedStrings {
     std::wstring USER_GUIDE;
     std::wstring FEATURE_NOT_SUPPORTED;
     std::wstring OVERLAY_WINDOW;
+    std::wstring FEATURE_CONFLICT;
 };
 
 // 中文字符串

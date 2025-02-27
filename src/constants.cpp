@@ -37,11 +37,12 @@ const LocalizedStrings ZH_CN = {
     TEXT("关闭浮窗"),
     TEXT("截图"),
     TEXT("截图成功，已保存至: "),
-    TEXT("预览窗口"),
+    TEXT("预览窗"),
     TEXT("打开相册"),
     TEXT("使用指南"),
     TEXT("此功能需要 Windows 10 1803 或更高版本，已自动禁用。"),
-    TEXT("叠加层模式"),
+    TEXT("叠加层"),
+    TEXT("预览窗和叠加层功能冲突，已自动关闭另一功能"),
 };
 
 // 英文字符串
@@ -85,5 +86,6 @@ const LocalizedStrings EN_US = {
     TEXT("Open Screenshot Folder"),
     TEXT("User Guide"),
     TEXT("This feature requires Windows 10 1803 or higher and has been disabled."),
-    TEXT("Overlay Mode"),
+    TEXT("Overlay Window"),
+    TEXT("Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled."),
 }; 

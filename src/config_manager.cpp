@@ -28,7 +28,7 @@ void ConfigManager::Initialize() {
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
         WritePrivateProfileString(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, TEXT(""), m_configPath.c_str());
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_ITEMS, 
-                                TEXT("CaptureWindow,OpenScreenshot,OverlayWindow,PreviewWindow,Reset,Close"), 
+                                TEXT("CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,Reset,Close"), 
                                 m_configPath.c_str());
         
         // 添加默认的宽高比和分辨率配置

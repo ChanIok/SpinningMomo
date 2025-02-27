@@ -159,15 +159,13 @@ public:
         if (m_isOverlayEnabled && m_overlayWindow) {
             m_overlayWindow->StopCapture(false);
         }
+        if (m_isPreviewEnabled && m_previewWindow) {
+            m_previewWindow->StopCapture();
+        }
     
         int width = 0, height = 0;
         if (ApplyWindowTransform(gameWindow, width, height)) {
-            if (m_isPreviewEnabled && m_previewWindow) {
-                m_previewWindow->StartCapture(gameWindow, width, height);
-            }
-            if (m_isOverlayEnabled && m_overlayWindow) {
-                m_overlayWindow->StartCapture(gameWindow, width, height);
-            }
+            StartWindowCapture(gameWindow, width, height);
         }
     }
 
@@ -194,16 +192,14 @@ public:
         if (m_isOverlayEnabled && m_overlayWindow) {
             m_overlayWindow->StopCapture(false);
         }
+        if (m_isPreviewEnabled && m_previewWindow) {
+            m_previewWindow->StopCapture();
+        }
     
         // 应用新分辨率
         int width = 0, height = 0;
         if (ApplyWindowTransform(gameWindow, width, height)) {
-            if (m_isPreviewEnabled && m_previewWindow) {
-                m_previewWindow->StartCapture(gameWindow, width, height);
-            }
-            if (m_isOverlayEnabled && m_overlayWindow) {
-                m_overlayWindow->StartCapture(gameWindow, width, height);
-            }
+            StartWindowCapture(gameWindow, width, height);
         }
     }
     
@@ -329,7 +325,17 @@ public:
                 m_strings.FEATURE_NOT_SUPPORTED.c_str());
             return;
         }
-    
+
+        // 先关闭叠加层
+        if (!m_isPreviewEnabled && m_isOverlayEnabled) {
+            m_isOverlayEnabled = false;
+            m_overlayWindow->StopCapture();
+            if (m_menuWindow) {
+                m_menuWindow->SetOverlayEnabled(false);
+            }
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.FEATURE_CONFLICT.c_str());
+        }
+
         m_isPreviewEnabled = !m_isPreviewEnabled;
         
         if (m_isPreviewEnabled) {
@@ -352,7 +358,17 @@ public:
                 m_strings.FEATURE_NOT_SUPPORTED.c_str());
             return;
         }
-        
+
+        // 如果现在要启用叠加层，但预览窗口已启用，先关闭预览窗口
+        if (!m_isOverlayEnabled && m_isPreviewEnabled) {
+            m_isPreviewEnabled = false;
+            m_previewWindow->StopCapture();
+            if (m_menuWindow) {
+                m_menuWindow->SetPreviewEnabled(false);
+            }
+            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.FEATURE_CONFLICT.c_str());
+        }
+
         m_isOverlayEnabled = !m_isOverlayEnabled;
         
         if (m_isOverlayEnabled) {
@@ -408,12 +424,7 @@ public:
         }
         int width = 0, height = 0;
         if (ApplyWindowTransform(gameWindow, width, height)) {
-            if (m_isPreviewEnabled && m_previewWindow) {
-                m_previewWindow->StartCapture(gameWindow, width, height);
-            }
-            if (m_isOverlayEnabled && m_overlayWindow) {
-                m_overlayWindow->StartCapture(gameWindow, width, height);
-            }
+            StartWindowCapture(gameWindow, width, height);
         }
     } 
 
@@ -882,6 +893,29 @@ private:
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
             return false;
         }
+    }
+
+    // 启动窗口捕获，确保互斥性
+    bool StartWindowCapture(HWND gameWindow, int width, int height) {
+        bool success = true;
+    
+        if (m_isPreviewEnabled && m_previewWindow) {
+            if (width > 0 && height > 0) {
+                success = m_previewWindow->StartCapture(gameWindow, width, height);
+            } else {
+                success = m_previewWindow->StartCapture(gameWindow);
+            }
+        }
+        
+        if (m_isOverlayEnabled && m_overlayWindow) {
+            if (width > 0 && height > 0) {
+                success = success && m_overlayWindow->StartCapture(gameWindow, width, height);
+            } else {
+                success = success && m_overlayWindow->StartCapture(gameWindow);
+            }
+        }
+        
+        return success;
     }
 
 };
