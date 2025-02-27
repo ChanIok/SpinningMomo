@@ -8,15 +8,16 @@ ConfigManager::ConfigManager() {
 
 void ConfigManager::Initialize() {
     // 获取程序所在目录
-    TCHAR exePath[MAX_PATH];
-    GetModuleFileName(NULL, exePath, MAX_PATH);
-    
-    // 获取程序所在目录
-    m_configPath = exePath;
-    size_t lastSlash = m_configPath.find_last_of(TEXT("\\"));
-    if (lastSlash != std::wstring::npos) {
-        m_configPath = m_configPath.substr(0, lastSlash + 1);
+    wchar_t exePath[MAX_PATH] = { 0 };
+    if (GetModuleFileNameW(NULL, exePath, MAX_PATH) == 0) {
+        // 获取失败，使用当前目录
+        m_configPath = L".\\";
+    } else {
+        // 提取目录部分
+        PathRemoveFileSpecW(exePath);
+        m_configPath = std::wstring(exePath) + L"\\";
     }
+    
     m_configPath += Constants::CONFIG_FILE;
 
     // 检查配置文件是否存在

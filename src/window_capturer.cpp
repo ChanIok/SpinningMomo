@@ -1,10 +1,12 @@
 #include "window_capturer.hpp"
 #include "window_utils.hpp"
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
+#include <winrt/Windows.Foundation.Metadata.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 #include <Windows.Graphics.DirectX.Direct3D11.interop.h>
 #include <queue>
 #include <mutex>
+#include "logger.hpp"
 
 using namespace winrt::Windows::Graphics::Capture;
 using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
@@ -90,7 +92,7 @@ bool WindowCapturer::CreateCaptureSession() {
     m_framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
         WindowUtils::GetWinRTDevice(),
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-        2,  // 使用2个缓冲区
+        1,
         { windowRect.right - windowRect.left, windowRect.bottom - windowRect.top }
     );
     if (!m_framePool) return false;
@@ -114,18 +116,22 @@ bool WindowCapturer::CreateCaptureSession() {
     m_captureSession = m_framePool.CreateCaptureSession(m_captureItem);
     if (!m_captureSession) return false;
 
-    // 禁用光标捕获
-    m_captureSession.IsCursorCaptureEnabled(false);
-
-    // 尝试禁用边框
-    try {
-        auto session3 = m_captureSession.try_as<winrt::Windows::Graphics::Capture::IGraphicsCaptureSession3>();
-        if (session3) {
-            session3.IsBorderRequired(false);
-        }
+    if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsCursorCaptureEnabled")) 
+    {
+        m_captureSession.IsCursorCaptureEnabled(false);
+    } else {
+        LOG_INFO("Cursor capture setting not available on this Windows version");
     }
-    catch (...) {
-        // 忽略错误
+    
+    if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsBorderRequired")) 
+    {
+        m_captureSession.IsBorderRequired(false);
+    } else {
+        LOG_INFO("Border requirement setting not available on this Windows version");
     }
 
     return true;

@@ -23,9 +23,6 @@ class SpinningMomoApp {
 public:
     SpinningMomoApp() = default;
     ~SpinningMomoApp() {
-        if (m_configManager) {
-            m_configManager->SaveAllConfigs();
-        }
         UnregisterHotKey(m_hwnd, 1);
     }
 
@@ -292,6 +289,8 @@ public:
                 if (!albumPath.empty()) {
                     m_configManager->SetGameAlbumPath(albumPath);
                     m_configManager->SaveGameAlbumConfig();
+                } else {
+                    albumPath = WindowUtils::GetScreenshotPath();
                 }
             }
         }
@@ -615,14 +614,14 @@ public:
                 if (app) {
                     if (lParam == WM_LBUTTONDBLCLK) {
                         app->HandleTrayIconDblClick();
-                        app->m_lastTrayClickTime = GetTickCount();
+                        app->m_lastTrayClickTime = GetTickCount64();
                     } else if (lParam == WM_LBUTTONUP) {
                         // 获取当前时间
-                        DWORD currentTime = GetTickCount();
+                        ULONGLONG currentTime = GetTickCount64();
                         // 获取系统双击时间
                         int doubleClickTime = GetDoubleClickTime();
                         // 如果与上次点击时间间隔大于双击时间，才处理单击
-                        if (currentTime - app->m_lastTrayClickTime > (DWORD)doubleClickTime) {
+                        if (currentTime - app->m_lastTrayClickTime > (ULONGLONG)doubleClickTime) {
                             app->ShowWindowSelectionMenu();
                         }
                         app->m_lastTrayClickTime = currentTime;
@@ -738,7 +737,7 @@ private:
     std::wstring m_language;
 
     // 记录最后一次托盘图标点击时间
-    DWORD m_lastTrayClickTime = 0;
+    ULONGLONG m_lastTrayClickTime = 0;
 
     // 待显示通知队列
     struct PendingNotification {

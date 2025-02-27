@@ -317,9 +317,6 @@ void TrayIcon::AddSettingsItems(
               
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
-    // 热键设置
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, strings.MODIFY_HOTKEY.c_str());
-
     // 预览窗口选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (previewEnabled ? MF_CHECKED : 0),
               Constants::ID_PREVIEW_WINDOW, strings.PREVIEW_WINDOW.c_str());
@@ -327,6 +324,11 @@ void TrayIcon::AddSettingsItems(
     // 叠加层窗口选项    
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (overlayEnabled ? MF_CHECKED : 0),
               Constants::ID_OVERLAY_WINDOW, strings.OVERLAY_WINDOW.c_str());
+
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+
+    // 热键设置
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_HOTKEY, strings.MODIFY_HOTKEY.c_str());
 
     // 浮窗模式选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (useFloatingWindow ? MF_CHECKED : 0),

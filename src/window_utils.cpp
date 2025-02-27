@@ -401,12 +401,12 @@ WindowUtils::Resolution WindowUtils::CalculateResolutionByScreen(double targetRa
 std::wstring WindowUtils::GetScreenshotPath() {
     const wchar_t* SCREENSHOT_DIR = L"ScreenShot";
     
-    // 首选：程序所在目录
-    wchar_t exePath[MAX_PATH];
+    // 获取程序所在目录
+    wchar_t exePath[MAX_PATH] = { 0 };
     if (GetModuleFileNameW(NULL, exePath, MAX_PATH) != 0) {
-        std::wstring fullPath(exePath);
-        std::wstring exeDir = fullPath.substr(0, fullPath.find_last_of(L"\\/"));
-        std::wstring primaryPath = exeDir + L"\\" + SCREENSHOT_DIR;
+        // 提取目录部分
+        PathRemoveFileSpecW(exePath);
+        std::wstring primaryPath = std::wstring(exePath) + L"\\" + SCREENSHOT_DIR;
         
         // 尝试在程序目录创建文件夹
         if (CreateDirectoryW(primaryPath.c_str(), NULL) || 

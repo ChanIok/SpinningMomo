@@ -36,14 +36,17 @@ bool Logger::Initialize() {
         return true;
     }
     
-    // 获取程序运行的当前目录
-    wchar_t currentDir[MAX_PATH] = { 0 };
-    if (GetCurrentDirectoryW(MAX_PATH, currentDir) == 0) {
+    // 获取程序所在的目录
+    wchar_t exePath[MAX_PATH] = { 0 };
+    if (GetModuleFileNameW(NULL, exePath, MAX_PATH) == 0) {
         return false;
     }
     
-    // 日志文件直接放在程序运行目录下
-    std::wstring logFilePath = std::wstring(currentDir) + L"\\app.log";
+    // 提取目录部分
+    PathRemoveFileSpecW(exePath);
+    
+    // 日志文件放在程序所在目录下
+    std::wstring logFilePath = std::wstring(exePath) + L"\\app.log";
     m_logFile.open(logFilePath, std::ios::out | std::ios::trunc);
     if (!m_logFile.is_open()) {
         return false;
