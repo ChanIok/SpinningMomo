@@ -89,15 +89,6 @@ namespace Constants {
     // 宽高比和分辨率配置
     inline const TCHAR* ASPECT_RATIO_ITEMS = TEXT("AspectRatioItems");  // 宽高比项目显示配置
     inline const TCHAR* RESOLUTION_ITEMS = TEXT("ResolutionItems");    // 分辨率项目显示配置
-    
-    // 预设分辨率名称
-    inline const TCHAR* RESOLUTION_DEFAULT = TEXT("Default");
-    inline const TCHAR* RESOLUTION_720P = TEXT("720P");
-    inline const TCHAR* RESOLUTION_1080P = TEXT("1080P");
-    inline const TCHAR* RESOLUTION_2K = TEXT("2K");
-    inline const TCHAR* RESOLUTION_4K = TEXT("4K");
-    inline const TCHAR* RESOLUTION_8K = TEXT("8K");
-    inline const TCHAR* RESOLUTION_12K = TEXT("12K");
 }
 
 // 比例结构体定义

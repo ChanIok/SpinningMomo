@@ -57,18 +57,20 @@ public:
         InitializeRatios();
         InitializeResolutions();
         
-        // 根据配置重建宽高比和分辨率列表
-        ConfigLoadResult ratioResult = m_configManager->BuildRatiosFromConfig(m_ratios, m_ratios, m_strings);
+        // 获取宽高比和分辨率列表
+        ConfigLoadResult ratioResult = m_configManager->GetAspectRatios(m_strings);
         if (!ratioResult.success) {
-            LOG_ERROR("Failed to load aspect ratio configuration: %s", ratioResult.errorDetails.c_str());
-            m_notificationManager->ShowNotification(m_strings.APP_NAME.c_str(), ratioResult.errorDetails);
+            LOG_ERROR("Failed to load aspect ratio configuration: %s", ratioResult.errorDetails);
+            ShowNotification(m_strings.APP_NAME.c_str(), ratioResult.errorDetails.c_str());
         }
+        m_ratios = std::move(ratioResult.ratios);
         
-        ConfigLoadResult resolutionResult = m_configManager->BuildResolutionsFromConfig(m_resolutions, m_resolutions, m_strings);
+        ConfigLoadResult resolutionResult = m_configManager->GetResolutionPresets(m_strings);
         if (!resolutionResult.success) {
-            LOG_ERROR("Failed to load resolution configuration: %s", resolutionResult.errorDetails.c_str());
-            m_notificationManager->ShowNotification(m_strings.APP_NAME.c_str(), resolutionResult.errorDetails);
+            LOG_ERROR("Failed to load resolution configuration: %s", resolutionResult.errorDetails);
+            ShowNotification(m_strings.APP_NAME.c_str(), resolutionResult.errorDetails.c_str());
         }
+        m_resolutions = std::move(resolutionResult.resolutions);
 
         // 初始化UI组件
         if (!RegisterWindowClass(hInstance)) {

@@ -4,12 +4,11 @@
 #include <string>
 #include <vector>
 
-struct AspectRatio;
-struct ResolutionPreset;
-
 // 配置加载结果
 struct ConfigLoadResult {
     bool success;
+    std::vector<AspectRatio> ratios;
+    std::vector<ResolutionPreset> resolutions;
     std::wstring errorDetails;
     
     ConfigLoadResult() : success(true) {}
@@ -40,7 +39,11 @@ public:
     void SaveTaskbarConfig();
     void SaveMenuConfig();
     void SaveGameAlbumConfig();
-    
+
+    // 根据配置构建宽高比和分辨率列表
+    ConfigLoadResult GetAspectRatios(const LocalizedStrings& strings);
+    ConfigLoadResult GetResolutionPresets(const LocalizedStrings& strings);
+
     // Getters
     const std::wstring& GetConfigPath() const { return m_configPath; }
     const std::wstring& GetWindowTitle() const { return m_windowTitle; }
@@ -54,14 +57,6 @@ public:
     const std::vector<std::wstring>& GetMenuItemsToShow() const { return m_menuItemsToShow; }
     const std::vector<std::wstring>& GetAspectRatioItems() const { return m_aspectRatioItems; }
     const std::vector<std::wstring>& GetResolutionItems() const { return m_resolutionItems; }
-    
-    // 根据配置构建宽高比和分辨率列表
-    ConfigLoadResult BuildRatiosFromConfig(std::vector<AspectRatio>& ratios, 
-                                          const std::vector<AspectRatio>& presets, 
-                                          const LocalizedStrings& strings);
-    ConfigLoadResult BuildResolutionsFromConfig(std::vector<ResolutionPreset>& resolutions, 
-                                               const std::vector<ResolutionPreset>& presets, 
-                                               const LocalizedStrings& strings);
     
     // Setters
     void SetWindowTitle(const std::wstring& title) { m_windowTitle = title; }
@@ -77,6 +72,10 @@ public:
     void SetResolutionItems(const std::vector<std::wstring>& items) { m_resolutionItems = items; }
 
 private:
+    // 获取默认的宽高比和分辨率预设
+    std::vector<AspectRatio> GetDefaultAspectRatios();
+    std::vector<ResolutionPreset> GetDefaultResolutionPresets();
+    
     bool AddCustomRatio(const std::wstring& ratio, std::vector<AspectRatio>& ratios);
     bool AddCustomResolution(const std::wstring& resolution, std::vector<ResolutionPreset>& resolutions);
     bool IsValidResolutionFormat(const std::wstring& resolution);

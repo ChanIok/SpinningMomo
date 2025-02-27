@@ -376,109 +376,134 @@ bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vec
         return false;
     }
 }
+// 获取默认的宽高比预设
+std::vector<AspectRatio> ConfigManager::GetDefaultAspectRatios() {
+    return {
+        {TEXT("32:9"), 32.0/9.0},  // 超宽屏
+        {TEXT("21:9"), 21.0/9.0},  // 宽屏
+        {TEXT("16:9"), 16.0/9.0},  // 标准宽屏
+        {TEXT("3:2"), 3.0/2.0},    // 传统显示器
+        {TEXT("1:1"), 1.0},        // 正方形
+        {TEXT("2:3"), 2.0/3.0},    // 竖屏
+        {TEXT("9:16"), 9.0/16.0}   // 竖屏宽屏
+    };
+}
 
-ConfigLoadResult ConfigManager::BuildRatiosFromConfig(std::vector<AspectRatio>& ratios, 
-                                                    const std::vector<AspectRatio>& presets, 
-                                                    const LocalizedStrings& strings) {
-    // 获取配置的宽高比项
-    const auto& aspectRatioItems = GetAspectRatioItems();
-    if (aspectRatioItems.empty()) {
-        // 如果配置为空，使用预设列表
-        ratios = presets;
-        return ConfigLoadResult();
+// 获取默认的分辨率预设
+std::vector<ResolutionPreset> ConfigManager::GetDefaultResolutionPresets() {
+    return {
+        {TEXT("Default"), 0, 0},    // 默认选项，使用屏幕尺寸计算
+        {TEXT("4K"), 3840, 2160},   // 8.3M pixels
+        {TEXT("6K"), 5760, 3240},   // 18.7M pixels
+        {TEXT("8K"), 7680, 4320},   // 33.2M pixels
+        {TEXT("12K"), 11520, 6480}  // 74.6M pixels
+    };
+}
+
+// 根据配置获取宽高比列表
+ConfigLoadResult ConfigManager::GetAspectRatios(const LocalizedStrings& strings) {
+    ConfigLoadResult result;
+    
+    // 1. 获取默认预设
+    result.ratios = GetDefaultAspectRatios();
+    
+    // 2. 如果配置中没有自定义项，直接返回默认预设
+    if (m_aspectRatioItems.empty()) {
+        return result;
     }
     
-    // 根据配置构建新的宽高比列表
+    // 3. 处理配置中的自定义项
     std::vector<AspectRatio> configuredRatios;
     bool hasError = false;
     std::wstring errorDetails;
     
-    for (const auto& ratioName : aspectRatioItems) {
-        // 查找预设中是否有匹配的宽高比
+    for (const auto& item : m_aspectRatioItems) {
+        // 检查是否是预定义项
         bool found = false;
-        for (const auto& preset : presets) {
-            if (preset.name == ratioName) {
+        for (const auto& preset : result.ratios) {
+            if (item == preset.name) {
                 configuredRatios.push_back(preset);
                 found = true;
                 break;
             }
         }
         
-        // 如果预设中没有，尝试解析自定义宽高比
+        // 如果不是预定义项，尝试解析为自定义比例
         if (!found) {
-            if (!AddCustomRatio(ratioName, configuredRatios)) {
+            if (!AddCustomRatio(item, configuredRatios)) {
                 hasError = true;
-                errorDetails += ratioName + TEXT(", ");
+                errorDetails += item + L", ";
             }
         }
     }
     
-    // 如果有有效的配置项，则替换传入的列表
+    // 如果有有效的配置项，用它们替换默认预设
     if (!configuredRatios.empty()) {
-        ratios = std::move(configuredRatios);
+        result.ratios = configuredRatios;
     }
     
-    // 如果有错误，返回错误信息
+    // 如果有错误，设置错误信息
     if (hasError) {
-        // 移除最后的逗号和空格
         if (errorDetails.length() >= 2) {
             errorDetails = errorDetails.substr(0, errorDetails.length() - 2);
         }
-        return ConfigLoadResult(strings.CONFIG_FORMAT_ERROR + errorDetails + TEXT("\n") + strings.RATIO_FORMAT_EXAMPLE);
+        result.success = false;
+        result.errorDetails = strings.CONFIG_FORMAT_ERROR + L" " + errorDetails + L"\n" + strings.RATIO_FORMAT_EXAMPLE;
     }
     
-    return ConfigLoadResult();
+    return result;
 }
 
-ConfigLoadResult ConfigManager::BuildResolutionsFromConfig(std::vector<ResolutionPreset>& resolutions, 
-                                                         const std::vector<ResolutionPreset>& presets, 
-                                                         const LocalizedStrings& strings) {
-    // 获取配置的分辨率项
-    const auto& resolutionItems = GetResolutionItems();
-    if (resolutionItems.empty()) {
-        // 如果配置为空，使用预设列表
-        resolutions = presets;
-        return ConfigLoadResult();
+// 根据配置获取分辨率列表
+ConfigLoadResult ConfigManager::GetResolutionPresets(const LocalizedStrings& strings) {
+    ConfigLoadResult result;
+    
+    // 1. 获取默认预设
+    result.resolutions = GetDefaultResolutionPresets();
+    
+    // 2. 如果配置中没有自定义项，直接返回默认预设
+    if (m_resolutionItems.empty()) {
+        return result;
     }
     
-    // 根据配置构建新的分辨率列表
+    // 3. 处理配置中的自定义项
     std::vector<ResolutionPreset> configuredResolutions;
     bool hasError = false;
     std::wstring errorDetails;
     
-    for (const auto& resName : resolutionItems) {
-        // 查找预设中是否有匹配的分辨率
+    for (const auto& item : m_resolutionItems) {
+        // 检查是否是预定义项
         bool found = false;
-        for (const auto& preset : presets) {
-            if (preset.name == resName) {
+        for (const auto& preset : result.resolutions) {
+            if (item == preset.name) {
                 configuredResolutions.push_back(preset);
                 found = true;
                 break;
             }
         }
         
-        // 如果预设中没有，尝试解析自定义分辨率
+        // 如果不是预定义项，尝试解析为自定义分辨率
         if (!found) {
-            if (!AddCustomResolution(resName, configuredResolutions)) {
+            if (!AddCustomResolution(item, configuredResolutions)) {
                 hasError = true;
-                errorDetails += resName + TEXT(", ");
+                errorDetails += item + L", ";
             }
         }
     }
     
-    // 如果有有效的配置项，则替换传入的列表
+    // 如果有有效的配置项，用它们替换默认预设
     if (!configuredResolutions.empty()) {
-        resolutions = std::move(configuredResolutions);
+        result.resolutions = configuredResolutions;
     }
     
-    // 如果有错误，返回错误信息
+    // 如果有错误，设置错误信息
     if (hasError) {
-        // 移除最后的逗号和空格
         if (errorDetails.length() >= 2) {
             errorDetails = errorDetails.substr(0, errorDetails.length() - 2);
         }
-        return ConfigLoadResult(strings.CONFIG_FORMAT_ERROR + errorDetails + TEXT("\n") + strings.RESOLUTION_FORMAT_EXAMPLE);
+        result.success = false;
+        result.errorDetails = strings.CONFIG_FORMAT_ERROR + L" " + errorDetails + L"\n" + strings.RESOLUTION_FORMAT_EXAMPLE;
     }
     
-    return ConfigLoadResult();
+    return result;
 }
