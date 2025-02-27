@@ -51,15 +51,6 @@ void ConfigManager::LoadAllConfigs() {
     LoadGameAlbumConfig();
 }
 
-void ConfigManager::SaveAllConfigs() {
-    SaveHotkeyConfig();
-    SaveWindowConfig();
-    SaveLanguageConfig();
-    SaveTaskbarConfig();
-    SaveMenuConfig();
-    SaveGameAlbumConfig();
-}
-
 void ConfigManager::LoadHotkeyConfig() {
     TCHAR buffer[32];
     // 读取修饰键
@@ -265,48 +256,6 @@ void ConfigManager::SaveMenuConfig() {
     WritePrivateProfileString(Constants::MENU_SECTION,
                             Constants::MENU_FLOATING,
                             buffer, m_configPath.c_str());
-    
-    // 保存菜单项显示配置
-    if (!m_menuItemsToShow.empty()) {
-        std::wstring menuItemsStr;
-        for (size_t i = 0; i < m_menuItemsToShow.size(); i++) {
-            menuItemsStr += m_menuItemsToShow[i];
-            if (i < m_menuItemsToShow.size() - 1) {
-                menuItemsStr += TEXT(",");
-            }
-        }
-        WritePrivateProfileString(Constants::MENU_SECTION,
-                                Constants::MENU_ITEMS,
-                                menuItemsStr.c_str(), m_configPath.c_str());
-    }
-    
-    // 保存宽高比项配置
-    if (!m_aspectRatioItems.empty()) {
-        std::wstring ratioItemsStr;
-        for (size_t i = 0; i < m_aspectRatioItems.size(); i++) {
-            ratioItemsStr += m_aspectRatioItems[i];
-            if (i < m_aspectRatioItems.size() - 1) {
-                ratioItemsStr += TEXT(",");
-            }
-        }
-        WritePrivateProfileString(Constants::MENU_SECTION,
-                                Constants::ASPECT_RATIO_ITEMS,
-                                ratioItemsStr.c_str(), m_configPath.c_str());
-    }
-    
-    // 保存分辨率项配置
-    if (!m_resolutionItems.empty()) {
-        std::wstring resolutionItemsStr;
-        for (size_t i = 0; i < m_resolutionItems.size(); i++) {
-            resolutionItemsStr += m_resolutionItems[i];
-            if (i < m_resolutionItems.size() - 1) {
-                resolutionItemsStr += TEXT(",");
-            }
-        }
-        WritePrivateProfileString(Constants::MENU_SECTION,
-                                Constants::RESOLUTION_ITEMS,
-                                resolutionItemsStr.c_str(), m_configPath.c_str());
-    }
 }
 
 void ConfigManager::LoadGameAlbumConfig() {

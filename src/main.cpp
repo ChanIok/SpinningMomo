@@ -396,7 +396,7 @@ public:
         m_isOverlayEnabled = !m_isOverlayEnabled;
         
         if (m_isOverlayEnabled) {
-            if (HWND gameWindow = WindowUtils::FindTargetWindow()) {
+            if (HWND gameWindow = FindTargetWindow()) {
                 m_overlayWindow->StartCapture(gameWindow);
             }
         } else {

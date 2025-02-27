@@ -32,7 +32,6 @@ public:
     void LoadGameAlbumConfig();
     
     // 配置保存
-    void SaveAllConfigs();
     void SaveHotkeyConfig();
     void SaveWindowConfig();
     void SaveLanguageConfig();
@@ -78,7 +77,6 @@ private:
     
     bool AddCustomRatio(const std::wstring& ratio, std::vector<AspectRatio>& ratios);
     bool AddCustomResolution(const std::wstring& resolution, std::vector<ResolutionPreset>& resolutions);
-    bool IsValidResolutionFormat(const std::wstring& resolution);
 
     std::wstring m_configPath;
     std::wstring m_windowTitle;
