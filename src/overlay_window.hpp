@@ -113,6 +113,7 @@ private:
     ThreadRAII m_captureAndRenderThread;
     ThreadRAII m_hookThread;
     ThreadRAII m_windowManagerThread;
+    std::mutex m_captureStateMutex;
     std::atomic<bool> m_running{false};
     POINT m_currentMousePos{0, 0};
     POINT m_lastMousePos{0, 0};
@@ -124,7 +125,6 @@ private:
     void CaptureAndRenderThreadProc();
     void HookThreadProc();
     void WindowManagerThreadProc();
-    bool CreateFrameTexture(UINT width, UINT height);
     static LRESULT CALLBACK MouseHookProc(int code, WPARAM wParam, LPARAM lParam);
 
     // 自定义消息定义

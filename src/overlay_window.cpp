@@ -158,7 +158,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     LOG_DEBUG("Overlay window dimensions: %dx%d", m_windowWidth, m_windowHeight);
 
     // 启动工作线程
-    m_running = true;
+    m_running.store(true);
     try {
         m_captureAndRenderThread = ThreadRAII([this]() { CaptureAndRenderThreadProc(); });
         m_hookThread = ThreadRAII([this]() { HookThreadProc(); });
@@ -180,6 +180,11 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
     // 延迟防止闪烁
     if(IsWindowVisible(m_hwnd)){
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+
+    if (!m_running) {
+        LOG_DEBUG("Exiting capture and render thread");
+        return;
     }
     
     if (!ResizeSwapChain()) {
@@ -332,7 +337,6 @@ void OverlayWindow::WindowManagerThreadProc() {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
-
     // 清理资源
     m_timerWindow = nullptr;  // 清除窗口句柄
     KillTimer(timerWindow, 1);
@@ -480,7 +484,7 @@ bool OverlayWindow::InitializeCapture() {
 
 void OverlayWindow::StopCapture(bool hideWindow) {
     // 停止标志
-    m_running = false;
+    m_running.store(false);
 
     if(m_framePool){
         m_framePool.FrameArrived(m_frameArrivedToken);
@@ -501,13 +505,15 @@ void OverlayWindow::StopCapture(bool hideWindow) {
     if (m_captureAndRenderThread.get() && m_captureAndRenderThread.get()->joinable()) {
         m_captureAndRenderThread.get()->join();
     }
+    LOG_DEBUG("Capture and render thread joined");
     if (m_hookThread.get() && m_hookThread.get()->joinable()) {
         m_hookThread.get()->join();
     }
+    LOG_DEBUG("Hook thread joined");
     if (m_windowManagerThread.get() && m_windowManagerThread.get()->joinable()) {
         m_windowManagerThread.get()->join();
     }
-
+    LOG_DEBUG("Window manager thread joined");
     if (m_captureSession) {
         m_captureSession.Close();
         m_captureSession = nullptr;
@@ -550,30 +556,33 @@ void OverlayWindow::RestoreGameWindow() {
 
 
 void OverlayWindow::Cleanup() {
-    // 释放 Direct3D 资源
-    m_renderTarget.Reset();
-    m_swapChain.Reset();
-    m_vertexBuffer.Reset();
-    m_inputLayout.Reset();
-    m_vertexShader.Reset();
-    m_pixelShader.Reset();
-    m_sampler.Reset();
-    m_blendState.Reset();
-    m_shaderResourceView.Reset();
-
-    // 清理 D3D 设备资源
-    if (m_context) {
-        // 重要：在释放设备前，先清除设备上下文中所有绑定的资源引用
-        m_context->ClearState();
-        m_context->Flush();
-        m_context.Reset();
-    }
-    if (m_swapChain) {
+    {
+        std::lock_guard<std::mutex> lock(m_captureStateMutex);
+        // 释放 Direct3D 资源
+        m_renderTarget.Reset();
         m_swapChain.Reset();
+        m_vertexBuffer.Reset();
+        m_inputLayout.Reset();
+        m_vertexShader.Reset();
+        m_pixelShader.Reset();
+        m_sampler.Reset();
+        m_blendState.Reset();
+        m_shaderResourceView.Reset();
+
+        // 清理 D3D 设备资源
+        if (m_context) {
+            // 重要：在释放设备前，先清除设备上下文中所有绑定的资源引用
+            m_context->ClearState();
+            m_context->Flush();
+            m_context.Reset();
+        }
+        if (m_swapChain) {
+            m_swapChain.Reset();
+        }
+        
+        m_device.Reset();
+        m_winrtDevice = nullptr;
     }
-    
-    m_device.Reset();
-    m_winrtDevice = nullptr;
 
     // 标记 D3D 初始化状态
     m_d3dInitialized = false;
@@ -928,15 +937,16 @@ void OverlayWindow::OnFrameArrived() {
         srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
         srvDesc.Texture2D.MipLevels = 1;
 
-        HRESULT hr = m_device->CreateShaderResourceView(
-            frameTexture.Get(), &srvDesc, &m_shaderResourceView);
-
-        // 设置着色器资源视图
-        if (SUCCEEDED(hr)) {
-            m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
-        }
-
-        PerformRendering();
+        {
+            std::lock_guard<std::mutex> lock(m_captureStateMutex);
+            HRESULT hr = m_device->CreateShaderResourceView(
+                frameTexture.Get(), &srvDesc, &m_shaderResourceView);
+            // 设置着色器资源视图
+            if (SUCCEEDED(hr)) {
+                m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+            }
+            PerformRendering();
+        }   
     }
 }
 
