@@ -33,11 +33,23 @@ public:
         // 记录系统信息
         LogSystemInfo();
 
+        // 初始化配置管理器
         m_configManager = std::make_unique<ConfigManager>();
         m_configManager->Initialize();
-        
-        // 加载配置
         m_configManager->LoadAllConfigs();
+        
+        // 从配置获取日志级别
+        LogLevel configLogLevel = m_configManager->GetLogLevel();
+        
+        #ifndef NDEBUG
+        // Debug版本下始终使用DEBUG级别
+        Logger::GetInstance().SetLogLevel(LogLevel::DEBUG);
+        LOG_INFO("Debug build: Setting log level to DEBUG");
+        #else
+            // Release版本使用配置文件中的设置
+            Logger::GetInstance().SetLogLevel(configLogLevel);
+            LOG_INFO("Log level set to %s", Logger::GetInstance().GetLevelString(configLogLevel));
+        #endif
 
         // 创建通知管理器
         m_notificationManager = std::make_unique<NotificationManager>(hInstance);
@@ -50,10 +62,6 @@ public:
         m_isScreenCaptureSupported = WindowUtils::IsWindowsCaptureSupported();
         LOG_INFO("Screen capture feature is %s", m_isScreenCaptureSupported ? "available" : "not available");
 
-        // 初始化预设数据
-        InitializeRatios();
-        InitializeResolutions();
-        
         // 获取宽高比和分辨率列表
         ConfigLoadResult ratioResult = m_configManager->GetAspectRatios(m_strings);
         if (!ratioResult.success) {
@@ -747,30 +755,6 @@ private:
     };
     std::vector<PendingNotification> m_pendingNotifications;
     size_t m_currentNotificationIndex = 0;
-
-    // 初始化预设的宽高比列表
-    void InitializeRatios() {
-        m_ratios = {
-            {TEXT("32:9"), 32.0/9.0},  // 超宽屏
-            {TEXT("21:9"), 21.0/9.0},  // 宽屏
-            {TEXT("16:9"), 16.0/9.0},  // 标准宽屏
-            {TEXT("3:2"), 3.0/2.0},    // 传统显示器
-            {TEXT("1:1"), 1.0},        // 正方形
-            {TEXT("2:3"), 2.0/3.0},    // 竖屏
-            {TEXT("9:16"), 9.0/16.0}   // 竖屏宽屏
-        };
-    }
-
-    // 初始化预设的分辨率列表
-    void InitializeResolutions() {
-        m_resolutions = {
-            {TEXT("Default"), 0, 0},    // 默认选项，使用屏幕尺寸计算
-            {TEXT("4K"), 3840, 2160},   // 8.3M pixels
-            {TEXT("6K"), 5760, 3240},   // 18.7M pixels
-            {TEXT("8K"), 7680, 4320},   // 33.2M pixels
-            {TEXT("12K"), 11520, 6480}  // 74.6M pixels
-        };
-    }
 
     bool RegisterWindowClass(HINSTANCE hInstance) {
         WNDCLASSEX wc = {0};

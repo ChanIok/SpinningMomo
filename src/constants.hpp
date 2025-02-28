@@ -89,6 +89,9 @@ namespace Constants {
     // 宽高比和分辨率配置
     inline const TCHAR* ASPECT_RATIO_ITEMS = TEXT("AspectRatioItems");  // 宽高比项目显示配置
     inline const TCHAR* RESOLUTION_ITEMS = TEXT("ResolutionItems");    // 分辨率项目显示配置
+
+    inline const TCHAR* LOGGER_SECTION = TEXT("Logger");     // 日志配置节名
+    inline const TCHAR* LOGGER_LEVEL = TEXT("LogLevel");     // 日志级别配置项
 }
 
 // 比例结构体定义

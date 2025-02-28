@@ -23,6 +23,7 @@ void ConfigManager::Initialize() {
     // 检查配置文件是否存在
     if (GetFileAttributes(m_configPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
         // 创建默认配置文件
+        WritePrivateProfileString(Constants::LOGGER_SECTION, Constants::LOGGER_LEVEL, TEXT("INFO"), m_configPath.c_str());
         WritePrivateProfileString(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, TEXT(""), m_configPath.c_str());
         WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, TEXT("3"), m_configPath.c_str());
         WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
@@ -49,6 +50,27 @@ void ConfigManager::LoadAllConfigs() {
     LoadTaskbarConfig();
     LoadMenuConfig();
     LoadGameAlbumConfig();
+    LoadLogConfig();
+}
+
+void ConfigManager::LoadLogConfig() {
+    TCHAR buffer[32];
+    if (GetPrivateProfileString(Constants::LOGGER_SECTION, 
+                               Constants::LOGGER_LEVEL,
+                               TEXT(""), 
+                               buffer, 
+                               _countof(buffer),
+                               m_configPath.c_str()) > 0) {
+        std::wstring logLevelStr = buffer;
+        
+        if (logLevelStr == TEXT("DEBUG")) {
+            m_logLevel = LogLevel::DEBUG;
+        } else if (logLevelStr == TEXT("INFO")) {
+            m_logLevel = LogLevel::INFO;
+        } else if (logLevelStr == TEXT("ERROR")) {
+            m_logLevel = LogLevel::ERR;
+        }
+    }
 }
 
 void ConfigManager::LoadHotkeyConfig() {
