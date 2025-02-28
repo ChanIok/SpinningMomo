@@ -83,14 +83,6 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
 
     if (!targetWindow) return false;
 
-    // 初始化 D3D 资源
-    if (!m_d3dInitialized) {
-        if (!InitializeD3D()) {
-            return false;
-        }
-        m_d3dInitialized = true;
-    }
-
     // 保存游戏窗口句柄
     m_gameWindow = targetWindow;
 
@@ -112,15 +104,22 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
     m_aspectRatio = static_cast<float>(height) / width;
 
     // 根据宽高比计算实际窗口尺寸
-    int actualWidth, actualHeight;
     if (m_aspectRatio >= 1.0f) {
         // 高度大于等于宽度，使用理想尺寸作为高度
-        actualHeight = m_idealSize;
-        actualWidth = static_cast<int>(actualHeight / m_aspectRatio);
+        m_windowHeight = m_idealSize;
+        m_windowWidth = static_cast<int>(m_windowHeight / m_aspectRatio);
     } else {
         // 宽度大于高度，使用理想尺寸作为宽度
-        actualWidth = m_idealSize;
-        actualHeight = static_cast<int>(actualWidth * m_aspectRatio);
+        m_windowWidth = m_idealSize;
+        m_windowHeight = static_cast<int>(m_windowWidth * m_aspectRatio);
+    }
+
+    // 初始化 D3D 资源
+    if (!m_d3dInitialized) {
+        if (!InitializeD3D()) {
+            return false;
+        }
+        m_d3dInitialized = true;
     }
 
     // 如果是首次显示，设置默认位置（左上角）
@@ -128,13 +127,13 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
         m_isFirstShow = false;  // 标记为非首次显示
         int x = 20;  // 距离左边缘20像素
         int y = 20;  // 距离上边缘20像素
-        SetWindowPos(m_hwnd, nullptr, x, y, actualWidth, actualHeight, 
+        SetWindowPos(m_hwnd, nullptr, x, y, m_windowWidth, m_windowHeight, 
                     SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     } else {
         // 如果窗口已经显示，只更新尺寸保持位置不变
         RECT previewRect;
         GetWindowRect(m_hwnd, &previewRect);
-        SetWindowPos(m_hwnd, nullptr, 0, 0, actualWidth, actualHeight,
+        SetWindowPos(m_hwnd, nullptr, 0, 0, m_windowWidth, m_windowHeight,
                     SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
     }
 
@@ -506,8 +505,8 @@ bool PreviewWindow::InitializeD3D() {
     // 创建交换链描述
     DXGI_SWAP_CHAIN_DESC scd = {};
     scd.BufferCount = 2;  // 使用双缓冲
-    scd.BufferDesc.Width = m_idealSize;
-    scd.BufferDesc.Height = m_idealSize;
+    scd.BufferDesc.Width = m_windowWidth > 0 ? m_windowWidth : m_idealSize;
+    scd.BufferDesc.Height = m_windowHeight > 0 ? m_windowHeight : m_idealSize;
     scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     scd.BufferDesc.RefreshRate.Numerator = 0;
     scd.BufferDesc.RefreshRate.Denominator = 1;
@@ -1090,7 +1089,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 std::lock_guard<std::mutex> lock(instance->m_renderTargetMutex);
                 
                 // 释放旧的渲染目标
-                instance->m_renderTarget = nullptr;
+                instance->m_renderTarget.Reset();
 
                 // 调整交换链大小
                 RECT clientRect;

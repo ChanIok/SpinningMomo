@@ -78,6 +78,8 @@ private:
     float m_aspectRatio;  // 当前窗口比例
     RECT m_gameWindowRect = {};         // 游戏窗口的尺寸
     HWND m_gameWindow = nullptr;        // 游戏窗口句柄
+    int m_windowWidth = 0;
+    int m_windowHeight = 0;
 
     // 互斥锁保护渲染目标访问
     std::mutex m_renderTargetMutex;
