@@ -8,6 +8,7 @@
 #include <mutex>
 #include <atomic>
 #include <dwmapi.h>
+#include "win_timer.hpp"
 
 class PreviewWindow {
 public:
@@ -39,9 +40,13 @@ private:
     };
 
     HWND m_hwnd;
+    HWND m_mainHwnd = nullptr;
     static PreviewWindow* instance;
     bool m_isFirstShow = true;  // 控制是否是首次显示
     bool m_d3dInitialized = false;
+
+    WinTimer m_cleanupTimer;  // 清理资源的定时器
+    const int CLEANUP_TIMEOUT = 30000;  // 清理超时（毫秒）
 
     // D3D资源
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;
@@ -115,7 +120,4 @@ private:
     int m_minIdealSize;  // 最小理想尺寸（屏幕短边的1/10）
     int m_maxIdealSize;  // 最大理想尺寸（屏幕长边）
     int m_idealSize;     // 当前理想尺寸
-
-    // 主窗口句柄
-    HWND m_mainHwnd = nullptr;
 }; 

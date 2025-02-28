@@ -6,6 +6,7 @@
 #include <winrt/Windows.Foundation.Metadata.h>
 #include <d3dcompiler.h>
 #include <stdexcept>
+#include "logger.hpp"
 
 namespace {
     // 着色器代码
@@ -66,12 +67,20 @@ PreviewWindow::PreviewWindow() : m_hwnd(nullptr), m_isDragging(false) {
 }
 
 PreviewWindow::~PreviewWindow() {
+    if (m_cleanupTimer.IsRunning()) {
+        m_cleanupTimer.Cancel();
+    }
     StopCapture();
     Cleanup();
     instance = nullptr;
 }
 
 bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customHeight) {
+    if (m_cleanupTimer.IsRunning()) {
+        LOG_DEBUG("Canceling cleanup timer due to new capture");
+        m_cleanupTimer.Cancel();
+    }
+
     if (!targetWindow) return false;
 
     // 初始化 D3D 资源
@@ -189,7 +198,7 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
         m_captureSession.StartCapture();
     }
     catch (...) {
-        OutputDebugStringA("Unknown error occurred while starting capture session\n");
+        LOG_ERROR("Unknown error occurred while starting capture session");
         return false;
     }
 
@@ -214,6 +223,15 @@ void PreviewWindow::StopCapture() {
 
     // 隐藏窗口
     ShowWindow(m_hwnd, SW_HIDE);
+
+    // 设置定时器调用 Cleanup
+    if (!m_cleanupTimer.IsRunning()) {
+        LOG_INFO("Starting cleanup timer");
+        m_cleanupTimer.SetTimer(CLEANUP_TIMEOUT, [this]() {
+            LOG_INFO("Cleanup timer fired");
+            Cleanup();
+        });
+    }
 }
 
 void PreviewWindow::OnFrameArrived() {
@@ -445,16 +463,43 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
 }
 
 void PreviewWindow::Cleanup() {
-    // 清理视口框资源
-    m_viewportVertexBuffer.Reset();
-    m_viewportVS.Reset();
-    m_viewportPS.Reset();
-    m_viewportInputLayout.Reset();
+    {
+        std::lock_guard<std::mutex> lock(m_renderTargetMutex);
 
-    if (m_hwnd) {
-        DestroyWindow(m_hwnd);
-        m_hwnd = nullptr;
+        // 清理视口框资源
+        m_viewportVertexBuffer.Reset();
+        m_viewportVS.Reset();
+        m_viewportPS.Reset();
+        m_viewportInputLayout.Reset();
+
+        // 清理主渲染资源
+        m_shaderResourceView.Reset();
+        m_vertexBuffer.Reset();
+        m_inputLayout.Reset();
+        m_vertexShader.Reset();
+        m_pixelShader.Reset();
+        m_sampler.Reset();
+        m_blendState.Reset();
+        m_renderTarget.Reset();
+
+        // 清理 D3D 设备资源
+        if (m_context) {
+            // 重要：在释放设备前，先清除设备上下文中所有绑定的资源引用
+            m_context->ClearState();
+            m_context->Flush();
+            m_context.Reset();
+        }
+        
+        if (m_swapChain) {
+            m_swapChain.Reset();
+        }
+        
+        m_device.Reset();
+        m_winrtDevice = nullptr;
     }
+    
+    // 标记 D3D 初始化状态
+    m_d3dInitialized = false;
 }
 
 bool PreviewWindow::InitializeD3D() {

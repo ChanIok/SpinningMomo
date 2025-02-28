@@ -110,8 +110,6 @@ void WinTimer::StartWaitThread() {
         // 等待定时器信号
         DWORD result = WaitForSingleObject(timerHandle, INFINITE);
         
-        LOG_DEBUG("Timer wait completed with result: " + std::to_string(result));
-        
         // 只有在等待成功且定时器还在运行状态时才执行回调
         State expectedState = State::Running;
         if (result == WAIT_OBJECT_0 && m_state.compare_exchange_strong(expectedState, State::Triggered)) {

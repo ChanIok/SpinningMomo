@@ -103,6 +103,11 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
 }
 
 bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
+    if (m_cleanupTimer.IsRunning()) {
+        LOG_DEBUG("Canceling cleanup timer due to new capture");
+        m_cleanupTimer.Cancel();
+    }
+
     if (!targetWindow) return false;
 
     m_gameWindow = targetWindow;
@@ -522,6 +527,15 @@ void OverlayWindow::StopCapture(bool hideWindow) {
     if (hideWindow) {
         RestoreGameWindow();
     }
+
+    // 设置定时器调用 Cleanup
+    if (!m_cleanupTimer.IsRunning()) {
+        LOG_INFO("Starting cleanup timer");
+        m_cleanupTimer.SetTimer(CLEANUP_TIMEOUT, [this]() {
+            LOG_INFO("Cleanup timer fired");
+            Cleanup();
+        });
+    }
 }
 
 void OverlayWindow::RestoreGameWindow() {
@@ -536,11 +550,7 @@ void OverlayWindow::RestoreGameWindow() {
 
 
 void OverlayWindow::Cleanup() {
-    if (m_hwnd) {
-        DestroyWindow(m_hwnd);
-        m_hwnd = nullptr;
-    }
-    // 释放其他 Direct3D 资源
+    // 释放 Direct3D 资源
     m_renderTarget.Reset();
     m_swapChain.Reset();
     m_vertexBuffer.Reset();
@@ -551,9 +561,22 @@ void OverlayWindow::Cleanup() {
     m_blendState.Reset();
     m_shaderResourceView.Reset();
 
-    // 最后释放 context 和 device
-    m_context.Reset();
+    // 清理 D3D 设备资源
+    if (m_context) {
+        // 重要：在释放设备前，先清除设备上下文中所有绑定的资源引用
+        m_context->ClearState();
+        m_context->Flush();
+        m_context.Reset();
+    }
+    if (m_swapChain) {
+        m_swapChain.Reset();
+    }
+    
     m_device.Reset();
+    m_winrtDevice = nullptr;
+
+    // 标记 D3D 初始化状态
+    m_d3dInitialized = false;
 }
 
 bool OverlayWindow::InitializeD3D() {

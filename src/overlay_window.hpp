@@ -8,6 +8,7 @@
 #include <mutex>
 #include <wrl/client.h>
 #include "thread_raii.hpp"
+#include "win_timer.hpp"
 
 class OverlayWindow {
 public:
@@ -34,6 +35,9 @@ private:
         DWORD dwmsEventTime
     );
 
+    WinTimer m_cleanupTimer;  // 清理资源的定时器
+    const int CLEANUP_TIMEOUT = 30000;  // 清理超时（毫秒）
+
     bool m_d3dInitialized = false;
     
     bool InitializeD3D();
@@ -45,6 +49,8 @@ private:
     void OnFrameArrived();
 
     bool InitializeCapture();
+
+    
 
     // Direct3D资源
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;
