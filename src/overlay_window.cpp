@@ -54,6 +54,9 @@ OverlayWindow::OverlayWindow() {
 OverlayWindow::~OverlayWindow() {
     StopCapture();
     Cleanup();
+    if (m_cleanupTimer.IsRunning()) {
+        m_cleanupTimer.Cancel();
+    }
     instance = nullptr;
 }
 

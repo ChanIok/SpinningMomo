@@ -67,11 +67,11 @@ PreviewWindow::PreviewWindow() : m_hwnd(nullptr), m_isDragging(false) {
 }
 
 PreviewWindow::~PreviewWindow() {
+    StopCapture();
+    Cleanup();
     if (m_cleanupTimer.IsRunning()) {
         m_cleanupTimer.Cancel();
     }
-    StopCapture();
-    Cleanup();
     instance = nullptr;
 }
 
