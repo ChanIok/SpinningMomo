@@ -248,12 +248,12 @@ public:
 
         // 使用当前时间生成格式化的文件名
         auto now = std::chrono::system_clock::now();
-        auto time = std::chrono::system_clock::to_time_t(now);
-        auto local_time = std::localtime(&time);
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
         
-        wchar_t timestamp[32];
-        std::wcsftime(timestamp, sizeof(timestamp)/sizeof(wchar_t), 
-                     L"%Y%m%d_%H%M%S", local_time);
+        wchar_t timestamp[20];
+        std::tm local_tm;
+        localtime_s(&local_tm, &now_time);
+        wcsftime(timestamp, 20, L"%Y%m%d_%H%M%S", &local_tm);
         
         // 添加毫秒
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -263,16 +263,16 @@ public:
         
         std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
         
-        if (!WindowUtils::CaptureWindow(gameWindow, [this, savePath](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
-            if (WindowUtils::SaveFrameToFile(texture.Get(), savePath)) {
-                ShowNotification(
-                    m_strings.APP_NAME.c_str(),
-                    (m_strings.CAPTURE_SUCCESS + savePath).c_str()
-                );
+        WindowUtils::TakeScreenshotAsync(gameWindow, savePath, 
+            [this](bool success, const std::wstring& path) {
+                if (success) {
+                    ShowNotification(
+                        m_strings.APP_NAME.c_str(),
+                        (m_strings.CAPTURE_SUCCESS + path).c_str()
+                    );
+                }
             }
-        })) {
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-        }
+        );
     }
 
     // 处理打开截图

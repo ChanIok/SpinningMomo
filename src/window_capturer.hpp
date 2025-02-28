@@ -8,24 +8,29 @@
 #include <functional>
 #include <mutex>
 #include <queue>
+#include <atomic>
+#include "win_timer.hpp"
 
 class WindowCapturer {
 public:
     WindowCapturer();
     ~WindowCapturer();
-
-    // 初始化捕获器
-    bool Initialize(HWND hwnd);
     
     // 清理资源
     void Cleanup();
 
-    // 异步捕获截图
-    bool CaptureScreenshot(std::function<void(ID3D11Texture2D*)> callback);
+    // 初始化捕获器
+    bool Initialize(HWND hwnd);
 
-    // 控制捕获会话
-    void StartCapture();
+    // 添加回调到队列
+    void AddCaptureCallback(std::function<void(ID3D11Texture2D*)> callback);
+
+    // 启动和停止捕获
+    bool StartCapture();
     void StopCapture();
+
+    // 简化API：设置回调并开始捕获
+    bool CaptureOneFrame(HWND hwnd, std::function<void(ID3D11Texture2D*)> callback);
 
 private:
     // 确保D3D资源已初始化
@@ -36,7 +41,6 @@ private:
 
     void ProcessFrameArrived(ID3D11Texture2D* texture);
 
-    // 窗口句柄
     HWND m_hwnd = nullptr;
 
     // 捕获相关资源
@@ -51,5 +55,7 @@ private:
 
     // 状态标志
     bool m_isInitialized = false;
-    bool m_isCapturing = false;
+    std::atomic<bool> m_isCapturing{false};
+
+    WinTimer m_cleanupTimer;
 }; 

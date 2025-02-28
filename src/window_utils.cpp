@@ -2,6 +2,7 @@
 #include <wincodec.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
+#include "logger.hpp"
 
 // 静态成员定义
 std::unique_ptr<WindowCapturer> WindowUtils::s_capturer = std::make_unique<WindowCapturer>();
@@ -455,28 +456,45 @@ std::wstring WindowUtils::GetGameScreenshotPath(HWND hwnd) {
     return L"";
 } 
 
-// 捕获窗口截图
-bool WindowUtils::CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback) {
-    if (!hwnd || !callback) return false;
-    
-    // 确保捕获器已初始化
-    if (!s_capturer->Initialize(hwnd)) return false;
-
-    // 设置回调并等待捕获
-    bool result = s_capturer->CaptureScreenshot([callback, capturer = s_capturer.get()](ID3D11Texture2D* texture) {
-        Microsoft::WRL::ComPtr<ID3D11Texture2D> capturedTexture;
-        OutputDebugString(L"CaptureWindow: QueryInterface called\n");
-        // 捕获完成后停止捕获
-        capturer->StopCapture();
-        if (SUCCEEDED(texture->QueryInterface(capturedTexture.GetAddressOf()))) {
-            callback(capturedTexture);
+// 异步截图实现
+bool WindowUtils::TakeScreenshotAsync(HWND hwnd, const std::wstring& filePath, 
+                                     std::function<void(bool success, const std::wstring& path)> completionCallback) {
+    if (!hwnd) {
+        LOG_ERROR("Invalid window handle");
+        if (completionCallback) {
+            completionCallback(false, filePath);
         }
-
+        return false;
+    }
+    
+    // 使用改进的队列API
+    bool result = s_capturer->CaptureOneFrame(hwnd, [filePath, completionCallback](ID3D11Texture2D* texture) {
+        bool success = false;
+        
+        if (texture) {
+            // 直接保存捕获的帧为文件
+            success = WindowUtils::SaveFrameToFile(texture, filePath);
+            
+            if (success) {
+                LOG_DEBUG("Screenshot saved successfully");
+            } else {
+                LOG_ERROR("Failed to save screenshot");
+            }
+        } else {
+            LOG_ERROR("Captured texture is null");
+        }
+        
+        // 调用完成回调（如果有）
+        if (completionCallback) {
+            completionCallback(success, filePath);
+        }
     });
 
-    // 如果成功设置回调，开始捕获
-    if (result) {
-        s_capturer->StartCapture();
+    if (!result) {
+        LOG_ERROR("Failed to start capture");
+        if (completionCallback) {
+            completionCallback(false, filePath);
+        }
     }
     
     return result;
@@ -532,7 +550,23 @@ bool WindowUtils::SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& 
             return false;
         }
     }
-
+    
     // 提交更改
     return encoder.Commit();
+}
+
+// 清理捕获相关资源
+void WindowUtils::CleanupCaptureResources() {
+    // 刷新上下文命令队列，确保所有待处理的命令都被处理
+    if (s_context) {
+        s_context->ClearState();
+        s_context->Flush();
+        s_context.Reset(); 
+    }
+
+    // 释放 WinRT D3D 设备
+    s_winrtDevice = nullptr;
+
+    // 释放 D3D 设备
+    s_device.Reset();
 }

@@ -39,18 +39,21 @@ public:
     // 窗口操作
     static bool ResizeWindow(HWND hwnd, int width, int height, bool taskbarLower = true, bool activate = true);
     
-    // 辅助方法
-    static std::wstring TrimRight(const std::wstring& str);
-
     // 分辨率计算
     static Resolution CalculateResolution(UINT64 totalPixels, double ratio);
     static Resolution CalculateResolutionByScreen(double targetRatio);
 
+    static bool TakeScreenshotAsync(
+        HWND hwnd, 
+        const std::wstring& filePath, 
+        std::function<void(bool success, const std::wstring& path)> completionCallback = nullptr
+    );
+
     // 截图相关函数
     static std::wstring GetScreenshotPath();
     static std::wstring GetGameScreenshotPath(HWND hwnd);
-    static bool CaptureWindow(HWND hwnd, std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)> callback);
     static bool SaveFrameToFile(ID3D11Texture2D* texture, const std::wstring& filePath);
+    static void CleanupCaptureResources();
 
     // D3D资源管理
     static bool EnsureD3DResources();

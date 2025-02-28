@@ -43,26 +43,111 @@ WindowCapturer::WindowCapturer() {
 }
 
 WindowCapturer::~WindowCapturer() {
+    if (m_cleanupTimer.IsRunning()) {
+        m_cleanupTimer.Cancel();
+    }
     Cleanup();
 }
 
+// 初始化捕获器
 bool WindowCapturer::Initialize(HWND hwnd) {
-    if (!hwnd || !IsWindow(hwnd)) return false;
+    if (!hwnd || !IsWindow(hwnd)) {
+        LOG_ERROR("Invalid window handle");
+        return false;
+    }
     
-    m_hwnd = hwnd;
-
+    if (m_hwnd != hwnd) {
+        m_hwnd = hwnd;
+    }
+    
     // 确保D3D资源已初始化
-    if (!EnsureD3DResources()) return false;
+    if (!EnsureD3DResources()) {
+        LOG_ERROR("Failed to initialize D3D resources");
+        return false;
+    }
 
+    if (m_isCapturing.load()) return true; // 已经在捕获中
+    
     // 创建捕获会话
-    if (!CreateCaptureSession()) return false;
-
-    m_isInitialized = true;
+    if (!CreateCaptureSession()) {
+        LOG_ERROR("Failed to create capture session");
+        Cleanup();
+        return false;
+    }
     return true;
 }
 
+// 添加回调到队列
+void WindowCapturer::AddCaptureCallback(std::function<void(ID3D11Texture2D*)> callback) {
+    if (!callback) return;
+    
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    m_callbackQueue.push(std::move(callback));
+}
+
+// 简化API：设置回调并立即开始捕获
+bool WindowCapturer::CaptureOneFrame(HWND hwnd, std::function<void(ID3D11Texture2D*)> callback) {
+    if (!callback) {
+        LOG_ERROR("Callback is null");
+        return false;
+    }
+    
+    // 初始化捕获器
+    if (!Initialize(hwnd)) {
+        LOG_ERROR("Failed to initialize capturer");
+        return false;
+    }
+    
+    // 添加回调到队列
+    AddCaptureCallback(std::move(callback));
+    
+    // 开始捕获
+    return StartCapture();
+}
+
+// 开始捕获
+bool WindowCapturer::StartCapture() {
+    if (m_isCapturing.load()) return true; // 已经在捕获中
+    
+    if (m_captureSession) {
+        LOG_DEBUG("Starting capture process");
+        m_captureSession.StartCapture();
+        m_isCapturing.store(true);
+        return true;
+    }
+    
+    LOG_ERROR("Capture session is null");
+    return false;
+}
+
+// 停止捕获
+void WindowCapturer::StopCapture() {
+    LOG_DEBUG("Stopping capture process");
+
+    m_isCapturing.store(false);
+    m_captureItem = nullptr;
+    m_hwnd = nullptr;
+
+    if (m_captureSession) {
+        m_captureSession.Close();
+        m_captureSession = nullptr;
+    }
+    if (m_framePool) {
+        m_framePool.FrameArrived(m_frameArrivedToken);
+        m_framePool.Close();
+        m_framePool = nullptr;
+    }
+
+    // 清空回调队列
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    std::queue<std::function<void(ID3D11Texture2D*)>> emptyQueue;
+    std::swap(m_callbackQueue, emptyQueue);
+}
+
+// 清理资源
 void WindowCapturer::Cleanup() {
     if (m_framePool) {
+        m_framePool.FrameArrived(m_frameArrivedToken);
         m_framePool.Close();
         m_framePool = nullptr;
     }
@@ -71,14 +156,21 @@ void WindowCapturer::Cleanup() {
         m_captureSession = nullptr;
     }
     m_captureItem = nullptr;
-    m_isInitialized = false;
-    m_isCapturing = false;
+    m_isCapturing.store(false);
+    m_hwnd = nullptr;
+    
+    // 清空回调队列
+    std::lock_guard<std::mutex> lock(m_queueMutex);
+    std::queue<std::function<void(ID3D11Texture2D*)>> emptyQueue;
+    std::swap(m_callbackQueue, emptyQueue);
+
+    // 清理D3D资源
+    WindowUtils::CleanupCaptureResources();
 }
 
 bool WindowCapturer::EnsureD3DResources() {
     return WindowUtils::EnsureD3DResources();
 }
-
 bool WindowCapturer::CreateCaptureSession() {
     // 获取窗口尺寸
     RECT windowRect;
@@ -137,51 +229,41 @@ bool WindowCapturer::CreateCaptureSession() {
     return true;
 }
 
-void WindowCapturer::StartCapture() {
-    if (m_captureSession && !m_isCapturing) {
-        m_captureSession.StartCapture();
-        m_isCapturing = true;
-    }
-}
-
-void WindowCapturer::StopCapture() {
-    if (!m_isCapturing) {
-        return;
-    }
-
-    Cleanup();
-}
-
-bool WindowCapturer::CaptureScreenshot(std::function<void(ID3D11Texture2D*)> callback) {
-    if (!m_isInitialized || !callback) return false;
-    
-    {
-        std::lock_guard<std::mutex> lock(m_queueMutex);
-        m_callbackQueue.push(callback);
-    }
-    
-    return true;
-}
-
 void WindowCapturer::ProcessFrameArrived(ID3D11Texture2D* texture) {
+    if (!texture) return;
+    
     std::function<void(ID3D11Texture2D*)> callback;
-    wchar_t threadIdStr[32];
-    _itow_s(GetCurrentThreadId(), threadIdStr, 32, 10);
+    bool hasCallback = false;
+    
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         if (!m_callbackQueue.empty()) {
             callback = std::move(m_callbackQueue.front());
             m_callbackQueue.pop();
+            hasCallback = true;
             
-            // 立即停止捕获，因为我们只需要一帧
-            m_isCapturing = false;
-            if (m_captureSession) {
-                m_captureSession.Close();
+            // 队列有回调，取消清理定时器
+            if (m_cleanupTimer.IsRunning()) {
+                m_cleanupTimer.Cancel();
+                LOG_DEBUG("Cleanup timer cancelled due to new callbacks");
             }
         }
     }
     
-    if (callback) {
+    if (hasCallback && callback) {
         callback(texture);
+    }
+    
+    // 如果队列为空且定时器未激活，则设置定时器
+    {
+        std::lock_guard<std::mutex> lock(m_queueMutex);
+        if (m_callbackQueue.empty() && !m_cleanupTimer.IsRunning()) {
+            LOG_DEBUG("Queue empty, starting cleanup timer");
+            
+            m_cleanupTimer.SetTimer(1000, [this]() {
+                LOG_DEBUG("Cleanup timer triggered, stopping capture");
+                Cleanup();
+            });
+        }
     }
 }
