@@ -1,5 +1,6 @@
 name: 问题报告
 description: 报告使用过程中遇到的问题或错误
+title: "[问题] "
 labels: ["bug"]
 body:
   - type: textarea
@@ -17,7 +18,6 @@ body:
       label: 日志文件
       description: 请将 app.log 文件的内容粘贴到下方，或者上传文件
       placeholder: 如有必要，请在 config.ini 将日志级别设置为 DEBUG 级别
-      render: shell
     validations:
       required: false
       
