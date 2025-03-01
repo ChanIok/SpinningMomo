@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*'  # 只在推送版本标签时触发
-    branches:
-      - master  # 在推送到 master 分支时也触发
     paths-ignore:
       - 'docs/**'
   pull_request:
@@ -13,6 +11,7 @@ on:
       - master  # 在提交 PR 到 master 分支时触发
     paths-ignore:
       - 'docs/**'
+  workflow_dispatch:  # 添加手动触发支持
 
 env:
   BUILD_TYPE: Release
