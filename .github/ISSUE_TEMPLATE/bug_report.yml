@@ -1,0 +1,31 @@
+name: 问题报告
+description: 报告使用过程中遇到的问题或错误
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 简单描述你遇到的问题，以及如何复现这个问题？
+      placeholder: 请详细描述问题...
+    validations:
+      required: true
+      
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志文件
+      description: 请将 app.log 文件的内容粘贴到下方，或者上传文件
+      placeholder: 如有必要，请在 config.ini 将日志级别设置为 DEBUG 级别
+      render: shell
+    validations:
+      required: false
+      
+  - type: textarea
+    id: additional
+    attributes:
+      label: 其他信息
+      description: 截图或其他有助于解决问题的信息（可选）
+      placeholder: 添加截图或其他信息...
+    validations:
+      required: false
