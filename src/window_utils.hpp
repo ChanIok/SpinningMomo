@@ -25,6 +25,7 @@ public:
     // 功能检查
     static bool IsWindowsCaptureSupported() {
         try {
+            // Windows 10 1803 (Build 17134)
             return winrt::Windows::Graphics::Capture::GraphicsCaptureSession::IsSupported();
         }
         catch (...) {

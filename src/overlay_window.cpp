@@ -390,12 +390,13 @@ bool OverlayWindow::InitializeCapture() {
         GetCurrentProcess(),
         hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
     if (status != 0) {
+        // 可能是 Windows 10 2004 之前的版本，忽略错误
         LOG_ERROR("Failed to set process priority class. Status code: %d", status);
     } else {
         LOG_INFO("Process priority class set successfully");
     }
 
-    // 设置 GPU 线程优先级
+    // 设置 GPU 线程优先级，可能没实际效果
     hr = dxgiDevice->SetGPUThreadPriority(7);
     if (SUCCEEDED(hr)) {
         LOG_DEBUG("GPU thread priority setup successful");
@@ -452,6 +453,7 @@ bool OverlayWindow::InitializeCapture() {
         winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
         L"IsCursorCaptureEnabled")) 
     {
+        // Windows 10 2004 (Build 19041)
         m_captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
     } else {
         LOG_INFO("Cursor capture setting not available on this Windows version");
@@ -462,7 +464,7 @@ bool OverlayWindow::InitializeCapture() {
         winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
         L"IsBorderRequired")) 
     {
-        // 从 Windows 10 2004 (20H1)版本开始提供
+        // Windows 10 2104 (Build 20348)
         m_captureSession.IsBorderRequired(false);
     } else {
         LOG_INFO("Border requirement setting not available on this Windows version");

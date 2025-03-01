@@ -180,7 +180,8 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
         winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
         L"IsCursorCaptureEnabled")) 
     {
-        m_captureSession.IsCursorCaptureEnabled(false);  // 禁用鼠标捕获
+        // Windows 10 2004 (Build 19041)
+        m_captureSession.IsCursorCaptureEnabled(false);
     }
     
     // 尝试禁用边框 - 使用ApiInformation检查API是否可用
@@ -188,7 +189,7 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
         winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
         L"IsBorderRequired")) 
     {
-        // 从 Windows 10 2004 (20H1)版本开始提供
+        // Windows 10 2104 (Build 20348)
         m_captureSession.IsBorderRequired(false);
     }
     

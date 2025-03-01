@@ -15,10 +15,15 @@
 ### 系统要求
 
 ::: warning 运行环境
-- **操作系统**：Windows 10 或更高版本
+- **操作系统**：Windows 10 1803 (Build 17134) 或更高版本
 - **运行库**：[Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+- **显卡/驱动**：支持 DirectX 11 的显卡和最新驱动
+- **Windows 功能**：
+  - 图形捕获功能 Windows 10 1803+
+  - 高级功能需要 Windows 10 2104+（Build 20348 或更高）
 
-如果运行时提示缺少 DLL，请安装上述运行库。
+如果运行时提示缺少 DLL，请安装上述运行库。  
+部分高级功能（如无边框捕获、隐藏鼠标捕获、硬件加速）在较新版本的 Windows 10/11 上提供更好体验。  
 :::
 
 ## 🚀 使用说明
