@@ -62,6 +62,9 @@ public:
     static ID3D11DeviceContext* GetContext() { return s_context.Get(); }
     static winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice GetWinRTDevice() { return s_winrtDevice; }
 
+    // 鼠标显示控制
+    static void HideCursor();
+    static void ShowCursor();
 private:
     // 静态捕获器实例
     static std::unique_ptr<WindowCapturer> s_capturer;
@@ -70,4 +73,6 @@ private:
     static Microsoft::WRL::ComPtr<ID3D11Device> s_device;
     static Microsoft::WRL::ComPtr<ID3D11DeviceContext> s_context;
     static winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice s_winrtDevice;
+
+    static bool s_cursorHidden;  // 标记鼠标是否被我们隐藏
 }; 

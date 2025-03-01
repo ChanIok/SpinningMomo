@@ -10,6 +10,8 @@ Microsoft::WRL::ComPtr<ID3D11Device> WindowUtils::s_device;
 Microsoft::WRL::ComPtr<ID3D11DeviceContext> WindowUtils::s_context;
 winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice WindowUtils::s_winrtDevice{ nullptr };
 
+bool WindowUtils::s_cursorHidden = false;
+
 // 匿名命名空间：内部实现，只在当前文件可见
 namespace {
     // 创建 Windows Runtime Direct3D 设备
@@ -569,4 +571,24 @@ void WindowUtils::CleanupCaptureResources() {
 
     // 释放 D3D 设备
     s_device.Reset();
+}
+
+// 隐藏鼠标光标
+void WindowUtils::HideCursor() {
+    if (!s_cursorHidden) {
+        // 隐藏鼠标直到计数器变为负数
+        while (::ShowCursor(FALSE) >= 0);
+        s_cursorHidden = true;
+        LOG_DEBUG("Cursor hidden");
+    }
+}
+
+// 显示鼠标光标
+void WindowUtils::ShowCursor() {
+    if (s_cursorHidden) {
+        // 显示鼠标直到计数器变为非负数
+        while (::ShowCursor(TRUE) < 0);
+        s_cursorHidden = false;
+        LOG_DEBUG("Cursor restored");
+    }
 }

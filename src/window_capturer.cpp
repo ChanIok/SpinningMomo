@@ -120,32 +120,14 @@ bool WindowCapturer::StartCapture() {
     return false;
 }
 
-// 停止捕获
-void WindowCapturer::StopCapture() {
-    LOG_DEBUG("Stopping capture process");
-
-    m_isCapturing.store(false);
-    m_captureItem = nullptr;
-    m_hwnd = nullptr;
-
-    if (m_captureSession) {
-        m_captureSession.Close();
-        m_captureSession = nullptr;
-    }
-    if (m_framePool) {
-        m_framePool.FrameArrived(m_frameArrivedToken);
-        m_framePool.Close();
-        m_framePool = nullptr;
-    }
-
-    // 清空回调队列
-    std::lock_guard<std::mutex> lock(m_queueMutex);
-    std::queue<std::function<void(ID3D11Texture2D*)>> emptyQueue;
-    std::swap(m_callbackQueue, emptyQueue);
-}
-
 // 清理资源
 void WindowCapturer::Cleanup() {
+    if (!m_isCapturing.load()) {    // 防止重入
+        return;
+    }
+
+    m_isCapturing.store(false);
+
     if (m_framePool) {
         m_framePool.FrameArrived(m_frameArrivedToken);
         m_framePool.Close();
@@ -156,7 +138,6 @@ void WindowCapturer::Cleanup() {
         m_captureSession = nullptr;
     }
     m_captureItem = nullptr;
-    m_isCapturing.store(false);
     m_hwnd = nullptr;
     
     // 清空回调队列
@@ -215,6 +196,8 @@ bool WindowCapturer::CreateCaptureSession() {
         m_captureSession.IsCursorCaptureEnabled(false);
     } else {
         LOG_INFO("Cursor capture setting not available on this Windows version");
+        m_needHideCursor = true;
+        WindowUtils::HideCursor();  // 使用WindowUtils提供的鼠标隐藏功能
     }
     
     if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
@@ -230,7 +213,7 @@ bool WindowCapturer::CreateCaptureSession() {
 }
 
 void WindowCapturer::ProcessFrameArrived(ID3D11Texture2D* texture) {
-    if (!texture) return;
+    if (!m_isCapturing.load() || !texture) return;
     
     std::function<void(ID3D11Texture2D*)> callback;
     bool hasCallback = false;
@@ -253,6 +236,13 @@ void WindowCapturer::ProcessFrameArrived(ID3D11Texture2D* texture) {
     if (hasCallback && callback) {
         callback(texture);
     }
+
+    // 兼容性隐藏鼠标后，立即停止捕获
+    if (m_needHideCursor) {
+        WindowUtils::ShowCursor();
+        Cleanup();
+        return;
+    }
     
     // 如果队列为空且定时器未激活，则设置定时器
     {
@@ -260,7 +250,7 @@ void WindowCapturer::ProcessFrameArrived(ID3D11Texture2D* texture) {
         if (m_callbackQueue.empty() && !m_cleanupTimer.IsRunning()) {
             LOG_DEBUG("Queue empty, starting cleanup timer");
             
-            m_cleanupTimer.SetTimer(1000, [this]() {
+            m_cleanupTimer.SetTimer(5000, [this]() {
                 LOG_DEBUG("Cleanup timer triggered, stopping capture");
                 Cleanup();
             });

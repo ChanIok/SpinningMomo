@@ -56,6 +56,7 @@ private:
     // 状态标志
     bool m_isInitialized = false;
     std::atomic<bool> m_isCapturing{false};
+    bool m_needHideCursor = false;
 
     WinTimer m_cleanupTimer;
 }; 
