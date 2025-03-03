@@ -106,11 +106,6 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
 }
 
 bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
-    if (m_cleanupTimer.IsRunning()) {
-        LOG_DEBUG("Canceling cleanup timer due to new capture");
-        m_cleanupTimer.Cancel();
-    }
-
     if (!targetWindow) return false;
 
     m_gameWindow = targetWindow;
@@ -137,6 +132,11 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
         LOG_DEBUG("Game window fits within screen dimensions, no need for overlay");
         RestoreGameWindow();
         return true;
+    }
+
+    if (m_cleanupTimer.IsRunning()) {
+        LOG_DEBUG("Canceling cleanup timer due to new capture");
+        m_cleanupTimer.Cancel();
     }
     
     // 初始化 D3D 资源
