@@ -488,6 +488,9 @@ bool OverlayWindow::InitializeCapture() {
 }
 
 void OverlayWindow::StopCapture(bool hideWindow) {
+    if (!m_running.load()) {
+        return;
+    }
     // 停止标志
     m_running.store(false);
 
