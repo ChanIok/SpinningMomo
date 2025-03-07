@@ -317,7 +317,7 @@ void OverlayWindow::WindowManagerThreadProc() {
                         
                         // 更新游戏窗口位置
                         SetWindowPos(m_gameWindow, NULL, newGameX, newGameY, 
-                            0, 0, SWP_NOSIZE | SWP_NOZORDER);
+                            0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
                     }
                     
                     // 更新上一次的鼠标位置
@@ -329,11 +329,11 @@ void OverlayWindow::WindowManagerThreadProc() {
         case WM_GAME_WINDOW_FOREGROUND:
             // 确保overlay窗口在游戏窗口上方
             SetWindowPos(m_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
             SetWindowPos(m_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
             SetWindowPos(m_gameWindow, m_hwnd, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_ASYNCWINDOWPOS);
             break;
         }
 
@@ -345,6 +345,7 @@ void OverlayWindow::WindowManagerThreadProc() {
     KillTimer(timerWindow, 1);
     DestroyWindow(timerWindow);
     UnregisterClassW(L"WindowManagerClass", GetModuleHandle(NULL));
+    LOG_DEBUG("Exiting window manager thread");
 }
 
 void CALLBACK OverlayWindow::WinEventProc(
