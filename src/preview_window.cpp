@@ -1102,7 +1102,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     static_cast<int>(targetX),
                     static_cast<int>(targetY),
                     0, 0,
-                    SWP_NOSIZE | SWP_NOZORDER);
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
             }
             return 0;
 
