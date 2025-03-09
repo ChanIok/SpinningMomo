@@ -27,7 +27,6 @@ public:
 
     // 启动和停止捕获
     bool StartCapture();
-    void StopCapture();
 
     // 简化API：设置回调并开始捕获
     bool CaptureOneFrame(HWND hwnd, std::function<void(ID3D11Texture2D*)> callback);
@@ -39,9 +38,16 @@ private:
     // 创建捕获会话
     bool CreateCaptureSession();
 
+    // 检查窗口尺寸是否变化
+    bool CheckWindowSizeChanged();
+
     void ProcessFrameArrived(ID3D11Texture2D* texture);
 
     HWND m_hwnd = nullptr;
+    
+    // 目标窗口尺寸
+    int m_targetWidth = 0;
+    int m_targetHeight = 0;
 
     // 捕获相关资源
     winrt::Windows::Graphics::Capture::GraphicsCaptureItem m_captureItem{ nullptr };
@@ -59,4 +65,5 @@ private:
     bool m_needHideCursor = false;
 
     WinTimer m_cleanupTimer;
+    const int CLEANUP_TIMEOUT = 10000; 
 }; 

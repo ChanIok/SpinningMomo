@@ -58,7 +58,13 @@ bool WindowCapturer::Initialize(HWND hwnd) {
     
     if (m_hwnd != hwnd) {
         m_hwnd = hwnd;
+        // 新窗口句柄，重置尺寸记录
+        m_targetWidth = 0;
+        m_targetHeight = 0;
     }
+    
+    // 检查窗口尺寸是否变化
+    bool sizeChanged = CheckWindowSizeChanged();
     
     // 确保D3D资源已初始化
     if (!EnsureD3DResources()) {
@@ -66,14 +72,33 @@ bool WindowCapturer::Initialize(HWND hwnd) {
         return false;
     }
 
-    if (m_isCapturing.load()) return true; // 已经在捕获中
-    
-    // 创建捕获会话
+    // 如果尺寸变化，需要重新创建
+    if (sizeChanged && m_isCapturing.load()) {
+        // 如果正在捕获，先停止
+        LOG_DEBUG("Window size changed, stopping capture");
+        m_isCapturing.store(false);
+        if (m_framePool) {
+            m_framePool.FrameArrived(m_frameArrivedToken);
+            m_framePool.Close();
+            m_framePool = nullptr;
+        }
+        if (m_captureSession) {
+            m_captureSession.Close();
+            m_captureSession = nullptr;
+        }
+        m_captureItem = nullptr;
+    } else if (m_isCapturing.load()) {
+        LOG_DEBUG("Already capturing, skipping initialization");
+        return true;
+    }
+
+    // 创建新的捕获会话
     if (!CreateCaptureSession()) {
         LOG_ERROR("Failed to create capture session");
         Cleanup();
         return false;
     }
+    LOG_DEBUG("Capture session created");
     return true;
 }
 
@@ -152,21 +177,52 @@ void WindowCapturer::Cleanup() {
 bool WindowCapturer::EnsureD3DResources() {
     return WindowUtils::EnsureD3DResources();
 }
-bool WindowCapturer::CreateCaptureSession() {
-    // 获取窗口尺寸
+
+// 检查窗口尺寸是否变化
+bool WindowCapturer::CheckWindowSizeChanged() {
+    if (!m_hwnd || !IsWindow(m_hwnd)) {
+        return false;
+    }
+    
     RECT windowRect;
-    if (!GetWindowRect(m_hwnd, &windowRect)) return false;
+    if (!GetWindowRect(m_hwnd, &windowRect)) {
+        return false;
+    }
+    
+    int newWidth = static_cast<int>(windowRect.right - windowRect.left);
+    int newHeight = static_cast<int>(windowRect.bottom - windowRect.top);
+    
+    // 检查尺寸是否变化
+    if (newWidth != m_targetWidth || newHeight != m_targetHeight) {
+        LOG_DEBUG("Window size changed: " + std::to_string(m_targetWidth) + "x" + std::to_string(m_targetHeight) + 
+                 " -> " + std::to_string(newWidth) + "x" + std::to_string(newHeight));
+        m_targetWidth = newWidth;
+        m_targetHeight = newHeight;
+        return true; // 尺寸已变化
+    }
+    
+    return false; // 尺寸未变化
+}
+
+bool WindowCapturer::CreateCaptureSession() {
+    // 确保已获取窗口尺寸
+    if (m_targetWidth == 0 || m_targetHeight == 0) {
+        RECT windowRect;
+        if (!GetWindowRect(m_hwnd, &windowRect)) return false;
+        m_targetWidth = static_cast<int>(windowRect.right - windowRect.left);
+        m_targetHeight = static_cast<int>(windowRect.bottom - windowRect.top);
+    }
 
     // 创建捕获项
     m_captureItem = CreateCaptureItemForWindow(m_hwnd);
     if (!m_captureItem) return false;
 
-    // 创建帧池
+    // 创建帧池，使用已保存的尺寸
     m_framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::Create(
         WindowUtils::GetWinRTDevice(),
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
         1,
-        { windowRect.right - windowRect.left, windowRect.bottom - windowRect.top }
+        { m_targetWidth, m_targetHeight }
     );
     if (!m_framePool) return false;
 
@@ -243,14 +299,14 @@ void WindowCapturer::ProcessFrameArrived(ID3D11Texture2D* texture) {
         Cleanup();
         return;
     }
-    
+
     // 如果队列为空且定时器未激活，则设置定时器
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         if (m_callbackQueue.empty() && !m_cleanupTimer.IsRunning()) {
             LOG_DEBUG("Queue empty, starting cleanup timer");
             
-            m_cleanupTimer.SetTimer(5000, [this]() {
+            m_cleanupTimer.SetTimer(CLEANUP_TIMEOUT, [this]() {
                 LOG_DEBUG("Cleanup timer triggered, stopping capture");
                 Cleanup();
             });
