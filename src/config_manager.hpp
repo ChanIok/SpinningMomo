@@ -69,9 +69,6 @@ public:
     void SetTaskbarAutoHide(bool autoHide) { m_taskbarAutoHide = autoHide; }
     void SetTaskbarLower(bool lower) { m_taskbarLower = lower; }
     void SetUseFloatingWindow(bool use) { m_useFloatingWindow = use; }
-    void SetMenuItemsToShow(const std::vector<std::wstring>& items) { m_menuItemsToShow = items; }
-    void SetAspectRatioItems(const std::vector<std::wstring>& items) { m_aspectRatioItems = items; }
-    void SetResolutionItems(const std::vector<std::wstring>& items) { m_resolutionItems = items; }
 
 private:
     // 获取默认的宽高比和分辨率预设

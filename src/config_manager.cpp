@@ -330,6 +330,12 @@ bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vec
         } else if (resolution == TEXT("2K")) {
             resolutions.emplace_back(resolution, 2560, 1440);
             return true;
+        } else if (resolution == TEXT("10K")) {
+            resolutions.emplace_back(resolution, 10240, 4320);
+            return true;
+        } else if (resolution == TEXT("16K")) {
+            resolutions.emplace_back(resolution, 15360, 8640);
+            return true;
         }
         
         // 处理自定义分辨率格式 (例如 1920x1080)
@@ -348,6 +354,7 @@ bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vec
         return false;
     }
 }
+
 // 获取默认的宽高比预设
 std::vector<AspectRatio> ConfigManager::GetDefaultAspectRatios() {
     return {

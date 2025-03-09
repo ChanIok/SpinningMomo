@@ -112,6 +112,7 @@
         "stacktrace": "cpp",
         "stdfloat": "cpp",
         "strstream": "cpp",
-        "syncstream": "cpp"
+        "syncstream": "cpp",
+        "resumable": "cpp"
     }
 }

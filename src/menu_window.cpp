@@ -200,6 +200,8 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
                 m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_CLOSE) {
                 m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_EXIT) {
+                m_items.push_back({strings.EXIT, ItemType::Exit, 0});
             }
         }
     } else {
@@ -370,6 +372,7 @@ void MenuWindow::OnPaint(HDC hdc) {
             case ItemType::OverlayWindow:
             case ItemType::Reset:
             case ItemType::Close:
+            case ItemType::Exit:
                 itemRect = {resolutionColumnRight + m_separatorHeight, settingsY, 
                           rect.right, settingsY + m_itemHeight};
                 settingsY += m_itemHeight;
@@ -490,6 +493,9 @@ void MenuWindow::OnLButtonDown(int x, int y) {
             case ItemType::Close:
                 Hide();  // 直接调用Hide函数关闭窗口
                 break;
+            case ItemType::Exit:
+                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_EXIT, 0);
+                break;
         }
     }
 }
@@ -531,6 +537,7 @@ int MenuWindow::CalculateWindowHeight() {
             case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
+            case ItemType::Exit:
                 settingsCount++;
                 break;
         }
@@ -574,7 +581,8 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
                 item.type == ItemType::PreviewWindow ||
                 item.type == ItemType::OverlayWindow ||
                 item.type == ItemType::Reset ||
-                item.type == ItemType::Close) {
+                item.type == ItemType::Close ||
+                item.type == ItemType::Exit) {
                 if (y >= settingsY && y < settingsY + m_itemHeight) {
                     return static_cast<int>(i);
                 }

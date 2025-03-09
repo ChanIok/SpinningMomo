@@ -23,7 +23,8 @@ public:
         PreviewWindow,
         OverlayWindow,
         Reset,
-        Close
+        Close,
+        Exit
     };
 
     // 列表项结构

@@ -92,6 +92,7 @@ ResolutionItems=Default,480P,720P,1080P,2K,4K,8K
   - `OverlayWindow`: 叠加层
   - `Reset`: 重置窗口
   - `Close`: 关闭菜单
+  - `Exit`: 退出程序
 
 示例：
 ```ini
@@ -99,7 +100,7 @@ ResolutionItems=Default,480P,720P,1080P,2K,4K,8K
 MenuItems=PreviewWindow,OverlayWindow,Reset,Close
 
 # 完整菜单
-MenuItems=CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,Reset,Close
+MenuItems=CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,Reset,Close,Exit
 ```
 
 ### 📸 相册目录设置

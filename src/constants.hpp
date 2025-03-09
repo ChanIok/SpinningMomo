@@ -82,6 +82,7 @@ namespace Constants {
     inline const TCHAR* MENU_ITEM_TYPE_PREVIEW = TEXT("PreviewWindow");
     inline const TCHAR* MENU_ITEM_TYPE_RESET = TEXT("Reset");
     inline const TCHAR* MENU_ITEM_TYPE_CLOSE = TEXT("Close");
+    inline const TCHAR* MENU_ITEM_TYPE_EXIT = TEXT("Exit");
     
     // 菜单项配置
     inline const TCHAR* MENU_ITEMS = TEXT("MenuItems");  // 菜单项显示配置
