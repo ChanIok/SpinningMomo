@@ -694,8 +694,15 @@ bool OverlayWindow::InitializeD3D() {
 
     // 创建交换链描述
     DXGI_SWAP_CHAIN_DESC1 scd = {};
-    scd.Width = m_windowWidth > 0 ? m_windowWidth : m_screenWidth;
-    scd.Height = m_windowHeight > 0 ? m_windowHeight : m_screenHeight;
+    if (m_useLetterboxMode) {
+        // 在填充模式下，使用屏幕宽高
+        scd.Width = m_screenWidth;
+        scd.Height = m_screenHeight;
+    } else {
+        // 在非填充模式下，使用窗口宽高
+        scd.Width = m_windowWidth > 0 ? m_windowWidth : m_screenWidth;
+        scd.Height = m_windowHeight > 0 ? m_windowHeight : m_screenHeight;
+    }
     scd.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     scd.BufferCount = 4;
     scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -775,8 +782,8 @@ bool OverlayWindow::ResizeSwapChain() {
     // 调整交换链缓冲区大小
     hr = m_swapChain->ResizeBuffers(
         4,
-        m_windowWidth > 0 ? m_windowWidth : m_screenWidth,
-        m_windowHeight > 0 ? m_windowHeight : m_screenHeight,
+        m_useLetterboxMode ? m_screenWidth : (m_windowWidth > 0 ? m_windowWidth : m_screenWidth),
+        m_useLetterboxMode ? m_screenHeight : (m_windowHeight > 0 ? m_windowHeight : m_screenHeight),
         DXGI_FORMAT_R8G8B8A8_UNORM,
         desc.Flags    // 保持原有标志
     );
@@ -867,6 +874,7 @@ bool OverlayWindow::CreateShaderResources() {
         LOG_ERROR("Failed to create input layout, HRESULT: 0x%08X", hr);
         return false;
     }
+    
     // 创建顶点缓冲
     Vertex vertices[] = {
         { -1.0f,  1.0f, 0.0f, 0.0f },
@@ -973,7 +981,43 @@ void OverlayWindow::PerformRendering() {
 }
 
 void OverlayWindow::InitializeRenderStates() {
-    // 设置固定的渲染状态
+    // 计算letterbox区域的顶点位置
+    float left = -1.0f, top = 1.0f, right = 1.0f, bottom = -1.0f;
+    
+    // 如果启用letterbox模式，计算实际渲染区域
+    if (m_useLetterboxMode) {
+        // 计算游戏内容的宽高比
+        float gameAspectRatio = static_cast<float>(m_cachedGameWidth) / m_cachedGameHeight;
+        
+        // 计算窗口/屏幕的宽高比
+        float screenAspectRatio = static_cast<float>(m_screenWidth) / m_screenHeight;
+        
+        // 根据宽高比计算实际的渲染区域
+        if (gameAspectRatio > screenAspectRatio) {
+            // 游戏比例更宽 - 需要上下黑边 (letterbox)
+            float height = screenAspectRatio / gameAspectRatio;
+            top = height;
+            bottom = -height;
+        } else if (gameAspectRatio < screenAspectRatio) {
+            // 游戏比例更窄 - 需要左右黑边 (pillarbox)
+            float width = gameAspectRatio / screenAspectRatio;
+            left = -width;
+            right = width;
+        }
+    }
+    
+    // 更新顶点数据
+    Vertex vertices[] = {
+        { left,  top,    0.0f, 0.0f },
+        { right, top,    1.0f, 0.0f },
+        { left,  bottom, 0.0f, 1.0f },
+        { right, bottom, 1.0f, 1.0f }
+    };
+    
+    // 更新顶点缓冲区
+    m_context->UpdateSubresource(m_vertexBuffer.Get(), 0, nullptr, vertices, 0, 0);
+    
+    // 设置固定的渲染状态 - 原来的代码
     UINT stride = sizeof(Vertex);
     UINT offset = 0;
     m_context->IASetVertexBuffers(0, 1, m_vertexBuffer.GetAddressOf(), &stride, &offset);
@@ -983,15 +1027,22 @@ void OverlayWindow::InitializeRenderStates() {
     m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
     m_context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
 
-    // 设置视口（使用计算后的窗口尺寸）
+    // 设置视口
     D3D11_VIEWPORT viewport = {};
-    viewport.Width = static_cast<float>(m_windowWidth > 0 ? m_windowWidth : m_screenWidth);
-    viewport.Height = static_cast<float>(m_windowHeight > 0 ? m_windowHeight : m_screenHeight);
+    if (m_useLetterboxMode) {
+        // 在填充模式下，使用屏幕宽高
+        viewport.Width = static_cast<float>(m_screenWidth);
+        viewport.Height = static_cast<float>(m_screenHeight);
+    } else {
+        // 在非填充模式下，使用窗口宽高
+        viewport.Width = static_cast<float>(m_windowWidth > 0 ? m_windowWidth : m_screenWidth);
+        viewport.Height = static_cast<float>(m_windowHeight > 0 ? m_windowHeight : m_screenHeight);
+    }
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     m_context->RSSetViewports(1, &viewport);
 
-    // 设置混合状态（只需要设置一次）
+    // 设置混合状态
     float blendFactor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_context->OMSetBlendState(m_blendState.Get(), blendFactor, 0xffffffff);
 }
@@ -1006,11 +1057,21 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             case WM_SHOW_OVERLAY: {
                 ShowWindow(hwnd, SW_SHOWNA);
                 
-                // 计算居中位置
+                // 计算窗口大小和位置
                 int screenWidth = instance->m_screenWidth;
                 int screenHeight = instance->m_screenHeight;
-                int left = (screenWidth - instance->m_windowWidth) / 2;
-                int top = (screenHeight - instance->m_windowHeight) / 2;
+                int left = 0;
+                int top = 0;
+                int width = screenWidth;
+                int height = screenHeight;
+                
+                // 如果不是黑边填充模式，则使用原本的居中计算
+                if (!instance->m_useLetterboxMode) {
+                    width = instance->m_windowWidth;
+                    height = instance->m_windowHeight;
+                    left = (screenWidth - width) / 2;
+                    top = (screenHeight - height) / 2;
+                }
                 
                 // 添加分层窗口样式
                 LONG exStyle = GetWindowLong(instance->m_gameWindow, GWL_EXSTYLE);
@@ -1021,8 +1082,7 @@ LRESULT CALLBACK OverlayWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
 
                 // 设置窗口位置和大小
                 SetWindowPos(hwnd, nullptr,
-                    left, top,
-                    instance->m_windowWidth, instance->m_windowHeight,
+                    left, top, width, height,
                     SWP_NOZORDER | SWP_NOACTIVATE);
                     
                 SetWindowPos(instance->m_gameWindow, hwnd, 0, 0, 0, 0,

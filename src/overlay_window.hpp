@@ -50,7 +50,8 @@ private:
 
     bool InitializeCapture();
 
-    
+    // 控制是否使用黑边填充模式(letterbox/pillarbox)
+    bool m_useLetterboxMode = true;
 
     // Direct3D资源
     Microsoft::WRL::ComPtr<ID3D11Device> m_device;
