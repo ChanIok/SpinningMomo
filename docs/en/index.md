@@ -175,15 +175,16 @@ Right-click or left-click the tray icon to:
 - 🎯 **Select Window**: Choose the target window from the submenu
 - 📐 **Window Ratio**: Select from preset ratios or custom ratios 
 - 📏 **Resolution**: Select from preset resolutions or custom resolutions
-- 📍 **Screenshot**: Save lossless screenshots to the ScreenShot folder in program directory (mainly for debugging or games without screenshot support)
-- 📂 **Open Screenshot Folder**: Open the game screenshot directory
+- 📍 **Capture**: Save lossless screenshots to the ScreenShot folder in program directory (mainly for debugging or games without screenshot support)
+- 📂 **Screenshots**: Open the game screenshot directory
 - 🔽 **Hide Taskbar**: Hide the taskbar to prevent overlap
 - ⬇️ **Lower Taskbar When Resizing**: Lower taskbar when resizing window
+- ⬛ **Black Border Mode**: Adds a full-screen black background to windows that do not match the screen ratio, enhancing immersion and resolving taskbar flickering issues under overlay layers.
 - ⌨️ **Modify Hotkey**: Set a new shortcut combination
-- 🔍 **Preview Window**: Similar to Photoshop's navigator for real-time preview when window exceeds screen
+- 🔍 **Preview**: Similar to Photoshop's navigator for real-time preview when window exceeds screen
   - Support dragging window top area to move position
   - Mouse wheel to zoom window size
-- 🖼️ **Overlay Window**: Render the target window on a fullscreen overlay for seamless zooming experience
+- 🖼️ **Overlay**: Render the target window on a fullscreen overlay for seamless zooming experience
 - 📱 **Floating Window Mode**: Toggle floating menu visibility (enabled by default, use hotkey to open menu when disabled)
 - 🌐 **Language**: Switch language
 - ⚙️ **Open Config**: Customize ratios and resolutions
