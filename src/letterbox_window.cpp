@@ -186,11 +186,9 @@ void LetterboxWindow::UpdatePosition(HWND targetWindow) {
     
     // 设置黑边窗口为全屏
     SetWindowPos(m_hwnd, m_targetWindow, 0, 0, screenWidth, screenHeight, SWP_NOACTIVATE);
-
-    // 将任务栏置于底层
-    if (HWND taskbar = FindWindow(TEXT("Shell_TrayWnd"), NULL)) {
-        SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    }
+    
+    // 创建一个计时器，稍后处理任务栏置底
+    SetTimer(m_hwnd, TIMER_TASKBAR_ZORDER, 10, nullptr);
 }
 
 bool LetterboxWindow::IsVisible() const {
@@ -349,6 +347,16 @@ LRESULT CALLBACK LetterboxWindow::LetterboxWndProc(HWND hwnd, UINT message, WPAR
     if (!pThis) return DefWindowProc(hwnd, message, wParam, lParam);
 
     switch (message) {
+        case WM_TIMER:
+            if (wParam == TIMER_TASKBAR_ZORDER) {
+                // 将任务栏置于底层
+                if (HWND taskbar = FindWindow(TEXT("Shell_TrayWnd"), NULL)) {
+                    SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, 
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                }
+                KillTimer(hwnd, TIMER_TASKBAR_ZORDER);
+            }
+            break;
         case WM_LBUTTONDOWN:
         case WM_RBUTTONDOWN:
         case WM_MBUTTONDOWN:
@@ -361,10 +369,7 @@ LRESULT CALLBACK LetterboxWindow::LetterboxWndProc(HWND hwnd, UINT message, WPAR
                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
                 
                 // 将任务栏置于底层
-                if (HWND taskbar = FindWindow(TEXT("Shell_TrayWnd"), NULL)) {
-                    SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, 
-                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-                }
+                SetTimer(pThis->m_hwnd, TIMER_TASKBAR_ZORDER, 10, nullptr);
             }
             break;
     }

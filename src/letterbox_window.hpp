@@ -45,6 +45,11 @@ private:
     static const UINT WM_TARGET_WINDOW_FOREGROUND = WM_USER + 100;
     static const UINT WM_HIDE_LETTERBOX = WM_USER + 101;
     static const UINT WM_SHOW_LETTERBOX = WM_USER + 102;
+    static const UINT WM_UPDATE_TASKBAR_ZORDER = WM_USER + 103; // 新增：更新任务栏Z序的消息
+
+    // 计时器ID定义
+    static const UINT TIMER_TASKBAR_ZORDER = 1001;  // 新增：任务栏Z序计时器ID
+
 
 public:
     LetterboxWindow();

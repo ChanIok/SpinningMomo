@@ -99,7 +99,7 @@ bool MenuWindow::Create(HWND parent,
 
 void MenuWindow::Show() {
     if (m_hwnd) {
-        ShowWindow(m_hwnd, SW_SHOW);
+        ShowWindow(m_hwnd, SW_SHOWNA);
         UpdateWindow(m_hwnd);
     }
 }
@@ -107,19 +107,6 @@ void MenuWindow::Show() {
 void MenuWindow::Hide() {
     if (m_hwnd) {
         ShowWindow(m_hwnd, SW_HIDE);
-    }
-}
-
-void MenuWindow::Activate() {
-    if (IsWindow(m_hwnd)) {
-        // 如果窗口被最小化，则还原
-        if (IsIconic(m_hwnd)) {
-            ShowWindow(m_hwnd, SW_RESTORE);
-        }
-        // 将窗口置于前台
-        SetForegroundWindow(m_hwnd);
-        // 设置焦点
-        SetFocus(m_hwnd);
     }
 }
 
@@ -474,6 +461,10 @@ void MenuWindow::OnMouseLeave() {
 void MenuWindow::OnLButtonDown(int x, int y) {
     if (m_hoverIndex >= 0 && m_hoverIndex < static_cast<int>(m_items.size())) {
         const auto& item = m_items[m_hoverIndex];
+
+        // 在发送消息前将父窗口设为前台窗口，解决 WS_EX_NOACTIVATE 的激活问题
+        SetForegroundWindow(m_hwndParent);
+
         switch (item.type) {
             case ItemType::Ratio:
                 SendMessage(m_hwndParent, WM_COMMAND, 

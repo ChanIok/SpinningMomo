@@ -787,8 +787,6 @@ public:
         if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
             if (!m_menuWindow->IsVisible()) {
                 m_menuWindow->Show();
-            } else {
-                m_menuWindow->Activate();
             }
         }
     }
@@ -1019,8 +1017,9 @@ private:
             outWidth = targetRes.width;
             outHeight = targetRes.height;
             
-            // 更新黑边窗口状态
-            UpdateLetterboxState(hwnd, targetRes.width, targetRes.height);
+            if (m_isLetterboxEnabled) {
+                UpdateLetterboxState(hwnd, targetRes.width, targetRes.height);
+            }
             
             return true;
         } else {
