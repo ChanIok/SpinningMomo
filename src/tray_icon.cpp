@@ -68,7 +68,11 @@ void TrayIcon::ShowContextMenu(
     bool useFloatingWindow,
     bool isFloatingWindowVisible,
     bool previewEnabled,
-    bool overlayEnabled) {
+    bool overlayEnabled,
+    bool letterboxEnabled) {
+    
+    POINT pt;
+    GetCursorPos(&pt);
     
     HMENU hMenu = CreatePopupMenu();
     if (!hMenu) return;
@@ -106,7 +110,7 @@ void TrayIcon::ShowContextMenu(
     
     // 添加设置选项
     AddSettingsItems(hMenu, taskbarAutoHide, taskbarLower, useFloatingWindow, 
-                    isFloatingWindowVisible, previewEnabled, overlayEnabled, strings);
+                    isFloatingWindowVisible, previewEnabled, overlayEnabled, letterboxEnabled, strings);
 
     // 添加语言子菜单
     HMENU hLangMenu = CreateLanguageSubmenu(language, strings);
@@ -125,8 +129,6 @@ void TrayIcon::ShowContextMenu(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING, Constants::ID_EXIT, strings.EXIT.c_str());
 
     // 显示菜单
-    POINT pt;
-    GetCursorPos(&pt);
     SetForegroundWindow(m_hwnd);
     TrackPopupMenu(hMenu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_RIGHTBUTTON,
                   pt.x, pt.y, 0, m_hwnd, NULL);
@@ -305,6 +307,7 @@ void TrayIcon::AddSettingsItems(
     bool isFloatingWindowVisible,
     bool previewEnabled,
     bool overlayEnabled,
+    bool letterboxEnabled,
     const LocalizedStrings& strings) {
     
     // 任务栏自动隐藏选项
@@ -315,6 +318,10 @@ void TrayIcon::AddSettingsItems(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarLower ? MF_CHECKED : 0),
               Constants::ID_LOWER_TASKBAR, strings.TASKBAR_LOWER.c_str());
               
+    // 黑边模式选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (letterboxEnabled ? MF_CHECKED : 0),
+              Constants::ID_LETTERBOX_WINDOW, strings.LETTERBOX_WINDOW.c_str());
+
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
     // 预览窗口选项

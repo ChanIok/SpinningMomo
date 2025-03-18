@@ -22,6 +22,7 @@ public:
         OpenScreenshot,
         PreviewWindow,
         OverlayWindow,
+        LetterboxWindow,  // 添加黑边模式类型
         Reset,
         Close,
         Exit
@@ -42,8 +43,9 @@ public:
                const LocalizedStrings& strings,            // 字符串只读，保持const
                size_t currentRatioIndex,                   // 添加初始比例索引
                size_t currentResolutionIndex,              // 添加初始分辨率索引
-               bool previewEnabled,                       // 添加初始预览窗口状态
-               bool overlayEnabled);                       // 添加初始叠加层窗口状态
+               bool previewEnabled,                        // 添加初始预览窗口状态
+               bool overlayEnabled,                        // 添加初始叠加层窗口状态
+               bool letterboxEnabled);                     // 添加初始黑边模式状态
     
     void Show();
     void Hide();
@@ -53,6 +55,7 @@ public:
     void SetCurrentResolution(size_t index);
     void SetPreviewEnabled(bool enabled);  // 设置预览窗口状态的函数
     void SetOverlayEnabled(bool enabled);  // 设置叠加层窗口状态的函数
+    void SetLetterboxEnabled(bool enabled);  // 设置黑边模式状态的函数
     void SetMenuItemsToShow(const std::vector<std::wstring>& items) { m_menuItemsToShow = items; }  // 设置要显示的菜单项
     void UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true);
     HWND GetHwnd() const;
@@ -97,6 +100,7 @@ private:
     size_t m_currentResolutionIndex = SIZE_MAX;  // 当前选中的分辨率索引
     bool m_previewEnabled = false;               // 预览窗口状态
     bool m_overlayEnabled = false;               // 叠加层窗口状态
+    bool m_letterboxEnabled = false;             // 黑边模式状态
     std::vector<AspectRatio>* m_ratioItems = nullptr;       // 使用指针，存储实际的宽高比数据
     std::vector<ResolutionPreset>* m_resolutionItems = nullptr;  // 使用指针，存储实际的分辨率数据
     std::vector<MenuItem> m_items;               // 所有列表项
@@ -115,4 +119,4 @@ private:
     void UpdateDpiDependentResources();
     int CalculateWindowHeight();
     int GetItemIndexFromPoint(int x, int y);
-}; 
+};

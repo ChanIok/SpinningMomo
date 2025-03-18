@@ -40,6 +40,11 @@ void ConfigManager::Initialize() {
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS, 
                                 TEXT("Default,4K,6K,8K,12K"), 
                                 m_configPath.c_str());
+        
+        // 添加默认的黑边模式配置（默认为禁用）
+        WritePrivateProfileString(Constants::LETTERBOX_SECTION, Constants::LETTERBOX_ENABLED, 
+                                TEXT("0"), 
+                                m_configPath.c_str());
     }
 }
 
@@ -51,6 +56,7 @@ void ConfigManager::LoadAllConfigs() {
     LoadMenuConfig();
     LoadGameAlbumConfig();
     LoadLogConfig();
+    LoadLetterboxConfig();
 }
 
 void ConfigManager::LoadLogConfig() {
@@ -297,6 +303,25 @@ void ConfigManager::SaveGameAlbumConfig() {
                                 m_gameAlbumPath.c_str(),
                                 m_configPath.c_str());
     }
+}
+
+// 加载黑边模式配置
+void ConfigManager::LoadLetterboxConfig() {
+    TCHAR buffer[32];
+    if (GetPrivateProfileString(Constants::LETTERBOX_SECTION,
+                              Constants::LETTERBOX_ENABLED,
+                              TEXT("0"), buffer, _countof(buffer),
+                              m_configPath.c_str()) > 0) {
+        m_letterboxEnabled = (_wtoi(buffer) != 0);
+    }
+}
+
+// 保存黑边模式配置
+void ConfigManager::SaveLetterboxConfig() {
+    WritePrivateProfileString(Constants::LETTERBOX_SECTION,
+                            Constants::LETTERBOX_ENABLED,
+                            m_letterboxEnabled ? TEXT("1") : TEXT("0"),
+                            m_configPath.c_str());
 }
 
 bool ConfigManager::AddCustomRatio(const std::wstring& ratio, std::vector<AspectRatio>& ratios) {

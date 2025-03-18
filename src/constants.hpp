@@ -39,6 +39,7 @@ namespace Constants {
     constexpr UINT ID_OPEN_SCREENSHOT = 2016;    // 打开相册菜单项ID
     constexpr UINT ID_USER_GUIDE = 2017;         // 使用指南菜单项ID
     constexpr UINT ID_OVERLAY_WINDOW = 2018;     // 叠加层菜单项ID
+    constexpr UINT ID_LETTERBOX_WINDOW = 2019;   // 黑边模式菜单项ID
     
     // 配置文件相关
     inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
@@ -83,6 +84,7 @@ namespace Constants {
     inline const TCHAR* MENU_ITEM_TYPE_RESET = TEXT("Reset");
     inline const TCHAR* MENU_ITEM_TYPE_CLOSE = TEXT("Close");
     inline const TCHAR* MENU_ITEM_TYPE_EXIT = TEXT("Exit");
+    inline const TCHAR* MENU_ITEM_TYPE_LETTERBOX = TEXT("LetterboxWindow");
     
     // 菜单项配置
     inline const TCHAR* MENU_ITEMS = TEXT("MenuItems");  // 菜单项显示配置
@@ -91,6 +93,9 @@ namespace Constants {
     inline const TCHAR* ASPECT_RATIO_ITEMS = TEXT("AspectRatioItems");  // 宽高比项目显示配置
     inline const TCHAR* RESOLUTION_ITEMS = TEXT("ResolutionItems");    // 分辨率项目显示配置
 
+    inline const TCHAR* LETTERBOX_SECTION = TEXT("Letterbox");     // 黑边模式配置节名
+    inline const TCHAR* LETTERBOX_ENABLED = TEXT("Enabled");       // 黑边模式启用配置项
+    
     inline const TCHAR* LOGGER_SECTION = TEXT("Logger");     // 日志配置节名
     inline const TCHAR* LOGGER_LEVEL = TEXT("LogLevel");     // 日志级别配置项
 }
@@ -159,6 +164,7 @@ struct LocalizedStrings {
     std::wstring FEATURE_NOT_SUPPORTED;
     std::wstring OVERLAY_WINDOW;
     std::wstring FEATURE_CONFLICT;
+    std::wstring LETTERBOX_WINDOW;
 };
 
 // 中文字符串

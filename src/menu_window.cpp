@@ -37,7 +37,8 @@ bool MenuWindow::Create(HWND parent,
                        size_t currentRatioIndex,
                        size_t currentResolutionIndex,
                        bool previewEnabled,
-                       bool overlayEnabled) {
+                       bool overlayEnabled,
+                       bool letterboxEnabled) {
     m_hwndParent = parent;
     m_ratioItems = &ratios;
     m_resolutionItems = &resolutions;
@@ -46,6 +47,7 @@ bool MenuWindow::Create(HWND parent,
     m_currentResolutionIndex = currentResolutionIndex;
     m_previewEnabled = previewEnabled;
     m_overlayEnabled = overlayEnabled;
+    m_letterboxEnabled = letterboxEnabled;
     
     InitializeItems(strings);
     
@@ -68,7 +70,7 @@ bool MenuWindow::Create(HWND parent,
         WS_POPUP | WS_CLIPCHILDREN,
         xPos, yPos,
         totalWidth, windowHeight,
-        parent,
+        NULL,
         NULL,
         m_hInstance,
         this
@@ -196,6 +198,8 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
                 m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_OVERLAY) {
                 m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});
+            } else if (itemType == Constants::MENU_ITEM_TYPE_LETTERBOX) {
+                m_items.push_back({strings.LETTERBOX_WINDOW, ItemType::LetterboxWindow, 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_RESET) {
                 m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
             } else if (itemType == Constants::MENU_ITEM_TYPE_CLOSE) {
@@ -210,6 +214,7 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
         m_items.push_back({strings.OPEN_SCREENSHOT, ItemType::OpenScreenshot, 0});
         m_items.push_back({strings.PREVIEW_WINDOW, ItemType::PreviewWindow, 0});
         m_items.push_back({strings.OVERLAY_WINDOW, ItemType::OverlayWindow, 0});
+        m_items.push_back({strings.LETTERBOX_WINDOW, ItemType::LetterboxWindow, 0});
         m_items.push_back({strings.RESET_WINDOW, ItemType::Reset, 0});
         m_items.push_back({strings.CLOSE_WINDOW, ItemType::Close, 0});
     }
@@ -370,6 +375,7 @@ void MenuWindow::OnPaint(HDC hdc) {
             case ItemType::OpenScreenshot:
             case ItemType::PreviewWindow:
             case ItemType::OverlayWindow:
+            case ItemType::LetterboxWindow:
             case ItemType::Reset:
             case ItemType::Close:
             case ItemType::Exit:
@@ -397,6 +403,8 @@ void MenuWindow::OnPaint(HDC hdc) {
         } else if (item.type == ItemType::OverlayWindow && m_overlayEnabled) {
             isSelected = true;
         } else if (item.type == ItemType::PreviewWindow && m_previewEnabled) {
+            isSelected = true;
+        } else if (item.type == ItemType::LetterboxWindow && m_letterboxEnabled) {
             isSelected = true;
         }
 
@@ -484,6 +492,9 @@ void MenuWindow::OnLButtonDown(int x, int y) {
             case ItemType::OverlayWindow:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_OVERLAY_WINDOW, 0);
                 break;
+            case ItemType::LetterboxWindow:
+                SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_LETTERBOX_WINDOW, 0);
+                break;
             case ItemType::PreviewWindow:
                 SendMessage(m_hwndParent, WM_COMMAND, Constants::ID_PREVIEW_WINDOW, 0);
                 break;
@@ -534,6 +545,7 @@ int MenuWindow::CalculateWindowHeight() {
             case ItemType::CaptureWindow:
             case ItemType::OpenScreenshot:
             case ItemType::OverlayWindow:
+            case ItemType::LetterboxWindow:
             case ItemType::PreviewWindow:
             case ItemType::Reset:
             case ItemType::Close:
@@ -580,6 +592,7 @@ int MenuWindow::GetItemIndexFromPoint(int x, int y) {
                 item.type == ItemType::OpenScreenshot ||
                 item.type == ItemType::PreviewWindow ||
                 item.type == ItemType::OverlayWindow ||
+                item.type == ItemType::LetterboxWindow ||
                 item.type == ItemType::Reset ||
                 item.type == ItemType::Close ||
                 item.type == ItemType::Exit) {
@@ -611,6 +624,11 @@ void MenuWindow::SetPreviewEnabled(bool enabled) {
     m_previewEnabled = enabled;
     InvalidateRect(m_hwnd, NULL, TRUE);
 } 
+
+void MenuWindow::SetLetterboxEnabled(bool enabled) {
+    m_letterboxEnabled = enabled;
+    InvalidateRect(m_hwnd, NULL, TRUE);
+}
 
 void MenuWindow::SetOverlayEnabled(bool enabled) {
     m_overlayEnabled = enabled;

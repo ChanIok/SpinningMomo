@@ -38,7 +38,8 @@ public:
         bool useFloatingWindow,
         bool isFloatingWindowVisible,
         bool previewEnabled,
-        bool overlayEnabled);
+        bool overlayEnabled,
+        bool letterboxEnabled);
     // 新增：显示快捷菜单
     void ShowQuickMenu(
         const POINT& pt,
@@ -82,5 +83,6 @@ private:
         bool isFloatingWindowVisible,
         bool previewEnabled,
         bool overlayEnabled,
+        bool letterboxEnabled,
         const LocalizedStrings& strings);
 }; 

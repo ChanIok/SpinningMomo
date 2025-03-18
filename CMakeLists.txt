@@ -26,6 +26,7 @@ add_executable(SpinningMomo WIN32
     src/overlay_window.cpp
     src/logger.cpp
     src/win_timer.cpp
+    src/letterbox_window.cpp
     src/resource.rc  # 添加资源文件
 )
 

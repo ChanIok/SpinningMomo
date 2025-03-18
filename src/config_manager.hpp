@@ -32,6 +32,7 @@ public:
     void LoadMenuConfig();
     void LoadGameAlbumConfig();
     void LoadLogConfig();
+    void LoadLetterboxConfig();
     
     // 配置保存
     void SaveHotkeyConfig();
@@ -40,6 +41,7 @@ public:
     void SaveTaskbarConfig();
     void SaveMenuConfig();
     void SaveGameAlbumConfig();
+    void SaveLetterboxConfig();
 
     // 根据配置构建宽高比和分辨率列表
     ConfigLoadResult GetAspectRatios(const LocalizedStrings& strings);
@@ -55,6 +57,7 @@ public:
     bool GetTaskbarAutoHide() const { return m_taskbarAutoHide; }
     bool GetTaskbarLower() const { return m_taskbarLower; }
     bool GetUseFloatingWindow() const { return m_useFloatingWindow; }
+    bool GetLetterboxEnabled() const { return m_letterboxEnabled; }
     const std::vector<std::wstring>& GetMenuItemsToShow() const { return m_menuItemsToShow; }
     const std::vector<std::wstring>& GetAspectRatioItems() const { return m_aspectRatioItems; }
     const std::vector<std::wstring>& GetResolutionItems() const { return m_resolutionItems; }
@@ -69,6 +72,7 @@ public:
     void SetTaskbarAutoHide(bool autoHide) { m_taskbarAutoHide = autoHide; }
     void SetTaskbarLower(bool lower) { m_taskbarLower = lower; }
     void SetUseFloatingWindow(bool use) { m_useFloatingWindow = use; }
+    void SetLetterboxEnabled(bool enabled) { m_letterboxEnabled = enabled; }
 
 private:
     // 获取默认的宽高比和分辨率预设
@@ -87,6 +91,7 @@ private:
     bool m_taskbarAutoHide = false;
     bool m_taskbarLower = true;
     bool m_useFloatingWindow = true;
+    bool m_letterboxEnabled = false;
     std::vector<std::wstring> m_menuItemsToShow;  // 要显示的菜单项类型
     std::vector<std::wstring> m_aspectRatioItems; // 要显示的宽高比项
     std::vector<std::wstring> m_resolutionItems;  // 要显示的分辨率项

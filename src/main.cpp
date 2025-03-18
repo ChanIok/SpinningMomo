@@ -16,6 +16,7 @@
 #include "notification_manager.hpp"
 #include "config_manager.hpp"
 #include "overlay_window.hpp"
+#include "letterbox_window.hpp"
 #include "logger.hpp"
 
 // 主应用程序类
@@ -108,13 +109,23 @@ public:
             return false;
         }
 
+        // 创建黑边窗口
+        m_letterboxWindow = std::make_unique<LetterboxWindow>();
+        if (!m_letterboxWindow->Initialize(hInstance)) {
+            LOG_ERROR("Failed to initialize letterbox window");
+            return false;
+        }
+
         // 创建菜单窗口
         m_menuWindow = std::make_unique<MenuWindow>(hInstance);
         // 设置菜单项显示配置
         m_menuWindow->SetMenuItemsToShow(m_configManager->GetMenuItemsToShow());
+        // 从配置中加载黑边模式状态
+        m_isLetterboxEnabled = m_configManager->GetLetterboxEnabled();
+        
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
                             m_currentRatioIndex, m_currentResolutionIndex,
-                            m_isPreviewEnabled, m_isOverlayEnabled)) {
+                            m_isPreviewEnabled, m_isOverlayEnabled, m_isLetterboxEnabled)) {
             LOG_ERROR("Failed to create menu window");
             return false;
         }
@@ -416,6 +427,50 @@ public:
         }
     }
 
+    // 切换黑边模式
+    void ToggleLetterboxMode() {
+        m_isLetterboxEnabled = !m_isLetterboxEnabled;
+        
+        // 更新配置并保存
+        m_configManager->SetLetterboxEnabled(m_isLetterboxEnabled);
+        m_configManager->SaveLetterboxConfig();
+        
+        if (m_menuWindow) {
+            m_menuWindow->SetLetterboxEnabled(m_isLetterboxEnabled);
+        }
+        
+        // 如果关闭黑边模式，则完全关闭黑边窗口功能
+        if (!m_isLetterboxEnabled && m_letterboxWindow && m_letterboxWindow->IsVisible()) {
+            m_letterboxWindow->Shutdown();
+        } 
+        // 如果开启黑边模式，则检查是否需要显示黑边窗口
+        else if (m_isLetterboxEnabled) {
+            // 尝试查找当前捕获的游戏窗口
+            HWND gameWindow = FindTargetWindow();
+            if (gameWindow) {
+                RECT rect;
+                GetClientRect(gameWindow, &rect);
+                UpdateLetterboxState(gameWindow, rect.right, rect.bottom);
+            }
+        }
+    }
+    
+    // 更新黑边窗口状态
+    void UpdateLetterboxState(HWND hwnd, int width, int height) {
+        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        
+        bool needLetterbox = m_isLetterboxEnabled && 
+                            ((width >= screenWidth && height < screenHeight) || 
+                             (height >= screenHeight && width < screenWidth));
+        
+        if (needLetterbox && m_letterboxWindow) {
+            m_letterboxWindow->Show(hwnd);
+        } else if (m_letterboxWindow && m_letterboxWindow->IsVisible()) {
+            m_letterboxWindow->Hide();
+        }
+    }
+
     // 切换语言
     void ChangeLanguage(const std::wstring& lang) {
         if (m_language != lang) {
@@ -487,7 +542,8 @@ public:
             m_configManager->GetUseFloatingWindow(),
             m_menuWindow && m_menuWindow->IsVisible(),
             m_isPreviewEnabled,
-            m_isOverlayEnabled
+            m_isOverlayEnabled,
+            m_isLetterboxEnabled
         );
     }
 
@@ -608,6 +664,9 @@ public:
                         case Constants::ID_PREVIEW_WINDOW:
                             app->TogglePreviewWindow();
                             break;
+                        case Constants::ID_LETTERBOX_WINDOW:
+                            app->ToggleLetterboxMode();
+                            break;
                         case Constants::ID_USER_GUIDE:
                             ShellExecute(NULL, TEXT("open"), 
                                 (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,
@@ -725,6 +784,7 @@ private:
     std::unique_ptr<NotificationManager> m_notificationManager;
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<OverlayWindow> m_overlayWindow;
+    std::unique_ptr<LetterboxWindow> m_letterboxWindow;
 
     // 应用状态
     bool m_isPreviewEnabled = false;
@@ -732,6 +792,7 @@ private:
     bool m_messageLoopStarted = false;
     bool m_isScreenCaptureSupported = false;
     bool m_isOverlayEnabled = false;
+    bool m_isLetterboxEnabled = false;
     size_t m_currentRatioIndex = SIZE_MAX;
     size_t m_currentResolutionIndex = 0;
     std::vector<std::pair<HWND, std::wstring>> m_windows;
@@ -926,7 +987,7 @@ private:
         }
 
         LOG_INFO("Target resolution: width=%d, height=%d", targetRes.width, targetRes.height);
-
+        
         bool resizeSuccess;
         if (m_isOverlayEnabled && m_overlayWindow) {
             resizeSuccess = WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
@@ -939,6 +1000,10 @@ private:
         if (resizeSuccess) {
             outWidth = targetRes.width;
             outHeight = targetRes.height;
+            
+            // 更新黑边窗口状态
+            UpdateLetterboxState(hwnd, targetRes.width, targetRes.height);
+            
             return true;
         } else {
             ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());

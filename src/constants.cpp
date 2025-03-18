@@ -43,6 +43,7 @@ const LocalizedStrings ZH_CN = {
     TEXT("此功能需要 Windows 10 1803 或更高版本，已自动禁用。"),
     TEXT("叠加层"),
     TEXT("预览窗和叠加层功能冲突，已自动关闭另一功能"),
+    TEXT("黑边模式"),
 };
 
 // 英文字符串
@@ -88,4 +89,5 @@ const LocalizedStrings EN_US = {
     TEXT("This feature requires Windows 10 1803 or higher and has been disabled."),
     TEXT("Overlay Window"),
     TEXT("Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled."),
+    TEXT("Letterbox Window"),
 }; 
