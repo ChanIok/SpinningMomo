@@ -108,7 +108,7 @@ public:
             LOG_ERROR("Failed to initialize overlay window");
             return false;
         }
-
+        
         // 创建黑边窗口
         m_letterboxWindow = std::make_unique<LetterboxWindow>();
         if (!m_letterboxWindow->Initialize(hInstance)) {
@@ -122,6 +122,7 @@ public:
         m_menuWindow->SetMenuItemsToShow(m_configManager->GetMenuItemsToShow());
         // 从配置中加载黑边模式状态
         m_isLetterboxEnabled = m_configManager->GetLetterboxEnabled();
+        m_overlayWindow->SetLetterboxMode(m_isLetterboxEnabled);
         
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
                             m_currentRatioIndex, m_currentResolutionIndex,
@@ -438,14 +439,31 @@ public:
         if (m_menuWindow) {
             m_menuWindow->SetLetterboxEnabled(m_isLetterboxEnabled);
         }
+
+        // 如果关闭黑边模式，则需要关闭黑边窗口
+        if (!m_isLetterboxEnabled && m_letterboxWindow) {
+            if (m_letterboxWindow->IsVisible()) {
+                m_letterboxWindow->Shutdown();
+            }
+        }
+
+        // 更新叠加层的黑边模式设置
+        if (m_overlayWindow) {
+            m_overlayWindow->SetLetterboxMode(m_isLetterboxEnabled);
+            
+            // 如果叠加层已启用且正在捕获，重启捕获以应用新设置
+            if (m_isOverlayEnabled && m_overlayWindow->IsCapturing()) {
+                HWND gameWindow = FindTargetWindow();
+                if (gameWindow) {
+                    m_overlayWindow->StopCapture();
+                    m_overlayWindow->StartCapture(gameWindow);
+                    return;
+                }
+            }
+        }
         
-        // 如果关闭黑边模式，则完全关闭黑边窗口功能
-        if (!m_isLetterboxEnabled && m_letterboxWindow && m_letterboxWindow->IsVisible()) {
-            m_letterboxWindow->Shutdown();
-        } 
-        // 如果开启黑边模式，则检查是否需要显示黑边窗口
-        else if (m_isLetterboxEnabled) {
-            // 尝试查找当前捕获的游戏窗口
+        // 如果开启黑边模式且没有活动的叠加层，则检查是否需要显示黑边窗口
+        if (m_isLetterboxEnabled) {
             HWND gameWindow = FindTargetWindow();
             if (gameWindow) {
                 RECT rect;

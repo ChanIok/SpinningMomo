@@ -21,6 +21,8 @@ public:
     void Cleanup();
     void RestoreGameWindow();
     HWND GetHwnd() const { return m_hwnd; }
+    void SetLetterboxMode(bool enabled) { m_useLetterboxMode = enabled; }
+    bool IsCapturing() const { return m_running.load(); }
 
 private:
     static OverlayWindow* instance;

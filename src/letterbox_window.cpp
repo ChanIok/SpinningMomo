@@ -191,8 +191,6 @@ void LetterboxWindow::UpdatePosition(HWND targetWindow) {
     if (HWND taskbar = FindWindow(TEXT("Shell_TrayWnd"), NULL)) {
         SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     }
-    
-    LOG_DEBUG("Letterbox window position updated");
 }
 
 bool LetterboxWindow::IsVisible() const {
