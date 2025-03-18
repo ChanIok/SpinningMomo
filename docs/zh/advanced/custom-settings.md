@@ -90,6 +90,7 @@ ResolutionItems=Default,480P,720P,1080P,2K,4K,8K
   - `OpenScreenshot`: 打开相册
   - `PreviewWindow`: 预览窗
   - `OverlayWindow`: 叠加层
+  - `LetterboxWindow`: 黑边模式
   - `Reset`: 重置窗口
   - `Close`: 关闭菜单
   - `Exit`: 退出程序
@@ -100,7 +101,7 @@ ResolutionItems=Default,480P,720P,1080P,2K,4K,8K
 MenuItems=PreviewWindow,OverlayWindow,Reset,Close
 
 # 完整菜单
-MenuItems=CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,Reset,Close,Exit
+MenuItems=CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,LetterboxWindow,Reset,Close,Exit
 ```
 
 ### 📸 相册目录设置
@@ -151,6 +152,16 @@ AutoHide=0
 # 0 = 不置底
 # 1 = 自动置底
 LowerOnResize=1
+```
+
+### ⬛ 黑边模式设置
+
+```ini
+[Letterbox]
+# 是否启用黑边模式
+# 0 = 禁用
+# 1 = 启用
+Enabled=0
 ```
 
 ### 🔊 日志级别设置
