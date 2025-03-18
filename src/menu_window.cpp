@@ -64,14 +64,14 @@ bool MenuWindow::Create(HWND parent,
     int yPos = (workArea.bottom - workArea.top - windowHeight) / 2;
     
     m_hwnd = CreateWindowEx(
-        WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+        WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
         MENU_WINDOW_CLASS,
         TEXT("SpinningMomo"),
         WS_POPUP | WS_CLIPCHILDREN,
         xPos, yPos,
         totalWidth, windowHeight,
-        NULL,
-        NULL,
+        nullptr,
+        nullptr,
         m_hInstance,
         this
     );
