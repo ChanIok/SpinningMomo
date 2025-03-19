@@ -30,15 +30,15 @@ void ConfigManager::Initialize() {
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
         WritePrivateProfileString(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, TEXT(""), m_configPath.c_str());
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_ITEMS, 
-                                TEXT("CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,Reset,Close"), 
+                                TEXT("CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,LetterboxWindow,Reset,Close,Exit"), 
                                 m_configPath.c_str());
         
         // 添加默认的宽高比和分辨率配置
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::ASPECT_RATIO_ITEMS, 
-                                TEXT("32:9,21:9,16:9,3:2,1:1,2:3,9:16"), 
+                                TEXT("32:9,21:9,16:9,3:2,1:1,3:4,2:3,9:16"), 
                                 m_configPath.c_str());
         WritePrivateProfileString(Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS, 
-                                TEXT("Default,4K,6K,8K,12K"), 
+                                TEXT("Default,1080P,2K,4K,6K,8K,12K"), 
                                 m_configPath.c_str());
         
         // 添加默认的黑边模式配置（默认为禁用）
@@ -354,6 +354,9 @@ bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vec
             return true;
         } else if (resolution == TEXT("2K")) {
             resolutions.emplace_back(resolution, 2560, 1440);
+            return true;
+        } else if (resolution == TEXT("5K")) {
+            resolutions.emplace_back(resolution, 5120, 2880);
             return true;
         } else if (resolution == TEXT("10K")) {
             resolutions.emplace_back(resolution, 10240, 4320);

@@ -385,17 +385,17 @@ bool OverlayWindow::InitializeCapture() {
         return false;
     }
 
-    // 设置进程调度优先级
-    bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
-    NTSTATUS status = D3DKMTSetProcessSchedulingPriorityClass(
-        GetCurrentProcess(),
-        hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
-    if (status != 0) {
-        // 可能是 Windows 10 2004 之前的版本，忽略错误
-        LOG_ERROR("Failed to set process priority class. Status code: %d", status);
-    } else {
-        LOG_INFO("Process priority class set successfully");
-    }
+    // 设置进程调度优先级，这有问题，暂时注释掉
+    // bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
+    // NTSTATUS status = D3DKMTSetProcessSchedulingPriorityClass(
+    //     GetCurrentProcess(),
+    //     hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
+    // if (status != 0) {
+    //     // 可能是 Windows 10 2004 之前的版本，忽略错误
+    //     LOG_ERROR("Failed to set process priority class. Status code: %d", status);
+    // } else {
+    //     LOG_INFO("Process priority class set successfully");
+    // }
 
     // 设置 GPU 线程优先级，可能没实际效果
     hr = dxgiDevice->SetGPUThreadPriority(7);
@@ -490,8 +490,10 @@ bool OverlayWindow::InitializeCapture() {
 
 void OverlayWindow::StopCapture(bool hideWindow) {
     if (!m_running.load()) {
+        LOG_ERROR("Capture already stopped");
         return;
     }
+
     // 停止标志
     m_running.store(false);
 
@@ -537,6 +539,8 @@ void OverlayWindow::StopCapture(bool hideWindow) {
         CloseHandle(m_frameLatencyWaitableObject);
         m_frameLatencyWaitableObject = nullptr;
     }
+
+    m_createNewSrv = true;
 
     // 隐藏叠加层，恢复游戏窗口
     if (hideWindow) {
@@ -635,8 +639,8 @@ bool OverlayWindow::InitializeD3D() {
         return false;
     }
 
-    // 设置最大帧延迟为3
-    hr = dxgiDevice->SetMaximumFrameLatency(3);
+    // 设置最大帧延迟为2
+    hr = dxgiDevice->SetMaximumFrameLatency(2);
     if (FAILED(hr)) {
         LOG_ERROR("Failed to set maximum frame latency, HRESULT: 0x%08X", hr);
         return false;
@@ -938,36 +942,62 @@ bool OverlayWindow::CreateShaderResources() {
 void OverlayWindow::OnFrameArrived() {
     if (!m_running) return;
     if (!m_framePool) return;
-    
     if (auto frame = m_framePool.TryGetNextFrame()) {
+        LOG_DEBUG("Frame acquired");
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
-        if (!frameTexture) return;
+        if (!frameTexture) {
+            LOG_ERROR("Failed to get frame texture");
+            return;
+        }
 
-        // 直接为捕获的纹理创建 SRV
-        m_shaderResourceView.Reset(); // 释放之前的 SRV
-
-        D3D11_TEXTURE2D_DESC desc;
-        frameTexture->GetDesc(&desc);
-
-        D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-        srvDesc.Format = desc.Format;
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MipLevels = 1;
-
-        {
+        // 只在需要时才创建新的SRV
+        if (m_createNewSrv) {
             std::lock_guard<std::mutex> lock(m_captureStateMutex);
+            m_shaderResourceView.Reset();
+
+            // 获取纹理描述
+            D3D11_TEXTURE2D_DESC desc;
+            frameTexture->GetDesc(&desc);
+            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+            srvDesc.Format = desc.Format;
+            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            srvDesc.Texture2D.MipLevels = 1;
+
             HRESULT hr = m_device->CreateShaderResourceView(
                 frameTexture.Get(), &srvDesc, &m_shaderResourceView);
-            // 设置着色器资源视图
-            if (SUCCEEDED(hr)) {
-                m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+                
+            if (FAILED(hr)) {
+                LOG_ERROR("Failed to create shader resource view, HRESULT: 0x%08X", hr);
+                return;
             }
-            PerformRendering();
-        }   
+            m_createNewSrv = false;
+        }
+
+        // 设置着色器资源视图并渲染
+        {
+            std::lock_guard<std::mutex> lock(m_captureStateMutex);
+            if (m_shaderResourceView) {
+                m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
+                PerformRendering();
+                LOG_DEBUG("Frame rendered");
+                frame.Close();
+                LOG_DEBUG("Frame closed");
+            } else {
+                LOG_ERROR("Shader resource view is null");
+            }
+        }
     }
 }
 
 void OverlayWindow::PerformRendering() {
+    if (m_frameLatencyWaitableObject) {
+        // 等待上一帧完成，控制延迟
+        DWORD result = WaitForSingleObjectEx(m_frameLatencyWaitableObject, 1000, TRUE);
+        if (result != WAIT_OBJECT_0) {
+            LOG_ERROR("Frame latency wait timed out or failed, result: %d", result);
+        }
+    }
+
     // 清理渲染目标
     float clearColor[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
     m_context->ClearRenderTargetView(m_renderTarget.Get(), clearColor);

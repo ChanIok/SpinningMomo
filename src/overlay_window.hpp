@@ -78,8 +78,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendState;
     HANDLE m_frameLatencyWaitableObject{nullptr};  // 添加帧延迟等待对象
     
-    // 缓存上一次的纹理描述符，用于优化SRV创建
-    D3D11_TEXTURE2D_DESC m_lastTextureDesc{};
+    bool m_createNewSrv = true;
 
     // 纹理资源和同步相关
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_frameTexture;

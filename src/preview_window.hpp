@@ -84,6 +84,7 @@ private:
     // 互斥锁保护渲染目标访问
     std::mutex m_renderTargetMutex;
     std::atomic<bool> m_running{false};
+    bool m_createNewSrv = true;
 
     // 视口框相关
     struct ViewportVertex {

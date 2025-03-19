@@ -245,7 +245,8 @@ void PreviewWindow::StopCapture() {
         m_framePool = nullptr;
     }
     m_captureItem = nullptr;
-
+    m_createNewSrv = true;
+    
     // 隐藏窗口
     ShowWindow(m_hwnd, SW_HIDE);
 
@@ -274,18 +275,23 @@ void PreviewWindow::OnFrameArrived() {
         
         // 更新着色器资源视图
         if (frameTexture) {
-            D3D11_TEXTURE2D_DESC desc;
-            frameTexture->GetDesc(&desc);
+            // 检查是否需要创建新的SRV
+            if (m_createNewSrv) {
+                D3D11_TEXTURE2D_DESC desc;
+                frameTexture->GetDesc(&desc);
 
-            D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-            srvDesc.Format = desc.Format;
-            srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-            srvDesc.Texture2D.MostDetailedMip = 0;
-            srvDesc.Texture2D.MipLevels = 1;
+                D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+                srvDesc.Format = desc.Format;
+                srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+                srvDesc.Texture2D.MostDetailedMip = 0;
+                srvDesc.Texture2D.MipLevels = 1;
 
-            Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newSRV;
-            if (SUCCEEDED(m_device->CreateShaderResourceView(frameTexture.Get(), &srvDesc, &newSRV))) {
-                m_shaderResourceView = newSRV;
+                Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newSRV;
+                HRESULT hr = m_device->CreateShaderResourceView(frameTexture.Get(), &srvDesc, &newSRV);
+                if (SUCCEEDED(hr)) {
+                    m_shaderResourceView = newSRV;
+                    m_createNewSrv = false;
+                }
             }
         }
 
@@ -306,7 +312,7 @@ void PreviewWindow::OnFrameArrived() {
             viewport.Width = static_cast<float>(clientRect.right - clientRect.left);
             viewport.Height = static_cast<float>(clientRect.bottom - clientRect.top);
             viewport.TopLeftX = 0.0f;
-            viewport.TopLeftY = 0.0f;  // 从窗口顶部开始渲染
+            viewport.TopLeftY = 0.0f;
             viewport.MinDepth = 0.0f;
             viewport.MaxDepth = 1.0f;
             m_context->RSSetViewports(1, &viewport);
