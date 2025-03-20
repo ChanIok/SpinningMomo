@@ -19,7 +19,7 @@ public:
     bool StartCapture(HWND targetWindow, int width = 0, int height = 0);
     void StopCapture(bool hideWindow = true);
     void Cleanup();
-    void RestoreGameWindow();
+    void RestoreGameWindow(bool withDelay = false);
     HWND GetHwnd() const { return m_hwnd; }
     void SetLetterboxMode(bool enabled) { m_useLetterboxMode = enabled; }
     bool IsCapturing() const { return m_running.load(); }
@@ -79,6 +79,7 @@ private:
     HANDLE m_frameLatencyWaitableObject{nullptr};  // 添加帧延迟等待对象
     
     bool m_createNewSrv = true;
+    bool m_process_priority_set = false;
 
     // 纹理资源和同步相关
     Microsoft::WRL::ComPtr<ID3D11Texture2D> m_frameTexture;

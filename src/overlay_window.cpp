@@ -130,7 +130,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     // 如果宽度和高度都小于屏幕尺寸，则不需要启动
     if (m_cachedGameWidth <= m_screenWidth && m_cachedGameHeight <= m_screenHeight) {
         LOG_DEBUG("Game window fits within screen dimensions, no need for overlay");
-        RestoreGameWindow();
+        RestoreGameWindow(true);
         return true;
     }
 
@@ -148,6 +148,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
         m_d3dInitialized = true;
     }
 
+    // 计算窗口尺寸
     if (m_cachedGameWidth * m_screenHeight <= m_screenWidth * m_cachedGameHeight) {
         // 基于高度计算宽度
         m_windowHeight = m_screenHeight;
@@ -196,13 +197,13 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
     }
     
     InitializeRenderStates();
-
+    
     // 创建捕获资源
     if (!InitializeCapture()) {
         LOG_ERROR("Failed to initialize screen capture resources");
         return;
     }
-
+    
     PostMessage(m_hwnd, WM_SHOW_OVERLAY, 0, 0);
 
     // 消息处理和渲染循环
@@ -384,17 +385,23 @@ bool OverlayWindow::InitializeCapture() {
         LOG_ERROR("Failed to get IDXGIDevice, HRESULT: 0x%08X", hr);
         return false;
     }
-
-    // 设置进程调度优先级，这有问题，暂时注释掉
-    // bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
-    // NTSTATUS status = D3DKMTSetProcessSchedulingPriorityClass(
-    //     GetCurrentProcess(),
-    //     hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
-    // if (status != 0) {
-    //     // 可能是 Windows 10 2004 之前的版本，忽略错误
-    //     LOG_ERROR("Failed to set process priority class. Status code: %d", status);
-    // } else {
-    //     LOG_INFO("Process priority class set successfully");
+    
+    // 设置进程调度优先级，似乎有问题，极端情况下会导致卡死？
+    // 只有在标志为false时才执行优先级设置
+    // if (!m_process_priority_set) {
+    //     bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
+    //     NTSTATUS status = D3DKMTSetProcessSchedulingPriorityClass(
+    //         GetCurrentProcess(),
+    //         hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
+    //     if (status != 0) {
+    //         // 可能是 Windows 10 2004 之前的版本，忽略错误
+    //         LOG_ERROR("Failed to set process priority class. Status code: %d", status);
+    //     } else {
+    //         LOG_INFO("Process priority class set successfully");
+    //     }
+        
+    //     // 无论成功与否，都标记为已尝试设置
+    //     m_process_priority_set = true;
     // }
 
     // 设置 GPU 线程优先级，可能没实际效果
@@ -525,15 +532,15 @@ void OverlayWindow::StopCapture(bool hideWindow) {
         m_windowManagerThread.get()->join();
     }
     LOG_DEBUG("Window manager thread joined");
-    if (m_captureSession) {
-        m_captureSession.Close();
-        m_captureSession = nullptr;
-    }
-    if (m_framePool) {
-        m_framePool.Close();
-        m_framePool = nullptr;
-    }
-    m_captureItem = nullptr;  
+        if (m_captureSession) {
+            m_captureSession.Close();
+            m_captureSession = nullptr;
+        }
+        if (m_framePool) {
+            m_framePool.Close();
+            m_framePool = nullptr;
+        }
+        m_captureItem = nullptr;  
 
     if (m_frameLatencyWaitableObject) {
         CloseHandle(m_frameLatencyWaitableObject);
@@ -557,14 +564,18 @@ void OverlayWindow::StopCapture(bool hideWindow) {
     }
 }
 
-void OverlayWindow::RestoreGameWindow() {
-    ShowWindow(m_hwnd, SW_HIDE);
+void OverlayWindow::RestoreGameWindow(bool withDelay) {
     LONG_PTR currentExStyle = GetWindowLongPtr(instance->m_gameWindow, GWL_EXSTYLE);
     currentExStyle &= ~WS_EX_LAYERED;
     SetWindowLongPtr(instance->m_gameWindow, GWL_EXSTYLE, currentExStyle);
     int left = (instance->m_screenWidth - instance->m_cachedGameWidth) / 2;
     int top = (instance->m_screenHeight - instance->m_cachedGameHeight) / 2;
-    SetWindowPos(instance->m_gameWindow, HWND_TOP, left, top, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOZORDER);
+    SetWindowPos(instance->m_gameWindow, HWND_TOP, left, top, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
+    if (withDelay && IsWindowVisible(instance->m_hwnd)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    ShowWindow(m_hwnd, SW_HIDE);
+    SetForegroundWindow(instance->m_gameWindow);
 }
 
 
@@ -943,7 +954,6 @@ void OverlayWindow::OnFrameArrived() {
     if (!m_running) return;
     if (!m_framePool) return;
     if (auto frame = m_framePool.TryGetNextFrame()) {
-        LOG_DEBUG("Frame acquired");
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());
         if (!frameTexture) {
             LOG_ERROR("Failed to get frame texture");
@@ -979,9 +989,7 @@ void OverlayWindow::OnFrameArrived() {
             if (m_shaderResourceView) {
                 m_context->PSSetShaderResources(0, 1, m_shaderResourceView.GetAddressOf());
                 PerformRendering();
-                LOG_DEBUG("Frame rendered");
                 frame.Close();
-                LOG_DEBUG("Frame closed");
             } else {
                 LOG_ERROR("Shader resource view is null");
             }
