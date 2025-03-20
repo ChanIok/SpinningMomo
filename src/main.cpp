@@ -442,9 +442,7 @@ public:
 
         // 如果关闭黑边模式，则需要关闭黑边窗口
         if (!m_isLetterboxEnabled && m_letterboxWindow) {
-            if (m_letterboxWindow->IsVisible()) {
-                m_letterboxWindow->Shutdown();
-            }
+            m_letterboxWindow->Shutdown();
         }
 
         // 更新叠加层的黑边模式设置
@@ -485,6 +483,10 @@ public:
         if (needLetterbox && m_letterboxWindow) {
             m_letterboxWindow->Show(hwnd);
         } else if (m_letterboxWindow && m_letterboxWindow->IsVisible()) {
+            if (m_isOverlayEnabled && m_overlayWindow->IsVisible()) {
+                m_letterboxWindow->Shutdown();
+                return;
+            }
             m_letterboxWindow->Hide();
         }
     }

@@ -23,6 +23,7 @@ public:
     HWND GetHwnd() const { return m_hwnd; }
     void SetLetterboxMode(bool enabled) { m_useLetterboxMode = enabled; }
     bool IsCapturing() const { return m_running.load(); }
+    bool IsVisible() const { return IsWindowVisible(m_hwnd); }
 
 private:
     static OverlayWindow* instance;
