@@ -1,6 +1,6 @@
 name: 问题报告
 description: 报告使用过程中遇到的问题或错误
-title: "[问题] "
+title: "[Bug] "
 labels: ["bug"]
 body:
   - type: textarea
