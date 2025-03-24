@@ -101,7 +101,13 @@ void LetterboxWindow::Show(HWND targetWindow) {
         LOG_ERROR("Cannot show letterbox window: no target window");
         return;
     }
-    
+
+    // 如果目标窗口不可见，不显示
+    if (!IsWindowVisible(m_targetWindow)) {
+        LOG_DEBUG("Target window is not visible, not showing letterbox");
+        return;
+    }
+
     // 确保事件监听线程已启动
     if (!IsEventThreadRunning()) {
         if (!StartEventThread()) {
@@ -136,6 +142,7 @@ void LetterboxWindow::Shutdown() {
     if (m_running.load()) {
         m_running.store(false);
     }
+
     // 向线程发送退出消息
     if (m_eventThread.getId() != std::thread::id()) {
         PostThreadMessage(GetThreadId(m_eventThread.get()->native_handle()), WM_QUIT, 0, 0);

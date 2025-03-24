@@ -9,7 +9,7 @@
 #include "logger.hpp"
 
 namespace {
-    // 着色器代码
+    // 基本渲染着色器
     const char* vertexShaderCode = R"(
         struct VS_INPUT {
             float2 pos : POSITION;
@@ -32,6 +32,37 @@ namespace {
         SamplerState samp : register(s0);
         float4 main(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD) : SV_Target {
             return tex.Sample(samp, texCoord);
+        }
+    )";
+
+    // 视口框渲染着色器
+    const char* viewportVertexShaderCode = R"(
+        struct VS_INPUT {
+            float2 pos : POSITION;
+            float4 color : COLOR;
+        };
+        
+        struct PS_INPUT {
+            float4 pos : SV_POSITION;
+            float4 color : COLOR;
+        };
+        
+        PS_INPUT main(VS_INPUT input) {
+            PS_INPUT output;
+            output.pos = float4(input.pos.x * 2 - 1, -(input.pos.y * 2 - 1), 0, 1);
+            output.color = input.color;
+            return output;
+        }
+    )";
+
+    const char* viewportPixelShaderCode = R"(
+        struct PS_INPUT {
+            float4 pos : SV_POSITION;
+            float4 color : COLOR;
+        };
+        
+        float4 main(PS_INPUT input) : SV_Target {
+            return input.color;
         }
     )";
 }
@@ -609,37 +640,6 @@ bool PreviewWindow::CreateRenderTarget() {
 }
 
 bool PreviewWindow::CreateViewportResources() {
-    // 着色器代码
-    const char* viewportVSCode = R"(
-        struct VS_INPUT {
-            float2 pos : POSITION;
-            float4 color : COLOR;
-        };
-        
-        struct PS_INPUT {
-            float4 pos : SV_POSITION;
-            float4 color : COLOR;
-        };
-        
-        PS_INPUT main(VS_INPUT input) {
-            PS_INPUT output;
-            output.pos = float4(input.pos.x * 2 - 1, -(input.pos.y * 2 - 1), 0, 1);
-            output.color = input.color;
-            return output;
-        }
-    )";
-
-    const char* viewportPSCode = R"(
-        struct PS_INPUT {
-            float4 pos : SV_POSITION;
-            float4 color : COLOR;
-        };
-        
-        float4 main(PS_INPUT input) : SV_Target {
-            return input.color;
-        }
-    )";
-
     // 编译着色器
     Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, psBlob, errorBlob;
     UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
@@ -647,12 +647,12 @@ bool PreviewWindow::CreateViewportResources() {
     compileFlags |= D3DCOMPILE_DEBUG;
 #endif
 
-    if (FAILED(D3DCompile(viewportVSCode, strlen(viewportVSCode), nullptr, nullptr, nullptr,
+    if (FAILED(D3DCompile(viewportVertexShaderCode, strlen(viewportVertexShaderCode), nullptr, nullptr, nullptr,
         "main", "vs_4_0", compileFlags, 0, &vsBlob, &errorBlob))) {
         return false;
     }
 
-    if (FAILED(D3DCompile(viewportPSCode, strlen(viewportPSCode), nullptr, nullptr, nullptr,
+    if (FAILED(D3DCompile(viewportPixelShaderCode, strlen(viewportPixelShaderCode), nullptr, nullptr, nullptr,
         "main", "ps_4_0", compileFlags, 0, &psBlob, &errorBlob))) {
         return false;
     }
@@ -1285,4 +1285,4 @@ void PreviewWindow::UpdateDpiDependentResources() {
         // 强制重绘
         InvalidateRect(m_hwnd, nullptr, TRUE);
     }
-} 
+}
