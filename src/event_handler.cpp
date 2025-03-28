@@ -42,8 +42,15 @@ EventHandler::EventHandler(
     m_resolutions(resolutions),
     m_language(language),
     m_windows(windows),
-    m_isScreenCaptureSupported(isScreenCaptureSupported)
+    m_isScreenCaptureSupported(isScreenCaptureSupported),
+    m_hotkeyId(Constants::ID_TRAYICON),
+    m_hotkeyRegistered(false),
+    m_hotkeySettingMode(false)
 {
+}
+
+EventHandler::~EventHandler() {
+    UnregisterHotkey();
 }
 
 // 显示通知
@@ -534,8 +541,7 @@ bool EventHandler::StartWindowCapture(HWND gameWindow, int width, int height) {
 }
 
 void EventHandler::SetHotkey() {
-    UnregisterHotKey(m_mainWindow, Constants::ID_TRAYICON);
-    PostMessage(m_mainWindow, Constants::WM_SET_HOTKEY_MODE, 0, 0);
+    m_hotkeySettingMode = true;
     ShowNotification(m_strings.APP_NAME.c_str(), m_strings.HOTKEY_SETTING.c_str());
 }
 
@@ -597,4 +603,73 @@ std::wstring EventHandler::GetHotkeyText() {
         }
     }
     return text;
+}
+
+bool EventHandler::RegisterHotkey(UINT modifiers, UINT key) {
+    // 确保先卸载之前的热键
+    UnregisterHotkey();
+    
+    bool success = ::RegisterHotKey(m_mainWindow, Constants::ID_TRAYICON, modifiers, key);
+    
+    if (success) {
+        m_hotkeyRegistered = true;
+        // 更新配置
+        m_configManager->SetHotkeyModifiers(modifiers);
+        m_configManager->SetHotkeyKey(key);
+        m_configManager->SaveHotkeyConfig();
+    }
+    
+    return success;
+}
+
+void EventHandler::UnregisterHotkey() {
+    if (m_hotkeyRegistered) {
+        ::UnregisterHotKey(m_mainWindow, Constants::ID_TRAYICON);
+        m_hotkeyRegistered = false;
+    }
+}
+
+void EventHandler::HandleHotkeyTriggered() {
+    if (m_configManager->GetUseFloatingWindow()) {
+        if (m_menuWindow) {
+            m_menuWindow->ToggleVisibility();
+        }
+    } else {
+        POINT pt;
+        GetCursorPos(&pt);
+        ShowQuickMenu(pt);
+    }
+}
+
+bool EventHandler::HandleKeyDown(WPARAM key) {
+    if (!m_hotkeySettingMode) {
+        return false;
+    }
+    
+    // 获取修饰键状态
+    UINT modifiers = 0;
+    if (GetAsyncKeyState(VK_CONTROL) & 0x8000) modifiers |= MOD_CONTROL;
+    if (GetAsyncKeyState(VK_SHIFT) & 0x8000) modifiers |= MOD_SHIFT;
+    if (GetAsyncKeyState(VK_MENU) & 0x8000) modifiers |= MOD_ALT;
+
+    // 如果按下了非修饰键
+    if (key != VK_CONTROL && key != VK_SHIFT && key != VK_MENU) {
+        m_hotkeySettingMode = false;
+
+        // 尝试注册新热键
+        if (RegisterHotkey(modifiers, static_cast<UINT>(key))) {
+            std::wstring hotkeyText = GetHotkeyText();
+            std::wstring message = m_strings.HOTKEY_SET_SUCCESS + hotkeyText;
+            ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
+        } else {
+            UINT defaultModifiers = MOD_CONTROL | MOD_ALT;
+            UINT defaultKey = 'R';
+            RegisterHotkey(defaultModifiers, defaultKey);
+            ShowNotification(m_strings.APP_NAME.c_str(), 
+                m_strings.HOTKEY_SET_FAILED.c_str());
+        }
+        return true;
+    }
+    
+    return false;
 }

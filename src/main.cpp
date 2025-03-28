@@ -24,9 +24,7 @@
 class SpinningMomoApp {
 public:
     SpinningMomoApp() = default;
-    ~SpinningMomoApp() {
-        UnregisterHotKey(m_hwnd, 1);
-    }
+    ~SpinningMomoApp() = default;
 
     bool Initialize(HINSTANCE hInstance) {
         Logger::GetInstance().Initialize();

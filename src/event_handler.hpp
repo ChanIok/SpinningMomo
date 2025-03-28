@@ -37,6 +37,11 @@ private:
     std::vector<std::pair<HWND, std::wstring>>& m_windows;
     HWND m_mainWindow;
     bool m_isScreenCaptureSupported;
+    
+    // 热键相关
+    WORD m_hotkeyId;
+    bool m_hotkeyRegistered;
+    bool m_hotkeySettingMode;
 public:
     EventHandler(
         HWND mainWindow,
@@ -59,6 +64,8 @@ public:
         std::vector<std::pair<HWND, std::wstring>>& windows,
         bool isScreenCaptureSupported
     );
+    
+    ~EventHandler();
 
     // 通知相关
     void ShowNotification(const wchar_t* title, const wchar_t* message, bool isError = false);
@@ -93,4 +100,12 @@ public:
     void SetHotkey();
     void OpenConfigFile();
     std::wstring GetHotkeyText();
+    
+    // 热键管理
+    bool RegisterHotkey(UINT modifiers, UINT key);
+    void UnregisterHotkey();
+    void HandleHotkeyTriggered();
+    bool IsHotkeySettingMode() const { return m_hotkeySettingMode; }
+    void SetHotkeySettingMode(bool mode) { m_hotkeySettingMode = mode; }
+    bool HandleKeyDown(WPARAM key);  // 返回true表示已处理
 };
