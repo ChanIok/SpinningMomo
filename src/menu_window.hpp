@@ -62,7 +62,6 @@ public:
     void Activate();  // 添加激活窗口的方法
 
 private:
-    static const TCHAR* MENU_WINDOW_CLASS;  // 只声明
     // 基础尺寸（96 DPI）
     static constexpr int BASE_ITEM_HEIGHT = 24;        // 列表项高度
     static constexpr int BASE_TITLE_HEIGHT = 26;       // 标题栏高度

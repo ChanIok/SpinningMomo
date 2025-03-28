@@ -1,7 +1,7 @@
 #include "config_manager.hpp"
-#include <tchar.h>
 #include <shellapi.h>
 #include <shlwapi.h>
+#include <string> // Include for std::stoi/stoul
 
 ConfigManager::ConfigManager() {
 }
@@ -22,28 +22,28 @@ void ConfigManager::Initialize() {
 
     // 检查配置文件是否存在
     if (GetFileAttributes(m_configPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
-        // 创建默认配置文件
-        WritePrivateProfileString(Constants::LOGGER_SECTION, Constants::LOGGER_LEVEL, TEXT("INFO"), m_configPath.c_str());
-        WritePrivateProfileString(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, TEXT(""), m_configPath.c_str());
-        WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, TEXT("3"), m_configPath.c_str());
-        WritePrivateProfileString(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, TEXT("82"), m_configPath.c_str());
-        WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_FLOATING, TEXT("1"), m_configPath.c_str());
-        WritePrivateProfileString(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, TEXT(""), m_configPath.c_str());
-        WritePrivateProfileString(Constants::MENU_SECTION, Constants::MENU_ITEMS, 
-                                TEXT("CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,LetterboxWindow,Reset,Close,Exit"), 
+    // 创建默认配置文件
+    WritePrivateProfileStringW(Constants::LOGGER_SECTION, Constants::LOGGER_LEVEL, L"INFO", m_configPath.c_str());
+    WritePrivateProfileStringW(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, L"", m_configPath.c_str());
+    WritePrivateProfileStringW(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, L"3", m_configPath.c_str());
+    WritePrivateProfileStringW(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, L"82", m_configPath.c_str());
+    WritePrivateProfileStringW(Constants::MENU_SECTION, Constants::MENU_FLOATING, L"1", m_configPath.c_str());
+    WritePrivateProfileStringW(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, L"", m_configPath.c_str());
+    WritePrivateProfileStringW(Constants::MENU_SECTION, Constants::MENU_ITEMS, 
+                                L"CaptureWindow,OpenScreenshot,PreviewWindow,OverlayWindow,LetterboxWindow,Reset,Close,Exit", 
                                 m_configPath.c_str());
         
-        // 添加默认的宽高比和分辨率配置
-        WritePrivateProfileString(Constants::MENU_SECTION, Constants::ASPECT_RATIO_ITEMS, 
-                                TEXT("32:9,21:9,16:9,3:2,1:1,3:4,2:3,9:16"), 
+    // 添加默认的宽高比和分辨率配置
+    WritePrivateProfileStringW(Constants::MENU_SECTION, Constants::ASPECT_RATIO_ITEMS, 
+                                L"32:9,21:9,16:9,3:2,1:1,3:4,2:3,9:16", 
                                 m_configPath.c_str());
-        WritePrivateProfileString(Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS, 
-                                TEXT("Default,1080P,2K,4K,6K,8K,12K"), 
+    WritePrivateProfileStringW(Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS, 
+                                L"Default,1080P,2K,4K,6K,8K,12K", 
                                 m_configPath.c_str());
         
-        // 添加默认的黑边模式配置（默认为禁用）
-        WritePrivateProfileString(Constants::LETTERBOX_SECTION, Constants::LETTERBOX_ENABLED, 
-                                TEXT("0"), 
+    // 添加默认的黑边模式配置（默认为禁用）
+    WritePrivateProfileStringW(Constants::LETTERBOX_SECTION, Constants::LETTERBOX_ENABLED, 
+                                L"0", 
                                 m_configPath.c_str());
     }
 }
@@ -60,64 +60,64 @@ void ConfigManager::LoadAllConfigs() {
 }
 
 void ConfigManager::LoadLogConfig() {
-    TCHAR buffer[32];
-    if (GetPrivateProfileString(Constants::LOGGER_SECTION, 
+    wchar_t buffer[32];
+    if (GetPrivateProfileStringW(Constants::LOGGER_SECTION, 
                                Constants::LOGGER_LEVEL,
-                               TEXT(""), 
+                               L"", 
                                buffer, 
                                _countof(buffer),
                                m_configPath.c_str()) > 0) {
         std::wstring logLevelStr = buffer;
         
-        if (logLevelStr == TEXT("DEBUG")) {
+        if (logLevelStr == L"DEBUG") {
             m_logLevel = LogLevel::DEBUG;
-        } else if (logLevelStr == TEXT("INFO")) {
+        } else if (logLevelStr == L"INFO") {
             m_logLevel = LogLevel::INFO;
-        } else if (logLevelStr == TEXT("ERROR")) {
+        } else if (logLevelStr == L"ERROR") {
             m_logLevel = LogLevel::ERR;
         }
     }
 }
 
 void ConfigManager::LoadHotkeyConfig() {
-    TCHAR buffer[32];
+    wchar_t buffer[32];
     // 读取修饰键
-    if (GetPrivateProfileString(Constants::HOTKEY_SECTION, 
+    if (GetPrivateProfileStringW(Constants::HOTKEY_SECTION, 
                               Constants::HOTKEY_MODIFIERS,
-                              TEXT(""), buffer, _countof(buffer),
+                              L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        m_hotkeyModifiers = _wtoi(buffer);
+        try { m_hotkeyModifiers = std::stoul(buffer); } catch (...) {}
     }
 
     // 读取主键
-    if (GetPrivateProfileString(Constants::HOTKEY_SECTION,
+    if (GetPrivateProfileStringW(Constants::HOTKEY_SECTION,
                               Constants::HOTKEY_KEY,
-                              TEXT(""), buffer, _countof(buffer),
+                              L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        m_hotkeyKey = _wtoi(buffer);
+        try { m_hotkeyKey = std::stoul(buffer); } catch (...) {}
     }
 }
 
 void ConfigManager::SaveHotkeyConfig() {
-    TCHAR buffer[32];
+    wchar_t buffer[32];
     // 保存修饰键
-    _stprintf_s(buffer, _countof(buffer), TEXT("%u"), m_hotkeyModifiers);
-    WritePrivateProfileString(Constants::HOTKEY_SECTION,
+    swprintf_s(buffer, _countof(buffer), L"%u", m_hotkeyModifiers);
+    WritePrivateProfileStringW(Constants::HOTKEY_SECTION,
                             Constants::HOTKEY_MODIFIERS,
                             buffer, m_configPath.c_str());
 
     // 保存主键
-    _stprintf_s(buffer, _countof(buffer), TEXT("%u"), m_hotkeyKey);
-    WritePrivateProfileString(Constants::HOTKEY_SECTION,
+    swprintf_s(buffer, _countof(buffer), L"%u", m_hotkeyKey);
+    WritePrivateProfileStringW(Constants::HOTKEY_SECTION,
                             Constants::HOTKEY_KEY,
                             buffer, m_configPath.c_str());
 }
 
 void ConfigManager::LoadWindowConfig() {
-    TCHAR buffer[256];
-    if (GetPrivateProfileString(Constants::WINDOW_SECTION,
+    wchar_t buffer[256];
+    if (GetPrivateProfileStringW(Constants::WINDOW_SECTION,
                               Constants::WINDOW_TITLE,
-                              TEXT(""), buffer, _countof(buffer),
+                              L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
         m_windowTitle = buffer;
     }
@@ -125,7 +125,7 @@ void ConfigManager::LoadWindowConfig() {
 
 void ConfigManager::SaveWindowConfig() {
     if (!m_windowTitle.empty()) {
-        WritePrivateProfileString(Constants::WINDOW_SECTION,
+        WritePrivateProfileStringW(Constants::WINDOW_SECTION,
                                 Constants::WINDOW_TITLE,
                                 m_windowTitle.c_str(),
                                 m_configPath.c_str());
@@ -133,10 +133,10 @@ void ConfigManager::SaveWindowConfig() {
 }
 
 void ConfigManager::LoadLanguageConfig() {
-    TCHAR buffer[32];
-    if (GetPrivateProfileString(Constants::LANG_SECTION,
+    wchar_t buffer[32];
+    if (GetPrivateProfileStringW(Constants::LANG_SECTION,
                               Constants::LANG_CURRENT,
-                              TEXT(""), buffer, _countof(buffer),
+                              L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
         m_language = buffer;
     } else {
@@ -149,63 +149,63 @@ void ConfigManager::LoadLanguageConfig() {
 }
 
 void ConfigManager::SaveLanguageConfig() {
-    WritePrivateProfileString(Constants::LANG_SECTION,
+    WritePrivateProfileStringW(Constants::LANG_SECTION,
                             Constants::LANG_CURRENT,
                             m_language.c_str(),
                             m_configPath.c_str());
 }
 
 void ConfigManager::LoadTaskbarConfig() {
-    TCHAR buffer[32];
-    if (GetPrivateProfileString(Constants::TASKBAR_SECTION,
+    wchar_t buffer[32];
+    if (GetPrivateProfileStringW(Constants::TASKBAR_SECTION,
                               Constants::TASKBAR_AUTOHIDE,
-                              TEXT("0"), buffer, _countof(buffer),
+                              L"0", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        m_taskbarAutoHide = (_wtoi(buffer) != 0);
+        try { m_taskbarAutoHide = (std::stoi(buffer) != 0); } catch (...) {}
     }
     
-    if (GetPrivateProfileString(Constants::TASKBAR_SECTION,
+    if (GetPrivateProfileStringW(Constants::TASKBAR_SECTION,
                               Constants::TASKBAR_LOWER,
-                              TEXT("1"), buffer, _countof(buffer),
+                              L"1", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        m_taskbarLower = (_wtoi(buffer) != 0);
+        try { m_taskbarLower = (std::stoi(buffer) != 0); } catch (...) {}
     }
 }
 
 void ConfigManager::SaveTaskbarConfig() {
-    WritePrivateProfileString(Constants::TASKBAR_SECTION,
+    WritePrivateProfileStringW(Constants::TASKBAR_SECTION,
                             Constants::TASKBAR_AUTOHIDE,
-                            m_taskbarAutoHide ? TEXT("1") : TEXT("0"),
+                            m_taskbarAutoHide ? L"1" : L"0",
                             m_configPath.c_str());
                             
-    WritePrivateProfileString(Constants::TASKBAR_SECTION,
+    WritePrivateProfileStringW(Constants::TASKBAR_SECTION,
                             Constants::TASKBAR_LOWER,
-                            m_taskbarLower ? TEXT("1") : TEXT("0"),
+                            m_taskbarLower ? L"1" : L"0",
                             m_configPath.c_str());
 }
 
 void ConfigManager::LoadMenuConfig() {
-    TCHAR buffer[1024];
+    wchar_t buffer[1024];
     
     // 读取浮动窗口设置
-    if (GetPrivateProfileString(Constants::MENU_SECTION,
+    if (GetPrivateProfileStringW(Constants::MENU_SECTION,
                               Constants::MENU_FLOATING,
-                              TEXT("1"), buffer, _countof(buffer),
+                              L"1", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        m_useFloatingWindow = (_wtoi(buffer) != 0);
+        try { m_useFloatingWindow = (std::stoi(buffer) != 0); } catch (...) {}
     }
     
     // 读取菜单项显示配置
-    if (GetPrivateProfileString(Constants::MENU_SECTION,
+    if (GetPrivateProfileStringW(Constants::MENU_SECTION,
                               Constants::MENU_ITEMS,
-                              TEXT(""), buffer, _countof(buffer),
+                              L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
         std::wstring itemsStr = buffer;
         if (!itemsStr.empty()) {
             m_menuItemsToShow.clear();
             
             size_t start = 0, end = 0;
-            while ((end = itemsStr.find(TEXT(","), start)) != std::wstring::npos) {
+            while ((end = itemsStr.find(L",", start)) != std::wstring::npos) {
                 std::wstring item = itemsStr.substr(start, end - start);
                 if (!item.empty()) {
                     m_menuItemsToShow.push_back(item);
@@ -223,16 +223,16 @@ void ConfigManager::LoadMenuConfig() {
     }
     
     // 读取宽高比项配置
-    if (GetPrivateProfileString(Constants::MENU_SECTION,
+    if (GetPrivateProfileStringW(Constants::MENU_SECTION,
                               Constants::ASPECT_RATIO_ITEMS,
-                              TEXT(""), buffer, _countof(buffer),
+                              L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
         std::wstring ratioItemsStr = buffer;
         if (!ratioItemsStr.empty()) {
             m_aspectRatioItems.clear();
             
             size_t start = 0, end = 0;
-            while ((end = ratioItemsStr.find(TEXT(","), start)) != std::wstring::npos) {
+            while ((end = ratioItemsStr.find(L",", start)) != std::wstring::npos) {
                 std::wstring item = ratioItemsStr.substr(start, end - start);
                 if (!item.empty()) {
                     m_aspectRatioItems.push_back(item);
@@ -250,16 +250,16 @@ void ConfigManager::LoadMenuConfig() {
     }
     
     // 读取分辨率项配置
-    if (GetPrivateProfileString(Constants::MENU_SECTION,
+    if (GetPrivateProfileStringW(Constants::MENU_SECTION,
                               Constants::RESOLUTION_ITEMS,
-                              TEXT(""), buffer, _countof(buffer),
+                              L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
         std::wstring resolutionItemsStr = buffer;
         if (!resolutionItemsStr.empty()) {
             m_resolutionItems.clear();
             
             size_t start = 0, end = 0;
-            while ((end = resolutionItemsStr.find(TEXT(","), start)) != std::wstring::npos) {
+            while ((end = resolutionItemsStr.find(L",", start)) != std::wstring::npos) {
                 std::wstring item = resolutionItemsStr.substr(start, end - start);
                 if (!item.empty()) {
                     m_resolutionItems.push_back(item);
@@ -279,18 +279,18 @@ void ConfigManager::LoadMenuConfig() {
 
 void ConfigManager::SaveMenuConfig() {
     // 保存浮动窗口设置
-    TCHAR buffer[32];
-    _stprintf_s(buffer, _countof(buffer), TEXT("%d"), m_useFloatingWindow ? 1 : 0);
-    WritePrivateProfileString(Constants::MENU_SECTION,
+    wchar_t buffer[32];
+    swprintf_s(buffer, _countof(buffer), L"%d", m_useFloatingWindow ? 1 : 0);
+    WritePrivateProfileStringW(Constants::MENU_SECTION,
                             Constants::MENU_FLOATING,
                             buffer, m_configPath.c_str());
 }
 
 void ConfigManager::LoadGameAlbumConfig() {
-    TCHAR buffer[MAX_PATH];
-    if (GetPrivateProfileString(Constants::SCREENSHOT_SECTION,
+    wchar_t buffer[MAX_PATH];
+    if (GetPrivateProfileStringW(Constants::SCREENSHOT_SECTION,
                               Constants::SCREENSHOT_PATH,
-                              TEXT(""), buffer, MAX_PATH,
+                              L"", buffer, MAX_PATH,
                               m_configPath.c_str()) > 0) {
         m_gameAlbumPath = buffer;
     }
@@ -298,7 +298,7 @@ void ConfigManager::LoadGameAlbumConfig() {
 
 void ConfigManager::SaveGameAlbumConfig() {
     if (!m_gameAlbumPath.empty()) {
-        WritePrivateProfileString(Constants::SCREENSHOT_SECTION,
+        WritePrivateProfileStringW(Constants::SCREENSHOT_SECTION,
                                 Constants::SCREENSHOT_PATH,
                                 m_gameAlbumPath.c_str(),
                                 m_configPath.c_str());
@@ -307,25 +307,25 @@ void ConfigManager::SaveGameAlbumConfig() {
 
 // 加载黑边模式配置
 void ConfigManager::LoadLetterboxConfig() {
-    TCHAR buffer[32];
-    if (GetPrivateProfileString(Constants::LETTERBOX_SECTION,
+    wchar_t buffer[32];
+    if (GetPrivateProfileStringW(Constants::LETTERBOX_SECTION,
                               Constants::LETTERBOX_ENABLED,
-                              TEXT("0"), buffer, _countof(buffer),
+                              L"0", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        m_letterboxEnabled = (_wtoi(buffer) != 0);
+        try { m_letterboxEnabled = (std::stoi(buffer) != 0); } catch (...) {}
     }
 }
 
 // 保存黑边模式配置
 void ConfigManager::SaveLetterboxConfig() {
-    WritePrivateProfileString(Constants::LETTERBOX_SECTION,
+    WritePrivateProfileStringW(Constants::LETTERBOX_SECTION,
                             Constants::LETTERBOX_ENABLED,
-                            m_letterboxEnabled ? TEXT("1") : TEXT("0"),
+                            m_letterboxEnabled ? L"1" : L"0",
                             m_configPath.c_str());
 }
 
 bool ConfigManager::AddCustomRatio(const std::wstring& ratio, std::vector<AspectRatio>& ratios) {
-    size_t colonPos = ratio.find(TEXT(":"));
+    size_t colonPos = ratio.find(L":");
     if (colonPos == std::wstring::npos) return false;
     
     try {
@@ -343,31 +343,31 @@ bool ConfigManager::AddCustomRatio(const std::wstring& ratio, std::vector<Aspect
 bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vector<ResolutionPreset>& resolutions) {
     try {
         // 处理常见分辨率标识符
-        if (resolution == TEXT("480P")) {
+        if (resolution == L"480P") {
             resolutions.emplace_back(resolution, 720, 480);
             return true;
-        } else if (resolution == TEXT("720P")) {
+        } else if (resolution == L"720P") {
             resolutions.emplace_back(resolution, 1280, 720);
             return true;
-        } else if (resolution == TEXT("1080P")) {
+        } else if (resolution == L"1080P") {
             resolutions.emplace_back(resolution, 1920, 1080);
             return true;
-        } else if (resolution == TEXT("2K")) {
+        } else if (resolution == L"2K") {
             resolutions.emplace_back(resolution, 2560, 1440);
             return true;
-        } else if (resolution == TEXT("5K")) {
+        } else if (resolution == L"5K") {
             resolutions.emplace_back(resolution, 5120, 2880);
             return true;
-        } else if (resolution == TEXT("10K")) {
+        } else if (resolution == L"10K") {
             resolutions.emplace_back(resolution, 10240, 4320);
             return true;
-        } else if (resolution == TEXT("16K")) {
+        } else if (resolution == L"16K") {
             resolutions.emplace_back(resolution, 15360, 8640);
             return true;
         }
         
         // 处理自定义分辨率格式 (例如 1920x1080)
-        size_t xPos = resolution.find(TEXT("x"));
+        size_t xPos = resolution.find(L"x");
         if (xPos == std::wstring::npos) return false;
 
         int width = std::stoi(resolution.substr(0, xPos));
@@ -386,24 +386,24 @@ bool ConfigManager::AddCustomResolution(const std::wstring& resolution, std::vec
 // 获取默认的宽高比预设
 std::vector<AspectRatio> ConfigManager::GetDefaultAspectRatios() {
     return {
-        {TEXT("32:9"), 32.0/9.0},  // 超宽屏
-        {TEXT("21:9"), 21.0/9.0},  // 宽屏
-        {TEXT("16:9"), 16.0/9.0},  // 标准宽屏
-        {TEXT("3:2"), 3.0/2.0},    // 传统显示器
-        {TEXT("1:1"), 1.0},        // 正方形
-        {TEXT("2:3"), 2.0/3.0},    // 竖屏
-        {TEXT("9:16"), 9.0/16.0}   // 竖屏宽屏
+        {L"32:9", 32.0/9.0},  // 超宽屏
+        {L"21:9", 21.0/9.0},  // 宽屏
+        {L"16:9", 16.0/9.0},  // 标准宽屏
+        {L"3:2", 3.0/2.0},    // 传统显示器
+        {L"1:1", 1.0},        // 正方形
+        {L"2:3", 2.0/3.0},    // 竖屏
+        {L"9:16", 9.0/16.0}   // 竖屏宽屏
     };
 }
 
 // 获取默认的分辨率预设
 std::vector<ResolutionPreset> ConfigManager::GetDefaultResolutionPresets() {
     return {
-        {TEXT("Default"), 0, 0},    // 默认选项，使用屏幕尺寸计算
-        {TEXT("4K"), 3840, 2160},   // 8.3M pixels
-        {TEXT("6K"), 5760, 3240},   // 18.7M pixels
-        {TEXT("8K"), 7680, 4320},   // 33.2M pixels
-        {TEXT("12K"), 11520, 6480}  // 74.6M pixels
+        {L"Default", 0, 0},    // 默认选项，使用屏幕尺寸计算
+        {L"4K", 3840, 2160},   // 8.3M pixels
+        {L"6K", 5760, 3240},   // 18.7M pixels
+        {L"8K", 7680, 4320},   // 33.2M pixels
+        {L"12K", 11520, 6480}  // 74.6M pixels
     };
 }
 

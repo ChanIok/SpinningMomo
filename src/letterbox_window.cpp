@@ -47,7 +47,7 @@ bool LetterboxWindow::Initialize(HINSTANCE hInstance) {
     }
 
     // 创建窗口，但不立即显示
-    m_hwnd = CreateWindowEx(
+    m_hwnd = CreateWindowExW(
         WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
         L"LetterboxWindowClass",
         L"Letterbox",
@@ -214,7 +214,7 @@ void LetterboxWindow::EventThreadProc() {
     wcMessage.cbSize = sizeof(WNDCLASSEX);
     wcMessage.lpfnWndProc = MessageWndProc;
     wcMessage.hInstance = m_hInstance;
-    wcMessage.lpszClassName = L"LetterboxMessageClass";
+    wcMessage.lpszClassName = L"SpinningMomoLetterboxMessageClass";
     
     if (!RegisterClassEx(&wcMessage)) {
         LOG_ERROR("Failed to register letterbox message window class");
@@ -222,9 +222,9 @@ void LetterboxWindow::EventThreadProc() {
     }
     
     // 创建消息窗口
-    m_messageWindow = CreateWindowEx(
+    m_messageWindow = CreateWindowExW(
         0,
-        L"LetterboxMessageClass",
+        L"SpinningMomoLetterboxMessageClass",
         L"LetterboxMessage",
         WS_OVERLAPPED,
         0, 0, 0, 0,

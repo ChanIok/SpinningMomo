@@ -2,10 +2,6 @@
 #include "window_utils.hpp"
 #include <windowsx.h>
 #include <algorithm>
-#include <tchar.h>
-
-// MenuWindow的静态成员定义
-const TCHAR* MenuWindow::MENU_WINDOW_CLASS = TEXT("SpinningMomoMenuClass");
 
 MenuWindow::MenuWindow(HINSTANCE hInstance) : m_hInstance(hInstance) {
     RegisterWindowClass();
@@ -19,15 +15,15 @@ MenuWindow::MenuWindow(HINSTANCE hInstance) : m_hInstance(hInstance) {
 }
 
 void MenuWindow::RegisterWindowClass() {
-    WNDCLASSEX wc = {0};
-    wc.cbSize = sizeof(WNDCLASSEX);
+    WNDCLASSEXW wc = {0};
+    wc.cbSize = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc = MenuWindowProc;
     wc.hInstance = m_hInstance;
-    wc.lpszClassName = MENU_WINDOW_CLASS;
+    wc.lpszClassName = L"SpinningMomoMenuClass";
     wc.hbrBackground = NULL;
     wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    RegisterClassEx(&wc);
+    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
+    RegisterClassExW(&wc);
 }
 
 bool MenuWindow::Create(HWND parent, 
@@ -63,10 +59,10 @@ bool MenuWindow::Create(HWND parent,
     int xPos = (workArea.right - workArea.left - totalWidth) / 2;
     int yPos = (workArea.bottom - workArea.top - windowHeight) / 2;
     
-    m_hwnd = CreateWindowEx(
+    m_hwnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
-        MENU_WINDOW_CLASS,
-        TEXT("SpinningMomo"),
+        L"SpinningMomoMenuClass",
+        L"SpinningMomo",
         WS_POPUP | WS_CLIPCHILDREN,
         xPos, yPos,
         totalWidth, windowHeight,
@@ -168,7 +164,7 @@ void MenuWindow::InitializeItems(const LocalizedStrings& strings) {
             } else {
                 swprintf(buffer, 16, L"%.0f", megaPixels);
             }
-            displayText = preset.name + TEXT(" (") + buffer + TEXT("M)");
+            displayText = preset.name + L" (" + buffer + L"M)";
         }
         m_items.push_back({displayText, ItemType::Resolution, static_cast<int>(i)});
     }
@@ -301,9 +297,9 @@ void MenuWindow::OnPaint(HDC hdc) {
 
     // 设置文本属性，使用 DPI 感知的字体大小
     SetBkMode(memDC, TRANSPARENT);
-    HFONT hFont = CreateFont(-m_fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+    HFONT hFont = CreateFontW(-m_fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                           DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                          CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("微软雅黑"));
+                          CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"微软雅黑");
     HFONT oldFont = (HFONT)SelectObject(memDC, hFont);
 
     // 绘制背景
@@ -321,7 +317,7 @@ void MenuWindow::OnPaint(HDC hdc) {
     // 绘制标题文本
     SetTextColor(memDC, RGB(51, 51, 51));
     titleRect.left += m_textPadding;
-    DrawText(memDC, TEXT("SpinningMomo"), -1, &titleRect, 
+    DrawTextW(memDC, L"SpinningMomo", -1, &titleRect, 
             DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOCLIP);
 
     // 绘制分隔线
@@ -408,7 +404,7 @@ void MenuWindow::OnPaint(HDC hdc) {
         // 绘制文本
         itemRect.left += m_textPadding + ((item.type == ItemType::Ratio) ? m_ratioIndicatorWidth : m_indicatorWidth);
         SetTextColor(memDC, RGB(51, 51, 51));
-        DrawText(memDC, item.text.c_str(), -1, &itemRect, 
+        DrawTextW(memDC, item.text.c_str(), -1, &itemRect, 
                 DT_SINGLELINE | DT_VCENTER | DT_LEFT);
 
         // 只有在同一列中才增加y坐标

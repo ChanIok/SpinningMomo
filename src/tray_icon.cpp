@@ -2,7 +2,6 @@
 #include "window_utils.hpp"
 #include <windowsx.h>
 #include <algorithm>
-#include <tchar.h>
 
 TrayIcon::TrayIcon(HWND hwnd) : m_hwnd(hwnd) {
     m_nid.cbSize = sizeof(NOTIFYICONDATA);
@@ -151,12 +150,12 @@ void TrayIcon::ShowQuickMenu(
     if (hSizeMenu) {
         for (size_t i = 0; i < resolutions.size(); ++i) {
             const auto& preset = resolutions[i];
-            TCHAR menuText[256];
+            wchar_t menuText[256];
             if (preset.baseWidth == 0 && preset.baseHeight == 0) {
                 // 如果是默认选项，不显示像素数
-                _stprintf_s(menuText, _countof(menuText), TEXT("%s"), preset.name.c_str());
+        swprintf_s(menuText, _countof(menuText), L"%s", preset.name.c_str());
             } else {
-                _stprintf_s(menuText, _countof(menuText), TEXT("%s (%.1fM)"), 
+        swprintf_s(menuText, _countof(menuText), L"%s (%.1fM)", 
                     preset.name.c_str(), 
                     preset.totalPixels / 1000000.0);
             }
@@ -244,12 +243,12 @@ HMENU TrayIcon::CreateResolutionSubmenu(
 
     for (size_t i = 0; i < resolutions.size(); ++i) {
         const auto& preset = resolutions[i];
-        TCHAR menuText[256];
+        wchar_t menuText[256];
         if (preset.baseWidth == 0 && preset.baseHeight == 0) {
             // 如果是默认选项，不显示像素数
-            _stprintf_s(menuText, _countof(menuText), TEXT("%s"), preset.name.c_str());
+        swprintf_s(menuText, _countof(menuText), L"%s", preset.name.c_str());
         } else {
-            _stprintf_s(menuText, _countof(menuText), TEXT("%s (%.1fM)"), 
+        swprintf_s(menuText, _countof(menuText), L"%s (%.1fM)", 
                 preset.name.c_str(), 
                 preset.totalPixels / 1000000.0);
         }
@@ -329,4 +328,4 @@ void TrayIcon::AddSettingsItems(
                   Constants::ID_TOGGLE_WINDOW_VISIBILITY,
                   (isFloatingWindowVisible ? strings.CLOSE_WINDOW.c_str() : strings.SHOW_WINDOW.c_str()));
     }
-} 
+}

@@ -273,10 +273,10 @@ HWND WindowUtils::FindTargetWindow(const std::wstring& configuredTitle) {
     // 2. 如果找不到，尝试预设的游戏窗口标题
     if (!gameWindow) {
         // 先尝试查找中文标题
-        gameWindow = FindWindow(NULL, TEXT("无限暖暖  "));
+        gameWindow = FindWindow(NULL, L"无限暖暖  ");
         if (!gameWindow) {
             // 如果找不到中文标题，尝试英文标题
-            gameWindow = FindWindow(NULL, TEXT("Infinity Nikki  "));
+            gameWindow = FindWindow(NULL, L"Infinity Nikki  ");
         }
     }
     
@@ -331,7 +331,7 @@ bool WindowUtils::ResizeWindow(HWND hwnd, int width, int height, bool taskbarLow
 
     // 如果窗口调整成功且需要置底任务栏，则执行置底操作
     if (success && taskbarLower) {
-        if (HWND taskbar = FindWindow(TEXT("Shell_TrayWnd"), NULL)) {
+        if (HWND taskbar = FindWindow(L"Shell_TrayWnd", NULL)) {
             SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         }
     }
@@ -345,8 +345,8 @@ std::vector<std::pair<HWND, std::wstring>> WindowUtils::GetWindows() {
     
     // 回调函数
     auto enumWindowsProc = [](HWND hwnd, LPARAM lParam) -> BOOL {
-        TCHAR className[256];
-        TCHAR windowText[256];
+        wchar_t className[256];
+        wchar_t windowText[256];
         
         if (!IsWindowVisible(hwnd)) return TRUE;
         if (!GetClassName(hwnd, className, 256)) return TRUE;

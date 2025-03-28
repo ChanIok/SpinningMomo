@@ -475,7 +475,7 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = L"PreviewWindowClass";
+    wc.lpszClassName = L"SpinningMomoPreviewWindowClass";
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);  // 添加背景色
     wc.style = CS_HREDRAW | CS_VREDRAW;            // 添加窗口样式
@@ -491,8 +491,8 @@ bool PreviewWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
     // 创建窗口，但初始不显示
     m_hwnd = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED,
-        L"PreviewWindowClass",
-        L"预览窗口",
+        L"SpinningMomoPreviewWindowClass",
+        L"PreviewWindow",
         WS_POPUP,  // 移除 WS_VISIBLE
         0, 0,  // 初始位置不重要，会在 StartCapture 中设置
         m_idealSize, m_idealSize + TITLE_HEIGHT,  // 初始尺寸为理想尺寸

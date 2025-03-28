@@ -3,8 +3,6 @@
 #include <windowsx.h>
 #include <algorithm>
 
-static const TCHAR* NOTIFICATION_WINDOW_CLASS = TEXT("SpinningMomoNotificationClass");
-
 NotificationWindow::NotificationWindow(HINSTANCE hInstance) 
     : m_hInstance(hInstance) {
     // 获取系统 DPI
@@ -24,7 +22,7 @@ NotificationWindow::~NotificationWindow() {
     if (m_hwnd) {
         DestroyWindow(m_hwnd);
     }
-    UnregisterClass(NOTIFICATION_WINDOW_CLASS, m_hInstance);
+    UnregisterClassW(L"SpinningMomoNotificationClass", m_hInstance);
 }
 
 int NotificationWindow::CalculateWindowHeight(const std::wstring& message) const {
@@ -32,7 +30,7 @@ int NotificationWindow::CalculateWindowHeight(const std::wstring& message) const
     HDC hdc = GetDC(NULL);
     HFONT messageFont = CreateFont(-m_fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("微软雅黑"));
+                                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"微软雅黑");
     HFONT oldFont = (HFONT)SelectObject(hdc, messageFont);
     
     // 计算文本区域宽度（窗口宽度减去左右内边距）
@@ -234,7 +232,7 @@ void NotificationWindow::RegisterWindowClass() {
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.lpfnWndProc = NotificationWindowProc;
     wc.hInstance = m_hInstance;
-    wc.lpszClassName = NOTIFICATION_WINDOW_CLASS;
+    wc.lpszClassName = L"SpinningMomoNotificationClass";
     wc.hbrBackground = NULL;
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
@@ -242,10 +240,10 @@ void NotificationWindow::RegisterWindowClass() {
 }
 
 bool NotificationWindow::CreateNotificationWindow() {
-    m_hwnd = CreateWindowEx(
+    m_hwnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
-        NOTIFICATION_WINDOW_CLASS,
-        TEXT("Notification"),
+        L"SpinningMomoNotificationClass",
+        L"Notification",
         WS_POPUP | WS_CLIPCHILDREN,
         0, 0, m_windowWidth, m_windowHeight,
         NULL, NULL, m_hInstance, this
@@ -390,10 +388,10 @@ void NotificationWindow::OnPaint(HDC hdc) {
     // 创建字体
     HFONT titleFont = CreateFont(-m_titleFontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                               DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                              CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("微软雅黑"));
+                              CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"微软雅黑");
     HFONT messageFont = CreateFont(-m_fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
                                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("微软雅黑"));
+                                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"微软雅黑");
 
     // 绘制背景
     HBRUSH hBackBrush = CreateSolidBrush(BG_COLOR);

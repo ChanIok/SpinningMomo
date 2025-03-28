@@ -3,7 +3,6 @@
 #include <shellapi.h>
 #include <memory>
 #include <string>
-#include <tchar.h>
 #include <strsafe.h>
 #include <vector>
 #include <dwmapi.h>
@@ -130,6 +129,11 @@ public:
             return false;
         }
 
+        // 如果启用了浮动窗口，则默认显示
+        if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
+            m_menuWindow->Show();
+        }
+
         // 创建事件处理器
         m_eventHandler = std::make_unique<EventHandler>(
             m_hwnd,
@@ -153,13 +157,8 @@ public:
             m_isScreenCaptureSupported
         );
 
-        // 如果启用了浮动窗口，则默认显示
-        if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
-            m_menuWindow->Show();
-        }
-
         // 注册热键
-        bool hotkeyRegistered = RegisterHotKey(m_hwnd, Constants::ID_TRAYICON, 
+        bool hotkeyRegistered = m_eventHandler->RegisterHotkey(
                           m_configManager->GetHotkeyModifiers(), 
                           m_configManager->GetHotkeyKey());
         
@@ -203,7 +202,6 @@ private:
 
     // 应用状态
     bool m_isPreviewEnabled = false;
-    bool m_hotkeySettingMode = false;
     bool m_messageLoopStarted = false;
     bool m_isScreenCaptureSupported = false;
     bool m_isOverlayEnabled = false;
@@ -233,7 +231,7 @@ private:
     size_t m_currentNotificationIndex = 0;
 
     // 添加待显示通知
-    void AddPendingNotification(const TCHAR* title, const TCHAR* message, bool isError = false) {
+    void AddPendingNotification(const wchar_t* title, const wchar_t* message, bool isError = false) {
         m_pendingNotifications.push_back({
             title,
             message,
@@ -243,18 +241,18 @@ private:
     }
 
     bool RegisterWindowClass(HINSTANCE hInstance) {
-        WNDCLASSEX wc = {0};
-        wc.cbSize = sizeof(WNDCLASSEX);
+        WNDCLASSEXW wc = {0};
+        wc.cbSize = sizeof(WNDCLASSEXW);
         wc.lpfnWndProc = WindowProc;
         wc.hInstance = hInstance;
         wc.lpszClassName = Constants::WINDOW_CLASS;
-        wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
-        wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
-        return RegisterClassEx(&wc) != 0;
+        wc.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_ICON1));
+        wc.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_ICON1));
+        return RegisterClassExW(&wc) != 0;
     }
 
     bool CreateAppWindow(HINSTANCE hInstance) {
-        m_hwnd = CreateWindow(Constants::WINDOW_CLASS, Constants::APP_NAME,
+        m_hwnd = CreateWindowW(Constants::WINDOW_CLASS, Constants::APP_NAME,
                             WS_POPUP, 0, 0, 0, 0, NULL, NULL, hInstance, this);
         return m_hwnd != NULL;
     }
@@ -318,37 +316,8 @@ private:
             }
 
             case WM_KEYDOWN: {
-                if (app && app->m_hotkeySettingMode) {
-                    // 获取修饰键状态
-                    UINT modifiers = 0;
-                    if (GetAsyncKeyState(VK_CONTROL) & 0x8000) modifiers |= MOD_CONTROL;
-                    if (GetAsyncKeyState(VK_SHIFT) & 0x8000) modifiers |= MOD_SHIFT;
-                    if (GetAsyncKeyState(VK_MENU) & 0x8000) modifiers |= MOD_ALT;
-
-                    // 如果按下了非修饰键
-                    if (wParam != VK_CONTROL && wParam != VK_SHIFT && wParam != VK_MENU) {
-                        app->m_hotkeySettingMode = false;
-
-                        // 尝试注册新热键
-                        if (RegisterHotKey(hwnd, Constants::ID_TRAYICON, modifiers, static_cast<UINT>(wParam))) {
-                            app->m_configManager->SetHotkeyModifiers(modifiers);
-                            app->m_configManager->SetHotkeyKey(static_cast<UINT>(wParam));
-                            app->m_configManager->SaveHotkeyConfig();
-                            
-                            std::wstring hotkeyText = app->m_eventHandler->GetHotkeyText();
-                            std::wstring message = app->m_strings.HOTKEY_SET_SUCCESS + hotkeyText;
-                            app->m_eventHandler->ShowNotification(app->m_strings.APP_NAME.c_str(), message.c_str());
-                        } else {
-                            UINT defaultModifiers = MOD_CONTROL | MOD_ALT;
-                            UINT defaultKey = 'R';
-                            RegisterHotKey(hwnd, Constants::ID_TRAYICON, defaultModifiers, defaultKey);
-                            app->m_configManager->SetHotkeyModifiers(defaultModifiers);
-                            app->m_configManager->SetHotkeyKey(defaultKey);
-                            app->m_configManager->SaveHotkeyConfig();
-                            app->m_eventHandler->ShowNotification(app->m_strings.APP_NAME.c_str(), 
-                                app->m_strings.HOTKEY_SET_FAILED.c_str());
-                        }
-                    }
+                if (app && app->m_eventHandler->IsHotkeySettingMode()) {
+                    return app->m_eventHandler->HandleKeyDown(wParam) ? 0 : 1;
                 }
                 return 0;
             }
@@ -412,7 +381,7 @@ private:
                             app->m_eventHandler->ToggleLetterboxMode();
                             break;
                         case Constants::ID_USER_GUIDE:
-                            ShellExecute(NULL, TEXT("open"), 
+                            ShellExecuteW(NULL, L"open", 
                                 (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,
                                 NULL, NULL, SW_SHOWNORMAL);
                             break;
@@ -445,15 +414,7 @@ private:
 
             case WM_HOTKEY: {
                 if (app && wParam == Constants::ID_TRAYICON) {
-                    if (app->m_configManager->GetUseFloatingWindow()) {
-                        if (app->m_menuWindow) {
-                            app->m_menuWindow->ToggleVisibility();
-                        }
-                    } else {
-                        POINT pt;
-                        GetCursorPos(&pt);
-                        app->m_eventHandler->ShowQuickMenu(pt);
-                    }
+                    app->m_eventHandler->HandleHotkeyTriggered();
                 }
                 return 0;
             }
@@ -464,13 +425,6 @@ private:
                     app->m_currentNotificationIndex = 0;
                     // 设置定时器，每隔一段时间显示一个通知
                     SetTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID, 1000, NULL);
-                }
-                return 0;
-            }
-
-            case Constants::WM_SET_HOTKEY_MODE: {
-                if (app) {
-                    app->m_hotkeySettingMode = true;
                 }
                 return 0;
             }
@@ -517,10 +471,10 @@ private:
     }
 };
 
-int WINAPI WinMain(
+int WINAPI wWinMain(
     _In_ HINSTANCE hInstance,
     _In_opt_ HINSTANCE hPrevInstance,
-    _In_ LPSTR lpCmdLine,
+    _In_ LPWSTR lpCmdLine,
     _In_ int nCmdShow) {
     
     // 设置 DPI 感知
@@ -529,7 +483,7 @@ int WINAPI WinMain(
     SpinningMomoApp app;
     
     if (!app.Initialize(hInstance)) {
-        MessageBox(NULL, TEXT("Application initialization failed."), 
+        MessageBoxW(NULL, L"Application initialization failed.", 
                   Constants::APP_NAME, MB_ICONERROR);
         return 1;
     }
