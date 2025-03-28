@@ -31,26 +31,8 @@ bool TrayIcon::Create() {
     return Shell_NotifyIcon(NIM_ADD, &m_nid) != FALSE;
 }
 
-void TrayIcon::ShowBalloon(const TCHAR* title, const TCHAR* message) {
-    try {
-        m_nid.uFlags = NIF_INFO;
-        if (FAILED(StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), title)) ||
-            FAILED(StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), message))) {
-            // 如果复制失败，使用安全的默认消息
-            StringCchCopy(m_nid.szInfoTitle, _countof(m_nid.szInfoTitle), TEXT("Notice"));
-            StringCchCopy(m_nid.szInfo, _countof(m_nid.szInfo), TEXT("An error occurred"));
-        }
-        m_nid.dwInfoFlags = NIIF_INFO;
-        Shell_NotifyIcon(NIM_MODIFY, &m_nid);
-        m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-    } catch (...) {
-        // 确保即使出错也能恢复正常状态
-        m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
-    }
-}
-
-void TrayIcon::UpdateTip(const TCHAR* tip) {
-    StringCchCopy(m_nid.szTip, _countof(m_nid.szTip), tip);
+void TrayIcon::UpdateTip(const std::wstring& tip) {
+    StringCchCopy(m_nid.szTip, _countof(m_nid.szTip), tip.c_str());
     Shell_NotifyIcon(NIM_MODIFY, &m_nid);
 }
 

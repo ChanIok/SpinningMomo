@@ -18,6 +18,7 @@
 #include "overlay_window.hpp"
 #include "letterbox_window.hpp"
 #include "logger.hpp"
+#include "event_handler.hpp"
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -67,14 +68,14 @@ public:
         ConfigLoadResult ratioResult = m_configManager->GetAspectRatios(m_strings);
         if (!ratioResult.success) {
             LOG_ERROR("Failed to load aspect ratio configuration: %s", ratioResult.errorDetails);
-            ShowNotification(m_strings.APP_NAME.c_str(), ratioResult.errorDetails.c_str());
+            AddPendingNotification(m_strings.APP_NAME.c_str(), ratioResult.errorDetails.c_str());
         }
         m_ratios = std::move(ratioResult.ratios);
         
         ConfigLoadResult resolutionResult = m_configManager->GetResolutionPresets(m_strings);
         if (!resolutionResult.success) {
             LOG_ERROR("Failed to load resolution configuration: %s", resolutionResult.errorDetails);
-            ShowNotification(m_strings.APP_NAME.c_str(), resolutionResult.errorDetails.c_str());
+            AddPendingNotification(m_strings.APP_NAME.c_str(), resolutionResult.errorDetails.c_str());
         }
         m_resolutions = std::move(resolutionResult.resolutions);
 
@@ -131,6 +132,29 @@ public:
             return false;
         }
 
+        // 创建事件处理器
+        m_eventHandler = std::make_unique<EventHandler>(
+            m_hwnd,
+            m_configManager.get(),
+            m_notificationManager.get(),
+            m_strings,
+            m_menuWindow.get(),
+            m_previewWindow.get(),
+            m_overlayWindow.get(),
+            m_letterboxWindow.get(),
+            m_trayIcon.get(),
+            m_isPreviewEnabled,
+            m_isOverlayEnabled,
+            m_isLetterboxEnabled,
+            m_currentRatioIndex,
+            m_currentResolutionIndex,
+            m_ratios,
+            m_resolutions,
+            m_language,
+            m_windows,
+            m_isScreenCaptureSupported
+        );
+
         // 如果启用了浮动窗口，则默认显示
         if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
             m_menuWindow->Show();
@@ -143,13 +167,13 @@ public:
         
         if (!hotkeyRegistered) {
             LOG_ERROR("Failed to register global hotkey");
-            ShowNotification(m_strings.APP_NAME.c_str(), 
+            AddPendingNotification(m_strings.APP_NAME.c_str(), 
                 m_strings.HOTKEY_REGISTER_FAILED.c_str());
         } else {
             // 只在热键注册成功时显示启动提示
-            std::wstring hotkeyText = GetHotkeyText();
+            std::wstring hotkeyText = m_eventHandler->GetHotkeyText();
             std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
-            ShowNotification(m_strings.APP_NAME.c_str(), message.c_str());
+            AddPendingNotification(m_strings.APP_NAME.c_str(), message.c_str());
         }
         LOG_INFO("Program initialization completed successfully");
         return true;
@@ -167,632 +191,6 @@ public:
         return (int)msg.wParam;
     }
 
-    // 处理窗口选择
-    void HandleWindowSelect(int id) {
-        int index = id - Constants::ID_WINDOW_BASE;
-        if (index >= 0 && index < m_windows.size()) {
-            m_configManager->SetWindowTitle(m_windows[index].second);
-            m_configManager->SaveWindowConfig();
-            ShowNotification(m_strings.APP_NAME.c_str(), 
-                    m_strings.WINDOW_SELECTED.c_str());
-        }
-    }
-
-    // 处理宽高比选择
-    void HandleRatioSelect(UINT id) {
-        size_t index = id - Constants::ID_RATIO_BASE;
-        if (index >= m_ratios.size()) {
-            return;
-        }
-    
-        m_currentRatioIndex = index;
-    
-        if (m_menuWindow) {
-            m_menuWindow->SetCurrentRatio(index);
-        }
-    
-        HWND gameWindow = FindTargetWindow();
-        if (!gameWindow) {
-            ShowNotification(m_strings.APP_NAME.c_str(), 
-                            m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
-        }
-    
-        if (m_isOverlayEnabled && m_overlayWindow) {
-            m_overlayWindow->StopCapture(false);
-        }
-        if (m_isPreviewEnabled && m_previewWindow) {
-            m_previewWindow->StopCapture();
-        }
-    
-        int width = 0, height = 0;
-        if (ApplyWindowTransform(gameWindow, width, height)) {
-            StartWindowCapture(gameWindow, width, height);
-        }
-    }
-
-    // 处理分辨率选择
-    void HandleResolutionSelect(UINT id) {
-        size_t index = id - Constants::ID_RESOLUTION_BASE;
-        if (index >= m_resolutions.size()) {
-            return;
-        }
-    
-        m_currentResolutionIndex = index;
-    
-        if (m_menuWindow) {
-            m_menuWindow->SetCurrentResolution(index);
-        }
-    
-        HWND gameWindow = FindTargetWindow();
-        if (!gameWindow) {
-            ShowNotification(m_strings.APP_NAME.c_str(), 
-                            m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
-        }
-    
-        if (m_isOverlayEnabled && m_overlayWindow) {
-            m_overlayWindow->StopCapture(false);
-        }
-        if (m_isPreviewEnabled && m_previewWindow) {
-            m_previewWindow->StopCapture();
-        }
-    
-        // 应用新分辨率
-        int width = 0, height = 0;
-        if (ApplyWindowTransform(gameWindow, width, height)) {
-            StartWindowCapture(gameWindow, width, height);
-        }
-    }
-    
-    // 处理截图
-    void HandleScreenshot() {
-        // 检查屏幕捕获功能是否可用
-        if (!m_isScreenCaptureSupported) {
-            ShowNotification(m_strings.APP_NAME.c_str(),
-                m_strings.FEATURE_NOT_SUPPORTED.c_str());
-            return;
-        }
-
-        HWND gameWindow = FindTargetWindow();
-        if (!gameWindow) {
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
-        }
-
-        // 检查窗口是否最小化
-        if (IsIconic(gameWindow)) {
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
-        }
-
-        // 使用当前时间生成格式化的文件名
-        auto now = std::chrono::system_clock::now();
-        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
-        
-        wchar_t timestamp[20];
-        std::tm local_tm;
-        localtime_s(&local_tm, &now_time);
-        wcsftime(timestamp, 20, L"%Y%m%d_%H%M%S", &local_tm);
-        
-        // 添加毫秒
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now.time_since_epoch()).count() % 1000;
-        std::wstring filename = std::wstring(timestamp) + 
-                               L"_" + std::to_wstring(ms) + L".png";
-        
-        std::wstring savePath = WindowUtils::GetScreenshotPath() + L"\\" + filename;
-        
-        WindowUtils::TakeScreenshotAsync(gameWindow, savePath, 
-            [this](bool success, const std::wstring& path) {
-                if (success) {
-                    ShowNotification(
-                        m_strings.APP_NAME.c_str(),
-                        (m_strings.CAPTURE_SUCCESS + path).c_str()
-                    );
-                }
-            }
-        );
-    }
-
-    // 处理打开截图
-    void HandleOpenScreenshot() {
-        std::wstring albumPath = m_configManager->GetGameAlbumPath();
-        
-        if (albumPath.empty() || !PathFileExistsW(albumPath.c_str())) {
-            HWND gameWindow = FindTargetWindow();
-            if (!gameWindow) {
-                // 如果找不到游戏窗口，打开程序的截图目录
-                albumPath = WindowUtils::GetScreenshotPath();
-            } else {
-                albumPath = WindowUtils::GetGameScreenshotPath(gameWindow);
-                if (!albumPath.empty()) {
-                    m_configManager->SetGameAlbumPath(albumPath);
-                    m_configManager->SaveGameAlbumConfig();
-                } else {
-                    albumPath = WindowUtils::GetScreenshotPath();
-                }
-            }
-        }
-
-        if (!albumPath.empty()) {
-            ShellExecuteW(NULL, L"explore", albumPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
-        }
-    }
-
-    // 设置热键
-    void SetHotkey() {
-        UnregisterHotKey(m_hwnd, Constants::ID_TRAYICON);
-        m_hotkeySettingMode = true;
-        ShowNotification(m_strings.APP_NAME.c_str(), 
-            m_strings.HOTKEY_SETTING.c_str());
-    }
-
-    // 切换任务栏自动隐藏
-    void ToggleTaskbarAutoHide() {
-        APPBARDATA abd = {0};
-        abd.cbSize = sizeof(APPBARDATA);
-        UINT state = (UINT)SHAppBarMessage(ABM_GETSTATE, &abd);
-        bool currentAutoHide = (state & ABS_AUTOHIDE) != 0;
-        abd.lParam = currentAutoHide ? 0 : ABS_AUTOHIDE;
-        SHAppBarMessage(ABM_SETSTATE, &abd);
-        m_configManager->SetTaskbarAutoHide(!currentAutoHide);
-        m_configManager->SaveTaskbarConfig();
-    }
-
-    // 切换任务栏是否在底部
-    void ToggleTaskbarLower() {
-        m_configManager->SetTaskbarLower(!m_configManager->GetTaskbarLower());
-        m_configManager->SaveTaskbarConfig();
-    }
-
-    // 切换浮动窗口
-    void ToggleFloatingWindow() {
-        bool wasEnabled = m_configManager->GetUseFloatingWindow();
-        bool newState = !wasEnabled;
-        m_configManager->SetUseFloatingWindow(newState);
-        m_configManager->SaveMenuConfig();
-
-        if (m_menuWindow) {
-            if (newState && !wasEnabled) {
-                m_menuWindow->Show();
-            } else if (!newState && m_menuWindow->IsVisible()) {
-                m_menuWindow->Hide();
-            }
-        }
-    }
-
-    // 切换预览窗口
-    void TogglePreviewWindow() {
-        if (!m_isScreenCaptureSupported) {
-            ShowNotification(m_strings.APP_NAME.c_str(),
-                m_strings.FEATURE_NOT_SUPPORTED.c_str());
-            return;
-        }
-
-        // 先关闭叠加层
-        if (!m_isPreviewEnabled && m_isOverlayEnabled) {
-            m_isOverlayEnabled = false;
-            m_overlayWindow->StopCapture();
-            if (m_menuWindow) {
-                m_menuWindow->SetOverlayEnabled(false);
-            }
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.FEATURE_CONFLICT.c_str());
-        }
-
-        m_isPreviewEnabled = !m_isPreviewEnabled;
-        
-        if (m_isPreviewEnabled) {
-            if (HWND gameWindow = FindTargetWindow()) {
-                m_previewWindow->StartCapture(gameWindow);
-            }
-        } else {
-            m_previewWindow->StopCapture();
-        }
-        
-        if (m_menuWindow) {
-            m_menuWindow->SetPreviewEnabled(m_isPreviewEnabled);
-        }
-    }
-
-    // 切换叠加层窗口
-    void ToggleOverlayWindow() {
-        if (!m_isScreenCaptureSupported) {
-            ShowNotification(m_strings.APP_NAME.c_str(),
-                m_strings.FEATURE_NOT_SUPPORTED.c_str());
-            return;
-        }
-
-        // 如果现在要启用叠加层，但预览窗口已启用，先关闭预览窗口
-        if (!m_isOverlayEnabled && m_isPreviewEnabled) {
-            m_isPreviewEnabled = false;
-            m_previewWindow->StopCapture();
-            if (m_menuWindow) {
-                m_menuWindow->SetPreviewEnabled(false);
-            }
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.FEATURE_CONFLICT.c_str());
-        }
-
-        m_isOverlayEnabled = !m_isOverlayEnabled;
-        
-        if (m_isOverlayEnabled) {
-            if (HWND gameWindow = FindTargetWindow()) {
-                m_overlayWindow->StartCapture(gameWindow);
-            }
-        } else {
-            m_overlayWindow->StopCapture();
-        }
-
-        if (m_menuWindow) {
-            m_menuWindow->SetOverlayEnabled(m_isOverlayEnabled);
-        }
-    }
-
-    // 切换黑边模式
-    void ToggleLetterboxMode() {
-        m_isLetterboxEnabled = !m_isLetterboxEnabled;
-        
-        // 更新配置并保存
-        m_configManager->SetLetterboxEnabled(m_isLetterboxEnabled);
-        m_configManager->SaveLetterboxConfig();
-        
-        if (m_menuWindow) {
-            m_menuWindow->SetLetterboxEnabled(m_isLetterboxEnabled);
-        }
-
-        // 如果关闭黑边模式，则需要关闭黑边窗口
-        if (!m_isLetterboxEnabled && m_letterboxWindow) {
-            m_letterboxWindow->Shutdown();
-        }
-
-        // 更新叠加层的黑边模式设置
-        if (m_overlayWindow) {
-            m_overlayWindow->SetLetterboxMode(m_isLetterboxEnabled);
-            
-            // 如果叠加层已启用且正在捕获，重启捕获以应用新设置
-            if (m_isOverlayEnabled && m_overlayWindow->IsCapturing()) {
-                HWND gameWindow = FindTargetWindow();
-                if (gameWindow) {
-                    m_overlayWindow->StopCapture();
-                    m_overlayWindow->StartCapture(gameWindow);
-                    return;
-                }
-            }
-        }
-        
-        // 如果开启黑边模式且没有活动的叠加层，则检查是否需要显示黑边窗口
-        if (m_isLetterboxEnabled) {
-            HWND gameWindow = FindTargetWindow();
-            if (gameWindow) {
-                RECT rect;
-                GetClientRect(gameWindow, &rect);
-                UpdateLetterboxState(gameWindow, rect.right, rect.bottom);
-            }
-        }
-    }
-    
-    // 更新黑边窗口状态
-    void UpdateLetterboxState(HWND hwnd, int width, int height) {
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-        
-        bool needLetterbox = m_isLetterboxEnabled && 
-                            ((width >= screenWidth && height < screenHeight) || 
-                             (height >= screenHeight && width < screenWidth));
-        
-        if (needLetterbox && m_letterboxWindow) {
-            m_letterboxWindow->Show(hwnd);
-        } else if (m_letterboxWindow && m_letterboxWindow->IsVisible()) {
-            if (m_isOverlayEnabled && m_overlayWindow->IsVisible()) {
-                m_letterboxWindow->Shutdown();
-                return;
-            }
-            m_letterboxWindow->Hide();
-        }
-    }
-
-    // 切换语言
-    void ChangeLanguage(const std::wstring& lang) {
-        if (m_language != lang) {
-            m_language = lang;
-            m_strings = (lang == Constants::LANG_EN_US) ? EN_US : ZH_CN;
-            m_configManager->SetLanguage(m_language);
-            m_configManager->SaveLanguageConfig();
-            
-            if (m_trayIcon) {
-                m_trayIcon->UpdateTip(m_strings.APP_NAME.c_str());
-            }
-            if (m_menuWindow) {
-                m_menuWindow->UpdateMenuItems(m_strings);
-            }
-        }
-    }
-
-    // 重置窗口大小
-    void ResetWindowSize() {
-        HWND gameWindow = FindTargetWindow();
-        if (!gameWindow) {
-            ShowNotification(m_strings.APP_NAME.c_str(), 
-                            m_strings.WINDOW_NOT_FOUND.c_str());
-            return;
-        }
-        m_currentRatioIndex = SIZE_MAX;
-        m_currentResolutionIndex = 0;
-        
-        if (m_menuWindow) {
-            m_menuWindow->SetCurrentRatio(m_currentRatioIndex);
-            m_menuWindow->SetCurrentResolution(m_currentResolutionIndex);
-        }
-        if (m_isPreviewEnabled && m_previewWindow) {
-            m_previewWindow->StopCapture();
-        }
-        if (m_isOverlayEnabled && m_overlayWindow) {
-            m_overlayWindow->StopCapture();
-        }
-        int width = 0, height = 0;
-        if (ApplyWindowTransform(gameWindow, width, height)) {
-            StartWindowCapture(gameWindow, width, height);
-        }
-    } 
-
-    // 打开配置文件
-    void OpenConfigFile() {
-        ShellExecute(NULL, TEXT("open"), TEXT("notepad.exe"), 
-                    m_configManager->GetConfigPath().c_str(), NULL, SW_SHOW);
-        ShowNotification(m_strings.APP_NAME.c_str(), 
-            m_strings.CONFIG_HELP.c_str());
-    }
-
-    // 菜单相关方法
-    void ShowWindowSelectionMenu() {
-        // 更新窗口列表
-        m_windows = WindowUtils::GetWindows();
-        
-        m_trayIcon->ShowContextMenu(
-            m_windows,
-            m_configManager->GetWindowTitle(),
-            m_ratios,
-            m_currentRatioIndex,
-            m_resolutions,
-            m_currentResolutionIndex,
-            m_strings,
-            m_configManager->GetTaskbarAutoHide(),
-            m_configManager->GetTaskbarLower(),
-            m_language,
-            m_configManager->GetUseFloatingWindow(),
-            m_menuWindow && m_menuWindow->IsVisible(),
-            m_isPreviewEnabled,
-            m_isOverlayEnabled,
-            m_isLetterboxEnabled
-        );
-    }
-
-    void ShowQuickMenu(const POINT& pt) {
-        m_trayIcon->ShowQuickMenu(
-            pt,
-            m_ratios,
-            m_currentRatioIndex,
-            m_resolutions,
-            m_currentResolutionIndex,
-            m_strings,
-            m_configManager->GetTaskbarAutoHide(),
-            m_isPreviewEnabled
-        );
-    }
-
-    // 窗口过程函数
-    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-        SpinningMomoApp* app = reinterpret_cast<SpinningMomoApp*>(
-            GetWindowLongPtr(hwnd, GWLP_USERDATA));
-
-        switch (msg) {
-            case WM_CREATE: {
-                CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-                SetWindowLongPtr(hwnd, GWLP_USERDATA, 
-                               reinterpret_cast<LONG_PTR>(cs->lpCreateParams));
-                return 0;
-            }
-
-            case WM_KEYDOWN: {
-                if (app && app->m_hotkeySettingMode) {
-                    // 获取修饰键状态
-                    UINT modifiers = 0;
-                    if (GetAsyncKeyState(VK_CONTROL) & 0x8000) modifiers |= MOD_CONTROL;
-                    if (GetAsyncKeyState(VK_SHIFT) & 0x8000) modifiers |= MOD_SHIFT;
-                    if (GetAsyncKeyState(VK_MENU) & 0x8000) modifiers |= MOD_ALT;
-
-                    // 如果按下了非修饰键
-                    if (wParam != VK_CONTROL && wParam != VK_SHIFT && wParam != VK_MENU) {
-                        app->m_hotkeySettingMode = false;
-
-                        // 尝试注册新热键
-                        if (RegisterHotKey(hwnd, Constants::ID_TRAYICON, modifiers, static_cast<UINT>(wParam))) {
-                            app->m_configManager->SetHotkeyModifiers(modifiers);
-                            app->m_configManager->SetHotkeyKey(static_cast<UINT>(wParam));
-                            app->m_configManager->SaveHotkeyConfig();
-                            
-                            std::wstring hotkeyText = app->GetHotkeyText();
-                            std::wstring message = app->m_strings.HOTKEY_SET_SUCCESS + hotkeyText;
-                            app->ShowNotification(app->m_strings.APP_NAME.c_str(), message.c_str());
-                        } else {
-                            UINT defaultModifiers = MOD_CONTROL | MOD_ALT;
-                            UINT defaultKey = 'R';
-                            RegisterHotKey(hwnd, Constants::ID_TRAYICON, defaultModifiers, defaultKey);
-                            app->m_configManager->SetHotkeyModifiers(defaultModifiers);
-                            app->m_configManager->SetHotkeyKey(defaultKey);
-                            app->m_configManager->SaveHotkeyConfig();
-                            app->ShowNotification(app->m_strings.APP_NAME.c_str(), 
-                                app->m_strings.HOTKEY_SET_FAILED.c_str());
-                        }
-                    }
-                }
-                return 0;
-            }
-
-            case WM_COMMAND: {
-                if (!app) return 0;
-                WORD cmd = LOWORD(wParam);
-                if (cmd >= Constants::ID_RATIO_BASE && cmd < Constants::ID_RATIO_BASE + 1000) {
-                    app->HandleRatioSelect(cmd);
-                } else if (cmd >= Constants::ID_RESOLUTION_BASE && cmd < Constants::ID_RESOLUTION_BASE + 1000) {
-                    app->HandleResolutionSelect(cmd);
-                } else if (cmd >= Constants::ID_WINDOW_BASE && cmd <= Constants::ID_WINDOW_MAX) {
-                    app->HandleWindowSelect(cmd);
-                } else {
-                    switch (cmd) {
-                        case Constants::ID_CONFIG:
-                            app->OpenConfigFile();
-                            break;
-                        case Constants::ID_HOTKEY:
-                            app->SetHotkey();
-                            break;
-                        case Constants::ID_EXIT:
-                            DestroyWindow(hwnd);
-                            break;
-                        case Constants::ID_RESET:
-                            app->ResetWindowSize();
-                            break;
-                        case Constants::ID_LANG_ZH_CN:
-                            app->ChangeLanguage(Constants::LANG_ZH_CN);
-                            break;
-                        case Constants::ID_LANG_EN_US:
-                            app->ChangeLanguage(Constants::LANG_EN_US);
-                            break;
-                        case Constants::ID_AUTOHIDE_TASKBAR:
-                            app->ToggleTaskbarAutoHide();
-                            break;
-                        case Constants::ID_LOWER_TASKBAR:
-                            app->ToggleTaskbarLower();
-                            break;
-                        case Constants::ID_FLOATING_WINDOW:
-                            app->ToggleFloatingWindow();
-                            break;
-                        case Constants::ID_OVERLAY_WINDOW:
-                            app->ToggleOverlayWindow();
-                            break;
-                        case Constants::ID_TOGGLE_WINDOW_VISIBILITY:
-                            if (app->m_menuWindow) {
-                                app->m_menuWindow->ToggleVisibility();
-                            }
-                            break;
-                        case Constants::ID_CAPTURE_WINDOW:
-                            app->HandleScreenshot();
-                            break;
-                        case Constants::ID_OPEN_SCREENSHOT:
-                            app->HandleOpenScreenshot();
-                            break;
-                        case Constants::ID_PREVIEW_WINDOW:
-                            app->TogglePreviewWindow();
-                            break;
-                        case Constants::ID_LETTERBOX_WINDOW:
-                            app->ToggleLetterboxMode();
-                            break;
-                        case Constants::ID_USER_GUIDE:
-                            ShellExecute(NULL, TEXT("open"), 
-                                (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,
-                                NULL, NULL, SW_SHOWNORMAL);
-                            break;
-                    }
-                }
-                return 0;
-            }
-
-            case WM_USER + 1: {  // Constants::WM_TRAYICON
-                if (app) {
-                    if (lParam == WM_LBUTTONDBLCLK) {
-                        app->HandleTrayIconDblClick();
-                        app->m_lastTrayClickTime = GetTickCount64();
-                    } else if (lParam == WM_LBUTTONUP) {
-                        // 获取当前时间
-                        ULONGLONG currentTime = GetTickCount64();
-                        // 获取系统双击时间
-                        int doubleClickTime = GetDoubleClickTime();
-                        // 如果与上次点击时间间隔大于双击时间，才处理单击
-                        if (currentTime - app->m_lastTrayClickTime > (ULONGLONG)doubleClickTime) {
-                            app->ShowWindowSelectionMenu();
-                        }
-                        app->m_lastTrayClickTime = currentTime;
-                    } else if (lParam == WM_RBUTTONUP) {
-                        app->ShowWindowSelectionMenu();
-                    }
-                }
-                return 0;
-            }
-
-            case WM_HOTKEY: {
-                if (app && wParam == Constants::ID_TRAYICON) {
-                    if (app->m_configManager->GetUseFloatingWindow()) {
-                        if (app->m_menuWindow) {
-                            app->m_menuWindow->ToggleVisibility();
-                        }
-                    } else {
-                        POINT pt;
-                        GetCursorPos(&pt);
-                        app->ShowQuickMenu(pt);
-                    }
-                }
-                return 0;
-            }
-
-            case Constants::WM_SHOW_PENDING_NOTIFICATIONS: {
-                if (app) {
-                    // 开始显示通知的索引
-                    app->m_currentNotificationIndex = 0;
-                    // 设置定时器，每隔一段时间显示一个通知
-                    SetTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID, 1000, NULL);
-                }
-                return 0;
-            }
-
-            case WM_TIMER: {
-                if (!app) return 0;
-
-                if (wParam == Constants::NOTIFICATION_TIMER_ID) {
-                    if (app->m_currentNotificationIndex < app->m_pendingNotifications.size()) {
-                        const auto& notification = app->m_pendingNotifications[app->m_currentNotificationIndex];
-                        if (app->m_notificationManager) {
-                            app->m_notificationManager->ShowNotification(
-                                notification.title.c_str(),
-                                notification.message.c_str(),
-                                notification.type
-                            );
-                        }
-                        app->m_currentNotificationIndex++;
-                    } else {
-                        // 所有通知已显示，停止定时器
-                        KillTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID);
-                        app->m_pendingNotifications.clear();
-                    }
-                    return 0;
-                }
-                return 0;
-            }
-
-            case WM_DESTROY: {
-                PostQuitMessage(0);
-                return 0;
-            }
-
-            case Constants::WM_PREVIEW_RCLICK: {
-                if (app) {
-                    POINT pt;
-                    GetCursorPos(&pt);
-                    app->ShowQuickMenu(pt);
-                }
-                return 0;
-            }
-        }
-        return DefWindowProc(hwnd, msg, wParam, lParam);
-    }
-
-    void HandleTrayIconDblClick() {
-        if (m_configManager->GetUseFloatingWindow() && m_menuWindow) {
-            if (!m_menuWindow->IsVisible()) {
-                m_menuWindow->Show();
-            }
-        }
-    }
-
 private:
     // 窗口和UI组件
     HWND m_hwnd = NULL;
@@ -803,6 +201,7 @@ private:
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<OverlayWindow> m_overlayWindow;
     std::unique_ptr<LetterboxWindow> m_letterboxWindow;
+    std::unique_ptr<EventHandler> m_eventHandler; // 新增事件处理器
 
     // 应用状态
     bool m_isPreviewEnabled = false;
@@ -834,6 +233,16 @@ private:
     };
     std::vector<PendingNotification> m_pendingNotifications;
     size_t m_currentNotificationIndex = 0;
+
+    // 添加待显示通知
+    void AddPendingNotification(const TCHAR* title, const TCHAR* message, bool isError = false) {
+        m_pendingNotifications.push_back({
+            title,
+            message,
+            isError ? NotificationWindow::NotificationType::Error 
+                   : NotificationWindow::NotificationType::Info
+        });
+    }
 
     bool RegisterWindowClass(HINSTANCE hInstance) {
         WNDCLASSEX wc = {0};
@@ -896,163 +305,218 @@ private:
             ReleaseDC(NULL, hdc);
         }
     }
-    
-    std::wstring GetHotkeyText() {
-        std::wstring text;
-        UINT modifiers = m_configManager->GetHotkeyModifiers();
-        UINT key = m_configManager->GetHotkeyKey();
 
-        if (modifiers & MOD_CONTROL) text += TEXT("Ctrl+");
-        if (modifiers & MOD_ALT) text += TEXT("Alt+");
-        if (modifiers & MOD_SHIFT) text += TEXT("Shift+");
-        
-        if (key >= 'A' && key <= 'Z') {
-            text += static_cast<TCHAR>(key);
-        } else {
-            switch (key) {
-                case VK_F1: text += TEXT("F1"); break;
-                case VK_F2: text += TEXT("F2"); break;
-                case VK_F3: text += TEXT("F3"); break;
-                case VK_F4: text += TEXT("F4"); break;
-                case VK_F5: text += TEXT("F5"); break;
-                case VK_F6: text += TEXT("F6"); break;
-                case VK_F7: text += TEXT("F7"); break;
-                case VK_F8: text += TEXT("F8"); break;
-                case VK_F9: text += TEXT("F9"); break;
-                case VK_F10: text += TEXT("F10"); break;
-                case VK_F11: text += TEXT("F11"); break;
-                case VK_F12: text += TEXT("F12"); break;
-                case VK_NUMPAD0: text += TEXT("Num0"); break;
-                case VK_NUMPAD1: text += TEXT("Num1"); break;
-                case VK_NUMPAD2: text += TEXT("Num2"); break;
-                case VK_NUMPAD3: text += TEXT("Num3"); break;
-                case VK_NUMPAD4: text += TEXT("Num4"); break;
-                case VK_NUMPAD5: text += TEXT("Num5"); break;
-                case VK_NUMPAD6: text += TEXT("Num6"); break;
-                case VK_NUMPAD7: text += TEXT("Num7"); break;
-                case VK_NUMPAD8: text += TEXT("Num8"); break;
-                case VK_NUMPAD9: text += TEXT("Num9"); break;
-                case VK_MULTIPLY: text += TEXT("Num*"); break;
-                case VK_ADD: text += TEXT("Num+"); break;
-                case VK_SUBTRACT: text += TEXT("Num-"); break;
-                case VK_DECIMAL: text += TEXT("Num."); break;
-                case VK_DIVIDE: text += TEXT("Num/"); break;
-                case VK_HOME: text += TEXT("Home"); break;
-                case VK_END: text += TEXT("End"); break;
-                case VK_PRIOR: text += TEXT("PageUp"); break;
-                case VK_NEXT: text += TEXT("PageDown"); break;
-                case VK_INSERT: text += TEXT("Insert"); break;
-                case VK_DELETE: text += TEXT("Delete"); break;
-                case VK_OEM_3: text += TEXT("`"); break;
-                default: text += static_cast<TCHAR>(key); break;
+    // 窗口过程函数
+    static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+        SpinningMomoApp* app = reinterpret_cast<SpinningMomoApp*>(
+            GetWindowLongPtr(hwnd, GWLP_USERDATA));
+
+        switch (msg) {
+            case WM_CREATE: {
+                CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+                SetWindowLongPtr(hwnd, GWLP_USERDATA, 
+                               reinterpret_cast<LONG_PTR>(cs->lpCreateParams));
+                return 0;
+            }
+
+            case WM_KEYDOWN: {
+                if (app && app->m_hotkeySettingMode) {
+                    // 获取修饰键状态
+                    UINT modifiers = 0;
+                    if (GetAsyncKeyState(VK_CONTROL) & 0x8000) modifiers |= MOD_CONTROL;
+                    if (GetAsyncKeyState(VK_SHIFT) & 0x8000) modifiers |= MOD_SHIFT;
+                    if (GetAsyncKeyState(VK_MENU) & 0x8000) modifiers |= MOD_ALT;
+
+                    // 如果按下了非修饰键
+                    if (wParam != VK_CONTROL && wParam != VK_SHIFT && wParam != VK_MENU) {
+                        app->m_hotkeySettingMode = false;
+
+                        // 尝试注册新热键
+                        if (RegisterHotKey(hwnd, Constants::ID_TRAYICON, modifiers, static_cast<UINT>(wParam))) {
+                            app->m_configManager->SetHotkeyModifiers(modifiers);
+                            app->m_configManager->SetHotkeyKey(static_cast<UINT>(wParam));
+                            app->m_configManager->SaveHotkeyConfig();
+                            
+                            std::wstring hotkeyText = app->m_eventHandler->GetHotkeyText();
+                            std::wstring message = app->m_strings.HOTKEY_SET_SUCCESS + hotkeyText;
+                            app->m_eventHandler->ShowNotification(app->m_strings.APP_NAME.c_str(), message.c_str());
+                        } else {
+                            UINT defaultModifiers = MOD_CONTROL | MOD_ALT;
+                            UINT defaultKey = 'R';
+                            RegisterHotKey(hwnd, Constants::ID_TRAYICON, defaultModifiers, defaultKey);
+                            app->m_configManager->SetHotkeyModifiers(defaultModifiers);
+                            app->m_configManager->SetHotkeyKey(defaultKey);
+                            app->m_configManager->SaveHotkeyConfig();
+                            app->m_eventHandler->ShowNotification(app->m_strings.APP_NAME.c_str(), 
+                                app->m_strings.HOTKEY_SET_FAILED.c_str());
+                        }
+                    }
+                }
+                return 0;
+            }
+
+            case WM_COMMAND: {
+                if (!app) return 0;
+                WORD cmd = LOWORD(wParam);
+                if (cmd >= Constants::ID_RATIO_BASE && cmd < Constants::ID_RATIO_BASE + 1000) {
+                    app->m_eventHandler->HandleRatioSelect(cmd);
+                } else if (cmd >= Constants::ID_RESOLUTION_BASE && cmd < Constants::ID_RESOLUTION_BASE + 1000) {
+                    app->m_eventHandler->HandleResolutionSelect(cmd);
+                } else if (cmd >= Constants::ID_WINDOW_BASE && cmd <= Constants::ID_WINDOW_MAX) {
+                    app->m_eventHandler->HandleWindowSelect(cmd);
+                } else {
+                    switch (cmd) {
+                        case Constants::ID_CONFIG:
+                            app->m_eventHandler->OpenConfigFile();
+                            break;
+                        case Constants::ID_HOTKEY:
+                            app->m_eventHandler->SetHotkey();
+                            break;
+                        case Constants::ID_EXIT:
+                            DestroyWindow(hwnd);
+                            break;
+                        case Constants::ID_RESET:
+                            app->m_eventHandler->ResetWindowSize();
+                            break;
+                        case Constants::ID_LANG_ZH_CN:
+                            app->m_eventHandler->ChangeLanguage(Constants::LANG_ZH_CN);
+                            break;
+                        case Constants::ID_LANG_EN_US:
+                            app->m_eventHandler->ChangeLanguage(Constants::LANG_EN_US);
+                            break;
+                        case Constants::ID_AUTOHIDE_TASKBAR:
+                            app->m_eventHandler->ToggleTaskbarAutoHide();
+                            break;
+                        case Constants::ID_LOWER_TASKBAR:
+                            app->m_eventHandler->ToggleTaskbarLower();
+                            break;
+                        case Constants::ID_FLOATING_WINDOW:
+                            app->m_eventHandler->ToggleFloatingWindow();
+                            break;
+                        case Constants::ID_OVERLAY_WINDOW:
+                            app->m_eventHandler->ToggleOverlayWindow();
+                            break;
+                        case Constants::ID_TOGGLE_WINDOW_VISIBILITY:
+                            if (app->m_menuWindow) {
+                                app->m_menuWindow->ToggleVisibility();
+                            }
+                            break;
+                        case Constants::ID_CAPTURE_WINDOW:
+                            app->m_eventHandler->HandleScreenshot();
+                            break;
+                        case Constants::ID_OPEN_SCREENSHOT:
+                            app->m_eventHandler->HandleOpenScreenshot();
+                            break;
+                        case Constants::ID_PREVIEW_WINDOW:
+                            app->m_eventHandler->TogglePreviewWindow();
+                            break;
+                        case Constants::ID_LETTERBOX_WINDOW:
+                            app->m_eventHandler->ToggleLetterboxMode();
+                            break;
+                        case Constants::ID_USER_GUIDE:
+                            ShellExecute(NULL, TEXT("open"), 
+                                (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,
+                                NULL, NULL, SW_SHOWNORMAL);
+                            break;
+                    }
+                }
+                return 0;
+            }
+
+            case WM_USER + 1: {  // Constants::WM_TRAYICON
+                if (app) {
+                    if (lParam == WM_LBUTTONDBLCLK) {
+                        app->m_eventHandler->HandleTrayIconDblClick();
+                        app->m_lastTrayClickTime = GetTickCount64();
+                    } else if (lParam == WM_LBUTTONUP) {
+                        // 获取当前时间
+                        ULONGLONG currentTime = GetTickCount64();
+                        // 获取系统双击时间
+                        int doubleClickTime = GetDoubleClickTime();
+                        // 如果与上次点击时间间隔大于双击时间，才处理单击
+                        if (currentTime - app->m_lastTrayClickTime > (ULONGLONG)doubleClickTime) {
+                            app->m_eventHandler->ShowWindowSelectionMenu();
+                        }
+                        app->m_lastTrayClickTime = currentTime;
+                    } else if (lParam == WM_RBUTTONUP) {
+                        app->m_eventHandler->ShowWindowSelectionMenu();
+                    }
+                }
+                return 0;
+            }
+
+            case WM_HOTKEY: {
+                if (app && wParam == Constants::ID_TRAYICON) {
+                    if (app->m_configManager->GetUseFloatingWindow()) {
+                        if (app->m_menuWindow) {
+                            app->m_menuWindow->ToggleVisibility();
+                        }
+                    } else {
+                        POINT pt;
+                        GetCursorPos(&pt);
+                        app->m_eventHandler->ShowQuickMenu(pt);
+                    }
+                }
+                return 0;
+            }
+
+            case Constants::WM_SHOW_PENDING_NOTIFICATIONS: {
+                if (app) {
+                    // 开始显示通知的索引
+                    app->m_currentNotificationIndex = 0;
+                    // 设置定时器，每隔一段时间显示一个通知
+                    SetTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID, 1000, NULL);
+                }
+                return 0;
+            }
+
+            case Constants::WM_SET_HOTKEY_MODE: {
+                if (app) {
+                    app->m_hotkeySettingMode = true;
+                }
+                return 0;
+            }
+
+            case WM_TIMER: {
+                if (!app) return 0;
+
+                if (wParam == Constants::NOTIFICATION_TIMER_ID) {
+                    if (app->m_currentNotificationIndex < app->m_pendingNotifications.size()) {
+                        const auto& notification = app->m_pendingNotifications[app->m_currentNotificationIndex];
+                        if (app->m_notificationManager) {
+                            app->m_notificationManager->ShowNotification(
+                                notification.title.c_str(),
+                                notification.message.c_str(),
+                                notification.type
+                            );
+                        }
+                        app->m_currentNotificationIndex++;
+                    } else {
+                        // 所有通知已显示，停止定时器
+                        KillTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID);
+                        app->m_pendingNotifications.clear();
+                    }
+                    return 0;
+                }
+                return 0;
+            }
+
+            case WM_DESTROY: {
+                PostQuitMessage(0);
+                return 0;
+            }
+
+            case Constants::WM_PREVIEW_RCLICK: {
+                if (app) {
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    app->m_eventHandler->ShowQuickMenu(pt);
+                }
+                return 0;
             }
         }
-        return text;
+        return DefWindowProc(hwnd, msg, wParam, lParam);
     }
-
-    // 显示通知
-    void ShowNotification(const TCHAR* title, const TCHAR* message, bool isError = false) {
-        if (!m_notificationManager) return;
-        
-        // 如果消息循环还没开始，将通知加入待显示队列
-        if (!m_messageLoopStarted) {
-            m_pendingNotifications.push_back({
-                title,
-                message,
-                isError ? NotificationWindow::NotificationType::Error 
-                       : NotificationWindow::NotificationType::Info
-            });
-            return;
-        }
-
-        // 否则直接显示通知
-        m_notificationManager->ShowNotification(
-            title, 
-            message, 
-            isError ? NotificationWindow::NotificationType::Error 
-                   : NotificationWindow::NotificationType::Info
-        );
-    }
-
-    // 查找目标窗口
-    HWND FindTargetWindow() {
-         return WindowUtils::FindTargetWindow(m_configManager->GetWindowTitle());
-    }
-
-    // 应用窗口变换
-    bool ApplyWindowTransform(HWND hwnd, int& outWidth, int& outHeight) {
-        if (!hwnd) return false;
-
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-        double ratio = static_cast<double>(screenWidth) / screenHeight;
-
-        if (m_currentRatioIndex != SIZE_MAX && m_currentRatioIndex < m_ratios.size()) {
-            ratio = m_ratios[m_currentRatioIndex].ratio;
-        }
-
-        WindowUtils::Resolution targetRes;
-        if (m_currentResolutionIndex != SIZE_MAX && m_currentResolutionIndex < m_resolutions.size()) {
-            const auto& preset = m_resolutions[m_currentResolutionIndex];
-            if (preset.baseWidth == 0 && preset.baseHeight == 0) {
-                // 如果是默认选项，使用屏幕尺寸计算
-                targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
-            } else {
-                targetRes = WindowUtils::CalculateResolution(preset.totalPixels, ratio);
-            }
-        } else {
-            targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
-        }
-
-        LOG_INFO("Target resolution: width=%d, height=%d", targetRes.width, targetRes.height);
-        
-        bool resizeSuccess;
-        if (m_isOverlayEnabled && m_overlayWindow) {
-            resizeSuccess = WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
-                m_configManager->GetTaskbarLower(), false);
-        } else {
-            resizeSuccess = WindowUtils::ResizeWindow(hwnd, targetRes.width, targetRes.height, 
-                m_configManager->GetTaskbarLower());
-        }
-        
-        if (resizeSuccess) {
-            outWidth = targetRes.width;
-            outHeight = targetRes.height;
-            
-            if (m_isLetterboxEnabled) {
-                UpdateLetterboxState(hwnd, targetRes.width, targetRes.height);
-            }
-            
-            return true;
-        } else {
-            ShowNotification(m_strings.APP_NAME.c_str(), m_strings.ADJUST_FAILED.c_str());
-            return false;
-        }
-    }
-
-    // 启动窗口捕获，确保互斥性
-    bool StartWindowCapture(HWND gameWindow, int width, int height) {
-        bool success = true;
-    
-        if (m_isPreviewEnabled && m_previewWindow) {
-            if (width > 0 && height > 0) {
-                success = m_previewWindow->StartCapture(gameWindow, width, height);
-            } else {
-                success = m_previewWindow->StartCapture(gameWindow);
-            }
-        }
-        
-        if (m_isOverlayEnabled && m_overlayWindow) {
-            if (width > 0 && height > 0) {
-                success = success && m_overlayWindow->StartCapture(gameWindow, width, height);
-            } else {
-                success = success && m_overlayWindow->StartCapture(gameWindow);
-            }
-        }
-        
-        return success;
-    }
-
 };
 
 int WINAPI WinMain(

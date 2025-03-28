@@ -5,13 +5,14 @@
 // 常量定义
 namespace Constants {
     // 应用程序基本信息
-    inline const TCHAR* APP_NAME = TEXT("旋转吧大喵");          
-    inline const TCHAR* WINDOW_CLASS = TEXT("SpinningMomoClass");  
+    inline const wchar_t* APP_NAME = L"旋转吧大喵";          
+    inline const wchar_t* WINDOW_CLASS = L"SpinningMomoClass";  
     
     // 消息和ID定义
     static const UINT WM_TRAYICON = WM_USER + 1;    // 自定义托盘图标消息
     static const UINT WM_PREVIEW_RCLICK = WM_USER + 2;  // 预览窗口右键点击消息
     static const UINT WM_SHOW_PENDING_NOTIFICATIONS = WM_USER + 100;  // 显示待处理通知消息
+    static const UINT WM_SET_HOTKEY_MODE = WM_USER + 101;  // 设置热键模式消息
     constexpr UINT ID_TRAYICON = 1;
     constexpr UINT NOTIFICATION_TIMER_ID = 2;  // 通知显示定时器ID
     
@@ -42,62 +43,62 @@ namespace Constants {
     constexpr UINT ID_LETTERBOX_WINDOW = 2019;   // 黑边模式菜单项ID
     
     // 配置文件相关
-    inline const TCHAR* CONFIG_FILE = TEXT("config.ini");     // 配置文件名
+    inline const wchar_t* CONFIG_FILE = L"config.ini";     // 配置文件名
     
     // 项目文档URL
-    inline const TCHAR* DOC_URL_ZH = TEXT("https://chaniok.github.io/SpinningMomo/");
-    inline const TCHAR* DOC_URL_EN = TEXT("https://chaniok.github.io/SpinningMomo/en/");
+    inline const wchar_t* DOC_URL_ZH = L"https://chaniok.github.io/SpinningMomo/";
+    inline const wchar_t* DOC_URL_EN = L"https://chaniok.github.io/SpinningMomo/en/";
     
     // 配置节和配置项
-    inline const TCHAR* WINDOW_SECTION = TEXT("Window");      // 窗口配置
-    inline const TCHAR* WINDOW_TITLE = TEXT("Title");         // 窗口标题配置项
+    inline const wchar_t* WINDOW_SECTION = L"Window";      // 窗口配置
+    inline const wchar_t* WINDOW_TITLE = L"Title";         // 窗口标题配置项
 
-    inline const TCHAR* SCREENSHOT_SECTION = TEXT("Screenshot");  // 截图配置节名
-    inline const TCHAR* SCREENSHOT_PATH = TEXT("GameAlbumPath"); // 游戏相册路径配置项
+    inline const wchar_t* SCREENSHOT_SECTION = L"Screenshot";  // 截图配置节名
+    inline const wchar_t* SCREENSHOT_PATH = L"GameAlbumPath"; // 游戏相册路径配置项
 
-    inline const TCHAR* HOTKEY_SECTION = TEXT("Hotkey");      // 热键配置节名
-    inline const TCHAR* HOTKEY_MODIFIERS = TEXT("Modifiers"); // 修饰键配置项
-    inline const TCHAR* HOTKEY_KEY = TEXT("Key");            // 主键配置项
+    inline const wchar_t* HOTKEY_SECTION = L"Hotkey";      // 热键配置节名
+    inline const wchar_t* HOTKEY_MODIFIERS = L"Modifiers"; // 修饰键配置项
+    inline const wchar_t* HOTKEY_KEY = L"Key";            // 主键配置项
     
     // 自定义比例和分辨率配置项（现在都在MENU_SECTION中）
-    inline const TCHAR* CUSTOM_RATIO_LIST = TEXT("CustomRatioList");       // 自定义比例列表配置项
-    inline const TCHAR* CUSTOM_RESOLUTION_LIST = TEXT("CustomResolutionList");      // 自定义分辨率列表配置项
+    inline const wchar_t* CUSTOM_RATIO_LIST = L"CustomRatioList";       // 自定义比例列表配置项
+    inline const wchar_t* CUSTOM_RESOLUTION_LIST = L"CustomResolutionList";      // 自定义分辨率列表配置项
     
     // 语言相关
-    inline const TCHAR* LANG_SECTION = TEXT("Language");     // 语言配置节名
-    inline const TCHAR* LANG_CURRENT = TEXT("Current");      // 当前语言配置项
-    inline const TCHAR* LANG_ZH_CN = TEXT("zh-CN");         // 中文
-    inline const TCHAR* LANG_EN_US = TEXT("en-US");         // 英文
+    inline const wchar_t* LANG_SECTION = L"Language";     // 语言配置节名
+    inline const wchar_t* LANG_CURRENT = L"Current";      // 当前语言配置项
+    inline const wchar_t* LANG_ZH_CN = L"zh-CN";         // 中文
+    inline const wchar_t* LANG_EN_US = L"en-US";         // 英文
     
-    inline const TCHAR* TASKBAR_SECTION = TEXT("Taskbar");    // 任务栏配置节名
-    inline const TCHAR* TASKBAR_AUTOHIDE = TEXT("AutoHide");  // 任务栏自动隐藏配置项
-    inline const TCHAR* TASKBAR_LOWER = TEXT("LowerOnResize"); // 调整时置底任务栏配置项
+    inline const wchar_t* TASKBAR_SECTION = L"Taskbar";    // 任务栏配置节名
+    inline const wchar_t* TASKBAR_AUTOHIDE = L"AutoHide";  // 任务栏自动隐藏配置项
+    inline const wchar_t* TASKBAR_LOWER = L"LowerOnResize"; // 调整时置底任务栏配置项
     
-    inline const TCHAR* MENU_SECTION = TEXT("Menu");      // 菜单配置节名
-    inline const TCHAR* MENU_FLOATING = TEXT("Floating");  // 浮动窗口配置项
+    inline const wchar_t* MENU_SECTION = L"Menu";      // 菜单配置节名
+    inline const wchar_t* MENU_FLOATING = L"Floating";  // 浮动窗口配置项
     
     // 菜单项类型字符串
-    inline const TCHAR* MENU_ITEM_TYPE_CAPTURE = TEXT("CaptureWindow");
-    inline const TCHAR* MENU_ITEM_TYPE_SCREENSHOT = TEXT("OpenScreenshot");
-    inline const TCHAR* MENU_ITEM_TYPE_OVERLAY = TEXT("OverlayWindow");
-    inline const TCHAR* MENU_ITEM_TYPE_PREVIEW = TEXT("PreviewWindow");
-    inline const TCHAR* MENU_ITEM_TYPE_RESET = TEXT("Reset");
-    inline const TCHAR* MENU_ITEM_TYPE_CLOSE = TEXT("Close");
-    inline const TCHAR* MENU_ITEM_TYPE_EXIT = TEXT("Exit");
-    inline const TCHAR* MENU_ITEM_TYPE_LETTERBOX = TEXT("LetterboxWindow");
+    inline const wchar_t* MENU_ITEM_TYPE_CAPTURE = L"CaptureWindow";
+    inline const wchar_t* MENU_ITEM_TYPE_SCREENSHOT = L"OpenScreenshot";
+    inline const wchar_t* MENU_ITEM_TYPE_OVERLAY = L"OverlayWindow";
+    inline const wchar_t* MENU_ITEM_TYPE_PREVIEW = L"PreviewWindow";
+    inline const wchar_t* MENU_ITEM_TYPE_RESET = L"Reset";
+    inline const wchar_t* MENU_ITEM_TYPE_CLOSE = L"Close";
+    inline const wchar_t* MENU_ITEM_TYPE_EXIT = L"Exit";
+    inline const wchar_t* MENU_ITEM_TYPE_LETTERBOX = L"LetterboxWindow";
     
     // 菜单项配置
-    inline const TCHAR* MENU_ITEMS = TEXT("MenuItems");  // 菜单项显示配置
+    inline const wchar_t* MENU_ITEMS = L"MenuItems";  // 菜单项显示配置
     
     // 宽高比和分辨率配置
-    inline const TCHAR* ASPECT_RATIO_ITEMS = TEXT("AspectRatioItems");  // 宽高比项目显示配置
-    inline const TCHAR* RESOLUTION_ITEMS = TEXT("ResolutionItems");    // 分辨率项目显示配置
+    inline const wchar_t* ASPECT_RATIO_ITEMS = L"AspectRatioItems";  // 宽高比项目显示配置
+    inline const wchar_t* RESOLUTION_ITEMS = L"ResolutionItems";    // 分辨率项目显示配置
 
-    inline const TCHAR* LETTERBOX_SECTION = TEXT("Letterbox");     // 黑边模式配置节名
-    inline const TCHAR* LETTERBOX_ENABLED = TEXT("Enabled");       // 黑边模式启用配置项
+    inline const wchar_t* LETTERBOX_SECTION = L"Letterbox";     // 黑边模式配置节名
+    inline const wchar_t* LETTERBOX_ENABLED = L"Enabled";       // 黑边模式启用配置项
     
-    inline const TCHAR* LOGGER_SECTION = TEXT("Logger");     // 日志配置节名
-    inline const TCHAR* LOGGER_LEVEL = TEXT("LogLevel");     // 日志级别配置项
+    inline const wchar_t* LOGGER_SECTION = L"Logger";     // 日志配置节名
+    inline const wchar_t* LOGGER_LEVEL = L"LogLevel";     // 日志级别配置项
 }
 
 // 比例结构体定义

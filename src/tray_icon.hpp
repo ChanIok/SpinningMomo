@@ -20,8 +20,7 @@ public:
     ~TrayIcon();
     
     bool Create();
-    void ShowBalloon(const TCHAR* title, const TCHAR* message);
-    void UpdateTip(const TCHAR* tip);
+    void UpdateTip(const std::wstring& tip);
 
     // 新增：显示上下文菜单
     void ShowContextMenu(
