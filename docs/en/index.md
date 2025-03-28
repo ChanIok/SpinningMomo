@@ -16,6 +16,10 @@ layout: doc
     <img alt="Release" src="https://img.shields.io/github/v/release/ChanIok/SpinningMomo?style=flat-square&color=brightgreen" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-orange?style=flat-square" />
   </div>
+  
+  <div class="download-btn">
+    <a href="https://github.com/ChanIok/SpinningMomo/releases/latest" class="download-link">⬇️ Download Latest Version</a>
+  </div>
 
   <div class="nav-links">
     <a href="#features">✨ Features</a> •
@@ -287,4 +291,4 @@ This project is licensed under the [MIT License](https://github.com/ChanIok/Spin
     margin-top: 0;
   }
 }
-</style> 
+</style>
