@@ -44,6 +44,7 @@ const LocalizedStrings ZH_CN = {
     L"叠加层",
     L"预览窗和叠加层功能冲突，已自动关闭另一功能",
     L"黑边模式",
+    L"切换窗口边框",
 };
 
 // 英文字符串
@@ -90,4 +91,5 @@ const LocalizedStrings EN_US = {
     L"Overlay",
     L"Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
     L"Letterbox",
+    L"Toggle Window Border",
 }; 

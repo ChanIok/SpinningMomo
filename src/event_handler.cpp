@@ -483,6 +483,17 @@ void EventHandler::ToggleTaskbarLower() {
     m_configManager->SaveTaskbarConfig();
 }
 
+void EventHandler::ToggleBorderlessMode() {
+    HWND gameWindow = FindTargetWindow();
+    if (!gameWindow) {
+        ShowNotification(m_strings.APP_NAME.c_str(), 
+                        m_strings.WINDOW_NOT_FOUND.c_str());
+        return;
+    }
+    
+    WindowUtils::ToggleWindowBorder(gameWindow);
+}
+
 void EventHandler::UpdateLetterboxState(HWND hwnd, int width, int height) {
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);

@@ -380,6 +380,9 @@ private:
                         case Constants::ID_LETTERBOX_WINDOW:
                             app->m_eventHandler->ToggleLetterboxMode();
                             break;
+                        case Constants::ID_TOGGLE_BORDERLESS:
+                            app->m_eventHandler->ToggleBorderlessMode();
+                            break;
                         case Constants::ID_USER_GUIDE:
                             ShellExecuteW(NULL, L"open", 
                                 (app->m_language == Constants::LANG_EN_US) ? Constants::DOC_URL_EN : Constants::DOC_URL_ZH,

@@ -41,6 +41,7 @@ namespace Constants {
     constexpr UINT ID_USER_GUIDE = 2017;         // 使用指南菜单项ID
     constexpr UINT ID_OVERLAY_WINDOW = 2018;     // 叠加层菜单项ID
     constexpr UINT ID_LETTERBOX_WINDOW = 2019;   // 黑边模式菜单项ID
+    constexpr UINT ID_TOGGLE_BORDERLESS = 2020;   // 切换边框模式菜单项ID
     
     // 配置文件相关
     inline const wchar_t* CONFIG_FILE = L"config.ini";     // 配置文件名
@@ -166,6 +167,7 @@ struct LocalizedStrings {
     std::wstring OVERLAY_WINDOW;
     std::wstring FEATURE_CONFLICT;
     std::wstring LETTERBOX_WINDOW;
+    std::wstring TOGGLE_BORDERLESS;
 };
 
 // 中文字符串

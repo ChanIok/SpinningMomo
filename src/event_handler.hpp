@@ -92,6 +92,7 @@ public:
     void ToggleFloatingWindow();
     void ToggleTaskbarAutoHide();
     void ToggleTaskbarLower();
+    void ToggleBorderlessMode();
     void UpdateLetterboxState(HWND hwnd, int width, int height);
     void ChangeLanguage(const std::wstring& lang);
     

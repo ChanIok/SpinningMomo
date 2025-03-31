@@ -290,7 +290,14 @@ void TrayIcon::AddSettingsItems(
     bool overlayEnabled,
     bool letterboxEnabled,
     const LocalizedStrings& strings) {
-    
+    // 黑边模式选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (letterboxEnabled ? MF_CHECKED : 0),
+              Constants::ID_LETTERBOX_WINDOW, strings.LETTERBOX_WINDOW.c_str());
+
+    // 窗口边框切换选项
+    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING,
+              Constants::ID_TOGGLE_BORDERLESS, strings.TOGGLE_BORDERLESS.c_str());
+
     // 任务栏自动隐藏选项
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarAutoHide ? MF_CHECKED : 0),
               Constants::ID_AUTOHIDE_TASKBAR, strings.TASKBAR_AUTOHIDE.c_str());
@@ -299,10 +306,6 @@ void TrayIcon::AddSettingsItems(
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (taskbarLower ? MF_CHECKED : 0),
               Constants::ID_LOWER_TASKBAR, strings.TASKBAR_LOWER.c_str());
               
-    // 黑边模式选项
-    InsertMenu(hMenu, -1, MF_BYPOSITION | MF_STRING | (letterboxEnabled ? MF_CHECKED : 0),
-              Constants::ID_LETTERBOX_WINDOW, strings.LETTERBOX_WINDOW.c_str());
-
     InsertMenu(hMenu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
     // 预览窗口选项

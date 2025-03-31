@@ -65,6 +65,10 @@ public:
     // 鼠标显示控制
     static void HideCursor();
     static void ShowCursor();
+    
+    // 窗口边框控制
+    static bool ToggleWindowBorder(HWND hwnd);
+
 private:
     // 静态捕获器实例
     static std::unique_ptr<WindowCapturer> s_capturer;

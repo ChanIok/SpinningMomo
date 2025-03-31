@@ -592,3 +592,34 @@ void WindowUtils::ShowCursor() {
         LOG_DEBUG("Cursor restored");
     }
 }
+
+// 切换窗口边框
+bool WindowUtils::ToggleWindowBorder(HWND hwnd) {
+    if (!hwnd || !IsWindow(hwnd)) return false;
+    
+    // 获取当前窗口样式
+    LONG style = GetWindowLong(hwnd, GWL_STYLE);
+    
+    // 检查当前是否有边框
+    bool hasBorder = (style & WS_OVERLAPPEDWINDOW) != 0;
+    
+    if (hasBorder) {
+        // 移除边框样式
+        style &= ~WS_OVERLAPPEDWINDOW;
+        style |= WS_POPUP;  // 添加WS_POPUP样式
+    } else {
+        // 添加边框样式
+        style &= ~WS_POPUP;  // 移除WS_POPUP样式
+        style |= WS_OVERLAPPEDWINDOW;
+    }
+    
+    // 应用新样式
+    SetWindowLong(hwnd, GWL_STYLE, style);
+    
+    // 强制窗口重绘和重新布局
+    SetWindowPos(hwnd, NULL, 0, 0, 0, 0, 
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+    
+    // 返回切换后的状态
+    return !hasBorder;
+}
