@@ -91,6 +91,17 @@
 
 **解决方案**：如果遇到无法解决的崩溃，请通过 [GitHub Issues](https://github.com/ChanIok/SpinningMomo/issues) 提供详细的系统信息和崩溃前操作步骤，以便开发者定位和解决问题
 
+### 管理员运行后无反应
+
+::: warning 问题描述
+右键以管理员身份运行程序后没有任何反应，也没有浮窗弹出。
+:::
+
+**解决方案**：
+1. 查看 Windows 安全中心的保护历史记录，检查是否有相关拦截信息，有则尝试关闭保护
+2. 尝试安装运行库：[Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+3. 换个渠道重新下载程序并运行
+
 ## 🎮 无限暖暖使用建议
 
 ### 动态场景拍照问题
