@@ -25,16 +25,18 @@
     </b>
   </p>
 
-  <img src="./docs/public/README.jpg" alt="Screenshot" >
+  <img src="./docs/public/README.webp" alt="Screenshot" >
 </div>
 
 ## 🎯 项目简介
 
-旋转吧大喵（SpinningMomo）最初是为了解决《无限暖暖》游戏拍摄竖构图的问题而开发的工具。
+旋转吧大喵（SpinningMomo）
 
-通过快捷键让您能够轻松切换游戏窗口的比例和尺寸，完美满足各种构图需求。无论是竖构图拍摄、相册浏览还是留影沙漏，都能获得最佳的显示效果。
+▸ 一键切换游戏窗口比例/尺寸，完美适配竖构图拍摄、相册浏览等场景
 
-甚至能突破游戏和设备原有的限制，输出 8K 甚至 12K 以上超高分辨率照片！
+▸ 突破原生限制，支持生成 8K-12K 超高清游戏截图
+
+▸ 专为《无限暖暖》优化，同时兼容多数 3D 游戏
 
 📖 查看[使用文档](https://chaniok.github.io/SpinningMomo)了解更多详细信息。
 

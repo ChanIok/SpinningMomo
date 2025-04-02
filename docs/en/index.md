@@ -27,19 +27,17 @@ layout: doc
   </div>
 
   <div class="screenshot-container">
-    <img src="/README.jpg" alt="Screenshot" />
+    <img src="/README.webp" alt="Screenshot" />
   </div>
 </div>
 
 ## 🎯 Introduction
 
-SpinningMomo was initially developed to solve the vertical composition photography issue in Infinity Nikki.
+▸ Easily switch game window aspect ratio and size, perfectly adapting to scenarios like vertical composition photography and album browsing.
 
-With hotkeys, you can easily switch the game window's aspect ratio and size, perfectly meeting various composition needs. Whether it's vertical photography, album browsing, or snapshot hourglass, you can achieve the best display effect.
+▸ Break through native limitations, supporting the generation of 8K-12K ultra-high-resolution game screenshots.
 
-It can even break through the original resolution limitations of the game and device, outputting ultra-high resolution photos up to 8K or even 12K!
-
-> If you find this tool helpful, please consider giving it a Star ⭐!
+▸ Optimized for Infinity Nikki, while also compatible with most 3D games.
 
 ## Features
 
