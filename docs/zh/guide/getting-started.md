@@ -51,6 +51,10 @@
 - 系统托盘会显示程序图标 <img src="/logo.png" style="display: inline; height: 1em; vertical-align: text-bottom;" />
 - 默认显示浮动窗口，可直接调整窗口
 
+::: warning 无浮窗弹出？
+如果运行程序后没有浮窗弹出，请参考 [故障排除指南](https://chaniok.github.io/SpinningMomo/zh/advanced/troubleshooting.html#%E7%AE%A1%E7%90%86%E5%91%98%E8%BF%90%E8%A1%8C%E5%90%8E%E6%97%A0%E5%8F%8D%E5%BA%94)
+:::
+
 ### 2️⃣ 快捷键
 
 | 功能 | 快捷键 | 说明 |
