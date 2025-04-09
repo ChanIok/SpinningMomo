@@ -1,5 +1,5 @@
 #pragma once
-#include "win_config.hpp"
+#include <windows.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Foundation.h>
 #include <windows.graphics.capture.interop.h>

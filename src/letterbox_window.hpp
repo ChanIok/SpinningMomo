@@ -1,8 +1,7 @@
 #pragma once
-
-#include "win_config.hpp"
-#include "thread_raii.hpp"
+#include <windows.h>
 #include <atomic>
+#include "thread_raii.hpp"
 
 // 黑边模式窗口类
 // 创建一个全屏黑色背景窗口，用于实现信箱模式（Letterbox Mode）

@@ -1,5 +1,5 @@
 #pragma once
-#include "win_config.hpp"
+#include <windows.h>
 #include <shellapi.h>
 #include <strsafe.h>
 #include <vector>

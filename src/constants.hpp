@@ -1,5 +1,5 @@
 #pragma once
-#include "win_config.hpp"
+#include <windows.h>
 #include <string>
 
 // 常量定义
