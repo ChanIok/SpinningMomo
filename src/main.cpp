@@ -6,7 +6,6 @@
 #include <strsafe.h>
 #include <vector>
 #include <dwmapi.h>
-#include <ShellScalingApi.h>
 #include "constants.hpp"
 #include "window_utils.hpp"
 #include "tray_icon.hpp"
@@ -518,9 +517,6 @@ int WINAPI wWinMain(
     _In_opt_ HINSTANCE hPrevInstance,
     _In_ LPWSTR lpCmdLine,
     _In_ int nCmdShow) {
-    
-    // 设置 DPI 感知
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     
     SpinningMomoApp app;
     

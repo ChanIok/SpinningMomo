@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Windows平台相关宏定义
 if(WIN32)
+    # 启用manifest处理
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST /MANIFESTUAC:level='requireAdministrator'")
     add_compile_definitions(
         UNICODE
         _UNICODE
@@ -58,7 +60,8 @@ add_executable(SpinningMomo WIN32
     src/logger.cpp
     src/win_timer.cpp
     src/letterbox_window.cpp
-    src/resource.rc  # 添加资源文件
+    src/resource.rc
+    app.manifest
 )
 
 # 添加Windows库
