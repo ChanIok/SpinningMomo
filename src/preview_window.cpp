@@ -107,12 +107,18 @@ PreviewWindow::~PreviewWindow() {
 }
 
 bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customHeight) {
+    if (!targetWindow) return false;
+
+    // 检查窗口是否处于最小化状态
+    if (IsIconic(targetWindow)) {
+        LOG_DEBUG("Game window is minimized, cannot start capture");
+        return false;
+    }
+
     if (m_cleanupTimer.IsRunning()) {
         LOG_DEBUG("Canceling cleanup timer due to new capture");
         m_cleanupTimer.Cancel();
     }
-
-    if (!targetWindow) return false;
 
     // 保存游戏窗口句柄
     m_gameWindow = targetWindow;

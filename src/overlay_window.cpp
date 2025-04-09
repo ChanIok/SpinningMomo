@@ -107,6 +107,12 @@ bool OverlayWindow::Initialize(HINSTANCE hInstance, HWND mainHwnd) {
 bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     if (!targetWindow) return false;
 
+    // 检查窗口是否处于最小化状态
+    if (IsIconic(targetWindow)) {
+        LOG_DEBUG("Game window is minimized, cannot start capture");
+        return false;
+    }
+
     m_gameWindow = targetWindow;
 
     // 获取游戏窗口尺寸并计算宽高比
