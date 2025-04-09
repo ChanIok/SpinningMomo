@@ -1,5 +1,4 @@
 #include "overlay_window.hpp"
-#include <d3dkmthk.h>
 #include <windowsx.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
@@ -385,24 +384,6 @@ bool OverlayWindow::InitializeCapture() {
         LOG_ERROR("Failed to get IDXGIDevice, HRESULT: 0x%08X", hr);
         return false;
     }
-    
-    // 设置进程调度优先级，似乎有问题，极端情况下会导致卡死？
-    // 只有在标志为false时才执行优先级设置
-    // if (!m_process_priority_set) {
-    //     bool hags_enabled = false; // 替换为 IsHAGSEnabled() 如果实现
-    //     NTSTATUS status = D3DKMTSetProcessSchedulingPriorityClass(
-    //         GetCurrentProcess(),
-    //         hags_enabled ? D3DKMT_SCHEDULINGPRIORITYCLASS_HIGH : D3DKMT_SCHEDULINGPRIORITYCLASS_REALTIME);
-    //     if (status != 0) {
-    //         // 可能是 Windows 10 2004 之前的版本，忽略错误
-    //         LOG_ERROR("Failed to set process priority class. Status code: %d", status);
-    //     } else {
-    //         LOG_INFO("Process priority class set successfully");
-    //     }
-        
-    //     // 无论成功与否，都标记为已尝试设置
-    //     m_process_priority_set = true;
-    // }
 
     // 设置 GPU 线程优先级，可能没实际效果
     hr = dxgiDevice->SetGPUThreadPriority(7);

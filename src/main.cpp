@@ -207,7 +207,7 @@ private:
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<OverlayWindow> m_overlayWindow;
     std::unique_ptr<LetterboxWindow> m_letterboxWindow;
-    std::unique_ptr<EventHandler> m_eventHandler; // 新增事件处理器
+    std::unique_ptr<EventHandler> m_eventHandler;
 
     // 应用状态
     bool m_isPreviewEnabled = false;
@@ -216,6 +216,7 @@ private:
     bool m_isOverlayEnabled = false;
     bool m_isLetterboxEnabled = false;
     HHOOK m_keyboardHook = NULL;
+    ULONGLONG m_lastTrayClickTime = 0;
     size_t m_currentRatioIndex = SIZE_MAX;
     size_t m_currentResolutionIndex = 0;
     std::vector<std::pair<HWND, std::wstring>> m_windows;
@@ -227,9 +228,6 @@ private:
     // 界面文本
     LocalizedStrings m_strings;
     std::wstring m_language;
-
-    // 记录最后一次托盘图标点击时间
-    ULONGLONG m_lastTrayClickTime = 0;
 
     // 待显示通知队列
     struct PendingNotification {
@@ -434,41 +432,9 @@ private:
                 return 0;
             }
 
-            case WM_USER + 1: {  // Constants::WM_TRAYICON
-                if (app) {
-                    if (lParam == WM_LBUTTONDBLCLK) {
-                        app->m_eventHandler->HandleTrayIconDblClick();
-                        app->m_lastTrayClickTime = GetTickCount64();
-                    } else if (lParam == WM_LBUTTONUP) {
-                        // 获取当前时间
-                        ULONGLONG currentTime = GetTickCount64();
-                        // 获取系统双击时间
-                        int doubleClickTime = GetDoubleClickTime();
-                        // 如果与上次点击时间间隔大于双击时间，才处理单击
-                        if (currentTime - app->m_lastTrayClickTime > (ULONGLONG)doubleClickTime) {
-                            app->m_eventHandler->ShowWindowSelectionMenu();
-                        }
-                        app->m_lastTrayClickTime = currentTime;
-                    } else if (lParam == WM_RBUTTONUP) {
-                        app->m_eventHandler->ShowWindowSelectionMenu();
-                    }
-                }
-                return 0;
-            }
-
             case WM_HOTKEY: {
-                if (app && wParam == Constants::ID_TRAYICON) {
+                if (app && wParam == Constants::HOTKEY_ID) {
                     app->m_eventHandler->HandleHotkeyTriggered();
-                }
-                return 0;
-            }
-
-            case Constants::WM_SHOW_PENDING_NOTIFICATIONS: {
-                if (app) {
-                    // 开始显示通知的索引
-                    app->m_currentNotificationIndex = 0;
-                    // 设置定时器，每隔一段时间显示一个通知
-                    SetTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID, 1000, NULL);
                 }
                 return 0;
             }
@@ -499,6 +465,38 @@ private:
 
             case WM_DESTROY: {
                 PostQuitMessage(0);
+                return 0;
+            }
+
+            case Constants::WM_TRAYICON: {
+                if (app) {
+                    if (lParam == WM_LBUTTONDBLCLK) {
+                        app->m_eventHandler->HandleTrayIconDblClick();
+                        app->m_lastTrayClickTime = GetTickCount64();
+                    } else if (lParam == WM_LBUTTONUP) {
+                        // 获取当前时间
+                        ULONGLONG currentTime = GetTickCount64();
+                        // 获取系统双击时间
+                        int doubleClickTime = GetDoubleClickTime();
+                        // 如果与上次点击时间间隔大于双击时间，才处理单击
+                        if (currentTime - app->m_lastTrayClickTime > (ULONGLONG)doubleClickTime) {
+                            app->m_eventHandler->ShowWindowSelectionMenu();
+                        }
+                        app->m_lastTrayClickTime = currentTime;
+                    } else if (lParam == WM_RBUTTONUP) {
+                        app->m_eventHandler->ShowWindowSelectionMenu();
+                    }
+                }
+                return 0;
+            }
+            
+            case Constants::WM_SHOW_PENDING_NOTIFICATIONS: {
+                if (app) {
+                    // 开始显示通知的索引
+                    app->m_currentNotificationIndex = 0;
+                    // 设置定时器，每隔一段时间显示一个通知
+                    SetTimer(app->m_hwnd, Constants::NOTIFICATION_TIMER_ID, 1000, NULL);
+                }
                 return 0;
             }
 

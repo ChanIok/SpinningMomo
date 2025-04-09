@@ -5,7 +5,7 @@
 // 常量定义
 namespace Constants {
     // 应用程序基本信息
-    inline const wchar_t* APP_NAME = L"旋转吧大喵";          
+    inline const wchar_t* APP_NAME = L"SpinningMomo";          
     inline const wchar_t* WINDOW_CLASS = L"SpinningMomoClass";  
     
     // 消息和ID定义
@@ -13,7 +13,7 @@ namespace Constants {
     static const UINT WM_PREVIEW_RCLICK = WM_USER + 2;  // 预览窗口右键点击消息
     static const UINT WM_SHOW_PENDING_NOTIFICATIONS = WM_USER + 100;  // 显示待处理通知消息
     static const UINT WM_SET_HOTKEY_MODE = WM_USER + 101;  // 设置热键模式消息
-    constexpr UINT ID_TRAYICON = 1;
+    constexpr UINT HOTKEY_ID = 1;              // 热键ID
     constexpr UINT NOTIFICATION_TIMER_ID = 2;  // 通知显示定时器ID
     
     // 菜单项ID定义

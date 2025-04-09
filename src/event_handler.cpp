@@ -43,7 +43,7 @@ EventHandler::EventHandler(
     m_language(language),
     m_windows(windows),
     m_isScreenCaptureSupported(isScreenCaptureSupported),
-    m_hotkeyId(Constants::ID_TRAYICON),
+    m_hotkeyId(Constants::HOTKEY_ID),
     m_hotkeyRegistered(false),
     m_hotkeySettingMode(false)
 {
@@ -620,7 +620,7 @@ bool EventHandler::RegisterHotkey(UINT modifiers, UINT key) {
     // 确保先卸载之前的热键
     UnregisterHotkey();
     
-    bool success = ::RegisterHotKey(m_mainWindow, Constants::ID_TRAYICON, modifiers, key);
+    bool success = ::RegisterHotKey(m_mainWindow, Constants::HOTKEY_ID, modifiers, key);
     
     if (success) {
         m_hotkeyRegistered = true;
@@ -635,7 +635,7 @@ bool EventHandler::RegisterHotkey(UINT modifiers, UINT key) {
 
 void EventHandler::UnregisterHotkey() {
     if (m_hotkeyRegistered) {
-        ::UnregisterHotKey(m_mainWindow, Constants::ID_TRAYICON);
+        ::UnregisterHotKey(m_mainWindow, Constants::HOTKEY_ID);
         m_hotkeyRegistered = false;
     }
 }

@@ -6,7 +6,7 @@
 TrayIcon::TrayIcon(HWND hwnd) : m_hwnd(hwnd) {
     m_nid.cbSize = sizeof(NOTIFYICONDATA);
     m_nid.hWnd = hwnd;
-    m_nid.uID = Constants::ID_TRAYICON;
+    m_nid.uID = Constants::HOTKEY_ID;
     m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     m_nid.uCallbackMessage = Constants::WM_TRAYICON;
     
