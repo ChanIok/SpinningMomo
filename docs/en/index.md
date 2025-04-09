@@ -72,13 +72,9 @@ layout: doc
 
 ### 1️⃣ Getting Started
 
-::: danger Important
-The program must be run as **Administrator**!
-:::
-
-Two ways to grant administrator privileges:
-- **Temporary**: Right-click the program → Select "Run as administrator"
-- **Permanent**: Right-click the program → Properties → Compatibility → Check "Run this program as an administrator" → Apply
+When running for the first time, you may encounter these security prompts:
+- **SmartScreen Alert**: Click **More info** → **Run anyway** (open-source software without commercial code signing)
+- **UAC Prompt**: Click **Yes** to allow administrator privileges (required for window adjustments)
 
 After startup:
 - Program icon <img src="/logo.png" style="display: inline; height: 1em; vertical-align: text-bottom;" /> will appear in system tray

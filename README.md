@@ -63,13 +63,17 @@
 
 ## 📖 使用指南
 
+### 📥 下载地址
+
+- **GitHub Release**：[点击下载最新版本](https://github.com/ChanIok/SpinningMomo/releases/latest)
+- **蓝奏云**：[点击下载](https://wwf.lanzoul.com/b0sxagp0d)（密码：momo）
+- **百度网盘**：[点击下载](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo)（提取码：momo）
+
 ### 1️⃣ 启动程序
 
-> ⚠️ **重要提示：必须以管理员身份运行程序！**
-
-两种授权方式：
-- **临时授权**：右键程序 → 选择"以管理员身份运行"
-- **永久授权**：右键程序 → 属性 → 兼容性 → 勾选"以管理员身份运行此程序" → 应用
+首次运行时，可能会遇到以下安全提示：
+- **SmartScreen 提示**：点击**更多信息**→**仍要运行**（开源软件无商业代码签名）
+- **UAC 提示**：点击**是**允许管理员权限（程序需要此权限调整窗口）
 
 启动后：
 - 系统托盘会显示程序图标 <img src="docs/public/logo.png" style="display: inline; height: 1em; vertical-align: text-bottom;" />
@@ -171,12 +175,6 @@
     </tr>
   </table>
 </div>
-
-### 📥 下载地址
-
-- **GitHub Release**：[点击下载最新版本](https://github.com/ChanIok/SpinningMomo/releases/latest)
-- **蓝奏云**：[点击下载](https://wwf.lanzoul.com/b0sxagp0d)（密码：momo）
-- **百度网盘**：[点击下载](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo)（提取码：momo）
 
 > 📖 更多详细说明请查看[完整文档](https://chaniok.github.io/SpinningMomo/)
 
