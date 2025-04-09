@@ -47,21 +47,13 @@
 ### 管理员运行后无反应
 
 ::: warning 问题描述
-右键以管理员身份运行程序后没有任何反应，也没有浮窗弹出。如：[Issue](https://github.com/ChanIok/SpinningMomo/issues/5)
+运行程序后没有任何反应，也没有浮窗弹出。如：[Issue](https://github.com/ChanIok/SpinningMomo/issues/5)
 :::
 
 **解决方案**：
 1. 查看 Windows 安全中心的保护历史记录，检查是否有相关拦截信息，有则尝试关闭保护
 2. 尝试重新安装运行库：[Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 3. 换个渠道重新下载程序并运行
-
-### 窗口调整失败
-
-::: warning 错误提示
-窗口调整失败。可能需要管理员权限，或窗口不支持调整大小。
-:::
-
-**解决方案**：右键程序图标，选择"以管理员身份运行"
 
 ### 热键注册失败
 
