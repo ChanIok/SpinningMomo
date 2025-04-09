@@ -23,7 +23,10 @@
 class SpinningMomoApp {
 public:
     SpinningMomoApp() = default;
-    ~SpinningMomoApp() = default;
+    ~SpinningMomoApp() {
+        // 确保钩子被卸载
+        UnregisterKeyboardHook();
+    }
 
     bool Initialize(HINSTANCE hInstance) {
         Logger::GetInstance().Initialize();
@@ -172,6 +175,12 @@ public:
             std::wstring message = m_strings.STARTUP_MESSAGE + hotkeyText + m_strings.STARTUP_MESSAGE_SUFFIX;
             AddPendingNotification(m_strings.APP_NAME.c_str(), message.c_str());
         }
+
+        // 注册全局键盘钩子 https://github.com/ChanIok/SpinningMomo/issues/4
+        if (!RegisterKeyboardHook()) {
+            LOG_INFO("Failed to register global keyboard hook");
+        }
+
         LOG_INFO("Program initialization completed successfully");
         return true;
     }
@@ -206,6 +215,7 @@ private:
     bool m_isScreenCaptureSupported = false;
     bool m_isOverlayEnabled = false;
     bool m_isLetterboxEnabled = false;
+    HHOOK m_keyboardHook = NULL;
     size_t m_currentRatioIndex = SIZE_MAX;
     size_t m_currentResolutionIndex = 0;
     std::vector<std::pair<HWND, std::wstring>> m_windows;
@@ -299,6 +309,37 @@ private:
             int dpiY = GetDeviceCaps(hdc, LOGPIXELSY);
             LOG_INFO("DPI Settings: %dx%d", dpiX, dpiY);
             ReleaseDC(NULL, hdc);
+        }
+    }
+
+    // 注册全局键盘钩子
+    bool RegisterKeyboardHook() {
+        // 确保之前的钩子已卸载
+        if (m_keyboardHook) {
+            UnregisterKeyboardHook();
+        }
+        
+        static auto keyboardProc = [](int nCode, WPARAM wParam, LPARAM lParam) -> LRESULT {
+            return CallNextHookEx(NULL, nCode, wParam, lParam);
+        };
+        
+        m_keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboardProc, GetModuleHandle(NULL), 0);
+        
+        if (!m_keyboardHook) {
+            LOG_ERROR("Failed to register keyboard hook. Error code: %d", GetLastError());
+            return false;
+        }
+        
+        LOG_INFO("Global keyboard hook registered successfully");
+        return true;
+    }
+
+    // 卸载键盘钩子
+    void UnregisterKeyboardHook() {
+        if (m_keyboardHook) {
+            UnhookWindowsHookEx(m_keyboardHook);
+            m_keyboardHook = NULL;
+            LOG_INFO("Global keyboard hook unregistered");
         }
     }
 
