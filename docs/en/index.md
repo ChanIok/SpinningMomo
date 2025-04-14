@@ -37,7 +37,7 @@ layout: doc
 
 ▸ Break through native limitations, supporting the generation of 8K-12K ultra-high-resolution game screenshots.
 
-▸ Optimized for Infinity Nikki, while also compatible with most 3D games.
+▸ Optimized for Infinity Nikki, while also compatible with most other games running in windowed mode.
 
 ## Features
 
