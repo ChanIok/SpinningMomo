@@ -1,3 +1,27 @@
+<template>
+  <n-layout-sider
+    collapse-mode="width"
+    :collapsed-width="72"
+    :width="200"
+    show-trigger
+    class="h-full rounded-xl m-4"
+    :style="{ backgroundColor: 'rgb(252, 252, 252)' }"
+    :collapsed="collapsed"
+    @collapse="collapsed = true"
+    @expand="collapsed = false"
+  >
+    <n-menu
+      v-model:value="activeKey"
+      :options="menuOptions"
+      :collapsed="collapsed"
+      :collapsed-width="66"
+      :collapsed-icon-size="24"
+      @update:value="handleMenuSelect"
+      class="custom-menu"
+    />
+  </n-layout-sider>
+</template>
+
 <script setup lang="ts">
 import { h, ref } from 'vue'
 import { useRouter } from 'vue-router'
@@ -19,7 +43,8 @@ import {
 
 const router = useRouter()
 const activeKey = ref<string | null>(null)
-const collapsed = ref(false)
+// 默认为收缩状态
+const collapsed = ref(true)
 
 function renderIcon(icon: any) {
   return () => h(NIcon, null, { default: () => h(icon) })
@@ -71,46 +96,10 @@ function handleMenuSelect(key: string) {
 }
 </script>
 
-<template>
-  <n-layout-sider
-    bordered
-    collapse-mode="width"
-    :collapsed-width="64"
-    :width="240"
-    show-trigger
-    class="app-sidebar"
-    @collapse="collapsed = true"
-    @expand="collapsed = false"
-  >
-    <n-menu
-      v-model:value="activeKey"
-      :options="menuOptions"
-      :collapsed="collapsed"
-      :collapsed-width="64"
-      :collapsed-icon-size="22"
-      @update:value="handleMenuSelect"
-    />
-  </n-layout-sider>
-</template>
-
 <style scoped>
-.app-sidebar {
-  height: 100vh;
-  background-color: var(--n-color);
-  border-right: 1px solid var(--n-border-color);
+.custom-menu :deep(.n-menu-item) {
+  height: 54px;
+  padding: 4px;
+  box-sizing: border-box;
 }
-
-.sidebar-header {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--n-border-color);
-}
-
-.app-title {
-  margin: 0;
-  font-size: 1.2rem;
-  font-weight: 400;
-}
-</style> 
+</style>

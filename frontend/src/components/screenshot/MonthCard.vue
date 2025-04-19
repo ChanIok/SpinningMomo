@@ -9,7 +9,7 @@ const props = defineProps<{
 // 格式化月份显示
 function formatMonth(year: number, month: number): string {
   const date = new Date(year, month - 1);
-  return new Intl.DateTimeFormat('default', { 
+  return new Intl.DateTimeFormat('default', {
     year: 'numeric',
     month: 'long'
   }).format(date);
@@ -37,17 +37,16 @@ function formatMonth(year: number, month: number): string {
 
 <style scoped>
 .month-card {
-  background: #fff;
-  border-radius: 8px;
+  background: var(--n-color);
+  border-radius: 4px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--n-border-color);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .month-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  background-color: var(--n-color-hover, rgba(0, 0, 0, 0.03));
 }
 
 .cover-image {
@@ -68,11 +67,6 @@ function formatMonth(year: number, month: number): string {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
-}
-
-.month-card:hover .cover-image :deep(img) {
-  transform: scale(1.05);
 }
 
 .month-info {
@@ -92,4 +86,4 @@ function formatMonth(year: number, month: number): string {
   font-size: 0.9em;
   color: #666;
 }
-</style> 
+</style>

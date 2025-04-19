@@ -58,12 +58,12 @@ function formatFileSize(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB'];
   let size = bytes;
   let unitIndex = 0;
-  
+
   while (size >= 1024 && unitIndex < units.length - 1) {
     size /= 1024;
     unitIndex++;
   }
-  
+
   return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 </script>
@@ -71,18 +71,18 @@ function formatFileSize(bytes: number): string {
 <style scoped>
 .screenshot-card {
   cursor: pointer;
-  transition: all 0.2s ease;
-  background: transparent;
+  transition: background-color 0.2s ease;
+  background-color: transparent;
   border-radius: 4px;
   overflow: hidden;
 }
 
 .screenshot-card:hover {
-  transform: translateY(-2px);
+  background-color: var(--n-color-hover, rgba(0, 0, 0, 0.03));
 }
 
 .screenshot-card.selected {
-  box-shadow: 0 0 0 2px var(--n-primary-color);
+  border: 2px solid var(--n-primary-color);
 }
 
 .image-container {
@@ -141,4 +141,4 @@ function formatFileSize(bytes: number): string {
   font-size: 0.8em;
   opacity: 0.9;
 }
-</style> 
+</style>

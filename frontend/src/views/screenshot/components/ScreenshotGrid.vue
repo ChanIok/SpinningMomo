@@ -16,15 +16,15 @@ const emit = defineEmits<{
 <template>
   <div class="screenshot-grid">
     <n-grid
-      :x-gap="16"
-      :y-gap="16"
+      :x-gap="12"
+      :y-gap="12"
       cols="2 s:3 m:4 l:5 xl:6 2xl:8"
       responsive="screen"
     >
       <n-grid-item v-for="screenshot in props.screenshots" :key="screenshot.id">
         <div class="screenshot-item">
-          <img 
-            :src="screenshot.thumbnailPath" 
+          <img
+            :src="screenshot.thumbnailPath"
             :alt="screenshot.filename"
             loading="lazy"
           />
@@ -34,8 +34,8 @@ const emit = defineEmits<{
 
     <div v-if="props.loading || props.hasMore" class="loading-more">
       <n-spin v-if="props.loading" size="small" />
-      <button 
-        v-else-if="props.hasMore" 
+      <button
+        v-else-if="props.hasMore"
         class="load-more-btn"
         @click="emit('load-more')"
       >
@@ -47,25 +47,25 @@ const emit = defineEmits<{
 
 <style scoped>
 .screenshot-grid {
-  padding: 16px;
+  padding: 12px;
 }
 
 .screenshot-item {
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 4px;
   background-color: var(--n-card-color);
+  transition: background-color 0.2s ease;
+}
+
+.screenshot-item:hover {
+  background-color: var(--n-color-hover, rgba(0, 0, 0, 0.03));
 }
 
 .screenshot-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.2s ease;
-}
-
-.screenshot-item:hover img {
-  transform: scale(1.05);
 }
 
 .loading-more {
@@ -87,4 +87,4 @@ const emit = defineEmits<{
 .load-more-btn:hover {
   opacity: 0.9;
 }
-</style> 
+</style>

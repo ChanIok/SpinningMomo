@@ -73,20 +73,20 @@ onUnmounted(() => {
 
 <template>
   <div class="screenshot-browser">
-    <view-toolbar v-model:mode="viewMode" />
-    
-    <div 
+    <view-toolbar v-model:mode="viewMode" class="border-b p-3" />
+
+    <div
       ref="browserContentRef"
       class="browser-content"
     >
-      <screenshot-grid 
+      <screenshot-grid
         v-if="viewMode === 'grid'"
         :screenshots="store.screenshots"
         :loading="store.loading"
         :has-more="store.hasMore"
         @load-more="loadScreenshots"
       />
-      
+
       <screenshot-list
         v-else
         :screenshots="store.screenshots"

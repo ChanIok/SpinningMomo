@@ -3,25 +3,12 @@ import { NLayout, NLayoutContent } from 'naive-ui'
 </script>
 
 <template>
-  <n-layout class="app-content">
-    <n-layout-content class="content-container">
-      <router-view />
+  <n-layout class="h-screen">
+    <n-layout-content
+      class="h-full box-border pl-4 pt-4 overflow-y-auto overflow-x-hidden flex flex-col"
+      :style="{ backgroundColor: 'var(--n-color)' }"
+    >
+      <router-view class="border-l border-t border-[#d8d8d8] rounded-tl-xl overflow-hidden" />
     </n-layout-content>
   </n-layout>
 </template>
-
-<style scoped>
-.app-content {
-  height: 100vh;
-}
-
-.content-container {
-  height: 100%;
-  padding: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--n-color);
-}
-</style> 
