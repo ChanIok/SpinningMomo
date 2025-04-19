@@ -41,6 +41,8 @@ frontend/dist-ssr/
 frontend/.vite/
 frontend/coverage/
 frontend/*.local
+frontend/auto-imports.d.ts
+frontend/components.d.ts
 
 # Frontend logs
 frontend/logs/

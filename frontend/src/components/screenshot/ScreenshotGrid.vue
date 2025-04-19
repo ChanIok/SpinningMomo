@@ -98,9 +98,10 @@ onUnmounted(() => {
 const { stop } = useIntersectionObserver(
   loadingRef,
   async ([{ isIntersecting }]) => {
-    if (isIntersecting && !loading.value && !store.reachedEnd) {
+    if (isIntersecting && !loading.value && store.hasMore) {
       loading.value = true;
-      await store.loadMoreScreenshots();
+      // 使用emit触发加载更多事件，而不是直接调用store方法
+      emit('load-more');
       loading.value = false;
     }
   }
@@ -148,4 +149,4 @@ function handleScreenshotClick(screenshot: Screenshot) {
   align-items: center;
   justify-content: center;
 }
-</style> 
+</style>

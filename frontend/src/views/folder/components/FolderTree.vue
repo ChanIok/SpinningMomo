@@ -16,9 +16,12 @@ onMounted(async () => {
   treeData.value = convertToTreeOptions(folderStore.folderTree)
 })
 
-const handleSelect = (key: string) => {
-  const [folderId, relativePath] = key.split('::')
-  emit('select', folderId, relativePath || '')
+const handleSelect = (keys: string[]) => {
+  if (keys.length > 0) {
+    const key = keys[0]
+    const [folderId, relativePath] = key.split('::')
+    emit('select', folderId, relativePath || '')
+  }
 }
 
 // 转换文件夹树数据为Tree组件所需格式
@@ -38,4 +41,4 @@ const convertToTreeOptions = (nodes: any[]): TreeOption[] => {
     :data="treeData"
     @update:selected-keys="handleSelect"
   />
-</template> 
+</template>
