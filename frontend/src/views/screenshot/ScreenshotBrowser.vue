@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useScreenshotListStore } from '@/stores/screenshot-list'
-import type { ScreenshotParams } from '@/types/screenshot'
-import ViewToolbar from '@/views/screenshot/components/ViewToolbar.vue'
+import { useUIStore } from '@/stores'
 import ScreenshotGrid from '@/views/screenshot/components/ScreenshotGrid.vue'
 import ScreenshotList from '@/views/screenshot/components/ScreenshotList.vue'
-import { useMessage } from 'naive-ui'
 
 const props = defineProps<{
   folderId?: string
@@ -14,9 +12,10 @@ const props = defineProps<{
   month?: number
 }>()
 
-const message = useMessage()
+// 使用简单的alert替代NaiveUI的message
+const showError = (msg: string) => alert(msg)
 const store = useScreenshotListStore()
-const viewMode = ref<'grid' | 'list'>('grid')
+const uiStore = useUIStore()
 const browserContentRef = ref<HTMLElement | null>(null)
 
 // 加载截图
@@ -29,7 +28,7 @@ async function loadScreenshots() {
       month: props.month,
     })
   } catch (error) {
-    message.error('加载截图失败')
+    showError('加载截图失败')
   }
 }
 
@@ -72,15 +71,16 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="screenshot-browser">
-    <view-toolbar v-model:mode="viewMode" class="border-b p-3" />
-
+  <div
+    id="screenshot-browser"
+    class="h-full flex flex-col mr-2 bg-white dark:bg-gray-800 rounded-md"
+  >
     <div
       ref="browserContentRef"
-      class="browser-content"
+      class="flex-1 overflow-y-auto"
     >
       <screenshot-grid
-        v-if="viewMode === 'grid'"
+        v-if="uiStore.viewMode === 'grid'"
         :screenshots="store.screenshots"
         :loading="store.loading"
         :has-more="store.hasMore"
@@ -97,25 +97,3 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.screenshot-browser {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--n-color);
-}
-
-.browser-content {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
-  background-color: var(--n-color);
-}
-
-@media (max-width: 600px) {
-  .browser-content {
-    padding: 8px;
-  }
-}
-</style>

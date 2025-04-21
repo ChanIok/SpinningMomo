@@ -1,7 +1,7 @@
 <script setup lang="ts"></script>
 
 <template>
-  <div id="app-content" class="h-screen">
+  <div id="app-content">
     <router-view/>
   </div>
 </template>

@@ -1,58 +1,32 @@
 <script setup lang="ts">
-import { NSpace, NButton, NIcon } from 'naive-ui'
 import { GridOutline, ListOutline } from '@vicons/ionicons5'
+import { useUIStore } from '@/stores'
 
-const props = defineProps<{
-  mode: 'grid' | 'list'
-}>()
-
-const emit = defineEmits<{
-  (e: 'update:mode', mode: 'grid' | 'list'): void
-}>()
+// 使用UI store
+const uiStore = useUIStore()
 </script>
 
 <template>
-  <div class="view-toolbar">
-    <n-space align="center" :size="12">
-      <div class="view-mode-buttons">
-        <n-button
-          quaternary
-          size="small"
-          :type="props.mode === 'grid' ? 'primary' : 'default'"
-          @click="emit('update:mode', 'grid')"
-        >
-          <template #icon>
-            <n-icon><grid-outline /></n-icon>
-          </template>
-        </n-button>
-        <n-button
-          quaternary
-          size="small"
-          :type="props.mode === 'list' ? 'primary' : 'default'"
-          @click="emit('update:mode', 'list')"
-        >
-          <template #icon>
-            <n-icon><list-outline /></n-icon>
-          </template>
-        </n-button>
-      </div>
-    </n-space>
+  <div class="flex items-center">
+    <div class="flex gap-1">
+      <button
+        class="p-1.5 rounded-md transition-colors"
+        :class="uiStore.viewMode === 'grid' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
+        @click="uiStore.setViewMode('grid')"
+      >
+        <grid-outline class="w-5 h-5" />
+      </button>
+      <button
+        class="p-1.5 rounded-md transition-colors"
+        :class="uiStore.viewMode === 'list' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
+        @click="uiStore.setViewMode('list')"
+      >
+        <list-outline class="w-5 h-5" />
+      </button>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.view-toolbar {
-  flex: none;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--n-border-color);
-  background-color: var(--n-color);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.view-mode-buttons {
-  display: flex;
-  gap: 4px;
-}
-</style> 
+/* 所有样式已通过Tailwind类实现 */
+</style>

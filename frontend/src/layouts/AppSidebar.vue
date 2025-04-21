@@ -1,7 +1,7 @@
 <template>
-  <div id="app-sidebar" class="flex-shrink-0 h-full w-16 flex flex-col">
+  <div id="app-sidebar" class="min-w-16 flex flex-col">
     <!-- 菜单项 -->
-    <ul class="flex-1 py-2">
+    <ul class="flex-1">
       <!-- 分隔线处理 -->
       <div v-for="(item, index) in menuItems" :key="index">
         <!-- 分隔线 -->
@@ -11,7 +11,7 @@
         <li
           v-else
           @click="item.key && handleMenuSelect(item.key)"
-          class="relative h-12 mx-2 mb-2 rounded-lg cursor-pointer flex justify-center items-center transition-colors group"
+          class="relative h-12 mx-2 mb-2 rounded-md cursor-pointer flex justify-center items-center transition-colors group"
           :class="{
             'bg-gray-200': activeKey === item.key,
             'hover:bg-gray-100': item.key !== undefined,

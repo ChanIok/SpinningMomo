@@ -114,7 +114,7 @@ function handlePerformanceSettingsUpdate(settings: AppSettings['performance']) {
 
 <style scoped>
 .settings-view {
-  padding: 20px;
+  padding-top: 8px;
   height: 100%;
   overflow: auto;
 }
