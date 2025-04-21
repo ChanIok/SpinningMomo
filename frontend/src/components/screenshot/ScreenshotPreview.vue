@@ -233,36 +233,191 @@ const getImageState = (id: number) => {
   const imageUrl = `/api/screenshots/${id}/raw`;
   // 如果状态不存在，初始化为加载中
   if (!loadingStates.value.has(imageUrl)) {
-    loadingStates.value.set(imageUrl, { loading: true, error: false });
+    loadingStates.value.set(imageUrl, { loading: true, error: false, thumbnailLoaded: false });
   }
-  return loadingStates.value.get(imageUrl) || { loading: true, error: false };
+  return loadingStates.value.get(imageUrl) || { loading: true, error: false, thumbnailLoaded: false };
 };
 
 // 图片加载状态接口
 interface ImageLoadingState {
   loading: boolean;
   error: boolean;
+  thumbnailLoaded: boolean; // 缩略图是否已加载
 }
 
 // 添加加载状态管理
 const loadingStates = ref<Map<string, ImageLoadingState>>(new Map());
 
-// 图片加载事件处理
-const handleImageLoad = (id: number) => {
-  const imageUrl = `/api/screenshots/${id}/raw`;
-  loadingStates.value.set(imageUrl, { loading: false, error: false });
+// 图片加载队列管理
+interface QueueItem {
+  id: number;
+  priority: number;
+  type: 'raw' | 'thumbnail';
+}
+
+const loadQueue = ref<QueueItem[]>([]);
+const activeLoads = ref(0);
+const MAX_CONCURRENT_LOADS = 2; // 限制并发加载数
+
+// 存储每个图片请求对应的AbortController
+const abortControllers = ref(new Map<string, AbortController>());
+
+// 处理队列
+const processQueue = () => {
+  if (loadQueue.value.length === 0 || activeLoads.value >= MAX_CONCURRENT_LOADS) {
+    return;
+  }
+
+  // 获取队列中优先级最高的项
+  loadQueue.value.sort((a, b) => b.priority - a.priority);
+  const { id, type } = loadQueue.value.shift()!;
+
+  // 开始加载
+  activeLoads.value++;
+
+  // 创建AbortController
+  const controller = new AbortController();
+  const imageUrl = `/api/screenshots/${id}/${type}`;
+  const key = `${id}-${type}`;
+
+  // 如果已有相同请求，取消它
+  if (abortControllers.value.has(key)) {
+    abortControllers.value.get(key)?.abort();
+  }
+
+  // 存储新的controller
+  abortControllers.value.set(key, controller);
+
+  // 使用fetch代替Image对象加载
+  fetch(imageUrl, { signal: controller.signal })
+    .then(response => {
+      if (!response.ok) throw new Error('Network response was not ok');
+      return response.blob();
+    })
+    .then(blob => {
+      // 创建blob URL
+      const url = URL.createObjectURL(blob);
+
+      // 使用Image对象加载blob URL以触发onload事件
+      const img = new Image();
+      img.onload = () => {
+        // 更新状态
+        if (type === 'raw') {
+          loadingStates.value.set(imageUrl, {
+            loading: false,
+            error: false,
+            thumbnailLoaded: true
+          });
+        } else if (type === 'thumbnail') {
+          const rawUrl = `/api/screenshots/${id}/raw`;
+          const currentState = loadingStates.value.get(rawUrl) || { loading: true, error: false, thumbnailLoaded: false };
+          loadingStates.value.set(rawUrl, { ...currentState, thumbnailLoaded: true });
+        }
+
+        // 清理
+        URL.revokeObjectURL(url);
+        abortControllers.value.delete(key);
+        activeLoads.value--;
+
+        // 处理下一个
+        processQueue();
+      };
+
+      img.src = url;
+    })
+    .catch(err => {
+      // 如果是取消请求导致的错误，不做特殊处理
+      if (err.name === 'AbortError') {
+        console.log(`Request for ${imageUrl} was aborted`);
+      } else {
+        // 其他错误
+        if (type === 'raw') {
+          loadingStates.value.set(imageUrl, {
+            loading: false,
+            error: true,
+            thumbnailLoaded: true
+          });
+        } else if (type === 'thumbnail') {
+          const rawUrl = `/api/screenshots/${id}/raw`;
+          const currentState = loadingStates.value.get(rawUrl) || { loading: true, error: false, thumbnailLoaded: false };
+          loadingStates.value.set(rawUrl, { ...currentState, thumbnailLoaded: true, error: true });
+        }
+      }
+
+      // 清理
+      abortControllers.value.delete(key);
+      activeLoads.value--;
+
+      // 处理下一个
+      processQueue();
+    });
 };
 
-const handleImageError = (id: number) => {
-  const imageUrl = `/api/screenshots/${id}/raw`;
-  loadingStates.value.set(imageUrl, { loading: false, error: true });
+// 添加到队列
+const queueImageLoad = (id: number, type: 'raw' | 'thumbnail', priority: number) => {
+  // 如果已在队列中，更新优先级
+  const existingIndex = loadQueue.value.findIndex(item => item.id === id && item.type === type);
+  if (existingIndex >= 0) {
+    loadQueue.value[existingIndex].priority = Math.max(loadQueue.value[existingIndex].priority, priority);
+    return;
+  }
+
+  // 添加到队列
+  loadQueue.value.push({ id, type, priority });
+  processQueue();
 };
+
+// 加载图片的方法
+const loadScreenshotImage = (screenshot: Screenshot, isVisible: boolean) => {
+  const id = screenshot.id;
+  const imageUrl = `/api/screenshots/${id}/raw`;
+
+  // 初始化加载状态
+  if (!loadingStates.value.has(imageUrl)) {
+    loadingStates.value.set(imageUrl, { loading: true, error: false, thumbnailLoaded: false });
+  }
+
+  // 设置优先级
+  const thumbnailPriority = isVisible ? 20 : 15; // 缩略图始终有更高的优先级
+  const rawPriority = isVisible ? 10 : 5;
+
+  // 先加载缩略图，再加载原图
+  queueImageLoad(id, 'thumbnail', thumbnailPriority);
+  queueImageLoad(id, 'raw', rawPriority);
+};
+
+// 已移除事件处理函数，改为使用队列管理
 
 // 删除不再使用的函数
 
-// 监听图片切换，重置缩放
-watch(currentIndex, () => {
+// 监听图片切换，重置缩放并更新加载队列
+watch(currentIndex, (newIndex) => {
   resetZoom();
+
+  // 清空队列中不在预渲染池的项
+  loadQueue.value = loadQueue.value.filter(item => {
+    const index = props.screenshots.findIndex(s => s.id === item.id);
+    return Math.abs(index - newIndex) <= Math.floor(BUFFER_SIZE / 2);
+  });
+
+  // 取消不在预渲染池的请求
+  abortControllers.value.forEach((controller, key) => {
+    const [idStr] = key.split('-');
+    const id = parseInt(idStr);
+    const index = props.screenshots.findIndex(s => s.id === id);
+    const isInRenderPool = Math.abs(index - newIndex) <= Math.floor(BUFFER_SIZE / 2);
+
+    if (!isInRenderPool) {
+      controller.abort();
+      abortControllers.value.delete(key);
+    }
+  });
+
+  // 为可见图片设置高优先级
+  visibleScreenshots.value.forEach((screenshot, index) => {
+    const isVisible = index === (newIndex - firstVisibleIndex.value);
+    loadScreenshotImage(screenshot, isVisible);
+  });
 });
 
 // 添加事件监听
@@ -270,6 +425,14 @@ onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('mousemove', handleDrag);
   window.addEventListener('mouseup', handleDragEnd);
+
+  // 初始加载当前可见图片
+  if (props.screenshots.length > 0) {
+    visibleScreenshots.value.forEach((screenshot, index) => {
+      const isVisible = index === (currentIndex.value - firstVisibleIndex.value);
+      loadScreenshotImage(screenshot, isVisible);
+    });
+  }
 });
 
 onUnmounted(() => {
@@ -279,6 +442,11 @@ onUnmounted(() => {
   if (rafId) {
     cancelAnimationFrame(rafId);
   }
+
+  // 取消所有请求
+  abortControllers.value.forEach(controller => {
+    controller.abort();
+  });
 });
 </script>
 
@@ -333,29 +501,40 @@ onUnmounted(() => {
               }"
               @mousedown.stop="handleDragStart"
             >
-              <!-- 加载状态 -->
-              <div v-if="getImageState(screenshot.id).loading" class="absolute inset-0 flex items-center justify-center bg-black/30">
-                <component :is="ReloadOutline" class="w-12 h-12 text-white animate-spin" />
+              <!-- 缩略图（占位） -->
+              <div class="absolute inset-0 flex items-center justify-center">
+                <img
+                  :src="`/api/screenshots/${screenshot.id}/thumbnail`"
+                  :alt="screenshot.filename"
+                  class="w-full h-full object-contain select-none transition-all duration-300"
+                  :class="{ 'opacity-0': !getImageState(screenshot.id).loading }"
+                  @click.stop
+                />
+              </div>
+
+              <!-- 高质量原图 -->
+              <div class="absolute inset-0 flex items-center justify-center">
+                <img
+                  :ref="el => setImageRef(el, screenshot)"
+                  :src="`/api/screenshots/${screenshot.id}/raw`"
+                  :alt="screenshot.filename"
+                  class="max-w-full max-h-full object-contain select-none origin-center will-change-transform touch-none backface-hidden transition-opacity duration-300"
+                  :class="{ 'opacity-0': getImageState(screenshot.id).loading }"
+                  @click.stop
+                />
               </div>
 
               <!-- 错误状态 -->
-              <div v-else-if="getImageState(screenshot.id).error" class="absolute inset-0 flex items-center justify-center bg-black/30">
+              <div v-if="getImageState(screenshot.id).error" class="absolute inset-0 flex items-center justify-center bg-black/30">
                 <div class="px-6 py-4 bg-red-500/80 text-white rounded-lg text-center">
                   图片加载失败
                 </div>
               </div>
 
-              <!-- 图片 -->
-              <img
-                :ref="el => setImageRef(el, screenshot)"
-                :src="`/api/screenshots/${screenshot.id}/raw`"
-                :alt="screenshot.filename"
-                class="max-w-full max-h-full object-contain select-none origin-center will-change-transform touch-none backface-hidden"
-                :class="{ 'opacity-50': getImageState(screenshot.id).loading }"
-                @click.stop
-                @load="handleImageLoad(screenshot.id)"
-                @error="handleImageError(screenshot.id)"
-              />
+              <!-- 加载状态（当缩略图也未加载时显示） -->
+              <div v-if="getImageState(screenshot.id).loading && !getImageState(screenshot.id).thumbnailLoaded" class="absolute inset-0 flex items-center justify-center bg-black/30">
+                <component :is="ReloadOutline" class="w-12 h-12 text-white animate-spin" />
+              </div>
             </div>
           </div>
         </div>
@@ -387,6 +566,12 @@ onUnmounted(() => {
 }
 
 img:not(.dragging) {
-  transition: transform 0.1s ease-out;
+  transition: transform 0.1s ease-out, opacity 0.3s ease;
+}
+
+/* 缩略图到原图的过渡效果 */
+.blur-sm.opacity-0 {
+  filter: blur(0);
+  transform: scale(1);
 }
 </style>
