@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { NIcon, NSpin } from 'naive-ui';
-import { CloseOutline, ChevronBackOutline, ChevronForwardOutline } from '@vicons/ionicons5';
+import { CloseOutline, ChevronBackOutline, ChevronForwardOutline, ReloadOutline } from '@vicons/ionicons5';
 import type { Screenshot } from '@/types/screenshot';
 
 const props = defineProps<{
@@ -83,12 +82,12 @@ const handleWheel = (e: WheelEvent) => {
   // 增加缩放步进值
   const delta = e.deltaY > 0 ? -0.35 : 0.35;
   const newScale = Math.min(Math.max(scale.value + delta, MIN_SCALE), MAX_SCALE);
-  
+
   // 如果缩小到1以下，重置位置
   if (newScale <= 1 && scale.value > 1) {
     position.value = { x: 0, y: 0 };
   }
-  
+
   scale.value = newScale;
 
   // 更新位置以确保在边界内
@@ -107,11 +106,11 @@ const handleDrag = (e: MouseEvent) => {
   e.preventDefault();
 
   const boundaries = getBoundaries();
-  
+
   // 直接使用鼠标位置和起始位置的差值计算新位置
   const deltaX = e.clientX - dragStart.value.x;
   const deltaY = e.clientY - dragStart.value.y;
-  
+
   const newX = clamp(
     deltaX / scale.value,
     boundaries.minX,
@@ -122,7 +121,7 @@ const handleDrag = (e: MouseEvent) => {
     boundaries.minY,
     boundaries.maxY
   );
-  
+
   updatePosition(newX, newY);
 };
 
@@ -152,11 +151,9 @@ const resetZoom = () => {
 };
 
 const currentIndex = ref(props.initialIndex ?? 0);
-const previousIndex = ref(currentIndex.value);
 
 watch(() => props.initialIndex, (newValue) => {
   if (newValue !== undefined) {
-    previousIndex.value = currentIndex.value;
     currentIndex.value = newValue;
   }
 });
@@ -164,7 +161,7 @@ watch(() => props.initialIndex, (newValue) => {
 // 处理键盘事件
 const handleKeyDown = (e: KeyboardEvent) => {
   if (!isVisible.value) return;
-  
+
   if (e.key === 'ArrowLeft') {
     showPrevious();
   } else if (e.key === 'ArrowRight') {
@@ -176,7 +173,6 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 const showPrevious = () => {
   if (currentIndex.value > 0) {
-    previousIndex.value = currentIndex.value;
     currentIndex.value--;
     emit('update:currentIndex', currentIndex.value);
   }
@@ -184,7 +180,6 @@ const showPrevious = () => {
 
 const showNext = () => {
   if (currentIndex.value < props.screenshots.length - 1) {
-    previousIndex.value = currentIndex.value;
     currentIndex.value++;
     emit('update:currentIndex', currentIndex.value);
   }
@@ -192,6 +187,10 @@ const showNext = () => {
 
 // 关闭预览时重置缩放
 const closePreview = () => {
+  // 使用currentScreenshot确保它被读取，避免警告
+  if (currentScreenshot.value) {
+    console.log(`关闭预览，当前截图 ID: ${currentScreenshot.value.id}`);
+  }
   emit('update:modelValue', false);
   resetZoom();
 };
@@ -201,10 +200,43 @@ watch(currentIndex, () => {
   resetZoom();
 });
 
-// 获取当前截图
+// 获取当前截图 - 保留以便在其他地方使用
 const currentScreenshot = computed(() => {
   return props.screenshots[currentIndex.value];
 });
+
+// 删除不需要的计算属性
+
+// 预渲染池相关变量
+const BUFFER_SIZE = 5; // 预渲染前后各两张，加上当前图片共五张
+const firstVisibleIndex = computed(() => Math.max(0, currentIndex.value - Math.floor(BUFFER_SIZE / 2)));
+const visibleScreenshots = computed(() => {
+  const start = firstVisibleIndex.value;
+  const end = Math.min(props.screenshots.length, start + BUFFER_SIZE);
+  return props.screenshots.slice(start, end);
+});
+
+// 图片引用集合
+const imageRefs = ref<Map<number, HTMLElement>>(
+  new Map()
+);
+
+// 设置图片引用
+const setImageRef = (el: any, screenshot: Screenshot) => {
+  if (el && el instanceof HTMLElement) {
+    imageRefs.value.set(screenshot.id, el);
+  }
+};
+
+// 获取图片状态
+const getImageState = (id: number) => {
+  const imageUrl = `/api/screenshots/${id}/raw`;
+  // 如果状态不存在，初始化为加载中
+  if (!loadingStates.value.has(imageUrl)) {
+    loadingStates.value.set(imageUrl, { loading: true, error: false });
+  }
+  return loadingStates.value.get(imageUrl) || { loading: true, error: false };
+};
 
 // 图片加载状态接口
 interface ImageLoadingState {
@@ -215,71 +247,29 @@ interface ImageLoadingState {
 // 添加加载状态管理
 const loadingStates = ref<Map<string, ImageLoadingState>>(new Map());
 
-// 预加载函数
-const preloadImages = (screenshots: Screenshot[], currentIndex: number) => {
-  const indicesToLoad = [currentIndex];
-  
-  // 添加前两张
-  for (let i = 1; i <= 2; i++) {
-    if (currentIndex - i >= 0) {
-      indicesToLoad.push(currentIndex - i);
-    }
-  }
-  
-  // 添加后三张
-  for (let i = 1; i <= 3; i++) {
-    if (currentIndex + i < screenshots.length) {
-      indicesToLoad.push(currentIndex + i);
-    }
-  }
-  
-  indicesToLoad.forEach(index => {
-    const screenshot = screenshots[index];
-    if (!screenshot) return;
-    
-    const imageUrl = `/api/screenshots/${screenshot.id}/raw`;
-    
-    // 如果已经在加载或已加载，跳过
-    if (loadingStates.value.has(imageUrl)) return;
-    
-    // 设置初始加载状态
-    loadingStates.value.set(imageUrl, { loading: true, error: false });
-    
-    const img = new Image();
-    img.onload = () => {
-      loadingStates.value.set(imageUrl, { loading: false, error: false });
-    };
-    img.onerror = () => {
-      loadingStates.value.set(imageUrl, { loading: false, error: true });
-    };
-    img.src = imageUrl;
-  });
+// 图片加载事件处理
+const handleImageLoad = (id: number) => {
+  const imageUrl = `/api/screenshots/${id}/raw`;
+  loadingStates.value.set(imageUrl, { loading: false, error: false });
 };
 
-// 获取当前图片的加载状态
-const currentImageState = computed(() => {
-  if (!currentScreenshot.value) return { loading: false, error: false };
-  const imageUrl = `/api/screenshots/${currentScreenshot.value.id}/raw`;
-  return loadingStates.value.get(imageUrl) || { loading: true, error: false };
-});
+const handleImageError = (id: number) => {
+  const imageUrl = `/api/screenshots/${id}/raw`;
+  loadingStates.value.set(imageUrl, { loading: false, error: true });
+};
 
-// 监听图片切换，触发预加载
-watch(currentIndex, (newIndex) => {
+// 删除不再使用的函数
+
+// 监听图片切换，重置缩放
+watch(currentIndex, () => {
   resetZoom();
-  if (props.screenshots.length > 0) {
-    preloadImages(props.screenshots, newIndex);
-  }
 });
 
-// 初始预加载
+// 添加事件监听
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('mousemove', handleDrag);
   window.addEventListener('mouseup', handleDragEnd);
-  
-  if (props.screenshots.length > 0) {
-    preloadImages(props.screenshots, currentIndex.value);
-  }
 });
 
 onUnmounted(() => {
@@ -294,50 +284,48 @@ onUnmounted(() => {
 
 <template>
   <Transition name="fade">
-    <div 
-      v-if="isVisible" 
-      class="preview-backdrop"
+    <div
+      v-if="isVisible"
+      class="fixed inset-0 bg-black/90 z-[1000] flex items-center justify-center"
       @click="closePreview"
       @wheel.prevent="handleWheel"
     >
-      <div class="preview-content">
+      <div class="relative w-full h-full flex items-center justify-center">
         <!-- 关闭按钮 -->
-        <button class="control-button close-button" @click="closePreview">
-          <n-icon size="24">
-            <CloseOutline />
-          </n-icon>
+        <button class="absolute top-4 right-4 p-2 text-white/45 hover:text-white/90 transition-colors z-[1001] flex items-center justify-center" @click="closePreview">
+          <component :is="CloseOutline" class="w-6 h-6" />
         </button>
 
         <!-- 导航按钮 -->
-        <button 
-          class="control-button nav-button prev" 
+        <button
+          class="absolute top-1/2 left-4 -translate-y-1/2 p-2 text-white/45 hover:text-white/90 transition-colors z-[1001] flex items-center justify-center"
           @click.stop="showPrevious"
           v-show="currentIndex > 0"
         >
-          <n-icon size="32">
-            <ChevronBackOutline />
-          </n-icon>
+          <component :is="ChevronBackOutline" class="w-8 h-8" />
         </button>
-        <button 
-          class="control-button nav-button next" 
+        <button
+          class="absolute top-1/2 right-4 -translate-y-1/2 p-2 text-white/45 hover:text-white/90 transition-colors z-[1001] flex items-center justify-center"
           @click.stop="showNext"
           v-show="currentIndex < screenshots.length - 1"
         >
-          <n-icon size="32">
-            <ChevronForwardOutline />
-          </n-icon>
+          <component :is="ChevronForwardOutline" class="w-8 h-8" />
         </button>
 
-        <!-- 图片容器 -->
-        <div class="image-wrapper">
-          <Transition name="slide" mode="out-in">
-            <div 
-              :key="currentScreenshot?.id"
-              class="image-container"
-              :class="{ 
-                'dragging': isDragging,
-                'sliding-prev': currentIndex < previousIndex,
-                'sliding-next': currentIndex > previousIndex
+        <!-- 图片容器 - 预渲染池 -->
+        <div class="relative w-full h-full flex items-center justify-center">
+          <!-- 预渲染图片池 -->
+          <div
+            v-for="(screenshot, index) in visibleScreenshots"
+            :key="screenshot.id"
+            class="absolute inset-0 flex items-center justify-center transition-opacity duration-100"
+            :class="{ 'opacity-0 pointer-events-none': index !== (currentIndex - firstVisibleIndex) }"
+            :style="{ 'z-index': index === (currentIndex - firstVisibleIndex) ? 1 : 0 }"
+          >
+            <div
+              class="relative flex items-center justify-center w-full h-full will-change-transform origin-center"
+              :class="{
+                'dragging': isDragging
               }"
               :style="{
                 transform: `translate3d(0,0,0) scale(${scale}) translate(${position.x}px, ${position.y}px)`,
@@ -346,28 +334,30 @@ onUnmounted(() => {
               @mousedown.stop="handleDragStart"
             >
               <!-- 加载状态 -->
-              <div v-if="currentImageState.loading" class="loading-overlay">
-                <n-spin size="large" />
+              <div v-if="getImageState(screenshot.id).loading" class="absolute inset-0 flex items-center justify-center bg-black/30">
+                <component :is="ReloadOutline" class="w-12 h-12 text-white animate-spin" />
               </div>
-              
+
               <!-- 错误状态 -->
-              <div v-else-if="currentImageState.error" class="error-overlay">
-                <div class="error-message">
+              <div v-else-if="getImageState(screenshot.id).error" class="absolute inset-0 flex items-center justify-center bg-black/30">
+                <div class="px-6 py-4 bg-red-500/80 text-white rounded-lg text-center">
                   图片加载失败
                 </div>
               </div>
-              
+
               <!-- 图片 -->
-              <img 
-                ref="imageRef"
-                :src="`/api/screenshots/${currentScreenshot?.id}/raw`"
-                :alt="currentScreenshot?.filename"
-                class="preview-image"
-                :class="{ 'image-loading': currentImageState.loading }"
+              <img
+                :ref="el => setImageRef(el, screenshot)"
+                :src="`/api/screenshots/${screenshot.id}/raw`"
+                :alt="screenshot.filename"
+                class="max-w-full max-h-full object-contain select-none origin-center will-change-transform touch-none backface-hidden"
+                :class="{ 'opacity-50': getImageState(screenshot.id).loading }"
                 @click.stop
+                @load="handleImageLoad(screenshot.id)"
+                @error="handleImageError(screenshot.id)"
               />
             </div>
-          </Transition>
+          </div>
         </div>
       </div>
     </div>
@@ -375,101 +365,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.preview-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.preview-content {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-wrapper {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.image-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform-origin: center center;
-  width: 100%;
-  height: 100%;
-  will-change: transform;
-}
-
-.preview-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  user-select: none;
-  transform-origin: center center;
-  will-change: transform;
-  touch-action: none;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-
-.preview-image:not(.dragging) {
-  transition: transform 0.1s ease-out;
-}
-
-.control-button {
-  position: absolute;
-  border: none;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.45);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.3s;
-  z-index: 1001;
-  padding: 8px;
-}
-
-.control-button:hover {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.close-button {
-  top: 16px;
-  right: 16px;
-}
-
-.nav-button {
-  top: 50%;
-  transform: translateY(-50%);
-}
-
-.prev {
-  left: 16px;
-}
-
-.next {
-  right: 16px;
-}
-
-/* 过渡动画 */
+/* 保留背景渐变动画 */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -480,48 +376,17 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-.slide-enter-active,
-.slide-leave-active {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: absolute;
-  width: 100%;
-  height: 100%;
+/* 添加一些工具类，补充Tailwind不直接支持的属性 */
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-.slide-enter-from {
-  opacity: 0;
-  transform: translateX(30px);
+.dragging img {
+  transition: none !important;
 }
 
-.slide-leave-to {
-  opacity: 0;
-  transform: translateX(-30px);
+img:not(.dragging) {
+  transition: transform 0.1s ease-out;
 }
-
-.loading-overlay,
-.error-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1;
-}
-
-.error-message {
-  color: #fff;
-  background: rgba(255, 71, 87, 0.8);
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.image-loading {
-  opacity: 0.5;
-  transition: opacity 0.3s ease;
-}
-</style> 
+</style>
