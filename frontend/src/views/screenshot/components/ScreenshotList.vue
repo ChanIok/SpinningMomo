@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { NList, NListItem, NSpin } from 'naive-ui'
 import type { Screenshot } from '@/types/screenshot'
 
 const props = defineProps<{
@@ -26,34 +25,51 @@ function formatDate(timestamp: number): string {
 </script>
 
 <template>
-  <div class="screenshot-list">
-    <n-list>
-      <n-list-item v-for="screenshot in props.screenshots" :key="screenshot.id">
-        <div class="list-item-content">
-          <div class="thumbnail">
-            <img 
-              :src="screenshot.thumbnailPath" 
+  <div class="p-4">
+    <!-- 列表容器 -->
+    <div class="divide-y divide-gray-200">
+      <!-- 列表项 -->
+      <div
+        v-for="screenshot in props.screenshots"
+        :key="screenshot.id"
+        class="py-4 first:pt-0 last:pb-0"
+      >
+        <div class="flex gap-4 items-center">
+          <!-- 缩略图 -->
+          <div class="w-[120px] h-[68px] overflow-hidden rounded flex-shrink-0 bg-background">
+            <img
+              :src="screenshot.thumbnailPath"
               :alt="screenshot.filename"
               loading="lazy"
+              class="w-full h-full object-cover"
             />
           </div>
-          <div class="info">
-            <h3>{{ screenshot.filename }}</h3>
-            <p class="details">
+          <!-- 信息区域 -->
+          <div class="flex-1 min-w-0">
+            <h3 class="m-0 mb-2 text-base font-medium text-gray-900 truncate">
+              {{ screenshot.filename }}
+            </h3>
+            <div class="flex gap-4 text-sm text-gray-500">
               <span>{{ formatFileSize(screenshot.file_size) }}</span>
               <span>{{ screenshot.width }} x {{ screenshot.height }}</span>
               <span>{{ formatDate(screenshot.created_at) }}</span>
-            </p>
+            </div>
           </div>
         </div>
-      </n-list-item>
-    </n-list>
+      </div>
+    </div>
 
-    <div v-if="props.loading || props.hasMore" class="loading-more">
-      <n-spin v-if="props.loading" size="small" />
-      <button 
-        v-else-if="props.hasMore" 
-        class="load-more-btn"
+    <!-- 加载更多区域 -->
+    <div v-if="props.loading || props.hasMore" class="flex justify-center py-6">
+      <!-- 加载中状态 -->
+      <div
+        v-if="props.loading"
+        class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"
+      ></div>
+      <!-- 加载更多按钮 -->
+      <button
+        v-else-if="props.hasMore"
+        class="px-4 py-2 rounded bg-primary text-white cursor-pointer transition-opacity duration-200 hover:opacity-90"
         @click="emit('load-more')"
       >
         加载更多
@@ -61,67 +77,3 @@ function formatDate(timestamp: number): string {
     </div>
   </div>
 </template>
-
-<style scoped>
-.screenshot-list {
-  padding: 16px;
-}
-
-.list-item-content {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-.thumbnail {
-  width: 120px;
-  height: 68px;
-  overflow: hidden;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.info {
-  flex: 1;
-}
-
-.info h3 {
-  margin: 0 0 8px;
-  font-size: 16px;
-  color: var(--n-text-color);
-}
-
-.details {
-  margin: 0;
-  font-size: 14px;
-  color: var(--n-text-color-3);
-  display: flex;
-  gap: 16px;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 24px 0;
-}
-
-.load-more-btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  background-color: var(--n-primary-color);
-  color: white;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.load-more-btn:hover {
-  opacity: 0.9;
-}
-</style> 

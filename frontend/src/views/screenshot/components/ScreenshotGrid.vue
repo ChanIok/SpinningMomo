@@ -1,42 +1,50 @@
 <script setup lang="ts">
-import { NGrid, NGridItem, NSpin } from 'naive-ui'
 import type { Screenshot } from '@/types/screenshot'
+import ScreenshotCard from '@/components/screenshot/ScreenshotCard.vue'
 
 const props = defineProps<{
   screenshots: Screenshot[]
   loading: boolean
   hasMore: boolean
+  selectedId?: number
 }>()
 
 const emit = defineEmits<{
   (e: 'load-more'): void
+  (e: 'screenshot-click', screenshot: Screenshot): void
 }>()
+
+function handleScreenshotClick(screenshot: Screenshot) {
+  emit('screenshot-click', screenshot)
+}
 </script>
 
 <template>
-  <div class="screenshot-grid">
-    <n-grid
-      :x-gap="12"
-      :y-gap="12"
-      cols="2 s:3 m:4 l:5 xl:6 2xl:8"
-      responsive="screen"
+  <div class="p-3">
+    <!-- 使用Tailwind网格布局 -->
+    <div
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-3"
     >
-      <n-grid-item v-for="screenshot in props.screenshots" :key="screenshot.id">
-        <div class="screenshot-item">
-          <img
-            :src="screenshot.thumbnailPath"
-            :alt="screenshot.filename"
-            loading="lazy"
-          />
-        </div>
-      </n-grid-item>
-    </n-grid>
+      <screenshot-card
+        v-for="screenshot in props.screenshots"
+        :key="screenshot.id"
+        :screenshot="screenshot"
+        :selected="props.selectedId === screenshot.id"
+        @click="handleScreenshotClick"
+      />
+    </div>
 
-    <div v-if="props.loading || props.hasMore" class="loading-more">
-      <n-spin v-if="props.loading" size="small" />
+    <!-- 加载更多区域 -->
+    <div v-if="props.loading || props.hasMore" class="flex justify-center py-6">
+      <!-- 加载中状态 -->
+      <div
+        v-if="props.loading"
+        class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent"
+      ></div>
+      <!-- 加载更多按钮 -->
       <button
         v-else-if="props.hasMore"
-        class="load-more-btn"
+        class="px-4 py-2 rounded bg-primary text-white cursor-pointer transition-opacity duration-200 hover:opacity-90"
         @click="emit('load-more')"
       >
         加载更多
@@ -44,47 +52,3 @@ const emit = defineEmits<{
     </div>
   </div>
 </template>
-
-<style scoped>
-.screenshot-grid {
-  padding: 12px;
-}
-
-.screenshot-item {
-  aspect-ratio: 1;
-  overflow: hidden;
-  border-radius: 4px;
-  background-color: var(--n-card-color);
-  transition: background-color 0.2s ease;
-}
-
-.screenshot-item:hover {
-  background-color: var(--n-color-hover, rgba(0, 0, 0, 0.03));
-}
-
-.screenshot-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.loading-more {
-  display: flex;
-  justify-content: center;
-  padding: 24px 0;
-}
-
-.load-more-btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  background-color: var(--n-primary-color);
-  color: white;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.load-more-btn:hover {
-  opacity: 0.9;
-}
-</style>

@@ -1,144 +1,66 @@
 <template>
-  <n-card
-    class="screenshot-card"
-    :class="{ selected }"
-    hoverable
-    :bordered="false"
+  <div
+    class="cursor-pointer transition-colors duration-200 bg-transparent rounded overflow-hidden"
+    :class="{ 'outline-2 outline-primary': selected }"
     @click="handleClick"
   >
-    <div class="image-container">
-      <n-image
+    <div class="relative w-full aspect-square bg-background hover:bg-background-hover group">
+      <img
         :src="imageUrl"
         :alt="screenshot.filename"
-        object-fit="cover"
-        preview-disabled
-        lazy
-        class="screenshot-image"
+        loading="lazy"
+        class="w-full h-full object-cover"
       />
-      <div class="info-overlay">
-        <div class="screenshot-info">
-          <n-ellipsis class="filename">{{ screenshot.filename }}</n-ellipsis>
-          <div class="screenshot-metadata">
+      <div
+        class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/75 to-transparent p-3 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+      >
+        <div class="flex flex-col gap-1">
+          <div class="text-sm font-medium truncate">{{ screenshot.filename }}</div>
+          <div class="flex gap-2 text-xs opacity-90">
             <span>{{ formatDate(screenshot.created_at) }}</span>
             <span>{{ formatFileSize(screenshot.file_size) }}</span>
           </div>
         </div>
       </div>
     </div>
-  </n-card>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { Screenshot } from '@/types/screenshot';
-import { NCard, NEllipsis, NImage } from 'naive-ui';
+import { computed } from 'vue'
+import type { Screenshot } from '@/types/screenshot'
 
 const props = defineProps<{
-  screenshot: Screenshot;
-  selected?: boolean;
-}>();
+  screenshot: Screenshot
+  selected?: boolean
+}>()
 
 const emit = defineEmits<{
-  (e: 'click', screenshot: Screenshot): void;
-}>();
+  (e: 'click', screenshot: Screenshot): void
+}>()
 
-const imageUrl = computed(() => `/api/screenshots/${props.screenshot.id}/thumbnail`);
+const imageUrl = computed(() => `/api/screenshots/${props.screenshot.id}/thumbnail`)
 
 function handleClick() {
-  emit('click', props.screenshot);
+  emit('click', props.screenshot)
 }
 
 function formatDate(date: string | number): string {
-  const timestamp = typeof date === 'string' ? parseInt(date) : date;
-  const dateObj = new Date(timestamp * 1000);
-  return `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}`;
+  const timestamp = typeof date === 'string' ? parseInt(date) : date
+  const dateObj = new Date(timestamp * 1000)
+  return `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString()}`
 }
 
 function formatFileSize(bytes: number): string {
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let size = bytes;
-  let unitIndex = 0;
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = bytes
+  let unitIndex = 0
 
   while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex++;
+    size /= 1024
+    unitIndex++
   }
 
-  return `${size.toFixed(1)} ${units[unitIndex]}`;
+  return `${size.toFixed(1)} ${units[unitIndex]}`
 }
 </script>
-
-<style scoped>
-.screenshot-card {
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  background-color: transparent;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.screenshot-card:hover {
-  background-color: var(--n-color-hover, rgba(0, 0, 0, 0.03));
-}
-
-.screenshot-card.selected {
-  border: 2px solid var(--n-primary-color);
-}
-
-.image-container {
-  position: relative;
-  width: 100%;
-  padding-bottom: 66.67%; /* 3:2 aspect ratio */
-  background-color: rgba(0, 0, 0, 0.03);
-}
-
-.screenshot-image {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.screenshot-image :deep(img) {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-}
-
-.info-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
-  padding: 12px;
-  color: white;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.screenshot-card:hover .info-overlay {
-  opacity: 1;
-}
-
-.screenshot-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.filename {
-  font-size: 0.9em;
-  font-weight: 500;
-  line-height: 1.4;
-}
-
-.screenshot-metadata {
-  display: flex;
-  gap: 8px;
-  font-size: 0.8em;
-  opacity: 0.9;
-}
-</style>

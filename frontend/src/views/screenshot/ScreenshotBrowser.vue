@@ -2,8 +2,10 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useScreenshotListStore } from '@/stores/screenshot-list'
 import { useUIStore } from '@/stores'
+import type { Screenshot } from '@/types/screenshot'
 import ScreenshotGrid from '@/views/screenshot/components/ScreenshotGrid.vue'
 import ScreenshotList from '@/views/screenshot/components/ScreenshotList.vue'
+import ScreenshotPreview from '@/components/screenshot/ScreenshotPreview.vue'
 
 const props = defineProps<{
   folderId?: string
@@ -17,6 +19,10 @@ const showError = (msg: string) => alert(msg)
 const store = useScreenshotListStore()
 const uiStore = useUIStore()
 const browserContentRef = ref<HTMLElement | null>(null)
+
+// 预览相关的状态
+const showPreview = ref(false)
+const previewIndex = ref(0)
 
 // 加载截图
 async function loadScreenshots() {
@@ -68,6 +74,16 @@ onUnmounted(() => {
     browserContentRef.value.removeEventListener('scroll', handleScroll)
   }
 })
+
+// 处理截图点击事件
+function handleScreenshotClick(screenshot: Screenshot) {
+  // 找到点击的截图在数组中的索引
+  const index = store.screenshots.findIndex(s => s.id === screenshot.id)
+  if (index !== -1) {
+    previewIndex.value = index
+    showPreview.value = true
+  }
+}
 </script>
 
 <template>
@@ -75,16 +91,23 @@ onUnmounted(() => {
     id="screenshot-browser"
     class="h-full flex flex-col mr-2 bg-white dark:bg-gray-800 rounded-md"
   >
-    <div
-      ref="browserContentRef"
-      class="flex-1 overflow-y-auto"
-    >
+    <!-- 预览组件 -->
+    <screenshot-preview
+      v-model="showPreview"
+      v-model:currentIndex="previewIndex"
+      :screenshots="store.screenshots"
+      :initial-index="previewIndex"
+    />
+
+    <div ref="browserContentRef" class="flex-1 overflow-y-auto">
       <screenshot-grid
         v-if="uiStore.viewMode === 'grid'"
         :screenshots="store.screenshots"
         :loading="store.loading"
         :has-more="store.hasMore"
+        :selected-id="showPreview ? store.screenshots[previewIndex]?.id : undefined"
         @load-more="loadScreenshots"
+        @screenshot-click="handleScreenshotClick"
       />
 
       <screenshot-list

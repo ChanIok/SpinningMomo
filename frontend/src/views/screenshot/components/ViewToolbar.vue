@@ -11,14 +11,22 @@ const uiStore = useUIStore()
     <div class="flex gap-1">
       <button
         class="p-1.5 rounded-md transition-colors"
-        :class="uiStore.viewMode === 'grid' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
+        :class="
+          uiStore.viewMode === 'grid'
+            ? 'bg-gray-100 text-gray-600 dark:bg-gray-900/50 dark:text-gray-400'
+            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+        "
         @click="uiStore.setViewMode('grid')"
       >
         <grid-outline class="w-5 h-5" />
       </button>
       <button
         class="p-1.5 rounded-md transition-colors"
-        :class="uiStore.viewMode === 'list' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400' : 'hover:bg-gray-100 dark:hover:bg-gray-700'"
+        :class="
+          uiStore.viewMode === 'list'
+            ? 'bg-gray-100 text-gray-600 dark:bg-gray-900/50 dark:text-gray-400'
+            : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+        "
         @click="uiStore.setViewMode('list')"
       >
         <list-outline class="w-5 h-5" />
