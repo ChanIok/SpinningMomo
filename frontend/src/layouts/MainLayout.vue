@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import AppSidebar from '@/layouts/AppSidebar.vue'
-import AppContent from '@/layouts/AppContent.vue'
 import AppHeader from '@/layouts/AppHeader.vue'
 import AppFooter from '@/layouts/AppFooter.vue'
+import AppActivityBar from '@/layouts/AppActivityBar.vue'
+import AppSideBar from '@/layouts/AppSideBar.vue'
+import AppContent from '@/layouts/AppContent.vue'
+import AppAuxiliaryBar from '@/layouts/AppAuxiliaryBar.vue'
 </script>
 
 <template>
@@ -12,8 +14,17 @@ import AppFooter from '@/layouts/AppFooter.vue'
 
     <!-- Main Content -->
     <main class="flex flex-1 overflow-hidden">
-      <app-sidebar />
+      <!-- 活动栏 -->
+      <app-activity-bar />
+
+      <!-- 侧边栏 -->
+      <app-side-bar />
+
+      <!-- 内容区 -->
       <app-content />
+
+      <!-- 辅助栏 -->
+      <app-auxiliary-bar />
     </main>
 
     <!-- Footer -->
