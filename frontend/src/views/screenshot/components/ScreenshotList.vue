@@ -5,10 +5,12 @@ const props = defineProps<{
   screenshots: Screenshot[]
   loading: boolean
   hasMore: boolean
+  selectedId?: number // 新增：当前选中的截图ID
 }>()
 
 const emit = defineEmits<{
   (e: 'load-more'): void
+  (e: 'screenshot-click', id: number): void // 新增：点击截图事件
 }>()
 
 function formatFileSize(bytes: number): string {
@@ -22,6 +24,11 @@ function formatFileSize(bytes: number): string {
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleString()
 }
+
+// 处理截图点击
+function handleScreenshotClick(id: number) {
+  emit('screenshot-click', id)
+}
 </script>
 
 <template>
@@ -32,7 +39,11 @@ function formatDate(timestamp: number): string {
       <div
         v-for="screenshot in props.screenshots"
         :key="screenshot.id"
-        class="py-4 first:pt-0 last:pb-0"
+        class="py-4 first:pt-0 last:pb-0 cursor-pointer transition-colors"
+        :class="{
+          'bg-gray-100 dark:bg-gray-800': props.selectedId === screenshot.id
+        }"
+        @click="handleScreenshotClick(screenshot.id)"
       >
         <div class="flex gap-4 items-center">
           <!-- 缩略图 -->
@@ -46,10 +57,10 @@ function formatDate(timestamp: number): string {
           </div>
           <!-- 信息区域 -->
           <div class="flex-1 min-w-0">
-            <h3 class="m-0 mb-2 text-base font-medium text-gray-900 truncate">
+            <h3 class="m-0 mb-2 text-base font-medium text-gray-900 dark:text-gray-100 truncate">
               {{ screenshot.filename }}
             </h3>
-            <div class="flex gap-4 text-sm text-gray-500">
+            <div class="flex gap-4 text-sm text-gray-500 dark:text-gray-400">
               <span>{{ formatFileSize(screenshot.file_size) }}</span>
               <span>{{ screenshot.width }} x {{ screenshot.height }}</span>
               <span>{{ formatDate(screenshot.created_at) }}</span>

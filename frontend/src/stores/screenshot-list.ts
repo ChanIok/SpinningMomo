@@ -10,9 +10,23 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
     const hasMore = ref(true);
     const lastId = ref<number | null>(null);
     const error = ref<string | null>(null);
+    const currentIndex = ref<number>(-1); // 新增：当前选中的截图索引
 
     // Getters
     const isEmpty = computed(() => screenshots.value.length === 0);
+
+    // 新增：当前选中的截图
+    const currentScreenshot = computed(() => {
+        if (currentIndex.value >= 0 && currentIndex.value < screenshots.value.length) {
+            return screenshots.value[currentIndex.value];
+        }
+        return null;
+    });
+
+    // 新增：当前选中的截图ID
+    const currentScreenshotId = computed(() => {
+        return currentScreenshot.value?.id;
+    });
 
     // Actions
     async function loadScreenshots(params?: Partial<ScreenshotParams>) {
@@ -56,6 +70,14 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
         hasMore.value = true;
         lastId.value = null;
         error.value = null;
+        currentIndex.value = -1; // 重置当前选中的截图索引
+    }
+
+    // 新增：设置当前选中的截图索引
+    function setCurrentIndex(index: number) {
+        if (index >= -1 && index < screenshots.value.length) {
+            currentIndex.value = index;
+        }
     }
 
     return {
@@ -65,13 +87,17 @@ export const useScreenshotListStore = defineStore('screenshotList', () => {
         hasMore,
         lastId,
         error,
-        
+        currentIndex,
+
         // Getters
         isEmpty,
-        
+        currentScreenshot,
+        currentScreenshotId,
+
         // Actions
         loadScreenshots,
         removeScreenshot,
-        reset
+        reset,
+        setCurrentIndex
     };
-}); 
+});

@@ -4,7 +4,6 @@ import { useScreenshotListStore } from '@/stores/screenshot-list'
 import { useUIStore } from '@/stores'
 import type { Screenshot } from '@/types/screenshot'
 import ScreenshotGrid from '@/views/screenshot/components/ScreenshotGrid.vue'
-import ScreenshotList from '@/views/screenshot/components/ScreenshotList.vue'
 import ScreenshotPreview from '@/components/screenshot/ScreenshotPreview.vue'
 
 const props = defineProps<{
@@ -80,8 +79,14 @@ function handleScreenshotClick(screenshot: Screenshot) {
   // 找到点击的截图在数组中的索引
   const index = store.screenshots.findIndex(s => s.id === screenshot.id)
   if (index !== -1) {
-    previewIndex.value = index
-    showPreview.value = true
+    if (uiStore.viewMode === 'grid') {
+      // 网格视图下显示弹出式预览
+      previewIndex.value = index
+      showPreview.value = true
+    } else {
+      // 列表视图下设置当前选中的截图
+      store.setCurrentIndex(index)
+    }
   }
 }
 </script>
@@ -91,8 +96,9 @@ function handleScreenshotClick(screenshot: Screenshot) {
     id="screenshot-browser"
     class="h-full flex flex-col mr-2 bg-white dark:bg-gray-800 rounded-md"
   >
-    <!-- 预览组件 -->
+    <!-- 弹出式预览组件（仅在网格视图下使用） -->
     <screenshot-preview
+      v-if="uiStore.viewMode === 'grid'"
       v-model="showPreview"
       v-model:currentIndex="previewIndex"
       :screenshots="store.screenshots"
@@ -100,6 +106,7 @@ function handleScreenshotClick(screenshot: Screenshot) {
     />
 
     <div ref="browserContentRef" class="flex-1 overflow-y-auto">
+      <!-- 网格视图 -->
       <screenshot-grid
         v-if="uiStore.viewMode === 'grid'"
         :screenshots="store.screenshots"
@@ -110,13 +117,22 @@ function handleScreenshotClick(screenshot: Screenshot) {
         @screenshot-click="handleScreenshotClick"
       />
 
-      <screenshot-list
-        v-else
-        :screenshots="store.screenshots"
-        :loading="store.loading"
-        :has-more="store.hasMore"
-        @load-more="loadScreenshots"
-      />
+      <!-- 列表视图下显示预览 -->
+      <div v-else class="h-full flex flex-col items-center justify-center">
+        <!-- 如果有选中的截图，显示预览 -->
+        <div v-if="store.currentScreenshot" class="w-full h-full flex items-center justify-center p-4">
+          <img
+            :src="`/api/screenshots/${store.currentScreenshot.id}/raw`"
+            :alt="store.currentScreenshot.filename"
+            class="max-w-full max-h-full object-contain"
+          />
+        </div>
+
+        <!-- 如果没有选中的截图，显示提示 -->
+        <div v-else class="text-center text-gray-500 dark:text-gray-400">
+          <p>请从左侧列表选择一张截图进行预览</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
