@@ -68,12 +68,10 @@ add_executable(SpinningMomo WIN32
 target_link_libraries(SpinningMomo PRIVATE
     dwmapi       # DWM API
     windowsapp   # Windows Runtime API
-    d3d11        # Direct3D 11
-    shell32      # Windows Shell API
-    dxgi         # DXGI
-    dxguid       # DXGI GUID definitions
     RuntimeObject # WinRT support
+    d3d11        # Direct3D 11
+    dxgi         # DXGI
     d3dcompiler  # D3D Compiler
-    Shcore       # Shell Core API
+    shell32      # Windows Shell API
     Shlwapi      # Shell Light-Weight API
 )
