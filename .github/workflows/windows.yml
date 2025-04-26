@@ -25,34 +25,30 @@ jobs:
       with:
         fetch-depth: 0  # 获取所有历史记录和标签
 
-    - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1.3
-      with:
-        vs-version: '[17.0,)'  # 使用 Visual Studio 2022 或更高版本
-        msbuild-architecture: x64
-
-    - name: Set up Visual Studio shell
-      uses: egor-tensin/vs-shell@v2
+    - name: Set up Visual Studio Developer Environment
+      uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
 
     - name: Configure CMake
+      env:
+        PreferredToolArchitecture: x64
       run: |
-        cmake -B ${{github.workspace}}/build `
+        cmake -B ${{github.workspace}}/out/build/x64-Release `
+          -G "Ninja" `
           -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} `
-          -DCMAKE_GENERATOR_PLATFORM=x64 `
-          -DCMAKE_SYSTEM_VERSION="10.0.22621.0"
+          -DCMAKE_CXX_COMPILER=cl
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+    - name: Build with Ninja
+      run: cmake --build ${{github.workspace}}/out/build/x64-Release --config ${{env.BUILD_TYPE}} --parallel
 
     - name: Create Release Package
       run: |
         # 创建发布目录
         mkdir ${{github.workspace}}/release
-        
+
         # 复制主程序和文档
-        copy ${{github.workspace}}/build/Release/SpinningMomo.exe ${{github.workspace}}/release/
+        copy ${{github.workspace}}/out/build/x64-Release/SpinningMomo.exe ${{github.workspace}}/release/
         copy ${{github.workspace}}/docs/重要_使用前必看.html ${{github.workspace}}/release/
         copy ${{github.workspace}}/LICENSE ${{github.workspace}}/release/
 
@@ -88,7 +84,7 @@ jobs:
         # 获取当前标签和上一个标签
         $CURRENT_TAG = "${{github.ref_name}}"
         $PREV_TAG = $(git describe --tags --abbrev=0 "$CURRENT_TAG^" 2>$null)
-        
+
         if (-not $PREV_TAG) {
           # 如果没有上一个标签，获取所有提交
           $COMMITS = $(git log --pretty=format:"%s|%b" --no-merges)
@@ -96,25 +92,25 @@ jobs:
           # 获取从上一个标签到当前标签的所有提交
           $COMMITS = $(git log "$PREV_TAG..$CURRENT_TAG" --pretty=format:"%s|%b" --no-merges)
         }
-        
+
         $FORMATTED_COMMITS = $COMMITS -split "`n" | ForEach-Object {
           $parts = $_ -split '\|'
           $title = $parts[0].Trim()
           $body = if ($parts.Length -gt 1) { $parts[1].Trim() } else { "" }
-          
+
           $output = "- $title"
           if ($body) {
             $output += "`n  $($body -replace "`n", "`n  ")"
           }
           $output
         }
-        
+
         $NOTES = @"
         ## 更新内容
 
         $($FORMATTED_COMMITS -join "`n")
         "@
-        
+
         # 使用环境文件来存储多行内容
         $NOTES | Out-File -FilePath release_notes.txt -Encoding utf8
         echo "RELEASE_NOTES<<EOF" >> $env:GITHUB_ENV

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 project(SpinningMomo)
 
 # 设置C++标准
@@ -23,7 +23,7 @@ if(WIN32)
         if(BUILD_TYPE_UPPER STREQUAL "RELEASE")
             # 设置静态运行时库
             set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
-            
+
             # 核心优化选项
             add_compile_options(/O2 /GL)
             add_link_options(/LTCG /OPT:REF /OPT:ICF)
