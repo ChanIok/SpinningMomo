@@ -119,15 +119,19 @@ void ConfigManager::LoadWindowConfig() {
                               Constants::WINDOW_TITLE,
                               L"", buffer, _countof(buffer),
                               m_configPath.c_str()) > 0) {
-        m_windowTitle = buffer;
+        m_windowTitle = buffer; // 直接赋值，期望引号已被去除
+    } else {
+        m_windowTitle.clear(); // 确保如果读取失败或为空，则为空
     }
 }
 
 void ConfigManager::SaveWindowConfig() {
     if (!m_windowTitle.empty()) {
+        // 用双引号包裹标题
+        std::wstring titleToWrite = L"\"" + m_windowTitle + L"\"";
         WritePrivateProfileStringW(Constants::WINDOW_SECTION,
                                 Constants::WINDOW_TITLE,
-                                m_windowTitle.c_str(),
+                                titleToWrite.c_str(), //写入带引号的标题
                                 m_configPath.c_str());
     }
 }

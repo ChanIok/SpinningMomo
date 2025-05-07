@@ -248,15 +248,9 @@ bool WindowUtils::EnsureD3DResources() {
 HWND WindowUtils::FindTargetWindow(const std::wstring& configuredTitle) {
     HWND gameWindow = NULL;
     
-    // 辅助函数：去除字符串右侧空格
-    auto trimRight = [](const std::wstring& str) -> std::wstring {
-        size_t end = str.find_last_not_of(L' ');
-        return (end == std::wstring::npos) ? L"" : str.substr(0, end + 1);
-    };
-    
-    // 辅助函数：比较窗口标题
-    auto compareWindowTitle = [&trimRight](const std::wstring& title1, const std::wstring& title2) -> bool {
-        return trimRight(title1) == trimRight(title2);
+    // 辅助函数：直接比较窗口标题 (移除 trimRight)
+    auto compareWindowTitle = [](const std::wstring& title1, const std::wstring& title2) -> bool {
+        return title1 == title2; // 精确比较
     };
     
     // 1. 如果有配置的标题，先尝试使用配置的标题查找
@@ -273,7 +267,7 @@ HWND WindowUtils::FindTargetWindow(const std::wstring& configuredTitle) {
     // 2. 如果找不到，尝试预设的游戏窗口标题
     if (!gameWindow) {
         // 先尝试查找中文标题
-        gameWindow = FindWindow(NULL, L"无限暖暖  ");
+        gameWindow = FindWindow(NULL, L"无限暖暖  "); // 精确匹配，包括两个尾部空格
         if (!gameWindow) {
             // 如果找不到中文标题，尝试英文标题
             gameWindow = FindWindow(NULL, L"Infinity Nikki  ");
