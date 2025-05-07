@@ -202,8 +202,6 @@ Right-click or left-click the tray icon to:
 ### Notes
 
 - System Requirements: Windows 10 or above
-- [Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
-  - Install this runtime if you encounter missing DLL errors
 - Higher resolutions may affect game performance, please adjust according to your device capabilities
 - It's recommended to test quality comparison before shooting to choose the most suitable settings
 

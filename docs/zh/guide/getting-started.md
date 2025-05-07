@@ -16,7 +16,6 @@
 
 ::: warning 运行环境
 - **操作系统**：Windows 10 1803 (Build 17134) 或更高版本
-- **运行库**：[Visual C++ Redistributable 2015-2022](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 - **显卡/驱动**：支持 DirectX 11 的显卡和最新驱动
 - **Windows 功能**：
   - 图形捕获功能 Windows 10 1803+
