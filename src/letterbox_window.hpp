@@ -1,7 +1,6 @@
 #pragma once
 #include <windows.h>
-#include <atomic>
-#include "thread_raii.hpp"
+#include <thread>
 
 // 黑边模式窗口类
 // 创建一个全屏黑色背景窗口，用于实现信箱模式（Letterbox Mode）
@@ -16,13 +15,12 @@ private:
     bool m_isVisible;           // 窗口是否可见
     
     // 线程和钩子相关
-    ThreadRAII m_eventThread;   // 事件监听线程
-    std::atomic<bool> m_running{false};  // 线程运行状态
+    std::jthread m_eventThread;   // 事件监听线程
     HWINEVENTHOOK m_eventHook{nullptr}; // 窗口事件钩子句柄
     DWORD m_targetProcessId{0}; // 目标进程ID
 
     // 事件监听线程处理函数
-    void EventThreadProc();
+    void EventThreadProc(std::stop_token stoken);
 
     // 静态回调函数
     static void CALLBACK WinEventProc(

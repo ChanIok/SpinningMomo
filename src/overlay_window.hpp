@@ -1,13 +1,13 @@
 #pragma once
 #include <windows.h>
 #include <mutex>
+#include <thread>
 #include <d3d11.h>
 #include <dxgi1_6.h>
 #include <winrt/base.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
 #include <wrl/client.h>
-#include "thread_raii.hpp"
 #include "win_timer.hpp"
 
 class OverlayWindow {
@@ -22,7 +22,7 @@ public:
     void RestoreGameWindow(bool withDelay = false);
     HWND GetHwnd() const { return m_hwnd; }
     void SetLetterboxMode(bool enabled) { m_useLetterboxMode = enabled; }
-    bool IsCapturing() const { return m_running.load(); }
+    bool IsCapturing() const { return m_captureAndRenderThread.joinable(); }
     bool IsVisible() const { return IsWindowVisible(m_hwnd); }
 
 private:
@@ -103,11 +103,10 @@ private:
     bool m_createNewSrv = true;
 
     // 线程相关成员
-    ThreadRAII m_captureAndRenderThread;
-    ThreadRAII m_hookThread;
-    ThreadRAII m_windowManagerThread;
+    std::jthread m_captureAndRenderThread;
+    std::jthread m_hookThread;
+    std::jthread m_windowManagerThread;
     std::mutex m_captureStateMutex;
-    std::atomic<bool> m_running{false};
     WinTimer m_cleanupTimer;  // 清理资源的定时器
 
     // 钩子相关
@@ -127,7 +126,7 @@ private:
     void PerformRendering();
 
     // 线程处理函数
-    void CaptureAndRenderThreadProc();
-    void HookThreadProc();
-    void WindowManagerThreadProc();
+    void CaptureAndRenderThreadProc(std::stop_token stoken);
+    void HookThreadProc(std::stop_token stoken);
+    void WindowManagerThreadProc(std::stop_token stoken);
 };

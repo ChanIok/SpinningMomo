@@ -167,11 +167,10 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
     LOG_DEBUG("Overlay window dimensions: %dx%d", m_windowWidth, m_windowHeight);
 
     // 启动工作线程
-    m_running.store(true);
     try {
-        m_captureAndRenderThread = ThreadRAII([this]() { CaptureAndRenderThreadProc(); });
-        m_hookThread = ThreadRAII([this]() { HookThreadProc(); });
-        m_windowManagerThread = ThreadRAII([this]() { WindowManagerThreadProc(); });
+        m_captureAndRenderThread = std::jthread([this](std::stop_token stoken) { CaptureAndRenderThreadProc(stoken); });
+        m_hookThread = std::jthread([this](std::stop_token stoken) { HookThreadProc(stoken); });
+        m_windowManagerThread = std::jthread([this](std::stop_token stoken) { WindowManagerThreadProc(stoken); });
         return true;
     }
     catch (const std::exception& e) {
@@ -182,7 +181,7 @@ bool OverlayWindow::StartCapture(HWND targetWindow, int width, int height) {
 }
 
 // 线程处理函数
-void OverlayWindow::CaptureAndRenderThreadProc() {
+void OverlayWindow::CaptureAndRenderThreadProc(std::stop_token stoken) {
     LOG_DEBUG("Starting capture and render thread");
     winrt::init_apartment();
 
@@ -191,7 +190,7 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
-    if (!m_running) {
+    if (stoken.stop_requested()) {
         LOG_DEBUG("Exiting capture and render thread");
         return;
     }
@@ -213,14 +212,14 @@ void OverlayWindow::CaptureAndRenderThreadProc() {
 
     // 消息处理和渲染循环
     MSG msg;
-    while (m_running && GetMessage(&msg, NULL, 0, 0)) {
+    while (!stoken.stop_requested() && GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
     LOG_DEBUG("Exiting capture and render thread");
 }
 
-void OverlayWindow::HookThreadProc() {
+void OverlayWindow::HookThreadProc(std::stop_token stoken) {
     // 设置鼠标钩子
     m_mouseHook = SetWindowsHookEx(WH_MOUSE_LL, MouseHookProc, 
                                   GetModuleHandle(NULL), 0);
@@ -250,7 +249,7 @@ void OverlayWindow::HookThreadProc() {
     }
     
     MSG msg;
-    while (m_running && GetMessage(&msg, NULL, 0, 0)) {
+    while (!stoken.stop_requested() && GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -266,7 +265,7 @@ void OverlayWindow::HookThreadProc() {
     }
 }
 
-void OverlayWindow::WindowManagerThreadProc() {
+void OverlayWindow::WindowManagerThreadProc(std::stop_token stoken) {
     // 创建一个隐藏的窗口来处理定时器消息
     WNDCLASSEXW wc = {};
     wc.cbSize = sizeof(WNDCLASSEXW);
@@ -294,7 +293,7 @@ void OverlayWindow::WindowManagerThreadProc() {
     SetTimer(timerWindow, 1, 16, NULL);
 
     MSG msg;
-    while (m_running && GetMessage(&msg, NULL, 0, 0)) {
+    while (!stoken.stop_requested() && GetMessage(&msg, NULL, 0, 0)) {
         switch (msg.message) {
         case WM_TIMER:
             // 根据鼠标位置更新游戏窗口位置
@@ -363,7 +362,7 @@ void CALLBACK OverlayWindow::WinEventProc(
     DWORD idEventThread,
     DWORD dwmsEventTime
 ) {
-    if (!instance || !instance->m_running || !instance->m_timerWindow) return;
+    if (!instance || !instance->IsCapturing() || !instance->m_timerWindow) return;
 
     // 当游戏窗口被激活时，发送消息到窗口管理线程
     if (event == EVENT_SYSTEM_FOREGROUND) {
@@ -483,40 +482,42 @@ bool OverlayWindow::InitializeCapture() {
 }
 
 void OverlayWindow::StopCapture(bool hideWindow) {
-    if (!m_running.load()) {
+    if (!IsCapturing()) {
         LOG_ERROR("Capture already stopped");
         return;
     }
 
-    // 停止标志
-    m_running.store(false);
+    // 请求所有线程停止
+    m_captureAndRenderThread.request_stop();
+    m_hookThread.request_stop();
+    m_windowManagerThread.request_stop();
 
     if(m_framePool){
         m_framePool.FrameArrived(m_frameArrivedToken);
     }
 
-    // 向线程发送退出消息
-    if (m_hookThread.getId() != std::thread::id()) {
-        PostThreadMessage(GetThreadId(m_hookThread.get()->native_handle()), WM_QUIT, 0, 0);
+    // 向线程发送退出消息（兼容现有消息循环）
+    if (m_hookThread.get_id() != std::thread::id()) {
+        PostThreadMessage(GetThreadId(m_hookThread.native_handle()), WM_QUIT, 0, 0);
     }
-    if (m_captureAndRenderThread.getId() != std::thread::id()) {
-        PostThreadMessage(GetThreadId(m_captureAndRenderThread.get()->native_handle()), WM_QUIT, 0, 0);
+    if (m_captureAndRenderThread.get_id() != std::thread::id()) {
+        PostThreadMessage(GetThreadId(m_captureAndRenderThread.native_handle()), WM_QUIT, 0, 0);
     }
-    if (m_windowManagerThread.getId() != std::thread::id()) {
-        PostThreadMessage(GetThreadId(m_windowManagerThread.get()->native_handle()), WM_QUIT, 0, 0);
+    if (m_windowManagerThread.get_id() != std::thread::id()) {
+        PostThreadMessage(GetThreadId(m_windowManagerThread.native_handle()), WM_QUIT, 0, 0);
     }
 
-    // 等待线程结束
-    if (m_captureAndRenderThread.get() && m_captureAndRenderThread.get()->joinable()) {
-        m_captureAndRenderThread.get()->join();
+    // jthread会在析构时自动join，但我们也可以显式join
+    if (m_captureAndRenderThread.joinable()) {
+        m_captureAndRenderThread.join();
     }
     LOG_DEBUG("Capture and render thread joined");
-    if (m_hookThread.get() && m_hookThread.get()->joinable()) {
-        m_hookThread.get()->join();
+    if (m_hookThread.joinable()) {
+        m_hookThread.join();
     }
     LOG_DEBUG("Hook thread joined");
-    if (m_windowManagerThread.get() && m_windowManagerThread.get()->joinable()) {
-        m_windowManagerThread.get()->join();
+    if (m_windowManagerThread.joinable()) {
+        m_windowManagerThread.join();
     }
     LOG_DEBUG("Window manager thread joined");
         if (m_captureSession) {
@@ -938,7 +939,7 @@ bool OverlayWindow::CreateShaderResources() {
 }
 
 void OverlayWindow::OnFrameArrived() {
-    if (!m_running) return;
+    if (!IsCapturing()) return;
     if (!m_framePool) return;
     if (auto frame = m_framePool.TryGetNextFrame()) {
         auto frameTexture = GetDXGIInterfaceFromObject<ID3D11Texture2D>(frame.Surface());

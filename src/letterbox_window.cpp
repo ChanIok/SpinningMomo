@@ -71,19 +71,17 @@ bool LetterboxWindow::Initialize(HINSTANCE hInstance) {
 
 bool LetterboxWindow::StartEventThread() {
     // 如果线程已经在运行，不需要再次启动
-    if (m_running.load()) {
+    if (m_eventThread.joinable()) {
         return true;
     }
     
     // 启动事件监听线程
-    m_running.store(true);
     try {
-        m_eventThread = ThreadRAII([this]() { EventThreadProc(); });
+        m_eventThread = std::jthread([this](std::stop_token stoken) { EventThreadProc(stoken); });
         LOG_DEBUG("Letterbox event thread started");
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR("Failed to start letterbox event thread: %s", e.what());
-        m_running.store(false);
         return false;
     }
 }
@@ -139,18 +137,13 @@ void LetterboxWindow::Shutdown() {
     }
     
     // 停止事件监听线程
-    if (m_running.load()) {
-        m_running.store(false);
-    }
-
-    // 向线程发送退出消息
-    if (m_eventThread.getId() != std::thread::id()) {
-        PostThreadMessage(GetThreadId(m_eventThread.get()->native_handle()), WM_QUIT, 0, 0);
+    if (m_eventThread.joinable()) {
+        m_eventThread.request_stop();
     }
 
     // 等待线程结束
-    if (m_eventThread.get() && m_eventThread.get()->joinable()) {
-        m_eventThread.get()->join();
+    if (m_eventThread.joinable()) {
+        m_eventThread.join();
     }
 
     // 清理钩子
@@ -203,10 +196,10 @@ bool LetterboxWindow::IsVisible() const {
 }
 
 bool LetterboxWindow::IsEventThreadRunning() const {
-    return m_running.load();
+    return m_eventThread.joinable();
 }
 
-void LetterboxWindow::EventThreadProc() {
+void LetterboxWindow::EventThreadProc(std::stop_token stoken) {
     LOG_DEBUG("Starting letterbox event thread");
     
     // 注册消息窗口类
@@ -260,7 +253,7 @@ void LetterboxWindow::EventThreadProc() {
     
     // 消息循环
     MSG msg;
-    while (m_running.load() && GetMessage(&msg, NULL, 0, 0)) {
+    while (!stoken.stop_requested() && GetMessage(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -290,7 +283,7 @@ void CALLBACK LetterboxWindow::WinEventProc(
     DWORD idEventThread,
     DWORD dwmsEventTime
 ) {
-    if (!instance || !instance->m_running.load() || !instance->m_messageWindow) return;
+    if (!instance || !instance->m_eventThread.joinable() || !instance->m_messageWindow) return;
     
     // 只处理与目标窗口相关的事件
     if (hwnd == instance->m_targetWindow) {
