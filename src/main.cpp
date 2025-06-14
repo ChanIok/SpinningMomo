@@ -269,44 +269,44 @@ private:
         osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
         
         // 使用RtlGetVersion
-        HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-        if (ntdll) {
-            typedef NTSTATUS(WINAPI* RtlGetVersionFunc)(OSVERSIONINFOEXW*);
-            RtlGetVersionFunc RtlGetVersion = (RtlGetVersionFunc)GetProcAddress(ntdll, "RtlGetVersion");
-            if (RtlGetVersion) {
-                RtlGetVersion(&osvi);
-                const char* windowsName = "Windows";
-                if (osvi.dwMajorVersion == 10) {
-                    if (osvi.dwBuildNumber >= 22000) {
-                        windowsName = "Windows 11";
-                    } else {
-                        windowsName = "Windows 10";
-                    }
-                } else {
-                    windowsName = "Windows";
-                }
+        // HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+        // if (ntdll) {
+        //     typedef NTSTATUS(WINAPI* RtlGetVersionFunc)(OSVERSIONINFOEXW*);
+        //     RtlGetVersionFunc RtlGetVersion = (RtlGetVersionFunc)GetProcAddress(ntdll, "RtlGetVersion");
+        //     if (RtlGetVersion) {
+        //         RtlGetVersion(&osvi);
+        //         const char* windowsName = "Windows";
+        //         if (osvi.dwMajorVersion == 10) {
+        //             if (osvi.dwBuildNumber >= 22000) {
+        //                 windowsName = "Windows 11";
+        //             } else {
+        //                 windowsName = "Windows 10";
+        //             }
+        //         } else {
+        //             windowsName = "Windows";
+        //         }
                 
-                LOG_INFO("%s Version: %d.%d.%d",
-                    windowsName, osvi.dwMajorVersion, 
-                    osvi.dwMinorVersion, osvi.dwBuildNumber);
-            }
-        }
+        //         LOG_INFO("%s Version: %d.%d.%d",
+        //             windowsName, osvi.dwMajorVersion, 
+        //             osvi.dwMinorVersion, osvi.dwBuildNumber);
+        //     }
+        // }
     
-        // 获取显示器信息
-        int monitorCount = GetSystemMetrics(SM_CMONITORS);
-        int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-        int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-        LOG_INFO("Display: Monitors: %d, Primary screen: %dx%d", 
-            monitorCount, screenWidth, screenHeight);
+        // // 获取显示器信息
+        // int monitorCount = GetSystemMetrics(SM_CMONITORS);
+        // int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        // int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+        // LOG_INFO("Display: Monitors: %d, Primary screen: %dx%d", 
+        //     monitorCount, screenWidth, screenHeight);
     
-        // 获取DPI设置
-        HDC hdc = GetDC(NULL);
-        if (hdc) {
-            int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
-            int dpiY = GetDeviceCaps(hdc, LOGPIXELSY);
-            LOG_INFO("DPI Settings: %dx%d", dpiX, dpiY);
-            ReleaseDC(NULL, hdc);
-        }
+        // // 获取DPI设置
+        // HDC hdc = GetDC(NULL);
+        // if (hdc) {
+        //     int dpiX = GetDeviceCaps(hdc, LOGPIXELSX);
+        //     int dpiY = GetDeviceCaps(hdc, LOGPIXELSY);
+        //     LOG_INFO("DPI Settings: %dx%d", dpiX, dpiY);
+        //     ReleaseDC(NULL, hdc);
+        // }
     }
 
     // 注册全局键盘钩子
