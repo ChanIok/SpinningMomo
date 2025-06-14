@@ -1,9 +1,11 @@
 #pragma once
 #include <windows.h>
 #include "constants.hpp"
-#include "logger.hpp" 
+// #include "logger.hpp" 
 #include <string>
 #include <vector>
+// import Utils.Logger;
+
 
 // 配置加载结果
 struct ConfigLoadResult {
@@ -31,7 +33,7 @@ public:
     void LoadTaskbarConfig();
     void LoadMenuConfig();
     void LoadGameAlbumConfig();
-    void LoadLogConfig();
+    // void LoadLogConfig();
     void LoadLetterboxConfig();
     
     // 配置保存
@@ -61,7 +63,7 @@ public:
     const std::vector<std::wstring>& GetMenuItemsToShow() const { return m_menuItemsToShow; }
     const std::vector<std::wstring>& GetAspectRatioItems() const { return m_aspectRatioItems; }
     const std::vector<std::wstring>& GetResolutionItems() const { return m_resolutionItems; }
-    LogLevel GetLogLevel() const { return m_logLevel; }
+    // LogLevel GetLogLevel() const { return m_logLevel; }
     
     // Setters
     void SetWindowTitle(const std::wstring& title) { m_windowTitle = title; }
@@ -95,5 +97,5 @@ private:
     std::vector<std::wstring> m_menuItemsToShow;  // 要显示的菜单项类型
     std::vector<std::wstring> m_aspectRatioItems; // 要显示的宽高比项
     std::vector<std::wstring> m_resolutionItems;  // 要显示的分辨率项
-    LogLevel m_logLevel = LogLevel::INFO;  // 默认为 INFO 级别
+    // LogLevel m_logLevel = LogLevel::INFO;  // 默认为 INFO 级别
 }; 

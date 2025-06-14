@@ -23,7 +23,7 @@ void ConfigManager::Initialize() {
     // 检查配置文件是否存在
     if (GetFileAttributes(m_configPath.c_str()) == INVALID_FILE_ATTRIBUTES) {
     // 创建默认配置文件
-    WritePrivateProfileStringW(Constants::LOGGER_SECTION, Constants::LOGGER_LEVEL, L"INFO", m_configPath.c_str());
+    // WritePrivateProfileStringW(Constants::LOGGER_SECTION, Constants::LOGGER_LEVEL, L"INFO", m_configPath.c_str());
     WritePrivateProfileStringW(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, L"", m_configPath.c_str());
     WritePrivateProfileStringW(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, L"3", m_configPath.c_str());
     WritePrivateProfileStringW(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, L"82", m_configPath.c_str());
@@ -55,29 +55,29 @@ void ConfigManager::LoadAllConfigs() {
     LoadTaskbarConfig();
     LoadMenuConfig();
     LoadGameAlbumConfig();
-    LoadLogConfig();
+    // LoadLogConfig();
     LoadLetterboxConfig();
 }
 
-void ConfigManager::LoadLogConfig() {
-    wchar_t buffer[32];
-    if (GetPrivateProfileStringW(Constants::LOGGER_SECTION, 
-                               Constants::LOGGER_LEVEL,
-                               L"", 
-                               buffer, 
-                               _countof(buffer),
-                               m_configPath.c_str()) > 0) {
-        std::wstring logLevelStr = buffer;
+// void ConfigManager::LoadLogConfig() {
+//     wchar_t buffer[32];
+//     if (GetPrivateProfileStringW(Constants::LOGGER_SECTION, 
+//                                Constants::LOGGER_LEVEL,
+//                                L"", 
+//                                buffer, 
+//                                _countof(buffer),
+//                                m_configPath.c_str()) > 0) {
+//         std::wstring logLevelStr = buffer;
         
-        if (logLevelStr == L"DEBUG") {
-            m_logLevel = LogLevel::DEBUG;
-        } else if (logLevelStr == L"INFO") {
-            m_logLevel = LogLevel::INFO;
-        } else if (logLevelStr == L"ERROR") {
-            m_logLevel = LogLevel::ERR;
-        }
-    }
-}
+//         if (logLevelStr == L"DEBUG") {
+//             m_logLevel = LogLevel::DEBUG;
+//         } else if (logLevelStr == L"INFO") {
+//             m_logLevel = LogLevel::INFO;
+//         } else if (logLevelStr == L"ERROR") {
+//             m_logLevel = LogLevel::ERR;
+//         }
+//     }
+// }
 
 void ConfigManager::LoadHotkeyConfig() {
     wchar_t buffer[32];

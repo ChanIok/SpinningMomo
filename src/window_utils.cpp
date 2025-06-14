@@ -2,7 +2,7 @@
 #include <wincodec.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
-#include "logger.hpp"
+// #include "logger.hpp"
 
 // 静态成员定义
 std::unique_ptr<WindowCapturer> WindowUtils::s_capturer = std::make_unique<WindowCapturer>();
@@ -456,7 +456,7 @@ std::wstring WindowUtils::GetGameScreenshotPath(HWND hwnd) {
 bool WindowUtils::TakeScreenshotAsync(HWND hwnd, const std::wstring& filePath, 
                                      std::function<void(bool success, const std::wstring& path)> completionCallback) {
     if (!hwnd) {
-        LOG_ERROR("Invalid window handle");
+        // LOG_ERROR("Invalid window handle");
         if (completionCallback) {
             completionCallback(false, filePath);
         }
@@ -472,12 +472,12 @@ bool WindowUtils::TakeScreenshotAsync(HWND hwnd, const std::wstring& filePath,
             success = WindowUtils::SaveFrameToFile(texture, filePath);
             
             if (success) {
-                LOG_DEBUG("Screenshot saved successfully");
+                // LOG_DEBUG("Screenshot saved successfully");
             } else {
-                LOG_ERROR("Failed to save screenshot");
+                // LOG_ERROR("Failed to save screenshot");
             }
         } else {
-            LOG_ERROR("Captured texture is null");
+            // LOG_ERROR("Captured texture is null");
         }
         
         // 调用完成回调（如果有）
@@ -487,7 +487,7 @@ bool WindowUtils::TakeScreenshotAsync(HWND hwnd, const std::wstring& filePath,
     });
 
     if (!result) {
-        LOG_ERROR("Failed to start capture");
+        // LOG_ERROR("Failed to start capture");
         if (completionCallback) {
             completionCallback(false, filePath);
         }
@@ -573,7 +573,7 @@ void WindowUtils::HideCursor() {
         // 隐藏鼠标直到计数器变为负数
         while (::ShowCursor(FALSE) >= 0);
         s_cursorHidden = true;
-        LOG_DEBUG("Cursor hidden");
+        // LOG_DEBUG("Cursor hidden");
     }
 }
 
@@ -583,7 +583,7 @@ void WindowUtils::ShowCursor() {
         // 显示鼠标直到计数器变为非负数
         while (::ShowCursor(TRUE) < 0);
         s_cursorHidden = false;
-        LOG_DEBUG("Cursor restored");
+        // LOG_DEBUG("Cursor restored");
     }
 }
 

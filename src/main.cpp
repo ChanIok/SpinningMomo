@@ -15,8 +15,10 @@
 #include "config_manager.hpp"
 #include "overlay_window.hpp"
 #include "letterbox_window.hpp"
-#include "logger.hpp"
+// #include "logger.hpp"
 #include "event_handler.hpp"
+
+import Utils.Logger;
 
 // 主应用程序类
 class SpinningMomoApp {
@@ -28,8 +30,7 @@ public:
     }
 
     bool Initialize(HINSTANCE hInstance) {
-        Logger::GetInstance().Initialize();
-        LOG_INFO("Program initialization started");
+
 
         // 记录系统信息
         LogSystemInfo();
@@ -40,16 +41,16 @@ public:
         m_configManager->LoadAllConfigs();
         
         // 从配置获取日志级别
-        LogLevel configLogLevel = m_configManager->GetLogLevel();
+        // LogLevel configLogLevel = m_configManager->GetLogLevel();
         
         #ifndef NDEBUG
         // Debug版本下始终使用DEBUG级别
-        Logger::GetInstance().SetLogLevel(LogLevel::DEBUG);
-        LOG_INFO("Debug build: Setting log level to DEBUG");
+        // Logger::GetInstance().SetLogLevel(LogLevel::DEBUG);
+        // LOG_INFO("Debug build: Setting log level to DEBUG");
         #else
             // Release版本使用配置文件中的设置
-            Logger::GetInstance().SetLogLevel(configLogLevel);
-            LOG_INFO("Log level set to %s", Logger::GetInstance().GetLevelString(configLogLevel));
+            // Logger::GetInstance().SetLogLevel(configLogLevel);
+            // LOG_INFO("Log level set to %s", Logger::GetInstance().GetLevelString(configLogLevel));
         #endif
 
         // 创建通知管理器
@@ -61,58 +62,58 @@ public:
 
         // 检查屏幕捕获功能是否可用
         m_isScreenCaptureSupported = WindowUtils::IsWindowsCaptureSupported();
-        LOG_INFO("Screen capture feature is %s", m_isScreenCaptureSupported ? "available" : "not available");
+        // LOG_INFO("Screen capture feature is %s", m_isScreenCaptureSupported ? "available" : "not available");
 
         // 获取宽高比和分辨率列表
         ConfigLoadResult ratioResult = m_configManager->GetAspectRatios(m_strings);
         if (!ratioResult.success) {
-            LOG_ERROR("Failed to load aspect ratio configuration: %s", ratioResult.errorDetails);
+            // LOG_ERROR("Failed to load aspect ratio configuration: %s", ratioResult.errorDetails);
             AddPendingNotification(m_strings.APP_NAME.c_str(), ratioResult.errorDetails.c_str());
         }
         m_ratios = std::move(ratioResult.ratios);
         
         ConfigLoadResult resolutionResult = m_configManager->GetResolutionPresets(m_strings);
         if (!resolutionResult.success) {
-            LOG_ERROR("Failed to load resolution configuration: %s", resolutionResult.errorDetails);
+            // LOG_ERROR("Failed to load resolution configuration: %s", resolutionResult.errorDetails);
             AddPendingNotification(m_strings.APP_NAME.c_str(), resolutionResult.errorDetails.c_str());
         }
         m_resolutions = std::move(resolutionResult.resolutions);
 
         // 初始化UI组件
         if (!RegisterWindowClass(hInstance)) {
-            LOG_ERROR("Failed to register window class");
+            // LOG_ERROR("Failed to register window class");
             return false;
         }
         if (!CreateAppWindow(hInstance)) {
-            LOG_ERROR("Failed to create application window");
+            // LOG_ERROR("Failed to create application window");
             return false;
         }
 
         // 创建托盘图标
         m_trayIcon = std::make_unique<TrayIcon>(m_hwnd);
         if (!m_trayIcon->Create()) {
-            LOG_ERROR("Failed to create tray icon");
+            // LOG_ERROR("Failed to create tray icon");
             return false;
         }
 
         // 创建预览窗口
         m_previewWindow = std::make_unique<PreviewWindow>();
         if (!m_previewWindow->Initialize(hInstance, m_hwnd)) {
-            LOG_ERROR("Failed to initialize preview window");
+            // LOG_ERROR("Failed to initialize preview window");
             return false;
         }
 
         // 创建叠加层窗口
         m_overlayWindow = std::make_unique<OverlayWindow>();
         if (!m_overlayWindow->Initialize(hInstance, m_hwnd)) {
-            LOG_ERROR("Failed to initialize overlay window");
+            // LOG_ERROR("Failed to initialize overlay window");
             return false;
         }
         
         // 创建黑边窗口
         m_letterboxWindow = std::make_unique<LetterboxWindow>();
         if (!m_letterboxWindow->Initialize(hInstance)) {
-            LOG_ERROR("Failed to initialize letterbox window");
+            // LOG_ERROR("Failed to initialize letterbox window");
             return false;
         }
 
@@ -127,7 +128,7 @@ public:
         if (!m_menuWindow->Create(m_hwnd, m_ratios, m_resolutions, m_strings,
                             m_currentRatioIndex, m_currentResolutionIndex,
                             m_isPreviewEnabled, m_isOverlayEnabled, m_isLetterboxEnabled)) {
-            LOG_ERROR("Failed to create menu window");
+            // LOG_ERROR("Failed to create menu window");
             return false;
         }
 
@@ -165,7 +166,7 @@ public:
                           m_configManager->GetHotkeyKey());
         
         if (!hotkeyRegistered) {
-            LOG_ERROR("Failed to register global hotkey");
+            // LOG_ERROR("Failed to register global hotkey");
             AddPendingNotification(m_strings.APP_NAME.c_str(), 
                 m_strings.HOTKEY_REGISTER_FAILED.c_str());
         } else {
@@ -177,10 +178,10 @@ public:
 
         // 注册全局键盘钩子 https://github.com/ChanIok/SpinningMomo/issues/4
         if (!RegisterKeyboardHook()) {
-            LOG_INFO("Failed to register global keyboard hook");
+            // LOG_INFO("Failed to register global keyboard hook");
         }
 
-        LOG_INFO("Program initialization completed successfully");
+        // LOG_INFO("Program initialization completed successfully");
         return true;
     }
 
@@ -323,11 +324,11 @@ private:
         m_keyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, keyboardProc, GetModuleHandle(NULL), 0);
         
         if (!m_keyboardHook) {
-            LOG_ERROR("Failed to register keyboard hook. Error code: %d", GetLastError());
+            // LOG_ERROR("Failed to register keyboard hook. Error code: %d", GetLastError());
             return false;
         }
         
-        LOG_INFO("Global keyboard hook registered successfully");
+        // LOG_INFO("Global keyboard hook registered successfully");
         return true;
     }
 
@@ -336,7 +337,7 @@ private:
         if (m_keyboardHook) {
             UnhookWindowsHookEx(m_keyboardHook);
             m_keyboardHook = NULL;
-            LOG_INFO("Global keyboard hook unregistered");
+            // LOG_INFO("Global keyboard hook unregistered");
         }
     }
 

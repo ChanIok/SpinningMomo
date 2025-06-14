@@ -1,5 +1,5 @@
 #include "win_timer.hpp"
-#include "logger.hpp"
+// #include "logger.hpp"
 
 WinTimer::WinTimer() {
     CreateTimerObject();
@@ -17,7 +17,7 @@ bool WinTimer::CreateTimerObject() {
     if (!m_timer) {
         m_timer = CreateWaitableTimer(nullptr, TRUE, nullptr);
         if (!m_timer) {
-            LOG_ERROR("Failed to create waitable timer");
+            // LOG_ERROR("Failed to create waitable timer");
             return false;
         }
     }
@@ -30,7 +30,7 @@ bool WinTimer::SetTimer(DWORD delayMs, std::function<void()> callback) {
     if (!m_state.compare_exchange_strong(expectedState, State::Running)) {
         // 如果已经在运行，不允许再次设置
         if (m_state == State::Running) {
-            LOG_ERROR("Timer already running, use Reset() instead");
+            // LOG_ERROR("Timer already running, use Reset() instead");
             return false;
         }
         
@@ -41,7 +41,7 @@ bool WinTimer::SetTimer(DWORD delayMs, std::function<void()> callback) {
     }
     
     if (!callback) {
-        LOG_ERROR("Invalid callback");
+        // LOG_ERROR("Invalid callback");
         m_state.store(State::Idle);
         return false;
     }
@@ -58,7 +58,7 @@ bool WinTimer::SetTimer(DWORD delayMs, std::function<void()> callback) {
     // 保存参数
     m_callback = std::move(callback);
     m_delayMs = delayMs;
-    LOG_DEBUG("Setting timer for " + std::to_string(delayMs) + " ms");
+    // LOG_DEBUG("Setting timer for " + std::to_string(delayMs) + " ms");
 
     // 重置并启动定时器
     return Reset();
@@ -67,11 +67,11 @@ bool WinTimer::SetTimer(DWORD delayMs, std::function<void()> callback) {
 bool WinTimer::Reset() {
     // 只有在有回调和定时器对象的情况下才能重置
     if (!m_timer || !m_callback) {
-        LOG_ERROR("Timer not properly initialized");
+        // LOG_ERROR("Timer not properly initialized");
         return false;
     }
     
-    LOG_DEBUG("Resetting timer");
+    // LOG_DEBUG("Resetting timer");
     
     // 确保状态为运行
     State expectedState = State::Idle;
@@ -87,7 +87,7 @@ bool WinTimer::Reset() {
     LARGE_INTEGER dueTime;
     dueTime.QuadPart = -static_cast<LONGLONG>(m_delayMs) * 10000LL; // 转换为100纳秒单位
     if (!SetWaitableTimer(m_timer, &dueTime, 0, nullptr, nullptr, FALSE)) {
-        LOG_ERROR("Failed to set waitable timer");
+        // LOG_ERROR("Failed to set waitable timer");
         m_state.store(State::Idle);
         return false;
     }
@@ -98,14 +98,14 @@ bool WinTimer::Reset() {
 }
 
 void WinTimer::StartWaitThread() {
-    LOG_DEBUG("Starting wait thread");
+    // LOG_DEBUG("Starting wait thread");
     
     // 捕获必要的变量，避免访问类成员
     HANDLE timerHandle = m_timer;
     auto callback = m_callback;
     
     m_waitThread = std::thread([this, timerHandle, callback]() {
-        LOG_DEBUG("Wait thread started");
+        // LOG_DEBUG("Wait thread started");
         
         // 等待定时器信号
         DWORD result = WaitForSingleObject(timerHandle, INFINITE);
@@ -113,7 +113,7 @@ void WinTimer::StartWaitThread() {
         // 只有在等待成功且定时器还在运行状态时才执行回调
         State expectedState = State::Running;
         if (result == WAIT_OBJECT_0 && m_state.compare_exchange_strong(expectedState, State::Triggered)) {
-            LOG_DEBUG("Timer triggered, executing callback");
+            // LOG_DEBUG("Timer triggered, executing callback");
             callback();
         }
     });
@@ -127,7 +127,7 @@ void WinTimer::Cancel() {
     State previousState = m_state.exchange(State::Idle);
     
     if (previousState == State::Running && m_timer) {
-        LOG_DEBUG("Cancelling timer");
+        // LOG_DEBUG("Cancelling timer");
         CancelWaitableTimer(m_timer);
     }
 }

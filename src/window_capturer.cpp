@@ -6,7 +6,7 @@
 #include <Windows.Graphics.DirectX.Direct3D11.interop.h>
 #include <queue>
 #include <mutex>
-#include "logger.hpp"
+// #include "logger.hpp"
 
 using namespace winrt::Windows::Graphics::Capture;
 using namespace winrt::Windows::Graphics::DirectX::Direct3D11;
@@ -52,7 +52,7 @@ WindowCapturer::~WindowCapturer() {
 // 初始化捕获器
 bool WindowCapturer::Initialize(HWND hwnd) {
     if (!hwnd || !IsWindow(hwnd)) {
-        LOG_ERROR("Invalid window handle");
+        // LOG_ERROR("Invalid window handle");
         return false;
     }
     
@@ -68,14 +68,14 @@ bool WindowCapturer::Initialize(HWND hwnd) {
     
     // 确保D3D资源已初始化
     if (!EnsureD3DResources()) {
-        LOG_ERROR("Failed to initialize D3D resources");
+        // LOG_ERROR("Failed to initialize D3D resources");
         return false;
     }
 
     // 如果尺寸变化，需要重新创建
     if (sizeChanged && m_isCapturing.load()) {
         // 如果正在捕获，先停止
-        LOG_DEBUG("Window size changed, stopping capture");
+        // LOG_DEBUG("Window size changed, stopping capture");
         m_isCapturing.store(false);
         if (m_framePool) {
             m_framePool.FrameArrived(m_frameArrivedToken);
@@ -88,17 +88,17 @@ bool WindowCapturer::Initialize(HWND hwnd) {
         }
         m_captureItem = nullptr;
     } else if (m_isCapturing.load()) {
-        LOG_DEBUG("Already capturing, skipping initialization");
+        // LOG_DEBUG("Already capturing, skipping initialization");
         return true;
     }
 
     // 创建新的捕获会话
     if (!CreateCaptureSession()) {
-        LOG_ERROR("Failed to create capture session");
+        // LOG_ERROR("Failed to create capture session");
         Cleanup();
         return false;
     }
-    LOG_DEBUG("Capture session created");
+    // LOG_DEBUG("Capture session created");
     return true;
 }
 
@@ -113,13 +113,13 @@ void WindowCapturer::AddCaptureCallback(std::function<void(ID3D11Texture2D*)> ca
 // 简化API：设置回调并立即开始捕获
 bool WindowCapturer::CaptureOneFrame(HWND hwnd, std::function<void(ID3D11Texture2D*)> callback) {
     if (!callback) {
-        LOG_ERROR("Callback is null");
+        // LOG_ERROR("Callback is null");
         return false;
     }
     
     // 初始化捕获器
     if (!Initialize(hwnd)) {
-        LOG_ERROR("Failed to initialize capturer");
+        // LOG_ERROR("Failed to initialize capturer");
         return false;
     }
     
@@ -135,13 +135,13 @@ bool WindowCapturer::StartCapture() {
     if (m_isCapturing.load()) return true; // 已经在捕获中
     
     if (m_captureSession) {
-        LOG_DEBUG("Starting capture process");
+        // LOG_DEBUG("Starting capture process");
         m_captureSession.StartCapture();
         m_isCapturing.store(true);
         return true;
     }
     
-    LOG_ERROR("Capture session is null");
+    // LOG_ERROR("Capture session is null");
     return false;
 }
 
@@ -194,8 +194,8 @@ bool WindowCapturer::CheckWindowSizeChanged() {
     
     // 检查尺寸是否变化
     if (newWidth != m_targetWidth || newHeight != m_targetHeight) {
-        LOG_DEBUG("Window size changed: " + std::to_string(m_targetWidth) + "x" + std::to_string(m_targetHeight) + 
-                 " -> " + std::to_string(newWidth) + "x" + std::to_string(newHeight));
+        // LOG_DEBUG("Window size changed: " + std::to_string(m_targetWidth) + "x" + std::to_string(m_targetHeight) + 
+                 // " -> " + std::to_string(newWidth) + "x" + std::to_string(newHeight));
         m_targetWidth = newWidth;
         m_targetHeight = newHeight;
         return true; // 尺寸已变化
@@ -251,7 +251,7 @@ bool WindowCapturer::CreateCaptureSession() {
     {
         m_captureSession.IsCursorCaptureEnabled(false);
     } else {
-        LOG_INFO("Cursor capture setting not available on this Windows version");
+        // LOG_INFO("Cursor capture setting not available on this Windows version");
         m_needHideCursor = true;
         WindowUtils::HideCursor();  // 使用WindowUtils提供的鼠标隐藏功能
     }
@@ -262,7 +262,7 @@ bool WindowCapturer::CreateCaptureSession() {
     {
         m_captureSession.IsBorderRequired(false);
     } else {
-        LOG_INFO("Border requirement setting not available on this Windows version");
+        // LOG_INFO("Border requirement setting not available on this Windows version");
     }
 
     return true;
@@ -284,7 +284,7 @@ void WindowCapturer::ProcessFrameArrived(ID3D11Texture2D* texture) {
             // 队列有回调，取消清理定时器
             if (m_cleanupTimer.IsRunning()) {
                 m_cleanupTimer.Cancel();
-                LOG_DEBUG("Cleanup timer cancelled due to new callbacks");
+                // LOG_DEBUG("Cleanup timer cancelled due to new callbacks");
             }
         }
     }
@@ -304,10 +304,10 @@ void WindowCapturer::ProcessFrameArrived(ID3D11Texture2D* texture) {
     {
         std::lock_guard<std::mutex> lock(m_queueMutex);
         if (m_callbackQueue.empty() && !m_cleanupTimer.IsRunning()) {
-            LOG_DEBUG("Queue empty, starting cleanup timer");
+            // LOG_DEBUG("Queue empty, starting cleanup timer");
             
             m_cleanupTimer.SetTimer(CLEANUP_TIMEOUT, [this]() {
-                LOG_DEBUG("Cleanup timer triggered, stopping capture");
+                // LOG_DEBUG("Cleanup timer triggered, stopping capture");
                 Cleanup();
             });
         }

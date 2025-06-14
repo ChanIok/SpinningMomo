@@ -1,5 +1,5 @@
 #include "event_handler.hpp"
-#include "logger.hpp"
+// #include "logger.hpp"
 #include <shellapi.h>
 #include <chrono>
 #include <shlwapi.h>
@@ -94,7 +94,7 @@ bool EventHandler::ApplyWindowTransform(HWND hwnd, int& outWidth, int& outHeight
         targetRes = WindowUtils::CalculateResolutionByScreen(ratio);
     }
 
-    LOG_INFO("Target resolution: width=%d, height=%d", targetRes.width, targetRes.height);
+    // LOG_INFO("Target resolution: width=%d, height=%d", targetRes.width, targetRes.height);
     
     bool resizeSuccess;
     if (m_isOverlayEnabled && m_overlayWindow) {

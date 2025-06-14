@@ -1,5 +1,5 @@
 #include "letterbox_window.hpp"
-#include "logger.hpp"
+// #include "logger.hpp"
 #include <windowsx.h>
 #include <dwmapi.h>
 
@@ -42,7 +42,7 @@ bool LetterboxWindow::Initialize(HINSTANCE hInstance) {
     wcex.lpszClassName = L"LetterboxWindowClass";
     
     if (!RegisterClassEx(&wcex)) {
-        LOG_ERROR("Failed to register letterbox window class");
+        // LOG_ERROR("Failed to register letterbox window class");
         return false;
     }
 
@@ -59,13 +59,13 @@ bool LetterboxWindow::Initialize(HINSTANCE hInstance) {
         nullptr);
 
     if (!m_hwnd) {
-        LOG_ERROR("Failed to create letterbox window");
+        // LOG_ERROR("Failed to create letterbox window");
         return false;
     }
 
     SetLayeredWindowAttributes(m_hwnd, 0, 255, LWA_ALPHA);
 
-    LOG_DEBUG("Letterbox window initialized successfully");
+    // LOG_DEBUG("Letterbox window initialized successfully");
     return true;
 }
 
@@ -78,10 +78,10 @@ bool LetterboxWindow::StartEventThread() {
     // 启动事件监听线程
     try {
         m_eventThread = std::jthread([this](std::stop_token stoken) { EventThreadProc(stoken); });
-        LOG_DEBUG("Letterbox event thread started");
+        // LOG_DEBUG("Letterbox event thread started");
         return true;
     } catch (const std::exception& e) {
-        LOG_ERROR("Failed to start letterbox event thread: %s", e.what());
+        // LOG_ERROR("Failed to start letterbox event thread: %s", e.what());
         return false;
     }
 }
@@ -96,20 +96,20 @@ void LetterboxWindow::Show(HWND targetWindow) {
     
     // 如果没有目标窗口，无法显示
     if (!m_targetWindow) {
-        LOG_ERROR("Cannot show letterbox window: no target window");
+        // LOG_ERROR("Cannot show letterbox window: no target window");
         return;
     }
 
     // 如果目标窗口不可见，不显示
     if (!IsWindowVisible(m_targetWindow)) {
-        LOG_DEBUG("Target window is not visible, not showing letterbox");
+        // LOG_DEBUG("Target window is not visible, not showing letterbox");
         return;
     }
 
     // 确保事件监听线程已启动
     if (!IsEventThreadRunning()) {
         if (!StartEventThread()) {
-            LOG_ERROR("Failed to start event thread, cannot show letterbox window");
+            // LOG_ERROR("Failed to start event thread, cannot show letterbox window");
             return;
         }
     }
@@ -118,7 +118,7 @@ void LetterboxWindow::Show(HWND targetWindow) {
     UpdatePosition(m_targetWindow);
     
     m_isVisible = true;
-    LOG_DEBUG("Letterbox window shown");
+    // LOG_DEBUG("Letterbox window shown");
 }
 
 void LetterboxWindow::Hide() {
@@ -126,7 +126,7 @@ void LetterboxWindow::Hide() {
     if (m_hwnd) {
         ShowWindow(m_hwnd, SW_HIDE);
         m_isVisible = false;
-        LOG_DEBUG("Letterbox window hidden");
+        // LOG_DEBUG("Letterbox window hidden");
     }
 }
 
@@ -152,7 +152,7 @@ void LetterboxWindow::Shutdown() {
         m_eventHook = nullptr;
     }
     
-    LOG_DEBUG("Letterbox window shutdown completed");
+    // LOG_DEBUG("Letterbox window shutdown completed");
 }
 
 void LetterboxWindow::UpdatePosition(HWND targetWindow) {
@@ -165,13 +165,13 @@ void LetterboxWindow::UpdatePosition(HWND targetWindow) {
     
     // 如果没有目标窗口，无法更新位置
     if (!m_targetWindow) {
-        LOG_ERROR("Cannot update letterbox position: no target window");
+        // LOG_ERROR("Cannot update letterbox position: no target window");
         return;
     }
     
     // 检查目标窗口是否有效
     if (!IsWindow(m_targetWindow)) {
-        LOG_ERROR("Target window is no longer valid");
+        // LOG_ERROR("Target window is no longer valid");
         Hide();
         return;
     }
@@ -200,7 +200,7 @@ bool LetterboxWindow::IsEventThreadRunning() const {
 }
 
 void LetterboxWindow::EventThreadProc(std::stop_token stoken) {
-    LOG_DEBUG("Starting letterbox event thread");
+    // LOG_DEBUG("Starting letterbox event thread");
     
     // 注册消息窗口类
     WNDCLASSEX wcMessage = {0};
@@ -210,7 +210,7 @@ void LetterboxWindow::EventThreadProc(std::stop_token stoken) {
     wcMessage.lpszClassName = L"SpinningMomoLetterboxMessageClass";
     
     if (!RegisterClassEx(&wcMessage)) {
-        LOG_ERROR("Failed to register letterbox message window class");
+        // LOG_ERROR("Failed to register letterbox message window class");
         return;
     }
     
@@ -227,7 +227,7 @@ void LetterboxWindow::EventThreadProc(std::stop_token stoken) {
         nullptr);
         
     if (!m_messageWindow) {
-        LOG_ERROR("Failed to create letterbox message window");
+        // LOG_ERROR("Failed to create letterbox message window");
         UnregisterClass(L"LetterboxMessageClass", m_hInstance);
         return;
     }
@@ -248,7 +248,7 @@ void LetterboxWindow::EventThreadProc(std::stop_token stoken) {
 
     if (!m_eventHook) {
         DWORD error = GetLastError();
-        LOG_ERROR("Failed to set window event hook. Error code: %d", error);
+        // LOG_ERROR("Failed to set window event hook. Error code: %d", error);
     }
     
     // 消息循环
@@ -271,7 +271,7 @@ void LetterboxWindow::EventThreadProc(std::stop_token stoken) {
     
     UnregisterClass(L"LetterboxMessageClass", m_hInstance);
     
-    LOG_DEBUG("Letterbox event thread stopped");
+    // LOG_DEBUG("Letterbox event thread stopped");
 }
 
 void CALLBACK LetterboxWindow::WinEventProc(
@@ -290,19 +290,19 @@ void CALLBACK LetterboxWindow::WinEventProc(
         switch (event) {
             case EVENT_SYSTEM_FOREGROUND:
                 // 窗口被激活，更新黑边窗口位置
-                LOG_DEBUG("Target window activated, updating letterbox position");
+                // LOG_DEBUG("Target window activated, updating letterbox position");
                 PostMessage(instance->m_messageWindow, WM_TARGET_WINDOW_FOREGROUND, 0, 0);
                 break;
                 
             case EVENT_SYSTEM_MINIMIZESTART:
                 // 窗口被最小化，隐藏黑边窗口
-                LOG_DEBUG("Target window minimized, hiding letterbox");
+                // LOG_DEBUG("Target window minimized, hiding letterbox");
                 PostMessage(instance->m_messageWindow, WM_HIDE_LETTERBOX, 0, 0);
                 break;
                 
             case EVENT_OBJECT_DESTROY:
                 // 窗口被销毁，隐藏黑边窗口
-                LOG_DEBUG("Target window destroyed, hiding letterbox");
+                // LOG_DEBUG("Target window destroyed, hiding letterbox");
                 PostMessage(instance->m_messageWindow, WM_HIDE_LETTERBOX, 0, 0);
                 break;
         }
@@ -360,10 +360,10 @@ LRESULT CALLBACK LetterboxWindow::LetterboxWndProc(HWND hwnd, UINT message, WPAR
         case WM_LBUTTONDOWN:
         case WM_RBUTTONDOWN:
         case WM_MBUTTONDOWN:
-            LOG_DEBUG("Mouse button down event received in letterbox window");
+            // LOG_DEBUG("Mouse button down event received in letterbox window");
             // 点击时激活目标窗口
             if (pThis->m_targetWindow && IsWindow(pThis->m_targetWindow)) {
-                LOG_DEBUG("Letterbox clicked, activating target window");
+                // LOG_DEBUG("Letterbox clicked, activating target window");
                 SetForegroundWindow(pThis->m_targetWindow);
                 SetWindowPos(pThis->m_hwnd, pThis->m_targetWindow, 0, 0, 0, 0, 
                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);

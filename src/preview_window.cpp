@@ -6,7 +6,7 @@
 #include <winrt/Windows.Foundation.Metadata.h>
 #include <d3dcompiler.h>
 #include <stdexcept>
-#include "logger.hpp"
+// #include "logger.hpp"
 
 namespace {
     // 基本渲染着色器
@@ -111,12 +111,12 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
 
     // 检查窗口是否处于最小化状态
     if (IsIconic(targetWindow)) {
-        LOG_DEBUG("Game window is minimized, cannot start capture");
+        // LOG_DEBUG("Game window is minimized, cannot start capture");
         return false;
     }
 
     if (m_cleanupTimer.IsRunning()) {
-        LOG_DEBUG("Canceling cleanup timer due to new capture");
+        // LOG_DEBUG("Canceling cleanup timer due to new capture");
         m_cleanupTimer.Cancel();
     }
 
@@ -154,11 +154,11 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
     // 初始化 D3D 资源
     if (!m_d3dInitialized) {
         if (!InitializeD3D()) {
-            LOG_ERROR("Failed to initialize D3D");
+            // LOG_ERROR("Failed to initialize D3D");
             return false;
         }
         m_d3dInitialized = true;
-        LOG_DEBUG("D3D initialization successful");
+        // LOG_DEBUG("D3D initialization successful");
     }
 
     // 如果是首次显示，设置默认位置（左上角）
@@ -182,7 +182,7 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
     HRESULT hr = m_device.As(&dxgiDevice);
     if (FAILED(hr)) {
-        LOG_ERROR("Failed to get DXGI device, error code: 0x%08X", static_cast<unsigned int>(hr));
+        // LOG_ERROR("Failed to get DXGI device, error code: 0x%08X", static_cast<unsigned int>(hr));
         return false;
     }
 
@@ -190,13 +190,13 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
     winrt::com_ptr<::IInspectable> inspectable;
     hr = CreateDirect3D11DeviceFromDXGIDevice(dxgiDevice.Get(), inspectable.put());
     if (FAILED(hr)) {
-        LOG_ERROR("Failed to create WinRT device, error code: 0x%08X", static_cast<unsigned int>(hr));
+        // LOG_ERROR("Failed to create WinRT device, error code: 0x%08X", static_cast<unsigned int>(hr));
         return false;
     }
 
     m_winrtDevice = inspectable.as<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice>();
     if (!m_winrtDevice) {
-        LOG_ERROR("Failed to get WinRT Direct3D device");
+        // LOG_ERROR("Failed to get WinRT Direct3D device");
         return false;
     }
 
@@ -208,12 +208,12 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
         reinterpret_cast<void**>(winrt::put_abi(m_captureItem))
     );
     if (FAILED(hr)) {
-        LOG_ERROR("Failed to create capture item, error code: 0x%08X", static_cast<unsigned int>(hr));
+        // LOG_ERROR("Failed to create capture item, error code: 0x%08X", static_cast<unsigned int>(hr));
         return false;
     }
 
     // 创建帧池，使用实际的窗口尺寸
-    LOG_DEBUG("Creating frame pool with dimensions %dx%d", width, height);
+    // LOG_DEBUG("Creating frame pool with dimensions %dx%d", width, height);
     m_framePool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
         m_winrtDevice,
         winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
@@ -249,11 +249,11 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
     
     try {
         // 开始捕获
-        LOG_DEBUG("Starting capture session");
+        // LOG_DEBUG("Starting capture session");
         m_captureSession.StartCapture();
     }
     catch (...) {
-        LOG_ERROR("Unknown error occurred while starting capture session");
+        // LOG_ERROR("Unknown error occurred while starting capture session");
         return false;
     }
 
@@ -261,7 +261,7 @@ bool PreviewWindow::StartCapture(HWND targetWindow, int customWidth, int customH
     ShowWindow(m_hwnd, SW_SHOWNA);
     UpdateWindow(m_hwnd);
     
-    LOG_DEBUG("Capture started successfully");
+    // LOG_DEBUG("Capture started successfully");
     return true;
 }
 
@@ -289,9 +289,9 @@ void PreviewWindow::StopCapture() {
 
     // 设置定时器调用 Cleanup
     if (!m_cleanupTimer.IsRunning()) {
-        LOG_INFO("Starting cleanup timer");
+        // LOG_INFO("Starting cleanup timer");
         m_cleanupTimer.SetTimer(CLEANUP_TIMEOUT, [this]() {
-            LOG_INFO("Cleanup timer fired");
+            // LOG_INFO("Cleanup timer fired");
             Cleanup();
         });
     }
@@ -571,7 +571,7 @@ void PreviewWindow::Cleanup() {
 }
 
 bool PreviewWindow::InitializeD3D() {
-    LOG_DEBUG("Initializing Direct3D");
+    // LOG_DEBUG("Initializing Direct3D");
 
     // 创建交换链描述
     DXGI_SWAP_CHAIN_DESC scd = {};
@@ -603,23 +603,23 @@ bool PreviewWindow::InitializeD3D() {
     );
 
     if (FAILED(hr)) {
-        LOG_ERROR("Failed to create D3D device and swap chain, error code: 0x%08X", static_cast<unsigned int>(hr));
+        // LOG_ERROR("Failed to create D3D device and swap chain, error code: 0x%08X", static_cast<unsigned int>(hr));
         return false;
     }
 
     if (!CreateRenderTarget()) {
-        LOG_ERROR("Failed to create render target");
+        // LOG_ERROR("Failed to create render target");
         return false;
     }
 
     if (!CreateShaderResources()) {
-        LOG_ERROR("Failed to create shader resources");
+        // LOG_ERROR("Failed to create shader resources");
         return false;
     }
 
     // 创建视口框资源
     if (!CreateViewportResources()) {
-        LOG_ERROR("Failed to create viewport resources");
+        // LOG_ERROR("Failed to create viewport resources");
         return false;
     }
 
@@ -631,14 +631,14 @@ bool PreviewWindow::CreateRenderTarget() {
     Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
     HRESULT hr = m_swapChain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
     if (FAILED(hr)) {
-        LOG_ERROR("Failed to get back buffer from swap chain, error code: 0x%08X", static_cast<unsigned int>(hr));
+        // LOG_ERROR("Failed to get back buffer from swap chain, error code: 0x%08X", static_cast<unsigned int>(hr));
         return false;
     }
 
     // 创建渲染目标视图
     hr = m_device->CreateRenderTargetView(backBuffer.Get(), nullptr, &m_renderTarget);
     if (FAILED(hr)) {
-        LOG_ERROR("Failed to create render target view, error code: 0x%08X", static_cast<unsigned int>(hr));
+        // LOG_ERROR("Failed to create render target view, error code: 0x%08X", static_cast<unsigned int>(hr));
         return false;
     }
 
@@ -682,7 +682,7 @@ bool PreviewWindow::CreateViewportResources() {
 
     if (FAILED(m_device->CreateInputLayout(layout, 2, vsBlob->GetBufferPointer(),
         vsBlob->GetBufferSize(), &m_viewportInputLayout))) {
-        LOG_ERROR("Failed to create input layout for viewport resources");
+        // LOG_ERROR("Failed to create input layout for viewport resources");
         return false;
     }
 
@@ -694,7 +694,7 @@ bool PreviewWindow::CreateViewportResources() {
     bufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     if (FAILED(m_device->CreateBuffer(&bufferDesc, nullptr, &m_viewportVertexBuffer))) {
-        LOG_ERROR("Failed to create vertex buffer for viewport resources");
+        // LOG_ERROR("Failed to create vertex buffer for viewport resources");
         return false;
     }
 
