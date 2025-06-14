@@ -90,8 +90,8 @@ PreviewWindow::PreviewWindow() : m_hwnd(nullptr), m_isDragging(false) {
     // 计算理想尺寸范围
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-    m_minIdealSize = min(screenWidth, screenHeight) / 10;
-    m_maxIdealSize = max(screenWidth, screenHeight);
+    m_minIdealSize = std::min(screenWidth, screenHeight) / 10;
+    m_maxIdealSize = std::max(screenWidth, screenHeight);
     m_idealSize = screenHeight / 2;  // 初始值设为屏幕高度的一半
 
     UpdateDpiDependentResources();
@@ -910,7 +910,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 case WMSZ_LEFT:
                 case WMSZ_RIGHT:
                     // 用户调整宽度，相应调整高度
-                    width = max(width, instance->m_minIdealSize);  // 应用最小尺寸限制
+                    width = std::max(width, instance->m_minIdealSize);  // 应用最小尺寸限制
                     height = static_cast<int>(width * instance->m_aspectRatio);
                     if (wParam == WMSZ_LEFT) {
                         rect->left = rect->right - width;
@@ -923,7 +923,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 case WMSZ_TOP:
                 case WMSZ_BOTTOM:
                     // 用户调整高度，相应调整宽度
-                    height = max(height, instance->m_minIdealSize);  // 应用最小尺寸限制
+                    height = std::max(height, instance->m_minIdealSize);  // 应用最小尺寸限制
                     width = static_cast<int>(height / instance->m_aspectRatio);
                     if (wParam == WMSZ_TOP) {
                         rect->top = rect->bottom - height;
@@ -942,7 +942,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 case WMSZ_BOTTOMLEFT:
                 case WMSZ_BOTTOMRIGHT:
                     // 对角调整时，以宽度为准
-                    width = max(width, instance->m_minIdealSize);  // 应用最小尺寸限制
+                    width = std::max(width, instance->m_minIdealSize);  // 应用最小尺寸限制
                     height = static_cast<int>(width * instance->m_aspectRatio);
                     
                     if (wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT) {
@@ -960,7 +960,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
             }
 
             // 更新理想尺寸（取新窗口宽高的较大值）
-            instance->m_idealSize = max(width, height);
+            instance->m_idealSize = std::max(width, height);
 
             return TRUE;
         }
@@ -1016,8 +1016,8 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     targetX = (screenWidth - gameWidth) / 2;  // 居中
                 } else {
                     targetX = -(relativeX * gameWidth);       // 拖动位置
-                    targetX = max(targetX, -gameWidth + screenWidth);
-                    targetX = min(targetX, 0.0f);
+                    targetX = std::max(targetX, -gameWidth + screenWidth);
+                    targetX = std::min(targetX, 0.0f);
                 }
 
                 // 垂直方向
@@ -1025,8 +1025,8 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     targetY = (screenHeight - gameHeight) / 2; // 居中
                 } else {
                     targetY = -(relativeY * gameHeight);      // 拖动位置
-                    targetY = max(targetY, -gameHeight + screenHeight);
-                    targetY = min(targetY, 0.0f);
+                    targetY = std::max(targetY, -gameHeight + screenHeight);
+                    targetY = std::min(targetY, 0.0f);
                 }
 
                 // 移动游戏窗口
@@ -1096,8 +1096,8 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     targetX = (screenWidth - gameWidth) / 2;  // 居中
                 } else {
                     targetX = -(relativeX * gameWidth);       // 拖动位置
-                    targetX = max(targetX, -gameWidth + screenWidth);
-                    targetX = min(targetX, 0.0f);
+                    targetX = std::max(targetX, -gameWidth + screenWidth);
+                    targetX = std::min(targetX, 0.0f);
                 }
 
                 // 垂直方向
@@ -1105,8 +1105,8 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                     targetY = (screenHeight - gameHeight) / 2; // 居中
                 } else {
                     targetY = -(relativeY * gameHeight);      // 拖动位置
-                    targetY = max(targetY, -gameHeight + screenHeight);
-                    targetY = min(targetY, 0.0f);
+                    targetY = std::max(targetY, -gameHeight + screenHeight);
+                    targetY = std::min(targetY, 0.0f);
                 }
 
                 // 移动游戏窗口
@@ -1146,7 +1146,7 @@ LRESULT CALLBACK PreviewWindow::WndProc(HWND hwnd, UINT message, WPARAM wParam, 
                 int height = clientRect.bottom - clientRect.top;  // 不再减去标题栏高度
 
                 // 更新理想尺寸（取当前窗口宽高的较大值）
-                instance->m_idealSize = max(width, height);
+                instance->m_idealSize = std::max(width, height);
 
                 // 调整交换链大小
                 HRESULT hr = instance->m_swapChain->ResizeBuffers(

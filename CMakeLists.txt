@@ -70,8 +70,12 @@ if(WIN32)
     endif()
 endif()
 
-# 创建可执行文件目标
-add_executable(SpinningMomo src/main.cpp)
+# 创建Windows GUI应用程序
+add_executable(SpinningMomo WIN32
+    src/main.cpp
+    resources/app.rc
+    resources/app.manifest
+)
 
 file(GLOB_RECURSE MODULE_FILES "src/*.ixx")
 file(GLOB_RECURSE MODULE_IMPL_FILES "src/*.cpp" EXCLUDE src/main.cpp)
