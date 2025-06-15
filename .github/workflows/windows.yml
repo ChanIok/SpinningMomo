@@ -45,7 +45,7 @@ jobs:
 
       - name: Create ZIP archive
         run: |
-          $VERSION = "${{github.ref_name}}"
+          $VERSION = "${{github.ref_name}}" -replace '[/\\:*?"<>|]', '-'
           $ARTIFACT_NAME = "SpinningMomo-$VERSION.zip"
           # 使用 PowerShell 的 Join-Path，但输出转换为 posix 风格的路径
           $ARTIFACT_PATH = (Join-Path ${{github.workspace}} $ARTIFACT_NAME).Replace('\', '/')
