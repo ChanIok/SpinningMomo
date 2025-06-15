@@ -3,7 +3,6 @@ module;
 export module Utils.Logger;
 
 import std;
-import Utils.Path;
 
 // 日志级别
 export enum class LogLevel { DEBUG = 0, INFO = 1, WARN = 2, ERROR = 3 };
