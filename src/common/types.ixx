@@ -7,12 +7,12 @@ import std;
 // 通用数据类型定义
 export namespace Common::Types {
 
-// 比例结构体定义
-struct AspectRatio {
+// 比例预设结构体
+struct RatioPreset {
   std::wstring name;  // 比例名称
   double ratio;       // 宽高比值
 
-  constexpr AspectRatio(const std::wstring& n, double r) noexcept : name(n), ratio(r) {}
+  constexpr RatioPreset(const std::wstring& n, double r) noexcept : name(n), ratio(r) {}
 };
 
 // 分辨率预设结构体
