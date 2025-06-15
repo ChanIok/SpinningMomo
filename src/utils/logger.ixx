@@ -76,7 +76,7 @@ export class Logger {
   // 单例数据
   struct LoggerImpl {
     std::mutex mutex;
-    std::ofstream log_file;
+    void* log_file_handle;  // 使用 void* 避免包含 Windows 头文件
     std::atomic<bool> initialized{false};
     std::atomic<LogLevel> current_log_level{LogLevel::INFO};
   };

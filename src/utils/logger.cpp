@@ -4,11 +4,62 @@ module Utils.Logger;
 
 import std;
 import Utils.Path;
-import Vendor.Windows;
+
+// Windows API 声明（避免包含 windows.h）
+extern "C" {
+__declspec(dllimport) void* __stdcall CreateFileW(
+    const wchar_t* lpFileName, unsigned long dwDesiredAccess, unsigned long dwShareMode,
+    void* lpSecurityAttributes, unsigned long dwCreationDisposition,
+    unsigned long dwFlagsAndAttributes, void* hTemplateFile);
+
+__declspec(dllimport) int __stdcall WriteFile(void* hFile, const void* lpBuffer,
+                                              unsigned long nNumberOfBytesToWrite,
+                                              unsigned long* lpNumberOfBytesWritten,
+                                              void* lpOverlapped);
+
+__declspec(dllimport) int __stdcall FlushFileBuffers(void* hFile);
+__declspec(dllimport) int __stdcall CloseHandle(void* hObject);
+__declspec(dllimport) unsigned long __stdcall GetLastError();
+__declspec(dllimport) void __stdcall OutputDebugStringW(const wchar_t* lpOutputString);
+
+// 字符转换 API
+__declspec(dllimport) int __stdcall MultiByteToWideChar(unsigned int CodePage,
+                                                        unsigned long dwFlags,
+                                                        const char* lpMultiByteStr, int cbMultiByte,
+                                                        wchar_t* lpWideCharStr, int cchWideChar);
+}
+
+// Windows API 常量
+constexpr unsigned long GENERIC_WRITE = 0x40000000;
+constexpr unsigned long FILE_SHARE_READ = 0x00000001;
+constexpr unsigned long CREATE_ALWAYS = 2;
+constexpr unsigned long OPEN_ALWAYS = 4;
+constexpr unsigned long FILE_ATTRIBUTE_NORMAL = 0x80;
+constexpr unsigned int CP_UTF8 = 65001;
+
+// Windows INVALID_HANDLE_VALUE 定义
+inline void* get_invalid_handle_value() { return reinterpret_cast<void*>(-1); }
+
+// UTF-8 到 UTF-16 转换辅助函数（使用 Windows API）
+std::wstring utf8_to_utf16(const std::string& utf8_str) {
+  if (utf8_str.empty()) return {};
+
+  // 先获取需要的缓冲区大小
+  int wide_size = MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(),
+                                      static_cast<int>(utf8_str.length()), nullptr, 0);
+  if (wide_size <= 0) return {};
+
+  // 分配缓冲区并转换
+  std::wstring wide_str(wide_size, 0);
+  MultiByteToWideChar(CP_UTF8, 0, utf8_str.c_str(), static_cast<int>(utf8_str.length()),
+                      &wide_str[0], wide_size);
+
+  return wide_str;
+}
 
 // 获取单例实现
 Logger::LoggerImpl& Logger::get_impl() {
-  static LoggerImpl impl;
+  static LoggerImpl impl{.log_file_handle = get_invalid_handle_value()};
   return impl;
 }
 
@@ -29,8 +80,16 @@ std::expected<void, LoggerError> Logger::Initialize() {
 
   // 日志文件放在程序所在目录下
   auto log_file_path = Utils::Path::Combine(exec_dir_result.value(), "app.log");
-  impl.log_file.open(log_file_path, std::ios::out | std::ios::trunc);
-  if (!impl.log_file.is_open()) {
+
+  // 转换为 UTF-16 路径
+  std::wstring wide_path = utf8_to_utf16(log_file_path.string());
+
+  // 使用 Windows API 创建文件
+  impl.log_file_handle = CreateFileW(wide_path.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                                     CREATE_ALWAYS,  // 总是创建新文件（覆盖旧的）
+                                     FILE_ATTRIBUTE_NORMAL, nullptr);
+
+  if (impl.log_file_handle == get_invalid_handle_value()) {
     return std::unexpected(LoggerError::FILE_OPEN_FAILED);
   }
 
@@ -38,9 +97,12 @@ std::expected<void, LoggerError> Logger::Initialize() {
 
   // 记录初始日志
   const std::string start_message =
-      std::format("[{}] ---------- Application Started ----------", get_timestamp());
-  impl.log_file << start_message << std::endl;
-  impl.log_file.flush();
+      std::format("[{}] ---------- Application Started ----------\n", get_timestamp());
+
+  unsigned long bytes_written;
+  WriteFile(impl.log_file_handle, start_message.c_str(),
+            static_cast<unsigned long>(start_message.length()), &bytes_written, nullptr);
+  FlushFileBuffers(impl.log_file_handle);
 
   // 设置默认日志级别
 #ifdef NDEBUG
@@ -57,11 +119,16 @@ void Logger::Shutdown() {
   auto& impl = get_impl();
   std::lock_guard<std::mutex> lock(impl.mutex);
 
-  if (impl.log_file.is_open()) {
+  if (impl.log_file_handle != get_invalid_handle_value()) {
     const std::string end_message =
-        std::format("{} ---------- Application Ended ----------", get_timestamp());
-    impl.log_file << end_message << std::endl;
-    impl.log_file.close();
+        std::format("[{}] ---------- Application Ended ----------\n", get_timestamp());
+
+    unsigned long bytes_written;
+    WriteFile(impl.log_file_handle, end_message.c_str(),
+              static_cast<unsigned long>(end_message.length()), &bytes_written, nullptr);
+    FlushFileBuffers(impl.log_file_handle);
+    CloseHandle(impl.log_file_handle);
+    impl.log_file_handle = get_invalid_handle_value();
   }
 
   impl.initialized.store(false, std::memory_order_release);
@@ -115,22 +182,23 @@ void Logger::write_log(LogLevel level, const std::string& message) const {
 
   // 构建完整的日志消息，只包含文件名和行号
   const std::string log_message =
-      std::format("{} [{}] [{}:{}] {}", timestamp, level_str, filename, loc_.line(), message);
+      std::format("{} [{}] [{}:{}] {}\n", timestamp, level_str, filename, loc_.line(), message);
 
   // 线程安全地写入日志
   {
     std::lock_guard<std::mutex> lock(impl.mutex);
 
     // 写入文件
-    if (impl.log_file.is_open()) {
-      impl.log_file << log_message << std::endl;
-      impl.log_file.flush();
+    if (impl.log_file_handle != get_invalid_handle_value()) {
+      unsigned long bytes_written;
+      WriteFile(impl.log_file_handle, log_message.c_str(),
+                static_cast<unsigned long>(log_message.length()), &bytes_written, nullptr);
+      FlushFileBuffers(impl.log_file_handle);
     }
 
     // 也输出到控制台（用于调试）
-    std::wstring wide_message(log_message.begin(), log_message.end());
-    wide_message += L"\n";
-    Vendor::Windows::OutputDebugStringW(wide_message.c_str());
+    std::wstring wide_message = utf8_to_utf16(log_message);
+    OutputDebugStringW(wide_message.c_str());
   }
 }
 
