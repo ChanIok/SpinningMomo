@@ -4,39 +4,24 @@ module;
 #include <shellapi.h>
 #include <shlwapi.h>
 
+#include <expected>
+#include <format>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
 module Core.ConfigManager;
 
-import std;
 import Core.Constants;
 import Common.Resolution;
 import Common.Types;
+import Utils.String;
 
 namespace Core::Config {
 
 // 使用 Common::Types 中的类型
 using RatioPreset = Common::Types::RatioPreset;
 using ResolutionPreset = Common::Types::ResolutionPreset;
-
-// 字符串转换：UTF-8转换
-namespace {
-[[nodiscard]] auto to_utf8(const std::wstring& wide_str) noexcept -> std::string {
-  if (wide_str.empty()) [[likely]]
-    return {};
-
-  const auto size_needed =
-      WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), static_cast<int>(wide_str.size()), nullptr,
-                          0, nullptr, nullptr);
-
-  if (size_needed <= 0) [[unlikely]]
-    return {};
-
-  std::string result(size_needed, '\0');
-  WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), static_cast<int>(wide_str.size()),
-                      result.data(), size_needed, nullptr, nullptr);
-
-  return result;
-}
-}  // namespace
 
 // 初始化配置管理器
 auto ConfigManager::Initialize() -> std::expected<void, std::string> {
@@ -75,9 +60,16 @@ auto ConfigManager::CreateDefaultConfig() -> std::expected<void, std::string> {
                                       m_config_path.c_str()) != 0;
   };
 
+  // 根据系统语言设置默认语言
+  LANGID lang_id = GetUserDefaultUILanguage();
+  WORD primary_lang_id = PRIMARYLANGID(lang_id);
+  std::wstring default_lang =
+      (primary_lang_id == LANG_CHINESE) ? Constants::LANG_ZH_CN : Constants::LANG_EN_US;
+
   if (!write_default(Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, L"") ||
       !write_default(Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, L"3") ||
       !write_default(Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, L"82") ||
+      !write_default(Constants::LANG_SECTION, Constants::LANG_CURRENT, default_lang) ||
       !write_default(Constants::MENU_SECTION, Constants::MENU_FLOATING, L"1") ||
       !write_default(Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, L"") ||
       !write_default(Constants::MENU_SECTION, Constants::MENU_ITEMS,
@@ -87,6 +79,8 @@ auto ConfigManager::CreateDefaultConfig() -> std::expected<void, std::string> {
                      L"32:9,21:9,16:9,3:2,1:1,3:4,2:3,9:16") ||
       !write_default(Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS,
                      L"Default,1080P,2K,4K,6K,8K,12K") ||
+      !write_default(Constants::TASKBAR_SECTION, Constants::TASKBAR_AUTOHIDE, L"0") ||
+      !write_default(Constants::TASKBAR_SECTION, Constants::TASKBAR_LOWER, L"1") ||
       !write_default(Constants::LETTERBOX_SECTION, Constants::LETTERBOX_ENABLED, L"0")) {
     return std::unexpected("Failed to create default configuration file");
   }
@@ -407,12 +401,6 @@ auto ConfigManager::ReadConfigString(const std::wstring& section, const std::wst
   wchar_t buffer[1024];
   DWORD result = GetPrivateProfileStringW(section.c_str(), key.c_str(), default_value.c_str(),
                                           buffer, _countof(buffer), m_config_path.c_str());
-
-  if (result == 0 && GetLastError() != ERROR_SUCCESS) {
-    return std::unexpected(
-        std::format("Failed to read config string for {}.{}", to_utf8(section), to_utf8(key)));
-  }
-
   return std::wstring(buffer);
 }
 
@@ -422,8 +410,8 @@ auto ConfigManager::WriteConfigString(const std::wstring& section, const std::ws
     -> std::expected<void, std::string> {
   if (!WritePrivateProfileStringW(section.c_str(), key.c_str(), value.c_str(),
                                   m_config_path.c_str())) {
-    return std::unexpected(
-        std::format("Failed to write config string for {}.{}", to_utf8(section), to_utf8(key)));
+    return std::unexpected(std::format("Failed to write config string for {}.{}",
+                                       Utils::String::ToUtf8(section), Utils::String::ToUtf8(key)));
   }
 
   return {};

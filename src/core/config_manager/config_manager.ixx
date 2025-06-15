@@ -1,5 +1,6 @@
 module;
 
+#include <iostream>
 #include <windows.h>
 
 export module Core.ConfigManager;

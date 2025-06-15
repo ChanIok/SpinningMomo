@@ -2,6 +2,8 @@ module;
 
 #include <windows.h>
 
+#include <iostream>
+
 export module Core.Constants;
 
 import std;
