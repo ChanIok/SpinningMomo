@@ -1,5 +1,6 @@
 module;
 
+#include <iostream>
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <strsafe.h>
@@ -31,7 +32,6 @@ auto create_window(Core::State::AppState& state, const CreateParams& params)
   state.ui.preview_enabled = params.preview_enabled;
   state.ui.overlay_enabled = params.overlay_enabled;
   state.ui.letterbox_enabled = params.letterbox_enabled;
-  state.event_dispatcher = params.event_dispatcher;
 
   // 初始化菜单项
   initialize_menu_items(state, params.strings);
@@ -206,11 +206,9 @@ auto unregister_hotkey(Core::State::AppState& state) -> void {
 
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
   // 发送窗口可见性切换事件
-  if (state.event_dispatcher) {
-    using namespace Core::Events;
-    state.event_dispatcher->PostEvent(
-        {EventType::SystemCommand, std::string("toggle_visibility"), state.window.hwnd});
-  }
+  using namespace Core::Events;
+  post_event(state.event_bus,
+             {EventType::SystemCommand, std::string("toggle_visibility"), state.window.hwnd});
 }
 
 LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -412,80 +410,61 @@ auto create_window_attributes(HWND hwnd) -> void {
 
 auto dispatch_item_click_event(Core::State::AppState& state, const Core::State::MenuItem& item)
     -> void {
-  if (!state.event_dispatcher) {
-    return;
-  }
-
   using namespace Core::Events;
 
   switch (item.type) {
     case Core::State::ItemType::Ratio: {
-      RatioChangeData data{
-          static_cast<size_t>(item.index), item.text,
-          0.0  // TODO: 需要从实际数据获取比例值
-      };
-      state.event_dispatcher->PostEvent({EventType::RatioChanged, data, state.window.hwnd});
+      const auto& ratio_preset = state.data.ratios[item.index];
+      post_event(state.event_bus, {EventType::RatioChanged,
+                                   RatioChangeData{static_cast<size_t>(item.index),
+                                                   ratio_preset.name, ratio_preset.ratio},
+                                   state.window.hwnd});
       break;
     }
-
     case Core::State::ItemType::Resolution: {
-      ResolutionChangeData data{
-          static_cast<size_t>(item.index), item.text,
-          0  // TODO: 需要从实际数据获取像素数
-      };
-      state.event_dispatcher->PostEvent({EventType::ResolutionChanged, data, state.window.hwnd});
+      const auto& res_preset = state.data.resolutions[item.index];
+      post_event(
+          state.event_bus,
+          {EventType::ResolutionChanged,
+           ResolutionChangeData{static_cast<size_t>(item.index), res_preset.name,
+                                res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
+           state.window.hwnd});
       break;
     }
-
-    case Core::State::ItemType::PreviewWindow: {
-      FeatureToggleData data{FeatureType::Preview, !state.ui.preview_enabled};
-      state.event_dispatcher->PostEvent({EventType::ToggleFeature, data, state.window.hwnd});
+    case Core::State::ItemType::PreviewWindow:
+      post_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Preview, !state.ui.preview_enabled},
+                  state.window.hwnd});
       break;
-    }
-
-    case Core::State::ItemType::OverlayWindow: {
-      FeatureToggleData data{FeatureType::Overlay, !state.ui.overlay_enabled};
-      state.event_dispatcher->PostEvent({EventType::ToggleFeature, data, state.window.hwnd});
+    case Core::State::ItemType::OverlayWindow:
+      post_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Overlay, !state.ui.overlay_enabled},
+                  state.window.hwnd});
       break;
-    }
-
-    case Core::State::ItemType::LetterboxWindow: {
-      FeatureToggleData data{FeatureType::Letterbox, !state.ui.letterbox_enabled};
-      state.event_dispatcher->PostEvent({EventType::ToggleFeature, data, state.window.hwnd});
+    case Core::State::ItemType::LetterboxWindow:
+      post_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Letterbox, !state.ui.letterbox_enabled},
+                  state.window.hwnd});
       break;
-    }
-
-    case Core::State::ItemType::CaptureWindow: {
-      state.event_dispatcher->PostEvent(
-          {EventType::WindowAction, WindowAction::Capture, state.window.hwnd});
+    case Core::State::ItemType::CaptureWindow:
+      post_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Capture, state.window.hwnd});
       break;
-    }
-
-    case Core::State::ItemType::OpenScreenshot: {
-      state.event_dispatcher->PostEvent(
-          {EventType::WindowAction, WindowAction::Screenshot, state.window.hwnd});
+    case Core::State::ItemType::OpenScreenshot:
+      post_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Screenshot, state.window.hwnd});
       break;
-    }
-
-    case Core::State::ItemType::Reset: {
-      state.event_dispatcher->PostEvent(
-          {EventType::WindowAction, WindowAction::Reset, state.window.hwnd});
+    case Core::State::ItemType::Reset:
+      post_event(state.event_bus, {EventType::WindowAction, WindowAction::Reset, state.window.hwnd});
       break;
-    }
-
-    case Core::State::ItemType::Close: {
-      state.event_dispatcher->PostEvent(
-          {EventType::WindowAction, WindowAction::Close, state.window.hwnd});
+    case Core::State::ItemType::Close:
+      post_event(state.event_bus, {EventType::WindowAction, WindowAction::Close, state.window.hwnd});
       break;
-    }
-
-    case Core::State::ItemType::Exit: {
-      state.event_dispatcher->PostEvent(
-          {EventType::WindowAction, WindowAction::Exit, state.window.hwnd});
-      break;
-    }
-
-    default:
+    case Core::State::ItemType::Exit:
+      post_event(state.event_bus, {EventType::WindowAction, WindowAction::Exit, state.window.hwnd});
       break;
   }
 }

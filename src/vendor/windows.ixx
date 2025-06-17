@@ -27,12 +27,52 @@ export auto MessageBoxA(HWND hWnd, const char* lpText, const char* lpCaption, UI
   return ::MessageBoxA(hWnd, lpText, lpCaption, uType);
 }
 
+// 消息循环相关的包装函数 - 使用明确的函数名避免宏冲突
+export auto GetWindowMessage(MSG* lpMsg, HWND hWnd, UINT wMsgFilterMin, UINT wMsgFilterMax) -> BOOL {
+  return ::GetMessageW(lpMsg, hWnd, wMsgFilterMin, wMsgFilterMax);
+}
+
+export auto TranslateWindowMessage(const MSG* lpMsg) -> BOOL {
+  return ::TranslateMessage(lpMsg);
+}
+
+export auto DispatchWindowMessage(const MSG* lpMsg) -> LRESULT {
+  return ::DispatchMessageW(lpMsg);
+}
+
+// 应用程序控制相关的包装函数
+export auto PostQuitMessage(int nExitCode) -> void {
+  ::PostQuitMessage(nExitCode);
+}
+
+// 系统信息相关的包装函数
+export auto GetVersionExW(LPOSVERSIONINFOW lpVersionInformation) -> BOOL {
+  return ::GetVersionExW(lpVersionInformation);
+}
+
 // Windows 常量导出
 export constexpr UINT MB_ICONERROR_t = 0x00000010L;
+
+// 热键修饰符常量导出
+export constexpr UINT MOD_CONTROL_t = 0x0002;
+export constexpr UINT MOD_ALT_t = 0x0001;
 
 // Windows 类型定义导出
 export using HWND = ::HWND;
 export using HINSTANCE = ::HINSTANCE;
 export using LPWSTR = ::LPWSTR;
+export using UINT = ::UINT;
+export using WPARAM = ::WPARAM;
+export using LPARAM = ::LPARAM;
+export using LRESULT = ::LRESULT;
+export using BOOL = ::BOOL;
+
+// 消息循环相关类型
+export using MSG = ::MSG;
+
+// 系统信息相关类型
+export using OSVERSIONINFOEXW = ::OSVERSIONINFOEXW;
+export using LPOSVERSIONINFOW = ::LPOSVERSIONINFOW;
+export using DWORD = ::DWORD;
 
 }  // namespace Vendor::Windows

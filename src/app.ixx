@@ -4,7 +4,6 @@ export module App;
 
 import std;
 import Vendor.Windows;
-import Core.ConfigManager;
 import Core.Events;
 import Core.State;
 import UI.AppWindow;
@@ -28,14 +27,8 @@ export class Application {
   [[nodiscard]] auto Run() -> int;
 
  private:
-  // 现代C++配置管理器
-  std::unique_ptr<Core::Config::ConfigManager> m_config_manager;
-
   // 应用状态
   std::unique_ptr<Core::State::AppState> m_app_state;
-
-  // 事件系统
-  std::shared_ptr<Core::Events::EventDispatcher> m_event_dispatcher;
 
   Vendor::Windows::HINSTANCE m_h_instance = nullptr;
 

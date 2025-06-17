@@ -7,6 +7,7 @@ export module Core.State;
 import std;
 import Core.Events;
 import Core.Constants;
+import Core.Config;
 import Common.Types;
 
 export namespace Core::State {
@@ -119,11 +120,12 @@ struct RenderState {
 
 // 应用程序状态（所有状态的聚合）
 struct AppState {
+  Core::Config::AppConfig config;
   WindowState window;
   UIState ui;
   DataState data;
   RenderState render;
-  std::shared_ptr<Core::Events::EventDispatcher> event_dispatcher;
+  Core::Events::EventBus event_bus;
 
   // 便捷访问方法
   auto is_window_valid() const -> bool { return window.hwnd != nullptr; }

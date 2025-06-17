@@ -1,10 +1,7 @@
 module;
 
-#include <dwmapi.h>
-#include <shellapi.h>
-#include <strsafe.h>
+#include <iostream>
 #include <windows.h>
-#include <windowsx.h>
 
 export module UI.AppWindow;
 
@@ -31,7 +28,6 @@ export struct CreateParams {
   bool preview_enabled;
   bool overlay_enabled;
   bool letterbox_enabled;
-  std::shared_ptr<Core::Events::EventDispatcher> event_dispatcher;
 };
 
 // ============================================================================
