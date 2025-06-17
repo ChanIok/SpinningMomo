@@ -1,135 +1,112 @@
 module;
 
-#include <windows.h>
 #include <dwmapi.h>
 #include <shellapi.h>
 #include <strsafe.h>
+#include <windows.h>
 #include <windowsx.h>
-#include <limits>
 
 export module UI.AppWindow;
 
 import std;
-import Core.Constants;
 import Common.Types;
+import Core.Constants;
+import Core.Events;
+import Core.State;
+import UI.AppWindow.Rendering;
 
-// 使用现代C++的类型别名
-using AspectRatio = Common::Types::RatioPreset;
-using ResolutionPreset = Common::Types::ResolutionPreset;
-using LocalizedStrings = Constants::LocalizedStrings;
+namespace UI::AppWindow {
 
-// 应用程序主窗口类
-export class AppWindow {
- public:
-  // 列表项类型
-  enum class ItemType {
-    Ratio,
-    Resolution,
-    CaptureWindow,
-    OpenScreenshot,
-    PreviewWindow,
-    OverlayWindow,
-    LetterboxWindow,
-    Reset,
-    Close,
-    Exit
-  };
+// ============================================================================
+// 导出的结构体
+// ============================================================================
 
-  // 列表项结构
-  struct MenuItem {
-    std::wstring text;
-    ItemType type;
-    int index;  // 在对应类型中的索引
-  };
-
-  explicit AppWindow(HINSTANCE hInstance);
-  ~AppWindow() = default;
-
-  // 禁用拷贝和移动
-  AppWindow(const AppWindow&) = delete;
-  auto operator=(const AppWindow&) -> AppWindow& = delete;
-  AppWindow(AppWindow&&) = delete;
-  auto operator=(AppWindow&&) -> AppWindow& = delete;
-
-  // 现代化的创建方法，使用 std::expected 进行错误处理
-  [[nodiscard]] auto Create(std::span<const AspectRatio> ratios,
-                            std::span<const ResolutionPreset> resolutions,
-                            const LocalizedStrings& strings, size_t currentRatioIndex,
-                            size_t currentResolutionIndex, bool previewEnabled, bool overlayEnabled,
-                            bool letterboxEnabled) -> std::expected<void, std::wstring>;
-
-  auto Show() -> void;
-  auto Hide() -> void;
-  [[nodiscard]] auto IsVisible() const -> bool;
-  auto ToggleVisibility() -> void;
-  auto SetCurrentRatio(size_t index) -> void;
-  auto SetCurrentResolution(size_t index) -> void;
-  auto SetPreviewEnabled(bool enabled) -> void;
-  auto SetOverlayEnabled(bool enabled) -> void;
-  auto SetLetterboxEnabled(bool enabled) -> void;
-  auto SetMenuItemsToShow(std::span<const std::wstring> items) -> void;
-  auto UpdateMenuItems(const LocalizedStrings& strings, bool forceRedraw = true) -> void;
-  [[nodiscard]] auto GetHwnd() const -> HWND;
-  auto Activate() -> void;
-  auto RegisterHotkey(UINT modifiers, UINT key) -> bool;
-  auto UnregisterHotkey() -> void;
-
- private:
-  // 基础尺寸（96 DPI）
-  static constexpr int BASE_ITEM_HEIGHT = 24;
-  static constexpr int BASE_TITLE_HEIGHT = 26;
-  static constexpr int BASE_SEPARATOR_HEIGHT = 1;
-  static constexpr int BASE_FONT_SIZE = 12;
-  static constexpr int BASE_TEXT_PADDING = 12;
-  static constexpr int BASE_INDICATOR_WIDTH = 3;
-  static constexpr int BASE_RATIO_INDICATOR_WIDTH = 4;
-  static constexpr int BASE_RATIO_COLUMN_WIDTH = 60;
-  static constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120;
-  static constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;
-
-  // DPI相关的尺寸变量
-  UINT m_dpi = 96;
-  int m_itemHeight = BASE_ITEM_HEIGHT;
-  int m_titleHeight = BASE_TITLE_HEIGHT;
-  int m_separatorHeight = BASE_SEPARATOR_HEIGHT;
-  int m_fontSize = BASE_FONT_SIZE;
-  int m_textPadding = BASE_TEXT_PADDING;
-  int m_indicatorWidth = BASE_INDICATOR_WIDTH;
-  int m_ratioIndicatorWidth = BASE_RATIO_INDICATOR_WIDTH;
-  int m_ratioColumnWidth = BASE_RATIO_COLUMN_WIDTH;
-  int m_resolutionColumnWidth = BASE_RESOLUTION_COLUMN_WIDTH;
-  int m_settingsColumnWidth = BASE_SETTINGS_COLUMN_WIDTH;
-
-  // 窗口相关成员
-  HWND m_hwnd = nullptr;
-  HINSTANCE m_hInstance = nullptr;
-  int m_hotkeyId = 1;
-
-  // 状态成员
-  int m_hoverIndex = -1;
-  size_t m_currentRatioIndex = std::numeric_limits<size_t>::max();
-  size_t m_currentResolutionIndex = std::numeric_limits<size_t>::max();
-  bool m_previewEnabled = false;
-  bool m_overlayEnabled = false;
-  bool m_letterboxEnabled = false;
-
-  // 数据成员 - 使用现代C++的span来表示非拥有的数据视图
-  std::span<const AspectRatio> m_ratioItems;
-  std::span<const ResolutionPreset> m_resolutionItems;
-  std::vector<MenuItem> m_items;
-  const LocalizedStrings* m_strings = nullptr;
-  std::vector<std::wstring> m_menuItemsToShow;
-
-  // 私有方法
-  auto InitializeItems(const LocalizedStrings& strings) -> void;
-  auto RegisterWindowClass() -> void;
-  static LRESULT CALLBACK AppWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-  auto HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) -> LRESULT;
-  auto OnPaint(HDC hdc) -> void;
-  auto OnMouseMove(int x, int y) -> void;
-  auto OnMouseLeave() -> void;
-  auto OnLButtonDown(int x, int y) -> void;
-  auto UpdateDpiDependentResources() -> void;
-  [[nodiscard]] auto CalculateWindowHeight() const -> int;
-  [[nodiscard]] auto GetItemIndexFromPoint(int x, int y) const -> int;
+// 窗口创建参数
+export struct CreateParams {
+  std::span<const Common::Types::RatioPreset> ratios;
+  std::span<const Common::Types::ResolutionPreset> resolutions;
+  const Constants::LocalizedStrings& strings;
+  size_t current_ratio_index;
+  size_t current_resolution_index;
+  bool preview_enabled;
+  bool overlay_enabled;
+  bool letterbox_enabled;
+  std::shared_ptr<Core::Events::EventDispatcher> event_dispatcher;
 };
+
+// ============================================================================
+// 窗口管理函数
+// ============================================================================
+
+// 窗口创建和销毁
+export auto create_window(Core::State::AppState& state, const CreateParams& params)
+    -> std::expected<void, std::wstring>;
+export auto destroy_window(Core::State::AppState& state) -> void;
+
+// 窗口显示控制
+export auto show_window(Core::State::AppState& state) -> void;
+export auto hide_window(Core::State::AppState& state) -> void;
+export auto toggle_visibility(Core::State::AppState& state) -> void;
+export auto is_window_visible(const Core::State::AppState& state) -> bool;
+export auto activate_window(Core::State::AppState& state) -> void;
+
+// 更新UI状态
+export auto set_current_ratio(Core::State::AppState& state, size_t index) -> void;
+export auto set_current_resolution(Core::State::AppState& state, size_t index) -> void;
+export auto set_preview_enabled(Core::State::AppState& state, bool enabled) -> void;
+export auto set_overlay_enabled(Core::State::AppState& state, bool enabled) -> void;
+export auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void;
+
+// 更新菜单项
+export auto update_menu_items(Core::State::AppState& state,
+                              const Constants::LocalizedStrings& strings) -> void;
+export auto set_menu_items_to_show(Core::State::AppState& state,
+                                   std::span<const std::wstring> items) -> void;
+
+// ============================================================================
+// 事件处理函数
+// ============================================================================
+
+// 鼠标事件处理
+export auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void;
+export auto handle_mouse_leave(Core::State::AppState& state) -> void;
+export auto handle_left_click(Core::State::AppState& state, int x, int y) -> void;
+
+// 热键处理
+export auto register_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool;
+export auto unregister_hotkey(Core::State::AppState& state) -> void;
+export auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void;
+
+// ============================================================================
+// 窗口过程函数
+// ============================================================================
+
+// 窗口过程函数
+export auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
+                             LPARAM lParam) -> LRESULT;
+
+// 静态窗口过程（用于注册）
+export LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// ============================================================================
+// 内部辅助函数（不导出）
+// ============================================================================
+
+// 注册窗口类
+auto register_window_class(HINSTANCE instance) -> void;
+
+// 初始化菜单项
+auto initialize_menu_items(Core::State::AppState& state, const Constants::LocalizedStrings& strings)
+    -> void;
+
+// 鼠标跟踪
+auto ensure_mouse_tracking(HWND hwnd) -> void;
+
+// 创建窗口样式和属性
+auto create_window_attributes(HWND hwnd) -> void;
+
+// 分发菜单项点击事件
+auto dispatch_item_click_event(Core::State::AppState& state, const Core::State::MenuItem& item)
+    -> void;
+
+}  // namespace UI::AppWindow

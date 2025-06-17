@@ -4,12 +4,10 @@ export module App;
 
 import std;
 import Vendor.Windows;
-
-// 预定义
-namespace Core::Config {
-class ConfigManager;
-}
-class AppWindow;
+import Core.ConfigManager;
+import Core.Events;
+import Core.State;
+import UI.AppWindow;
 
 // 主应用程序类
 export class Application {
@@ -33,10 +31,15 @@ export class Application {
   // 现代C++配置管理器
   std::unique_ptr<Core::Config::ConfigManager> m_config_manager;
 
-  // 应用窗口
-  std::unique_ptr<AppWindow> m_app_window;
+  // 应用状态
+  std::unique_ptr<Core::State::AppState> m_app_state;
+
+  // 事件系统
+  std::shared_ptr<Core::Events::EventDispatcher> m_event_dispatcher;
+
   Vendor::Windows::HINSTANCE m_h_instance = nullptr;
 
   // 内部辅助函数
   auto LogSystemInfo() -> void;
+  auto RegisterEventHandlers() -> void;
 };
