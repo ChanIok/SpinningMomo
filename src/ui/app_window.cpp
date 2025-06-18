@@ -17,10 +17,6 @@ import UI.AppWindow.Rendering;
 
 namespace UI::AppWindow {
 
-// ============================================================================
-// 实现区域
-// ============================================================================
-
 auto create_window(Core::State::AppState& state, const CreateParams& params)
     -> std::expected<void, std::wstring> {
   // 保存数据到状态

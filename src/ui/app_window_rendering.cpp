@@ -10,8 +10,6 @@ import Core.State;
 
 namespace UI::AppWindow {
 
-// 实现所有从.ixx文件分离的函数
-
 auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
   const auto& render = state.render;
   const int total_width =

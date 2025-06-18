@@ -1,12 +1,13 @@
 module;
 
-#include <iostream>
 #include <windows.h>
+
+#include <iostream>
 
 export module UI.AppWindow;
 
 import std;
-import Common.Types;
+import Types.Presets;
 import Core.Constants;
 import Core.Events;
 import Core.State;
@@ -14,14 +15,10 @@ import UI.AppWindow.Rendering;
 
 namespace UI::AppWindow {
 
-// ============================================================================
-// 导出的结构体
-// ============================================================================
-
 // 窗口创建参数
 export struct CreateParams {
-  std::span<const Common::Types::RatioPreset> ratios;
-  std::span<const Common::Types::ResolutionPreset> resolutions;
+  std::span<const Types::Presets::RatioPreset> ratios;
+  std::span<const Types::Presets::ResolutionPreset> resolutions;
   const Constants::LocalizedStrings& strings;
   size_t current_ratio_index;
   size_t current_resolution_index;
@@ -29,10 +26,6 @@ export struct CreateParams {
   bool overlay_enabled;
   bool letterbox_enabled;
 };
-
-// ============================================================================
-// 窗口管理函数
-// ============================================================================
 
 // 窗口创建和销毁
 export auto create_window(Core::State::AppState& state, const CreateParams& params)
@@ -59,10 +52,6 @@ export auto update_menu_items(Core::State::AppState& state,
 export auto set_menu_items_to_show(Core::State::AppState& state,
                                    std::span<const std::wstring> items) -> void;
 
-// ============================================================================
-// 事件处理函数
-// ============================================================================
-
 // 鼠标事件处理
 export auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void;
 export auto handle_mouse_leave(Core::State::AppState& state) -> void;
@@ -73,20 +62,12 @@ export auto register_hotkey(Core::State::AppState& state, UINT modifiers, UINT k
 export auto unregister_hotkey(Core::State::AppState& state) -> void;
 export auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void;
 
-// ============================================================================
-// 窗口过程函数
-// ============================================================================
-
 // 窗口过程函数
 export auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
                              LPARAM lParam) -> LRESULT;
 
 // 静态窗口过程（用于注册）
 export LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-// ============================================================================
-// 内部辅助函数（不导出）
-// ============================================================================
 
 // 注册窗口类
 auto register_window_class(HINSTANCE instance) -> void;

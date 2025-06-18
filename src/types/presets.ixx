@@ -1,11 +1,10 @@
 module;
 
-export module Common.Types;
+export module Types.Presets;
 
 import std;
 
-// 通用数据类型定义
-export namespace Common::Types {
+export namespace Types::Presets {
 
 // 比例预设结构体
 struct RatioPreset {
@@ -26,4 +25,4 @@ struct ResolutionPreset {
       : name(n), totalPixels(static_cast<std::uint64_t>(w) * h), baseWidth(w), baseHeight(h) {}
 };
 
-}  // namespace Common::Types
+}  // namespace Types::Presets

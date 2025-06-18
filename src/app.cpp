@@ -1,8 +1,8 @@
 module;
 
 module App;
+
 import std;
-import Core.Config;
 import Core.Config.Io;
 import Core.Constants;
 import Core.Events;

@@ -7,10 +7,7 @@ export module UI.AppWindow.Rendering;
 
 import std;
 import Core.State;
-
-// ============================================================================
-// 导出的结构体
-// ============================================================================
+import Types.State;
 
 namespace UI::AppWindow {
 
@@ -27,10 +24,6 @@ export struct ColumnBounds {
   int resolution_column_right;
   int settings_column_left;
 };
-
-// ============================================================================
-// 导出的布局计算函数
-// ============================================================================
 
 // 计算窗口尺寸
 export auto calculate_window_size(const Core::State::AppState& state) -> SIZE;
@@ -50,20 +43,12 @@ export auto count_items_per_column(const std::vector<Core::State::MenuItem>& ite
 // 获取列边界
 export auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds;
 
-// ============================================================================
-// 导出的渲染函数
-// ============================================================================
-
 // 主绘制函数
 export auto paint_window(HDC hdc, const RECT& client_rect, const Core::State::AppState& state)
     -> void;
 
 // 创建DPI缩放的字体
 export auto create_scaled_font(int font_size) -> HFONT;
-
-// ============================================================================
-// 内部辅助函数（不导出）
-// ============================================================================
 
 // 获取设置列中的项目索引
 auto get_settings_item_index(const Core::State::AppState& state, int y) -> int;

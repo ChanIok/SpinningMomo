@@ -1,16 +1,12 @@
 module;
 
-export module Core.Config;
+export module Types.Config;
 
 import std;
-import Common.Types;
+import Types.Presets;
 import Vendor.Windows;
 
-export namespace Core::Config {
-
-// ============================================================================
-// 单个配置项的结构体定义 (POD)
-// ============================================================================
+export namespace Types::Config {
 
 struct HotkeyConfig {
   Vendor::Windows::UINT modifiers = Vendor::Windows::MOD_CONTROL_t | Vendor::Windows::MOD_ALT_t;
@@ -45,9 +41,6 @@ struct LetterboxConfig {
   bool enabled = false;
 };
 
-// ============================================================================
-// 聚合的应用程序总配置 (POD)
-// ============================================================================
 struct AppConfig {
   HotkeyConfig hotkey;
   WindowConfig window;
@@ -61,12 +54,9 @@ struct AppConfig {
   std::wstring config_file_path;
 };
 
-// ============================================================================
-// 宽高比和分辨率的加载结果
-// ============================================================================
 struct RatioLoadResult {
   bool success = true;
-  std::vector<Common::Types::RatioPreset> ratios;
+  std::vector<Types::Presets::RatioPreset> ratios;
   std::wstring error_details;
 
   RatioLoadResult() = default;
@@ -75,11 +65,11 @@ struct RatioLoadResult {
 
 struct ResolutionLoadResult {
   bool success = true;
-  std::vector<Common::Types::ResolutionPreset> resolutions;
+  std::vector<Types::Presets::ResolutionPreset> resolutions;
   std::wstring error_details;
 
   ResolutionLoadResult() = default;
   explicit ResolutionLoadResult(const std::wstring& error) : success(false), error_details(error) {}
 };
 
-}  // namespace Core::Config
+}  // namespace Types::Config
