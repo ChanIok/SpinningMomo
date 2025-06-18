@@ -36,36 +36,34 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     // 3. 注册事件处理器
     RegisterEventHandlers();
 
-    // 4. 从配置中获取数据并传递给AppWindow
-    // TODO: 根据语言配置选择字符串
-    const auto& strings = Constants::ZH_CN;
+    // 4. 从配置中获取数据并填充到 AppState
+    const auto& strings =
+        (m_app_state->config.language.current_language == Core::Constants::LANG_ZH_CN)
+            ? Core::Constants::ZH_CN
+            : Core::Constants::EN_US;
+    m_app_state->data.strings = &strings;
 
     auto ratio_data = Core::Config::Io::get_aspect_ratios(m_app_state->config, strings);
     if (!ratio_data.success) {
       Logger().warn("Failed to load aspect ratios: {}",
                     Utils::String::ToUtf8(ratio_data.error_details));
     }
+    m_app_state->data.ratios = std::move(ratio_data.ratios);
 
     auto resolution_data = Core::Config::Io::get_resolution_presets(m_app_state->config, strings);
     if (!resolution_data.success) {
       Logger().warn("Failed to load resolutions: {}",
                     Utils::String::ToUtf8(resolution_data.error_details));
     }
+    m_app_state->data.resolutions = std::move(resolution_data.resolutions);
 
-    // 创建窗口参数
-    UI::AppWindow::CreateParams params{
-        .ratios = std::span(ratio_data.ratios),
-        .resolutions = std::span(resolution_data.resolutions),
-        .strings = strings,
-        .current_ratio_index = m_app_state->ui.current_ratio_index,            // 初始值为0
-        .current_resolution_index = m_app_state->ui.current_resolution_index,  // 初始值为0
-        .preview_enabled = m_app_state->config.menu.use_floating_window,       // 示例，具体逻辑待定
-        .overlay_enabled = m_app_state->ui.overlay_enabled,                    // 初始值为false
-        .letterbox_enabled = m_app_state->config.letterbox.enabled};
+    // 从配置初始化UI状态
+    m_app_state->ui.preview_enabled = m_app_state->config.menu.use_floating_window;
+    m_app_state->ui.letterbox_enabled = m_app_state->config.letterbox.enabled;
 
     // 创建窗口
-    if (auto result = UI::AppWindow::create_window(*m_app_state, params); !result) {
-      Logger().error("Failed to create app window: {}", Utils::String::ToUtf8(result.error()));
+    if (auto result = UI::AppWindow::create_window(*m_app_state); !result) {
+      Logger().error("Failed to create app window: {}", result.error());
       return false;
     }
 

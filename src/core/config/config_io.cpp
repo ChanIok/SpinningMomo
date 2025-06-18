@@ -7,6 +7,7 @@ module;
 #include <format>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 module Core.Config.Io;
 
@@ -14,6 +15,7 @@ import Types.Config;
 import Core.Constants;
 import Types.Presets;
 import Utils.String;
+import Utils.Path;
 
 namespace Core::Config::Io {
 
@@ -102,52 +104,56 @@ auto create_default_config_file(const std::wstring& path) -> std::expected<void,
 }
 
 // 从文件加载配置到 AppConfig
-auto load_from_file(const std::wstring& path) -> Types::Config::AppConfig {
-  Types::Config::AppConfig cfg;
-  cfg.config_file_path = path;
+auto load_from_file(const std::wstring& path) -> std::expected<Types::Config::AppConfig, std::string> {
+  try {
+    Types::Config::AppConfig cfg;
+    cfg.config_file_path = path;
 
-  // Hotkey
-  cfg.hotkey.modifiers = read_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, 3);
-  cfg.hotkey.key = read_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, 82);
+    // Hotkey
+    cfg.hotkey.modifiers = read_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, 3);
+    cfg.hotkey.key = read_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, 82);
 
-  // Window
-  cfg.window.title = read_string(path, Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, L"");
+    // Window
+    cfg.window.title = read_string(path, Constants::WINDOW_SECTION, Constants::WINDOW_TITLE, L"");
 
-  // Language
-  cfg.language.current_language =
-      read_string(path, Constants::LANG_SECTION, Constants::LANG_CURRENT, L"");
-  if (cfg.language.current_language.empty()) {
-    LANGID lang_id = GetUserDefaultUILanguage();
-    WORD primary_lang_id = PRIMARYLANGID(lang_id);
+    // Language
     cfg.language.current_language =
-        (primary_lang_id == LANG_CHINESE) ? Constants::LANG_ZH_CN : Constants::LANG_EN_US;
+        read_string(path, Constants::LANG_SECTION, Constants::LANG_CURRENT, L"");
+    if (cfg.language.current_language.empty()) {
+      LANGID lang_id = GetUserDefaultUILanguage();
+      WORD primary_lang_id = PRIMARYLANGID(lang_id);
+      cfg.language.current_language =
+          (primary_lang_id == LANG_CHINESE) ? Constants::LANG_ZH_CN : Constants::LANG_EN_US;
+    }
+
+    // Taskbar
+    cfg.taskbar.auto_hide =
+        (read_int(path, Constants::TASKBAR_SECTION, Constants::TASKBAR_AUTOHIDE, 0) != 0);
+    cfg.taskbar.lower =
+        (read_int(path, Constants::TASKBAR_SECTION, Constants::TASKBAR_LOWER, 1) != 0);
+
+    // Menu
+    cfg.menu.use_floating_window =
+        (read_int(path, Constants::MENU_SECTION, Constants::MENU_FLOATING, 1) != 0);
+    cfg.menu.items_to_show =
+        parse_string_list(read_string(path, Constants::MENU_SECTION, Constants::MENU_ITEMS, L""));
+    cfg.menu.aspect_ratio_items = parse_string_list(
+        read_string(path, Constants::MENU_SECTION, Constants::ASPECT_RATIO_ITEMS, L""));
+    cfg.menu.resolution_items = parse_string_list(
+        read_string(path, Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS, L""));
+
+    // GameAlbum
+    cfg.game_album.screenshot_path =
+        read_string(path, Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, L"");
+
+    // Letterbox
+    cfg.letterbox.enabled =
+        (read_int(path, Constants::LETTERBOX_SECTION, Constants::LETTERBOX_ENABLED, 0) != 0);
+
+    return cfg;
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Failed to load configuration: ") + e.what());
   }
-
-  // Taskbar
-  cfg.taskbar.auto_hide =
-      (read_int(path, Constants::TASKBAR_SECTION, Constants::TASKBAR_AUTOHIDE, 0) != 0);
-  cfg.taskbar.lower =
-      (read_int(path, Constants::TASKBAR_SECTION, Constants::TASKBAR_LOWER, 1) != 0);
-
-  // Menu
-  cfg.menu.use_floating_window =
-      (read_int(path, Constants::MENU_SECTION, Constants::MENU_FLOATING, 1) != 0);
-  cfg.menu.items_to_show =
-      parse_string_list(read_string(path, Constants::MENU_SECTION, Constants::MENU_ITEMS, L""));
-  cfg.menu.aspect_ratio_items = parse_string_list(
-      read_string(path, Constants::MENU_SECTION, Constants::ASPECT_RATIO_ITEMS, L""));
-  cfg.menu.resolution_items = parse_string_list(
-      read_string(path, Constants::MENU_SECTION, Constants::RESOLUTION_ITEMS, L""));
-
-  // GameAlbum
-  cfg.game_album.screenshot_path =
-      read_string(path, Constants::SCREENSHOT_SECTION, Constants::SCREENSHOT_PATH, L"");
-
-  // Letterbox
-  cfg.letterbox.enabled =
-      (read_int(path, Constants::LETTERBOX_SECTION, Constants::LETTERBOX_ENABLED, 0) != 0);
-
-  return cfg;
 }
 
 // 默认预设获取
@@ -203,21 +209,26 @@ auto add_custom_resolution(const std::wstring& resolution,
 
 auto initialize() -> std::expected<Types::Config::AppConfig, std::string> {
   try {
-    wchar_t exe_path_buf[MAX_PATH] = {0};
-    if (GetModuleFileNameW(nullptr, exe_path_buf, MAX_PATH) == 0) {
-      return std::unexpected("Failed to get module file name.");
+    auto dir_result = Utils::Path::GetExecutableDirectory();
+    if (!dir_result) {
+      return std::unexpected("Failed to get executable directory: " + dir_result.error());
     }
-
-    PathRemoveFileSpecW(exe_path_buf);
-    std::wstring config_path = std::wstring(exe_path_buf) + L"\\" + Constants::CONFIG_FILE;
-
-    if (GetFileAttributesW(config_path.c_str()) == INVALID_FILE_ATTRIBUTES) {
-      if (auto result = create_default_config_file(config_path); !result) {
+    
+    auto config_path = dir_result.value() / std::filesystem::path(Constants::CONFIG_FILE);
+    
+    // 检查文件是否存在
+    if (!std::filesystem::exists(config_path)) {
+      if (auto result = create_default_config_file(config_path.wstring()); !result) {
         return std::unexpected(result.error());
       }
     }
 
-    return load_from_file(config_path);
+    auto load_result = load_from_file(config_path.wstring());
+    if (!load_result) {
+      return std::unexpected("Failed to load configuration: " + load_result.error());
+    }
+    
+    return load_result.value();
   } catch (const std::exception& e) {
     return std::unexpected(std::string("Initialization failed: ") + e.what());
   }

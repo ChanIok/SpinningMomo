@@ -17,20 +17,10 @@ import UI.AppWindow.Rendering;
 
 namespace UI::AppWindow {
 
-auto create_window(Core::State::AppState& state, const CreateParams& params)
-    -> std::expected<void, std::wstring> {
-  // 保存数据到状态
-  state.data.ratios = params.ratios;
-  state.data.resolutions = params.resolutions;
-  state.data.strings = &params.strings;
-  state.ui.current_ratio_index = params.current_ratio_index;
-  state.ui.current_resolution_index = params.current_resolution_index;
-  state.ui.preview_enabled = params.preview_enabled;
-  state.ui.overlay_enabled = params.overlay_enabled;
-  state.ui.letterbox_enabled = params.letterbox_enabled;
-
+auto create_window(Core::State::AppState& state)
+    -> std::expected<void, std::string> {
   // 初始化菜单项
-  initialize_menu_items(state, params.strings);
+  initialize_menu_items(state, *state.data.strings);
 
   // 获取系统DPI
   UINT dpi = 96;
@@ -54,7 +44,7 @@ auto create_window(Core::State::AppState& state, const CreateParams& params)
       window_size.cy, nullptr, nullptr, state.window.instance, &state);
 
   if (!state.window.hwnd) {
-    return std::unexpected(L"Failed to create window");
+    return std::unexpected("Failed to create window");
   }
 
   // 保存窗口尺寸和位置

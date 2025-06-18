@@ -53,10 +53,10 @@ struct UIState {
   bool letterbox_enabled = false;
 };
 
-// 数据状态（非拥有，引用外部数据）
+// 数据状态（拥有或引用外部数据）
 struct DataState {
-  std::span<const Types::Presets::RatioPreset> ratios;
-  std::span<const Types::Presets::ResolutionPreset> resolutions;
+  std::vector<Types::Presets::RatioPreset> ratios;
+  std::vector<Types::Presets::ResolutionPreset> resolutions;
   std::vector<MenuItem> menu_items;
   const Constants::LocalizedStrings* strings = nullptr;
   std::vector<std::wstring> menu_items_to_show;

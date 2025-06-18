@@ -15,21 +15,9 @@ import UI.AppWindow.Rendering;
 
 namespace UI::AppWindow {
 
-// 窗口创建参数
-export struct CreateParams {
-  std::span<const Types::Presets::RatioPreset> ratios;
-  std::span<const Types::Presets::ResolutionPreset> resolutions;
-  const Constants::LocalizedStrings& strings;
-  size_t current_ratio_index;
-  size_t current_resolution_index;
-  bool preview_enabled;
-  bool overlay_enabled;
-  bool letterbox_enabled;
-};
-
 // 窗口创建和销毁
-export auto create_window(Core::State::AppState& state, const CreateParams& params)
-    -> std::expected<void, std::wstring>;
+export auto create_window(Core::State::AppState& state)
+    -> std::expected<void, std::string>;
 export auto destroy_window(Core::State::AppState& state) -> void;
 
 // 窗口显示控制
