@@ -43,7 +43,7 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
         UI::AppWindow::hide_window(app_state);
         break;
       case WindowAction::Exit:
-        Vendor::Windows::PostQuitMessage(0);
+        UI::AppWindow::destroy_window(app_state);
         break;
     }
   });

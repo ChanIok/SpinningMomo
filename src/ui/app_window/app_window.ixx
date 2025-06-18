@@ -1,23 +1,18 @@
 module;
 
-#include <windows.h>
-
-#include <iostream>
-
 export module UI.AppWindow;
 
 import std;
-import Types.Presets;
 import Core.Constants;
-import Core.Events;
 import Core.State;
+import Types.Presets;
 import UI.AppWindow.Rendering;
+import Vendor.Windows;
 
 namespace UI::AppWindow {
 
 // 窗口创建和销毁
-export auto create_window(Core::State::AppState& state)
-    -> std::expected<void, std::string>;
+export auto create_window(Core::State::AppState& state) -> std::expected<void, std::string>;
 export auto destroy_window(Core::State::AppState& state) -> void;
 
 // 窗口显示控制
@@ -40,38 +35,19 @@ export auto update_menu_items(Core::State::AppState& state,
 export auto set_menu_items_to_show(Core::State::AppState& state,
                                    std::span<const std::wstring> items) -> void;
 
-// 鼠标事件处理
-export auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void;
-export auto handle_mouse_leave(Core::State::AppState& state) -> void;
-export auto handle_left_click(Core::State::AppState& state, int x, int y) -> void;
-
 // 热键处理
-export auto register_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool;
+export auto register_hotkey(Core::State::AppState& state, Vendor::Windows::UINT modifiers,
+                            Vendor::Windows::UINT key) -> bool;
 export auto unregister_hotkey(Core::State::AppState& state) -> void;
-export auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void;
-
-// 窗口过程函数
-export auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
-                             LPARAM lParam) -> LRESULT;
-
-// 静态窗口过程（用于注册）
-export LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 // 注册窗口类
-auto register_window_class(HINSTANCE instance) -> void;
+auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void;
 
 // 初始化菜单项
-auto initialize_menu_items(Core::State::AppState& state, const Core::Constants::LocalizedStrings& strings)
-    -> void;
-
-// 鼠标跟踪
-auto ensure_mouse_tracking(HWND hwnd) -> void;
+auto initialize_menu_items(Core::State::AppState& state,
+                           const Core::Constants::LocalizedStrings& strings) -> void;
 
 // 创建窗口样式和属性
-auto create_window_attributes(HWND hwnd) -> void;
-
-// 分发菜单项点击事件
-auto dispatch_item_click_event(Core::State::AppState& state, const Core::State::MenuItem& item)
-    -> void;
+auto create_window_attributes(Vendor::Windows::HWND hwnd) -> void;
 
 }  // namespace UI::AppWindow
