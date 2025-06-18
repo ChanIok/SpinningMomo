@@ -58,7 +58,7 @@ struct DataState {
   std::vector<Types::Presets::RatioPreset> ratios;
   std::vector<Types::Presets::ResolutionPreset> resolutions;
   std::vector<MenuItem> menu_items;
-  const Constants::LocalizedStrings* strings = nullptr;
+  const Core::Constants::LocalizedStrings* strings = nullptr;
   std::vector<std::wstring> menu_items_to_show;
 };
 

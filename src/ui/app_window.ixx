@@ -36,7 +36,7 @@ export auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) ->
 
 // 更新菜单项
 export auto update_menu_items(Core::State::AppState& state,
-                              const Constants::LocalizedStrings& strings) -> void;
+                              const Core::Constants::LocalizedStrings& strings) -> void;
 export auto set_menu_items_to_show(Core::State::AppState& state,
                                    std::span<const std::wstring> items) -> void;
 
@@ -61,7 +61,7 @@ export LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, L
 auto register_window_class(HINSTANCE instance) -> void;
 
 // 初始化菜单项
-auto initialize_menu_items(Core::State::AppState& state, const Constants::LocalizedStrings& strings)
+auto initialize_menu_items(Core::State::AppState& state, const Core::Constants::LocalizedStrings& strings)
     -> void;
 
 // 鼠标跟踪

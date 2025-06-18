@@ -7,6 +7,7 @@ import Core.Config.Io;
 import Core.Constants;
 import Core.Events;
 import Core.State;
+import Handlers.EventRegistrar;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
@@ -34,7 +35,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     }
 
     // 3. 注册事件处理器
-    RegisterEventHandlers();
+    Handlers::register_all_handlers(*m_app_state);
 
     // 4. 从配置中获取数据并填充到 AppState
     const auto& strings =
@@ -95,97 +96,6 @@ auto Application::Run() -> int {
     }
   }
   return static_cast<int>(msg.wParam);
-}
-
-auto Application::RegisterEventHandlers() -> void {
-  using namespace Core::Events;
-
-  // 注册比例改变事件处理器
-  subscribe(m_app_state->event_bus, EventType::RatioChanged, [this](const Event& event) {
-    if (!m_app_state) return;
-    auto data = std::any_cast<RatioChangeData>(event.data);
-    Logger().info("Ratio changed to index {}", data.index);
-    UI::AppWindow::set_current_ratio(*m_app_state, data.index);
-    // 注意：这里可能需要更新配置文件，但通常比例选择是临时状态，不保存
-  });
-
-  // 注册功能开关事件处理器
-  subscribe(m_app_state->event_bus, EventType::ToggleFeature, [this](const Event& event) {
-    if (!m_app_state) return;
-    auto data = std::any_cast<FeatureToggleData>(event.data);
-    Logger().info("Feature toggled");
-
-    bool config_changed = false;
-    switch (data.feature) {
-      case FeatureType::Preview:
-        UI::AppWindow::set_preview_enabled(*m_app_state, data.enabled);
-        // m_app_state->config.menu.use_floating_window = data.enabled; // 假设预览就是浮动窗口
-        // config_changed = true;
-        break;
-      case FeatureType::Overlay:
-        UI::AppWindow::set_overlay_enabled(*m_app_state, data.enabled);
-        // Overlay 通常是临时状态，不写入配置
-        break;
-      case FeatureType::Letterbox:
-        UI::AppWindow::set_letterbox_enabled(*m_app_state, data.enabled);
-        m_app_state->config.letterbox.enabled = data.enabled;
-        config_changed = true;
-        break;
-    }
-
-    if (config_changed) {
-      if (auto result = Core::Config::Io::save(m_app_state->config); !result) {
-        Logger().error("Failed to save config: {}", result.error());
-      }
-    }
-  });
-
-  // 注册分辨率改变事件处理器
-  subscribe(m_app_state->event_bus, EventType::ResolutionChanged, [this](const Event& event) {
-    if (!m_app_state) return;
-    auto data = std::any_cast<ResolutionChangeData>(event.data);
-    Logger().info("Resolution changed to index {}", data.index);
-    UI::AppWindow::set_current_resolution(*m_app_state, data.index);
-    // 注意：分辨率选择也可能是临时状态
-  });
-
-  // 注册系统命令事件处理器
-  subscribe(m_app_state->event_bus, EventType::SystemCommand, [this](const Event& event) {
-    auto command = std::any_cast<std::string>(event.data);
-    Logger().info("System command received");
-
-    if (command == "toggle_visibility") {
-      if (m_app_state) {
-        UI::AppWindow::toggle_visibility(*m_app_state);
-      }
-    }
-  });
-
-  // 注册窗口动作事件处理器
-  subscribe(m_app_state->event_bus, EventType::WindowAction, [this](const Event& event) {
-    auto action = std::any_cast<WindowAction>(event.data);
-    Logger().info("Window action triggered");
-
-    switch (action) {
-      case WindowAction::Capture:
-        // TODO: 实现截图功能
-        break;
-      case WindowAction::Screenshot:
-        // TODO: 打开相册
-        break;
-      case WindowAction::Reset:
-        // TODO: 重置窗口
-        break;
-      case WindowAction::Close:
-        if (m_app_state) {
-          UI::AppWindow::hide_window(*m_app_state);
-        }
-        break;
-      case WindowAction::Exit:
-        Vendor::Windows::PostQuitMessage(0);
-        break;
-    }
-  });
 }
 
 auto Application::LogSystemInfo() -> void {

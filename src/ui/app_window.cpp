@@ -136,7 +136,7 @@ auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void {
   }
 }
 
-auto update_menu_items(Core::State::AppState& state, const Constants::LocalizedStrings& strings)
+auto update_menu_items(Core::State::AppState& state, const Core::Constants::LocalizedStrings& strings)
     -> void {
   state.data.menu_items.clear();
   initialize_menu_items(state, strings);
@@ -295,7 +295,7 @@ auto register_window_class(HINSTANCE instance) -> void {
   RegisterClassExW(&wc);
 }
 
-auto initialize_menu_items(Core::State::AppState& state, const Constants::LocalizedStrings& strings)
+auto initialize_menu_items(Core::State::AppState& state, const Core::Constants::LocalizedStrings& strings)
     -> void {
   state.data.menu_items.clear();
 
@@ -328,26 +328,26 @@ auto initialize_menu_items(Core::State::AppState& state, const Constants::Locali
   // 添加设置选项
   if (!state.data.menu_items_to_show.empty()) {
     for (const auto& itemType : state.data.menu_items_to_show) {
-      if (itemType == Constants::MENU_ITEM_TYPE_CAPTURE) {
+      if (itemType == Core::Constants::MENU_ITEM_TYPE_CAPTURE) {
         state.data.menu_items.push_back(
             {strings.CAPTURE_WINDOW, Core::State::ItemType::CaptureWindow, 0});
-      } else if (itemType == Constants::MENU_ITEM_TYPE_SCREENSHOT) {
+      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_SCREENSHOT) {
         state.data.menu_items.push_back(
             {strings.OPEN_SCREENSHOT, Core::State::ItemType::OpenScreenshot, 0});
-      } else if (itemType == Constants::MENU_ITEM_TYPE_PREVIEW) {
+      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_PREVIEW) {
         state.data.menu_items.push_back(
             {strings.PREVIEW_WINDOW, Core::State::ItemType::PreviewWindow, 0});
-      } else if (itemType == Constants::MENU_ITEM_TYPE_OVERLAY) {
+      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_OVERLAY) {
         state.data.menu_items.push_back(
             {strings.OVERLAY_WINDOW, Core::State::ItemType::OverlayWindow, 0});
-      } else if (itemType == Constants::MENU_ITEM_TYPE_LETTERBOX) {
+      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_LETTERBOX) {
         state.data.menu_items.push_back(
             {strings.LETTERBOX_WINDOW, Core::State::ItemType::LetterboxWindow, 0});
-      } else if (itemType == Constants::MENU_ITEM_TYPE_RESET) {
+      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_RESET) {
         state.data.menu_items.push_back({strings.RESET_WINDOW, Core::State::ItemType::Reset, 0});
-      } else if (itemType == Constants::MENU_ITEM_TYPE_CLOSE) {
+      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_CLOSE) {
         state.data.menu_items.push_back({strings.CLOSE_WINDOW, Core::State::ItemType::Close, 0});
-      } else if (itemType == Constants::MENU_ITEM_TYPE_EXIT) {
+      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_EXIT) {
         state.data.menu_items.push_back({strings.EXIT, Core::State::ItemType::Exit, 0});
       }
     }

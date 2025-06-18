@@ -9,7 +9,7 @@ export module Core.Constants;
 import std;
 
 // 常量定义 - 保持与原有constants.hpp完全相同的接口
-export namespace Constants {
+export namespace Core::Constants {
 
 // 应用程序基本信息
 const std::wstring APP_NAME = L"SpinningMomo";
@@ -160,4 +160,4 @@ extern const LocalizedStrings ZH_CN;
 
 // 英文字符串声明
 extern const LocalizedStrings EN_US;
-}  // namespace Constants
+}  // namespace Core::Constants

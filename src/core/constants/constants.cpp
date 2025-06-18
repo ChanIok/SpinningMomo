@@ -2,8 +2,9 @@ module;
 
 module Core.Constants;
 
+namespace Core::Constants {
 // 中文字符串定义
-const Constants::LocalizedStrings Constants::ZH_CN = {
+const LocalizedStrings ZH_CN = {
     L"旋转吧大喵",
     L"选择窗口",
     L"窗口比例",
@@ -100,3 +101,5 @@ const Constants::LocalizedStrings Constants::EN_US = {
     L"Letterbox",
     L"Toggle Window Border",
 };
+
+}  // namespace Core::Constants

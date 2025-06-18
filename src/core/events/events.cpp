@@ -6,7 +6,6 @@ import std;
 
 namespace Core::Events {
 
-namespace {
 // 内部处理器调用
 auto call_handlers(EventBus& bus, const Event& event) -> void {
   // 调用函数回调处理器
@@ -21,7 +20,6 @@ auto call_handlers(EventBus& bus, const Event& event) -> void {
     }
   }
 }
-}  // namespace
 
 auto subscribe(EventBus& bus, EventType type, EventHandler handler) -> void {
   if (handler) {

@@ -34,5 +34,4 @@ export class Application {
 
   // 内部辅助函数
   auto LogSystemInfo() -> void;
-  auto RegisterEventHandlers() -> void;
 };
