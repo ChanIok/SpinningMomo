@@ -3,6 +3,7 @@ module;
 module Handlers.Window;
 
 import std;
+import Core.Actions;
 import Core.Config.Io;
 import Core.Events;
 import Core.State;
@@ -79,6 +80,13 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
 
   // 后续处理
   post_transform_actions(state, *target_window, new_resolution);
+
+  // 通过Action更新UI状态
+  Core::Actions::dispatch_action(
+      state, Core::Actions::Action{Core::Actions::Payloads::SetCurrentRatio{.index = data.index}});
+
+  // 手动触发UI更新 (之前Action未触发)
+  Core::Actions::trigger_ui_update(state);
 }
 
 // 处理分辨率改变事件
@@ -124,6 +132,14 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
 
   // 后续处理
   post_transform_actions(state, *target_window, new_resolution);
+
+  // 通过Action更新UI状态
+  Core::Actions::dispatch_action(
+      state,
+      Core::Actions::Action{Core::Actions::Payloads::SetCurrentResolution{.index = data.index}});
+
+  // 手动触发UI更新 (之前Action未触发)
+  Core::Actions::trigger_ui_update(state);
 }
 
 // 处理窗口动作事件
@@ -147,10 +163,12 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
         return;
       }
 
-      // 重置UI状态
-      UI::AppWindow::set_current_ratio(state,
-                                       std::numeric_limits<size_t>::max());  // 表示使用屏幕比例
-      UI::AppWindow::set_current_resolution(state, 0);
+      // 通过Action重置UI状态
+      Core::Actions::dispatch_action(
+          state, Core::Actions::Action{Core::Actions::Payloads::ResetWindowState{}});
+
+      // 窗口重置完成，手动更新UI
+      Core::Actions::trigger_ui_update(state);
 
       Logger().debug("Window reset to screen size successfully");
       break;

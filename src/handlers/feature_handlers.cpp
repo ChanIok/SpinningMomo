@@ -3,10 +3,10 @@ module;
 module Handlers.Feature;
 
 import std;
+import Core.Actions;
 import Core.Config.Io;
 import Core.Events;
 import Core.State;
-import UI.AppWindow;
 import Utils.Logger;
 
 namespace Handlers {
@@ -22,20 +22,28 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
     bool config_changed = false;
     switch (data.feature) {
       case FeatureType::Preview:
-        UI::AppWindow::set_preview_enabled(app_state, data.enabled);
+        Core::Actions::dispatch_action(
+            app_state, Core::Actions::Action{
+                           Core::Actions::Payloads::TogglePreview{.enabled = data.enabled}});
         // app_state.config.menu.use_floating_window = data.enabled; // 假设预览就是浮动窗口
         // config_changed = true;
         break;
       case FeatureType::Overlay:
-        UI::AppWindow::set_overlay_enabled(app_state, data.enabled);
+        Core::Actions::dispatch_action(
+            app_state, Core::Actions::Action{
+                           Core::Actions::Payloads::ToggleOverlay{.enabled = data.enabled}});
         // Overlay 通常是临时状态，不写入配置
         break;
       case FeatureType::Letterbox:
-        UI::AppWindow::set_letterbox_enabled(app_state, data.enabled);
+        Core::Actions::dispatch_action(
+            app_state, Core::Actions::Action{
+                           Core::Actions::Payloads::ToggleLetterbox{.enabled = data.enabled}});
         app_state.config.letterbox.enabled = data.enabled;
         config_changed = true;
         break;
     }
+
+    Core::Actions::trigger_ui_update(app_state);
 
     if (config_changed) {
       if (auto result = Core::Config::Io::save(app_state.config); !result) {
@@ -45,4 +53,4 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
   });
 }
 
-} 
+}  // namespace Handlers

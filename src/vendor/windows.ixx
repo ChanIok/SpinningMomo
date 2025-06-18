@@ -45,6 +45,11 @@ export auto PostQuitMessage(int nExitCode) -> void {
   ::PostQuitMessage(nExitCode);
 }
 
+// 窗口重绘相关的包装函数
+export auto InvalidateRect(HWND hWnd, const RECT* lpRect, BOOL bErase) -> BOOL {
+  return ::InvalidateRect(hWnd, lpRect, bErase);
+}
+
 // 系统信息相关的包装函数
 export auto GetVersionExW(LPOSVERSIONINFOW lpVersionInformation) -> BOOL {
   return ::GetVersionExW(lpVersionInformation);
@@ -74,5 +79,8 @@ export using MSG = ::MSG;
 export using OSVERSIONINFOEXW = ::OSVERSIONINFOEXW;
 export using LPOSVERSIONINFOW = ::LPOSVERSIONINFOW;
 export using DWORD = ::DWORD;
+
+// 窗口相关类型
+export using RECT = ::RECT;
 
 }  // namespace Vendor::Windows

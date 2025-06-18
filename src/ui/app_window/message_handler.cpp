@@ -8,6 +8,7 @@ module;
 module UI.AppWindow.MessageHandler;
 
 import std;
+import Core.Actions;
 import Core.Events;
 import Core.State;
 import UI.AppWindow.Rendering;
@@ -117,20 +118,21 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
   const int new_hover_index = get_item_index_from_point(state, x, y);
   if (new_hover_index != state.ui.hover_index) {
-    state.ui.hover_index = new_hover_index;
+    Core::Actions::dispatch_action(
+        state, Core::Actions::Action{
+                   Core::Actions::Payloads::UpdateHoverIndex{.index = new_hover_index}});
+
+    Core::Actions::trigger_ui_update(state);
     ensure_mouse_tracking(state.window.hwnd);
-    if (state.window.hwnd) {
-      InvalidateRect(state.window.hwnd, nullptr, TRUE);
-    }
   }
 }
 
 // 处理鼠标移出窗口，重置悬停状态并重绘
 auto handle_mouse_leave(Core::State::AppState& state) -> void {
-  state.ui.hover_index = -1;
-  if (state.window.hwnd) {
-    InvalidateRect(state.window.hwnd, nullptr, TRUE);
-  }
+  Core::Actions::dispatch_action(
+      state, Core::Actions::Action{Core::Actions::Payloads::UpdateHoverIndex{.index = -1}});
+
+  Core::Actions::trigger_ui_update(state);
 }
 
 // 处理鼠标左键点击，分发项目点击事件
