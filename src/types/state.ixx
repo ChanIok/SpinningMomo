@@ -46,7 +46,7 @@ struct WindowState {
 // UI交互状态
 struct UIState {
   int hover_index = -1;
-  size_t current_ratio_index = 0;
+  size_t current_ratio_index = std::numeric_limits<size_t>::max();
   size_t current_resolution_index = 0;
   bool preview_enabled = false;
   bool overlay_enabled = false;
@@ -104,4 +104,4 @@ struct RenderState {
   }
 };
 
-}  // namespace Types::State 
+}  // namespace Types::State

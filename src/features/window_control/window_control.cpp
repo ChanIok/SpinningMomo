@@ -1,11 +1,13 @@
 module;
 
-#include <iostream>
 #include <windows.h>
+
+#include <iostream>
 
 module Features.WindowControl;
 
 import std;
+import Vendor.Std;
 
 namespace Features::WindowControl {
 
@@ -183,6 +185,69 @@ auto toggle_window_border(HWND hwnd) -> std::expected<bool, std::string> {
 
   // 返回切换后的状态
   return !hasBorder;
+}
+
+// 根据比例和总像素计算分辨率
+auto calculate_resolution(double ratio, std::uint64_t total_pixels) -> Resolution {
+  double height_d = std::sqrt(static_cast<double>(total_pixels) / ratio);
+  double width_d = height_d * ratio;
+
+  int height = static_cast<int>(Vendor::Std::round(height_d));
+  int width = static_cast<int>(Vendor::Std::round(width_d));
+
+  return {width, height};
+}
+
+// 根据屏幕尺寸和比例计算分辨率
+auto calculate_resolution_by_screen(double ratio) -> Resolution {
+  int screen_width = GetSystemMetrics(SM_CXSCREEN);
+  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  double screen_ratio = static_cast<double>(screen_width) / screen_height;
+
+  if (ratio > screen_ratio) {
+    // 宽比例，以屏幕宽度为基准
+    int width = screen_width;
+    int height = static_cast<int>(Vendor::Std::round(width / ratio));
+    return {width, height};
+  } else {
+    // 高比例，以屏幕高度为基准
+    int height = screen_height;
+    int width = static_cast<int>(Vendor::Std::round(height * ratio));
+    return {width, height};
+  }
+}
+
+// 应用窗口变换
+auto apply_window_transform(HWND target_window, const Resolution& resolution,
+                            const TransformOptions& options) -> std::expected<void, std::string> {
+  if (!target_window || !IsWindow(target_window)) {
+    return std::unexpected{"Invalid window handle provided."};
+  }
+
+  // 调用现有的调整窗口大小函数
+  auto result = resize_and_center_window(target_window, resolution.width, resolution.height,
+                                         options.taskbar_lower, options.activate_window);
+
+  if (!result) {
+    return std::unexpected{result.error()};
+  }
+
+  return {};
+}
+
+// 重置窗口到屏幕尺寸
+auto reset_window_to_screen(HWND target_window, const TransformOptions& options)
+    -> std::expected<void, std::string> {
+  if (!target_window || !IsWindow(target_window)) {
+    return std::unexpected{"Invalid window handle provided."};
+  }
+
+  int screen_width = GetSystemMetrics(SM_CXSCREEN);
+  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  double screen_ratio = static_cast<double>(screen_width) / screen_height;
+
+  Resolution screen_resolution = calculate_resolution_by_screen(screen_ratio);
+  return apply_window_transform(target_window, screen_resolution, options);
 }
 
 }  // namespace Features::WindowControl
