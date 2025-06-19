@@ -8,6 +8,7 @@ import Core.Config.Io;
 import Core.Events;
 import Core.State;
 import Features.WindowControl;
+import Features.Notifications;
 import UI.AppWindow;
 import Utils.Logger;
 import Vendor.Windows;
@@ -20,7 +21,6 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
 auto handle_window_action(Core::State::AppState& state, const Core::Events::Event& event) -> void;
 auto get_current_ratio(const Core::State::AppState& state) -> double;
 auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64_t;
-auto show_notification(Core::State::AppState& state, const std::string& message) -> void;
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window,
                             const Features::WindowControl::Resolution& resolution) -> void;
 
@@ -49,7 +49,7 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   // 查找目标窗口
   auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
   if (!target_window) {
-    show_notification(state, "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
     return;
   }
 
@@ -71,7 +71,7 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
-    show_notification(state, "Failed to apply window transform: " + result.error());
+    Features::Notifications::show_notification(state, "SpinningMomo", "Failed to apply window transform: " + result.error());
     return;
   }
 
@@ -99,7 +99,7 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   // 查找目标窗口
   auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
   if (!target_window) {
-    show_notification(state, "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
     return;
   }
 
@@ -123,7 +123,7 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
-    show_notification(state, "Failed to apply window transform: " + result.error());
+    Features::Notifications::show_notification(state, "SpinningMomo", "Failed to apply window transform: " + result.error());
     return;
   }
 
@@ -150,7 +150,7 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
     case Core::Events::WindowAction::Reset: {
       auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
       if (!target_window) {
-        show_notification(state, "Target window not found. Please ensure the game is running.");
+        Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
         return;
       }
 
@@ -159,7 +159,7 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
 
       auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
       if (!result) {
-        show_notification(state, "Failed to reset window: " + result.error());
+        Features::Notifications::show_notification(state, "SpinningMomo", "Failed to reset window: " + result.error());
         return;
       }
 
@@ -197,15 +197,6 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
     return state.data.resolutions[state.ui.current_resolution_index].totalPixels;
   }
   return 0;  // 表示使用屏幕尺寸
-}
-
-// 显示通知
-auto show_notification(Core::State::AppState& state, const std::string& message) -> void {
-  Logger().debug("Showing notification: {}", message);
-  //   using namespace Core::Events;
-  //   post_event(state.event_bus, {EventType::SystemCommand,
-  //                                std::string("show_notification:") + message,
-  //                                state.window.hwnd});
 }
 
 // 变换后的后续处理

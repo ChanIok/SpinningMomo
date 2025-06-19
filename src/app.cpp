@@ -8,6 +8,7 @@ import Core.Constants;
 import Core.Events;
 import Core.State;
 import Handlers.EventRegistrar;
+import Features.Notifications;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
@@ -86,16 +87,31 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
 auto Application::Run() -> int {
   Vendor::Windows::MSG msg{};
-  while (Vendor::Windows::GetWindowMessage(&msg, nullptr, 0, 0)) {
-    Vendor::Windows::TranslateWindowMessage(&msg);
-    Vendor::Windows::DispatchWindowMessage(&msg);
+  const auto timeout = 16;  // ~60 FPS
 
-    // 处理自定义事件
+  while (true) {
+    // 等待消息或超时
+    Vendor::Windows::MsgWaitForMultipleObjectsEx(0, nullptr, timeout,
+                                                 Vendor::Windows::QS_ALLINPUT_t,
+                                                 Vendor::Windows::MWMO_INPUTAVAILABLE_t);
+
+    // 处理所有挂起的消息
+    while (Vendor::Windows::PeekMessageW(&msg, nullptr, 0, 0, Vendor::Windows::PM_REMOVE_t)) {
+      if (msg.message == Vendor::Windows::WM_QUIT_t) {
+        return static_cast<int>(msg.wParam);
+      }
+      Vendor::Windows::TranslateWindowMessage(&msg);
+      Vendor::Windows::DispatchWindowMessageW(&msg);
+    }
+
+    // 在处理完消息或超时后，运行我们的更新逻辑
     if (m_app_state) {
       Core::Events::process_events(m_app_state->event_bus);
+
+      // 更新通知系统
+      Features::Notifications::update_notifications(*m_app_state);
     }
   }
-  return static_cast<int>(msg.wParam);
 }
 
 auto Application::LogSystemInfo() -> void {

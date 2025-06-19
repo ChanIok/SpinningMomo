@@ -6,6 +6,7 @@ import std;
 import Core.Events;
 import Types.Config;
 import Types.State;
+import Types.Notification;
 import Vendor.Windows;
 
 namespace Core::State {
@@ -25,6 +26,7 @@ export struct AppState {
   DataState data;
   RenderState render;
   Core::Events::EventBus event_bus;
+  Types::Notification::NotificationSystemState notifications;
 
   // 便捷访问方法
   auto is_window_valid() const -> bool { return window.hwnd != nullptr; }
