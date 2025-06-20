@@ -50,6 +50,9 @@ constexpr UINT ID_OVERLAY_WINDOW = 2018;            // 叠加层菜单项ID
 constexpr UINT ID_LETTERBOX_WINDOW = 2019;          // 黑边模式菜单项ID
 constexpr UINT ID_TOGGLE_BORDERLESS = 2020;         // 切换边框模式菜单项ID
 
+// 资源 ID
+constexpr int IDI_ICON1 = 101;
+
 // 配置文件相关
 const std::wstring CONFIG_FILE = L"config.ini";  // 配置文件名
 

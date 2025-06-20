@@ -12,10 +12,15 @@ import Features.Notifications;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
+import UI.TrayIcon;
 import Vendor.Windows;
 
 Application::Application() = default;
-Application::~Application() = default;
+Application::~Application() {
+    if (m_app_state) {
+        UI::TrayIcon::destroy(*m_app_state);
+    }
+}
 
 auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
   m_h_instance = hInstance;
@@ -67,6 +72,12 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     if (auto result = UI::AppWindow::create_window(*m_app_state); !result) {
       Logger().error("Failed to create app window: {}", result.error());
       return false;
+    }
+
+    // 创建托盘图标
+    if (auto result = UI::TrayIcon::create(*m_app_state); !result) {
+        Logger().warn("Failed to create tray icon: {}", result.error());
+        // This might not be a fatal error, so we just log a warning.
     }
 
     // 默认显示窗口

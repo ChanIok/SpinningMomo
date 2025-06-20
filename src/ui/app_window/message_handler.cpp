@@ -11,7 +11,9 @@ import std;
 import Core.Actions;
 import Core.Events;
 import Core.State;
+import Core.Constants;
 import UI.AppWindow.Rendering;
+import UI.TrayIcon;
 
 namespace UI::AppWindow::MessageHandler {
 
@@ -24,6 +26,7 @@ auto handle_left_click(Core::State::AppState& state, int x, int y) -> void;
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void;
 auto dispatch_item_click_event(Core::State::AppState& state, const Core::State::MenuItem& item)
     -> void;
+auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void;
 auto ensure_mouse_tracking(HWND hwnd) -> void;
 
 // 静态窗口过程函数，将窗口句柄与应用程序状态关联起来
@@ -49,6 +52,16 @@ LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM l
 auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
                       LPARAM lParam) -> LRESULT {
   switch (msg) {
+    case Core::Constants::WM_TRAYICON:
+        if (lParam == WM_RBUTTONUP || lParam == WM_LBUTTONUP) {
+            UI::TrayIcon::show_context_menu(state);
+        }
+        return 0;
+    
+    case WM_COMMAND:
+        handle_tray_command(state, LOWORD(wParam));
+        return 0;
+        
     case WM_HOTKEY:
       handle_hotkey(state, wParam);
       return 0;
@@ -222,6 +235,68 @@ auto dispatch_item_click_event(Core::State::AppState& state, const Core::State::
       post_event(state.event_bus, {EventType::WindowAction, WindowAction::Exit, state.window.hwnd});
       break;
   }
+}
+
+// 新增：处理来自托盘菜单的命令
+auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void {
+    using namespace Core::Events;
+
+    if (command_id >= Core::Constants::ID_RATIO_BASE && command_id < Core::Constants::ID_RESOLUTION_BASE) {
+        // Handle ratio selection
+        const size_t index = command_id - Core::Constants::ID_RATIO_BASE;
+        if (index < state.data.ratios.size()) {
+            const auto& ratio_preset = state.data.ratios[index];
+            post_event(state.event_bus, {EventType::RatioChanged,
+                                         RatioChangeData{index, ratio_preset.name, ratio_preset.ratio},
+                                         state.window.hwnd});
+        }
+        return;
+    }
+
+    if (command_id >= Core::Constants::ID_RESOLUTION_BASE && command_id < Core::Constants::ID_WINDOW_BASE) {
+        // Handle resolution selection
+        const size_t index = command_id - Core::Constants::ID_RESOLUTION_BASE;
+        if (index < state.data.resolutions.size()) {
+            const auto& res_preset = state.data.resolutions[index];
+            post_event(state.event_bus,
+                       {EventType::ResolutionChanged,
+                        ResolutionChangeData{
+                            index, res_preset.name,
+                            res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
+                        state.window.hwnd});
+        }
+        return;
+    }
+    
+    // Handle other commands
+    switch (command_id) {
+        case Core::Constants::ID_EXIT:
+            post_event(state.event_bus, {EventType::WindowAction, WindowAction::Exit, state.window.hwnd});
+            break;
+        case Core::Constants::ID_RESET:
+            post_event(state.event_bus, {EventType::WindowAction, WindowAction::Reset, state.window.hwnd});
+            break;
+        case Core::Constants::ID_CAPTURE_WINDOW:
+            post_event(state.event_bus, {EventType::WindowAction, WindowAction::Capture, state.window.hwnd});
+            break;
+        case Core::Constants::ID_OPEN_SCREENSHOT:
+             post_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshot, state.window.hwnd});
+            break;
+        case Core::Constants::ID_PREVIEW_WINDOW:
+            post_event(state.event_bus, {EventType::ToggleFeature, FeatureToggleData{FeatureType::Preview, !state.ui.preview_enabled}, state.window.hwnd});
+            break;
+        case Core::Constants::ID_OVERLAY_WINDOW:
+            post_event(state.event_bus, {EventType::ToggleFeature, FeatureToggleData{FeatureType::Overlay, !state.ui.overlay_enabled}, state.window.hwnd});
+            break;
+        case Core::Constants::ID_LETTERBOX_WINDOW:
+            post_event(state.event_bus, {EventType::ToggleFeature, FeatureToggleData{FeatureType::Letterbox, !state.ui.letterbox_enabled}, state.window.hwnd});
+            break;
+        // Add other cases for config, hotkey, language, etc.
+        // For example:
+        // case Core::Constants::ID_CONFIG:
+        //     post_event(state.event_bus, {EventType::SystemCommand, std::string("open_config"), state.window.hwnd});
+        //     break;
+    }
 }
 
 }  // namespace UI::AppWindow::MessageHandler

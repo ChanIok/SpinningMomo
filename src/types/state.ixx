@@ -7,6 +7,7 @@ export module Types.State;
 import std;
 import Core.Constants;
 import Types.Presets;
+import Features.WindowControl;
 
 export namespace Types::State {
 
@@ -58,6 +59,7 @@ struct DataState {
   std::vector<Types::Presets::RatioPreset> ratios;
   std::vector<Types::Presets::ResolutionPreset> resolutions;
   std::vector<MenuItem> menu_items;
+  std::vector<Features::WindowControl::WindowInfo> windows;
   const Core::Constants::LocalizedStrings* strings = nullptr;
   std::vector<std::wstring> menu_items_to_show;
 };

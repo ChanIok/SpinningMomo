@@ -7,6 +7,7 @@ import Core.Events;
 import Types.Config;
 import Types.State;
 import Types.Notification;
+import Types.TrayIcon;
 import Vendor.Windows;
 
 namespace Core::State {
@@ -27,6 +28,7 @@ export struct AppState {
   RenderState render;
   Core::Events::EventBus event_bus;
   Types::Notification::NotificationSystemState notifications;
+  Types::TrayIcon::Data tray_icon;
 
   // 便捷访问方法
   auto is_window_valid() const -> bool { return window.hwnd != nullptr; }
