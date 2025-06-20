@@ -5,7 +5,6 @@ export module Core.Events;
 import std;
 import Vendor.Windows;
 
-// 应用程序事件系统
 namespace Core::Events {
 
 // 事件类型枚举
@@ -20,11 +19,11 @@ export enum class EventType {
 
 // 窗口动作类型
 export enum class WindowAction {
-  Capture,     // 截图
-  Screenshot,  // 打开相册
-  Reset,       // 重置窗口
-  Close,       // 关闭窗口
-  Exit         // 退出程序
+  Capture,      // 截图
+  Screenshots,  // 打开相册
+  Reset,        // 重置窗口
+  Hide,         // 关闭窗口
+  Exit          // 退出程序
 };
 
 // 功能开关类型

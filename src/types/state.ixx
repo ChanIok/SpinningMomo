@@ -21,7 +21,7 @@ enum class ItemType {
   OverlayWindow,
   LetterboxWindow,
   Reset,
-  Close,
+  Hide,
   Exit
 };
 

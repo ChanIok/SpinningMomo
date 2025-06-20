@@ -117,7 +117,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_CLOSE:
       Core::Events::post_event(state.event_bus,
                                {Core::Events::EventType::WindowAction,
-                                Core::Events::WindowAction::Close, state.window.hwnd});
+                                Core::Events::WindowAction::Hide, state.window.hwnd});
       return 0;
 
     case WM_DESTROY:
@@ -221,15 +221,15 @@ auto dispatch_item_click_event(Core::State::AppState& state, const Core::State::
       break;
     case Core::State::ItemType::OpenScreenshot:
       post_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Screenshot, state.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Screenshots, state.window.hwnd});
       break;
     case Core::State::ItemType::Reset:
       post_event(state.event_bus,
                  {EventType::WindowAction, WindowAction::Reset, state.window.hwnd});
       break;
-    case Core::State::ItemType::Close:
+    case Core::State::ItemType::Hide:
       post_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Close, state.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Hide, state.window.hwnd});
       break;
     case Core::State::ItemType::Exit:
       post_event(state.event_bus, {EventType::WindowAction, WindowAction::Exit, state.window.hwnd});
@@ -280,7 +280,7 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
             post_event(state.event_bus, {EventType::WindowAction, WindowAction::Capture, state.window.hwnd});
             break;
         case Core::Constants::ID_OPEN_SCREENSHOT:
-             post_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshot, state.window.hwnd});
+             post_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots, state.window.hwnd});
             break;
         case Core::Constants::ID_PREVIEW_WINDOW:
             post_event(state.event_bus, {EventType::ToggleFeature, FeatureToggleData{FeatureType::Preview, !state.ui.preview_enabled}, state.window.hwnd});

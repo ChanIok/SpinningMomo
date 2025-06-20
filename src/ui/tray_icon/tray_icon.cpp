@@ -2,6 +2,8 @@ module;
 
 #include <windows.h>
 
+#include <iostream>
+
 module UI.TrayIcon;
 
 import std;

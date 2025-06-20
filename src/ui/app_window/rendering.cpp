@@ -104,7 +104,7 @@ auto count_items_per_column(const std::vector<Core::State::MenuItem>& items) -> 
       case ItemType::LetterboxWindow:
       case ItemType::PreviewWindow:
       case ItemType::Reset:
-      case ItemType::Close:
+      case ItemType::Hide:
       case ItemType::Exit:
         ++counts.settings_count;
         break;
@@ -168,7 +168,7 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
     if (item.type == ItemType::CaptureWindow || item.type == ItemType::OpenScreenshot ||
         item.type == ItemType::PreviewWindow || item.type == ItemType::OverlayWindow ||
         item.type == ItemType::LetterboxWindow || item.type == ItemType::Reset ||
-        item.type == ItemType::Close || item.type == ItemType::Exit) {
+        item.type == ItemType::Hide || item.type == ItemType::Exit) {
       if (y >= settings_y && y < settings_y + render.item_height) {
         return static_cast<int>(i);
       }
@@ -248,7 +248,7 @@ auto draw_items(HDC mem_dc, const RECT& rect, const Core::State::AppState& state
       case ItemType::OverlayWindow:
       case ItemType::LetterboxWindow:
       case ItemType::Reset:
-      case ItemType::Close:
+      case ItemType::Hide:
       case ItemType::Exit:
         item_rect = {bounds.resolution_column_right + render.separator_height, settings_y,
                      rect.right, settings_y + render.item_height};

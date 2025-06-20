@@ -224,7 +224,7 @@ auto initialize_menu_items(Core::State::AppState& state,
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_RESET) {
         state.data.menu_items.push_back({strings.RESET_WINDOW, Core::State::ItemType::Reset, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_CLOSE) {
-        state.data.menu_items.push_back({strings.CLOSE_WINDOW, Core::State::ItemType::Close, 0});
+        state.data.menu_items.push_back({strings.CLOSE_WINDOW, Core::State::ItemType::Hide, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_EXIT) {
         state.data.menu_items.push_back({strings.EXIT, Core::State::ItemType::Exit, 0});
       }
@@ -242,7 +242,7 @@ auto initialize_menu_items(Core::State::AppState& state,
     state.data.menu_items.push_back(
         {strings.LETTERBOX_WINDOW, Core::State::ItemType::LetterboxWindow, 0});
     state.data.menu_items.push_back({strings.RESET_WINDOW, Core::State::ItemType::Reset, 0});
-    state.data.menu_items.push_back({strings.CLOSE_WINDOW, Core::State::ItemType::Close, 0});
+    state.data.menu_items.push_back({strings.CLOSE_WINDOW, Core::State::ItemType::Hide, 0});
   }
 }
 
