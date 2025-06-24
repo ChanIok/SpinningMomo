@@ -24,7 +24,7 @@ enum class State {
   Triggered  // 定时器已触发
 };
 
-class Timer {
+export class Timer {
  public:
   Timer();
   ~Timer();

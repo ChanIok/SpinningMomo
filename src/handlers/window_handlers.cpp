@@ -78,14 +78,11 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   Logger().debug("Window transform applied successfully: {}x{}", new_resolution.width,
                  new_resolution.height);
 
-  // 后续处理
   post_transform_actions(state, *target_window, new_resolution);
 
-  // 通过Action更新UI状态
   Core::Actions::dispatch_action(
       state, Core::Actions::Action{Core::Actions::Payloads::SetCurrentRatio{.index = data.index}});
 
-  // 手动触发UI更新 (之前Action未触发)
   Core::Actions::trigger_ui_update(state);
 }
 
@@ -130,15 +127,12 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   Logger().debug("Window transform applied successfully: {}x{}", new_resolution.width,
                  new_resolution.height);
 
-  // 后续处理
   post_transform_actions(state, *target_window, new_resolution);
 
-  // 通过Action更新UI状态
   Core::Actions::dispatch_action(
       state,
       Core::Actions::Action{Core::Actions::Payloads::SetCurrentResolution{.index = data.index}});
 
-  // 手动触发UI更新 (之前Action未触发)
   Core::Actions::trigger_ui_update(state);
 }
 
@@ -163,11 +157,9 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
         return;
       }
 
-      // 通过Action重置UI状态
       Core::Actions::dispatch_action(
           state, Core::Actions::Action{Core::Actions::Payloads::ResetWindowState{}});
 
-      // 窗口重置完成，手动更新UI
       Core::Actions::trigger_ui_update(state);
 
       Logger().debug("Window reset to screen size successfully");

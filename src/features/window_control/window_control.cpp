@@ -34,7 +34,7 @@ auto find_target_window(const std::wstring& configured_title) -> std::expected<H
   // 2. 如果找不到，尝试预设的游戏窗口标题
   if (!gameWindow) {
     // 先尝试查找中文标题
-    gameWindow = FindWindow(nullptr, L"无限暖暖  ");  // 精确匹配，包括两个尾部空格
+    gameWindow = FindWindow(nullptr, L"无限暖暖");  // 精确匹配，包括两个尾部空格
     if (!gameWindow) {
       // 如果找不到中文标题，尝试英文标题
       gameWindow = FindWindow(nullptr, L"Infinity Nikki  ");

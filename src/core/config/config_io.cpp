@@ -4,10 +4,10 @@ module;
 #include <windows.h>
 
 #include <expected>
+#include <filesystem>
 #include <format>
 #include <string>
 #include <vector>
-#include <filesystem>
 
 module Core.Config.Io;
 
@@ -104,13 +104,15 @@ auto create_default_config_file(const std::wstring& path) -> std::expected<void,
 }
 
 // 从文件加载配置到 AppConfig
-auto load_from_file(const std::wstring& path) -> std::expected<Types::Config::AppConfig, std::string> {
+auto load_from_file(const std::wstring& path)
+    -> std::expected<Types::Config::AppConfig, std::string> {
   try {
     Types::Config::AppConfig cfg;
     cfg.config_file_path = path;
 
     // Hotkey
-    cfg.hotkey.modifiers = read_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, 3);
+    cfg.hotkey.modifiers =
+        read_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS, 3);
     cfg.hotkey.key = read_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_KEY, 82);
 
     // Window
@@ -213,9 +215,9 @@ auto initialize() -> std::expected<Types::Config::AppConfig, std::string> {
     if (!dir_result) {
       return std::unexpected("Failed to get executable directory: " + dir_result.error());
     }
-    
+
     auto config_path = dir_result.value() / std::filesystem::path(Constants::CONFIG_FILE);
-    
+
     // 检查文件是否存在
     if (!std::filesystem::exists(config_path)) {
       if (auto result = create_default_config_file(config_path.wstring()); !result) {
@@ -227,7 +229,7 @@ auto initialize() -> std::expected<Types::Config::AppConfig, std::string> {
     if (!load_result) {
       return std::unexpected("Failed to load configuration: " + load_result.error());
     }
-    
+
     return load_result.value();
   } catch (const std::exception& e) {
     return std::unexpected(std::string("Initialization failed: ") + e.what());

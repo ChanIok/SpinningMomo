@@ -120,20 +120,23 @@ auto Timer::StartWaitThread() -> void {
       callback();
     }
   });
+  
+  // 分离线程使其独立运行，避免在回调中Cancel时发生死锁
+  m_waitThread.detach();
 }
 
 auto Timer::Cancel() -> void {
-  // 停止等待线程
-  if (m_waitThread.joinable()) {
-    m_waitThread.request_stop();
-    m_waitThread.join();
-  }
-
   // 设置状态为空闲，不管之前是什么状态
   State previousState = m_state.exchange(State::Idle);
 
+  // 如果定时器正在运行，取消Windows定时器对象
   if (previousState == State::Running && m_timer) {
     CancelWaitableTimer(m_timer);
+  }
+  
+  // 请求停止线程（如果线程还存在的话）
+  if (m_waitThread.joinable()) {
+    m_waitThread.request_stop();
   }
 }
 

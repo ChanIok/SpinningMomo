@@ -9,6 +9,7 @@ import Core.Events;
 import Core.State;
 import Handlers.EventRegistrar;
 import Features.Notifications;
+import Features.Preview.Window;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
@@ -17,9 +18,10 @@ import Vendor.Windows;
 
 Application::Application() = default;
 Application::~Application() {
-    if (m_app_state) {
-        UI::TrayIcon::destroy(*m_app_state);
-    }
+  if (m_app_state) {
+    Features::Preview::Window::cleanup_preview(*m_app_state);
+    UI::TrayIcon::destroy(*m_app_state);
+  }
 }
 
 auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
@@ -76,8 +78,16 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
     // 创建托盘图标
     if (auto result = UI::TrayIcon::create(*m_app_state); !result) {
-        Logger().warn("Failed to create tray icon: {}", result.error());
-        // This might not be a fatal error, so we just log a warning.
+      Logger().warn("Failed to create tray icon: {}", result.error());
+      // This might not be a fatal error, so we just log a warning.
+    }
+
+    // 初始化预览系统
+    if (auto preview_result = Features::Preview::Window::initialize_preview(
+            *m_app_state, m_h_instance, m_app_state->window.hwnd);
+        !preview_result) {
+      Logger().warn("Failed to initialize preview system");
+      // 预览功能不可用，但应用继续运行
     }
 
     // 默认显示窗口
