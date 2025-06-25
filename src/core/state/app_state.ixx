@@ -9,6 +9,7 @@ import Types.State;
 import Types.Notification;
 import Types.TrayIcon;
 import Types.Preview;
+import Types.Screenshot;
 import Vendor.Windows;
 
 namespace Core::State {
@@ -31,6 +32,7 @@ export struct AppState {
   Types::Notification::NotificationSystemState notifications;
   Types::TrayIcon::Data tray_icon;
   Types::Preview::PreviewState preview;
+  Types::Screenshot::ScreenshotState screenshot;
 
   // 便捷访问方法
   auto is_window_valid() const -> bool { return window.hwnd != nullptr; }

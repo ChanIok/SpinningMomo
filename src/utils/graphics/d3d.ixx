@@ -34,6 +34,10 @@ export struct ShaderResources {
 export auto create_d3d_context(HWND hwnd, int width, int height)
     -> std::expected<D3DContext, std::string>;
 
+// 创建无头D3D设备（仅设备和上下文，无交换链）
+export auto create_headless_d3d_device()
+    -> std::expected<std::pair<Microsoft::WRL::ComPtr<ID3D11Device>, Microsoft::WRL::ComPtr<ID3D11DeviceContext>>, std::string>;
+
 // 创建渲染目标
 export auto create_render_target(D3DContext& context) -> std::expected<void, std::string>;
 

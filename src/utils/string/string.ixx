@@ -2,6 +2,8 @@ module;
 
 #include <windows.h>
 
+#include <chrono>
+#include <format>
 #include <string>
 
 export module Utils.String;
@@ -44,6 +46,18 @@ export [[nodiscard]] auto FromUtf8(const std::string& utf8_str) noexcept -> std:
                       result.data(), size_needed);
 
   return result;
+}
+
+// 格式化时间戳为文件名安全的字符串
+export [[nodiscard]] auto FormatTimestamp(const std::chrono::system_clock::time_point& time_point)
+    -> std::string {
+  using namespace std::chrono;
+
+  auto now = time_point;
+  auto local_time = zoned_time{current_zone(), now};
+  auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
+
+  return std::format("Screenshot_{:%Y%m%d_%H%M%S}_{:03d}.png", local_time, ms.count());
 }
 
 }  // namespace Utils::String

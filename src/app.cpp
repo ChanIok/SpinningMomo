@@ -10,6 +10,7 @@ import Core.State;
 import Handlers.EventRegistrar;
 import Features.Notifications;
 import Features.Preview.Window;
+import Features.Screenshot;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
@@ -20,6 +21,7 @@ Application::Application() = default;
 Application::~Application() {
   if (m_app_state) {
     Features::Preview::Window::cleanup_preview(*m_app_state);
+    Features::Screenshot::cleanup_system(m_app_state->screenshot);
     UI::TrayIcon::destroy(*m_app_state);
   }
 }

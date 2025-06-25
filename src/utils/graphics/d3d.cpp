@@ -61,6 +61,41 @@ auto create_d3d_context(HWND hwnd, int width, int height)
   return context;
 }
 
+auto create_headless_d3d_device()
+    -> std::expected<std::pair<Microsoft::WRL::ComPtr<ID3D11Device>, Microsoft::WRL::ComPtr<ID3D11DeviceContext>>, std::string> {
+  Microsoft::WRL::ComPtr<ID3D11Device> device;
+  Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+
+  UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+#ifdef _DEBUG
+  createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+  // 创建无头D3D设备（参考旧代码的实现）
+  HRESULT hr = D3D11CreateDevice(
+      nullptr,                    // 使用默认适配器
+      D3D_DRIVER_TYPE_HARDWARE,   // 硬件驱动
+      nullptr,                    // 软件光栅化器句柄
+      createDeviceFlags,          // 创建标志
+      nullptr,                    // 功能级别数组
+      0,                          // 功能级别数组大小
+      D3D11_SDK_VERSION,          // SDK版本
+      &device,                    // 输出设备
+      nullptr,                    // 输出功能级别
+      &context                    // 输出设备上下文
+  );
+
+  if (FAILED(hr)) {
+    auto error_msg = std::format("Failed to create headless D3D device, HRESULT: 0x{:08X}",
+                                 static_cast<unsigned int>(hr));
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  }
+
+  Logger().debug("Headless D3D device created successfully");
+  return std::make_pair(device, context);
+}
+
 auto create_render_target(D3DContext& context) -> std::expected<void, std::string> {
   // 获取后缓冲
   Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;

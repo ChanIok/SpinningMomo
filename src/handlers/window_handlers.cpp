@@ -9,6 +9,7 @@ import Core.Events;
 import Core.State;
 import Features.WindowControl;
 import Features.Notifications;
+import Features.Screenshot;
 import UI.AppWindow;
 import Utils.Logger;
 import Vendor.Windows;
@@ -163,6 +164,36 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
       Core::Actions::trigger_ui_update(state);
 
       Logger().debug("Window reset to screen size successfully");
+      break;
+    }
+    case Core::Events::WindowAction::Capture: {
+      auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+      if (!target_window) {
+        Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+        return;
+      }
+
+      // 创建截图完成回调
+      auto completion_callback = [&state](bool success, const std::wstring& path) {
+        if (success) {
+          // 转换路径为字符串用于通知
+          std::string path_str(path.begin(), path.end());
+          Features::Notifications::show_notification(state, "SpinningMomo", "Screenshot saved to: " + path_str);
+          Logger().debug("Screenshot saved successfully: {}", path_str);
+        } else {
+          Features::Notifications::show_notification(state, "SpinningMomo", "Failed to capture screenshot");
+          Logger().error("Screenshot capture failed");
+        }
+      };
+
+      // 执行截图
+      auto result = Features::Screenshot::take_screenshot(state.screenshot, *target_window, completion_callback);
+      if (!result) {
+        Features::Notifications::show_notification(state, "SpinningMomo", "Failed to start screenshot: " + result.error());
+        Logger().error("Failed to start screenshot: {}", result.error());
+      } else {
+        Logger().debug("Screenshot capture started successfully");
+      }
       break;
     }
     default:
