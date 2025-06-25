@@ -6,6 +6,7 @@ import std;
 import Core.Events;
 import Types.Config;
 import Types.State;
+import Types.UI;
 import Types.Notification;
 import Types.TrayIcon;
 import Types.Preview;
@@ -20,6 +21,7 @@ export using ::Types::State::MenuItem;
 export using ::Types::State::RenderState;
 export using ::Types::State::UIState;
 export using ::Types::State::WindowState;
+export using ::Types::UI::D2DRenderState;
 
 // 应用程序状态（所有状态的聚合）
 export struct AppState {
@@ -28,6 +30,7 @@ export struct AppState {
   UIState ui;
   DataState data;
   RenderState render;
+  Types::UI::D2DRenderState d2d_render;  // 新增Direct2D渲染状态
   Core::Events::EventBus event_bus;
   Types::Notification::NotificationSystemState notifications;
   Types::TrayIcon::Data tray_icon;

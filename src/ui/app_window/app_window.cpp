@@ -14,6 +14,8 @@ import Core.Events;
 import Core.State;
 import UI.AppWindow.MessageHandler;
 import UI.AppWindow.Rendering;
+import UI.Rendering.D2DInit;
+import Utils.Logger;
 
 namespace UI::AppWindow {
 
@@ -51,6 +53,12 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   // 创建窗口属性
   create_window_attributes(state.window.hwnd);
 
+  // 初始化Direct2D渲染
+  if (auto result = UI::Rendering::D2DInit::initialize_d2d(state, state.window.hwnd); !result) {
+    // Direct2D初始化失败，但不影响窗口创建，会回退到GDI渲染
+    Logger().warn("Failed to initialize Direct2D rendering: {}", result.error());
+  }
+
   return {};
 }
 
@@ -79,6 +87,10 @@ auto toggle_visibility(Core::State::AppState& state) -> void {
 
 auto destroy_window(Core::State::AppState& state) -> void {
   unregister_hotkey(state);
+
+  // 清理Direct2D资源
+  UI::Rendering::D2DInit::cleanup_d2d(state);
+
   if (state.window.hwnd) {
     DestroyWindow(state.window.hwnd);
     state.window.hwnd = nullptr;

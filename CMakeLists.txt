@@ -107,6 +107,8 @@ target_link_libraries(SpinningMomo PRIVATE
     d3d11 # Direct3D 11
     dxgi # DXGI
     d3dcompiler # D3D Compiler
+    d2d1 # Direct2D
+    dwrite # DirectWrite
     shell32 # Windows Shell API
     Shlwapi # Shell Light-Weight API
 )

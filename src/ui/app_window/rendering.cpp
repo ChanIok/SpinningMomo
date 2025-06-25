@@ -7,6 +7,9 @@ module UI.AppWindow.Rendering;
 
 import std;
 import Core.State;
+import Types.UI;
+import UI.Rendering.D2DPaint;
+import Utils.Logger;
 
 namespace UI::AppWindow {
 
@@ -124,37 +127,8 @@ auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds {
 }
 
 auto paint_window(HDC hdc, const RECT& client_rect, const Core::State::AppState& state) -> void {
-  // 创建双缓冲
-  HDC mem_dc = CreateCompatibleDC(hdc);
-  HBITMAP mem_bitmap = CreateCompatibleBitmap(hdc, client_rect.right, client_rect.bottom);
-  HBITMAP old_bitmap = static_cast<HBITMAP>(SelectObject(mem_dc, mem_bitmap));
-
-  // 设置文本属性，使用 DPI 感知的字体大小
-  SetBkMode(mem_dc, TRANSPARENT);
-  HFONT h_font = create_scaled_font(state.render.font_size);
-  HFONT old_font = static_cast<HFONT>(SelectObject(mem_dc, h_font));
-
-  // 绘制各个部分
-  draw_background(mem_dc, client_rect);
-  draw_title_bar(mem_dc, client_rect, state);
-  draw_separators(mem_dc, client_rect, state);
-  draw_items(mem_dc, client_rect, state, h_font);
-
-  // 复制到屏幕
-  BitBlt(hdc, 0, 0, client_rect.right, client_rect.bottom, mem_dc, 0, 0, SRCCOPY);
-
-  // 清理资源
-  SelectObject(mem_dc, old_font);
-  DeleteObject(h_font);
-  SelectObject(mem_dc, old_bitmap);
-  DeleteObject(mem_bitmap);
-  DeleteDC(mem_dc);
-}
-
-auto create_scaled_font(int font_size) -> HFONT {
-  return CreateFontW(-font_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
-                     OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
-                     DEFAULT_PITCH | FF_DONTCARE, L"微软雅黑");
+  // 只使用Direct2D渲染
+  UI::Rendering::D2DPaint::paint_window_d2d(state, client_rect);
 }
 
 auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
@@ -176,129 +150,6 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
     }
   }
   return -1;
-}
-
-auto draw_background(HDC mem_dc, const RECT& rect) -> void {
-  HBRUSH h_back_brush = CreateSolidBrush(RGB(255, 255, 255));
-  FillRect(mem_dc, &rect, h_back_brush);
-  DeleteObject(h_back_brush);
-}
-
-auto draw_title_bar(HDC mem_dc, const RECT& rect, const Core::State::AppState& state) -> void {
-  // 绘制标题栏
-  RECT title_rect = rect;
-  title_rect.bottom = state.render.title_height;
-  HBRUSH h_title_brush = CreateSolidBrush(RGB(240, 240, 240));
-  FillRect(mem_dc, &title_rect, h_title_brush);
-  DeleteObject(h_title_brush);
-
-  // 绘制标题文本
-  SetTextColor(mem_dc, RGB(51, 51, 51));
-  title_rect.left += state.render.text_padding;
-  DrawTextW(mem_dc, L"SpinningMomo", -1, &title_rect,
-            DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_NOCLIP);
-}
-
-auto draw_separators(HDC mem_dc, const RECT& rect, const Core::State::AppState& state) -> void {
-  const auto bounds = get_column_bounds(state);
-  const auto& render = state.render;
-
-  // 绘制水平分隔线
-  RECT sep_rect{rect.left, render.title_height, rect.right,
-                render.title_height + render.separator_height};
-  HBRUSH h_sep_brush = CreateSolidBrush(RGB(229, 229, 229));
-  FillRect(mem_dc, &sep_rect, h_sep_brush);
-
-  // 绘制垂直分隔线
-  RECT v_sep_rect1{bounds.ratio_column_right, render.title_height,
-                   bounds.ratio_column_right + render.separator_height, rect.bottom};
-  RECT v_sep_rect2{bounds.resolution_column_right, render.title_height,
-                   bounds.resolution_column_right + render.separator_height, rect.bottom};
-  FillRect(mem_dc, &v_sep_rect1, h_sep_brush);
-  FillRect(mem_dc, &v_sep_rect2, h_sep_brush);
-  DeleteObject(h_sep_brush);
-}
-
-auto draw_items(HDC mem_dc, const RECT& rect, const Core::State::AppState& state, HFONT font)
-    -> void {
-  const auto bounds = get_column_bounds(state);
-  const auto& render = state.render;
-  const auto& items = state.data.menu_items;
-
-  int y = render.title_height + render.separator_height;
-  int settings_y = y;
-
-  for (size_t i = 0; i < items.size(); ++i) {
-    const auto& item = items[i];
-    RECT item_rect{};
-
-    // 根据项目类型确定绘制位置
-    using ItemType = Core::State::ItemType;
-    switch (item.type) {
-      case ItemType::Ratio:
-        item_rect = {0, y, bounds.ratio_column_right, y + render.item_height};
-        break;
-      case ItemType::Resolution:
-        item_rect = {bounds.ratio_column_right + render.separator_height, y,
-                     bounds.resolution_column_right, y + render.item_height};
-        break;
-      case ItemType::CaptureWindow:
-      case ItemType::OpenScreenshot:
-      case ItemType::PreviewWindow:
-      case ItemType::OverlayWindow:
-      case ItemType::LetterboxWindow:
-      case ItemType::Reset:
-      case ItemType::Hide:
-      case ItemType::Exit:
-        item_rect = {bounds.resolution_column_right + render.separator_height, settings_y,
-                     rect.right, settings_y + render.item_height};
-        settings_y += render.item_height;
-        break;
-      default:
-        continue;
-    }
-
-    const bool is_hovered = (static_cast<int>(i) == state.ui.hover_index);
-    draw_single_item(mem_dc, item, item_rect, state, is_hovered, font);
-
-    // 只有在同一列中才增加y坐标
-    if ((i + 1 < items.size()) && (items[i + 1].type == item.type)) {
-      if (item.type != ItemType::Reset) {
-        y += render.item_height;
-      }
-    } else if (i + 1 < items.size() && items[i + 1].type != item.type) {
-      if (items[i + 1].type != ItemType::Reset) {
-        y = render.title_height + render.separator_height;
-      }
-    }
-  }
-}
-
-auto draw_single_item(HDC mem_dc, const Core::State::MenuItem& item, const RECT& item_rect,
-                      const Core::State::AppState& state, bool is_hovered, HFONT font) -> void {
-  // 绘制悬停背景
-  if (is_hovered) {
-    HBRUSH h_hover_brush = CreateSolidBrush(RGB(242, 242, 242));
-    FillRect(mem_dc, &item_rect, h_hover_brush);
-    DeleteObject(h_hover_brush);
-  }
-
-  // 绘制选中指示器
-  const bool is_selected = Core::State::is_item_selected(item, state.ui);
-  if (is_selected) {
-    const int indicator_width = get_indicator_width(item, state);
-    RECT indicator_rect{item_rect.left, item_rect.top, item_rect.left + indicator_width,
-                        item_rect.bottom};
-    HBRUSH h_indicator_brush = CreateSolidBrush(RGB(255, 160, 80));
-    FillRect(mem_dc, &indicator_rect, h_indicator_brush);
-    DeleteObject(h_indicator_brush);
-  }
-
-  // 绘制文本
-  RECT text_rect = item_rect;
-  text_rect.left += state.render.text_padding + get_indicator_width(item, state);
-  SetTextColor(mem_dc, RGB(51, 51, 51));
-  DrawTextW(mem_dc, item.text.c_str(), -1, &text_rect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
 }
 
 auto get_indicator_width(const Core::State::MenuItem& item, const Core::State::AppState& state)

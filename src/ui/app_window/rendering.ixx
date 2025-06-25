@@ -8,6 +8,7 @@ export module UI.AppWindow.Rendering;
 import std;
 import Core.State;
 import Types.State;
+import Types.UI;
 
 namespace UI::AppWindow {
 
@@ -47,31 +48,11 @@ export auto get_column_bounds(const Core::State::AppState& state) -> ColumnBound
 export auto paint_window(HDC hdc, const RECT& client_rect, const Core::State::AppState& state)
     -> void;
 
-// 创建DPI缩放的字体
-export auto create_scaled_font(int font_size) -> HFONT;
+// 获取指示器宽度
+export auto get_indicator_width(const Core::State::MenuItem& item,
+                                const Core::State::AppState& state) -> int;
 
 // 获取设置列中的项目索引
 auto get_settings_item_index(const Core::State::AppState& state, int y) -> int;
-
-// 绘制背景
-auto draw_background(HDC mem_dc, const RECT& rect) -> void;
-
-// 绘制标题栏
-auto draw_title_bar(HDC mem_dc, const RECT& rect, const Core::State::AppState& state) -> void;
-
-// 绘制分隔线
-auto draw_separators(HDC mem_dc, const RECT& rect, const Core::State::AppState& state) -> void;
-
-// 绘制所有菜单项
-auto draw_items(HDC mem_dc, const RECT& rect, const Core::State::AppState& state, HFONT font)
-    -> void;
-
-// 绘制单个菜单项
-auto draw_single_item(HDC mem_dc, const Core::State::MenuItem& item, const RECT& item_rect,
-                      const Core::State::AppState& state, bool is_hovered, HFONT font) -> void;
-
-// 获取指示器宽度
-auto get_indicator_width(const Core::State::MenuItem& item, const Core::State::AppState& state)
-    -> int;
 
 }  // namespace UI::AppWindow
