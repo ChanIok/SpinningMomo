@@ -11,4 +11,4 @@ export struct Data {
   bool is_created = false;
 };
 
-}  // namespace UI::TrayIcon::Sta
+}  // namespace UI::TrayIcon::State

@@ -8,6 +8,7 @@ import Core.Config.State;
 import Types.UI;
 import Features.Notifications.State;
 import UI.TrayIcon.State;
+import UI.TrayMenu.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
 import UI.AppWindow.State;
@@ -26,6 +27,7 @@ export struct AppState {
   UI::AppWindow::State app_window;
   Features::Notifications::State::NotificationSystemState notifications;
   UI::TrayIcon::State::Data tray_icon;
+  UI::TrayMenu::State::Data tray_menu;
   Features::Preview::State::PreviewState preview;
   Features::Screenshot::State::ScreenshotState screenshot;
 
@@ -39,6 +41,7 @@ export struct AppState {
 export auto update_render_dpi(AppState& state, Vendor::Windows::UINT new_dpi) -> void {
   state.app_window.window.dpi = new_dpi;
   state.app_window.layout.update_dpi_scaling(new_dpi);
+  state.tray_menu.layout.update_dpi_scaling(new_dpi);
 }
 
 }  // namespace Core::State

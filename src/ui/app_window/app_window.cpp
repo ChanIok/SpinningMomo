@@ -14,7 +14,7 @@ import Core.Events;
 import Core.State;
 import UI.AppWindow.MessageHandler;
 import UI.AppWindow.Layout;
-import UI.Rendering.D2DContext;
+import UI.AppWindow.D2DContext;
 import Utils.Logger;
 
 namespace UI::AppWindow {
@@ -54,10 +54,9 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   create_window_attributes(state.app_window.window.hwnd);
 
   // 初始化Direct2D渲染
-  if (auto result = UI::Rendering::D2DContext::initialize_d2d(state, state.app_window.window.hwnd);
-      !result) {
+  if (!UI::AppWindow::D2DContext::initialize_d2d(state, state.app_window.window.hwnd)) {
     // Direct2D初始化失败，但不影响窗口创建，会回退到GDI渲染
-    Logger().warn("Failed to initialize Direct2D rendering: {}", result.error());
+    Logger().warn("Failed to initialize Direct2D rendering");
   }
 
   return {};
@@ -90,7 +89,7 @@ auto destroy_window(Core::State::AppState& state) -> void {
   unregister_hotkey(state);
 
   // 清理Direct2D资源
-  UI::Rendering::D2DContext::cleanup_d2d(state);
+  UI::AppWindow::D2DContext::cleanup_d2d(state);
 
   if (state.app_window.window.hwnd) {
     DestroyWindow(state.app_window.window.hwnd);

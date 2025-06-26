@@ -16,7 +16,7 @@ import UI.AppWindow.Layout;
 import UI.AppWindow.Painter;
 import UI.AppWindow.State;
 import UI.TrayIcon;
-import UI.Rendering.D2DContext;
+import UI.AppWindow.D2DContext;
 
 namespace UI::AppWindow::MessageHandler {
 
@@ -82,7 +82,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
       // 如果Direct2D已初始化，调整渲染目标大小
       if (state.d2d_render.is_initialized) {
-        UI::Rendering::D2DContext::resize_d2d(state, window_size);
+        UI::AppWindow::D2DContext::resize_d2d(state, window_size);
       }
 
       return 0;

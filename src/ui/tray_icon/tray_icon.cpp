@@ -9,6 +9,7 @@ module UI.TrayIcon;
 import std;
 import Core.State;
 import Core.Constants;
+import UI.TrayMenu;
 import Vendor.Windows;
 import Vendor.ShellApi;
 
@@ -187,70 +188,11 @@ auto destroy(Core::State::AppState& state) -> void {
 }
 
 auto show_context_menu(Core::State::AppState& state) -> void {
-  POINT pt;
-  GetCursorPos(&pt);
+  Vendor::Windows::POINT pt;
+  GetCursorPos(reinterpret_cast<POINT*>(&pt));
 
-  HMENU h_menu = CreatePopupMenu();
-  if (!h_menu) return;
-
-  const auto& strings = *state.app_window.data.strings;
-
-  // Window selection submenu
-  if (HMENU h_window_menu = create_window_selection_submenu(state)) {
-    InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)h_window_menu,
-                strings.SELECT_WINDOW.c_str());
-    InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-  }
-
-  // Ratio submenu
-  if (HMENU h_ratio_menu = create_ratio_submenu(state)) {
-    InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)h_ratio_menu,
-                strings.WINDOW_RATIO.c_str());
-  }
-
-  // Resolution submenu
-  if (HMENU h_size_menu = create_resolution_submenu(state)) {
-    InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)h_size_menu,
-                strings.RESOLUTION.c_str());
-  }
-
-  // Reset option
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_RESET,
-              strings.RESET_WINDOW.c_str());
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-
-  // Screenshot options
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_CAPTURE_WINDOW,
-              strings.CAPTURE_WINDOW.c_str());
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_OPEN_SCREENSHOT,
-              strings.OPEN_SCREENSHOT.c_str());
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-
-  // Settings items
-  add_settings_items(h_menu, state);
-
-  // Language submenu
-  if (HMENU h_lang_menu = create_language_submenu(state)) {
-    InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING | MF_POPUP, (UINT_PTR)h_lang_menu,
-                strings.LANGUAGE.c_str());
-  }
-
-  // Config and Exit options
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_CONFIG,
-              strings.OPEN_CONFIG.c_str());
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_USER_GUIDE,
-              strings.USER_GUIDE.c_str());
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_EXIT,
-              strings.EXIT.c_str());
-
-  // 显示
-  SetForegroundWindow(state.app_window.window.hwnd);
-  TrackPopupMenu(h_menu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0,
-                 state.app_window.window.hwnd, NULL);
-
-  DestroyMenu(h_menu);
+  // 使用自定义D2D菜单替代系统菜单
+  UI::TrayMenu::show_menu(state, pt);
 }
 
 auto show_quick_menu(Core::State::AppState& state, const Vendor::Windows::POINT& pt) -> void {

@@ -15,6 +15,7 @@ import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
 import UI.TrayIcon;
+import UI.TrayMenu;
 import Vendor.Windows;
 
 Application::Application() = default;
@@ -22,6 +23,7 @@ Application::~Application() {
   if (m_app_state) {
     Features::Preview::Window::cleanup_preview(*m_app_state);
     Features::Screenshot::cleanup_system(m_app_state->screenshot);
+    UI::TrayMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);
   }
 }
@@ -82,6 +84,12 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     if (auto result = UI::TrayIcon::create(*m_app_state); !result) {
       Logger().warn("Failed to create tray icon: {}", result.error());
       // This might not be a fatal error, so we just log a warning.
+    }
+
+    // 初始化托盘菜单
+    if (auto result = UI::TrayMenu::initialize(*m_app_state); !result) {
+      Logger().warn("Failed to initialize tray menu: {}", result.error());
+      // 托盘菜单初始化失败，但不影响应用程序运行
     }
 
     // 初始化预览系统
