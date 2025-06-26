@@ -1,14 +1,14 @@
 module;
 
-export module Types.TrayIcon;
+export module UI.TrayIcon.State;
 
 import Vendor.ShellApi;
 
-namespace Types::TrayIcon {
+namespace UI::TrayIcon::State {
 
 export struct Data {
   Vendor::ShellApi::NOTIFYICONDATAW nid{};
   bool is_created = false;
 };
 
-}  // namespace Types::TrayIcon
+}  // namespace UI::TrayIcon::Sta

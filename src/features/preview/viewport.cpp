@@ -9,7 +9,7 @@ module;
 module Features.Preview.Viewport;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.D3D;
 import Utils.Logger;
@@ -64,7 +64,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   }
 
   // 创建视口框顶点数据
-  std::vector<Types::Preview::ViewportVertex> vertices;
+  std::vector<Features::Preview::State::ViewportVertex> vertices;
   create_viewport_vertices(state, vertices);
 
   if (vertices.empty()) {
@@ -81,7 +81,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   // 创建动态顶点缓冲区
   auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
       rendering_resources->d3d_context.device.Get(), vertices.data(), vertices.size(),
-      sizeof(Types::Preview::ViewportVertex),
+      sizeof(Features::Preview::State::ViewportVertex),
       true);  // 动态缓冲区
 
   if (!buffer_result) {
@@ -95,7 +95,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   context->IASetInputLayout(input_layout.Get());
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
-  UINT stride = sizeof(Types::Preview::ViewportVertex);
+  UINT stride = sizeof(Features::Preview::State::ViewportVertex);
   UINT offset = 0;
   context->IASetVertexBuffers(0, 1, viewport_buffer.GetAddressOf(), &stride, &offset);
 
@@ -107,7 +107,8 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
 }
 
 auto create_viewport_vertices(const Core::State::AppState& state,
-                              std::vector<Types::Preview::ViewportVertex>& vertices) -> void {
+                              std::vector<Features::Preview::State::ViewportVertex>& vertices)
+    -> void {
   vertices.clear();
 
   if (!state.preview.viewport.visible) {
@@ -149,8 +150,8 @@ auto create_viewport_vertices(const Core::State::AppState& state,
   viewportBottom = std::clamp(viewportBottom, 0.0f, 1.0f);
 
   // 视口框颜色 RGBA(255, 160, 80, 0.8)
-  Types::Preview::ViewportVertex::Color frameColor = {255.0f / 255.0f, 160.0f / 255.0f,
-                                                      80.0f / 255.0f, 0.8f};
+  Features::Preview::State::ViewportVertex::Color frameColor = {255.0f / 255.0f, 160.0f / 255.0f,
+                                                                80.0f / 255.0f, 0.8f};
 
   // 创建矩形框线条顶点（4条边，8个顶点）
   vertices.reserve(8);

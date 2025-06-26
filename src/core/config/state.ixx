@@ -1,12 +1,12 @@
 module;
 
-export module Types.Config;
+export module Core.Config.State;
 
 import std;
 import Types.Presets;
 import Vendor.Windows;
 
-export namespace Types::Config {
+export namespace Core::Config::State {
 
 struct HotkeyConfig {
   Vendor::Windows::UINT modifiers = Vendor::Windows::MOD_CONTROL_t | Vendor::Windows::MOD_ALT_t;
@@ -72,4 +72,4 @@ struct ResolutionLoadResult {
   explicit ResolutionLoadResult(const std::wstring& error) : success(false), error_details(error) {}
 };
 
-}  // namespace Types::Config
+}  // namespace Core::Config::State

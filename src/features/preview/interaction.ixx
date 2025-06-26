@@ -5,7 +5,7 @@ module;
 export module Features.Preview.Interaction;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 
 export namespace Features::Preview::Interaction {

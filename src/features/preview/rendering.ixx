@@ -7,7 +7,7 @@ module;
 export module Features.Preview.Rendering;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.D3D;
 
@@ -34,17 +34,18 @@ auto update_capture_srv(Core::State::AppState& state,
     -> std::expected<void, std::string>;
 
 // 渲染基本的全屏四边形（显示捕获内容）
-auto render_basic_quad(const Types::Preview::RenderingResources& resources) -> void;
+auto render_basic_quad(const Features::Preview::State::RenderingResources& resources) -> void;
 
 // 渲染视口框
-auto render_viewport_frame(Core::State::AppState& state, const Types::Preview::RenderingResources& resources)
-    -> void;
+auto render_viewport_frame(Core::State::AppState& state,
+                           const Features::Preview::State::RenderingResources& resources) -> void;
 
 // 创建基本顶点缓冲区（全屏四边形）
 auto create_basic_vertex_buffer(ID3D11Device* device)
     -> std::expected<Microsoft::WRL::ComPtr<ID3D11Buffer>, std::string>;
 
 // 获取渲染资源（从状态中）
-auto get_rendering_resources(Core::State::AppState& state) -> Types::Preview::RenderingResources*;
+auto get_rendering_resources(Core::State::AppState& state)
+    -> Features::Preview::State::RenderingResources*;
 
 }  // namespace Features::Preview::Rendering

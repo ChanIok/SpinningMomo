@@ -8,7 +8,7 @@ module;
 module Features.Preview.Interaction;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 import Core.Constants;
 import Utils.Logger;

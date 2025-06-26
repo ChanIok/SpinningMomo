@@ -7,7 +7,7 @@ module;
 export module Features.Preview.Viewport;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 
 export namespace Features::Preview::Viewport {
@@ -26,7 +26,8 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
 
 // 创建视口框顶点数据
 auto create_viewport_vertices(const Core::State::AppState& state,
-                              std::vector<Types::Preview::ViewportVertex>& vertices) -> void;
+                              std::vector<Features::Preview::State::ViewportVertex>& vertices)
+    -> void;
 
 // 计算视口框在预览窗口中的位置
 auto calculate_viewport_position(const Core::State::AppState& state) -> RECT;

@@ -7,14 +7,14 @@ module;
 export module Features.Preview.CaptureIntegration;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.Capture;
 
 export namespace Features::Preview::CaptureIntegration {
 
 // 类型别名，使用Types中统一定义的CaptureSession
-using CaptureSession = Types::Preview::CaptureSession;
+using CaptureSession = Features::Preview::State::CaptureSession;
 
 // 初始化捕获系统
 auto initialize_capture(Core::State::AppState& state, HWND target_window, int width, int height)

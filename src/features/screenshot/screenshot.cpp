@@ -12,7 +12,7 @@ module;
 module Features.Screenshot;
 
 import std;
-import Types.Screenshot;
+import Features.Screenshot.State;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
@@ -149,7 +149,7 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
 }
 
 // 安全调用完成回调的辅助函数
-auto safe_call_completion_callback(const Types::Screenshot::ScreenshotRequest& request,
+auto safe_call_completion_callback(const Features::Screenshot::State::ScreenshotRequest& request,
                                    bool success) -> void {
   if (!request.completion_callback) {
     return;
@@ -163,8 +163,8 @@ auto safe_call_completion_callback(const Types::Screenshot::ScreenshotRequest& r
 }
 
 // 核心截图捕获逻辑
-auto do_screenshot_capture(const Types::Screenshot::ScreenshotRequest& request,
-                           Types::Screenshot::ScreenshotState& state)
+auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest& request,
+                           Features::Screenshot::State::ScreenshotState& state)
     -> std::expected<void, std::string> {
   // 获取窗口大小
   RECT rect;
@@ -228,7 +228,7 @@ auto do_screenshot_capture(const Types::Screenshot::ScreenshotRequest& request,
   }
 
   // 创建会话信息并存储到状态中
-  Types::Screenshot::SessionInfo session_info;
+  Features::Screenshot::State::SessionInfo session_info;
   session_info.session = std::move(session_result.value());
   session_info.request = request;
 
@@ -248,8 +248,8 @@ auto do_screenshot_capture(const Types::Screenshot::ScreenshotRequest& request,
 }
 
 // 处理单个截图请求
-auto process_single_request(const Types::Screenshot::ScreenshotRequest& request,
-                            Types::Screenshot::ScreenshotState& state) -> void {
+auto process_single_request(const Features::Screenshot::State::ScreenshotRequest& request,
+                            Features::Screenshot::State::ScreenshotState& state) -> void {
   Logger().debug("Processing screenshot request for window: {}",
                  reinterpret_cast<uintptr_t>(request.target_window));
 
@@ -268,7 +268,7 @@ auto process_single_request(const Types::Screenshot::ScreenshotRequest& request,
 }
 
 // 启动清理定时器
-auto start_cleanup_timer(Types::Screenshot::ScreenshotState& state) -> void {
+auto start_cleanup_timer(Features::Screenshot::State::ScreenshotState& state) -> void {
   if (!state.d3d_initialized) {
     return;
   }
@@ -294,11 +294,11 @@ auto start_cleanup_timer(Types::Screenshot::ScreenshotState& state) -> void {
 }
 
 // 工作线程主函数
-auto worker_thread_proc(Types::Screenshot::ScreenshotState& state) -> void {
+auto worker_thread_proc(Features::Screenshot::State::ScreenshotState& state) -> void {
   Logger().debug("Screenshot worker thread started");
 
   while (!state.should_stop) {
-    Types::Screenshot::ScreenshotRequest request;
+    Features::Screenshot::State::ScreenshotRequest request;
     bool has_request = false;
 
     // 等待新请求或清理请求
@@ -357,7 +357,7 @@ auto worker_thread_proc(Types::Screenshot::ScreenshotState& state) -> void {
 auto is_supported() -> bool { return Utils::Graphics::Capture::is_capture_supported(); }
 
 // 只初始化D3D资源（不创建工作线程）
-auto initialize_d3d_resources_only(Types::Screenshot::ScreenshotState& state)
+auto initialize_d3d_resources_only(Features::Screenshot::State::ScreenshotState& state)
     -> std::expected<void, std::string> {
   Logger().debug("Initializing D3D resources only");
 
@@ -402,7 +402,7 @@ auto initialize_d3d_resources_only(Types::Screenshot::ScreenshotState& state)
 }
 
 // 初始化完整系统
-auto initialize_system(Types::Screenshot::ScreenshotState& state)
+auto initialize_system(Features::Screenshot::State::ScreenshotState& state)
     -> std::expected<void, std::string> {
   Logger().debug("Initializing screenshot system");
 
@@ -426,7 +426,7 @@ auto initialize_system(Types::Screenshot::ScreenshotState& state)
   return {};
 }
 
-auto cleanup_system(Types::Screenshot::ScreenshotState& state) -> void {
+auto cleanup_system(Features::Screenshot::State::ScreenshotState& state) -> void {
   Logger().debug("Cleaning up screenshot system");
 
   // 取消清理定时器
@@ -454,7 +454,7 @@ auto cleanup_system(Types::Screenshot::ScreenshotState& state) -> void {
 }
 
 auto take_screenshot(
-    Types::Screenshot::ScreenshotState& state, HWND target_window,
+    Features::Screenshot::State::ScreenshotState& state, HWND target_window,
     std::function<void(bool success, const std::wstring& path)> completion_callback)
     -> std::expected<void, std::string> {
   if (!target_window || !IsWindow(target_window)) {
@@ -509,7 +509,7 @@ auto take_screenshot(
   state.cleanup_requested = false;  // 取消任何待处理的清理请求
 
   // 创建截图请求
-  Types::Screenshot::ScreenshotRequest request;
+  Features::Screenshot::State::ScreenshotRequest request;
   request.target_window = target_window;
   request.file_path = file_path.wstring();
   request.completion_callback = completion_callback;

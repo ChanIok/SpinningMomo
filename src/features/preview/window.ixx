@@ -5,7 +5,7 @@ module;
 export module Features.Preview.Window;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 
 export namespace Features::Preview::Window {

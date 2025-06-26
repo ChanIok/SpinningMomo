@@ -11,7 +11,7 @@ module;
 
 module Core.Config.Io;
 
-import Types.Config;
+import Core.Config.State;
 import Core.Constants;
 import Types.Presets;
 import Utils.String;
@@ -105,9 +105,9 @@ auto create_default_config_file(const std::wstring& path) -> std::expected<void,
 
 // 从文件加载配置到 AppConfig
 auto load_from_file(const std::wstring& path)
-    -> std::expected<Types::Config::AppConfig, std::string> {
+    -> std::expected<Core::Config::State::AppConfig, std::string> {
   try {
-    Types::Config::AppConfig cfg;
+    Core::Config::State::AppConfig cfg;
     cfg.config_file_path = path;
 
     // Hotkey
@@ -209,7 +209,7 @@ auto add_custom_resolution(const std::wstring& resolution,
   }
 }
 
-auto initialize() -> std::expected<Types::Config::AppConfig, std::string> {
+auto initialize() -> std::expected<Core::Config::State::AppConfig, std::string> {
   try {
     auto dir_result = Utils::Path::GetExecutableDirectory();
     if (!dir_result) {
@@ -236,7 +236,7 @@ auto initialize() -> std::expected<Types::Config::AppConfig, std::string> {
   }
 }
 
-auto save(const Types::Config::AppConfig& config) -> std::expected<void, std::string> {
+auto save(const Core::Config::State::AppConfig& config) -> std::expected<void, std::string> {
   const auto& path = config.config_file_path;
   bool success =
       write_int(path, Constants::HOTKEY_SECTION, Constants::HOTKEY_MODIFIERS,
@@ -267,10 +267,10 @@ auto save(const Types::Config::AppConfig& config) -> std::expected<void, std::st
   return {};
 }
 
-auto get_aspect_ratios(const Types::Config::AppConfig& config,
+auto get_aspect_ratios(const Core::Config::State::AppConfig& config,
                        const Constants::LocalizedStrings& strings)
-    -> Types::Config::RatioLoadResult {
-  Types::Config::RatioLoadResult result;
+    -> Core::Config::State::RatioLoadResult {
+  Core::Config::State::RatioLoadResult result;
   auto default_presets = get_default_ratio_presets();
 
   if (config.menu.aspect_ratio_items.empty()) {
@@ -312,10 +312,10 @@ auto get_aspect_ratios(const Types::Config::AppConfig& config,
   return result;
 }
 
-auto get_resolution_presets(const Types::Config::AppConfig& config,
+auto get_resolution_presets(const Core::Config::State::AppConfig& config,
                             const Constants::LocalizedStrings& strings)
-    -> Types::Config::ResolutionLoadResult {
-  Types::Config::ResolutionLoadResult result;
+    -> Core::Config::State::ResolutionLoadResult {
+  Core::Config::State::ResolutionLoadResult result;
   auto default_presets = get_default_resolution_presets();
 
   if (config.menu.resolution_items.empty()) {

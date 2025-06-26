@@ -10,7 +10,7 @@ module Features.Notifications;
 
 import std;
 import Core.State;
-import Types.Notification;
+import Features.Notifications.State;
 import Features.Notifications.Constants;
 import Utils.Logger;
 
@@ -86,7 +86,7 @@ void draw_close_button(HDC hdc, const RECT& rect, bool is_hovered, int dpi) {
   DeleteObject(hClosePen);
 }
 
-void on_paint(HDC hdc, Types::Notification::Notification& n, int dpi) {
+void on_paint(HDC hdc, Features::Notifications::State::Notification& n, int dpi) {
   RECT rect;
   GetClientRect(n.hwnd, &rect);
 
@@ -145,15 +145,16 @@ void on_paint(HDC hdc, Types::Notification::Notification& n, int dpi) {
 
 // 窗口消息处理
 LRESULT CALLBACK NotificationWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-  Types::Notification::Notification* notification = nullptr;
+  Features::Notifications::State::Notification* notification = nullptr;
   if (msg == WM_NCCREATE) {
     CREATESTRUCT* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    notification = reinterpret_cast<Types::Notification::Notification*>(cs->lpCreateParams);
+    notification =
+        reinterpret_cast<Features::Notifications::State::Notification*>(cs->lpCreateParams);
     SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(notification));
     notification->hwnd = hwnd;
   } else {
-    notification =
-        reinterpret_cast<Types::Notification::Notification*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    notification = reinterpret_cast<Features::Notifications::State::Notification*>(
+        GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
 
   if (!notification) {
@@ -191,7 +192,8 @@ LRESULT CALLBACK NotificationWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 
       if (!notification->is_hovered) {
         notification->is_hovered = true;
-        if (notification->state == Types::Notification::NotificationAnimState::Displaying) {
+        if (notification->state ==
+            Features::Notifications::State::NotificationAnimState::Displaying) {
           notification->pause_start_time = std::chrono::steady_clock::now();
         }
 
@@ -207,7 +209,8 @@ LRESULT CALLBACK NotificationWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         InvalidateRect(hwnd, NULL, TRUE);
       }
       notification->is_hovered = false;
-      if (notification->state == Types::Notification::NotificationAnimState::Displaying &&
+      if (notification->state ==
+              Features::Notifications::State::NotificationAnimState::Displaying &&
           notification->pause_start_time.time_since_epoch().count() > 0) {
         auto paused_duration = std::chrono::steady_clock::now() - notification->pause_start_time;
         notification->total_paused_duration +=
@@ -219,7 +222,7 @@ LRESULT CALLBACK NotificationWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
     }
 
     case WM_LBUTTONUP: {
-      notification->state = Types::Notification::NotificationAnimState::FadingOut;
+      notification->state = Features::Notifications::State::NotificationAnimState::FadingOut;
       notification->last_state_change_time = std::chrono::steady_clock::now();
       return 0;
     }
@@ -248,7 +251,8 @@ auto register_window_class(HINSTANCE hInstance) -> void {
 }
 
 auto create_notification_window(Core::State::AppState& state,
-                                Types::Notification::Notification& notification) -> bool {
+                                Features::Notifications::State::Notification& notification)
+    -> bool {
   register_window_class(state.app_window.window.instance);
 
   int dpi = state.app_window.window.dpi;
@@ -287,24 +291,24 @@ auto update_window_positions(Core::State::AppState& state) -> void {
   for (auto it = state.notifications.active_notifications.rbegin();
        it != state.notifications.active_notifications.rend(); ++it) {
     auto& n = *it;
-    if (n.state == Types::Notification::NotificationAnimState::Done) continue;
+    if (n.state == Features::Notifications::State::NotificationAnimState::Done) continue;
 
     current_y -= n.height;
 
     POINT new_target_pos = {base_x, current_y};
 
     if (n.target_pos.y != new_target_pos.y &&
-        n.state == Types::Notification::NotificationAnimState::Displaying) {
-      n.state = Types::Notification::NotificationAnimState::MovingUp;
+        n.state == Features::Notifications::State::NotificationAnimState::Displaying) {
+      n.state = Features::Notifications::State::NotificationAnimState::MovingUp;
       n.last_state_change_time = std::chrono::steady_clock::now();
     }
 
     n.target_pos = new_target_pos;
 
-    if (n.state == Types::Notification::NotificationAnimState::Spawning) {
+    if (n.state == Features::Notifications::State::NotificationAnimState::Spawning) {
       // 新通知从底部滑入，起始位置不同
       n.current_pos = {base_x, workArea.bottom};
-    } else if (n.state != Types::Notification::NotificationAnimState::MovingUp) {
+    } else if (n.state != Features::Notifications::State::NotificationAnimState::MovingUp) {
       // 确保 current_pos 在其他状态时更新，除非正在动画
       n.current_pos = n.target_pos;
     }
@@ -320,8 +324,8 @@ auto show_notification(Core::State::AppState& state, const std::wstring& title,
   if (state.notifications.active_notifications.size() >= Constants::MAX_VISIBLE_NOTIFICATIONS) {
     // 找到最旧的 "Displaying" 通知，并将其状态设置为 FadingOut
     for (auto& n : state.notifications.active_notifications) {
-      if (n.state == Types::Notification::NotificationAnimState::Displaying) {
-        n.state = Types::Notification::NotificationAnimState::FadingOut;
+      if (n.state == Features::Notifications::State::NotificationAnimState::Displaying) {
+        n.state = Features::Notifications::State::NotificationAnimState::FadingOut;
         n.last_state_change_time = std::chrono::steady_clock::now();
         break;  // 只淡出一个
       }
@@ -329,12 +333,13 @@ auto show_notification(Core::State::AppState& state, const std::wstring& title,
   }
 
   // 2. 创建新的通知对象
-  state.notifications.active_notifications.emplace_back(Types::Notification::Notification{
-      .id = state.notifications.next_id++,
-      .title = title,
-      .message = message,
-      .state = Types::Notification::NotificationAnimState::Spawning,
-      .last_state_change_time = std::chrono::steady_clock::now()});
+  state.notifications.active_notifications.emplace_back(
+      Features::Notifications::State::Notification{
+          .id = state.notifications.next_id++,
+          .title = title,
+          .message = message,
+          .state = Features::Notifications::State::NotificationAnimState::Spawning,
+          .last_state_change_time = std::chrono::steady_clock::now()});
 
   // 在更新位置前计算高度
   auto& new_notification = state.notifications.active_notifications.back();
@@ -365,17 +370,18 @@ auto update_notifications(Core::State::AppState& state) -> void {
     bool should_erase = false;
 
     auto elapsed_time = now - notification.last_state_change_time;
-    if (notification.state == Types::Notification::NotificationAnimState::Displaying &&
+    if (notification.state == Features::Notifications::State::NotificationAnimState::Displaying &&
         notification.is_hovered) {
       // 悬停时不计时间
-    } else if (notification.state == Types::Notification::NotificationAnimState::Displaying) {
+    } else if (notification.state ==
+               Features::Notifications::State::NotificationAnimState::Displaying) {
       elapsed_time -= notification.total_paused_duration;
     }
 
     switch (notification.state) {
-      case Types::Notification::NotificationAnimState::Spawning:
+      case Features::Notifications::State::NotificationAnimState::Spawning:
         if (create_notification_window(state, notification)) {
-          notification.state = Types::Notification::NotificationAnimState::SlidingIn;
+          notification.state = Features::Notifications::State::NotificationAnimState::SlidingIn;
           notification.last_state_change_time = now;
           notification.total_paused_duration = std::chrono::milliseconds(0);
           ShowWindow(notification.hwnd, SW_SHOWNA);
@@ -385,7 +391,7 @@ auto update_notifications(Core::State::AppState& state) -> void {
           should_erase = true;
         }
         break;
-      case Types::Notification::NotificationAnimState::SlidingIn: {
+      case Features::Notifications::State::NotificationAnimState::SlidingIn: {
         float progress = std::min(
             1.0f, static_cast<float>(
                       std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time).count()) /
@@ -401,7 +407,7 @@ auto update_notifications(Core::State::AppState& state) -> void {
         notification.opacity = eased_progress;
 
         if (progress >= 1.0f) {
-          notification.state = Types::Notification::NotificationAnimState::Displaying;
+          notification.state = Features::Notifications::State::NotificationAnimState::Displaying;
           notification.last_state_change_time = now;
           notification.current_pos = notification.target_pos;
           notification.total_paused_duration = std::chrono::milliseconds(0);
@@ -409,13 +415,13 @@ auto update_notifications(Core::State::AppState& state) -> void {
         InvalidateRect(notification.hwnd, NULL, TRUE);
         break;
       }
-      case Types::Notification::NotificationAnimState::Displaying:
+      case Features::Notifications::State::NotificationAnimState::Displaying:
         if (!notification.is_hovered && elapsed_time >= Constants::DISPLAY_DURATION) {
-          notification.state = Types::Notification::NotificationAnimState::FadingOut;
+          notification.state = Features::Notifications::State::NotificationAnimState::FadingOut;
           notification.last_state_change_time = now;
         }
         break;
-      case Types::Notification::NotificationAnimState::MovingUp: {
+      case Features::Notifications::State::NotificationAnimState::MovingUp: {
         float progress = std::min(
             1.0f, static_cast<float>(
                       std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time).count()) /
@@ -430,13 +436,13 @@ auto update_notifications(Core::State::AppState& state) -> void {
                      SWP_NOSIZE | SWP_NOACTIVATE);
 
         if (progress >= 1.0f) {
-          notification.state = Types::Notification::NotificationAnimState::Displaying;
+          notification.state = Features::Notifications::State::NotificationAnimState::Displaying;
           notification.last_state_change_time = now;
           notification.current_pos = notification.target_pos;
         }
         break;
       }
-      case Types::Notification::NotificationAnimState::FadingOut: {
+      case Features::Notifications::State::NotificationAnimState::FadingOut: {
         float progress = std::min(
             1.0f, static_cast<float>(
                       std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time).count()) /
@@ -444,12 +450,12 @@ auto update_notifications(Core::State::AppState& state) -> void {
         notification.opacity = 1.0f - ease_out_cubic(progress);
 
         if (progress >= 1.0f) {
-          notification.state = Types::Notification::NotificationAnimState::Done;
+          notification.state = Features::Notifications::State::NotificationAnimState::Done;
         }
         InvalidateRect(notification.hwnd, NULL, TRUE);
         break;
       }
-      case Types::Notification::NotificationAnimState::Done:
+      case Features::Notifications::State::NotificationAnimState::Done:
         // 标记为待删除
         should_erase = true;
         break;

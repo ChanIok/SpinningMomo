@@ -10,7 +10,7 @@ module;
 module Features.Preview.Window;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
@@ -32,9 +32,9 @@ auto register_preview_window_class(HINSTANCE instance) -> bool;
 auto create_preview_window(HINSTANCE instance, HWND parent, int width, int height,
                            Core::State::AppState* state) -> HWND;
 auto setup_window_appearance(HWND hwnd) -> void;
-auto calculate_window_size(Types::Preview::PreviewState& state, int capture_width,
+auto calculate_window_size(Features::Preview::State::PreviewState& state, int capture_width,
                            int capture_height) -> void;
-auto handle_first_show(Types::Preview::PreviewState& state) -> void;
+auto handle_first_show(Features::Preview::State::PreviewState& state) -> void;
 
 auto create_window(HINSTANCE instance, HWND parent, Core::State::AppState* state)
     -> std::expected<HWND, std::string> {
@@ -319,7 +319,7 @@ auto setup_window_appearance(HWND hwnd) -> void {
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
 }
 
-auto calculate_window_size(Types::Preview::PreviewState& state, int capture_width,
+auto calculate_window_size(Features::Preview::State::PreviewState& state, int capture_width,
                            int capture_height) -> void {
   state.size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
 
@@ -334,7 +334,7 @@ auto calculate_window_size(Types::Preview::PreviewState& state, int capture_widt
   }
 }
 
-auto handle_first_show(Types::Preview::PreviewState& state) -> void {
+auto handle_first_show(Features::Preview::State::PreviewState& state) -> void {
   state.is_first_show = false;
   int x = 20;  // 默认位置
   int y = 20;

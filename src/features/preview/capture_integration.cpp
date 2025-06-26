@@ -10,7 +10,7 @@ module;
 module Features.Preview.CaptureIntegration;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.Capture;
 import Utils.Logger;

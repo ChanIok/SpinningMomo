@@ -4,14 +4,14 @@ module;
 #include <windows.h>
 #include <wrl/client.h>
 
-export module Types.Preview;
+export module Features.Preview.State;
 
 import std;
 import Utils.Timer;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 
-export namespace Types::Preview {
+export namespace Features::Preview::State {
 
 // 视口状态
 struct ViewportState {
@@ -129,4 +129,4 @@ struct ViewportVertex {
   } color;
 };
 
-}  // namespace Types::Preview
+}  // namespace Features::Preview::State

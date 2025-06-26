@@ -1,11 +1,11 @@
 module;
 
-export module Types.Notification;
+export module Features.Notifications.State;
 
 import std;
 import Vendor.Windows;
 
-export namespace Types::Notification {
+export namespace Features::Notifications::State {
 
 // 通知当前的动画/生命周期阶段
 enum class NotificationAnimState {
@@ -47,7 +47,6 @@ struct NotificationSystemState {
   // 这对于将指针传递给 WNDPROC 非常重要。
   std::list<Notification> active_notifications;
   size_t next_id = 0;
- 
 };
 
-}  // namespace Types::Notification
+}  // namespace Features::Notifications::State

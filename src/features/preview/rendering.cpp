@@ -9,7 +9,7 @@ module;
 module Features.Preview.Rendering;
 
 import std;
-import Types.Preview;
+import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.D3D;
 import Utils.Logger;
@@ -194,14 +194,14 @@ auto update_capture_srv(Core::State::AppState& state,
   return {};
 }
 
-auto render_basic_quad(const Types::Preview::RenderingResources& resources) -> void {
+auto render_basic_quad(const Features::Preview::State::RenderingResources& resources) -> void {
   auto* context = resources.d3d_context.context.Get();
 
   // 设置着色器和资源
   context->IASetInputLayout(resources.basic_shaders.input_layout.Get());
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-  UINT stride = sizeof(Types::Preview::Vertex);
+  UINT stride = sizeof(Features::Preview::State::Vertex);
   UINT offset = 0;
   context->IASetVertexBuffers(0, 1, resources.basic_vertex_buffer.GetAddressOf(), &stride, &offset);
 
@@ -219,7 +219,7 @@ auto render_basic_quad(const Types::Preview::RenderingResources& resources) -> v
 }
 
 auto render_viewport_frame(Core::State::AppState& state,
-                           const Types::Preview::RenderingResources& resources) -> void {
+                           const Features::Preview::State::RenderingResources& resources) -> void {
   // 更新视口状态
   Features::Preview::Viewport::update_viewport_rect(state);
 
@@ -232,15 +232,15 @@ auto render_viewport_frame(Core::State::AppState& state,
 auto create_basic_vertex_buffer(ID3D11Device* device)
     -> std::expected<Microsoft::WRL::ComPtr<ID3D11Buffer>, std::string> {
   // 创建全屏四边形的顶点数据
-  Types::Preview::Vertex vertices[] = {
+  Features::Preview::State::Vertex vertices[] = {
       {-1.0f, 1.0f, 0.0f, 0.0f},   // 左上
       {1.0f, 1.0f, 1.0f, 0.0f},    // 右上
       {-1.0f, -1.0f, 0.0f, 1.0f},  // 左下
       {1.0f, -1.0f, 1.0f, 1.0f}    // 右下
   };
 
-  auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(device, vertices, 4,
-                                                                  sizeof(Types::Preview::Vertex));
+  auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
+      device, vertices, 4, sizeof(Features::Preview::State::Vertex));
 
   if (!buffer_result) {
     return std::unexpected("Failed to create vertex buffer");
@@ -249,7 +249,8 @@ auto create_basic_vertex_buffer(ID3D11Device* device)
   return buffer_result.value();
 }
 
-auto get_rendering_resources(Core::State::AppState& state) -> Types::Preview::RenderingResources* {
+auto get_rendering_resources(Core::State::AppState& state)
+    -> Features::Preview::State::RenderingResources* {
   return &state.preview.rendering_resources;
 }
 
