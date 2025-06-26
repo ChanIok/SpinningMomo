@@ -13,15 +13,15 @@ import Core.Constants;
 import Core.Events;
 import Core.State;
 import UI.AppWindow.MessageHandler;
-import UI.AppWindow.Rendering;
-import UI.Rendering.D2DInit;
+import UI.AppWindow.Layout;
+import UI.Rendering.D2DContext;
 import Utils.Logger;
 
 namespace UI::AppWindow {
 
 auto create_window(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 初始化菜单项
-  initialize_menu_items(state, *state.data.strings);
+  initialize_menu_items(state, *state.app_window.data.strings);
 
   // 获取系统DPI
   UINT dpi = 96;
@@ -35,26 +35,27 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   const auto window_size = calculate_window_size(state);
   const auto window_pos = calculate_center_position(window_size);
 
-  register_window_class(state.window.instance);
+  register_window_class(state.app_window.window.instance);
 
-  state.window.hwnd = CreateWindowExW(
+  state.app_window.window.hwnd = CreateWindowExW(
       WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, L"SpinningMomoAppWindowClass",
       L"SpinningMomo", WS_POPUP | WS_CLIPCHILDREN, window_pos.x, window_pos.y, window_size.cx,
-      window_size.cy, nullptr, nullptr, state.window.instance, &state);
+      window_size.cy, nullptr, nullptr, state.app_window.window.instance, &state);
 
-  if (!state.window.hwnd) {
+  if (!state.app_window.window.hwnd) {
     return std::unexpected("Failed to create window");
   }
 
   // 保存窗口尺寸和位置
-  state.window.size = window_size;
-  state.window.position = window_pos;
+  state.app_window.window.size = window_size;
+  state.app_window.window.position = window_pos;
 
   // 创建窗口属性
-  create_window_attributes(state.window.hwnd);
+  create_window_attributes(state.app_window.window.hwnd);
 
   // 初始化Direct2D渲染
-  if (auto result = UI::Rendering::D2DInit::initialize_d2d(state, state.window.hwnd); !result) {
+  if (auto result = UI::Rendering::D2DContext::initialize_d2d(state, state.app_window.window.hwnd);
+      !result) {
     // Direct2D初始化失败，但不影响窗口创建，会回退到GDI渲染
     Logger().warn("Failed to initialize Direct2D rendering: {}", result.error());
   }
@@ -63,17 +64,17 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 }
 
 auto show_window(Core::State::AppState& state) -> void {
-  if (state.window.hwnd) {
-    ShowWindow(state.window.hwnd, SW_SHOWNA);
-    UpdateWindow(state.window.hwnd);
-    state.window.is_visible = true;
+  if (state.app_window.window.hwnd) {
+    ShowWindow(state.app_window.window.hwnd, SW_SHOWNA);
+    UpdateWindow(state.app_window.window.hwnd);
+    state.app_window.window.is_visible = true;
   }
 }
 
 auto hide_window(Core::State::AppState& state) -> void {
-  if (state.window.hwnd) {
-    ShowWindow(state.window.hwnd, SW_HIDE);
-    state.window.is_visible = false;
+  if (state.app_window.window.hwnd) {
+    ShowWindow(state.app_window.window.hwnd, SW_HIDE);
+    state.app_window.window.is_visible = false;
   }
 }
 
@@ -89,86 +90,87 @@ auto destroy_window(Core::State::AppState& state) -> void {
   unregister_hotkey(state);
 
   // 清理Direct2D资源
-  UI::Rendering::D2DInit::cleanup_d2d(state);
+  UI::Rendering::D2DContext::cleanup_d2d(state);
 
-  if (state.window.hwnd) {
-    DestroyWindow(state.window.hwnd);
-    state.window.hwnd = nullptr;
-    state.window.is_visible = false;
+  if (state.app_window.window.hwnd) {
+    DestroyWindow(state.app_window.window.hwnd);
+    state.app_window.window.hwnd = nullptr;
+    state.app_window.window.is_visible = false;
   }
 }
 
 auto is_window_visible(const Core::State::AppState& state) -> bool {
-  return state.window.hwnd && IsWindowVisible(state.window.hwnd);
+  return state.app_window.window.hwnd && IsWindowVisible(state.app_window.window.hwnd);
 }
 
 auto activate_window(Core::State::AppState& state) -> void {
-  if (state.window.hwnd) {
-    SetForegroundWindow(state.window.hwnd);
+  if (state.app_window.window.hwnd) {
+    SetForegroundWindow(state.app_window.window.hwnd);
   }
 }
 
 auto set_current_ratio(Core::State::AppState& state, size_t index) -> void {
-  state.ui.current_ratio_index = index;
-  if (state.window.hwnd) {
-    InvalidateRect(state.window.hwnd, nullptr, TRUE);
+  state.app_window.ui.current_ratio_index = index;
+  if (state.app_window.window.hwnd) {
+    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
   }
 }
 
 auto set_current_resolution(Core::State::AppState& state, size_t index) -> void {
-  if (index < state.data.resolutions.size()) {
-    state.ui.current_resolution_index = index;
-    if (state.window.hwnd) {
-      InvalidateRect(state.window.hwnd, nullptr, TRUE);
+  if (index < state.app_window.data.resolutions.size()) {
+    state.app_window.ui.current_resolution_index = index;
+    if (state.app_window.window.hwnd) {
+      InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
     }
   }
 }
 
 auto set_preview_enabled(Core::State::AppState& state, bool enabled) -> void {
-  state.ui.preview_enabled = enabled;
-  if (state.window.hwnd) {
-    InvalidateRect(state.window.hwnd, nullptr, TRUE);
+  state.app_window.ui.preview_enabled = enabled;
+  if (state.app_window.window.hwnd) {
+    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
   }
 }
 
 auto set_overlay_enabled(Core::State::AppState& state, bool enabled) -> void {
-  state.ui.overlay_enabled = enabled;
-  if (state.window.hwnd) {
-    InvalidateRect(state.window.hwnd, nullptr, TRUE);
+  state.app_window.ui.overlay_enabled = enabled;
+  if (state.app_window.window.hwnd) {
+    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
   }
 }
 
 auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void {
-  state.ui.letterbox_enabled = enabled;
-  if (state.window.hwnd) {
-    InvalidateRect(state.window.hwnd, nullptr, TRUE);
+  state.app_window.ui.letterbox_enabled = enabled;
+  if (state.app_window.window.hwnd) {
+    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
   }
 }
 
 auto update_menu_items(Core::State::AppState& state,
                        const Core::Constants::LocalizedStrings& strings) -> void {
-  state.data.menu_items.clear();
+  state.app_window.data.menu_items.clear();
   initialize_menu_items(state, strings);
-  if (state.window.hwnd) {
-    InvalidateRect(state.window.hwnd, nullptr, TRUE);
+  if (state.app_window.window.hwnd) {
+    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
   }
 }
 
 auto set_menu_items_to_show(Core::State::AppState& state, std::span<const std::wstring> items)
     -> void {
-  state.data.menu_items_to_show.assign(items.begin(), items.end());
+  state.app_window.data.menu_items_to_show.assign(items.begin(), items.end());
 }
 
 auto register_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool {
-  if (state.window.hwnd) {
-    return ::RegisterHotKey(state.window.hwnd, state.window.hotkey_id, modifiers, key);
+  if (state.app_window.window.hwnd) {
+    return ::RegisterHotKey(state.app_window.window.hwnd, state.app_window.window.hotkey_id,
+                            modifiers, key);
   }
   return false;
 }
 
 auto unregister_hotkey(Core::State::AppState& state) -> void {
-  if (state.window.hwnd) {
-    ::UnregisterHotKey(state.window.hwnd, state.window.hotkey_id);
+  if (state.app_window.window.hwnd) {
+    ::UnregisterHotKey(state.app_window.window.hwnd, state.app_window.window.hotkey_id);
   }
 }
 
@@ -187,18 +189,19 @@ auto register_window_class(HINSTANCE instance) -> void {
 
 auto initialize_menu_items(Core::State::AppState& state,
                            const Core::Constants::LocalizedStrings& strings) -> void {
-  state.data.menu_items.clear();
+  state.app_window.data.menu_items.clear();
 
   // 添加比例选项
-  for (size_t i = 0; i < state.data.ratios.size(); ++i) {
-    state.data.menu_items.push_back(
-        {state.data.ratios[i].name, Core::State::ItemType::Ratio, static_cast<int>(i)});
+  for (size_t i = 0; i < state.app_window.data.ratios.size(); ++i) {
+    state.app_window.data.menu_items.push_back({state.app_window.data.ratios[i].name,
+                                                UI::AppWindow::ItemType::Ratio,
+                                                static_cast<int>(i)});
   }
 
   // 添加分辨率选项
-  for (size_t i = 0; i < state.data.resolutions.size(); ++i) {
+  for (size_t i = 0; i < state.app_window.data.resolutions.size(); ++i) {
     std::wstring displayText;
-    const auto& preset = state.data.resolutions[i];
+    const auto& preset = state.app_window.data.resolutions[i];
     if (preset.baseWidth == 0 && preset.baseHeight == 0) {
       displayText = preset.name;
     } else {
@@ -211,50 +214,55 @@ auto initialize_menu_items(Core::State::AppState& state,
       }
       displayText = preset.name + L" (" + buffer + L"M)";
     }
-    state.data.menu_items.push_back(
-        {displayText, Core::State::ItemType::Resolution, static_cast<int>(i)});
+    state.app_window.data.menu_items.push_back(
+        {displayText, UI::AppWindow::ItemType::Resolution, static_cast<int>(i)});
   }
 
   // 添加设置选项
-  if (!state.data.menu_items_to_show.empty()) {
-    for (const auto& itemType : state.data.menu_items_to_show) {
+  if (!state.app_window.data.menu_items_to_show.empty()) {
+    for (const auto& itemType : state.app_window.data.menu_items_to_show) {
       if (itemType == Core::Constants::MENU_ITEM_TYPE_CAPTURE) {
-        state.data.menu_items.push_back(
-            {strings.CAPTURE_WINDOW, Core::State::ItemType::CaptureWindow, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::CaptureWindow, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_SCREENSHOT) {
-        state.data.menu_items.push_back(
-            {strings.OPEN_SCREENSHOT, Core::State::ItemType::OpenScreenshot, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::OpenScreenshot, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_PREVIEW) {
-        state.data.menu_items.push_back(
-            {strings.PREVIEW_WINDOW, Core::State::ItemType::PreviewWindow, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::PreviewWindow, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_OVERLAY) {
-        state.data.menu_items.push_back(
-            {strings.OVERLAY_WINDOW, Core::State::ItemType::OverlayWindow, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::OverlayWindow, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_LETTERBOX) {
-        state.data.menu_items.push_back(
-            {strings.LETTERBOX_WINDOW, Core::State::ItemType::LetterboxWindow, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::LetterboxWindow, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_RESET) {
-        state.data.menu_items.push_back({strings.RESET_WINDOW, Core::State::ItemType::Reset, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.RESET_WINDOW, UI::AppWindow::ItemType::Reset, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_CLOSE) {
-        state.data.menu_items.push_back({strings.CLOSE_WINDOW, Core::State::ItemType::Hide, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::Hide, 0});
       } else if (itemType == Core::Constants::MENU_ITEM_TYPE_EXIT) {
-        state.data.menu_items.push_back({strings.EXIT, Core::State::ItemType::Exit, 0});
+        state.app_window.data.menu_items.push_back(
+            {strings.EXIT, UI::AppWindow::ItemType::Exit, 0});
       }
     }
   } else {
     // 默认菜单项
-    state.data.menu_items.push_back(
-        {strings.CAPTURE_WINDOW, Core::State::ItemType::CaptureWindow, 0});
-    state.data.menu_items.push_back(
-        {strings.OPEN_SCREENSHOT, Core::State::ItemType::OpenScreenshot, 0});
-    state.data.menu_items.push_back(
-        {strings.PREVIEW_WINDOW, Core::State::ItemType::PreviewWindow, 0});
-    state.data.menu_items.push_back(
-        {strings.OVERLAY_WINDOW, Core::State::ItemType::OverlayWindow, 0});
-    state.data.menu_items.push_back(
-        {strings.LETTERBOX_WINDOW, Core::State::ItemType::LetterboxWindow, 0});
-    state.data.menu_items.push_back({strings.RESET_WINDOW, Core::State::ItemType::Reset, 0});
-    state.data.menu_items.push_back({strings.CLOSE_WINDOW, Core::State::ItemType::Hide, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::CaptureWindow, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::OpenScreenshot, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::PreviewWindow, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::OverlayWindow, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::LetterboxWindow, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.RESET_WINDOW, UI::AppWindow::ItemType::Reset, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::Hide, 0});
   }
 }
 

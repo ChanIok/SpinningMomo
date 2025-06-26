@@ -18,9 +18,9 @@ auto create_window_selection_submenu(const Core::State::AppState& state) -> HMEN
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto& strings = *state.data.strings;
+  const auto& strings = *state.app_window.data.strings;
   int id = Core::Constants::ID_WINDOW_BASE;
-  for (const auto& window : state.data.windows) {
+  for (const auto& window : state.app_window.data.windows) {
     UINT flags = MF_BYPOSITION | MF_STRING;
     if (window.title == state.config.window.title) {
       flags |= MF_CHECKED;
@@ -35,14 +35,14 @@ auto create_ratio_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto& strings = *state.data.strings;
-  for (size_t i = 0; i < state.data.ratios.size(); ++i) {
+  const auto& strings = *state.app_window.data.strings;
+  for (size_t i = 0; i < state.app_window.data.ratios.size(); ++i) {
     UINT flags = MF_BYPOSITION | MF_STRING;
-    if (i == state.ui.current_ratio_index) {
+    if (i == state.app_window.ui.current_ratio_index) {
       flags |= MF_CHECKED;
     }
     InsertMenuW(h_menu, -1, flags, Core::Constants::ID_RATIO_BASE + i,
-                state.data.ratios[i].name.c_str());
+                state.app_window.data.ratios[i].name.c_str());
   }
 
   return h_menu;
@@ -52,8 +52,8 @@ auto create_resolution_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  for (size_t i = 0; i < state.data.resolutions.size(); ++i) {
-    const auto& preset = state.data.resolutions[i];
+  for (size_t i = 0; i < state.app_window.data.resolutions.size(); ++i) {
+    const auto& preset = state.app_window.data.resolutions[i];
     wchar_t menu_text_buffer[256];
 
     std::wstring formatted_text;
@@ -67,7 +67,7 @@ auto create_resolution_submenu(const Core::State::AppState& state) -> HMENU {
     wcscpy_s(menu_text_buffer, std::size(menu_text_buffer), formatted_text.c_str());
 
     UINT flags = MF_BYPOSITION | MF_STRING;
-    if (i == state.ui.current_resolution_index) {
+    if (i == state.app_window.ui.current_resolution_index) {
       flags |= MF_CHECKED;
     }
     InsertMenuW(h_menu, -1, flags, Core::Constants::ID_RESOLUTION_BASE + i, menu_text_buffer);
@@ -80,7 +80,7 @@ auto create_language_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto& strings = *state.data.strings;
+  const auto& strings = *state.app_window.data.strings;
   InsertMenuW(
       h_menu, -1,
       MF_BYPOSITION | MF_STRING |
@@ -96,10 +96,11 @@ auto create_language_submenu(const Core::State::AppState& state) -> HMENU {
 }
 
 auto add_settings_items(HMENU h_menu, const Core::State::AppState& state) -> void {
-  const auto& strings = *state.data.strings;
+  const auto& strings = *state.app_window.data.strings;
 
   // Letterbox Mode
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING | (state.ui.letterbox_enabled ? MF_CHECKED : 0),
+  InsertMenuW(h_menu, -1,
+              MF_BYPOSITION | MF_STRING | (state.app_window.ui.letterbox_enabled ? MF_CHECKED : 0),
               Core::Constants::ID_LETTERBOX_WINDOW, strings.LETTERBOX_WINDOW.c_str());
 
   // Toggle Borderless
@@ -109,11 +110,13 @@ auto add_settings_items(HMENU h_menu, const Core::State::AppState& state) -> voi
   InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
   // Preview Window
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING | (state.ui.preview_enabled ? MF_CHECKED : 0),
+  InsertMenuW(h_menu, -1,
+              MF_BYPOSITION | MF_STRING | (state.app_window.ui.preview_enabled ? MF_CHECKED : 0),
               Core::Constants::ID_PREVIEW_WINDOW, strings.PREVIEW_WINDOW.c_str());
 
   // Overlay Window
-  InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING | (state.ui.overlay_enabled ? MF_CHECKED : 0),
+  InsertMenuW(h_menu, -1,
+              MF_BYPOSITION | MF_STRING | (state.app_window.ui.overlay_enabled ? MF_CHECKED : 0),
               Core::Constants::ID_OVERLAY_WINDOW, strings.OVERLAY_WINDOW.c_str());
 
   InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
@@ -134,16 +137,16 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
 
   auto& nid = state.tray_icon.nid;
   nid.cbSize = sizeof(decltype(nid));
-  nid.hWnd = state.window.hwnd;
+  nid.hWnd = state.app_window.window.hwnd;
   nid.uID = Core::Constants::HOTKEY_ID;
   nid.uFlags =
       Vendor::ShellApi::NIF_ICON_t | Vendor::ShellApi::NIF_MESSAGE_t | Vendor::ShellApi::NIF_TIP_t;
   nid.uCallbackMessage = Core::Constants::WM_TRAYICON;
 
   // 加载图标
-  nid.hIcon = static_cast<HICON>(
-      LoadImageW(state.window.instance, MAKEINTRESOURCEW(Core::Constants::IDI_ICON1), IMAGE_ICON,
-                 GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
+  nid.hIcon = static_cast<HICON>(LoadImageW(
+      state.app_window.window.instance, MAKEINTRESOURCEW(Core::Constants::IDI_ICON1), IMAGE_ICON,
+      GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
 
   if (!nid.hIcon) {
     nid.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
@@ -190,7 +193,7 @@ auto show_context_menu(Core::State::AppState& state) -> void {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return;
 
-  const auto& strings = *state.data.strings;
+  const auto& strings = *state.app_window.data.strings;
 
   // Window selection submenu
   if (HMENU h_window_menu = create_window_selection_submenu(state)) {
@@ -243,9 +246,9 @@ auto show_context_menu(Core::State::AppState& state) -> void {
               strings.EXIT.c_str());
 
   // 显示
-  SetForegroundWindow(state.window.hwnd);
+  SetForegroundWindow(state.app_window.window.hwnd);
   TrackPopupMenu(h_menu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN | TPM_RIGHTBUTTON, pt.x, pt.y, 0,
-                 state.window.hwnd, NULL);
+                 state.app_window.window.hwnd, NULL);
 
   DestroyMenu(h_menu);
 }

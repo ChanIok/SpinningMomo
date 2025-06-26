@@ -6,13 +6,13 @@ module;
 
 #include <iostream>
 
-module UI.Rendering.D2DInit;
+module UI.Rendering.D2DContext;
 
 import std;
 import Core.State;
 import Types.UI;
 
-namespace UI::Rendering::D2DInit {
+namespace UI::Rendering::D2DContext {
 
 // 初始化Direct2D资源
 auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> std::expected<void, std::string> {
@@ -154,15 +154,15 @@ auto resize_d2d(Core::State::AppState& state, const SIZE& new_size)
 auto create_text_format(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& d2d = state.d2d_render;
 
-  HRESULT hr =
-      d2d.write_factory->CreateTextFormat(L"微软雅黑",                                 // 字体名称
-                                          nullptr,                                     // 字体集合
-                                          DWRITE_FONT_WEIGHT_NORMAL,                   // 字体粗细
-                                          DWRITE_FONT_STYLE_NORMAL,                    // 字体样式
-                                          DWRITE_FONT_STRETCH_NORMAL,                  // 字体拉伸
-                                          static_cast<float>(state.render.font_size),  // 字体大小
-                                          L"zh-cn",                                    // 区域设置
-                                          &d2d.text_format);
+  HRESULT hr = d2d.write_factory->CreateTextFormat(
+      L"微软雅黑",                                            // 字体名称
+      nullptr,                                                // 字体集合
+      DWRITE_FONT_WEIGHT_NORMAL,                              // 字体粗细
+      DWRITE_FONT_STYLE_NORMAL,                               // 字体样式
+      DWRITE_FONT_STRETCH_NORMAL,                             // 字体拉伸
+      static_cast<float>(state.app_window.layout.font_size),  // 字体大小
+      L"zh-cn",                                               // 区域设置
+      &d2d.text_format);
 
   if (FAILED(hr)) {
     return std::unexpected(std::format("Failed to create text format, HRESULT: 0x{:08X}",
@@ -211,4 +211,4 @@ auto create_brushes(Core::State::AppState& state) -> std::expected<void, std::st
   return {};
 }
 
-}  // namespace UI::Rendering::D2DInit
+}  // namespace UI::Rendering::D2DContext

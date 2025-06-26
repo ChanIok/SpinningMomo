@@ -5,6 +5,7 @@ module;
 export module UI.AppWindow.MessageHandler;
 
 import Core.State;
+import UI.AppWindow.State;
 
 namespace UI::AppWindow::MessageHandler {
 

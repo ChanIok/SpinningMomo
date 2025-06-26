@@ -3,18 +3,17 @@ module;
 #include <dwmapi.h>
 #include <windows.h>
 
-module UI.AppWindow.Rendering;
+module UI.AppWindow.Layout;
 
 import std;
 import Core.State;
 import Types.UI;
-import UI.Rendering.D2DPaint;
 import Utils.Logger;
 
 namespace UI::AppWindow {
 
 auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
-  const auto& render = state.render;
+  const auto& render = state.app_window.layout;
   const int total_width =
       render.ratio_column_width + render.resolution_column_width + render.settings_column_width;
   const int window_height = calculate_window_height(state);
@@ -23,8 +22,8 @@ auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
 }
 
 auto calculate_window_height(const Core::State::AppState& state) -> int {
-  const auto counts = count_items_per_column(state.data.menu_items);
-  const auto& render = state.render;
+  const auto counts = count_items_per_column(state.app_window.data.menu_items);
+  const auto& render = state.app_window.layout;
 
   // 计算每列的高度
   const int ratio_height = counts.ratio_count * render.item_height;
@@ -53,8 +52,8 @@ auto calculate_center_position(const SIZE& window_size) -> POINT {
 }
 
 auto get_item_index_from_point(const Core::State::AppState& state, int x, int y) -> int {
-  const auto& render = state.render;
-  const auto& items = state.data.menu_items;
+  const auto& render = state.app_window.layout;
+  const auto& items = state.app_window.data.menu_items;
 
   // 检查是否在标题栏或分隔线区域
   if (y < render.title_height + render.separator_height) {
@@ -64,11 +63,11 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
   const auto bounds = get_column_bounds(state);
 
   // 确定点击的是哪一列
-  Core::State::ItemType target_type;
+  UI::AppWindow::ItemType target_type;
   if (x < bounds.ratio_column_right) {
-    target_type = Core::State::ItemType::Ratio;
+    target_type = UI::AppWindow::ItemType::Ratio;
   } else if (x < bounds.resolution_column_right) {
-    target_type = Core::State::ItemType::Resolution;
+    target_type = UI::AppWindow::ItemType::Resolution;
   } else {
     // 设置列的特殊处理
     return get_settings_item_index(state, y);
@@ -89,11 +88,11 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
   return -1;
 }
 
-auto count_items_per_column(const std::vector<Core::State::MenuItem>& items) -> ColumnCounts {
+auto count_items_per_column(const std::vector<UI::AppWindow::MenuItem>& items) -> ColumnCounts {
   ColumnCounts counts;
 
   for (const auto& item : items) {
-    using ItemType = Core::State::ItemType;
+    using ItemType = UI::AppWindow::ItemType;
     switch (item.type) {
       case ItemType::Ratio:
         ++counts.ratio_count;
@@ -118,7 +117,7 @@ auto count_items_per_column(const std::vector<Core::State::MenuItem>& items) -> 
 }
 
 auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds {
-  const auto& render = state.render;
+  const auto& render = state.app_window.layout;
   const int ratio_column_right = render.ratio_column_width;
   const int resolution_column_right = ratio_column_right + render.resolution_column_width;
   const int settings_column_left = resolution_column_right + render.separator_height;
@@ -126,19 +125,14 @@ auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds {
   return {ratio_column_right, resolution_column_right, settings_column_left};
 }
 
-auto paint_window(HDC hdc, const RECT& client_rect, const Core::State::AppState& state) -> void {
-  // 只使用Direct2D渲染
-  UI::Rendering::D2DPaint::paint_window_d2d(state, client_rect);
-}
-
 auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
-  const auto& render = state.render;
-  const auto& items = state.data.menu_items;
+  const auto& render = state.app_window.layout;
+  const auto& items = state.app_window.data.menu_items;
 
   int settings_y = render.title_height + render.separator_height;
   for (size_t i = 0; i < items.size(); ++i) {
     const auto& item = items[i];
-    using ItemType = Core::State::ItemType;
+    using ItemType = UI::AppWindow::ItemType;
     if (item.type == ItemType::CaptureWindow || item.type == ItemType::OpenScreenshot ||
         item.type == ItemType::PreviewWindow || item.type == ItemType::OverlayWindow ||
         item.type == ItemType::LetterboxWindow || item.type == ItemType::Reset ||
@@ -152,10 +146,11 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
   return -1;
 }
 
-auto get_indicator_width(const Core::State::MenuItem& item, const Core::State::AppState& state)
+auto get_indicator_width(const UI::AppWindow::MenuItem& item, const Core::State::AppState& state)
     -> int {
-  return (item.type == Core::State::ItemType::Ratio) ? state.render.ratio_indicator_width
-                                                     : state.render.indicator_width;
+  return (item.type == UI::AppWindow::ItemType::Ratio)
+             ? state.app_window.layout.ratio_indicator_width
+             : state.app_window.layout.indicator_width;
 }
 
 }  // namespace UI::AppWindow

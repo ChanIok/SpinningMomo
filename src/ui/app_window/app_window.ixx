@@ -6,7 +6,7 @@ import std;
 import Core.Constants;
 import Core.State;
 import Types.Presets;
-import UI.AppWindow.Rendering;
+import UI.AppWindow.Layout;
 import Vendor.Windows;
 
 namespace UI::AppWindow {

@@ -4,13 +4,13 @@ module;
 #include <dwrite.h>
 #include <windows.h>
 
-export module UI.Rendering.D2DInit;
+export module UI.Rendering.D2DContext;
 
 import std;
 import Core.State;
 import Types.UI;
 
-namespace UI::Rendering::D2DInit {
+namespace UI::Rendering::D2DContext {
 
 // 内部函数声明
 auto create_text_format(Core::State::AppState& state) -> std::expected<void, std::string>;
@@ -27,4 +27,4 @@ export auto cleanup_d2d(Core::State::AppState& state) -> void;
 export auto resize_d2d(Core::State::AppState& state, const SIZE& new_size)
     -> std::expected<void, std::string>;
 
-}  // namespace UI::Rendering::D2DInit
+}  // namespace UI::Rendering::D2DContext

@@ -2,14 +2,14 @@ module;
 
 #include <windows.h>
 
-export module Types.State;
+export module UI.AppWindow.State;
 
 import std;
 import Core.Constants;
 import Types.Presets;
 import Features.WindowControl;
 
-export namespace Types::State {
+export namespace UI::AppWindow {
 
 // 菜单项类型枚举
 enum class ItemType {
@@ -33,7 +33,7 @@ struct MenuItem {
 };
 
 // 窗口系统状态
-struct WindowState {
+struct WindowInfo {
   HWND hwnd = nullptr;
   HINSTANCE instance = nullptr;
   SIZE size{};
@@ -45,7 +45,7 @@ struct WindowState {
 };
 
 // UI交互状态
-struct UIState {
+struct InteractionState {
   int hover_index = -1;
   size_t current_ratio_index = std::numeric_limits<size_t>::max();
   size_t current_resolution_index = 0;
@@ -65,7 +65,7 @@ struct DataState {
 };
 
 // 渲染相关状态（DPI缩放后的尺寸）
-struct RenderState {
+struct LayoutConfig {
   // 基础尺寸（96 DPI）
   static constexpr int BASE_ITEM_HEIGHT = 24;
   static constexpr int BASE_TITLE_HEIGHT = 26;
@@ -106,4 +106,38 @@ struct RenderState {
   }
 };
 
-}  // namespace Types::State
+// 主窗口聚合状态
+struct State {
+  WindowInfo window;
+  InteractionState ui;
+  DataState data;
+  LayoutConfig layout;
+
+  // 便捷访问方法
+  auto is_window_valid() const -> bool { return window.hwnd != nullptr; }
+  auto get_total_width() const -> int {
+    return layout.ratio_column_width + layout.resolution_column_width +
+           layout.settings_column_width;
+  }
+  auto get_menu_item_count() const -> size_t { return data.menu_items.size(); }
+};
+
+// 辅助函数
+auto is_item_selected(const MenuItem& item, const InteractionState& ui_state) -> bool {
+  switch (item.type) {
+    case ItemType::Ratio:
+      return item.index == static_cast<int>(ui_state.current_ratio_index);
+    case ItemType::Resolution:
+      return item.index == static_cast<int>(ui_state.current_resolution_index);
+    case ItemType::PreviewWindow:
+      return ui_state.preview_enabled;
+    case ItemType::OverlayWindow:
+      return ui_state.overlay_enabled;
+    case ItemType::LetterboxWindow:
+      return ui_state.letterbox_enabled;
+    default:
+      return false;
+  }
+}
+
+}  // namespace UI::AppWindow

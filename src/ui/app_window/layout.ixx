@@ -3,11 +3,11 @@ module;
 #include <dwmapi.h>
 #include <windows.h>
 
-export module UI.AppWindow.Rendering;
+export module UI.AppWindow.Layout;
 
 import std;
 import Core.State;
-import Types.State;
+import UI.AppWindow.State;
 import Types.UI;
 
 namespace UI::AppWindow {
@@ -39,17 +39,14 @@ export auto calculate_center_position(const SIZE& window_size) -> POINT;
 export auto get_item_index_from_point(const Core::State::AppState& state, int x, int y) -> int;
 
 // 计算每列的项目数量
-export auto count_items_per_column(const std::vector<Core::State::MenuItem>& items) -> ColumnCounts;
+export auto count_items_per_column(const std::vector<UI::AppWindow::MenuItem>& items)
+    -> ColumnCounts;
 
 // 获取列边界
 export auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds;
 
-// 主绘制函数
-export auto paint_window(HDC hdc, const RECT& client_rect, const Core::State::AppState& state)
-    -> void;
-
 // 获取指示器宽度
-export auto get_indicator_width(const Core::State::MenuItem& item,
+export auto get_indicator_width(const UI::AppWindow::MenuItem& item,
                                 const Core::State::AppState& state) -> int;
 
 // 获取设置列中的项目索引

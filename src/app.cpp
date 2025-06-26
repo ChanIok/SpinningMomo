@@ -34,7 +34,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
     // 1. 创建 AppState
     m_app_state = std::make_unique<Core::State::AppState>();
-    m_app_state->window.instance = m_h_instance;
+    m_app_state->app_window.window.instance = m_h_instance;
 
     // 2. 初始化配置
     if (auto config_result = Core::Config::Io::initialize(); config_result) {
@@ -52,25 +52,25 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
         (m_app_state->config.language.current_language == Core::Constants::LANG_ZH_CN)
             ? Core::Constants::ZH_CN
             : Core::Constants::EN_US;
-    m_app_state->data.strings = &strings;
+    m_app_state->app_window.data.strings = &strings;
 
     auto ratio_data = Core::Config::Io::get_aspect_ratios(m_app_state->config, strings);
     if (!ratio_data.success) {
       Logger().warn("Failed to load aspect ratios: {}",
                     Utils::String::ToUtf8(ratio_data.error_details));
     }
-    m_app_state->data.ratios = std::move(ratio_data.ratios);
+    m_app_state->app_window.data.ratios = std::move(ratio_data.ratios);
 
     auto resolution_data = Core::Config::Io::get_resolution_presets(m_app_state->config, strings);
     if (!resolution_data.success) {
       Logger().warn("Failed to load resolutions: {}",
                     Utils::String::ToUtf8(resolution_data.error_details));
     }
-    m_app_state->data.resolutions = std::move(resolution_data.resolutions);
+    m_app_state->app_window.data.resolutions = std::move(resolution_data.resolutions);
 
     // 从配置初始化UI状态
-    m_app_state->ui.preview_enabled = m_app_state->config.menu.use_floating_window;
-    m_app_state->ui.letterbox_enabled = m_app_state->config.letterbox.enabled;
+    m_app_state->app_window.ui.preview_enabled = m_app_state->config.menu.use_floating_window;
+    m_app_state->app_window.ui.letterbox_enabled = m_app_state->config.letterbox.enabled;
 
     // 创建窗口
     if (auto result = UI::AppWindow::create_window(*m_app_state); !result) {
@@ -86,7 +86,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
     // 初始化预览系统
     if (auto preview_result = Features::Preview::Window::initialize_preview(
-            *m_app_state, m_h_instance, m_app_state->window.hwnd);
+            *m_app_state, m_h_instance, m_app_state->app_window.window.hwnd);
         !preview_result) {
       Logger().warn("Failed to initialize preview system");
       // 预览功能不可用，但应用继续运行

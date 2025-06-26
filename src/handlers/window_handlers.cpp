@@ -50,7 +50,8 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   // 查找目标窗口
   auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(
+        state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
     return;
   }
 
@@ -66,13 +67,15 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   }
 
   // 应用窗口变换
-  Features::WindowControl::TransformOptions options{.taskbar_lower = state.config.taskbar.lower,
-                                                    .activate_window = !state.ui.overlay_enabled};
+  Features::WindowControl::TransformOptions options{
+      .taskbar_lower = state.config.taskbar.lower,
+      .activate_window = !state.app_window.ui.overlay_enabled};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
-    Features::Notifications::show_notification(state, "SpinningMomo", "Failed to apply window transform: " + result.error());
+    Features::Notifications::show_notification(
+        state, "SpinningMomo", "Failed to apply window transform: " + result.error());
     return;
   }
 
@@ -97,7 +100,8 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   // 查找目标窗口
   auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(
+        state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
     return;
   }
 
@@ -115,13 +119,15 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   }
 
   // 应用窗口变换
-  Features::WindowControl::TransformOptions options{.taskbar_lower = state.config.taskbar.lower,
-                                                    .activate_window = !state.ui.overlay_enabled};
+  Features::WindowControl::TransformOptions options{
+      .taskbar_lower = state.config.taskbar.lower,
+      .activate_window = !state.app_window.ui.overlay_enabled};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
-    Features::Notifications::show_notification(state, "SpinningMomo", "Failed to apply window transform: " + result.error());
+    Features::Notifications::show_notification(
+        state, "SpinningMomo", "Failed to apply window transform: " + result.error());
     return;
   }
 
@@ -145,7 +151,8 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
     case Core::Events::WindowAction::Reset: {
       auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
       if (!target_window) {
-        Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+        Features::Notifications::show_notification(
+            state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
         return;
       }
 
@@ -154,7 +161,8 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
 
       auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
       if (!result) {
-        Features::Notifications::show_notification(state, "SpinningMomo", "Failed to reset window: " + result.error());
+        Features::Notifications::show_notification(state, "SpinningMomo",
+                                                   "Failed to reset window: " + result.error());
         return;
       }
 
@@ -169,7 +177,8 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
     case Core::Events::WindowAction::Capture: {
       auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
       if (!target_window) {
-        Features::Notifications::show_notification(state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+        Features::Notifications::show_notification(
+            state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
         return;
       }
 
@@ -178,18 +187,22 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
         if (success) {
           // 转换路径为字符串用于通知
           std::string path_str(path.begin(), path.end());
-          Features::Notifications::show_notification(state, "SpinningMomo", "Screenshot saved to: " + path_str);
+          Features::Notifications::show_notification(state, "SpinningMomo",
+                                                     "Screenshot saved to: " + path_str);
           Logger().debug("Screenshot saved successfully: {}", path_str);
         } else {
-          Features::Notifications::show_notification(state, "SpinningMomo", "Failed to capture screenshot");
+          Features::Notifications::show_notification(state, "SpinningMomo",
+                                                     "Failed to capture screenshot");
           Logger().error("Screenshot capture failed");
         }
       };
 
       // 执行截图
-      auto result = Features::Screenshot::take_screenshot(state.screenshot, *target_window, completion_callback);
+      auto result = Features::Screenshot::take_screenshot(state.screenshot, *target_window,
+                                                          completion_callback);
       if (!result) {
-        Features::Notifications::show_notification(state, "SpinningMomo", "Failed to start screenshot: " + result.error());
+        Features::Notifications::show_notification(state, "SpinningMomo",
+                                                   "Failed to start screenshot: " + result.error());
         Logger().error("Failed to start screenshot: {}", result.error());
       } else {
         Logger().debug("Screenshot capture started successfully");
@@ -204,8 +217,8 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
 
 // 获取当前比例
 auto get_current_ratio(const Core::State::AppState& state) -> double {
-  if (state.ui.current_ratio_index < state.data.ratios.size()) {
-    return state.data.ratios[state.ui.current_ratio_index].ratio;
+  if (state.app_window.ui.current_ratio_index < state.app_window.data.ratios.size()) {
+    return state.app_window.data.ratios[state.app_window.ui.current_ratio_index].ratio;
   }
 
   // 默认使用屏幕比例
@@ -216,8 +229,9 @@ auto get_current_ratio(const Core::State::AppState& state) -> double {
 
 // 获取当前总像素数
 auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64_t {
-  if (state.ui.current_resolution_index < state.data.resolutions.size()) {
-    return state.data.resolutions[state.ui.current_resolution_index].totalPixels;
+  if (state.app_window.ui.current_resolution_index < state.app_window.data.resolutions.size()) {
+    return state.app_window.data.resolutions[state.app_window.ui.current_resolution_index]
+        .totalPixels;
   }
   return 0;  // 表示使用屏幕尺寸
 }
