@@ -63,7 +63,6 @@ auto create_tray_menu_window(Core::State::AppState& state) -> std::expected<void
   }
 
   // 创建窗口（初始时隐藏）
-  // 移除 WS_EX_NOACTIVATE 标志，让菜单能够获得焦点以便正确处理焦点丢失事件
   tray_menu.hwnd =
       CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, TRAY_MENU_CLASS_NAME,
                       L"TrayMenu", WS_POPUP, 0, 0, 100, 100,  // 临时尺寸，稍后会调整
@@ -81,6 +80,42 @@ auto create_tray_menu_window(Core::State::AppState& state) -> std::expected<void
   return {};
 }
 
+// 构建窗口列表子菜单
+auto build_window_list(Core::State::AppState& state) -> std::vector<UI::TrayMenu::State::MenuItem> {
+  std::vector<UI::TrayMenu::State::MenuItem> windows;
+
+  // 枚举所有可见窗口
+  EnumWindows(
+      [](HWND hwnd, LPARAM lParam) -> BOOL {
+        auto* windows = reinterpret_cast<std::vector<UI::TrayMenu::State::MenuItem>*>(lParam);
+
+        // 检查窗口是否可见且不是最小化状态
+        if (IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
+          wchar_t title[256];
+          if (GetWindowTextW(hwnd, title, 256) > 0) {
+            // 过滤掉一些系统窗口和不需要的窗口
+            std::wstring window_title(title);
+            if (!window_title.empty() && window_title != L"Program Manager" &&
+                window_title.find(L"SpinningMomo") == std::wstring::npos) {
+              // 为每个窗口分配唯一的命令ID
+              int id = Core::Constants::ID_WINDOW_BASE + static_cast<int>(windows->size()) + 1;
+              windows->emplace_back(window_title, id);
+            }
+          }
+        }
+        return TRUE;
+      },
+      reinterpret_cast<LPARAM>(&windows));
+
+  // 如果没有找到窗口，添加一个提示项
+  if (windows.empty()) {
+    windows.emplace_back(L"(无可用窗口)", 0);
+    windows.back().is_enabled = false;
+  }
+
+  return windows;
+}
+
 // 初始化菜单项数据
 auto initialize_menu_items(Core::State::AppState& state) -> void {
   auto& tray_menu = state.tray_menu;
@@ -90,8 +125,10 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
 
   const auto& strings = *state.app_window.data.strings;
 
-  // 窗口选择 - 使用第一个窗口ID作为占位符
-  items.emplace_back(strings.SELECT_WINDOW, Core::Constants::ID_WINDOW_BASE);
+  // 窗口选择 - 构建子菜单
+  UI::TrayMenu::State::MenuItem window_item(strings.SELECT_WINDOW, Core::Constants::ID_WINDOW_BASE);
+  window_item.submenu_items = build_window_list(state);
+  items.emplace_back(std::move(window_item));
 
   // 分隔线
   items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
@@ -140,9 +177,9 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
     return result;
   }
 
-  // 创建D2D渲染目标
-  if (!UI::TrayMenu::D2DContext::initialize_d2d(state, state.tray_menu.hwnd)) {
-    return std::unexpected("Failed to initialize D2D for tray menu");
+  // 创建主菜单D2D资源
+  if (!UI::TrayMenu::D2DContext::initialize_main_menu(state, state.tray_menu.hwnd)) {
+    return std::unexpected("Failed to initialize D2D for main menu");
   }
 
   return {};
@@ -151,8 +188,8 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
 auto cleanup(Core::State::AppState& state) -> void {
   auto& tray_menu = state.tray_menu;
 
-  // 清理D2D资源
-  UI::TrayMenu::D2DContext::cleanup_d2d(state);
+  // 清理主菜单D2D资源
+  UI::TrayMenu::D2DContext::cleanup_main_menu(state);
 
   if (tray_menu.hwnd) {
     DestroyWindow(tray_menu.hwnd);
@@ -203,7 +240,6 @@ auto show_menu(Core::State::AppState& state, const Vendor::Windows::POINT& posit
                tray_menu.menu_size.cx, tray_menu.menu_size.cy, SWP_NOACTIVATE);
 
   // 显示窗口并激活它以获得焦点
-  // 这样当用户点击菜单外的区域时，菜单会失去焦点并自动关闭
   ShowWindow(tray_menu.hwnd, SW_SHOW);
   SetForegroundWindow(tray_menu.hwnd);
   SetFocus(tray_menu.hwnd);
@@ -226,8 +262,25 @@ auto show_menu(Core::State::AppState& state, const Vendor::Windows::POINT& posit
 
 auto hide_menu(Core::State::AppState& state) -> void {
   auto& tray_menu = state.tray_menu;
+  auto& interaction = tray_menu.interaction;
+
+  // 先隐藏子菜单
+  hide_submenu(state);
 
   if (tray_menu.hwnd && tray_menu.is_visible) {
+    // 清理所有定时器
+    if (interaction.show_timer_id != 0) {
+      KillTimer(tray_menu.hwnd, interaction.show_timer_id);
+      interaction.show_timer_id = 0;
+      interaction.pending_submenu_index = -1;
+    }
+
+    // 清理隐藏定时器
+    if (interaction.hide_timer_id != 0) {
+      KillTimer(tray_menu.hwnd, interaction.hide_timer_id);
+      interaction.hide_timer_id = 0;
+    }
+
     ShowWindow(tray_menu.hwnd, SW_HIDE);
     tray_menu.is_visible = false;
     tray_menu.interaction.hover_index = -1;
@@ -239,13 +292,177 @@ auto is_menu_visible(const Core::State::AppState& state) -> bool {
 }
 
 auto handle_menu_command(Core::State::AppState& state, int command_id) -> void {
-  // 隐藏菜单
+  // 隐藏菜单（包括子菜单）
   hide_menu(state);
 
   // 转发命令到主窗口的消息处理器
   // 这样可以复用现有的命令处理逻辑
   if (state.app_window.window.hwnd) {
     PostMessageW(state.app_window.window.hwnd, WM_COMMAND, command_id, 0);
+  }
+}
+
+// 计算子菜单尺寸
+auto calculate_submenu_size(Core::State::AppState& state) -> void {
+  auto& tray_menu = state.tray_menu;
+  const auto& layout = tray_menu.layout;
+
+  if (tray_menu.current_submenu.empty()) {
+    tray_menu.submenu_size = {0, 0};
+    return;
+  }
+
+  // 计算子菜单的宽度和高度
+  int max_width = layout.min_width;
+  int total_height = layout.padding * 2;
+
+  for (const auto& item : tray_menu.current_submenu) {
+    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+      total_height += layout.separator_height;
+    } else {
+      total_height += layout.item_height;
+      // 简单估算文本宽度（实际应该使用文本测量）
+      int text_width =
+          static_cast<int>(item.text.length() * layout.font_size * 0.6) + layout.text_padding * 2;
+      max_width = std::max(max_width, text_width);
+    }
+  }
+
+  tray_menu.submenu_size = {max_width, total_height};
+}
+
+// 计算子菜单位置
+auto calculate_submenu_position(Core::State::AppState& state, int parent_index) -> void {
+  auto& tray_menu = state.tray_menu;
+  const auto& layout = tray_menu.layout;
+
+  // 计算父菜单项的位置
+  int parent_y = layout.padding;
+  for (int i = 0; i < parent_index; ++i) {
+    const auto& item = tray_menu.items[i];
+    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+      parent_y += layout.separator_height;
+    } else {
+      parent_y += layout.item_height;
+    }
+  }
+
+  // 子菜单显示在主菜单右侧
+  tray_menu.submenu_position.x = tray_menu.position.x + tray_menu.menu_size.cx;
+  tray_menu.submenu_position.y = tray_menu.position.y + parent_y;
+
+  // 确保子菜单不会超出屏幕边界
+  RECT screen_rect;
+  SystemParametersInfoW(SPI_GETWORKAREA, 0, &screen_rect, 0);
+
+  // 检查右边界
+  if (tray_menu.submenu_position.x + tray_menu.submenu_size.cx > screen_rect.right) {
+    // 显示在主菜单左侧
+    tray_menu.submenu_position.x = tray_menu.position.x - tray_menu.submenu_size.cx;
+  }
+
+  // 检查下边界
+  if (tray_menu.submenu_position.y + tray_menu.submenu_size.cy > screen_rect.bottom) {
+    tray_menu.submenu_position.y = screen_rect.bottom - tray_menu.submenu_size.cy;
+  }
+
+  // 检查上边界
+  if (tray_menu.submenu_position.y < screen_rect.top) {
+    tray_menu.submenu_position.y = screen_rect.top;
+  }
+}
+
+// 显示子菜单
+auto show_submenu(Core::State::AppState& state, int parent_index) -> void {
+  auto& tray_menu = state.tray_menu;
+
+  Logger().debug("show_submenu called with parent_index: {}", parent_index);
+
+  // 如果已经显示相同的子菜单，直接返回
+  if (tray_menu.submenu_hwnd && tray_menu.submenu_parent_index == parent_index) {
+    Logger().debug("Submenu already showing for the same parent, skipping");
+    return;
+  }
+
+  // 隐藏当前子菜单
+  hide_submenu(state);
+
+  if (parent_index < 0 || parent_index >= static_cast<int>(tray_menu.items.size())) {
+    Logger().warn("Invalid parent_index: {}", parent_index);
+    return;
+  }
+
+  const auto& parent_item = tray_menu.items[parent_index];
+  if (!parent_item.has_submenu()) {
+    Logger().warn("Parent item at index {} has no submenu", parent_index);
+    return;
+  }
+
+  // 设置子菜单数据
+  tray_menu.current_submenu = parent_item.submenu_items;
+  tray_menu.submenu_parent_index = parent_index;
+
+  // 计算子菜单尺寸和位置
+  calculate_submenu_size(state);
+  calculate_submenu_position(state, parent_index);
+
+  Logger().debug("Submenu size: {}x{}, position: ({}, {})", tray_menu.submenu_size.cx,
+                 tray_menu.submenu_size.cy, tray_menu.submenu_position.x,
+                 tray_menu.submenu_position.y);
+
+  // 创建子菜单窗口
+  tray_menu.submenu_hwnd = CreateWindowExW(
+      WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, TRAY_MENU_CLASS_NAME, L"TraySubmenu",
+      WS_POPUP, tray_menu.submenu_position.x, tray_menu.submenu_position.y,
+      tray_menu.submenu_size.cx, tray_menu.submenu_size.cy,
+      tray_menu.hwnd,  // 父窗口
+      nullptr, state.app_window.window.instance, &state);
+
+  if (tray_menu.submenu_hwnd) {
+    Logger().debug("Submenu window created successfully: {}", (void*)tray_menu.submenu_hwnd);
+
+    SetLayeredWindowAttributes(tray_menu.submenu_hwnd, 0, 240, LWA_ALPHA);
+
+    // 初始化子菜单D2D资源
+    if (!UI::TrayMenu::D2DContext::initialize_submenu(state, tray_menu.submenu_hwnd)) {
+      Logger().error("Failed to initialize submenu D2D resources");
+      DestroyWindow(tray_menu.submenu_hwnd);
+      tray_menu.submenu_hwnd = nullptr;
+      return;
+    }
+
+    Logger().debug("Submenu D2D resources initialized successfully");
+
+    ShowWindow(tray_menu.submenu_hwnd, SW_SHOW);
+    Logger().debug("Submenu window shown");
+
+    // 强制置顶确保可见性
+    SetWindowPos(tray_menu.submenu_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    Logger().debug("Submenu window set to topmost");
+  } else {
+    Logger().error("Failed to create submenu window, error: {}", GetLastError());
+  }
+}
+
+// 隐藏子菜单
+auto hide_submenu(Core::State::AppState& state) -> void {
+  auto& tray_menu = state.tray_menu;
+
+  if (tray_menu.submenu_hwnd) {
+    Logger().debug("Hiding submenu window: {}", (void*)tray_menu.submenu_hwnd);
+
+    // 清理子菜单D2D资源
+    UI::TrayMenu::D2DContext::cleanup_submenu(state);
+
+    DestroyWindow(tray_menu.submenu_hwnd);
+    tray_menu.submenu_hwnd = nullptr;
+    tray_menu.submenu_parent_index = -1;
+    tray_menu.current_submenu.clear();
+    tray_menu.interaction.submenu_hover_index = -1;  // 重置子菜单悬停索引
+
+  } else {
+    Logger().debug("hide_submenu called but no submenu exists");
   }
 }
 

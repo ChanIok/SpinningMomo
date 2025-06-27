@@ -26,6 +26,9 @@ struct MenuItem {
   bool is_checked = false;
   bool is_enabled = true;
 
+  // 新增：子菜单支持
+  std::vector<MenuItem> submenu_items;
+
   // 构造函数
   MenuItem() = default;
   MenuItem(const std::wstring& text, int id) : text(text), command_id(id) {}
@@ -38,6 +41,9 @@ struct MenuItem {
     item.type = MenuItemType::Separator;
     return item;
   }
+
+  // 便捷方法
+  auto has_submenu() const -> bool { return !submenu_items.empty(); }
 };
 
 // 布局配置
@@ -74,11 +80,22 @@ struct LayoutConfig {
   }
 };
 
-// 交互状态
+// 交互状态（添加子菜单延迟隐藏）
 struct InteractionState {
   int hover_index = -1;
+  int submenu_hover_index = -1;
   bool is_mouse_tracking = false;
-  POINT last_mouse_pos{};
+
+  // 子菜单显示延迟
+  UINT_PTR show_timer_id = 0;
+  int pending_submenu_index = -1;
+  static constexpr UINT SHOW_TIMER_DELAY = 200;  // 200ms延迟显示
+  static constexpr UINT_PTR SHOW_TIMER_ID = 1;
+
+  // 子菜单隐藏延迟（解决对角线移动问题）
+  UINT_PTR hide_timer_id = 0;
+  static constexpr UINT HIDE_TIMER_DELAY = 300;  // 300ms延迟隐藏
+  static constexpr UINT_PTR HIDE_TIMER_ID = 2;
 };
 
 // 托盘菜单数据
@@ -88,17 +105,25 @@ struct Data {
   bool is_visible = false;
   bool is_created = false;
 
-  // D2D渲染目标（托盘菜单专用）
+  // 主菜单D2D资源
   ID2D1HwndRenderTarget* render_target = nullptr;
-  bool render_target_initialized = false;
-
-  // 托盘菜单专用画刷（与渲染目标生命周期绑定）
   ID2D1SolidColorBrush* white_brush = nullptr;
   ID2D1SolidColorBrush* text_brush = nullptr;
   ID2D1SolidColorBrush* separator_brush = nullptr;
   ID2D1SolidColorBrush* hover_brush = nullptr;
   ID2D1SolidColorBrush* indicator_brush = nullptr;
-  bool brushes_initialized = false;
+
+  // 子菜单D2D资源（新增专用画刷）
+  ID2D1HwndRenderTarget* submenu_render_target = nullptr;
+  ID2D1SolidColorBrush* submenu_white_brush = nullptr;
+  ID2D1SolidColorBrush* submenu_text_brush = nullptr;
+  ID2D1SolidColorBrush* submenu_separator_brush = nullptr;
+  ID2D1SolidColorBrush* submenu_hover_brush = nullptr;
+  ID2D1SolidColorBrush* submenu_indicator_brush = nullptr;
+
+  // 简化的初始化标志
+  bool main_menu_d2d_ready = false;
+  bool submenu_d2d_ready = false;
 
   // 菜单数据
   std::vector<MenuItem> items;
@@ -110,6 +135,13 @@ struct Data {
   // 计算出的尺寸
   SIZE menu_size{};
   POINT position{};
+
+  // 子菜单相关
+  HWND submenu_hwnd = nullptr;            // 当前显示的子菜单窗口
+  int submenu_parent_index = -1;          // 触发子菜单的父项索引
+  std::vector<MenuItem> current_submenu;  // 当前子菜单项
+  SIZE submenu_size{};                    // 子菜单尺寸
+  POINT submenu_position{};               // 子菜单位置
 
   // 便捷方法
   auto is_valid() const -> bool { return hwnd != nullptr && is_created; }

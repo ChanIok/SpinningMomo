@@ -12,13 +12,16 @@ import Types.UI;
 
 namespace UI::TrayMenu::D2DContext {
 
-// 初始化托盘菜单的Direct2D资源
-export auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool;
+// 主菜单D2D资源管理
+export auto initialize_main_menu(Core::State::AppState& state, HWND hwnd) -> bool;
+export auto cleanup_main_menu(Core::State::AppState& state) -> void;
 
-// 清理托盘菜单的Direct2D资源
-export auto cleanup_d2d(Core::State::AppState& state) -> void;
+// 子菜单D2D资源管理
+export auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool;
+export auto cleanup_submenu(Core::State::AppState& state) -> void;
 
-// 调整托盘菜单渲染目标大小
-export auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool;
+// 调整渲染目标大小（保留用于窗口大小变化）
+export auto resize_main_menu(Core::State::AppState& state, const SIZE& new_size) -> bool;
+export auto resize_submenu(Core::State::AppState& state, const SIZE& new_size) -> bool;
 
 }  // namespace UI::TrayMenu::D2DContext

@@ -26,4 +26,8 @@ export auto is_menu_visible(const Core::State::AppState& state) -> bool;
 // 处理菜单命令
 export auto handle_menu_command(Core::State::AppState& state, int command_id) -> void;
 
+// 子菜单管理
+export auto show_submenu(Core::State::AppState& state, int parent_index) -> void;
+export auto hide_submenu(Core::State::AppState& state) -> void;
+
 }  // namespace UI::TrayMenu
