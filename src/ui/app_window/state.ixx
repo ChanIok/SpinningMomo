@@ -25,6 +25,18 @@ enum class ItemType {
   Exit
 };
 
+// 布局常量
+constexpr int BASE_ITEM_HEIGHT = 24;
+constexpr int BASE_TITLE_HEIGHT = 26;
+constexpr int BASE_SEPARATOR_HEIGHT = 1;
+constexpr int BASE_FONT_SIZE = 12;
+constexpr int BASE_TEXT_PADDING = 12;
+constexpr int BASE_INDICATOR_WIDTH = 3;
+constexpr int BASE_RATIO_INDICATOR_WIDTH = 4;
+constexpr int BASE_RATIO_COLUMN_WIDTH = 60;
+constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120;
+constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;
+
 // 菜单项结构
 struct MenuItem {
   std::wstring text;
@@ -64,25 +76,19 @@ struct DataState {
   std::vector<std::wstring> menu_items_to_show;
 };
 
+// 渲染状态（分离可变的渲染状态，解决const_cast问题）
+struct RenderState {
+  bool is_rendering = false;
+  bool needs_resize = false;
+};
+
 // 渲染相关状态（DPI缩放后的尺寸）
 struct LayoutConfig {
-  // 基础尺寸（96 DPI）
-  static constexpr int BASE_ITEM_HEIGHT = 24;
-  static constexpr int BASE_TITLE_HEIGHT = 26;
-  static constexpr int BASE_SEPARATOR_HEIGHT = 1;
-  static constexpr int BASE_FONT_SIZE = 12;
-  static constexpr int BASE_TEXT_PADDING = 12;
-  static constexpr int BASE_INDICATOR_WIDTH = 3;
-  static constexpr int BASE_RATIO_INDICATOR_WIDTH = 4;
-  static constexpr int BASE_RATIO_COLUMN_WIDTH = 60;
-  static constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120;
-  static constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;
-
   // DPI缩放后的实际尺寸
   int item_height = BASE_ITEM_HEIGHT;
   int title_height = BASE_TITLE_HEIGHT;
   int separator_height = BASE_SEPARATOR_HEIGHT;
-  int font_size = BASE_FONT_SIZE;
+  float font_size = BASE_FONT_SIZE;  // 改为float，DirectWrite使用浮点数
   int text_padding = BASE_TEXT_PADDING;
   int indicator_width = BASE_INDICATOR_WIDTH;
   int ratio_indicator_width = BASE_RATIO_INDICATOR_WIDTH;
@@ -96,7 +102,7 @@ struct LayoutConfig {
     item_height = static_cast<int>(BASE_ITEM_HEIGHT * scale);
     title_height = static_cast<int>(BASE_TITLE_HEIGHT * scale);
     separator_height = static_cast<int>(BASE_SEPARATOR_HEIGHT * scale);
-    font_size = static_cast<int>(BASE_FONT_SIZE * scale);
+    font_size = static_cast<float>(BASE_FONT_SIZE * scale);  // 使用float
     text_padding = static_cast<int>(BASE_TEXT_PADDING * scale);
     indicator_width = static_cast<int>(BASE_INDICATOR_WIDTH * scale);
     ratio_indicator_width = static_cast<int>(BASE_RATIO_INDICATOR_WIDTH * scale);
@@ -112,6 +118,7 @@ struct State {
   InteractionState ui;
   DataState data;
   LayoutConfig layout;
+  RenderState render;
 
   // 便捷访问方法
   auto is_window_valid() const -> bool { return window.hwnd != nullptr; }

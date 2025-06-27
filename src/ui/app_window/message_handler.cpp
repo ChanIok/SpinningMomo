@@ -12,6 +12,7 @@ import Core.Actions;
 import Core.Events;
 import Core.State;
 import Core.Constants;
+import UI.AppWindow;
 import UI.AppWindow.Layout;
 import UI.AppWindow.Painter;
 import UI.AppWindow.State;
@@ -93,7 +94,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       if (HDC hdc = BeginPaint(hwnd, &ps); hdc) {
         RECT rect{};
         GetClientRect(hwnd, &rect);
-        UI::AppWindow::Painter::paint_app_window(state, rect);
+        UI::AppWindow::Painter::paint_app_window(state, hwnd, rect);
         EndPaint(hwnd, &ps);
       }
       return 0;
@@ -144,7 +145,7 @@ auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
         state,
         Core::Actions::Action{Core::Actions::Payloads::UpdateHoverIndex{.index = new_hover_index}});
 
-    Core::Actions::trigger_ui_update(state);
+    UI::AppWindow::request_repaint(state);
     ensure_mouse_tracking(state.app_window.window.hwnd);
   }
 }
@@ -154,7 +155,7 @@ auto handle_mouse_leave(Core::State::AppState& state) -> void {
   Core::Actions::dispatch_action(
       state, Core::Actions::Action{Core::Actions::Payloads::UpdateHoverIndex{.index = -1}});
 
-  Core::Actions::trigger_ui_update(state);
+  UI::AppWindow::request_repaint(state);
 }
 
 // 处理鼠标左键点击，分发项目点击事件

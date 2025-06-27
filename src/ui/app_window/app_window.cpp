@@ -15,6 +15,7 @@ import Core.State;
 import UI.AppWindow.MessageHandler;
 import UI.AppWindow.Layout;
 import UI.AppWindow.D2DContext;
+import UI.AppWindow.Painter;
 import Utils.Logger;
 
 namespace UI::AppWindow {
@@ -62,11 +63,21 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   return {};
 }
 
+// 标准化渲染触发机制
+auto request_repaint(Core::State::AppState& state) -> void {
+  if (state.app_window.window.hwnd && state.app_window.window.is_visible) {
+    InvalidateRect(state.app_window.window.hwnd, nullptr, FALSE);
+  }
+}
+
 auto show_window(Core::State::AppState& state) -> void {
   if (state.app_window.window.hwnd) {
     ShowWindow(state.app_window.window.hwnd, SW_SHOWNA);
     UpdateWindow(state.app_window.window.hwnd);
     state.app_window.window.is_visible = true;
+
+    // 触发初始绘制（使用标准InvalidateRect机制）
+    request_repaint(state);
   }
 }
 
@@ -78,7 +89,7 @@ auto hide_window(Core::State::AppState& state) -> void {
 }
 
 auto toggle_visibility(Core::State::AppState& state) -> void {
-  if (is_window_visible(state)) {
+  if (state.app_window.window.is_visible) {
     hide_window(state);
   } else {
     show_window(state);
@@ -98,20 +109,10 @@ auto destroy_window(Core::State::AppState& state) -> void {
   }
 }
 
-auto is_window_visible(const Core::State::AppState& state) -> bool {
-  return state.app_window.window.hwnd && IsWindowVisible(state.app_window.window.hwnd);
-}
-
-auto activate_window(Core::State::AppState& state) -> void {
-  if (state.app_window.window.hwnd) {
-    SetForegroundWindow(state.app_window.window.hwnd);
-  }
-}
-
 auto set_current_ratio(Core::State::AppState& state, size_t index) -> void {
   state.app_window.ui.current_ratio_index = index;
   if (state.app_window.window.hwnd) {
-    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
+    request_repaint(state);
   }
 }
 
@@ -119,7 +120,7 @@ auto set_current_resolution(Core::State::AppState& state, size_t index) -> void 
   if (index < state.app_window.data.resolutions.size()) {
     state.app_window.ui.current_resolution_index = index;
     if (state.app_window.window.hwnd) {
-      InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
+      request_repaint(state);
     }
   }
 }
@@ -127,21 +128,21 @@ auto set_current_resolution(Core::State::AppState& state, size_t index) -> void 
 auto set_preview_enabled(Core::State::AppState& state, bool enabled) -> void {
   state.app_window.ui.preview_enabled = enabled;
   if (state.app_window.window.hwnd) {
-    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
+    request_repaint(state);
   }
 }
 
 auto set_overlay_enabled(Core::State::AppState& state, bool enabled) -> void {
   state.app_window.ui.overlay_enabled = enabled;
   if (state.app_window.window.hwnd) {
-    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
+    request_repaint(state);
   }
 }
 
 auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void {
   state.app_window.ui.letterbox_enabled = enabled;
   if (state.app_window.window.hwnd) {
-    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
+    request_repaint(state);
   }
 }
 
@@ -150,7 +151,7 @@ auto update_menu_items(Core::State::AppState& state,
   state.app_window.data.menu_items.clear();
   initialize_menu_items(state, strings);
   if (state.app_window.window.hwnd) {
-    InvalidateRect(state.app_window.window.hwnd, nullptr, TRUE);
+    request_repaint(state);
   }
 }
 
@@ -266,19 +267,6 @@ auto initialize_menu_items(Core::State::AppState& state,
 }
 
 auto create_window_attributes(HWND hwnd) -> void {
-  // 设置窗口样式
-  SetLayeredWindowAttributes(hwnd, 0, 204, LWA_ALPHA);
-
-  // 设置DWM属性
-  MARGINS margins{1, 1, 1, 1};
-  DwmExtendFrameIntoClientArea(hwnd, &margins);
-
-  DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
-  DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
-
-  BOOL value = TRUE;
-  DwmSetWindowAttribute(hwnd, DWMWA_ALLOW_NCPAINT, &value, sizeof(value));
-
   DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
 }

@@ -40,6 +40,7 @@ export struct AppState {
 // 根据DPI更新渲染状态
 export auto update_render_dpi(AppState& state, Vendor::Windows::UINT new_dpi) -> void {
   state.app_window.window.dpi = new_dpi;
+  state.d2d_render.needs_font_update = true;
   state.app_window.layout.update_dpi_scaling(new_dpi);
   state.tray_menu.layout.update_dpi_scaling(new_dpi);
 }

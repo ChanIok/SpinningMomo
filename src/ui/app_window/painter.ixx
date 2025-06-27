@@ -21,7 +21,11 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
 auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindow::MenuItem& item,
                           const D2D1_RECT_F& item_rect, bool is_hovered) -> void;
 
-// 主绘制函数（替换现有的paint_window）
-export auto paint_app_window(const Core::State::AppState& state, const RECT& client_rect) -> void;
+// 分层窗口更新函数
+export auto update_layered_window(const Core::State::AppState& state, HWND hwnd) -> void;
+
+// 主绘制函数
+export auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& client_rect)
+    -> void;
 
 }  // namespace UI::AppWindow::Painter

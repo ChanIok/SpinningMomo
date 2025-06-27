@@ -19,8 +19,6 @@ export auto destroy_window(Core::State::AppState& state) -> void;
 export auto show_window(Core::State::AppState& state) -> void;
 export auto hide_window(Core::State::AppState& state) -> void;
 export auto toggle_visibility(Core::State::AppState& state) -> void;
-export auto is_window_visible(const Core::State::AppState& state) -> bool;
-export auto activate_window(Core::State::AppState& state) -> void;
 
 // 更新UI状态
 export auto set_current_ratio(Core::State::AppState& state, size_t index) -> void;
@@ -39,6 +37,9 @@ export auto set_menu_items_to_show(Core::State::AppState& state,
 export auto register_hotkey(Core::State::AppState& state, Vendor::Windows::UINT modifiers,
                             Vendor::Windows::UINT key) -> bool;
 export auto unregister_hotkey(Core::State::AppState& state) -> void;
+
+// 渲染触发
+export auto request_repaint(Core::State::AppState& state) -> void;
 
 // 注册窗口类
 auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void;

@@ -1,6 +1,7 @@
 module;
 
 #include <d2d1.h>
+#include <dwmapi.h>
 #include <dwrite.h>
 #include <windows.h>
 #include <wrl/client.h>
@@ -30,7 +31,7 @@ constexpr const wchar_t* TRAY_MENU_CLASS_NAME = L"SpinningMomoTrayMenuClass";
 auto register_tray_menu_class(HINSTANCE instance) -> bool {
   WNDCLASSEXW wc{};
   wc.cbSize = sizeof(WNDCLASSEXW);
-  wc.style = CS_HREDRAW | CS_VREDRAW | CS_DROPSHADOW;
+  wc.style = CS_HREDRAW | CS_VREDRAW;
   wc.lpfnWndProc = UI::TrayMenu::MessageHandler::static_window_proc;
   wc.cbClsExtra = 0;
   wc.cbWndExtra = sizeof(Core::State::AppState*);
@@ -161,6 +162,15 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   items.emplace_back(strings.EXIT, Core::Constants::ID_EXIT);
 }
 
+auto create_window_attributes(HWND hwnd) -> void {
+  // 设置窗口样式
+  SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+
+  // 设置DWM属性
+  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+}
+
 }  // anonymous namespace
 
 namespace UI::TrayMenu {
@@ -176,6 +186,8 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
   if (auto result = create_tray_menu_window(state); !result) {
     return result;
   }
+
+  create_window_attributes(state.tray_menu.hwnd);
 
   // 创建主菜单D2D资源
   if (!UI::TrayMenu::D2DContext::initialize_main_menu(state, state.tray_menu.hwnd)) {
@@ -421,7 +433,7 @@ auto show_submenu(Core::State::AppState& state, int parent_index) -> void {
   if (tray_menu.submenu_hwnd) {
     Logger().debug("Submenu window created successfully: {}", (void*)tray_menu.submenu_hwnd);
 
-    SetLayeredWindowAttributes(tray_menu.submenu_hwnd, 0, 240, LWA_ALPHA);
+    create_window_attributes(tray_menu.submenu_hwnd);
 
     // 初始化子菜单D2D资源
     if (!UI::TrayMenu::D2DContext::initialize_submenu(state, tray_menu.submenu_hwnd)) {
