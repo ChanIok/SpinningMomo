@@ -4,6 +4,8 @@ module;
 #include <dwrite.h>
 #include <windows.h>
 
+#include <iostream>
+
 module UI.TrayMenu.D2DContext;
 
 import std;
@@ -133,11 +135,8 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& tray_menu = state.tray_menu;
   const auto& d2d = state.d2d_render;
 
-  Logger().debug("initialize_submenu called for HWND: {}", (void*)hwnd);
-
   // 如果已经初始化，直接返回成功
   if (tray_menu.submenu_d2d_ready) {
-    Logger().debug("Submenu D2D already ready, skipping initialization");
     return true;
   }
 
@@ -150,7 +149,6 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
   // 获取窗口的客户区大小
   RECT rc;
   GetClientRect(hwnd, &rc);
-  Logger().debug("Submenu client rect: {}x{}", rc.right - rc.left, rc.bottom - rc.top);
 
   // 创建子菜单渲染目标
   D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
@@ -164,8 +162,6 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
     return false;
   }
 
-  Logger().debug("Submenu render target created successfully");
-
   // 创建子菜单画刷
   if (!create_brushes_for_target(tray_menu.submenu_render_target, &tray_menu.submenu_white_brush,
                                  &tray_menu.submenu_text_brush, &tray_menu.submenu_separator_brush,
@@ -176,7 +172,6 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
     return false;
   }
 
-  Logger().info("Submenu D2D resources initialized successfully");
   tray_menu.submenu_d2d_ready = true;
   return true;
 }

@@ -90,10 +90,8 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
         state.tray_menu.hwnd = nullptr;
         state.tray_menu.is_created = false;
-        Logger().debug("Main menu window destroyed and all timers cleaned up");
       } else if (hwnd == state.tray_menu.submenu_hwnd) {
         state.tray_menu.submenu_hwnd = nullptr;
-        Logger().debug("Submenu window destroyed");
       }
       return 0;
     }
@@ -154,8 +152,10 @@ auto handle_size(Core::State::AppState& state, HWND hwnd) -> LRESULT {
 
   // 根据窗口类型调整渲染目标大小
   if (hwnd == state.tray_menu.submenu_hwnd) {
+    Logger().debug("Resizing submenu to size: {}x{}", new_size.cx, new_size.cy);
     UI::TrayMenu::D2DContext::resize_submenu(state, new_size);
-  } else {
+  } else if (hwnd == state.tray_menu.hwnd) {
+    Logger().debug("Resizing main menu to size: {}x{}", new_size.cx, new_size.cy);
     UI::TrayMenu::D2DContext::resize_main_menu(state, new_size);
   }
 

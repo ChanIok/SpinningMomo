@@ -43,10 +43,10 @@ auto paint_tray_menu(const Core::State::AppState& state, const RECT& client_rect
   HRESULT hr = tray_menu.render_target->EndDraw();
   if (hr == D2DERR_RECREATE_TARGET) {
     // 标记主菜单的渲染目标需要重新创建
+    Logger().warn("Main menu render target needs recreation");
     const_cast<Core::State::AppState&>(state).tray_menu.main_menu_d2d_ready = false;
   } else if (FAILED(hr)) {
-    // 记录其他绘制错误
-    // 这里可以添加日志记录，但要避免在绘制循环中频繁记录
+    Logger().error("Main menu paint error: 0x{:X}", hr);
   }
 }
 
@@ -192,8 +192,6 @@ auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) 
     const_cast<Core::State::AppState&>(state).tray_menu.submenu_d2d_ready = false;
   } else if (FAILED(hr)) {
     Logger().error("Submenu paint error: 0x{:X}", hr);
-  } else {
-    Logger().debug("Submenu paint completed successfully");
   }
 }
 

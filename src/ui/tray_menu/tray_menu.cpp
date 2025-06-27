@@ -431,15 +431,11 @@ auto show_submenu(Core::State::AppState& state, int parent_index) -> void {
       return;
     }
 
-    Logger().debug("Submenu D2D resources initialized successfully");
-
     ShowWindow(tray_menu.submenu_hwnd, SW_SHOW);
-    Logger().debug("Submenu window shown");
 
     // 强制置顶确保可见性
     SetWindowPos(tray_menu.submenu_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    Logger().debug("Submenu window set to topmost");
   } else {
     Logger().error("Failed to create submenu window, error: {}", GetLastError());
   }
