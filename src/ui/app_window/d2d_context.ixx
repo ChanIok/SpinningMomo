@@ -1,7 +1,5 @@
 module;
 
-#include <d2d1.h>
-#include <dwrite.h>
 #include <windows.h>
 
 export module UI.AppWindow.D2DContext;

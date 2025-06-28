@@ -1,7 +1,7 @@
 module;
 
-#include <d2d1.h>
-#include <dwrite.h>
+#include <d2d1_3.h>
+#include <dwrite_3.h>
 #include <windows.h>
 
 export module Types.UI;
@@ -12,10 +12,11 @@ export namespace Types::UI {
 
 // Direct2D渲染状态
 struct D2DRenderState {
-  // Direct2D资源句柄（使用原始指针，符合POD风格）
-  ID2D1Factory* factory = nullptr;
-  ID2D1DCRenderTarget* render_target = nullptr;
-  IDWriteFactory* write_factory = nullptr;
+  // Direct2D 1.3资源句柄
+  ID2D1Factory7* factory = nullptr;               // Direct2D 1.3 工厂
+  ID2D1DCRenderTarget* render_target = nullptr;   // DC渲染目标（兼容性）
+  ID2D1DeviceContext6* device_context = nullptr;  // Direct2D 1.3 设备上下文
+  IDWriteFactory7* write_factory = nullptr;       // DirectWrite 1.3 工厂
 
   // 内存DC和位图资源
   HDC memory_dc = nullptr;
@@ -53,17 +54,16 @@ struct D2DRenderState {
 struct D2DColors {
   // === One Dark Pro主色调 ===
   static constexpr D2D1_COLOR_F WHITE = {0.16f, 0.17f, 0.21f, 1.0f};      // #282C34 主背景
-  static constexpr D2D1_COLOR_F TITLE_BAR = {0.13f, 0.14f, 0.17f, 1.0f};  // #21252B 标题栏
   static constexpr D2D1_COLOR_F SEPARATOR = {0.20f, 0.22f, 0.27f, 1.0f};  // #333842 分隔线
-  static constexpr D2D1_COLOR_F TEXT = {0.67f, 0.71f, 0.78f, 1.0f};       // #ABB2BF 主文字
+  static constexpr D2D1_COLOR_F TEXT = {0.87f, 0.91f, 0.98f, 1.0f};       // #DEE8FC 更亮的主文字
   static constexpr D2D1_COLOR_F INDICATOR = {0.38f, 0.68f, 0.84f, 1.0f};  // #61AFEF 青色指示器
-  static constexpr D2D1_COLOR_F HOVER = {0.19f, 0.20f, 0.25f, 1.0f};      // #2F3240 悬停背景
+  static constexpr D2D1_COLOR_F HOVER = {0.22f, 0.24f, 0.29f, 1.0f};      // #383D4A 悬停背景
 
   // === 半透明版本（用于分层窗口） ===
-  static constexpr D2D1_COLOR_F WHITE_SEMI = {0.16f, 0.17f, 0.21f, 0.85f};     // 85%透明度
-  static constexpr D2D1_COLOR_F TITLE_BAR_SEMI = {0.13f, 0.14f, 0.17f, 0.9f};  // 90%透明度
-  static constexpr D2D1_COLOR_F SEPARATOR_SEMI = {0.20f, 0.22f, 0.27f, 0.7f};  // 70%透明度
-  static constexpr D2D1_COLOR_F HOVER_SEMI = {0.19f, 0.20f, 0.25f, 0.8f};      // 80%透明度
+  static constexpr D2D1_COLOR_F WHITE_SEMI = {0.16f, 0.17f, 0.21f, 0.65f};      // 主背景
+  static constexpr D2D1_COLOR_F SEPARATOR_SEMI = {0.20f, 0.22f, 0.27f, 0.65f};  // 分隔线
+  static constexpr D2D1_COLOR_F TITLE_BAR_SEMI = {0.16f, 0.17f, 0.21f, 0.65f};  // 标题栏
+  static constexpr D2D1_COLOR_F HOVER_SEMI = {0.22f, 0.24f, 0.29f, 0.65f};  // 悬停背景
 };
 
 // 辅助函数：将RECT转换为D2D1_RECT_F

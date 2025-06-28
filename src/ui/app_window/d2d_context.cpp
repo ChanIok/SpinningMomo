@@ -1,7 +1,7 @@
 module;
 
-#include <d2d1.h>
-#include <dwrite.h>
+#include <d2d1_3.h>
+#include <dwrite_3.h>
 #include <windows.h>
 
 module UI.AppWindow.D2DContext;
@@ -21,7 +21,6 @@ auto create_brush_safe(ID2D1RenderTarget* target, const D2D1_COLOR_F& color,
 // 辅助函数：批量创建所有画刷
 auto create_all_brushes_simple(Types::UI::D2DRenderState& d2d) -> bool {
   return create_brush_safe(d2d.render_target, Types::UI::D2DColors::WHITE, &d2d.white_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::TITLE_BAR, &d2d.title_brush) &&
          create_brush_safe(d2d.render_target, Types::UI::D2DColors::SEPARATOR,
                            &d2d.separator_brush) &&
          create_brush_safe(d2d.render_target, Types::UI::D2DColors::TEXT, &d2d.text_brush) &&
@@ -55,12 +54,14 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
   // 清理现有资源
   cleanup_d2d(state);
 
-  HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2d.factory);
+  // 创建Direct2D 1.3工厂
+  HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory7),
+                                 nullptr, reinterpret_cast<void**>(&d2d.factory));
   if (FAILED(hr)) {
     return false;
   }
 
-  hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory),
+  hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory7),
                            reinterpret_cast<IUnknown**>(&d2d.write_factory));
   if (FAILED(hr)) {
     cleanup_d2d(state);
@@ -116,6 +117,12 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
     cleanup_d2d(state);
     return false;
   }
+
+  // 尝试获取设备上下文接口（Direct2D 1.3功能）
+  hr = d2d.render_target->QueryInterface(__uuidof(ID2D1DeviceContext6),
+                                         reinterpret_cast<void**>(&d2d.device_context));
+  // 注意：DC渲染目标可能不支持设备上下文，这是正常的
+  // 我们将在绘制时检查是否可用
 
   // 创建所有画刷（使用简化的批量创建函数）
   if (!create_all_brushes_simple(d2d)) {
@@ -213,13 +220,19 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
     d2d.old_bitmap = nullptr;
   }
 
+  // 释放设备上下文
+  if (d2d.device_context) {
+    d2d.device_context->Release();
+    d2d.device_context = nullptr;
+  }
+
   // 释放DC渲染目标
   if (d2d.render_target) {
     d2d.render_target->Release();
     d2d.render_target = nullptr;
   }
 
-  // 释放D2D工厂
+  // 释放D2D 1.3工厂
   if (d2d.factory) {
     d2d.factory->Release();
     d2d.factory = nullptr;

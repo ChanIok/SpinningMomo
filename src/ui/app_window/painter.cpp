@@ -1,7 +1,7 @@
 module;
 
-#include <d2d1.h>
-#include <dwrite.h>
+#include <d2d1_3.h>
+#include <dwrite_3.h>
 #include <windows.h>
 
 module UI.AppWindow.Painter;
@@ -51,6 +51,11 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
 
   // 清空背景为完全透明
   d2d.render_target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+
+  // 全局设置替换混合模式，避免所有颜色叠加
+  if (d2d.device_context) {
+    d2d.device_context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
+  }
 
   const auto rect_f = Types::UI::rect_to_d2d(client_rect);
 
@@ -198,7 +203,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
   const auto& d2d = state.d2d_render;
   const auto& render = state.app_window.layout;
 
-  // 绘制悬停背景（使用半透明画刷）
+  // 绘制悬停背景
   if (is_hovered) {
     d2d.render_target->FillRectangle(item_rect, d2d.hover_semi_brush);
   }
