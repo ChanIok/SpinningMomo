@@ -10,6 +10,7 @@ import Core.State;
 import Features.Preview.Window;
 import Features.WindowControl;
 import Features.Notifications;
+import Features.Overlay;
 import Utils.Logger;
 
 namespace Handlers {
@@ -64,13 +65,49 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
         Core::Actions::dispatch_action(
             app_state,
             Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = data.enabled}});
-        // Overlay 通常是临时状态，不写入配置
+
+        // 在action调度后执行实际功能
+        if (data.enabled) {
+          // 查找目标窗口
+          auto target_window =
+              Features::WindowControl::find_target_window(app_state.config.window.title);
+          if (target_window) {
+            if (auto result =
+                    Features::Overlay::start_overlay(app_state, target_window.value());
+                !result) {
+              Logger().error("Failed to start overlay: {}", result.error());
+              // 回滚UI状态
+              Core::Actions::dispatch_action(
+                  app_state,
+                  Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = false}});
+              Features::Notifications::show_notification(app_state, "SpinningMomo",
+                                                         "Failed to start overlay window");
+            }
+          } else {
+            Logger().warn("No target window found for overlay");
+            Core::Actions::dispatch_action(
+                app_state,
+                Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = false}});
+            Features::Notifications::show_notification(
+                app_state, "SpinningMomo",
+                "Target window not found. Please ensure the game is running.");
+          }
+        } else {
+          // 停止叠加层
+          Features::Overlay::stop_overlay(app_state);
+        }
         break;
       case FeatureType::Letterbox:
         Core::Actions::dispatch_action(
             app_state, Core::Actions::Action{
                            Core::Actions::Payloads::ToggleLetterbox{.enabled = data.enabled}});
         app_state.config.letterbox.enabled = data.enabled;
+
+        // 如果叠加层正在运行，更新其黑边模式设置
+        if (Features::Overlay::is_overlay_capturing(app_state)) {
+          Features::Overlay::set_letterbox_mode(app_state, data.enabled);
+        }
+
         config_changed = true;
         break;
     }

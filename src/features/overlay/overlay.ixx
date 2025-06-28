@@ -1,0 +1,42 @@
+module;
+
+#include <windows.h>
+
+export module Features.Overlay;
+
+import std;
+import Core.State;
+import Features.Overlay.State;
+
+namespace Features::Overlay {
+
+// 初始化叠加层系统
+export auto initialize_overlay(Core::State::AppState& state, HINSTANCE instance, HWND parent)
+    -> std::expected<void, std::string>;
+
+// 开始叠加层捕获
+export auto start_overlay(Core::State::AppState& state, HWND target_window)
+    -> std::expected<void, std::string>;
+
+// 停止叠加层
+export auto stop_overlay(Core::State::AppState& state) -> void;
+
+// 设置黑边模式
+export auto set_letterbox_mode(Core::State::AppState& state, bool enabled) -> void;
+
+// 检查是否正在捕获
+export auto is_overlay_capturing(const Core::State::AppState& state) -> bool;
+
+// 检查是否可见
+export auto is_overlay_visible(const Core::State::AppState& state) -> bool;
+
+// 获取叠加层窗口句柄
+export auto get_overlay_window_handle(const Core::State::AppState& state) -> HWND;
+
+// 恢复游戏窗口
+export auto restore_game_window(Core::State::AppState& state, bool with_delay = false) -> void;
+
+// 清理资源
+export auto cleanup_overlay(Core::State::AppState& state) -> void;
+
+}  // namespace Features::Overlay

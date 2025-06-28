@@ -9,6 +9,7 @@ import Core.Events;
 import Core.State;
 import Handlers.EventRegistrar;
 import Features.Notifications;
+import Features.Overlay;
 import Features.Preview.Window;
 import Features.Screenshot;
 import Utils.Logger;
@@ -22,6 +23,7 @@ Application::Application() = default;
 Application::~Application() {
   if (m_app_state) {
     Features::Preview::Window::cleanup_preview(*m_app_state);
+    Features::Overlay::stop_overlay(*m_app_state);
     Features::Screenshot::cleanup_system(m_app_state->screenshot);
     UI::TrayMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);
@@ -98,6 +100,14 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
         !preview_result) {
       Logger().warn("Failed to initialize preview system");
       // 预览功能不可用，但应用继续运行
+    }
+
+    // 初始化overlay系统
+    if (auto overlay_result = Features::Overlay::initialize_overlay(
+            *m_app_state, m_h_instance, m_app_state->app_window.window.hwnd);
+        !overlay_result) {
+      Logger().warn("Failed to initialize overlay system: {}", overlay_result.error());
+      // overlay功能不可用，但应用继续运行
     }
 
     // 默认显示窗口

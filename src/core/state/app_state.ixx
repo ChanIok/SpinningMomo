@@ -11,6 +11,7 @@ import UI.TrayIcon.State;
 import UI.TrayMenu.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
+import Features.Overlay.State;
 import UI.AppWindow.State;
 import Vendor.Windows;
 
@@ -30,6 +31,7 @@ export struct AppState {
   UI::TrayMenu::State::Data tray_menu;
   Features::Preview::State::PreviewState preview;
   Features::Screenshot::State::ScreenshotState screenshot;
+  Features::Overlay::State::OverlayState overlay;
 
   // 便捷访问方法（保持向后兼容）
   auto is_window_valid() const -> bool { return app_window.is_window_valid(); }

@@ -1,0 +1,101 @@
+module;
+
+#include <d3d11.h>
+#include <windows.h>
+#include <wrl/client.h>
+
+export module Features.Overlay.State;
+
+import std;
+import Utils.Timer;
+import Utils.Graphics.Capture;
+import Utils.Graphics.D3D;
+
+export namespace Features::Overlay::State {
+
+// 消息常量
+constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
+constexpr UINT WM_SHOW_OVERLAY = WM_USER + 2;
+constexpr UINT WM_MOUSE_EVENT = WM_USER + 3;
+constexpr UINT WM_WINDOW_EVENT = WM_USER + 4;
+constexpr int CLEANUP_TIMEOUT = 30000;  // 清理超时（毫秒）
+
+// 顶点结构体
+struct Vertex {
+  float x, y;
+  float u, v;
+};
+
+// 窗口状态
+struct WindowState {
+  HWND overlay_hwnd = nullptr;
+  HWND target_window = nullptr;
+  HWND main_window = nullptr;
+  HWND timer_window = nullptr;
+
+  int screen_width = 0;
+  int screen_height = 0;
+  int window_width = 0;
+  int window_height = 0;
+  int cached_game_width = 0;
+  int cached_game_height = 0;
+  RECT game_window_rect{};
+
+  bool use_letterbox_mode = true;
+  bool is_visible = false;
+};
+
+// 渲染状态
+struct RenderingState {
+  Utils::Graphics::D3D::D3DContext d3d_context;
+  Utils::Graphics::D3D::ShaderResources shader_resources;
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture;
+  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shader_resource_view;
+  HANDLE frame_latency_object = nullptr;
+
+  bool d3d_initialized = false;
+  bool render_states_initialized = false;
+  bool has_new_frame = false;
+  bool recreate_texture_flag = false;
+  bool create_new_srv = true;
+};
+
+// 捕获状态
+struct CaptureState {
+  Utils::Graphics::Capture::CaptureSession session;
+  bool active = false;
+};
+
+// 交互状态
+struct InteractionState {
+  HHOOK mouse_hook = nullptr;
+  HWINEVENTHOOK event_hook = nullptr;
+  POINT current_mouse_pos{};
+  POINT last_mouse_pos{};
+  DWORD game_process_id = 0;
+};
+
+// 线程状态
+struct ThreadState {
+  std::jthread capture_render_thread;
+  std::jthread hook_thread;
+  std::jthread window_manager_thread;
+  std::atomic<bool> should_stop{false};
+};
+
+// 叠加层完整状态
+struct OverlayState {
+  WindowState window;
+  RenderingState rendering;
+  CaptureState capture;
+  InteractionState interaction;
+  ThreadState threads;
+
+  std::optional<Utils::Timer::Timer> cleanup_timer;
+  std::mutex texture_mutex;
+  std::mutex render_target_mutex;
+  std::mutex capture_state_mutex;
+  std::condition_variable frame_available;
+};
+
+}  // namespace Features::Overlay::State
