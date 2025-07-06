@@ -9,6 +9,7 @@ import Core.State;
 import Features.WindowControl;
 import Features.Notifications;
 import Features.Screenshot;
+import Features.Screenshot.Folder;
 import UI.AppWindow;
 import Utils.Logger;
 import Vendor.Windows;
@@ -116,6 +117,16 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
         Logger().error("Failed to start screenshot: {}", result.error());
       } else {
         Logger().debug("Screenshot capture started successfully");
+      }
+      break;
+    }
+    case Core::Events::WindowAction::Screenshots: {
+      Logger().debug("Opening screenshot folder");
+
+      if (auto result = Features::Screenshot::Folder::open_folder(state); !result) {
+        Logger().error("Failed to open screenshot folder: {}", result.error());
+        Features::Notifications::show_notification(state, "SpinningMomo",
+                                                   "Failed to open screenshot folder");
       }
       break;
     }
