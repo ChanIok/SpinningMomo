@@ -8,7 +8,6 @@ module;
 module UI.AppWindow.MessageHandler;
 
 import std;
-import Core.Actions;
 import Core.Events;
 import Core.State;
 import Core.Constants;
@@ -21,35 +20,192 @@ import UI.AppWindow.D2DContext;
 
 namespace UI::AppWindow::MessageHandler {
 
-// 内部函数声明
-auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
-                      LPARAM lParam) -> LRESULT;
-auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void;
-auto handle_mouse_leave(Core::State::AppState& state) -> void;
-auto handle_left_click(Core::State::AppState& state, int x, int y) -> void;
-auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void;
+// 确保窗口能接收到WM_MOUSELEAVE消息
+auto ensure_mouse_tracking(HWND hwnd) -> void {
+  TRACKMOUSEEVENT tme{};
+  tme.cbSize = sizeof(TRACKMOUSEEVENT);
+  tme.dwFlags = TME_LEAVE;
+  tme.hwndTrack = hwnd;
+  TrackMouseEvent(&tme);
+}
+
+// 将菜单项点击转换为具体的高层应用事件
 auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow::MenuItem& item)
-    -> void;
-auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void;
-auto ensure_mouse_tracking(HWND hwnd) -> void;
+    -> void {
+  using namespace Core::Events;
 
-// 静态窗口过程函数，将窗口句柄与应用程序状态关联起来
-LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-  Core::State::AppState* state = nullptr;
+  switch (item.type) {
+    case UI::AppWindow::ItemType::Ratio: {
+      const auto& ratio_preset = state.app_window.data.ratios[item.index];
+      send_event(state.event_bus, {EventType::RatioChanged,
+                                   RatioChangeData{static_cast<size_t>(item.index),
+                                                   ratio_preset.name, ratio_preset.ratio},
+                                   state.app_window.window.hwnd});
+      break;
+    }
+    case UI::AppWindow::ItemType::Resolution: {
+      const auto& res_preset = state.app_window.data.resolutions[item.index];
+      send_event(state.event_bus,
+                 {EventType::ResolutionChanged,
+                  ResolutionChangeData{
+                      static_cast<size_t>(item.index), res_preset.name,
+                      res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
+                  state.app_window.window.hwnd});
+      break;
+    }
+    case UI::AppWindow::ItemType::PreviewWindow:
+      send_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
+                  state.app_window.window.hwnd});
+      break;
+    case UI::AppWindow::ItemType::OverlayWindow:
+      send_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
+                  state.app_window.window.hwnd});
+      break;
+    case UI::AppWindow::ItemType::LetterboxWindow:
+      send_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
+                  state.app_window.window.hwnd});
+      break;
+    case UI::AppWindow::ItemType::CaptureWindow:
+      send_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
+      break;
+    case UI::AppWindow::ItemType::OpenScreenshot:
+      send_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
+                                   state.app_window.window.hwnd});
+      break;
+    case UI::AppWindow::ItemType::Reset:
+      send_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
+      break;
+    case UI::AppWindow::ItemType::Hide:
+      send_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Hide, state.app_window.window.hwnd});
+      break;
+    case UI::AppWindow::ItemType::Exit:
+      send_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
+      break;
+  }
+}
 
-  if (msg == WM_NCCREATE) {
-    const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
-    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
-  } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+// 处理来自托盘菜单的命令
+auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void {
+  using namespace Core::Events;
+
+  if (command_id >= Core::Constants::ID_RATIO_BASE &&
+      command_id < Core::Constants::ID_RESOLUTION_BASE) {
+    // Handle ratio selection
+    const size_t index = command_id - Core::Constants::ID_RATIO_BASE;
+    if (index < state.app_window.data.ratios.size()) {
+      const auto& ratio_preset = state.app_window.data.ratios[index];
+      send_event(state.event_bus, {EventType::RatioChanged,
+                                   RatioChangeData{index, ratio_preset.name, ratio_preset.ratio},
+                                   state.app_window.window.hwnd});
+    }
+    return;
   }
 
-  if (state) {
-    return window_procedure(*state, hwnd, msg, wParam, lParam);
+  if (command_id >= Core::Constants::ID_RESOLUTION_BASE &&
+      command_id < Core::Constants::ID_WINDOW_BASE) {
+    // Handle resolution selection
+    const size_t index = command_id - Core::Constants::ID_RESOLUTION_BASE;
+    if (index < state.app_window.data.resolutions.size()) {
+      const auto& res_preset = state.app_window.data.resolutions[index];
+      send_event(state.event_bus,
+                 {EventType::ResolutionChanged,
+                  ResolutionChangeData{
+                      index, res_preset.name,
+                      res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
+                  state.app_window.window.hwnd});
+    }
+    return;
   }
 
-  return DefWindowProc(hwnd, msg, wParam, lParam);
+  // Handle other commands
+  switch (command_id) {
+    case Core::Constants::ID_EXIT:
+      send_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
+      break;
+    case Core::Constants::ID_RESET:
+      send_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
+      break;
+    case Core::Constants::ID_CAPTURE_WINDOW:
+      send_event(state.event_bus,
+                 {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
+      break;
+    case Core::Constants::ID_OPEN_SCREENSHOT:
+      send_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
+                                   state.app_window.window.hwnd});
+      break;
+    case Core::Constants::ID_PREVIEW_WINDOW:
+      send_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
+                  state.app_window.window.hwnd});
+      break;
+    case Core::Constants::ID_OVERLAY_WINDOW:
+      send_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
+                  state.app_window.window.hwnd});
+      break;
+    case Core::Constants::ID_LETTERBOX_WINDOW:
+      send_event(state.event_bus,
+                 {EventType::ToggleFeature,
+                  FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
+                  state.app_window.window.hwnd});
+      break;
+      // Add other cases for config, hotkey, language, etc.
+      // For example:
+      // case Core::Constants::ID_CONFIG:
+      //     send_event(state.event_bus, {EventType::SystemCommand, std::string("open_config"),
+      //     state.app_window.window.hwnd}); break;
+  }
+}
+
+// 处理热键，发送系统命令事件
+auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
+  using namespace Core::Events;
+  send_event(state.event_bus, {EventType::SystemCommand, std::string("toggle_visibility"),
+                               state.app_window.window.hwnd});
+}
+
+// 处理鼠标移出窗口，重置悬停状态并重绘
+auto handle_mouse_leave(Core::State::AppState& state) -> void {
+  // 重置悬停索引
+  state.app_window.ui.hover_index = -1;
+
+  UI::AppWindow::request_repaint(state);
+}
+
+// 处理鼠标移动，更新悬停状态并重绘
+auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
+  const int new_hover_index = get_item_index_from_point(state, x, y);
+  if (new_hover_index != state.app_window.ui.hover_index) {
+    // 更新悬停索引
+    state.app_window.ui.hover_index = new_hover_index;
+
+    UI::AppWindow::request_repaint(state);
+    ensure_mouse_tracking(state.app_window.window.hwnd);
+  }
+}
+
+// 处理鼠标左键点击，分发项目点击事件
+auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
+  const int clicked_index = get_item_index_from_point(state, x, y);
+  if (clicked_index >= 0 &&
+      clicked_index < static_cast<int>(state.app_window.data.menu_items.size())) {
+    const auto& item = state.app_window.data.menu_items[clicked_index];
+    dispatch_item_click_event(state, item);
+  }
 }
 
 // 主窗口过程函数，负责将Windows消息翻译成应用程序事件
@@ -137,193 +293,23 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
   return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-// 处理鼠标移动，更新悬停状态并重绘
-auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
-  const int new_hover_index = get_item_index_from_point(state, x, y);
-  if (new_hover_index != state.app_window.ui.hover_index) {
-    Core::Actions::dispatch_action(
-        state,
-        Core::Actions::Action{Core::Actions::Payloads::UpdateHoverIndex{.index = new_hover_index}});
+// 静态窗口过程函数，将窗口句柄与应用程序状态关联起来
+LRESULT CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+  Core::State::AppState* state = nullptr;
 
-    UI::AppWindow::request_repaint(state);
-    ensure_mouse_tracking(state.app_window.window.hwnd);
-  }
-}
-
-// 处理鼠标移出窗口，重置悬停状态并重绘
-auto handle_mouse_leave(Core::State::AppState& state) -> void {
-  Core::Actions::dispatch_action(
-      state, Core::Actions::Action{Core::Actions::Payloads::UpdateHoverIndex{.index = -1}});
-
-  UI::AppWindow::request_repaint(state);
-}
-
-// 处理鼠标左键点击，分发项目点击事件
-auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
-  const int clicked_index = get_item_index_from_point(state, x, y);
-  if (clicked_index >= 0 &&
-      clicked_index < static_cast<int>(state.app_window.data.menu_items.size())) {
-    const auto& item = state.app_window.data.menu_items[clicked_index];
-    dispatch_item_click_event(state, item);
-  }
-}
-
-// 处理热键，发送系统命令事件
-auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
-  using namespace Core::Events;
-  send_event(state.event_bus, {EventType::SystemCommand, std::string("toggle_visibility"),
-                               state.app_window.window.hwnd});
-}
-
-// 确保窗口能接收到WM_MOUSELEAVE消息
-auto ensure_mouse_tracking(HWND hwnd) -> void {
-  TRACKMOUSEEVENT tme{};
-  tme.cbSize = sizeof(TRACKMOUSEEVENT);
-  tme.dwFlags = TME_LEAVE;
-  tme.hwndTrack = hwnd;
-  TrackMouseEvent(&tme);
-}
-
-// 将菜单项点击转换为具体的高层应用事件
-auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow::MenuItem& item)
-    -> void {
-  using namespace Core::Events;
-
-  switch (item.type) {
-    case UI::AppWindow::ItemType::Ratio: {
-      const auto& ratio_preset = state.app_window.data.ratios[item.index];
-      send_event(state.event_bus, {EventType::RatioChanged,
-                                   RatioChangeData{static_cast<size_t>(item.index),
-                                                   ratio_preset.name, ratio_preset.ratio},
-                                   state.app_window.window.hwnd});
-      break;
-    }
-    case UI::AppWindow::ItemType::Resolution: {
-      const auto& res_preset = state.app_window.data.resolutions[item.index];
-      send_event(state.event_bus,
-                 {EventType::ResolutionChanged,
-                  ResolutionChangeData{
-                      static_cast<size_t>(item.index), res_preset.name,
-                      res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
-                  state.app_window.window.hwnd});
-      break;
-    }
-    case UI::AppWindow::ItemType::PreviewWindow:
-      send_event(state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
-                  state.app_window.window.hwnd});
-      break;
-    case UI::AppWindow::ItemType::OverlayWindow:
-      send_event(state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
-                  state.app_window.window.hwnd});
-      break;
-    case UI::AppWindow::ItemType::LetterboxWindow:
-      send_event(state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
-                  state.app_window.window.hwnd});
-      break;
-    case UI::AppWindow::ItemType::CaptureWindow:
-      send_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
-      break;
-    case UI::AppWindow::ItemType::OpenScreenshot:
-      send_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
-                                   state.app_window.window.hwnd});
-      break;
-    case UI::AppWindow::ItemType::Reset:
-      send_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
-      break;
-    case UI::AppWindow::ItemType::Hide:
-      send_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Hide, state.app_window.window.hwnd});
-      break;
-    case UI::AppWindow::ItemType::Exit:
-      send_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
-      break;
-  }
-}
-
-// 新增：处理来自托盘菜单的命令
-auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void {
-  using namespace Core::Events;
-
-  if (command_id >= Core::Constants::ID_RATIO_BASE &&
-      command_id < Core::Constants::ID_RESOLUTION_BASE) {
-    // Handle ratio selection
-    const size_t index = command_id - Core::Constants::ID_RATIO_BASE;
-    if (index < state.app_window.data.ratios.size()) {
-      const auto& ratio_preset = state.app_window.data.ratios[index];
-      send_event(state.event_bus, {EventType::RatioChanged,
-                                   RatioChangeData{index, ratio_preset.name, ratio_preset.ratio},
-                                   state.app_window.window.hwnd});
-    }
-    return;
+  if (msg == WM_NCCREATE) {
+    const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
+  } else {
+    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
   }
 
-  if (command_id >= Core::Constants::ID_RESOLUTION_BASE &&
-      command_id < Core::Constants::ID_WINDOW_BASE) {
-    // Handle resolution selection
-    const size_t index = command_id - Core::Constants::ID_RESOLUTION_BASE;
-    if (index < state.app_window.data.resolutions.size()) {
-      const auto& res_preset = state.app_window.data.resolutions[index];
-      send_event(state.event_bus,
-                 {EventType::ResolutionChanged,
-                  ResolutionChangeData{
-                      index, res_preset.name,
-                      res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
-                  state.app_window.window.hwnd});
-    }
-    return;
+  if (state) {
+    return window_procedure(*state, hwnd, msg, wParam, lParam);
   }
 
-  // Handle other commands
-  switch (command_id) {
-    case Core::Constants::ID_EXIT:
-      send_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
-      break;
-    case Core::Constants::ID_RESET:
-      send_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
-      break;
-    case Core::Constants::ID_CAPTURE_WINDOW:
-      send_event(state.event_bus,
-                 {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
-      break;
-    case Core::Constants::ID_OPEN_SCREENSHOT:
-      send_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
-                                   state.app_window.window.hwnd});
-      break;
-    case Core::Constants::ID_PREVIEW_WINDOW:
-      send_event(state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
-                  state.app_window.window.hwnd});
-      break;
-    case Core::Constants::ID_OVERLAY_WINDOW:
-      send_event(state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
-                  state.app_window.window.hwnd});
-      break;
-    case Core::Constants::ID_LETTERBOX_WINDOW:
-      send_event(state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
-                  state.app_window.window.hwnd});
-      break;
-      // Add other cases for config, hotkey, language, etc.
-      // For example:
-      // case Core::Constants::ID_CONFIG:
-      //     send_event(state.event_bus, {EventType::SystemCommand, std::string("open_config"),
-      //     state.app_window.window.hwnd}); break;
-  }
+  return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
 }  // namespace UI::AppWindow::MessageHandler
