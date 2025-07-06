@@ -12,6 +12,7 @@ import UI.TrayMenu.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
 import Features.Overlay.State;
+import Features.Letterbox.State;
 import UI.AppWindow.State;
 import Vendor.Windows;
 
@@ -32,6 +33,7 @@ export struct AppState {
   Features::Preview::State::PreviewState preview;
   Features::Screenshot::State::ScreenshotState screenshot;
   Features::Overlay::State::OverlayState overlay;
+  Features::Letterbox::State::LetterboxState letterbox;
 
   // 便捷访问方法（保持向后兼容）
   auto is_window_valid() const -> bool { return app_window.is_window_valid(); }

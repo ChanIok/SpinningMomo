@@ -8,6 +8,7 @@ import Core.Constants;
 import Core.Events;
 import Core.State;
 import Handlers.EventRegistrar;
+import Features.Letterbox;
 import Features.Notifications;
 import Features.Overlay;
 import Features.Preview.Window;
@@ -24,6 +25,7 @@ Application::~Application() {
   if (m_app_state) {
     Features::Preview::Window::cleanup_preview(*m_app_state);
     Features::Overlay::stop_overlay(*m_app_state);
+    Features::Letterbox::shutdown(*m_app_state);
     Features::Screenshot::cleanup_system(m_app_state->screenshot);
     UI::TrayMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);
@@ -108,6 +110,13 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
         !overlay_result) {
       Logger().warn("Failed to initialize overlay system: {}", overlay_result.error());
       // overlay功能不可用，但应用继续运行
+    }
+
+    // 初始化letterbox系统
+    if (auto letterbox_result = Features::Letterbox::initialize(*m_app_state, m_h_instance);
+        !letterbox_result) {
+      Logger().warn("Failed to initialize letterbox system: {}", letterbox_result.error());
+      // letterbox功能不可用，但应用继续运行
     }
 
     // 默认显示窗口

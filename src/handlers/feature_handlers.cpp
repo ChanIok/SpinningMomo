@@ -7,6 +7,7 @@ import Core.Actions;
 import Core.Config.Io;
 import Core.Events;
 import Core.State;
+import Features.Letterbox;
 import Features.Preview.Window;
 import Features.WindowControl;
 import Features.Notifications;
@@ -14,6 +15,106 @@ import Features.Overlay;
 import Utils.Logger;
 
 namespace Handlers {
+
+// 处理预览功能切换
+auto handle_preview_toggle(Core::State::AppState& state, bool enabled) -> void {
+  Core::Actions::dispatch_action(
+      state, Core::Actions::Action{Core::Actions::Payloads::TogglePreview{.enabled = enabled}});
+
+  if (enabled) {
+    // 查找目标窗口
+    auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+    if (target_window) {
+      if (auto result = Features::Preview::Window::start_preview(state, target_window.value());
+          !result) {
+        Logger().error("Failed to start preview");
+        // 回滚UI状态
+        Core::Actions::dispatch_action(
+            state, Core::Actions::Action{Core::Actions::Payloads::TogglePreview{.enabled = false}});
+        Features::Notifications::show_notification(state, "SpinningMomo",
+                                                   "Failed to start preview window");
+      }
+    } else {
+      Logger().warn("No target window found for preview");
+      Core::Actions::dispatch_action(
+          state, Core::Actions::Action{Core::Actions::Payloads::TogglePreview{.enabled = false}});
+      Features::Notifications::show_notification(
+          state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    }
+  } else {
+    // 停止预览
+    Features::Preview::Window::stop_preview(state);
+  }
+}
+
+// 处理叠加层功能切换
+auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
+  Core::Actions::dispatch_action(
+      state, Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = enabled}});
+
+  if (enabled) {
+    // 查找目标窗口
+    auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+    if (target_window) {
+      if (auto result = Features::Overlay::start_overlay(state, target_window.value()); !result) {
+        Logger().error("Failed to start overlay: {}", result.error());
+        // 回滚UI状态
+        Core::Actions::dispatch_action(
+            state, Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = false}});
+        Features::Notifications::show_notification(state, "SpinningMomo",
+                                                   "Failed to start overlay window");
+      }
+    } else {
+      Logger().warn("No target window found for overlay");
+      Core::Actions::dispatch_action(
+          state, Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = false}});
+      Features::Notifications::show_notification(
+          state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    }
+  } else {
+    // 停止叠加层
+    Features::Overlay::stop_overlay(state);
+  }
+}
+
+// 处理letterbox功能切换
+auto handle_letterbox_toggle(Core::State::AppState& state, bool enabled) -> void {
+  Core::Actions::dispatch_action(
+      state, Core::Actions::Action{Core::Actions::Payloads::ToggleLetterbox{.enabled = enabled}});
+  state.config.letterbox.enabled = enabled;
+
+  if (enabled) {
+    // 查找目标窗口
+    auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+    if (target_window) {
+      if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
+        Logger().error("Failed to show letterbox: {}", result.error());
+        // 回滚UI状态
+        Core::Actions::dispatch_action(
+            state,
+            Core::Actions::Action{Core::Actions::Payloads::ToggleLetterbox{.enabled = false}});
+        Features::Notifications::show_notification(state, "SpinningMomo",
+                                                   "Failed to show letterbox window");
+      }
+    } else {
+      Logger().warn("No target window found for letterbox");
+      Core::Actions::dispatch_action(
+          state, Core::Actions::Action{Core::Actions::Payloads::ToggleLetterbox{.enabled = false}});
+      Features::Notifications::show_notification(
+          state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    }
+  } else {
+    // 隐藏letterbox
+    if (auto result = Features::Letterbox::hide(state); !result) {
+      Logger().error("Failed to hide letterbox: {}", result.error());
+    }
+  }
+
+  // 如果叠加层正在运行，更新其黑边模式设置
+  if (Features::Overlay::is_overlay_capturing(state)) {
+    Features::Overlay::set_letterbox_mode(state, enabled);
+  }
+}
 
 auto register_feature_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
@@ -26,88 +127,13 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
     bool config_changed = false;
     switch (data.feature) {
       case FeatureType::Preview:
-        Core::Actions::dispatch_action(
-            app_state,
-            Core::Actions::Action{Core::Actions::Payloads::TogglePreview{.enabled = data.enabled}});
-
-        // 在action调度后执行实际功能
-        if (data.enabled) {
-          // 查找目标窗口
-          auto target_window =
-              Features::WindowControl::find_target_window(app_state.config.window.title);
-          if (target_window) {
-            if (auto result =
-                    Features::Preview::Window::start_preview(app_state, target_window.value());
-                !result) {
-              Logger().error("Failed to start preview");
-              // 回滚UI状态
-              Core::Actions::dispatch_action(
-                  app_state,
-                  Core::Actions::Action{Core::Actions::Payloads::TogglePreview{.enabled = false}});
-              Features::Notifications::show_notification(app_state, "SpinningMomo",
-                                                         "Failed to start preview window");
-            }
-          } else {
-            Logger().warn("No target window found for preview");
-            Core::Actions::dispatch_action(
-                app_state,
-                Core::Actions::Action{Core::Actions::Payloads::TogglePreview{.enabled = false}});
-            Features::Notifications::show_notification(
-                app_state, "SpinningMomo",
-                "Target window not found. Please ensure the game is running.");
-          }
-        } else {
-          // 停止预览
-          Features::Preview::Window::stop_preview(app_state);
-        }
+        handle_preview_toggle(app_state, data.enabled);
         break;
       case FeatureType::Overlay:
-        Core::Actions::dispatch_action(
-            app_state,
-            Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = data.enabled}});
-
-        // 在action调度后执行实际功能
-        if (data.enabled) {
-          // 查找目标窗口
-          auto target_window =
-              Features::WindowControl::find_target_window(app_state.config.window.title);
-          if (target_window) {
-            if (auto result =
-                    Features::Overlay::start_overlay(app_state, target_window.value());
-                !result) {
-              Logger().error("Failed to start overlay: {}", result.error());
-              // 回滚UI状态
-              Core::Actions::dispatch_action(
-                  app_state,
-                  Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = false}});
-              Features::Notifications::show_notification(app_state, "SpinningMomo",
-                                                         "Failed to start overlay window");
-            }
-          } else {
-            Logger().warn("No target window found for overlay");
-            Core::Actions::dispatch_action(
-                app_state,
-                Core::Actions::Action{Core::Actions::Payloads::ToggleOverlay{.enabled = false}});
-            Features::Notifications::show_notification(
-                app_state, "SpinningMomo",
-                "Target window not found. Please ensure the game is running.");
-          }
-        } else {
-          // 停止叠加层
-          Features::Overlay::stop_overlay(app_state);
-        }
+        handle_overlay_toggle(app_state, data.enabled);
         break;
       case FeatureType::Letterbox:
-        Core::Actions::dispatch_action(
-            app_state, Core::Actions::Action{
-                           Core::Actions::Payloads::ToggleLetterbox{.enabled = data.enabled}});
-        app_state.config.letterbox.enabled = data.enabled;
-
-        // 如果叠加层正在运行，更新其黑边模式设置
-        if (Features::Overlay::is_overlay_capturing(app_state)) {
-          Features::Overlay::set_letterbox_mode(app_state, data.enabled);
-        }
-
+        handle_letterbox_toggle(app_state, data.enabled);
         config_changed = true;
         break;
     }
