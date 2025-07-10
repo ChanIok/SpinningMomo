@@ -5,6 +5,7 @@ module;
 #include <wil/com.h>
 #include <windows.h>
 #include <wrl.h>
+#include <filesystem>
 
 module Core.WebView;
 
@@ -113,7 +114,38 @@ class ControllerCompletedHandler
     webview_state.resources.webview.get()->add_NavigationCompleted(
         navigation_completed_handler.Get(), &token);
 
-    // 导航到初始 URL
+    // 设置Virtual Host映射到前端构建目录
+    auto dist_path = std::filesystem::absolute(webview_state.config.frontend_dist_path).wstring();
+    
+    // 获取ICoreWebView2_3接口用于虚拟主机映射
+    wil::com_ptr<ICoreWebView2_3> webview3;
+    auto query_hr = webview_state.resources.webview->QueryInterface(IID_PPV_ARGS(&webview3));
+    if (SUCCEEDED(query_hr) && webview3) {
+        auto mapping_hr = webview3->SetVirtualHostNameToFolderMapping(
+            webview_state.config.virtual_host_name.c_str(),
+            dist_path.c_str(),
+            COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS
+        );
+        if (SUCCEEDED(mapping_hr)) {
+            Logger().info("Virtual host mapping established: {} -> {}", 
+                          Utils::String::ToUtf8(webview_state.config.virtual_host_name),
+                          Utils::String::ToUtf8(dist_path));
+        }
+    }
+
+    // 根据编译模式选择URL
+#ifdef _DEBUG
+    // 开发环境：连接Vite dev server (热重载)
+    webview_state.config.initial_url = webview_state.config.dev_server_url;
+    Logger().info("Debug mode: Using Vite dev server at {}", 
+                  Utils::String::ToUtf8(webview_state.config.dev_server_url));
+#else
+    // 生产环境：使用构建产物
+    webview_state.config.initial_url = L"https://" + webview_state.config.virtual_host_name + L"/index.html";
+    Logger().info("Release mode: Using built frontend from resources/web");
+#endif
+
+    // 导航到选定的 URL
     webview_state.resources.webview.get()->Navigate(webview_state.config.initial_url.c_str());
     webview_state.is_ready = true;
 

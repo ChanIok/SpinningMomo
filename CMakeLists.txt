@@ -123,6 +123,10 @@ target_link_libraries(SpinningMomo PRIVATE
     unofficial::webview2::webview2
 )
 
+# Web应用构建和部署
+include(${CMAKE_SOURCE_DIR}/cmake/build_web_app.cmake)
+setup_web_app_build(SpinningMomo)
+
 # 复制 .ifc 文件到指定目录供 IntelliSense 使用
 add_custom_command(TARGET SpinningMomo
     POST_BUILD
