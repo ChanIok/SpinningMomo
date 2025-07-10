@@ -154,6 +154,7 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   // 系统选项
   items.emplace_back(strings.OPEN_CONFIG, Core::Constants::ID_CONFIG);
   items.emplace_back(strings.USER_GUIDE, Core::Constants::ID_USER_GUIDE);
+  items.emplace_back(strings.WEBVIEW_TEST, Core::Constants::ID_WEBVIEW_TEST);
 
   // 分隔线
   items.emplace_back(UI::TrayMenu::State::MenuItem::separator());

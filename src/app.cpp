@@ -16,8 +16,10 @@ import Features.Screenshot;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
+import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.TrayMenu;
+import Core.WebView;
 import Vendor.Windows;
 
 Application::Application() = default;
@@ -29,6 +31,11 @@ Application::~Application() {
       Logger().error("Failed to shutdown Letterbox: {}", result.error());
     }
     Features::Screenshot::cleanup_system(m_app_state->screenshot);
+
+    // 清理WebView
+    Core::WebView::shutdown(*m_app_state);
+    UI::WebViewWindow::destroy(*m_app_state);
+
     UI::TrayMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);
   }
@@ -84,6 +91,22 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     if (auto result = UI::AppWindow::create_window(*m_app_state); !result) {
       Logger().error("Failed to create app window: {}", result.error());
       return false;
+    }
+
+    // 创建独立的WebView窗口
+    if (auto result = UI::WebViewWindow::create(*m_app_state); !result) {
+      Logger().warn("Failed to create WebView window: {}", result.error());
+      // WebView功能不可用，但应用继续运行
+    } else {
+      // 初始化WebView内容
+      if (auto webview_result =
+              Core::WebView::initialize(*m_app_state, m_app_state->webview.window.parent_hwnd);
+          !webview_result) {
+        Logger().error("Failed to initialize WebView: {}", webview_result.error());
+        // WebView初始化失败，但应用继续运行
+      } else {
+        Logger().info("WebView initialization started (async)");
+      }
     }
 
     // 创建托盘图标

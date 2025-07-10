@@ -49,6 +49,7 @@ const LocalizedStrings ZH_CN = {
     L"预览窗和叠加层功能冲突，已自动关闭另一功能",
     L"黑边模式",
     L"切换窗口边框",
+    L"WebView测试",
 };
 
 // 英文字符串定义
@@ -100,6 +101,7 @@ const Constants::LocalizedStrings Constants::EN_US = {
     L"has been automatically disabled.",
     L"Letterbox",
     L"Toggle Window Border",
+    L"WebView Test",
 };
 
 }  // namespace Core::Constants

@@ -163,6 +163,10 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
                   FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
                   state.app_window.window.hwnd});
       break;
+    case Core::Constants::ID_WEBVIEW_TEST:
+      send_event(state.event_bus, {EventType::SystemCommand, std::string("webview_test"),
+                                   state.app_window.window.hwnd});
+      break;
       // Add other cases for config, hotkey, language, etc.
       // For example:
       // case Core::Constants::ID_CONFIG:

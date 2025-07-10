@@ -49,6 +49,7 @@ constexpr UINT ID_USER_GUIDE = 2017;                // 使用指南菜单项ID
 constexpr UINT ID_OVERLAY_WINDOW = 2018;            // 叠加层菜单项ID
 constexpr UINT ID_LETTERBOX_WINDOW = 2019;          // 黑边模式菜单项ID
 constexpr UINT ID_TOGGLE_BORDERLESS = 2020;         // 切换边框模式菜单项ID
+constexpr UINT ID_WEBVIEW_TEST = 2021;              // WebView测试菜单项ID
 
 // 资源 ID
 constexpr int IDI_ICON1 = 101;
@@ -156,6 +157,7 @@ struct LocalizedStrings {
   std::wstring FEATURE_CONFLICT;
   std::wstring LETTERBOX_WINDOW;
   std::wstring TOGGLE_BORDERLESS;
+  std::wstring WEBVIEW_TEST;
 };
 
 // 中文字符串声明
