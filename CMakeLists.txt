@@ -9,6 +9,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_MODULE_STD ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# 查找依赖包
+find_package(spdlog CONFIG REQUIRED)
+find_package(asio CONFIG REQUIRED)
+find_package(reflectcpp CONFIG REQUIRED)
+find_package(unofficial-webview2 CONFIG REQUIRED)
+
 # Windows平台相关宏定义
 if(WIN32)
     # 启用manifest处理
@@ -111,6 +117,10 @@ target_link_libraries(SpinningMomo PRIVATE
     dwrite # DirectWrite
     shell32 # Windows Shell API
     Shlwapi # Shell Light-Weight API
+    spdlog::spdlog
+    asio::asio
+    reflectcpp::reflectcpp
+    unofficial::webview2::webview2
 )
 
 # 复制 .ifc 文件到指定目录供 IntelliSense 使用

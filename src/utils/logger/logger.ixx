@@ -1,99 +1,78 @@
 module;
 
+#include <spdlog/spdlog.h>
+
 export module Utils.Logger;
 
 import std;
 
-// 日志级别
-export enum class LogLevel { DEBUG = 0, INFO = 1, WARN = 2, ERROR = 3 };
+export using LoggerError = std::string;
 
-// 日志初始化结果
-export enum class LoggerError {
-  SUCCESS,
-  MODULE_PATH_FAILED,
-  FILE_OPEN_FAILED,
-  ALREADY_INITIALIZED
-};
+namespace Utils::Logging {
 
-// 现代化的日志记录类
+// 日志管理函数
+export auto initialize() -> std::expected<void, LoggerError>;
+export auto shutdown() -> void;
+export auto flush() -> void;
+
+}  // namespace Utils::Logging
+
+// Logger类 - 使用构造函数捕获source_location
 export class Logger {
  public:
-  // 构造函数捕获调用位置
-  Logger(std::source_location loc = std::source_location::current()) : loc_(loc) {}
+  Logger(std::source_location loc = std::source_location::current());
 
-  // 各级别日志方法
+  // 格式化日志函数
   template <typename... Args>
-  void debug(std::format_string<Args...> fmt, Args&&... args) const {
-    log_with_level<LogLevel::DEBUG>(fmt, std::forward<Args>(args)...);
+  auto trace(spdlog::format_string_t<Args...> fmt, Args&&... args) const -> void {
+    spdlog::default_logger()->log(
+        spdlog::source_loc{loc_.file_name(), static_cast<int>(loc_.line()), loc_.function_name()},
+        spdlog::level::trace, fmt, std::forward<Args>(args)...);
   }
 
   template <typename... Args>
-  void info(std::format_string<Args...> fmt, Args&&... args) const {
-    log_with_level<LogLevel::INFO>(fmt, std::forward<Args>(args)...);
+  auto debug(spdlog::format_string_t<Args...> fmt, Args&&... args) const -> void {
+    spdlog::default_logger()->log(
+        spdlog::source_loc{loc_.file_name(), static_cast<int>(loc_.line()), loc_.function_name()},
+        spdlog::level::debug, fmt, std::forward<Args>(args)...);
   }
 
   template <typename... Args>
-  void warn(std::format_string<Args...> fmt, Args&&... args) const {
-    log_with_level<LogLevel::WARN>(fmt, std::forward<Args>(args)...);
+  auto info(spdlog::format_string_t<Args...> fmt, Args&&... args) const -> void {
+    spdlog::default_logger()->log(
+        spdlog::source_loc{loc_.file_name(), static_cast<int>(loc_.line()), loc_.function_name()},
+        spdlog::level::info, fmt, std::forward<Args>(args)...);
   }
 
   template <typename... Args>
-  void error(std::format_string<Args...> fmt, Args&&... args) const {
-    log_with_level<LogLevel::ERROR>(fmt, std::forward<Args>(args)...);
+  auto warn(spdlog::format_string_t<Args...> fmt, Args&&... args) const -> void {
+    spdlog::default_logger()->log(
+        spdlog::source_loc{loc_.file_name(), static_cast<int>(loc_.line()), loc_.function_name()},
+        spdlog::level::warn, fmt, std::forward<Args>(args)...);
   }
 
-  // 简单字符串重载
-  void debug(std::string_view msg) const;
-  void info(std::string_view msg) const;
-  void warn(std::string_view msg) const;
-  void error(std::string_view msg) const;
+  template <typename... Args>
+  auto error(spdlog::format_string_t<Args...> fmt, Args&&... args) const -> void {
+    spdlog::default_logger()->log(
+        spdlog::source_loc{loc_.file_name(), static_cast<int>(loc_.line()), loc_.function_name()},
+        spdlog::level::err, fmt, std::forward<Args>(args)...);
+  }
 
-  // 静态管理方法
-  static std::expected<void, LoggerError> Initialize();
-  static void SetLogLevel(LogLevel level) noexcept;
-  static LogLevel GetLogLevel() noexcept;
-  static void Shutdown();
+  template <typename... Args>
+  auto critical(spdlog::format_string_t<Args...> fmt, Args&&... args) const -> void {
+    spdlog::default_logger()->log(
+        spdlog::source_loc{loc_.file_name(), static_cast<int>(loc_.line()), loc_.function_name()},
+        spdlog::level::critical, fmt, std::forward<Args>(args)...);
+  }
+
+  // 简单字符串日志函数
+  auto trace(std::string_view msg) const -> void;
+  auto debug(std::string_view msg) const -> void;
+  auto info(std::string_view msg) const -> void;
+  auto warn(std::string_view msg) const -> void;
+  auto error(std::string_view msg) const -> void;
+  auto critical(std::string_view msg) const -> void;
 
  private:
   std::source_location loc_;
-
-  // 统一的日志实现
-  template <LogLevel Level, typename... Args>
-  void log_with_level(std::format_string<Args...> fmt, Args&&... args) const {
-    if (should_log(Level)) {
-      std::string message = std::format(fmt, std::forward<Args>(args)...);
-      write_log(Level, message);
-    }
-  }
-
-  // 内部实现
-  static bool should_log(LogLevel level) noexcept;
-  void write_log(LogLevel level, const std::string& message) const;
-  static std::string get_timestamp();
-  static constexpr std::string_view get_level_string(LogLevel level) noexcept;
-
-  // 单例数据
-  struct LoggerImpl {
-    std::mutex mutex;
-    void* log_file_handle;  // 使用 void* 避免包含 Windows 头文件
-    std::atomic<bool> initialized{false};
-    std::atomic<LogLevel> current_log_level{LogLevel::INFO};
-  };
-  static LoggerImpl& get_impl();
 };
-
-// constexpr 日志级别字符串映射
-constexpr std::string_view Logger::get_level_string(LogLevel level) noexcept {
-  switch (level) {
-    case LogLevel::DEBUG:
-      return "DEBUG";
-    case LogLevel::INFO:
-      return "INFO";
-    case LogLevel::WARN:
-      return "WARN";
-    case LogLevel::ERROR:
-      return "ERROR";
-    default:
-      return "UNKNOWN";
-  }
-}

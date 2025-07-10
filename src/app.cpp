@@ -25,7 +25,9 @@ Application::~Application() {
   if (m_app_state) {
     Features::Preview::Window::cleanup_preview(*m_app_state);
     Features::Overlay::stop_overlay(*m_app_state);
-    Features::Letterbox::shutdown(*m_app_state);
+    if (auto result = Features::Letterbox::shutdown(*m_app_state); !result) {
+      Logger().error("Failed to shutdown Letterbox: {}", result.error());
+    }
     Features::Screenshot::cleanup_system(m_app_state->screenshot);
     UI::TrayMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);

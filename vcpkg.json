@@ -1,0 +1,12 @@
+{
+  "name": "infinity-momo",
+  "version": "0.1.0",
+  "builtin-baseline": "f9d77ef46dfe708b51db358acdea2b97615d5193",
+  "dependencies": [
+    "uwebsockets",
+    "spdlog",
+    "asio",
+    "reflectcpp",
+    "webview2"
+  ]
+}

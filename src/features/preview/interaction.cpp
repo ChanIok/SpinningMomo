@@ -248,7 +248,9 @@ auto handle_size(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM 
   state.preview.size.window_height = height;
 
   // 调整渲染系统大小
-  Features::Preview::Rendering::resize_rendering(state, width, height);
+  if (auto result = Features::Preview::Rendering::resize_rendering(state, width, height); !result) {
+    Logger().error("Failed to resize preview rendering: {}", result.error());
+  }
 
   return 0;
 }
