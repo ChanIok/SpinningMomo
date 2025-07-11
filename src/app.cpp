@@ -3,6 +3,7 @@ module;
 module App;
 
 import std;
+import Core.Async.Runtime;
 import Core.Config.Io;
 import Core.Constants;
 import Core.Events;
@@ -38,6 +39,8 @@ Application::~Application() {
 
     UI::TrayMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);
+
+    Core::Async::stop(*m_app_state);
   }
 }
 
@@ -51,7 +54,13 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state = std::make_unique<Core::State::AppState>();
     m_app_state->app_window.window.instance = m_h_instance;
 
-    // 2. 初始化配置
+    // 2. 启动异步运行时（用于RPC处理）
+    if (auto result = Core::Async::start(*m_app_state); !result) {
+      Logger().error("Failed to start async runtime: {}", result.error());
+      return false;
+    }
+
+    // 3. 初始化配置
     if (auto config_result = Core::Config::Io::initialize(); config_result) {
       m_app_state->config = std::move(config_result.value());
     } else {

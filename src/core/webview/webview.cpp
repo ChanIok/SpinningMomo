@@ -1,16 +1,17 @@
 module;
 
-#include <objbase.h>  // 必须放最前面
-#include <WebView2.h>
+#include <WebView2.h>  // 必须放最后面
 #include <wil/com.h>
 #include <windows.h>
 #include <wrl.h>
+
 #include <filesystem>
 
 module Core.WebView;
 
 import std;
 import Core.WebView.State;
+import Core.WebView.RpcBridge;
 import Utils.Logger;
 import Utils.String;
 
@@ -114,40 +115,72 @@ class ControllerCompletedHandler
     webview_state.resources.webview.get()->add_NavigationCompleted(
         navigation_completed_handler.Get(), &token);
 
+    // 注册WebView消息处理器
+    auto message_handler = Core::WebView::RpcBridge::create_message_handler(*m_state);
+
+    // 创建COM消息处理器
+    auto webview_message_handler =
+        Microsoft::WRL::Callback<ICoreWebView2WebMessageReceivedEventHandler>(
+            [message_handler](ICoreWebView2* sender,
+                              ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
+              try {
+                LPWSTR message_raw;
+                HRESULT hr = args->get_WebMessageAsJson(&message_raw);
+
+                if (SUCCEEDED(hr) && message_raw) {
+                  std::string message = Utils::String::ToUtf8(message_raw);
+                  message_handler(message);
+                  CoTaskMemFree(message_raw);
+                }
+
+                return S_OK;
+              } catch (const std::exception& e) {
+                Logger().error("Error in WebView message handler: {}", e.what());
+                return E_FAIL;
+              }
+            });
+
+    webview_state.resources.webview.get()->add_WebMessageReceived(webview_message_handler.Get(),
+                                                                  &token);
+    Logger().info("WebView message handler registered");
+
     // 设置Virtual Host映射到前端构建目录
     auto dist_path = std::filesystem::absolute(webview_state.config.frontend_dist_path).wstring();
-    
+
     // 获取ICoreWebView2_3接口用于虚拟主机映射
     wil::com_ptr<ICoreWebView2_3> webview3;
     auto query_hr = webview_state.resources.webview->QueryInterface(IID_PPV_ARGS(&webview3));
     if (SUCCEEDED(query_hr) && webview3) {
-        auto mapping_hr = webview3->SetVirtualHostNameToFolderMapping(
-            webview_state.config.virtual_host_name.c_str(),
-            dist_path.c_str(),
-            COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS
-        );
-        if (SUCCEEDED(mapping_hr)) {
-            Logger().info("Virtual host mapping established: {} -> {}", 
-                          Utils::String::ToUtf8(webview_state.config.virtual_host_name),
-                          Utils::String::ToUtf8(dist_path));
-        }
+      auto mapping_hr = webview3->SetVirtualHostNameToFolderMapping(
+          webview_state.config.virtual_host_name.c_str(), dist_path.c_str(),
+          COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+      if (SUCCEEDED(mapping_hr)) {
+        Logger().info("Virtual host mapping established: {} -> {}",
+                      Utils::String::ToUtf8(webview_state.config.virtual_host_name),
+                      Utils::String::ToUtf8(dist_path));
+      }
     }
 
     // 根据编译模式选择URL
 #ifdef _DEBUG
     // 开发环境：连接Vite dev server (热重载)
     webview_state.config.initial_url = webview_state.config.dev_server_url;
-    Logger().info("Debug mode: Using Vite dev server at {}", 
+    Logger().info("Debug mode: Using Vite dev server at {}",
                   Utils::String::ToUtf8(webview_state.config.dev_server_url));
 #else
     // 生产环境：使用构建产物
-    webview_state.config.initial_url = L"https://" + webview_state.config.virtual_host_name + L"/index.html";
+    webview_state.config.initial_url =
+        L"https://" + webview_state.config.virtual_host_name + L"/index.html";
     Logger().info("Release mode: Using built frontend from resources/web");
 #endif
 
     // 导航到选定的 URL
     webview_state.resources.webview.get()->Navigate(webview_state.config.initial_url.c_str());
     webview_state.is_ready = true;
+
+    // 初始化RPC桥接
+    Core::WebView::RpcBridge::initialize_rpc_bridge(*m_state);
+    webview_state.messaging.is_rpc_ready = true;
 
     Logger().info("WebView2 ready, navigating to: {}",
                   Utils::String::ToUtf8(webview_state.config.initial_url));
@@ -357,7 +390,7 @@ auto post_message(Core::State::AppState& state, const std::string& message) -> v
 
   if (webview_state.is_ready) {
     std::wstring wmessage(message.begin(), message.end());
-    webview_state.resources.webview.get()->PostWebMessageAsString(wmessage.c_str());
+    webview_state.resources.webview.get()->PostWebMessageAsJson(wmessage.c_str());
     Logger().debug("Posted message to WebView");
   }
 }

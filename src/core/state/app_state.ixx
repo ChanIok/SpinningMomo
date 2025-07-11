@@ -3,44 +3,42 @@ module;
 export module Core.State;
 
 import std;
-import Core.Events;
+import Core.Async.State;
 import Core.Config.State;
+import Core.Events;
+import Core.RpcHandlers.State;
 import Core.WebView.State;
-import Types.UI;
+import Features.Letterbox.State;
 import Features.Notifications.State;
-import UI.TrayIcon.State;
-import UI.TrayMenu.State;
+import Features.Overlay.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
-import Features.Overlay.State;
-import Features.Letterbox.State;
+import Types.UI;
 import UI.AppWindow.State;
+import UI.TrayIcon.State;
+import UI.TrayMenu.State;
 import Vendor.Windows;
 
 export namespace Core::State {
 
-// 应用程序状态（模块化组合）
 export struct AppState {
   // 应用级状态
+  Core::Async::State::AsyncRuntimeState async_runtime;
   Core::Config::State::AppConfig config;
-  Core::Events::EventBus event_bus;
   Types::UI::D2DRenderState d2d_render;
+  Core::Events::EventBus event_bus;
+  Core::RpcHandlers::State::RpcHandlerState rpc_handlers;
+  Core::WebView::State::WebViewState webview;
 
   // 功能模块状态
   UI::AppWindow::State app_window;
+  Features::Letterbox::State::LetterboxState letterbox;
   Features::Notifications::State::NotificationSystemState notifications;
-  UI::TrayIcon::State::Data tray_icon;
-  UI::TrayMenu::State::Data tray_menu;
+  Features::Overlay::State::OverlayState overlay;
   Features::Preview::State::PreviewState preview;
   Features::Screenshot::State::ScreenshotState screenshot;
-  Features::Overlay::State::OverlayState overlay;
-  Features::Letterbox::State::LetterboxState letterbox;
-  Core::WebView::State::WebViewState webview;
-
-  // 便捷访问方法（保持向后兼容）
-  auto is_window_valid() const -> bool { return app_window.is_window_valid(); }
-  auto get_total_width() const -> int { return app_window.get_total_width(); }
-  auto get_menu_item_count() const -> size_t { return app_window.get_menu_item_count(); }
+  UI::TrayIcon::State::Data tray_icon;
+  UI::TrayMenu::State::Data tray_menu;
 };
 
 // 根据DPI更新渲染状态

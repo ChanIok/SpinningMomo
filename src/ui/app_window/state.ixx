@@ -119,14 +119,6 @@ struct State {
   DataState data;
   LayoutConfig layout;
   RenderState render;
-
-  // 便捷访问方法
-  auto is_window_valid() const -> bool { return window.hwnd != nullptr; }
-  auto get_total_width() const -> int {
-    return layout.ratio_column_width + layout.resolution_column_width +
-           layout.settings_column_width;
-  }
-  auto get_menu_item_count() const -> size_t { return data.menu_items.size(); }
 };
 
 // 辅助函数
