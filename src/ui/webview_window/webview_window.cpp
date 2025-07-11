@@ -18,8 +18,8 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   register_window_class(state.app_window.window.instance);
 
   // 设置默认窗口大小和位置
-  const int width = 1200;
-  const int height = 800;
+  const int width = 1280;
+  const int height = 720;
   const int x = 200;
   const int y = 100;
 

@@ -14,8 +14,8 @@ export namespace Core::WebView::State {
 struct WindowState {
   HWND parent_hwnd = nullptr;
   HWND webview_hwnd = nullptr;
-  int width = 800;
-  int height = 600;
+  int width = 1280;
+  int height = 720;
   int x = 0;
   int y = 0;
   bool is_visible = false;
