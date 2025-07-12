@@ -14,6 +14,8 @@ import Features.Notifications;
 import Features.Overlay;
 import Features.Preview.Window;
 import Features.Screenshot;
+import Features.Settings;
+import Features.Settings.Rpc;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
@@ -70,6 +72,15 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
     // 3. 注册事件处理器
     Handlers::register_all_handlers(*m_app_state);
+
+    // 3.1 初始化 settings 模块
+    if (auto settings_result = Features::Settings::initialize(*m_app_state); !settings_result) {
+      Logger().warn("Failed to initialize settings: {}", settings_result.error());
+      // 不影响应用启动
+    }
+
+    // 3.2 注册 Settings RPC 处理器
+    Features::Settings::Rpc::register_handlers(*m_app_state);
 
     // 4. 从配置中获取数据并填充到 AppState
     const auto& strings =

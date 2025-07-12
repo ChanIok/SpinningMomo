@@ -120,6 +120,7 @@
     "stdfloat": "cpp",
     "strstream": "cpp",
     "syncstream": "cpp",
-    "resumable": "cpp"
+    "resumable": "cpp",
+    "*.ipp": "cpp"
   }
 }
