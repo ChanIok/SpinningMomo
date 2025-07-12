@@ -8,6 +8,7 @@ module;
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <rfl/json.hpp>
 #include <string>
 
 export module link_workaround;
@@ -50,14 +51,22 @@ export [[maybe_unused]] auto println_to_cout(const std::string& message) -> void
   std::cout << message << std::endl;
 }
 
-export [[maybe_unused]] auto flush_cout() -> void {
-  std::cout.flush();
-}
+export [[maybe_unused]] auto flush_cout() -> void { std::cout.flush(); }
 
-export [[maybe_unused]] auto print_newline() -> void {
-  std::cout << std::endl;
-}
+export [[maybe_unused]] auto print_newline() -> void { std::cout << std::endl; }
 
-export [[maybe_unused]] auto get_cout_reference() -> std::ostream& {
-  return std::cout;
+export [[maybe_unused]] auto get_cout_reference() -> std::ostream& { return std::cout; }
+
+// 用于强制实例化 rfl 模板的虚拟结构体
+struct RflLinkWorkaround {
+  int id;
+  std::string name;
+};
+
+// 用于确保 rfl::json 读写模板被实例化并链接的虚拟函数
+// 此函数无需被调用，只需存在于编译过程中即可
+export [[maybe_unused]] auto force_rfl_linkage() -> void {
+  const auto dummy_obj = RflLinkWorkaround{1, "test"};
+  const auto json_string = rfl::json::write(dummy_obj);
+  (void)rfl::json::read<RflLinkWorkaround>(json_string);
 }
