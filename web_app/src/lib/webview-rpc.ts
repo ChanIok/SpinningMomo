@@ -60,243 +60,247 @@ export class JsonRpcError extends Error {
   }
 }
 
-// WebView JSON-RPC 通信类，单例模式，确保全局唯一的通信实例
-export class WebViewRPC {
-  private static instance: WebViewRPC
-  private pendingRequests = new Map<string | number, PendingRequest>()
-  private eventHandlers = new Map<string, Set<(params: unknown) => void>>()
-  private nextId = 1
-  private isDebugMode = import.meta.env.DEV
+// --- 模块级状态 (原单例类属性) ---
+const pendingRequests = new Map<string | number, PendingRequest>()
+const eventHandlers = new Map<string, Set<(params: unknown) => void>>()
+let nextId = 1
+const isDebugMode = import.meta.env.DEV
+let isInitialized = false
 
-  // 获取单例实例
-  static getInstance(): WebViewRPC {
-    if (!this.instance) {
-      this.instance = new WebViewRPC()
-    }
-    return this.instance
-  }
+// --- 内部辅助函数 (原私有方法) ---
 
-  private constructor() {
-    this.initializeMessageListener()
-  }
-
-  // 初始化消息监听器
-  private initializeMessageListener(): void {
-    if (typeof window !== 'undefined' && window.chrome?.webview) {
-      window.chrome.webview.addEventListener('message', this.handleMessage.bind(this))
-      this.debug('WebView RPC initialized')
-    } else if (this.isDebugMode) {
-      this.debug('WebView2 not available, running in mock mode')
-    }
-  }
-
-  // 调用远程方法（请求-响应模式）
-  async call<T = unknown>(method: string, params?: unknown, timeout = 10000): Promise<T> {
-    return new Promise((resolve, reject) => {
-      // 检查WebView2可用性
-      if (!this.isWebViewAvailable()) {
-        reject(new JsonRpcError(
-          JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
-          'WebView2 not available'
-        ))
-        return
-      }
-
-      const id = this.nextId++
-      const request: JsonRpcRequest = {
-        jsonrpc: '2.0',
-        method,
-        params,
-        id
-      }
-
-      // 设置超时处理
-      const timeoutHandle = setTimeout(() => {
-        this.pendingRequests.delete(id)
-        reject(new JsonRpcError(
-          JsonRpcErrorCode.TIMEOUT,
-          `Request timeout: ${method}`,
-          { method, timeout }
-        ))
-      }, timeout)
-
-      // 存储待处理请求
-      this.pendingRequests.set(id, {
-        resolve: (value: unknown) => resolve(value as T),
-        reject,
-        timeout: timeoutHandle
-      })
-
-      // 发送请求
-      try {
-        this.postMessage(request)
-        this.debug('RPC call:', method, params)
-      } catch (error) {
-        clearTimeout(timeoutHandle)
-        this.pendingRequests.delete(id)
-        reject(error)
-      }
-    })
-  }
-
-  // 监听事件通知
-  on(method: string, handler: (params: unknown) => void): void {
-    if (!this.eventHandlers.has(method)) {
-      this.eventHandlers.set(method, new Set())
-    }
-    this.eventHandlers.get(method)!.add(handler)
-    this.debug('Event listener added:', method)
-  }
-
-  // 取消事件监听
-  off(method: string, handler: (params: unknown) => void): void {
-    const handlers = this.eventHandlers.get(method)
-    if (handlers) {
-      handlers.delete(handler)
-      if (handlers.size === 0) {
-        this.eventHandlers.delete(method)
-      }
-    }
-    this.debug('Event listener removed:', method)
-  }
-
-  // 处理收到的消息
-  private handleMessage(event: MessageEvent): void {
-    try {
-      const message = event.data
-
-      // 验证JSON-RPC格式
-      if (!this.isValidJsonRpcMessage(message)) {
-        this.debug('Invalid JSON-RPC message:', message)
-        return
-      }
-
-      // 处理响应消息
-      if ('id' in message && this.pendingRequests.has(message.id)) {
-        this.handleResponse(message as JsonRpcResponse)
-      }
-      // 处理通知消息
-      else if ('method' in message && !('id' in message)) {
-        this.handleNotification(message as JsonRpcNotification)
-      }
-    } catch (error) {
-      console.error('Failed to handle WebView message:', error)
-    }
-  }
-
-  // 处理响应消息
-  private handleResponse(response: JsonRpcResponse): void {
-    const pendingRequest = this.pendingRequests.get(response.id)
-    if (!pendingRequest) return
-
-    const { resolve, reject, timeout } = pendingRequest
-    clearTimeout(timeout)
-    this.pendingRequests.delete(response.id)
-
-    if (response.error) {
-      const error = new JsonRpcError(
-        response.error.code as JsonRpcErrorCode,
-        response.error.message,
-        response.error.data
-      )
-      reject(error)
-      this.debug('RPC error:', response.error)
-    } else {
-      resolve(response.result)
-      this.debug('RPC response:', response.id, response.result)
-    }
-  }
-
-  // 处理通知消息
-  private handleNotification(notification: JsonRpcNotification): void {
-    const handlers = this.eventHandlers.get(notification.method)
-    if (handlers && handlers.size > 0) {
-      handlers.forEach(handler => {
-        try {
-          handler(notification.params)
-        } catch (error) {
-          console.error(`Error in event handler for ${notification.method}:`, error)
-        }
-      })
-      this.debug('Event received:', notification.method, notification.params)
-    } else {
-      this.debug('No handlers for event:', notification.method)
-    }
-  }
-
-  // 验证JSON-RPC消息格式
-  private isValidJsonRpcMessage(message: unknown): boolean {
-    if (typeof message !== 'object' || !message) return false
-    
-    const msg = message as Record<string, unknown>
-    return msg.jsonrpc === '2.0' && typeof msg.method === 'string'
-  }
-
-  // 检查WebView2是否可用
-  private isWebViewAvailable(): boolean {
-    return typeof window !== 'undefined' && !!window.chrome?.webview
-  }
-
-  // 发送消息到WebView2
-  private postMessage(message: JsonRpcRequest | JsonRpcNotification): void {
-    if (this.isWebViewAvailable() && window.chrome?.webview) {
-      window.chrome.webview.postMessage(message)
-    } else if (this.isDebugMode) {
-      // 开发模式下的模拟处理
-      this.debug('Mock message (WebView2 not available):', message)
-    } else {
-      throw new JsonRpcError(
-        JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
-        'WebView2 not available'
-      )
-    }
-  }
-
-  // 调试日志
-  private debug(...args: unknown[]): void {
-    if (this.isDebugMode) {
-      console.log('[WebView RPC]', ...args)
-    }
-  }
-
-  // 获取统计信息
-  getStats() {
-    return {
-      pendingRequests: this.pendingRequests.size,
-      eventHandlers: Array.from(this.eventHandlers.entries()).map(([method, handlers]) => ({
-        method,
-        handlerCount: handlers.size
-      })),
-      isWebViewAvailable: this.isWebViewAvailable()
-    }
-  }
-
-  // 清理资源
-  dispose(): void {
-    // 清理所有待处理请求
-    for (const [, request] of this.pendingRequests) {
-      clearTimeout(request.timeout)
-      request.reject(new JsonRpcError(
-        JsonRpcErrorCode.INTERNAL_ERROR,
-        'WebView RPC disposed'
-      ))
-    }
-    this.pendingRequests.clear()
-    
-    // 清理事件处理器
-    this.eventHandlers.clear()
-    
-    this.debug('WebView RPC disposed')
+function debug(...args: unknown[]): void {
+  if (isDebugMode) {
+    console.log('[WebView RPC]', ...args)
   }
 }
 
-// 导出全局单例实例
-export const webviewRPC = WebViewRPC.getInstance()
+function isWebViewAvailable(): boolean {
+  return typeof window !== 'undefined' && !!window.chrome?.webview
+}
 
-// 类型辅助工具
+function postMessage(message: JsonRpcRequest | JsonRpcNotification): void {
+  if (isWebViewAvailable() && window.chrome?.webview) {
+    window.chrome.webview.postMessage(message)
+  } else if (isDebugMode) {
+    debug('Mock message (WebView2 not available):', message)
+  } else {
+    throw new JsonRpcError(
+      JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
+      'WebView2 not available'
+    )
+  }
+}
+
+function handleResponse(response: JsonRpcResponse): void {
+  const pendingRequest = pendingRequests.get(response.id)
+  if (!pendingRequest) return
+
+  const { resolve, reject, timeout } = pendingRequest
+  clearTimeout(timeout)
+  pendingRequests.delete(response.id)
+
+  if (response.error) {
+    const error = new JsonRpcError(
+      response.error.code as JsonRpcErrorCode,
+      response.error.message,
+      response.error.data
+    )
+    reject(error)
+    debug('RPC error:', response.error)
+  } else {
+    resolve(response.result)
+    debug('RPC response:', response.id, response.result)
+  }
+}
+
+function handleNotification(notification: JsonRpcNotification): void {
+  const handlers = eventHandlers.get(notification.method)
+  if (handlers && handlers.size > 0) {
+    handlers.forEach(handler => {
+      try {
+        handler(notification.params)
+      } catch (error) {
+        console.error(`Error in event handler for ${notification.method}:`, error)
+      }
+    })
+    debug('Event received:', notification.method, notification.params)
+  } else {
+    debug('No handlers for event:', notification.method)
+  }
+}
+
+function isValidJsonRpcMessage(message: unknown): boolean {
+  if (typeof message !== 'object' || !message) return false
+  
+  const msg = message as Record<string, unknown>
+  
+  if (msg.jsonrpc !== '2.0') return false
+  
+  if ('method' in msg && typeof msg.method === 'string') return true
+  
+  if ('id' in msg && ('result' in msg || 'error' in msg)) return true
+  
+  return false
+}
+
+function handleMessage(event: MessageEvent): void {
+  try {
+    const message = event.data
+
+    if (!isValidJsonRpcMessage(message)) {
+      debug('Invalid JSON-RPC message:', message)
+      return
+    }
+
+    if ('id' in message && pendingRequests.has(message.id)) {
+      handleResponse(message as JsonRpcResponse)
+    }
+    else if ('method' in message && !('id' in message)) {
+      handleNotification(message as JsonRpcNotification)
+    }
+  } catch (error) {
+    console.error('Failed to handle WebView message:', error)
+  }
+}
+
+// --- 公开的自由函数 API ---
+
+/**
+ * 调用远程方法（请求-响应模式）
+ */
+export async function call<T = unknown>(method: string, params?: unknown, timeout = 10000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    if (!isWebViewAvailable()) {
+      reject(new JsonRpcError(
+        JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
+        'WebView2 not available'
+      ))
+      return
+    }
+
+    const id = nextId++
+    const request: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      method,
+      params,
+      id
+    }
+
+    const timeoutHandle = setTimeout(() => {
+      pendingRequests.delete(id)
+      reject(new JsonRpcError(
+        JsonRpcErrorCode.TIMEOUT,
+        `Request timeout: ${method}`,
+        { method, timeout }
+      ))
+    }, timeout)
+
+    pendingRequests.set(id, {
+      resolve: (value: unknown) => resolve(value as T),
+      reject,
+      timeout: timeoutHandle
+    })
+
+    try {
+      postMessage(request)
+      debug('RPC call:', method, params)
+    } catch (error) {
+      clearTimeout(timeoutHandle)
+      pendingRequests.delete(id)
+      reject(error)
+    }
+  })
+}
+
+/**
+ * 监听事件通知
+ */
+export function on(method: string, handler: (params: unknown) => void): void {
+  if (!eventHandlers.has(method)) {
+    eventHandlers.set(method, new Set())
+  }
+  eventHandlers.get(method)!.add(handler)
+  debug('Event listener added:', method)
+}
+
+/**
+ * 取消事件监听
+ */
+export function off(method: string, handler: (params: unknown) => void): void {
+  const handlers = eventHandlers.get(method)
+  if (handlers) {
+    handlers.delete(handler)
+    if (handlers.size === 0) {
+      eventHandlers.delete(method)
+    }
+  }
+  debug('Event listener removed:', method)
+}
+
+/**
+ * 获取统计信息
+ */
+export function getStats() {
+  return {
+    pendingRequests: pendingRequests.size,
+    eventHandlers: Array.from(eventHandlers.entries()).map(([method, handlers]) => ({
+      method,
+      handlerCount: handlers.size
+    })),
+    isWebViewAvailable: isWebViewAvailable()
+  }
+}
+
+/**
+ * 清理资源，在应用卸载时调用
+ */
+export function dispose(): void {
+  for (const [, request] of pendingRequests) {
+    clearTimeout(request.timeout)
+    request.reject(new JsonRpcError(
+      JsonRpcErrorCode.INTERNAL_ERROR,
+      'WebView RPC disposed'
+    ))
+  }
+  pendingRequests.clear()
+  eventHandlers.clear()
+  
+  if (isWebViewAvailable() && window.chrome?.webview) {
+    window.chrome.webview.removeEventListener('message', handleMessage)
+  }
+  
+  isInitialized = false
+  debug('WebView RPC disposed')
+}
+
+/**
+ * 初始化 RPC 通信，应在应用启动时调用一次
+ */
+export function initializeRPC(): void {
+  if (isInitialized) {
+    debug('RPC already initialized.')
+    return
+  }
+  
+  if (isWebViewAvailable() && window.chrome?.webview) {
+    window.chrome.webview.addEventListener('message', handleMessage)
+    isInitialized = true
+    debug('WebView RPC initialized')
+  } else if (isDebugMode) {
+    debug('WebView2 not available, running in mock mode')
+  }
+
+  // 确保在页面卸载时清理资源
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', dispose)
+  }
+}
+
+// --- 类型辅助工具 ---
 export type RpcMethod<TParams = unknown, TResult = unknown> = {
   params: TParams
   result: TResult
 }
 
-export type RpcEventHandler<T = unknown> = (params: T) => void 
+export type RpcEventHandler<T = unknown> = (params: T) => void

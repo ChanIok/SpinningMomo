@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { AppSettings, AppInfo, SettingsPage, PartialAppSettings } from '../types'
-import { settingsAPI } from '../api/settings-rpc'
+import { settingsAPI } from '../api/settings-api'
 import type { RpcEventHandler } from '@/lib/webview-rpc'
 
 interface SettingsState {

@@ -10,9 +10,22 @@ import Core.WebView;
 import Core.WebView.State;
 import Core.RpcHandlers;
 import Core.Async.Runtime;
+import Core.Events;
 import Utils.Logger;
 
 namespace Core::WebView::RpcBridge {
+
+// 辅助函数：创建通用错误响应（当无法处理请求时）
+auto create_generic_error_response(const std::string& error_message) -> std::string {
+  return std::format(R"({{
+    "jsonrpc": "2.0",
+    "error": {{
+      "code": -32603,
+      "message": "Internal error: {}"
+    }},
+    "id": null
+  }})", error_message);
+}
 
 auto initialize_rpc_bridge(Core::State::AppState& state) -> void {
   Logger().info("Initializing WebView RPC bridge");
@@ -34,33 +47,23 @@ auto handle_webview_message(Core::State::AppState& state, const std::string& mes
                  message.substr(0, 100) + (message.size() > 100 ? "..." : ""));
 
   try {
-    // 处理JSON-RPC请求
+    // 在异步线程上处理RPC请求
     auto response = co_await Core::RpcHandlers::process_request(state, message);
 
-    // 发送响应给前端
-    Core::WebView::post_message(state, response);
-
-    Logger().debug("Successfully processed RPC request and sent response");
+    // 直接投递响应字符串到UI线程处理
+    Core::Events::post_event(state.event_bus, 
+      {Core::Events::EventType::WebViewResponse, response});
+    
+    Logger().debug("WebView response queued for UI thread processing");
 
   } catch (const std::exception& e) {
     Logger().error("Error handling WebView RPC message: {}", e.what());
 
-    // 发送错误响应
-    try {
-      auto error_response = R"({
-                "jsonrpc": "2.0",
-                "error": {
-                    "code": -32603,
-                    "message": "Internal error: )" +
-                            std::string(e.what()) + R"("
-                },
-                "id": null
-            })";
-
-      Core::WebView::post_message(state, error_response);
-    } catch (...) {
-      Logger().error("Failed to send error response");
-    }
+    // 错误处理：直接投递错误响应字符串
+    Core::Events::post_event(state.event_bus, 
+      {Core::Events::EventType::WebViewResponse, create_generic_error_response(e.what())});
+    
+    Logger().debug("WebView error response queued for UI thread processing");
   }
 }
 

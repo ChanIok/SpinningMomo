@@ -14,7 +14,8 @@ export enum class EventType {
   WindowAction,       // 窗口动作
   ToggleFeature,      // 功能开关
   SystemCommand,      // 系统命令
-  ConfigChanged       // 配置改变
+  ConfigChanged,      // 配置改变
+  WebViewResponse     // WebView响应
 };
 
 // 窗口动作类型

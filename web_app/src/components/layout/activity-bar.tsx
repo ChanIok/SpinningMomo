@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router'
-import { Image, Album, Calendar, MapPin, Folder, Settings } from 'lucide-react'
+import { Menu, Settings } from 'lucide-react'
 
 interface MenuItem {
   key?: string
@@ -11,11 +11,7 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
-  { label: '照片', key: 'gallery', icon: Image },
-  { label: '相册', key: 'albums', icon: Album },
-  { label: '日历', key: 'calendar', icon: Calendar },
-  { label: '地点', key: 'places', icon: MapPin },
-  { label: '文件夹', key: 'folders', icon: Folder },
+  { label: '菜单', key: 'menu', icon: Menu },
   { type: 'divider' },
   { label: '设置', key: 'settings', icon: Settings },
 ]
