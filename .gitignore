@@ -50,16 +50,16 @@ test/
 .cursor
 
 # Web App (Vite + React)
-web_app/node_modules/
-web_app/dist/
-web_app/dist-ssr/
-web_app/.env
-web_app/.env.local
-web_app/.env.development.local
-web_app/.env.test.local
-web_app/.env.production.local
-web_app/*.log
-web_app/coverage/
-web_app/.cache/
-web_app/.parcel-cache/
-web_app/.vite/
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/.env
+web/.env.local
+web/.env.development.local
+web/.env.test.local
+web/.env.production.local
+web/*.log
+web/coverage/
+web/.cache/
+web/.parcel-cache/
+web/.vite/
