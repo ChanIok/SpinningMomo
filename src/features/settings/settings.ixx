@@ -13,7 +13,7 @@ export auto initialize(Core::State::AppState& app_state) -> std::expected<void, 
 export auto get_settings(const Types::GetSettingsParams& params)
     -> std::expected<Types::GetSettingsResult, std::string>;
 
-export auto update_settings(const Types::UpdateSettingsParams& params)
+export auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string>;
 
 }  // namespace Features::Settings

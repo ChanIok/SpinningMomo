@@ -13,6 +13,7 @@ import Features.Notifications.State;
 import Features.Overlay.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
+import Features.Settings.Types;
 import Types.UI;
 import UI.AppWindow.State;
 import UI.TrayIcon.State;
@@ -29,6 +30,9 @@ export struct AppState {
   Core::Events::EventBus event_bus;
   Core::RpcHandlers::State::RpcHandlerState rpc_handlers;
   Core::WebView::State::WebViewState webview;
+
+  // 应用设置状态（JSON配置）
+  Features::Settings::Types::AppSettings settings;
 
   // 功能模块状态
   UI::AppWindow::State app_window;

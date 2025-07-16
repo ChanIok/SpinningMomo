@@ -31,10 +31,6 @@ struct RpcError {
 template <typename T>
 using RpcResult = std::expected<T, RpcError>;
 
-// 异步处理器签名
-template <typename Request, typename Response>
-using AsyncHandler = std::function<asio::awaitable<RpcResult<Response>>(const Request&)>;
-
 struct MethodListItem {
   std::string name;
   std::string description;

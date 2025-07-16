@@ -16,7 +16,8 @@ import Utils.Logger;
 
 namespace Features::Settings::Rpc {
 
-auto handle_get_settings(const Types::GetSettingsParams& params)
+auto handle_get_settings([[maybe_unused]] Core::State::AppState& app_state,
+                         const Types::GetSettingsParams& params)
     -> asio::awaitable<Core::RpcHandlers::RpcResult<Types::GetSettingsResult>> {
   auto result = Features::Settings::get_settings(params);
 
@@ -29,9 +30,10 @@ auto handle_get_settings(const Types::GetSettingsParams& params)
   }
 }
 
-auto handle_update_settings(const Types::UpdateSettingsParams& params)
+auto handle_update_settings(Core::State::AppState& app_state,
+                            const Types::UpdateSettingsParams& params)
     -> asio::awaitable<Core::RpcHandlers::RpcResult<Types::UpdateSettingsResult>> {
-  auto result = Features::Settings::update_settings(params);
+  auto result = Features::Settings::update_settings(app_state, params);
 
   if (result) {
     co_return result.value();

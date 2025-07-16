@@ -7,6 +7,7 @@ module Features.Settings;
 
 import std;
 import Core.State;
+import Core.Events;
 import Features.Settings.Types;
 import Utils.Path;
 
@@ -40,6 +41,17 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
         return std::unexpected("Failed to create settings file");
       }
       file << json_str;
+      
+      // 初始化内存状态
+      app_state.settings.window.title = "";
+      app_state.settings.version = "1.0";
+    } else {
+      // 从文件加载到内存状态
+      auto result = get_settings({});
+      if (result) {
+        app_state.settings.window.title = result.value().window.title;
+        app_state.settings.version = result.value().version;
+      }
     }
 
     return {};
@@ -78,7 +90,7 @@ auto get_settings(const Types::GetSettingsParams& params)
   }
 }
 
-auto update_settings(const Types::UpdateSettingsParams& params)
+auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string> {
   try {
     auto settings_path = get_settings_path();
@@ -86,7 +98,14 @@ auto update_settings(const Types::UpdateSettingsParams& params)
       return std::unexpected(settings_path.error());
     }
 
-    // 构造完整的设置对象
+    // 保存旧设置用于事件通知
+    Types::AppSettings old_settings = app_state.settings;
+
+    // 更新内存中的全局状态
+    app_state.settings.window = params.window;
+    app_state.settings.version = "1.0";
+
+    // 构造完整的设置对象并保存到文件
     Types::GetSettingsResult settings;
     settings.window = params.window;
     settings.version = "1.0";
@@ -95,10 +114,21 @@ auto update_settings(const Types::UpdateSettingsParams& params)
 
     std::ofstream file(settings_path.value());
     if (!file) {
+      // 回滚内存状态
+      app_state.settings = old_settings;
       return std::unexpected("Failed to open settings file for writing");
     }
 
     file << json_str;
+
+    // 发送设置变更事件
+    Types::SettingsChangeData change_data{
+        .old_settings = old_settings,
+        .new_settings = app_state.settings,
+        .change_description = "Settings updated via RPC"};
+
+    Core::Events::post_event(app_state.event_bus, 
+        Core::Events::Event{Core::Events::EventType::ConfigChanged, change_data});
 
     Types::UpdateSettingsResult result;
     result.success = true;

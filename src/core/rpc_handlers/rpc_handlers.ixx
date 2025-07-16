@@ -12,11 +12,10 @@ export import Core.RpcHandlers.Types;
 
 namespace Core::RpcHandlers {
 
-// 注册RPC方法
-export template <typename Request, typename Response>
-auto register_method(Core::State::AppState& app_state, const std::string& method_name,
-                     AsyncHandler<Request, Response> handler, const std::string& description = "")
-    -> void;
+// 异步处理器签名
+template <typename Request, typename Response>
+using AsyncHandler =
+    std::function<asio::awaitable<RpcResult<Response>>(Core::State::AppState&, const Request&)>;
 
 // 处理JSON-RPC请求
 export auto process_request(Core::State::AppState& app_state, const std::string& request_json)
@@ -29,14 +28,14 @@ export auto get_method_list(const Core::State::AppState& app_state) -> std::vect
 export auto method_exists(const Core::State::AppState& app_state, const std::string& method_name)
     -> bool;
 
-// 注册方法
-template <typename Request, typename Response>
+// 注册RPC方法
+export template <typename Request, typename Response>
 auto register_method(Core::State::AppState& app_state, const std::string& method_name,
-                     AsyncHandler<Request, Response> handler, const std::string& description)
+                     AsyncHandler<Request, Response> handler, const std::string& description = "")
     -> void {
   // 创建类型擦除的处理器包装
-  auto wrapped_handler = [handler](rfl::Generic params_generic,
-                                   rfl::Generic id) -> asio::awaitable<std::string> {
+  auto wrapped_handler = [handler, &app_state](rfl::Generic params_generic,
+                                               rfl::Generic id) -> asio::awaitable<std::string> {
     try {
       // 从 rfl::Generic 转换为 Request 类型
       auto request_result = rfl::from_generic<Request>(params_generic);
@@ -49,8 +48,8 @@ auto register_method(Core::State::AppState& app_state, const std::string& method
         co_return rfl::json::write(error_response);
       }
 
-      // 执行业务逻辑
-      auto result = co_await handler(request_result.value());
+      // 执行业务逻辑 - 传递 app_state 参数
+      auto result = co_await handler(app_state, request_result.value());
 
       // 构造响应
       if (result) {
