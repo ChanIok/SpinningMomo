@@ -389,7 +389,7 @@ auto post_message(Core::State::AppState& state, const std::string& message) -> v
   auto& webview_state = state.webview;
 
   if (webview_state.is_ready) {
-    std::wstring wmessage(message.begin(), message.end());
+    std::wstring wmessage = Utils::String::FromUtf8(message);
     webview_state.resources.webview.get()->PostWebMessageAsJson(wmessage.c_str());
     Logger().debug("Posted message to WebView");
   }

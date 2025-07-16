@@ -69,12 +69,6 @@ let isInitialized = false
 
 // --- 内部辅助函数 (原私有方法) ---
 
-function debug(...args: unknown[]): void {
-  if (isDebugMode) {
-    console.log('[WebView RPC]', ...args)
-  }
-}
-
 function isWebViewAvailable(): boolean {
   return typeof window !== 'undefined' && !!window.chrome?.webview
 }
@@ -83,7 +77,7 @@ function postMessage(message: JsonRpcRequest | JsonRpcNotification): void {
   if (isWebViewAvailable() && window.chrome?.webview) {
     window.chrome.webview.postMessage(message)
   } else if (isDebugMode) {
-    debug('Mock message (WebView2 not available):', message)
+    console.log('[WebView RPC]', 'Mock message (WebView2 not available):', message)
   } else {
     throw new JsonRpcError(
       JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE,
@@ -107,10 +101,10 @@ function handleResponse(response: JsonRpcResponse): void {
       response.error.data
     )
     reject(error)
-    debug('RPC error:', response.error)
+    if (isDebugMode) console.log('[WebView RPC]', 'RPC error:', response.error)
   } else {
     resolve(response.result)
-    debug('RPC response:', response.id, response.result)
+    if (isDebugMode) console.log('[WebView RPC]', 'RPC response:', response.id, response.result)
   }
 }
 
@@ -124,9 +118,9 @@ function handleNotification(notification: JsonRpcNotification): void {
         console.error(`Error in event handler for ${notification.method}:`, error)
       }
     })
-    debug('Event received:', notification.method, notification.params)
+    if (isDebugMode) console.log('[WebView RPC]', 'Event received:', notification.method, notification.params)
   } else {
-    debug('No handlers for event:', notification.method)
+    if (isDebugMode) console.log('[WebView RPC]', 'No handlers for event:', notification.method)
   }
 }
 
@@ -149,7 +143,7 @@ function handleMessage(event: MessageEvent): void {
     const message = event.data
 
     if (!isValidJsonRpcMessage(message)) {
-      debug('Invalid JSON-RPC message:', message)
+      if (isDebugMode) console.log('[WebView RPC]', 'Invalid JSON-RPC message:', message)
       return
     }
 
@@ -204,7 +198,7 @@ export async function call<T = unknown>(method: string, params?: unknown, timeou
 
     try {
       postMessage(request)
-      debug('RPC call:', method, params)
+      if (isDebugMode) console.log('[WebView RPC]', 'RPC call:', method, params)
     } catch (error) {
       clearTimeout(timeoutHandle)
       pendingRequests.delete(id)
@@ -221,7 +215,7 @@ export function on(method: string, handler: (params: unknown) => void): void {
     eventHandlers.set(method, new Set())
   }
   eventHandlers.get(method)!.add(handler)
-  debug('Event listener added:', method)
+  if (isDebugMode) console.log('[WebView RPC]', 'Event listener added:', method)
 }
 
 /**
@@ -235,7 +229,7 @@ export function off(method: string, handler: (params: unknown) => void): void {
       eventHandlers.delete(method)
     }
   }
-  debug('Event listener removed:', method)
+  if (isDebugMode) console.log('[WebView RPC]', 'Event listener removed:', method)
 }
 
 /**
@@ -271,7 +265,7 @@ export function dispose(): void {
   }
   
   isInitialized = false
-  debug('WebView RPC disposed')
+  if (isDebugMode) console.log('[WebView RPC]', 'WebView RPC disposed')
 }
 
 /**
@@ -279,16 +273,16 @@ export function dispose(): void {
  */
 export function initializeRPC(): void {
   if (isInitialized) {
-    debug('RPC already initialized.')
+    if (isDebugMode) console.log('[WebView RPC]', 'RPC already initialized.')
     return
   }
   
   if (isWebViewAvailable() && window.chrome?.webview) {
     window.chrome.webview.addEventListener('message', handleMessage)
     isInitialized = true
-    debug('WebView RPC initialized')
+    if (isDebugMode) console.log('[WebView RPC]', 'WebView RPC initialized')
   } else if (isDebugMode) {
-    debug('WebView2 not available, running in mock mode')
+    console.log('[WebView RPC]', 'WebView2 not available, running in mock mode')
   }
 
   // 确保在页面卸载时清理资源

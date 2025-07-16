@@ -10,7 +10,7 @@ export function ContentArea() {
         is not included as its imports were removed in prior edits.
         This can be added back or re-designed later if needed.
       */}
-      <main className='h-full flex-1 overflow-hidden'>
+      <main className='h-full flex-1 overflow-auto'>
         <Routes>
           <Route path='/menu/*' element={<MenuPage />} />
           <Route path='/settings/*' element={<SettingsPage />} />

@@ -31,9 +31,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
     // 如果文件不存在，创建默认配置
     if (!std::filesystem::exists(settings_path.value())) {
-      Types::GetSettingsResult default_settings;
-      default_settings.window.title = "";
-      default_settings.version = "1.0";
+      auto default_settings = Types::create_default_app_settings();
 
       auto json_str = rfl::json::write(default_settings);
       std::ofstream file(settings_path.value());
@@ -41,16 +39,14 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
         return std::unexpected("Failed to create settings file");
       }
       file << json_str;
-      
+
       // 初始化内存状态
-      app_state.settings.window.title = "";
-      app_state.settings.version = "1.0";
+      app_state.settings = default_settings;
     } else {
       // 从文件加载到内存状态
       auto result = get_settings({});
       if (result) {
-        app_state.settings.window.title = result.value().window.title;
-        app_state.settings.version = result.value().version;
+        app_state.settings = result.value();
       }
     }
 
@@ -79,7 +75,7 @@ auto get_settings(const Types::GetSettingsParams& params)
 
     std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-    auto result = rfl::json::read<Types::GetSettingsResult>(json_str);
+    auto result = rfl::json::read<Types::AppSettings>(json_str);
     if (!result) {
       return std::unexpected("Failed to parse settings: " + result.error().what());
     }
@@ -102,15 +98,10 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     Types::AppSettings old_settings = app_state.settings;
 
     // 更新内存中的全局状态
-    app_state.settings.window = params.window;
-    app_state.settings.version = "1.0";
+    app_state.settings = params;
 
-    // 构造完整的设置对象并保存到文件
-    Types::GetSettingsResult settings;
-    settings.window = params.window;
-    settings.version = "1.0";
-
-    auto json_str = rfl::json::write(settings);
+    // 直接保存AppSettings到文件
+    auto json_str = rfl::json::write(params);
 
     std::ofstream file(settings_path.value());
     if (!file) {
@@ -122,12 +113,12 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     file << json_str;
 
     // 发送设置变更事件
-    Types::SettingsChangeData change_data{
-        .old_settings = old_settings,
-        .new_settings = app_state.settings,
-        .change_description = "Settings updated via RPC"};
+    Types::SettingsChangeData change_data{.old_settings = old_settings,
+                                          .new_settings = app_state.settings,
+                                          .change_description = "Settings updated via RPC"};
 
-    Core::Events::post_event(app_state.event_bus, 
+    Core::Events::post_event(
+        app_state.event_bus,
         Core::Events::Event{Core::Events::EventType::ConfigChanged, change_data});
 
     Types::UpdateSettingsResult result;

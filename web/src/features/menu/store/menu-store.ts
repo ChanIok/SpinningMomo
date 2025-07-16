@@ -1,19 +1,22 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import type { MenuState } from '../types'
-import { getWindowSettings, updateWindowTitle as apiUpdateWindowTitle } from '../api/menu-api'
+import type { MenuState, AppSettings, FeatureItem, PresetItem } from '../types'
+import { DEFAULT_APP_SETTINGS } from '../types'
+import { getAppSettings, updateAppSettings } from '../api/menu-api'
 
 interface MenuStoreState extends MenuState {
   // 状态更新方法
-  setWindowTitle: (title: string) => void
-  setLoading: (loading: boolean) => void
+  setAppSettings: (settings: AppSettings) => void
   setError: (error: string | null) => void
   clearError: () => void
   
-  // 业务方法
+  // 业务方法（使用乐观更新）
   initialize: () => Promise<void>
   updateWindowTitle: (title: string) => Promise<void>
-  loadWindowSettings: () => Promise<void>
+  updateMenuItems: (items: FeatureItem[]) => Promise<void>
+  updateAspectRatios: (items: PresetItem[]) => Promise<void>
+  updateResolutions: (items: PresetItem[]) => Promise<void>
+  loadAppSettings: () => Promise<void>
   
   // 清理方法
   cleanup: () => void
@@ -23,18 +26,14 @@ export const useMenuStore = create<MenuStoreState>()(
   devtools(
     (set, get) => ({
       // 初始状态
-      windowTitle: '',
+      appSettings: DEFAULT_APP_SETTINGS,
       isLoading: false,
       error: null,
       isInitialized: false,
 
       // 状态更新方法
-      setWindowTitle: (title: string) => {
-        set({ windowTitle: title })
-      },
-
-      setLoading: (loading: boolean) => {
-        set({ isLoading: loading })
+      setAppSettings: (settings: AppSettings) => {
+        set({ appSettings: settings })
       },
 
       setError: (error: string | null) => {
@@ -53,11 +52,11 @@ export const useMenuStore = create<MenuStoreState>()(
         try {
           set({ isLoading: true, error: null })
 
-          // 加载窗口设置
-          const windowSettings = await getWindowSettings()
+          // 加载应用设置
+          const appSettings = await getAppSettings()
           
           set({ 
-            windowTitle: windowSettings.title,
+            appSettings,
             isLoading: false, 
             isInitialized: true 
           })
@@ -72,45 +71,149 @@ export const useMenuStore = create<MenuStoreState>()(
         }
       },
 
-      // 加载窗口设置
-      loadWindowSettings: async () => {
+      // 加载应用设置
+      loadAppSettings: async () => {
         try {
           set({ isLoading: true, error: null })
-          const windowSettings = await getWindowSettings()
+          const appSettings = await getAppSettings()
           set({ 
-            windowTitle: windowSettings.title,
+            appSettings,
             isLoading: false 
           })
         } catch (error) {
           set({ 
-            error: error instanceof Error ? error.message : '加载窗口设置失败',
+            error: error instanceof Error ? error.message : '加载应用设置失败',
             isLoading: false 
           })
           throw error
         }
       },
 
-      // 更新窗口标题
+      // 乐观更新：更新窗口标题
       updateWindowTitle: async (title: string) => {
+        const { appSettings } = get()
+        const previousSettings = appSettings
+        
+        // 1. 立即更新本地状态（乐观更新）
+        const optimisticSettings = {
+          ...appSettings,
+          title
+        }
+        set({ 
+          appSettings: optimisticSettings,
+          error: null 
+        })
+        
         try {
-          set({ isLoading: true, error: null })
-          
-          // 更新到后端
-          await apiUpdateWindowTitle(title)
-          
-          // 更新本地状态
-          set({
-            windowTitle: title,
-            isLoading: false
-          })
-          
+          // 2. 同步到后端
+          await updateAppSettings(optimisticSettings)
           console.log('✅ 窗口标题已更新:', title)
         } catch (error) {
-          set({
-            error: error instanceof Error ? error.message : '更新窗口标题失败',
-            isLoading: false
+          // 3. 失败时回滚到之前的状态
+          set({ 
+            appSettings: previousSettings,
+            error: error instanceof Error ? error.message : '更新窗口标题失败'
           })
-          console.error('❌ 窗口标题更新失败:', error)
+          console.error('❌ 窗口标题更新失败，已回滚:', error)
+          throw error
+        }
+      },
+
+      // 乐观更新：更新菜单项
+      updateMenuItems: async (items: FeatureItem[]) => {
+        const { appSettings } = get()
+        const previousSettings = appSettings
+        
+        // 1. 立即更新本地状态（乐观更新）
+        const optimisticSettings = {
+          ...appSettings,
+          appMenu: {
+            ...appSettings.appMenu,
+            menuItems: items
+          }
+        }
+        set({ 
+          appSettings: optimisticSettings,
+          error: null 
+        })
+        
+        try {
+          // 2. 同步到后端
+          await updateAppSettings(optimisticSettings)
+          console.log('✅ 菜单项已更新:', items)
+        } catch (error) {
+          // 3. 失败时回滚到之前的状态
+          set({ 
+            appSettings: previousSettings,
+            error: error instanceof Error ? error.message : '更新菜单项失败'
+          })
+          console.error('❌ 菜单项更新失败，已回滚:', error)
+          throw error
+        }
+      },
+
+      // 乐观更新：更新比例设置
+      updateAspectRatios: async (items: PresetItem[]) => {
+        const { appSettings } = get()
+        const previousSettings = appSettings
+        
+        // 1. 立即更新本地状态（乐观更新）
+        const optimisticSettings = {
+          ...appSettings,
+          appMenu: {
+            ...appSettings.appMenu,
+            aspectRatios: items
+          }
+        }
+        set({ 
+          appSettings: optimisticSettings,
+          error: null 
+        })
+        
+        try {
+          // 2. 同步到后端
+          await updateAppSettings(optimisticSettings)
+          console.log('✅ 比例设置已更新:', items)
+        } catch (error) {
+          // 3. 失败时回滚到之前的状态
+          set({ 
+            appSettings: previousSettings,
+            error: error instanceof Error ? error.message : '更新比例设置失败'
+          })
+          console.error('❌ 比例设置更新失败，已回滚:', error)
+          throw error
+        }
+      },
+
+      // 乐观更新：更新分辨率设置
+      updateResolutions: async (items: PresetItem[]) => {
+        const { appSettings } = get()
+        const previousSettings = appSettings
+        
+        // 1. 立即更新本地状态（乐观更新）
+        const optimisticSettings = {
+          ...appSettings,
+          appMenu: {
+            ...appSettings.appMenu,
+            resolutions: items
+          }
+        }
+        set({ 
+          appSettings: optimisticSettings,
+          error: null 
+        })
+        
+        try {
+          // 2. 同步到后端
+          await updateAppSettings(optimisticSettings)
+          console.log('✅ 分辨率设置已更新:', items)
+        } catch (error) {
+          // 3. 失败时回滚到之前的状态
+          set({ 
+            appSettings: previousSettings,
+            error: error instanceof Error ? error.message : '更新分辨率设置失败'
+          })
+          console.error('❌ 分辨率设置更新失败，已回滚:', error)
           throw error
         }
       },
@@ -118,7 +221,7 @@ export const useMenuStore = create<MenuStoreState>()(
       // 清理资源
       cleanup: () => {
         set({
-          windowTitle: '',
+          appSettings: DEFAULT_APP_SETTINGS,
           isLoading: false,
           error: null,
           isInitialized: false
