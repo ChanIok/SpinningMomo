@@ -1,0 +1,150 @@
+module;
+
+module Core.Initializer;
+
+import std;
+import Core.Async.Runtime;
+import Core.Config.Io;
+import Core.Constants;
+import Core.Events;
+import Core.State;
+import Core.WebView;
+import Handlers.EventRegistrar;
+import Features.Letterbox;
+import Features.Notifications;
+import Features.Overlay;
+import Features.Preview.Window;
+import Features.Screenshot;
+import Features.Settings;
+import Features.Settings.Rpc;
+import Utils.Logger;
+import Utils.String;
+import UI.AppWindow;
+import UI.WebViewWindow;
+import UI.TrayIcon;
+import UI.TrayMenu;
+import Vendor.Windows;
+
+namespace Core::Initializer {
+
+auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINSTANCE instance)
+    -> std::expected<void, std::string> {
+  try {
+    // 1. 启动异步运行时（用于RPC处理）
+    if (auto result = Core::Async::start(state); !result) {
+      return std::unexpected("Failed to start async runtime: " + result.error());
+    }
+
+    // 2. 初始化配置
+    if (auto config_result = Core::Config::Io::initialize(); config_result) {
+      state.config = std::move(config_result.value());
+    } else {
+      return std::unexpected("Failed to initialize configuration: " + config_result.error());
+    }
+
+    // 3. 注册事件处理器
+    Handlers::register_all_handlers(state);
+
+    // 4. 初始化 settings 模块
+    if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
+      Logger().warn("Failed to initialize settings: {}", settings_result.error());
+      // 不影响应用启动
+    }
+
+    // 5. 注册 Settings RPC 处理器
+    Features::Settings::Rpc::register_handlers(state);
+
+    // 6. 从配置中获取数据并填充到 AppState
+    const auto& strings = (state.config.language.current_language == Core::Constants::LANG_ZH_CN)
+                              ? Core::Constants::ZH_CN
+                              : Core::Constants::EN_US;
+    state.app_window.data.strings = &strings;
+
+    auto ratio_data = Core::Config::Io::get_aspect_ratios(state.config, strings);
+    if (!ratio_data.success) {
+      Logger().warn("Failed to load aspect ratios: {}",
+                    Utils::String::ToUtf8(ratio_data.error_details));
+    }
+    state.app_window.data.ratios = std::move(ratio_data.ratios);
+
+    auto resolution_data = Core::Config::Io::get_resolution_presets(state.config, strings);
+    if (!resolution_data.success) {
+      Logger().warn("Failed to load resolutions: {}",
+                    Utils::String::ToUtf8(resolution_data.error_details));
+    }
+    state.app_window.data.resolutions = std::move(resolution_data.resolutions);
+
+    // 从配置初始化UI状态
+    state.app_window.ui.preview_enabled = state.config.menu.use_floating_window;
+    state.app_window.ui.letterbox_enabled = state.config.letterbox.enabled;
+
+    // 7. 创建窗口
+    if (auto result = UI::AppWindow::create_window(state); !result) {
+      return std::unexpected("Failed to create app window: " + result.error());
+    }
+
+    // 8. 创建独立的WebView窗口
+    if (auto result = UI::WebViewWindow::create(state); !result) {
+      Logger().warn("Failed to create WebView window: {}", result.error());
+      // WebView功能不可用，但应用继续运行
+    } else {
+      // 初始化WebView内容
+      if (auto webview_result = Core::WebView::initialize(state, state.webview.window.parent_hwnd);
+          !webview_result) {
+        Logger().error("Failed to initialize WebView: {}", webview_result.error());
+        // WebView初始化失败，但应用继续运行
+      } else {
+        Logger().info("WebView initialization started (async)");
+      }
+    }
+
+    // 9. 创建托盘图标
+    if (auto result = UI::TrayIcon::create(state); !result) {
+      Logger().warn("Failed to create tray icon: {}", result.error());
+      // This might not be a fatal error, so we just log a warning.
+    }
+
+    // 10. 初始化托盘菜单
+    if (auto result = UI::TrayMenu::initialize(state); !result) {
+      Logger().warn("Failed to initialize tray menu: {}", result.error());
+      // 托盘菜单初始化失败，但不影响应用程序运行
+    }
+
+    // 11. 初始化预览系统
+    if (auto preview_result = Features::Preview::Window::initialize_preview(
+            state, instance, state.app_window.window.hwnd);
+        !preview_result) {
+      Logger().warn("Failed to initialize preview system");
+      // 预览功能不可用，但应用继续运行
+    }
+
+    // 12. 初始化overlay系统
+    if (auto overlay_result =
+            Features::Overlay::initialize_overlay(state, instance, state.app_window.window.hwnd);
+        !overlay_result) {
+      Logger().warn("Failed to initialize overlay system: {}", overlay_result.error());
+      // overlay功能不可用，但应用继续运行
+    }
+
+    // 13. 初始化letterbox系统
+    if (auto letterbox_result = Features::Letterbox::initialize(state, instance);
+        !letterbox_result) {
+      Logger().warn("Failed to initialize letterbox system: {}", letterbox_result.error());
+      // letterbox功能不可用，但应用继续运行
+    }
+
+    // 14. 默认显示窗口
+    UI::AppWindow::show_window(state);
+
+    // 15. 注册热键
+    UI::AppWindow::register_hotkey(state, state.config.hotkey.modifiers, state.config.hotkey.key);
+
+    Logger().info("Application initialized successfully");
+    return {};
+
+  } catch (const std::exception& e) {
+    return std::unexpected("Exception during initialization: " + std::string(e.what()));
+  }
+}
+
+}  // namespace Core::Initializer
