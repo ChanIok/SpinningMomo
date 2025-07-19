@@ -27,7 +27,7 @@ struct PresetItem {
 
 // 应用菜单配置
 struct AppMenuSettings {
-  std::vector<FeatureItem> menu_items;
+  std::vector<FeatureItem> feature_items;
   std::vector<PresetItem> aspect_ratios;
   std::vector<PresetItem> resolutions;
 };
@@ -74,7 +74,7 @@ inline auto create_default_app_settings() -> AppSettings {
   settings.title = "";
 
   // 直接访问字段，无需特殊API
-  settings.app_menu.menu_items = {
+  settings.app_menu.feature_items = {
       {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_SCREENSHOT_CAPTURE), "截图", true, 1},
       {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_SCREENSHOT_OPEN_FOLDER), "打开相册",
        true, 2},

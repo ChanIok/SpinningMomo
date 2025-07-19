@@ -14,7 +14,7 @@ export function MenuContent() {
     error,
     isInitialized,
     updateWindowTitle,
-    updateMenuItems,
+    updateFeatureItems,
     updateAspectRatios,
     updateResolutions,
     clearError
@@ -53,31 +53,31 @@ export function MenuContent() {
   }
 
   // 安全获取菜单数据的辅助函数
-  const getMenuItems = () => appSettings?.appMenu?.menuItems || []
+  const getFeatureItems = () => appSettings?.appMenu?.featureItems || []
   const getAspectRatios = () => appSettings?.appMenu?.aspectRatios || []
   const getResolutions = () => appSettings?.appMenu?.resolutions || []
 
-  // 菜单项相关处理
-  const handleMenuItemsReorder = async (items: FeatureItem[]) => {
+  // 功能项相关处理
+  const handleFeatureItemsReorder = async (items: FeatureItem[]) => {
     try {
-      await updateMenuItems(items)
-      toast.success('菜单项顺序已更新')
+      await updateFeatureItems(items)
+      toast.success('功能项顺序已更新')
     } catch (error) {
-      console.error('Failed to update menu items:', error)
-      toast.error('更新菜单项失败')
+      console.error('Failed to update feature items:', error)
+      toast.error('更新功能项失败')
     }
   }
 
-  const handleMenuItemToggle = async (id: string, enabled: boolean) => {
+  const handleFeatureItemToggle = async (id: string, enabled: boolean) => {
     try {
-      const updatedItems = getMenuItems().map(item =>
+      const updatedItems = getFeatureItems().map(item =>
         item.id === id ? { ...item, enabled } : item
       )
-      await updateMenuItems(updatedItems)
+      await updateFeatureItems(updatedItems)
       // 乐观更新，无需立即显示成功提示，只在失败时显示错误
     } catch (error) {
-      console.error('Failed to toggle menu item:', error)
-      toast.error('更新菜单项失败')
+      console.error('Failed to toggle feature item:', error)
+      toast.error('更新功能项失败')
     }
   }
 
@@ -286,9 +286,9 @@ export function MenuContent() {
 
           {/* 功能选择器 */}
           <DraggableFeatureList
-            items={getMenuItems()}
-            onReorder={handleMenuItemsReorder}
-            onToggle={handleMenuItemToggle}
+            items={getFeatureItems()}
+            onReorder={handleFeatureItemsReorder}
+            onToggle={handleFeatureItemToggle}
             title="功能菜单"
             description="管理浮窗中显示的功能项，支持拖拽排序"
           />

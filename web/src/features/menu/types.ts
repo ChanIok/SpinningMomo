@@ -23,7 +23,7 @@ export interface AppSettings {
   version: string
   title: string
   appMenu: {
-    menuItems: FeatureItem[]
+    featureItems: FeatureItem[]
     aspectRatios: PresetItem[]
     resolutions: PresetItem[]
   }
@@ -60,7 +60,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   version: '1.0',
   title: '',
   appMenu: {
-    menuItems: [
+    featureItems: [
       { id: 'screenshot.capture', label: '截图', enabled: true, order: 1 },
       { id: 'screenshot.openFolder', label: '打开相册', enabled: true, order: 2 },
       { id: 'feature.togglePreview', label: '预览窗口', enabled: true, order: 3 },

@@ -13,7 +13,7 @@ interface MenuStoreState extends MenuState {
   // 业务方法（使用乐观更新）
   initialize: () => Promise<void>
   updateWindowTitle: (title: string) => Promise<void>
-  updateMenuItems: (items: FeatureItem[]) => Promise<void>
+  updateFeatureItems: (items: FeatureItem[]) => Promise<void>
   updateAspectRatios: (items: PresetItem[]) => Promise<void>
   updateResolutions: (items: PresetItem[]) => Promise<void>
   loadAppSettings: () => Promise<void>
@@ -119,8 +119,8 @@ export const useMenuStore = create<MenuStoreState>()(
         }
       },
 
-      // 乐观更新：更新菜单项
-      updateMenuItems: async (items: FeatureItem[]) => {
+      // 乐观更新：更新功能项
+      updateFeatureItems: async (items: FeatureItem[]) => {
         const { appSettings } = get()
         const previousSettings = appSettings
         
@@ -129,7 +129,7 @@ export const useMenuStore = create<MenuStoreState>()(
           ...appSettings,
           appMenu: {
             ...appSettings.appMenu,
-            menuItems: items
+            featureItems: items
           }
         }
         set({ 
@@ -140,14 +140,14 @@ export const useMenuStore = create<MenuStoreState>()(
         try {
           // 2. 同步到后端
           await updateAppSettings(optimisticSettings)
-          console.log('✅ 菜单项已更新:', items)
+          console.log('✅ 功能项已更新:', items)
         } catch (error) {
           // 3. 失败时回滚到之前的状态
           set({ 
             appSettings: previousSettings,
-            error: error instanceof Error ? error.message : '更新菜单项失败'
+            error: error instanceof Error ? error.message : '更新功能项失败'
           })
-          console.error('❌ 菜单项更新失败，已回滚:', error)
+          console.error('❌ 功能项更新失败，已回滚:', error)
           throw error
         }
       },

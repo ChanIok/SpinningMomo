@@ -8,7 +8,7 @@ interface ServerSettings extends Record<string, unknown> {
   version: string
   title: string
   app_menu: {
-    menu_items: unknown[]
+    feature_items: unknown[]
     aspect_ratios: unknown[]
     resolutions: unknown[]
   }
