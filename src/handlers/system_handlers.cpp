@@ -17,7 +17,7 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
   // 注册系统命令事件处理器
-  subscribe(app_state.event_bus, EventType::SystemCommand, [&app_state](const Event& event) {
+  subscribe(*app_state.event_bus, EventType::SystemCommand, [&app_state](const Event& event) {
     auto command = std::any_cast<std::string>(event.data);
     Logger().debug("System command received: {}", command);
 

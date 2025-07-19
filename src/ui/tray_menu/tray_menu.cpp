@@ -12,6 +12,7 @@ module UI.TrayMenu;
 
 import std;
 import Core.State;
+import Core.I18n.State;
 import Core.Constants;
 import Core.I18n.Types;
 import Types.UI;
@@ -155,7 +156,7 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
 
   items.clear();
 
-  const auto strings = get_tray_menu_strings(state.i18n.texts);
+  const auto strings = get_tray_menu_strings(state.i18n->texts);
 
   // 窗口选择 - 构建子菜单
   UI::TrayMenu::State::MenuItem window_item(strings.select_window, Core::Constants::ID_WINDOW_BASE);

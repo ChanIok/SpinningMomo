@@ -6,7 +6,6 @@ module;
 module Core.I18n;
 
 import std;
-import Core.State;
 import Core.I18n.Types;
 import Core.I18n.State;
 import Utils.Logger;
@@ -37,19 +36,16 @@ auto load_embedded_language_data(Types::Language lang)
   }
 }
 
-auto initialize(Core::State::AppState& app_state, Types::Language default_lang)
+auto initialize(State::I18nState& i18n_state, Types::Language default_lang)
     -> std::expected<void, std::string> {
   try {
-    // 重置状态为默认值
-    app_state.i18n = State::I18nState{};
-
-    // 加载默认语言到texts字段
-    auto load_result = load_language(app_state, default_lang);
+    // 加载默认语言到传入的状态
+    auto load_result = load_language(i18n_state, default_lang);
     if (!load_result) {
       return std::unexpected("Failed to load default language: " + load_result.error());
     }
 
-    app_state.i18n.is_initialized = true;
+    i18n_state.is_initialized = true;
 
     return {};
   } catch (const std::exception& e) {
@@ -57,7 +53,7 @@ auto initialize(Core::State::AppState& app_state, Types::Language default_lang)
   }
 }
 
-auto load_language(Core::State::AppState& app_state, Types::Language lang)
+auto load_language(State::I18nState& i18n_state, Types::Language lang)
     -> std::expected<void, std::string> {
   try {
     // 获取嵌入的语言数据
@@ -72,9 +68,9 @@ auto load_language(Core::State::AppState& app_state, Types::Language lang)
       return std::unexpected("Failed to parse text data: " + config_result.error().what());
     }
 
-    // 直接更新texts字段
-    app_state.i18n.current_language = lang;
-    app_state.i18n.texts = std::move(config_result.value());
+    // 更新传入的状态
+    i18n_state.current_language = lang;
+    i18n_state.texts = std::move(config_result.value());
 
     return {};
   } catch (const std::exception& e) {
@@ -82,12 +78,12 @@ auto load_language(Core::State::AppState& app_state, Types::Language lang)
   }
 }
 
-auto get_current_language(const Core::State::AppState& app_state) -> Types::Language {
-  return app_state.i18n.current_language;
+auto get_current_language(const State::I18nState& i18n_state) -> Types::Language {
+  return i18n_state.current_language;
 }
 
-auto is_initialized(const Core::State::AppState& app_state) -> bool {
-  return app_state.i18n.is_initialized;
+auto is_initialized(const State::I18nState& i18n_state) -> bool {
+  return i18n_state.is_initialized;
 }
 
 }  // namespace Core::I18n

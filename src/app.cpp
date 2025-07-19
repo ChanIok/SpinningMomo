@@ -6,6 +6,9 @@ import std;
 import Core.Initializer;
 import Core.State;
 import Core.Async.Runtime;
+import Core.Async.State;
+import Core.Events;
+import Core.I18n.State;
 import Features.Letterbox;
 import Features.Notifications;
 import Features.Overlay;
@@ -39,7 +42,7 @@ Application::~Application() {
     UI::TrayMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);
 
-    Core::Async::stop(*m_app_state);
+    Core::Async::stop(*m_app_state->async_runtime);
   }
 }
 
@@ -51,20 +54,23 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
     // 创建 AppState
     m_app_state = std::make_unique<Core::State::AppState>();
+    m_app_state->async_runtime = std::make_unique<Core::Async::State::AsyncRuntimeState>();
+    m_app_state->event_bus = std::make_unique<Core::Events::EventBus>();
+    m_app_state->i18n = std::make_unique<Core::I18n::State::I18nState>();
     m_app_state->app_window.window.instance = m_h_instance;
 
     // 测试嵌入式多语言系统
     Logger().info("=== Testing Embedded I18n System ===");
 
     // 初始化I18n系统
-    if (auto result = Core::I18n::initialize(*m_app_state, Core::I18n::Types::Language::ZhCN);
+    if (auto result = Core::I18n::initialize(*m_app_state->i18n, Core::I18n::Types::Language::ZhCN);
         !result) {
       Logger().error("Failed to initialize I18n system: {}", result.error());
     } else {
       Logger().info("I18n system initialized successfully with default Chinese");
 
       // 直接访问texts字段测试默认英文
-      const auto& en_name = m_app_state->i18n.texts.app.name;
+      const auto& en_name = m_app_state->i18n->texts.app.name;
       Logger().info("Default app name (Chinese): {}", en_name);
     }
 
@@ -106,7 +112,7 @@ auto Application::Run() -> int {
 
     // 在处理完消息或超时后，运行我们的更新逻辑
     if (m_app_state) {
-      Core::Events::process_events(m_app_state->event_bus);
+      Core::Events::process_events(*m_app_state->event_bus);
 
       // 更新通知系统
       Features::Notifications::update_notifications(*m_app_state);

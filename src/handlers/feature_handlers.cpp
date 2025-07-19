@@ -113,7 +113,7 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
   // 注册功能开关事件处理器
-  subscribe(app_state.event_bus, EventType::ToggleFeature, [&app_state](const Event& event) {
+  subscribe(*app_state.event_bus, EventType::ToggleFeature, [&app_state](const Event& event) {
     auto data = std::any_cast<FeatureToggleData>(event.data);
     Logger().debug("Feature toggled");
 

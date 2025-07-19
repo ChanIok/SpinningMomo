@@ -3,10 +3,10 @@ module;
 export module Core.State;
 
 import std;
-import Core.Async.State;
+// import Core.Async.State; // 被移除
 import Core.Config.State;
-import Core.Events;
-import Core.I18n.State;
+// import Core.Events;
+// import Core.I18n.State;
 import Core.RpcHandlers.State;
 import Core.WebView.State;
 import Features.Letterbox.State;
@@ -21,15 +21,27 @@ import UI.TrayIcon.State;
 import UI.TrayMenu.State;
 import Vendor.Windows;
 
+export namespace Core::Async::State {
+struct AsyncRuntimeState;
+}
+
+export namespace Core::Events {
+struct EventBus;
+}
+
+export namespace Core::I18n::State {
+struct I18nState;
+}
+
 export namespace Core::State {
 
 export struct AppState {
   // 应用级状态
-  Core::Async::State::AsyncRuntimeState async_runtime;
+  std::unique_ptr<Core::Async::State::AsyncRuntimeState> async_runtime;
   Core::Config::State::AppConfig config;
   Types::UI::D2DRenderState d2d_render;
-  Core::Events::EventBus event_bus;
-  Core::I18n::State::I18nState i18n;
+  std::unique_ptr<Core::Events::EventBus> event_bus;
+  std::unique_ptr<Core::I18n::State::I18nState> i18n;
   Core::RpcHandlers::State::RpcHandlerState rpc_handlers;
   Core::WebView::State::WebViewState webview;
 

@@ -5,15 +5,13 @@ module;
 module Core.Async.Runtime;
 
 import std;
-import Core.State;
 import Core.Async.State;
 import Utils.Logger;
 
 namespace Core::Async {
 
-auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<void, std::string> {
-  auto& runtime = state.async_runtime;
-
+auto start(Core::Async::State::AsyncRuntimeState& runtime, size_t thread_count)
+    -> std::expected<void, std::string> {
   // 检查是否已经运行
   if (runtime.is_running.exchange(true)) {
     Logger().warn("AsyncRuntime already started");
@@ -65,9 +63,7 @@ auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<v
   }
 }
 
-auto stop(Core::State::AppState& state) -> void {
-  auto& runtime = state.async_runtime;
-
+auto stop(Core::Async::State::AsyncRuntimeState& runtime) -> void {
   if (!runtime.is_running.exchange(false)) {
     return;  // 已经停止
   }
@@ -102,12 +98,11 @@ auto stop(Core::State::AppState& state) -> void {
   }
 }
 
-auto is_running(const Core::State::AppState& state) -> bool {
-  return state.async_runtime.is_running.load();
+auto is_running(const Core::Async::State::AsyncRuntimeState& runtime) -> bool {
+  return runtime.is_running.load();
 }
 
-auto get_io_context(Core::State::AppState& state) -> asio::io_context* {
-  auto& runtime = state.async_runtime;
+auto get_io_context(Core::Async::State::AsyncRuntimeState& runtime) -> asio::io_context* {
   return runtime.get_io_context();
 }
 

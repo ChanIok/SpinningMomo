@@ -9,6 +9,7 @@ module UI.TrayIcon;
 import std;
 import Common.MenuData;
 import Core.State;
+import Core.I18n.State;
 import Core.Constants;
 import Core.I18n.Types;
 import UI.TrayMenu;
@@ -55,7 +56,7 @@ auto create_window_selection_submenu(const Core::State::AppState& state) -> HMEN
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto strings = get_tray_strings(state.i18n.texts);
+  const auto strings = get_tray_strings(state.i18n->texts);
   int id = Core::Constants::ID_WINDOW_BASE;
   for (const auto& window : state.app_window.data.windows) {
     UINT flags = MF_BYPOSITION | MF_STRING;
@@ -72,7 +73,7 @@ auto create_ratio_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto strings = get_tray_strings(state.i18n.texts);
+  const auto strings = get_tray_strings(state.i18n->texts);
   const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
   for (size_t i = 0; i < ratios.size(); ++i) {
     UINT flags = MF_BYPOSITION | MF_STRING;
@@ -120,7 +121,7 @@ auto create_language_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto strings = get_tray_strings(state.i18n.texts);
+  const auto strings = get_tray_strings(state.i18n->texts);
   InsertMenuW(
       h_menu, -1,
       MF_BYPOSITION | MF_STRING |
@@ -136,7 +137,7 @@ auto create_language_submenu(const Core::State::AppState& state) -> HMENU {
 }
 
 auto add_settings_items(HMENU h_menu, const Core::State::AppState& state) -> void {
-  const auto strings = get_tray_strings(state.i18n.texts);
+  const auto strings = get_tray_strings(state.i18n->texts);
 
   // Letterbox Mode
   InsertMenuW(h_menu, -1,

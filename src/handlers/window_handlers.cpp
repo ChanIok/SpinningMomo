@@ -255,15 +255,15 @@ auto register_window_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
   // 处理比例改变
-  subscribe(app_state.event_bus, EventType::RatioChanged,
+  subscribe(*app_state.event_bus, EventType::RatioChanged,
             [&app_state](const Event& event) { handle_ratio_changed(app_state, event); });
 
   // 处理分辨率改变
-  subscribe(app_state.event_bus, EventType::ResolutionChanged,
+  subscribe(*app_state.event_bus, EventType::ResolutionChanged,
             [&app_state](const Event& event) { handle_resolution_changed(app_state, event); });
 
   // 处理窗口动作
-  subscribe(app_state.event_bus, EventType::WindowAction,
+  subscribe(*app_state.event_bus, EventType::WindowAction,
             [&app_state](const Event& event) { handle_window_action(app_state, event); });
 }
 

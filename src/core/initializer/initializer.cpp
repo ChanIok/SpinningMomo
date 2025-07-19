@@ -31,7 +31,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     -> std::expected<void, std::string> {
   try {
     // 1. 启动异步运行时（用于RPC处理）
-    if (auto result = Core::Async::start(state); !result) {
+    if (auto result = Core::Async::start(*state.async_runtime); !result) {
       return std::unexpected("Failed to start async runtime: " + result.error());
     }
 

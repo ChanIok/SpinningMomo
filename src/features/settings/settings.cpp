@@ -139,7 +139,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
                                           .change_description = "Settings updated via RPC"};
 
     Core::Events::post_event(
-        app_state.event_bus,
+        *app_state.event_bus,
         Core::Events::Event{Core::Events::EventType::ConfigChanged, change_data});
 
     Types::UpdateSettingsResult result;

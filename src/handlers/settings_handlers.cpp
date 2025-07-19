@@ -33,7 +33,7 @@ auto register_settings_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
   // 注册设置变更事件处理器
-  subscribe(app_state.event_bus, EventType::ConfigChanged,
+  subscribe(*app_state.event_bus, EventType::ConfigChanged,
             [&app_state](const Event& event) { handle_settings_changed(app_state, event); });
 
   Logger().info("Settings handlers registered successfully");

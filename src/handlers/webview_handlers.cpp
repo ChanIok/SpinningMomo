@@ -14,7 +14,7 @@ auto register_webview_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
   // 注册WebView响应事件处理器
-  subscribe(app_state.event_bus, EventType::WebViewResponse, [&app_state](const Event& event) {
+  subscribe(*app_state.event_bus, EventType::WebViewResponse, [&app_state](const Event& event) {
     try {
       auto response_json = std::any_cast<std::string>(event.data);
       

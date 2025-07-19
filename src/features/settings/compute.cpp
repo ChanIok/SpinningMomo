@@ -11,6 +11,7 @@ import Common.MenuIds;
 import Core.Constants;
 import Core.I18n.Types;
 import Core.State;
+import Core.I18n.State;
 import Utils.String;
 
 namespace Features::Settings::Compute {
@@ -167,7 +168,7 @@ auto compute_presets_from_config(const Types::AppSettings& config,
 
 auto update_computed_state(Core::State::AppState& app_state) -> bool {
   app_state.settings.computed_presets =
-      compute_presets_from_config(app_state.settings.config, app_state.i18n.texts);
+      compute_presets_from_config(app_state.settings.config, app_state.i18n->texts);
   return true;
 }
 

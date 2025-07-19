@@ -44,41 +44,41 @@ auto dispatch_feature_action(Core::State::AppState& state, const std::string& ac
 
   switch (*menu_id) {
     case Id::FeatureTogglePreview:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
                   state.app_window.window.hwnd});
       break;
     case Id::FeatureToggleOverlay:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
                   state.app_window.window.hwnd});
       break;
     case Id::FeatureToggleLetterbox:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
                   state.app_window.window.hwnd});
       break;
     case Id::ScreenshotCapture:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
       break;
     case Id::ScreenshotOpenFolder:
-      send_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
+      send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
                                    state.app_window.window.hwnd});
       break;
     case Id::WindowResetTransform:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
       break;
     case Id::PanelHide:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::WindowAction, WindowAction::Hide, state.app_window.window.hwnd});
       break;
     case Id::AppExit:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
       break;
   }
@@ -94,7 +94,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < ratios.size()) {
         const auto& ratio_preset = ratios[item.index];
-        send_event(state.event_bus, {EventType::RatioChanged,
+        send_event(*state.event_bus, {EventType::RatioChanged,
                                      RatioChangeData{static_cast<size_t>(item.index),
                                                      ratio_preset.name, ratio_preset.ratio},
                                      state.app_window.window.hwnd});
@@ -105,7 +105,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       const auto& resolutions = Common::MenuData::get_current_resolutions(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
         const auto& res_preset = resolutions[item.index];
-        send_event(state.event_bus,
+        send_event(*state.event_bus,
                    {EventType::ResolutionChanged,
                     ResolutionChangeData{
                         static_cast<size_t>(item.index), res_preset.name,
@@ -133,7 +133,7 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
     const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
     if (index < ratios.size()) {
       const auto& ratio_preset = ratios[index];
-      send_event(state.event_bus, {EventType::RatioChanged,
+      send_event(*state.event_bus, {EventType::RatioChanged,
                                    RatioChangeData{index, ratio_preset.name, ratio_preset.ratio},
                                    state.app_window.window.hwnd});
     }
@@ -147,7 +147,7 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
     const auto& resolutions = Common::MenuData::get_current_resolutions(state);
     if (index < resolutions.size()) {
       const auto& res_preset = resolutions[index];
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::ResolutionChanged,
                   ResolutionChangeData{
                       index, res_preset.name,
@@ -160,47 +160,47 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
   // Handle other commands
   switch (command_id) {
     case Core::Constants::ID_EXIT:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
       break;
     case Core::Constants::ID_RESET:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
       break;
     case Core::Constants::ID_CAPTURE_WINDOW:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
       break;
     case Core::Constants::ID_OPEN_SCREENSHOT:
-      send_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
+      send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
                                    state.app_window.window.hwnd});
       break;
     case Core::Constants::ID_PREVIEW_WINDOW:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
                   state.app_window.window.hwnd});
       break;
     case Core::Constants::ID_OVERLAY_WINDOW:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
                   state.app_window.window.hwnd});
       break;
     case Core::Constants::ID_LETTERBOX_WINDOW:
-      send_event(state.event_bus,
+      send_event(*state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
                   state.app_window.window.hwnd});
       break;
     case Core::Constants::ID_WEBVIEW_TEST:
-      send_event(state.event_bus, {EventType::SystemCommand, std::string("webview_test"),
+      send_event(*state.event_bus, {EventType::SystemCommand, std::string("webview_test"),
                                    state.app_window.window.hwnd});
       break;
       // Add other cases for config, hotkey, language, etc.
       // For example:
       // case Core::Constants::ID_CONFIG:
-      //     send_event(state.event_bus, {EventType::SystemCommand, std::string("open_config"),
+      //     send_event(*state.event_bus, {EventType::SystemCommand, std::string("open_config"),
       //     state.app_window.window.hwnd}); break;
   }
 }
@@ -208,7 +208,7 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
 // 处理热键，发送系统命令事件
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
   using namespace Core::Events;
-  send_event(state.event_bus, {EventType::SystemCommand, std::string("toggle_visibility"),
+  send_event(*state.event_bus, {EventType::SystemCommand, std::string("toggle_visibility"),
                                state.app_window.window.hwnd});
 }
 
@@ -316,7 +316,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_CLOSE:
       Core::Events::send_event(
-          state.event_bus, {Core::Events::EventType::WindowAction, Core::Events::WindowAction::Hide,
+          *state.event_bus, {Core::Events::EventType::WindowAction, Core::Events::WindowAction::Hide,
                             state.app_window.window.hwnd});
       return 0;
 
