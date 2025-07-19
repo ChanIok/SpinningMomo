@@ -54,12 +54,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 5. 注册 Settings RPC 处理器
     Features::Settings::Rpc::register_handlers(state);
 
-    // 6. 从配置中获取数据并填充到 AppState
-    const auto& strings = (state.config.language.current_language == Core::Constants::LANG_ZH_CN)
-                              ? Core::Constants::ZH_CN
-                              : Core::Constants::EN_US;
-    state.app_window.data.strings = &strings;
-
     // 注意：比例和分辨率数据现在由settings模块管理
     // 在Features::Settings::initialize(state)中已经处理了数据的加载和计算
 

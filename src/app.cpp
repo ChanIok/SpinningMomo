@@ -18,7 +18,9 @@ import UI.TrayIcon;
 import UI.TrayMenu;
 import Core.WebView;
 import Utils.Logger;
+import Utils.String;
 import Vendor.Windows;
+import Core.I18n;
 
 Application::Application() = default;
 Application::~Application() {
@@ -50,6 +52,23 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     // 创建 AppState
     m_app_state = std::make_unique<Core::State::AppState>();
     m_app_state->app_window.window.instance = m_h_instance;
+
+    // 测试嵌入式多语言系统
+    Logger().info("=== Testing Embedded I18n System ===");
+
+    // 初始化I18n系统
+    if (auto result = Core::I18n::initialize(*m_app_state, Core::I18n::Types::Language::ZhCN);
+        !result) {
+      Logger().error("Failed to initialize I18n system: {}", result.error());
+    } else {
+      Logger().info("I18n system initialized successfully with default Chinese");
+
+      // 直接访问texts字段测试默认英文
+      const auto& en_name = m_app_state->i18n.texts.app.name;
+      Logger().info("Default app name (Chinese): {}", en_name);
+    }
+
+    Logger().info("=== I18n Testing Complete ===");
 
     // 调用统一的初始化器
     if (auto result = Core::Initializer::initialize_application(*m_app_state, m_h_instance);

@@ -11,7 +11,6 @@ module UI.AppWindow;
 import std;
 import Common.MenuData;
 import Common.MenuData.Types;
-import Core.Constants;
 import Core.Events;
 import Core.State;
 import UI.AppWindow.MessageHandler;
@@ -24,7 +23,7 @@ namespace UI::AppWindow {
 
 auto create_window(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 初始化菜单项
-  initialize_menu_items(state, *state.app_window.data.strings);
+  initialize_menu_items(state);
 
   // 获取系统DPI
   UINT dpi = 96;
@@ -149,10 +148,9 @@ auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void {
   }
 }
 
-auto update_menu_items(Core::State::AppState& state,
-                       const Core::Constants::LocalizedStrings& strings) -> void {
+auto update_menu_items(Core::State::AppState& state) -> void {
   state.app_window.data.menu_items.clear();
-  initialize_menu_items(state, strings);
+  initialize_menu_items(state);
   if (state.app_window.window.hwnd) {
     request_repaint(state);
   }
@@ -190,8 +188,7 @@ auto register_window_class(HINSTANCE instance) -> void {
   RegisterClassExW(&wc);
 }
 
-auto initialize_menu_items(Core::State::AppState& state,
-                           const Core::Constants::LocalizedStrings& strings) -> void {
+auto initialize_menu_items(Core::State::AppState& state) -> void {
   state.app_window.data.menu_items.clear();
 
   // 通过统一的 MenuData API 获取所有数据
@@ -225,7 +222,7 @@ auto initialize_menu_items(Core::State::AppState& state,
         displayText, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
   }
 
-  // 添加功能项（使用新的统一API，无需硬编码）
+  // 添加功能项（使用新的统一API，现在文本已经通过i18n系统本地化了）
   for (size_t i = 0; i < feature_items.size(); ++i) {
     const auto& item = feature_items[i];
     state.app_window.data.menu_items.emplace_back(
@@ -240,10 +237,8 @@ auto create_window_attributes(HWND hwnd) -> void {
 
 // 设置变更响应实现
 auto refresh_from_settings(Core::State::AppState& state) -> void {
-  if (state.app_window.data.strings) {
-    update_menu_items(state, *state.app_window.data.strings);
-    request_repaint(state);
-  }
+  update_menu_items(state);
+  request_repaint(state);
 }
 
 }  // namespace UI::AppWindow

@@ -13,6 +13,7 @@ module UI.TrayMenu;
 import std;
 import Core.State;
 import Core.Constants;
+import Core.I18n.Types;
 import Types.UI;
 import UI.TrayMenu.State;
 import UI.TrayMenu.Layout;
@@ -20,9 +21,39 @@ import UI.TrayMenu.MessageHandler;
 import UI.TrayMenu.Painter;
 import UI.TrayMenu.D2DContext;
 import Utils.Logger;
+import Utils.String;
 import Vendor.Windows;
 
 namespace {
+
+// 本地化文本访问辅助结构
+struct TrayMenuStrings {
+  std::wstring select_window;
+  std::wstring window_ratio;
+  std::wstring resolution;
+  std::wstring capture_window;
+  std::wstring preview_window;
+  std::wstring overlay_window;
+  std::wstring open_config;
+  std::wstring user_guide;
+  std::wstring webview_test;
+  std::wstring exit;
+};
+
+// 从i18n系统获取tray menu相关的本地化文本
+auto get_tray_menu_strings(const Core::I18n::Types::TextData& texts) -> TrayMenuStrings {
+  return TrayMenuStrings{
+      .select_window = Utils::String::FromUtf8(texts.window.menu.select),
+      .window_ratio = Utils::String::FromUtf8(texts.window.menu.ratio),
+      .resolution = Utils::String::FromUtf8(texts.window.menu.resolution),
+      .capture_window = Utils::String::FromUtf8(texts.features.screenshot.menu.capture),
+      .preview_window = Utils::String::FromUtf8(texts.features.preview.menu.toggle),
+      .overlay_window = Utils::String::FromUtf8(texts.features.overlay.menu.toggle),
+      .open_config = Utils::String::FromUtf8(texts.settings.menu.config),
+      .user_guide = Utils::String::FromUtf8(texts.system.menu.user_guide),
+      .webview_test = Utils::String::FromUtf8(texts.system.menu.webview_test),
+      .exit = Utils::String::FromUtf8(texts.system.menu.exit)};
+}
 
 // 窗口类名
 constexpr const wchar_t* TRAY_MENU_CLASS_NAME = L"SpinningMomoTrayMenuClass";
@@ -124,10 +155,10 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
 
   items.clear();
 
-  const auto& strings = *state.app_window.data.strings;
+  const auto strings = get_tray_menu_strings(state.i18n.texts);
 
   // 窗口选择 - 构建子菜单
-  UI::TrayMenu::State::MenuItem window_item(strings.SELECT_WINDOW, Core::Constants::ID_WINDOW_BASE);
+  UI::TrayMenu::State::MenuItem window_item(strings.select_window, Core::Constants::ID_WINDOW_BASE);
   window_item.submenu_items = build_window_list(state);
   items.emplace_back(std::move(window_item));
 
@@ -135,32 +166,32 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
 
   // 窗口设置 - 使用比例和分辨率的基础ID
-  items.emplace_back(strings.WINDOW_RATIO, Core::Constants::ID_RATIO_BASE);
-  items.emplace_back(strings.RESOLUTION, Core::Constants::ID_RESOLUTION_BASE);
+  items.emplace_back(strings.window_ratio, Core::Constants::ID_RATIO_BASE);
+  items.emplace_back(strings.resolution, Core::Constants::ID_RESOLUTION_BASE);
 
   // 分隔线
   items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
 
   // 功能选项
-  items.emplace_back(strings.CAPTURE_WINDOW, Core::Constants::ID_CAPTURE_WINDOW);
-  items.emplace_back(strings.PREVIEW_WINDOW, Core::Constants::ID_PREVIEW_WINDOW,
+  items.emplace_back(strings.capture_window, Core::Constants::ID_CAPTURE_WINDOW);
+  items.emplace_back(strings.preview_window, Core::Constants::ID_PREVIEW_WINDOW,
                      state.app_window.ui.preview_enabled);
-  items.emplace_back(strings.OVERLAY_WINDOW, Core::Constants::ID_OVERLAY_WINDOW,
+  items.emplace_back(strings.overlay_window, Core::Constants::ID_OVERLAY_WINDOW,
                      state.app_window.ui.overlay_enabled);
 
   // 分隔线
   items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
 
   // 系统选项
-  items.emplace_back(strings.OPEN_CONFIG, Core::Constants::ID_CONFIG);
-  items.emplace_back(strings.USER_GUIDE, Core::Constants::ID_USER_GUIDE);
-  items.emplace_back(strings.WEBVIEW_TEST, Core::Constants::ID_WEBVIEW_TEST);
+  items.emplace_back(strings.open_config, Core::Constants::ID_CONFIG);
+  items.emplace_back(strings.user_guide, Core::Constants::ID_USER_GUIDE);
+  items.emplace_back(strings.webview_test, Core::Constants::ID_WEBVIEW_TEST);
 
   // 分隔线
   items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
 
   // 退出
-  items.emplace_back(strings.EXIT, Core::Constants::ID_EXIT);
+  items.emplace_back(strings.exit, Core::Constants::ID_EXIT);
 }
 
 auto create_window_attributes(HWND hwnd) -> void {

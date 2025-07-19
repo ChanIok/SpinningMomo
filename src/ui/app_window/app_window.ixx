@@ -3,7 +3,6 @@ module;
 export module UI.AppWindow;
 
 import std;
-import Core.Constants;
 import Core.State;
 import Types.Presets;
 import UI.AppWindow.Layout;
@@ -28,8 +27,7 @@ export auto set_overlay_enabled(Core::State::AppState& state, bool enabled) -> v
 export auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void;
 
 // 更新菜单项
-export auto update_menu_items(Core::State::AppState& state,
-                              const Core::Constants::LocalizedStrings& strings) -> void;
+export auto update_menu_items(Core::State::AppState& state) -> void;
 export auto set_menu_items_to_show(Core::State::AppState& state,
                                    std::span<const std::wstring> items) -> void;
 
@@ -48,8 +46,7 @@ export auto refresh_from_settings(Core::State::AppState& state) -> void;
 auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void;
 
 // 初始化菜单项
-auto initialize_menu_items(Core::State::AppState& state,
-                           const Core::Constants::LocalizedStrings& strings) -> void;
+auto initialize_menu_items(Core::State::AppState& state) -> void;
 
 // 创建窗口样式和属性
 auto create_window_attributes(Vendor::Windows::HWND hwnd) -> void;

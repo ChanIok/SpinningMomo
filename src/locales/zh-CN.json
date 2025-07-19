@@ -1,0 +1,116 @@
+{
+  "app": {
+    "name": "旋转吧大喵",
+    "messages": {
+      "startup": "窗口比例调整工具已在后台运行。\n按 [",
+      "startup_suffix": "] 可以显示/隐藏调整窗口"
+    }
+  },
+
+  "window": {
+    "menu": {
+      "select": "选择窗口",
+      "ratio": "窗口比例",
+      "resolution": "分辨率",
+      "reset": "重置窗口",
+      "toggle_borderless": "切换窗口边框"
+    },
+    "messages": {
+      "selected": "已选择窗口",
+      "adjust_success": "窗口调整成功！",
+      "adjust_failed": "窗口调整失败。可能需要管理员权限，或窗口不支持调整大小。",
+      "not_found": "未找到目标窗口，请确保窗口已启动。",
+      "reset_success": "窗口已重置为屏幕大小。",
+      "reset_failed": "重置窗口尺寸失败。"
+    }
+  },
+
+  "features": {
+    "screenshot": {
+      "menu": {
+        "capture": "截图",
+        "open_folder": "打开相册"
+      },
+      "messages": {
+        "success": "截图成功，已保存至: "
+      }
+    },
+
+    "overlay": {
+      "menu": {
+        "toggle": "叠加层"
+      },
+      "messages": {
+        "conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能"
+      }
+    },
+
+    "preview": {
+      "menu": {
+        "toggle": "预览窗"
+      },
+      "messages": {
+        "conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能"
+      }
+    },
+
+    "letterbox": {
+      "menu": {
+        "toggle": "黑边模式"
+      }
+    }
+  },
+
+  "settings": {
+    "menu": {
+      "hotkey": "修改热键",
+      "config": "打开配置文件",
+      "language": "语言"
+    },
+    "messages": {
+      "hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
+      "hotkey_success": "热键已设置为：",
+      "hotkey_failed": "热键设置失败，已恢复默认热键。",
+      "hotkey_register_failed": "热键注册失败。程序仍可使用，但快捷键将不可用。",
+      "config_help": "配置文件说明：\n1. [AspectRatioItems] 节用于添加自定义比例\n2. [ResolutionItems] 节用于添加自定义分辨率\n3. 保存后重启软件生效",
+      "load_failed": "加载配置失败，请检查配置文件。",
+      "format_error": "格式错误：",
+      "ratio_format_example": "请使用正确格式，如：16:10,17:10",
+      "resolution_format_example": "请使用正确格式，如：3840x2160,7680x4320"
+    }
+  },
+
+  "ui": {
+    "taskbar": {
+      "menu": {
+        "autohide": "隐藏任务栏",
+        "lower": "调整时置底任务栏"
+      }
+    },
+    "floating": {
+      "menu": {
+        "mode": "浮窗模式",
+        "show": "显示浮窗",
+        "hide": "关闭浮窗"
+      }
+    }
+  },
+
+  "i18n": {
+    "languages": {
+      "zh_cn": "中文",
+      "en_us": "English"
+    }
+  },
+
+  "system": {
+    "menu": {
+      "exit": "退出",
+      "user_guide": "使用指南",
+      "webview_test": "WebView测试"
+    },
+    "messages": {
+      "feature_not_supported": "此功能需要 Windows 10 1803 或更高版本，已自动禁用。"
+    }
+  }
+}

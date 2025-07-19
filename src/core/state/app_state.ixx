@@ -6,6 +6,7 @@ import std;
 import Core.Async.State;
 import Core.Config.State;
 import Core.Events;
+import Core.I18n.State;
 import Core.RpcHandlers.State;
 import Core.WebView.State;
 import Features.Letterbox.State;
@@ -28,6 +29,7 @@ export struct AppState {
   Core::Config::State::AppConfig config;
   Types::UI::D2DRenderState d2d_render;
   Core::Events::EventBus event_bus;
+  Core::I18n::State::I18nState i18n;
   Core::RpcHandlers::State::RpcHandlerState rpc_handlers;
   Core::WebView::State::WebViewState webview;
 

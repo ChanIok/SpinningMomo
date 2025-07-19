@@ -76,6 +76,10 @@ if(WIN32)
     endif()
 endif()
 
+# 嵌入语言文件
+include(${CMAKE_SOURCE_DIR}/cmake/embed_locales.cmake)
+embed_all_locales()
+
 # 创建Windows GUI应用程序
 add_executable(SpinningMomo WIN32
     src/main.cpp
@@ -86,10 +90,11 @@ add_executable(SpinningMomo WIN32
 file(GLOB_RECURSE MODULE_FILES "src/*.ixx")
 file(GLOB_RECURSE MODULE_IMPL_FILES "src/*.cpp" EXCLUDE src/main.cpp)
 
-# 添加模块文件
+# 添加模块文件（包括生成的嵌入语言文件）
 target_sources(SpinningMomo PRIVATE
     FILE_SET CXX_MODULES FILES
     ${MODULE_FILES}
+    ${EMBEDDED_LOCALE_SOURCES}
 )
 
 # 添加模块实现文件

@@ -46,10 +46,10 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       file << json_str;
 
       // 计算预设并初始化内存状态
-      Compute::update_computed_state(default_state);
-      default_state.is_initialized = true;
-
       app_state.settings = default_state;
+      Compute::update_computed_state(app_state);
+      app_state.settings.is_initialized = true;
+
     } else {
       // 从文件加载配置
       auto config_result = get_settings({});
@@ -61,11 +61,10 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       State::SettingsState state;
       state.config = config_result.value();
 
-      // 计算预设
-      Compute::update_computed_state(state);
-      state.is_initialized = true;
-
+      // 先设置到app_state，然后计算预设
       app_state.settings = state;
+      Compute::update_computed_state(app_state);
+      app_state.settings.is_initialized = true;
     }
 
     return {};
@@ -119,7 +118,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     app_state.settings.config = params;
 
     // 重新计算预设状态
-    Compute::update_computed_state(app_state.settings);
+    Compute::update_computed_state(app_state);
 
     // 保存到文件
     auto json_str = rfl::json::write(params);
@@ -128,7 +127,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     if (!file) {
       // 回滚状态
       app_state.settings.config = old_settings;
-      Compute::update_computed_state(app_state.settings);
+      Compute::update_computed_state(app_state);
       return std::unexpected("Failed to open settings file for writing");
     }
 

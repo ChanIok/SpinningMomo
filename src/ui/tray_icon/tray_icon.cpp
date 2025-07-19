@@ -10,17 +10,52 @@ import std;
 import Common.MenuData;
 import Core.State;
 import Core.Constants;
+import Core.I18n.Types;
 import UI.TrayMenu;
 import Vendor.Windows;
 import Vendor.ShellApi;
+import Utils.String;
 
 namespace {
+
+// 本地化文本访问辅助结构
+struct TrayStrings {
+  std::wstring select_window;
+  std::wstring window_ratio;
+  std::wstring resolution;
+  std::wstring capture_window;
+  std::wstring preview_window;
+  std::wstring overlay_window;
+  std::wstring letterbox_window;
+  std::wstring toggle_borderless;
+  std::wstring modify_hotkey;
+  std::wstring chinese;
+  std::wstring english;
+  std::wstring exit;
+};
+
+// 从i18n系统获取tray相关的本地化文本
+auto get_tray_strings(const Core::I18n::Types::TextData& texts) -> TrayStrings {
+  return TrayStrings{
+      .select_window = Utils::String::FromUtf8(texts.window.menu.select),
+      .window_ratio = Utils::String::FromUtf8(texts.window.menu.ratio),
+      .resolution = Utils::String::FromUtf8(texts.window.menu.resolution),
+      .capture_window = Utils::String::FromUtf8(texts.features.screenshot.menu.capture),
+      .preview_window = Utils::String::FromUtf8(texts.features.preview.menu.toggle),
+      .overlay_window = Utils::String::FromUtf8(texts.features.overlay.menu.toggle),
+      .letterbox_window = Utils::String::FromUtf8(texts.features.letterbox.menu.toggle),
+      .toggle_borderless = Utils::String::FromUtf8(texts.window.menu.toggle_borderless),
+      .modify_hotkey = Utils::String::FromUtf8(texts.settings.menu.hotkey),
+      .chinese = Utils::String::FromUtf8(texts.i18n.languages.zh_cn),
+      .english = Utils::String::FromUtf8(texts.i18n.languages.en_us),
+      .exit = Utils::String::FromUtf8(texts.system.menu.exit)};
+}
 
 auto create_window_selection_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto& strings = *state.app_window.data.strings;
+  const auto strings = get_tray_strings(state.i18n.texts);
   int id = Core::Constants::ID_WINDOW_BASE;
   for (const auto& window : state.app_window.data.windows) {
     UINT flags = MF_BYPOSITION | MF_STRING;
@@ -37,7 +72,7 @@ auto create_ratio_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto& strings = *state.app_window.data.strings;
+  const auto strings = get_tray_strings(state.i18n.texts);
   const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
   for (size_t i = 0; i < ratios.size(); ++i) {
     UINT flags = MF_BYPOSITION | MF_STRING;
@@ -85,50 +120,50 @@ auto create_language_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  const auto& strings = *state.app_window.data.strings;
+  const auto strings = get_tray_strings(state.i18n.texts);
   InsertMenuW(
       h_menu, -1,
       MF_BYPOSITION | MF_STRING |
           (state.config.language.current_language == Core::Constants::LANG_ZH_CN ? MF_CHECKED : 0),
-      Core::Constants::ID_LANG_ZH_CN, strings.CHINESE.c_str());
+      Core::Constants::ID_LANG_ZH_CN, strings.chinese.c_str());
   InsertMenuW(
       h_menu, -1,
       MF_BYPOSITION | MF_STRING |
           (state.config.language.current_language == Core::Constants::LANG_EN_US ? MF_CHECKED : 0),
-      Core::Constants::ID_LANG_EN_US, strings.ENGLISH.c_str());
+      Core::Constants::ID_LANG_EN_US, strings.english.c_str());
 
   return h_menu;
 }
 
 auto add_settings_items(HMENU h_menu, const Core::State::AppState& state) -> void {
-  const auto& strings = *state.app_window.data.strings;
+  const auto strings = get_tray_strings(state.i18n.texts);
 
   // Letterbox Mode
   InsertMenuW(h_menu, -1,
               MF_BYPOSITION | MF_STRING | (state.app_window.ui.letterbox_enabled ? MF_CHECKED : 0),
-              Core::Constants::ID_LETTERBOX_WINDOW, strings.LETTERBOX_WINDOW.c_str());
+              Core::Constants::ID_LETTERBOX_WINDOW, strings.letterbox_window.c_str());
 
   // Toggle Borderless
   InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_TOGGLE_BORDERLESS,
-              strings.TOGGLE_BORDERLESS.c_str());
+              strings.toggle_borderless.c_str());
 
   InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
   // Preview Window
   InsertMenuW(h_menu, -1,
               MF_BYPOSITION | MF_STRING | (state.app_window.ui.preview_enabled ? MF_CHECKED : 0),
-              Core::Constants::ID_PREVIEW_WINDOW, strings.PREVIEW_WINDOW.c_str());
+              Core::Constants::ID_PREVIEW_WINDOW, strings.preview_window.c_str());
 
   // Overlay Window
   InsertMenuW(h_menu, -1,
               MF_BYPOSITION | MF_STRING | (state.app_window.ui.overlay_enabled ? MF_CHECKED : 0),
-              Core::Constants::ID_OVERLAY_WINDOW, strings.OVERLAY_WINDOW.c_str());
+              Core::Constants::ID_OVERLAY_WINDOW, strings.overlay_window.c_str());
 
   InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
 
   // Hotkey settings
   InsertMenuW(h_menu, -1, MF_BYPOSITION | MF_STRING, Core::Constants::ID_HOTKEY,
-              strings.MODIFY_HOTKEY.c_str());
+              strings.modify_hotkey.c_str());
 }
 
 }  // anonymous namespace

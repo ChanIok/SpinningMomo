@@ -7,10 +7,46 @@ import Features.Settings.Types;
 import Features.Settings.State;
 import Types.Presets;
 import Common.MenuData.Types;
+import Common.MenuIds;
 import Core.Constants;
+import Core.I18n.Types;
+import Core.State;
 import Utils.String;
 
 namespace Features::Settings::Compute {
+
+// 将菜单ID映射到本地化文本
+auto get_localized_text_for_menu_id(const std::string& menu_id,
+                                    const Core::I18n::Types::TextData& texts) -> std::wstring {
+  // 将字符串ID转换为强类型ID
+  auto id = Common::MenuIds::from_string(menu_id);
+  if (!id) {
+    // 如果ID不存在，返回ID本身作为fallback
+    return Utils::String::FromUtf8(menu_id);
+  }
+
+  // 根据ID返回对应的本地化文本
+  switch (*id) {
+    case Common::MenuIds::Id::ScreenshotCapture:
+      return Utils::String::FromUtf8(texts.features.screenshot.menu.capture);
+    case Common::MenuIds::Id::ScreenshotOpenFolder:
+      return Utils::String::FromUtf8(texts.features.screenshot.menu.open_folder);
+    case Common::MenuIds::Id::FeatureTogglePreview:
+      return Utils::String::FromUtf8(texts.features.preview.menu.toggle);
+    case Common::MenuIds::Id::FeatureToggleOverlay:
+      return Utils::String::FromUtf8(texts.features.overlay.menu.toggle);
+    case Common::MenuIds::Id::FeatureToggleLetterbox:
+      return Utils::String::FromUtf8(texts.features.letterbox.menu.toggle);
+    case Common::MenuIds::Id::WindowResetTransform:
+      return Utils::String::FromUtf8(texts.window.menu.reset);
+    case Common::MenuIds::Id::PanelHide:
+      return Utils::String::FromUtf8("关闭浮窗");  // 这个在JSON中没有直接对应，使用硬编码
+    case Common::MenuIds::Id::AppExit:
+      return Utils::String::FromUtf8(texts.system.menu.exit);
+    default:
+      return Utils::String::FromUtf8(menu_id);
+  }
+}
 
 // 简单的比例解析
 auto parse_ratio(const std::string& id) -> std::optional<double> {
@@ -71,7 +107,8 @@ auto parse_resolution(const std::string& id) -> std::optional<std::pair<int, int
 }
 
 // 计算功能项预设
-auto compute_feature_items_from_config(const Types::AppSettings& config)
+auto compute_feature_items_from_config(const Types::AppSettings& config,
+                                       const Core::I18n::Types::TextData& texts)
     -> std::vector<Common::MenuData::Types::ComputedFeatureItem> {
   std::vector<Common::MenuData::Types::ComputedFeatureItem> computed_items;
 
@@ -87,16 +124,18 @@ auto compute_feature_items_from_config(const Types::AppSettings& config)
   std::sort(enabled_items.begin(), enabled_items.end(),
             [](const auto& a, const auto& b) { return a.second < b.second; });
 
-  // 转换为 ComputedFeatureItem
+  // 转换为 ComputedFeatureItem，使用i18n系统获取本地化文本
   for (const auto& [item, order] : enabled_items) {
-    std::wstring text = Utils::String::FromUtf8(item.label);
+    std::wstring text = get_localized_text_for_menu_id(item.id, texts);
     computed_items.emplace_back(text, item.id, item.enabled, item.order);
   }
 
   return computed_items;
 }
 
-auto compute_presets_from_config(const Types::AppSettings& config) -> State::ComputedPresets {
+auto compute_presets_from_config(const Types::AppSettings& config,
+                                 const Core::I18n::Types::TextData& texts)
+    -> State::ComputedPresets {
   State::ComputedPresets computed;
 
   // 处理比例预设
@@ -121,13 +160,14 @@ auto compute_presets_from_config(const Types::AppSettings& config) -> State::Com
   }
 
   // 处理功能项预设
-  computed.feature_items = compute_feature_items_from_config(config);
+  computed.feature_items = compute_feature_items_from_config(config, texts);
 
   return computed;
 }
 
-auto update_computed_state(State::SettingsState& state) -> bool {
-  state.computed_presets = compute_presets_from_config(state.config);
+auto update_computed_state(Core::State::AppState& app_state) -> bool {
+  app_state.settings.computed_presets =
+      compute_presets_from_config(app_state.settings.config, app_state.i18n.texts);
   return true;
 }
 

@@ -5,7 +5,6 @@ module;
 export module UI.AppWindow.State;
 
 import std;
-import Core.Constants;
 import Types.Presets;
 import Features.WindowControl;
 import Common.MenuIds;
@@ -65,7 +64,6 @@ struct InteractionState {
 struct DataState {
   std::vector<MenuItem> menu_items;  // 从settings计算生成的菜单项
   std::vector<Features::WindowControl::WindowInfo> windows;
-  const Core::Constants::LocalizedStrings* strings = nullptr;
   std::vector<std::wstring> menu_items_to_show;
 };
 

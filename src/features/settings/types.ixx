@@ -74,23 +74,22 @@ inline auto create_default_app_settings() -> AppSettings {
   settings.version = "1.0";
   settings.title = "";
 
-  // 使用新的强类型菜单ID
+  // 使用新的强类型菜单ID，label留空，将从i18n系统动态获取
   settings.app_menu.feature_items = {
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotCapture)), "截图",
-       true, 1},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotOpenFolder)),
-       "打开相册", true, 2},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureTogglePreview)),
-       "预览窗口", true, 3},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleOverlay)), "叠加层",
-       true, 4},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleLetterbox)),
-       "黑边模式", true, 5},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::WindowResetTransform)),
-       "重置窗口", true, 6},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::PanelHide)), "关闭浮窗", true,
-       7},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::AppExit)), "退出", false, 8}};
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotCapture)), "", true,
+       1},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotOpenFolder)), "", true,
+       2},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureTogglePreview)), "", true,
+       3},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleOverlay)), "", true,
+       4},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleLetterbox)), "",
+       true, 5},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::WindowResetTransform)), "", true,
+       6},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::PanelHide)), "", true, 7},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::AppExit)), "", false, 8}};
 
   // 直接访问字段，无需特殊API
   settings.app_menu.aspect_ratios = {
