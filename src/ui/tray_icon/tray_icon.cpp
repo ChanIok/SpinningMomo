@@ -7,6 +7,7 @@ module;
 module UI.TrayIcon;
 
 import std;
+import Common.MenuData;
 import Core.State;
 import Core.Constants;
 import UI.TrayMenu;
@@ -37,13 +38,14 @@ auto create_ratio_submenu(const Core::State::AppState& state) -> HMENU {
   if (!h_menu) return nullptr;
 
   const auto& strings = *state.app_window.data.strings;
-  for (size_t i = 0; i < state.app_window.data.ratios.size(); ++i) {
+  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+  for (size_t i = 0; i < ratios.size(); ++i) {
     UINT flags = MF_BYPOSITION | MF_STRING;
     if (i == state.app_window.ui.current_ratio_index) {
       flags |= MF_CHECKED;
     }
-    InsertMenuW(h_menu, -1, flags, Core::Constants::ID_RATIO_BASE + i,
-                state.app_window.data.ratios[i].name.c_str());
+    InsertMenuW(h_menu, -1, flags, static_cast<UINT>(Core::Constants::ID_RATIO_BASE + i),
+                ratios[i].name.c_str());
   }
 
   return h_menu;
@@ -53,8 +55,9 @@ auto create_resolution_submenu(const Core::State::AppState& state) -> HMENU {
   HMENU h_menu = CreatePopupMenu();
   if (!h_menu) return nullptr;
 
-  for (size_t i = 0; i < state.app_window.data.resolutions.size(); ++i) {
-    const auto& preset = state.app_window.data.resolutions[i];
+  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  for (size_t i = 0; i < resolutions.size(); ++i) {
+    const auto& preset = resolutions[i];
     wchar_t menu_text_buffer[256];
 
     std::wstring formatted_text;
@@ -71,7 +74,8 @@ auto create_resolution_submenu(const Core::State::AppState& state) -> HMENU {
     if (i == state.app_window.ui.current_resolution_index) {
       flags |= MF_CHECKED;
     }
-    InsertMenuW(h_menu, -1, flags, Core::Constants::ID_RESOLUTION_BASE + i, menu_text_buffer);
+    InsertMenuW(h_menu, -1, flags, static_cast<UINT>(Core::Constants::ID_RESOLUTION_BASE + i),
+                menu_text_buffer);
   }
 
   return h_menu;

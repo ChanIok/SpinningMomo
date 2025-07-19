@@ -41,6 +41,9 @@ export auto unregister_hotkey(Core::State::AppState& state) -> void;
 // 渲染触发
 export auto request_repaint(Core::State::AppState& state) -> void;
 
+// 设置变更响应
+export auto refresh_from_settings(Core::State::AppState& state) -> void;
+
 // 注册窗口类
 auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void;
 

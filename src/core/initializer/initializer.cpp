@@ -60,19 +60,8 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
                               : Core::Constants::EN_US;
     state.app_window.data.strings = &strings;
 
-    auto ratio_data = Core::Config::Io::get_aspect_ratios(state.config, strings);
-    if (!ratio_data.success) {
-      Logger().warn("Failed to load aspect ratios: {}",
-                    Utils::String::ToUtf8(ratio_data.error_details));
-    }
-    state.app_window.data.ratios = std::move(ratio_data.ratios);
-
-    auto resolution_data = Core::Config::Io::get_resolution_presets(state.config, strings);
-    if (!resolution_data.success) {
-      Logger().warn("Failed to load resolutions: {}",
-                    Utils::String::ToUtf8(resolution_data.error_details));
-    }
-    state.app_window.data.resolutions = std::move(resolution_data.resolutions);
+    // 注意：比例和分辨率数据现在由settings模块管理
+    // 在Features::Settings::initialize(state)中已经处理了数据的加载和计算
 
     // 从配置初始化UI状态
     state.app_window.ui.preview_enabled = state.config.menu.use_floating_window;

@@ -9,6 +9,7 @@ module;
 module UI.AppWindow;
 
 import std;
+import Common.MenuData;
 import Core.Constants;
 import Core.Events;
 import Core.State;
@@ -117,7 +118,8 @@ auto set_current_ratio(Core::State::AppState& state, size_t index) -> void {
 }
 
 auto set_current_resolution(Core::State::AppState& state, size_t index) -> void {
-  if (index < state.app_window.data.resolutions.size()) {
+  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  if (index < resolutions.size()) {
     state.app_window.ui.current_resolution_index = index;
     if (state.app_window.window.hwnd) {
       request_repaint(state);
@@ -191,17 +193,21 @@ auto initialize_menu_items(Core::State::AppState& state,
                            const Core::Constants::LocalizedStrings& strings) -> void {
   state.app_window.data.menu_items.clear();
 
+  // 从settings模块获取数据，而不是从app_window.data
+  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+
   // 添加比例选项
-  for (size_t i = 0; i < state.app_window.data.ratios.size(); ++i) {
-    state.app_window.data.menu_items.push_back({state.app_window.data.ratios[i].name,
+  for (size_t i = 0; i < ratios.size(); ++i) {
+    state.app_window.data.menu_items.push_back({ratios[i].name,
                                                 UI::AppWindow::ItemType::AspectRatio,
                                                 static_cast<int>(i)});
   }
 
   // 添加分辨率选项
-  for (size_t i = 0; i < state.app_window.data.resolutions.size(); ++i) {
+  for (size_t i = 0; i < resolutions.size(); ++i) {
     std::wstring displayText;
-    const auto& preset = state.app_window.data.resolutions[i];
+    const auto& preset = resolutions[i];
     if (preset.baseWidth == 0 && preset.baseHeight == 0) {
       displayText = preset.name;
     } else {
@@ -271,6 +277,14 @@ auto initialize_menu_items(Core::State::AppState& state,
 auto create_window_attributes(HWND hwnd) -> void {
   DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+}
+
+// 设置变更响应实现
+auto refresh_from_settings(Core::State::AppState& state) -> void {
+  if (state.app_window.data.strings) {
+    update_menu_items(state, *state.app_window.data.strings);
+    request_repaint(state);
+  }
 }
 
 }  // namespace UI::AppWindow

@@ -3,6 +3,7 @@ module;
 module Handlers.Window;
 
 import std;
+import Common.MenuData;
 import Core.Config.Io;
 import Core.Events;
 import Core.State;
@@ -18,8 +19,9 @@ namespace Handlers {
 
 // 获取当前比例
 auto get_current_ratio(const Core::State::AppState& state) -> double {
-  if (state.app_window.ui.current_ratio_index < state.app_window.data.ratios.size()) {
-    return state.app_window.data.ratios[state.app_window.ui.current_ratio_index].ratio;
+  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+  if (state.app_window.ui.current_ratio_index < ratios.size()) {
+    return ratios[state.app_window.ui.current_ratio_index].ratio;
   }
 
   // 默认使用屏幕比例
@@ -30,9 +32,9 @@ auto get_current_ratio(const Core::State::AppState& state) -> double {
 
 // 获取当前总像素数
 auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64_t {
-  if (state.app_window.ui.current_resolution_index < state.app_window.data.resolutions.size()) {
-    return state.app_window.data.resolutions[state.app_window.ui.current_resolution_index]
-        .totalPixels;
+  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  if (state.app_window.ui.current_resolution_index < resolutions.size()) {
+    return resolutions[state.app_window.ui.current_resolution_index].totalPixels;
   }
   return 0;  // 表示使用屏幕尺寸
 }
@@ -179,8 +181,8 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   post_transform_actions(state, *target_window, new_resolution);
 
   // 更新当前比例索引
-  if (data.index < state.app_window.data.ratios.size() ||
-      data.index == std::numeric_limits<size_t>::max()) {
+  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+  if (data.index < ratios.size() || data.index == std::numeric_limits<size_t>::max()) {
     state.app_window.ui.current_ratio_index = data.index;
   }
 
@@ -237,7 +239,8 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   post_transform_actions(state, *target_window, new_resolution);
 
   // 更新当前分辨率索引
-  if (data.index < state.app_window.data.resolutions.size()) {
+  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  if (data.index < resolutions.size()) {
     state.app_window.ui.current_resolution_index = data.index;
   }
 

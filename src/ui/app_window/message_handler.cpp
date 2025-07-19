@@ -8,6 +8,7 @@ module;
 module UI.AppWindow.MessageHandler;
 
 import std;
+import Common.MenuData;
 import Core.Events;
 import Core.State;
 import Core.Constants;
@@ -36,21 +37,27 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
 
   switch (item.type) {
     case UI::AppWindow::ItemType::AspectRatio: {
-      const auto& ratio_preset = state.app_window.data.ratios[item.index];
-      send_event(state.event_bus, {EventType::RatioChanged,
-                                   RatioChangeData{static_cast<size_t>(item.index),
-                                                   ratio_preset.name, ratio_preset.ratio},
-                                   state.app_window.window.hwnd});
+      const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+      if (item.index >= 0 && static_cast<size_t>(item.index) < ratios.size()) {
+        const auto& ratio_preset = ratios[item.index];
+        send_event(state.event_bus, {EventType::RatioChanged,
+                                     RatioChangeData{static_cast<size_t>(item.index),
+                                                     ratio_preset.name, ratio_preset.ratio},
+                                     state.app_window.window.hwnd});
+      }
       break;
     }
     case UI::AppWindow::ItemType::Resolution: {
-      const auto& res_preset = state.app_window.data.resolutions[item.index];
-      send_event(state.event_bus,
-                 {EventType::ResolutionChanged,
-                  ResolutionChangeData{
-                      static_cast<size_t>(item.index), res_preset.name,
-                      res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
-                  state.app_window.window.hwnd});
+      const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+      if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
+        const auto& res_preset = resolutions[item.index];
+        send_event(state.event_bus,
+                   {EventType::ResolutionChanged,
+                    ResolutionChangeData{
+                        static_cast<size_t>(item.index), res_preset.name,
+                        res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
+                    state.app_window.window.hwnd});
+      }
       break;
     }
     case UI::AppWindow::ItemType::FeatureTogglePreview:
@@ -102,8 +109,9 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
       command_id < Core::Constants::ID_RESOLUTION_BASE) {
     // Handle ratio selection
     const size_t index = command_id - Core::Constants::ID_RATIO_BASE;
-    if (index < state.app_window.data.ratios.size()) {
-      const auto& ratio_preset = state.app_window.data.ratios[index];
+    const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+    if (index < ratios.size()) {
+      const auto& ratio_preset = ratios[index];
       send_event(state.event_bus, {EventType::RatioChanged,
                                    RatioChangeData{index, ratio_preset.name, ratio_preset.ratio},
                                    state.app_window.window.hwnd});
@@ -115,8 +123,9 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
       command_id < Core::Constants::ID_WINDOW_BASE) {
     // Handle resolution selection
     const size_t index = command_id - Core::Constants::ID_RESOLUTION_BASE;
-    if (index < state.app_window.data.resolutions.size()) {
-      const auto& res_preset = state.app_window.data.resolutions[index];
+    const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+    if (index < resolutions.size()) {
+      const auto& res_preset = resolutions[index];
       send_event(state.event_bus,
                  {EventType::ResolutionChanged,
                   ResolutionChangeData{

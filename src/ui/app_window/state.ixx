@@ -76,9 +76,7 @@ struct InteractionState {
 
 // 数据状态（拥有或引用外部数据）
 struct DataState {
-  std::vector<Types::Presets::RatioPreset> ratios;
-  std::vector<Types::Presets::ResolutionPreset> resolutions;
-  std::vector<MenuItem> menu_items;
+  std::vector<MenuItem> menu_items;  // 从settings计算生成的菜单项
   std::vector<Features::WindowControl::WindowInfo> windows;
   const Core::Constants::LocalizedStrings* strings = nullptr;
   std::vector<std::wstring> menu_items_to_show;
