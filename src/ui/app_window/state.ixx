@@ -8,30 +8,12 @@ import std;
 import Core.Constants;
 import Types.Presets;
 import Features.WindowControl;
+import Common.MenuIds;
 
 export namespace UI::AppWindow {
 
-// 菜单项类型枚举
-enum class ItemType {
-  None,
-  // 截图
-  ScreenshotCapture,
-  ScreenshotOpenFolder,
-  // 功能
-  FeatureTogglePreview,
-  FeatureToggleOverlay,
-  FeatureToggleLetterbox,
-  // 窗口
-  WindowResetTransform,
-  // 面板
-  PanelHide,
-  // 应用
-  AppExit,
-  // 比例
-  AspectRatio,
-  // 分辨率
-  Resolution
-};
+// 菜单项类别枚举（简化版本）
+enum class MenuItemCategory { AspectRatio, Resolution, Feature };
 
 // 布局常量
 constexpr int BASE_ITEM_HEIGHT = 24;
@@ -48,8 +30,13 @@ constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;
 // 菜单项结构
 struct MenuItem {
   std::wstring text;
-  ItemType type;
-  int index;  // 在对应类型中的索引
+  MenuItemCategory category;
+  int index;              // 在对应类别中的索引
+  std::string action_id;  // 仅 Feature 类别使用
+
+  // 构造函数
+  MenuItem(const std::wstring& t, MenuItemCategory cat, int idx, const std::string& action = "")
+      : text(t), category(cat), index(idx), action_id(action) {}
 };
 
 // 窗口系统状态
@@ -129,17 +116,27 @@ struct State {
 
 // 辅助函数
 auto is_item_selected(const MenuItem& item, const InteractionState& ui_state) -> bool {
-  switch (item.type) {
-    case ItemType::AspectRatio:
+  switch (item.category) {
+    case MenuItemCategory::AspectRatio:
       return item.index == static_cast<int>(ui_state.current_ratio_index);
-    case ItemType::Resolution:
+    case MenuItemCategory::Resolution:
       return item.index == static_cast<int>(ui_state.current_resolution_index);
-    case ItemType::FeatureTogglePreview:
-      return ui_state.preview_enabled;
-    case ItemType::FeatureToggleOverlay:
-      return ui_state.overlay_enabled;
-    case ItemType::FeatureToggleLetterbox:
-      return ui_state.letterbox_enabled;
+    case MenuItemCategory::Feature: {
+      // 基于 action_id 判断功能项的选中状态
+      auto menu_id = Common::MenuIds::from_string(item.action_id);
+      if (!menu_id) return false;
+
+      switch (*menu_id) {
+        case Common::MenuIds::Id::FeatureTogglePreview:
+          return ui_state.preview_enabled;
+        case Common::MenuIds::Id::FeatureToggleOverlay:
+          return ui_state.overlay_enabled;
+        case Common::MenuIds::Id::FeatureToggleLetterbox:
+          return ui_state.letterbox_enabled;
+        default:
+          return false;
+      }
+    }
     default:
       return false;
   }

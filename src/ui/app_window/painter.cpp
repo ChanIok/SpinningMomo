@@ -12,6 +12,7 @@ import Types.UI;
 import UI.AppWindow.Layout;
 import UI.AppWindow.State;
 import UI.AppWindow.D2DContext;
+import Common.MenuIds;
 
 namespace UI::AppWindow::Painter {
 
@@ -150,28 +151,20 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     const auto& item = items[i];
     D2D1_RECT_F item_rect{};
 
-    // 根据项目类型确定绘制位置
-    using ItemType = UI::AppWindow::ItemType;
-    switch (item.type) {
-      case ItemType::AspectRatio:
+    // 根据项目类别确定绘制位置
+    switch (item.category) {
+      case UI::AppWindow::MenuItemCategory::AspectRatio:
         item_rect =
             Types::UI::make_d2d_rect(rect.left, y, static_cast<float>(bounds.ratio_column_right),
                                      y + static_cast<float>(render.item_height));
         break;
-      case ItemType::Resolution:
+      case UI::AppWindow::MenuItemCategory::Resolution:
         item_rect = Types::UI::make_d2d_rect(
             static_cast<float>(bounds.ratio_column_right + render.separator_height), y,
             static_cast<float>(bounds.resolution_column_right),
             y + static_cast<float>(render.item_height));
         break;
-      case ItemType::ScreenshotCapture:
-      case ItemType::ScreenshotOpenFolder:
-      case ItemType::FeatureTogglePreview:
-      case ItemType::FeatureToggleOverlay:
-      case ItemType::FeatureToggleLetterbox:
-      case ItemType::WindowResetTransform:
-      case ItemType::PanelHide:
-      case ItemType::AppExit:
+      case UI::AppWindow::MenuItemCategory::Feature:
         item_rect = Types::UI::make_d2d_rect(
             static_cast<float>(bounds.resolution_column_right + render.separator_height),
             settings_y, rect.right, settings_y + static_cast<float>(render.item_height));
@@ -185,12 +178,15 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     draw_app_single_item(state, item, item_rect, is_hovered);
 
     // 只有在同一列中才增加y坐标（复制现有逻辑）
-    if ((i + 1 < items.size()) && (items[i + 1].type == item.type)) {
-      if (item.type != ItemType::WindowResetTransform) {
+    if ((i + 1 < items.size()) && (items[i + 1].category == item.category)) {
+      if (item.category != UI::AppWindow::MenuItemCategory::Feature ||
+          item.action_id != Common::MenuIds::to_string(Common::MenuIds::Id::WindowResetTransform)) {
         y += static_cast<float>(render.item_height);
       }
-    } else if (i + 1 < items.size() && items[i + 1].type != item.type) {
-      if (items[i + 1].type != ItemType::WindowResetTransform) {
+    } else if (i + 1 < items.size() && items[i + 1].category != item.category) {
+      if (items[i + 1].category != UI::AppWindow::MenuItemCategory::Feature ||
+          items[i + 1].action_id !=
+              Common::MenuIds::to_string(Common::MenuIds::Id::WindowResetTransform)) {
         y = rect.top + static_cast<float>(render.title_height + render.separator_height);
       }
     }

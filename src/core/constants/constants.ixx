@@ -89,16 +89,6 @@ const std::wstring TASKBAR_LOWER = L"LowerOnResize";  // 调整时置底任务�
 const std::wstring MENU_SECTION = L"Menu";       // 菜单配置节名
 const std::wstring MENU_FLOATING = L"Floating";  // 浮动窗口配置项
 
-// 菜单项ID
-const std::wstring MENU_ITEM_ID_SCREENSHOT_CAPTURE = L"screenshot.capture";
-const std::wstring MENU_ITEM_ID_SCREENSHOT_OPEN_FOLDER = L"screenshot.openFolder";
-const std::wstring MENU_ITEM_ID_FEATURE_TOGGLE_PREVIEW = L"feature.togglePreview";
-const std::wstring MENU_ITEM_ID_FEATURE_TOGGLE_OVERLAY = L"feature.toggleOverlay";
-const std::wstring MENU_ITEM_ID_FEATURE_TOGGLE_LETTERBOX = L"feature.toggleLetterbox";
-const std::wstring MENU_ITEM_ID_WINDOW_RESET_TRANSFORM = L"window.resetTransform";
-const std::wstring MENU_ITEM_ID_PANEL_HIDE = L"panel.hide";
-const std::wstring MENU_ITEM_ID_APP_EXIT = L"app.exit";
-
 // 菜单项配置
 const std::wstring MENU_ITEMS = L"MenuItems";  // 菜单项显示配置
 

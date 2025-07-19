@@ -5,6 +5,7 @@ export module Features.Settings.Types;
 import std;
 import Core.Constants;
 import Utils.String;
+import Common.MenuIds;
 
 export namespace Features::Settings::Types {
 
@@ -73,21 +74,23 @@ inline auto create_default_app_settings() -> AppSettings {
   settings.version = "1.0";
   settings.title = "";
 
-  // 直接访问字段，无需特殊API
+  // 使用新的强类型菜单ID
   settings.app_menu.feature_items = {
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_SCREENSHOT_CAPTURE), "截图", true, 1},
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_SCREENSHOT_OPEN_FOLDER), "打开相册",
-       true, 2},
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_PREVIEW), "预览窗口",
-       true, 3},
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_OVERLAY), "叠加层", true,
-       4},
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_LETTERBOX), "黑边模式",
-       true, 5},
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_WINDOW_RESET_TRANSFORM), "重置窗口",
-       true, 6},
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_PANEL_HIDE), "关闭浮窗", true, 7},
-      {Utils::String::ToUtf8(Core::Constants::MENU_ITEM_ID_APP_EXIT), "退出", false, 8}};
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotCapture)), "截图",
+       true, 1},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotOpenFolder)),
+       "打开相册", true, 2},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureTogglePreview)),
+       "预览窗口", true, 3},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleOverlay)), "叠加层",
+       true, 4},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleLetterbox)),
+       "黑边模式", true, 5},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::WindowResetTransform)),
+       "重置窗口", true, 6},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::PanelHide)), "关闭浮窗", true,
+       7},
+      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::AppExit)), "退出", false, 8}};
 
   // 直接访问字段，无需特殊API
   settings.app_menu.aspect_ratios = {

@@ -6,6 +6,9 @@ import std;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Types.Presets;
+import Common.MenuData.Types;
+import Core.Constants;
+import Utils.String;
 
 namespace Features::Settings::Compute {
 
@@ -67,6 +70,32 @@ auto parse_resolution(const std::string& id) -> std::optional<std::pair<int, int
   return std::nullopt;
 }
 
+// 计算功能项预设
+auto compute_feature_items_from_config(const Types::AppSettings& config)
+    -> std::vector<Common::MenuData::Types::ComputedFeatureItem> {
+  std::vector<Common::MenuData::Types::ComputedFeatureItem> computed_items;
+
+  // 处理功能项，过滤启用的项目并按顺序排序
+  std::vector<std::pair<Types::FeatureItem, int>> enabled_items;
+  for (const auto& item : config.app_menu.feature_items) {
+    if (item.enabled) {
+      enabled_items.emplace_back(item, item.order);
+    }
+  }
+
+  // 按 order 排序
+  std::sort(enabled_items.begin(), enabled_items.end(),
+            [](const auto& a, const auto& b) { return a.second < b.second; });
+
+  // 转换为 ComputedFeatureItem
+  for (const auto& [item, order] : enabled_items) {
+    std::wstring text = Utils::String::FromUtf8(item.label);
+    computed_items.emplace_back(text, item.id, item.enabled, item.order);
+  }
+
+  return computed_items;
+}
+
 auto compute_presets_from_config(const Types::AppSettings& config) -> State::ComputedPresets {
   State::ComputedPresets computed;
 
@@ -90,6 +119,9 @@ auto compute_presets_from_config(const Types::AppSettings& config) -> State::Com
       }
     }
   }
+
+  // 处理功能项预设
+  computed.feature_items = compute_feature_items_from_config(config);
 
   return computed;
 }

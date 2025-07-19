@@ -10,6 +10,7 @@ module UI.AppWindow;
 
 import std;
 import Common.MenuData;
+import Common.MenuData.Types;
 import Core.Constants;
 import Core.Events;
 import Core.State;
@@ -193,15 +194,15 @@ auto initialize_menu_items(Core::State::AppState& state,
                            const Core::Constants::LocalizedStrings& strings) -> void {
   state.app_window.data.menu_items.clear();
 
-  // 从settings模块获取数据，而不是从app_window.data
+  // 通过统一的 MenuData API 获取所有数据
   const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
   const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  const auto& feature_items = Common::MenuData::get_current_feature_items(state);
 
   // 添加比例选项
   for (size_t i = 0; i < ratios.size(); ++i) {
-    state.app_window.data.menu_items.push_back({ratios[i].name,
-                                                UI::AppWindow::ItemType::AspectRatio,
-                                                static_cast<int>(i)});
+    state.app_window.data.menu_items.emplace_back(
+        ratios[i].name, UI::AppWindow::MenuItemCategory::AspectRatio, static_cast<int>(i));
   }
 
   // 添加分辨率选项
@@ -220,57 +221,15 @@ auto initialize_menu_items(Core::State::AppState& state,
       }
       displayText = preset.name + L" (" + buffer + L"M)";
     }
-    state.app_window.data.menu_items.push_back(
-        {displayText, UI::AppWindow::ItemType::Resolution, static_cast<int>(i)});
+    state.app_window.data.menu_items.emplace_back(
+        displayText, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
   }
 
-  // 添加设置选项
-  if (!state.app_window.data.menu_items_to_show.empty()) {
-    for (const auto& itemType : state.app_window.data.menu_items_to_show) {
-      if (itemType == Core::Constants::MENU_ITEM_ID_SCREENSHOT_CAPTURE) {
-        state.app_window.data.menu_items.push_back(
-            {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::ScreenshotCapture, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_ID_SCREENSHOT_OPEN_FOLDER) {
-        state.app_window.data.menu_items.push_back(
-            {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::ScreenshotOpenFolder, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_PREVIEW) {
-        state.app_window.data.menu_items.push_back(
-            {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::FeatureTogglePreview, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_OVERLAY) {
-        state.app_window.data.menu_items.push_back(
-            {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::FeatureToggleOverlay, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_LETTERBOX) {
-        state.app_window.data.menu_items.push_back(
-            {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::FeatureToggleLetterbox, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_ID_WINDOW_RESET_TRANSFORM) {
-        state.app_window.data.menu_items.push_back(
-            {strings.RESET_WINDOW, UI::AppWindow::ItemType::WindowResetTransform, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_ID_PANEL_HIDE) {
-        state.app_window.data.menu_items.push_back(
-            {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::PanelHide, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_ID_APP_EXIT) {
-        state.app_window.data.menu_items.push_back(
-            {strings.EXIT, UI::AppWindow::ItemType::AppExit, 0});
-      }
-    }
-  } else {
-    // 默认菜单项
-    state.app_window.data.menu_items.push_back(
-        {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::ScreenshotCapture, 0});
-    state.app_window.data.menu_items.push_back(
-        {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::ScreenshotOpenFolder, 0});
-    state.app_window.data.menu_items.push_back(
-        {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::FeatureTogglePreview, 0});
-    state.app_window.data.menu_items.push_back(
-        {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::FeatureToggleOverlay, 0});
-    state.app_window.data.menu_items.push_back(
-        {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::FeatureToggleLetterbox, 0});
-    state.app_window.data.menu_items.push_back(
-        {strings.RESET_WINDOW, UI::AppWindow::ItemType::WindowResetTransform, 0});
-    state.app_window.data.menu_items.push_back(
-        {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::PanelHide, 0});
-    state.app_window.data.menu_items.push_back(
-        {strings.EXIT, UI::AppWindow::ItemType::AppExit, 0});
+  // 添加功能项（使用新的统一API，无需硬编码）
+  for (size_t i = 0; i < feature_items.size(); ++i) {
+    const auto& item = feature_items[i];
+    state.app_window.data.menu_items.emplace_back(
+        item.text, UI::AppWindow::MenuItemCategory::Feature, static_cast<int>(i), item.action_id);
   }
 }
 

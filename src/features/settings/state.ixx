@@ -5,13 +5,15 @@ export module Features.Settings.State;
 import std;
 import Features.Settings.Types;
 import Types.Presets;
+import Common.MenuData.Types;
 
 export namespace Features::Settings::State {
 
 // 计算后的预设状态
 struct ComputedPresets {
-  std::vector<::Types::Presets::RatioPreset> aspect_ratios;
-  std::vector<::Types::Presets::ResolutionPreset> resolutions;
+  std::vector<Common::MenuData::Types::RatioPreset> aspect_ratios;
+  std::vector<Common::MenuData::Types::ResolutionPreset> resolutions;
+  std::vector<Common::MenuData::Types::ComputedFeatureItem> feature_items;
 
   ComputedPresets() = default;
 };

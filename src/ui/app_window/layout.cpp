@@ -63,11 +63,11 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
   const auto bounds = get_column_bounds(state);
 
   // 确定点击的是哪一列
-  UI::AppWindow::ItemType target_type;
+  UI::AppWindow::MenuItemCategory target_category;
   if (x < bounds.ratio_column_right) {
-    target_type = UI::AppWindow::ItemType::AspectRatio;
+    target_category = UI::AppWindow::MenuItemCategory::AspectRatio;
   } else if (x < bounds.resolution_column_right) {
-    target_type = UI::AppWindow::ItemType::Resolution;
+    target_category = UI::AppWindow::MenuItemCategory::Resolution;
   } else {
     // 设置列的特殊处理
     return get_settings_item_index(state, y);
@@ -77,7 +77,7 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
   int item_y = render.title_height + render.separator_height;
   for (size_t i = 0; i < items.size(); ++i) {
     const auto& item = items[i];
-    if (item.type == target_type) {
+    if (item.category == target_category) {
       if (y >= item_y && y < item_y + render.item_height) {
         return static_cast<int>(i);
       }
@@ -92,22 +92,14 @@ auto count_items_per_column(const std::vector<UI::AppWindow::MenuItem>& items) -
   ColumnCounts counts;
 
   for (const auto& item : items) {
-    using ItemType = UI::AppWindow::ItemType;
-    switch (item.type) {
-      case ItemType::AspectRatio:
+    switch (item.category) {
+      case UI::AppWindow::MenuItemCategory::AspectRatio:
         ++counts.ratio_count;
         break;
-      case ItemType::Resolution:
+      case UI::AppWindow::MenuItemCategory::Resolution:
         ++counts.resolution_count;
         break;
-      case ItemType::ScreenshotCapture:
-      case ItemType::ScreenshotOpenFolder:
-      case ItemType::FeatureTogglePreview:
-      case ItemType::FeatureToggleOverlay:
-      case ItemType::FeatureToggleLetterbox:
-      case ItemType::WindowResetTransform:
-      case ItemType::PanelHide:
-      case ItemType::AppExit:
+      case UI::AppWindow::MenuItemCategory::Feature:
         ++counts.settings_count;
         break;
     }
@@ -132,18 +124,9 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
   int settings_y = render.title_height + render.separator_height;
   for (size_t i = 0; i < items.size(); ++i) {
     const auto& item = items[i];
-    using ItemType = UI::AppWindow::ItemType;
 
-    // 判断是否为设置项
-    const bool is_setting_item = item.type == ItemType::ScreenshotCapture ||
-                                 item.type == ItemType::ScreenshotOpenFolder ||
-                                 item.type == ItemType::FeatureTogglePreview ||
-                                 item.type == ItemType::FeatureToggleOverlay ||
-                                 item.type == ItemType::FeatureToggleLetterbox ||
-                                 item.type == ItemType::WindowResetTransform ||
-                                 item.type == ItemType::PanelHide || item.type == ItemType::AppExit;
-
-    if (is_setting_item) {
+    // 判断是否为功能项
+    if (item.category == UI::AppWindow::MenuItemCategory::Feature) {
       if (y >= settings_y && y < settings_y + render.item_height) {
         return static_cast<int>(i);
       }
@@ -155,7 +138,7 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
 
 auto get_indicator_width(const UI::AppWindow::MenuItem& item, const Core::State::AppState& state)
     -> int {
-  return (item.type == UI::AppWindow::ItemType::AspectRatio)
+  return (item.category == UI::AppWindow::MenuItemCategory::AspectRatio)
              ? state.app_window.layout.ratio_indicator_width
              : state.app_window.layout.indicator_width;
 }
