@@ -194,7 +194,7 @@ auto initialize_menu_items(Core::State::AppState& state,
   // 添加比例选项
   for (size_t i = 0; i < state.app_window.data.ratios.size(); ++i) {
     state.app_window.data.menu_items.push_back({state.app_window.data.ratios[i].name,
-                                                UI::AppWindow::ItemType::Ratio,
+                                                UI::AppWindow::ItemType::AspectRatio,
                                                 static_cast<int>(i)});
   }
 
@@ -221,48 +221,50 @@ auto initialize_menu_items(Core::State::AppState& state,
   // 添加设置选项
   if (!state.app_window.data.menu_items_to_show.empty()) {
     for (const auto& itemType : state.app_window.data.menu_items_to_show) {
-      if (itemType == Core::Constants::MENU_ITEM_TYPE_CAPTURE) {
+      if (itemType == Core::Constants::MENU_ITEM_ID_SCREENSHOT_CAPTURE) {
         state.app_window.data.menu_items.push_back(
-            {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::CaptureWindow, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_SCREENSHOT) {
+            {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::ScreenshotCapture, 0});
+      } else if (itemType == Core::Constants::MENU_ITEM_ID_SCREENSHOT_OPEN_FOLDER) {
         state.app_window.data.menu_items.push_back(
-            {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::OpenScreenshot, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_PREVIEW) {
+            {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::ScreenshotOpenFolder, 0});
+      } else if (itemType == Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_PREVIEW) {
         state.app_window.data.menu_items.push_back(
-            {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::PreviewWindow, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_OVERLAY) {
+            {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::FeatureTogglePreview, 0});
+      } else if (itemType == Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_OVERLAY) {
         state.app_window.data.menu_items.push_back(
-            {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::OverlayWindow, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_LETTERBOX) {
+            {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::FeatureToggleOverlay, 0});
+      } else if (itemType == Core::Constants::MENU_ITEM_ID_FEATURE_TOGGLE_LETTERBOX) {
         state.app_window.data.menu_items.push_back(
-            {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::LetterboxWindow, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_RESET) {
+            {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::FeatureToggleLetterbox, 0});
+      } else if (itemType == Core::Constants::MENU_ITEM_ID_WINDOW_RESET_TRANSFORM) {
         state.app_window.data.menu_items.push_back(
-            {strings.RESET_WINDOW, UI::AppWindow::ItemType::Reset, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_CLOSE) {
+            {strings.RESET_WINDOW, UI::AppWindow::ItemType::WindowResetTransform, 0});
+      } else if (itemType == Core::Constants::MENU_ITEM_ID_PANEL_HIDE) {
         state.app_window.data.menu_items.push_back(
-            {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::Hide, 0});
-      } else if (itemType == Core::Constants::MENU_ITEM_TYPE_EXIT) {
+            {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::PanelHide, 0});
+      } else if (itemType == Core::Constants::MENU_ITEM_ID_APP_EXIT) {
         state.app_window.data.menu_items.push_back(
-            {strings.EXIT, UI::AppWindow::ItemType::Exit, 0});
+            {strings.EXIT, UI::AppWindow::ItemType::AppExit, 0});
       }
     }
   } else {
     // 默认菜单项
     state.app_window.data.menu_items.push_back(
-        {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::CaptureWindow, 0});
+        {strings.CAPTURE_WINDOW, UI::AppWindow::ItemType::ScreenshotCapture, 0});
     state.app_window.data.menu_items.push_back(
-        {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::OpenScreenshot, 0});
+        {strings.OPEN_SCREENSHOT, UI::AppWindow::ItemType::ScreenshotOpenFolder, 0});
     state.app_window.data.menu_items.push_back(
-        {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::PreviewWindow, 0});
+        {strings.PREVIEW_WINDOW, UI::AppWindow::ItemType::FeatureTogglePreview, 0});
     state.app_window.data.menu_items.push_back(
-        {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::OverlayWindow, 0});
+        {strings.OVERLAY_WINDOW, UI::AppWindow::ItemType::FeatureToggleOverlay, 0});
     state.app_window.data.menu_items.push_back(
-        {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::LetterboxWindow, 0});
+        {strings.LETTERBOX_WINDOW, UI::AppWindow::ItemType::FeatureToggleLetterbox, 0});
     state.app_window.data.menu_items.push_back(
-        {strings.RESET_WINDOW, UI::AppWindow::ItemType::Reset, 0});
+        {strings.RESET_WINDOW, UI::AppWindow::ItemType::WindowResetTransform, 0});
     state.app_window.data.menu_items.push_back(
-        {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::Hide, 0});
+        {strings.CLOSE_WINDOW, UI::AppWindow::ItemType::PanelHide, 0});
+    state.app_window.data.menu_items.push_back(
+        {strings.EXIT, UI::AppWindow::ItemType::AppExit, 0});
   }
 }
 

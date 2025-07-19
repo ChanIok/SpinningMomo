@@ -9,6 +9,9 @@ import std;
 import Core.State;
 import Core.Events;
 import Features.Settings.Types;
+import Features.Settings.State;
+import Features.Settings.Compute;
+import Types.Presets;
 import Utils.Path;
 
 namespace Features::Settings {
@@ -22,6 +25,8 @@ auto get_settings_path() -> std::expected<std::filesystem::path, std::string> {
   return dir_result.value() / "settings.json";
 }
 
+// === 业务逻辑函数 ===
+
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   try {
     auto settings_path = get_settings_path();
@@ -31,23 +36,36 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
     // 如果文件不存在，创建默认配置
     if (!std::filesystem::exists(settings_path.value())) {
-      auto default_settings = Types::create_default_app_settings();
+      auto default_state = State::create_default_settings_state();
 
-      auto json_str = rfl::json::write(default_settings);
+      auto json_str = rfl::json::write(default_state.config);
       std::ofstream file(settings_path.value());
       if (!file) {
         return std::unexpected("Failed to create settings file");
       }
       file << json_str;
 
-      // 初始化内存状态
-      app_state.settings = default_settings;
+      // 计算预设并初始化内存状态
+      Compute::update_computed_state(default_state);
+      default_state.is_initialized = true;
+
+      app_state.settings = default_state;
     } else {
-      // 从文件加载到内存状态
-      auto result = get_settings({});
-      if (result) {
-        app_state.settings = result.value();
+      // 从文件加载配置
+      auto config_result = get_settings({});
+      if (!config_result) {
+        return std::unexpected(config_result.error());
       }
+
+      // 创建完整状态
+      State::SettingsState state;
+      state.config = config_result.value();
+
+      // 计算预设
+      Compute::update_computed_state(state);
+      state.is_initialized = true;
+
+      app_state.settings = state;
     }
 
     return {};
@@ -95,18 +113,22 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     }
 
     // 保存旧设置用于事件通知
-    Types::AppSettings old_settings = app_state.settings;
+    Types::AppSettings old_settings = app_state.settings.config;
 
-    // 更新内存中的全局状态
-    app_state.settings = params;
+    // 更新配置
+    app_state.settings.config = params;
 
-    // 直接保存AppSettings到文件
+    // 重新计算预设状态
+    Compute::update_computed_state(app_state.settings);
+
+    // 保存到文件
     auto json_str = rfl::json::write(params);
 
     std::ofstream file(settings_path.value());
     if (!file) {
-      // 回滚内存状态
-      app_state.settings = old_settings;
+      // 回滚状态
+      app_state.settings.config = old_settings;
+      Compute::update_computed_state(app_state.settings);
       return std::unexpected("Failed to open settings file for writing");
     }
 
@@ -114,7 +136,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
 
     // 发送设置变更事件
     Types::SettingsChangeData change_data{.old_settings = old_settings,
-                                          .new_settings = app_state.settings,
+                                          .new_settings = app_state.settings.config,
                                           .change_description = "Settings updated via RPC"};
 
     Core::Events::post_event(

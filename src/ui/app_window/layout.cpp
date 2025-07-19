@@ -65,7 +65,7 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
   // 确定点击的是哪一列
   UI::AppWindow::ItemType target_type;
   if (x < bounds.ratio_column_right) {
-    target_type = UI::AppWindow::ItemType::Ratio;
+    target_type = UI::AppWindow::ItemType::AspectRatio;
   } else if (x < bounds.resolution_column_right) {
     target_type = UI::AppWindow::ItemType::Resolution;
   } else {
@@ -94,20 +94,20 @@ auto count_items_per_column(const std::vector<UI::AppWindow::MenuItem>& items) -
   for (const auto& item : items) {
     using ItemType = UI::AppWindow::ItemType;
     switch (item.type) {
-      case ItemType::Ratio:
+      case ItemType::AspectRatio:
         ++counts.ratio_count;
         break;
       case ItemType::Resolution:
         ++counts.resolution_count;
         break;
-      case ItemType::CaptureWindow:
-      case ItemType::OpenScreenshot:
-      case ItemType::OverlayWindow:
-      case ItemType::LetterboxWindow:
-      case ItemType::PreviewWindow:
-      case ItemType::Reset:
-      case ItemType::Hide:
-      case ItemType::Exit:
+      case ItemType::ScreenshotCapture:
+      case ItemType::ScreenshotOpenFolder:
+      case ItemType::FeatureTogglePreview:
+      case ItemType::FeatureToggleOverlay:
+      case ItemType::FeatureToggleLetterbox:
+      case ItemType::WindowResetTransform:
+      case ItemType::PanelHide:
+      case ItemType::AppExit:
         ++counts.settings_count;
         break;
     }
@@ -133,10 +133,17 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
   for (size_t i = 0; i < items.size(); ++i) {
     const auto& item = items[i];
     using ItemType = UI::AppWindow::ItemType;
-    if (item.type == ItemType::CaptureWindow || item.type == ItemType::OpenScreenshot ||
-        item.type == ItemType::PreviewWindow || item.type == ItemType::OverlayWindow ||
-        item.type == ItemType::LetterboxWindow || item.type == ItemType::Reset ||
-        item.type == ItemType::Hide || item.type == ItemType::Exit) {
+
+    // 判断是否为设置项
+    const bool is_setting_item = item.type == ItemType::ScreenshotCapture ||
+                                 item.type == ItemType::ScreenshotOpenFolder ||
+                                 item.type == ItemType::FeatureTogglePreview ||
+                                 item.type == ItemType::FeatureToggleOverlay ||
+                                 item.type == ItemType::FeatureToggleLetterbox ||
+                                 item.type == ItemType::WindowResetTransform ||
+                                 item.type == ItemType::PanelHide || item.type == ItemType::AppExit;
+
+    if (is_setting_item) {
       if (y >= settings_y && y < settings_y + render.item_height) {
         return static_cast<int>(i);
       }
@@ -148,7 +155,7 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
 
 auto get_indicator_width(const UI::AppWindow::MenuItem& item, const Core::State::AppState& state)
     -> int {
-  return (item.type == UI::AppWindow::ItemType::Ratio)
+  return (item.type == UI::AppWindow::ItemType::AspectRatio)
              ? state.app_window.layout.ratio_indicator_width
              : state.app_window.layout.indicator_width;
 }

@@ -153,7 +153,7 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     // 根据项目类型确定绘制位置
     using ItemType = UI::AppWindow::ItemType;
     switch (item.type) {
-      case ItemType::Ratio:
+      case ItemType::AspectRatio:
         item_rect =
             Types::UI::make_d2d_rect(rect.left, y, static_cast<float>(bounds.ratio_column_right),
                                      y + static_cast<float>(render.item_height));
@@ -164,14 +164,14 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
             static_cast<float>(bounds.resolution_column_right),
             y + static_cast<float>(render.item_height));
         break;
-      case ItemType::CaptureWindow:
-      case ItemType::OpenScreenshot:
-      case ItemType::PreviewWindow:
-      case ItemType::OverlayWindow:
-      case ItemType::LetterboxWindow:
-      case ItemType::Reset:
-      case ItemType::Hide:
-      case ItemType::Exit:
+      case ItemType::ScreenshotCapture:
+      case ItemType::ScreenshotOpenFolder:
+      case ItemType::FeatureTogglePreview:
+      case ItemType::FeatureToggleOverlay:
+      case ItemType::FeatureToggleLetterbox:
+      case ItemType::WindowResetTransform:
+      case ItemType::PanelHide:
+      case ItemType::AppExit:
         item_rect = Types::UI::make_d2d_rect(
             static_cast<float>(bounds.resolution_column_right + render.separator_height),
             settings_y, rect.right, settings_y + static_cast<float>(render.item_height));
@@ -186,11 +186,11 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
 
     // 只有在同一列中才增加y坐标（复制现有逻辑）
     if ((i + 1 < items.size()) && (items[i + 1].type == item.type)) {
-      if (item.type != ItemType::Reset) {
+      if (item.type != ItemType::WindowResetTransform) {
         y += static_cast<float>(render.item_height);
       }
     } else if (i + 1 < items.size() && items[i + 1].type != item.type) {
-      if (items[i + 1].type != ItemType::Reset) {
+      if (items[i + 1].type != ItemType::WindowResetTransform) {
         y = rect.top + static_cast<float>(render.title_height + render.separator_height);
       }
     }

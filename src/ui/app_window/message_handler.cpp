@@ -35,7 +35,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
   using namespace Core::Events;
 
   switch (item.type) {
-    case UI::AppWindow::ItemType::Ratio: {
+    case UI::AppWindow::ItemType::AspectRatio: {
       const auto& ratio_preset = state.app_window.data.ratios[item.index];
       send_event(state.event_bus, {EventType::RatioChanged,
                                    RatioChangeData{static_cast<size_t>(item.index),
@@ -53,41 +53,41 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
                   state.app_window.window.hwnd});
       break;
     }
-    case UI::AppWindow::ItemType::PreviewWindow:
+    case UI::AppWindow::ItemType::FeatureTogglePreview:
       send_event(state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
                   state.app_window.window.hwnd});
       break;
-    case UI::AppWindow::ItemType::OverlayWindow:
+    case UI::AppWindow::ItemType::FeatureToggleOverlay:
       send_event(state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
                   state.app_window.window.hwnd});
       break;
-    case UI::AppWindow::ItemType::LetterboxWindow:
+    case UI::AppWindow::ItemType::FeatureToggleLetterbox:
       send_event(state.event_bus,
                  {EventType::ToggleFeature,
                   FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
                   state.app_window.window.hwnd});
       break;
-    case UI::AppWindow::ItemType::CaptureWindow:
+    case UI::AppWindow::ItemType::ScreenshotCapture:
       send_event(state.event_bus,
                  {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
       break;
-    case UI::AppWindow::ItemType::OpenScreenshot:
+    case UI::AppWindow::ItemType::ScreenshotOpenFolder:
       send_event(state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
                                    state.app_window.window.hwnd});
       break;
-    case UI::AppWindow::ItemType::Reset:
+    case UI::AppWindow::ItemType::WindowResetTransform:
       send_event(state.event_bus,
                  {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
       break;
-    case UI::AppWindow::ItemType::Hide:
+    case UI::AppWindow::ItemType::PanelHide:
       send_event(state.event_bus,
                  {EventType::WindowAction, WindowAction::Hide, state.app_window.window.hwnd});
       break;
-    case UI::AppWindow::ItemType::Exit:
+    case UI::AppWindow::ItemType::AppExit:
       send_event(state.event_bus,
                  {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
       break;

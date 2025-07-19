@@ -3,9 +3,9 @@ export type MenuPage = 'main'
 
 // 功能项（应用菜单中的功能）
 export interface FeatureItem {
-  id: string        // 如: 'CaptureWindow', 'OpenScreenshot'
-  label: string     // 显示名称
-  enabled: boolean  // 是否显示在菜单中
+  id: string; // 如: 'screenshot.capture', 'screenshot.openFolder'
+  label: string; // 显示名称
+  enabled: boolean; // 是否显示在菜单中
   order: number     // 排序序号
 }
 
@@ -61,14 +61,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   title: '',
   appMenu: {
     menuItems: [
-      { id: 'CaptureWindow', label: '截图', enabled: true, order: 1 },
-      { id: 'OpenScreenshot', label: '打开相册', enabled: true, order: 2 },
-      { id: 'PreviewWindow', label: '预览窗口', enabled: true, order: 3 },
-      { id: 'OverlayWindow', label: '叠加层', enabled: true, order: 4 },
-      { id: 'LetterboxWindow', label: '黑边模式', enabled: true, order: 5 },
-      { id: 'Reset', label: '重置窗口', enabled: true, order: 6 },
-      { id: 'Close', label: '关闭浮窗', enabled: true, order: 7 },
-      { id: 'Exit', label: '退出', enabled: false, order: 8 }
+      { id: 'screenshot.capture', label: '截图', enabled: true, order: 1 },
+      { id: 'screenshot.openFolder', label: '打开相册', enabled: true, order: 2 },
+      { id: 'feature.togglePreview', label: '预览窗口', enabled: true, order: 3 },
+      { id: 'feature.toggleOverlay', label: '叠加层', enabled: true, order: 4 },
+      { id: 'feature.toggleLetterbox', label: '黑边模式', enabled: true, order: 5 },
+      { id: 'window.resetTransform', label: '重置窗口', enabled: true, order: 6 },
+      { id: 'panel.hide', label: '关闭浮窗', enabled: true, order: 7 },
+      { id: 'app.exit', label: '退出', enabled: false, order: 8 },
     ],
     aspectRatios: [
       { id: '32:9', label: '32:9', enabled: true, order: 1, isCustom: false },

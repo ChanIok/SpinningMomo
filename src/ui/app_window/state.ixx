@@ -13,16 +13,24 @@ export namespace UI::AppWindow {
 
 // 菜单项类型枚举
 enum class ItemType {
-  Ratio,
-  Resolution,
-  CaptureWindow,
-  OpenScreenshot,
-  PreviewWindow,
-  OverlayWindow,
-  LetterboxWindow,
-  Reset,
-  Hide,
-  Exit
+  None,
+  // 截图
+  ScreenshotCapture,
+  ScreenshotOpenFolder,
+  // 功能
+  FeatureTogglePreview,
+  FeatureToggleOverlay,
+  FeatureToggleLetterbox,
+  // 窗口
+  WindowResetTransform,
+  // 面板
+  PanelHide,
+  // 应用
+  AppExit,
+  // 比例
+  AspectRatio,
+  // 分辨率
+  Resolution
 };
 
 // 布局常量
@@ -124,15 +132,15 @@ struct State {
 // 辅助函数
 auto is_item_selected(const MenuItem& item, const InteractionState& ui_state) -> bool {
   switch (item.type) {
-    case ItemType::Ratio:
+    case ItemType::AspectRatio:
       return item.index == static_cast<int>(ui_state.current_ratio_index);
     case ItemType::Resolution:
       return item.index == static_cast<int>(ui_state.current_resolution_index);
-    case ItemType::PreviewWindow:
+    case ItemType::FeatureTogglePreview:
       return ui_state.preview_enabled;
-    case ItemType::OverlayWindow:
+    case ItemType::FeatureToggleOverlay:
       return ui_state.overlay_enabled;
-    case ItemType::LetterboxWindow:
+    case ItemType::FeatureToggleLetterbox:
       return ui_state.letterbox_enabled;
     default:
       return false;
