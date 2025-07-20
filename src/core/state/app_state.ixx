@@ -4,10 +4,9 @@ export module Core.State;
 
 import std;
 // import Core.Async.State; // 被移除
-import Core.Config.State;
 // import Core.Events;
 // import Core.I18n.State;
-// import Core.RpcHandlers.State; // Core::RpcHandlers的模板依赖
+import Core.RpcHandlers.State; // Core::RpcHandlers的模板依赖
 import Core.WebView.State;
 import Features.Letterbox.State;
 import Features.Notifications.State;
@@ -33,16 +32,15 @@ export namespace Core::I18n::State {
 struct I18nState;
 }
 
-export namespace Core::RpcHandlers::State {
-struct RpcHandlerState;
-}
+// export namespace Core::RpcHandlers::State {
+// struct RpcHandlerState;
+// }
 
 export namespace Core::State {
 
 export struct AppState {
   // 应用级状态
   std::unique_ptr<Core::Async::State::AsyncRuntimeState> async_runtime;
-  Core::Config::State::AppConfig config;
   Types::UI::D2DRenderState d2d_render;
   std::unique_ptr<Core::Events::EventBus> event_bus;
   std::unique_ptr<Core::I18n::State::I18nState> i18n;

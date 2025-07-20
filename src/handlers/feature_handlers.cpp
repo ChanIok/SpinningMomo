@@ -3,7 +3,6 @@ module;
 module Handlers.Feature;
 
 import std;
-import Core.Config.Io;
 import Core.Events;
 import Core.State;
 import Features.Letterbox;
@@ -22,8 +21,10 @@ auto handle_preview_toggle(Core::State::AppState& state, bool enabled) -> void {
   state.app_window.ui.preview_enabled = enabled;
 
   if (enabled) {
-    // 查找目标窗口
-    auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+    // 查找目标窗口（暂时硬编码为空）
+    // TODO: 等待settings设计完成后，从settings中读取窗口标题
+    std::wstring window_title = L"";
+    auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Preview::Window::start_preview(state, target_window.value());
           !result) {
@@ -51,8 +52,10 @@ auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
   state.app_window.ui.overlay_enabled = enabled;
 
   if (enabled) {
-    // 查找目标窗口
-    auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+    // 查找目标窗口（暂时硬编码为空）
+    // TODO: 等待settings设计完成后，从settings中读取窗口标题
+    std::wstring window_title = L"";
+    auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Overlay::start_overlay(state, target_window.value()); !result) {
         Logger().error("Failed to start overlay: {}", result.error());
@@ -77,11 +80,14 @@ auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
 auto handle_letterbox_toggle(Core::State::AppState& state, bool enabled) -> void {
   // 更新黑边状态
   state.app_window.ui.letterbox_enabled = enabled;
-  state.config.letterbox.enabled = enabled;
+  // TODO: 等待settings设计完成后，将letterbox enabled状态保存到settings
+  // state.config.letterbox.enabled = enabled; // 暂时注释掉
 
   if (enabled) {
-    // 查找目标窗口
-    auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+    // 查找目标窗口（暂时硬编码为空）
+    // TODO: 等待settings设计完成后，从settings中读取窗口标题
+    std::wstring window_title = L"";
+    auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
         Logger().error("Failed to show letterbox: {}", result.error());
@@ -117,7 +123,6 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
     auto data = std::any_cast<FeatureToggleData>(event.data);
     Logger().debug("Feature toggled");
 
-    bool config_changed = false;
     switch (data.feature) {
       case FeatureType::Preview:
         handle_preview_toggle(app_state, data.enabled);
@@ -127,19 +132,12 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
         break;
       case FeatureType::Letterbox:
         handle_letterbox_toggle(app_state, data.enabled);
-        config_changed = true;
         break;
     }
 
     // 触发UI更新
     if (app_state.app_window.window.hwnd) {
       Vendor::Windows::InvalidateRect(app_state.app_window.window.hwnd, nullptr, true);
-    }
-
-    if (config_changed) {
-      if (auto result = Core::Config::Io::save(app_state.config); !result) {
-        Logger().error("Failed to save config: {}", result.error());
-      }
     }
   });
 }

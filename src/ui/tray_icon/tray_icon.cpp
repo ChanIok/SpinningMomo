@@ -60,9 +60,10 @@ auto create_window_selection_submenu(const Core::State::AppState& state) -> HMEN
   int id = Core::Constants::ID_WINDOW_BASE;
   for (const auto& window : state.app_window.data.windows) {
     UINT flags = MF_BYPOSITION | MF_STRING;
-    if (window.title == state.config.window.title) {
-      flags |= MF_CHECKED;
-    }
+    // TODO: 等待settings设计完成后，从settings中读取当前选中的窗口标题
+    // if (window.title == state.config.window.title) {
+    //   flags |= MF_CHECKED;
+    // }
     InsertMenuW(h_menu, -1, flags, id++, window.title.c_str());
   }
 
@@ -122,15 +123,14 @@ auto create_language_submenu(const Core::State::AppState& state) -> HMENU {
   if (!h_menu) return nullptr;
 
   const auto strings = get_tray_strings(state.i18n->texts);
+  // TODO: 等待settings设计完成后，从settings中读取当前语言设置
   InsertMenuW(
       h_menu, -1,
-      MF_BYPOSITION | MF_STRING |
-          (state.config.language.current_language == Core::Constants::LANG_ZH_CN ? MF_CHECKED : 0),
+      MF_BYPOSITION | MF_STRING | MF_CHECKED, // 硬编码默认选中中文
       Core::Constants::ID_LANG_ZH_CN, strings.chinese.c_str());
   InsertMenuW(
       h_menu, -1,
-      MF_BYPOSITION | MF_STRING |
-          (state.config.language.current_language == Core::Constants::LANG_EN_US ? MF_CHECKED : 0),
+      MF_BYPOSITION | MF_STRING, // 英文不选中
       Core::Constants::ID_LANG_EN_US, strings.english.c_str());
 
   return h_menu;

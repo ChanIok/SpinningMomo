@@ -8,9 +8,9 @@ module;
 export module Features.Screenshot.Folder;
 
 import std;
-import Core.Config.State;
-import Core.State;
 import Features.WindowControl;
+import Features.Settings.State;
+import Core.State;
 import Utils.Logger;
 import Utils.Path;
 
@@ -63,11 +63,13 @@ auto discover_game_path(HWND game_window) -> std::expected<std::filesystem::path
 }
 
 // 解析截图目录路径（核心逻辑）
-auto resolve_path(const Core::Config::State::AppConfig& config, HWND game_window = nullptr)
+auto resolve_path(const Features::Settings::State::SettingsState& settings, HWND game_window = nullptr)
     -> std::expected<std::filesystem::path, std::string> {
-  // 1. 检查配置中的路径
-  if (!config.game_album.screenshot_path.empty()) {
-    std::filesystem::path config_path = config.game_album.screenshot_path;
+  // 1. 检查配置中的路径（暂时硬编码为空）
+  // TODO: 等待settings设计完成后，从settings中读取截图路径
+  std::string screenshot_path_config = ""; // 硬编码为空
+  if (!screenshot_path_config.empty()) {
+    std::filesystem::path config_path = screenshot_path_config;
     if (std::filesystem::exists(config_path)) {
       Logger().debug("Using configured screenshot path: {}", config_path.string());
       return config_path;
@@ -86,9 +88,11 @@ auto resolve_path(const Core::Config::State::AppConfig& config, HWND game_window
     }
   }
 
-  // 3. 尝试通过配置的窗口标题查找游戏窗口
-  if (!config.window.title.empty()) {
-    auto target_window = Features::WindowControl::find_target_window(config.window.title);
+  // 3. 尝试通过配置的窗口标题查找游戏窗口（暂时硬编码为空）
+  // TODO: 等待settings设计完成后，从settings中读取窗口标题
+  std::wstring window_title_config = L""; // 硬编码为空
+  if (!window_title_config.empty()) {
+    auto target_window = Features::WindowControl::find_target_window(window_title_config);
     if (target_window) {
       if (auto game_path = discover_game_path(target_window.value())) {
         Logger().debug("Discovered game screenshot path from configured window");
@@ -116,7 +120,7 @@ auto resolve_path(const Core::Config::State::AppConfig& config, HWND game_window
 // 打开截图文件夹（对外接口）
 export auto open_folder(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 解析路径
-  auto path_result = resolve_path(state.config);
+  auto path_result = resolve_path(state.settings);
   if (!path_result) {
     return std::unexpected("Failed to resolve screenshot path: " + path_result.error());
   }

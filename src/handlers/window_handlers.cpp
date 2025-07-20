@@ -4,7 +4,6 @@ module Handlers.Window;
 
 import std;
 import Common.MenuData;
-import Core.Config.Io;
 import Core.Events;
 import Core.State;
 import Features.WindowControl;
@@ -57,14 +56,17 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
 
   switch (action) {
     case Core::Events::WindowAction::Reset: {
-      auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+      // TODO: 等待settings设计完成后，从settings中读取窗口标题
+      std::wstring window_title = L"";
+      auto target_window = Features::WindowControl::find_target_window(window_title);
       if (!target_window) {
         Features::Notifications::show_notification(
             state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
         return;
       }
 
-      Features::WindowControl::TransformOptions options{.taskbar_lower = state.config.taskbar.lower,
+      // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
+      Features::WindowControl::TransformOptions options{.taskbar_lower = false,
                                                         .activate_window = true};
 
       auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
@@ -88,7 +90,9 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
       break;
     }
     case Core::Events::WindowAction::Capture: {
-      auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+      // TODO: 等待settings设计完成后，从settings中读取窗口标题
+      std::wstring window_title = L"";
+      auto target_window = Features::WindowControl::find_target_window(window_title);
       if (!target_window) {
         Features::Notifications::show_notification(
             state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
@@ -144,7 +148,9 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   Logger().debug("Handling ratio change to index {}, ratio: {}", data.index, data.ratio_value);
 
   // 查找目标窗口
-  auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+  // TODO: 等待settings设计完成后，从settings中读取窗口标题
+  std::wstring window_title = L"";
+  auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(
         state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
@@ -163,8 +169,9 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   }
 
   // 应用窗口变换
+  // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.config.taskbar.lower,
+      .taskbar_lower = false,
       .activate_window = !state.app_window.ui.overlay_enabled};
 
   auto result =
@@ -200,7 +207,9 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
                  data.total_pixels);
 
   // 查找目标窗口
-  auto target_window = Features::WindowControl::find_target_window(state.config.window.title);
+  // TODO: 等待settings设计完成后，从settings中读取窗口标题
+  std::wstring window_title = L"";
+  auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(
         state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
@@ -221,8 +230,9 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   }
 
   // 应用窗口变换
+  // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.config.taskbar.lower,
+      .taskbar_lower = false,
       .activate_window = !state.app_window.ui.overlay_enabled};
 
   auto result =

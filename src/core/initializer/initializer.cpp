@@ -4,7 +4,6 @@ module Core.Initializer;
 
 import std;
 import Core.Async.Runtime;
-import Core.Config.Io;
 import Core.Constants;
 import Core.Events;
 import Core.State;
@@ -35,13 +34,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to start async runtime: " + result.error());
     }
 
-    // 2. 初始化配置
-    if (auto config_result = Core::Config::Io::initialize(); config_result) {
-      state.config = std::move(config_result.value());
-    } else {
-      return std::unexpected("Failed to initialize configuration: " + config_result.error());
-    }
-
     // 3. 注册事件处理器
     Handlers::register_all_handlers(state);
 
@@ -56,10 +48,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 注意：比例和分辨率数据现在由settings模块管理
     // 在Features::Settings::initialize(state)中已经处理了数据的加载和计算
-
-    // 从配置初始化UI状态
-    state.app_window.ui.preview_enabled = state.config.menu.use_floating_window;
-    state.app_window.ui.letterbox_enabled = state.config.letterbox.enabled;
 
     // 7. 创建窗口
     if (auto result = UI::AppWindow::create_window(state); !result) {
@@ -119,8 +107,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 14. 默认显示窗口
     UI::AppWindow::show_window(state);
 
-    // 15. 注册热键
-    UI::AppWindow::register_hotkey(state, state.config.hotkey.modifiers, state.config.hotkey.key);
+    // 15. 注册热键（暂时硬编码）
+    // TODO: 等待settings设计完成后，从settings中读取热键配置
+    UI::AppWindow::register_hotkey(state, 0, 0); // 硬编码为无热键
 
     Logger().info("Application initialized successfully");
     return {};
