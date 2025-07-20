@@ -45,6 +45,15 @@ export auto DispatchWindowMessageW(const MSG* lpMsg) -> LRESULT {
   return ::DispatchMessageW(lpMsg);
 }
 
+// 窗口操作相关的包装函数
+export auto GetWindowRect(HWND hWnd, RECT* lpRect) -> BOOL {
+  return ::GetWindowRect(hWnd, lpRect);
+}
+
+export auto SetWindowPos(HWND hWnd, HWND hWndInsertAfter, int x, int y, int cx, int cy, UINT uFlags) -> BOOL {
+  return ::SetWindowPos(hWnd, hWndInsertAfter, x, y, cx, cy, uFlags);
+}
+
 // 应用程序控制相关的包装函数
 export auto PostQuitMessage(int nExitCode) -> void { ::PostQuitMessage(nExitCode); }
 
@@ -80,6 +89,10 @@ export constexpr UINT MOD_ALT_t = 0x0001;
 
 // WM_QUIT 常量
 export constexpr UINT WM_QUIT_t = 0x0012;
+
+// SetWindowPos 常量
+export constexpr UINT SWP_NOZORDER_t = 0x0004;
+export constexpr UINT SWP_NOACTIVATE_t = 0x0010;
 
 // Windows 类型定义导出
 export using HWND = ::HWND;

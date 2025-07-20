@@ -4,6 +4,8 @@ module;
 #include <dwrite_3.h>
 #include <windows.h>
 
+#include <iostream>
+
 export module UI.AppWindow.Types;
 
 import std;
