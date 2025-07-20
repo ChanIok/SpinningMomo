@@ -10,7 +10,8 @@ module UI.TrayMenu.D2DContext;
 
 import std;
 import Core.State;
-import Types.UI;
+import UI.AppWindow.Types;
+import UI.AppWindow.State;
 import UI.TrayMenu.State;
 import Utils.Logger;
 
@@ -24,19 +25,19 @@ auto create_brushes_for_target(ID2D1HwndRenderTarget* target, ID2D1SolidColorBru
                                ID2D1SolidColorBrush** indicator_brush) -> bool {
   HRESULT hr;
 
-  hr = target->CreateSolidColorBrush(Types::UI::D2DColors::WHITE, white_brush);
+  hr = target->CreateSolidColorBrush(UI::AppWindow::Colors::WHITE, white_brush);
   if (FAILED(hr)) return false;
 
-  hr = target->CreateSolidColorBrush(Types::UI::D2DColors::TEXT, text_brush);
+  hr = target->CreateSolidColorBrush(UI::AppWindow::Colors::TEXT, text_brush);
   if (FAILED(hr)) return false;
 
-  hr = target->CreateSolidColorBrush(Types::UI::D2DColors::SEPARATOR, separator_brush);
+  hr = target->CreateSolidColorBrush(UI::AppWindow::Colors::SEPARATOR, separator_brush);
   if (FAILED(hr)) return false;
 
-  hr = target->CreateSolidColorBrush(Types::UI::D2DColors::HOVER, hover_brush);
+  hr = target->CreateSolidColorBrush(UI::AppWindow::Colors::HOVER, hover_brush);
   if (FAILED(hr)) return false;
 
-  hr = target->CreateSolidColorBrush(Types::UI::D2DColors::INDICATOR, indicator_brush);
+  hr = target->CreateSolidColorBrush(UI::AppWindow::Colors::INDICATOR, indicator_brush);
   if (FAILED(hr)) return false;
 
   return true;
@@ -75,17 +76,19 @@ namespace UI::TrayMenu::D2DContext {
 // 初始化主菜单D2D资源
 auto initialize_main_menu(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& tray_menu = *state.tray_menu;
-  const auto& d2d = state.d2d_render;
 
   // 如果已经初始化，直接返回成功
   if (tray_menu.main_menu_d2d_ready) {
     return true;
   }
 
-  // 检查全局D2D工厂是否已初始化
-  if (!d2d.is_initialized || !d2d.factory) {
+  // 检查AppWindow的D2D工厂是否已初始化
+  if (!state.app_window || !state.app_window->d2d_context.is_initialized || 
+      !state.app_window->d2d_context.factory) {
     return false;
   }
+
+  const auto& d2d_context = state.app_window->d2d_context;
 
   // 获取窗口的客户区大小
   RECT rc;
@@ -93,7 +96,7 @@ auto initialize_main_menu(Core::State::AppState& state, HWND hwnd) -> bool {
 
   // 创建主菜单渲染目标
   D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
-  HRESULT hr = d2d.factory->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
+  HRESULT hr = d2d_context.factory->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
                                                    D2D1::HwndRenderTargetProperties(hwnd, size),
                                                    &tray_menu.render_target);
 
@@ -134,18 +137,20 @@ auto cleanup_main_menu(Core::State::AppState& state) -> void {
 // 初始化子菜单D2D资源
 auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& tray_menu = *state.tray_menu;
-  const auto& d2d = state.d2d_render;
 
   // 如果已经初始化，直接返回成功
   if (tray_menu.submenu_d2d_ready) {
     return true;
   }
 
-  // 检查全局D2D工厂是否已初始化
-  if (!d2d.is_initialized || !d2d.factory) {
-    Logger().error("Global D2D not initialized or factory is null");
+  // 检查AppWindow的D2D工厂是否已初始化
+  if (!state.app_window || !state.app_window->d2d_context.is_initialized || 
+      !state.app_window->d2d_context.factory) {
+    Logger().error("AppWindow D2D not initialized or factory is null");
     return false;
   }
+
+  const auto& d2d_context = state.app_window->d2d_context;
 
   // 获取窗口的客户区大小
   RECT rc;
@@ -153,7 +158,7 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
 
   // 创建子菜单渲染目标
   D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
-  HRESULT hr = d2d.factory->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
+  HRESULT hr = d2d_context.factory->CreateHwndRenderTarget(D2D1::RenderTargetProperties(),
                                                    D2D1::HwndRenderTargetProperties(hwnd, size),
                                                    &tray_menu.submenu_render_target);
 

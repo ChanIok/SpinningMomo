@@ -7,16 +7,16 @@ export module UI.TrayMenu.Painter;
 
 import std;
 import Core.State;
-import Types.UI;
+import UI.AppWindow.Types;
 import UI.TrayMenu.State;
 
-namespace UI::TrayMenu::Painter {
+export namespace UI::TrayMenu::Painter {
 
 // 主菜单绘制
-export auto paint_tray_menu(const Core::State::AppState& state, const RECT& client_rect) -> void;
+auto paint_tray_menu(const Core::State::AppState& state, const RECT& client_rect) -> void;
 
 // 子菜单绘制
-export auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) -> void;
+auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) -> void;
 
 auto draw_menu_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;
 auto draw_menu_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;

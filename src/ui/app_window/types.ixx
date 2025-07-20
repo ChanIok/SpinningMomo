@@ -1,5 +1,7 @@
 module;
 
+#include <d2d1_3.h>
+#include <dwrite_3.h>
 #include <windows.h>
 
 export module UI.AppWindow.Types;
@@ -66,12 +68,6 @@ struct DataState {
   std::vector<std::wstring> menu_items_to_show;
 };
 
-// 渲染状态（分离可变的渲染状态，解决const_cast问题）
-struct RenderState {
-  bool is_rendering = false;
-  bool needs_resize = false;
-};
-
 // 渲染相关状态（DPI缩放后的尺寸）
 struct LayoutConfig {
   // DPI缩放后的实际尺寸
@@ -101,5 +97,72 @@ struct LayoutConfig {
     settings_column_width = static_cast<int>(BASE_SETTINGS_COLUMN_WIDTH * scale);
   }
 };
+
+// One Dark Pro风格暗色主题颜色常量 (AppWindow专用)
+struct Colors {
+  // === One Dark Pro主色调 ===
+  static constexpr D2D1_COLOR_F WHITE = {0.16f, 0.17f, 0.21f, 1.0f};      // #282C34 主背景
+  static constexpr D2D1_COLOR_F SEPARATOR = {0.20f, 0.22f, 0.27f, 1.0f};  // #333842 分隔线
+  static constexpr D2D1_COLOR_F TEXT = {0.87f, 0.91f, 0.98f, 1.0f};       // #DEE8FC 更亮的主文字
+  static constexpr D2D1_COLOR_F INDICATOR = {0.38f, 0.68f, 0.84f, 1.0f};  // #61AFEF 青色指示器
+  static constexpr D2D1_COLOR_F HOVER = {0.22f, 0.24f, 0.29f, 1.0f};      // #383D4A 悬停背景
+
+  // === 半透明版本（用于分层窗口） ===
+  static constexpr D2D1_COLOR_F WHITE_SEMI = {0.16f, 0.17f, 0.21f, 0.65f};      // 主背景
+  static constexpr D2D1_COLOR_F SEPARATOR_SEMI = {0.20f, 0.22f, 0.27f, 0.65f};  // 分隔线
+  static constexpr D2D1_COLOR_F TITLE_BAR_SEMI = {0.16f, 0.17f, 0.21f, 0.65f};  // 标题栏
+  static constexpr D2D1_COLOR_F HOVER_SEMI = {0.22f, 0.24f, 0.29f, 0.65f};      // 悬停背景
+};
+
+// AppWindow专用的Direct2D渲染状态
+struct RenderContext {
+  // Direct2D 1.3资源句柄
+  ID2D1Factory7* factory = nullptr;               // Direct2D 1.3 工厂
+  ID2D1DCRenderTarget* render_target = nullptr;   // DC渲染目标（兼容性）
+  ID2D1DeviceContext6* device_context = nullptr;  // Direct2D 1.3 设备上下文
+  IDWriteFactory7* write_factory = nullptr;       // DirectWrite 1.3 工厂
+
+  // 内存DC和位图资源
+  HDC memory_dc = nullptr;
+  HBITMAP dib_bitmap = nullptr;
+  HGDIOBJ old_bitmap = nullptr;
+  void* bitmap_bits = nullptr;
+  SIZE bitmap_size = {0, 0};
+
+  // 缓存的画刷（简单的固定数组，避免动态分配）
+  // 不透明画刷（用于文字和指示器）
+  ID2D1SolidColorBrush* white_brush = nullptr;
+  ID2D1SolidColorBrush* title_brush = nullptr;
+  ID2D1SolidColorBrush* separator_brush = nullptr;
+  ID2D1SolidColorBrush* text_brush = nullptr;
+  ID2D1SolidColorBrush* indicator_brush = nullptr;
+  ID2D1SolidColorBrush* hover_brush = nullptr;
+
+  // 半透明画刷（用于背景和装饰元素）
+  ID2D1SolidColorBrush* white_semi_brush = nullptr;
+  ID2D1SolidColorBrush* title_semi_brush = nullptr;
+  ID2D1SolidColorBrush* separator_semi_brush = nullptr;
+  ID2D1SolidColorBrush* hover_semi_brush = nullptr;
+
+  // 文本格式
+  IDWriteTextFormat* text_format = nullptr;
+
+  // 状态标志
+  bool is_initialized = false;
+  bool is_rendering = false;
+  bool needs_resize = false;
+  bool needs_font_update = false;
+};
+
+// 辅助函数：将RECT转换为D2D1_RECT_F
+inline auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
+  return D2D1::RectF(static_cast<float>(rect.left), static_cast<float>(rect.top),
+                     static_cast<float>(rect.right), static_cast<float>(rect.bottom));
+}
+
+// 辅助函数：创建D2D矩形
+inline auto make_d2d_rect(float left, float top, float right, float bottom) -> D2D1_RECT_F {
+  return D2D1::RectF(left, top, right, bottom);
+}
 
 }  // namespace UI::AppWindow

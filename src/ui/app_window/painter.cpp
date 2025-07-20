@@ -8,9 +8,9 @@ module UI.AppWindow.Painter;
 
 import std;
 import Core.State;
-import Types.UI;
 import UI.AppWindow.Layout;
 import UI.AppWindow.State;
+import UI.AppWindow.Types;
 import UI.AppWindow.D2DContext;
 import Common.MenuIds;
 
@@ -18,18 +18,17 @@ namespace UI::AppWindow::Painter {
 
 // 主绘制函数实现
 auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
-  const auto& d2d = state.d2d_render;
-  auto& render_state = state.app_window->render;
+  auto& d2d = state.app_window->d2d_context;
 
   if (!d2d.is_initialized || !d2d.render_target) {
     return;
   }
 
   // 1. 先处理渲染目标resize（如果需要）
-  if (render_state.needs_resize) {
+  if (d2d.needs_resize) {
     if (UI::AppWindow::D2DContext::resize_d2d(
             state, {client_rect.right - client_rect.left, client_rect.bottom - client_rect.top})) {
-      render_state.needs_resize = false;
+      d2d.needs_resize = false;
     } else {
       return;  // resize失败，无法继续绘制
     }
@@ -42,11 +41,11 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
     }
   }
 
-  if (render_state.is_rendering) {
+  if (d2d.is_rendering) {
     return;
   }
 
-  render_state.is_rendering = true;
+  d2d.is_rendering = true;
 
   d2d.render_target->BeginDraw();
 
@@ -58,7 +57,7 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
     d2d.device_context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
   }
 
-  const auto rect_f = Types::UI::rect_to_d2d(client_rect);
+  const auto rect_f = UI::AppWindow::rect_to_d2d(client_rect);
 
   // 4. 绘制各个部分
   draw_app_background(state, rect_f);
@@ -71,10 +70,10 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
   // 处理设备丢失等错误
   if (hr == D2DERR_RECREATE_TARGET) {
     // 设备丢失，标记需要重新创建渲染目标
-    render_state.needs_resize = true;
+    d2d.needs_resize = true;
   }
 
-  render_state.is_rendering = false;
+  d2d.is_rendering = false;
 
   // 5. 更新分层窗口
   if (SUCCEEDED(hr)) {
@@ -84,24 +83,24 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
 
 // 绘制背景
 auto draw_app_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& d2d = state.d2d_render;
+  const auto& d2d = state.app_window->d2d_context;
   // 使用半透明白色背景
   d2d.render_target->FillRectangle(rect, d2d.white_semi_brush);
 }
 
 // 绘制标题栏
 auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& d2d = state.d2d_render;
+  const auto& d2d = state.app_window->d2d_context;
   const auto& render = state.app_window->layout;
 
   // 绘制标题栏背景（使用半透明画刷）
-  D2D1_RECT_F title_rect = Types::UI::make_d2d_rect(
+  D2D1_RECT_F title_rect = UI::AppWindow::make_d2d_rect(
       rect.left, rect.top, rect.right, rect.top + static_cast<float>(render.title_height));
   d2d.render_target->FillRectangle(title_rect, d2d.title_semi_brush);
 
   // 绘制标题文本（保持完全不透明）
   D2D1_RECT_F text_rect =
-      Types::UI::make_d2d_rect(rect.left + static_cast<float>(render.text_padding), rect.top,
+      UI::AppWindow::make_d2d_rect(rect.left + static_cast<float>(render.text_padding), rect.top,
                                rect.right, rect.top + static_cast<float>(render.title_height));
 
   d2d.render_target->DrawText(L"SpinningMomo",
@@ -111,27 +110,27 @@ auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& r
 
 // 绘制分隔线
 auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& d2d = state.d2d_render;
+  const auto& d2d = state.app_window->d2d_context;
   const auto& render = state.app_window->layout;
 
   // 使用简单的列边界计算
   const auto bounds = get_column_bounds(state);
 
   // 绘制水平分隔线（使用半透明画刷）
-  D2D1_RECT_F h_sep_rect = Types::UI::make_d2d_rect(
+  D2D1_RECT_F h_sep_rect = UI::AppWindow::make_d2d_rect(
       rect.left, rect.top + static_cast<float>(render.title_height), rect.right,
       rect.top + static_cast<float>(render.title_height + render.separator_height));
   d2d.render_target->FillRectangle(h_sep_rect, d2d.separator_semi_brush);
 
   // 绘制垂直分隔线1（使用半透明画刷）
-  D2D1_RECT_F v_sep_rect1 = Types::UI::make_d2d_rect(
+  D2D1_RECT_F v_sep_rect1 = UI::AppWindow::make_d2d_rect(
       static_cast<float>(bounds.ratio_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.bottom);
   d2d.render_target->FillRectangle(v_sep_rect1, d2d.separator_semi_brush);
 
   // 绘制垂直分隔线2（使用半透明画刷）
-  D2D1_RECT_F v_sep_rect2 = Types::UI::make_d2d_rect(
+  D2D1_RECT_F v_sep_rect2 = UI::AppWindow::make_d2d_rect(
       static_cast<float>(bounds.resolution_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.bottom);
@@ -155,17 +154,17 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     switch (item.category) {
       case UI::AppWindow::MenuItemCategory::AspectRatio:
         item_rect =
-            Types::UI::make_d2d_rect(rect.left, y, static_cast<float>(bounds.ratio_column_right),
+            UI::AppWindow::make_d2d_rect(rect.left, y, static_cast<float>(bounds.ratio_column_right),
                                      y + static_cast<float>(render.item_height));
         break;
       case UI::AppWindow::MenuItemCategory::Resolution:
-        item_rect = Types::UI::make_d2d_rect(
+        item_rect = UI::AppWindow::make_d2d_rect(
             static_cast<float>(bounds.ratio_column_right + render.separator_height), y,
             static_cast<float>(bounds.resolution_column_right),
             y + static_cast<float>(render.item_height));
         break;
       case UI::AppWindow::MenuItemCategory::Feature:
-        item_rect = Types::UI::make_d2d_rect(
+        item_rect = UI::AppWindow::make_d2d_rect(
             static_cast<float>(bounds.resolution_column_right + render.separator_height),
             settings_y, rect.right, settings_y + static_cast<float>(render.item_height));
         settings_y += static_cast<float>(render.item_height);
@@ -196,7 +195,7 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
 // 绘制单个菜单项
 auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindow::MenuItem& item,
                           const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
-  const auto& d2d = state.d2d_render;
+  const auto& d2d = state.app_window->d2d_context;
   const auto& render = state.app_window->layout;
 
   // 绘制悬停背景
@@ -208,7 +207,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
   const bool is_selected = UI::AppWindow::State::is_item_selected(item, state.app_window->ui);
   if (is_selected) {
     const int indicator_width = get_indicator_width(item, state);
-    D2D1_RECT_F indicator_rect = Types::UI::make_d2d_rect(
+    D2D1_RECT_F indicator_rect = UI::AppWindow::make_d2d_rect(
         item_rect.left, item_rect.top, item_rect.left + static_cast<float>(indicator_width),
         item_rect.bottom);
     d2d.render_target->FillRectangle(indicator_rect, d2d.indicator_brush);
@@ -216,7 +215,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
 
   // 绘制文本（保持完全不透明）
   const int indicator_width = get_indicator_width(item, state);
-  D2D1_RECT_F text_rect = Types::UI::make_d2d_rect(
+  D2D1_RECT_F text_rect = UI::AppWindow::make_d2d_rect(
       item_rect.left + static_cast<float>(render.text_padding + indicator_width), item_rect.top,
       item_rect.right, item_rect.bottom);
 
@@ -226,7 +225,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
 
 // UpdateLayeredWindow函数 - 将内存DC更新到分层窗口
 auto update_layered_window(const Core::State::AppState& state, HWND hwnd) -> void {
-  const auto& d2d = state.d2d_render;
+  const auto& d2d = state.app_window->d2d_context;
 
   if (!d2d.memory_dc || !d2d.is_initialized) {
     return;

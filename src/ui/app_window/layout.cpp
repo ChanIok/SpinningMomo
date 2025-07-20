@@ -8,7 +8,6 @@ module UI.AppWindow.Layout;
 import std;
 import Core.State;
 import UI.AppWindow.State;
-import Types.UI;
 import Utils.Logger;
 
 namespace UI::AppWindow {

@@ -69,7 +69,6 @@ namespace Core::State {
 export struct AppState {
   // 应用级状态
   std::unique_ptr<Core::Async::State::AsyncRuntimeState> async_runtime;
-  Types::UI::D2DRenderState d2d_render;
   std::unique_ptr<Core::Events::EventBus> event_bus;
   std::unique_ptr<Core::I18n::State::I18nState> i18n;
   std::unique_ptr<Core::RpcHandlers::State::RpcHandlerState> rpc_handlers;

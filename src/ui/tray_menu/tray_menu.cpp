@@ -15,7 +15,7 @@ import Core.State;
 import Core.I18n.State;
 import Core.Constants;
 import Core.I18n.Types;
-import Types.UI;
+import UI.AppWindow.Types;
 import UI.AppWindow.State;
 import UI.TrayMenu.State;
 import UI.TrayMenu.Layout;
@@ -261,9 +261,9 @@ auto show_menu(Core::State::AppState& state, const Vendor::Windows::POINT& posit
     }
   }
 
-  // 检查D2D是否已初始化
-  if (!state.d2d_render.is_initialized) {
-    Logger().warn("D2D not initialized, tray menu may not render correctly");
+  // 检查AppWindow的D2D是否已初始化
+  if (!state.app_window || !state.app_window->d2d_context.is_initialized) {
+    Logger().warn("AppWindow D2D not initialized, tray menu may not render correctly");
   }
 
   // 更新菜单项状态

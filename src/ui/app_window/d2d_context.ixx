@@ -6,7 +6,6 @@ export module UI.AppWindow.D2DContext;
 
 import std;
 import Core.State;
-import Types.UI;
 
 namespace UI::AppWindow::D2DContext {
 

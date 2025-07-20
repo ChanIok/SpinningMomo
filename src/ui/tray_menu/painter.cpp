@@ -10,31 +10,37 @@ module UI.TrayMenu.Painter;
 
 import std;
 import Core.State;
-import Types.UI;
+import UI.AppWindow.Types;
+import UI.AppWindow.State;
 import UI.TrayMenu.State;
-import UI.TrayMenu.D2DContext;
+import UI.TrayMenu.Layout;
 import Utils.Logger;
 
 namespace UI::TrayMenu::Painter {
 
 // 主绘制函数实现
 auto paint_tray_menu(const Core::State::AppState& state, const RECT& client_rect) -> void {
-  const auto& d2d = state.d2d_render;
-  const auto& tray_menu = *state.tray_menu;
+  // 检查AppWindow的D2D上下文是否可用
+  if (!state.app_window) {
+    return;
+  }
+  const auto& d2d = state.app_window->d2d_context;
+  auto& tray_menu = *state.tray_menu;
 
   // 检查主菜单D2D资源是否就绪
   if (!tray_menu.main_menu_d2d_ready || !tray_menu.render_target) {
     return;
   }
 
-  // 检查全局D2D资源是否可用（字体等）
+  // 检查AppWindow D2D资源是否可用（字体等）
   if (!d2d.is_initialized) {
     return;
   }
 
   tray_menu.render_target->BeginDraw();
 
-  const auto rect_f = Types::UI::rect_to_d2d(client_rect);
+  // 将RECT转换为D2D1_RECT_F
+  const auto rect_f = UI::AppWindow::rect_to_d2d(client_rect);
 
   // 绘制各个部分
   draw_menu_background(state, rect_f);
@@ -102,7 +108,7 @@ auto draw_menu_items(const Core::State::AppState& state, const D2D1_RECT_F& rect
 auto draw_single_menu_item(const Core::State::AppState& state,
                            const UI::TrayMenu::State::MenuItem& item, const D2D1_RECT_F& item_rect,
                            bool is_hovered) -> void {
-  const auto& d2d = state.d2d_render;
+  const auto& d2d = state.app_window->d2d_context;
   const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
@@ -159,8 +165,12 @@ auto draw_separator(const Core::State::AppState& state, const D2D1_RECT_F& separ
 
 // 子菜单绘制函数实现
 auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) -> void {
-  const auto& d2d = state.d2d_render;
-  const auto& tray_menu = *state.tray_menu;
+  // 检查AppWindow的D2D上下文是否可用
+  if (!state.app_window) {
+    return;
+  }
+  const auto& d2d = state.app_window->d2d_context;
+  auto& tray_menu = *state.tray_menu;
 
   // 检查子菜单D2D资源是否就绪
   if (!tray_menu.submenu_d2d_ready || !tray_menu.submenu_render_target) {
@@ -177,7 +187,8 @@ auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) 
 
   tray_menu.submenu_render_target->BeginDraw();
 
-  const auto rect_f = Types::UI::rect_to_d2d(client_rect);
+  // 将RECT转换为D2D1_RECT_F
+  const auto rect_f = UI::AppWindow::rect_to_d2d(client_rect);
 
   // 绘制子菜单背景
   draw_submenu_background(state, rect_f);
@@ -245,7 +256,7 @@ auto draw_submenu_items(const Core::State::AppState& state, const D2D1_RECT_F& r
 auto draw_submenu_single_item(const Core::State::AppState& state,
                               const UI::TrayMenu::State::MenuItem& item,
                               const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
-  const auto& d2d = state.d2d_render;
+  const auto& d2d = state.app_window->d2d_context;
   const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 

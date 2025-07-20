@@ -22,7 +22,7 @@ namespace Handlers {
 // 从 app_state.ixx 迁移的 DPI 更新函数
 auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_dpi, const Vendor::Windows::SIZE& window_size) -> void {
   state.app_window->window.dpi = new_dpi;
-  state.d2d_render.needs_font_update = true;
+  state.app_window->d2d_context.needs_font_update = true;
   state.app_window->layout.update_dpi_scaling(new_dpi);
   state.tray_menu->layout.update_dpi_scaling(new_dpi);
   
@@ -35,7 +35,7 @@ auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_d
                  window_size.cx, window_size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
     
     // 如果Direct2D已初始化，调整渲染目标大小
-    if (state.d2d_render.is_initialized) {
+    if (state.app_window->d2d_context.is_initialized) {
       UI::AppWindow::D2DContext::resize_d2d(state, window_size);
     }
   }

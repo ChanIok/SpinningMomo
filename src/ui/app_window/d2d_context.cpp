@@ -9,7 +9,7 @@ module UI.AppWindow.D2DContext;
 import std;
 import Core.State;
 import UI.AppWindow.State;
-import Types.UI;
+import UI.AppWindow.Types;
 
 namespace UI::AppWindow::D2DContext {
 
@@ -20,27 +20,27 @@ auto create_brush_safe(ID2D1RenderTarget* target, const D2D1_COLOR_F& color,
 }
 
 // 辅助函数：批量创建所有画刷
-auto create_all_brushes_simple(Types::UI::D2DRenderState& d2d) -> bool {
-  return create_brush_safe(d2d.render_target, Types::UI::D2DColors::WHITE, &d2d.white_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::SEPARATOR,
+auto create_all_brushes_simple(UI::AppWindow::RenderContext& d2d) -> bool {
+  return create_brush_safe(d2d.render_target, UI::AppWindow::Colors::WHITE, &d2d.white_brush) &&
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::SEPARATOR,
                            &d2d.separator_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::TEXT, &d2d.text_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::INDICATOR,
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::TEXT, &d2d.text_brush) &&
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::INDICATOR,
                            &d2d.indicator_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::HOVER, &d2d.hover_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::WHITE_SEMI,
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::HOVER, &d2d.hover_brush) &&
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::WHITE_SEMI,
                            &d2d.white_semi_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::TITLE_BAR_SEMI,
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::TITLE_BAR_SEMI,
                            &d2d.title_semi_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::SEPARATOR_SEMI,
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::SEPARATOR_SEMI,
                            &d2d.separator_semi_brush) &&
-         create_brush_safe(d2d.render_target, Types::UI::D2DColors::HOVER_SEMI,
+         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::HOVER_SEMI,
                            &d2d.hover_semi_brush);
 }
 
 // 初始化Direct2D资源
 auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
-  auto& d2d = state.d2d_render;
+  auto& d2d = state.app_window->d2d_context;
 
   // 获取窗口大小
   RECT rc;
@@ -149,7 +149,7 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
 
 // 清理Direct2D资源
 auto cleanup_d2d(Core::State::AppState& state) -> void {
-  auto& d2d = state.d2d_render;
+  auto& d2d = state.app_window->d2d_context;
 
   // 释放画刷
   if (d2d.white_brush) {
@@ -245,7 +245,7 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
 
 // 调整渲染目标大小
 auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
-  auto& d2d = state.d2d_render;
+  auto& d2d = state.app_window->d2d_context;
 
   if (!d2d.is_initialized || !d2d.render_target) {
     return false;
@@ -301,7 +301,7 @@ auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
 
 // 更新文本格式（DPI变化时）
 auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
-  auto& d2d = state.d2d_render;
+  auto& d2d = state.app_window->d2d_context;
   auto& layout = state.app_window->layout;
 
   // 如果不需要更新或工厂不可用，直接返回成功

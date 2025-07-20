@@ -11,7 +11,6 @@ import Core.Events;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.Settings.Compute;
-import Types.Presets;
 import Utils.Path;
 
 namespace Features::Settings {

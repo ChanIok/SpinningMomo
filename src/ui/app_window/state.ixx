@@ -14,7 +14,7 @@ struct AppWindowState {
   AppWindow::InteractionState ui;
   AppWindow::DataState data;
   AppWindow::LayoutConfig layout;
-  AppWindow::RenderState render;
+  AppWindow::RenderContext d2d_context;  // 私有的D2D渲染上下文
 };
 
 // 辅助函数

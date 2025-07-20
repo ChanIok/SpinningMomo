@@ -5,7 +5,6 @@ module Features.Settings.Compute;
 import std;
 import Features.Settings.Types;
 import Features.Settings.State;
-import Types.Presets;
 import Common.MenuData.Types;
 import Common.MenuIds;
 import Core.Constants;

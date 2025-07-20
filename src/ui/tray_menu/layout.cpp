@@ -12,13 +12,19 @@ module UI.TrayMenu.Layout;
 import std;
 import Core.State;
 import UI.TrayMenu.State;
+import UI.AppWindow.State;
 import Vendor.Windows;
 
 namespace UI::TrayMenu::Layout {
 
 // 计算文本宽度
 auto calculate_text_width(const Core::State::AppState& state, const std::wstring& text) -> int {
-  const auto& d2d = state.d2d_render;
+  // 检查AppWindow的D2D上下文是否可用
+  if (!state.app_window) {
+    // 如果AppWindow未初始化，使用估算值
+    return static_cast<int>(text.length() * state.tray_menu->layout.font_size * 0.6);
+  }
+  const auto& d2d = state.app_window->d2d_context;
 
   if (!d2d.is_initialized || !d2d.text_format) {
     // 如果D2D未初始化，使用估算值

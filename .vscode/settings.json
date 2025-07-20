@@ -6,6 +6,7 @@
   "C_Cpp.experimentalFeatures": "enabled",
   "C_Cpp.intelliSenseEngine": "default",
   "C_Cpp.enhancedColorization": "enabled",
+  "C_Cpp.errorSquiggles": "disabled",
   "files.associations": {
     "vector": "cpp",
     "xstring": "cpp",

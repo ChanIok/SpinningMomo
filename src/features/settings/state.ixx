@@ -4,7 +4,6 @@ export module Features.Settings.State;
 
 import std;
 import Features.Settings.Types;
-import Types.Presets;
 import Common.MenuData.Types;
 
 export namespace Features::Settings::State {
