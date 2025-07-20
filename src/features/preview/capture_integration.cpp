@@ -59,15 +59,15 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
     return std::unexpected("Failed to create capture session");
   }
 
-  state.preview.capture_session.session = std::move(session_result.value());
-  state.preview.capture_session.active = false;
+  state.preview->capture_session.session = std::move(session_result.value());
+  state.preview->capture_session.active = false;
 
   Logger().info("Capture system initialized successfully");
   return {};
 }
 
 auto start_capture(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& capture = state.preview.capture_session.session;
+  auto& capture = state.preview->capture_session.session;
 
   auto start_result = Utils::Graphics::Capture::start_capture(capture);
   if (!start_result) {
@@ -75,37 +75,37 @@ auto start_capture(Core::State::AppState& state) -> std::expected<void, std::str
     return std::unexpected("Failed to start capture");
   }
 
-  state.preview.capture_session.active = true;
+  state.preview->capture_session.active = true;
   Logger().info("Capture started successfully");
   return {};
 }
 
 auto stop_capture(Core::State::AppState& state) -> void {
-  auto& capture = state.preview.capture_session.session;
+  auto& capture = state.preview->capture_session.session;
 
-  if (state.preview.capture_session.active) {
+  if (state.preview->capture_session.active) {
     Utils::Graphics::Capture::stop_capture(capture);
-    state.preview.capture_session.active = false;
+    state.preview->capture_session.active = false;
     Logger().info("Capture stopped");
   }
 }
 
 auto cleanup_capture(Core::State::AppState& state) -> void {
-  auto& capture = state.preview.capture_session.session;
+  auto& capture = state.preview->capture_session.session;
 
-  if (state.preview.capture_session.active) {
+  if (state.preview->capture_session.active) {
     Utils::Graphics::Capture::stop_capture(capture);
   }
 
   Utils::Graphics::Capture::cleanup_capture_session(capture);
-  state.preview.capture_session.active = false;
+  state.preview->capture_session.active = false;
 
   Logger().info("Capture resources cleaned up");
 }
 
 auto on_frame_arrived(Core::State::AppState& state, Microsoft::WRL::ComPtr<ID3D11Texture2D> texture)
     -> void {
-  if (!state.preview.running || !texture) {
+  if (!state.preview->running || !texture) {
     return;
   }
 
@@ -114,11 +114,11 @@ auto on_frame_arrived(Core::State::AppState& state, Microsoft::WRL::ComPtr<ID3D1
 }
 
 auto is_capture_active(const Core::State::AppState& state) -> bool {
-  return state.preview.capture_session.active;
+  return state.preview->capture_session.active;
 }
 
 auto get_capture_session(Core::State::AppState& state) -> CaptureSession* {
-  return &state.preview.capture_session;
+  return &state.preview->capture_session;
 }
 
 }  // namespace Features::Preview::CaptureIntegration

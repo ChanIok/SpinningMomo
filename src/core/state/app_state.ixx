@@ -3,60 +3,68 @@ module;
 export module Core.State;
 
 import std;
-// import Core.Async.State; // 被移除
-// import Core.Events;
-// import Core.I18n.State;
+
 import Core.RpcHandlers.State; // Core::RpcHandlers的模板依赖
-// import Core.WebView.State; // 改为前向声明
-import Features.Letterbox.State;
-import Features.Notifications.State;
-import Features.Overlay.State;
-import Features.Preview.State;
-import Features.Screenshot.State;
-// import Features.Settings.State; // 改为前向声明
+
 import Types.UI;
-// import UI.AppWindow.State; // 改为前向声明
-// import UI.TrayIcon.State; // 改为前向声明
-// import UI.TrayMenu.State; // 改为前向声明
-import Vendor.Windows;
 
-export namespace Core::Async::State {
-struct AsyncRuntimeState;
+namespace Core::Async::State {
+export struct AsyncRuntimeState;
 }
 
-export namespace Core::Events {
-struct EventBus;
+namespace Core::Events {
+export struct EventBus;
 }
 
-export namespace Core::I18n::State {
-struct I18nState;
+namespace Core::I18n::State {
+export struct I18nState;
 }
 
-export namespace Core::WebView::State {
-struct WebViewState;
+namespace Core::WebView::State {
+export struct WebViewState;
 }
 
-export namespace Features::Settings::State {
-struct SettingsState;
+namespace Features::Settings::State {
+export struct SettingsState;
 }
 
-export namespace UI::AppWindow::State {
-struct AppWindowState;
+namespace UI::AppWindow::State {
+export struct AppWindowState;
 }
 
-export namespace UI::TrayIcon::State {
-struct TrayIconState;
+namespace UI::TrayIcon::State {
+export struct TrayIconState;
 }
 
-export namespace UI::TrayMenu::State {
-struct TrayMenuState;
+namespace UI::TrayMenu::State {
+export struct TrayMenuState;
 }
 
-// export namespace Core::RpcHandlers::State {
-// struct RpcHandlerState;
+namespace Features::Letterbox::State {
+export struct LetterboxState;
+}
+
+namespace Features::Notifications::State {
+export struct NotificationSystemState;
+}
+
+namespace Features::Overlay::State {
+export struct OverlayState;
+}
+
+namespace Features::Preview::State {
+export struct PreviewState;
+}
+
+namespace Features::Screenshot::State {
+export struct ScreenshotState;
+}
+
+// namespace Core::RpcHandlers::State {
+// export struct RpcHandlerState;
 // }
 
-export namespace Core::State {
+namespace Core::State {
 
 export struct AppState {
   // 应用级状态
@@ -76,11 +84,11 @@ export struct AppState {
   std::unique_ptr<UI::TrayMenu::State::TrayMenuState> tray_menu;
 
   // 功能模块状态
-  Features::Letterbox::State::LetterboxState letterbox;
-  Features::Notifications::State::NotificationSystemState notifications;
-  Features::Overlay::State::OverlayState overlay;
-  Features::Preview::State::PreviewState preview;
-  Features::Screenshot::State::ScreenshotState screenshot;
+  std::unique_ptr<Features::Letterbox::State::LetterboxState> letterbox;
+  std::unique_ptr<Features::Notifications::State::NotificationSystemState> notifications;
+  std::unique_ptr<Features::Overlay::State::OverlayState> overlay;
+  std::unique_ptr<Features::Preview::State::PreviewState> preview;
+  std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;
 };
 
 }  // namespace Core::State

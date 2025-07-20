@@ -35,7 +35,7 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
 // 初始化
 auto initialize(Core::State::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string> {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   if (letterbox.is_initialized) {
     return std::unexpected{"Letterbox already initialized"};
@@ -60,7 +60,7 @@ auto initialize(Core::State::AppState& state, HINSTANCE instance)
 
 // 关闭
 auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
     return {};
@@ -97,7 +97,7 @@ auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> 
 
 // 显示
 auto show(Core::State::AppState& state, HWND target_window) -> std::expected<void, std::string> {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
     return std::unexpected{"Letterbox not initialized"};
@@ -139,7 +139,7 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
 
 // 隐藏
 auto hide(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
     return std::unexpected{"Letterbox not initialized"};
@@ -161,7 +161,7 @@ auto hide(Core::State::AppState& state) -> std::expected<void, std::string> {
 // 更新位置
 auto update_position(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
     return std::unexpected{"Letterbox not initialized"};
@@ -205,16 +205,16 @@ auto update_position(Core::State::AppState& state, HWND target_window)
 }
 
 // 状态查询
-auto is_visible(const Core::State::AppState& state) -> bool { return state.letterbox.is_visible; }
+auto is_visible(const Core::State::AppState& state) -> bool { return state.letterbox->is_visible; }
 
 auto is_event_thread_running(const Core::State::AppState& state) -> bool {
-  return state.letterbox.event_thread.joinable();
+  return state.letterbox->event_thread.joinable();
 }
 
 // 启动事件监听
 auto start_event_monitoring(Core::State::AppState& state, const State::LetterboxConfig& config)
     -> std::expected<void, std::string> {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   if (letterbox.event_thread.joinable()) {
     return {};  // 已经在运行
@@ -231,7 +231,7 @@ auto start_event_monitoring(Core::State::AppState& state, const State::Letterbox
 
 // 停止事件监听
 auto stop_event_monitoring(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   if (letterbox.event_thread.joinable()) {
     letterbox.event_thread.request_stop();
@@ -291,7 +291,7 @@ auto create_letterbox_window(State::LetterboxState& letterbox, Core::State::AppS
 
 auto event_thread_proc(Core::State::AppState& state, std::stop_token stoken,
                        const State::LetterboxConfig& config) -> void {
-  auto& letterbox = state.letterbox;
+  auto& letterbox = *state.letterbox;
 
   // 注册消息窗口类
   WNDCLASSEX wcMessage = {0};
@@ -356,7 +356,7 @@ LRESULT CALLBACK letterbox_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPAR
     return DefWindowProc(hwnd, message, wParam, lParam);
   }
 
-  auto& letterbox = state->letterbox;
+  auto& letterbox = *state->letterbox;
 
   switch (message) {
     case WM_TIMER:
@@ -405,7 +405,7 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
       break;
 
     case State::WM_SHOW_LETTERBOX:
-      if (!is_visible(*state) && state->letterbox.target_window) {
+      if (!is_visible(*state) && state->letterbox->target_window) {
         [[maybe_unused]] auto result = show(*state);
       }
       break;
@@ -420,11 +420,11 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
   auto* state =
       reinterpret_cast<Core::State::AppState*>(GetProp(hwnd, L"SpinningMomo_LetterboxState"));
 
-  if (!state || !state->letterbox.event_thread.joinable() || !state->letterbox.message_window) {
+  if (!state || !state->letterbox->event_thread.joinable() || !state->letterbox->message_window) {
     return;
   }
 
-  auto& letterbox = state->letterbox;
+  auto& letterbox = *state->letterbox;
 
   // 只处理与目标窗口相关的事件
   if (hwnd == letterbox.target_window) {

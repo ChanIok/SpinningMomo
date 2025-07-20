@@ -289,8 +289,8 @@ auto update_window_positions(Core::State::AppState& state) -> void {
   int base_x = workArea.right - window_width - padding;
 
   // 从下往上迭代，定位窗口
-  for (auto it = state.notifications.active_notifications.rbegin();
-       it != state.notifications.active_notifications.rend(); ++it) {
+  for (auto it = state.notifications->active_notifications.rbegin();
+       it != state.notifications->active_notifications.rend(); ++it) {
     auto& n = *it;
     if (n.state == Features::Notifications::State::NotificationAnimState::Done) continue;
 
@@ -322,9 +322,9 @@ auto update_window_positions(Core::State::AppState& state) -> void {
 auto show_notification(Core::State::AppState& state, const std::wstring& title,
                        const std::wstring& message) -> void {
   // 1. 如果活动通知数量达到上限，将最旧的标记为淡出
-  if (state.notifications.active_notifications.size() >= Constants::MAX_VISIBLE_NOTIFICATIONS) {
+  if (state.notifications->active_notifications.size() >= Constants::MAX_VISIBLE_NOTIFICATIONS) {
     // 找到最旧的 "Displaying" 通知，并将其状态设置为 FadingOut
-    for (auto& n : state.notifications.active_notifications) {
+    for (auto& n : state.notifications->active_notifications) {
       if (n.state == Features::Notifications::State::NotificationAnimState::Displaying) {
         n.state = Features::Notifications::State::NotificationAnimState::FadingOut;
         n.last_state_change_time = std::chrono::steady_clock::now();
@@ -334,16 +334,16 @@ auto show_notification(Core::State::AppState& state, const std::wstring& title,
   }
 
   // 2. 创建新的通知对象
-  state.notifications.active_notifications.emplace_back(
+  state.notifications->active_notifications.emplace_back(
       Features::Notifications::State::Notification{
-          .id = state.notifications.next_id++,
+          .id = state.notifications->next_id++,
           .title = title,
           .message = message,
           .state = Features::Notifications::State::NotificationAnimState::Spawning,
           .last_state_change_time = std::chrono::steady_clock::now()});
 
   // 在更新位置前计算高度
-  auto& new_notification = state.notifications.active_notifications.back();
+  auto& new_notification = state.notifications->active_notifications.back();
   new_notification.height =
       calculate_window_height(new_notification.message, state.app_window->window.dpi);
 
@@ -364,8 +364,8 @@ auto update_notifications(Core::State::AppState& state) -> void {
   auto now = std::chrono::steady_clock::now();
 
   // 遍历所有通知，根据其状态更新状态
-  for (auto it = state.notifications.active_notifications.begin();
-       it != state.notifications.active_notifications.end();
+  for (auto it = state.notifications->active_notifications.begin();
+       it != state.notifications->active_notifications.end();
        /* no increment */) {
     auto& notification = *it;
     bool should_erase = false;
@@ -466,7 +466,7 @@ auto update_notifications(Core::State::AppState& state) -> void {
       if (notification.hwnd) {
         DestroyWindow(notification.hwnd);
       }
-      it = state.notifications.active_notifications.erase(it);
+      it = state.notifications->active_notifications.erase(it);
     } else {
       ++it;
     }

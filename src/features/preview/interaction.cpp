@@ -67,7 +67,7 @@ auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   GetClientRect(hwnd, &rc);
 
   // 绘制标题栏背景
-  RECT titleRect = {0, 0, rc.right, state.preview.dpi_sizes.title_height};
+  RECT titleRect = {0, 0, rc.right, state.preview->dpi_sizes.title_height};
   HBRUSH titleBrush = CreateSolidBrush(RGB(240, 240, 240));
   FillRect(hdc, &titleRect, titleBrush);
   DeleteObject(titleBrush);
@@ -75,20 +75,20 @@ auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   // 绘制标题文本
   SetBkMode(hdc, TRANSPARENT);
   SetTextColor(hdc, RGB(51, 51, 51));
-  HFONT hFont = CreateFont(-state.preview.dpi_sizes.font_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE,
+  HFONT hFont = CreateFont(-state.preview->dpi_sizes.font_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE,
                            FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, TEXT("微软雅黑"));
   HFONT oldFont = (HFONT)SelectObject(hdc, hFont);
 
-  titleRect.left += state.preview.dpi_sizes.font_size;
+  titleRect.left += state.preview->dpi_sizes.font_size;
   DrawTextW(hdc, L"预览窗口", -1, &titleRect, DT_SINGLELINE | DT_VCENTER | DT_LEFT);
 
   SelectObject(hdc, oldFont);
   DeleteObject(hFont);
 
   // 绘制分隔线
-  RECT sepRect = {0, state.preview.dpi_sizes.title_height - 1, rc.right,
-                  state.preview.dpi_sizes.title_height};
+  RECT sepRect = {0, state.preview->dpi_sizes.title_height - 1, rc.right,
+                  state.preview->dpi_sizes.title_height};
   HBRUSH sepBrush = CreateSolidBrush(RGB(229, 229, 229));
   FillRect(hdc, &sepRect, sepBrush);
   DeleteObject(sepBrush);
@@ -99,9 +99,9 @@ auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
 
 auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
-  if (state.preview.interaction.is_dragging) {
+  if (state.preview->interaction.is_dragging) {
     update_window_drag(state, hwnd, {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
-  } else if (state.preview.interaction.viewport_dragging) {
+  } else if (state.preview->interaction.viewport_dragging) {
     update_viewport_drag(state, hwnd, {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)});
   }
   return 0;
@@ -118,7 +118,7 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
   }
 
   // 如果游戏窗口完全可见，整个预览窗口都可以拖拽
-  if (state.preview.viewport.game_window_fully_visible) {
+  if (state.preview->viewport.game_window_fully_visible) {
     start_window_drag(state, hwnd, pt);
     return 0;
   }
@@ -132,11 +132,11 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
     GetClientRect(hwnd, &clientRect);
     float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
     float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top -
-                                             state.preview.dpi_sizes.title_height);
+                                             state.preview->dpi_sizes.title_height);
 
     float relativeX = static_cast<float>(pt.x) / previewWidth;
     float relativeY =
-        static_cast<float>(pt.y - state.preview.dpi_sizes.title_height) / previewHeight;
+        static_cast<float>(pt.y - state.preview->dpi_sizes.title_height) / previewHeight;
 
     move_game_window_to_position(state, relativeX, relativeY);
   }
@@ -148,9 +148,9 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
 
 auto handle_left_button_up(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
-  if (state.preview.interaction.is_dragging) {
+  if (state.preview->interaction.is_dragging) {
     end_window_drag(state, hwnd);
-  } else if (state.preview.interaction.viewport_dragging) {
+  } else if (state.preview->interaction.viewport_dragging) {
     end_viewport_drag(state, hwnd);
   }
   return 0;
@@ -182,8 +182,8 @@ auto handle_sizing(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARA
     case WMSZ_LEFT:
     case WMSZ_RIGHT:
       // 调整宽度，相应调整高度
-      width = std::max(width, state.preview.size.min_ideal_size);
-      height = static_cast<int>(width * state.preview.size.aspect_ratio);
+      width = std::max(width, state.preview->size.min_ideal_size);
+      height = static_cast<int>(width * state.preview->size.aspect_ratio);
       if (wParam == WMSZ_LEFT) {
         rect->left = rect->right - width;
       } else {
@@ -195,8 +195,8 @@ auto handle_sizing(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARA
     case WMSZ_TOP:
     case WMSZ_BOTTOM:
       // 调整高度，相应调整宽度
-      height = std::max(height, state.preview.size.min_ideal_size);
-      width = static_cast<int>(height / state.preview.size.aspect_ratio);
+      height = std::max(height, state.preview->size.min_ideal_size);
+      width = static_cast<int>(height / state.preview->size.aspect_ratio);
       if (wParam == WMSZ_TOP) {
         rect->top = rect->bottom - height;
       } else {
@@ -210,8 +210,8 @@ auto handle_sizing(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARA
     case WMSZ_BOTTOMLEFT:
     case WMSZ_BOTTOMRIGHT:
       // 对角调整，以宽度为准
-      width = std::max(width, state.preview.size.min_ideal_size);
-      height = static_cast<int>(width * state.preview.size.aspect_ratio);
+      width = std::max(width, state.preview->size.min_ideal_size);
+      height = static_cast<int>(width * state.preview->size.aspect_ratio);
 
       if (wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT) {
         rect->left = rect->right - width;
@@ -228,12 +228,12 @@ auto handle_sizing(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARA
   }
 
   // 更新理想尺寸
-  state.preview.size.ideal_size = std::max(width, height);
+  state.preview->size.ideal_size = std::max(width, height);
   return TRUE;
 }
 
 auto handle_size(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam) -> LRESULT {
-  if (!state.preview.rendering_resources.initialized) {
+  if (!state.preview->rendering_resources.initialized) {
     return 0;
   }
 
@@ -243,9 +243,9 @@ auto handle_size(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM 
   int height = clientRect.bottom - clientRect.top;
 
   // 更新理想尺寸
-  state.preview.size.ideal_size = std::max(width, height);
-  state.preview.size.window_width = width;
-  state.preview.size.window_height = height;
+  state.preview->size.ideal_size = std::max(width, height);
+  state.preview->size.window_width = width;
+  state.preview->size.window_height = height;
 
   // 调整渲染系统大小
   if (auto result = Features::Preview::Rendering::resize_rendering(state, width, height); !result) {
@@ -259,7 +259,7 @@ auto handle_dpi_changed(Core::State::AppState& state, HWND hwnd, WPARAM wParam, 
     -> LRESULT {
   // 更新DPI
   UINT newDpi = HIWORD(wParam);
-  state.preview.dpi_sizes.update_dpi_scaling(newDpi);
+  state.preview->dpi_sizes.update_dpi_scaling(newDpi);
 
   // 使用系统建议的新窗口位置
   RECT* const prcNewWindow = (RECT*)lParam;
@@ -285,8 +285,8 @@ auto handle_nc_hit_test(Core::State::AppState& state, HWND hwnd, WPARAM wParam, 
 
 auto handle_right_button_up(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
-  if (state.preview.main_window) {
-    PostMessage(state.preview.main_window, Core::Constants::WM_PREVIEW_RCLICK, 0, 0);
+  if (state.preview->main_window) {
+    PostMessage(state.preview->main_window, Core::Constants::WM_PREVIEW_RCLICK, 0, 0);
   }
   return 0;
 }
@@ -294,58 +294,58 @@ auto handle_right_button_up(Core::State::AppState& state, HWND hwnd, WPARAM wPar
 // 窗口拖拽实现
 
 auto start_window_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
-  state.preview.interaction.is_dragging = true;
-  state.preview.interaction.drag_start = pt;
+  state.preview->interaction.is_dragging = true;
+  state.preview->interaction.drag_start = pt;
   SetCapture(hwnd);
 }
 
 auto update_window_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
-  if (!state.preview.interaction.is_dragging) return;
+  if (!state.preview->interaction.is_dragging) return;
 
   RECT rect;
   GetWindowRect(hwnd, &rect);
-  int deltaX = pt.x - state.preview.interaction.drag_start.x;
-  int deltaY = pt.y - state.preview.interaction.drag_start.y;
+  int deltaX = pt.x - state.preview->interaction.drag_start.x;
+  int deltaY = pt.y - state.preview->interaction.drag_start.y;
 
   SetWindowPos(hwnd, nullptr, rect.left + deltaX, rect.top + deltaY, 0, 0,
                SWP_NOSIZE | SWP_NOZORDER);
 }
 
 auto end_window_drag(Core::State::AppState& state, HWND hwnd) -> void {
-  state.preview.interaction.is_dragging = false;
+  state.preview->interaction.is_dragging = false;
   ReleaseCapture();
 }
 
 // 视口拖拽实现
 
 auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
-  state.preview.interaction.viewport_dragging = true;
-  state.preview.interaction.viewport_drag_start = pt;
+  state.preview->interaction.viewport_dragging = true;
+  state.preview->interaction.viewport_drag_start = pt;
 
   // 计算拖拽偏移
   if (is_point_in_viewport(state, pt)) {
-    state.preview.interaction.viewport_drag_offset.x =
-        pt.x - state.preview.viewport.viewport_rect.left;
-    state.preview.interaction.viewport_drag_offset.y =
-        pt.y - state.preview.viewport.viewport_rect.top;
+    state.preview->interaction.viewport_drag_offset.x =
+        pt.x - state.preview->viewport.viewport_rect.left;
+    state.preview->interaction.viewport_drag_offset.y =
+        pt.y - state.preview->viewport.viewport_rect.top;
   } else {
     // 点击在视口外，计算相对于视口中心的偏移
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
     float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
     float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top -
-                                             state.preview.dpi_sizes.title_height);
+                                             state.preview->dpi_sizes.title_height);
 
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-    float gameWidth = static_cast<float>(state.preview.game_window_rect.right -
-                                         state.preview.game_window_rect.left);
-    float gameHeight = static_cast<float>(state.preview.game_window_rect.bottom -
-                                          state.preview.game_window_rect.top);
+    float gameWidth = static_cast<float>(state.preview->game_window_rect.right -
+                                         state.preview->game_window_rect.left);
+    float gameHeight = static_cast<float>(state.preview->game_window_rect.bottom -
+                                          state.preview->game_window_rect.top);
 
-    state.preview.interaction.viewport_drag_offset.x =
+    state.preview->interaction.viewport_drag_offset.x =
         static_cast<LONG>(screenWidth * previewWidth / (2 * gameWidth));
-    state.preview.interaction.viewport_drag_offset.y =
+    state.preview->interaction.viewport_drag_offset.y =
         static_cast<LONG>(screenHeight * previewHeight / (2 * gameHeight));
   }
 
@@ -353,26 +353,26 @@ auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> v
 }
 
 auto update_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
-  if (!state.preview.interaction.viewport_dragging) return;
+  if (!state.preview->interaction.viewport_dragging) return;
 
   RECT clientRect;
   GetClientRect(hwnd, &clientRect);
   float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
   float previewHeight =
-      static_cast<float>(clientRect.bottom - clientRect.top - state.preview.dpi_sizes.title_height);
+      static_cast<float>(clientRect.bottom - clientRect.top - state.preview->dpi_sizes.title_height);
 
   // 计算新的相对位置
   float relativeX =
-      static_cast<float>(pt.x - state.preview.interaction.viewport_drag_offset.x) / previewWidth;
-  float relativeY = static_cast<float>(pt.y - state.preview.interaction.viewport_drag_offset.y -
-                                       state.preview.dpi_sizes.title_height) /
+      static_cast<float>(pt.x - state.preview->interaction.viewport_drag_offset.x) / previewWidth;
+  float relativeY = static_cast<float>(pt.y - state.preview->interaction.viewport_drag_offset.y -
+                                       state.preview->dpi_sizes.title_height) /
                     previewHeight;
 
   move_game_window_to_position(state, relativeX, relativeY);
 }
 
 auto end_viewport_drag(Core::State::AppState& state, HWND hwnd) -> void {
-  state.preview.interaction.viewport_dragging = false;
+  state.preview->interaction.viewport_dragging = false;
   ReleaseCapture();
 }
 
@@ -381,24 +381,24 @@ auto end_viewport_drag(Core::State::AppState& state, HWND hwnd) -> void {
 auto handle_window_scaling(Core::State::AppState& state, HWND hwnd, int wheel_delta,
                            POINT mouse_pos) -> void {
   // 计算新的理想尺寸（每次改变10%）
-  int oldIdealSize = state.preview.size.ideal_size;
+  int oldIdealSize = state.preview->size.ideal_size;
   int newIdealSize = static_cast<int>(oldIdealSize * (1.0f + (wheel_delta > 0 ? 0.1f : -0.1f)));
 
   // 限制在最小最大范围内
-  newIdealSize = std::clamp(newIdealSize, state.preview.size.min_ideal_size,
-                            state.preview.size.max_ideal_size);
+  newIdealSize = std::clamp(newIdealSize, state.preview->size.min_ideal_size,
+                            state.preview->size.max_ideal_size);
 
   if (newIdealSize != oldIdealSize) {
-    state.preview.size.ideal_size = newIdealSize;
+    state.preview->size.ideal_size = newIdealSize;
 
     // 根据宽高比计算实际窗口尺寸
     int newWidth, newHeight;
-    if (state.preview.size.aspect_ratio >= 1.0f) {
+    if (state.preview->size.aspect_ratio >= 1.0f) {
       newHeight = newIdealSize;
-      newWidth = static_cast<int>(newHeight / state.preview.size.aspect_ratio);
+      newWidth = static_cast<int>(newHeight / state.preview->size.aspect_ratio);
     } else {
       newWidth = newIdealSize;
-      newHeight = static_cast<int>(newWidth * state.preview.size.aspect_ratio);
+      newHeight = static_cast<int>(newWidth * state.preview->size.aspect_ratio);
     }
 
     // 获取当前窗口位置
@@ -409,8 +409,8 @@ auto handle_window_scaling(Core::State::AppState& state, HWND hwnd, int wheel_de
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
     float relativeX = static_cast<float>(mouse_pos.x) / (clientRect.right - clientRect.left);
-    float relativeY = static_cast<float>(mouse_pos.y - state.preview.dpi_sizes.title_height) /
-                      (clientRect.bottom - clientRect.top - state.preview.dpi_sizes.title_height);
+    float relativeY = static_cast<float>(mouse_pos.y - state.preview->dpi_sizes.title_height) /
+                      (clientRect.bottom - clientRect.top - state.preview->dpi_sizes.title_height);
 
     // 计算新位置（保持鼠标指向的点不变）
     int deltaWidth = newWidth - (windowRect.right - windowRect.left);
@@ -426,21 +426,21 @@ auto handle_window_scaling(Core::State::AppState& state, HWND hwnd, int wheel_de
 // 辅助函数实现
 
 auto is_point_in_title_bar(const Core::State::AppState& state, POINT pt) -> bool {
-  return pt.y < state.preview.dpi_sizes.title_height;
+  return pt.y < state.preview->dpi_sizes.title_height;
 }
 
 auto is_point_in_viewport(const Core::State::AppState& state, POINT pt) -> bool {
-  return (pt.x >= state.preview.viewport.viewport_rect.left &&
-          pt.x <= state.preview.viewport.viewport_rect.right &&
-          pt.y >= state.preview.viewport.viewport_rect.top &&
-          pt.y <= state.preview.viewport.viewport_rect.bottom);
+  return (pt.x >= state.preview->viewport.viewport_rect.left &&
+          pt.x <= state.preview->viewport.viewport_rect.right &&
+          pt.y >= state.preview->viewport.viewport_rect.top &&
+          pt.y <= state.preview->viewport.viewport_rect.bottom);
 }
 
 auto get_border_hit_test(const Core::State::AppState& state, HWND hwnd, POINT pt) -> LRESULT {
   RECT rc;
   GetClientRect(hwnd, &rc);
 
-  int borderWidth = state.preview.dpi_sizes.border_width;
+  int borderWidth = state.preview->dpi_sizes.border_width;
 
   if (pt.x <= borderWidth) {
     if (pt.y <= borderWidth) return HTTOPLEFT;
@@ -460,17 +460,17 @@ auto get_border_hit_test(const Core::State::AppState& state, HWND hwnd, POINT pt
 
 auto move_game_window_to_position(Core::State::AppState& state, float relative_x, float relative_y)
     -> void {
-  if (!state.preview.target_window) return;
+  if (!state.preview->target_window) return;
 
   // 获取屏幕尺寸
   int screenWidth = GetSystemMetrics(SM_CXSCREEN);
   int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
   // 获取游戏窗口尺寸
-  float gameWidth = static_cast<float>(state.preview.game_window_rect.right -
-                                       state.preview.game_window_rect.left);
-  float gameHeight = static_cast<float>(state.preview.game_window_rect.bottom -
-                                        state.preview.game_window_rect.top);
+  float gameWidth = static_cast<float>(state.preview->game_window_rect.right -
+                                       state.preview->game_window_rect.left);
+  float gameHeight = static_cast<float>(state.preview->game_window_rect.bottom -
+                                        state.preview->game_window_rect.top);
 
   // 计算新位置
   float targetX, targetY;
@@ -494,19 +494,19 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
   }
 
   // 移动游戏窗口
-  SetWindowPos(state.preview.target_window, nullptr, static_cast<int>(targetX),
+  SetWindowPos(state.preview->target_window, nullptr, static_cast<int>(targetX),
                static_cast<int>(targetY), 0, 0,
                SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
 }
 
 auto center_game_window_if_possible(Core::State::AppState& state) -> void {
-  if (!state.preview.target_window) return;
+  if (!state.preview->target_window) return;
 
   int screenWidth = GetSystemMetrics(SM_CXSCREEN);
   int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
   RECT gameRect;
-  GetWindowRect(state.preview.target_window, &gameRect);
+  GetWindowRect(state.preview->target_window, &gameRect);
   int gameWidth = gameRect.right - gameRect.left;
   int gameHeight = gameRect.bottom - gameRect.top;
 
@@ -514,7 +514,7 @@ auto center_game_window_if_possible(Core::State::AppState& state) -> void {
     int centerX = (screenWidth - gameWidth) / 2;
     int centerY = (screenHeight - gameHeight) / 2;
 
-    SetWindowPos(state.preview.target_window, nullptr, centerX, centerY, 0, 0,
+    SetWindowPos(state.preview->target_window, nullptr, centerX, centerY, 0, 0,
                  SWP_NOSIZE | SWP_NOZORDER);
   }
 }

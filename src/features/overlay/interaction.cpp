@@ -24,8 +24,8 @@ LRESULT CALLBACK mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam) {
   if (code >= 0 && g_app_state) {
     auto* mouse_struct = reinterpret_cast<MSLLHOOKSTRUCT*>(lParam);
     // 只发送消息到timer_window，不直接处理
-    if (g_app_state->overlay.window.timer_window) {
-      PostMessage(g_app_state->overlay.window.timer_window, State::WM_MOUSE_EVENT,
+    if (g_app_state->overlay->window.timer_window) {
+      PostMessage(g_app_state->overlay->window.timer_window, State::WM_MOUSE_EVENT,
                   MAKEWPARAM(mouse_struct->pt.x, mouse_struct->pt.y), 0);
     }
   }
@@ -37,8 +37,8 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
                              LONG idChild, DWORD idEventThread, DWORD dwmsEventTime) {
   if (g_app_state) {
     // 只发送消息到timer_window，不直接处理
-    if (g_app_state->overlay.window.timer_window) {
-      PostMessage(g_app_state->overlay.window.timer_window, State::WM_WINDOW_EVENT,
+    if (g_app_state->overlay->window.timer_window) {
+      PostMessage(g_app_state->overlay->window.timer_window, State::WM_WINDOW_EVENT,
                   static_cast<WPARAM>(event), reinterpret_cast<LPARAM>(hwnd));
     }
   }
@@ -49,9 +49,9 @@ auto initialize_interaction(Core::State::AppState& state) -> std::expected<void,
   g_app_state = &state;
 
   // 获取游戏进程ID
-  if (state.overlay.window.target_window) {
+  if (state.overlay->window.target_window) {
     DWORD process_id;
-    GetWindowThreadProcessId(state.overlay.window.target_window, &process_id);
+    GetWindowThreadProcessId(state.overlay->window.target_window, &process_id);
     set_game_process_id(state, process_id);
   }
 
@@ -59,7 +59,7 @@ auto initialize_interaction(Core::State::AppState& state) -> std::expected<void,
 }
 
 auto install_mouse_hook(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (overlay_state.interaction.mouse_hook) {
     return {};  // 已经安装
@@ -80,7 +80,7 @@ auto install_mouse_hook(Core::State::AppState& state) -> std::expected<void, std
 }
 
 auto install_window_event_hook(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (overlay_state.interaction.event_hook) {
     return {};  // 已经安装
@@ -102,7 +102,7 @@ auto install_window_event_hook(Core::State::AppState& state) -> std::expected<vo
 }
 
 auto uninstall_hooks(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (overlay_state.interaction.mouse_hook) {
     UnhookWindowsHookEx(overlay_state.interaction.mouse_hook);
@@ -116,12 +116,12 @@ auto uninstall_hooks(Core::State::AppState& state) -> void {
 }
 
 auto handle_mouse_movement(Core::State::AppState& state, POINT mouse_pos) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   overlay_state.interaction.current_mouse_pos = mouse_pos;
 }
 
 auto update_game_window_position(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (!overlay_state.window.target_window) return;
 
@@ -164,7 +164,7 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
 }
 
 auto handle_window_event(Core::State::AppState& state, DWORD event, HWND hwnd) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (event == EVENT_SYSTEM_FOREGROUND && hwnd == overlay_state.window.target_window) {
     // 游戏窗口获得焦点，发送消息确保叠加层在上方
@@ -180,11 +180,11 @@ auto cleanup_interaction(Core::State::AppState& state) -> void {
 }
 
 auto get_game_process_id(Core::State::AppState& state) -> DWORD {
-  return state.overlay.interaction.game_process_id;
+  return state.overlay->interaction.game_process_id;
 }
 
 auto set_game_process_id(Core::State::AppState& state, DWORD process_id) -> void {
-  state.overlay.interaction.game_process_id = process_id;
+  state.overlay->interaction.game_process_id = process_id;
 }
 
 }  // namespace Features::Overlay::Interaction

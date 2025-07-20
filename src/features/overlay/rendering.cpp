@@ -18,7 +18,7 @@ import Utils.Logger;
 namespace Features::Overlay::Rendering {
 
 auto initialize_d3d_rendering(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (overlay_state.rendering.d3d_initialized) {
     return {};
@@ -43,7 +43,7 @@ auto initialize_d3d_rendering(Core::State::AppState& state) -> std::expected<voi
 }
 
 auto initialize_render_states(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (overlay_state.rendering.render_states_initialized) {
     return {};
@@ -62,7 +62,7 @@ auto initialize_render_states(Core::State::AppState& state) -> std::expected<voi
 }
 
 auto resize_swap_chain(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (!overlay_state.rendering.d3d_initialized) {
     return std::unexpected("D3D not initialized");
@@ -81,7 +81,7 @@ auto resize_swap_chain(Core::State::AppState& state) -> std::expected<void, std:
 }
 
 auto create_render_target(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   auto result = ::Utils::Graphics::D3D::create_render_target(overlay_state.rendering.d3d_context);
   if (!result) {
@@ -92,7 +92,7 @@ auto create_render_target(Core::State::AppState& state) -> std::expected<void, s
 }
 
 auto create_shader_resources(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   auto vertex_code = std::string(Utils::get_vertex_shader_code());
   auto pixel_code = std::string(Utils::get_pixel_shader_code());
@@ -127,7 +127,7 @@ auto create_shader_resources(Core::State::AppState& state) -> std::expected<void
 }
 
 auto perform_rendering(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   auto& d3d_context = overlay_state.rendering.d3d_context;
   auto& shader_resources = overlay_state.rendering.shader_resources;
 
@@ -196,7 +196,7 @@ auto perform_rendering(Core::State::AppState& state) -> void {
 
 auto on_frame_arrived(Core::State::AppState& state,
                       Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   {
     std::lock_guard<std::mutex> lock(overlay_state.texture_mutex);
@@ -211,7 +211,7 @@ auto on_frame_arrived(Core::State::AppState& state,
 auto update_texture_resources(Core::State::AppState& state,
                               Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture)
     -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (!frame_texture) {
     return std::unexpected("Invalid frame texture");
@@ -237,7 +237,7 @@ auto update_texture_resources(Core::State::AppState& state,
 }
 
 auto cleanup_rendering_resources(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   ::Utils::Graphics::D3D::cleanup_shader_resources(overlay_state.rendering.shader_resources);
   ::Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
@@ -255,11 +255,11 @@ auto cleanup_rendering_resources(Core::State::AppState& state) -> void {
 }
 
 auto has_new_frame(const Core::State::AppState& state) -> bool {
-  return state.overlay.rendering.has_new_frame;
+  return state.overlay->rendering.has_new_frame;
 }
 
 auto set_new_frame_flag(Core::State::AppState& state, bool has_frame) -> void {
-  state.overlay.rendering.has_new_frame = has_frame;
+  state.overlay->rendering.has_new_frame = has_frame;
 }
 
 }  // namespace Features::Overlay::Rendering

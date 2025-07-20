@@ -21,7 +21,7 @@ import Utils.Graphics.Capture;
 namespace Features::Overlay::Capture {
 
 auto initialize_capture(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   // 检查系统支持
   if (!::Utils::Graphics::Capture::is_capture_supported()) {
@@ -42,7 +42,7 @@ auto initialize_capture(Core::State::AppState& state) -> std::expected<void, std
 
 auto start_capture(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (!target_window || !IsWindow(target_window)) {
     auto error_msg = "Invalid target window";
@@ -98,7 +98,7 @@ auto start_capture(Core::State::AppState& state, HWND target_window)
 }
 
 auto stop_capture(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (overlay_state.capture.active) {
     ::Utils::Graphics::Capture::stop_capture(overlay_state.capture.session);
@@ -107,7 +107,7 @@ auto stop_capture(Core::State::AppState& state) -> void {
 }
 
 auto cleanup_capture(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   stop_capture(state);
   ::Utils::Graphics::Capture::cleanup_capture_session(overlay_state.capture.session);
@@ -115,13 +115,13 @@ auto cleanup_capture(Core::State::AppState& state) -> void {
 }
 
 auto is_capturing(const Core::State::AppState& state) -> bool {
-  return state.overlay.capture.active;
+  return state.overlay->capture.active;
 }
 
 auto is_capture_supported() -> bool { return ::Utils::Graphics::Capture::is_capture_supported(); }
 
 auto create_winrt_device(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (!overlay_state.rendering.d3d_initialized) {
     return std::unexpected("D3D not initialized");
@@ -140,7 +140,7 @@ auto create_winrt_device(Core::State::AppState& state) -> std::expected<void, st
 
 auto handle_frame_arrived(Core::State::AppState& state,
                           Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   // 更新纹理资源
   if (overlay_state.rendering.create_new_srv) {

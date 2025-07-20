@@ -147,7 +147,7 @@ auto set_window_layered_attributes(HWND hwnd) -> std::expected<void, std::string
 
 auto handle_overlay_window_message(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam,
                                    Core::State::AppState& state) -> LRESULT {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   switch (message) {
     case Features::Overlay::State::WM_SHOW_OVERLAY: {

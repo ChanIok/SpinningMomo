@@ -20,7 +20,7 @@ import Utils.Logger;
 namespace Features::Overlay::Threads {
 
 auto start_threads(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   // 确保之前的线程已停止
   stop_threads(state);
@@ -47,7 +47,7 @@ auto start_threads(Core::State::AppState& state) -> std::expected<void, std::str
 }
 
 auto stop_threads(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   overlay_state.threads.should_stop = true;
 
@@ -67,7 +67,7 @@ auto stop_threads(Core::State::AppState& state) -> void {
 }
 
 auto wait_for_threads(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (overlay_state.threads.capture_render_thread.joinable()) {
     Logger().debug("Waiting for capture and render thread to join");
@@ -84,7 +84,7 @@ auto wait_for_threads(Core::State::AppState& state) -> void {
 }
 
 auto capture_render_thread_proc(Core::State::AppState& state, std::stop_token token) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   // 初始化COM
   // winrt::init_apartment();
@@ -168,7 +168,7 @@ auto hook_thread_proc(Core::State::AppState& state, std::stop_token token) -> vo
 
   // 改进的消息循环 - 使用PeekMessage避免阻塞
   MSG msg;
-  while (!token.stop_requested() && !state.overlay.threads.should_stop) {
+  while (!token.stop_requested() && !state.overlay->threads.should_stop) {
     BOOL result = PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE);
     if (result) {
       if (msg.message == WM_QUIT) {
@@ -187,7 +187,7 @@ auto hook_thread_proc(Core::State::AppState& state, std::stop_token token) -> vo
 }
 
 auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token token) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   // 创建定时器窗口
   WNDCLASSEXW wc = {};
@@ -271,7 +271,7 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
 }
 
 auto are_threads_running(const Core::State::AppState& state) -> bool {
-  const auto& overlay_state = state.overlay;
+  const auto& overlay_state = *state.overlay;
   return overlay_state.threads.capture_render_thread.joinable() ||
          overlay_state.threads.hook_thread.joinable() ||
          overlay_state.threads.window_manager_thread.joinable();

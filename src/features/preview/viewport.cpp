@@ -18,29 +18,29 @@ import Features.Preview.Rendering;
 namespace Features::Preview::Viewport {
 
 auto update_viewport_rect(Core::State::AppState& state) -> void {
-  if (!state.preview.target_window || !state.preview.hwnd) {
+  if (!state.preview->target_window || !state.preview->hwnd) {
     return;
   }
 
   // 更新游戏窗口位置信息
-  state.preview.game_window_rect = get_game_window_screen_rect(state);
+  state.preview->game_window_rect = get_game_window_screen_rect(state);
 
   // 检查游戏窗口是否完全可见
-  state.preview.viewport.game_window_fully_visible = check_game_window_visibility(state);
+  state.preview->viewport.game_window_fully_visible = check_game_window_visibility(state);
 
-  if (state.preview.viewport.game_window_fully_visible) {
+  if (state.preview->viewport.game_window_fully_visible) {
     // 如果游戏窗口完全可见，隐藏视口框
-    state.preview.viewport.visible = false;
+    state.preview->viewport.visible = false;
     return;
   }
 
   // 游戏窗口超出屏幕，显示视口框
-  state.preview.viewport.visible = true;
-  state.preview.viewport.viewport_rect = calculate_viewport_position(state);
+  state.preview->viewport.visible = true;
+  state.preview->viewport.viewport_rect = calculate_viewport_position(state);
 }
 
 auto check_game_window_visibility(Core::State::AppState& state) -> bool {
-  if (!state.preview.target_window) {
+  if (!state.preview->target_window) {
     return false;
   }
 
@@ -59,7 +59,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
                            const Microsoft::WRL::ComPtr<ID3D11VertexShader>& vertex_shader,
                            const Microsoft::WRL::ComPtr<ID3D11PixelShader>& pixel_shader,
                            const Microsoft::WRL::ComPtr<ID3D11InputLayout>& input_layout) -> void {
-  if (!state.preview.viewport.visible || !context) {
+  if (!state.preview->viewport.visible || !context) {
     return;
   }
 
@@ -111,16 +111,16 @@ auto create_viewport_vertices(const Core::State::AppState& state,
     -> void {
   vertices.clear();
 
-  if (!state.preview.viewport.visible) {
+  if (!state.preview->viewport.visible) {
     return;
   }
 
   // 获取预览窗口客户区大小
   RECT clientRect;
-  GetClientRect(state.preview.hwnd, &clientRect);
+  GetClientRect(state.preview->hwnd, &clientRect);
   float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
   float previewHeight =
-      static_cast<float>(clientRect.bottom - clientRect.top - state.preview.dpi_sizes.title_height);
+      static_cast<float>(clientRect.bottom - clientRect.top - state.preview->dpi_sizes.title_height);
 
   if (previewWidth <= 0 || previewHeight <= 0) {
     return;
@@ -128,7 +128,7 @@ auto create_viewport_vertices(const Core::State::AppState& state,
 
   // 计算可见区域在预览窗口中的相对位置
   RECT visibleArea = calculate_visible_game_area(state);
-  RECT gameRect = state.preview.game_window_rect;
+  RECT gameRect = state.preview->game_window_rect;
 
   float gameWidth = static_cast<float>(gameRect.right - gameRect.left);
   float gameHeight = static_cast<float>(gameRect.bottom - gameRect.top);
@@ -176,16 +176,16 @@ auto create_viewport_vertices(const Core::State::AppState& state,
 auto calculate_viewport_position(const Core::State::AppState& state) -> RECT {
   RECT result = {0, 0, 0, 0};
 
-  if (!state.preview.hwnd || !state.preview.target_window) {
+  if (!state.preview->hwnd || !state.preview->target_window) {
     return result;
   }
 
   // 获取预览窗口客户区
   RECT clientRect;
-  GetClientRect(state.preview.hwnd, &clientRect);
+  GetClientRect(state.preview->hwnd, &clientRect);
 
   // 计算预览区域（除去标题栏）
-  int previewTop = state.preview.dpi_sizes.title_height;
+  int previewTop = state.preview->dpi_sizes.title_height;
   int previewWidth = clientRect.right - clientRect.left;
   int previewHeight = clientRect.bottom - clientRect.top - previewTop;
 
@@ -195,7 +195,7 @@ auto calculate_viewport_position(const Core::State::AppState& state) -> RECT {
 
   // 获取可见区域相对游戏窗口的比例
   RECT visibleArea = calculate_visible_game_area(state);
-  RECT gameRect = state.preview.game_window_rect;
+  RECT gameRect = state.preview->game_window_rect;
 
   float gameWidth = static_cast<float>(gameRect.right - gameRect.left);
   float gameHeight = static_cast<float>(gameRect.bottom - gameRect.top);
@@ -221,8 +221,8 @@ auto calculate_viewport_position(const Core::State::AppState& state) -> RECT {
 auto get_game_window_screen_rect(const Core::State::AppState& state) -> RECT {
   RECT rect = {0, 0, 0, 0};
 
-  if (state.preview.target_window && IsWindow(state.preview.target_window)) {
-    GetWindowRect(state.preview.target_window, &rect);
+  if (state.preview->target_window && IsWindow(state.preview->target_window)) {
+    GetWindowRect(state.preview->target_window, &rect);
   }
 
   return rect;

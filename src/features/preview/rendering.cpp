@@ -20,7 +20,7 @@ namespace Features::Preview::Rendering {
 
 auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, int height)
     -> std::expected<void, std::string> {
-  auto& resources = state.preview.rendering_resources;
+  auto& resources = state.preview->rendering_resources;
 
   // 创建D3D上下文
   auto d3d_result = Utils::Graphics::D3D::create_d3d_context(hwnd, width, height);
@@ -62,14 +62,14 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
   resources.basic_vertex_buffer = std::move(vertex_buffer_result.value());
 
   resources.initialized = true;
-  state.preview.d3d_initialized = true;
+  state.preview->d3d_initialized = true;
 
   Logger().info("Preview rendering system initialized successfully");
   return {};
 }
 
 auto cleanup_rendering(Core::State::AppState& state) -> void {
-  auto& resources = state.preview.rendering_resources;
+  auto& resources = state.preview->rendering_resources;
 
   if (resources.initialized) {
     // 清理着色器资源
@@ -86,17 +86,17 @@ auto cleanup_rendering(Core::State::AppState& state) -> void {
     resources.initialized = false;
   }
 
-  state.preview.d3d_initialized = false;
+  state.preview->d3d_initialized = false;
   Logger().info("Preview rendering resources cleaned up");
 }
 
 auto resize_rendering(Core::State::AppState& state, int width, int height)
     -> std::expected<void, std::string> {
-  if (!state.preview.rendering_resources.initialized) {
+  if (!state.preview->rendering_resources.initialized) {
     return std::unexpected("D3D not initialized");
   }
 
-  auto& resources = state.preview.rendering_resources;
+  auto& resources = state.preview->rendering_resources;
 
   // 调整交换链大小
   auto resize_result =
@@ -112,17 +112,17 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
 
 auto render_frame(Core::State::AppState& state,
                   Microsoft::WRL::ComPtr<ID3D11Texture2D> capture_texture) -> void {
-  if (!state.preview.rendering_resources.initialized) {
+  if (!state.preview->rendering_resources.initialized) {
     return;
   }
 
-  auto& resources = state.preview.rendering_resources;
+  auto& resources = state.preview->rendering_resources;
   auto* context = resources.d3d_context.context.Get();
 
   // 更新捕获SRV（如果需要）
-  if (state.preview.create_new_srv && capture_texture) {
+  if (state.preview->create_new_srv && capture_texture) {
     if (auto srv_result = update_capture_srv(state, capture_texture); srv_result) {
-      state.preview.create_new_srv = false;
+      state.preview->create_new_srv = false;
     }
   }
 
@@ -141,7 +141,7 @@ auto render_frame(Core::State::AppState& state,
   // 设置视口
   D3D11_VIEWPORT viewport = {};
   RECT clientRect;
-  GetClientRect(state.preview.hwnd, &clientRect);
+  GetClientRect(state.preview->hwnd, &clientRect);
   viewport.Width = static_cast<float>(clientRect.right - clientRect.left);
   viewport.Height = static_cast<float>(clientRect.bottom - clientRect.top);
   viewport.TopLeftX = 0.0f;
@@ -163,11 +163,11 @@ auto render_frame(Core::State::AppState& state,
 auto update_capture_srv(Core::State::AppState& state,
                         Microsoft::WRL::ComPtr<ID3D11Texture2D> texture)
     -> std::expected<void, std::string> {
-  if (!state.preview.rendering_resources.initialized || !texture) {
+  if (!state.preview->rendering_resources.initialized || !texture) {
     return std::unexpected("Invalid rendering resources or texture");
   }
 
-  auto& resources = state.preview.rendering_resources;
+  auto& resources = state.preview->rendering_resources;
 
   // 获取纹理描述
   D3D11_TEXTURE2D_DESC desc;
@@ -251,7 +251,7 @@ auto create_basic_vertex_buffer(ID3D11Device* device)
 
 auto get_rendering_resources(Core::State::AppState& state)
     -> Features::Preview::State::RenderingResources* {
-  return &state.preview.rendering_resources;
+  return &state.preview->rendering_resources;
 }
 
 }  // namespace Features::Preview::Rendering

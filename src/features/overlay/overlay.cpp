@@ -34,7 +34,7 @@ auto initialize_overlay(Core::State::AppState& state, HINSTANCE instance, HWND p
 
 auto start_overlay(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
@@ -84,7 +84,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
 }
 
 auto stop_overlay(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   Logger().debug("Stopping overlay");
 
   // 停止线程
@@ -109,7 +109,7 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 }
 
 auto set_letterbox_mode(Core::State::AppState& state, bool enabled) -> void {
-  state.overlay.window.use_letterbox_mode = enabled;
+  state.overlay->window.use_letterbox_mode = enabled;
 }
 
 auto is_overlay_capturing(const Core::State::AppState& state) -> bool {

@@ -16,7 +16,7 @@ namespace Features::Overlay::Window {
 
 auto create_overlay_window(HINSTANCE instance, HWND parent, Core::State::AppState& state)
     -> std::expected<HWND, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   auto [screen_width, screen_height] = Utils::get_screen_dimensions();
 
   overlay_state.window.screen_width = screen_width;
@@ -64,7 +64,7 @@ auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance,
 }
 
 auto show_overlay_window(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
     ShowWindow(overlay_state.window.overlay_hwnd, SW_SHOW);
     overlay_state.window.is_visible = true;
@@ -72,7 +72,7 @@ auto show_overlay_window(Core::State::AppState& state) -> void {
 }
 
 auto hide_overlay_window(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
     ShowWindow(overlay_state.window.overlay_hwnd, SW_HIDE);
     overlay_state.window.is_visible = false;
@@ -80,14 +80,14 @@ auto hide_overlay_window(Core::State::AppState& state) -> void {
 }
 
 auto is_overlay_window_visible(const Core::State::AppState& state) -> bool {
-  const auto& overlay_state = state.overlay;
+  const auto& overlay_state = *state.overlay;
   return overlay_state.window.is_visible && overlay_state.window.overlay_hwnd &&
          IsWindowVisible(overlay_state.window.overlay_hwnd);
 }
 
 auto update_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
     -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
 
   // 缓存游戏窗口尺寸
   overlay_state.window.cached_game_width = game_width;
@@ -112,7 +112,7 @@ auto update_overlay_window_size(Core::State::AppState& state, int game_width, in
 }
 
 auto position_overlay_window(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   if (!overlay_state.window.overlay_hwnd) return;
 
   // 居中显示
@@ -124,7 +124,7 @@ auto position_overlay_window(Core::State::AppState& state) -> void {
 }
 
 auto destroy_overlay_window(Core::State::AppState& state) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
     DestroyWindow(overlay_state.window.overlay_hwnd);
     overlay_state.window.overlay_hwnd = nullptr;
@@ -133,11 +133,11 @@ auto destroy_overlay_window(Core::State::AppState& state) -> void {
 }
 
 auto get_overlay_window_handle(const Core::State::AppState& state) -> HWND {
-  return state.overlay.window.overlay_hwnd;
+  return state.overlay->window.overlay_hwnd;
 }
 
 auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   if (!overlay_state.window.target_window) return;
 
   if (with_delay) {
@@ -155,7 +155,7 @@ auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void 
 
 auto set_game_window_transparency(Core::State::AppState& state, BYTE alpha)
     -> std::expected<void, std::string> {
-  auto& overlay_state = state.overlay;
+  auto& overlay_state = *state.overlay;
   if (!overlay_state.window.target_window) {
     return std::unexpected("No target window set");
   }

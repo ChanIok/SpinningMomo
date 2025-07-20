@@ -116,7 +116,7 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
       };
 
       // 执行截图
-      auto result = Features::Screenshot::take_screenshot(state.screenshot, *target_window,
+      auto result = Features::Screenshot::take_screenshot(*state.screenshot, *target_window,
                                                           completion_callback);
       if (!result) {
         Features::Notifications::show_notification(state, "SpinningMomo",

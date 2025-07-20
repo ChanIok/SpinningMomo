@@ -12,11 +12,16 @@ import Core.I18n.State;
 import Core.RpcHandlers.State;
 import Core.WebView.State;
 import Features.Settings.State;
+import Features.Letterbox.State;
 import Features.Letterbox;
 import Features.Notifications;
+import Features.Notifications.State;
+import Features.Overlay.State;
 import Features.Overlay;
+import Features.Preview.State;
 import Features.Preview.Window;
 import Features.Screenshot;
+import Features.Screenshot.State;
 import Features.Settings;
 import UI.AppWindow;
 import UI.AppWindow.State;
@@ -35,11 +40,11 @@ Application::Application() = default;
 Application::~Application() {
   if (m_app_state) {
     Features::Preview::Window::cleanup_preview(*m_app_state);
-    Features::Overlay::stop_overlay(*m_app_state);
+    Features::Overlay::cleanup_overlay(*m_app_state);
     if (auto result = Features::Letterbox::shutdown(*m_app_state); !result) {
       Logger().error("Failed to shutdown Letterbox: {}", result.error());
     }
-    Features::Screenshot::cleanup_system(m_app_state->screenshot);
+    Features::Screenshot::cleanup_system(*m_app_state->screenshot);
 
     // 清理WebView
     Core::WebView::shutdown(*m_app_state);
@@ -71,6 +76,13 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->app_window = std::make_unique<UI::AppWindow::State::AppWindowState>();
     m_app_state->tray_icon = std::make_unique<UI::TrayIcon::State::TrayIconState>();
     m_app_state->tray_menu = std::make_unique<UI::TrayMenu::State::TrayMenuState>();
+
+    // 初始化功能模块状态
+    m_app_state->letterbox = std::make_unique<Features::Letterbox::State::LetterboxState>();
+    m_app_state->notifications = std::make_unique<Features::Notifications::State::NotificationSystemState>();
+    m_app_state->overlay = std::make_unique<Features::Overlay::State::OverlayState>();
+    m_app_state->preview = std::make_unique<Features::Preview::State::PreviewState>();
+    m_app_state->screenshot = std::make_unique<Features::Screenshot::State::ScreenshotState>();
 
     m_app_state->app_window->window.instance = m_h_instance;
 

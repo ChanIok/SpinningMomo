@@ -66,22 +66,22 @@ auto initialize_preview(Core::State::AppState& state, HINSTANCE instance, HWND p
   }
 
   // 初始化预览状态
-  state.preview.hwnd = window_result.value();
-  state.preview.main_window = parent;
-  state.preview.is_first_show = true;
+  state.preview->hwnd = window_result.value();
+  state.preview->main_window = parent;
+  state.preview->is_first_show = true;
 
   // 初始化DPI
   HDC hdc = GetDC(nullptr);
   UINT dpi = GetDeviceCaps(hdc, LOGPIXELSX);
   ReleaseDC(nullptr, hdc);
-  state.preview.dpi_sizes.update_dpi_scaling(dpi);
+  state.preview->dpi_sizes.update_dpi_scaling(dpi);
 
   // 计算理想尺寸范围
   int screenWidth = GetSystemMetrics(SM_CXSCREEN);
   int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-  state.preview.size.min_ideal_size = std::min(screenWidth, screenHeight) / 10;
-  state.preview.size.max_ideal_size = std::max(screenWidth, screenHeight);
-  state.preview.size.ideal_size = screenHeight / 2;
+  state.preview->size.min_ideal_size = std::min(screenWidth, screenHeight) / 10;
+  state.preview->size.max_ideal_size = std::max(screenWidth, screenHeight);
+  state.preview->size.ideal_size = screenHeight / 2;
 
   Logger().info("Preview window initialized successfully");
   return {};
@@ -100,12 +100,12 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   // 取消清理定时器
-  if (state.preview.cleanup_timer && state.preview.cleanup_timer->IsRunning()) {
-    state.preview.cleanup_timer->Cancel();
+  if (state.preview->cleanup_timer && state.preview->cleanup_timer->IsRunning()) {
+    state.preview->cleanup_timer->Cancel();
   }
 
   // 保存目标窗口
-  state.preview.target_window = target_window;
+  state.preview->target_window = target_window;
 
   // 计算捕获尺寸
   RECT clientRect;
@@ -114,7 +114,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   int height = clientRect.bottom - clientRect.top;
 
   // 计算窗口尺寸和宽高比
-  calculate_window_size(state.preview, width, height);
+  calculate_window_size(*state.preview, width, height);
 
   // 检查是否支持捕获
   if (!Utils::Graphics::Capture::is_capture_supported()) {
@@ -122,10 +122,10 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   // 初始化渲染系统（如果需要）
-  if (!state.preview.d3d_initialized) {
+  if (!state.preview->d3d_initialized) {
     auto rendering_result = Features::Preview::Rendering::initialize_rendering(
-        state, state.preview.hwnd, state.preview.size.window_width,
-        state.preview.size.window_height);
+        state, state.preview->hwnd, state.preview->size.window_width,
+        state.preview->size.window_height);
 
     if (!rendering_result) {
       Logger().error("Failed to initialize rendering system");
@@ -143,12 +143,12 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   // 处理首次显示
-  if (state.preview.is_first_show) {
-    handle_first_show(state.preview);
+  if (state.preview->is_first_show) {
+    handle_first_show(*state.preview);
   } else {
     // 更新窗口尺寸，保持位置
-    SetWindowPos(state.preview.hwnd, nullptr, 0, 0, state.preview.size.window_width,
-                 state.preview.size.window_height,
+    SetWindowPos(state.preview->hwnd, nullptr, 0, 0, state.preview->size.window_width,
+                 state.preview->size.window_height,
                  SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
   }
 
@@ -159,20 +159,20 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected(start_result.error());
   }
 
-  state.preview.running = true;
-  state.preview.is_visible = true;
+  state.preview->running = true;
+  state.preview->is_visible = true;
 
   Logger().info("Preview capture started successfully");
   return {};
 }
 
 auto stop_preview(Core::State::AppState& state) -> void {
-  if (!state.preview.running) {
+  if (!state.preview->running) {
     return;
   }
 
-  state.preview.running = false;
-  state.preview.create_new_srv = true;
+  state.preview->running = false;
+  state.preview->create_new_srv = true;
 
   // 停止捕获
   Features::Preview::CaptureIntegration::stop_capture(state);
@@ -181,12 +181,12 @@ auto stop_preview(Core::State::AppState& state) -> void {
   hide_preview_window(state);
 
   // 启动清理定时器
-  if (!state.preview.cleanup_timer) {
-    state.preview.cleanup_timer.emplace();
+  if (!state.preview->cleanup_timer) {
+    state.preview->cleanup_timer.emplace();
   }
 
-  if (!state.preview.cleanup_timer->IsRunning()) {
-    if (auto result = state.preview.cleanup_timer->SetTimer(std::chrono::milliseconds(30000),
+  if (!state.preview->cleanup_timer->IsRunning()) {
+    if (auto result = state.preview->cleanup_timer->SetTimer(std::chrono::milliseconds(30000),
                                                             [&state]() { cleanup_preview(state); });
         !result) {
       Logger().error("Failed to set cleanup timer: {}", static_cast<int>(result.error()));
@@ -197,63 +197,63 @@ auto stop_preview(Core::State::AppState& state) -> void {
 }
 
 auto show_preview_window(Core::State::AppState& state) -> void {
-  if (state.preview.hwnd) {
-    ShowWindow(state.preview.hwnd, SW_SHOWNA);
-    UpdateWindow(state.preview.hwnd);
-    state.preview.is_visible = true;
+  if (state.preview->hwnd) {
+    ShowWindow(state.preview->hwnd, SW_SHOWNA);
+    UpdateWindow(state.preview->hwnd);
+    state.preview->is_visible = true;
   }
 }
 
 auto hide_preview_window(Core::State::AppState& state) -> void {
-  if (state.preview.hwnd) {
-    ShowWindow(state.preview.hwnd, SW_HIDE);
-    state.preview.is_visible = false;
+  if (state.preview->hwnd) {
+    ShowWindow(state.preview->hwnd, SW_HIDE);
+    state.preview->is_visible = false;
   }
 }
 
 auto is_preview_window_visible(const Core::State::AppState& state) -> bool {
-  return state.preview.hwnd && IsWindowVisible(state.preview.hwnd);
+  return state.preview->hwnd && IsWindowVisible(state.preview->hwnd);
 }
 
 auto resize_preview_window(Core::State::AppState& state, int width, int height) -> void {
-  if (state.preview.hwnd) {
-    SetWindowPos(state.preview.hwnd, nullptr, 0, 0, width, height,
+  if (state.preview->hwnd) {
+    SetWindowPos(state.preview->hwnd, nullptr, 0, 0, width, height,
                  SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-    state.preview.size.window_width = width;
-    state.preview.size.window_height = height;
+    state.preview->size.window_width = width;
+    state.preview->size.window_height = height;
   }
 }
 
 auto move_preview_window(Core::State::AppState& state, int x, int y) -> void {
-  if (state.preview.hwnd) {
-    SetWindowPos(state.preview.hwnd, nullptr, x, y, 0, 0,
+  if (state.preview->hwnd) {
+    SetWindowPos(state.preview->hwnd, nullptr, x, y, 0, 0,
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
   }
 }
 
 auto update_preview_dpi(Core::State::AppState& state, UINT new_dpi) -> void {
-  state.preview.dpi_sizes.update_dpi_scaling(new_dpi);
+  state.preview->dpi_sizes.update_dpi_scaling(new_dpi);
 
-  if (state.preview.hwnd) {
+  if (state.preview->hwnd) {
     // 获取当前窗口位置和大小
     RECT rect;
-    GetWindowRect(state.preview.hwnd, &rect);
+    GetWindowRect(state.preview->hwnd, &rect);
     int width = rect.right - rect.left;
     int height = rect.bottom - rect.top;
 
     // 更新窗口
-    SetWindowPos(state.preview.hwnd, nullptr, 0, 0, width, height,
+    SetWindowPos(state.preview->hwnd, nullptr, 0, 0, width, height,
                  SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
     // 强制重绘
-    InvalidateRect(state.preview.hwnd, nullptr, TRUE);
+    InvalidateRect(state.preview->hwnd, nullptr, TRUE);
   }
 }
 
 auto cleanup_preview(Core::State::AppState& state) -> void {
-  if (state.preview.cleanup_timer) {
-    state.preview.cleanup_timer->Cancel();
-    state.preview.cleanup_timer.reset();
+  if (state.preview->cleanup_timer) {
+    state.preview->cleanup_timer->Cancel();
+    state.preview->cleanup_timer.reset();
   }
 
   // 清理捕获资源
@@ -262,20 +262,20 @@ auto cleanup_preview(Core::State::AppState& state) -> void {
   // 清理渲染资源
   Features::Preview::Rendering::cleanup_rendering(state);
 
-  state.preview.d3d_initialized = false;
-  state.preview.running = false;
-  state.preview.target_window = nullptr;
-  state.preview.create_new_srv = true;
+  state.preview->d3d_initialized = false;
+  state.preview->running = false;
+  state.preview->target_window = nullptr;
+  state.preview->create_new_srv = true;
 
   Logger().info("Preview resources cleaned up");
 }
 
 auto get_preview_window_handle(const Core::State::AppState& state) -> HWND {
-  return state.preview.hwnd;
+  return state.preview->hwnd;
 }
 
 auto is_preview_running(const Core::State::AppState& state) -> bool {
-  return state.preview.running;
+  return state.preview->running;
 }
 
 // 内部实现函数
