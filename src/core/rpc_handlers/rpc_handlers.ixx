@@ -8,7 +8,7 @@ export module Core.RpcHandlers;
 
 import std;
 import Core.State;
-export import Core.RpcHandlers.Types;
+import Core.RpcHandlers.Types;
 
 namespace Core::RpcHandlers {
 
@@ -77,7 +77,7 @@ auto register_method(Core::State::AppState& app_state, const std::string& method
   };
 
   // 存储到注册表
-  app_state.rpc_handlers.registry[method_name] = MethodInfo{
+  app_state.rpc_handlers->registry[method_name] = MethodInfo{
       .name = method_name, .description = description, .handler = std::move(wrapped_handler)};
 }
 

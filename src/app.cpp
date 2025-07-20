@@ -9,6 +9,7 @@ import Core.Async.Runtime;
 import Core.Async.State;
 import Core.Events;
 import Core.I18n.State;
+import Core.RpcHandlers.State;
 import Features.Letterbox;
 import Features.Notifications;
 import Features.Overlay;
@@ -57,6 +58,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->async_runtime = std::make_unique<Core::Async::State::AsyncRuntimeState>();
     m_app_state->event_bus = std::make_unique<Core::Events::EventBus>();
     m_app_state->i18n = std::make_unique<Core::I18n::State::I18nState>();
+    m_app_state->rpc_handlers = std::make_unique<Core::RpcHandlers::State::RpcHandlerState>();
     m_app_state->app_window.window.instance = m_h_instance;
 
     // 测试嵌入式多语言系统

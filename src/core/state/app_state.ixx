@@ -7,7 +7,7 @@ import std;
 import Core.Config.State;
 // import Core.Events;
 // import Core.I18n.State;
-import Core.RpcHandlers.State;
+// import Core.RpcHandlers.State; // Core::RpcHandlers的模板依赖
 import Core.WebView.State;
 import Features.Letterbox.State;
 import Features.Notifications.State;
@@ -33,6 +33,10 @@ export namespace Core::I18n::State {
 struct I18nState;
 }
 
+export namespace Core::RpcHandlers::State {
+struct RpcHandlerState;
+}
+
 export namespace Core::State {
 
 export struct AppState {
@@ -42,7 +46,7 @@ export struct AppState {
   Types::UI::D2DRenderState d2d_render;
   std::unique_ptr<Core::Events::EventBus> event_bus;
   std::unique_ptr<Core::I18n::State::I18nState> i18n;
-  Core::RpcHandlers::State::RpcHandlerState rpc_handlers;
+  std::unique_ptr<Core::RpcHandlers::State::RpcHandlerState> rpc_handlers;
   Core::WebView::State::WebViewState webview;
 
   // 应用设置状态（包含配置和计算状态）

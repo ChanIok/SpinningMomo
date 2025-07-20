@@ -24,13 +24,13 @@ auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
 
 // 检查指定方法是否已注册
 auto method_exists(const Core::State::AppState& app_state, const std::string& method_name) -> bool {
-  return app_state.rpc_handlers.registry.find(method_name) != app_state.rpc_handlers.registry.end();
+  return app_state.rpc_handlers->registry.find(method_name) != app_state.rpc_handlers->registry.end();
 }
 
 // 获取所有已注册方法的列表
 auto get_method_list(const Core::State::AppState& app_state) -> std::vector<MethodListItem> {
   std::vector<MethodListItem> methods;
-  const auto& registry = app_state.rpc_handlers.registry;
+  const auto& registry = app_state.rpc_handlers->registry;
 
   for (const auto& [name, info] : registry) {
     methods.emplace_back(MethodListItem{.name = name, .description = info.description});
@@ -70,7 +70,7 @@ auto process_request(Core::State::AppState& app_state,
     }
 
     // 查找已注册的方法
-    auto& registry = app_state.rpc_handlers.registry;
+    auto& registry = app_state.rpc_handlers->registry;
     auto method_it = registry.find(request.method);
     if (method_it == registry.end()) {
       Logger().error("Method not found: {}", request.method);
