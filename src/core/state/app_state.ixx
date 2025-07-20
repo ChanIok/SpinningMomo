@@ -4,10 +4,6 @@ export module Core.State;
 
 import std;
 
-import Core.RpcHandlers.State; // Core::RpcHandlers的模板依赖
-
-import Types.UI;
-
 namespace Core::Async::State {
 export struct AsyncRuntimeState;
 }
@@ -60,9 +56,9 @@ namespace Features::Screenshot::State {
 export struct ScreenshotState;
 }
 
-// namespace Core::RpcHandlers::State {
-// export struct RpcHandlerState;
-// }
+namespace Core::RpcHandlers::State {
+export struct RpcHandlerState;
+}
 
 namespace Core::State {
 

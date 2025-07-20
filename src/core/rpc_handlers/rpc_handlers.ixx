@@ -30,9 +30,10 @@ export auto method_exists(const Core::State::AppState& app_state, const std::str
 
 // 注册RPC方法
 export template <typename Request, typename Response>
-auto register_method(Core::State::AppState& app_state, const std::string& method_name,
-                     AsyncHandler<Request, Response> handler, const std::string& description = "")
-    -> void {
+auto register_method(Core::State::AppState& app_state,
+                     std::unordered_map<std::string, MethodInfo>& registry,
+                     const std::string& method_name, AsyncHandler<Request, Response> handler,
+                     const std::string& description = "") -> void {
   // 创建类型擦除的处理器包装
   auto wrapped_handler = [handler, &app_state](rfl::Generic params_generic,
                                                rfl::Generic id) -> asio::awaitable<std::string> {
@@ -77,7 +78,7 @@ auto register_method(Core::State::AppState& app_state, const std::string& method
   };
 
   // 存储到注册表
-  app_state.rpc_handlers->registry[method_name] = MethodInfo{
+  registry[method_name] = MethodInfo{
       .name = method_name, .description = description, .handler = std::move(wrapped_handler)};
 }
 

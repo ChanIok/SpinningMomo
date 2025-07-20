@@ -10,6 +10,7 @@ import std;
 import Core.State;
 import Core.RpcHandlers;
 import Core.RpcHandlers.Types;
+import Core.RpcHandlers.State;
 import Features.Settings;
 import Features.Settings.Types;
 import Utils.Logger;
@@ -46,10 +47,12 @@ auto handle_update_settings(Core::State::AppState& app_state,
 
 auto register_handlers(Core::State::AppState& app_state) -> void {
   Core::RpcHandlers::register_method<Types::GetSettingsParams, Types::GetSettingsResult>(
-      app_state, "settings.get", handle_get_settings, "Get current settings configuration");
+      app_state, app_state.rpc_handlers->registry, "settings.get", handle_get_settings,
+      "Get current settings configuration");
 
   Core::RpcHandlers::register_method<Types::UpdateSettingsParams, Types::UpdateSettingsResult>(
-      app_state, "settings.update", handle_update_settings, "Update settings configuration");
+      app_state, app_state.rpc_handlers->registry, "settings.update", handle_update_settings,
+      "Update settings configuration");
 
   Logger().info("Registered settings RPC methods");
 }

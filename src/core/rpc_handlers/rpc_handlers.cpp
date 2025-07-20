@@ -8,6 +8,7 @@ module Core.RpcHandlers;
 
 import std;
 import Core.State;
+import Core.RpcHandlers.State;
 import Core.RpcHandlers.Types;
 import Utils.Logger;
 
