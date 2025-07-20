@@ -9,6 +9,7 @@ module UI.WebViewWindow;
 import std;
 import Core.State;
 import Core.WebView.State;
+import UI.AppWindow.State;
 import Utils.Logger;
 import Vendor.Windows;
 
@@ -16,7 +17,7 @@ namespace UI::WebViewWindow {
 
 auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 注册窗口类
-  register_window_class(state.app_window.window.instance);
+  register_window_class(state.app_window->window.instance);
 
   // 设置默认窗口大小和位置
   const int width = 1280;
@@ -32,7 +33,7 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
                               x, y, width, height,                    // 位置和大小
                               nullptr,                                // 父窗口
                               nullptr,                                // 菜单
-                              state.app_window.window.instance,       // 实例句柄
+                              state.app_window->window.instance,       // 实例句柄
                               &state                                  // 用户数据
   );
 

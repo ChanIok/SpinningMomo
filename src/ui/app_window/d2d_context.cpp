@@ -8,6 +8,7 @@ module UI.AppWindow.D2DContext;
 
 import std;
 import Core.State;
+import UI.AppWindow.State;
 import Types.UI;
 
 namespace UI::AppWindow::D2DContext {
@@ -301,7 +302,7 @@ auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
 // 更新文本格式（DPI变化时）
 auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
   auto& d2d = state.d2d_render;
-  auto& layout = state.app_window.layout;
+  auto& layout = state.app_window->layout;
 
   // 如果不需要更新或工厂不可用，直接返回成功
   if (!d2d.needs_font_update || !d2d.write_factory) {

@@ -16,6 +16,7 @@ import Core.I18n.State;
 import Core.Constants;
 import Core.I18n.Types;
 import Types.UI;
+import UI.AppWindow.State;
 import UI.TrayMenu.State;
 import UI.TrayMenu.Layout;
 import UI.TrayMenu.MessageHandler;
@@ -80,14 +81,14 @@ auto register_tray_menu_class(HINSTANCE instance) -> bool {
 
 // 创建托盘菜单窗口
 auto create_tray_menu_window(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   if (tray_menu.is_created) {
     return {};
   }
 
   // 注册窗口类
-  if (!register_tray_menu_class(state.app_window.window.instance)) {
+  if (!register_tray_menu_class(state.app_window->window.instance)) {
     DWORD error = GetLastError();
     if (error != ERROR_CLASS_ALREADY_EXISTS) {
       return std::unexpected(
@@ -99,7 +100,7 @@ auto create_tray_menu_window(Core::State::AppState& state) -> std::expected<void
   tray_menu.hwnd =
       CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, TRAY_MENU_CLASS_NAME,
                       L"TrayMenu", WS_POPUP, 0, 0, 100, 100,  // 临时尺寸，稍后会调整
-                      nullptr, nullptr, state.app_window.window.instance, &state);
+                      nullptr, nullptr, state.app_window->window.instance, &state);
 
   if (!tray_menu.hwnd) {
     return std::unexpected(
@@ -151,7 +152,7 @@ auto build_window_list(Core::State::AppState& state) -> std::vector<UI::TrayMenu
 
 // 初始化菜单项数据
 auto initialize_menu_items(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   auto& items = tray_menu.items;
 
   items.clear();
@@ -176,9 +177,9 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   // 功能选项
   items.emplace_back(strings.capture_window, Core::Constants::ID_CAPTURE_WINDOW);
   items.emplace_back(strings.preview_window, Core::Constants::ID_PREVIEW_WINDOW,
-                     state.app_window.ui.preview_enabled);
+                     state.app_window->ui.preview_enabled);
   items.emplace_back(strings.overlay_window, Core::Constants::ID_OVERLAY_WINDOW,
-                     state.app_window.ui.overlay_enabled);
+                     state.app_window->ui.overlay_enabled);
 
   // 分隔线
   items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
@@ -210,7 +211,7 @@ namespace UI::TrayMenu {
 
 auto initialize(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 更新DPI缩放
-  state.tray_menu.layout.update_dpi_scaling(state.app_window.window.dpi);
+  state.tray_menu->layout.update_dpi_scaling(state.app_window->window.dpi);
 
   // 初始化菜单项
   initialize_menu_items(state);
@@ -220,10 +221,10 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
     return result;
   }
 
-  create_window_attributes(state.tray_menu.hwnd);
+  create_window_attributes(state.tray_menu->hwnd);
 
   // 创建主菜单D2D资源
-  if (!UI::TrayMenu::D2DContext::initialize_main_menu(state, state.tray_menu.hwnd)) {
+  if (!UI::TrayMenu::D2DContext::initialize_main_menu(state, state.tray_menu->hwnd)) {
     return std::unexpected("Failed to initialize D2D for main menu");
   }
 
@@ -231,7 +232,7 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
 }
 
 auto cleanup(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   // 清理主菜单D2D资源
   UI::TrayMenu::D2DContext::cleanup_main_menu(state);
@@ -246,7 +247,7 @@ auto cleanup(Core::State::AppState& state) -> void {
 }
 
 auto show_menu(Core::State::AppState& state, const Vendor::Windows::POINT& position) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   // 如果菜单已经可见，直接返回
   if (tray_menu.is_visible) {
@@ -306,7 +307,7 @@ auto show_menu(Core::State::AppState& state, const Vendor::Windows::POINT& posit
 }
 
 auto hide_menu(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   auto& interaction = tray_menu.interaction;
 
   // 先隐藏子菜单
@@ -333,7 +334,7 @@ auto hide_menu(Core::State::AppState& state) -> void {
 }
 
 auto is_menu_visible(const Core::State::AppState& state) -> bool {
-  return state.tray_menu.is_visible;
+  return state.tray_menu->is_visible;
 }
 
 auto handle_menu_command(Core::State::AppState& state, int command_id) -> void {
@@ -342,14 +343,14 @@ auto handle_menu_command(Core::State::AppState& state, int command_id) -> void {
 
   // 转发命令到主窗口的消息处理器
   // 这样可以复用现有的命令处理逻辑
-  if (state.app_window.window.hwnd) {
-    PostMessageW(state.app_window.window.hwnd, WM_COMMAND, command_id, 0);
+  if (state.app_window->window.hwnd) {
+    PostMessageW(state.app_window->window.hwnd, WM_COMMAND, command_id, 0);
   }
 }
 
 // 计算子菜单尺寸
 auto calculate_submenu_size(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   if (tray_menu.current_submenu.empty()) {
@@ -378,7 +379,7 @@ auto calculate_submenu_size(Core::State::AppState& state) -> void {
 
 // 计算子菜单位置
 auto calculate_submenu_position(Core::State::AppState& state, int parent_index) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   // 计算父菜单项的位置
@@ -419,7 +420,7 @@ auto calculate_submenu_position(Core::State::AppState& state, int parent_index) 
 
 // 显示子菜单
 auto show_submenu(Core::State::AppState& state, int parent_index) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   Logger().debug("show_submenu called with parent_index: {}", parent_index);
 
@@ -461,7 +462,7 @@ auto show_submenu(Core::State::AppState& state, int parent_index) -> void {
       WS_POPUP, tray_menu.submenu_position.x, tray_menu.submenu_position.y,
       tray_menu.submenu_size.cx, tray_menu.submenu_size.cy,
       tray_menu.hwnd,  // 父窗口
-      nullptr, state.app_window.window.instance, &state);
+      nullptr, state.app_window->window.instance, &state);
 
   if (tray_menu.submenu_hwnd) {
     Logger().debug("Submenu window created successfully: {}", (void*)tray_menu.submenu_hwnd);
@@ -488,7 +489,7 @@ auto show_submenu(Core::State::AppState& state, int parent_index) -> void {
 
 // 隐藏子菜单
 auto hide_submenu(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   if (tray_menu.submenu_hwnd) {
     Logger().debug("Hiding submenu window: {}", (void*)tray_menu.submenu_hwnd);

@@ -19,7 +19,7 @@ namespace UI::AppWindow::Painter {
 // 主绘制函数实现
 auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
   const auto& d2d = state.d2d_render;
-  auto& render_state = state.app_window.render;
+  auto& render_state = state.app_window->render;
 
   if (!d2d.is_initialized || !d2d.render_target) {
     return;
@@ -92,7 +92,7 @@ auto draw_app_background(const Core::State::AppState& state, const D2D1_RECT_F& 
 // 绘制标题栏
 auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.d2d_render;
-  const auto& render = state.app_window.layout;
+  const auto& render = state.app_window->layout;
 
   // 绘制标题栏背景（使用半透明画刷）
   D2D1_RECT_F title_rect = Types::UI::make_d2d_rect(
@@ -112,7 +112,7 @@ auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& r
 // 绘制分隔线
 auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.d2d_render;
-  const auto& render = state.app_window.layout;
+  const auto& render = state.app_window->layout;
 
   // 使用简单的列边界计算
   const auto bounds = get_column_bounds(state);
@@ -140,8 +140,8 @@ auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& 
 
 // 绘制所有菜单项
 auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& render = state.app_window.layout;
-  const auto& items = state.app_window.data.menu_items;
+  const auto& render = state.app_window->layout;
+  const auto& items = state.app_window->data.menu_items;
   const auto bounds = get_column_bounds(state);
 
   float y = rect.top + static_cast<float>(render.title_height + render.separator_height);
@@ -174,7 +174,7 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
         continue;
     }
 
-    const bool is_hovered = (static_cast<int>(i) == state.app_window.ui.hover_index);
+    const bool is_hovered = (static_cast<int>(i) == state.app_window->ui.hover_index);
     draw_app_single_item(state, item, item_rect, is_hovered);
 
     // 只有在同一列中才增加y坐标（复制现有逻辑）
@@ -197,7 +197,7 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
 auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindow::MenuItem& item,
                           const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& d2d = state.d2d_render;
-  const auto& render = state.app_window.layout;
+  const auto& render = state.app_window->layout;
 
   // 绘制悬停背景
   if (is_hovered) {
@@ -205,7 +205,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
   }
 
   // 绘制选中指示器（保持完全不透明）
-  const bool is_selected = UI::AppWindow::is_item_selected(item, state.app_window.ui);
+  const bool is_selected = UI::AppWindow::State::is_item_selected(item, state.app_window->ui);
   if (is_selected) {
     const int indicator_width = get_indicator_width(item, state);
     D2D1_RECT_F indicator_rect = Types::UI::make_d2d_rect(

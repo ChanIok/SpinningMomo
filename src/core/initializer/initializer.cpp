@@ -6,6 +6,7 @@ import std;
 import Core.Async.Runtime;
 import Core.Constants;
 import Core.Events;
+import UI.AppWindow.State;
 import Core.State;
 import Core.WebView;
 import Core.WebView.State;
@@ -84,7 +85,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 11. 初始化预览系统
     if (auto preview_result = Features::Preview::Window::initialize_preview(
-            state, instance, state.app_window.window.hwnd);
+            state, instance, state.app_window->window.hwnd);
         !preview_result) {
       Logger().warn("Failed to initialize preview system");
       // 预览功能不可用，但应用继续运行
@@ -92,7 +93,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 12. 初始化overlay系统
     if (auto overlay_result =
-            Features::Overlay::initialize_overlay(state, instance, state.app_window.window.hwnd);
+            Features::Overlay::initialize_overlay(state, instance, state.app_window->window.hwnd);
         !overlay_result) {
       Logger().warn("Failed to initialize overlay system: {}", overlay_result.error());
       // overlay功能不可用，但应用继续运行

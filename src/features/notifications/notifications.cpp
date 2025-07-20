@@ -10,6 +10,7 @@ module Features.Notifications;
 
 import std;
 import Core.State;
+import UI.AppWindow.State;
 import Features.Notifications.State;
 import Features.Notifications.Constants;
 import Utils.Logger;
@@ -253,15 +254,15 @@ auto register_window_class(HINSTANCE hInstance) -> void {
 auto create_notification_window(Core::State::AppState& state,
                                 Features::Notifications::State::Notification& notification)
     -> bool {
-  register_window_class(state.app_window.window.instance);
+  register_window_class(state.app_window->window.instance);
 
-  int dpi = state.app_window.window.dpi;
+  int dpi = state.app_window->window.dpi;
   int width = MulDiv(Constants::BASE_WINDOW_WIDTH, dpi, 96);
 
   HWND hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
                               Constants::NOTIFICATION_WINDOW_CLASS.c_str(), L"Notification",
                               WS_POPUP | WS_CLIPCHILDREN, 0, 0, width, notification.height, NULL,
-                              NULL, state.app_window.window.instance, &notification);
+                              NULL, state.app_window->window.instance, &notification);
 
   if (!hwnd) return false;
 
@@ -279,7 +280,7 @@ auto update_window_positions(Core::State::AppState& state) -> void {
   RECT workArea;
   SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
 
-  int dpi = state.app_window.window.dpi;
+  int dpi = state.app_window->window.dpi;
   int window_width = MulDiv(Constants::BASE_WINDOW_WIDTH, dpi, 96);
   int padding = MulDiv(Constants::BASE_PADDING, dpi, 96);
   int spacing = MulDiv(Constants::BASE_SPACING, dpi, 96);
@@ -344,7 +345,7 @@ auto show_notification(Core::State::AppState& state, const std::wstring& title,
   // 在更新位置前计算高度
   auto& new_notification = state.notifications.active_notifications.back();
   new_notification.height =
-      calculate_window_height(new_notification.message, state.app_window.window.dpi);
+      calculate_window_height(new_notification.message, state.app_window->window.dpi);
 
   // 3. 更新所有通知的位置
   update_window_positions(state);

@@ -5,6 +5,7 @@ module Handlers.Feature;
 import std;
 import Core.Events;
 import Core.State;
+import UI.AppWindow; // 使用UI.AppWindow模块的接口函数
 import Features.Letterbox;
 import Features.Preview.Window;
 import Features.WindowControl;
@@ -17,8 +18,8 @@ namespace Handlers {
 
 // 处理预览功能切换
 auto handle_preview_toggle(Core::State::AppState& state, bool enabled) -> void {
-  // 更新预览状态
-  state.app_window.ui.preview_enabled = enabled;
+  // 更新预览状态（使用UI.AppWindow的接口函数）
+  UI::AppWindow::set_preview_enabled(state, enabled);
 
   if (enabled) {
     // 查找目标窗口（暂时硬编码为空）
@@ -30,13 +31,13 @@ auto handle_preview_toggle(Core::State::AppState& state, bool enabled) -> void {
           !result) {
         Logger().error("Failed to start preview");
         // 回滚UI状态
-        state.app_window.ui.preview_enabled = false;
+        UI::AppWindow::set_preview_enabled(state, false);
         Features::Notifications::show_notification(state, "SpinningMomo",
                                                    "Failed to start preview window");
       }
     } else {
       Logger().warn("No target window found for preview");
-      state.app_window.ui.preview_enabled = false;
+      UI::AppWindow::set_preview_enabled(state, false);
       Features::Notifications::show_notification(
           state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
     }
@@ -48,8 +49,8 @@ auto handle_preview_toggle(Core::State::AppState& state, bool enabled) -> void {
 
 // 处理叠加层功能切换
 auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
-  // 更新叠加层状态
-  state.app_window.ui.overlay_enabled = enabled;
+  // 更新叠加层状态（使用UI.AppWindow的接口函数）
+  UI::AppWindow::set_overlay_enabled(state, enabled);
 
   if (enabled) {
     // 查找目标窗口（暂时硬编码为空）
@@ -60,13 +61,13 @@ auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
       if (auto result = Features::Overlay::start_overlay(state, target_window.value()); !result) {
         Logger().error("Failed to start overlay: {}", result.error());
         // 回滚UI状态
-        state.app_window.ui.overlay_enabled = false;
+        UI::AppWindow::set_overlay_enabled(state, false);
         Features::Notifications::show_notification(state, "SpinningMomo",
                                                    "Failed to start overlay window");
       }
     } else {
       Logger().warn("No target window found for overlay");
-      state.app_window.ui.overlay_enabled = false;
+      UI::AppWindow::set_overlay_enabled(state, false);
       Features::Notifications::show_notification(
           state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
     }
@@ -78,8 +79,8 @@ auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
 
 // 处理letterbox功能切换
 auto handle_letterbox_toggle(Core::State::AppState& state, bool enabled) -> void {
-  // 更新黑边状态
-  state.app_window.ui.letterbox_enabled = enabled;
+  // 更新黑边状态（使用UI.AppWindow的接口函数）
+  UI::AppWindow::set_letterbox_enabled(state, enabled);
   // TODO: 等待settings设计完成后，将letterbox enabled状态保存到settings
   // state.config.letterbox.enabled = enabled; // 暂时注释掉
 
@@ -92,13 +93,13 @@ auto handle_letterbox_toggle(Core::State::AppState& state, bool enabled) -> void
       if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
         Logger().error("Failed to show letterbox: {}", result.error());
         // 回滚UI状态
-        state.app_window.ui.letterbox_enabled = false;
+        UI::AppWindow::set_letterbox_enabled(state, false);
         Features::Notifications::show_notification(state, "SpinningMomo",
                                                    "Failed to show letterbox window");
       }
     } else {
       Logger().warn("No target window found for letterbox");
-      state.app_window.ui.letterbox_enabled = false;
+      UI::AppWindow::set_letterbox_enabled(state, false);
       Features::Notifications::show_notification(
           state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
     }
@@ -136,9 +137,7 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
     }
 
     // 触发UI更新
-    if (app_state.app_window.window.hwnd) {
-      Vendor::Windows::InvalidateRect(app_state.app_window.window.hwnd, nullptr, true);
-    }
+    UI::AppWindow::request_repaint(app_state);
   });
 }
 

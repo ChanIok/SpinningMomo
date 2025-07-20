@@ -6,7 +6,7 @@ import Vendor.ShellApi;
 
 namespace UI::TrayIcon::State {
 
-export struct Data {
+export struct TrayIconState {
   Vendor::ShellApi::NOTIFYICONDATAW nid{};
   bool is_created = false;
 };

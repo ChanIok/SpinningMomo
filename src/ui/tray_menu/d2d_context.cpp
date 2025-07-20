@@ -11,6 +11,7 @@ module UI.TrayMenu.D2DContext;
 import std;
 import Core.State;
 import Types.UI;
+import UI.TrayMenu.State;
 import Utils.Logger;
 
 namespace {
@@ -73,7 +74,7 @@ namespace UI::TrayMenu::D2DContext {
 
 // 初始化主菜单D2D资源
 auto initialize_main_menu(Core::State::AppState& state, HWND hwnd) -> bool {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   const auto& d2d = state.d2d_render;
 
   // 如果已经初始化，直接返回成功
@@ -115,7 +116,7 @@ auto initialize_main_menu(Core::State::AppState& state, HWND hwnd) -> bool {
 
 // 清理主菜单D2D资源
 auto cleanup_main_menu(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   // 释放主菜单画刷
   release_brushes(&tray_menu.white_brush, &tray_menu.text_brush, &tray_menu.separator_brush,
@@ -132,7 +133,7 @@ auto cleanup_main_menu(Core::State::AppState& state) -> void {
 
 // 初始化子菜单D2D资源
 auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   const auto& d2d = state.d2d_render;
 
   // 如果已经初始化，直接返回成功
@@ -178,7 +179,7 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
 
 // 清理子菜单D2D资源
 auto cleanup_submenu(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   // 释放子菜单画刷
   release_brushes(&tray_menu.submenu_white_brush, &tray_menu.submenu_text_brush,
@@ -196,7 +197,7 @@ auto cleanup_submenu(Core::State::AppState& state) -> void {
 
 // 调整主菜单渲染目标大小
 auto resize_main_menu(Core::State::AppState& state, const SIZE& new_size) -> bool {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   if (!tray_menu.main_menu_d2d_ready || !tray_menu.render_target) {
     return false;
@@ -209,7 +210,7 @@ auto resize_main_menu(Core::State::AppState& state, const SIZE& new_size) -> boo
 
 // 调整子菜单渲染目标大小
 auto resize_submenu(Core::State::AppState& state, const SIZE& new_size) -> bool {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   if (!tray_menu.submenu_d2d_ready || !tray_menu.submenu_render_target) {
     return false;

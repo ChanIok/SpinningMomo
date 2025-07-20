@@ -9,7 +9,7 @@ namespace Features::WindowControl {
 
 // 窗口信息结构体
 export struct WindowInfo {
-  Vendor::Windows::HWND handle;
+  Vendor::Windows::HWND handle = nullptr;  // 添加默认值
   std::wstring title;
 
   auto operator==(const WindowInfo& other) const noexcept -> bool {

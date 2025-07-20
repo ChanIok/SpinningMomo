@@ -22,7 +22,7 @@ auto calculate_text_width(const Core::State::AppState& state, const std::wstring
 
   if (!d2d.is_initialized || !d2d.text_format) {
     // 如果D2D未初始化，使用估算值
-    return static_cast<int>(text.length() * state.tray_menu.layout.font_size * 0.6);
+    return static_cast<int>(text.length() * state.tray_menu->layout.font_size * 0.6);
   }
 
   // 使用DirectWrite测量文本
@@ -30,7 +30,7 @@ auto calculate_text_width(const Core::State::AppState& state, const std::wstring
   HRESULT hr = d2d.write_factory->CreateTextLayout(
       text.c_str(), static_cast<UINT32>(text.length()), d2d.text_format,
       1000.0f,  // 最大宽度
-      static_cast<float>(state.tray_menu.layout.item_height), text_layout.GetAddressOf());
+      static_cast<float>(state.tray_menu->layout.item_height), text_layout.GetAddressOf());
 
   if (SUCCEEDED(hr)) {
     DWRITE_TEXT_METRICS metrics;
@@ -41,12 +41,12 @@ auto calculate_text_width(const Core::State::AppState& state, const std::wstring
   }
 
   // 回退到估算值
-  return static_cast<int>(text.length() * state.tray_menu.layout.font_size * 0.6);
+  return static_cast<int>(text.length() * state.tray_menu->layout.font_size * 0.6);
 }
 
 // 计算菜单尺寸
 auto calculate_menu_size(Core::State::AppState& state) -> void {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   int total_height = layout.padding * 2;  // 上下边距
@@ -78,7 +78,7 @@ auto calculate_menu_size(Core::State::AppState& state) -> void {
 // 计算菜单位置（确保在屏幕内）
 auto calculate_menu_position(Core::State::AppState& state, const Vendor::Windows::POINT& cursor_pos)
     -> Vendor::Windows::POINT {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   // 获取鼠标所在显示器的工作区
   HMONITOR monitor = MonitorFromPoint({cursor_pos.x, cursor_pos.y}, MONITOR_DEFAULTTONEAREST);
@@ -114,7 +114,7 @@ auto calculate_menu_position(Core::State::AppState& state, const Vendor::Windows
 
 // 根据坐标获取菜单项索引
 auto get_menu_item_at_point(const Core::State::AppState& state, const POINT& pt) -> int {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   int current_y = tray_menu.layout.padding;
 
   for (size_t i = 0; i < tray_menu.items.size(); ++i) {

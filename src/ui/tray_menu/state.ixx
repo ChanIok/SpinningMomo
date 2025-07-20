@@ -99,7 +99,7 @@ struct InteractionState {
 };
 
 // 托盘菜单数据
-struct Data {
+struct TrayMenuState {
   // 窗口相关
   HWND hwnd = nullptr;
   bool is_visible = false;

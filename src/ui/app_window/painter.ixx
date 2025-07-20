@@ -8,7 +8,7 @@ export module UI.AppWindow.Painter;
 import std;
 import Core.State;
 import Types.UI;
-import UI.AppWindow.State;
+import UI.AppWindow.Types;
 
 namespace UI::AppWindow::Painter {
 

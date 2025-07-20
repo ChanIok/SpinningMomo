@@ -15,9 +15,9 @@ import Features.Preview.State;
 import Features.Screenshot.State;
 // import Features.Settings.State; // 改为前向声明
 import Types.UI;
-import UI.AppWindow.State;
-import UI.TrayIcon.State;
-import UI.TrayMenu.State;
+// import UI.AppWindow.State; // 改为前向声明
+// import UI.TrayIcon.State; // 改为前向声明
+// import UI.TrayMenu.State; // 改为前向声明
 import Vendor.Windows;
 
 export namespace Core::Async::State {
@@ -40,6 +40,18 @@ export namespace Features::Settings::State {
 struct SettingsState;
 }
 
+export namespace UI::AppWindow::State {
+struct AppWindowState;
+}
+
+export namespace UI::TrayIcon::State {
+struct TrayIconState;
+}
+
+export namespace UI::TrayMenu::State {
+struct TrayMenuState;
+}
+
 // export namespace Core::RpcHandlers::State {
 // struct RpcHandlerState;
 // }
@@ -59,9 +71,9 @@ export struct AppState {
   std::unique_ptr<Features::Settings::State::SettingsState> settings;
 
   // UI状态
-  UI::AppWindow::State::Data app_window;
-  UI::TrayIcon::State::Data tray_icon;
-  UI::TrayMenu::State::Data tray_menu;
+  std::unique_ptr<UI::AppWindow::State::AppWindowState> app_window;
+  std::unique_ptr<UI::TrayIcon::State::TrayIconState> tray_icon;
+  std::unique_ptr<UI::TrayMenu::State::TrayMenuState> tray_menu;
 
   // 功能模块状态
   Features::Letterbox::State::LetterboxState letterbox;
@@ -70,13 +82,5 @@ export struct AppState {
   Features::Preview::State::PreviewState preview;
   Features::Screenshot::State::ScreenshotState screenshot;
 };
-
-// 根据DPI更新渲染状态
-export auto update_render_dpi(AppState& state, Vendor::Windows::UINT new_dpi) -> void {
-  state.app_window.window.dpi = new_dpi;
-  state.d2d_render.needs_font_update = true;
-  state.app_window.layout.update_dpi_scaling(new_dpi);
-  state.tray_menu.layout.update_dpi_scaling(new_dpi);
-}
 
 }  // namespace Core::State

@@ -20,7 +20,7 @@ namespace {
 
 // 获取子菜单中指定点击位置的菜单项索引
 auto get_submenu_item_at_point(const Core::State::AppState& state, const POINT& pt) -> int {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   int current_y = layout.padding;
@@ -72,9 +72,9 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_DESTROY: {
       // 区分主菜单和子菜单窗口的销毁
-      if (hwnd == state.tray_menu.hwnd) {
+      if (hwnd == state.tray_menu->hwnd) {
         // 清理所有定时器
-        auto& interaction = state.tray_menu.interaction;
+        auto& interaction = state.tray_menu->interaction;
 
         if (interaction.show_timer_id != 0) {
           KillTimer(hwnd, interaction.show_timer_id);
@@ -88,10 +88,10 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
           interaction.hide_timer_id = 0;
         }
 
-        state.tray_menu.hwnd = nullptr;
-        state.tray_menu.is_created = false;
-      } else if (hwnd == state.tray_menu.submenu_hwnd) {
-        state.tray_menu.submenu_hwnd = nullptr;
+        state.tray_menu->hwnd = nullptr;
+        state.tray_menu->is_created = false;
+      } else if (hwnd == state.tray_menu->submenu_hwnd) {
+        state.tray_menu->submenu_hwnd = nullptr;
       }
       return 0;
     }
@@ -132,7 +132,7 @@ auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
     GetClientRect(hwnd, &rect);
 
     // 检查是主菜单还是子菜单
-    if (hwnd == state.tray_menu.submenu_hwnd) {
+    if (hwnd == state.tray_menu->submenu_hwnd) {
       UI::TrayMenu::Painter::paint_submenu(state, rect);
     } else {
       UI::TrayMenu::Painter::paint_tray_menu(state, rect);
@@ -151,10 +151,10 @@ auto handle_size(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   SIZE new_size = {rc.right - rc.left, rc.bottom - rc.top};
 
   // 根据窗口类型调整渲染目标大小
-  if (hwnd == state.tray_menu.submenu_hwnd) {
+  if (hwnd == state.tray_menu->submenu_hwnd) {
     Logger().debug("Resizing submenu to size: {}x{}", new_size.cx, new_size.cy);
     UI::TrayMenu::D2DContext::resize_submenu(state, new_size);
-  } else if (hwnd == state.tray_menu.hwnd) {
+  } else if (hwnd == state.tray_menu->hwnd) {
     Logger().debug("Resizing main menu to size: {}x{}", new_size.cx, new_size.cy);
     UI::TrayMenu::D2DContext::resize_main_menu(state, new_size);
   }
@@ -165,7 +165,7 @@ auto handle_size(Core::State::AppState& state, HWND hwnd) -> LRESULT {
 // 处理WM_MOUSEMOVE消息
 auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   auto& interaction = tray_menu.interaction;
   POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
@@ -243,7 +243,7 @@ auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, L
 // 处理WM_LBUTTONDOWN消息
 auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   // 检查是否点击的是子菜单
   if (hwnd == tray_menu.submenu_hwnd) {
@@ -279,7 +279,7 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
 // 处理WM_KEYDOWN消息
 auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
   switch (wParam) {
     case VK_ESCAPE:
       UI::TrayMenu::hide_menu(state);
@@ -349,7 +349,7 @@ auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPA
 
 // 处理WM_KILLFOCUS消息 - 简单的焦点管理
 auto handle_kill_focus(Core::State::AppState& state, HWND hwnd) -> LRESULT {
-  auto& tray_menu = state.tray_menu;
+  auto& tray_menu = *state.tray_menu;
 
   // 检查焦点是否转移到了菜单系统内的其他窗口
   HWND new_focus = GetFocus();
@@ -368,7 +368,7 @@ auto handle_kill_focus(Core::State::AppState& state, HWND hwnd) -> LRESULT {
 
 // 处理WM_TIMER消息（添加隐藏定时器支持）
 auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM timer_id) -> LRESULT {
-  auto& interaction = state.tray_menu.interaction;
+  auto& interaction = state.tray_menu->interaction;
 
   if (timer_id == interaction.SHOW_TIMER_ID && timer_id == interaction.show_timer_id) {
     Logger().debug("Show timer expired, showing submenu for index: {}",
@@ -380,9 +380,9 @@ auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM timer_id) -> L
 
     // 验证待显示的索引仍然有效且鼠标仍在该菜单项上
     if (interaction.pending_submenu_index >= 0 &&
-        interaction.pending_submenu_index < static_cast<int>(state.tray_menu.items.size()) &&
-        interaction.pending_submenu_index == state.tray_menu.interaction.hover_index) {
-      const auto& item = state.tray_menu.items[interaction.pending_submenu_index];
+        interaction.pending_submenu_index < static_cast<int>(state.tray_menu->items.size()) &&
+        interaction.pending_submenu_index == state.tray_menu->interaction.hover_index) {
+      const auto& item = state.tray_menu->items[interaction.pending_submenu_index];
       if (item.has_submenu()) {
         UI::TrayMenu::show_submenu(state, interaction.pending_submenu_index);
       }

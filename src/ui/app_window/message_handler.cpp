@@ -46,40 +46,40 @@ auto dispatch_feature_action(Core::State::AppState& state, const std::string& ac
     case Id::FeatureTogglePreview:
       send_event(*state.event_bus,
                  {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
-                  state.app_window.window.hwnd});
+                  FeatureToggleData{FeatureType::Preview, !state.app_window->ui.preview_enabled},
+                  state.app_window->window.hwnd});
       break;
     case Id::FeatureToggleOverlay:
       send_event(*state.event_bus,
                  {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
-                  state.app_window.window.hwnd});
+                  FeatureToggleData{FeatureType::Overlay, !state.app_window->ui.overlay_enabled},
+                  state.app_window->window.hwnd});
       break;
     case Id::FeatureToggleLetterbox:
       send_event(*state.event_bus,
                  {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
-                  state.app_window.window.hwnd});
+                  FeatureToggleData{FeatureType::Letterbox, !state.app_window->ui.letterbox_enabled},
+                  state.app_window->window.hwnd});
       break;
     case Id::ScreenshotCapture:
       send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Capture, state.app_window->window.hwnd});
       break;
     case Id::ScreenshotOpenFolder:
       send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
-                                   state.app_window.window.hwnd});
+                                   state.app_window->window.hwnd});
       break;
     case Id::WindowResetTransform:
       send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Reset, state.app_window->window.hwnd});
       break;
     case Id::PanelHide:
       send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Hide, state.app_window.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Hide, state.app_window->window.hwnd});
       break;
     case Id::AppExit:
       send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Exit, state.app_window->window.hwnd});
       break;
   }
 }
@@ -97,7 +97,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
         send_event(*state.event_bus, {EventType::RatioChanged,
                                      RatioChangeData{static_cast<size_t>(item.index),
                                                      ratio_preset.name, ratio_preset.ratio},
-                                     state.app_window.window.hwnd});
+                                     state.app_window->window.hwnd});
       }
       break;
     }
@@ -110,7 +110,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
                     ResolutionChangeData{
                         static_cast<size_t>(item.index), res_preset.name,
                         res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
-                    state.app_window.window.hwnd});
+                    state.app_window->window.hwnd});
       }
       break;
     }
@@ -135,7 +135,7 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
       const auto& ratio_preset = ratios[index];
       send_event(*state.event_bus, {EventType::RatioChanged,
                                    RatioChangeData{index, ratio_preset.name, ratio_preset.ratio},
-                                   state.app_window.window.hwnd});
+                                   state.app_window->window.hwnd});
     }
     return;
   }
@@ -152,7 +152,7 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
                   ResolutionChangeData{
                       index, res_preset.name,
                       res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
-                  state.app_window.window.hwnd});
+                  state.app_window->window.hwnd});
     }
     return;
   }
@@ -161,47 +161,47 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
   switch (command_id) {
     case Core::Constants::ID_EXIT:
       send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Exit, state.app_window.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Exit, state.app_window->window.hwnd});
       break;
     case Core::Constants::ID_RESET:
       send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Reset, state.app_window.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Reset, state.app_window->window.hwnd});
       break;
     case Core::Constants::ID_CAPTURE_WINDOW:
       send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Capture, state.app_window.window.hwnd});
+                 {EventType::WindowAction, WindowAction::Capture, state.app_window->window.hwnd});
       break;
     case Core::Constants::ID_OPEN_SCREENSHOT:
       send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
-                                   state.app_window.window.hwnd});
+                                   state.app_window->window.hwnd});
       break;
     case Core::Constants::ID_PREVIEW_WINDOW:
       send_event(*state.event_bus,
                  {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Preview, !state.app_window.ui.preview_enabled},
-                  state.app_window.window.hwnd});
+                  FeatureToggleData{FeatureType::Preview, !state.app_window->ui.preview_enabled},
+                  state.app_window->window.hwnd});
       break;
     case Core::Constants::ID_OVERLAY_WINDOW:
       send_event(*state.event_bus,
                  {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Overlay, !state.app_window.ui.overlay_enabled},
-                  state.app_window.window.hwnd});
+                  FeatureToggleData{FeatureType::Overlay, !state.app_window->ui.overlay_enabled},
+                  state.app_window->window.hwnd});
       break;
     case Core::Constants::ID_LETTERBOX_WINDOW:
       send_event(*state.event_bus,
                  {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Letterbox, !state.app_window.ui.letterbox_enabled},
-                  state.app_window.window.hwnd});
+                  FeatureToggleData{FeatureType::Letterbox, !state.app_window->ui.letterbox_enabled},
+                  state.app_window->window.hwnd});
       break;
     case Core::Constants::ID_WEBVIEW_TEST:
       send_event(*state.event_bus, {EventType::SystemCommand, std::string("webview_test"),
-                                   state.app_window.window.hwnd});
+                                   state.app_window->window.hwnd});
       break;
       // Add other cases for config, hotkey, language, etc.
       // For example:
       // case Core::Constants::ID_CONFIG:
       //     send_event(*state.event_bus, {EventType::SystemCommand, std::string("open_config"),
-      //     state.app_window.window.hwnd}); break;
+      //     state.app_window->window.hwnd}); break;
   }
 }
 
@@ -209,13 +209,13 @@ auto handle_tray_command(Core::State::AppState& state, WORD command_id) -> void 
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
   using namespace Core::Events;
   send_event(*state.event_bus, {EventType::SystemCommand, std::string("toggle_visibility"),
-                               state.app_window.window.hwnd});
+                               state.app_window->window.hwnd});
 }
 
 // 处理鼠标移出窗口，重置悬停状态并重绘
 auto handle_mouse_leave(Core::State::AppState& state) -> void {
   // 重置悬停索引
-  state.app_window.ui.hover_index = -1;
+  state.app_window->ui.hover_index = -1;
 
   UI::AppWindow::request_repaint(state);
 }
@@ -223,12 +223,12 @@ auto handle_mouse_leave(Core::State::AppState& state) -> void {
 // 处理鼠标移动，更新悬停状态并重绘
 auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
   const int new_hover_index = get_item_index_from_point(state, x, y);
-  if (new_hover_index != state.app_window.ui.hover_index) {
+  if (new_hover_index != state.app_window->ui.hover_index) {
     // 更新悬停索引
-    state.app_window.ui.hover_index = new_hover_index;
+    state.app_window->ui.hover_index = new_hover_index;
 
     UI::AppWindow::request_repaint(state);
-    ensure_mouse_tracking(state.app_window.window.hwnd);
+    ensure_mouse_tracking(state.app_window->window.hwnd);
   }
 }
 
@@ -236,8 +236,8 @@ auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
 auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
   const int clicked_index = get_item_index_from_point(state, x, y);
   if (clicked_index >= 0 &&
-      clicked_index < static_cast<int>(state.app_window.data.menu_items.size())) {
-    const auto& item = state.app_window.data.menu_items[clicked_index];
+      clicked_index < static_cast<int>(state.app_window->data.menu_items.size())) {
+    const auto& item = state.app_window->data.menu_items[clicked_index];
     dispatch_item_click_event(state, item);
   }
 }
@@ -262,19 +262,12 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_DPICHANGED: {
       const UINT dpi = HIWORD(wParam);
-      Core::State::update_render_dpi(state, dpi);
-
       const auto window_size = calculate_window_size(state);
-      RECT currentRect{};
-      GetWindowRect(hwnd, &currentRect);
-
-      SetWindowPos(hwnd, nullptr, currentRect.left, currentRect.top, window_size.cx, window_size.cy,
-                   SWP_NOZORDER | SWP_NOACTIVATE);
-
-      // 如果Direct2D已初始化，调整渲染目标大小
-      if (state.d2d_render.is_initialized) {
-        UI::AppWindow::D2DContext::resize_d2d(state, window_size);
-      }
+      
+      // 发送DPI改变事件来更新渲染状态
+      Core::Events::send_event(*state.event_bus, {Core::Events::EventType::DpiChanged,
+                                                 Core::Events::DpiChangeData{dpi, window_size},
+                                                 hwnd});
 
       return 0;
     }
@@ -308,7 +301,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_NCHITTEST: {
       POINT pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
       ScreenToClient(hwnd, &pt);
-      if (pt.y < state.app_window.layout.title_height) {
+      if (pt.y < state.app_window->layout.title_height) {
         return HTCAPTION;
       }
       return HTCLIENT;
@@ -317,7 +310,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_CLOSE:
       Core::Events::send_event(
           *state.event_bus, {Core::Events::EventType::WindowAction, Core::Events::WindowAction::Hide,
-                            state.app_window.window.hwnd});
+                            state.app_window->window.hwnd});
       return 0;
 
     case WM_DESTROY:

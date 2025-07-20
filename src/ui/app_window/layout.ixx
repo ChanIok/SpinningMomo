@@ -8,6 +8,7 @@ export module UI.AppWindow.Layout;
 import std;
 import Core.State;
 import UI.AppWindow.State;
+import UI.AppWindow.Types;
 import Types.UI;
 
 namespace UI::AppWindow {

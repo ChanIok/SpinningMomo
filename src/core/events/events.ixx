@@ -15,7 +15,8 @@ export enum class EventType {
   ToggleFeature,      // 功能开关
   SystemCommand,      // 系统命令
   ConfigChanged,      // 配置改变
-  WebViewResponse     // WebView响应
+  WebViewResponse,    // WebView响应
+  DpiChanged          // DPI改变
 };
 
 // 窗口动作类型
@@ -63,6 +64,12 @@ export struct ResolutionChangeData {
 export struct FeatureToggleData {
   FeatureType feature;
   bool enabled;
+};
+
+// DPI改变事件数据
+export struct DpiChangeData {
+  Vendor::Windows::UINT new_dpi;
+  Vendor::Windows::SIZE window_size;
 };
 
 // 事件处理器函数类型

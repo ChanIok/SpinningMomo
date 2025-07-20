@@ -5,6 +5,7 @@ module Handlers.Window;
 import std;
 import Common.MenuData;
 import Core.Events;
+import UI.AppWindow.State;  // 移动到 Core.State 之前
 import Core.State;
 import Features.WindowControl;
 import Features.Notifications;
@@ -19,8 +20,8 @@ namespace Handlers {
 // 获取当前比例
 auto get_current_ratio(const Core::State::AppState& state) -> double {
   const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
-  if (state.app_window.ui.current_ratio_index < ratios.size()) {
-    return ratios[state.app_window.ui.current_ratio_index].ratio;
+  if (state.app_window->ui.current_ratio_index < ratios.size()) {
+    return ratios[state.app_window->ui.current_ratio_index].ratio;
   }
 
   // 默认使用屏幕比例
@@ -32,8 +33,8 @@ auto get_current_ratio(const Core::State::AppState& state) -> double {
 // 获取当前总像素数
 auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64_t {
   const auto& resolutions = Common::MenuData::get_current_resolutions(state);
-  if (state.app_window.ui.current_resolution_index < resolutions.size()) {
-    return resolutions[state.app_window.ui.current_resolution_index].totalPixels;
+  if (state.app_window->ui.current_resolution_index < resolutions.size()) {
+    return resolutions[state.app_window->ui.current_resolution_index].totalPixels;
   }
   return 0;  // 表示使用屏幕尺寸
 }
@@ -77,13 +78,13 @@ auto handle_window_action(Core::State::AppState& state, const Core::Events::Even
       }
 
       // 重置UI状态到默认值
-      state.app_window.ui.current_ratio_index =
+      state.app_window->ui.current_ratio_index =
           std::numeric_limits<size_t>::max();  // 表示使用屏幕比例
-      state.app_window.ui.current_resolution_index = 0;
+      state.app_window->ui.current_resolution_index = 0;
 
       // 触发UI更新
-      if (state.app_window.window.hwnd) {
-        Vendor::Windows::InvalidateRect(state.app_window.window.hwnd, nullptr, true);
+      if (state.app_window->window.hwnd) {
+        Vendor::Windows::InvalidateRect(state.app_window->window.hwnd, nullptr, true);
       }
 
       Logger().debug("Window reset to screen size successfully");
@@ -172,7 +173,7 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = false,
-      .activate_window = !state.app_window.ui.overlay_enabled};
+      .activate_window = !state.app_window->ui.overlay_enabled};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -190,12 +191,12 @@ auto handle_ratio_changed(Core::State::AppState& state, const Core::Events::Even
   // 更新当前比例索引
   const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
   if (data.index < ratios.size() || data.index == std::numeric_limits<size_t>::max()) {
-    state.app_window.ui.current_ratio_index = data.index;
+    state.app_window->ui.current_ratio_index = data.index;
   }
 
   // 触发UI更新
-  if (state.app_window.window.hwnd) {
-    Vendor::Windows::InvalidateRect(state.app_window.window.hwnd, nullptr, true);
+  if (state.app_window->window.hwnd) {
+    Vendor::Windows::InvalidateRect(state.app_window->window.hwnd, nullptr, true);
   }
 }
 
@@ -233,7 +234,7 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = false,
-      .activate_window = !state.app_window.ui.overlay_enabled};
+      .activate_window = !state.app_window->ui.overlay_enabled};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -251,12 +252,12 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   // 更新当前分辨率索引
   const auto& resolutions = Common::MenuData::get_current_resolutions(state);
   if (data.index < resolutions.size()) {
-    state.app_window.ui.current_resolution_index = data.index;
+    state.app_window->ui.current_resolution_index = data.index;
   }
 
   // 触发UI更新
-  if (state.app_window.window.hwnd) {
-    Vendor::Windows::InvalidateRect(state.app_window.window.hwnd, nullptr, true);
+  if (state.app_window->window.hwnd) {
+    Vendor::Windows::InvalidateRect(state.app_window->window.hwnd, nullptr, true);
   }
 }
 

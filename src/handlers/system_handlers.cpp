@@ -1,5 +1,7 @@
 module;
 
+#include <windows.h>
+
 module Handlers.System;
 
 import std;
@@ -7,11 +9,37 @@ import Core.Events;
 import Core.State;
 import Core.WebView;
 import UI.AppWindow;
+import UI.AppWindow.Layout;
+import UI.AppWindow.D2DContext;
+import UI.AppWindow.State;
 import UI.WebViewWindow;
+import UI.TrayMenu.State;
 import Utils.Logger;
 import Vendor.Windows;
 
 namespace Handlers {
+
+// 从 app_state.ixx 迁移的 DPI 更新函数
+auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_dpi, const Vendor::Windows::SIZE& window_size) -> void {
+  state.app_window->window.dpi = new_dpi;
+  state.d2d_render.needs_font_update = true;
+  state.app_window->layout.update_dpi_scaling(new_dpi);
+  state.tray_menu->layout.update_dpi_scaling(new_dpi);
+  
+  // 更新窗口尺寸
+  if (state.app_window->window.hwnd) {
+    RECT currentRect{};
+    GetWindowRect(state.app_window->window.hwnd, &currentRect);
+    
+    SetWindowPos(state.app_window->window.hwnd, nullptr, currentRect.left, currentRect.top, 
+                 window_size.cx, window_size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
+    
+    // 如果Direct2D已初始化，调整渲染目标大小
+    if (state.d2d_render.is_initialized) {
+      UI::AppWindow::D2DContext::resize_d2d(state, window_size);
+    }
+  }
+}
 
 auto register_system_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
@@ -62,6 +90,16 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
         }
       }
     }
+  });
+
+  // 注册DPI改变事件处理器
+  subscribe(*app_state.event_bus, EventType::DpiChanged, [&app_state](const Event& event) {
+    auto dpi_data = std::any_cast<DpiChangeData>(event.data);
+    Logger().debug("DPI changed to: {}, window size: {}x{}", dpi_data.new_dpi, dpi_data.window_size.cx, dpi_data.window_size.cy);
+    
+    update_render_dpi(app_state, dpi_data.new_dpi, dpi_data.window_size);
+    
+    Logger().info("DPI update completed successfully");
   });
 }
 

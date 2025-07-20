@@ -102,5 +102,6 @@ export using DWORD = ::DWORD;
 
 // 窗口相关类型
 export using RECT = ::RECT;
+export using SIZE = ::SIZE;
 
 }  // namespace Vendor::Windows

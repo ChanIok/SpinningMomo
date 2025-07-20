@@ -19,9 +19,12 @@ import Features.Preview.Window;
 import Features.Screenshot;
 import Features.Settings;
 import UI.AppWindow;
+import UI.AppWindow.State;
 import UI.WebViewWindow;
 import UI.TrayIcon;
+import UI.TrayIcon.State;
 import UI.TrayMenu;
+import UI.TrayMenu.State;
 import Core.WebView;
 import Utils.Logger;
 import Utils.String;
@@ -63,7 +66,13 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->rpc_handlers = std::make_unique<Core::RpcHandlers::State::RpcHandlerState>();
     m_app_state->webview = std::make_unique<Core::WebView::State::WebViewState>();
     m_app_state->settings = std::make_unique<Features::Settings::State::SettingsState>();
-    m_app_state->app_window.window.instance = m_h_instance;
+
+    // 初始化UI状态
+    m_app_state->app_window = std::make_unique<UI::AppWindow::State::AppWindowState>();
+    m_app_state->tray_icon = std::make_unique<UI::TrayIcon::State::TrayIconState>();
+    m_app_state->tray_menu = std::make_unique<UI::TrayMenu::State::TrayMenuState>();
+
+    m_app_state->app_window->window.instance = m_h_instance;
 
     // 测试嵌入式多语言系统
     Logger().info("=== Testing Embedded I18n System ===");

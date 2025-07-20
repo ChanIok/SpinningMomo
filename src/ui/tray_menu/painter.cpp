@@ -20,7 +20,7 @@ namespace UI::TrayMenu::Painter {
 // 主绘制函数实现
 auto paint_tray_menu(const Core::State::AppState& state, const RECT& client_rect) -> void {
   const auto& d2d = state.d2d_render;
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
 
   // 检查主菜单D2D资源是否就绪
   if (!tray_menu.main_menu_d2d_ready || !tray_menu.render_target) {
@@ -44,7 +44,7 @@ auto paint_tray_menu(const Core::State::AppState& state, const RECT& client_rect
   if (hr == D2DERR_RECREATE_TARGET) {
     // 标记主菜单的渲染目标需要重新创建
     Logger().warn("Main menu render target needs recreation");
-    const_cast<Core::State::AppState&>(state).tray_menu.main_menu_d2d_ready = false;
+    const_cast<Core::State::AppState&>(state).tray_menu->main_menu_d2d_ready = false;
   } else if (FAILED(hr)) {
     Logger().error("Main menu paint error: 0x{:X}", hr);
   }
@@ -52,7 +52,7 @@ auto paint_tray_menu(const Core::State::AppState& state, const RECT& client_rect
 
 // 绘制菜单背景
 auto draw_menu_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
 
   // 清除背景
   tray_menu.render_target->Clear(D2D1::ColorF(D2D1::ColorF::White, 0.95f));
@@ -70,7 +70,7 @@ auto draw_menu_background(const Core::State::AppState& state, const D2D1_RECT_F&
 
 // 绘制所有菜单项
 auto draw_menu_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   float current_y = rect.top + static_cast<float>(layout.padding);
@@ -103,7 +103,7 @@ auto draw_single_menu_item(const Core::State::AppState& state,
                            const UI::TrayMenu::State::MenuItem& item, const D2D1_RECT_F& item_rect,
                            bool is_hovered) -> void {
   const auto& d2d = state.d2d_render;
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   // 绘制悬停背景
@@ -153,14 +153,14 @@ auto draw_single_menu_item(const Core::State::AppState& state,
 
 // 绘制分隔线
 auto draw_separator(const Core::State::AppState& state, const D2D1_RECT_F& separator_rect) -> void {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   tray_menu.render_target->FillRectangle(separator_rect, tray_menu.separator_brush);
 }
 
 // 子菜单绘制函数实现
 auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) -> void {
   const auto& d2d = state.d2d_render;
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
 
   // 检查子菜单D2D资源是否就绪
   if (!tray_menu.submenu_d2d_ready || !tray_menu.submenu_render_target) {
@@ -189,7 +189,7 @@ auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) 
   if (hr == D2DERR_RECREATE_TARGET) {
     Logger().warn("Submenu render target needs recreation");
     // 标记子菜单渲染目标需要重新创建
-    const_cast<Core::State::AppState&>(state).tray_menu.submenu_d2d_ready = false;
+    const_cast<Core::State::AppState&>(state).tray_menu->submenu_d2d_ready = false;
   } else if (FAILED(hr)) {
     Logger().error("Submenu paint error: 0x{:X}", hr);
   }
@@ -197,7 +197,7 @@ auto paint_submenu(const Core::State::AppState& state, const RECT& client_rect) 
 
 // 绘制子菜单背景
 auto draw_submenu_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   // 清除背景
@@ -213,7 +213,7 @@ auto draw_submenu_background(const Core::State::AppState& state, const D2D1_RECT
 
 // 绘制子菜单项
 auto draw_submenu_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   float current_y = rect.top + static_cast<float>(layout.padding);
@@ -246,7 +246,7 @@ auto draw_submenu_single_item(const Core::State::AppState& state,
                               const UI::TrayMenu::State::MenuItem& item,
                               const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& d2d = state.d2d_render;
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
 
   // 绘制悬停背景
@@ -284,7 +284,7 @@ auto draw_submenu_single_item(const Core::State::AppState& state,
 // 绘制子菜单分隔线
 auto draw_submenu_separator(const Core::State::AppState& state, const D2D1_RECT_F& separator_rect)
     -> void {
-  const auto& tray_menu = state.tray_menu;
+  const auto& tray_menu = *state.tray_menu;
   tray_menu.submenu_render_target->FillRectangle(separator_rect, tray_menu.submenu_separator_brush);
 }
 
