@@ -36,7 +36,7 @@ auto initialize_rpc_bridge(Core::State::AppState& state) -> void {
   }
 
   // 初始化RPC桥接状态
-  state.webview.messaging.next_message_id = 1;
+  state.webview->messaging.next_message_id = 1;
 
   Logger().info("WebView RPC bridge initialized");
 }

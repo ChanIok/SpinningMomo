@@ -8,6 +8,7 @@ import Core.Constants;
 import Core.Events;
 import Core.State;
 import Core.WebView;
+import Core.WebView.State;
 import Handlers.EventRegistrar;
 import Features.Letterbox;
 import Features.Notifications;
@@ -60,7 +61,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       // WebView功能不可用，但应用继续运行
     } else {
       // 初始化WebView内容
-      if (auto webview_result = Core::WebView::initialize(state, state.webview.window.parent_hwnd);
+      if (auto webview_result = Core::WebView::initialize(state, state.webview->window.parent_hwnd);
           !webview_result) {
         Logger().error("Failed to initialize WebView: {}", webview_result.error());
         // WebView初始化失败，但应用继续运行

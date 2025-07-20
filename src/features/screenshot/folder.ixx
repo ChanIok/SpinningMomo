@@ -120,7 +120,7 @@ auto resolve_path(const Features::Settings::State::SettingsState& settings, HWND
 // 打开截图文件夹（对外接口）
 export auto open_folder(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 解析路径
-  auto path_result = resolve_path(state.settings);
+  auto path_result = resolve_path(*state.settings);
   if (!path_result) {
     return std::unexpected("Failed to resolve screenshot path: " + path_result.error());
   }

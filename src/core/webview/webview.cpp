@@ -32,7 +32,7 @@ class NavigationStartingEventHandler
   HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2* sender,
                                    ICoreWebView2NavigationStartingEventArgs* args) {
     if (m_state) {
-      m_state->webview.is_loading = true;
+      m_state->webview->is_loading = true;
       Logger().debug("WebView navigation starting");
     }
     return S_OK;
@@ -53,7 +53,7 @@ class NavigationCompletedEventHandler
                                    ICoreWebView2NavigationCompletedEventArgs* args) {
     if (!m_state) return S_OK;
 
-    m_state->webview.is_loading = false;
+    m_state->webview->is_loading = false;
 
     BOOL success;
     args->get_IsSuccess(&success);
@@ -83,7 +83,7 @@ class ControllerCompletedHandler
 
   HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Controller* controller) {
     if (!m_state) return E_FAIL;
-    auto& webview_state = m_state->webview;
+    auto& webview_state = *m_state->webview;
 
     if (FAILED(result)) {
       Logger().error("Failed to create WebView2 controller: {}", result);
@@ -204,7 +204,7 @@ class EnvironmentCompletedHandler
 
   HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Environment* env) {
     if (!m_state) return E_FAIL;
-    auto& webview_state = m_state->webview;
+    auto& webview_state = *m_state->webview;
 
     if (FAILED(result)) {
       Logger().error("Failed to create WebView2 environment: {}", result);
@@ -225,7 +225,7 @@ namespace Core::WebView {
 
 auto initialize(Core::State::AppState& state, HWND parent_hwnd)
     -> std::expected<void, std::string> {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (webview_state.is_initialized) {
     return std::unexpected("WebView already initialized");
@@ -253,7 +253,7 @@ auto initialize(Core::State::AppState& state, HWND parent_hwnd)
 }
 
 auto show_webview(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (!webview_state.is_ready) {
     return std::unexpected("WebView not ready");
@@ -267,7 +267,7 @@ auto show_webview(Core::State::AppState& state) -> std::expected<void, std::stri
 }
 
 auto hide_webview(Core::State::AppState& state) -> void {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (webview_state.resources.controller) {
     webview_state.resources.controller.get()->put_IsVisible(FALSE);
@@ -277,7 +277,7 @@ auto hide_webview(Core::State::AppState& state) -> void {
 }
 
 auto resize_webview(Core::State::AppState& state, int width, int height) -> void {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (webview_state.resources.controller) {
     webview_state.window.width = width;
@@ -292,7 +292,7 @@ auto resize_webview(Core::State::AppState& state, int width, int height) -> void
 }
 
 auto move_webview(Core::State::AppState& state, int x, int y) -> void {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (webview_state.resources.controller) {
     webview_state.window.x = x;
@@ -307,7 +307,7 @@ auto move_webview(Core::State::AppState& state, int x, int y) -> void {
 
 auto navigate_to_url(Core::State::AppState& state, const std::wstring& url)
     -> std::expected<void, std::string> {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (!webview_state.is_ready) {
     return std::unexpected("WebView not ready");
@@ -326,7 +326,7 @@ auto navigate_to_url(Core::State::AppState& state, const std::wstring& url)
 
 auto navigate_to_string(Core::State::AppState& state, const std::wstring& html)
     -> std::expected<void, std::string> {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (!webview_state.is_ready) {
     return std::unexpected("WebView not ready");
@@ -341,18 +341,18 @@ auto navigate_to_string(Core::State::AppState& state, const std::wstring& html)
   return {};
 }
 
-auto is_webview_ready(const Core::State::AppState& state) -> bool { return state.webview.is_ready; }
+auto is_webview_ready(const Core::State::AppState& state) -> bool { return state.webview->is_ready; }
 
 auto is_webview_loading(const Core::State::AppState& state) -> bool {
-  return state.webview.is_loading.load();
+  return state.webview->is_loading.load();
 }
 
 auto get_current_url(const Core::State::AppState& state) -> std::wstring {
-  return state.webview.resources.current_url;
+  return state.webview->resources.current_url;
 }
 
 auto open_dev_tools(Core::State::AppState& state) -> void {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (webview_state.is_ready && webview_state.config.enable_dev_tools) {
     webview_state.resources.webview.get()->OpenDevToolsWindow();
@@ -367,7 +367,7 @@ auto close_dev_tools(Core::State::AppState& state) -> void {
 }
 
 auto shutdown(Core::State::AppState& state) -> void {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (webview_state.resources.controller) {
     webview_state.resources.controller.get()->Close();
@@ -386,7 +386,7 @@ auto shutdown(Core::State::AppState& state) -> void {
 
 // 消息功能保持不变
 auto post_message(Core::State::AppState& state, const std::string& message) -> void {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   if (webview_state.is_ready) {
     std::wstring wmessage = Utils::String::FromUtf8(message);
@@ -397,7 +397,7 @@ auto post_message(Core::State::AppState& state, const std::string& message) -> v
 
 auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
                               std::function<void(const std::string&)> handler) -> void {
-  auto& webview_state = state.webview;
+  auto& webview_state = *state.webview;
 
   std::lock_guard<std::mutex> lock(webview_state.messaging.message_mutex);
   webview_state.messaging.handlers[message_type] = std::move(handler);

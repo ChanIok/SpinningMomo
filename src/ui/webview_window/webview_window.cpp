@@ -8,6 +8,7 @@ module UI.WebViewWindow;
 
 import std;
 import Core.State;
+import Core.WebView.State;
 import Utils.Logger;
 import Vendor.Windows;
 
@@ -40,49 +41,49 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   }
 
   // 保存窗口句柄到WebView状态中
-  state.webview.window.parent_hwnd = hwnd;
-  state.webview.window.width = width;
-  state.webview.window.height = height;
-  state.webview.window.x = x;
-  state.webview.window.y = y;
-  state.webview.window.is_visible = false;
+  state.webview->window.parent_hwnd = hwnd;
+  state.webview->window.width = width;
+  state.webview->window.height = height;
+  state.webview->window.x = x;
+  state.webview->window.y = y;
+  state.webview->window.is_visible = false;
 
   Logger().info("WebView window created successfully");
   return {};
 }
 
 auto destroy(Core::State::AppState& state) -> void {
-  if (state.webview.window.parent_hwnd) {
-    DestroyWindow(state.webview.window.parent_hwnd);
-    state.webview.window.parent_hwnd = nullptr;
-    state.webview.window.is_visible = false;
+  if (state.webview->window.parent_hwnd) {
+    DestroyWindow(state.webview->window.parent_hwnd);
+    state.webview->window.parent_hwnd = nullptr;
+    state.webview->window.is_visible = false;
     Logger().info("WebView window destroyed");
   }
 }
 
 auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
-  if (!state.webview.window.parent_hwnd) {
+  if (!state.webview->window.parent_hwnd) {
     return std::unexpected("WebView window not created");
   }
 
-  ShowWindow(state.webview.window.parent_hwnd, SW_SHOW);
-  UpdateWindow(state.webview.window.parent_hwnd);
-  state.webview.window.is_visible = true;
+  ShowWindow(state.webview->window.parent_hwnd, SW_SHOW);
+  UpdateWindow(state.webview->window.parent_hwnd);
+  state.webview->window.is_visible = true;
 
   Logger().info("WebView window shown");
   return {};
 }
 
 auto hide(Core::State::AppState& state) -> void {
-  if (state.webview.window.parent_hwnd) {
-    ShowWindow(state.webview.window.parent_hwnd, SW_HIDE);
-    state.webview.window.is_visible = false;
+  if (state.webview->window.parent_hwnd) {
+    ShowWindow(state.webview->window.parent_hwnd, SW_HIDE);
+    state.webview->window.is_visible = false;
     Logger().info("WebView window hidden");
   }
 }
 
 auto toggle_visibility(Core::State::AppState& state) -> void {
-  if (state.webview.window.is_visible) {
+  if (state.webview->window.is_visible) {
     hide(state);
   } else {
     if (auto result = show(state); !result) {
@@ -92,11 +93,11 @@ auto toggle_visibility(Core::State::AppState& state) -> void {
 }
 
 auto get_hwnd(const Core::State::AppState& state) -> Vendor::Windows::HWND {
-  return state.webview.window.parent_hwnd;
+  return state.webview->window.parent_hwnd;
 }
 
 auto is_visible(const Core::State::AppState& state) -> bool {
-  return state.webview.window.is_visible;
+  return state.webview->window.is_visible;
 }
 
 auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
@@ -134,11 +135,11 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
       if (state) {
         int width = LOWORD(lparam);
         int height = HIWORD(lparam);
-        state->webview.window.width = width;
-        state->webview.window.height = height;
+        state->webview->window.width = width;
+        state->webview->window.height = height;
 
         // 如果WebView已经初始化，同步调整大小
-        if (state->webview.is_ready) {
+        if (state->webview->is_ready) {
           // 这里可以调用WebView的resize函数
           // Core::WebView::resize_webview(*state, width, height);
         }
@@ -150,8 +151,8 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
       if (state) {
         int x = static_cast<int>(static_cast<short>(LOWORD(lparam)));
         int y = static_cast<int>(static_cast<short>(HIWORD(lparam)));
-        state->webview.window.x = x;
-        state->webview.window.y = y;
+        state->webview->window.x = x;
+        state->webview->window.y = y;
       }
       break;
     }
@@ -167,7 +168,7 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
     case WM_DESTROY: {
       if (state) {
-        state->webview.window.is_visible = false;
+        state->webview->window.is_visible = false;
       }
       break;
     }

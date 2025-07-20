@@ -46,9 +46,9 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       file << json_str;
 
       // 计算预设并初始化内存状态
-      app_state.settings = default_state;
+      *app_state.settings = default_state;
       Compute::update_computed_state(app_state);
-      app_state.settings.is_initialized = true;
+      app_state.settings->is_initialized = true;
 
     } else {
       // 从文件加载配置
@@ -62,14 +62,14 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       state.config = config_result.value();
 
       // 先设置到app_state，然后计算预设
-      app_state.settings = state;
+      *app_state.settings = state;
       Compute::update_computed_state(app_state);
-      app_state.settings.is_initialized = true;
+      app_state.settings->is_initialized = true;
     }
 
     return {};
   } catch (const std::exception& e) {
-    return std::unexpected("Initialization failed: " + std::string(e.what()));
+    return std::unexpected("Failed to initialize settings: " + std::string(e.what()));
   }
 }
 
@@ -111,11 +111,16 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
       return std::unexpected(settings_path.error());
     }
 
+    // 确保 settings 已初始化
+    if (!app_state.settings) {
+      return std::unexpected("Settings not initialized");
+    }
+
     // 保存旧设置用于事件通知
-    Types::AppSettings old_settings = app_state.settings.config;
+    Types::AppSettings old_settings = app_state.settings->config;
 
     // 更新配置
-    app_state.settings.config = params;
+    app_state.settings->config = params;
 
     // 重新计算预设状态
     Compute::update_computed_state(app_state);
@@ -126,7 +131,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     std::ofstream file(settings_path.value());
     if (!file) {
       // 回滚状态
-      app_state.settings.config = old_settings;
+      app_state.settings->config = old_settings;
       Compute::update_computed_state(app_state);
       return std::unexpected("Failed to open settings file for writing");
     }
@@ -135,7 +140,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
 
     // 发送设置变更事件
     Types::SettingsChangeData change_data{.old_settings = old_settings,
-                                          .new_settings = app_state.settings.config,
+                                          .new_settings = app_state.settings->config,
                                           .change_description = "Settings updated via RPC"};
 
     Core::Events::post_event(
