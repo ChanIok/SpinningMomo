@@ -1,0 +1,24 @@
+# 默认强制所有文本文件使用 LF (Unix-style) 行尾，避免跨平台问题
+* text=auto eol=lf
+
+# 为必须使用 CRLF (Windows-style) 的文件设置例外
+src/resources/app.rc       text eol=crlf
+src/resources/app.manifest text eol=crlf
+# *.bat      text eol=crlf
+# *.cmd      text eol=crlf
+
+# 标记二进制文件，防止 Git 对其进行文本处理
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.webp     binary
+*.ico      binary
+*.exe      binary
+*.dll      binary
+*.lib      binary
+*.pdb      binary
+
+# GitHub Linguist 优化：从语言统计中排除第三方库和文档
+third_party/**      linguist-vendored
+docs/**             linguist-documentation
+documentation/**    linguist-documentation 
