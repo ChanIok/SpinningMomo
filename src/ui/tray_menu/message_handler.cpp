@@ -14,6 +14,7 @@ import UI.TrayMenu.Layout;
 import UI.TrayMenu.Painter;
 import UI.TrayMenu.D2DContext;
 import UI.TrayMenu.State;
+import UI.TrayMenu.Types;
 import Utils.Logger;
 
 namespace {
@@ -22,14 +23,15 @@ namespace {
 auto get_submenu_item_at_point(const Core::State::AppState& state, const POINT& pt) -> int {
   const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
+  const auto& current_submenu = tray_menu.get_current_submenu();
 
   int current_y = layout.padding;
 
-  for (size_t i = 0; i < tray_menu.current_submenu.size(); ++i) {
-    const auto& item = tray_menu.current_submenu[i];
+  for (size_t i = 0; i < current_submenu.size(); ++i) {
+    const auto& item = current_submenu[i];
 
     int item_height;
-    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+    if (item.type == UI::TrayMenu::Types::MenuItemType::Separator) {
       item_height = layout.separator_height;
     } else {
       item_height = layout.item_height;
@@ -220,8 +222,8 @@ auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, L
               KillTimer(hwnd, interaction.hide_timer_id);
             }
             interaction.hide_timer_id =
-                SetTimer(hwnd, UI::TrayMenu::State::InteractionState::HIDE_TIMER_ID,
-                         UI::TrayMenu::State::InteractionState::HIDE_TIMER_DELAY, nullptr);
+                SetTimer(hwnd, UI::TrayMenu::Types::InteractionState::HIDE_TIMER_ID,
+                         UI::TrayMenu::Types::InteractionState::HIDE_TIMER_DELAY, nullptr);
           }
         }
       }
@@ -250,11 +252,13 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
     // 处理子菜单点击
     POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
     int clicked_index = get_submenu_item_at_point(state, pt);
+    const auto& current_submenu = tray_menu.get_current_submenu();
 
-    if (clicked_index >= 0 && clicked_index < static_cast<int>(tray_menu.current_submenu.size())) {
-      const auto& item = tray_menu.current_submenu[clicked_index];
-      if (item.type == UI::TrayMenu::State::MenuItemType::Normal && item.is_enabled) {
-        UI::TrayMenu::handle_menu_command(state, item.command_id);
+    if (clicked_index >= 0 && clicked_index < static_cast<int>(current_submenu.size())) {
+      const auto& item = current_submenu[clicked_index];
+      if (item.type == UI::TrayMenu::Types::MenuItemType::Normal && item.is_enabled) {
+        // 传递完整的MenuItem对象而不是command_id
+        UI::TrayMenu::handle_menu_command(state, item);
       }
     }
   } else {
@@ -262,13 +266,13 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
     if (tray_menu.interaction.hover_index >= 0 &&
         tray_menu.interaction.hover_index < static_cast<int>(tray_menu.items.size())) {
       const auto& item = tray_menu.items[tray_menu.interaction.hover_index];
-      if (item.type == UI::TrayMenu::State::MenuItemType::Normal && item.is_enabled) {
+      if (item.type == UI::TrayMenu::Types::MenuItemType::Normal && item.is_enabled) {
         if (item.has_submenu()) {
           // 如果有子菜单，显示子菜单
           UI::TrayMenu::show_submenu(state, tray_menu.interaction.hover_index);
         } else {
-          // 否则执行命令
-          UI::TrayMenu::handle_menu_command(state, item.command_id);
+          // 否则执行命令 - 传递完整的MenuItem对象
+          UI::TrayMenu::handle_menu_command(state, item);
         }
       }
     }
@@ -288,7 +292,7 @@ auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPA
       // 向上导航
       int new_index = tray_menu.interaction.hover_index - 1;
       while (new_index >= 0 &&
-             tray_menu.items[new_index].type != UI::TrayMenu::State::MenuItemType::Normal) {
+             tray_menu.items[new_index].type != UI::TrayMenu::Types::MenuItemType::Normal) {
         new_index--;
       }
       if (new_index >= 0) {
@@ -301,7 +305,7 @@ auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPA
       // 向下导航
       int new_index = tray_menu.interaction.hover_index + 1;
       while (new_index < static_cast<int>(tray_menu.items.size()) &&
-             tray_menu.items[new_index].type != UI::TrayMenu::State::MenuItemType::Normal) {
+             tray_menu.items[new_index].type != UI::TrayMenu::Types::MenuItemType::Normal) {
         new_index++;
       }
       if (new_index < static_cast<int>(tray_menu.items.size())) {
@@ -331,13 +335,13 @@ auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPA
       if (tray_menu.interaction.hover_index >= 0 &&
           tray_menu.interaction.hover_index < static_cast<int>(tray_menu.items.size())) {
         const auto& item = tray_menu.items[tray_menu.interaction.hover_index];
-        if (item.type == UI::TrayMenu::State::MenuItemType::Normal && item.is_enabled) {
+        if (item.type == UI::TrayMenu::Types::MenuItemType::Normal && item.is_enabled) {
           if (item.has_submenu()) {
             // 如果有子菜单，显示子菜单
             UI::TrayMenu::show_submenu(state, tray_menu.interaction.hover_index);
           } else {
             // 否则执行命令
-            UI::TrayMenu::handle_menu_command(state, item.command_id);
+            UI::TrayMenu::handle_menu_command(state, item);
           }
         }
       }
@@ -390,7 +394,7 @@ auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM timer_id) -> L
 
     // 重置待显示索引
     interaction.pending_submenu_index = -1;
-  } else if (timer_id == UI::TrayMenu::State::InteractionState::HIDE_TIMER_ID &&
+  } else if (timer_id == UI::TrayMenu::Types::InteractionState::HIDE_TIMER_ID &&
              timer_id == interaction.hide_timer_id) {
     Logger().debug("Hide timer expired, hiding submenu for diagonal movement");
 

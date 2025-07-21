@@ -13,11 +13,13 @@ module UI.TrayMenu;
 import std;
 import Core.State;
 import Core.I18n.State;
-import Core.Constants;
 import Core.I18n.Types;
+import Core.Events;
+import Common.MenuIds;
 import UI.AppWindow.Types;
 import UI.AppWindow.State;
 import UI.TrayMenu.State;
+import UI.TrayMenu.Types;
 import UI.TrayMenu.Layout;
 import UI.TrayMenu.MessageHandler;
 import UI.TrayMenu.Painter;
@@ -25,6 +27,8 @@ import UI.TrayMenu.D2DContext;
 import Utils.Logger;
 import Utils.String;
 import Vendor.Windows;
+import Features.WindowControl;
+import Common.MenuData;
 
 namespace {
 
@@ -113,43 +117,63 @@ auto create_tray_menu_window(Core::State::AppState& state) -> std::expected<void
   return {};
 }
 
-// 构建窗口列表子菜单
-auto build_window_list(Core::State::AppState& state) -> std::vector<UI::TrayMenu::State::MenuItem> {
-  std::vector<UI::TrayMenu::State::MenuItem> windows;
+// 构建窗口选择子菜单 - 数据驱动版本
+auto build_window_submenu(Core::State::AppState& state)
+    -> std::vector<UI::TrayMenu::Types::MenuItem> {
+  std::vector<UI::TrayMenu::Types::MenuItem> items;
 
-  // 枚举所有可见窗口
-  EnumWindows(
-      [](HWND hwnd, LPARAM lParam) -> BOOL {
-        auto* windows = reinterpret_cast<std::vector<UI::TrayMenu::State::MenuItem>*>(lParam);
+  // 获取所有可见窗口
+  auto windows = Features::WindowControl::get_visible_windows();
 
-        // 检查窗口是否可见且不是最小化状态
-        if (IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
-          wchar_t title[256];
-          if (GetWindowTextW(hwnd, title, 256) > 0) {
-            // 过滤掉一些系统窗口和不需要的窗口
-            std::wstring window_title(title);
-            if (!window_title.empty() && window_title != L"Program Manager" &&
-                window_title.find(L"SpinningMomo") == std::wstring::npos) {
-              // 为每个窗口分配唯一的命令ID
-              int id = Core::Constants::ID_WINDOW_BASE + static_cast<int>(windows->size()) + 1;
-              windows->emplace_back(window_title, id);
-            }
-          }
-        }
-        return TRUE;
-      },
-      reinterpret_cast<LPARAM>(&windows));
-
-  // 如果没有找到窗口，添加一个提示项
-  if (windows.empty()) {
-    windows.emplace_back(L"(无可用窗口)", 0);
-    windows.back().is_enabled = false;
+  for (const auto& window : windows) {
+    // 过滤掉系统窗口和不需要的窗口
+    if (!window.title.empty() && window.title != L"Program Manager" &&
+        window.title.find(L"SpinningMomo") == std::wstring::npos) {
+      // 使用工厂方法创建窗口菜单项，直接存储业务数据
+      items.emplace_back(UI::TrayMenu::Types::MenuItem::window_item(window));
+    }
   }
 
-  return windows;
+  // 如果没有找到窗口，添加一个提示项
+  if (items.empty()) {
+    auto disabled_item = UI::TrayMenu::Types::MenuItem(L"(无可用窗口)");
+    disabled_item.is_enabled = false;
+    items.emplace_back(std::move(disabled_item));
+  }
+
+  return items;
 }
 
-// 初始化菜单项数据
+// 构建比例选择子菜单 - 数据驱动版本
+auto build_ratio_submenu(Core::State::AppState& state)
+    -> std::vector<UI::TrayMenu::Types::MenuItem> {
+  std::vector<UI::TrayMenu::Types::MenuItem> items;
+  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+
+  for (size_t i = 0; i < ratios.size(); ++i) {
+    bool is_selected = (i == state.app_window->ui.current_ratio_index);
+    items.emplace_back(UI::TrayMenu::Types::MenuItem::ratio_item(ratios[i], i, is_selected));
+  }
+
+  return items;
+}
+
+// 构建分辨率选择子菜单 - 数据驱动版本
+auto build_resolution_submenu(Core::State::AppState& state)
+    -> std::vector<UI::TrayMenu::Types::MenuItem> {
+  std::vector<UI::TrayMenu::Types::MenuItem> items;
+  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+
+  for (size_t i = 0; i < resolutions.size(); ++i) {
+    bool is_selected = (i == state.app_window->ui.current_resolution_index);
+    items.emplace_back(
+        UI::TrayMenu::Types::MenuItem::resolution_item(resolutions[i], i, is_selected));
+  }
+
+  return items;
+}
+
+// 初始化菜单项数据 - 重构为完全数据驱动
 auto initialize_menu_items(Core::State::AppState& state) -> void {
   auto& tray_menu = *state.tray_menu;
   auto& items = tray_menu.items;
@@ -158,41 +182,51 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
 
   const auto strings = get_tray_menu_strings(state.i18n->texts);
 
-  // 窗口选择 - 构建子菜单
-  UI::TrayMenu::State::MenuItem window_item(strings.select_window, Core::Constants::ID_WINDOW_BASE);
-  window_item.submenu_items = build_window_list(state);
-  items.emplace_back(std::move(window_item));
+  // 窗口选择 - 使用数据驱动的子菜单构建
+  auto window_menu = UI::TrayMenu::Types::MenuItem(strings.select_window);
+  window_menu.submenu_items = build_window_submenu(state);
+  items.emplace_back(std::move(window_menu));
 
   // 分隔线
-  items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
+  items.emplace_back(UI::TrayMenu::Types::MenuItem::separator());
 
-  // 窗口设置 - 使用比例和分辨率的基础ID
-  items.emplace_back(strings.window_ratio, Core::Constants::ID_RATIO_BASE);
-  items.emplace_back(strings.resolution, Core::Constants::ID_RESOLUTION_BASE);
+  // 比例选择 - 使用数据驱动的子菜单构建
+  auto ratio_menu = UI::TrayMenu::Types::MenuItem(strings.window_ratio);
+  ratio_menu.submenu_items = build_ratio_submenu(state);
+  items.emplace_back(std::move(ratio_menu));
 
-  // 分隔线
-  items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
-
-  // 功能选项
-  items.emplace_back(strings.capture_window, Core::Constants::ID_CAPTURE_WINDOW);
-  items.emplace_back(strings.preview_window, Core::Constants::ID_PREVIEW_WINDOW,
-                     state.app_window->ui.preview_enabled);
-  items.emplace_back(strings.overlay_window, Core::Constants::ID_OVERLAY_WINDOW,
-                     state.app_window->ui.overlay_enabled);
+  // 分辨率选择 - 使用数据驱动的子菜单构建
+  auto resolution_menu = UI::TrayMenu::Types::MenuItem(strings.resolution);
+  resolution_menu.submenu_items = build_resolution_submenu(state);
+  items.emplace_back(std::move(resolution_menu));
 
   // 分隔线
-  items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
+  items.emplace_back(UI::TrayMenu::Types::MenuItem::separator());
 
-  // 系统选项
-  items.emplace_back(strings.open_config, Core::Constants::ID_CONFIG);
-  items.emplace_back(strings.user_guide, Core::Constants::ID_USER_GUIDE);
-  items.emplace_back(strings.webview_test, Core::Constants::ID_WEBVIEW_TEST);
+  // 功能选项 - 使用新的工厂方法
+  items.emplace_back(
+      UI::TrayMenu::Types::MenuItem::feature_item(strings.capture_window, "screenshot.capture"));
+  items.emplace_back(UI::TrayMenu::Types::MenuItem::feature_item(
+      strings.preview_window, "feature.toggle_preview", state.app_window->ui.preview_enabled));
+  items.emplace_back(UI::TrayMenu::Types::MenuItem::feature_item(
+      strings.overlay_window, "feature.toggle_overlay", state.app_window->ui.overlay_enabled));
 
   // 分隔线
-  items.emplace_back(UI::TrayMenu::State::MenuItem::separator());
+  items.emplace_back(UI::TrayMenu::Types::MenuItem::separator());
+
+  // 系统选项 - 使用新的工厂方法
+  items.emplace_back(
+      UI::TrayMenu::Types::MenuItem::system_item(strings.open_config, "settings.config"));
+  items.emplace_back(
+      UI::TrayMenu::Types::MenuItem::system_item(strings.user_guide, "app.user_guide"));
+  items.emplace_back(
+      UI::TrayMenu::Types::MenuItem::system_item(strings.webview_test, "app.webview_test"));
+
+  // 分隔线
+  items.emplace_back(UI::TrayMenu::Types::MenuItem::separator());
 
   // 退出
-  items.emplace_back(strings.exit, Core::Constants::ID_EXIT);
+  items.emplace_back(UI::TrayMenu::Types::MenuItem::system_item(strings.exit, "app.exit"));
 }
 
 auto create_window_attributes(HWND hwnd) -> void {
@@ -292,7 +326,7 @@ auto show_menu(Core::State::AppState& state, const Vendor::Windows::POINT& posit
   // 初始化键盘导航：选中第一个可用的菜单项
   tray_menu.interaction.hover_index = -1;
   for (size_t i = 0; i < tray_menu.items.size(); ++i) {
-    if (tray_menu.items[i].type == UI::TrayMenu::State::MenuItemType::Normal &&
+    if (tray_menu.items[i].type == UI::TrayMenu::Types::MenuItemType::Normal &&
         tray_menu.items[i].is_enabled) {
       tray_menu.interaction.hover_index = static_cast<int>(i);
       break;
@@ -336,14 +370,126 @@ auto is_menu_visible(const Core::State::AppState& state) -> bool {
   return state.tray_menu->is_visible;
 }
 
-auto handle_menu_command(Core::State::AppState& state, int command_id) -> void {
+auto handle_menu_command(Core::State::AppState& state, const UI::TrayMenu::Types::MenuItem& item)
+    -> void {
+  using namespace Core::Events;
+
   // 隐藏菜单（包括子菜单）
   hide_menu(state);
 
-  // 转发命令到主窗口的消息处理器
-  // 这样可以复用现有的命令处理逻辑
-  if (state.app_window->window.hwnd) {
-    PostMessageW(state.app_window->window.hwnd, WM_COMMAND, command_id, 0);
+  // 检查菜单项是否有关联的动作
+  if (!item.has_action()) {
+    Logger().warn("Menu item '{}' has no associated action", Utils::String::ToUtf8(item.text));
+    return;
+  }
+
+  const auto& action = item.action.value();
+
+  // 根据动作类型发送相应的事件
+  switch (action.type) {
+    case UI::TrayMenu::Types::MenuAction::Type::WindowSelection: {
+      try {
+        auto window_info = std::any_cast<Features::WindowControl::WindowInfo>(action.data);
+        send_event(*state.event_bus,
+                   {EventType::WindowSelected,
+                    WindowSelectionData{window_info.handle, window_info.title}, nullptr});
+        Logger().info("Window selected: {}", Utils::String::ToUtf8(window_info.title));
+      } catch (const std::bad_any_cast& e) {
+        Logger().error("Failed to cast window selection data: {}", e.what());
+      }
+      break;
+    }
+
+    case UI::TrayMenu::Types::MenuAction::Type::RatioSelection: {
+      try {
+        auto ratio_data = std::any_cast<UI::TrayMenu::Types::RatioData>(action.data);
+        send_event(*state.event_bus,
+                   {EventType::RatioChanged,
+                    RatioChangeData{ratio_data.index, ratio_data.name, ratio_data.ratio}, nullptr});
+        Logger().info("Ratio selected: {} ({})", Utils::String::ToUtf8(ratio_data.name),
+                      ratio_data.ratio);
+      } catch (const std::bad_any_cast& e) {
+        Logger().error("Failed to cast ratio selection data: {}", e.what());
+      }
+      break;
+    }
+
+    case UI::TrayMenu::Types::MenuAction::Type::ResolutionSelection: {
+      try {
+        auto resolution_data = std::any_cast<UI::TrayMenu::Types::ResolutionData>(action.data);
+        send_event(*state.event_bus,
+                   {EventType::ResolutionChanged,
+                    ResolutionChangeData{resolution_data.index, resolution_data.name,
+                                         resolution_data.total_pixels},
+                    nullptr});
+        Logger().info("Resolution selected: {} ({}M pixels)",
+                      Utils::String::ToUtf8(resolution_data.name),
+                      resolution_data.total_pixels / 1000000.0);
+      } catch (const std::bad_any_cast& e) {
+        Logger().error("Failed to cast resolution selection data: {}", e.what());
+      }
+      break;
+    }
+
+    case UI::TrayMenu::Types::MenuAction::Type::FeatureToggle: {
+      try {
+        auto action_id = std::any_cast<std::string>(action.data);
+
+        // 根据action_id确定功能类型和新状态
+        if (action_id == "feature.toggle_preview") {
+          send_event(*state.event_bus, {EventType::ToggleFeature,
+                                        FeatureToggleData{FeatureType::Preview,
+                                                          !state.app_window->ui.preview_enabled},
+                                        nullptr});
+        } else if (action_id == "feature.toggle_overlay") {
+          send_event(*state.event_bus, {EventType::ToggleFeature,
+                                        FeatureToggleData{FeatureType::Overlay,
+                                                          !state.app_window->ui.overlay_enabled},
+                                        nullptr});
+        } else if (action_id == "feature.toggle_letterbox") {
+          send_event(*state.event_bus, {EventType::ToggleFeature,
+                                        FeatureToggleData{FeatureType::Letterbox,
+                                                          !state.app_window->ui.letterbox_enabled},
+                                        nullptr});
+        } else if (action_id == "screenshot.capture") {
+          send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Capture, nullptr});
+        }
+
+        Logger().info("Feature action triggered: {}", action_id);
+      } catch (const std::bad_any_cast& e) {
+        Logger().error("Failed to cast feature toggle data: {}", e.what());
+      }
+      break;
+    }
+
+    case UI::TrayMenu::Types::MenuAction::Type::SystemCommand: {
+      try {
+        auto command = std::any_cast<std::string>(action.data);
+
+        // 根据系统命令发送相应事件
+        if (command == "app.exit") {
+          send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Exit, nullptr});
+        } else if (command == "settings.config") {
+          send_event(*state.event_bus,
+                     {EventType::SystemCommand, std::string("open_config"), nullptr});
+        } else if (command == "app.user_guide") {
+          send_event(*state.event_bus,
+                     {EventType::SystemCommand, std::string("user_guide"), nullptr});
+        } else if (command == "app.webview_test") {
+          send_event(*state.event_bus,
+                     {EventType::SystemCommand, std::string("webview_test"), nullptr});
+        }
+
+        Logger().info("System command executed: {}", command);
+      } catch (const std::bad_any_cast& e) {
+        Logger().error("Failed to cast system command data: {}", e.what());
+      }
+      break;
+    }
+
+    default:
+      Logger().warn("Unknown menu action type: {}", static_cast<int>(action.type));
+      break;
   }
 }
 
@@ -351,8 +497,9 @@ auto handle_menu_command(Core::State::AppState& state, int command_id) -> void {
 auto calculate_submenu_size(Core::State::AppState& state) -> void {
   auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
+  const auto& current_submenu = tray_menu.get_current_submenu();
 
-  if (tray_menu.current_submenu.empty()) {
+  if (current_submenu.empty()) {
     tray_menu.submenu_size = {0, 0};
     return;
   }
@@ -361,8 +508,8 @@ auto calculate_submenu_size(Core::State::AppState& state) -> void {
   int max_width = layout.min_width;
   int total_height = layout.padding * 2;
 
-  for (const auto& item : tray_menu.current_submenu) {
-    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+  for (const auto& item : current_submenu) {
+    if (item.type == UI::TrayMenu::Types::MenuItemType::Separator) {
       total_height += layout.separator_height;
     } else {
       total_height += layout.item_height;
@@ -385,7 +532,7 @@ auto calculate_submenu_position(Core::State::AppState& state, int parent_index) 
   int parent_y = layout.padding;
   for (int i = 0; i < parent_index; ++i) {
     const auto& item = tray_menu.items[i];
-    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+    if (item.type == UI::TrayMenu::Types::MenuItemType::Separator) {
       parent_y += layout.separator_height;
     } else {
       parent_y += layout.item_height;
@@ -443,8 +590,7 @@ auto show_submenu(Core::State::AppState& state, int parent_index) -> void {
     return;
   }
 
-  // 设置子菜单数据
-  tray_menu.current_submenu = parent_item.submenu_items;
+  // 设置子菜单数据 - 只需设置父项索引，避免数据复制
   tray_menu.submenu_parent_index = parent_index;
 
   // 计算子菜单尺寸和位置
@@ -499,7 +645,6 @@ auto hide_submenu(Core::State::AppState& state) -> void {
     DestroyWindow(tray_menu.submenu_hwnd);
     tray_menu.submenu_hwnd = nullptr;
     tray_menu.submenu_parent_index = -1;
-    tray_menu.current_submenu.clear();
     tray_menu.interaction.submenu_hover_index = -1;  // 重置子菜单悬停索引
 
   } else {

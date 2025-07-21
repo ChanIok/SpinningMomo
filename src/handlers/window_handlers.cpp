@@ -13,6 +13,7 @@ import Features.Screenshot;
 import Features.Screenshot.Folder;
 import UI.AppWindow;
 import Utils.Logger;
+import Utils.String;
 import Vendor.Windows;
 
 namespace Handlers {
@@ -261,6 +262,36 @@ auto handle_resolution_changed(Core::State::AppState& state, const Core::Events:
   }
 }
 
+// 处理窗口选择事件 - 新增
+auto handle_window_selected(Core::State::AppState& state, const Core::Events::Event& event) -> void {
+  auto data = std::any_cast<Core::Events::WindowSelectionData>(event.data);
+  
+  Logger().info("Window selected: {}", Utils::String::ToUtf8(data.window_title));
+  
+  // 这里可以添加窗口选择的业务逻辑
+  // 例如：
+  // 1. 更新应用状态中的目标窗口
+  // 2. 保存到配置文件
+  // 3. 触发其他相关功能（如开始预览、更新UI状态等）
+  
+  // 示例：更新目标窗口信息（如果有相关状态管理）
+  // state.settings->window.target_title = data.window_title;
+  
+  // 示例：可能触发其他业务逻辑
+  // 如果启用了预览功能，可能需要重新开始预览新窗口
+  if (state.app_window->ui.preview_enabled) {
+    Logger().debug("Preview is enabled, may need to restart preview for new target window");
+    // Features::Preview::restart_with_target(state, data.window_handle);
+  }
+  
+  // 发送通知给用户
+  Features::Notifications::show_notification(
+    state, 
+    "SpinningMomo", 
+    std::format("已选择窗口: {}", Utils::String::ToUtf8(data.window_title))
+  );
+}
+
 // 注册窗口处理器
 auto register_window_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
@@ -276,6 +307,10 @@ auto register_window_handlers(Core::State::AppState& app_state) -> void {
   // 处理窗口动作
   subscribe(*app_state.event_bus, EventType::WindowAction,
             [&app_state](const Event& event) { handle_window_action(app_state, event); });
+
+  // 处理窗口选择
+  subscribe(*app_state.event_bus, EventType::WindowSelected,
+            [&app_state](const Event& event) { handle_window_selected(app_state, event); });
 }
 
 }  // namespace Handlers

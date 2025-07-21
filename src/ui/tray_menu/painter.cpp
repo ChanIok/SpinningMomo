@@ -13,6 +13,7 @@ import Core.State;
 import UI.AppWindow.Types;
 import UI.AppWindow.State;
 import UI.TrayMenu.State;
+import UI.TrayMenu.Types;
 import UI.TrayMenu.Layout;
 import Utils.Logger;
 
@@ -85,7 +86,7 @@ auto draw_menu_items(const Core::State::AppState& state, const D2D1_RECT_F& rect
     const auto& item = tray_menu.items[i];
     bool is_hovered = (static_cast<int>(i) == tray_menu.interaction.hover_index);
 
-    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+    if (item.type == UI::TrayMenu::Types::MenuItemType::Separator) {
       // 绘制分隔线
       float separator_height = static_cast<float>(layout.separator_height);
       D2D1_RECT_F separator_rect = D2D1::RectF(
@@ -106,7 +107,7 @@ auto draw_menu_items(const Core::State::AppState& state, const D2D1_RECT_F& rect
 
 // 绘制单个菜单项
 auto draw_single_menu_item(const Core::State::AppState& state,
-                           const UI::TrayMenu::State::MenuItem& item, const D2D1_RECT_F& item_rect,
+                           const UI::TrayMenu::Types::MenuItem& item, const D2D1_RECT_F& item_rect,
                            bool is_hovered) -> void {
   const auto& d2d = state.app_window->d2d_context;
   const auto& tray_menu = *state.tray_menu;
@@ -226,14 +227,15 @@ auto draw_submenu_background(const Core::State::AppState& state, const D2D1_RECT
 auto draw_submenu_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& tray_menu = *state.tray_menu;
   const auto& layout = tray_menu.layout;
+  const auto& current_submenu = tray_menu.get_current_submenu();
 
   float current_y = rect.top + static_cast<float>(layout.padding);
 
-  for (size_t i = 0; i < tray_menu.current_submenu.size(); ++i) {
-    const auto& item = tray_menu.current_submenu[i];
+  for (size_t i = 0; i < current_submenu.size(); ++i) {
+    const auto& item = current_submenu[i];
     bool is_hovered = (static_cast<int>(i) == tray_menu.interaction.submenu_hover_index);
 
-    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+    if (item.type == UI::TrayMenu::Types::MenuItemType::Separator) {
       // 绘制分隔线
       float separator_height = static_cast<float>(layout.separator_height);
       D2D1_RECT_F separator_rect = D2D1::RectF(
@@ -254,7 +256,7 @@ auto draw_submenu_items(const Core::State::AppState& state, const D2D1_RECT_F& r
 
 // 绘制单个子菜单项
 auto draw_submenu_single_item(const Core::State::AppState& state,
-                              const UI::TrayMenu::State::MenuItem& item,
+                              const UI::TrayMenu::Types::MenuItem& item,
                               const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& d2d = state.app_window->d2d_context;
   const auto& tray_menu = *state.tray_menu;

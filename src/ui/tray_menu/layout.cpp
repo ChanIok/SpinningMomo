@@ -12,6 +12,7 @@ module UI.TrayMenu.Layout;
 import std;
 import Core.State;
 import UI.TrayMenu.State;
+import UI.TrayMenu.Types;
 import UI.AppWindow.State;
 import Vendor.Windows;
 
@@ -59,7 +60,7 @@ auto calculate_menu_size(Core::State::AppState& state) -> void {
   int max_width = layout.min_width;
 
   for (const auto& item : tray_menu.items) {
-    if (item.type == UI::TrayMenu::State::MenuItemType::Separator) {
+    if (item.type == UI::TrayMenu::Types::MenuItemType::Separator) {
       total_height += layout.separator_height;
     } else {
       total_height += layout.item_height;
@@ -125,12 +126,12 @@ auto get_menu_item_at_point(const Core::State::AppState& state, const POINT& pt)
 
   for (size_t i = 0; i < tray_menu.items.size(); ++i) {
     const auto& item = tray_menu.items[i];
-    int item_height = (item.type == UI::TrayMenu::State::MenuItemType::Separator)
+    int item_height = (item.type == UI::TrayMenu::Types::MenuItemType::Separator)
                           ? tray_menu.layout.separator_height
                           : tray_menu.layout.item_height;
 
     if (pt.y >= current_y && pt.y < current_y + item_height &&
-        item.type == UI::TrayMenu::State::MenuItemType::Normal) {
+        item.type == UI::TrayMenu::Types::MenuItemType::Normal) {
       return static_cast<int>(i);
     }
     current_y += item_height;

@@ -12,6 +12,7 @@ export enum class EventType {
   RatioChanged,       // 比例改变
   ResolutionChanged,  // 分辨率改变
   WindowAction,       // 窗口动作
+  WindowSelected,     // 窗口选择
   ToggleFeature,      // 功能开关
   SystemCommand,      // 系统命令
   ConfigChanged,      // 配置改变
@@ -58,6 +59,12 @@ export struct ResolutionChangeData {
   size_t index;
   std::wstring resolution_name;
   std::uint64_t total_pixels;
+};
+
+// 窗口选择事件数据 - 新增
+export struct WindowSelectionData {
+  Vendor::Windows::HWND window_handle;
+  std::wstring window_title;
 };
 
 // 功能开关事件数据
