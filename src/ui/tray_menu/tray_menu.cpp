@@ -44,17 +44,16 @@ struct TrayMenuStrings {
 
 // 从i18n系统获取tray menu相关的本地化文本
 auto get_tray_menu_strings(const Core::I18n::Types::TextData& texts) -> TrayMenuStrings {
-  return TrayMenuStrings{
-      .select_window = Utils::String::FromUtf8(texts.window.menu.select),
-      .window_ratio = Utils::String::FromUtf8(texts.window.menu.ratio),
-      .resolution = Utils::String::FromUtf8(texts.window.menu.resolution),
-      .capture_window = Utils::String::FromUtf8(texts.features.screenshot.menu.capture),
-      .preview_window = Utils::String::FromUtf8(texts.features.preview.menu.toggle),
-      .overlay_window = Utils::String::FromUtf8(texts.features.overlay.menu.toggle),
-      .open_config = Utils::String::FromUtf8(texts.settings.menu.config),
-      .user_guide = Utils::String::FromUtf8(texts.system.menu.user_guide),
-      .webview_test = Utils::String::FromUtf8(texts.system.menu.webview_test),
-      .exit = Utils::String::FromUtf8(texts.system.menu.exit)};
+  return TrayMenuStrings{.select_window = Utils::String::FromUtf8(texts.menu.window_select),
+                         .window_ratio = Utils::String::FromUtf8(texts.menu.window_ratio),
+                         .resolution = Utils::String::FromUtf8(texts.menu.window_resolution),
+                         .capture_window = Utils::String::FromUtf8(texts.menu.screenshot_capture),
+                         .preview_window = Utils::String::FromUtf8(texts.menu.preview_toggle),
+                         .overlay_window = Utils::String::FromUtf8(texts.menu.overlay_toggle),
+                         .open_config = Utils::String::FromUtf8(texts.menu.settings_config),
+                         .user_guide = Utils::String::FromUtf8(texts.menu.app_user_guide),
+                         .webview_test = Utils::String::FromUtf8(texts.menu.app_webview_test),
+                         .exit = Utils::String::FromUtf8(texts.menu.app_exit)};
 }
 
 // 窗口类名

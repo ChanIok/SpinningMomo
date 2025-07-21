@@ -3,14 +3,12 @@ module;
 module Features.Settings.Compute;
 
 import std;
+import Core.State;
+import Core.I18n.Types;
+import Core.I18n.State;
+import Common.MenuData.Types;
 import Features.Settings.Types;
 import Features.Settings.State;
-import Common.MenuData.Types;
-import Common.MenuIds;
-import Core.Constants;
-import Core.I18n.Types;
-import Core.State;
-import Core.I18n.State;
 import Utils.String;
 
 namespace Features::Settings::Compute {
@@ -18,33 +16,26 @@ namespace Features::Settings::Compute {
 // 将菜单ID映射到本地化文本
 auto get_localized_text_for_menu_id(const std::string& menu_id,
                                     const Core::I18n::Types::TextData& texts) -> std::wstring {
-  // 将字符串ID转换为强类型ID
-  auto id = Common::MenuIds::from_string(menu_id);
-  if (!id) {
-    // 如果ID不存在，返回ID本身作为fallback
+  // 直接使用字符串比较，映射到新的i18n结构
+  if (menu_id == "screenshot.capture") {
+    return Utils::String::FromUtf8(texts.menu.screenshot_capture);
+  } else if (menu_id == "screenshot.open_folder") {
+    return Utils::String::FromUtf8(texts.menu.screenshot_open_folder);
+  } else if (menu_id == "feature.toggle_preview") {
+    return Utils::String::FromUtf8(texts.menu.preview_toggle);
+  } else if (menu_id == "feature.toggle_overlay") {
+    return Utils::String::FromUtf8(texts.menu.overlay_toggle);
+  } else if (menu_id == "feature.toggle_letterbox") {
+    return Utils::String::FromUtf8(texts.menu.letterbox_toggle);
+  } else if (menu_id == "window.reset_transform") {
+    return Utils::String::FromUtf8(texts.menu.window_reset);
+  } else if (menu_id == "panel.hide") {
+    return Utils::String::FromUtf8(texts.menu.app_hide);
+  } else if (menu_id == "app.exit") {
+    return Utils::String::FromUtf8(texts.menu.app_exit);
+  } else {
+    // 如果ID不匹配，返回ID本身作为fallback
     return Utils::String::FromUtf8(menu_id);
-  }
-
-  // 根据ID返回对应的本地化文本
-  switch (*id) {
-    case Common::MenuIds::Id::ScreenshotCapture:
-      return Utils::String::FromUtf8(texts.features.screenshot.menu.capture);
-    case Common::MenuIds::Id::ScreenshotOpenFolder:
-      return Utils::String::FromUtf8(texts.features.screenshot.menu.open_folder);
-    case Common::MenuIds::Id::FeatureTogglePreview:
-      return Utils::String::FromUtf8(texts.features.preview.menu.toggle);
-    case Common::MenuIds::Id::FeatureToggleOverlay:
-      return Utils::String::FromUtf8(texts.features.overlay.menu.toggle);
-    case Common::MenuIds::Id::FeatureToggleLetterbox:
-      return Utils::String::FromUtf8(texts.features.letterbox.menu.toggle);
-    case Common::MenuIds::Id::WindowResetTransform:
-      return Utils::String::FromUtf8(texts.window.menu.reset);
-    case Common::MenuIds::Id::PanelHide:
-      return Utils::String::FromUtf8("关闭浮窗");  // 这个在JSON中没有直接对应，使用硬编码
-    case Common::MenuIds::Id::AppExit:
-      return Utils::String::FromUtf8(texts.system.menu.exit);
-    default:
-      return Utils::String::FromUtf8(menu_id);
   }
 }
 
@@ -114,7 +105,7 @@ auto compute_feature_items_from_config(const Types::AppSettings& config,
 
   // 处理功能项，过滤启用的项目并按顺序排序
   std::vector<std::pair<Types::FeatureItem, int>> enabled_items;
-  for (const auto& item : config.app_menu.feature_items) {
+  for (const auto& item : config.ui.app_menu.feature_items) {
     if (item.enabled) {
       enabled_items.emplace_back(item, item.order);
     }
@@ -139,7 +130,7 @@ auto compute_presets_from_config(const Types::AppSettings& config,
   State::ComputedPresets computed;
 
   // 处理比例预设
-  for (const auto& item : config.app_menu.aspect_ratios) {
+  for (const auto& item : config.ui.app_menu.aspect_ratios) {
     if (item.enabled) {
       if (auto ratio = parse_ratio(item.id)) {
         std::wstring name(item.id.begin(), item.id.end());
@@ -149,7 +140,7 @@ auto compute_presets_from_config(const Types::AppSettings& config,
   }
 
   // 处理分辨率预设
-  for (const auto& item : config.app_menu.resolutions) {
+  for (const auto& item : config.ui.app_menu.resolutions) {
     if (item.enabled) {
       if (auto resolution = parse_resolution(item.id)) {
         std::wstring name(item.id.begin(), item.id.end());

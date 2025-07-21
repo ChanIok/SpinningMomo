@@ -3,15 +3,12 @@ module;
 export module Features.Settings.Types;
 
 import std;
-import Core.Constants;
-import Utils.String;
-import Common.MenuIds;
 
 export namespace Features::Settings::Types {
 
 // 功能项（应用菜单中的功能）
 struct FeatureItem {
-  std::string id;       // 如: "CaptureWindow", "OpenScreenshot"
+  std::string id;       // 如: "screenshot.capture", "screenshot.open_folder"
   std::string label;    // 显示名称
   bool enabled = true;  // 是否显示在菜单中
   int order = 0;        // 排序序号
@@ -26,28 +23,70 @@ struct PresetItem {
   bool is_custom = false;  // 是否为自定义项
 };
 
-// 应用菜单配置
-struct AppMenuSettings {
-  std::vector<FeatureItem> feature_items;
-  std::vector<PresetItem> aspect_ratios;
-  std::vector<PresetItem> resolutions;
-};
-
-// 完整的应用设置（统一的核心类型）
+// 完整的应用设置（重构后的结构）
 struct AppSettings {
   std::string version = "1.0";
-  std::string title;  // 窗口标题
-  AppMenuSettings app_menu;
+
+  // app 分组 - 应用核心设置
+  struct App {
+    // 快捷键设置
+    struct Hotkey {
+      int modifiers = 3;  // Ctrl + Alt
+      int key = 82;       // R键
+    } hotkey;
+
+    // 语言设置
+    struct Language {
+      std::string current = "zh-CN";  // zh-CN, en-US
+    } language;
+
+    // 日志设置
+    struct Logger {
+      std::string level = "INFO";  // DEBUG, INFO, ERROR
+    } logger;
+  } app;
+
+  // window 分组 - 窗口相关设置
+  struct Window {
+    std::string target_title;  // 目标窗口标题
+
+    // 任务栏设置
+    struct Taskbar {
+      bool auto_hide = false;       // 隐藏任务栏
+      bool lower_on_resize = true;  // 调整时置底任务栏
+    } taskbar;
+  } window;
+
+  // features 分组 - 功能特性设置
+  struct Features {
+    // 截图功能设置
+    struct Screenshot {
+      std::string game_album_path;  // 游戏相册目录路径
+    } screenshot;
+
+    // 黑边模式设置
+    struct Letterbox {
+      bool enabled = false;  // 是否启用黑边模式
+    } letterbox;
+  } features;
+
+  // ui 分组 - UI界面设置
+  struct UI {
+    // 应用菜单配置
+    struct AppMenu {
+      std::vector<FeatureItem> feature_items;
+      std::vector<PresetItem> aspect_ratios;
+      std::vector<PresetItem> resolutions;
+    } app_menu;
+  } ui;
 };
 
-// 设置变更事件数据（暂时保留以维持兼容性）
+// 设置变更事件数据
 struct SettingsChangeData {
   AppSettings old_settings;
   AppSettings new_settings;
   std::string change_description;
 };
-
-// === 简化的RPC接口 ===
 
 // 获取设置
 struct GetSettingsParams {
@@ -63,43 +102,46 @@ struct UpdateSettingsResult {
   std::string message;
 };
 
-// 业务错误类型
-struct ServiceError {
-  std::string message;
-};
-
 // 辅助函数：创建默认设置
 inline auto create_default_app_settings() -> AppSettings {
   AppSettings settings;
   settings.version = "1.0";
-  settings.title = "";
 
-  // 使用新的强类型菜单ID，label留空，将从i18n系统动态获取
-  settings.app_menu.feature_items = {
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotCapture)), "", true,
-       1},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::ScreenshotOpenFolder)), "", true,
-       2},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureTogglePreview)), "", true,
-       3},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleOverlay)), "", true,
-       4},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::FeatureToggleLetterbox)), "",
-       true, 5},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::WindowResetTransform)), "", true,
-       6},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::PanelHide)), "", true, 7},
-      {std::string(Common::MenuIds::to_string(Common::MenuIds::Id::AppExit)), "", false, 8}};
+  // app 设置
+  settings.app.hotkey.modifiers = 3;  // Ctrl + Alt
+  settings.app.hotkey.key = 82;       // R键
+  settings.app.language.current = "zh-CN";
+  settings.app.logger.level = "INFO";
 
-  // 直接访问字段，无需特殊API
-  settings.app_menu.aspect_ratios = {
+  // window 设置
+  settings.window.target_title = "";
+  settings.window.taskbar.auto_hide = false;
+  settings.window.taskbar.lower_on_resize = true;
+
+  // features 设置
+  settings.features.screenshot.game_album_path = "";
+  settings.features.letterbox.enabled = false;
+
+  // ui 设置 - app_menu 配置
+  // 直接使用字符串ID，label留空，将从i18n系统动态获取
+  settings.ui.app_menu.feature_items = {{"screenshot.capture", "", true, 1},
+                                        {"screenshot.open_folder", "", true, 2},
+                                        {"feature.toggle_preview", "", true, 3},
+                                        {"feature.toggle_overlay", "", true, 4},
+                                        {"feature.toggle_letterbox", "", true, 5},
+                                        {"window.reset_transform", "", true, 6},
+                                        {"panel.hide", "", true, 7},
+                                        {"app.exit", "", false, 8}};
+
+  // 默认比例配置
+  settings.ui.app_menu.aspect_ratios = {
       {"32:9", "32:9", true, 1, false}, {"21:9", "21:9", true, 2, false},
       {"16:9", "16:9", true, 3, false}, {"3:2", "3:2", true, 4, false},
       {"1:1", "1:1", true, 5, false},   {"3:4", "3:4", true, 6, false},
       {"2:3", "2:3", true, 7, false},   {"9:16", "9:16", true, 8, false}};
 
-  // 普通字段直接访问
-  settings.app_menu.resolutions = {
+  // 默认分辨率配置
+  settings.ui.app_menu.resolutions = {
       {"Default", "Default", true, 1, false}, {"1080P", "1080P", true, 2, false},
       {"2K", "2K", true, 3, false},           {"4K", "4K", true, 4, false},
       {"6K", "6K", true, 5, false},           {"8K", "8K", true, 6, false},

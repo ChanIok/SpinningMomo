@@ -23,10 +23,10 @@ export function MenuContent() {
   const [inputTitle, setInputTitle] = useState('')
   const [isUpdatingTitle, setIsUpdatingTitle] = useState(false)
 
-  // 同步store中的标题到输入框
+  // 同步store中的标题到输入框（适配新的嵌套结构）
   useEffect(() => {
-    setInputTitle(appSettings?.title || '')
-  }, [appSettings?.title])
+    setInputTitle(appSettings?.window?.targetTitle || '')
+  }, [appSettings?.window?.targetTitle])
 
   const handleUpdateTitle = async () => {
     if (inputTitle.trim() === '') {
@@ -52,10 +52,10 @@ export function MenuContent() {
     }
   }
 
-  // 安全获取菜单数据的辅助函数
-  const getFeatureItems = () => appSettings?.appMenu?.featureItems || []
-  const getAspectRatios = () => appSettings?.appMenu?.aspectRatios || []
-  const getResolutions = () => appSettings?.appMenu?.resolutions || []
+  // 安全获取菜单数据的辅助函数（适配新的嵌套结构）
+  const getFeatureItems = () => appSettings?.ui?.appMenu?.featureItems || []
+  const getAspectRatios = () => appSettings?.ui?.appMenu?.aspectRatios || []
+  const getResolutions = () => appSettings?.ui?.appMenu?.resolutions || []
 
   // 功能项相关处理
   const handleFeatureItemsReorder = async (items: FeatureItem[]) => {

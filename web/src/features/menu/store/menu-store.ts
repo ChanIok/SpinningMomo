@@ -89,15 +89,18 @@ export const useMenuStore = create<MenuStoreState>()(
         }
       },
 
-      // 乐观更新：更新窗口标题
+      // 乐观更新：更新窗口标题（适配新的嵌套结构）
       updateWindowTitle: async (title: string) => {
         const { appSettings } = get()
         const previousSettings = appSettings
         
-        // 1. 立即更新本地状态（乐观更新）
+        // 1. 立即更新本地状态（乐观更新）- 更新到 window.targetTitle
         const optimisticSettings = {
           ...appSettings,
-          title
+          window: {
+            ...appSettings.window,
+            targetTitle: title
+          }
         }
         set({ 
           appSettings: optimisticSettings,
@@ -119,17 +122,20 @@ export const useMenuStore = create<MenuStoreState>()(
         }
       },
 
-      // 乐观更新：更新功能项
+      // 乐观更新：更新功能项（适配新的嵌套结构）
       updateFeatureItems: async (items: FeatureItem[]) => {
         const { appSettings } = get()
         const previousSettings = appSettings
         
-        // 1. 立即更新本地状态（乐观更新）
+        // 1. 立即更新本地状态（乐观更新）- 更新到 ui.appMenu.featureItems
         const optimisticSettings = {
           ...appSettings,
-          appMenu: {
-            ...appSettings.appMenu,
-            featureItems: items
+          ui: {
+            ...appSettings.ui,
+            appMenu: {
+              ...appSettings.ui.appMenu,
+              featureItems: items
+            }
           }
         }
         set({ 
@@ -152,17 +158,20 @@ export const useMenuStore = create<MenuStoreState>()(
         }
       },
 
-      // 乐观更新：更新比例设置
+      // 乐观更新：更新比例设置（适配新的嵌套结构）
       updateAspectRatios: async (items: PresetItem[]) => {
         const { appSettings } = get()
         const previousSettings = appSettings
         
-        // 1. 立即更新本地状态（乐观更新）
+        // 1. 立即更新本地状态（乐观更新）- 更新到 ui.appMenu.aspectRatios
         const optimisticSettings = {
           ...appSettings,
-          appMenu: {
-            ...appSettings.appMenu,
-            aspectRatios: items
+          ui: {
+            ...appSettings.ui,
+            appMenu: {
+              ...appSettings.ui.appMenu,
+              aspectRatios: items
+            }
           }
         }
         set({ 
@@ -185,17 +194,20 @@ export const useMenuStore = create<MenuStoreState>()(
         }
       },
 
-      // 乐观更新：更新分辨率设置
+      // 乐观更新：更新分辨率设置（适配新的嵌套结构）
       updateResolutions: async (items: PresetItem[]) => {
         const { appSettings } = get()
         const previousSettings = appSettings
         
-        // 1. 立即更新本地状态（乐观更新）
+        // 1. 立即更新本地状态（乐观更新）- 更新到 ui.appMenu.resolutions
         const optimisticSettings = {
           ...appSettings,
-          appMenu: {
-            ...appSettings.appMenu,
-            resolutions: items
+          ui: {
+            ...appSettings.ui,
+            appMenu: {
+              ...appSettings.ui.appMenu,
+              resolutions: items
+            }
           }
         }
         set({ 

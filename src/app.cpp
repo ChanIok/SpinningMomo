@@ -79,7 +79,8 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
     // 初始化功能模块状态
     m_app_state->letterbox = std::make_unique<Features::Letterbox::State::LetterboxState>();
-    m_app_state->notifications = std::make_unique<Features::Notifications::State::NotificationSystemState>();
+    m_app_state->notifications =
+        std::make_unique<Features::Notifications::State::NotificationSystemState>();
     m_app_state->overlay = std::make_unique<Features::Overlay::State::OverlayState>();
     m_app_state->preview = std::make_unique<Features::Preview::State::PreviewState>();
     m_app_state->screenshot = std::make_unique<Features::Screenshot::State::ScreenshotState>();
@@ -96,9 +97,9 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     } else {
       Logger().info("I18n system initialized successfully with default Chinese");
 
-      // 直接访问texts字段测试默认英文
-      const auto& en_name = m_app_state->i18n->texts.app.name;
-      Logger().info("Default app name (Chinese): {}", en_name);
+      // 直接访问texts字段测试默认中文
+      const auto& app_name = m_app_state->i18n->texts.label.app_name;
+      Logger().info("Default app name (Chinese): {}", app_name);
     }
 
     Logger().info("=== I18n Testing Complete ===");

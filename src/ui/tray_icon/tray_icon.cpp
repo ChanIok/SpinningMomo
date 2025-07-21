@@ -40,18 +40,18 @@ struct TrayStrings {
 // 从i18n系统获取tray相关的本地化文本
 auto get_tray_strings(const Core::I18n::Types::TextData& texts) -> TrayStrings {
   return TrayStrings{
-      .select_window = Utils::String::FromUtf8(texts.window.menu.select),
-      .window_ratio = Utils::String::FromUtf8(texts.window.menu.ratio),
-      .resolution = Utils::String::FromUtf8(texts.window.menu.resolution),
-      .capture_window = Utils::String::FromUtf8(texts.features.screenshot.menu.capture),
-      .preview_window = Utils::String::FromUtf8(texts.features.preview.menu.toggle),
-      .overlay_window = Utils::String::FromUtf8(texts.features.overlay.menu.toggle),
-      .letterbox_window = Utils::String::FromUtf8(texts.features.letterbox.menu.toggle),
-      .toggle_borderless = Utils::String::FromUtf8(texts.window.menu.toggle_borderless),
-      .modify_hotkey = Utils::String::FromUtf8(texts.settings.menu.hotkey),
-      .chinese = Utils::String::FromUtf8(texts.i18n.languages.zh_cn),
-      .english = Utils::String::FromUtf8(texts.i18n.languages.en_us),
-      .exit = Utils::String::FromUtf8(texts.system.menu.exit)};
+      .select_window = Utils::String::FromUtf8(texts.menu.window_select),
+      .window_ratio = Utils::String::FromUtf8(texts.menu.window_ratio),
+      .resolution = Utils::String::FromUtf8(texts.menu.window_resolution),
+      .capture_window = Utils::String::FromUtf8(texts.menu.screenshot_capture),
+      .preview_window = Utils::String::FromUtf8(texts.menu.preview_toggle),
+      .overlay_window = Utils::String::FromUtf8(texts.menu.overlay_toggle),
+      .letterbox_window = Utils::String::FromUtf8(texts.menu.letterbox_toggle),
+      .toggle_borderless = Utils::String::FromUtf8(texts.menu.window_toggle_borderless),
+      .modify_hotkey = Utils::String::FromUtf8(texts.menu.settings_hotkey),
+      .chinese = Utils::String::FromUtf8(texts.label.language_zh_cn),
+      .english = Utils::String::FromUtf8(texts.label.language_en_us),
+      .exit = Utils::String::FromUtf8(texts.menu.app_exit)};
 }
 
 auto create_window_selection_submenu(const Core::State::AppState& state) -> HMENU {
@@ -126,14 +126,12 @@ auto create_language_submenu(const Core::State::AppState& state) -> HMENU {
 
   const auto strings = get_tray_strings(state.i18n->texts);
   // TODO: 等待settings设计完成后，从settings中读取当前语言设置
-  InsertMenuW(
-      h_menu, -1,
-      MF_BYPOSITION | MF_STRING | MF_CHECKED, // 硬编码默认选中中文
-      Core::Constants::ID_LANG_ZH_CN, strings.chinese.c_str());
-  InsertMenuW(
-      h_menu, -1,
-      MF_BYPOSITION | MF_STRING, // 英文不选中
-      Core::Constants::ID_LANG_EN_US, strings.english.c_str());
+  InsertMenuW(h_menu, -1,
+              MF_BYPOSITION | MF_STRING | MF_CHECKED,  // 硬编码默认选中中文
+              Core::Constants::ID_LANG_ZH_CN, strings.chinese.c_str());
+  InsertMenuW(h_menu, -1,
+              MF_BYPOSITION | MF_STRING,  // 英文不选中
+              Core::Constants::ID_LANG_EN_US, strings.english.c_str());
 
   return h_menu;
 }
