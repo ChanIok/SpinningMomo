@@ -28,8 +28,8 @@ import UI.AppWindow.State;
 import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.TrayIcon.State;
-import UI.TrayMenu;
-import UI.TrayMenu.State;
+import UI.ContextMenu;
+import UI.ContextMenu.State;
 import Core.WebView;
 import Utils.Logger;
 import Utils.String;
@@ -50,7 +50,7 @@ Application::~Application() {
     Core::WebView::shutdown(*m_app_state);
     UI::WebViewWindow::destroy(*m_app_state);
 
-    UI::TrayMenu::cleanup(*m_app_state);
+    UI::ContextMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);
 
     Core::Async::stop(*m_app_state->async_runtime);
@@ -75,7 +75,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     // 初始化UI状态
     m_app_state->app_window = std::make_unique<UI::AppWindow::State::AppWindowState>();
     m_app_state->tray_icon = std::make_unique<UI::TrayIcon::State::TrayIconState>();
-    m_app_state->tray_menu = std::make_unique<UI::TrayMenu::State::TrayMenuState>();
+    m_app_state->context_menu = std::make_unique<UI::ContextMenu::State::ContextMenuState>();
 
     // 初始化功能模块状态
     m_app_state->letterbox = std::make_unique<Features::Letterbox::State::LetterboxState>();

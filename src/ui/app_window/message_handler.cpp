@@ -19,6 +19,8 @@ import UI.AppWindow.Layout;
 import UI.AppWindow.Painter;
 import UI.AppWindow.State;
 import UI.TrayIcon;
+import UI.ContextMenu;
+import UI.ContextMenu.Types;
 import UI.AppWindow.D2DContext;
 import Utils.Logger;
 
@@ -203,6 +205,12 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
         return HTCAPTION;
       }
       return HTCLIENT;
+    }
+
+    case WM_RBUTTONUP: {
+        // 复用托盘菜单的逻辑来显示上下文菜单
+        UI::TrayIcon::show_context_menu(state);
+        return 0;
     }
 
     case WM_CLOSE:

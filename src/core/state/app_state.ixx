@@ -32,8 +32,8 @@ namespace UI::TrayIcon::State {
 export struct TrayIconState;
 }
 
-namespace UI::TrayMenu::State {
-export struct TrayMenuState;
+namespace UI::ContextMenu::State {
+export struct ContextMenuState;
 }
 
 namespace Features::Letterbox::State {
@@ -76,7 +76,7 @@ export struct AppState {
   // UI状态
   std::unique_ptr<UI::AppWindow::State::AppWindowState> app_window;
   std::unique_ptr<UI::TrayIcon::State::TrayIconState> tray_icon;
-  std::unique_ptr<UI::TrayMenu::State::TrayMenuState> tray_menu;
+  std::unique_ptr<UI::ContextMenu::State::ContextMenuState> context_menu;
 
   // 功能模块状态
   std::unique_ptr<Features::Letterbox::State::LetterboxState> letterbox;

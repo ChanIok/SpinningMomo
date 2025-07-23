@@ -5,13 +5,13 @@ module;
 
 #include <iostream>
 
-export module UI.TrayMenu.Types;
+export module UI.ContextMenu.Types;
 
 import std;
 import Features.WindowControl;
 import Common.MenuData.Types;
 
-export namespace UI::TrayMenu::Types {
+export namespace UI::ContextMenu::Types {
 
 // 菜单项类型枚举
 enum class MenuItemType {
@@ -193,4 +193,4 @@ struct InteractionState {
   static constexpr UINT_PTR HIDE_TIMER_ID = 2;
 };
 
-}  // namespace UI::TrayMenu::Types
+}  // namespace UI::ContextMenu::Types

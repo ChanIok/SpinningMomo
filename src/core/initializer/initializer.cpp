@@ -23,7 +23,7 @@ import Utils.String;
 import UI.AppWindow;
 import UI.WebViewWindow;
 import UI.TrayIcon;
-import UI.TrayMenu;
+import UI.ContextMenu;
 import Vendor.Windows;
 
 namespace Core::Initializer {
@@ -78,7 +78,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     }
 
     // 10. 初始化托盘菜单
-    if (auto result = UI::TrayMenu::initialize(state); !result) {
+    if (auto result = UI::ContextMenu::initialize(state); !result) {
       Logger().warn("Failed to initialize tray menu: {}", result.error());
       // 托盘菜单初始化失败，但不影响应用程序运行
     }
