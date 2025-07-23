@@ -13,6 +13,7 @@ import Common.MenuData;
 import Common.MenuData.Types;
 import Core.Events;
 import Core.State;
+import UI.AppWindow.Events;
 import UI.AppWindow.MessageHandler;
 import UI.AppWindow.Layout;
 import UI.AppWindow.D2DContext;
@@ -38,9 +39,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   const auto window_pos = calculate_center_position(window_size);
 
   // 发送DPI改变事件来更新渲染状态
-  Core::Events::send_event(*state.event_bus, {Core::Events::EventType::DpiChanged,
-                                             Core::Events::DpiChangeData{dpi, window_size},
-                                             nullptr});
+  Core::Events::send(*state.event_bus, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});
 
   register_window_class(state.app_window->window.instance);
 

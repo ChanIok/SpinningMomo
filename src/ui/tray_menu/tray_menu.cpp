@@ -18,6 +18,7 @@ import Core.Events;
 import Common.MenuIds;
 import UI.AppWindow.Types;
 import UI.AppWindow.State;
+import UI.AppWindow.Events;
 import UI.TrayMenu.State;
 import UI.TrayMenu.Types;
 import UI.TrayMenu.Layout;
@@ -390,9 +391,9 @@ auto handle_menu_command(Core::State::AppState& state, const UI::TrayMenu::Types
     case UI::TrayMenu::Types::MenuAction::Type::WindowSelection: {
       try {
         auto window_info = std::any_cast<Features::WindowControl::WindowInfo>(action.data);
-        send_event(*state.event_bus,
-                   {EventType::WindowSelected,
-                    WindowSelectionData{window_info.handle, window_info.title}, nullptr});
+        // 使用新的事件系统发送窗口选择事件
+        Core::Events::send(*state.event_bus, UI::AppWindow::Events::WindowSelectionEvent{
+                                                 window_info.title, window_info.handle});
         Logger().info("Window selected: {}", Utils::String::ToUtf8(window_info.title));
       } catch (const std::bad_any_cast& e) {
         Logger().error("Failed to cast window selection data: {}", e.what());
@@ -403,9 +404,10 @@ auto handle_menu_command(Core::State::AppState& state, const UI::TrayMenu::Types
     case UI::TrayMenu::Types::MenuAction::Type::RatioSelection: {
       try {
         auto ratio_data = std::any_cast<UI::TrayMenu::Types::RatioData>(action.data);
-        send_event(*state.event_bus,
-                   {EventType::RatioChanged,
-                    RatioChangeData{ratio_data.index, ratio_data.name, ratio_data.ratio}, nullptr});
+        // 使用新的事件系统发送比例改变事件
+        Core::Events::send(*state.event_bus,
+                           UI::AppWindow::Events::RatioChangeEvent{
+                               ratio_data.index, ratio_data.name, ratio_data.ratio});
         Logger().info("Ratio selected: {} ({})", Utils::String::ToUtf8(ratio_data.name),
                       ratio_data.ratio);
       } catch (const std::bad_any_cast& e) {
@@ -417,11 +419,10 @@ auto handle_menu_command(Core::State::AppState& state, const UI::TrayMenu::Types
     case UI::TrayMenu::Types::MenuAction::Type::ResolutionSelection: {
       try {
         auto resolution_data = std::any_cast<UI::TrayMenu::Types::ResolutionData>(action.data);
-        send_event(*state.event_bus,
-                   {EventType::ResolutionChanged,
-                    ResolutionChangeData{resolution_data.index, resolution_data.name,
-                                         resolution_data.total_pixels},
-                    nullptr});
+        // 使用新的事件系统发送分辨率改变事件
+        Core::Events::send(*state.event_bus, UI::AppWindow::Events::ResolutionChangeEvent{
+                                                 resolution_data.index, resolution_data.name,
+                                                 resolution_data.total_pixels});
         Logger().info("Resolution selected: {} ({}M pixels)",
                       Utils::String::ToUtf8(resolution_data.name),
                       resolution_data.total_pixels / 1000000.0);
@@ -437,22 +438,20 @@ auto handle_menu_command(Core::State::AppState& state, const UI::TrayMenu::Types
 
         // 根据action_id确定功能类型和新状态
         if (action_id == "feature.toggle_preview") {
-          send_event(*state.event_bus, {EventType::ToggleFeature,
-                                        FeatureToggleData{FeatureType::Preview,
-                                                          !state.app_window->ui.preview_enabled},
-                                        nullptr});
+          // 发送预览切换事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::PreviewToggleEvent{
+                                                   !state.app_window->ui.preview_enabled});
         } else if (action_id == "feature.toggle_overlay") {
-          send_event(*state.event_bus, {EventType::ToggleFeature,
-                                        FeatureToggleData{FeatureType::Overlay,
-                                                          !state.app_window->ui.overlay_enabled},
-                                        nullptr});
+          // 发送叠加层切换事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::OverlayToggleEvent{
+                                                   !state.app_window->ui.overlay_enabled});
         } else if (action_id == "feature.toggle_letterbox") {
-          send_event(*state.event_bus, {EventType::ToggleFeature,
-                                        FeatureToggleData{FeatureType::Letterbox,
-                                                          !state.app_window->ui.letterbox_enabled},
-                                        nullptr});
+          // 发送黑边模式切换事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::LetterboxToggleEvent{
+                                                   !state.app_window->ui.letterbox_enabled});
         } else if (action_id == "screenshot.capture") {
-          send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Capture, nullptr});
+          // 发送截图事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::CaptureEvent{});
         }
 
         Logger().info("Feature action triggered: {}", action_id);
@@ -468,16 +467,11 @@ auto handle_menu_command(Core::State::AppState& state, const UI::TrayMenu::Types
 
         // 根据系统命令发送相应事件
         if (command == "app.exit") {
-          send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Exit, nullptr});
-        } else if (command == "settings.config") {
-          send_event(*state.event_bus,
-                     {EventType::SystemCommand, std::string("open_config"), nullptr});
-        } else if (command == "app.user_guide") {
-          send_event(*state.event_bus,
-                     {EventType::SystemCommand, std::string("user_guide"), nullptr});
-        } else if (command == "app.webview_test") {
-          send_event(*state.event_bus,
-                     {EventType::SystemCommand, std::string("webview_test"), nullptr});
+          // 发送退出事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::ExitEvent{});
+        } else {
+          // 使用新的事件系统发送系统命令事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::SystemCommandEvent{command});
         }
 
         Logger().info("System command executed: {}", command);

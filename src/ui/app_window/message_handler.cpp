@@ -14,6 +14,7 @@ import Core.Events;
 import Core.State;
 import Core.Constants;
 import UI.AppWindow;
+import UI.AppWindow.Events;
 import UI.AppWindow.Layout;
 import UI.AppWindow.Painter;
 import UI.AppWindow.State;
@@ -34,8 +35,8 @@ auto ensure_mouse_tracking(HWND hwnd) -> void {
 
 // 基于 action_id 分发功能事件
 auto dispatch_feature_action(Core::State::AppState& state, const std::string& action_id) -> void {
-  using namespace Core::Events;
   using namespace Common::MenuIds;
+  using namespace UI::AppWindow::Events;
 
   // 将字符串转换为强类型ID
   auto menu_id = from_string(action_id);
@@ -45,42 +46,31 @@ auto dispatch_feature_action(Core::State::AppState& state, const std::string& ac
 
   switch (*menu_id) {
     case Id::FeatureTogglePreview:
-      send_event(*state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Preview, !state.app_window->ui.preview_enabled},
-                  state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus,
+                         PreviewToggleEvent{!state.app_window->ui.preview_enabled});
       break;
     case Id::FeatureToggleOverlay:
-      send_event(*state.event_bus,
-                 {EventType::ToggleFeature,
-                  FeatureToggleData{FeatureType::Overlay, !state.app_window->ui.overlay_enabled},
-                  state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus,
+                         OverlayToggleEvent{!state.app_window->ui.overlay_enabled});
       break;
     case Id::FeatureToggleLetterbox:
-      send_event(*state.event_bus, {EventType::ToggleFeature,
-                                    FeatureToggleData{FeatureType::Letterbox,
-                                                      !state.app_window->ui.letterbox_enabled},
-                                    state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus,
+                         LetterboxToggleEvent{!state.app_window->ui.letterbox_enabled});
       break;
     case Id::ScreenshotCapture:
-      send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Capture, state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus, CaptureEvent{});
       break;
     case Id::ScreenshotOpenFolder:
-      send_event(*state.event_bus, {EventType::WindowAction, WindowAction::Screenshots,
-                                    state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus, ScreenshotsEvent{});
       break;
     case Id::WindowControlResetTransform:
-      send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Reset, state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus, ResetEvent{});
       break;
     case Id::PanelHide:
-      send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Hide, state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus, HideEvent{});
       break;
     case Id::AppExit:
-      send_event(*state.event_bus,
-                 {EventType::WindowAction, WindowAction::Exit, state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus, ExitEvent{});
       break;
   }
 }
@@ -88,17 +78,16 @@ auto dispatch_feature_action(Core::State::AppState& state, const std::string& ac
 // 将菜单项点击转换为具体的高层应用事件
 auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow::MenuItem& item)
     -> void {
-  using namespace Core::Events;
+  using namespace UI::AppWindow::Events;
 
   switch (item.category) {
     case UI::AppWindow::MenuItemCategory::AspectRatio: {
       const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < ratios.size()) {
         const auto& ratio_preset = ratios[item.index];
-        send_event(*state.event_bus, {EventType::RatioChanged,
-                                      RatioChangeData{static_cast<size_t>(item.index),
-                                                      ratio_preset.name, ratio_preset.ratio},
-                                      state.app_window->window.hwnd});
+        Core::Events::send(*state.event_bus,
+                           RatioChangeEvent{static_cast<size_t>(item.index), ratio_preset.name,
+                                            ratio_preset.ratio});
       }
       break;
     }
@@ -106,12 +95,10 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       const auto& resolutions = Common::MenuData::get_current_resolutions(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
         const auto& res_preset = resolutions[item.index];
-        send_event(*state.event_bus,
-                   {EventType::ResolutionChanged,
-                    ResolutionChangeData{
-                        static_cast<size_t>(item.index), res_preset.name,
-                        res_preset.baseWidth * static_cast<uint64_t>(res_preset.baseHeight)},
-                    state.app_window->window.hwnd});
+        Core::Events::send(*state.event_bus,
+                           ResolutionChangeEvent{static_cast<size_t>(item.index), res_preset.name,
+                                                 res_preset.baseWidth *
+                                                     static_cast<uint64_t>(res_preset.baseHeight)});
       }
       break;
     }
@@ -125,9 +112,8 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
 
 // 处理热键，发送系统命令事件
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
-  using namespace Core::Events;
-  send_event(*state.event_bus, {EventType::SystemCommand, std::string("toggle_visibility"),
-                                state.app_window->window.hwnd});
+  using namespace UI::AppWindow::Events;
+  Core::Events::send(*state.event_bus, SystemCommandEvent{"toggle_visibility"});
 }
 
 // 处理鼠标移出窗口，重置悬停状态并重绘
@@ -179,9 +165,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       const auto window_size = calculate_window_size(state);
 
       // 发送DPI改变事件来更新渲染状态
-      Core::Events::send_event(*state.event_bus,
-                               {Core::Events::EventType::DpiChanged,
-                                Core::Events::DpiChangeData{dpi, window_size}, hwnd});
+      Core::Events::send(*state.event_bus, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});
 
       return 0;
     }
@@ -222,9 +206,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     }
 
     case WM_CLOSE:
-      Core::Events::send_event(*state.event_bus,
-                               {Core::Events::EventType::WindowAction,
-                                Core::Events::WindowAction::Hide, state.app_window->window.hwnd});
+      Core::Events::send(*state.event_bus, UI::AppWindow::Events::HideEvent{});
       return 0;
 
     case WM_DESTROY:

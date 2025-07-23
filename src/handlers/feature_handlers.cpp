@@ -5,7 +5,8 @@ module Handlers.Feature;
 import std;
 import Core.Events;
 import Core.State;
-import UI.AppWindow; // 使用UI.AppWindow模块的接口函数
+import UI.AppWindow;
+import UI.AppWindow.Events;
 import Features.Letterbox;
 import Features.Preview.Window;
 import Features.WindowControl;
@@ -17,11 +18,12 @@ import Vendor.Windows;
 namespace Handlers {
 
 // 处理预览功能切换
-auto handle_preview_toggle(Core::State::AppState& state, bool enabled) -> void {
+auto handle_preview_toggle(Core::State::AppState& state,
+                           const UI::AppWindow::Events::PreviewToggleEvent& event) -> void {
   // 更新预览状态（使用UI.AppWindow的接口函数）
-  UI::AppWindow::set_preview_enabled(state, enabled);
+  UI::AppWindow::set_preview_enabled(state, event.enabled);
 
-  if (enabled) {
+  if (event.enabled) {
     // 查找目标窗口（暂时硬编码为空）
     // TODO: 等待settings设计完成后，从settings中读取窗口标题
     std::wstring window_title = L"";
@@ -48,11 +50,12 @@ auto handle_preview_toggle(Core::State::AppState& state, bool enabled) -> void {
 }
 
 // 处理叠加层功能切换
-auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
+auto handle_overlay_toggle(Core::State::AppState& state,
+                           const UI::AppWindow::Events::OverlayToggleEvent& event) -> void {
   // 更新叠加层状态（使用UI.AppWindow的接口函数）
-  UI::AppWindow::set_overlay_enabled(state, enabled);
+  UI::AppWindow::set_overlay_enabled(state, event.enabled);
 
-  if (enabled) {
+  if (event.enabled) {
     // 查找目标窗口（暂时硬编码为空）
     // TODO: 等待settings设计完成后，从settings中读取窗口标题
     std::wstring window_title = L"";
@@ -78,13 +81,14 @@ auto handle_overlay_toggle(Core::State::AppState& state, bool enabled) -> void {
 }
 
 // 处理letterbox功能切换
-auto handle_letterbox_toggle(Core::State::AppState& state, bool enabled) -> void {
+auto handle_letterbox_toggle(Core::State::AppState& state,
+                             const UI::AppWindow::Events::LetterboxToggleEvent& event) -> void {
   // 更新黑边状态（使用UI.AppWindow的接口函数）
-  UI::AppWindow::set_letterbox_enabled(state, enabled);
+  UI::AppWindow::set_letterbox_enabled(state, event.enabled);
   // TODO: 等待settings设计完成后，将letterbox enabled状态保存到settings
   // state.config.letterbox.enabled = enabled; // 暂时注释掉
 
-  if (enabled) {
+  if (event.enabled) {
     // 查找目标窗口（暂时硬编码为空）
     // TODO: 等待settings设计完成后，从settings中读取窗口标题
     std::wstring window_title = L"";
@@ -112,33 +116,37 @@ auto handle_letterbox_toggle(Core::State::AppState& state, bool enabled) -> void
 
   // 如果叠加层正在运行，更新其黑边模式设置
   if (Features::Overlay::is_overlay_capturing(state)) {
-    Features::Overlay::set_letterbox_mode(state, enabled);
+    Features::Overlay::set_letterbox_mode(state, event.enabled);
   }
 }
 
 auto register_feature_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
-  // 注册功能开关事件处理器
-  subscribe(*app_state.event_bus, EventType::ToggleFeature, [&app_state](const Event& event) {
-    auto data = std::any_cast<FeatureToggleData>(event.data);
-    Logger().debug("Feature toggled");
+  // 注册功能开关事件处理器 - 使用新的强类型事件系统
+  subscribe<UI::AppWindow::Events::PreviewToggleEvent>(
+      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::PreviewToggleEvent& event) {
+        Logger().debug("Preview toggle event received: enabled={}", event.enabled);
+        handle_preview_toggle(app_state, event);
+        // 触发UI更新
+        UI::AppWindow::request_repaint(app_state);
+      });
 
-    switch (data.feature) {
-      case FeatureType::Preview:
-        handle_preview_toggle(app_state, data.enabled);
-        break;
-      case FeatureType::Overlay:
-        handle_overlay_toggle(app_state, data.enabled);
-        break;
-      case FeatureType::Letterbox:
-        handle_letterbox_toggle(app_state, data.enabled);
-        break;
-    }
+  subscribe<UI::AppWindow::Events::OverlayToggleEvent>(
+      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::OverlayToggleEvent& event) {
+        Logger().debug("Overlay toggle event received: enabled={}", event.enabled);
+        handle_overlay_toggle(app_state, event);
+        // 触发UI更新
+        UI::AppWindow::request_repaint(app_state);
+      });
 
-    // 触发UI更新
-    UI::AppWindow::request_repaint(app_state);
-  });
+  subscribe<UI::AppWindow::Events::LetterboxToggleEvent>(
+      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::LetterboxToggleEvent& event) {
+        Logger().debug("Letterbox toggle event received: enabled={}", event.enabled);
+        handle_letterbox_toggle(app_state, event);
+        // 触发UI更新
+        UI::AppWindow::request_repaint(app_state);
+      });
 }
 
 }  // namespace Handlers
