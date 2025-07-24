@@ -10,7 +10,7 @@ import Core.State;
 import UI.AppWindow.State;
 import UI.AppWindow.Types;
 
-namespace UI::AppWindow {
+namespace UI::AppWindow::Layout {
 
 // 列计数结构
 export struct ColumnCounts {
@@ -25,6 +25,9 @@ export struct ColumnBounds {
   int resolution_column_right;
   int settings_column_left;
 };
+
+// 更新布局配置
+export auto update_layout(Core::State::AppState& state) -> void;
 
 // 计算窗口尺寸
 export auto calculate_window_size(const Core::State::AppState& state) -> SIZE;

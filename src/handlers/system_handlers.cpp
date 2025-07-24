@@ -23,7 +23,9 @@ auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_d
                        const Vendor::Windows::SIZE& window_size) -> void {
   state.app_window->window.dpi = new_dpi;
   state.app_window->d2d_context.needs_font_update = true;
-  state.app_window->layout.update_dpi_scaling(new_dpi);
+
+  // 更新布局配置（基于新的DPI）
+  UI::AppWindow::Layout::update_layout(state);
 
   // 更新窗口尺寸
   if (state.app_window->window.hwnd) {

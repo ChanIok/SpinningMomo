@@ -78,6 +78,20 @@ struct AppSettings {
       std::vector<PresetItem> aspect_ratios;
       std::vector<PresetItem> resolutions;
     } app_menu;
+    
+    // AppWindow布局配置
+    struct AppWindowLayout {
+      int base_item_height = 24;
+      int base_title_height = 26;
+      int base_separator_height = 1;
+      int base_font_size = 12;
+      int base_text_padding = 12;
+      int base_indicator_width = 3;
+      int base_ratio_indicator_width = 4;
+      int base_ratio_column_width = 60;
+      int base_resolution_column_width = 120;
+      int base_settings_column_width = 120;
+    } app_window_layout;
   } ui;
 };
 
@@ -146,6 +160,18 @@ inline auto create_default_app_settings() -> AppSettings {
       {"2K", "2K", true, 3, false},           {"4K", "4K", true, 4, false},
       {"6K", "6K", true, 5, false},           {"8K", "8K", true, 6, false},
       {"12K", "12K", true, 7, false}};
+
+  // ui 设置 - app_window_layout 配置
+  settings.ui.app_window_layout.base_item_height = 24;
+  settings.ui.app_window_layout.base_title_height = 26;
+  settings.ui.app_window_layout.base_separator_height = 1;
+  settings.ui.app_window_layout.base_font_size = 12;
+  settings.ui.app_window_layout.base_text_padding = 12;
+  settings.ui.app_window_layout.base_indicator_width = 3;
+  settings.ui.app_window_layout.base_ratio_indicator_width = 4;
+  settings.ui.app_window_layout.base_ratio_column_width = 60;
+  settings.ui.app_window_layout.base_resolution_column_width = 120;
+  settings.ui.app_window_layout.base_settings_column_width = 120;
 
   return settings;
 }

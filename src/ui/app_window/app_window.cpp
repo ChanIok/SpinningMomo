@@ -24,9 +24,6 @@ import Utils.Logger;
 namespace UI::AppWindow {
 
 auto create_window(Core::State::AppState& state) -> std::expected<void, std::string> {
-  // 初始化菜单项
-  initialize_menu_items(state);
-
   // 获取系统DPI
   UINT dpi = 96;
   if (HDC hdc = GetDC(nullptr); hdc) {
@@ -34,9 +31,18 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
     ReleaseDC(nullptr, hdc);
   }
 
+  // 保存DPI到状态中
+  state.app_window->window.dpi = dpi;
+
+  // 应用布局配置（基于应用状态）
+  UI::AppWindow::Layout::update_layout(state);
+
+  // 初始化菜单项
+  initialize_menu_items(state);
+
   // 计算窗口尺寸和位置
-  const auto window_size = calculate_window_size(state);
-  const auto window_pos = calculate_center_position(window_size);
+  const auto window_size = UI::AppWindow::Layout::calculate_window_size(state);
+  const auto window_pos = UI::AppWindow::Layout::calculate_center_position(window_size);
 
   // 发送DPI改变事件来更新渲染状态
   Core::Events::send(*state.event_bus, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});
@@ -241,7 +247,22 @@ auto create_window_attributes(HWND hwnd) -> void {
 
 // 设置变更响应实现
 auto refresh_from_settings(Core::State::AppState& state) -> void {
+  // 更新布局配置（基于应用状态）
+  UI::AppWindow::Layout::update_layout(state);
+
+  // 重新计算窗口大小
+  const auto new_size = UI::AppWindow::Layout::calculate_window_size(state);
+  if (state.app_window->window.hwnd) {
+    // 调整窗口大小
+    SetWindowPos(state.app_window->window.hwnd, nullptr, 0, 0, new_size.cx, new_size.cy,
+                 SWP_NOMOVE | SWP_NOZORDER);
+    state.app_window->window.size = new_size;
+  }
+
+  // 更新菜单项
   update_menu_items(state);
+
+  // 请求重绘
   request_repaint(state);
 }
 

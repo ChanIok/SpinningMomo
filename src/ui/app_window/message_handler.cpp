@@ -127,7 +127,7 @@ auto handle_mouse_leave(Core::State::AppState& state) -> void {
 
 // 处理鼠标移动，更新悬停状态并重绘
 auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
-  const int new_hover_index = get_item_index_from_point(state, x, y);
+  const int new_hover_index = UI::AppWindow::Layout::get_item_index_from_point(state, x, y);
   if (new_hover_index != state.app_window->ui.hover_index) {
     // 更新悬停索引
     state.app_window->ui.hover_index = new_hover_index;
@@ -139,7 +139,7 @@ auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
 
 // 处理鼠标左键点击，分发项目点击事件
 auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
-  const int clicked_index = get_item_index_from_point(state, x, y);
+  const int clicked_index = UI::AppWindow::Layout::get_item_index_from_point(state, x, y);
   if (clicked_index >= 0 &&
       clicked_index < static_cast<int>(state.app_window->data.menu_items.size())) {
     const auto& item = state.app_window->data.menu_items[clicked_index];
@@ -163,7 +163,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_DPICHANGED: {
       const UINT dpi = HIWORD(wParam);
-      const auto window_size = calculate_window_size(state);
+      const auto window_size = UI::AppWindow::Layout::calculate_window_size(state);
 
       // 发送DPI改变事件来更新渲染状态
       Core::Events::send(*state.event_bus, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});

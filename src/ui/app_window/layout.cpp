@@ -8,9 +8,35 @@ module UI.AppWindow.Layout;
 import std;
 import Core.State;
 import UI.AppWindow.State;
+import Features.Settings.State;
+import Features.Settings.Types;
 import Utils.Logger;
 
-namespace UI::AppWindow {
+namespace UI::AppWindow::Layout {
+
+auto update_layout(Core::State::AppState& state) -> void {
+  const auto& settings = state.settings->config;
+  const auto& layout_settings = settings.ui.app_window_layout;
+  const UINT dpi = state.app_window->window.dpi;
+  const double scale = static_cast<double>(dpi) / 96.0;
+
+  auto& layout = state.app_window->layout;
+
+  // 直接从配置计算实际渲染尺寸
+  layout.item_height = static_cast<int>(layout_settings.base_item_height * scale);
+  layout.title_height = static_cast<int>(layout_settings.base_title_height * scale);
+  layout.separator_height = static_cast<int>(layout_settings.base_separator_height * scale);
+  layout.font_size = static_cast<float>(layout_settings.base_font_size * scale);
+  layout.text_padding = static_cast<int>(layout_settings.base_text_padding * scale);
+  layout.indicator_width = static_cast<int>(layout_settings.base_indicator_width * scale);
+  layout.ratio_indicator_width =
+      static_cast<int>(layout_settings.base_ratio_indicator_width * scale);
+  layout.ratio_column_width = static_cast<int>(layout_settings.base_ratio_column_width * scale);
+  layout.resolution_column_width =
+      static_cast<int>(layout_settings.base_resolution_column_width * scale);
+  layout.settings_column_width =
+      static_cast<int>(layout_settings.base_settings_column_width * scale);
+}
 
 auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
   const auto& render = state.app_window->layout;

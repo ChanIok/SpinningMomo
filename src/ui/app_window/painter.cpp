@@ -114,7 +114,7 @@ auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& 
   const auto& render = state.app_window->layout;
 
   // 使用简单的列边界计算
-  const auto bounds = get_column_bounds(state);
+  const auto bounds = UI::AppWindow::Layout::get_column_bounds(state);
 
   // 绘制水平分隔线（使用半透明画刷）
   D2D1_RECT_F h_sep_rect = UI::AppWindow::make_d2d_rect(
@@ -141,7 +141,7 @@ auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& 
 auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& render = state.app_window->layout;
   const auto& items = state.app_window->data.menu_items;
-  const auto bounds = get_column_bounds(state);
+  const auto bounds = UI::AppWindow::Layout::get_column_bounds(state);
 
   float y = rect.top + static_cast<float>(render.title_height + render.separator_height);
   float settings_y = y;
@@ -206,7 +206,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
   // 绘制选中指示器（保持完全不透明）
   const bool is_selected = UI::AppWindow::State::is_item_selected(item, state.app_window->ui);
   if (is_selected) {
-    const int indicator_width = get_indicator_width(item, state);
+    const int indicator_width = UI::AppWindow::Layout::get_indicator_width(item, state);
     D2D1_RECT_F indicator_rect = UI::AppWindow::make_d2d_rect(
         item_rect.left, item_rect.top, item_rect.left + static_cast<float>(indicator_width),
         item_rect.bottom);
@@ -214,7 +214,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
   }
 
   // 绘制文本（保持完全不透明）
-  const int indicator_width = get_indicator_width(item, state);
+  const int indicator_width = UI::AppWindow::Layout::get_indicator_width(item, state);
   D2D1_RECT_F text_rect = UI::AppWindow::make_d2d_rect(
       item_rect.left + static_cast<float>(render.text_padding + indicator_width), item_rect.top,
       item_rect.right, item_rect.bottom);

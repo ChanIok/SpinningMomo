@@ -8,7 +8,7 @@ module Features.Settings;
 import std;
 import Core.State;
 import Core.Events;
-import Core.Settings.Events;
+import Features.Settings.Events;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.Settings.Compute;
@@ -144,7 +144,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
                                           .change_description = "Settings updated via RPC"};
 
     Core::Events::post(*app_state.event_bus,
-        Core::Settings::Events::SettingsChangeEvent{change_data});
+        Features::Settings::Events::SettingsChangeEvent{change_data});
 
     Types::UpdateSettingsResult result;
     result.success = true;

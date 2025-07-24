@@ -17,18 +17,6 @@ export namespace UI::AppWindow {
 // 菜单项类别枚举（简化版本）
 enum class MenuItemCategory { AspectRatio, Resolution, Feature };
 
-// 布局常量
-constexpr int BASE_ITEM_HEIGHT = 24;
-constexpr int BASE_TITLE_HEIGHT = 26;
-constexpr int BASE_SEPARATOR_HEIGHT = 1;
-constexpr int BASE_FONT_SIZE = 12;
-constexpr int BASE_TEXT_PADDING = 12;
-constexpr int BASE_INDICATOR_WIDTH = 3;
-constexpr int BASE_RATIO_INDICATOR_WIDTH = 4;
-constexpr int BASE_RATIO_COLUMN_WIDTH = 60;
-constexpr int BASE_RESOLUTION_COLUMN_WIDTH = 120;
-constexpr int BASE_SETTINGS_COLUMN_WIDTH = 120;
-
 // 菜单项结构
 struct MenuItem {
   std::wstring text;
@@ -70,34 +58,19 @@ struct DataState {
   std::vector<std::wstring> menu_items_to_show;
 };
 
-// 渲染相关状态（DPI缩放后的尺寸）
+// 渲染相关状态（实际渲染尺寸）
 struct LayoutConfig {
-  // DPI缩放后的实际尺寸
-  int item_height = BASE_ITEM_HEIGHT;
-  int title_height = BASE_TITLE_HEIGHT;
-  int separator_height = BASE_SEPARATOR_HEIGHT;
-  float font_size = BASE_FONT_SIZE;  // 改为float，DirectWrite使用浮点数
-  int text_padding = BASE_TEXT_PADDING;
-  int indicator_width = BASE_INDICATOR_WIDTH;
-  int ratio_indicator_width = BASE_RATIO_INDICATOR_WIDTH;
-  int ratio_column_width = BASE_RATIO_COLUMN_WIDTH;
-  int resolution_column_width = BASE_RESOLUTION_COLUMN_WIDTH;
-  int settings_column_width = BASE_SETTINGS_COLUMN_WIDTH;
-
-  // 更新DPI缩放
-  auto update_dpi_scaling(UINT dpi) -> void {
-    const double scale = static_cast<double>(dpi) / 96.0;
-    item_height = static_cast<int>(BASE_ITEM_HEIGHT * scale);
-    title_height = static_cast<int>(BASE_TITLE_HEIGHT * scale);
-    separator_height = static_cast<int>(BASE_SEPARATOR_HEIGHT * scale);
-    font_size = static_cast<float>(BASE_FONT_SIZE * scale);  // 使用float
-    text_padding = static_cast<int>(BASE_TEXT_PADDING * scale);
-    indicator_width = static_cast<int>(BASE_INDICATOR_WIDTH * scale);
-    ratio_indicator_width = static_cast<int>(BASE_RATIO_INDICATOR_WIDTH * scale);
-    ratio_column_width = static_cast<int>(BASE_RATIO_COLUMN_WIDTH * scale);
-    resolution_column_width = static_cast<int>(BASE_RESOLUTION_COLUMN_WIDTH * scale);
-    settings_column_width = static_cast<int>(BASE_SETTINGS_COLUMN_WIDTH * scale);
-  }
+  // 实际渲染尺寸（基于DPI缩放和配置）
+  int item_height = 24;
+  int title_height = 26;
+  int separator_height = 1;
+  float font_size = 12.0f;  // 改为float，DirectWrite使用浮点数
+  int text_padding = 12;
+  int indicator_width = 3;
+  int ratio_indicator_width = 4;
+  int ratio_column_width = 60;
+  int resolution_column_width = 120;
+  int settings_column_width = 120;
 };
 
 // One Dark Pro风格暗色主题颜色常量 (AppWindow专用)
