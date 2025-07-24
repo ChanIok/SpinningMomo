@@ -14,6 +14,7 @@ import UI.AppWindow.State;
 import Features.Notifications.State;
 import Features.Notifications.Constants;
 import Utils.Logger;
+import Utils.String;
 
 namespace Features::Notifications {
 
@@ -355,8 +356,8 @@ auto show_notification(Core::State::AppState& state, const std::wstring& title,
 auto show_notification(Core::State::AppState& state, const std::string& title,
                        const std::string& message) -> void {
   // 转换为 wstring 并调用主实现
-  std::wstring wideTitle(title.begin(), title.end());
-  std::wstring wideMessage(message.begin(), message.end());
+  std::wstring wideTitle = Utils::String::FromUtf8(title);
+  std::wstring wideMessage = Utils::String::FromUtf8(message);
   show_notification(state, wideTitle, wideMessage);
 }
 

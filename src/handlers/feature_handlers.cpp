@@ -5,6 +5,7 @@ module Handlers.Feature;
 import std;
 import Core.Events;
 import Core.State;
+import Core.I18n.State;
 import UI.AppWindow;
 import UI.AppWindow.Events;
 import Features.Settings.State;
@@ -34,14 +35,14 @@ auto handle_preview_toggle(Core::State::AppState& state,
         Logger().error("Failed to start preview");
         // 回滚UI状态
         UI::AppWindow::set_preview_enabled(state, false);
-        Features::Notifications::show_notification(state, "SpinningMomo",
-                                                   "Failed to start preview window");
+        Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                   state.i18n->texts.message.window_adjust_failed);
       }
     } else {
       Logger().warn("No target window found for preview");
       UI::AppWindow::set_preview_enabled(state, false);
-      Features::Notifications::show_notification(
-          state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                 state.i18n->texts.message.window_not_found);
     }
   } else {
     // 停止预览
@@ -63,14 +64,14 @@ auto handle_overlay_toggle(Core::State::AppState& state,
         Logger().error("Failed to start overlay: {}", result.error());
         // 回滚UI状态
         UI::AppWindow::set_overlay_enabled(state, false);
-        Features::Notifications::show_notification(state, "SpinningMomo",
-                                                   "Failed to start overlay window");
+        Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                   state.i18n->texts.message.window_adjust_failed);
       }
     } else {
       Logger().warn("No target window found for overlay");
       UI::AppWindow::set_overlay_enabled(state, false);
-      Features::Notifications::show_notification(
-          state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                 state.i18n->texts.message.window_not_found);
     }
   } else {
     // 停止叠加层
@@ -94,14 +95,14 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
         Logger().error("Failed to show letterbox: {}", result.error());
         // 回滚UI状态
         UI::AppWindow::set_letterbox_enabled(state, false);
-        Features::Notifications::show_notification(state, "SpinningMomo",
-                                                   "Failed to show letterbox window");
+        Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                   state.i18n->texts.message.window_adjust_failed);
       }
     } else {
       Logger().warn("No target window found for letterbox");
       UI::AppWindow::set_letterbox_enabled(state, false);
-      Features::Notifications::show_notification(
-          state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                 state.i18n->texts.message.window_not_found);
     }
   } else {
     // 隐藏letterbox

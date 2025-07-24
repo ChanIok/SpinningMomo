@@ -9,6 +9,7 @@ import Core.WebView.Events;
 import UI.AppWindow.State;
 import UI.AppWindow.Events;
 import Core.State;
+import Core.I18n.State;
 import Features.Settings.State;
 import Features.WindowControl;
 import Features.Notifications;
@@ -61,8 +62,8 @@ auto handle_capture_event(Core::State::AppState& state,
   std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(
-        state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                               state.i18n->texts.message.window_not_found);
     return;
   }
 
@@ -71,12 +72,13 @@ auto handle_capture_event(Core::State::AppState& state,
     if (success) {
       // 转换路径为字符串用于通知
       std::string path_str(path.begin(), path.end());
-      Features::Notifications::show_notification(state, "SpinningMomo",
-                                                 "Screenshot saved to: " + path_str);
+      Features::Notifications::show_notification(
+          state, state.i18n->texts.label.app_name,
+          state.i18n->texts.message.screenshot_success + path_str);
       Logger().debug("Screenshot saved successfully: {}", path_str);
     } else {
-      Features::Notifications::show_notification(state, "SpinningMomo",
-                                                 "Failed to capture screenshot");
+      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                 state.i18n->texts.message.window_adjust_failed);
       Logger().error("Screenshot capture failed");
     }
   };
@@ -85,8 +87,9 @@ auto handle_capture_event(Core::State::AppState& state,
   auto result =
       Features::Screenshot::take_screenshot(*state.screenshot, *target_window, completion_callback);
   if (!result) {
-    Features::Notifications::show_notification(state, "SpinningMomo",
-                                               "Failed to start screenshot: " + result.error());
+    Features::Notifications::show_notification(
+        state, state.i18n->texts.label.app_name,
+        state.i18n->texts.message.window_adjust_failed + ": " + result.error());
     Logger().error("Failed to start screenshot: {}", result.error());
   } else {
     Logger().debug("Screenshot capture started successfully");
@@ -100,8 +103,8 @@ auto handle_screenshots_event(Core::State::AppState& state,
 
   if (auto result = Features::Screenshot::Folder::open_folder(state); !result) {
     Logger().error("Failed to open screenshot folder: {}", result.error());
-    Features::Notifications::show_notification(state, "SpinningMomo",
-                                               "Failed to open screenshot folder");
+    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                               state.i18n->texts.message.window_adjust_failed);
   }
 }
 
@@ -111,8 +114,8 @@ auto handle_reset_event(Core::State::AppState& state,
   std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(
-        state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                               state.i18n->texts.message.window_not_found);
     return;
   }
 
@@ -122,8 +125,9 @@ auto handle_reset_event(Core::State::AppState& state,
 
   auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
   if (!result) {
-    Features::Notifications::show_notification(state, "SpinningMomo",
-                                               "Failed to reset window: " + result.error());
+    Features::Notifications::show_notification(
+        state, state.i18n->texts.label.app_name,
+        state.i18n->texts.message.window_reset_failed + ": " + result.error());
     return;
   }
 
@@ -149,8 +153,8 @@ auto handle_ratio_changed(Core::State::AppState& state,
   std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(
-        state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                               state.i18n->texts.message.window_not_found);
     return;
   }
 
@@ -174,7 +178,8 @@ auto handle_ratio_changed(Core::State::AppState& state,
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
     Features::Notifications::show_notification(
-        state, "SpinningMomo", "Failed to apply window transform: " + result.error());
+        state, state.i18n->texts.label.app_name,
+        state.i18n->texts.message.window_adjust_failed + ": " + result.error());
     return;
   }
 
@@ -205,8 +210,8 @@ auto handle_resolution_changed(Core::State::AppState& state,
   std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(
-        state, "SpinningMomo", "Target window not found. Please ensure the game is running.");
+    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                               state.i18n->texts.message.window_not_found);
     return;
   }
 
@@ -232,7 +237,8 @@ auto handle_resolution_changed(Core::State::AppState& state,
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
     Features::Notifications::show_notification(
-        state, "SpinningMomo", "Failed to apply window transform: " + result.error());
+        state, state.i18n->texts.label.app_name,
+        state.i18n->texts.message.window_adjust_failed + ": " + result.error());
     return;
   }
 
@@ -270,8 +276,9 @@ auto handle_window_selected(Core::State::AppState& state,
 
   // 发送通知给用户
   Features::Notifications::show_notification(
-      state, "SpinningMomo",
-      std::format("已选择窗口: {}", Utils::String::ToUtf8(event.window_title)));
+      state, state.i18n->texts.label.app_name,
+      std::format("{}: {}", state.i18n->texts.message.window_selected,
+                  Utils::String::ToUtf8(event.window_title)));
 }
 
 // 注册窗口处理器
