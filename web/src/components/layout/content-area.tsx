@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router'
-import { SettingsPage } from '@/features/settings'
 import { MenuPage } from '@/features/menu'
+import { LayoutPage } from '@/features/layout'
 
 export function ContentArea() {
   return (
@@ -13,7 +13,7 @@ export function ContentArea() {
       <main className='h-full flex-1 overflow-auto'>
         <Routes>
           <Route path='/menu/*' element={<MenuPage />} />
-          <Route path='/settings/*' element={<SettingsPage />} />
+          <Route path='/layout/*' element={<LayoutPage />} />
           <Route
             path='*'
             element={

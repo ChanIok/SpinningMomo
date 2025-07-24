@@ -48,6 +48,7 @@ test/
 
 .windsurfrules
 .cursor
+.claude
 
 # Web App (Vite + React)
 web/node_modules/

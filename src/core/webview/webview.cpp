@@ -5,8 +5,6 @@ module;
 #include <wrl.h>
 #include <WebView2.h>  // 必须放最后面
 
-#include <filesystem>
-
 module Core.WebView;
 
 import std;
@@ -283,8 +281,7 @@ auto resize_webview(Core::State::AppState& state, int width, int height) -> void
     webview_state.window.width = width;
     webview_state.window.height = height;
 
-    RECT bounds = {webview_state.window.x, webview_state.window.y, webview_state.window.x + width,
-                   webview_state.window.y + height};
+    RECT bounds = {0, 0, width, height};
 
     webview_state.resources.controller.get()->put_Bounds(bounds);
     Logger().debug("WebView resized to {}x{}", width, height);
@@ -341,7 +338,9 @@ auto navigate_to_string(Core::State::AppState& state, const std::wstring& html)
   return {};
 }
 
-auto is_webview_ready(const Core::State::AppState& state) -> bool { return state.webview->is_ready; }
+auto is_webview_ready(const Core::State::AppState& state) -> bool {
+  return state.webview->is_ready;
+}
 
 auto is_webview_loading(const Core::State::AppState& state) -> bool {
   return state.webview->is_loading.load();

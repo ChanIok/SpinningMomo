@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { useMenuStore } from '../store/menu-store'
+import { useMenuActions, useMenuStore } from '../store/menu-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,16 +9,13 @@ import { DraggablePresetList } from './draggable-preset-list'
 import type { FeatureItem, PresetItem } from '../types'
 
 export function MenuContent() {
+  const { appSettings, error, isInitialized, clearError } = useMenuStore()
   const {
-    appSettings,
-    error,
-    isInitialized,
     updateWindowTitle,
     updateFeatureItems,
     updateAspectRatios,
-    updateResolutions,
-    clearError
-  } = useMenuStore()
+    updateResolutions
+  } = useMenuActions()
 
   const [inputTitle, setInputTitle] = useState('')
   const [isUpdatingTitle, setIsUpdatingTitle] = useState(false)
@@ -225,7 +222,7 @@ export function MenuContent() {
   }
 
   return (
-    <div className="p-6 max-w-4xl">
+    <div className="p-6">
       {/* 页面标题 */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">菜单</h1>

@@ -8,6 +8,7 @@ module UI.WebViewWindow;
 
 import std;
 import Core.State;
+import Core.WebView;
 import Core.WebView.State;
 import UI.AppWindow.State;
 import Utils.Logger;
@@ -33,7 +34,7 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
                               x, y, width, height,                    // 位置和大小
                               nullptr,                                // 父窗口
                               nullptr,                                // 菜单
-                              state.app_window->window.instance,       // 实例句柄
+                              state.app_window->window.instance,      // 实例句柄
                               &state                                  // 用户数据
   );
 
@@ -141,8 +142,8 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
         // 如果WebView已经初始化，同步调整大小
         if (state->webview->is_ready) {
-          // 这里可以调用WebView的resize函数
-          // Core::WebView::resize_webview(*state, width, height);
+          // 调用WebView的resize函数来调整WebView控件大小
+          Core::WebView::resize_webview(*state, width, height);
         }
       }
       break;
