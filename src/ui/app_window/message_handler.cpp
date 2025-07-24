@@ -212,6 +212,13 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       return 0;
     }
 
+    case WM_SIZE: {
+      SIZE new_size = {LOWORD(lParam), HIWORD(lParam)};
+      // 调整Direct2D渲染上下文以适应新的窗口大小
+      UI::AppWindow::D2DContext::resize_d2d(state, new_size);
+      return 0;
+    }
+
     case WM_CLOSE:
       Core::Events::send(*state.event_bus, UI::AppWindow::Events::HideEvent{});
       return 0;

@@ -216,18 +216,18 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   for (size_t i = 0; i < resolutions.size(); ++i) {
     std::wstring displayText;
     const auto& preset = resolutions[i];
-    if (preset.baseWidth == 0 && preset.baseHeight == 0) {
-      displayText = preset.name;
-    } else {
-      const double megaPixels = preset.totalPixels / 1000000.0;
-      wchar_t buffer[16];
-      if (megaPixels < 10) {
-        swprintf(buffer, 16, L"%.1f", megaPixels);
-      } else {
-        swprintf(buffer, 16, L"%.0f", megaPixels);
-      }
-      displayText = preset.name + L" (" + buffer + L"M)";
-    }
+    // if (preset.baseWidth == 0 && preset.baseHeight == 0) {
+    displayText = preset.name;
+    // } else {
+    //   const double megaPixels = preset.totalPixels / 1000000.0;
+    //   wchar_t buffer[16];
+    //   if (megaPixels < 10) {
+    //     swprintf(buffer, 16, L"%.1f", megaPixels);
+    //   } else {
+    //     swprintf(buffer, 16, L"%.0f", megaPixels);
+    //   }
+    //   displayText = preset.name + L" (" + buffer + L"M)";
+    // }
     state.app_window->data.menu_items.emplace_back(
         displayText, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
   }
@@ -247,9 +247,13 @@ auto create_window_attributes(HWND hwnd) -> void {
 
 // 设置变更响应实现
 auto refresh_from_settings(Core::State::AppState& state) -> void {
+
+  // 更新菜单项
+  update_menu_items(state);
+
   // 更新布局配置（基于应用状态）
   UI::AppWindow::Layout::update_layout(state);
-
+  
   // 重新计算窗口大小
   const auto new_size = UI::AppWindow::Layout::calculate_window_size(state);
   if (state.app_window->window.hwnd) {
@@ -257,10 +261,9 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
     SetWindowPos(state.app_window->window.hwnd, nullptr, 0, 0, new_size.cx, new_size.cy,
                  SWP_NOMOVE | SWP_NOZORDER);
     state.app_window->window.size = new_size;
+    // 日志输出大小
+    Logger().info("Window size updated: {}x{}", new_size.cx, new_size.cy);
   }
-
-  // 更新菜单项
-  update_menu_items(state);
 
   // 请求重绘
   request_repaint(state);
