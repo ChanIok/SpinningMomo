@@ -9,6 +9,7 @@ import Core.WebView.Events;
 import UI.AppWindow.State;
 import UI.AppWindow.Events;
 import Core.State;
+import Features.Settings.State;
 import Features.WindowControl;
 import Features.Notifications;
 import Features.Screenshot;
@@ -57,8 +58,7 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
 // 处理截图事件
 auto handle_capture_event(Core::State::AppState& state,
                           const UI::AppWindow::Events::CaptureEvent& event) -> void {
-  // TODO: 等待settings设计完成后，从settings中读取窗口标题
-  std::wstring window_title = L"";
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(
@@ -108,8 +108,7 @@ auto handle_screenshots_event(Core::State::AppState& state,
 // 处理重置窗口事件
 auto handle_reset_event(Core::State::AppState& state,
                         const UI::AppWindow::Events::ResetEvent& event) -> void {
-  // TODO: 等待settings设计完成后，从settings中读取窗口标题
-  std::wstring window_title = L"";
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(
@@ -147,8 +146,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
   Logger().debug("Handling ratio change to index {}, ratio: {}", event.index, event.ratio_value);
 
   // 查找目标窗口
-  // TODO: 等待settings设计完成后，从settings中读取窗口标题
-  std::wstring window_title = L"";
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(
@@ -204,8 +202,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
                  event.total_pixels);
 
   // 查找目标窗口
-  // TODO: 等待settings设计完成后，从settings中读取窗口标题
-  std::wstring window_title = L"";
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(
@@ -261,14 +258,8 @@ auto handle_window_selected(Core::State::AppState& state,
                             const UI::AppWindow::Events::WindowSelectionEvent& event) -> void {
   Logger().info("Window selected: {}", Utils::String::ToUtf8(event.window_title));
 
-  // 这里可以添加窗口选择的业务逻辑
-  // 例如：
-  // 1. 更新应用状态中的目标窗口
-  // 2. 保存到配置文件
-  // 3. 触发其他相关功能（如开始预览、更新UI状态等）
-
-  // 示例：更新目标窗口信息（如果有相关状态管理）
-  // state.settings->window.target_title = event.window_title;
+  // 更新设置状态中的目标窗口标题
+  state.settings->config.window.target_title = Utils::String::ToUtf8(event.window_title);
 
   // 示例：可能触发其他业务逻辑
   // 如果启用了预览功能，可能需要重新开始预览新窗口

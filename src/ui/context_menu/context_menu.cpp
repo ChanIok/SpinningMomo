@@ -185,9 +185,12 @@ void handle_menu_action(Core::State::AppState& state,
         if (command == "app.exit") {
           // 发送退出事件
           Core::Events::send(*state.event_bus, UI::AppWindow::Events::ExitEvent{});
-        } else {
-          // 使用新的事件系统发送系统命令事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::SystemCommandEvent{command});
+        } else if (command == "toggle_visibility") {
+          // 发送切换可见性事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::ToggleVisibilityEvent{});
+        } else if (command == "app.webview_test") {
+          // 发送WebView测试事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::WebViewTestEvent{});
         }
 
         Logger().info("System command executed: {}", command);

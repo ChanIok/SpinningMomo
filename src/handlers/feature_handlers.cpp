@@ -7,12 +7,14 @@ import Core.Events;
 import Core.State;
 import UI.AppWindow;
 import UI.AppWindow.Events;
+import Features.Settings.State;
 import Features.Letterbox;
 import Features.Preview.Window;
 import Features.WindowControl;
 import Features.Notifications;
 import Features.Overlay;
 import Utils.Logger;
+import Utils.String;
 import Vendor.Windows;
 
 namespace Handlers {
@@ -24,9 +26,7 @@ auto handle_preview_toggle(Core::State::AppState& state,
   UI::AppWindow::set_preview_enabled(state, event.enabled);
 
   if (event.enabled) {
-    // 查找目标窗口（暂时硬编码为空）
-    // TODO: 等待settings设计完成后，从settings中读取窗口标题
-    std::wstring window_title = L"";
+    std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
     auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Preview::Window::start_preview(state, target_window.value());
@@ -56,9 +56,7 @@ auto handle_overlay_toggle(Core::State::AppState& state,
   UI::AppWindow::set_overlay_enabled(state, event.enabled);
 
   if (event.enabled) {
-    // 查找目标窗口（暂时硬编码为空）
-    // TODO: 等待settings设计完成后，从settings中读取窗口标题
-    std::wstring window_title = L"";
+    std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
     auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Overlay::start_overlay(state, target_window.value()); !result) {
@@ -89,9 +87,7 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
   // state.config.letterbox.enabled = enabled; // 暂时注释掉
 
   if (event.enabled) {
-    // 查找目标窗口（暂时硬编码为空）
-    // TODO: 等待settings设计完成后，从settings中读取窗口标题
-    std::wstring window_title = L"";
+    std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
     auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
@@ -120,15 +116,14 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
   }
 }
 
+// 注册功能开关事件处理器
 auto register_feature_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
-  // 注册功能开关事件处理器 - 使用新的强类型事件系统
   subscribe<UI::AppWindow::Events::PreviewToggleEvent>(
       *app_state.event_bus, [&app_state](const UI::AppWindow::Events::PreviewToggleEvent& event) {
         Logger().debug("Preview toggle event received: enabled={}", event.enabled);
         handle_preview_toggle(app_state, event);
-        // 触发UI更新
         UI::AppWindow::request_repaint(app_state);
       });
 
@@ -136,7 +131,6 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
       *app_state.event_bus, [&app_state](const UI::AppWindow::Events::OverlayToggleEvent& event) {
         Logger().debug("Overlay toggle event received: enabled={}", event.enabled);
         handle_overlay_toggle(app_state, event);
-        // 触发UI更新
         UI::AppWindow::request_repaint(app_state);
       });
 
@@ -144,7 +138,6 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
       *app_state.event_bus, [&app_state](const UI::AppWindow::Events::LetterboxToggleEvent& event) {
         Logger().debug("Letterbox toggle event received: enabled={}", event.enabled);
         handle_letterbox_toggle(app_state, event);
-        // 触发UI更新
         UI::AppWindow::request_repaint(app_state);
       });
 }

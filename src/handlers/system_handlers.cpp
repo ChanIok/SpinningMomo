@@ -13,7 +13,6 @@ import UI.AppWindow.D2DContext;
 import UI.AppWindow.State;
 import UI.AppWindow.Events;
 import UI.WebViewWindow;
-import UI.TrayMenu.State;
 import Utils.Logger;
 import Vendor.Windows;
 
@@ -42,61 +41,76 @@ auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_d
   }
 }
 
+// 处理 hide 命令
+auto handle_hide_event(Core::State::AppState& state) -> void { UI::AppWindow::hide_window(state); }
+
+// 处理 webview_test 命令
+auto handle_webview_test(Core::State::AppState& state) -> void {
+  Logger().info("WebView test command received");
+
+  if (UI::WebViewWindow::is_visible(state)) {
+    // 隐藏WebView窗口
+    UI::WebViewWindow::hide(state);
+    Core::WebView::hide_webview(state);
+    Logger().info("WebView window hidden");
+  } else {
+    // 显示WebView窗口
+    if (auto window_result = UI::WebViewWindow::show(state); window_result) {
+      // 等待一下让窗口完全显示
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+      // 检查WebView状态并重试
+      int retry_count = 0;
+      const int max_retries = 10;
+
+      while (retry_count < max_retries && !Core::WebView::is_webview_ready(state)) {
+        Logger().debug("Waiting for WebView to be ready... (attempt {}/{})", retry_count + 1,
+                       max_retries);
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        retry_count++;
+      }
+
+      if (Core::WebView::is_webview_ready(state)) {
+        if (auto webview_result = Core::WebView::show_webview(state); webview_result) {
+          Logger().info("WebView window and content shown successfully");
+        } else {
+          Logger().error("Failed to show WebView content: {}", webview_result.error());
+        }
+      } else {
+        Logger().error("WebView still not ready after {} attempts. Check WebView initialization.",
+                       max_retries);
+      }
+    } else {
+      Logger().error("Failed to show WebView window: {}", window_result.error());
+    }
+  }
+}
+
+// 处理退出事件
+auto handle_exit_event(Core::State::AppState& state) -> void {
+  Logger().info("Exit event received, posting quit message");
+  Vendor::Windows::PostQuitMessage(0);
+}
+
+// 处理 toggle_visibility 命令
+auto handle_toggle_visibility_event(Core::State::AppState& state) -> void {
+  UI::AppWindow::toggle_visibility(state);
+}
+
 auto register_system_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
+  using namespace UI::AppWindow::Events;
 
-  // 注册系统命令事件处理器
-  subscribe<UI::AppWindow::Events::SystemCommandEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::SystemCommandEvent& event) {
-        Logger().debug("System command received: {}", event.command);
+  subscribe<HideEvent>(*app_state.event_bus,
+                       [&app_state](const HideEvent&) { handle_hide_event(app_state); });
 
-        if (event.command == "toggle_visibility") {
-          UI::AppWindow::toggle_visibility(app_state);
-        } else if (event.command == "webview_test") {
-          // 处理webview测试命令 - 切换WebView窗口显示状态
-          Logger().info("WebView test command received");
+  subscribe<WebViewTestEvent>(*app_state.event_bus, [&app_state](const WebViewTestEvent&) {
+    handle_webview_test(app_state);
+  });
 
-          if (UI::WebViewWindow::is_visible(app_state)) {
-            // 隐藏WebView窗口
-            UI::WebViewWindow::hide(app_state);
-            Core::WebView::hide_webview(app_state);
-            Logger().info("WebView window hidden");
-          } else {
-            // 显示WebView窗口
-            if (auto window_result = UI::WebViewWindow::show(app_state); window_result) {
-              // 等待一下让窗口完全显示
-              std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  subscribe<ExitEvent>(*app_state.event_bus,
+                       [&app_state](const ExitEvent&) { handle_exit_event(app_state); });
 
-              // 检查WebView状态并重试
-              int retry_count = 0;
-              const int max_retries = 10;
-
-              while (retry_count < max_retries && !Core::WebView::is_webview_ready(app_state)) {
-                Logger().debug("Waiting for WebView to be ready... (attempt {}/{})",
-                               retry_count + 1, max_retries);
-                std::this_thread::sleep_for(std::chrono::milliseconds(200));
-                retry_count++;
-              }
-
-              if (Core::WebView::is_webview_ready(app_state)) {
-                if (auto webview_result = Core::WebView::show_webview(app_state); webview_result) {
-                  Logger().info("WebView window and content shown successfully");
-                } else {
-                  Logger().error("Failed to show WebView content: {}", webview_result.error());
-                }
-              } else {
-                Logger().error(
-                    "WebView still not ready after {} attempts. Check WebView initialization.",
-                    max_retries);
-              }
-            } else {
-              Logger().error("Failed to show WebView window: {}", window_result.error());
-            }
-          }
-        }
-      });
-
-  // 注册WebView响应事件处理器
   subscribe<Core::WebView::Events::WebViewResponseEvent>(
       *app_state.event_bus, [&app_state](const Core::WebView::Events::WebViewResponseEvent& event) {
         try {
@@ -120,6 +134,11 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
         update_render_dpi(app_state, event.new_dpi, event.window_size);
 
         Logger().info("DPI update completed successfully");
+      });
+
+  subscribe<UI::AppWindow::Events::ToggleVisibilityEvent>(
+      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::ToggleVisibilityEvent&) {
+        handle_toggle_visibility_event(app_state);
       });
 
   Logger().info("System handlers (including WebView handlers) registered successfully");

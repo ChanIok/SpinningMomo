@@ -69,7 +69,7 @@ auto dispatch_feature_action(Core::State::AppState& state, const std::string& ac
       Core::Events::send(*state.event_bus, ResetEvent{});
       break;
     case Id::PanelHide:
-      Core::Events::send(*state.event_bus, HideEvent{});
+      Core::Events::send(*state.event_bus, ToggleVisibilityEvent{});
       break;
     case Id::AppExit:
       Core::Events::send(*state.event_bus, ExitEvent{});
@@ -105,7 +105,6 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       break;
     }
     case UI::AppWindow::MenuItemCategory::Feature: {
-      // 基于 action_id 进行事件分发，无需硬编码
       dispatch_feature_action(state, item.action_id);
       break;
     }
@@ -115,7 +114,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
 // 处理热键，发送系统命令事件
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
   using namespace UI::AppWindow::Events;
-  Core::Events::send(*state.event_bus, SystemCommandEvent{"toggle_visibility"});
+  Core::Events::send(*state.event_bus, ToggleVisibilityEvent{});
 }
 
 // 处理鼠标移出窗口，重置悬停状态并重绘
@@ -208,9 +207,9 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     }
 
     case WM_RBUTTONUP: {
-        // 复用托盘菜单的逻辑来显示上下文菜单
-        UI::TrayIcon::show_context_menu(state);
-        return 0;
+      // 复用托盘菜单的逻辑来显示上下文菜单
+      UI::TrayIcon::show_context_menu(state);
+      return 0;
     }
 
     case WM_CLOSE:

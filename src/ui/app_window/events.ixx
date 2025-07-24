@@ -73,14 +73,14 @@ export struct ExitEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
-// 系统命令事件
-export struct SystemCommandEvent {
-  std::string command;
-
+export struct WebViewTestEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
-// 窗口选择事件
+export struct ToggleVisibilityEvent {
+  std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
+};
+
 export struct WindowSelectionEvent {
   std::wstring window_title;
   Vendor::Windows::HWND window_handle;
