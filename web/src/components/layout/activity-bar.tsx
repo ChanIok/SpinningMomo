@@ -12,9 +12,9 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { label: '菜单', key: 'menu', icon: Menu },
+  { label: '布局', key: 'layout', icon: Palette },
   { type: 'divider' },
   { label: '设置', key: 'settings', icon: Settings },
-  { label: '布局', key: 'layout', icon: Palette },
 ]
 
 export function ActivityBar() {

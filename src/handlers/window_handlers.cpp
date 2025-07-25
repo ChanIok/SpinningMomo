@@ -10,6 +10,7 @@ import UI.AppWindow.State;
 import UI.AppWindow.Events;
 import Core.State;
 import Core.I18n.State;
+import Features.Settings;
 import Features.Settings.State;
 import Features.WindowControl;
 import Features.Notifications;
@@ -266,6 +267,19 @@ auto handle_window_selected(Core::State::AppState& state,
 
   // 更新设置状态中的目标窗口标题
   state.settings->config.window.target_title = Utils::String::ToUtf8(event.window_title);
+
+  // 保存设置到文件
+  auto settings_path = Features::Settings::get_settings_path();
+  if (settings_path) {
+    auto save_result =
+        Features::Settings::save_settings_to_file(settings_path.value(), state.settings->config);
+    if (!save_result) {
+      Logger().error("Failed to save settings: {}", save_result.error());
+      // 可能需要通知用户保存失败
+    }
+  } else {
+    Logger().error("Failed to get settings path: {}", settings_path.error());
+  }
 
   // 示例：可能触发其他业务逻辑
   // 如果启用了预览功能，可能需要重新开始预览新窗口

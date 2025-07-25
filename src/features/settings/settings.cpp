@@ -25,8 +25,6 @@ auto get_settings_path() -> std::expected<std::filesystem::path, std::string> {
   return dir_result.value() / "settings.json";
 }
 
-// === 业务逻辑函数 ===
-
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   try {
     auto settings_path = get_settings_path();
@@ -126,17 +124,13 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     Compute::update_computed_state(app_state);
 
     // 保存到文件
-    auto json_str = rfl::json::write(params);
-
-    std::ofstream file(settings_path.value());
-    if (!file) {
+    auto save_result = save_settings_to_file(settings_path.value(), params);
+    if (!save_result) {
       // 回滚状态
       app_state.settings->config = old_settings;
       Compute::update_computed_state(app_state);
-      return std::unexpected("Failed to open settings file for writing");
+      return std::unexpected(save_result.error());
     }
-
-    file << json_str;
 
     // 发送设置变更事件
     Types::SettingsChangeData change_data{.old_settings = old_settings,
@@ -144,13 +138,32 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
                                           .change_description = "Settings updated via RPC"};
 
     Core::Events::post(*app_state.event_bus,
-        Features::Settings::Events::SettingsChangeEvent{change_data});
+                       Features::Settings::Events::SettingsChangeEvent{change_data});
 
     Types::UpdateSettingsResult result;
     result.success = true;
     result.message = "Settings updated successfully";
 
     return result;
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to save settings: " + std::string(e.what()));
+  }
+}
+
+auto save_settings_to_file(const std::filesystem::path& settings_path,
+                           const Types::AppSettings& config) -> std::expected<void, std::string> {
+  try {
+    // 序列化配置到格式化的 JSON
+    auto json_str = rfl::json::write(config, rfl::json::pretty);
+
+    // 写入文件
+    std::ofstream file(settings_path);
+    if (!file) {
+      return std::unexpected("Failed to open settings file for writing");
+    }
+
+    file << json_str;
+    return {};
   } catch (const std::exception& e) {
     return std::unexpected("Failed to save settings: " + std::string(e.what()));
   }
