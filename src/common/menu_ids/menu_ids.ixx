@@ -10,33 +10,33 @@ export namespace Common::MenuIds {
 enum class Id : int {
   // === 应用核心 (1000-1099) ===
   AppExit = 1000,
-  AppUserGuide = 1001, 
-  AppWebViewTest = 1002,
+  AppUserGuide = 1001,
+  AppWebView = 1002,
   PanelHide = 1003,  // 应用面板的隐藏功能
-  
-  // === 窗口控制模块 (2000-2999) === 
+
+  // === 窗口控制模块 (2000-2999) ===
   // 窗口选择子范围: 2000-2199 (200个窗口)
   WindowControlWindowBase = 2000,
-  
-  // 比例选择子范围: 2200-2399 (200个比例)  
+
+  // 比例选择子范围: 2200-2399 (200个比例)
   WindowControlRatioBase = 2200,
-  
+
   // 分辨率选择子范围: 2400-2599 (200个分辨率)
   WindowControlResolutionBase = 2400,
-  
+
   // 窗口操作功能: 2600-2699
   WindowControlResetTransform = 2600,
   WindowControlToggleBorder = 2601,
-  
+
   // === 截图功能 (3000-3099) ===
   ScreenshotCapture = 3000,
   ScreenshotOpenFolder = 3001,
-  
+
   // === 功能特性切换 (3100-3199) ===
-  FeatureTogglePreview = 3100,   // 预览窗口
-  FeatureToggleOverlay = 3101,   // 叠加层
-  FeatureToggleLetterbox = 3102, // 黑边模式
-  
+  FeatureTogglePreview = 3100,    // 预览窗口
+  FeatureToggleOverlay = 3101,    // 叠加层
+  FeatureToggleLetterbox = 3102,  // 黑边模式
+
   // === 设置相关 (3200-3299) ===
   SettingsConfig = 3200,
   SettingsHotkey = 3201
@@ -70,7 +70,7 @@ constexpr std::string_view to_string(Id id) {
     case Id::WindowControlResolutionBase:
     case Id::WindowControlToggleBorder:
     case Id::AppUserGuide:
-    case Id::AppWebViewTest:
+    case Id::AppWebView:
     case Id::SettingsConfig:
     case Id::SettingsHotkey:
       return "";

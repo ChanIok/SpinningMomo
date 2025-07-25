@@ -15,14 +15,15 @@ struct TextData {
   // 菜单项文本 - 所有出现在菜单中的可点击项
   struct Menu {
     // 应用菜单项
-    std::string app_show;          // 显示浮窗
-    std::string app_hide;          // 关闭浮窗
-    std::string app_exit;          // 退出
-    std::string app_user_guide;    // 使用指南
-    std::string app_webview_test;  // WebView测试
+    std::string app_show;        // 显示浮窗
+    std::string app_hide;        // 关闭浮窗
+    std::string app_exit;        // 退出
+    std::string app_user_guide;  // 使用指南
+    std::string app_webview;     // 主界面
 
     // 窗口菜单项
     std::string window_select;             // 选择窗口
+    std::string window_no_available;       // 无可用窗口
     std::string window_ratio;              // 窗口比例
     std::string window_resolution;         // 分辨率
     std::string window_reset;              // 重置窗口

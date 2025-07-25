@@ -6,9 +6,10 @@
     "app_hide": "Hide",
     "app_exit": "Exit",
     "app_user_guide": "User Guide",
-    "app_webview_test": "WebView Test",
+    "app_webview": "Main Interface",
 
     "window_select": "Select Window",
+    "window_no_available": "(No Available Windows)",
     "window_ratio": "Window Ratio",
     "window_resolution": "Resolution",
     "window_reset": "Reset",

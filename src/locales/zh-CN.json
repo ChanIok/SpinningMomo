@@ -6,9 +6,10 @@
     "app_hide": "关闭浮窗",
     "app_exit": "退出",
     "app_user_guide": "使用指南",
-    "app_webview_test": "WebView测试",
+    "app_webview": "主界面",
 
     "window_select": "选择窗口",
+    "window_no_available": "(无可用窗口)",
     "window_ratio": "窗口比例",
     "window_resolution": "分辨率",
     "window_reset": "重置窗口",

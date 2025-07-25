@@ -188,9 +188,9 @@ void handle_menu_action(Core::State::AppState& state,
         } else if (command == "toggle_visibility") {
           // 发送切换可见性事件
           Core::Events::send(*state.event_bus, UI::AppWindow::Events::ToggleVisibilityEvent{});
-        } else if (command == "app.webview_test") {
-          // 发送WebView测试事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::WebViewTestEvent{});
+        } else if (command == "app.webview") {
+          // 发送WebView事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::WebViewEvent{});
         }
 
         Logger().info("System command executed: {}", command);

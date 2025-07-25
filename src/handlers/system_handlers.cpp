@@ -106,9 +106,8 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
   subscribe<HideEvent>(*app_state.event_bus,
                        [&app_state](const HideEvent&) { handle_hide_event(app_state); });
 
-  subscribe<WebViewTestEvent>(*app_state.event_bus, [&app_state](const WebViewTestEvent&) {
-    handle_webview_test(app_state);
-  });
+  subscribe<WebViewEvent>(*app_state.event_bus,
+                          [&app_state](const WebViewEvent&) { handle_webview_test(app_state); });
 
   subscribe<ExitEvent>(*app_state.event_bus,
                        [&app_state](const ExitEvent&) { handle_exit_event(app_state); });

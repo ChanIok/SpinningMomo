@@ -73,7 +73,7 @@ export struct ExitEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
-export struct WebViewTestEvent {
+export struct WebViewEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
