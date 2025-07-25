@@ -18,6 +18,26 @@ import Features.Preview.Viewport;
 
 namespace Features::Preview::Rendering {
 
+auto create_basic_vertex_buffer(ID3D11Device* device)
+    -> std::expected<Microsoft::WRL::ComPtr<ID3D11Buffer>, std::string> {
+  // 创建全屏四边形的顶点数据
+  Features::Preview::Types::Vertex vertices[] = {
+      {-1.0f, 1.0f, 0.0f, 0.0f},   // 左上
+      {1.0f, 1.0f, 1.0f, 0.0f},    // 右上
+      {-1.0f, -1.0f, 0.0f, 1.0f},  // 左下
+      {1.0f, -1.0f, 1.0f, 1.0f}    // 右下
+  };
+
+  auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
+      device, vertices, 4, sizeof(Features::Preview::Types::Vertex));
+
+  if (!buffer_result) {
+    return std::unexpected("Failed to create vertex buffer");
+  }
+
+  return buffer_result.value();
+}
+
 auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, int height)
     -> std::expected<void, std::string> {
   auto& resources = state.preview->rendering_resources;
@@ -98,9 +118,14 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
 
   auto& resources = state.preview->rendering_resources;
 
+  resources.resources_busy.store(true, std::memory_order_release);
+
   // 调整交换链大小
   auto resize_result =
       Utils::Graphics::D3D::resize_swap_chain(resources.d3d_context, width, height);
+
+  resources.resources_busy.store(false, std::memory_order_release);
+
   if (!resize_result) {
     Logger().error("Failed to resize swap chain");
     return std::unexpected("Failed to resize swap chain");
@@ -110,6 +135,75 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
   return {};
 }
 
+auto update_capture_srv(Core::State::AppState& state,
+                        Microsoft::WRL::ComPtr<ID3D11Texture2D> texture)
+    -> std::expected<void, std::string> {
+  if (!state.preview->rendering_resources.initialized || !texture) {
+    return std::unexpected("Invalid rendering resources or texture");
+  }
+
+  auto& resources = state.preview->rendering_resources;
+
+  // 获取纹理描述
+  D3D11_TEXTURE2D_DESC desc;
+  texture->GetDesc(&desc);
+
+  // 创建着色器资源视图描述
+  D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+  srvDesc.Format = desc.Format;
+  srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+  srvDesc.Texture2D.MostDetailedMip = 0;
+  srvDesc.Texture2D.MipLevels = 1;
+
+  // 创建新的SRV
+  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newSRV;
+  HRESULT hr =
+      resources.d3d_context.device->CreateShaderResourceView(texture.Get(), &srvDesc, &newSRV);
+  if (FAILED(hr)) {
+    Logger().error("Failed to create shader resource view, HRESULT: 0x{:08X}",
+                   static_cast<unsigned int>(hr));
+    return std::unexpected("Failed to create shader resource view");
+  }
+
+  resources.capture_srv = newSRV;
+  return {};
+}
+
+auto render_basic_quad(const Features::Preview::Types::RenderingResources& resources) -> void {
+  auto* context = resources.d3d_context.context.Get();
+
+  // 设置着色器和资源
+  context->IASetInputLayout(resources.basic_shaders.input_layout.Get());
+  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+  UINT stride = sizeof(Features::Preview::Types::Vertex);
+  UINT offset = 0;
+  context->IASetVertexBuffers(0, 1, resources.basic_vertex_buffer.GetAddressOf(), &stride, &offset);
+
+  context->VSSetShader(resources.basic_shaders.vertex_shader.Get(), nullptr, 0);
+  context->PSSetShader(resources.basic_shaders.pixel_shader.Get(), nullptr, 0);
+  context->PSSetShaderResources(0, 1, resources.capture_srv.GetAddressOf());
+  context->PSSetSamplers(0, 1, resources.basic_shaders.sampler.GetAddressOf());
+
+  // 设置混合状态
+  float blendFactor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+  context->OMSetBlendState(resources.basic_shaders.blend_state.Get(), blendFactor, 0xffffffff);
+
+  // 绘制
+  context->Draw(4, 0);
+}
+
+auto render_viewport_frame(Core::State::AppState& state,
+                           const Features::Preview::Types::RenderingResources& resources) -> void {
+  // 更新视口状态
+  Features::Preview::Viewport::update_viewport_rect(state);
+
+  // 渲染视口框
+  Features::Preview::Viewport::render_viewport_frame(
+      state, resources.d3d_context.context.Get(), resources.viewport_shaders.vertex_shader,
+      resources.viewport_shaders.pixel_shader, resources.viewport_shaders.input_layout);
+}
+
 auto render_frame(Core::State::AppState& state,
                   Microsoft::WRL::ComPtr<ID3D11Texture2D> capture_texture) -> void {
   if (!state.preview->rendering_resources.initialized) {
@@ -117,6 +211,12 @@ auto render_frame(Core::State::AppState& state,
   }
 
   auto& resources = state.preview->rendering_resources;
+
+  // 检查渲染资源是否正忙，如果是则跳过渲染
+  if (resources.resources_busy.load(std::memory_order_acquire)) {
+    return;
+  }
+
   auto* context = resources.d3d_context.context.Get();
 
   // 更新捕获SRV（如果需要）
@@ -158,100 +258,6 @@ auto render_frame(Core::State::AppState& state,
 
   // 显示
   resources.d3d_context.swap_chain->Present(0, 0);
-}
-
-auto update_capture_srv(Core::State::AppState& state,
-                        Microsoft::WRL::ComPtr<ID3D11Texture2D> texture)
-    -> std::expected<void, std::string> {
-  if (!state.preview->rendering_resources.initialized || !texture) {
-    return std::unexpected("Invalid rendering resources or texture");
-  }
-
-  auto& resources = state.preview->rendering_resources;
-
-  // 获取纹理描述
-  D3D11_TEXTURE2D_DESC desc;
-  texture->GetDesc(&desc);
-
-  // 创建着色器资源视图描述
-  D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-  srvDesc.Format = desc.Format;
-  srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-  srvDesc.Texture2D.MostDetailedMip = 0;
-  srvDesc.Texture2D.MipLevels = 1;
-
-  // 创建新的SRV
-  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newSRV;
-  HRESULT hr =
-      resources.d3d_context.device->CreateShaderResourceView(texture.Get(), &srvDesc, &newSRV);
-  if (FAILED(hr)) {
-    Logger().error("Failed to create shader resource view, HRESULT: 0x{:08X}",
-                   static_cast<unsigned int>(hr));
-    return std::unexpected("Failed to create shader resource view");
-  }
-
-  resources.capture_srv = newSRV;
-  return {};
-}
-
-auto render_basic_quad(const Features::Preview::State::RenderingResources& resources) -> void {
-  auto* context = resources.d3d_context.context.Get();
-
-  // 设置着色器和资源
-  context->IASetInputLayout(resources.basic_shaders.input_layout.Get());
-  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-  UINT stride = sizeof(Features::Preview::State::Vertex);
-  UINT offset = 0;
-  context->IASetVertexBuffers(0, 1, resources.basic_vertex_buffer.GetAddressOf(), &stride, &offset);
-
-  context->VSSetShader(resources.basic_shaders.vertex_shader.Get(), nullptr, 0);
-  context->PSSetShader(resources.basic_shaders.pixel_shader.Get(), nullptr, 0);
-  context->PSSetShaderResources(0, 1, resources.capture_srv.GetAddressOf());
-  context->PSSetSamplers(0, 1, resources.basic_shaders.sampler.GetAddressOf());
-
-  // 设置混合状态
-  float blendFactor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  context->OMSetBlendState(resources.basic_shaders.blend_state.Get(), blendFactor, 0xffffffff);
-
-  // 绘制
-  context->Draw(4, 0);
-}
-
-auto render_viewport_frame(Core::State::AppState& state,
-                           const Features::Preview::State::RenderingResources& resources) -> void {
-  // 更新视口状态
-  Features::Preview::Viewport::update_viewport_rect(state);
-
-  // 渲染视口框
-  Features::Preview::Viewport::render_viewport_frame(
-      state, resources.d3d_context.context.Get(), resources.viewport_shaders.vertex_shader,
-      resources.viewport_shaders.pixel_shader, resources.viewport_shaders.input_layout);
-}
-
-auto create_basic_vertex_buffer(ID3D11Device* device)
-    -> std::expected<Microsoft::WRL::ComPtr<ID3D11Buffer>, std::string> {
-  // 创建全屏四边形的顶点数据
-  Features::Preview::State::Vertex vertices[] = {
-      {-1.0f, 1.0f, 0.0f, 0.0f},   // 左上
-      {1.0f, 1.0f, 1.0f, 0.0f},    // 右上
-      {-1.0f, -1.0f, 0.0f, 1.0f},  // 左下
-      {1.0f, -1.0f, 1.0f, 1.0f}    // 右下
-  };
-
-  auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
-      device, vertices, 4, sizeof(Features::Preview::State::Vertex));
-
-  if (!buffer_result) {
-    return std::unexpected("Failed to create vertex buffer");
-  }
-
-  return buffer_result.value();
-}
-
-auto get_rendering_resources(Core::State::AppState& state)
-    -> Features::Preview::State::RenderingResources* {
-  return &state.preview->rendering_resources;
 }
 
 }  // namespace Features::Preview::Rendering

@@ -1,82 +1,14 @@
 module;
 
-#include <d3d11.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 export module Features.Preview.State;
 
 import std;
 import Utils.Timer;
-import Utils.Graphics.Capture;
-import Utils.Graphics.D3D;
+import Features.Preview.Types;
 
 export namespace Features::Preview::State {
-
-// 视口状态
-struct ViewportState {
-  RECT viewport_rect{};
-  bool visible = true;
-  bool game_window_fully_visible = false;
-  POINT drag_start{};
-  POINT drag_offset{};
-};
-
-// 交互状态
-struct InteractionState {
-  bool is_dragging = false;
-  bool viewport_dragging = false;
-  POINT drag_start{};
-  POINT viewport_drag_start{};
-  POINT viewport_drag_offset{};
-};
-
-// DPI相关尺寸
-struct DpiDependentSizes {
-  static constexpr int BASE_TITLE_HEIGHT = 24;
-  static constexpr int BASE_FONT_SIZE = 12;
-  static constexpr int BASE_BORDER_WIDTH = 8;
-
-  UINT dpi = 96;
-  int title_height = BASE_TITLE_HEIGHT;
-  int font_size = BASE_FONT_SIZE;
-  int border_width = BASE_BORDER_WIDTH;
-
-  auto update_dpi_scaling(UINT new_dpi) -> void {
-    dpi = new_dpi;
-    const double scale = static_cast<double>(new_dpi) / 96.0;
-    title_height = static_cast<int>(BASE_TITLE_HEIGHT * scale);
-    font_size = static_cast<int>(BASE_FONT_SIZE * scale);
-    border_width = static_cast<int>(BASE_BORDER_WIDTH * scale);
-  }
-};
-
-// 窗口尺寸状态
-struct WindowSizeState {
-  int window_width = 0;
-  int window_height = 0;
-  float aspect_ratio = 1.0f;
-  int ideal_size = 0;
-  int min_ideal_size = 0;
-  int max_ideal_size = 0;
-};
-
-// D3D渲染资源
-struct RenderingResources {
-  Utils::Graphics::D3D::D3DContext d3d_context;
-  Utils::Graphics::D3D::ShaderResources basic_shaders;
-  Utils::Graphics::D3D::ShaderResources viewport_shaders;
-  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> capture_srv;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> basic_vertex_buffer;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> viewport_vertex_buffer;
-  bool initialized = false;
-};
-
-// 捕获会话（业务层封装）
-struct CaptureSession {
-  Utils::Graphics::Capture::CaptureSession session;
-  bool active = false;
-};
 
 // 预览窗口完整状态
 struct PreviewState {
@@ -90,43 +22,27 @@ struct PreviewState {
   bool is_first_show = true;
 
   // 尺寸相关
-  WindowSizeState size;
-  DpiDependentSizes dpi_sizes;
+  Features::Preview::Types::WindowSizeState size;
+  Features::Preview::Types::DpiDependentSizes dpi_sizes;
 
   // 交互状态
-  InteractionState interaction;
-  ViewportState viewport;
+  Features::Preview::Types::InteractionState interaction;
+  Features::Preview::Types::ViewportState viewport;
 
   // 渲染状态
   bool d3d_initialized = false;
   bool running = false;
   bool create_new_srv = true;
-  RenderingResources rendering_resources;
+  Features::Preview::Types::RenderingResources rendering_resources;
 
   // 捕获状态
-  CaptureSession capture_session;
+  Features::Preview::Types::CaptureSession capture_session;
 
   // 定时器
   std::optional<Utils::Timer::Timer> cleanup_timer;
 
   // 游戏窗口缓存信息
   RECT game_window_rect{};
-};
-
-// 顶点结构体
-struct Vertex {
-  float x, y;
-  float u, v;
-};
-
-// 视口框顶点结构体
-struct ViewportVertex {
-  struct Position {
-    float x, y;
-  } pos;
-  struct Color {
-    float r, g, b, a;
-  } color;
 };
 
 }  // namespace Features::Preview::State

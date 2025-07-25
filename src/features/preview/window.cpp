@@ -10,31 +10,108 @@ module;
 module Features.Preview.Window;
 
 import std;
-import Features.Preview.State;
 import Core.State;
+import Features.Preview.State;
+import Features.Preview.Types;
+import Features.Preview.Interaction;
+import Features.Preview.Rendering;
+import Features.Preview.Capture;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
 import Utils.Timer;
 import Utils.Logger;
-import Core.Constants;
-import Features.Preview.Interaction;
-import Features.Preview.Rendering;
-import Features.Preview.CaptureIntegration;
 
 namespace Features::Preview::Window {
 
-// 窗口类名
-constexpr wchar_t PREVIEW_WINDOW_CLASS[] = L"SpinningMomoPreviewWindowClass";
+// 窗口过程 - 使用GWLP_USERDATA模式获取状态
+LRESULT CALLBACK preview_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+  Core::State::AppState* state = nullptr;
 
-// 前向声明
-LRESULT CALLBACK preview_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
-auto register_preview_window_class(HINSTANCE instance) -> bool;
+  if (message == WM_NCCREATE) {
+    const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
+  } else {
+    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+  }
+
+  if (!state) {
+    return DefWindowProcW(hwnd, message, wParam, lParam);
+  }
+
+  // 使用交互模块处理消息
+  auto [handled, lresult] =
+      Features::Preview::Interaction::handle_preview_message(*state, hwnd, message, wParam, lParam);
+
+  if (handled) {
+    return lresult;
+  }
+
+  return DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+auto register_preview_window_class(HINSTANCE instance) -> bool {
+  WNDCLASSEXW wc = {};
+  wc.cbSize = sizeof(WNDCLASSEXW);
+  wc.lpfnWndProc = preview_window_proc;
+  wc.hInstance = instance;
+  wc.lpszClassName = Features::Preview::Types::PREVIEW_WINDOW_CLASS;
+  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+  wc.style = CS_HREDRAW | CS_VREDRAW;
+
+  return RegisterClassExW(&wc) != 0;
+}
+
 auto create_preview_window(HINSTANCE instance, HWND parent, int width, int height,
-                           Core::State::AppState* state) -> HWND;
-auto setup_window_appearance(HWND hwnd) -> void;
+                           Core::State::AppState* state) -> HWND {
+  return CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED,
+                         Features::Preview::Types::PREVIEW_WINDOW_CLASS, L"PreviewWindow", WS_POPUP,
+                         0, 0, width, height, nullptr, nullptr, instance, state);
+}
+
+auto setup_window_appearance(HWND hwnd) -> void {
+  // 设置透明度
+  SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+
+  // 设置DWM属性
+  MARGINS margins = {1, 1, 1, 1};
+  DwmExtendFrameIntoClientArea(hwnd, &margins);
+
+  DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
+  DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
+
+  BOOL value = TRUE;
+  DwmSetWindowAttribute(hwnd, DWMWA_ALLOW_NCPAINT, &value, sizeof(value));
+
+  // Windows 11 圆角
+  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+}
+
 auto calculate_window_size(Features::Preview::State::PreviewState& state, int capture_width,
-                           int capture_height) -> void;
-auto handle_first_show(Features::Preview::State::PreviewState& state) -> void;
+                           int capture_height) -> void {
+  state.size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
+
+  if (state.size.aspect_ratio >= 1.0f) {
+    // 高度大于等于宽度
+    state.size.window_height = state.size.ideal_size;
+    state.size.window_width = static_cast<int>(state.size.window_height / state.size.aspect_ratio);
+  } else {
+    // 宽度大于高度
+    state.size.window_width = state.size.ideal_size;
+    state.size.window_height = static_cast<int>(state.size.window_width * state.size.aspect_ratio);
+  }
+}
+
+auto handle_first_show(Features::Preview::State::PreviewState& state) -> void {
+  state.is_first_show = false;
+  int x = 20;  // 默认位置
+  int y = 20;
+
+  SetWindowPos(state.hwnd, nullptr, x, y, state.size.window_width, state.size.window_height,
+               SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
+}
 
 auto create_window(HINSTANCE instance, HWND parent, Core::State::AppState* state)
     -> std::expected<HWND, std::string> {
@@ -134,8 +211,8 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   // 初始化捕获系统
-  auto capture_result = Features::Preview::CaptureIntegration::initialize_capture(
-      state, target_window, width, height);
+  auto capture_result =
+      Features::Preview::Capture::initialize_capture(state, target_window, width, height);
 
   if (!capture_result) {
     Logger().error("Failed to initialize capture system");
@@ -153,7 +230,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   // 启动捕获
-  auto start_result = Features::Preview::CaptureIntegration::start_capture(state);
+  auto start_result = Features::Preview::Capture::start_capture(state);
   if (!start_result) {
     Logger().error("Failed to start capture");
     return std::unexpected(start_result.error());
@@ -166,6 +243,13 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   return {};
 }
 
+auto hide_preview_window(Core::State::AppState& state) -> void {
+  if (state.preview->hwnd) {
+    ShowWindow(state.preview->hwnd, SW_HIDE);
+    state.preview->is_visible = false;
+  }
+}
+
 auto stop_preview(Core::State::AppState& state) -> void {
   if (!state.preview->running) {
     return;
@@ -175,7 +259,7 @@ auto stop_preview(Core::State::AppState& state) -> void {
   state.preview->create_new_srv = true;
 
   // 停止捕获
-  Features::Preview::CaptureIntegration::stop_capture(state);
+  Features::Preview::Capture::stop_capture(state);
 
   // 隐藏窗口
   hide_preview_window(state);
@@ -186,49 +270,14 @@ auto stop_preview(Core::State::AppState& state) -> void {
   }
 
   if (!state.preview->cleanup_timer->IsRunning()) {
-    if (auto result = state.preview->cleanup_timer->SetTimer(std::chrono::milliseconds(30000),
-                                                            [&state]() { cleanup_preview(state); });
+    if (auto result = state.preview->cleanup_timer->SetTimer(
+            std::chrono::milliseconds(30000), [&state]() { cleanup_preview(state); });
         !result) {
       Logger().error("Failed to set cleanup timer: {}", static_cast<int>(result.error()));
     }
   }
 
   Logger().info("Preview capture stopped");
-}
-
-auto show_preview_window(Core::State::AppState& state) -> void {
-  if (state.preview->hwnd) {
-    ShowWindow(state.preview->hwnd, SW_SHOWNA);
-    UpdateWindow(state.preview->hwnd);
-    state.preview->is_visible = true;
-  }
-}
-
-auto hide_preview_window(Core::State::AppState& state) -> void {
-  if (state.preview->hwnd) {
-    ShowWindow(state.preview->hwnd, SW_HIDE);
-    state.preview->is_visible = false;
-  }
-}
-
-auto is_preview_window_visible(const Core::State::AppState& state) -> bool {
-  return state.preview->hwnd && IsWindowVisible(state.preview->hwnd);
-}
-
-auto resize_preview_window(Core::State::AppState& state, int width, int height) -> void {
-  if (state.preview->hwnd) {
-    SetWindowPos(state.preview->hwnd, nullptr, 0, 0, width, height,
-                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
-    state.preview->size.window_width = width;
-    state.preview->size.window_height = height;
-  }
-}
-
-auto move_preview_window(Core::State::AppState& state, int x, int y) -> void {
-  if (state.preview->hwnd) {
-    SetWindowPos(state.preview->hwnd, nullptr, x, y, 0, 0,
-                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-  }
 }
 
 auto update_preview_dpi(Core::State::AppState& state, UINT new_dpi) -> void {
@@ -257,7 +306,7 @@ auto cleanup_preview(Core::State::AppState& state) -> void {
   }
 
   // 清理捕获资源
-  Features::Preview::CaptureIntegration::cleanup_capture(state);
+  Features::Preview::Capture::cleanup_capture(state);
 
   // 清理渲染资源
   Features::Preview::Rendering::cleanup_rendering(state);
@@ -268,112 +317,6 @@ auto cleanup_preview(Core::State::AppState& state) -> void {
   state.preview->create_new_srv = true;
 
   Logger().info("Preview resources cleaned up");
-}
-
-auto get_preview_window_handle(const Core::State::AppState& state) -> HWND {
-  return state.preview->hwnd;
-}
-
-auto is_preview_running(const Core::State::AppState& state) -> bool {
-  return state.preview->running;
-}
-
-// 内部实现函数
-
-auto register_preview_window_class(HINSTANCE instance) -> bool {
-  WNDCLASSEXW wc = {};
-  wc.cbSize = sizeof(WNDCLASSEXW);
-  wc.lpfnWndProc = preview_window_proc;
-  wc.hInstance = instance;
-  wc.lpszClassName = PREVIEW_WINDOW_CLASS;
-  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-  wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-  wc.style = CS_HREDRAW | CS_VREDRAW;
-
-  return RegisterClassExW(&wc) != 0;
-}
-
-auto create_preview_window(HINSTANCE instance, HWND parent, int width, int height,
-                           Core::State::AppState* state) -> HWND {
-  return CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED, PREVIEW_WINDOW_CLASS,
-                         L"PreviewWindow", WS_POPUP, 0, 0, width, height, nullptr, nullptr,
-                         instance, state);
-}
-
-auto setup_window_appearance(HWND hwnd) -> void {
-  // 设置透明度
-  SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
-
-  // 设置DWM属性
-  MARGINS margins = {1, 1, 1, 1};
-  DwmExtendFrameIntoClientArea(hwnd, &margins);
-
-  DWMNCRENDERINGPOLICY policy = DWMNCRP_ENABLED;
-  DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &policy, sizeof(policy));
-
-  BOOL value = TRUE;
-  DwmSetWindowAttribute(hwnd, DWMWA_ALLOW_NCPAINT, &value, sizeof(value));
-
-  // Windows 11 圆角
-  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
-  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
-}
-
-auto calculate_window_size(Features::Preview::State::PreviewState& state, int capture_width,
-                           int capture_height) -> void {
-  state.size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
-
-  if (state.size.aspect_ratio >= 1.0f) {
-    // 高度大于等于宽度
-    state.size.window_height = state.size.ideal_size;
-    state.size.window_width = static_cast<int>(state.size.window_height / state.size.aspect_ratio);
-  } else {
-    // 宽度大于高度
-    state.size.window_width = state.size.ideal_size;
-    state.size.window_height = static_cast<int>(state.size.window_width * state.size.aspect_ratio);
-  }
-}
-
-auto handle_first_show(Features::Preview::State::PreviewState& state) -> void {
-  state.is_first_show = false;
-  int x = 20;  // 默认位置
-  int y = 20;
-
-  SetWindowPos(state.hwnd, nullptr, x, y, state.size.window_width, state.size.window_height,
-               SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
-}
-
-// 窗口过程 - 使用GWLP_USERDATA模式获取状态
-LRESULT CALLBACK preview_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-  Core::State::AppState* state = nullptr;
-
-  if (message == WM_NCCREATE) {
-    const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
-    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
-    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
-  } else {
-    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-  }
-
-  if (!state) {
-    return DefWindowProcW(hwnd, message, wParam, lParam);
-  }
-
-  // 使用交互模块处理消息
-  auto [result, lresult] =
-      Features::Preview::Interaction::handle_preview_message(*state, hwnd, message, wParam, lParam);
-
-  switch (result) {
-    case Features::Preview::Interaction::MessageResult::Handled:
-      return lresult;
-    case Features::Preview::Interaction::MessageResult::NotHandled:
-      // 继续处理其他消息
-      break;
-    case Features::Preview::Interaction::MessageResult::Default:
-      return DefWindowProcW(hwnd, message, wParam, lParam);
-  }
-
-  return DefWindowProcW(hwnd, message, wParam, lParam);
 }
 
 }  // namespace Features::Preview::Window
