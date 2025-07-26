@@ -157,16 +157,14 @@ auto update_capture_srv(Core::State::AppState& state,
   srvDesc.Texture2D.MipLevels = 1;
 
   // 创建新的SRV
-  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> newSRV;
-  HRESULT hr =
-      resources.d3d_context.device->CreateShaderResourceView(texture.Get(), &srvDesc, &newSRV);
+  HRESULT hr = resources.d3d_context.device->CreateShaderResourceView(
+      texture.Get(), &srvDesc, resources.capture_srv.ReleaseAndGetAddressOf());
   if (FAILED(hr)) {
     Logger().error("Failed to create shader resource view, HRESULT: 0x{:08X}",
                    static_cast<unsigned int>(hr));
     return std::unexpected("Failed to create shader resource view");
   }
 
-  resources.capture_srv = newSRV;
   return {};
 }
 

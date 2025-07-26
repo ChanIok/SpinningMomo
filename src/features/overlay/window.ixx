@@ -34,6 +34,9 @@ export auto update_overlay_window_size(Core::State::AppState& state, int game_wi
 // 销毁叠加层窗口
 export auto destroy_overlay_window(Core::State::AppState& state) -> void;
 
+// 注销叠加层窗口类
+export auto unregister_overlay_window_class(HINSTANCE instance) -> void;
+
 // 恢复游戏窗口
 export auto restore_game_window(Core::State::AppState& state, bool with_delay = false) -> void;
 

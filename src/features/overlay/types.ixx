@@ -41,7 +41,7 @@ struct WindowState {
   int cached_game_height = 0;
   RECT game_window_rect{};
 
-  bool use_letterbox_mode = true;
+  bool use_letterbox_mode = false;
   bool is_visible = false;
 };
 
@@ -50,11 +50,11 @@ struct RenderingState {
   Utils::Graphics::D3D::D3DContext d3d_context;
   Utils::Graphics::D3D::ShaderResources shader_resources;
   Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture;
-  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shader_resource_view;
+  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> capture_srv;
   HANDLE frame_latency_object = nullptr;
+  std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
 
   bool d3d_initialized = false;
-  bool render_states_initialized = false;
   bool has_new_frame = false;
   bool recreate_texture_flag = false;
   bool create_new_srv = true;
@@ -80,7 +80,10 @@ struct ThreadState {
   std::jthread capture_render_thread;
   std::jthread hook_thread;
   std::jthread window_manager_thread;
-  std::atomic<bool> should_stop{false};
+  
+  DWORD capture_render_thread_id = 0;
+  DWORD hook_thread_id = 0;
+  DWORD window_manager_thread_id = 0;
 };
 
 }  // namespace Features::Overlay::Types

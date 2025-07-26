@@ -11,26 +11,12 @@ import Features.Overlay.State;
 
 namespace Features::Overlay::Rendering {
 
-// 初始化D3D渲染资源
-export auto initialize_d3d_rendering(Core::State::AppState& state)
-    -> std::expected<void, std::string>;
-
-// 初始化渲染状态
-export auto initialize_render_states(Core::State::AppState& state)
+// 初始化渲染系统
+export auto initialize_rendering(Core::State::AppState& state)
     -> std::expected<void, std::string>;
 
 // 调整交换链大小
-export auto resize_swap_chain(Core::State::AppState& state) -> std::expected<void, std::string>;
-
-// 创建渲染目标
-export auto create_render_target(Core::State::AppState& state) -> std::expected<void, std::string>;
-
-// 创建着色器资源
-export auto create_shader_resources(Core::State::AppState& state)
-    -> std::expected<void, std::string>;
-
-// 执行渲染
-export auto perform_rendering(Core::State::AppState& state) -> void;
+export auto resize_rendering(Core::State::AppState& state) -> std::expected<void, std::string>;
 
 // 渲染帧
 export auto render_frame(Core::State::AppState& state,
@@ -41,8 +27,5 @@ export auto cleanup_rendering_resources(Core::State::AppState& state) -> void;
 
 // 检查是否有新帧
 export auto has_new_frame(const Core::State::AppState& state) -> bool;
-
-// 设置新帧标志
-export auto set_new_frame_flag(Core::State::AppState& state, bool has_frame) -> void;
 
 }  // namespace Features::Overlay::Rendering

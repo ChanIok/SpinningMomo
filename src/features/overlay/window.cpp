@@ -8,11 +8,60 @@ module Features.Overlay.Window;
 
 import std;
 import Features.Overlay.State;
-import Features.Overlay.Utils;
 import Utils.Logger;
 import Core.State;
+import Features.Overlay.Types;
+import Features.Overlay.Utils;
+import Features.Overlay.Interaction;
 
 namespace Features::Overlay::Window {
+
+// 窗口过程 - 使用GWLP_USERDATA模式获取状态
+LRESULT CALLBACK overlay_window_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
+  Core::State::AppState* state = nullptr;
+
+  if (message == WM_NCCREATE) {
+    const auto* cs = reinterpret_cast<CREATESTRUCT*>(lParam);
+    state = reinterpret_cast<Core::State::AppState*>(cs->lpCreateParams);
+    SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(state));
+  } else {
+    state = reinterpret_cast<Core::State::AppState*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+  }
+
+  if (!state) {
+    return DefWindowProcW(hwnd, message, wParam, lParam);
+  }
+
+  // 调用交互模块处理消息
+  auto [handled, result] =
+      Interaction::handle_overlay_message(*state, hwnd, message, wParam, lParam);
+  if (handled) {
+    return result;
+  }
+
+  return DefWindowProcW(hwnd, message, wParam, lParam);
+}
+
+auto register_overlay_window_class(HINSTANCE instance) -> std::expected<void, std::string> {
+  WNDCLASSEXW wc = {};
+  wc.cbSize = sizeof(WNDCLASSEXW);
+  wc.lpfnWndProc = overlay_window_proc;
+  wc.hInstance = instance;
+  wc.lpszClassName = L"OverlayWindowClass";
+  wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+
+  if (!RegisterClassExW(&wc)) {
+    DWORD error = GetLastError();
+    return std::unexpected(
+        std::format("Failed to register overlay window class. Error: {}", error));
+  }
+
+  return {};
+}
+
+auto unregister_overlay_window_class(HINSTANCE instance) -> void {
+  UnregisterClassW(L"OverlayWindowClass", instance);
+}
 
 auto create_overlay_window(HINSTANCE instance, HWND parent, Core::State::AppState& state)
     -> std::expected<HWND, std::string> {
@@ -26,7 +75,7 @@ auto create_overlay_window(HINSTANCE instance, HWND parent, Core::State::AppStat
   HWND hwnd = CreateWindowExW(WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE |
                                   WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP,
                               L"OverlayWindowClass", L"Overlay Window", WS_POPUP, 0, 0,
-                              screen_width, screen_height, nullptr, nullptr, instance, nullptr);
+                              screen_width, screen_height, nullptr, nullptr, instance, &state);
 
   if (!hwnd) {
     DWORD error = GetLastError();
@@ -35,28 +84,45 @@ auto create_overlay_window(HINSTANCE instance, HWND parent, Core::State::AppStat
     return std::unexpected(error_msg);
   }
 
-  // 设置窗口为完全透明但可见
-  if (auto result = Utils::set_window_layered_attributes(hwnd); !result) {
-    Logger().error(std::format("Failed to set window layered attributes: {}", result.error()));
-    DestroyWindow(hwnd);
-    return std::unexpected(result.error());
-  }
-
   overlay_state.window.overlay_hwnd = hwnd;
   Logger().info("Overlay window created successfully");
   return hwnd;
 }
 
+auto set_window_transparency(HWND hwnd, BYTE alpha) -> std::expected<void, std::string> {
+  LONG ex_style = GetWindowLong(hwnd, GWL_EXSTYLE);
+  if (!SetWindowLong(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED)) {
+    DWORD error = GetLastError();
+    return std::unexpected(std::format("Failed to set layered window style. Error: {}", error));
+  }
+
+  if (!SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA)) {
+    DWORD error = GetLastError();
+    return std::unexpected(std::format("Failed to set window transparency. Error: {}", error));
+  }
+
+  return {};
+}
+
+auto set_window_layered_attributes(HWND hwnd) -> std::expected<void, std::string> {
+  if (!SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)) {
+    DWORD error = GetLastError();
+    return std::unexpected(
+        std::format("Failed to set layered window attributes. Error: {}", error));
+  }
+  return {};
+}
+
 auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance, HWND parent)
     -> std::expected<void, std::string> {
   // 注册窗口类
-  if (auto result = Utils::register_overlay_window_class(instance); !result) {
+  if (auto result = register_overlay_window_class(instance); !result) {
     return std::unexpected(result.error());
   }
 
   // 创建窗口
   if (auto result = create_overlay_window(instance, parent, state); !result) {
-    Utils::unregister_overlay_window_class(instance);
+    unregister_overlay_window_class(instance);
     return std::unexpected(result.error());
   }
 
@@ -132,9 +198,7 @@ auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void 
   LONG ex_style = GetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE);
   SetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE, ex_style & ~WS_EX_LAYERED);
 
-  // 重绘窗口
-  RedrawWindow(overlay_state.window.target_window, nullptr, nullptr,
-               RDW_ERASE | RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
+  SetForegroundWindow(overlay_state.window.target_window);
 }
 
 }  // namespace Features::Overlay::Window

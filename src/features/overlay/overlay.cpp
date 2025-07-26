@@ -21,8 +21,6 @@ namespace Features::Overlay {
 
 auto initialize_overlay(Core::State::AppState& state, HINSTANCE instance, HWND parent)
     -> std::expected<void, std::string> {
-  // 设置全局状态指针
-  Utils::set_global_app_state(&state);
 
   // 初始化窗口系统
   if (auto result = Window::initialize_overlay_window(state, instance, parent); !result) {
@@ -39,9 +37,6 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
   }
-
-  // 停止现有的叠加层
-  stop_overlay(state);
 
   // 获取窗口尺寸并检查是否需要叠加层
   auto dimensions_result = Utils::get_window_dimensions(target_window);
@@ -67,9 +62,11 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Overlay window is not valid. Please restart the application.");
   }
 
-  // 初始化D3D渲染
-  if (auto result = Rendering::initialize_d3d_rendering(state); !result) {
-    return std::unexpected(result.error());
+  // 初始化渲染系统（仅在未初始化时）
+  if (!state.overlay->rendering.d3d_initialized ) {
+    if (auto result = Rendering::initialize_rendering(state); !result) {
+      return std::unexpected(result.error());
+    }
   }
 
   // 设置目标窗口
@@ -91,6 +88,7 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 
   // 设置运行状态为false
   overlay_state.running = false;
+  overlay_state.rendering.create_new_srv = true;
 
   // 停止线程
   Threads::stop_threads(state);
@@ -131,7 +129,7 @@ auto cleanup_overlay(Core::State::AppState& state) -> void {
   Window::destroy_overlay_window(state);
 
   // 注销窗口类
-  Utils::unregister_overlay_window_class(GetModuleHandle(nullptr));
+  Window::unregister_overlay_window_class(GetModuleHandle(nullptr));
 }
 
 }  // namespace Features::Overlay

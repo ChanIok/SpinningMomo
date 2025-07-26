@@ -14,6 +14,10 @@ namespace Features::Overlay::Interaction {
 export auto initialize_interaction(Core::State::AppState& state)
     -> std::expected<void, std::string>;
 
+// 处理叠加层窗口消息
+export auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT message,
+                                   WPARAM wParam, LPARAM lParam) -> std::pair<bool, LRESULT>;
+
 // 安装鼠标钩子
 export auto install_mouse_hook(Core::State::AppState& state) -> std::expected<void, std::string>;
 
@@ -35,11 +39,5 @@ export auto handle_window_event(Core::State::AppState& state, DWORD event, HWND 
 
 // 清理交互资源
 export auto cleanup_interaction(Core::State::AppState& state) -> void;
-
-// 获取游戏进程ID
-export auto get_game_process_id(Core::State::AppState& state) -> DWORD;
-
-// 设置游戏进程ID
-export auto set_game_process_id(Core::State::AppState& state, DWORD process_id) -> void;
 
 }  // namespace Features::Overlay::Interaction

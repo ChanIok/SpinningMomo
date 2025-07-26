@@ -8,6 +8,7 @@ module Features.Overlay.Interaction;
 
 import std;
 import Core.State;
+import Features.Overlay.Rendering;
 import Features.Overlay.State;
 import Features.Overlay.Types;
 import Utils.Logger;
@@ -51,7 +52,7 @@ auto initialize_interaction(Core::State::AppState& state) -> std::expected<void,
   if (state.overlay->window.target_window) {
     DWORD process_id;
     GetWindowThreadProcessId(state.overlay->window.target_window, &process_id);
-    set_game_process_id(state, process_id);
+    state.overlay->interaction.game_process_id = process_id;
   }
 
   return {};
@@ -178,12 +179,91 @@ auto cleanup_interaction(Core::State::AppState& state) -> void {
   g_app_state = nullptr;
 }
 
-auto get_game_process_id(Core::State::AppState& state) -> DWORD {
-  return state.overlay->interaction.game_process_id;
-}
+auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
+                            LPARAM lParam) -> std::pair<bool, LRESULT> {
+  auto& overlay_state = *state.overlay;
 
-auto set_game_process_id(Core::State::AppState& state, DWORD process_id) -> void {
-  state.overlay->interaction.game_process_id = process_id;
+  switch (message) {
+    case Types::WM_SHOW_OVERLAY: {
+      ShowWindow(hwnd, SW_SHOWNA);
+
+      // 计算窗口大小和位置
+      int screenWidth = overlay_state.window.screen_width;
+      int screenHeight = overlay_state.window.screen_height;
+      int left = 0;
+      int top = 0;
+      int width = screenWidth;
+      int height = screenHeight;
+
+      // 如果不是黑边填充模式，则使用原本的居中计算
+      if (!overlay_state.window.use_letterbox_mode) {
+        width = overlay_state.window.window_width;
+        height = overlay_state.window.window_height;
+        left = (screenWidth - width) / 2;
+        top = (screenHeight - height) / 2;
+        Logger().debug("Not using letterbox mode, using window size: {}x{}", width, height);
+      }
+      Logger().debug("Using letterbox mode: {}", overlay_state.window.use_letterbox_mode);
+
+      // 添加分层窗口样式
+      if (overlay_state.window.target_window) {
+        LONG exStyle = GetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE);
+        SetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+
+        // 设置透明度 (透明度1，但仍可点击)
+        SetLayeredWindowAttributes(overlay_state.window.target_window, 0, 1, LWA_ALPHA);
+      }
+
+      // 设置窗口位置和大小
+      SetWindowPos(hwnd, nullptr, left, top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+
+      if (overlay_state.window.target_window) {
+        SetWindowPos(overlay_state.window.target_window, hwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+      }
+
+      UpdateWindow(hwnd);
+      overlay_state.window.is_visible = true;
+      return {true, 0};
+    }
+
+    case Types::WM_GAME_WINDOW_FOREGROUND: {
+      // 处理游戏窗口前台事件
+      if (overlay_state.window.target_window) {
+        SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS);
+        SetWindowPos(overlay_state.window.target_window, hwnd, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW | SWP_NOCOPYBITS |
+                         SWP_ASYNCWINDOWPOS);
+      }
+      return {true, 0};
+    }
+
+    case WM_SIZE: {
+      // 处理窗口大小变化
+      if (!overlay_state.rendering.d3d_initialized) {
+        return {true, 0};
+      }
+
+      // 更新窗口尺寸
+      overlay_state.window.window_width = LOWORD(lParam);
+      overlay_state.window.window_height = HIWORD(lParam);
+
+      // 调整渲染系统大小
+      if (auto result = Rendering::resize_rendering(state); !result) {
+        Logger().error("Failed to resize overlay rendering: {}", result.error());
+      }
+
+      return {true, 0};
+    }
+
+    case WM_DESTROY:
+      overlay_state.window.is_visible = false;
+      return {true, 0};
+  }
+
+  return {false, 0};
 }
 
 }  // namespace Features::Overlay::Interaction

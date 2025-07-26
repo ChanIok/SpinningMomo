@@ -112,9 +112,9 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
   }
 
   // 如果叠加层正在运行，更新其黑边模式设置
-  if (Features::Overlay::is_overlay_capturing(state)) {
-    Features::Overlay::set_letterbox_mode(state, event.enabled);
-  }
+  // if (Features::Overlay::is_overlay_capturing(state)) {
+  //   Features::Overlay::set_letterbox_mode(state, event.enabled);
+  // }
 }
 
 // 注册功能开关事件处理器

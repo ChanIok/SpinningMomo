@@ -24,9 +24,6 @@ export auto stop_overlay(Core::State::AppState& state) -> void;
 // 设置黑边模式
 export auto set_letterbox_mode(Core::State::AppState& state, bool enabled) -> void;
 
-// 检查是否正在捕获
-export auto is_overlay_capturing(const Core::State::AppState& state) -> bool;
-
 // 清理资源
 export auto cleanup_overlay(Core::State::AppState& state) -> void;
 

@@ -26,7 +26,4 @@ export auto hook_thread_proc(Core::State::AppState& state, std::stop_token token
 // 窗口管理线程处理函数
 export auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token token) -> void;
 
-// 检查线程是否正在运行
-export auto are_threads_running(const Core::State::AppState& state) -> bool;
-
 }  // namespace Features::Overlay::Threads
