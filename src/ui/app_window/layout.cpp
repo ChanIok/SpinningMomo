@@ -3,6 +3,8 @@ module;
 #include <dwmapi.h>
 #include <windows.h>
 
+#include <iostream>
+
 module UI.AppWindow.Layout;
 
 import std;

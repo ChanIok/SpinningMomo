@@ -38,6 +38,60 @@ auto create_all_brushes_simple(UI::AppWindow::RenderContext& d2d) -> bool {
                            &d2d.hover_semi_brush);
 }
 
+// 辅助函数：测量文本宽度
+auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format,
+                        IDWriteFactory7* write_factory) -> float {
+  if (text.empty() || !text_format || !write_factory) {
+    return 0.0f;
+  }
+
+  // 创建文本布局
+  IDWriteTextLayout* text_layout = nullptr;
+  HRESULT hr =
+      write_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.length()), text_format,
+                                      10000.0f,  // 宽度（足够大以避免换行）
+                                      10000.0f,  // 高度
+                                      &text_layout);
+
+  if (FAILED(hr) || !text_layout) {
+    return 0.0f;
+  }
+
+  // 获取文本布局的度量信息
+  DWRITE_TEXT_METRICS metrics = {};
+  hr = text_layout->GetMetrics(&metrics);
+  text_layout->Release();
+
+  if (FAILED(hr)) {
+    return 0.0f;
+  }
+
+  return metrics.width;
+}
+
+// 创建具有指定字体大小的文本格式
+auto create_text_format_with_size(IDWriteFactory7* write_factory, float font_size)
+    -> IDWriteTextFormat* {
+  if (!write_factory) {
+    return nullptr;
+  }
+
+  IDWriteTextFormat* text_format = nullptr;
+  HRESULT hr = write_factory->CreateTextFormat(
+      L"Microsoft YaHei", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+      DWRITE_FONT_STRETCH_NORMAL, font_size, L"zh-CN", &text_format);
+
+  if (FAILED(hr) || !text_format) {
+    return nullptr;
+  }
+
+  // 设置文本对齐方式
+  text_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+  text_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+
+  return text_format;
+}
+
 // 初始化Direct2D资源
 auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& d2d = state.app_window->d2d_context;

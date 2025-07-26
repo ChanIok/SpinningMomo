@@ -71,6 +71,10 @@ struct LayoutConfig {
   int ratio_column_width = 60;
   int resolution_column_width = 120;
   int settings_column_width = 120;
+
+  // 字体大小调整相关常量
+  static constexpr float MIN_FONT_SIZE = 8.0f;   // 最小字体大小
+  static constexpr float FONT_SIZE_STEP = 0.5f;  // 字体大小调整步长
 };
 
 // One Dark Pro风格暗色主题颜色常量 (AppWindow专用)

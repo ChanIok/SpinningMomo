@@ -26,10 +26,8 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
 
   // 1. 先处理渲染目标resize（如果需要）
   if (d2d.needs_resize) {
-    if (UI::AppWindow::D2DContext::resize_d2d(
+    if (!UI::AppWindow::D2DContext::resize_d2d(
             state, {client_rect.right - client_rect.left, client_rect.bottom - client_rect.top})) {
-      d2d.needs_resize = false;
-    } else {
       return;  // resize失败，无法继续绘制
     }
   }
@@ -101,7 +99,7 @@ auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& r
   // 绘制标题文本（保持完全不透明）
   D2D1_RECT_F text_rect =
       UI::AppWindow::make_d2d_rect(rect.left + static_cast<float>(render.text_padding), rect.top,
-                               rect.right, rect.top + static_cast<float>(render.title_height));
+                                   rect.right, rect.top + static_cast<float>(render.title_height));
 
   d2d.render_target->DrawText(L"SpinningMomo",
                               12,  // 文本长度
@@ -153,9 +151,9 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     // 根据项目类别确定绘制位置
     switch (item.category) {
       case UI::AppWindow::MenuItemCategory::AspectRatio:
-        item_rect =
-            UI::AppWindow::make_d2d_rect(rect.left, y, static_cast<float>(bounds.ratio_column_right),
-                                     y + static_cast<float>(render.item_height));
+        item_rect = UI::AppWindow::make_d2d_rect(rect.left, y,
+                                                 static_cast<float>(bounds.ratio_column_right),
+                                                 y + static_cast<float>(render.item_height));
         break;
       case UI::AppWindow::MenuItemCategory::Resolution:
         item_rect = UI::AppWindow::make_d2d_rect(
@@ -179,7 +177,8 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     // 只有在同一列中才增加y坐标（复制现有逻辑）
     if ((i + 1 < items.size()) && (items[i + 1].category == item.category)) {
       if (item.category != UI::AppWindow::MenuItemCategory::Feature ||
-          item.action_id != Common::MenuIds::to_string(Common::MenuIds::Id::WindowControlResetTransform)) {
+          item.action_id !=
+              Common::MenuIds::to_string(Common::MenuIds::Id::WindowControlResetTransform)) {
         y += static_cast<float>(render.item_height);
       }
     } else if (i + 1 < items.size() && items[i + 1].category != item.category) {
@@ -215,10 +214,76 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
 
   // 绘制文本（保持完全不透明）
   const int indicator_width = UI::AppWindow::Layout::get_indicator_width(item, state);
+
   D2D1_RECT_F text_rect = UI::AppWindow::make_d2d_rect(
       item_rect.left + static_cast<float>(render.text_padding + indicator_width), item_rect.top,
-      item_rect.right, item_rect.bottom);
+      item_rect.right - static_cast<float>(render.text_padding / 2), item_rect.bottom);
 
+  // 计算可用于文本的宽度
+  const float available_width = text_rect.right - text_rect.left;
+
+  // 如果文本为空或宽度无效，则直接使用默认字体绘制
+  if (item.text.empty() || available_width <= 0.0f) {
+    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
+                                d2d.text_format, text_rect, d2d.text_brush);
+    return;
+  }
+
+  // 测量当前字体大小下的文本宽度
+  float text_width =
+      UI::AppWindow::D2DContext::measure_text_width(item.text, d2d.text_format, d2d.write_factory);
+
+  // 如果文本宽度小于可用宽度，则直接使用默认字体绘制
+  if (text_width <= available_width) {
+    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
+                                d2d.text_format, text_rect, d2d.text_brush);
+    return;
+  }
+
+  // 文本太宽，需要调整字体大小
+  IDWriteTextFormat* adjusted_text_format = nullptr;
+  float adjusted_font_size = render.font_size;
+
+  // 逐步减小字体大小，直到文本适合或达到最小字体大小
+  while (adjusted_font_size > UI::AppWindow::LayoutConfig::MIN_FONT_SIZE) {
+    adjusted_font_size -= UI::AppWindow::LayoutConfig::FONT_SIZE_STEP;
+
+    // 如果已达到最小字体大小，则使用最小字体大小
+    if (adjusted_font_size <= UI::AppWindow::LayoutConfig::MIN_FONT_SIZE) {
+      adjusted_font_size = UI::AppWindow::LayoutConfig::MIN_FONT_SIZE;
+    }
+
+    // 创建调整后的文本格式
+    adjusted_text_format = UI::AppWindow::D2DContext::create_text_format_with_size(
+        d2d.write_factory, adjusted_font_size);
+    if (!adjusted_text_format) {
+      // 如果创建失败，则回退到默认字体
+      break;
+    }
+
+    // 测量调整后字体大小的文本宽度
+    text_width = UI::AppWindow::D2DContext::measure_text_width(item.text, adjusted_text_format,
+                                                               d2d.write_factory);
+
+    // 如果文本宽度满足要求，则使用调整后的字体绘制
+    if (text_width <= available_width) {
+      d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
+                                  adjusted_text_format, text_rect, d2d.text_brush);
+      adjusted_text_format->Release();
+      return;
+    }
+
+    // 释放临时文本格式对象
+    adjusted_text_format->Release();
+    adjusted_text_format = nullptr;
+
+    // 如果已达到最小字体大小，则跳出循环
+    if (adjusted_font_size <= UI::AppWindow::LayoutConfig::MIN_FONT_SIZE) {
+      break;
+    }
+  }
+
+  // 如果无法调整到合适的字体大小，仍然使用默认字体绘制（可能会被截断）
   d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
                               d2d.text_format, text_rect, d2d.text_brush);
 }

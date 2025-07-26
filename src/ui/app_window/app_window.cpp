@@ -247,13 +247,12 @@ auto create_window_attributes(HWND hwnd) -> void {
 
 // 设置变更响应实现
 auto refresh_from_settings(Core::State::AppState& state) -> void {
-
   // 更新菜单项
   update_menu_items(state);
 
   // 更新布局配置（基于应用状态）
   UI::AppWindow::Layout::update_layout(state);
-  
+
   // 重新计算窗口大小
   const auto new_size = UI::AppWindow::Layout::calculate_window_size(state);
   if (state.app_window->window.hwnd) {
@@ -264,6 +263,8 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
     // 日志输出大小
     Logger().info("Window size updated: {}x{}", new_size.cx, new_size.cy);
   }
+
+  state.app_window->d2d_context.needs_font_update = true;
 
   // 请求重绘
   request_repaint(state);
