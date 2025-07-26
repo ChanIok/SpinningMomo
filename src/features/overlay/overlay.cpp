@@ -74,9 +74,11 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
 
   // 设置目标窗口
   overlay_state.window.target_window = target_window;
+  overlay_state.running = true;  // 设置运行状态为true
 
   // 启动线程
   if (auto result = Threads::start_threads(state); !result) {
+    overlay_state.running = false;  // 如果线程启动失败，设置运行状态为false
     return std::unexpected(result.error());
   }
 
@@ -86,6 +88,9 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
 auto stop_overlay(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   Logger().debug("Stopping overlay");
+
+  // 设置运行状态为false
+  overlay_state.running = false;
 
   // 停止线程
   Threads::stop_threads(state);
@@ -110,22 +115,6 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 
 auto set_letterbox_mode(Core::State::AppState& state, bool enabled) -> void {
   state.overlay->window.use_letterbox_mode = enabled;
-}
-
-auto is_overlay_capturing(const Core::State::AppState& state) -> bool {
-  return Capture::is_capturing(state) && Threads::are_threads_running(state);
-}
-
-auto is_overlay_visible(const Core::State::AppState& state) -> bool {
-  return Window::is_overlay_window_visible(state);
-}
-
-auto get_overlay_window_handle(const Core::State::AppState& state) -> HWND {
-  return Window::get_overlay_window_handle(state);
-}
-
-auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void {
-  Window::restore_game_window(state, with_delay);
 }
 
 auto cleanup_overlay(Core::State::AppState& state) -> void {

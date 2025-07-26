@@ -111,18 +111,6 @@ auto update_overlay_window_size(Core::State::AppState& state, int game_width, in
   return {};
 }
 
-auto position_overlay_window(Core::State::AppState& state) -> void {
-  auto& overlay_state = *state.overlay;
-  if (!overlay_state.window.overlay_hwnd) return;
-
-  // 居中显示
-  int x = (overlay_state.window.screen_width - overlay_state.window.window_width) / 2;
-  int y = (overlay_state.window.screen_height - overlay_state.window.window_height) / 2;
-
-  SetWindowPos(overlay_state.window.overlay_hwnd, nullptr, x, y, overlay_state.window.window_width,
-               overlay_state.window.window_height, SWP_NOZORDER | SWP_NOACTIVATE);
-}
-
 auto destroy_overlay_window(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
@@ -130,10 +118,6 @@ auto destroy_overlay_window(Core::State::AppState& state) -> void {
     overlay_state.window.overlay_hwnd = nullptr;
     overlay_state.window.is_visible = false;
   }
-}
-
-auto get_overlay_window_handle(const Core::State::AppState& state) -> HWND {
-  return state.overlay->window.overlay_hwnd;
 }
 
 auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void {
@@ -151,16 +135,6 @@ auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void 
   // 重绘窗口
   RedrawWindow(overlay_state.window.target_window, nullptr, nullptr,
                RDW_ERASE | RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN);
-}
-
-auto set_game_window_transparency(Core::State::AppState& state, BYTE alpha)
-    -> std::expected<void, std::string> {
-  auto& overlay_state = *state.overlay;
-  if (!overlay_state.window.target_window) {
-    return std::unexpected("No target window set");
-  }
-
-  return Utils::set_window_transparency(overlay_state.window.target_window, alpha);
 }
 
 }  // namespace Features::Overlay::Window

@@ -32,14 +32,9 @@ export auto create_shader_resources(Core::State::AppState& state)
 // 执行渲染
 export auto perform_rendering(Core::State::AppState& state) -> void;
 
-// 处理新帧到达
-export auto on_frame_arrived(Core::State::AppState& state,
-                             Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void;
-
-// 更新纹理资源
-export auto update_texture_resources(Core::State::AppState& state,
-                                     Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture)
-    -> std::expected<void, std::string>;
+// 渲染帧
+export auto render_frame(Core::State::AppState& state,
+                         Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void;
 
 // 清理渲染资源
 export auto cleanup_rendering_resources(Core::State::AppState& state) -> void;

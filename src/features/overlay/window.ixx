@@ -31,19 +31,10 @@ export auto is_overlay_window_visible(const Core::State::AppState& state) -> boo
 export auto update_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
     -> std::expected<void, std::string>;
 
-// 设置叠加层窗口位置
-export auto position_overlay_window(Core::State::AppState& state) -> void;
-
 // 销毁叠加层窗口
 export auto destroy_overlay_window(Core::State::AppState& state) -> void;
 
-// 获取叠加层窗口句柄
-export auto get_overlay_window_handle(const Core::State::AppState& state) -> HWND;
-
 // 恢复游戏窗口
 export auto restore_game_window(Core::State::AppState& state, bool with_delay = false) -> void;
-
-// 设置游戏窗口透明度
-export auto set_game_window_transparency(Core::State::AppState& state, BYTE alpha) -> std::expected<void, std::string>;
 
 }  // namespace Features::Overlay::Window

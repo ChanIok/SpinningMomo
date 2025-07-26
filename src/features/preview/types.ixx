@@ -89,7 +89,7 @@ struct RenderingResources {
 };
 
 // 捕获会话（业务层封装）
-struct CaptureSession {
+struct CaptureState {
   Utils::Graphics::Capture::CaptureSession session;
   bool active = false;
 };

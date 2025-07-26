@@ -36,7 +36,7 @@ struct PreviewState {
   Features::Preview::Types::RenderingResources rendering_resources;
 
   // 捕获状态
-  Features::Preview::Types::CaptureSession capture_session;
+  Features::Preview::Types::CaptureState capture_state;
 
   // 定时器
   std::optional<Utils::Timer::Timer> cleanup_timer;

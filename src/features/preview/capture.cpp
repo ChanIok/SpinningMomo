@@ -67,46 +67,46 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
     return std::unexpected("Failed to create capture session");
   }
 
-  state.preview->capture_session.session = std::move(session_result.value());
-  state.preview->capture_session.active = false;
+  state.preview->capture_state.session = std::move(session_result.value());
+  state.preview->capture_state.active = false;
 
   Logger().info("Capture system initialized successfully");
   return {};
 }
 
 auto start_capture(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& capture = state.preview->capture_session.session;
+  auto& session = state.preview->capture_state.session;
 
-  auto start_result = Utils::Graphics::Capture::start_capture(capture);
+  auto start_result = Utils::Graphics::Capture::start_capture(session);
   if (!start_result) {
     Logger().error("Failed to start capture");
     return std::unexpected("Failed to start capture");
   }
 
-  state.preview->capture_session.active = true;
-  Logger().info("Capture started successfully");
+  state.preview->capture_state.active = true;
+  Logger().debug("Capture started successfully");
   return {};
 }
 
 auto stop_capture(Core::State::AppState& state) -> void {
-  auto& capture = state.preview->capture_session.session;
+  auto& session = state.preview->capture_state.session;
 
-  if (state.preview->capture_session.active) {
-    Utils::Graphics::Capture::stop_capture(capture);
-    state.preview->capture_session.active = false;
-    Logger().info("Capture stopped");
+  if (state.preview->capture_state.active) {
+    Utils::Graphics::Capture::stop_capture(session);
+    state.preview->capture_state.active = false;
+    Logger().debug("Capture stopped");
   }
 }
 
 auto cleanup_capture(Core::State::AppState& state) -> void {
-  auto& capture = state.preview->capture_session.session;
+  auto& session = state.preview->capture_state.session;
 
-  if (state.preview->capture_session.active) {
-    Utils::Graphics::Capture::stop_capture(capture);
+  if (state.preview->capture_state.active) {
+    Utils::Graphics::Capture::stop_capture(session);
   }
 
-  Utils::Graphics::Capture::cleanup_capture_session(capture);
-  state.preview->capture_session.active = false;
+  Utils::Graphics::Capture::cleanup_capture_session(session);
+  state.preview->capture_state.active = false;
 
   Logger().info("Capture resources cleaned up");
 }

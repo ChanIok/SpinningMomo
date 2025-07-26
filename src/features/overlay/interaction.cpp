@@ -9,9 +9,8 @@ module Features.Overlay.Interaction;
 import std;
 import Core.State;
 import Features.Overlay.State;
+import Features.Overlay.Types;
 import Utils.Logger;
-
-namespace State = Features::Overlay::State;
 
 namespace Features::Overlay::Interaction {
 
@@ -25,7 +24,7 @@ LRESULT CALLBACK mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam) {
     auto* mouse_struct = reinterpret_cast<MSLLHOOKSTRUCT*>(lParam);
     // 只发送消息到timer_window，不直接处理
     if (g_app_state->overlay->window.timer_window) {
-      PostMessage(g_app_state->overlay->window.timer_window, State::WM_MOUSE_EVENT,
+      PostMessage(g_app_state->overlay->window.timer_window, Types::WM_MOUSE_EVENT,
                   MAKEWPARAM(mouse_struct->pt.x, mouse_struct->pt.y), 0);
     }
   }
@@ -38,7 +37,7 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
   if (g_app_state) {
     // 只发送消息到timer_window，不直接处理
     if (g_app_state->overlay->window.timer_window) {
-      PostMessage(g_app_state->overlay->window.timer_window, State::WM_WINDOW_EVENT,
+      PostMessage(g_app_state->overlay->window.timer_window, Types::WM_WINDOW_EVENT,
                   static_cast<WPARAM>(event), reinterpret_cast<LPARAM>(hwnd));
     }
   }
@@ -169,7 +168,7 @@ auto handle_window_event(Core::State::AppState& state, DWORD event, HWND hwnd) -
   if (event == EVENT_SYSTEM_FOREGROUND && hwnd == overlay_state.window.target_window) {
     // 游戏窗口获得焦点，发送消息确保叠加层在上方
     if (overlay_state.window.overlay_hwnd) {
-      PostMessage(overlay_state.window.overlay_hwnd, State::WM_GAME_WINDOW_FOREGROUND, 0, 0);
+      PostMessage(overlay_state.window.overlay_hwnd, Types::WM_GAME_WINDOW_FOREGROUND, 0, 0);
     }
   }
 }

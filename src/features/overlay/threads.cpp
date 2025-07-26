@@ -11,6 +11,7 @@ module Features.Overlay.Threads;
 import std;
 import Core.State;
 import Features.Overlay.State;
+import Features.Overlay.Types;
 import Features.Overlay.Rendering;
 import Features.Overlay.Capture;
 import Features.Overlay.Interaction;
@@ -50,6 +51,7 @@ auto stop_threads(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
   overlay_state.threads.should_stop = true;
+  overlay_state.running = false;  // 设置运行状态为false
 
   // 请求停止所有线程
   if (overlay_state.threads.capture_render_thread.joinable()) {
@@ -109,12 +111,15 @@ auto capture_render_thread_proc(Core::State::AppState& state, std::stop_token to
   }
 
   // 初始化捕获
-  if (auto result = Capture::initialize_capture(state); !result) {
+  if (auto result = Capture::initialize_capture(state, overlay_state.window.target_window,
+                                                overlay_state.window.cached_game_width,
+                                                overlay_state.window.cached_game_height);
+      !result) {
     return;
   }
 
   // 显示叠加层窗口
-  PostMessage(overlay_state.window.overlay_hwnd, State::WM_SHOW_OVERLAY, 0, 0);
+  PostMessage(overlay_state.window.overlay_hwnd, Types::WM_SHOW_OVERLAY, 0, 0);
 
   // 渲染循环
   while (!token.stop_requested() && !overlay_state.threads.should_stop) {
@@ -130,19 +135,10 @@ auto capture_render_thread_proc(Core::State::AppState& state, std::stop_token to
     }
 
     if (Rendering::has_new_frame(state)) {
-      // 更新纹理资源
-      if (overlay_state.rendering.create_new_srv && overlay_state.rendering.frame_texture) {
-        if (auto result =
-                Rendering::update_texture_resources(state, overlay_state.rendering.frame_texture);
-            result) {
-          overlay_state.rendering.create_new_srv = false;
-        }
-      }
-
       lock.unlock();
 
       // 执行渲染
-      Rendering::perform_rendering(state);
+      Rendering::render_frame(state, overlay_state.rendering.frame_texture);
 
       // 重置新帧标志
       Rendering::set_new_frame_flag(state, false);
@@ -227,7 +223,7 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
         Interaction::update_game_window_position(state);
         break;
 
-      case State::WM_GAME_WINDOW_FOREGROUND:
+      case Types::WM_GAME_WINDOW_FOREGROUND:
         // 确保叠加层窗口在游戏窗口上方
         if (overlay_state.window.overlay_hwnd && overlay_state.window.target_window) {
           SetWindowPos(overlay_state.window.overlay_hwnd, HWND_TOPMOST, 0, 0, 0, 0,
@@ -241,7 +237,7 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
         }
         break;
 
-      case State::WM_MOUSE_EVENT: {
+      case Types::WM_MOUSE_EVENT: {
         // 处理鼠标事件
         POINT mouse_pos;
         mouse_pos.x = LOWORD(msg.wParam);
@@ -250,7 +246,7 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
         break;
       }
 
-      case State::WM_WINDOW_EVENT: {
+      case Types::WM_WINDOW_EVENT: {
         // 处理窗口事件
         DWORD event = static_cast<DWORD>(msg.wParam);
         HWND hwnd = reinterpret_cast<HWND>(msg.lParam);

@@ -9,6 +9,7 @@ module Features.Overlay.Utils;
 import std;
 import Core.State;
 import Features.Overlay.State;
+import Features.Overlay.Types;
 
 namespace Features::Overlay::Utils {
 
@@ -150,14 +151,14 @@ auto handle_overlay_window_message(HWND hwnd, UINT message, WPARAM wParam, LPARA
   auto& overlay_state = *state.overlay;
 
   switch (message) {
-    case Features::Overlay::State::WM_SHOW_OVERLAY: {
+    case Types::WM_SHOW_OVERLAY: {
       // 显示叠加层窗口
       ShowWindow(hwnd, SW_SHOW);
       overlay_state.window.is_visible = true;
       return 0;
     }
 
-    case Features::Overlay::State::WM_GAME_WINDOW_FOREGROUND: {
+    case Types::WM_GAME_WINDOW_FOREGROUND: {
       // 处理游戏窗口前台事件
       if (overlay_state.window.target_window) {
         SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
