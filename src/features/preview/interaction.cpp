@@ -54,6 +54,9 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
     -> void {
   if (!state.preview->target_window) return;
 
+  Logger().debug("move_game_window_to_position: relative_x: {}, relative_y: {}", relative_x,
+                relative_y);
+
   // 获取屏幕尺寸
   int screenWidth = GetSystemMetrics(SM_CXSCREEN);
   int screenHeight = GetSystemMetrics(SM_CYSCREEN);
@@ -71,7 +74,7 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
   if (gameWidth <= screenWidth) {
     targetX = (screenWidth - gameWidth) / 2;  // 居中
   } else {
-    targetX = -(relative_x * gameWidth);
+    targetX = -relative_x * gameWidth + screenWidth / 2;
     targetX = std::max(targetX, -gameWidth + screenWidth);
     targetX = std::min(targetX, 0.0f);
   }
@@ -80,7 +83,7 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
   if (gameHeight <= screenHeight) {
     targetY = (screenHeight - gameHeight) / 2;  // 居中
   } else {
-    targetY = -(relative_y * gameHeight);
+    targetY = -relative_y * gameHeight + screenHeight / 2;
     targetY = std::max(targetY, -gameHeight + screenHeight);
     targetY = std::min(targetY, 0.0f);
   }
@@ -118,34 +121,6 @@ auto end_window_drag(Core::State::AppState& state, HWND hwnd) -> void {
 // 视口拖拽实现
 auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
   state.preview->interaction.viewport_dragging = true;
-  state.preview->interaction.viewport_drag_start = pt;
-
-  // 计算拖拽偏移
-  if (is_point_in_viewport(state, pt)) {
-    state.preview->interaction.viewport_drag_offset.x =
-        pt.x - state.preview->viewport.viewport_rect.left;
-    state.preview->interaction.viewport_drag_offset.y =
-        pt.y - state.preview->viewport.viewport_rect.top;
-  } else {
-    // 点击在视口外，计算相对于视口中心的偏移
-    RECT clientRect;
-    GetClientRect(hwnd, &clientRect);
-    float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
-    float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top -
-                                             state.preview->dpi_sizes.title_height);
-
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-    float gameWidth = static_cast<float>(state.preview->game_window_rect.right -
-                                         state.preview->game_window_rect.left);
-    float gameHeight = static_cast<float>(state.preview->game_window_rect.bottom -
-                                          state.preview->game_window_rect.top);
-
-    state.preview->interaction.viewport_drag_offset.x =
-        static_cast<LONG>(screenWidth * previewWidth / (2 * gameWidth));
-    state.preview->interaction.viewport_drag_offset.y =
-        static_cast<LONG>(screenHeight * previewHeight / (2 * gameHeight));
-  }
 
   SetCapture(hwnd);
 }
@@ -156,15 +131,13 @@ auto update_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> 
   RECT clientRect;
   GetClientRect(hwnd, &clientRect);
   float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
-  float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top -
-                                           state.preview->dpi_sizes.title_height);
+  float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
   // 计算新的相对位置
   float relativeX =
-      static_cast<float>(pt.x - state.preview->interaction.viewport_drag_offset.x) / previewWidth;
-  float relativeY = static_cast<float>(pt.y - state.preview->interaction.viewport_drag_offset.y -
-                                       state.preview->dpi_sizes.title_height) /
-                    previewHeight;
+      static_cast<float>(pt.x) / previewWidth;
+  float relativeY =
+      static_cast<float>(pt.y) / previewHeight;
 
   move_game_window_to_position(state, relativeX, relativeY);
 }
@@ -208,12 +181,10 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
     float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
-    float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top -
-                                             state.preview->dpi_sizes.title_height);
+    float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
     float relativeX = static_cast<float>(pt.x) / previewWidth;
-    float relativeY =
-        static_cast<float>(pt.y - state.preview->dpi_sizes.title_height) / previewHeight;
+    float relativeY = static_cast<float>(pt.y) / previewHeight;
 
     move_game_window_to_position(state, relativeX, relativeY);
   }
@@ -265,8 +236,7 @@ auto handle_window_scaling(Core::State::AppState& state, HWND hwnd, int wheel_de
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
     float relativeX = static_cast<float>(mouse_pos.x) / (clientRect.right - clientRect.left);
-    float relativeY = static_cast<float>(mouse_pos.y - state.preview->dpi_sizes.title_height) /
-                      (clientRect.bottom - clientRect.top - state.preview->dpi_sizes.title_height);
+    float relativeY = static_cast<float>(mouse_pos.y) / (clientRect.bottom - clientRect.top);
 
     // 计算新位置（保持鼠标指向的点不变）
     int deltaWidth = newWidth - (windowRect.right - windowRect.left);

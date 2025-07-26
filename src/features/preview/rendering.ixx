@@ -8,8 +8,6 @@ export module Features.Preview.Rendering;
 
 import std;
 import Core.State;
-import Features.Preview.Types;
-import Utils.Graphics.D3D;
 
 export namespace Features::Preview::Rendering {
 

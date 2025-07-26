@@ -9,10 +9,11 @@ module;
 module Features.Preview.Rendering;
 
 import std;
-import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.D3D;
 import Utils.Logger;
+import Features.Preview.State;
+import Features.Preview.Types;
 import Features.Preview.Shaders;
 import Features.Preview.Viewport;
 

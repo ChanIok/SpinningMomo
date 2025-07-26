@@ -37,8 +37,6 @@ struct ViewportState {
   RECT viewport_rect{};
   bool visible = true;
   bool game_window_fully_visible = false;
-  POINT drag_start{};
-  POINT drag_offset{};
 };
 
 // 交互状态
@@ -46,8 +44,6 @@ struct InteractionState {
   bool is_dragging = false;
   bool viewport_dragging = false;
   POINT drag_start{};
-  POINT viewport_drag_start{};
-  POINT viewport_drag_offset{};
 };
 
 // DPI相关尺寸

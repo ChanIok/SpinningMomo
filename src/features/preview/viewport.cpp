@@ -9,11 +9,12 @@ module;
 module Features.Preview.Viewport;
 
 import std;
-import Features.Preview.State;
 import Core.State;
 import Utils.Graphics.D3D;
-import Utils.Logger;
+import Features.Preview.State;
+import Features.Preview.Types;
 import Features.Preview.Rendering;
+import Utils.Logger;
 
 namespace Features::Preview::Viewport {
 
@@ -53,10 +54,10 @@ auto calculate_viewport_position(const Core::State::AppState& state) -> RECT {
   RECT clientRect;
   GetClientRect(state.preview->hwnd, &clientRect);
 
-  // 计算预览区域（除去标题栏）
+  // 计算预览区域
   int previewTop = state.preview->dpi_sizes.title_height;
   int previewWidth = clientRect.right - clientRect.left;
-  int previewHeight = clientRect.bottom - clientRect.top - previewTop;
+  int previewHeight = clientRect.bottom - clientRect.top;
 
   if (previewWidth <= 0 || previewHeight <= 0) {
     return result;
@@ -138,8 +139,7 @@ auto create_viewport_vertices(const Core::State::AppState& state,
   RECT clientRect;
   GetClientRect(state.preview->hwnd, &clientRect);
   float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
-  float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top -
-                                           state.preview->dpi_sizes.title_height);
+  float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
   if (previewWidth <= 0 || previewHeight <= 0) {
     return;

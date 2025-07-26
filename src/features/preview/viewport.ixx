@@ -6,7 +6,6 @@ module;
 export module Features.Preview.Viewport;
 
 import std;
-import Features.Preview.Types;
 import Core.State;
 
 export namespace Features::Preview::Viewport {
