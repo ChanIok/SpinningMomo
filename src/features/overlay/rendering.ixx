@@ -25,7 +25,4 @@ export auto render_frame(Core::State::AppState& state,
 // 清理渲染资源
 export auto cleanup_rendering_resources(Core::State::AppState& state) -> void;
 
-// 检查是否有新帧
-export auto has_new_frame(const Core::State::AppState& state) -> bool;
-
 }  // namespace Features::Overlay::Rendering

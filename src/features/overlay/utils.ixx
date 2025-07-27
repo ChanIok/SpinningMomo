@@ -5,8 +5,6 @@ module;
 export module Features.Overlay.Utils;
 
 import std;
-import Features.Overlay.State;
-import Core.State;
 
 namespace Features::Overlay::Utils {
 
@@ -23,8 +21,5 @@ export auto should_use_overlay(int game_width, int game_height, int screen_width
 
 // 获取游戏窗口尺寸
 export auto get_window_dimensions(HWND hwnd) -> std::expected<std::pair<int, int>, std::string>;
-
-// 获取游戏窗口矩形
-export auto get_window_rect_safe(HWND hwnd) -> std::expected<RECT, std::string>;
 
 }  // namespace Features::Overlay::Utils

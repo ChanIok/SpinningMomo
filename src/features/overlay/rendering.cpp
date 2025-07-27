@@ -246,8 +246,4 @@ auto cleanup_rendering_resources(Core::State::AppState& state) -> void {
   overlay_state.rendering.d3d_initialized = false;
 }
 
-auto has_new_frame(const Core::State::AppState& state) -> bool {
-  return state.overlay->rendering.has_new_frame;
-}
-
 }  // namespace Features::Overlay::Rendering

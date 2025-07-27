@@ -50,13 +50,4 @@ auto get_window_dimensions(HWND hwnd) -> std::expected<std::pair<int, int>, std:
   return std::make_pair(rect.right - rect.left, rect.bottom - rect.top);
 }
 
-auto get_window_rect_safe(HWND hwnd) -> std::expected<RECT, std::string> {
-  RECT rect;
-  if (!GetWindowRect(hwnd, &rect)) {
-    DWORD error = GetLastError();
-    return std::unexpected(std::format("Failed to get window rect. Error: {}", error));
-  }
-  return rect;
-}
-
 }  // namespace Features::Overlay::Utils

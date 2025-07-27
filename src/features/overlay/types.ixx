@@ -18,7 +18,6 @@ constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
 constexpr UINT WM_SHOW_OVERLAY = WM_USER + 2;
 constexpr UINT WM_MOUSE_EVENT = WM_USER + 3;
 constexpr UINT WM_WINDOW_EVENT = WM_USER + 4;
-constexpr int CLEANUP_TIMEOUT = 30000;  // 清理超时（毫秒）
 
 // 顶点结构体
 struct Vertex {
@@ -55,8 +54,6 @@ struct RenderingState {
   std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
 
   bool d3d_initialized = false;
-  bool has_new_frame = false;
-  bool recreate_texture_flag = false;
   bool create_new_srv = true;
 };
 

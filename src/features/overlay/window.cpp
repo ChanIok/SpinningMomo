@@ -159,13 +159,6 @@ auto update_overlay_window_size(Core::State::AppState& state, int game_width, in
   overlay_state.window.cached_game_width = game_width;
   overlay_state.window.cached_game_height = game_height;
 
-  // 检查是否需要叠加层
-  if (!Utils::should_use_overlay(game_width, game_height, overlay_state.window.screen_width,
-                                 overlay_state.window.screen_height)) {
-    Logger().debug("Game window fits within screen, overlay not needed");
-    return std::unexpected("Game window fits within screen, overlay not needed");
-  }
-
   // 计算叠加层窗口尺寸
   auto [window_width, window_height] = Utils::calculate_overlay_dimensions(
       game_width, game_height, overlay_state.window.screen_width,

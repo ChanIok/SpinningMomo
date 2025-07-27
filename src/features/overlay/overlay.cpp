@@ -16,12 +16,12 @@ import Features.Overlay.Interaction;
 import Features.Overlay.Threads;
 import Features.Overlay.Utils;
 import Utils.Logger;
+import Utils.Timer;
 
 namespace Features::Overlay {
 
 auto initialize_overlay(Core::State::AppState& state, HINSTANCE instance, HWND parent)
     -> std::expected<void, std::string> {
-
   // 初始化窗口系统
   if (auto result = Window::initialize_overlay_window(state, instance, parent); !result) {
     return std::unexpected(result.error());
@@ -49,7 +49,8 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
 
   if (!Utils::should_use_overlay(width, height, screen_width, screen_height)) {
     Window::restore_game_window(state, true);
-    return std::unexpected("Game window fits within screen, overlay not needed");
+    // 不返回错误，因为游戏窗口在屏幕内，不需要叠加层
+    return {};
   }
 
   // 更新窗口尺寸
@@ -63,7 +64,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
   }
 
   // 初始化渲染系统（仅在未初始化时）
-  if (!state.overlay->rendering.d3d_initialized ) {
+  if (!state.overlay->rendering.d3d_initialized) {
     if (auto result = Rendering::initialize_rendering(state); !result) {
       return std::unexpected(result.error());
     }
@@ -107,6 +108,19 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 
   // 清理交互资源
   Interaction::cleanup_interaction(state);
+
+  // 启动清理定时器
+  if (!overlay_state.cleanup_timer) {
+    overlay_state.cleanup_timer.emplace();
+  }
+
+  if (!overlay_state.cleanup_timer->IsRunning()) {
+    if (auto result = overlay_state.cleanup_timer->SetTimer(std::chrono::milliseconds(30000),
+                                                            [&state]() { cleanup_overlay(state); });
+        !result) {
+      Logger().error("Failed to set cleanup timer: {}", static_cast<int>(result.error()));
+    }
+  }
 
   Logger().debug("Overlay stopped");
 }
