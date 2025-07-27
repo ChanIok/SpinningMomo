@@ -2,6 +2,7 @@ module;
 
 #include <windows.h>
 
+#include <functional>
 #include <iostream>
 
 module Features.Overlay;

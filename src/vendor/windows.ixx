@@ -75,6 +75,7 @@ export auto MsgWaitForMultipleObjectsEx(DWORD nCount, const HANDLE* pHandles, DW
 
 // Windows 常量导出
 export constexpr UINT MB_ICONERROR_t = 0x00000010L;
+export constexpr UINT WM_USER_t = 0x0400;
 
 // PeekMessage 常量
 export constexpr UINT PM_REMOVE_t = 0x0001;

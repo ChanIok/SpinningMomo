@@ -12,13 +12,13 @@ import Common.MenuData;
 import Common.MenuIds;
 import Core.Events;
 import Core.State;
-import Core.Constants;
 import UI.AppWindow;
 import UI.AppWindow.Events;
 import UI.AppWindow.Layout;
 import UI.AppWindow.Painter;
 import UI.AppWindow.State;
 import UI.TrayIcon;
+import UI.TrayIcon.Types;
 import UI.ContextMenu;
 import UI.ContextMenu.Types;
 import UI.AppWindow.D2DContext;
@@ -151,7 +151,7 @@ auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
 auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
                       LPARAM lParam) -> LRESULT {
   switch (msg) {
-    case Core::Constants::WM_TRAYICON:
+    case UI::TrayIcon::Types::WM_TRAYICON:
       if (lParam == WM_RBUTTONUP || lParam == WM_LBUTTONUP) {
         UI::TrayIcon::show_context_menu(state);
       }

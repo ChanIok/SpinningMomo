@@ -376,14 +376,6 @@ auto handle_nc_hit_test(Core::State::AppState& state, HWND hwnd, WPARAM wParam, 
   return get_border_hit_test(state, hwnd, pt);
 }
 
-auto handle_right_button_up(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
-    -> LRESULT {
-  if (state.preview->main_window) {
-    PostMessage(state.preview->main_window, Core::Constants::WM_PREVIEW_RCLICK, 0, 0);
-  }
-  return 0;
-}
-
 auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   PAINTSTRUCT ps;
   HDC hdc = BeginPaint(hwnd, &ps);
@@ -452,9 +444,6 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
 
     case WM_NCHITTEST:
       return {true, handle_nc_hit_test(state, hwnd, wParam, lParam)};
-
-    case WM_RBUTTONUP:
-      return {true, handle_right_button_up(state, hwnd, wParam, lParam)};
 
     case WM_DESTROY:
       // 清理资源但不调用PostQuitMessage

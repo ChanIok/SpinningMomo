@@ -8,7 +8,6 @@ module UI.TrayIcon;
 
 import std;
 import Core.State;
-import Core.Constants;
 import Core.I18n.Types;
 import Core.I18n.State;
 import Common.MenuData;
@@ -17,6 +16,7 @@ import UI.ContextMenu;
 import UI.ContextMenu.Types;
 import UI.AppWindow.State;
 import UI.TrayIcon.State;
+import UI.TrayIcon.Types;
 import Utils.String;
 import Vendor.Windows;
 import Vendor.ShellApi;
@@ -121,18 +121,18 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& nid = state.tray_icon->nid;
   nid.cbSize = sizeof(decltype(nid));
   nid.hWnd = state.app_window->window.hwnd;
-  nid.uID = Core::Constants::HOTKEY_ID;
+  nid.uID = UI::TrayIcon::Types::HOTKEY_ID;
   nid.uFlags =
       Vendor::ShellApi::NIF_ICON_t | Vendor::ShellApi::NIF_MESSAGE_t | Vendor::ShellApi::NIF_TIP_t;
-  nid.uCallbackMessage = Core::Constants::WM_TRAYICON;
+  nid.uCallbackMessage = UI::TrayIcon::Types::WM_TRAYICON;
 
   nid.hIcon = static_cast<HICON>(LoadImageW(
-      state.app_window->window.instance, MAKEINTRESOURCEW(Core::Constants::IDI_ICON1), IMAGE_ICON,
+      state.app_window->window.instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1), IMAGE_ICON,
       GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
   if (!nid.hIcon) nid.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
   if (!nid.hIcon) return std::unexpected("Failed to load tray icon.");
 
-  const auto app_name = Core::Constants::APP_NAME;
+  const auto app_name = UI::TrayIcon::Types::APP_NAME;
   const auto buffer_size = std::size(nid.szTip);
   const auto copy_len = std::min(app_name.length(), buffer_size - 1);
   app_name.copy(nid.szTip, copy_len);
