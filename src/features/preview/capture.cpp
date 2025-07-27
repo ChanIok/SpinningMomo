@@ -11,6 +11,7 @@ module Features.Preview.Capture;
 
 import std;
 import Core.State;
+import Core.State.AppInfo;
 import Utils.Graphics.Capture;
 import Utils.Logger;
 import Features.Preview.State;
@@ -35,7 +36,7 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
   }
 
   // 检查是否支持捕获
-  if (!Utils::Graphics::Capture::is_capture_supported()) {
+  if (!state.app_info->is_capture_supported) {
     return std::unexpected("Capture not supported on this system");
   }
 

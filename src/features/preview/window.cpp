@@ -11,6 +11,7 @@ module Features.Preview.Window;
 
 import std;
 import Core.State;
+import Core.State.AppInfo;
 import Features.Preview.State;
 import Features.Preview.Types;
 import Features.Preview.Interaction;
@@ -202,7 +203,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   calculate_window_size(*state.preview, width, height);
 
   // 检查是否支持捕获
-  if (!Utils::Graphics::Capture::is_capture_supported()) {
+  if (!state.app_info->is_capture_supported) {
     return std::unexpected("Capture not supported on this system");
   }
 

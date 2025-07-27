@@ -17,14 +17,7 @@ import Utils.Logger;
 
 namespace Utils::Graphics::Capture {
 
-auto is_capture_supported() -> bool {
-  try {
-    // Windows 10 1803 (Build 17134)
-    return winrt::Windows::Graphics::Capture::GraphicsCaptureSession::IsSupported();
-  } catch (...) {
-    return false;
-  }
-}
+
 
 auto create_winrt_device(ID3D11Device* d3d_device)
     -> std::expected<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice, std::string> {

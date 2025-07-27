@@ -1,10 +1,7 @@
 module;
 
 #include <d3d11.h>
-#include <windows.graphics.capture.interop.h>
-#include <windows.graphics.directx.direct3d11.interop.h>
 #include <windows.h>
-#include <winrt/Windows.Foundation.Metadata.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
@@ -27,9 +24,6 @@ export struct CaptureSession {
 
 // 帧回调函数类型
 using FrameCallback = std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)>;
-
-// 检查系统是否支持Graphics Capture
-export auto is_capture_supported() -> bool;
 
 // 创建WinRT设备
 export auto create_winrt_device(ID3D11Device* d3d_device)

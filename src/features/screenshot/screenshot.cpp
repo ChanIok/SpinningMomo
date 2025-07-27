@@ -12,6 +12,8 @@ module;
 module Features.Screenshot;
 
 import std;
+import Core.State;
+import Core.State.AppInfo;
 import Features.Screenshot.State;
 import Utils.Logger;
 import Utils.Path;
@@ -249,7 +251,8 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
 
 // 处理单个截图请求
 auto process_single_request(const Features::Screenshot::State::ScreenshotRequest& request,
-                            Features::Screenshot::State::ScreenshotState& state) -> void {
+                            Core::State::AppState& app_state) -> void {
+  auto& state = *app_state.screenshot;
   Logger().debug("Processing screenshot request for window: {}",
                  reinterpret_cast<uintptr_t>(request.target_window));
 
@@ -294,7 +297,8 @@ auto start_cleanup_timer(Features::Screenshot::State::ScreenshotState& state) ->
 }
 
 // 工作线程主函数
-auto worker_thread_proc(Features::Screenshot::State::ScreenshotState& state) -> void {
+auto worker_thread_proc(Core::State::AppState& app_state) -> void {
+  auto& state = *app_state.screenshot;
   Logger().debug("Screenshot worker thread started");
 
   while (!state.should_stop) {
@@ -339,7 +343,7 @@ auto worker_thread_proc(Features::Screenshot::State::ScreenshotState& state) -> 
 
     // 处理请求
     if (has_request) {
-      process_single_request(request, state);
+      process_single_request(request, app_state);
 
       // 如果队列为空，启动清理定时器
       {
@@ -354,15 +358,14 @@ auto worker_thread_proc(Features::Screenshot::State::ScreenshotState& state) -> 
   Logger().debug("Screenshot worker thread stopped");
 }
 
-auto is_supported() -> bool { return Utils::Graphics::Capture::is_capture_supported(); }
-
 // 只初始化D3D资源（不创建工作线程）
-auto initialize_d3d_resources_only(Features::Screenshot::State::ScreenshotState& state)
+auto initialize_d3d_resources_only(Core::State::AppState& app_state)
     -> std::expected<void, std::string> {
+  auto& state = *app_state.screenshot;
   Logger().debug("Initializing D3D resources only");
 
   // 检查系统支持
-  if (!is_supported()) {
+  if (!app_state.app_info->is_capture_supported) {
     return std::unexpected("Windows Graphics Capture is not supported");
   }
 
@@ -402,19 +405,20 @@ auto initialize_d3d_resources_only(Features::Screenshot::State::ScreenshotState&
 }
 
 // 初始化完整系统
-auto initialize_system(Features::Screenshot::State::ScreenshotState& state)
-    -> std::expected<void, std::string> {
+auto initialize_system(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  auto& state = *app_state.screenshot;
   Logger().debug("Initializing screenshot system");
 
   // 初始化D3D资源
-  auto d3d_result = initialize_d3d_resources_only(state);
+  auto d3d_result = initialize_d3d_resources_only(app_state);
   if (!d3d_result) {
     return d3d_result;
   }
 
   // 启动工作线程
   state.should_stop = false;
-  state.worker_thread = std::make_unique<std::jthread>([&state]() { worker_thread_proc(state); });
+  state.worker_thread =
+      std::make_unique<std::jthread>([&app_state]() { worker_thread_proc(app_state); });
 
   // 清空队列
   std::lock_guard<std::mutex> lock(state.request_mutex);
@@ -426,7 +430,8 @@ auto initialize_system(Features::Screenshot::State::ScreenshotState& state)
   return {};
 }
 
-auto cleanup_system(Features::Screenshot::State::ScreenshotState& state) -> void {
+auto cleanup_system(Core::State::AppState& app_state) -> void {
+  auto& state = *app_state.screenshot;
   Logger().debug("Cleaning up screenshot system");
 
   // 取消清理定时器
@@ -454,9 +459,10 @@ auto cleanup_system(Features::Screenshot::State::ScreenshotState& state) -> void
 }
 
 auto take_screenshot(
-    Features::Screenshot::State::ScreenshotState& state, HWND target_window,
+    Core::State::AppState& app_state, HWND target_window,
     std::function<void(bool success, const std::wstring& path)> completion_callback)
     -> std::expected<void, std::string> {
+  auto& state = *app_state.screenshot;
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window handle");
   }
@@ -486,14 +492,14 @@ auto take_screenshot(
     // 如果只是D3D资源被清理，但工作线程还在，只重新初始化D3D资源
     if (!state.d3d_initialized && state.worker_thread && state.worker_thread->joinable()) {
       Logger().debug("Worker thread exists, only reinitializing D3D resources");
-      auto d3d_result = initialize_d3d_resources_only(state);
+      auto d3d_result = initialize_d3d_resources_only(app_state);
       if (!d3d_result) {
         return std::unexpected("Failed to reinitialize D3D resources: " + d3d_result.error());
       }
     } else {
       // 完全重新初始化系统
       Logger().debug("Full system reinitialization required");
-      auto init_result = initialize_system(state);
+      auto init_result = initialize_system(app_state);
       if (!init_result) {
         return std::unexpected("Failed to initialize screenshot system: " + init_result.error());
       }

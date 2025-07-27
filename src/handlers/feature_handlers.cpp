@@ -148,7 +148,7 @@ auto handle_capture_event(Core::State::AppState& state,
 
   // 执行截图
   auto result =
-      Features::Screenshot::take_screenshot(*state.screenshot, *target_window, completion_callback);
+      Features::Screenshot::take_screenshot(state, *target_window, completion_callback);
   if (!result) {
     Features::Notifications::show_notification(
         state, state.i18n->texts.label.app_name,

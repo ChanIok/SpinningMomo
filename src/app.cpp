@@ -46,7 +46,7 @@ Application::~Application() {
     if (auto result = Features::Letterbox::shutdown(*m_app_state); !result) {
       Logger().error("Failed to shutdown Letterbox: {}", result.error());
     }
-    Features::Screenshot::cleanup_system(*m_app_state->screenshot);
+    Features::Screenshot::cleanup_system(*m_app_state);
 
     // 清理WebView
     UI::WebViewWindow::cleanup(*m_app_state);
@@ -163,6 +163,11 @@ auto Application::LogSystemInfo() -> void {
       m_app_state->app_info->os_minor_version = version.minor_version;
       m_app_state->app_info->os_build_number = version.build_number;
       m_app_state->app_info->os_name = Utils::System::get_windows_name(version);
+      
+      // 设置捕获支持状态 (Windows 10 1903 build 18362 or later)
+      m_app_state->app_info->is_capture_supported = 
+        (version.major_version > 10) || 
+        (version.major_version == 10 && version.build_number >= 18362);
     }
   } else {
     Logger().error("Failed to get OS version: {}", version_result.error());
