@@ -11,6 +11,7 @@ import Core.Events;
 import Core.I18n.State;
 import Core.RpcHandlers.State;
 import Core.WebView.State;
+import Core.State.AppInfo;
 import Features.Settings.State;
 import Features.Letterbox.State;
 import Features.Letterbox;
@@ -33,6 +34,7 @@ import UI.ContextMenu.State;
 import Core.WebView;
 import Utils.Logger;
 import Utils.String;
+import Utils.System;
 import Vendor.Windows;
 import Core.I18n;
 
@@ -69,6 +71,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->i18n = std::make_unique<Core::I18n::State::I18nState>();
     m_app_state->rpc_handlers = std::make_unique<Core::RpcHandlers::State::RpcHandlerState>();
     m_app_state->webview = std::make_unique<Core::WebView::State::WebViewState>();
+    m_app_state->app_info = std::make_unique<Core::State::AppInfo::AppInfoState>();
     m_app_state->settings = std::make_unique<Features::Settings::State::SettingsState>();
 
     // 初始化UI状态
@@ -120,7 +123,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
 auto Application::Run() -> int {
   Vendor::Windows::MSG msg{};
-  const auto timeout = 16;  // ~60 FPS
+  const auto timeout = 10;
 
   while (true) {
     // 等待消息或超时
@@ -148,11 +151,20 @@ auto Application::Run() -> int {
 }
 
 auto Application::LogSystemInfo() -> void {
-  Vendor::Windows::OSVERSIONINFOEXW osvi{};
-  osvi.dwOSVersionInfoSize = sizeof(Vendor::Windows::OSVERSIONINFOEXW);
+  // 使用 Utils::System 模块获取系统版本信息
+  if (auto version_result = Utils::System::get_windows_version()) {
+    const auto& version = version_result.value();
+    Logger().info("OS Version: {}.{}.{}", version.major_version, version.minor_version,
+                  version.build_number);
 
-  if (Vendor::Windows::GetVersionExW(reinterpret_cast<Vendor::Windows::LPOSVERSIONINFOW>(&osvi))) {
-    Logger().info("OS Version: {}.{}.{}", osvi.dwMajorVersion, osvi.dwMinorVersion,
-                  osvi.dwBuildNumber);
+    // 填充系统信息到 AppInfoState
+    if (m_app_state && m_app_state->app_info) {
+      m_app_state->app_info->os_major_version = version.major_version;
+      m_app_state->app_info->os_minor_version = version.minor_version;
+      m_app_state->app_info->os_build_number = version.build_number;
+      m_app_state->app_info->os_name = Utils::System::get_windows_name(version);
+    }
+  } else {
+    Logger().error("Failed to get OS version: {}", version_result.error());
   }
 }

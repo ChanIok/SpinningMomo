@@ -20,6 +20,10 @@ namespace Core::WebView::State {
 export struct WebViewState;
 }
 
+namespace Core::State::AppInfo {
+export struct AppInfoState;
+}
+
 namespace Features::Settings::State {
 export struct SettingsState;
 }
@@ -69,6 +73,7 @@ export struct AppState {
   std::unique_ptr<Core::I18n::State::I18nState> i18n;
   std::unique_ptr<Core::RpcHandlers::State::RpcHandlerState> rpc_handlers;
   std::unique_ptr<Core::WebView::State::WebViewState> webview;
+  std::unique_ptr<Core::State::AppInfo::AppInfoState> app_info;
 
   // 应用设置状态（包含配置和计算状态）
   std::unique_ptr<Features::Settings::State::SettingsState> settings;
