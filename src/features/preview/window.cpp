@@ -63,8 +63,8 @@ auto register_preview_window_class(HINSTANCE instance) -> bool {
   return RegisterClassExW(&wc) != 0;
 }
 
-auto create_preview_window(HINSTANCE instance, HWND parent, int width, int height,
-                           Core::State::AppState* state) -> HWND {
+auto create_preview_window(HINSTANCE instance, int width, int height, Core::State::AppState* state)
+    -> HWND {
   return CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED,
                          Features::Preview::Types::PREVIEW_WINDOW_CLASS, L"PreviewWindow", WS_POPUP,
                          0, 0, width, height, nullptr, nullptr, instance, state);
@@ -113,7 +113,7 @@ auto handle_first_show(Features::Preview::State::PreviewState& state) -> void {
                SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
 }
 
-auto create_window(HINSTANCE instance, HWND parent, Core::State::AppState* state)
+auto create_window(HINSTANCE instance, Core::State::AppState* state)
     -> std::expected<HWND, std::string> {
   // 1. 注册窗口类
   if (!register_preview_window_class(instance)) {
@@ -124,7 +124,7 @@ auto create_window(HINSTANCE instance, HWND parent, Core::State::AppState* state
   int idealSize = static_cast<int>(screenHeight * 0.5);
 
   // 2. 创建窗口
-  HWND hwnd = create_preview_window(instance, parent, idealSize, idealSize + 24, state);
+  HWND hwnd = create_preview_window(instance, idealSize, idealSize + 24, state);
   if (!hwnd) {
     return std::unexpected("Failed to create preview window");
   }
@@ -134,17 +134,16 @@ auto create_window(HINSTANCE instance, HWND parent, Core::State::AppState* state
   return hwnd;
 }
 
-auto initialize_preview(Core::State::AppState& state, HINSTANCE instance, HWND parent)
+auto initialize_preview(Core::State::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string> {
   // 创建窗口，传递状态指针
-  auto window_result = create_window(instance, parent, &state);
+  auto window_result = create_window(instance, &state);
   if (!window_result) {
     return std::unexpected(window_result.error());
   }
 
   // 初始化预览状态
   state.preview->hwnd = window_result.value();
-  state.preview->main_window = parent;
   state.preview->is_first_show = true;
 
   // 初始化DPI
@@ -166,6 +165,15 @@ auto initialize_preview(Core::State::AppState& state, HINSTANCE instance, HWND p
 
 auto start_preview(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
+  // 检查预览窗口是否存在，如果不存在则初始化
+  if (!state.preview->hwnd) {
+    HINSTANCE instance = GetModuleHandle(nullptr);
+
+    if (auto result = initialize_preview(state, instance); !result) {
+      return std::unexpected(result.error());
+    }
+  }
+
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
   }

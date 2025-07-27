@@ -29,7 +29,6 @@ struct Vertex {
 struct WindowState {
   HWND overlay_hwnd = nullptr;
   HWND target_window = nullptr;
-  HWND main_window = nullptr;
   HWND timer_window = nullptr;
 
   int screen_width = 0;
@@ -77,7 +76,7 @@ struct ThreadState {
   std::jthread capture_render_thread;
   std::jthread hook_thread;
   std::jthread window_manager_thread;
-  
+
   DWORD capture_render_thread_id = 0;
   DWORD hook_thread_id = 0;
   DWORD window_manager_thread_id = 0;

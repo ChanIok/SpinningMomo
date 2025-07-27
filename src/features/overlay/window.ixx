@@ -11,11 +11,11 @@ import Core.State;
 namespace Features::Overlay::Window {
 
 // 创建叠加层窗口
-export auto create_overlay_window(HINSTANCE instance, HWND parent, Core::State::AppState& state)
+export auto create_overlay_window(HINSTANCE instance, Core::State::AppState& state)
     -> std::expected<HWND, std::string>;
 
 // 初始化叠加层窗口系统
-export auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance, HWND parent)
+export auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string>;
 
 // 显示叠加层窗口

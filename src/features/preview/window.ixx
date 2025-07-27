@@ -10,7 +10,7 @@ import Core.State;
 namespace Features::Preview::Window {
 
 // 初始化预览系统
-export auto initialize_preview(Core::State::AppState& state, HINSTANCE instance, HWND parent)
+export auto initialize_preview(Core::State::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string>;
 
 // 开始捕获并显示预览

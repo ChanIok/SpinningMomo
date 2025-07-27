@@ -63,14 +63,13 @@ auto unregister_overlay_window_class(HINSTANCE instance) -> void {
   UnregisterClassW(L"OverlayWindowClass", instance);
 }
 
-auto create_overlay_window(HINSTANCE instance, HWND parent, Core::State::AppState& state)
+auto create_overlay_window(HINSTANCE instance, Core::State::AppState& state)
     -> std::expected<HWND, std::string> {
   auto& overlay_state = *state.overlay;
   auto [screen_width, screen_height] = Utils::get_screen_dimensions();
 
   overlay_state.window.screen_width = screen_width;
   overlay_state.window.screen_height = screen_height;
-  overlay_state.window.main_window = parent;
 
   HWND hwnd = CreateWindowExW(WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE |
                                   WS_EX_LAYERED | WS_EX_NOREDIRECTIONBITMAP,
@@ -113,7 +112,7 @@ auto set_window_layered_attributes(HWND hwnd) -> std::expected<void, std::string
   return {};
 }
 
-auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance, HWND parent)
+auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string> {
   // 注册窗口类
   if (auto result = register_overlay_window_class(instance); !result) {
@@ -121,7 +120,7 @@ auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance,
   }
 
   // 创建窗口
-  if (auto result = create_overlay_window(instance, parent, state); !result) {
+  if (auto result = create_overlay_window(instance, state); !result) {
     unregister_overlay_window_class(instance);
     return std::unexpected(result.error());
   }

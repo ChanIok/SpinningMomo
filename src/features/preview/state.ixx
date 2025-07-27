@@ -15,7 +15,6 @@ struct PreviewState {
   // 窗口句柄
   HWND hwnd = nullptr;
   HWND target_window = nullptr;
-  HWND main_window = nullptr;
 
   // 窗口状态
   bool is_visible = false;

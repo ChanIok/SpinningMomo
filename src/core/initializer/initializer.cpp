@@ -7,18 +7,13 @@ import Core.Async.Runtime;
 import Core.Events;
 import Core.State;
 import Handlers.EventRegistrar;
-import Features.Letterbox;
 import Features.Notifications;
-import Features.Overlay;
-import Features.Preview.Window;
-import Features.Screenshot;
 import Features.Settings;
 import Features.Settings.Rpc;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
 import UI.AppWindow.State;
-import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
 import Vendor.Windows;
@@ -60,29 +55,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     if (auto result = UI::ContextMenu::initialize(state); !result) {
       Logger().warn("Failed to initialize tray menu: {}", result.error());
       // 托盘菜单初始化失败，但不影响应用程序运行
-    }
-
-    // 11. 初始化预览系统
-    if (auto preview_result = Features::Preview::Window::initialize_preview(
-            state, instance, state.app_window->window.hwnd);
-        !preview_result) {
-      Logger().warn("Failed to initialize preview system");
-      // 预览功能不可用，但应用继续运行
-    }
-
-    // 12. 初始化overlay系统
-    if (auto overlay_result =
-            Features::Overlay::initialize_overlay(state, instance, state.app_window->window.hwnd);
-        !overlay_result) {
-      Logger().warn("Failed to initialize overlay system: {}", overlay_result.error());
-      // overlay功能不可用，但应用继续运行
-    }
-
-    // 13. 初始化letterbox系统
-    if (auto letterbox_result = Features::Letterbox::initialize(state, instance);
-        !letterbox_result) {
-      Logger().warn("Failed to initialize letterbox system: {}", letterbox_result.error());
-      // letterbox功能不可用，但应用继续运行
     }
 
     // 14. 默认显示窗口

@@ -21,19 +21,23 @@ import Utils.Timer;
 
 namespace Features::Overlay {
 
-auto initialize_overlay(Core::State::AppState& state, HINSTANCE instance, HWND parent)
-    -> std::expected<void, std::string> {
-  // 初始化窗口系统
-  if (auto result = Window::initialize_overlay_window(state, instance, parent); !result) {
-    return std::unexpected(result.error());
-  }
-
-  return {};
-}
-
 auto start_overlay(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
+
+  // 取消清理定时器
+  if (overlay_state.cleanup_timer && overlay_state.cleanup_timer->IsRunning()) {
+    overlay_state.cleanup_timer->Cancel();
+  }
+
+  // 检查窗口是否已初始化，如果未初始化则进行初始化
+  if (!overlay_state.window.overlay_hwnd) {
+    HINSTANCE instance = GetModuleHandle(nullptr);
+    
+    if (auto result = Window::initialize_overlay_window(state, instance); !result) {
+      return std::unexpected(result.error());
+    }
+  }
 
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
@@ -145,6 +149,8 @@ auto cleanup_overlay(Core::State::AppState& state) -> void {
 
   // 注销窗口类
   Window::unregister_overlay_window_class(GetModuleHandle(nullptr));
+
+  Logger().info("Overlay cleaned up");
 }
 
 }  // namespace Features::Overlay

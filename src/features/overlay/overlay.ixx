@@ -6,13 +6,8 @@ export module Features.Overlay;
 
 import std;
 import Core.State;
-import Features.Overlay.State;
 
 namespace Features::Overlay {
-
-// 初始化叠加层系统
-export auto initialize_overlay(Core::State::AppState& state, HINSTANCE instance, HWND parent)
-    -> std::expected<void, std::string>;
 
 // 开始叠加层捕获
 export auto start_overlay(Core::State::AppState& state, HWND target_window)
