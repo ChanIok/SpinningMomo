@@ -14,6 +14,9 @@ import Features.Letterbox.State;
 
 namespace Features::Letterbox {
 
+// 全局状态指针，用于钩子回调
+Core::State::AppState* g_app_state = nullptr;
+
 // 更新位置
 auto update_position(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
@@ -23,18 +26,6 @@ auto update_position(Core::State::AppState& state, HWND target_window)
     return std::unexpected{"Letterbox not initialized"};
   }
 
-  // 如果目标窗口发生变化，更新属性
-  if (target_window && target_window != letterbox.target_window) {
-    // 清理旧窗口属性
-    if (letterbox.target_window) {
-      RemoveProp(letterbox.target_window, L"SpinningMomo_LetterboxState");
-    }
-
-    // 设置新窗口属性
-    letterbox.target_window = target_window;
-    SetProp(letterbox.target_window, L"SpinningMomo_LetterboxState",
-            reinterpret_cast<HANDLE>(&state));
-  }
 
   if (!letterbox.target_window) {
     return std::unexpected{"No target window specified"};
@@ -148,6 +139,9 @@ auto initialize(Core::State::AppState& state, HINSTANCE instance)
     return std::unexpected{"Letterbox already initialized"};
   }
 
+  // 设置全局状态指针
+  g_app_state = &state;
+
   letterbox.instance = instance;
   letterbox.is_visible = false;
 
@@ -209,9 +203,8 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
 
 void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG idObject,
                              LONG idChild, DWORD idEventThread, DWORD dwmsEventTime) {
-  // 通过目标窗口属性查找状态
-  auto* state =
-      reinterpret_cast<Core::State::AppState*>(GetProp(hwnd, L"SpinningMomo_LetterboxState"));
+  // 使用全局状态指针替代窗口属性
+  auto* state = g_app_state;
 
   if (!state || !state->letterbox->event_thread.joinable() || !state->letterbox->message_window) {
     return;
@@ -352,10 +345,6 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
     return result;
   }
 
-  // 设置目标窗口属性，方便钩子回调查找状态
-  SetProp(letterbox.target_window, L"SpinningMomo_LetterboxState",
-          reinterpret_cast<HANDLE>(&state));
-
   letterbox.is_visible = true;
   return {};
 }
@@ -373,10 +362,6 @@ auto hide(Core::State::AppState& state) -> std::expected<void, std::string> {
     letterbox.is_visible = false;
   }
 
-  // 清理目标窗口属性
-  if (letterbox.target_window) {
-    RemoveProp(letterbox.target_window, L"SpinningMomo_LetterboxState");
-  }
 
   return {};
 }
@@ -416,10 +401,6 @@ auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> 
   [[maybe_unused]] auto stop_result = stop_event_monitoring(state);
   // 记录错误但继续清理
 
-  // 清理目标窗口属性（防止hide函数没有清理）
-  if (letterbox.target_window) {
-    RemoveProp(letterbox.target_window, L"SpinningMomo_LetterboxState");
-  }
 
   // 销毁窗口
   if (letterbox.window_handle) {
@@ -429,6 +410,9 @@ auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> 
 
   // 注销窗口类
   UnregisterClass(L"LetterboxWindowClass", letterbox.instance);
+
+  // 清除全局状态指针
+  g_app_state = nullptr;
 
   letterbox.is_initialized = false;
 
