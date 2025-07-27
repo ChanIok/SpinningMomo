@@ -29,7 +29,7 @@ export struct Resolution {
 
 // 窗口变换选项
 export struct TransformOptions {
-  bool taskbar_lower = false;
+  bool taskbar_lower = true;
   bool activate_window = true;
   std::optional<Vendor::Windows::HWND> letterbox_window = std::nullopt;
 };

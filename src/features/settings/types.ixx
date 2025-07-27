@@ -128,7 +128,7 @@ inline auto create_default_app_settings() -> AppSettings {
   settings.app.logger.level = "INFO";
 
   // window 设置
-  settings.window.target_title = "";
+  settings.window.target_title = "无限暖暖  ";
   settings.window.taskbar.auto_hide = false;
   settings.window.taskbar.lower_on_resize = true;
 

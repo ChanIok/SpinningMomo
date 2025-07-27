@@ -39,6 +39,11 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Invalid target window");
   }
 
+  // 检查窗口是否最小化
+  if (IsIconic(target_window)) {
+    return std::unexpected("Target window is minimized");
+  }
+
   // 获取窗口尺寸并检查是否需要叠加层
   auto dimensions_result = Utils::get_window_dimensions(target_window);
   if (!dimensions_result) {
@@ -57,11 +62,6 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
   // 更新窗口尺寸
   if (auto result = Window::update_overlay_window_size(state, width, height); !result) {
     return std::unexpected(result.error());
-  }
-
-  // 验证overlay窗口已创建且有效
-  if (!overlay_state.window.overlay_hwnd || !IsWindow(overlay_state.window.overlay_hwnd)) {
-    return std::unexpected("Overlay window is not valid. Please restart the application.");
   }
 
   // 初始化渲染系统（仅在未初始化时）

@@ -14,8 +14,8 @@ import Features.Settings;
 import Features.Settings.State;
 import Features.WindowControl;
 import Features.Notifications;
-import Features.Screenshot;
-import Features.Screenshot.Folder;
+import Features.Preview.Window;
+import Features.Overlay;
 import UI.AppWindow;
 import Utils.Logger;
 import Utils.String;
@@ -45,69 +45,42 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
   return 0;  // 表示使用屏幕尺寸
 }
 
+// 在窗口变换前停止活动模块
+auto prepare_window_transform(Core::State::AppState& state) -> void {
+  // 停止活动模块
+  if (state.app_window->ui.preview_enabled) {
+    Features::Preview::Window::stop_preview(state);
+  }
+
+  if (state.app_window->ui.overlay_enabled) {
+    Features::Overlay::stop_overlay(state);
+  }
+}
+
 // 变换后的后续处理
-auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window,
-                            const Features::WindowControl::Resolution& resolution) -> void {
-  // TODO: 添加后续处理逻辑
-  // 1. 更新黑边状态
-  // 2. 重启窗口捕获
-  // 3. 其他UI更新
-
-  Logger().debug("Post-transform actions completed for window {}x{}", resolution.width,
-                 resolution.height);
-}
-
-// 处理截图事件
-auto handle_capture_event(Core::State::AppState& state,
-                          const UI::AppWindow::Events::CaptureEvent& event) -> void {
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
-  auto target_window = Features::WindowControl::find_target_window(window_title);
-  if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_not_found);
-    return;
-  }
-
-  // 创建截图完成回调
-  auto completion_callback = [&state](bool success, const std::wstring& path) {
-    if (success) {
-      // 转换路径为字符串用于通知
-      std::string path_str(path.begin(), path.end());
-      Features::Notifications::show_notification(
-          state, state.i18n->texts.label.app_name,
-          state.i18n->texts.message.screenshot_success + path_str);
-      Logger().debug("Screenshot saved successfully: {}", path_str);
-    } else {
-      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                                 state.i18n->texts.message.window_adjust_failed);
-      Logger().error("Screenshot capture failed");
+auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
+    -> void {
+  // 重启之前启用的模块
+  if (state.app_window->ui.preview_enabled) {
+    auto preview_result = Features::Preview::Window::start_preview(state, target_window);
+    if (!preview_result) {
+      Logger().error("Failed to restart preview after window transform: {}",
+                     preview_result.error());
     }
-  };
-
-  // 执行截图
-  auto result =
-      Features::Screenshot::take_screenshot(*state.screenshot, *target_window, completion_callback);
-  if (!result) {
-    Features::Notifications::show_notification(
-        state, state.i18n->texts.label.app_name,
-        state.i18n->texts.message.window_adjust_failed + ": " + result.error());
-    Logger().error("Failed to start screenshot: {}", result.error());
-  } else {
-    Logger().debug("Screenshot capture started successfully");
   }
+
+  if (state.app_window->ui.overlay_enabled) {
+    auto overlay_result = Features::Overlay::start_overlay(state, target_window);
+    if (!overlay_result) {
+      Logger().error("Failed to restart overlay after window transform: {}",
+                     overlay_result.error());
+    }
+  }
+
+  Logger().debug("Post-transform actions completed");
 }
 
-// 处理打开截图文件夹事件
-auto handle_screenshots_event(Core::State::AppState& state,
-                              const UI::AppWindow::Events::ScreenshotsEvent& event) -> void {
-  Logger().debug("Opening screenshot folder");
 
-  if (auto result = Features::Screenshot::Folder::open_folder(state); !result) {
-    Logger().error("Failed to open screenshot folder: {}", result.error());
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_adjust_failed);
-  }
-}
 
 // 处理重置窗口事件
 auto handle_reset_event(Core::State::AppState& state,
@@ -120,9 +93,11 @@ auto handle_reset_event(Core::State::AppState& state,
     return;
   }
 
-  // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
-  Features::WindowControl::TransformOptions options{.taskbar_lower = false,
-                                                    .activate_window = true};
+  prepare_window_transform(state);
+
+  Features::WindowControl::TransformOptions options{
+      .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
+      .activate_window = true};
 
   auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
   if (!result) {
@@ -131,6 +106,8 @@ auto handle_reset_event(Core::State::AppState& state,
         state.i18n->texts.message.window_reset_failed + ": " + result.error());
     return;
   }
+
+  post_transform_actions(state, *target_window);
 
   // 重置UI状态到默认值
   state.app_window->ui.current_ratio_index =
@@ -170,10 +147,12 @@ auto handle_ratio_changed(Core::State::AppState& state,
     new_resolution = Features::WindowControl::calculate_resolution(event.ratio_value, total_pixels);
   }
 
+  prepare_window_transform(state);
+
   // 应用窗口变换
-  // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = false, .activate_window = !state.app_window->ui.overlay_enabled};
+      .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
+      .activate_window = !state.app_window->ui.overlay_enabled};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -187,7 +166,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
   Logger().debug("Window transform applied successfully: {}x{}", new_resolution.width,
                  new_resolution.height);
 
-  post_transform_actions(state, *target_window, new_resolution);
+  post_transform_actions(state, target_window.value());
 
   // 更新当前比例索引
   const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
@@ -216,23 +195,24 @@ auto handle_resolution_changed(Core::State::AppState& state,
     return;
   }
 
-  // 获取当前比例
-  double current_ratio = get_current_ratio(state);
-
   // 计算新分辨率
+  double current_ratio = get_current_ratio(state);
   Features::WindowControl::Resolution new_resolution;
+
   if (event.total_pixels == 0) {
-    // 默认选项，使用屏幕尺寸
+    // 使用屏幕尺寸计算
     new_resolution = Features::WindowControl::calculate_resolution_by_screen(current_ratio);
   } else {
     new_resolution =
         Features::WindowControl::calculate_resolution(current_ratio, event.total_pixels);
   }
 
+  prepare_window_transform(state);
+
   // 应用窗口变换
-  // TODO: 等待settings设计完成后，从settings中读取taskbar.lower配置
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = false, .activate_window = !state.app_window->ui.overlay_enabled};
+      .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
+      .activate_window = !state.app_window->ui.overlay_enabled};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -246,7 +226,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
   Logger().debug("Window transform applied successfully: {}x{}", new_resolution.width,
                  new_resolution.height);
 
-  post_transform_actions(state, *target_window, new_resolution);
+  post_transform_actions(state, target_window.value());
 
   // 更新当前分辨率索引
   const auto& resolutions = Common::MenuData::get_current_resolutions(state);
@@ -281,12 +261,15 @@ auto handle_window_selected(Core::State::AppState& state,
     Logger().error("Failed to get settings path: {}", settings_path.error());
   }
 
-  // 示例：可能触发其他业务逻辑
-  // 如果启用了预览功能，可能需要重新开始预览新窗口
-  if (state.app_window->ui.preview_enabled) {
-    Logger().debug("Preview is enabled, may need to restart preview for new target window");
-    // Features::Preview::restart_with_target(state, event.window_handle);
+  // 重启模块
+  prepare_window_transform(state);
+  auto target_window = Features::WindowControl::find_target_window(event.window_title);
+  if (!target_window) {
+    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                               state.i18n->texts.message.window_not_found);
+    return;
   }
+  post_transform_actions(state, target_window.value());
 
   // 发送通知给用户
   Features::Notifications::show_notification(
@@ -310,17 +293,6 @@ auto register_window_handlers(Core::State::AppState& app_state) -> void {
       *app_state.event_bus,
       [&app_state](const UI::AppWindow::Events::ResolutionChangeEvent& event) {
         handle_resolution_changed(app_state, event);
-      });
-
-  // 处理窗口动作事件
-  subscribe<UI::AppWindow::Events::CaptureEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::CaptureEvent& event) {
-        handle_capture_event(app_state, event);
-      });
-
-  subscribe<UI::AppWindow::Events::ScreenshotsEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::ScreenshotsEvent& event) {
-        handle_screenshots_event(app_state, event);
       });
 
   subscribe<UI::AppWindow::Events::ResetEvent>(

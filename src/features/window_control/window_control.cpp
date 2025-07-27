@@ -20,7 +20,6 @@ auto find_target_window(const std::wstring& configured_title) -> std::expected<H
     return title1 == title2;  // 精确比较
   };
 
-  // 1. 如果有配置的标题，先尝试使用配置的标题查找
   if (!configured_title.empty()) {
     auto windows = get_visible_windows();
     for (const auto& window : windows) {
@@ -28,16 +27,6 @@ auto find_target_window(const std::wstring& configured_title) -> std::expected<H
         gameWindow = window.handle;
         break;
       }
-    }
-  }
-
-  // 2. 如果找不到，尝试预设的游戏窗口标题
-  if (!gameWindow) {
-    // 先尝试查找中文标题
-    gameWindow = FindWindow(nullptr, L"无限暖暖  ");  // 精确匹配，包括两个尾部空格
-    if (!gameWindow) {
-      // 如果找不到中文标题，尝试英文标题
-      gameWindow = FindWindow(nullptr, L"Infinity Nikki  ");
     }
   }
 
