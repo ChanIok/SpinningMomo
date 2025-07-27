@@ -1,6 +1,6 @@
 # ==============================================================================
 # Web App Build and Deployment Script
-# ==============================================================================
+# =============================================================================
 # 此脚本负责处理Web应用资源的构建和部署
 # 仅在 Release 模式下执行Web应用构建，Debug 模式使用 Vite 开发服务器
 
@@ -11,14 +11,14 @@ string(TOUPPER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_UPPER)
 function(setup_web_app_build TARGET_NAME)
     if(BUILD_TYPE_UPPER STREQUAL "RELEASE")
         # Release 模式：构建并复制前端资源
-        if(EXISTS ${CMAKE_SOURCE_DIR}/web_app/package.json)
+        if(EXISTS ${CMAKE_SOURCE_DIR}/web/package.json)
             find_program(NPM_EXECUTABLE npm)
             if(NPM_EXECUTABLE)
                 # 添加前端构建目标
                 add_custom_target(build_frontend
                     COMMAND ${NPM_EXECUTABLE} install
                     COMMAND ${NPM_EXECUTABLE} run build
-                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/web_app
+                    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/web
                     COMMENT "Building web app with npm for Release..."
                 )
 
@@ -26,7 +26,7 @@ function(setup_web_app_build TARGET_NAME)
                 add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
                     COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET_NAME}>/resources
                     COMMAND ${CMAKE_COMMAND} -E copy_directory
-                    ${CMAKE_SOURCE_DIR}/web_app/dist
+                    ${CMAKE_SOURCE_DIR}/web/dist
                     $<TARGET_FILE_DIR:${TARGET_NAME}>/resources/web
                     COMMENT "Copying web app resources to Release output directory..."
                     DEPENDS build_frontend
@@ -38,10 +38,10 @@ function(setup_web_app_build TARGET_NAME)
                 message(STATUS "Web app build enabled for Release: npm found at ${NPM_EXECUTABLE}")
             else()
                 message(WARNING "npm not found - web app will not be built automatically")
-                message(STATUS "Please ensure web_app/dist exists for Release builds or install Node.js")
+                message(STATUS "Please ensure web/dist exists for Release builds or install Node.js")
             endif()
         else()
-            message(STATUS "No web_app/package.json found - skipping web app build")
+            message(STATUS "No web/package.json found - skipping web app build")
         endif()
     else()
         # Debug 模式：跳过Web应用构建
