@@ -16,54 +16,14 @@ import Vendor.Windows;
 
 namespace UI::WebViewWindow {
 
-auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
-  // 注册窗口类
-  register_window_class(state.app_window->window.instance);
-
-  // 设置默认窗口大小和位置
-  const int width = 1280;
-  const int height = 720;
-  const int x = 200;
-  const int y = 100;
-
-  // 创建独立窗口
-  HWND hwnd = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,                 // 扩展样式
-                              L"SpinningMomoWebViewWindowClass",      // 窗口类名
-                              L"SpinningMomo WebView",                // 窗口标题
-                              WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,  // 窗口样式
-                              x, y, width, height,                    // 位置和大小
-                              nullptr,                                // 父窗口
-                              nullptr,                                // 菜单
-                              state.app_window->window.instance,      // 实例句柄
-                              &state                                  // 用户数据
-  );
-
-  if (!hwnd) {
-    return std::unexpected("Failed to create WebView window");
-  }
-
-  // 保存窗口句柄到WebView状态中
-  state.webview->window.parent_hwnd = hwnd;
-  state.webview->window.width = width;
-  state.webview->window.height = height;
-  state.webview->window.x = x;
-  state.webview->window.y = y;
-  state.webview->window.is_visible = false;
-
-  Logger().info("WebView window created successfully");
-  return {};
-}
-
-auto destroy(Core::State::AppState& state) -> void {
-  if (state.webview->window.parent_hwnd) {
-    DestroyWindow(state.webview->window.parent_hwnd);
-    state.webview->window.parent_hwnd = nullptr;
-    state.webview->window.is_visible = false;
-    Logger().info("WebView window destroyed");
-  }
-}
-
 auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
+  // 如果 WebView 还未初始化，则进行初始化
+  if (!state.webview->is_initialized) {
+    if (auto result = initialize(state); !result) {
+      return std::unexpected(result.error());
+    }
+  }
+
   if (!state.webview->window.parent_hwnd) {
     return std::unexpected("WebView window not created");
   }
@@ -92,29 +52,6 @@ auto toggle_visibility(Core::State::AppState& state) -> void {
       Logger().error("Failed to show WebView window: {}", result.error());
     }
   }
-}
-
-auto get_hwnd(const Core::State::AppState& state) -> Vendor::Windows::HWND {
-  return state.webview->window.parent_hwnd;
-}
-
-auto is_visible(const Core::State::AppState& state) -> bool {
-  return state.webview->window.is_visible;
-}
-
-auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
-  WNDCLASSEXW wc{};
-  wc.cbSize = sizeof(WNDCLASSEXW);
-  wc.lpfnWndProc = window_proc;
-  wc.hInstance = instance;
-  wc.lpszClassName = L"SpinningMomoWebViewWindowClass";
-  wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
-  wc.style = CS_HREDRAW | CS_VREDRAW;
-  wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-  wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-  wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
-
-  RegisterClassExW(&wc);
 }
 
 auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
@@ -161,8 +98,7 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
     case WM_CLOSE: {
       if (state) {
-        // 隐藏窗口而不是销毁
-        hide(*state);
+        cleanup(*state);
         return 0;
       }
       break;
@@ -177,6 +113,86 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
   }
 
   return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
+  WNDCLASSEXW wc{};
+  wc.cbSize = sizeof(WNDCLASSEXW);
+  wc.lpfnWndProc = window_proc;
+  wc.hInstance = instance;
+  wc.lpszClassName = L"SpinningMomoWebViewWindowClass";
+  wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+  wc.style = CS_HREDRAW | CS_VREDRAW;
+  wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+  wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+  wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
+
+  RegisterClassExW(&wc);
+}
+
+auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
+  // 注册窗口类
+  register_window_class(state.app_window->window.instance);
+
+  // 设置默认窗口大小和位置
+  const int width = 1280;
+  const int height = 720;
+  const int x = 200;
+  const int y = 100;
+
+  // 创建独立窗口
+  HWND hwnd = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,                 // 扩展样式
+                              L"SpinningMomoWebViewWindowClass",      // 窗口类名
+                              L"SpinningMomo WebView",                // 窗口标题
+                              WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,  // 窗口样式
+                              x, y, width, height,                    // 位置和大小
+                              nullptr,                                // 父窗口
+                              nullptr,                                // 菜单
+                              state.app_window->window.instance,      // 实例句柄
+                              &state                                  // 用户数据
+  );
+
+  if (!hwnd) {
+    return std::unexpected("Failed to create WebView window");
+  }
+
+  // 保存窗口句柄到WebView状态中
+  state.webview->window.parent_hwnd = hwnd;
+  state.webview->window.width = width;
+  state.webview->window.height = height;
+  state.webview->window.x = x;
+  state.webview->window.y = y;
+  state.webview->window.is_visible = false;
+
+  Logger().info("WebView window created successfully");
+  return {};
+}
+
+auto cleanup(Core::State::AppState& state) -> void {
+  // 关闭 WebView
+  Core::WebView::shutdown(state);
+
+  if (state.webview->window.parent_hwnd) {
+    DestroyWindow(state.webview->window.parent_hwnd);
+    state.webview->window.parent_hwnd = nullptr;
+    state.webview->window.is_visible = false;
+    Logger().info("WebView window destroyed");
+  }
+}
+
+auto initialize(Core::State::AppState& state) -> std::expected<void, std::string> {
+  // 创建窗口
+  if (auto result = create(state); !result) {
+    return std::unexpected("Failed to create WebView window: " + result.error());
+  }
+
+  // 初始化 WebView
+  if (auto result = Core::WebView::initialize(state, state.webview->window.parent_hwnd); !result) {
+    return std::unexpected("Failed to initialize WebView: " + result.error());
+  }
+
+  Logger().info("WebView window initialized");
+  return {};
 }
 
 }  // namespace UI::WebViewWindow

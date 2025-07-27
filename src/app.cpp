@@ -47,8 +47,7 @@ Application::~Application() {
     Features::Screenshot::cleanup_system(*m_app_state->screenshot);
 
     // 清理WebView
-    Core::WebView::shutdown(*m_app_state);
-    UI::WebViewWindow::destroy(*m_app_state);
+    UI::WebViewWindow::cleanup(*m_app_state);
 
     UI::ContextMenu::cleanup(*m_app_state);
     UI::TrayIcon::destroy(*m_app_state);

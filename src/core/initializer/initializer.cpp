@@ -4,12 +4,8 @@ module Core.Initializer;
 
 import std;
 import Core.Async.Runtime;
-import Core.Constants;
 import Core.Events;
-import UI.AppWindow.State;
 import Core.State;
-import Core.WebView;
-import Core.WebView.State;
 import Handlers.EventRegistrar;
 import Features.Letterbox;
 import Features.Notifications;
@@ -21,6 +17,7 @@ import Features.Settings.Rpc;
 import Utils.Logger;
 import Utils.String;
 import UI.AppWindow;
+import UI.AppWindow.State;
 import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
@@ -48,27 +45,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 5. 注册 Settings RPC 处理器
     Features::Settings::Rpc::register_handlers(state);
 
-    // 注意：比例和分辨率数据现在由settings模块管理
-    // 在Features::Settings::initialize(state)中已经处理了数据的加载和计算
-
     // 7. 创建窗口
     if (auto result = UI::AppWindow::create_window(state); !result) {
       return std::unexpected("Failed to create app window: " + result.error());
-    }
-
-    // 8. 创建独立的WebView窗口
-    if (auto result = UI::WebViewWindow::create(state); !result) {
-      Logger().warn("Failed to create WebView window: {}", result.error());
-      // WebView功能不可用，但应用继续运行
-    } else {
-      // 初始化WebView内容
-      if (auto webview_result = Core::WebView::initialize(state, state.webview->window.parent_hwnd);
-          !webview_result) {
-        Logger().error("Failed to initialize WebView: {}", webview_result.error());
-        // WebView初始化失败，但应用继续运行
-      } else {
-        Logger().info("WebView initialization started (async)");
-      }
     }
 
     // 9. 创建托盘图标

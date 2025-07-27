@@ -30,7 +30,6 @@ class NavigationStartingEventHandler
   HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2* sender,
                                    ICoreWebView2NavigationStartingEventArgs* args) {
     if (m_state) {
-      m_state->webview->is_loading = true;
       Logger().debug("WebView navigation starting");
     }
     return S_OK;
@@ -50,8 +49,6 @@ class NavigationCompletedEventHandler
   HRESULT STDMETHODCALLTYPE Invoke(ICoreWebView2* sender,
                                    ICoreWebView2NavigationCompletedEventArgs* args) {
     if (!m_state) return S_OK;
-
-    m_state->webview->is_loading = false;
 
     BOOL success;
     args->get_IsSuccess(&success);
@@ -178,7 +175,6 @@ class ControllerCompletedHandler
 
     // 初始化RPC桥接
     Core::WebView::RpcBridge::initialize_rpc_bridge(*m_state);
-    webview_state.messaging.is_rpc_ready = true;
 
     Logger().info("WebView2 ready, navigating to: {}",
                   Utils::String::ToUtf8(webview_state.config.initial_url));
@@ -250,29 +246,7 @@ auto initialize(Core::State::AppState& state, HWND parent_hwnd)
   return {};
 }
 
-auto show_webview(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& webview_state = *state.webview;
 
-  if (!webview_state.is_ready) {
-    return std::unexpected("WebView not ready");
-  }
-
-  webview_state.resources.controller.get()->put_IsVisible(TRUE);
-  webview_state.window.is_visible = true;
-
-  Logger().info("WebView shown");
-  return {};
-}
-
-auto hide_webview(Core::State::AppState& state) -> void {
-  auto& webview_state = *state.webview;
-
-  if (webview_state.resources.controller) {
-    webview_state.resources.controller.get()->put_IsVisible(FALSE);
-    webview_state.window.is_visible = false;
-    Logger().info("WebView hidden");
-  }
-}
 
 auto resize_webview(Core::State::AppState& state, int width, int height) -> void {
   auto& webview_state = *state.webview;
@@ -319,50 +293,6 @@ auto navigate_to_url(Core::State::AppState& state, const std::wstring& url)
   Logger().info("Navigating to: {}", Utils::String::ToUtf8(url));
 
   return {};
-}
-
-auto navigate_to_string(Core::State::AppState& state, const std::wstring& html)
-    -> std::expected<void, std::string> {
-  auto& webview_state = *state.webview;
-
-  if (!webview_state.is_ready) {
-    return std::unexpected("WebView not ready");
-  }
-
-  auto hr = webview_state.resources.webview.get()->NavigateToString(html.c_str());
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to navigate to HTML string");
-  }
-
-  Logger().debug("Navigating to HTML string");
-  return {};
-}
-
-auto is_webview_ready(const Core::State::AppState& state) -> bool {
-  return state.webview->is_ready;
-}
-
-auto is_webview_loading(const Core::State::AppState& state) -> bool {
-  return state.webview->is_loading.load();
-}
-
-auto get_current_url(const Core::State::AppState& state) -> std::wstring {
-  return state.webview->resources.current_url;
-}
-
-auto open_dev_tools(Core::State::AppState& state) -> void {
-  auto& webview_state = *state.webview;
-
-  if (webview_state.is_ready && webview_state.config.enable_dev_tools) {
-    webview_state.resources.webview.get()->OpenDevToolsWindow();
-    Logger().info("Developer tools opened");
-  }
-}
-
-auto close_dev_tools(Core::State::AppState& state) -> void {
-  // WebView2 没有直接的关闭开发工具的API
-  // 开发工具窗口需要用户手动关闭
-  Logger().info("Developer tools close requested (user must close manually)");
 }
 
 auto shutdown(Core::State::AppState& state) -> void {

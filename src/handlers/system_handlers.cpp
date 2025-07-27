@@ -46,46 +46,11 @@ auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_d
 // 处理 hide 命令
 auto handle_hide_event(Core::State::AppState& state) -> void { UI::AppWindow::hide_window(state); }
 
-// 处理 webview_test 命令
-auto handle_webview_test(Core::State::AppState& state) -> void {
-  Logger().info("WebView test command received");
-
-  if (UI::WebViewWindow::is_visible(state)) {
-    // 隐藏WebView窗口
-    UI::WebViewWindow::hide(state);
-    Core::WebView::hide_webview(state);
-    Logger().info("WebView window hidden");
-  } else {
-    // 显示WebView窗口
-    if (auto window_result = UI::WebViewWindow::show(state); window_result) {
-      // 等待一下让窗口完全显示
-      std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-      // 检查WebView状态并重试
-      int retry_count = 0;
-      const int max_retries = 10;
-
-      while (retry_count < max_retries && !Core::WebView::is_webview_ready(state)) {
-        Logger().debug("Waiting for WebView to be ready... (attempt {}/{})", retry_count + 1,
-                       max_retries);
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        retry_count++;
-      }
-
-      if (Core::WebView::is_webview_ready(state)) {
-        if (auto webview_result = Core::WebView::show_webview(state); webview_result) {
-          Logger().info("WebView window and content shown successfully");
-        } else {
-          Logger().error("Failed to show WebView content: {}", webview_result.error());
-        }
-      } else {
-        Logger().error("WebView still not ready after {} attempts. Check WebView initialization.",
-                       max_retries);
-      }
-    } else {
-      Logger().error("Failed to show WebView window: {}", window_result.error());
-    }
-  }
+// 处理 webview 命令
+auto handle_webview(Core::State::AppState& state) -> void {
+  Logger().info("WebView command received");
+  UI::WebViewWindow::toggle_visibility(state);
+  Logger().info("WebView window visibility toggled");
 }
 
 // 处理退出事件
@@ -107,7 +72,7 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
                        [&app_state](const HideEvent&) { handle_hide_event(app_state); });
 
   subscribe<WebViewEvent>(*app_state.event_bus,
-                          [&app_state](const WebViewEvent&) { handle_webview_test(app_state); });
+                          [&app_state](const WebViewEvent&) { handle_webview(app_state); });
 
   subscribe<ExitEvent>(*app_state.event_bus,
                        [&app_state](const ExitEvent&) { handle_exit_event(app_state); });

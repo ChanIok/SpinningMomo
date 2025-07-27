@@ -19,7 +19,6 @@ struct WindowState {
   int x = 0;
   int y = 0;
   bool is_visible = false;
-  bool is_dev_tools_enabled = false;
 };
 
 // WebView核心资源
@@ -38,18 +37,12 @@ struct MessageState {
   std::unordered_map<std::string, std::function<void(const std::string&)>> handlers;
   std::mutex message_mutex;
   std::atomic<uint64_t> next_message_id{0};
-
-  // RPC相关状态
-  std::atomic<bool> is_rpc_ready{false};
-  std::mutex pending_notifications_mutex;
-  std::queue<std::string> pending_notifications;
 };
 
 // WebView配置
 struct WebViewConfig {
   std::wstring user_data_folder = L"./webview_data";
   std::wstring initial_url = L"";  // 运行时根据编译模式自动设置
-  bool enable_dev_tools = true;
   std::vector<std::wstring> allowed_origins;
   bool enable_password_autosave = false;
   bool enable_general_autofill = false;
@@ -69,7 +62,6 @@ struct WebViewState {
 
   bool is_initialized = false;
   bool is_ready = false;
-  std::atomic<bool> is_loading{false};
 };
 
 }  // namespace Core::WebView::State
