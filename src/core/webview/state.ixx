@@ -10,23 +10,14 @@ import std;
 
 export namespace Core::WebView::State {
 
-// 拖拽状态结构体
-struct DragState {
-  bool is_dragging = false;
-  POINT start_pos = {0, 0};
-  RECT window_rect = {0, 0, 0, 0};
-};
-
 // WebView窗口状态
 struct WindowState {
-  HWND parent_hwnd = nullptr;
   HWND webview_hwnd = nullptr;
   int width = 1280;
   int height = 720;
   int x = 0;
   int y = 0;
   bool is_visible = false;
-  DragState drag_state;
 };
 
 // WebView核心资源

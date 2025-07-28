@@ -21,12 +21,4 @@ export auto maximize_window(Core::State::AppState& state) -> std::expected<void,
 export auto restore_window(Core::State::AppState& state) -> std::expected<void, std::string>;
 export auto close_window(Core::State::AppState& state) -> std::expected<void, std::string>;
 
-// 窗口拖拽功能
-export auto start_drag_window(Core::State::AppState& state, int screen_x, int screen_y) 
-    -> std::expected<void, std::string>;
-export auto move_drag_window(Core::State::AppState& state, int screen_x, int screen_y) 
-    -> std::expected<void, std::string>;
-export auto end_drag_window(Core::State::AppState& state) 
-    -> std::expected<void, std::string>;
-
 }  // namespace UI::WebViewWindow

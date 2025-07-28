@@ -11,7 +11,7 @@ import Core.WebView.State;
 namespace Core::WebView {
 
 // 初始化函数
-export auto initialize(Core::State::AppState& state, HWND parent_hwnd)
+export auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string>;
 
 // 销毁函数

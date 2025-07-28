@@ -8,11 +8,6 @@ import Core.State;
 namespace UI::WebViewWindow::Rpc {
 
 // RPC参数和结果类型定义
-struct DragParams {
-  int x;
-  int y;
-};
-
 struct WindowStateResult {
   bool is_maximized;
 };

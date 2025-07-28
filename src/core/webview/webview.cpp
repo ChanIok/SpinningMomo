@@ -10,6 +10,7 @@ module Core.WebView;
 import std;
 import Core.WebView.State;
 import Core.WebView.RpcBridge;
+import Core.WebView.DragHandler;  // 添加拖动处理模块的导入
 import Utils.Logger;
 import Utils.String;
 
@@ -169,6 +170,13 @@ class ControllerCompletedHandler
     Logger().info("Release mode: Using built frontend from resources/web");
 #endif
 
+    // 注册拖动处理对象
+    if (auto result = Core::WebView::DragHandler::register_drag_handler(*m_state); !result) {
+        Logger().warn("Failed to register drag handler: {}", result.error());
+    } else {
+        Logger().info("Drag handler registered");
+    }
+
     // 导航到选定的 URL
     webview_state.resources.webview.get()->Navigate(webview_state.config.initial_url.c_str());
     webview_state.is_ready = true;
@@ -190,11 +198,11 @@ class EnvironmentCompletedHandler
           ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler> {
  private:
   Core::State::AppState* m_state;
-  HWND m_parent_hwnd;
+  HWND m_webview_hwnd;
 
  public:
-  EnvironmentCompletedHandler(Core::State::AppState* state, HWND parent_hwnd)
-      : m_state(state), m_parent_hwnd(parent_hwnd) {}
+  EnvironmentCompletedHandler(Core::State::AppState* state, HWND webview_hwnd)
+      : m_state(state), m_webview_hwnd(webview_hwnd) {}
 
   HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Environment* env) {
     if (!m_state) return E_FAIL;
@@ -209,7 +217,7 @@ class EnvironmentCompletedHandler
 
     // 现在，使用其自己的处理器创建控制器
     auto controller_handler = Microsoft::WRL::Make<ControllerCompletedHandler>(m_state);
-    return env->CreateCoreWebView2Controller(m_parent_hwnd, controller_handler.Get());
+    return env->CreateCoreWebView2Controller(m_webview_hwnd, controller_handler.Get());
   }
 };
 
@@ -217,7 +225,7 @@ class EnvironmentCompletedHandler
 
 namespace Core::WebView {
 
-auto initialize(Core::State::AppState& state, HWND parent_hwnd)
+auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
@@ -225,7 +233,7 @@ auto initialize(Core::State::AppState& state, HWND parent_hwnd)
     return std::unexpected("WebView already initialized");
   }
 
-  webview_state.window.parent_hwnd = parent_hwnd;
+  webview_state.window.webview_hwnd = webview_hwnd;
 
   // 初始化 COM (如果尚未初始化)
   HRESULT com_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -234,7 +242,7 @@ auto initialize(Core::State::AppState& state, HWND parent_hwnd)
   }
 
   // 使用我们的有状态处理器创建环境
-  auto environment_handler = Microsoft::WRL::Make<EnvironmentCompletedHandler>(&state, parent_hwnd);
+  auto environment_handler = Microsoft::WRL::Make<EnvironmentCompletedHandler>(&state, webview_hwnd);
   auto hr = CreateCoreWebView2Environment(environment_handler.Get());
 
   if (FAILED(hr)) {

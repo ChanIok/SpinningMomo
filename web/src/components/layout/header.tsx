@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button'
 import { Minus, Square, X, Minimize2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
+import './header.css';
+
 export function Header() {
   const [isMaximized, setIsMaximized] = useState(false)
 
@@ -11,44 +13,6 @@ export function Header() {
     // 这里可以添加监听窗口状态变化的逻辑
     // 暂时使用简单的方法检测最大化状态
   }, [])
-
-  const handleDragStart = (e: React.MouseEvent) => {
-    // 只有在标题栏上按下鼠标左键才触发拖动
-    if (e.button !== 0) return
-    
-    // 发送开始拖动消息到后端
-    call('webview.dragStart', {
-      x: e.screenX,
-      y: e.screenY
-    }).catch(err => {
-      console.error('Failed to start drag:', err)
-    })
-    
-    // 添加鼠标移动和释放事件监听器
-    const handleDragMove = (e: MouseEvent) => {
-      // 发送移动消息到后端
-      call('webview.dragMove', {
-        x: e.screenX,
-        y: e.screenY
-      }).catch(err => {
-        console.error('Failed to move window:', err)
-      })
-    }
-    
-    const handleDragEnd = () => {
-      // 发送结束拖动消息到后端
-      call('webview.dragEnd').catch(err => {
-        console.error('Failed to end drag:', err)
-      })
-      
-      // 移除事件监听器
-      document.removeEventListener('mousemove', handleDragMove)
-      document.removeEventListener('mouseup', handleDragEnd)
-    }
-    
-    document.addEventListener('mousemove', handleDragMove)
-    document.addEventListener('mouseup', handleDragEnd)
-  }
 
   const handleMinimize = () => {
     call('webview.minimize').catch(err => {
@@ -80,8 +44,7 @@ export function Header() {
 
   return (
     <header 
-      className='h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 gap-2 flex items-center justify-between border-b select-none'
-      onMouseDown={handleDragStart}
+      className='h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 gap-2 flex items-center justify-between border-b select-none drag-region'
     >
       <div></div> {/* 左侧占位符 */}
       <div className='flex gap-2'>
