@@ -44,7 +44,7 @@ auto handle_maximize_window(Core::State::AppState& app_state,
     -> asio::awaitable<Core::RpcHandlers::RpcResult<WindowControlResult>> {
   try {
     auto result = UI::WebViewWindow::maximize_window(app_state);
-
+    Logger().info("Maximize window: {}");
     if (result) {
       co_return WindowControlResult{.success = true};
     } else {
@@ -64,7 +64,7 @@ auto handle_restore_window(Core::State::AppState& app_state,
     -> asio::awaitable<Core::RpcHandlers::RpcResult<WindowControlResult>> {
   try {
     auto result = UI::WebViewWindow::restore_window(app_state);
-
+    Logger().info("Restore window: {}");
     if (result) {
       co_return WindowControlResult{.success = true};
     } else {

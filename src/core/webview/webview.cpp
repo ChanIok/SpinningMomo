@@ -4,15 +4,47 @@ module;
 #include <windows.h>
 #include <wrl.h>
 #include <WebView2.h>  // 必须放最后面
+#include <WebView2EnvironmentOptions.h>
 
 module Core.WebView;
 
 import std;
 import Core.WebView.State;
 import Core.WebView.RpcBridge;
-import Core.WebView.DragHandler;  // 添加拖动处理模块的导入
+import Core.WebView.DragHandler;
 import Utils.Logger;
 import Utils.String;
+
+// 匿名命名空间，用于封装辅助函数
+namespace {
+
+// 检查WebView2运行时版本是否支持拖拽区域功能
+bool is_drag_region_supported() {
+  LPWSTR version_info = nullptr;
+  HRESULT hr = GetAvailableCoreWebView2BrowserVersionString(nullptr, &version_info);
+
+  if (SUCCEEDED(hr) && version_info) {
+    // 将版本字符串转换为数字进行比较
+    std::wstring version_str(version_info);
+    CoTaskMemFree(version_info);
+
+    // 查找版本号（格式通常是：110.0.1587.41）
+    // 我们只关心主版本号
+    size_t dot_pos = version_str.find(L'.');
+    if (dot_pos != std::wstring::npos) {
+      std::wstring major_version_str = version_str.substr(0, dot_pos);
+      int major_version = _wtoi(major_version_str.c_str());
+
+      // 版本110及以上支持拖拽区域功能
+      return major_version >= 110;
+    }
+  }
+
+  // 默认假设不支持，使用后备方案
+  return false;
+}
+
+}  // namespace
 
 // 匿名命名空间，用于封装 COM 回调处理器
 namespace {
@@ -170,11 +202,17 @@ class ControllerCompletedHandler
     Logger().info("Release mode: Using built frontend from resources/web");
 #endif
 
-    // 注册拖动处理对象
-    if (auto result = Core::WebView::DragHandler::register_drag_handler(*m_state); !result) {
+    // 注册拖动处理对象（仅在需要时作为后备方案）
+    // 检查是否支持拖拽区域功能
+    bool drag_supported = is_drag_region_supported();
+    if (!drag_supported) {
+      if (auto result = Core::WebView::DragHandler::register_drag_handler(*m_state); !result) {
         Logger().warn("Failed to register drag handler: {}", result.error());
+      } else {
+        Logger().info("Drag handler registered as fallback for older WebView2 versions");
+      }
     } else {
-        Logger().info("Drag handler registered");
+      Logger().info("Using native drag region support, COM-based drag handler not needed");
     }
 
     // 导航到选定的 URL
@@ -233,28 +271,41 @@ auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     return std::unexpected("WebView already initialized");
   }
 
-  webview_state.window.webview_hwnd = webview_hwnd;
-
   // 初始化 COM (如果尚未初始化)
   HRESULT com_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   if (FAILED(com_hr) && com_hr != RPC_E_CHANGED_MODE) {
     return std::unexpected("Failed to initialize COM");
   }
 
-  // 使用我们的有状态处理器创建环境
-  auto environment_handler = Microsoft::WRL::Make<EnvironmentCompletedHandler>(&state, webview_hwnd);
-  auto hr = CreateCoreWebView2Environment(environment_handler.Get());
+  // 创建环境选项对象并添加浏览器参数
+  auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
+  if (options) {
+    // 添加启用拖拽区域的参数（在旧版本上会被忽略，不会造成错误）
+    options->put_AdditionalBrowserArguments(L"--enable-features=msWebView2EnableDraggableRegions");
+  }
+
+  // 使用我们的有状态处理器创建环境，带参数
+  auto environment_handler =
+      Microsoft::WRL::Make<EnvironmentCompletedHandler>(&state, webview_hwnd);
+  HRESULT hr = E_FAIL;
+
+  if (options) {
+    hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, options.Get(),
+                                                  environment_handler.Get());
+  } else {
+    // 如果创建选项对象失败，尝试不带参数的创建
+    Logger().warn("Failed to create WebView2 environment options, trying without options");
+    hr = CreateCoreWebView2Environment(environment_handler.Get());
+  }
 
   if (FAILED(hr)) {
     return std::unexpected("Failed to create WebView2 environment: " + std::to_string(hr));
   }
 
   webview_state.is_initialized = true;
-  Logger().info("WebView2 initialization started");
+  Logger().info("WebView2 initialization started with draggable regions support flag");
   return {};
 }
-
-
 
 auto resize_webview(Core::State::AppState& state, int width, int height) -> void {
   auto& webview_state = *state.webview;
@@ -267,20 +318,6 @@ auto resize_webview(Core::State::AppState& state, int width, int height) -> void
 
     webview_state.resources.controller.get()->put_Bounds(bounds);
     Logger().debug("WebView resized to {}x{}", width, height);
-  }
-}
-
-auto move_webview(Core::State::AppState& state, int x, int y) -> void {
-  auto& webview_state = *state.webview;
-
-  if (webview_state.resources.controller) {
-    webview_state.window.x = x;
-    webview_state.window.y = y;
-
-    RECT bounds = {x, y, x + webview_state.window.width, y + webview_state.window.height};
-
-    webview_state.resources.controller.get()->put_Bounds(bounds);
-    Logger().debug("WebView moved to ({}, {})", x, y);
   }
 }
 

@@ -131,7 +131,7 @@ auto register_drag_handler(Core::State::AppState& state) -> std::expected<void, 
                 window.addEventListener('DOMContentLoaded', () => {
                     document.body.addEventListener('mousedown', evt => {
                         const { target } = evt;
-                        const appRegion = getComputedStyle(target)['-webkit-app-region'];
+                        const appRegion = getComputedStyle(target)['app-region'];
                         
                         if (appRegion === 'drag') {
                             try {

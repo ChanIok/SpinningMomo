@@ -3,7 +3,6 @@ module;
 #include <dwmapi.h>
 #include <windows.h>
 #include <windowsx.h>
-#include <dwmapi.h>
 
 #include <iostream>
 
@@ -107,8 +106,6 @@ auto close_window(Core::State::AppState& state) -> std::expected<void, std::stri
   return {};
 }
 
-
-
 auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
                  Vendor::Windows::WPARAM wparam, Vendor::Windows::LPARAM lparam)
     -> Vendor::Windows::LRESULT {
@@ -125,6 +122,40 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
   }
 
   switch (msg) {
+    case WM_NCCALCSIZE: {
+      // 处理非客户区大小计算，仅调整顶部边框以抵消WS_THICKFRAME的影响
+      if (wparam == TRUE) {
+        // 检查窗口是否已最大化
+        bool is_maximized = IsZoomed(hwnd);
+
+        // 只有在非最大化状态下才调整顶部边框
+        if (!is_maximized) {
+          NCCALCSIZE_PARAMS* nccsp = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+
+          // 保存原始矩形
+          RECT original = nccsp->rgrc[0];
+
+          // 先调用默认处理，获取标准的客户区计算结果
+          LRESULT result = DefWindowProcW(hwnd, msg, wparam, lparam);
+
+          // 保持默认处理后的左侧、右侧和底部不变，只调整顶部
+          nccsp->rgrc[0].top = original.top;
+
+          return result;
+        }
+      }
+      // 对于最大化窗口或其他情况，使用默认处理
+      return DefWindowProcW(hwnd, msg, wparam, lparam);
+    }
+
+    case WM_GETMINMAXINFO: {
+      // 限制窗口的最小尺寸为320x240
+      MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
+      mmi->ptMinTrackSize.x = 320;
+      mmi->ptMinTrackSize.y = 240;
+      return 0;
+    }
+
     case WM_SIZE: {
       if (state) {
         int width = LOWORD(lparam);

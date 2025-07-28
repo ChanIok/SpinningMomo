@@ -44,10 +44,12 @@ export function Header() {
 
   return (
     <header 
-      className='h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 gap-2 flex items-center justify-between border-b select-none drag-region'
+      className='h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 gap-2 flex items-center justify-between border-b '
     >
-      <div></div> {/* 左侧占位符 */}
-      <div className='flex gap-2'>
+      <div 
+        className='drag-region flex-1 h-full'
+      ></div> {/* 可拖动区域 */}
+      <div className='flex gap-2 '>
         <Button
           variant='ghost'
           size='icon'
