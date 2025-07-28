@@ -10,13 +10,14 @@ import Handlers.EventRegistrar;
 import Features.Notifications;
 import Features.Settings;
 import Features.Settings.Rpc;
-import Utils.Logger;
-import Utils.String;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.TrayIcon;
 import UI.ContextMenu;
+import UI.WebViewWindow.Rpc;
 import Vendor.Windows;
+import Utils.Logger;
+import Utils.String;
 
 namespace Core::Initializer {
 
@@ -39,6 +40,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 5. 注册 Settings RPC 处理器
     Features::Settings::Rpc::register_handlers(state);
+
+    // 6. 注册 WebView Window RPC 处理器
+    UI::WebViewWindow::Rpc::register_handlers(state);
 
     // 7. 创建窗口
     if (auto result = UI::AppWindow::create_window(state); !result) {

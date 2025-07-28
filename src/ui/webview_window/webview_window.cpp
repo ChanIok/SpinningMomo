@@ -1,5 +1,6 @@
 module;
 
+#include <dwmapi.h>
 #include <windows.h>
 
 #include <iostream>
@@ -52,6 +53,111 @@ auto toggle_visibility(Core::State::AppState& state) -> void {
       Logger().error("Failed to show WebView window: {}", result.error());
     }
   }
+}
+
+// 窗口控制功能实现
+auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+  auto& webview_state = *state.webview;
+
+  if (!webview_state.window.parent_hwnd) {
+    return std::unexpected("WebView window not created");
+  }
+
+  ShowWindow(webview_state.window.parent_hwnd, SW_MINIMIZE);
+  Logger().debug("WebView window minimized");
+  return {};
+}
+
+auto maximize_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+  auto& webview_state = *state.webview;
+
+  if (!webview_state.window.parent_hwnd) {
+    return std::unexpected("WebView window not created");
+  }
+
+  ShowWindow(webview_state.window.parent_hwnd, SW_MAXIMIZE);
+  Logger().debug("WebView window maximized");
+  return {};
+}
+
+auto restore_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+  auto& webview_state = *state.webview;
+
+  if (!webview_state.window.parent_hwnd) {
+    return std::unexpected("WebView window not created");
+  }
+
+  ShowWindow(webview_state.window.parent_hwnd, SW_RESTORE);
+  Logger().debug("WebView window restored");
+  return {};
+}
+
+auto close_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+  auto& webview_state = *state.webview;
+
+  if (!webview_state.window.parent_hwnd) {
+    return std::unexpected("WebView window not created");
+  }
+
+  // 发送WM_CLOSE消息关闭窗口
+  PostMessage(webview_state.window.parent_hwnd, WM_CLOSE, 0, 0);
+  Logger().debug("WebView window close requested");
+  return {};
+}
+
+// 拖拽功能实现
+auto start_drag_window(Core::State::AppState& state, int screen_x, int screen_y)
+    -> std::expected<void, std::string> {
+  auto& webview_state = *state.webview;
+
+  if (!webview_state.window.parent_hwnd) {
+    return std::unexpected("WebView window not created");
+  }
+
+  // 设置拖拽状态
+  webview_state.window.drag_state.is_dragging = true;
+  webview_state.window.drag_state.start_pos.x = screen_x;
+  webview_state.window.drag_state.start_pos.y = screen_y;
+
+  // 获取当前窗口位置和大小
+  GetWindowRect(webview_state.window.parent_hwnd, &webview_state.window.drag_state.window_rect);
+
+  Logger().debug("Started dragging window from ({}, {})", screen_x, screen_y);
+  return {};
+}
+
+auto move_drag_window(Core::State::AppState& state, int screen_x, int screen_y)
+    -> std::expected<void, std::string> {
+  auto& webview_state = *state.webview;
+
+  if (!webview_state.window.parent_hwnd || !webview_state.window.drag_state.is_dragging) {
+    return std::unexpected("Drag operation not active");
+  }
+
+  // 计算新的窗口位置
+  int new_x = webview_state.window.drag_state.window_rect.left +
+              (screen_x - webview_state.window.drag_state.start_pos.x);
+  int new_y = webview_state.window.drag_state.window_rect.top +
+              (screen_y - webview_state.window.drag_state.start_pos.y);
+
+  // 更新窗口位置
+  if (!SetWindowPos(webview_state.window.parent_hwnd, nullptr, new_x, new_y, 0, 0,
+                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE)) {
+    Logger().warn("Failed to move window during drag");
+  }
+
+  return {};
+}
+
+auto end_drag_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+  auto& webview_state = *state.webview;
+
+  if (webview_state.window.drag_state.is_dragging) {
+    webview_state.window.drag_state.is_dragging = false;
+    Logger().debug("Finished dragging window");
+  }
+
+  return {};
 }
 
 auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
@@ -130,6 +236,11 @@ auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
   RegisterClassExW(&wc);
 }
 
+auto create_window_attributes(HWND hwnd) -> void {
+  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+}
+
 auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 注册窗口类
   register_window_class(state.app_window->window.instance);
@@ -140,16 +251,16 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   const int x = 200;
   const int y = 100;
 
-  // 创建独立窗口
-  HWND hwnd = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,                 // 扩展样式
-                              L"SpinningMomoWebViewWindowClass",      // 窗口类名
-                              L"SpinningMomo WebView",                // 窗口标题
-                              WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,  // 窗口样式
-                              x, y, width, height,                    // 位置和大小
-                              nullptr,                                // 父窗口
-                              nullptr,                                // 菜单
-                              state.app_window->window.instance,      // 实例句柄
-                              &state                                  // 用户数据
+  // 创建独立窗口（真正无边框样式）
+  HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW,                    // 扩展样式
+                              L"SpinningMomoWebViewWindowClass",  // 窗口类名
+                              L"SpinningMomo WebView",            // 窗口标题
+                              WS_POPUP,                           // 真正的无边框窗口样式
+                              x, y, width, height,                // 位置和大小
+                              nullptr,                            // 父窗口
+                              nullptr,                            // 菜单
+                              state.app_window->window.instance,  // 实例句柄
+                              &state                              // 用户数据
   );
 
   if (!hwnd) {
@@ -163,6 +274,9 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   state.webview->window.x = x;
   state.webview->window.y = y;
   state.webview->window.is_visible = false;
+
+  // 创建窗口属性（Win11样式）
+  create_window_attributes(hwnd);
 
   Logger().info("WebView window created successfully");
   return {};

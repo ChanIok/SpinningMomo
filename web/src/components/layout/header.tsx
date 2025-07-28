@@ -1,37 +1,120 @@
+import { call } from '@/lib/webview-rpc'
+import { Button } from '@/components/ui/button'
+import { Minus, Square, X, Minimize2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+
 export function Header() {
-  // const location = useLocation()
+  const [isMaximized, setIsMaximized] = useState(false)
+
+  // 监听窗口状态变化
+  useEffect(() => {
+    // 这里可以添加监听窗口状态变化的逻辑
+    // 暂时使用简单的方法检测最大化状态
+  }, [])
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    // 只有在标题栏上按下鼠标左键才触发拖动
+    if (e.button !== 0) return
+    
+    // 发送开始拖动消息到后端
+    call('webview.dragStart', {
+      x: e.screenX,
+      y: e.screenY
+    }).catch(err => {
+      console.error('Failed to start drag:', err)
+    })
+    
+    // 添加鼠标移动和释放事件监听器
+    const handleDragMove = (e: MouseEvent) => {
+      // 发送移动消息到后端
+      call('webview.dragMove', {
+        x: e.screenX,
+        y: e.screenY
+      }).catch(err => {
+        console.error('Failed to move window:', err)
+      })
+    }
+    
+    const handleDragEnd = () => {
+      // 发送结束拖动消息到后端
+      call('webview.dragEnd').catch(err => {
+        console.error('Failed to end drag:', err)
+      })
+      
+      // 移除事件监听器
+      document.removeEventListener('mousemove', handleDragMove)
+      document.removeEventListener('mouseup', handleDragEnd)
+    }
+    
+    document.addEventListener('mousemove', handleDragMove)
+    document.addEventListener('mouseup', handleDragEnd)
+  }
+
+  const handleMinimize = () => {
+    call('webview.minimize').catch(err => {
+      console.error('Failed to minimize window:', err)
+    })
+  }
+
+  const handleMaximizeToggle = () => {
+    if (isMaximized) {
+      call('webview.restore').then(() => {
+        setIsMaximized(false)
+      }).catch(err => {
+        console.error('Failed to restore window:', err)
+      })
+    } else {
+      call('webview.maximize').then(() => {
+        setIsMaximized(true)
+      }).catch(err => {
+        console.error('Failed to maximize window:', err)
+      })
+    }
+  }
+
+  const handleClose = () => {
+    call('webview.close').catch(err => {
+      console.error('Failed to close window:', err)
+    })
+  }
 
   return (
-    <header className='h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 gap-2 flex items-center justify-end border-b'>
-        <>
-          {/* <Button
-            variant={sidebarVisible ? 'secondary' : 'ghost'}
-            size='icon'
-            onClick={toggleSidebar}
-            className='h-8 w-8'
-            title={sidebarVisible ? '隐藏侧边栏' : '显示侧边栏'}
-          >
-            {sidebarVisible ? (
-              <PanelLeftClose className='h-4 w-4' />
-            ) : (
-              <PanelLeftOpen className='h-4 w-4' />
-            )}
-          </Button>
-
-          <Button
-            variant={detailsVisible ? 'secondary' : 'ghost'}
-            size='icon'
-            onClick={toggleDetails}
-            className='h-8 w-8'
-            title={detailsVisible ? '隐藏详情面板' : '显示详情面板'}
-          >
-            {detailsVisible ? (
-              <PanelRightClose className='h-4 w-4' />
-            ) : (
-              <PanelRightOpen className='h-4 w-4' />
-            )}
-          </Button> */}
-        </>
+    <header 
+      className='h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 gap-2 flex items-center justify-between border-b select-none'
+      onMouseDown={handleDragStart}
+    >
+      <div></div> {/* 左侧占位符 */}
+      <div className='flex gap-2'>
+        <Button
+          variant='ghost'
+          size='icon'
+          className='h-8 w-8'
+          onClick={handleMinimize}
+          title='Minimize'
+        >
+          <Minus className='h-4 w-4' />
+        </Button>
+        
+        <Button
+          variant='ghost'
+          size='icon'
+          className='h-8 w-8'
+          onClick={handleMaximizeToggle}
+          title={isMaximized ? 'Restore' : 'Maximize'}
+        >
+          {isMaximized ? <Minimize2 className='h-4 w-4' /> : <Square className='h-4 w-4' />}
+        </Button>
+        
+        <Button
+          variant='ghost'
+          size='icon'
+          className='h-8 w-8 hover:bg-destructive hover:text-destructive-foreground'
+          onClick={handleClose}
+          title='Close'
+        >
+          <X className='h-4 w-4' />
+        </Button>
+      </div>
     </header>
   )
 }
