@@ -12,7 +12,6 @@ export namespace Core::WebView::State {
 
 // WebView窗口状态
 struct WindowState {
-  HWND parent_hwnd = nullptr;
   HWND webview_hwnd = nullptr;
   int width = 1280;
   int height = 720;

@@ -1,6 +1,8 @@
 module;
 
 #include <windows.h>
+#include <windowsx.h>
+#include <dwmapi.h>
 
 #include <iostream>
 
@@ -24,12 +26,12 @@ auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
     }
   }
 
-  if (!state.webview->window.parent_hwnd) {
+  if (!state.webview->window.webview_hwnd) {
     return std::unexpected("WebView window not created");
   }
 
-  ShowWindow(state.webview->window.parent_hwnd, SW_SHOW);
-  UpdateWindow(state.webview->window.parent_hwnd);
+  ShowWindow(state.webview->window.webview_hwnd, SW_SHOW);
+  UpdateWindow(state.webview->window.webview_hwnd);
   state.webview->window.is_visible = true;
 
   Logger().info("WebView window shown");
@@ -37,8 +39,8 @@ auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
 }
 
 auto hide(Core::State::AppState& state) -> void {
-  if (state.webview->window.parent_hwnd) {
-    ShowWindow(state.webview->window.parent_hwnd, SW_HIDE);
+  if (state.webview->window.webview_hwnd) {
+    ShowWindow(state.webview->window.webview_hwnd, SW_HIDE);
     state.webview->window.is_visible = false;
     Logger().info("WebView window hidden");
   }
@@ -141,23 +143,27 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   const int y = 100;
 
   // 创建独立窗口
-  HWND hwnd = CreateWindowExW(WS_EX_OVERLAPPEDWINDOW,                 // 扩展样式
-                              L"SpinningMomoWebViewWindowClass",      // 窗口类名
-                              L"SpinningMomo WebView",                // 窗口标题
-                              WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,  // 窗口样式
-                              x, y, width, height,                    // 位置和大小
-                              nullptr,                                // 父窗口
-                              nullptr,                                // 菜单
-                              state.app_window->window.instance,      // 实例句柄
-                              &state                                  // 用户数据
+  HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW,                    // 扩展样式
+                              L"SpinningMomoWebViewWindowClass",  // 窗口类名
+                              L"SpinningMomo WebView",            // 窗口标题
+                              WS_POPUP | WS_THICKFRAME,           // 窗口样式
+                              x, y, width, height,                // 位置和大小
+                              nullptr,                            // 父窗口
+                              nullptr,                            // 菜单
+                              state.app_window->window.instance,  // 实例句柄
+                              &state                              // 用户数据
   );
 
   if (!hwnd) {
     return std::unexpected("Failed to create WebView window");
   }
 
+  // 设置窗口圆角
+  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+
   // 保存窗口句柄到WebView状态中
-  state.webview->window.parent_hwnd = hwnd;
+  state.webview->window.webview_hwnd = hwnd;
   state.webview->window.width = width;
   state.webview->window.height = height;
   state.webview->window.x = x;
@@ -172,9 +178,9 @@ auto cleanup(Core::State::AppState& state) -> void {
   // 关闭 WebView
   Core::WebView::shutdown(state);
 
-  if (state.webview->window.parent_hwnd) {
-    DestroyWindow(state.webview->window.parent_hwnd);
-    state.webview->window.parent_hwnd = nullptr;
+  if (state.webview->window.webview_hwnd) {
+    DestroyWindow(state.webview->window.webview_hwnd);
+    state.webview->window.webview_hwnd = nullptr;
     state.webview->window.is_visible = false;
     Logger().info("WebView window destroyed");
   }
@@ -187,7 +193,7 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
   }
 
   // 初始化 WebView
-  if (auto result = Core::WebView::initialize(state, state.webview->window.parent_hwnd); !result) {
+  if (auto result = Core::WebView::initialize(state, state.webview->window.webview_hwnd); !result) {
     return std::unexpected("Failed to initialize WebView: " + result.error());
   }
 
