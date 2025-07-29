@@ -6,8 +6,6 @@ export module Features.Screenshot;
 
 import std;
 import Core.State;
-import Features.Screenshot.State;
-import Utils.Graphics.Capture;
 
 namespace Features::Screenshot {
 

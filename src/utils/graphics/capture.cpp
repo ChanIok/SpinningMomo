@@ -17,8 +17,6 @@ import Utils.Logger;
 
 namespace Utils::Graphics::Capture {
 
-
-
 auto create_winrt_device(ID3D11Device* d3d_device)
     -> std::expected<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice, std::string> {
   if (!d3d_device) {
@@ -124,6 +122,9 @@ auto create_capture_session(
           winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
           L"IsCursorCaptureEnabled")) {
     session.session.IsCursorCaptureEnabled(false);
+  } else {
+    // 如果不支持IsCursorCaptureEnabled，则标记需要手动隐藏光标
+    session.need_hide_cursor = true;
   }
 
   // 尝试禁用边框（如果支持）

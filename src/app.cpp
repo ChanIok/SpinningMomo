@@ -62,8 +62,6 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
   m_h_instance = hInstance;
 
   try {
-    LogSystemInfo();
-
     // 创建 AppState
     m_app_state = std::make_unique<Core::State::AppState>();
     m_app_state->async_runtime = std::make_unique<Core::Async::State::AsyncRuntimeState>();
@@ -88,6 +86,8 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->screenshot = std::make_unique<Features::Screenshot::State::ScreenshotState>();
 
     m_app_state->app_window->window.instance = m_h_instance;
+
+    LogSystemInfo();
 
     // 测试嵌入式多语言系统
     Logger().info("=== Testing Embedded I18n System ===");
@@ -163,11 +163,12 @@ auto Application::LogSystemInfo() -> void {
       m_app_state->app_info->os_minor_version = version.minor_version;
       m_app_state->app_info->os_build_number = version.build_number;
       m_app_state->app_info->os_name = Utils::System::get_windows_name(version);
-      
+
       // 设置捕获支持状态 (Windows 10 1903 build 18362 or later)
-      m_app_state->app_info->is_capture_supported = 
-        (version.major_version > 10) || 
-        (version.major_version == 10 && version.build_number >= 18362);
+      m_app_state->app_info->is_capture_supported =
+          (version.major_version > 10) ||
+          (version.major_version == 10 && version.build_number >= 18362);
+      Logger().info("Is capture supported: {}", m_app_state->app_info->is_capture_supported);
     }
   } else {
     Logger().error("Failed to get OS version: {}", version_result.error());

@@ -196,6 +196,11 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
 
     auto& session_info = it->second;
 
+    // 如果使用了手动隐藏光标，在这里恢复光标显示
+    if (session_info.session.need_hide_cursor) {
+      ShowCursor(TRUE);
+    }
+
     if (texture) {
       // 直接在回调中保存纹理
       auto save_result = save_texture_with_wic(texture.Get(), session_info.request.file_path);
@@ -234,13 +239,21 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
   session_info.session = std::move(session_result.value());
   session_info.request = request;
 
+  // 如果需要手动隐藏光标，则在开始捕获前隐藏光标
+  if (session_info.session.need_hide_cursor) {
+    ShowCursor(FALSE);
+  }
+
   state.active_sessions[session_id] = std::move(session_info);
 
   // 开始捕获 - 不等待，直接返回
   auto start_result =
       Utils::Graphics::Capture::start_capture(state.active_sessions[session_id].session);
   if (!start_result) {
-    // 如果启动失败，清理会话
+    // 如果启动失败，清理会话，恢复光标显示
+    if (state.active_sessions[session_id].session.need_hide_cursor) {
+      ShowCursor(TRUE);
+    }
     state.active_sessions.erase(session_id);
     return std::unexpected("Failed to start capture: " + start_result.error());
   }

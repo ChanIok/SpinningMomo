@@ -20,6 +20,7 @@ export struct CaptureSession {
   winrt::Windows::Graphics::Capture::GraphicsCaptureSession session{nullptr};
   winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
   winrt::event_token frame_token;
+  bool need_hide_cursor = false;
 };
 
 // 帧回调函数类型
