@@ -35,6 +35,22 @@ auto ensure_mouse_tracking(HWND hwnd) -> void {
   TrackMouseEvent(&tme);
 }
 
+// 检查鼠标是否在关闭按钮上
+auto is_mouse_on_close_button(const Core::State::AppState& state, int x, int y) -> bool {
+  const auto& render = state.app_window->layout;
+
+  // 计算按钮尺寸（正方形，与标题栏高度一致）
+  const int button_size = render.title_height;
+
+  // 计算按钮位置（右上角）
+  const int button_right = state.app_window->window.size.cx;
+  const int button_left = button_right - button_size;
+  const int button_top = 0;
+  const int button_bottom = button_size;
+
+  return (x >= button_left && x <= button_right && y >= button_top && y <= button_bottom);
+}
+
 // 基于 action_id 分发功能事件
 auto dispatch_feature_action(Core::State::AppState& state, const std::string& action_id) -> void {
   using namespace Common::MenuIds;
@@ -122,6 +138,9 @@ auto handle_mouse_leave(Core::State::AppState& state) -> void {
   // 重置悬停索引
   state.app_window->ui.hover_index = -1;
 
+  // 重置关闭按钮悬停状态
+  state.app_window->ui.close_button_hovered = false;
+
   UI::AppWindow::request_repaint(state);
 }
 
@@ -135,10 +154,25 @@ auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
     UI::AppWindow::request_repaint(state);
     ensure_mouse_tracking(state.app_window->window.hwnd);
   }
+
+  // 检查关闭按钮悬停状态
+  const bool close_hovered = is_mouse_on_close_button(state, x, y);
+  if (close_hovered != state.app_window->ui.close_button_hovered) {
+    state.app_window->ui.close_button_hovered = close_hovered;
+    UI::AppWindow::request_repaint(state);
+    ensure_mouse_tracking(state.app_window->window.hwnd);
+  }
 }
 
 // 处理鼠标左键点击，分发项目点击事件
 auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
+  // 检查是否点击了关闭按钮
+  if (is_mouse_on_close_button(state, x, y)) {
+    // 发送隐藏事件而不是退出事件
+    Core::Events::send(*state.event_bus, UI::AppWindow::Events::HideEvent{});
+    return;
+  }
+
   const int clicked_index = UI::AppWindow::Layout::get_item_index_from_point(state, x, y);
   if (clicked_index >= 0 &&
       clicked_index < static_cast<int>(state.app_window->data.menu_items.size())) {
@@ -200,6 +234,12 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_NCHITTEST: {
       POINT pt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
       ScreenToClient(hwnd, &pt);
+
+      // 检查是否在关闭按钮上
+      if (is_mouse_on_close_button(state, pt.x, pt.y)) {
+        return HTCLIENT;  // 关闭按钮区域不支持拖动
+      }
+
       if (pt.y < state.app_window->layout.title_height) {
         return HTCAPTION;
       }

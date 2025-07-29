@@ -49,6 +49,7 @@ struct InteractionState {
   bool preview_enabled = false;
   bool overlay_enabled = false;
   bool letterbox_enabled = false;
+  bool close_button_hovered = false;
 };
 
 // 数据状态（拥有或引用外部数据）

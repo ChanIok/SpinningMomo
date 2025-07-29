@@ -86,6 +86,47 @@ auto draw_app_background(const Core::State::AppState& state, const D2D1_RECT_F& 
   d2d.render_target->FillRectangle(rect, d2d.white_semi_brush);
 }
 
+// 绘制关闭按钮
+auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& title_rect) -> void {
+  const auto& d2d = state.app_window->d2d_context;
+  const auto& render = state.app_window->layout;
+
+  // 计算按钮尺寸（正方形，与标题栏高度一致）
+  const float button_size = static_cast<float>(render.title_height);
+  const float button_padding = static_cast<float>(render.text_padding) / 2.0f;
+
+  // 计算按钮位置（右上角）
+  const float x = title_rect.right - button_size;
+  const float y = title_rect.top;
+
+  // 创建按钮区域矩形
+  const D2D1_RECT_F button_rect = D2D1::RectF(x, y, x + button_size, y + button_size);
+
+  // 绘制悬停背景（如果需要）
+  if (state.app_window->ui.close_button_hovered) {
+    d2d.render_target->FillRectangle(button_rect, d2d.hover_brush);
+  }
+
+  // 计算"X"图标尺寸和位置
+  const float icon_margin = button_size * 0.35f;  // 边距
+  const float icon_size = button_size - 2 * icon_margin;
+
+  const float icon_left = x + icon_margin;
+  const float icon_top = y + icon_margin;
+  const float icon_right = icon_left + icon_size;
+  const float icon_bottom = icon_top + icon_size;
+
+  // 绘制"X"图标
+  const float pen_width = 1.5f;
+  d2d.render_target->DrawLine(D2D1::Point2F(icon_left, icon_top),
+                              D2D1::Point2F(icon_right, icon_bottom), d2d.text_brush, pen_width,
+                              nullptr);
+
+  d2d.render_target->DrawLine(D2D1::Point2F(icon_right, icon_top),
+                              D2D1::Point2F(icon_left, icon_bottom), d2d.text_brush, pen_width,
+                              nullptr);
+}
+
 // 绘制标题栏
 auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.app_window->d2d_context;
@@ -104,6 +145,9 @@ auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& r
   d2d.render_target->DrawText(L"SpinningMomo",
                               12,  // 文本长度
                               d2d.text_format, text_rect, d2d.text_brush);
+
+  // 绘制关闭按钮
+  draw_close_button(state, title_rect);
 }
 
 // 绘制分隔线
