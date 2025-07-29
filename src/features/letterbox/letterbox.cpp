@@ -11,11 +11,30 @@ module Features.Letterbox;
 import std;
 import Core.State;
 import Features.Letterbox.State;
+import Utils.Logger;
 
 namespace Features::Letterbox {
 
 // 全局状态指针，用于钩子回调
 Core::State::AppState* g_app_state = nullptr;
+
+// 检查是否需要显示letterbox
+auto needs_letterbox(HWND target_window) -> bool {
+  if (!target_window || !IsWindow(target_window)) {
+    return false;
+  }
+
+  RECT rect;
+  GetClientRect(target_window, &rect);
+  int window_width = rect.right - rect.left;
+  int window_height = rect.bottom - rect.top;
+
+  int screen_width = GetSystemMetrics(SM_CXSCREEN);
+  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+
+  return ((window_width >= screen_width && window_height < screen_height) ||
+          (window_height >= screen_height && window_width < screen_width));
+}
 
 // 更新位置
 auto update_position(Core::State::AppState& state, HWND target_window)
@@ -25,7 +44,6 @@ auto update_position(Core::State::AppState& state, HWND target_window)
   if (!letterbox.is_initialized) {
     return std::unexpected{"Letterbox not initialized"};
   }
-
 
   if (!letterbox.target_window) {
     return std::unexpected{"No target window specified"};
@@ -234,6 +252,9 @@ auto event_thread_proc(Core::State::AppState& state, std::stop_token stoken,
                        const State::LetterboxConfig& config) -> void {
   auto& letterbox = *state.letterbox;
 
+  // 保存线程ID
+  letterbox.event_thread_id = GetCurrentThreadId();
+
   // 注册消息窗口类
   WNDCLASSEX wcMessage = {0};
   wcMessage.cbSize = sizeof(WNDCLASSEX);
@@ -332,6 +353,12 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
     return std::unexpected{"Target window is not visible"};
   }
 
+  // 检查是否真正需要显示letterbox
+  if (!needs_letterbox(letterbox.target_window)) {
+    [[maybe_unused]] auto hide_result = hide(state);
+    return {};
+  }
+
   // 确保事件监听线程已启动
   if (!state.letterbox->event_thread.joinable()) {
     if (auto result = start_event_monitoring(state, State::LetterboxConfig{}); !result) {
@@ -362,7 +389,6 @@ auto hide(Core::State::AppState& state) -> std::expected<void, std::string> {
     letterbox.is_visible = false;
   }
 
-
   return {};
 }
 
@@ -372,6 +398,9 @@ auto stop_event_monitoring(Core::State::AppState& state) -> std::expected<void, 
 
   if (letterbox.event_thread.joinable()) {
     letterbox.event_thread.request_stop();
+    if (letterbox.event_thread_id != 0) {
+      PostThreadMessage(letterbox.event_thread_id, WM_QUIT, 0, 0);
+    }
     letterbox.event_thread.join();
   }
 
@@ -401,7 +430,6 @@ auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> 
   [[maybe_unused]] auto stop_result = stop_event_monitoring(state);
   // 记录错误但继续清理
 
-
   // 销毁窗口
   if (letterbox.window_handle) {
     DestroyWindow(letterbox.window_handle);
@@ -415,6 +443,8 @@ auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> 
   g_app_state = nullptr;
 
   letterbox.is_initialized = false;
+
+  Logger().debug("Letterbox shutdown successfully");
 
   return {};
 }

@@ -187,7 +187,7 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
     case Types::WM_SHOW_OVERLAY: {
       ShowWindow(hwnd, SW_SHOWNA);
 
-      // 计算窗口大小和位置
+      // 计算窗口大小和位置 - 在letterbox模式下，overlay窗口始终是全屏的
       int screenWidth = overlay_state.window.screen_width;
       int screenHeight = overlay_state.window.screen_height;
       int left = 0;
@@ -195,15 +195,16 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       int width = screenWidth;
       int height = screenHeight;
 
-      // 如果不是黑边填充模式，则使用原本的居中计算
+      // 在非letterbox模式下使用居中窗口
       if (!overlay_state.window.use_letterbox_mode) {
         width = overlay_state.window.window_width;
         height = overlay_state.window.window_height;
         left = (screenWidth - width) / 2;
         top = (screenHeight - height) / 2;
         Logger().debug("Not using letterbox mode, using window size: {}x{}", width, height);
+      } else {
+        Logger().debug("Using letterbox mode, using full screen size: {}x{}", width, height);
       }
-      Logger().debug("Using letterbox mode: {}", overlay_state.window.use_letterbox_mode);
 
       // 添加分层窗口样式
       if (overlay_state.window.target_window) {

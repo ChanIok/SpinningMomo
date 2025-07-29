@@ -7,13 +7,16 @@ import Core.Events;
 import Core.State;
 import Core.I18n.State;
 import UI.AppWindow;
+import UI.AppWindow.State;
 import UI.AppWindow.Events;
+import Features.Settings;
 import Features.Settings.State;
 import Features.Letterbox;
 import Features.Preview.Window;
 import Features.WindowControl;
 import Features.Notifications;
 import Features.Overlay;
+import Features.Overlay.State;
 import Features.Screenshot;
 import Features.Screenshot.Folder;
 import Utils.Logger;
@@ -59,6 +62,13 @@ auto handle_overlay_toggle(Core::State::AppState& state,
   UI::AppWindow::set_overlay_enabled(state, event.enabled);
 
   if (event.enabled) {
+    // 如果启用了黑边模式，关闭黑边窗口
+    if (state.settings->config.features.letterbox.enabled) {
+      if (auto result = Features::Letterbox::shutdown(state); !result) {
+        Logger().error("Failed to shutdown letterbox: {}", result.error());
+      }
+    }
+
     std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
     auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
@@ -78,6 +88,18 @@ auto handle_overlay_toggle(Core::State::AppState& state,
   } else {
     // 停止叠加层
     Features::Overlay::stop_overlay(state);
+
+    // 如果启用了黑边模式，重新显示黑边窗口
+    if (state.settings->config.features.letterbox.enabled) {
+      std::wstring window_title =
+          Utils::String::FromUtf8(state.settings->config.window.target_title);
+      auto target_window = Features::WindowControl::find_target_window(window_title);
+      if (target_window) {
+        if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
+          Logger().error("Failed to show letterbox: {}", result.error());
+        }
+      }
+    }
   }
 }
 
@@ -86,12 +108,51 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
                              const UI::AppWindow::Events::LetterboxToggleEvent& event) -> void {
   // 更新黑边状态（使用UI.AppWindow的接口函数）
   UI::AppWindow::set_letterbox_enabled(state, event.enabled);
-  // TODO: 等待settings设计完成后，将letterbox enabled状态保存到settings
-  // state.config.letterbox.enabled = enabled; // 暂时注释掉
 
+  // 更新叠加层状态中的letterbox启用状态
+  Features::Overlay::set_letterbox_mode(state, event.enabled);
+
+  // 更新设置状态中的letterbox启用状态
+  state.settings->config.features.letterbox.enabled = event.enabled;
+
+  // 保存设置到文件
+  auto settings_path = Features::Settings::get_settings_path();
+  if (settings_path) {
+    auto save_result =
+        Features::Settings::save_settings_to_file(settings_path.value(), state.settings->config);
+    if (!save_result) {
+      Logger().error("Failed to save settings: {}", save_result.error());
+    }
+  } else {
+    Logger().error("Failed to get settings path: {}", settings_path.error());
+  }
+
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+  auto target_window = Features::WindowControl::find_target_window(window_title);
+
+  // 如果叠加层正在捕获，重启捕获以应用新设置
+  if (state.overlay->running) {
+    if (target_window) {
+      Features::Overlay::stop_overlay(state);
+      auto start_result = Features::Overlay::start_overlay(state, target_window.value());
+      // 关闭letterbox
+      if (auto result = Features::Letterbox::shutdown(state); !result) {
+        Logger().error("Failed to shutdown letterbox: {}", result.error());
+      }
+      if (!start_result) {
+        Logger().error("Failed to restart overlay after letterbox mode change: {}",
+                       start_result.error());
+        // 回滚UI状态
+        UI::AppWindow::set_letterbox_enabled(state, false);
+        Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+                                                   state.i18n->texts.message.window_adjust_failed);
+      }
+    }
+    return;
+  }
+
+  // 如果启用letterbox，检查当前窗口是否需要显示letterbox
   if (event.enabled) {
-    std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
-    auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
         Logger().error("Failed to show letterbox: {}", result.error());
@@ -100,23 +161,13 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
         Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
                                                    state.i18n->texts.message.window_adjust_failed);
       }
-    } else {
-      Logger().warn("No target window found for letterbox");
-      UI::AppWindow::set_letterbox_enabled(state, false);
-      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                                 state.i18n->texts.message.window_not_found);
     }
   } else {
-    // 隐藏letterbox
-    if (auto result = Features::Letterbox::hide(state); !result) {
-      Logger().error("Failed to hide letterbox: {}", result.error());
+    // 关闭letterbox
+    if (auto result = Features::Letterbox::shutdown(state); !result) {
+      Logger().error("Failed to shutdown letterbox: {}", result.error());
     }
   }
-
-  // 如果叠加层正在运行，更新其黑边模式设置
-  // if (Features::Overlay::is_overlay_capturing(state)) {
-  //   Features::Overlay::set_letterbox_mode(state, event.enabled);
-  // }
 }
 
 // 处理截图事件
@@ -147,8 +198,7 @@ auto handle_capture_event(Core::State::AppState& state,
   };
 
   // 执行截图
-  auto result =
-      Features::Screenshot::take_screenshot(state, *target_window, completion_callback);
+  auto result = Features::Screenshot::take_screenshot(state, *target_window, completion_callback);
   if (!result) {
     Features::Notifications::show_notification(
         state, state.i18n->texts.label.app_name,

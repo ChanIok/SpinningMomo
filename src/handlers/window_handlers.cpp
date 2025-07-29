@@ -12,10 +12,12 @@ import Core.State;
 import Core.I18n.State;
 import Features.Settings;
 import Features.Settings.State;
+import Features.Letterbox;
 import Features.WindowControl;
 import Features.Notifications;
 import Features.Preview.Window;
 import Features.Overlay;
+import Features.Overlay.State;
 import UI.AppWindow;
 import Utils.Logger;
 import Utils.String;
@@ -77,10 +79,17 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
     }
   }
 
+  // 重启letterbox
+  if (!state.overlay->running && state.app_window->ui.letterbox_enabled) {
+    auto letterbox_result = Features::Letterbox::show(state, target_window);
+    if (!letterbox_result) {
+      Logger().error("Failed to restart letterbox after window transform: {}",
+                     letterbox_result.error());
+    }
+  }
+
   Logger().debug("Post-transform actions completed");
 }
-
-
 
 // 处理重置窗口事件
 auto handle_reset_event(Core::State::AppState& state,

@@ -18,6 +18,7 @@ struct LetterboxState {
 
   // 线程和事件相关
   std::jthread event_thread;
+  DWORD event_thread_id{0};
   HWINEVENTHOOK event_hook{nullptr};
   DWORD target_process_id{0};
 };

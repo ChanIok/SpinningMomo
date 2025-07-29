@@ -6,7 +6,6 @@ export module Features.Letterbox;
 
 import std;
 import Core.State;
-import Features.Letterbox.State;
 
 namespace Features::Letterbox {
 

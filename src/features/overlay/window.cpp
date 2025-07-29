@@ -159,12 +159,17 @@ auto update_overlay_window_size(Core::State::AppState& state, int game_width, in
   overlay_state.window.cached_game_height = game_height;
 
   // 计算叠加层窗口尺寸
-  auto [window_width, window_height] = Utils::calculate_overlay_dimensions(
-      game_width, game_height, overlay_state.window.screen_width,
-      overlay_state.window.screen_height);
+  if (overlay_state.window.use_letterbox_mode) {
+    overlay_state.window.window_width = overlay_state.window.screen_width;
+    overlay_state.window.window_height = overlay_state.window.screen_height;
+  } else {
+    auto [window_width, window_height] = Utils::calculate_overlay_dimensions(
+        game_width, game_height, overlay_state.window.screen_width,
+        overlay_state.window.screen_height);
 
-  overlay_state.window.window_width = window_width;
-  overlay_state.window.window_height = window_height;
+    overlay_state.window.window_width = window_width;
+    overlay_state.window.window_height = window_height;
+  }
 
   return {};
 }

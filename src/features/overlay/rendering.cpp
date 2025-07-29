@@ -33,7 +33,7 @@ auto create_shader_resources(Core::State::AppState& state) -> std::expected<void
 
   overlay_state.rendering.shader_resources = std::move(result.value());
 
-  // 创建顶点缓冲区
+  // 创建顶点缓冲区，初始使用全屏顶点
   Types::Vertex vertices[] = {
       {-1.0f, -1.0f, 0.0f, 1.0f},  // 左下
       {-1.0f, 1.0f, 0.0f, 0.0f},   // 左上
@@ -149,6 +149,53 @@ auto update_capture_srv(Core::State::AppState& state,
   return {};
 }
 
+auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
+  auto& overlay_state = *state.overlay;
+  auto& d3d_context = overlay_state.rendering.d3d_context;
+  auto& shader_resources = overlay_state.rendering.shader_resources;
+
+  // 计算顶点坐标
+  float left = -1.0f, right = 1.0f, top = 1.0f, bottom = -1.0f;
+
+  if (overlay_state.window.use_letterbox_mode) {
+    // 计算letterbox区域的顶点位置
+    int screen_width = overlay_state.window.screen_width;
+    int screen_height = overlay_state.window.screen_height;
+    int game_width = overlay_state.window.cached_game_width;
+    int game_height = overlay_state.window.cached_game_height;
+
+    // 计算游戏内容的宽高比
+    float game_aspect = static_cast<float>(game_width) / game_height;
+
+    // 计算窗口/屏幕的宽高比
+    float screen_aspect = static_cast<float>(screen_width) / screen_height;
+
+    // 根据宽高比计算实际的渲染区域
+    if (game_aspect > screen_aspect) {
+      // 游戏比例更宽 - 需要上下黑边 (letterbox)
+      float height = screen_aspect / game_aspect;
+      top = height;
+      bottom = -height;
+    } else if (game_aspect < screen_aspect) {
+      // 游戏比例更窄 - 需要左右黑边 (pillarbox)
+      float width = game_aspect / screen_aspect;
+      left = -width;
+      right = width;
+    }
+  }
+
+  // 更新顶点数据
+  Types::Vertex vertices[] = {
+      {left, bottom, 0.0f, 1.0f},  // 左下
+      {left, top, 0.0f, 0.0f},     // 左上
+      {right, bottom, 1.0f, 1.0f}, // 右下
+      {right, top, 1.0f, 0.0f}     // 右上
+  };
+  
+  // 更新顶点缓冲区
+  d3d_context.context->UpdateSubresource(shader_resources.vertex_buffer.Get(), 0, nullptr, vertices, 0, 0);
+}
+
 auto render_frame(Core::State::AppState& state,
                   Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void {
   auto& overlay_state = *state.overlay;
@@ -180,12 +227,15 @@ auto render_frame(Core::State::AppState& state,
     }
   }
 
-  // 清理渲染目标
+  // 清理渲染目标为黑色（作为黑边的背景色）
   float clear_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   d3d_context.context->ClearRenderTargetView(d3d_context.render_target.Get(), clear_color);
   d3d_context.context->OMSetRenderTargets(1, d3d_context.render_target.GetAddressOf(), nullptr);
 
-  // 设置视口
+  // 根据letterbox模式更新顶点缓冲区
+  update_vertex_buffer_for_letterbox(state);
+
+  // 设置视口和渲染参数
   D3D11_VIEWPORT viewport = {};
   viewport.Width = static_cast<float>(overlay_state.window.window_width);
   viewport.Height = static_cast<float>(overlay_state.window.window_height);
