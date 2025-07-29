@@ -3,6 +3,7 @@ module;
 #include <windows.h>
 
 #include <expected>
+#include <string>
 
 module Utils.System;
 
