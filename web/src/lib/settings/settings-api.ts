@@ -10,8 +10,14 @@ interface ServerSettings extends Record<string, unknown> {
   // app 分组
   app: {
     hotkey: {
-      modifiers: number
-      key: number
+      toggleVisibility: {
+        modifiers: number
+        key: number
+      }
+      screenshot: {
+        modifiers: number
+        key: number
+      }
     }
     language: {
       current: string

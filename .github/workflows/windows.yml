@@ -22,6 +22,21 @@ jobs:
         with:
           fetch-depth: 0 # 获取所有历史记录和标签
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: web
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: web
+
       - name: Set up Visual Studio Developer Environment
         uses: ilammy/msvc-dev-cmd@v1
         with:

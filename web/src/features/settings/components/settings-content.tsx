@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/lib/settings'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { 
   Select, 
@@ -11,28 +9,9 @@ import {
   SelectValue 
 } from '@/components/ui/select'
 import { HotkeyRecorder } from './hotkey-recorder'
-import type { AppSettings } from '@/lib/settings'
 
 export function SettingsContent() {
   const { appSettings, updateSettings, isLoading } = useSettingsStore()
-  
-  // 保存更改
-  const handleSave = async (partialAppSettings: Partial<AppSettings['app']>, showNotification = true) => {
-    try {
-      await updateSettings({
-        app: {
-          ...appSettings.app,
-          ...partialAppSettings
-        }
-      });
-      if (showNotification) {
-        toast.success('设置已保存');
-      }
-    } catch (error) {
-      console.error('Failed to update settings:', error);
-      toast.error('保存设置失败');
-    }
-  };
   
   // 重置为默认值
   const handleReset = async () => {
