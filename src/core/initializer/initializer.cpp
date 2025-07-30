@@ -10,6 +10,7 @@ import Handlers.EventRegistrar;
 import Features.Notifications;
 import Features.Settings;
 import Features.Settings.Rpc;
+import Features.Settings.State;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.TrayIcon;
@@ -64,9 +65,13 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 14. 默认显示窗口
     UI::AppWindow::show_window(state);
 
-    // 15. 注册热键（暂时硬编码）
-    // TODO: 等待settings设计完成后，从settings中读取热键配置
-    UI::AppWindow::register_hotkey(state, 0, 0); // 硬编码为无热键
+    // 15. 注册热键（从settings中读取配置）
+    UI::AppWindow::register_toggle_visibility_hotkey(state, 
+                                                     state.settings->config.app.hotkey.toggle_visibility.modifiers,
+                                                     state.settings->config.app.hotkey.toggle_visibility.key);
+    UI::AppWindow::register_screenshot_hotkey(state,
+                                              state.settings->config.app.hotkey.screenshot.modifiers,
+                                              state.settings->config.app.hotkey.screenshot.key);
 
     Logger().info("Application initialized successfully");
     return {};

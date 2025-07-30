@@ -31,7 +31,9 @@ export auto set_menu_items_to_show(Core::State::AppState& state,
                                    std::span<const std::wstring> items) -> void;
 
 // 热键处理
-export auto register_hotkey(Core::State::AppState& state, Vendor::Windows::UINT modifiers,
+export auto register_toggle_visibility_hotkey(Core::State::AppState& state, Vendor::Windows::UINT modifiers,
+                            Vendor::Windows::UINT key) -> bool;
+export auto register_screenshot_hotkey(Core::State::AppState& state, Vendor::Windows::UINT modifiers,
                             Vendor::Windows::UINT key) -> bool;
 export auto unregister_hotkey(Core::State::AppState& state) -> void;
 

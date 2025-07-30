@@ -37,8 +37,14 @@ export interface AppSettings {
   app: {
     // 快捷键设置
     hotkey: {
-      modifiers: number  // Ctrl + Alt = 3
-      key: number        // R键 = 82
+      toggleVisibility: {
+        modifiers: number  // Ctrl + Alt = 3
+        key: number        // R键 = 82
+      }
+      screenshot: {
+        modifiers: number  // 无修饰键 = 0
+        key: number        // 印屏键 = 44
+      }
     }
     
     // 语言设置
@@ -123,8 +129,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // app 设置
   app: {
     hotkey: {
-      modifiers: 3,  // Ctrl + Alt
-      key: 82        // R键
+      toggleVisibility: {
+        modifiers: 3,  // Ctrl + Alt
+        key: 82        // R键
+      },
+      screenshot: {
+        modifiers: 0,  // 无修饰键
+        key: 44        // 印屏键
+      }
     },
     language: {
       current: 'zh-CN'
@@ -195,8 +207,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       baseIndicatorWidth: 3,
       baseRatioIndicatorWidth: 4,
       baseRatioColumnWidth: 60,
-      baseResolutionColumnWidth: 120,
-      baseSettingsColumnWidth: 120
+      baseResolutionColumnWidth: 70,
+      baseSettingsColumnWidth: 80
     }
   }
 } as const

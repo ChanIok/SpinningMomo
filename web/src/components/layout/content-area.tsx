@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router'
 import { MenuPage } from '@/features/menu'
 import { LayoutPage } from '@/features/layout'
+import { SettingsPage } from '@/features/settings'
 
 export function ContentArea() {
   return (
@@ -14,6 +15,7 @@ export function ContentArea() {
         <Routes>
           <Route path='/menu/*' element={<MenuPage />} />
           <Route path='/layout/*' element={<LayoutPage />} />
+          <Route path='/settings/*' element={<SettingsPage />} />
           <Route
             path='*'
             element={

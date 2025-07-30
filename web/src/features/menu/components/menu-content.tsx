@@ -227,7 +227,7 @@ export function MenuContent() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">菜单</h1>
         <p className="text-muted-foreground mt-1">
-          管理应用程序的各种功能和设置
+          管理浮窗菜单项和右键菜单项的设置
         </p>
       </div>
 
@@ -237,7 +237,7 @@ export function MenuContent() {
           <div className="pb-2">
             <h3 className="text-lg font-semibold text-foreground">窗口控制</h3>
             <p className="text-sm text-muted-foreground mt-1">
-              自定义应用程序窗口的显示设置
+              自定义应用程序窗口的控制设置
             </p>
           </div>
           
@@ -248,7 +248,7 @@ export function MenuContent() {
                   窗口标题
                 </Label>
                 <p className="text-sm text-muted-foreground mt-1">
-                  设置应用程序窗口的标题栏文本
+                  设置目标窗口的标题栏文本
                 </p>
               </div>
               <div className="flex-shrink-0 flex items-center gap-2">

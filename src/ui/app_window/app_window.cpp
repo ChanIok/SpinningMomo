@@ -171,9 +171,17 @@ auto set_menu_items_to_show(Core::State::AppState& state, std::span<const std::w
   state.app_window->data.menu_items_to_show.assign(items.begin(), items.end());
 }
 
-auto register_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool {
+auto register_toggle_visibility_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool {
   if (state.app_window->window.hwnd) {
-    return ::RegisterHotKey(state.app_window->window.hwnd, state.app_window->window.hotkey_id,
+    return ::RegisterHotKey(state.app_window->window.hwnd, state.app_window->window.toggle_visibility_hotkey_id,
+                            modifiers, key);
+  }
+  return false;
+}
+
+auto register_screenshot_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool {
+  if (state.app_window->window.hwnd) {
+    return ::RegisterHotKey(state.app_window->window.hwnd, state.app_window->window.screenshot_hotkey_id,
                             modifiers, key);
   }
   return false;
@@ -181,7 +189,8 @@ auto register_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> 
 
 auto unregister_hotkey(Core::State::AppState& state) -> void {
   if (state.app_window->window.hwnd) {
-    ::UnregisterHotKey(state.app_window->window.hwnd, state.app_window->window.hotkey_id);
+    ::UnregisterHotKey(state.app_window->window.hwnd, state.app_window->window.toggle_visibility_hotkey_id);
+    ::UnregisterHotKey(state.app_window->window.hwnd, state.app_window->window.screenshot_hotkey_id);
   }
 }
 

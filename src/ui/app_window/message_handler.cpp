@@ -130,7 +130,13 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
 // 处理热键，发送系统命令事件
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
   using namespace UI::AppWindow::Events;
-  Core::Events::send(*state.event_bus, ToggleVisibilityEvent{});
+  
+  // 根据热键ID分发不同事件
+  if (hotkey_id == state.app_window->window.toggle_visibility_hotkey_id) {
+    Core::Events::send(*state.event_bus, ToggleVisibilityEvent{});
+  } else if (hotkey_id == state.app_window->window.screenshot_hotkey_id) {
+    Core::Events::send(*state.event_bus, CaptureEvent{});
+  }
 }
 
 // 处理鼠标移出窗口，重置悬停状态并重绘

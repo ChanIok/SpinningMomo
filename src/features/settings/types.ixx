@@ -31,18 +31,25 @@ struct AppSettings {
   struct App {
     // 快捷键设置
     struct Hotkey {
-      int modifiers = 3;  // Ctrl + Alt
-      int key = 82;       // R键
+      struct ToggleVisibility {
+        int modifiers;  // Ctrl + Alt
+        int key;        // R键
+      } toggle_visibility;
+
+      struct Screenshot {
+        int modifiers;  // 无修饰键
+        int key;        // 印屏键
+      } screenshot;
     } hotkey;
 
     // 语言设置
     struct Language {
-      std::string current = "zh-CN";  // zh-CN, en-US
+      std::string current;  // zh-CN, en-US
     } language;
 
     // 日志设置
     struct Logger {
-      std::string level = "INFO";  // DEBUG, INFO, ERROR
+      std::string level;  // DEBUG, INFO, ERROR
     } logger;
   } app;
 
@@ -78,19 +85,19 @@ struct AppSettings {
       std::vector<PresetItem> aspect_ratios;
       std::vector<PresetItem> resolutions;
     } app_menu;
-    
+
     // AppWindow布局配置
     struct AppWindowLayout {
-      int base_item_height = 24;
-      int base_title_height = 26;
-      int base_separator_height = 1;
-      int base_font_size = 12;
-      int base_text_padding = 12;
-      int base_indicator_width = 3;
-      int base_ratio_indicator_width = 4;
-      int base_ratio_column_width = 60;
-      int base_resolution_column_width = 120;
-      int base_settings_column_width = 120;
+      int base_item_height;
+      int base_title_height;
+      int base_separator_height;
+      int base_font_size;
+      int base_text_padding;
+      int base_indicator_width;
+      int base_ratio_indicator_width;
+      int base_ratio_column_width;
+      int base_resolution_column_width;
+      int base_settings_column_width;
     } app_window_layout;
   } ui;
 };
@@ -122,8 +129,10 @@ inline auto create_default_app_settings() -> AppSettings {
   settings.version = "1.0";
 
   // app 设置
-  settings.app.hotkey.modifiers = 3;  // Ctrl + Alt
-  settings.app.hotkey.key = 82;       // R键
+  settings.app.hotkey.toggle_visibility.modifiers = 3;  // Ctrl + Alt
+  settings.app.hotkey.toggle_visibility.key = 82;       // R键
+  settings.app.hotkey.screenshot.modifiers = 0;         // 无修饰键
+  settings.app.hotkey.screenshot.key = 44;              // 印屏键
   settings.app.language.current = "zh-CN";
   settings.app.logger.level = "INFO";
 
@@ -144,15 +153,15 @@ inline auto create_default_app_settings() -> AppSettings {
                                         {"feature.toggle_overlay", "", true, 4},
                                         {"feature.toggle_letterbox", "", true, 5},
                                         {"window.reset_transform", "", true, 6},
-                                        {"panel.hide", "", true, 7},
-                                        {"app.exit", "", false, 8}};
+                                        {"panel.hide", "", false, 7},
+                                        {"app.exit", "", true, 8}};
 
   // 默认比例配置
   settings.ui.app_menu.aspect_ratios = {
-      {"32:9", "32:9", true, 1, false}, {"21:9", "21:9", true, 2, false},
-      {"16:9", "16:9", true, 3, false}, {"3:2", "3:2", true, 4, false},
-      {"1:1", "1:1", true, 5, false},   {"3:4", "3:4", true, 6, false},
-      {"2:3", "2:3", true, 7, false},   {"9:16", "9:16", true, 8, false}};
+      {"32:9", "32:9", false, 1, false}, {"21:9", "21:9", true, 2, false},
+      {"16:9", "16:9", true, 3, false},  {"3:2", "3:2", true, 4, false},
+      {"1:1", "1:1", true, 5, false},    {"3:4", "3:4", true, 6, false},
+      {"2:3", "2:3", true, 7, false},    {"9:16", "9:16", true, 8, false}};
 
   // 默认分辨率配置
   settings.ui.app_menu.resolutions = {
@@ -170,8 +179,8 @@ inline auto create_default_app_settings() -> AppSettings {
   settings.ui.app_window_layout.base_indicator_width = 3;
   settings.ui.app_window_layout.base_ratio_indicator_width = 4;
   settings.ui.app_window_layout.base_ratio_column_width = 60;
-  settings.ui.app_window_layout.base_resolution_column_width = 120;
-  settings.ui.app_window_layout.base_settings_column_width = 120;
+  settings.ui.app_window_layout.base_resolution_column_width = 70;
+  settings.ui.app_window_layout.base_settings_column_width = 80;
 
   return settings;
 }
