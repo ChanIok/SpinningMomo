@@ -20,7 +20,7 @@ import Features.Notifications.State;
 import Features.Overlay.State;
 import Features.Overlay;
 import Features.Preview.State;
-import Features.Preview.Window;
+import Features.Preview;
 import Features.Screenshot;
 import Features.Screenshot.State;
 import Features.Settings;
@@ -41,7 +41,7 @@ import Core.I18n;
 Application::Application() = default;
 Application::~Application() {
   if (m_app_state) {
-    Features::Preview::Window::cleanup_preview(*m_app_state);
+    Features::Preview::cleanup_preview(*m_app_state);
     Features::Overlay::cleanup_overlay(*m_app_state);
     if (auto result = Features::Letterbox::shutdown(*m_app_state); !result) {
       Logger().error("Failed to shutdown Letterbox: {}", result.error());

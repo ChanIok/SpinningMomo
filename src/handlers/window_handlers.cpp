@@ -15,7 +15,7 @@ import Features.Settings.State;
 import Features.Letterbox;
 import Features.WindowControl;
 import Features.Notifications;
-import Features.Preview.Window;
+import Features.Preview;
 import Features.Overlay;
 import Features.Overlay.State;
 import UI.AppWindow;
@@ -51,7 +51,7 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
 auto prepare_window_transform(Core::State::AppState& state) -> void {
   // 停止活动模块
   if (state.app_window->ui.preview_enabled) {
-    Features::Preview::Window::stop_preview(state);
+    Features::Preview::stop_preview(state);
   }
 
   if (state.app_window->ui.overlay_enabled) {
@@ -64,7 +64,7 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
     -> void {
   // 重启之前启用的模块
   if (state.app_window->ui.preview_enabled) {
-    auto preview_result = Features::Preview::Window::start_preview(state, target_window);
+    auto preview_result = Features::Preview::start_preview(state, target_window);
     if (!preview_result) {
       Logger().error("Failed to restart preview after window transform: {}",
                      preview_result.error());

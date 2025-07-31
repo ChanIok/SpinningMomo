@@ -12,7 +12,7 @@ import UI.AppWindow.Events;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Letterbox;
-import Features.Preview.Window;
+import Features.Preview;
 import Features.WindowControl;
 import Features.Notifications;
 import Features.Overlay;
@@ -35,7 +35,7 @@ auto handle_preview_toggle(Core::State::AppState& state,
     std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
     auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
-      if (auto result = Features::Preview::Window::start_preview(state, target_window.value());
+      if (auto result = Features::Preview::start_preview(state, target_window.value());
           !result) {
         Logger().error("Failed to start preview: {}", result.error());
         // 回滚UI状态
@@ -53,7 +53,7 @@ auto handle_preview_toggle(Core::State::AppState& state,
     }
   } else {
     // 停止预览
-    Features::Preview::Window::stop_preview(state);
+    Features::Preview::stop_preview(state);
   }
 }
 

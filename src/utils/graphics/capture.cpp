@@ -162,10 +162,6 @@ auto stop_capture(CaptureSession& session) -> void {
     session.session.Close();
     session.session = nullptr;
   }
-}
-
-auto cleanup_capture_session(CaptureSession& session) -> void {
-  stop_capture(session);
 
   if (session.frame_pool) {
     session.frame_pool.FrameArrived(session.frame_token);
@@ -174,6 +170,11 @@ auto cleanup_capture_session(CaptureSession& session) -> void {
   }
 
   session.capture_item = nullptr;
+}
+
+auto cleanup_capture_session(CaptureSession& session) -> void {
+  stop_capture(session);
+
   session.winrt_device = nullptr;
 }
 

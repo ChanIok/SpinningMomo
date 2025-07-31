@@ -69,7 +69,6 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
   }
 
   state.preview->capture_state.session = std::move(session_result.value());
-  state.preview->capture_state.active = false;
 
   Logger().info("Capture system initialized successfully");
   return {};
@@ -84,7 +83,6 @@ auto start_capture(Core::State::AppState& state) -> std::expected<void, std::str
     return std::unexpected("Failed to start capture");
   }
 
-  state.preview->capture_state.active = true;
   Logger().debug("Capture started successfully");
   return {};
 }
@@ -92,22 +90,14 @@ auto start_capture(Core::State::AppState& state) -> std::expected<void, std::str
 auto stop_capture(Core::State::AppState& state) -> void {
   auto& session = state.preview->capture_state.session;
 
-  if (state.preview->capture_state.active) {
     Utils::Graphics::Capture::stop_capture(session);
-    state.preview->capture_state.active = false;
     Logger().debug("Capture stopped");
-  }
 }
 
 auto cleanup_capture(Core::State::AppState& state) -> void {
   auto& session = state.preview->capture_state.session;
 
-  if (state.preview->capture_state.active) {
-    Utils::Graphics::Capture::stop_capture(session);
-  }
-
   Utils::Graphics::Capture::cleanup_capture_session(session);
-  state.preview->capture_state.active = false;
 
   Logger().info("Capture resources cleaned up");
 }
