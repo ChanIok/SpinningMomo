@@ -35,16 +35,12 @@ auto start(Core::Async::State::AsyncRuntimeState& runtime, size_t thread_count)
     runtime.worker_threads.reserve(thread_count);
     for (size_t i = 0; i < thread_count; ++i) {
       runtime.worker_threads.emplace_back([&runtime, i]() {
-        Logger().debug("AsyncRuntime worker thread {} started", i);
-
         try {
           auto work = asio::make_work_guard(*runtime.io_context);
           runtime.io_context->run();
         } catch (const std::exception& e) {
           Logger().error("AsyncRuntime worker thread {} error: {}", i, e.what());
         }
-
-        Logger().debug("AsyncRuntime worker thread {} stopped", i);
       });
     }
 

@@ -63,6 +63,8 @@ struct TextData {
     std::string screenshot_success;  // 截图成功
     std::string overlay_conflict;    // 叠加层冲突
     std::string preview_conflict;    // 预览窗冲突
+    std::string preview_start_failed; // 预览窗启动失败
+    std::string overlay_start_failed; // 叠加层启动失败
 
     // 设置消息
     std::string settings_hotkey_prompt;              // 热键设置提示

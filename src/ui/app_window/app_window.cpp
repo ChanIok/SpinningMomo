@@ -67,8 +67,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 
   // 初始化Direct2D渲染
   if (!UI::AppWindow::D2DContext::initialize_d2d(state, state.app_window->window.hwnd)) {
-    // Direct2D初始化失败，但不影响窗口创建，会回退到GDI渲染
-    Logger().warn("Failed to initialize Direct2D rendering");
+    Logger().error("Failed to initialize Direct2D rendering");
   }
 
   return {};

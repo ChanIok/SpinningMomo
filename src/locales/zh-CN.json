@@ -43,6 +43,8 @@
     "screenshot_success": "截图成功，已保存至: ",
     "overlay_conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能",
     "preview_conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能",
+    "preview_start_failed": "预览窗启动失败: ",
+    "overlay_start_failed": "叠加层启动失败: ",
 
     "settings_hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
     "settings_hotkey_success": "热键已设置为：",

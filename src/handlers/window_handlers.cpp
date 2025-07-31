@@ -123,11 +123,6 @@ auto handle_reset_event(Core::State::AppState& state,
       std::numeric_limits<size_t>::max();  // 表示使用屏幕比例
   state.app_window->ui.current_resolution_index = 0;
 
-  // 触发UI更新
-  if (state.app_window->window.hwnd) {
-    Vendor::Windows::InvalidateRect(state.app_window->window.hwnd, nullptr, true);
-  }
-
   Logger().debug("Window reset to screen size successfully");
 }
 
@@ -181,11 +176,6 @@ auto handle_ratio_changed(Core::State::AppState& state,
   const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
   if (event.index < ratios.size() || event.index == std::numeric_limits<size_t>::max()) {
     state.app_window->ui.current_ratio_index = event.index;
-  }
-
-  // 触发UI更新
-  if (state.app_window->window.hwnd) {
-    Vendor::Windows::InvalidateRect(state.app_window->window.hwnd, nullptr, true);
   }
 }
 
@@ -242,11 +232,6 @@ auto handle_resolution_changed(Core::State::AppState& state,
   if (event.index < resolutions.size()) {
     state.app_window->ui.current_resolution_index = event.index;
   }
-
-  // 触发UI更新
-  if (state.app_window->window.hwnd) {
-    Vendor::Windows::InvalidateRect(state.app_window->window.hwnd, nullptr, true);
-  }
 }
 
 // 处理窗口选择事件
@@ -295,6 +280,7 @@ auto register_window_handlers(Core::State::AppState& app_state) -> void {
   subscribe<UI::AppWindow::Events::RatioChangeEvent>(
       *app_state.event_bus, [&app_state](const UI::AppWindow::Events::RatioChangeEvent& event) {
         handle_ratio_changed(app_state, event);
+        UI::AppWindow::request_repaint(app_state);
       });
 
   // 处理分辨率改变
@@ -302,11 +288,14 @@ auto register_window_handlers(Core::State::AppState& app_state) -> void {
       *app_state.event_bus,
       [&app_state](const UI::AppWindow::Events::ResolutionChangeEvent& event) {
         handle_resolution_changed(app_state, event);
+        UI::AppWindow::request_repaint(app_state);
       });
 
+  // 处理重置窗口
   subscribe<UI::AppWindow::Events::ResetEvent>(
       *app_state.event_bus, [&app_state](const UI::AppWindow::Events::ResetEvent& event) {
         handle_reset_event(app_state, event);
+        UI::AppWindow::request_repaint(app_state);
       });
 
   // 处理窗口选择
