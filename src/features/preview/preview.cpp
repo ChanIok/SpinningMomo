@@ -25,42 +25,20 @@ import Utils.Logger;
 
 namespace Features::Preview {
 
-auto initialize_preview(Core::State::AppState& state, HINSTANCE instance)
-    -> std::expected<void, std::string> {
-  // 创建窗口，传递状态指针
-  auto window_result = Window::create_window(instance, &state);
-  if (!window_result) {
-    return std::unexpected(window_result.error());
-  }
-
-  // 初始化预览状态
-  state.preview->hwnd = window_result.value();
-  state.preview->is_first_show = true;
-
-  // 初始化DPI
-  HDC hdc = GetDC(nullptr);
-  UINT dpi = GetDeviceCaps(hdc, LOGPIXELSX);
-  ReleaseDC(nullptr, hdc);
-  state.preview->dpi_sizes.update_dpi_scaling(dpi);
-
-  // 计算理想尺寸范围
-  int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-  state.preview->size.min_ideal_size = std::min(screenWidth, screenHeight) / 10;
-  state.preview->size.max_ideal_size = std::max(screenWidth, screenHeight);
-  state.preview->size.ideal_size = screenHeight / 2;
-
-  Logger().info("Preview window initialized successfully");
-  return {};
-}
-
 auto start_preview(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
+  auto& preview_state = *state.preview;
+
+  // 检查是否支持捕获
+  if (!state.app_info->is_capture_supported) {
+    return std::unexpected("Capture not supported on this system");
+  }
+
   // 检查预览窗口是否存在，如果不存在则初始化
-  if (!state.preview->hwnd) {
+  if (!preview_state.hwnd) {
     HINSTANCE instance = GetModuleHandle(nullptr);
-    Logger().debug("Initializing preview window");
-    if (auto result = initialize_preview(state, instance); !result) {
+
+    if (auto result = Window::initialize_preview_window(state, instance); !result) {
       return std::unexpected(result.error());
     }
   }
@@ -71,17 +49,16 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
 
   // 检查窗口是否最小化
   if (IsIconic(target_window)) {
-    Logger().debug("Target window is minimized, cannot start capture");
     return std::unexpected("Target window is minimized");
   }
 
   // 取消清理定时器
-  if (state.preview->cleanup_timer && state.preview->cleanup_timer->IsRunning()) {
-    state.preview->cleanup_timer->Cancel();
+  if (preview_state.cleanup_timer && preview_state.cleanup_timer->IsRunning()) {
+    preview_state.cleanup_timer->Cancel();
   }
 
   // 保存目标窗口
-  state.preview->target_window = target_window;
+  preview_state.target_window = target_window;
 
   // 计算捕获尺寸
   RECT clientRect;
@@ -90,18 +67,13 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   int height = clientRect.bottom - clientRect.top;
 
   // 计算窗口尺寸和宽高比
-  Window::calculate_window_size(*state.preview, width, height);
-
-  // 检查是否支持捕获
-  if (!state.app_info->is_capture_supported) {
-    return std::unexpected("Capture not supported on this system");
-  }
+  Window::calculate_window_size(preview_state, width, height);
 
   // 初始化渲染系统（如果需要）
-  if (!state.preview->d3d_initialized) {
-    auto rendering_result = Rendering::initialize_rendering(state, state.preview->hwnd,
-                                                            state.preview->size.window_width,
-                                                            state.preview->size.window_height);
+  if (!preview_state.d3d_initialized) {
+    auto rendering_result =
+        Rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
+                                        preview_state.size.window_height);
 
     if (!rendering_result) {
       Logger().error("Failed to initialize rendering system");
@@ -118,12 +90,12 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   // 处理首次显示
-  if (state.preview->is_first_show) {
-    Window::handle_first_show(*state.preview);
+  if (preview_state.is_first_show) {
+    Window::handle_first_show(preview_state);
   } else {
     // 更新窗口尺寸，保持位置
-    SetWindowPos(state.preview->hwnd, nullptr, 0, 0, state.preview->size.window_width,
-                 state.preview->size.window_height,
+    SetWindowPos(preview_state.hwnd, nullptr, 0, 0, preview_state.size.window_width,
+                 preview_state.size.window_height,
                  SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
   }
 
@@ -134,20 +106,22 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected(start_result.error());
   }
 
-  state.preview->running = true;
-  state.preview->is_visible = true;
+  preview_state.running = true;
+  preview_state.is_visible = true;
 
   Logger().info("Preview capture started successfully");
   return {};
 }
 
 auto stop_preview(Core::State::AppState& state) -> void {
-  if (!state.preview->running) {
+  auto& preview_state = *state.preview;
+
+  if (!preview_state.running) {
     return;
   }
 
-  state.preview->running = false;
-  state.preview->create_new_srv = true;
+  preview_state.running = false;
+  preview_state.create_new_srv = true;
 
   // 停止捕获
   Capture::stop_capture(state);
@@ -156,13 +130,13 @@ auto stop_preview(Core::State::AppState& state) -> void {
   Window::hide_preview_window(state);
 
   // 启动清理定时器
-  if (!state.preview->cleanup_timer) {
-    state.preview->cleanup_timer.emplace();
+  if (!preview_state.cleanup_timer) {
+    preview_state.cleanup_timer.emplace();
   }
 
   if (!state.preview->cleanup_timer->IsRunning()) {
     if (auto result = state.preview->cleanup_timer->SetTimer(
-            std::chrono::milliseconds(30000), [&state]() { cleanup_preview(state); });
+            std::chrono::milliseconds(3000), [&state]() { cleanup_preview(state); });
         !result) {
       Logger().error("Failed to set cleanup timer: {}", static_cast<int>(result.error()));
     }
@@ -182,16 +156,14 @@ auto cleanup_preview(Core::State::AppState& state) -> void {
     state.preview->cleanup_timer.reset();
   }
 
+  // 停止预览
+  stop_preview(state);
+
   // 清理捕获资源
   Capture::cleanup_capture(state);
 
   // 清理渲染资源
   Rendering::cleanup_rendering(state);
-
-  state.preview->d3d_initialized = false;
-  state.preview->running = false;
-  state.preview->target_window = nullptr;
-  state.preview->create_new_srv = true;
 
   Logger().info("Preview resources cleaned up");
 }

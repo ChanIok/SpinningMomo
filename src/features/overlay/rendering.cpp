@@ -158,30 +158,20 @@ auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
   float left = -1.0f, right = 1.0f, top = 1.0f, bottom = -1.0f;
 
   if (overlay_state.window.use_letterbox_mode) {
-    // 计算letterbox区域的顶点位置
-    int screen_width = overlay_state.window.screen_width;
-    int screen_height = overlay_state.window.screen_height;
-    int game_width = overlay_state.window.cached_game_width;
-    int game_height = overlay_state.window.cached_game_height;
-
-    // 计算游戏内容的宽高比
-    float game_aspect = static_cast<float>(game_width) / game_height;
-
-    // 计算窗口/屏幕的宽高比
-    float screen_aspect = static_cast<float>(screen_width) / screen_height;
-
-    // 根据宽高比计算实际的渲染区域
-    if (game_aspect > screen_aspect) {
-      // 游戏比例更宽 - 需要上下黑边 (letterbox)
-      float height = screen_aspect / game_aspect;
-      top = height;
-      bottom = -height;
-    } else if (game_aspect < screen_aspect) {
-      // 游戏比例更窄 - 需要左右黑边 (pillarbox)
-      float width = game_aspect / screen_aspect;
-      left = -width;
-      right = width;
-    }
+    // 使用工具函数计算黑边区域
+    auto [content_left, content_top, content_width, content_height] = 
+        Utils::calculate_letterbox_area(
+            overlay_state.window.screen_width,
+            overlay_state.window.screen_height,
+            overlay_state.window.cached_game_width,
+            overlay_state.window.cached_game_height);
+    
+    // 将像素坐标转换为标准化设备坐标(-1到1)
+    // 注意：Direct3D的Y轴是向上的，而窗口坐标Y轴是向下的
+    left = (content_left * 2.0f / overlay_state.window.screen_width) - 1.0f;
+    right = ((content_left + content_width) * 2.0f / overlay_state.window.screen_width) - 1.0f;
+    top = 1.0f - (content_top * 2.0f / overlay_state.window.screen_height);
+    bottom = 1.0f - ((content_top + content_height) * 2.0f / overlay_state.window.screen_height);
   }
 
   // 更新顶点数据
@@ -279,7 +269,7 @@ auto render_frame(Core::State::AppState& state,
   }
 }
 
-auto cleanup_rendering_resources(Core::State::AppState& state) -> void {
+auto cleanup_rendering(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
   ::Utils::Graphics::D3D::cleanup_shader_resources(overlay_state.rendering.shader_resources);

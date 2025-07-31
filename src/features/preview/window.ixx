@@ -29,8 +29,9 @@ export auto calculate_window_size(Features::Preview::State::PreviewState& state,
 // 处理首次显示
 export auto handle_first_show(Features::Preview::State::PreviewState& state) -> void;
 
-// 创建窗口（包括注册类和设置外观）
-export auto create_window(HINSTANCE instance, Core::State::AppState* state)
-    -> std::expected<HWND, std::string>;
+// 初始化预览窗口系统
+export auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
+    -> std::expected<void, std::string>;
+
 
 }  // namespace Features::Preview::Window

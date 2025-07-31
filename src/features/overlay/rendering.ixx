@@ -23,6 +23,6 @@ export auto render_frame(Core::State::AppState& state,
                          Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void;
 
 // 清理渲染资源
-export auto cleanup_rendering_resources(Core::State::AppState& state) -> void;
+export auto cleanup_rendering(Core::State::AppState& state) -> void;
 
 }  // namespace Features::Overlay::Rendering

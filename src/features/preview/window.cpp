@@ -114,7 +114,7 @@ auto handle_first_show(Features::Preview::State::PreviewState& state) -> void {
                SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
 }
 
-auto create_window(HINSTANCE instance, Core::State::AppState* state)
+auto create_window(HINSTANCE instance, Core::State::AppState& state)
     -> std::expected<HWND, std::string> {
   // 1. 注册窗口类
   if (!register_preview_window_class(instance)) {
@@ -125,7 +125,7 @@ auto create_window(HINSTANCE instance, Core::State::AppState* state)
   int idealSize = static_cast<int>(screenHeight * 0.5);
 
   // 2. 创建窗口
-  HWND hwnd = create_preview_window(instance, idealSize, idealSize + 24, state);
+  HWND hwnd = create_preview_window(instance, idealSize, idealSize + 24, &state);
   if (!hwnd) {
     return std::unexpected("Failed to create preview window");
   }
@@ -133,6 +133,35 @@ auto create_window(HINSTANCE instance, Core::State::AppState* state)
   // 3. 设置窗口外观
   setup_window_appearance(hwnd);
   return hwnd;
+}
+
+
+auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
+    -> std::expected<void, std::string> {
+  // 创建窗口，传递状态引用
+  auto window_result = create_window(instance, state);
+  if (!window_result) {
+    return std::unexpected(window_result.error());
+  }
+
+  // 初始化预览状态
+  state.preview->hwnd = window_result.value();
+  state.preview->is_first_show = true;
+
+  // 初始化DPI
+  HDC hdc = GetDC(nullptr);
+  UINT dpi = GetDeviceCaps(hdc, LOGPIXELSX);
+  ReleaseDC(nullptr, hdc);
+  state.preview->dpi_sizes.update_dpi_scaling(dpi);
+
+  // 计算理想尺寸范围
+  int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+  state.preview->size.min_ideal_size = std::min(screenWidth, screenHeight) / 10;
+  state.preview->size.max_ideal_size = std::max(screenWidth, screenHeight);
+  state.preview->size.ideal_size = screenHeight / 2;
+
+  return {};
 }
 
 auto show_preview_window(Core::State::AppState& state) -> void {
