@@ -168,6 +168,9 @@ void handle_menu_action(Core::State::AppState& state,
         } else if (action_id == "screenshot.capture") {
           // 发送截图事件
           Core::Events::send(*state.event_bus, UI::AppWindow::Events::CaptureEvent{});
+        } else if (action_id == "panel.hide") {
+          // 发送切换可见性事件
+          Core::Events::send(*state.event_bus, UI::AppWindow::Events::ToggleVisibilityEvent{});
         }
 
         Logger().info("Feature action triggered: {}", action_id);

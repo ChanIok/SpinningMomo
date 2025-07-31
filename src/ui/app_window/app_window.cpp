@@ -225,18 +225,7 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   for (size_t i = 0; i < resolutions.size(); ++i) {
     std::wstring displayText;
     const auto& preset = resolutions[i];
-    // if (preset.baseWidth == 0 && preset.baseHeight == 0) {
     displayText = preset.name;
-    // } else {
-    //   const double megaPixels = preset.totalPixels / 1000000.0;
-    //   wchar_t buffer[16];
-    //   if (megaPixels < 10) {
-    //     swprintf(buffer, 16, L"%.1f", megaPixels);
-    //   } else {
-    //     swprintf(buffer, 16, L"%.0f", megaPixels);
-    //   }
-    //   displayText = preset.name + L" (" + buffer + L"M)";
-    // }
     state.app_window->data.menu_items.emplace_back(
         displayText, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
   }
