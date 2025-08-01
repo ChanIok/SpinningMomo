@@ -6,6 +6,9 @@ import std;
 
 export namespace Features::Settings::Types {
 
+// 当前设置版本
+constexpr int CURRENT_SETTINGS_VERSION = 2;
+
 // 功能项（应用菜单中的功能）
 struct FeatureItem {
   std::string id;       // 如: "screenshot.capture", "screenshot.open_folder"
@@ -25,7 +28,7 @@ struct PresetItem {
 
 // 完整的应用设置（重构后的结构）
 struct AppSettings {
-  std::string version = "1.0";
+  int version;
 
   // app 分组 - 应用核心设置
   struct App {
@@ -126,7 +129,7 @@ struct UpdateSettingsResult {
 // 辅助函数：创建默认设置
 inline auto create_default_app_settings() -> AppSettings {
   AppSettings settings;
-  settings.version = "1.0";
+  settings.version = CURRENT_SETTINGS_VERSION;
 
   // app 设置
   settings.app.hotkey.toggle_visibility.modifiers = 3;  // Ctrl + Alt

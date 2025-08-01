@@ -12,7 +12,9 @@ import Features.Settings.Events;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.Settings.Compute;
+import Features.Settings.Migration;
 import Utils.Path;
+import Utils.Logger;
 
 namespace Features::Settings {
 
@@ -23,6 +25,81 @@ auto get_settings_path() -> std::expected<std::filesystem::path, std::string> {
   }
 
   return dir_result.value() / "settings.json";
+}
+
+// 专用于初始化的设置读取函数，使用rfl::Generic处理版本迁移
+auto get_settings_for_initialization() -> std::expected<Types::AppSettings, std::string> {
+  try {
+    auto settings_path = get_settings_path();
+    if (!settings_path) {
+      return std::unexpected(settings_path.error());
+    }
+
+    if (!std::filesystem::exists(settings_path.value())) {
+      return std::unexpected("Settings file does not exist");
+    }
+
+    // 读取原始JSON字符串
+    std::ifstream file(settings_path.value());
+    if (!file) {
+      return std::unexpected("Failed to open settings file");
+    }
+
+    std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+    // 使用rfl::Generic解析JSON以获取版本号
+    auto generic_result = rfl::json::read<rfl::Generic::Object>(json_str);
+    if (!generic_result) {
+      return std::unexpected("Failed to parse settings as generic JSON: " +
+                             generic_result.error().what());
+    }
+
+    auto generic_settings = generic_result.value();
+
+    // 尝试提取版本号
+    int version = 1;  // 默认版本
+    auto version_result = generic_settings.get("version").and_then(rfl::to_int);
+    if (version_result) {
+      version = version_result.value();
+    }
+
+    // 如果版本低于当前版本，执行迁移
+    if (version < Types::CURRENT_SETTINGS_VERSION) {
+      // 执行迁移，传入原始的generic_settings
+      auto migration_result = Migration::migrate_settings(generic_settings, version);
+      if (!migration_result) {
+        return std::unexpected("Settings migration failed: " + migration_result.error());
+      }
+      
+      // 使用迁移后的generic对象转换为AppSettings
+      auto app_settings_result = rfl::from_generic<Types::AppSettings>(migration_result.value());
+      if (!app_settings_result) {
+        return std::unexpected("Failed to convert migrated generic JSON to AppSettings: " +
+                               app_settings_result.error().what());
+      }
+      
+      auto migrated_settings = app_settings_result.value();
+      
+      // 自动保存迁移后的设置到文件
+      auto save_result = save_settings_to_file(settings_path.value(), migrated_settings);
+      if (!save_result) {
+        return std::unexpected("Failed to save migrated settings: " + save_result.error());
+      }
+      
+      return migrated_settings;
+    }
+
+    // 如果版本已经是最新版，直接转换为AppSettings
+    auto app_settings_result = rfl::from_generic<Types::AppSettings>(generic_settings);
+    if (!app_settings_result) {
+      return std::unexpected("Failed to convert generic JSON to AppSettings: " +
+                             app_settings_result.error().what());
+    }
+
+    return app_settings_result.value();
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to read settings: " + std::string(e.what()));
+  }
 }
 
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
@@ -49,15 +126,17 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       app_state.settings->is_initialized = true;
 
     } else {
-      // 从文件加载配置
-      auto config_result = get_settings({});
+      // 从文件加载配置（使用专为初始化设计的函数，内部已处理迁移）
+      auto config_result = get_settings_for_initialization();
       if (!config_result) {
         return std::unexpected(config_result.error());
       }
 
+      auto config = config_result.value();
+
       // 创建完整状态
       State::SettingsState state;
-      state.config = config_result.value();
+      state.config = config;
 
       // 先设置到app_state，然后计算预设
       *app_state.settings = state;
