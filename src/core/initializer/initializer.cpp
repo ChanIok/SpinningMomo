@@ -11,6 +11,8 @@ import Features.Notifications;
 import Features.Settings;
 import Features.Settings.Rpc;
 import Features.Settings.State;
+import Features.Updater;
+import Features.Updater.Rpc;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.TrayIcon;
@@ -35,12 +37,21 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 4. 初始化 settings 模块
     if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
-      Logger().warn("Failed to initialize settings: {}", settings_result.error());
+      Logger().error("Failed to initialize settings: {}", settings_result.error());
+      return std::unexpected("Failed to initialize settings: " + settings_result.error());
+    }
+
+    // 4.1. 初始化 updater 模块
+    if (auto updater_result = Features::Updater::initialize(state); !updater_result) {
+      Logger().warn("Failed to initialize updater: {}", updater_result.error());
       // 不影响应用启动
     }
 
     // 5. 注册 Settings RPC 处理器
     Features::Settings::Rpc::register_handlers(state);
+
+    // 5.1. 注册 Updater RPC 处理器
+    Features::Updater::Rpc::register_handlers(state);
 
     // 6. 注册 WebView Window RPC 处理器
     UI::WebViewWindow::Rpc::register_handlers(state);
@@ -66,12 +77,12 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     UI::AppWindow::show_window(state);
 
     // 15. 注册热键（从settings中读取配置）
-    UI::AppWindow::register_toggle_visibility_hotkey(state, 
-                                                     state.settings->config.app.hotkey.toggle_visibility.modifiers,
-                                                     state.settings->config.app.hotkey.toggle_visibility.key);
-    UI::AppWindow::register_screenshot_hotkey(state,
-                                              state.settings->config.app.hotkey.screenshot.modifiers,
-                                              state.settings->config.app.hotkey.screenshot.key);
+    UI::AppWindow::register_toggle_visibility_hotkey(
+        state, state.settings->config.app.hotkey.toggle_visibility.modifiers,
+        state.settings->config.app.hotkey.toggle_visibility.key);
+    UI::AppWindow::register_screenshot_hotkey(
+        state, state.settings->config.app.hotkey.screenshot.modifiers,
+        state.settings->config.app.hotkey.screenshot.key);
 
     Logger().info("Application initialized successfully");
     return {};

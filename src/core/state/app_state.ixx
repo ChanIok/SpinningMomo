@@ -28,6 +28,10 @@ namespace Features::Settings::State {
 export struct SettingsState;
 }
 
+namespace Features::Updater::State {
+export struct UpdateState;
+}
+
 namespace UI::AppWindow::State {
 export struct AppWindowState;
 }
@@ -77,6 +81,9 @@ export struct AppState {
 
   // 应用设置状态（包含配置和计算状态）
   std::unique_ptr<Features::Settings::State::SettingsState> settings;
+  
+  // 更新模块状态
+  std::unique_ptr<Features::Updater::State::UpdateState> updater;
 
   // UI状态
   std::unique_ptr<UI::AppWindow::State::AppWindowState> app_window;

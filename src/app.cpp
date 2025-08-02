@@ -24,6 +24,8 @@ import Features.Preview;
 import Features.Screenshot;
 import Features.Screenshot.State;
 import Features.Settings;
+import Features.Updater;
+import Features.Updater.State;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.WebViewWindow;
@@ -41,6 +43,12 @@ import Core.I18n;
 Application::Application() = default;
 Application::~Application() {
   if (m_app_state) {
+    // 检查是否有待处理的更新
+    if (m_app_state->updater && m_app_state->updater->pending_update) {
+      Logger().info("Executing pending update on program exit");
+      Features::Updater::execute_pending_update(*m_app_state);
+    }
+
     Features::Preview::cleanup_preview(*m_app_state);
     Features::Overlay::cleanup_overlay(*m_app_state);
     if (auto result = Features::Letterbox::shutdown(*m_app_state); !result) {
@@ -84,6 +92,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->overlay = std::make_unique<Features::Overlay::State::OverlayState>();
     m_app_state->preview = std::make_unique<Features::Preview::State::PreviewState>();
     m_app_state->screenshot = std::make_unique<Features::Screenshot::State::ScreenshotState>();
+    m_app_state->updater = std::make_unique<Features::Updater::State::UpdateState>();
 
     m_app_state->app_window->window.instance = m_h_instance;
 

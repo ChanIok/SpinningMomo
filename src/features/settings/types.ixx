@@ -80,6 +80,20 @@ struct AppSettings {
     } letterbox;
   } features;
 
+  // updater 分组 - 更新设置
+  struct Updater {
+    bool auto_check = true;         // 是否自动检查更新
+    int check_interval_hours = 24;  // 检查间隔（小时）
+
+    // 服务器配置
+    struct Server {
+      std::string name;  // 服务器名称
+      std::string url;   // 服务器API地址
+    };
+
+    std::vector<Server> servers;  // 服务器列表（按优先级排序）
+  } updater;
+
   // ui 分组 - UI界面设置
   struct UI {
     // 应用菜单配置
@@ -147,6 +161,14 @@ inline auto create_default_app_settings() -> AppSettings {
   // features 设置
   settings.features.screenshot.game_album_path = "";
   settings.features.letterbox.enabled = false;
+
+  // updater 设置
+  settings.updater.auto_check = true;
+  settings.updater.check_interval_hours = 24;
+
+  // 默认服务器配置（按优先级排序）
+  settings.updater.servers = {
+      {"GitHub官方", "https://api.github.com/repos/ChanIok/SpinningMomo/releases/latest"}};
 
   // ui 设置 - app_menu 配置
   // 直接使用字符串ID，label留空，将从i18n系统动态获取

@@ -9,6 +9,7 @@ export module Core.RpcHandlers;
 import std;
 import Core.State;
 import Core.RpcHandlers.Types;
+import Utils.Logger;
 
 namespace Core::RpcHandlers {
 
@@ -37,42 +38,33 @@ auto register_method(Core::State::AppState& app_state,
   // 创建类型擦除的处理器包装
   auto wrapped_handler = [handler, &app_state](rfl::Generic params_generic,
                                                rfl::Generic id) -> asio::awaitable<std::string> {
-    try {
-      // 从 rfl::Generic 转换为 Request 类型
-      auto request_result = rfl::from_generic<Request>(params_generic);
-      if (!request_result) {
-        JsonRpcErrorResponse error_response;
-        error_response.id = id;
-        error_response.error =
-            RpcError{.code = static_cast<int>(ErrorCode::InvalidParams),
-                     .message = "Invalid parameters: " + request_result.error().what()};
-        co_return rfl::json::write(error_response);
-      }
-
-      // 执行业务逻辑 - 传递 app_state 参数
-      auto result = co_await handler(app_state, request_result.value());
-
-      // 构造响应
-      if (result) {
-        // 成功响应
-        JsonRpcSuccessResponse success_response;
-        success_response.id = id;
-        success_response.result = rfl::to_generic(result.value());
-        co_return rfl::json::write(success_response);
-      } else {
-        // 错误响应
-        JsonRpcErrorResponse error_response;
-        error_response.id = id;
-        error_response.error = result.error();
-        co_return rfl::json::write(error_response);
-      }
-
-    } catch (const std::exception& e) {
-      // 异常处理
+    // 从 rfl::Generic 转换为 Request 类型
+    auto request_result = rfl::from_generic<Request>(params_generic);
+    if (!request_result) {
       JsonRpcErrorResponse error_response;
       error_response.id = id;
-      error_response.error = RpcError{.code = static_cast<int>(ErrorCode::InternalError),
-                                      .message = "Internal error: " + std::string(e.what())};
+      error_response.error =
+          RpcError{.code = static_cast<int>(ErrorCode::InvalidParams),
+                   .message = "Invalid parameters: " + request_result.error().what()};
+      co_return rfl::json::write(error_response);
+    }
+
+    // 执行业务逻辑 - 传递 app_state 参数
+    auto result = co_await handler(app_state, request_result.value());
+
+    // 构造响应
+    if (result) {
+      // 成功响应
+      JsonRpcSuccessResponse success_response;
+      success_response.id = id;
+      success_response.result = rfl::to_generic(result.value());
+      co_return rfl::json::write(success_response);
+    } else {
+      // 错误响应
+      JsonRpcErrorResponse error_response;
+      error_response.id = id;
+      error_response.error = result.error();
+      Logger().error("Error response: {}", error_response.error.message);
       co_return rfl::json::write(error_response);
     }
   };
