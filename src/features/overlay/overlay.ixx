@@ -10,8 +10,8 @@ import Core.State;
 namespace Features::Overlay {
 
 // 开始叠加层捕获
-export auto start_overlay(Core::State::AppState& state, HWND target_window)
-    -> std::expected<void, std::string>;
+export auto start_overlay(Core::State::AppState& state, HWND target_window,
+                          bool is_pre_launch = false) -> std::expected<void, std::string>;
 
 // 停止叠加层
 export auto stop_overlay(Core::State::AppState& state) -> void;

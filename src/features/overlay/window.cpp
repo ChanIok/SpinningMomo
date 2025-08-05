@@ -88,21 +88,6 @@ auto create_overlay_window(HINSTANCE instance, Core::State::AppState& state)
   return hwnd;
 }
 
-auto set_window_transparency(HWND hwnd, BYTE alpha) -> std::expected<void, std::string> {
-  LONG ex_style = GetWindowLong(hwnd, GWL_EXSTYLE);
-  if (!SetWindowLong(hwnd, GWL_EXSTYLE, ex_style | WS_EX_LAYERED)) {
-    DWORD error = GetLastError();
-    return std::unexpected(std::format("Failed to set layered window style. Error: {}", error));
-  }
-
-  if (!SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA)) {
-    DWORD error = GetLastError();
-    return std::unexpected(std::format("Failed to set window transparency. Error: {}", error));
-  }
-
-  return {};
-}
-
 auto set_window_layered_attributes(HWND hwnd) -> std::expected<void, std::string> {
   if (!SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA)) {
     DWORD error = GetLastError();
@@ -128,13 +113,6 @@ auto initialize_overlay_window(Core::State::AppState& state, HINSTANCE instance)
   return {};
 }
 
-auto show_overlay_window(Core::State::AppState& state) -> void {
-  auto& overlay_state = *state.overlay;
-  if (overlay_state.window.overlay_hwnd) {
-    ShowWindow(overlay_state.window.overlay_hwnd, SW_SHOW);
-  }
-}
-
 auto hide_overlay_window(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
@@ -143,7 +121,7 @@ auto hide_overlay_window(Core::State::AppState& state) -> void {
 }
 
 auto set_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
-    -> std::expected<void, std::string> {
+    -> void {
   auto& overlay_state = *state.overlay;
 
   // 缓存游戏窗口尺寸
@@ -189,8 +167,6 @@ auto set_overlay_window_size(Core::State::AppState& state, int game_width, int g
     SetWindowPos(overlay_state.window.target_window, overlay_state.window.overlay_hwnd, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE);
   }
-
-  return {};
 }
 
 auto destroy_overlay_window(Core::State::AppState& state) -> void {
@@ -201,17 +177,52 @@ auto destroy_overlay_window(Core::State::AppState& state) -> void {
   }
 }
 
+auto show_overlay_window_first_time(Core::State::AppState& state)
+    -> std::expected<void, std::string> {
+  auto& overlay_state = *state.overlay;
+
+  // 显示叠加层窗口
+  ShowWindow(overlay_state.window.overlay_hwnd, SW_SHOWNA);
+
+  // 添加分层窗口样式到目标窗口
+  LONG exStyle = GetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE);
+  SetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+
+  // 设置透明度 (透明度1，但仍可点击)
+  if (!SetLayeredWindowAttributes(overlay_state.window.target_window, 0, 1, LWA_ALPHA)) {
+    DWORD error = GetLastError();
+    return std::unexpected(
+        std::format("Failed to set layered window attributes. Error: {}", error));
+  }
+
+  Logger().debug("Set target window layered");
+  return {};
+}
+
 auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void {
   auto& overlay_state = *state.overlay;
   if (!overlay_state.window.target_window) return;
 
   if (with_delay) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
   }
 
   // 移除分层窗口样式
   LONG ex_style = GetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE);
   SetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE, ex_style & ~WS_EX_LAYERED);
+
+  // 获取窗口尺寸
+  auto dimensions_result = Utils::get_window_dimensions(overlay_state.window.target_window);
+  if (!dimensions_result) {
+    return;
+  }
+
+  auto [width, height] = dimensions_result.value();
+
+  int left = (overlay_state.window.screen_width - width) / 2;
+  int top = (overlay_state.window.screen_height - height) / 2;
+  SetWindowPos(overlay_state.window.target_window, HWND_TOP, left, top, 0, 0,
+               SWP_NOSIZE | SWP_SHOWWINDOW | SWP_NOZORDER | SWP_NOACTIVATE);
 
   SetForegroundWindow(overlay_state.window.target_window);
 }

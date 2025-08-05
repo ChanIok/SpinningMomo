@@ -47,6 +47,19 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
   return 0;  // 表示使用屏幕尺寸
 }
 
+// 变换前的准备
+auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
+    -> void {
+  // 提取启动overlay
+  if (state.app_window->ui.overlay_enabled) {
+    Logger().debug("Starting overlay before window transform");
+    auto overlay_result = Features::Overlay::start_overlay(state, target_window, true);
+    if (!overlay_result) {
+      Logger().error("Failed to start overlay before window transform: {}", overlay_result.error());
+    }
+  }
+}
+
 // 变换后的后续处理
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
@@ -58,16 +71,6 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
                      letterbox_result.error());
     }
   }
-
-  // 重启overlay, 如果目标窗口小于屏幕，则停止overlay
-  if (state.app_window->ui.overlay_enabled) {
-    auto overlay_result = Features::Overlay::start_overlay(state, target_window);
-    if (!overlay_result) {
-      Logger().error("Failed to restart overlay after window transform: {}",
-                     overlay_result.error());
-    }
-  }
-
   Logger().debug("Post-transform actions completed");
 }
 
@@ -116,6 +119,8 @@ auto handle_ratio_changed(Core::State::AppState& state,
     return;
   }
 
+  prepare_transform_actions(state, target_window.value());
+
   // 计算新分辨率
   auto total_pixels = get_current_total_pixels(state);
   Features::WindowControl::Resolution new_resolution;
@@ -130,7 +135,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
-      .activate_window = !state.app_window->ui.overlay_enabled};
+      .activate_window = true};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -168,6 +173,8 @@ auto handle_resolution_changed(Core::State::AppState& state,
     return;
   }
 
+  prepare_transform_actions(state, target_window.value());
+
   // 计算新分辨率
   double current_ratio = get_current_ratio(state);
   Features::WindowControl::Resolution new_resolution;
@@ -183,7 +190,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
-      .activate_window = !state.app_window->ui.overlay_enabled};
+      .activate_window = true};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);

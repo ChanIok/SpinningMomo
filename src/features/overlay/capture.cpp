@@ -12,6 +12,7 @@ module Features.Overlay.Capture;
 import std;
 import Core.State;
 import Core.State.AppInfo;
+import Features.Overlay;
 import Features.Overlay.State;
 import Features.Overlay.Rendering;
 import Features.Overlay.Utils;
@@ -31,32 +32,40 @@ auto on_frame_arrived(Core::State::AppState& state,
   auto content_size = frame.ContentSize();
   auto& last_width = state.overlay->capture_state.last_frame_width;
   auto& last_height = state.overlay->capture_state.last_frame_height;
-  
-  bool size_changed = (content_size.Width != last_width) || 
-                      (content_size.Height != last_height);
-  
+
+  bool size_changed = (content_size.Width != last_width) || (content_size.Height != last_height);
+
   if (size_changed) {
+    // 检查是否需要退出
+    auto [screen_width, screen_height] = Utils::get_screen_dimensions();
+    if (!Utils::should_use_overlay(content_size.Width, content_size.Height, screen_width,
+                                   screen_height)) {
+      stop_overlay(state);
+      return;
+    }
+
     // 更新记录的尺寸
     last_width = content_size.Width;
     last_height = content_size.Height;
-    
+
     // 重建帧池
-    ::Utils::Graphics::Capture::recreate_frame_pool(
-        state.overlay->capture_state.session,
-        content_size.Width,
-        content_size.Height
-    );
+    ::Utils::Graphics::Capture::recreate_frame_pool(state.overlay->capture_state.session,
+                                                    content_size.Width, content_size.Height);
 
     state.overlay->rendering.create_new_srv = true;
 
     Window::set_overlay_window_size(state, content_size.Width, content_size.Height);
+
+    // 延迟防止闪烁
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
 
     return;
   }
 
   auto surface = frame.Surface();
   if (surface) {
-    auto texture = ::Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+    auto texture =
+        ::Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
     if (texture) {
       // 触发渲染
       Rendering::render_frame(state, texture);
@@ -105,6 +114,8 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
 
   overlay_state.capture_state.session = std::move(session_result.value());
   overlay_state.capture_state.active = false;
+  overlay_state.capture_state.last_frame_width = width;
+  overlay_state.capture_state.last_frame_height = height;
 
   Logger().info("Capture system initialized successfully");
   return {};
@@ -130,6 +141,8 @@ auto stop_capture(Core::State::AppState& state) -> void {
   if (state.overlay->capture_state.active) {
     ::Utils::Graphics::Capture::stop_capture(session);
     state.overlay->capture_state.active = false;
+    state.overlay->capture_state.last_frame_width = 0;
+    state.overlay->capture_state.last_frame_height = 0;
     Logger().debug("Capture stopped");
   }
 }

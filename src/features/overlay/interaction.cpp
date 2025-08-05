@@ -216,20 +216,6 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
   auto& overlay_state = *state.overlay;
 
   switch (message) {
-    case Types::WM_SHOW_OVERLAY: {
-      ShowWindow(hwnd, SW_SHOWNA);
-
-      // 添加分层窗口样式
-      if (overlay_state.window.target_window) {
-        LONG exStyle = GetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE);
-        SetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
-
-        // 设置透明度 (透明度1，但仍可点击)
-        SetLayeredWindowAttributes(overlay_state.window.target_window, 0, 1, LWA_ALPHA);
-      }
-      return {true, 0};
-    }
-
     case Types::WM_GAME_WINDOW_FOREGROUND: {
       // 处理游戏窗口前台事件
       if (overlay_state.window.target_window) {

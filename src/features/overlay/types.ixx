@@ -15,9 +15,8 @@ export namespace Features::Overlay::Types {
 
 // 消息常量
 constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
-constexpr UINT WM_SHOW_OVERLAY = WM_USER + 2;
-constexpr UINT WM_MOUSE_EVENT = WM_USER + 3;
-constexpr UINT WM_WINDOW_EVENT = WM_USER + 4;
+constexpr UINT WM_MOUSE_EVENT = WM_USER + 2;
+constexpr UINT WM_WINDOW_EVENT = WM_USER + 3;
 
 // 顶点结构体
 struct Vertex {
@@ -74,11 +73,9 @@ struct InteractionState {
 
 // 线程状态
 struct ThreadState {
-  std::jthread capture_render_thread;
   std::jthread hook_thread;
   std::jthread window_manager_thread;
 
-  DWORD capture_render_thread_id = 0;
   DWORD hook_thread_id = 0;
   DWORD window_manager_thread_id = 0;
 };

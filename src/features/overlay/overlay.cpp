@@ -22,9 +22,14 @@ import Utils.Timer;
 
 namespace Features::Overlay {
 
-auto start_overlay(Core::State::AppState& state, HWND target_window)
+auto start_overlay(Core::State::AppState& state, HWND target_window, bool is_pre_launch)
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
+
+  if (state.overlay->running) {
+    Logger().debug("Overlay already running, skipping");
+    return {};
+  }
 
   // 检查是否支持捕获
   if (!state.app_info->is_capture_supported) {
@@ -49,7 +54,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Target window is minimized");
   }
 
-  // 获取窗口尺寸并检查是否需要叠加层
+  // 获取窗口尺寸
   auto dimensions_result = Utils::get_window_dimensions(target_window);
   if (!dimensions_result) {
     return std::unexpected(dimensions_result.error());
@@ -58,16 +63,9 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
   auto [width, height] = dimensions_result.value();
   auto [screen_width, screen_height] = Utils::get_screen_dimensions();
 
-  if (!Utils::should_use_overlay(width, height, screen_width, screen_height)) {
-    if (state.overlay->running) {
-      stop_overlay(state);
-    }
-    Window::restore_game_window(state, true);
+  if (!Utils::should_use_overlay(width, height, screen_width, screen_height) && !is_pre_launch) {
+    Window::restore_game_window(state);
     // 不返回错误，因为游戏窗口在屏幕内，不需要叠加层
-    return {};
-  }
-
-  if (state.overlay->running) {
     return {};
   }
 
@@ -80,9 +78,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
   overlay_state.window.target_window = target_window;
 
   // 更新窗口尺寸
-  if (auto result = Window::set_overlay_window_size(state, width, height); !result) {
-    return std::unexpected(result.error());
-  }
+  Window::set_overlay_window_size(state, width, height);
 
   // 初始化渲染系统（仅在未初始化时）
   if (!overlay_state.rendering.d3d_initialized) {
@@ -93,7 +89,25 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
 
   overlay_state.running = true;  // 设置运行状态为true
 
-  // 启动线程
+  // 初始化捕获
+  if (auto result = Capture::initialize_capture(state, target_window, width, height); !result) {
+    overlay_state.running = false;
+    return std::unexpected(result.error());
+  }
+
+  // 启动捕获
+  if (auto result = Capture::start_capture(state); !result) {
+    overlay_state.running = false;
+    return std::unexpected(result.error());
+  }
+
+  // 显示叠加层窗口并设置透明度
+  if (auto result = Window::show_overlay_window_first_time(state); !result) {
+    overlay_state.running = false;
+    return std::unexpected(result.error());
+  }
+
+  // 启动线程（只启动钩子和窗口管理线程）
   if (auto result = Threads::start_threads(state); !result) {
     overlay_state.running = false;  // 如果线程启动失败，设置运行状态为false
     return std::unexpected(result.error());
@@ -115,10 +129,10 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 
   // 停止捕获
   Capture::stop_capture(state);
-  
+
   // 恢复游戏窗口
-  Window::restore_game_window(state);
-  
+  Window::restore_game_window(state,true);
+
   // 隐藏窗口
   Window::hide_overlay_window(state);
 
