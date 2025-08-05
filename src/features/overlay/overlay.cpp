@@ -146,9 +146,6 @@ auto cleanup_overlay(Core::State::AppState& state) -> void {
     state.overlay->cleanup_timer.reset();
   }
 
-  // 停止所有活动
-  stop_overlay(state);
-
   // 清理捕获资源
   Capture::cleanup_capture(state);
 

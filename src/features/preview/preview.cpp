@@ -156,9 +156,6 @@ auto cleanup_preview(Core::State::AppState& state) -> void {
     state.preview->cleanup_timer.reset();
   }
 
-  // 停止预览
-  stop_preview(state);
-
   // 清理捕获资源
   Capture::cleanup_capture(state);
 
