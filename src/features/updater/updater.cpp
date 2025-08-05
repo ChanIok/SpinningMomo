@@ -21,12 +21,9 @@ import Features.Updater.Types;
 import Features.Settings.State;
 import Utils.Logger;
 import Utils.Path;
+import Vendor.Version;
 
 namespace Features::Updater {
-
-auto get_current_version() -> std::string {
-  return "0.7.5.0";  // 应该从 version.hpp 获取，这里简化
-}
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)
     -> bool {
@@ -247,7 +244,7 @@ auto get_release_info(Core::State::AppState& app_state)
         app_state.updater->current_server_index = i;
         Logger().info("Successfully connected to update server: {}", server.name);
         Logger().debug("Response: {}", response.value());
-        return parse_github_release_info(response.value(), get_current_version());
+        return parse_github_release_info(response.value(), Vendor::Version::get_app_version());
       } else {
         // 记录失败，继续尝试下一个服务器
         Logger().warn("Failed to connect to update server {}: {}", server.name, response.error());
@@ -312,7 +309,7 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
     // 写入批处理脚本
     script << "@echo off\n";
     script << "echo Starting update process...\n";
-    script << "timeout /t 2 /nobreak >nul\n";                  // 等待主程序退出
+    script << "timeout /t 1 /nobreak >nul\n";                  // 等待主程序退出
     script << "taskkill /f /im SpinningMomo.exe >nul 2>&1\n";  // 确保主程序退出
     script << "echo Extracting update package...\n";
     script << "powershell -Command \"Expand-Archive -Path '" << update_package_path.string()
