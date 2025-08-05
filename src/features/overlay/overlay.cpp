@@ -59,8 +59,15 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
   auto [screen_width, screen_height] = Utils::get_screen_dimensions();
 
   if (!Utils::should_use_overlay(width, height, screen_width, screen_height)) {
+    if (state.overlay->running) {
+      stop_overlay(state);
+    }
     Window::restore_game_window(state, true);
     // 不返回错误，因为游戏窗口在屏幕内，不需要叠加层
+    return {};
+  }
+
+  if (state.overlay->running) {
     return {};
   }
 
@@ -69,8 +76,11 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
     overlay_state.cleanup_timer->Cancel();
   }
 
+  // 设置目标窗口
+  overlay_state.window.target_window = target_window;
+
   // 更新窗口尺寸
-  if (auto result = Window::update_overlay_window_size(state, width, height); !result) {
+  if (auto result = Window::set_overlay_window_size(state, width, height); !result) {
     return std::unexpected(result.error());
   }
 
@@ -81,8 +91,6 @@ auto start_overlay(Core::State::AppState& state, HWND target_window)
     }
   }
 
-  // 设置目标窗口
-  overlay_state.window.target_window = target_window;
   overlay_state.running = true;  // 设置运行状态为true
 
   // 启动线程
@@ -107,12 +115,12 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 
   // 停止捕获
   Capture::stop_capture(state);
-
-  // 隐藏窗口
-  Window::hide_overlay_window(state);
-
+  
   // 恢复游戏窗口
   Window::restore_game_window(state);
+  
+  // 隐藏窗口
+  Window::hide_overlay_window(state);
 
   // 等待线程结束
   Threads::wait_for_threads(state);

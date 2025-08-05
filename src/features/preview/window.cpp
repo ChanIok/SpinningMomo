@@ -91,7 +91,7 @@ auto setup_window_appearance(HWND hwnd) -> void {
 }
 
 auto set_preview_window_size(Features::Preview::State::PreviewState& state, int capture_width,
-                           int capture_height) -> void {
+                             int capture_height) -> void {
   state.size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
 
   if (state.size.aspect_ratio >= 1.0f) {
@@ -103,15 +103,15 @@ auto set_preview_window_size(Features::Preview::State::PreviewState& state, int 
     state.size.window_width = state.size.ideal_size;
     state.size.window_height = static_cast<int>(state.size.window_width * state.size.aspect_ratio);
   }
-}
 
-auto handle_first_show(Features::Preview::State::PreviewState& state) -> void {
-  state.is_first_show = false;
-  int x = 20;  // 默认位置
-  int y = 20;
-
-  SetWindowPos(state.hwnd, nullptr, x, y, state.size.window_width, state.size.window_height,
-               SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
+  if (state.is_first_show) {
+    state.is_first_show = false;
+    SetWindowPos(state.hwnd, nullptr, 20, 20, state.size.window_width, state.size.window_height,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+  } else {
+    SetWindowPos(state.hwnd, nullptr, 0, 0, state.size.window_width, state.size.window_height,
+                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+  }
 }
 
 auto create_window(HINSTANCE instance, Core::State::AppState& state)
@@ -134,7 +134,6 @@ auto create_window(HINSTANCE instance, Core::State::AppState& state)
   setup_window_appearance(hwnd);
   return hwnd;
 }
-
 
 auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string> {

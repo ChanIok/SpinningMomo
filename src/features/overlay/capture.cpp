@@ -22,13 +22,46 @@ import Utils.Graphics.Capture;
 namespace Features::Overlay::Capture {
 
 auto on_frame_arrived(Core::State::AppState& state,
-                      Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void {
-  if (!state.overlay->running || !frame_texture) {
+                      ::Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
+  if (!state.overlay->running || !frame) {
     return;
   }
 
-  // 触发渲染
-  Rendering::render_frame(state, frame_texture);
+  // 检查帧大小是否发生变化
+  auto content_size = frame.ContentSize();
+  auto& last_width = state.overlay->capture_state.last_frame_width;
+  auto& last_height = state.overlay->capture_state.last_frame_height;
+  
+  bool size_changed = (content_size.Width != last_width) || 
+                      (content_size.Height != last_height);
+  
+  if (size_changed) {
+    // 更新记录的尺寸
+    last_width = content_size.Width;
+    last_height = content_size.Height;
+    
+    // 重建帧池
+    ::Utils::Graphics::Capture::recreate_frame_pool(
+        state.overlay->capture_state.session,
+        content_size.Width,
+        content_size.Height
+    );
+
+    state.overlay->rendering.create_new_srv = true;
+
+    Window::set_overlay_window_size(state, content_size.Width, content_size.Height);
+
+    return;
+  }
+
+  auto surface = frame.Surface();
+  if (surface) {
+    auto texture = ::Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+    if (texture) {
+      // 触发渲染
+      Rendering::render_frame(state, texture);
+    }
+  }
 }
 
 auto initialize_capture(Core::State::AppState& state, HWND target_window, int width, int height)
@@ -57,8 +90,8 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
   }
 
   // 创建帧回调
-  auto frame_callback = [&state](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
-    on_frame_arrived(state, texture);
+  auto frame_callback = [&state](::Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
+    on_frame_arrived(state, frame);
   };
 
   // 创建捕获会话

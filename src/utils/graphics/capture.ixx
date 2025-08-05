@@ -23,8 +23,10 @@ export struct CaptureSession {
   bool need_hide_cursor = false;
 };
 
+export using Direct3D11CaptureFrame = winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame;
+
 // 帧回调函数类型
-using FrameCallback = std::function<void(Microsoft::WRL::ComPtr<ID3D11Texture2D>)>;
+using FrameCallback = std::function<void(Direct3D11CaptureFrame)>;
 
 // 创建WinRT设备
 export auto create_winrt_device(ID3D11Device* d3d_device)
@@ -44,6 +46,9 @@ export auto stop_capture(CaptureSession& session) -> void;
 
 // 清理捕获资源
 export auto cleanup_capture_session(CaptureSession& session) -> void;
+
+// 重建帧池
+export auto recreate_frame_pool(CaptureSession& session, int width, int height) -> void;
 
 // 从WinRT对象获取DXGI接口的辅助函数
 export template <typename T>

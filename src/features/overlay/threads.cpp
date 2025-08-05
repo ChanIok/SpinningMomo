@@ -93,11 +93,6 @@ auto capture_render_thread_proc(Core::State::AppState& state, std::stop_token to
   // 初始化COM
   // winrt::init_apartment();
 
-  // 延迟防止闪烁
-  if (Window::is_overlay_window_visible(state)) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-  }
-
   if (token.stop_requested()) {
     return;
   }

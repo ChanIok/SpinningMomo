@@ -184,7 +184,7 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
   auto session_id = state.next_session_id.fetch_add(1);
 
   // 创建帧回调，通过会话ID管理生命周期
-  auto frame_callback = [&state, session_id](Microsoft::WRL::ComPtr<ID3D11Texture2D> texture) {
+  auto frame_callback = [&state, session_id](Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
     bool success = false;
 
     // 查找对应的会话信息
@@ -201,18 +201,24 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
       ShowCursor(TRUE);
     }
 
-    if (texture) {
-      // 直接在回调中保存纹理
-      auto save_result = save_texture_with_wic(texture.Get(), session_info.request.file_path);
-      if (save_result) {
-        success = true;
-        Logger().debug("Screenshot saved successfully for session {}", session_id);
-      } else {
-        Logger().error("Failed to save screenshot for session {}: {}", session_id,
-                       save_result.error());
+    if (frame) {
+      auto surface = frame.Surface();
+      if (surface) {
+        auto texture = Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+        if (texture) {
+          // 直接在回调中保存纹理
+          auto save_result = save_texture_with_wic(texture.Get(), session_info.request.file_path);
+          if (save_result) {
+            success = true;
+            Logger().debug("Screenshot saved successfully for session {}", session_id);
+          } else {
+            Logger().error("Failed to save screenshot for session {}: {}", session_id,
+                           save_result.error());
+          }
+        }
       }
     } else {
-      Logger().error("Captured texture is null for session {}", session_id);
+      Logger().error("Captured frame is null for session {}", session_id);
     }
 
     // 停止并清理捕获会话

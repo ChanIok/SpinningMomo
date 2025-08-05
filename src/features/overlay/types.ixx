@@ -59,6 +59,8 @@ struct RenderingState {
 struct CaptureState {
   Utils::Graphics::Capture::CaptureSession session;
   bool active = false;
+  int last_frame_width = 0;
+  int last_frame_height = 0;
 };
 
 // 交互状态

@@ -142,12 +142,7 @@ auto hide_overlay_window(Core::State::AppState& state) -> void {
   }
 }
 
-auto is_overlay_window_visible(const Core::State::AppState& state) -> bool {
-  const auto& overlay_state = *state.overlay;
-  return overlay_state.window.overlay_hwnd && IsWindowVisible(overlay_state.window.overlay_hwnd);
-}
-
-auto update_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
+auto set_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
@@ -166,6 +161,33 @@ auto update_overlay_window_size(Core::State::AppState& state, int game_width, in
 
     overlay_state.window.window_width = window_width;
     overlay_state.window.window_height = window_height;
+  }
+
+  // 计算窗口大小和位置 - 在letterbox模式下，overlay窗口始终是全屏的
+  int screen_width = overlay_state.window.screen_width;
+  int screen_height = overlay_state.window.screen_height;
+  int left = 0;
+  int top = 0;
+  int width = screen_width;
+  int height = screen_height;
+
+  // 在非letterbox模式下使用居中窗口
+  if (!overlay_state.window.use_letterbox_mode) {
+    width = overlay_state.window.window_width;
+    height = overlay_state.window.window_height;
+    left = (screen_width - width) / 2;
+    top = (screen_height - height) / 2;
+    Logger().debug("Not using letterbox mode, using window size: {}x{}", width, height);
+  } else {
+    Logger().debug("Using letterbox mode, using full screen size: {}x{}", width, height);
+  }
+
+  SetWindowPos(overlay_state.window.overlay_hwnd, nullptr, left, top, width, height,
+               SWP_NOZORDER | SWP_NOACTIVATE);
+
+  if (overlay_state.window.target_window) {
+    SetWindowPos(overlay_state.window.target_window, overlay_state.window.overlay_hwnd, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE);
   }
 
   return {};

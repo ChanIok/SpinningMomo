@@ -24,11 +24,8 @@ export auto show_overlay_window(Core::State::AppState& state) -> void;
 // 隐藏叠加层窗口
 export auto hide_overlay_window(Core::State::AppState& state) -> void;
 
-// 检查叠加层窗口是否可见
-export auto is_overlay_window_visible(const Core::State::AppState& state) -> bool;
-
 // 更新叠加层窗口尺寸
-export auto update_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
+export auto set_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
     -> std::expected<void, std::string>;
 
 // 销毁叠加层窗口

@@ -26,9 +26,6 @@ export auto destroy_preview_window(Core::State::AppState& state) -> void;
 export auto set_preview_window_size(Features::Preview::State::PreviewState& state, int capture_width,
                        int capture_height) -> void;
 
-// 处理首次显示
-export auto handle_first_show(Features::Preview::State::PreviewState& state) -> void;
-
 // 初始化预览窗口系统
 export auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
     -> std::expected<void, std::string>;

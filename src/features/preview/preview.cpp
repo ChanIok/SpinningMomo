@@ -66,38 +66,30 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   int width = clientRect.right - clientRect.left;
   int height = clientRect.bottom - clientRect.top;
 
-  // 计算窗口尺寸和宽高比
-  Window::set_preview_window_size(preview_state, width, height);
-
+  
   // 初始化渲染系统（如果需要）
   if (!preview_state.d3d_initialized) {
     auto rendering_result =
-        Rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
-                                        preview_state.size.window_height);
-
-    if (!rendering_result) {
-      Logger().error("Failed to initialize rendering system");
-      return std::unexpected(rendering_result.error());
+    Rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
+      preview_state.size.window_height);
+      
+      if (!rendering_result) {
+        Logger().error("Failed to initialize rendering system");
+        return std::unexpected(rendering_result.error());
+      }
     }
-  }
+    
+    // 初始化捕获系统
+    auto capture_result = Capture::initialize_capture(state, target_window, width, height);
+    
+    if (!capture_result) {
+      Logger().error("Failed to initialize capture system");
+      return std::unexpected(capture_result.error());
+    }
+    // 计算窗口尺寸和宽高比
+    Window::set_preview_window_size(preview_state, width, height);
 
-  // 初始化捕获系统
-  auto capture_result = Capture::initialize_capture(state, target_window, width, height);
-
-  if (!capture_result) {
-    Logger().error("Failed to initialize capture system");
-    return std::unexpected(capture_result.error());
-  }
-
-  // 处理首次显示
-  if (preview_state.is_first_show) {
-    Window::handle_first_show(preview_state);
-  } else {
-    // 更新窗口尺寸，保持位置
-    SetWindowPos(preview_state.hwnd, nullptr, 0, 0, preview_state.size.window_width,
-                 preview_state.size.window_height,
-                 SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW | SWP_NOACTIVATE);
-  }
+    Window::show_preview_window(state);
 
   // 启动捕获
   auto start_result = Capture::start_capture(state);

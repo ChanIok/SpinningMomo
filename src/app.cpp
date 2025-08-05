@@ -48,8 +48,9 @@ Application::~Application() {
       Logger().info("Executing pending update on program exit");
       Features::Updater::execute_pending_update(*m_app_state);
     }
-
+    Features::Preview::stop_preview(*m_app_state);
     Features::Preview::cleanup_preview(*m_app_state);
+    Features::Overlay::stop_overlay(*m_app_state);
     Features::Overlay::cleanup_overlay(*m_app_state);
     if (auto result = Features::Letterbox::shutdown(*m_app_state); !result) {
       Logger().error("Failed to shutdown Letterbox: {}", result.error());

@@ -99,13 +99,7 @@ auto create_capture_session(
   // 设置帧到达回调
   session.frame_token = session.frame_pool.FrameArrived([frame_callback](auto&& sender, auto&&) {
     if (auto frame = sender.TryGetNextFrame()) {
-      auto surface = frame.Surface();
-      if (surface) {
-        auto texture = get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
-        if (texture) {
-          frame_callback(texture);
-        }
-      }
+      frame_callback(frame);
     }
   });
 
@@ -176,6 +170,17 @@ auto cleanup_capture_session(CaptureSession& session) -> void {
   stop_capture(session);
 
   session.winrt_device = nullptr;
+}
+
+auto recreate_frame_pool(CaptureSession& session, int width, int height) -> void {
+  if (session.frame_pool) {
+    session.frame_pool.Recreate(
+        session.winrt_device,
+        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
+        1,
+        {width, height}
+    );
+  }
 }
 
 template <typename T>

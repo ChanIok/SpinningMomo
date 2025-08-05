@@ -91,6 +91,8 @@ struct RenderingResources {
 // 捕获会话（业务层封装）
 struct CaptureState {
   Utils::Graphics::Capture::CaptureSession session;
+  int last_frame_width = 0;
+  int last_frame_height = 0;
 };
 
 }  // namespace Features::Preview::Types

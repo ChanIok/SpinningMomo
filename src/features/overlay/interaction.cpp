@@ -219,25 +219,6 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
     case Types::WM_SHOW_OVERLAY: {
       ShowWindow(hwnd, SW_SHOWNA);
 
-      // 计算窗口大小和位置 - 在letterbox模式下，overlay窗口始终是全屏的
-      int screenWidth = overlay_state.window.screen_width;
-      int screenHeight = overlay_state.window.screen_height;
-      int left = 0;
-      int top = 0;
-      int width = screenWidth;
-      int height = screenHeight;
-
-      // 在非letterbox模式下使用居中窗口
-      if (!overlay_state.window.use_letterbox_mode) {
-        width = overlay_state.window.window_width;
-        height = overlay_state.window.window_height;
-        left = (screenWidth - width) / 2;
-        top = (screenHeight - height) / 2;
-        Logger().debug("Not using letterbox mode, using window size: {}x{}", width, height);
-      } else {
-        Logger().debug("Using letterbox mode, using full screen size: {}x{}", width, height);
-      }
-
       // 添加分层窗口样式
       if (overlay_state.window.target_window) {
         LONG exStyle = GetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE);
@@ -246,15 +227,6 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
         // 设置透明度 (透明度1，但仍可点击)
         SetLayeredWindowAttributes(overlay_state.window.target_window, 0, 1, LWA_ALPHA);
       }
-
-      // 设置窗口位置和大小
-      SetWindowPos(hwnd, nullptr, left, top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
-
-      if (overlay_state.window.target_window) {
-        SetWindowPos(overlay_state.window.target_window, hwnd, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-      }
-
-      UpdateWindow(hwnd);
       return {true, 0};
     }
 

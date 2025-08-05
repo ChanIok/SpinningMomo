@@ -47,44 +47,24 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
   return 0;  // 表示使用屏幕尺寸
 }
 
-// 在窗口变换前停止活动模块
-auto prepare_window_transform(Core::State::AppState& state) -> void {
-  // 停止活动模块
-  if (state.app_window->ui.preview_enabled) {
-    Features::Preview::stop_preview(state);
-  }
-
-  if (state.app_window->ui.overlay_enabled) {
-    Features::Overlay::stop_overlay(state);
-  }
-}
-
 // 变换后的后续处理
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
-  // 重启之前启用的模块
-  if (state.app_window->ui.preview_enabled) {
-    auto preview_result = Features::Preview::start_preview(state, target_window);
-    if (!preview_result) {
-      Logger().error("Failed to restart preview after window transform: {}",
-                     preview_result.error());
-    }
-  }
-
-  if (state.app_window->ui.overlay_enabled) {
-    auto overlay_result = Features::Overlay::start_overlay(state, target_window);
-    if (!overlay_result) {
-      Logger().error("Failed to restart overlay after window transform: {}",
-                     overlay_result.error());
-    }
-  }
-
   // 重启letterbox
   if (!state.overlay->running && state.app_window->ui.letterbox_enabled) {
     auto letterbox_result = Features::Letterbox::show(state, target_window);
     if (!letterbox_result) {
       Logger().error("Failed to restart letterbox after window transform: {}",
                      letterbox_result.error());
+    }
+  }
+
+  // 重启overlay, 如果目标窗口小于屏幕，则停止overlay
+  if (state.app_window->ui.overlay_enabled) {
+    auto overlay_result = Features::Overlay::start_overlay(state, target_window);
+    if (!overlay_result) {
+      Logger().error("Failed to restart overlay after window transform: {}",
+                     overlay_result.error());
     }
   }
 
@@ -102,8 +82,6 @@ auto handle_reset_event(Core::State::AppState& state,
     return;
   }
 
-  prepare_window_transform(state);
-
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
       .activate_window = true};
@@ -115,8 +93,6 @@ auto handle_reset_event(Core::State::AppState& state,
         state.i18n->texts.message.window_reset_failed + ": " + result.error());
     return;
   }
-
-  post_transform_actions(state, *target_window);
 
   // 重置UI状态到默认值
   state.app_window->ui.current_ratio_index =
@@ -150,8 +126,6 @@ auto handle_ratio_changed(Core::State::AppState& state,
   } else {
     new_resolution = Features::WindowControl::calculate_resolution(event.ratio_value, total_pixels);
   }
-
-  prepare_window_transform(state);
 
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
@@ -206,8 +180,6 @@ auto handle_resolution_changed(Core::State::AppState& state,
         Features::WindowControl::calculate_resolution(current_ratio, event.total_pixels);
   }
 
-  prepare_window_transform(state);
-
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
@@ -255,8 +227,6 @@ auto handle_window_selected(Core::State::AppState& state,
     Logger().error("Failed to get settings path: {}", settings_path.error());
   }
 
-  // 重启模块
-  prepare_window_transform(state);
   auto target_window = Features::WindowControl::find_target_window(event.window_title);
   if (!target_window) {
     Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
