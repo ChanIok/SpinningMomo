@@ -67,7 +67,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   int height = clientRect.bottom - clientRect.top;
 
   // 计算窗口尺寸和宽高比
-  Window::calculate_window_size(preview_state, width, height);
+  Window::set_preview_window_size(preview_state, width, height);
 
   // 初始化渲染系统（如果需要）
   if (!preview_state.d3d_initialized) {
@@ -107,7 +107,6 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   }
 
   preview_state.running = true;
-  preview_state.is_visible = true;
 
   Logger().info("Preview capture started successfully");
   return {};

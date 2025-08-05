@@ -161,7 +161,6 @@ auto initialize(Core::State::AppState& state, HINSTANCE instance)
   g_app_state = &state;
 
   letterbox.instance = instance;
-  letterbox.is_visible = false;
 
   // 注册窗口类
   if (auto result = register_window_class(instance); !result) {
@@ -195,25 +194,24 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
   }
 
   switch (message) {
-    case State::WM_TARGET_WINDOW_FOREGROUND:
-      if (!state->letterbox->is_visible) {
+    case State::WM_TARGET_WINDOW_FOREGROUND: {
+      if (!IsWindowVisible(hwnd)) {
         [[maybe_unused]] auto result = show(*state);
       } else {
         [[maybe_unused]] auto result = update_position(*state, state->letterbox->target_window);
       }
       break;
+    }
 
-    case State::WM_HIDE_LETTERBOX:
-      if (state->letterbox->is_visible) {
-        [[maybe_unused]] auto result = hide(*state);
-      }
+    case State::WM_HIDE_LETTERBOX: {
+      [[maybe_unused]] auto result = hide(*state);
       break;
+    }
 
-    case State::WM_SHOW_LETTERBOX:
-      if (!state->letterbox->is_visible && state->letterbox->target_window) {
-        [[maybe_unused]] auto result = show(*state);
-      }
+    case State::WM_SHOW_LETTERBOX: {
+      [[maybe_unused]] auto result = show(*state);
       break;
+    }
   }
 
   return DefWindowProc(hwnd, message, wParam, lParam);
@@ -355,7 +353,7 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
 
   // 检查是否真正需要显示letterbox
   if (!needs_letterbox(letterbox.target_window)) {
-    [[maybe_unused]] auto hide_result = hide(state);
+    [[maybe_unused]] auto result = hide(state);
     return {};
   }
 
@@ -372,7 +370,6 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
     return result;
   }
 
-  letterbox.is_visible = true;
   return {};
 }
 
@@ -386,7 +383,6 @@ auto hide(Core::State::AppState& state) -> std::expected<void, std::string> {
 
   if (letterbox.window_handle) {
     ShowWindow(letterbox.window_handle, SW_HIDE);
-    letterbox.is_visible = false;
   }
 
   return {};
@@ -421,10 +417,8 @@ auto shutdown(Core::State::AppState& state) -> std::expected<void, std::string> 
   }
 
   // 隐藏窗口
-  if (letterbox.is_visible) {
-    [[maybe_unused]] auto hide_result = hide(state);
-    // 记录错误但继续清理
-  }
+  [[maybe_unused]] auto hide_result = hide(state);
+  // 记录错误但继续清理
 
   // 停止事件监听
   [[maybe_unused]] auto stop_result = stop_event_monitoring(state);

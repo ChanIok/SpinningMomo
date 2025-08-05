@@ -23,7 +23,7 @@ export auto update_preview_window_dpi(Core::State::AppState& state, UINT new_dpi
 export auto destroy_preview_window(Core::State::AppState& state) -> void;
 
 // 计算窗口尺寸
-export auto calculate_window_size(Features::Preview::State::PreviewState& state, int capture_width,
+export auto set_preview_window_size(Features::Preview::State::PreviewState& state, int capture_width,
                        int capture_height) -> void;
 
 // 处理首次显示

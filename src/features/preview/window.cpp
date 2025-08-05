@@ -90,7 +90,7 @@ auto setup_window_appearance(HWND hwnd) -> void {
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
 }
 
-auto calculate_window_size(Features::Preview::State::PreviewState& state, int capture_width,
+auto set_preview_window_size(Features::Preview::State::PreviewState& state, int capture_width,
                            int capture_height) -> void {
   state.size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
 
@@ -167,14 +167,12 @@ auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
 auto show_preview_window(Core::State::AppState& state) -> void {
   if (state.preview->hwnd) {
     ShowWindow(state.preview->hwnd, SW_SHOW);
-    state.preview->is_visible = true;
   }
 }
 
 auto hide_preview_window(Core::State::AppState& state) -> void {
   if (state.preview->hwnd) {
     ShowWindow(state.preview->hwnd, SW_HIDE);
-    state.preview->is_visible = false;
   }
 }
 
@@ -199,7 +197,6 @@ auto destroy_preview_window(Core::State::AppState& state) -> void {
   if (state.preview->hwnd) {
     DestroyWindow(state.preview->hwnd);
     state.preview->hwnd = nullptr;
-    state.preview->is_visible = false;
   }
 }
 

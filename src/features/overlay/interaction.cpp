@@ -255,7 +255,6 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       }
 
       UpdateWindow(hwnd);
-      overlay_state.window.is_visible = true;
       return {true, 0};
     }
 
@@ -292,7 +291,6 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
     }
 
     case WM_DESTROY:
-      overlay_state.window.is_visible = false;
       return {true, 0};
   }
 

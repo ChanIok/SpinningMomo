@@ -13,7 +13,6 @@ struct LetterboxState {
   HWND target_window{nullptr};
   HWND message_window{nullptr};
   HINSTANCE instance{nullptr};
-  bool is_visible{false};
   bool is_initialized{false};
 
   // 线程和事件相关

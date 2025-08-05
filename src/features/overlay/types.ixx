@@ -40,7 +40,6 @@ struct WindowState {
   RECT game_window_rect{};
 
   bool use_letterbox_mode = false;
-  bool is_visible = false;
 };
 
 // 渲染状态

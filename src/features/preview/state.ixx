@@ -17,7 +17,6 @@ struct PreviewState {
   HWND target_window = nullptr;
 
   // 窗口状态
-  bool is_visible = false;
   bool is_first_show = true;
 
   // 尺寸相关

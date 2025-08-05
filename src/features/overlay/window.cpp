@@ -132,7 +132,6 @@ auto show_overlay_window(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
     ShowWindow(overlay_state.window.overlay_hwnd, SW_SHOW);
-    overlay_state.window.is_visible = true;
   }
 }
 
@@ -140,14 +139,12 @@ auto hide_overlay_window(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.window.overlay_hwnd) {
     ShowWindow(overlay_state.window.overlay_hwnd, SW_HIDE);
-    overlay_state.window.is_visible = false;
   }
 }
 
 auto is_overlay_window_visible(const Core::State::AppState& state) -> bool {
   const auto& overlay_state = *state.overlay;
-  return overlay_state.window.is_visible && overlay_state.window.overlay_hwnd &&
-         IsWindowVisible(overlay_state.window.overlay_hwnd);
+  return overlay_state.window.overlay_hwnd && IsWindowVisible(overlay_state.window.overlay_hwnd);
 }
 
 auto update_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
@@ -179,7 +176,6 @@ auto destroy_overlay_window(Core::State::AppState& state) -> void {
   if (overlay_state.window.overlay_hwnd) {
     DestroyWindow(overlay_state.window.overlay_hwnd);
     overlay_state.window.overlay_hwnd = nullptr;
-    overlay_state.window.is_visible = false;
   }
 }
 
