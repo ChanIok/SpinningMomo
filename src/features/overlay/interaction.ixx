@@ -6,7 +6,6 @@ export module Features.Overlay.Interaction;
 
 import std;
 import Core.State;
-import Features.Overlay.State;
 
 namespace Features::Overlay::Interaction {
 

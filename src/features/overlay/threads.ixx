@@ -4,7 +4,6 @@ export module Features.Overlay.Threads;
 
 import std;
 import Core.State;
-import Features.Overlay.State;
 
 namespace Features::Overlay::Threads {
 
@@ -16,9 +15,6 @@ export auto stop_threads(Core::State::AppState& state) -> void;
 
 // 等待所有线程结束
 export auto wait_for_threads(Core::State::AppState& state) -> void;
-
-// 捕获和渲染线程处理函数
-export auto capture_render_thread_proc(Core::State::AppState& state, std::stop_token token) -> void;
 
 // 钩子线程处理函数
 export auto hook_thread_proc(Core::State::AppState& state, std::stop_token token) -> void;
