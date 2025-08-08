@@ -70,22 +70,22 @@ auto get_settings_for_initialization() -> std::expected<Types::AppSettings, std:
       if (!migration_result) {
         return std::unexpected("Settings migration failed: " + migration_result.error());
       }
-      
+
       // 使用迁移后的generic对象转换为AppSettings
       auto app_settings_result = rfl::from_generic<Types::AppSettings>(migration_result.value());
       if (!app_settings_result) {
         return std::unexpected("Failed to convert migrated generic JSON to AppSettings: " +
                                app_settings_result.error().what());
       }
-      
+
       auto migrated_settings = app_settings_result.value();
-      
+
       // 自动保存迁移后的设置到文件
       auto save_result = save_settings_to_file(settings_path.value(), migrated_settings);
       if (!save_result) {
         return std::unexpected("Failed to save migrated settings: " + save_result.error());
       }
-      
+
       return migrated_settings;
     }
 
@@ -113,7 +113,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     if (!std::filesystem::exists(settings_path.value())) {
       auto default_state = State::create_default_settings_state();
 
-      auto json_str = rfl::json::write(default_state.config);
+      auto json_str = rfl::json::write(default_state.config, rfl::json::pretty);
       std::ofstream file(settings_path.value());
       if (!file) {
         return std::unexpected("Failed to create settings file");

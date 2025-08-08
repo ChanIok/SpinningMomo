@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router'
-import { Menu, Settings, Palette } from 'lucide-react'
+import { Menu, Settings, Palette, Wrench } from 'lucide-react'
 
 interface MenuItem {
   key?: string
@@ -13,6 +13,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { label: '菜单', key: 'menu', icon: Menu },
   { label: '布局', key: 'layout', icon: Palette },
+  { label: '功能', key: 'function', icon: Wrench },
   { type: 'divider' },
   { label: '设置', key: 'settings', icon: Settings },
 ]

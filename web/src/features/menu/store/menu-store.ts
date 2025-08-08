@@ -8,16 +8,6 @@ export const useMenuStore = useSettingsStore
 export const useMenuActions = () => {
   const { appSettings, updateSettings } = useSettingsStore()
   
-  // 乐观更新：更新窗口标题
-  const updateWindowTitle = async (title: string) => {
-    await updateSettings({
-      window: {
-        ...appSettings.window,
-        targetTitle: title
-      }
-    })
-  }
-  
   // 乐观更新：更新功能项
   const updateFeatureItems = async (items: FeatureItem[]) => {
     await updateSettings({
@@ -59,7 +49,6 @@ export const useMenuActions = () => {
   
   return {
     appSettings,
-    updateWindowTitle,
     updateFeatureItems,
     updateAspectRatios,
     updateResolutions

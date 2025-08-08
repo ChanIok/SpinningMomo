@@ -71,7 +71,7 @@ struct AppSettings {
   struct Features {
     // 截图功能设置
     struct Screenshot {
-      std::string game_album_path;  // 游戏相册目录路径
+      std::string screenshot_dir_path;  // 游戏相册目录路径
     } screenshot;
 
     // 黑边模式设置
@@ -159,7 +159,7 @@ inline auto create_default_app_settings() -> AppSettings {
   settings.window.taskbar.lower_on_resize = true;
 
   // features 设置
-  settings.features.screenshot.game_album_path = "";
+  settings.features.screenshot.screenshot_dir_path = "";
   settings.features.letterbox.enabled = false;
 
   // updater 设置

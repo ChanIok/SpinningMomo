@@ -73,7 +73,7 @@ export interface AppSettings {
   features: {
     // 截图功能设置
     screenshot: {
-      gameAlbumPath: string  // 游戏相册目录路径
+      screenshotDirPath: string  // 截图目录路径
     }
     
     // 黑边模式设置
@@ -158,7 +158,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // features 设置
   features: {
     screenshot: {
-      gameAlbumPath: ''
+      screenshotDirPath: ''
     },
     letterbox: {
       enabled: false

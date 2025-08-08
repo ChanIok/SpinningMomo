@@ -18,6 +18,7 @@ export function SettingsContent() {
   const [updateStatus, setUpdateStatus] = useState<{
     available: boolean
     version?: string
+    downloadUrl?: string
   } | null>(null)
   const [isChecking, setIsChecking] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)

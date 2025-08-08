@@ -1,9 +1,6 @@
-import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useMenuActions, useMenuStore } from '../store/menu-store'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { DraggableFeatureList } from './draggable-feature-list'
 import { DraggablePresetList } from './draggable-preset-list'
 import type { FeatureItem, PresetItem } from '../types'
@@ -11,43 +8,10 @@ import type { FeatureItem, PresetItem } from '../types'
 export function MenuContent() {
   const { appSettings, error, isInitialized, clearError } = useMenuStore()
   const {
-    updateWindowTitle,
     updateFeatureItems,
     updateAspectRatios,
     updateResolutions
   } = useMenuActions()
-
-  const [inputTitle, setInputTitle] = useState('')
-  const [isUpdatingTitle, setIsUpdatingTitle] = useState(false)
-
-  // 同步store中的标题到输入框（适配新的嵌套结构）
-  useEffect(() => {
-    setInputTitle(appSettings?.window?.targetTitle || '')
-  }, [appSettings?.window?.targetTitle])
-
-  const handleUpdateTitle = async () => {
-    if (inputTitle.trim() === '') {
-      toast.error('窗口标题不能为空')
-      return
-    }
-
-    setIsUpdatingTitle(true)
-    try {
-      await updateWindowTitle(inputTitle.trim())
-      toast.success('窗口标题已更新')
-    } catch (error) {
-      console.error('Failed to update window title:', error)
-      toast.error('更新窗口标题失败')
-    } finally {
-      setIsUpdatingTitle(false)
-    }
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleUpdateTitle()
-    }
-  }
 
   // 安全获取菜单数据的辅助函数（适配新的嵌套结构）
   const getFeatureItems = () => appSettings?.ui?.appMenu?.featureItems || []
@@ -225,53 +189,13 @@ export function MenuContent() {
     <div className="p-6">
       {/* 页面标题 */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">菜单</h1>
+        <h1 className="text-2xl font-bold text-foreground">菜单设置</h1>
         <p className="text-muted-foreground mt-1">
           管理浮窗菜单项和右键菜单项的设置
         </p>
       </div>
 
       <div className="space-y-8">
-        {/* 窗口控制 */}
-        <div className="space-y-4">
-          <div className="pb-2">
-            <h3 className="text-lg font-semibold text-foreground">窗口控制</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              自定义应用程序窗口的控制设置
-            </p>
-          </div>
-          
-          <div className="border-l-2 border-border pl-4 space-y-4">
-            <div className="flex items-center justify-between py-4">
-              <div className="flex-1 pr-4">
-                <Label className="text-sm font-medium text-foreground">
-                  窗口标题
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  设置目标窗口的标题栏文本
-                </p>
-              </div>
-              <div className="flex-shrink-0 flex items-center gap-2">
-                <Input
-                  value={inputTitle}
-                  onChange={(e) => setInputTitle(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="输入窗口标题..."
-                  className="w-48"
-                  disabled={isUpdatingTitle}
-                />
-                <Button
-                  onClick={handleUpdateTitle}
-                  disabled={isUpdatingTitle || inputTitle.trim() === ''}
-                  size="sm"
-                >
-                  {isUpdatingTitle ? '更新中...' : '更新'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* 浮窗设置 */}
         <div className="space-y-6">
           <div className="pb-2">

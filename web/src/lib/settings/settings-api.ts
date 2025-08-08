@@ -39,7 +39,7 @@ interface ServerSettings extends Record<string, unknown> {
   // features 分组
   features: {
     screenshot: {
-      game_album_path: string
+      screenshot_dir_path: string
     }
     letterbox: {
       enabled: boolean
