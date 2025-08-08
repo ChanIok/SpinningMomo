@@ -3,6 +3,7 @@ import { MenuPage } from '@/features/menu'
 import { LayoutPage } from '@/features/layout'
 import { SettingsPage } from '@/features/settings'
 import { FunctionPage } from '@/features/function'
+import { AboutPage } from '@/features/about'
 
 export function ContentArea() {
   return (
@@ -18,6 +19,7 @@ export function ContentArea() {
           <Route path='/layout/*' element={<LayoutPage />} />
           <Route path='/function/*' element={<FunctionPage />} />
           <Route path='/settings/*' element={<SettingsPage />} />
+          <Route path='/about/*' element={<AboutPage />} />
           <Route
             path='*'
             element={

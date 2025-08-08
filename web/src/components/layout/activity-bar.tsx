@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router'
-import { Menu, Settings, Palette, Wrench } from 'lucide-react'
+import { Menu, Settings, Palette, Wrench, Info } from 'lucide-react'
 
 interface MenuItem {
   key?: string
@@ -16,6 +16,7 @@ const menuItems: MenuItem[] = [
   { label: '功能', key: 'function', icon: Wrench },
   { type: 'divider' },
   { label: '设置', key: 'settings', icon: Settings },
+  { label: '关于', key: 'about', icon: Info },
 ]
 
 export function ActivityBar() {

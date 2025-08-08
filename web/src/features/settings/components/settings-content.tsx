@@ -1,9 +1,6 @@
 import { toast } from 'sonner'
-import { useState } from 'react'
 import { useSettingsStore } from '@/lib/settings'
-import { checkForUpdates, downloadUpdate, installUpdate } from '@/lib/updater-api'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
 import { 
   Select, 
   SelectContent, 
@@ -15,13 +12,7 @@ import { HotkeyRecorder } from './hotkey-recorder'
 
 export function SettingsContent() {
   const { appSettings, updateSettings, isLoading } = useSettingsStore()
-  const [updateStatus, setUpdateStatus] = useState<{
-    available: boolean
-    version?: string
-    downloadUrl?: string
-  } | null>(null)
-  const [isChecking, setIsChecking] = useState(false)
-  const [isDownloading, setIsDownloading] = useState(false)
+  
   
   // 重置为默认值
   const handleReset = async () => {
@@ -54,51 +45,7 @@ export function SettingsContent() {
     }
   };
 
-  // 检查更新
-  const handleCheckForUpdates = async () => {
-    setIsChecking(true)
-    try {
-      const result = await checkForUpdates()
-      setUpdateStatus(result)
-      if (result.available) {
-        toast.success(`发现新版本: ${result.version}`)
-      } else {
-        toast.success('当前已是最新版本')
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '检查更新失败')
-    } finally {
-      setIsChecking(false)
-    }
-  };
-
-  // 下载并安装更新
-  const handleDownloadUpdate = async () => {
-    if (!updateStatus?.downloadUrl) {
-      toast.error('没有可用的下载链接')
-      return
-    }
-    
-    setIsDownloading(true)
-    try {
-      const result = await downloadUpdate(updateStatus.downloadUrl)
-      if (result.success) {
-        // 下载成功后直接安装更新（退出时安装）
-        try {
-          await installUpdate(false)
-          toast.success('更新已下载并将在下次程序重启时自动应用')
-        } catch (installError) {
-          toast.error(installError instanceof Error ? installError.message : '安装更新失败')
-        }
-      } else {
-        toast.error(result.message || '下载更新失败')
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '下载更新失败')
-    } finally {
-      setIsDownloading(false)
-    }
-  };
+  
 
   return (
     <div className="p-6 w-full">
@@ -272,45 +219,7 @@ export function SettingsContent() {
           </div>
         </div>
         
-        {/* 更新设置 */}
-        <div className="space-y-4">
-          <div className="pb-2">
-            <h3 className="text-lg font-semibold text-foreground">更新设置</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              管理应用程序更新检查和安装
-            </p>
-          </div>
-          
-          <div className="border-l-2 border-border pl-4 space-y-4">
-            <div className="flex items-center justify-between py-4">
-              <div className="flex-1 pr-4">
-                <Label className="text-sm font-medium text-foreground">
-                  检查更新
-                </Label>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {updateStatus?.available ? `发现新版本: ${updateStatus.version}` : '当前已是最新版本'}
-                </p>
-              </div>
-              <Button 
-                onClick={handleCheckForUpdates}
-                disabled={isChecking || isLoading}
-              >
-                {isChecking ? '检查中...' : '立即检查'}
-              </Button>
-            </div>
-            
-            {updateStatus?.available && (
-              <div className="flex justify-end py-2">
-                <Button 
-                  onClick={handleDownloadUpdate}
-                  disabled={isDownloading || isLoading}
-                >
-                  {isDownloading ? '更新中...' : '下载并安装更新'}
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+        
         
         {/* 重置按钮 */}
         <div className="flex justify-end gap-3 py-4">
