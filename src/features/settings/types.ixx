@@ -12,18 +12,15 @@ constexpr int CURRENT_SETTINGS_VERSION = 2;
 // 功能项（应用菜单中的功能）
 struct FeatureItem {
   std::string id;       // 如: "screenshot.capture", "screenshot.open_folder"
-  std::string label;    // 显示名称
   bool enabled = true;  // 是否显示在菜单中
   int order = 0;        // 排序序号
 };
 
 // 预设项（比例/分辨率）
 struct PresetItem {
-  std::string id;          // 如: "16:9", "1080P"
-  std::string label;       // 显示名称
-  bool enabled = true;     // 是否显示在菜单中
-  int order = 0;           // 排序序号
-  bool is_custom = false;  // 是否为自定义项
+  std::string id;       // 如: "16:9", "1080P"
+  bool enabled = true;  // 是否显示在菜单中
+  int order = 0;        // 排序序号
 };
 
 // 完整的应用设置（重构后的结构）
@@ -171,29 +168,24 @@ inline auto create_default_app_settings() -> AppSettings {
       {"GitHub官方", "https://api.github.com/repos/ChanIok/SpinningMomo/releases/latest"}};
 
   // ui 设置 - app_menu 配置
-  // 直接使用字符串ID，label留空，将从i18n系统动态获取
-  settings.ui.app_menu.feature_items = {{"screenshot.capture", "", true, 1},
-                                        {"screenshot.open_folder", "", true, 2},
-                                        {"feature.toggle_preview", "", true, 3},
-                                        {"feature.toggle_overlay", "", true, 4},
-                                        {"feature.toggle_letterbox", "", true, 5},
-                                        {"window.reset_transform", "", true, 6},
-                                        {"panel.hide", "", false, 7},
-                                        {"app.exit", "", true, 8}};
+  settings.ui.app_menu.feature_items = {{"screenshot.capture", true, 1},
+                                        {"screenshot.open_folder", true, 2},
+                                        {"feature.toggle_preview", true, 3},
+                                        {"feature.toggle_overlay", true, 4},
+                                        {"feature.toggle_letterbox", true, 5},
+                                        {"window.reset_transform", true, 6},
+                                        {"panel.hide", false, 7},
+                                        {"app.exit", true, 8}};
 
   // 默认比例配置
-  settings.ui.app_menu.aspect_ratios = {
-      {"32:9", "32:9", false, 1, false}, {"21:9", "21:9", true, 2, false},
-      {"16:9", "16:9", true, 3, false},  {"3:2", "3:2", true, 4, false},
-      {"1:1", "1:1", true, 5, false},    {"3:4", "3:4", true, 6, false},
-      {"2:3", "2:3", true, 7, false},    {"9:16", "9:16", true, 8, false}};
+  settings.ui.app_menu.aspect_ratios = {{"32:9", false, 1}, {"21:9", true, 2}, {"16:9", true, 3},
+                                        {"3:2", true, 4},   {"1:1", true, 5},  {"3:4", true, 6},
+                                        {"2:3", true, 7},   {"9:16", true, 8}};
 
   // 默认分辨率配置
-  settings.ui.app_menu.resolutions = {
-      {"Default", "Default", true, 1, false}, {"1080P", "1080P", true, 2, false},
-      {"2K", "2K", true, 3, false},           {"4K", "4K", true, 4, false},
-      {"6K", "6K", true, 5, false},           {"8K", "8K", true, 6, false},
-      {"12K", "12K", true, 7, false}};
+  settings.ui.app_menu.resolutions = {{"Default", true, 1}, {"1080P", true, 2}, {"2K", true, 3},
+                                      {"4K", true, 4},      {"6K", true, 5},    {"8K", true, 6},
+                                      {"12K", true, 7}};
 
   // ui 设置 - app_window_layout 配置
   settings.ui.app_window_layout.base_item_height = 24;

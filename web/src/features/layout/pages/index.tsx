@@ -11,7 +11,7 @@ export function LayoutPage() {
   }, [clearError])
 
   return (
-    <div className="h-full flex bg-background">
+    <div>
       {/* 布局内容区域 */}
       <LayoutContent />
     </div>

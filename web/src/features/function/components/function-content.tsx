@@ -97,7 +97,7 @@ export function FunctionContent() {
   }
 
   return (
-    <div className='p-6'>
+    <div className='w-full max-w-[768px] p-6'>
       {/* 页面标题 */}
       <div className='mb-6'>
         <h1 className='text-2xl font-bold text-foreground'>功能设置</h1>

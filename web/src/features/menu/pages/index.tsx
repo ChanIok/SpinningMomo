@@ -11,11 +11,11 @@ export function MenuPage() {
   }, [clearError])
 
   return (
-    <div className="h-full flex bg-background">
+    <div>
       {/* 菜单内容区域 */}
       <MenuContent />
     </div>
   )
 }
 
-export default MenuPage 
+export default MenuPage

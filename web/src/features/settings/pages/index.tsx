@@ -11,7 +11,7 @@ export function SettingsPage() {
   }, [clearError])
 
   return (
-    <div className="h-full flex bg-background">
+    <div>
       {/* 设置内容区域 */}
       <SettingsContent />
     </div>

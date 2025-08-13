@@ -3,7 +3,7 @@ import { FunctionContent } from '../components/function-content'
 // 模拟store hook，实际应该从store中导入
 const useFunctionStore = () => {
   return {
-    clearError: () => {}
+    clearError: () => {},
   }
 }
 
@@ -16,7 +16,7 @@ export function FunctionPage() {
   }, [clearError])
 
   return (
-    <div className="h-full flex bg-background">
+    <div>
       {/* 功能设置内容区域 */}
       <FunctionContent />
     </div>

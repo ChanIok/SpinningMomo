@@ -7,11 +7,7 @@ import type { FeatureItem, PresetItem } from '../types'
 
 export function MenuContent() {
   const { appSettings, error, isInitialized, clearError } = useMenuStore()
-  const {
-    updateFeatureItems,
-    updateAspectRatios,
-    updateResolutions
-  } = useMenuActions()
+  const { updateFeatureItems, updateAspectRatios, updateResolutions } = useMenuActions()
 
   // 安全获取菜单数据的辅助函数（适配新的嵌套结构）
   const getFeatureItems = () => appSettings?.ui?.appMenu?.featureItems || []
@@ -31,7 +27,7 @@ export function MenuContent() {
 
   const handleFeatureItemToggle = async (id: string, enabled: boolean) => {
     try {
-      const updatedItems = getFeatureItems().map(item =>
+      const updatedItems = getFeatureItems().map((item) =>
         item.id === id ? { ...item, enabled } : item
       )
       await updateFeatureItems(updatedItems)
@@ -55,7 +51,7 @@ export function MenuContent() {
 
   const handleAspectRatioToggle = async (id: string, enabled: boolean) => {
     try {
-      const updatedItems = getAspectRatios().map(item =>
+      const updatedItems = getAspectRatios().map((item) =>
         item.id === id ? { ...item, enabled } : item
       )
       await updateAspectRatios(updatedItems)
@@ -69,7 +65,8 @@ export function MenuContent() {
   const handleAspectRatioAdd = async (newItem: Omit<PresetItem, 'order'>) => {
     try {
       const currentItems = getAspectRatios()
-      const maxOrder = currentItems.length > 0 ? Math.max(...currentItems.map(item => item.order)) : 0
+      const maxOrder =
+        currentItems.length > 0 ? Math.max(...currentItems.map((item) => item.order)) : 0
       const itemWithOrder = { ...newItem, order: maxOrder + 1 }
       const updatedItems = [...currentItems, itemWithOrder]
       await updateAspectRatios(updatedItems)
@@ -82,7 +79,7 @@ export function MenuContent() {
 
   const handleAspectRatioRemove = async (id: string) => {
     try {
-      const updatedItems = getAspectRatios().filter(item => item.id !== id)
+      const updatedItems = getAspectRatios().filter((item) => item.id !== id)
       await updateAspectRatios(updatedItems)
       toast.success('比例已删除')
     } catch (error) {
@@ -104,7 +101,7 @@ export function MenuContent() {
 
   const handleResolutionToggle = async (id: string, enabled: boolean) => {
     try {
-      const updatedItems = getResolutions().map(item =>
+      const updatedItems = getResolutions().map((item) =>
         item.id === id ? { ...item, enabled } : item
       )
       await updateResolutions(updatedItems)
@@ -118,7 +115,8 @@ export function MenuContent() {
   const handleResolutionAdd = async (newItem: Omit<PresetItem, 'order'>) => {
     try {
       const currentItems = getResolutions()
-      const maxOrder = currentItems.length > 0 ? Math.max(...currentItems.map(item => item.order)) : 0
+      const maxOrder =
+        currentItems.length > 0 ? Math.max(...currentItems.map((item) => item.order)) : 0
       const itemWithOrder = { ...newItem, order: maxOrder + 1 }
       const updatedItems = [...currentItems, itemWithOrder]
       await updateResolutions(updatedItems)
@@ -131,7 +129,7 @@ export function MenuContent() {
 
   const handleResolutionRemove = async (id: string) => {
     try {
-      const updatedItems = getResolutions().filter(item => item.id !== id)
+      const updatedItems = getResolutions().filter((item) => item.id !== id)
       await updateResolutions(updatedItems)
       toast.success('分辨率已删除')
     } catch (error) {
@@ -156,10 +154,10 @@ export function MenuContent() {
   // 显示加载状态（仅在未初始化时）
   if (!isInitialized) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary mx-auto"></div>
-          <p className="text-sm text-muted-foreground mt-2">加载菜单中...</p>
+      <div className='flex items-center justify-center p-6'>
+        <div className='text-center'>
+          <div className='mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary'></div>
+          <p className='mt-2 text-sm text-muted-foreground'>加载菜单中...</p>
         </div>
       </div>
     )
@@ -168,16 +166,11 @@ export function MenuContent() {
   // 显示错误状态
   if (error) {
     return (
-      <div className="p-6 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">无法加载菜单</p>
-          <p className="text-sm text-red-500 mt-1">{error}</p>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={clearError}
-            className="mt-2"
-          >
+      <div className='flex items-center justify-center p-6'>
+        <div className='text-center'>
+          <p className='text-sm text-muted-foreground'>无法加载菜单</p>
+          <p className='mt-1 text-sm text-red-500'>{error}</p>
+          <Button variant='outline' size='sm' onClick={clearError} className='mt-2'>
             重试
           </Button>
         </div>
@@ -186,23 +179,19 @@ export function MenuContent() {
   }
 
   return (
-    <div className="p-6">
+    <div className='w-full max-w-[768px] p-6'>
       {/* 页面标题 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">菜单设置</h1>
-        <p className="text-muted-foreground mt-1">
-          管理浮窗菜单项和右键菜单项的设置
-        </p>
+      <div className='mb-6'>
+        <h1 className='text-2xl font-bold text-foreground'>菜单设置</h1>
+        <p className='mt-1 text-muted-foreground'>管理浮窗菜单项和右键菜单项的设置</p>
       </div>
 
-      <div className="space-y-8">
+      <div className='space-y-8'>
         {/* 浮窗设置 */}
-        <div className="space-y-6">
-          <div className="pb-2">
-            <h3 className="text-lg font-semibold text-foreground">浮窗设置</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              自定义浮窗菜单中显示的功能和选项
-            </p>
+        <div className='space-y-6'>
+          <div className='pb-2'>
+            <h3 className='text-lg font-semibold text-foreground'>浮窗设置</h3>
+            <p className='mt-1 text-sm text-muted-foreground'>自定义浮窗菜单中显示的功能和选项</p>
           </div>
 
           {/* 功能选择器 */}
@@ -210,8 +199,8 @@ export function MenuContent() {
             items={getFeatureItems()}
             onReorder={handleFeatureItemsReorder}
             onToggle={handleFeatureItemToggle}
-            title="功能菜单"
-            description="管理浮窗中显示的功能项，支持拖拽排序"
+            title='功能菜单'
+            description='管理浮窗中显示的功能项，支持拖拽排序'
           />
 
           {/* 比例管理器 */}
@@ -221,9 +210,9 @@ export function MenuContent() {
             onToggle={handleAspectRatioToggle}
             onAdd={handleAspectRatioAdd}
             onRemove={handleAspectRatioRemove}
-            title="宽高比设置"
-            description="管理浮窗中显示的宽高比选项，支持添加自定义比例"
-            addPlaceholder="如: 21:9"
+            title='宽高比设置'
+            description='管理浮窗中显示的宽高比选项，支持添加自定义比例'
+            addPlaceholder='如: 21:9'
             validateCustom={validateAspectRatio}
           />
 
@@ -234,13 +223,13 @@ export function MenuContent() {
             onToggle={handleResolutionToggle}
             onAdd={handleResolutionAdd}
             onRemove={handleResolutionRemove}
-            title="分辨率设置"
-            description="管理浮窗中显示的分辨率选项，支持添加自定义分辨率"
-            addPlaceholder="如: 3840x2160 或 5K"
+            title='分辨率设置'
+            description='管理浮窗中显示的分辨率选项，支持添加自定义分辨率'
+            addPlaceholder='如: 3840x2160 或 5K'
             validateCustom={validateResolution}
           />
         </div>
       </div>
     </div>
   )
-} 
+}

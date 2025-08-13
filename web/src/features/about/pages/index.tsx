@@ -2,12 +2,10 @@ import { AboutContent } from '../components/about-content'
 
 export function AboutPage() {
   return (
-    <div className="h-full flex bg-background">
+    <div>
       <AboutContent />
     </div>
   )
 }
 
 export default AboutPage
-
-
