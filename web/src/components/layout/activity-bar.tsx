@@ -11,11 +11,11 @@ interface MenuItem {
 }
 
 const menuItems: MenuItem[] = [
+  { label: '功能', key: 'function', icon: Wrench },
   { label: '菜单', key: 'menu', icon: Menu },
   { label: '布局', key: 'layout', icon: Palette },
-  { label: '功能', key: 'function', icon: Wrench },
-  { type: 'divider' },
   { label: '设置', key: 'settings', icon: Settings },
+  { type: 'divider' },
   { label: '关于', key: 'about', icon: Info },
 ]
 
@@ -44,27 +44,27 @@ export function ActivityBar() {
   return (
     <div
       className={cn(
-        'bg-background border-border flex h-full flex-col border-r',
+        'flex h-full flex-col border-r border-border bg-background',
         // 桌面端：固定宽度
         'w-16 md:w-16',
         // 移动端：底部导航栏样式 (可选，现在先保持侧边栏)
         'sm:w-16'
       )}
     >
-      <div className='p-2 flex flex-1 flex-col'>
-        <nav className='space-y-1 flex flex-col'>
+      <div className='flex flex-1 flex-col p-2'>
+        <nav className='flex flex-col space-y-1'>
           {menuItems.map((item, index) =>
             item.type === 'divider' ? (
-              <div key={`divider-${index}`} className='mx-2 my-3 border-border border-t' />
+              <div key={`divider-${index}`} className='mx-2 my-3 border-t border-border' />
             ) : (
               <div key={item.key} className='group relative'>
                 <button
                   onClick={() => item.key && handleMenuSelect(item.key)}
                   title={item.label}
                   className={cn(
-                    'h-12 w-12 rounded-lg relative flex cursor-pointer items-center justify-center transition-all duration-200',
+                    'relative flex h-12 w-12 cursor-pointer items-center justify-center rounded-lg transition-all duration-200',
                     'hover:bg-accent hover:text-accent-foreground',
-                    'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+                    'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
                     {
                       'bg-primary text-primary-foreground shadow-sm': activeKey === item.key,
                       'text-muted-foreground': activeKey !== item.key,
@@ -80,16 +80,16 @@ export function ActivityBar() {
                 {item.label && item.key && (
                   <div
                     className={cn(
-                      'ml-3 px-3 py-2 bg-popover text-popover-foreground text-sm rounded-md shadow-md border-border absolute left-full border',
+                      'absolute left-full ml-3 rounded-md border border-border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md',
                       'invisible z-50 whitespace-nowrap opacity-0 transition-all duration-200 group-hover:visible group-hover:opacity-100',
                       'top-1/2 -translate-y-1/2 transform',
                       // 移动端隐藏工具提示
-                      'md:block hidden'
+                      'hidden md:block'
                     )}
                   >
                     {item.label}
                     {/* 箭头 */}
-                    <div className='w-2 h-2 bg-popover border-border -left-1 absolute top-1/2 -translate-y-1/2 rotate-45 transform border-b border-l' />
+                    <div className='absolute top-1/2 -left-1 h-2 w-2 -translate-y-1/2 rotate-45 transform border-b border-l border-border bg-popover' />
                   </div>
                 )}
               </div>
