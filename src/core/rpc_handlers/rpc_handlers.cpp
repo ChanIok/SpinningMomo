@@ -20,12 +20,13 @@ auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
   JsonRpcErrorResponse error_response;
   error_response.id = request_id;
   error_response.error = RpcError{.code = static_cast<int>(error_code), .message = message};
-  return rfl::json::write(error_response);
+  return rfl::json::write<rfl::SnakeCaseToCamelCase>(error_response);
 }
 
 // 检查指定方法是否已注册
 auto method_exists(const Core::State::AppState& app_state, const std::string& method_name) -> bool {
-  return app_state.rpc_handlers->registry.find(method_name) != app_state.rpc_handlers->registry.end();
+  return app_state.rpc_handlers->registry.find(method_name) !=
+         app_state.rpc_handlers->registry.end();
 }
 
 // 获取所有已注册方法的列表
@@ -41,11 +42,11 @@ auto get_method_list(const Core::State::AppState& app_state) -> std::vector<Meth
 }
 
 // 处理JSON-RPC 2.0协议请求
-auto process_request(Core::State::AppState& app_state,
-                     const std::string& request_json) -> asio::awaitable<std::string> {
+auto process_request(Core::State::AppState& app_state, const std::string& request_json)
+    -> asio::awaitable<std::string> {
   try {
     // 解析JSON-RPC请求
-    auto request_result = rfl::json::read<JsonRpcRequest>(request_json);
+    auto request_result = rfl::json::read<JsonRpcRequest, rfl::SnakeCaseToCamelCase>(request_json);
     if (!request_result) {
       Logger().error("Parse error: {}", request_result.error().what());
       co_return create_error_response(rfl::Generic(), ErrorCode::ParseError,
@@ -67,7 +68,7 @@ auto process_request(Core::State::AppState& app_state,
       JsonRpcSuccessResponse success_response;
       success_response.id = request_id;
       success_response.result = rfl::to_generic(get_method_list(app_state));
-      co_return rfl::json::write(success_response);
+      co_return rfl::json::write<rfl::SnakeCaseToCamelCase>(success_response);
     }
 
     // 查找已注册的方法

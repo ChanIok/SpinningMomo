@@ -18,6 +18,10 @@ template <typename Request, typename Response>
 using AsyncHandler =
     std::function<asio::awaitable<RpcResult<Response>>(Core::State::AppState&, const Request&)>;
 
+// 创建标准错误响应
+export auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
+                                  const std::string& message) -> std::string;
+
 // 处理JSON-RPC请求
 export auto process_request(Core::State::AppState& app_state, const std::string& request_json)
     -> asio::awaitable<std::string>;
@@ -39,14 +43,10 @@ auto register_method(Core::State::AppState& app_state,
   auto wrapped_handler = [handler, &app_state](rfl::Generic params_generic,
                                                rfl::Generic id) -> asio::awaitable<std::string> {
     // 从 rfl::Generic 转换为 Request 类型
-    auto request_result = rfl::from_generic<Request>(params_generic);
+    auto request_result = rfl::from_generic<Request, rfl::SnakeCaseToCamelCase>(params_generic);
     if (!request_result) {
-      JsonRpcErrorResponse error_response;
-      error_response.id = id;
-      error_response.error =
-          RpcError{.code = static_cast<int>(ErrorCode::InvalidParams),
-                   .message = "Invalid parameters: " + request_result.error().what()};
-      co_return rfl::json::write(error_response);
+      co_return create_error_response(id, ErrorCode::InvalidParams,
+                                      "Invalid parameters: " + request_result.error().what());
     }
 
     // 执行业务逻辑 - 传递 app_state 参数
@@ -57,15 +57,13 @@ auto register_method(Core::State::AppState& app_state,
       // 成功响应
       JsonRpcSuccessResponse success_response;
       success_response.id = id;
-      success_response.result = rfl::to_generic(result.value());
-      co_return rfl::json::write(success_response);
+      success_response.result = rfl::to_generic<rfl::SnakeCaseToCamelCase>(result.value());
+      co_return rfl::json::write<rfl::SnakeCaseToCamelCase>(success_response);
     } else {
       // 错误响应
-      JsonRpcErrorResponse error_response;
-      error_response.id = id;
-      error_response.error = result.error();
-      Logger().error("Error response: {}", error_response.error.message);
-      co_return rfl::json::write(error_response);
+      const auto& error = result.error();
+      Logger().error("Error response: {}", error.message);
+      co_return create_error_response(id, static_cast<ErrorCode>(error.code), error.message);
     }
   };
 
