@@ -8,6 +8,7 @@ module;
 module Utils.Logger;
 
 import std;
+import Vendor.BuildConfig;
 
 // 构造函数实现
 Logger::Logger(std::source_location loc) : loc_(std::move(loc)) {}
@@ -65,14 +66,13 @@ auto initialize() -> std::expected<void, LoggerError> {
         "infinity_momo", sinks.begin(), sinks.end(), spdlog::thread_pool(),
         spdlog::async_overflow_policy::block);
 
-    async_logger->set_pattern("%Y-%m-%d %H:%M:%S.%e [%^%l%$] [%s:%#] %v");
+    async_logger->set_pattern(Vendor::BuildConfig::is_debug_build()
+                                  ? "%Y-%m-%d %H:%M:%S.%e [%^%l%$] [%g:%#] %v"
+                                  : "%Y-%m-%d %H:%M:%S.%e [%^%l%$] [%s:%#] %v");
     spdlog::flush_every(std::chrono::seconds(5));
 
-#ifdef _DEBUG
-    async_logger->set_level(spdlog::level::trace);
-#else
-    async_logger->set_level(spdlog::level::info);
-#endif
+    async_logger->set_level(Vendor::BuildConfig::is_debug_build() ? spdlog::level::trace
+                                                                  : spdlog::level::info);
 
     async_logger->flush_on(spdlog::level::err);
     spdlog::register_logger(async_logger);
