@@ -90,26 +90,12 @@ auto create_message_handler(Core::State::AppState& state)
     -> std::function<void(const std::string&)> {
   return [&state](const std::string& message) {
     // 在异步运行时中处理消息
-    auto* io_context = Core::Async::get_io_context(*state.async_runtime);
-    if (!io_context) {
-      Logger().error("Async runtime not available for message handling");
-      return;
-    }
-
     asio::co_spawn(
-        *io_context,
+        *Core::Async::get_io_context(*state.async_runtime),
         [&state, message]() -> asio::awaitable<void> {
           co_await handle_webview_message(state, message);
         },
-        [](std::exception_ptr e) {
-          if (e) {
-            try {
-              std::rethrow_exception(e);
-            } catch (const std::exception& ex) {
-              Logger().error("Unhandled exception in message handler: {}", ex.what());
-            }
-          }
-        });
+        asio::detached);
   };
 }
 

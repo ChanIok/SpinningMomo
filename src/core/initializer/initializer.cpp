@@ -6,6 +6,7 @@ import std;
 import Core.Async.Runtime;
 import Core.Events;
 import Core.State;
+import Core.HttpServer;
 import Handlers.EventRegistrar;
 import Features.Notifications;
 import Features.Settings;
@@ -31,6 +32,12 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 1. 启动异步运行时（用于RPC处理）
     if (auto result = Core::Async::start(*state.async_runtime); !result) {
       return std::unexpected("Failed to start async runtime: " + result.error());
+    }
+
+    // 2. 初始化HTTP服务器
+    if (auto result = Core::HttpServer::initialize(state); !result) {
+      Logger().warn("Failed to initialize HTTP server: {}", result.error());
+      // HTTP服务器失败不应该阻止应用启动
     }
 
     // 3. 注册事件处理器

@@ -99,7 +99,7 @@ auto is_running(const Core::Async::State::AsyncRuntimeState& runtime) -> bool {
 }
 
 auto get_io_context(Core::Async::State::AsyncRuntimeState& runtime) -> asio::io_context* {
-  return runtime.get_io_context();
+  return runtime.io_context.get();
 }
 
 }  // namespace Core::Async

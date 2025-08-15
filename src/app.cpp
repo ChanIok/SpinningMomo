@@ -12,6 +12,7 @@ import Core.I18n.State;
 import Core.RpcHandlers.State;
 import Core.WebView.State;
 import Core.State.AppInfo;
+import Core.HttpServer.State;
 import Features.Settings.State;
 import Features.Letterbox.State;
 import Features.Letterbox;
@@ -34,6 +35,7 @@ import UI.TrayIcon.State;
 import UI.ContextMenu;
 import UI.ContextMenu.State;
 import Core.WebView;
+import Core.HttpServer;
 import Utils.Logger;
 import Utils.String;
 import Utils.System;
@@ -43,6 +45,9 @@ import Core.I18n;
 Application::Application() = default;
 Application::~Application() {
   if (m_app_state) {
+    // 关闭HTTP服务器
+    Core::HttpServer::shutdown(*m_app_state);
+    
     // 检查是否有待处理的更新
     if (m_app_state->updater && m_app_state->updater->pending_update) {
       Logger().info("Executing pending update on program exit");
@@ -57,7 +62,8 @@ Application::~Application() {
     }
     Features::Screenshot::cleanup_system(*m_app_state);
 
-    // 清理WebView
+
+    UI::AppWindow::destroy_window(*m_app_state);
     UI::WebViewWindow::cleanup(*m_app_state);
 
     UI::ContextMenu::cleanup(*m_app_state);
@@ -94,6 +100,9 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->preview = std::make_unique<Features::Preview::State::PreviewState>();
     m_app_state->screenshot = std::make_unique<Features::Screenshot::State::ScreenshotState>();
     m_app_state->updater = std::make_unique<Features::Updater::State::UpdateState>();
+    
+    // 初始化HTTP服务器状态
+    m_app_state->http_server = std::make_unique<Core::HttpServer::State::HttpServerState>();
 
     m_app_state->app_window->window.instance = m_h_instance;
 

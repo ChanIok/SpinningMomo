@@ -20,14 +20,6 @@ struct AsyncRuntimeState {
   // 配置
   size_t thread_count = 0;  // 0表示使用硬件并发数
 
-  // 内联状态查询方法
-  auto is_initialized() const -> bool { return io_context != nullptr; }
-
-  auto get_io_context() -> asio::io_context* { return io_context.get(); }
-
-  auto get_thread_count() const -> size_t {
-    return thread_count > 0 ? thread_count : std::thread::hardware_concurrency();
-  }
-};
+  };
 
 }  // namespace Core::Async::State

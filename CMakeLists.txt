@@ -14,6 +14,7 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(asio CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
 find_package(unofficial-webview2 CONFIG REQUIRED)
+find_package(unofficial-uwebsockets CONFIG REQUIRED)
 
 # Windows平台相关宏定义
 if(WIN32)
@@ -127,6 +128,7 @@ target_link_libraries(SpinningMomo PRIVATE
     asio::asio
     reflectcpp::reflectcpp
     unofficial::webview2::webview2
+    unofficial::uwebsockets::uwebsockets
 )
 
 # Web应用资源复制

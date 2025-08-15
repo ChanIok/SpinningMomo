@@ -68,6 +68,10 @@ namespace Core::RpcHandlers::State {
 export struct RpcHandlerState;
 }
 
+namespace Core::HttpServer::State {
+export struct HttpServerState;
+}
+
 namespace Core::State {
 
 export struct AppState {
@@ -96,6 +100,9 @@ export struct AppState {
   std::unique_ptr<Features::Overlay::State::OverlayState> overlay;
   std::unique_ptr<Features::Preview::State::PreviewState> preview;
   std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;
+  
+  // HTTP服务器状态
+  std::unique_ptr<Core::HttpServer::State::HttpServerState> http_server;
 };
 
 }  // namespace Core::State
