@@ -1,4 +1,4 @@
-import { call } from '@/lib/webview-rpc'
+import { call } from '@/lib/rpc'
 import type { AppSettings } from './settings-types'
 
 /**
@@ -7,9 +7,9 @@ import type { AppSettings } from './settings-types'
 export async function getAppSettings(): Promise<AppSettings> {
   try {
     const result = await call<AppSettings>('settings.get')
-    
+
     console.log('📝 获取应用设置成功:', result)
-    
+
     return result
   } catch (error) {
     console.error('Failed to get app settings:', error)
@@ -24,12 +24,12 @@ export async function getAppSettings(): Promise<AppSettings> {
 export async function updateAppSettings(appSettings: AppSettings): Promise<void> {
   try {
     console.log('📝 更新应用设置:', appSettings)
-    
+
     await call<{
       success: boolean
       message: string
     }>('settings.update', appSettings)
-    
+
     console.log('✅ 应用设置已更新')
   } catch (error) {
     console.error('Failed to update app settings:', error)

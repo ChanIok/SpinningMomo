@@ -1,4 +1,4 @@
-import { call, JsonRpcError } from '@/lib/webview-rpc'
+import { call, JsonRpcError } from '@/lib/rpc'
 
 /**
  * 检查更新
@@ -11,12 +11,12 @@ export async function checkForUpdates() {
       download_url: string
       changelog?: string
     }>('updater.check_for_update')
-    
+
     return {
       available: result.has_update,
       version: result.latest_version,
       downloadUrl: result.download_url,
-      releaseNotes: result.changelog
+      releaseNotes: result.changelog,
     }
   } catch (error) {
     console.error('Failed to check for updates:', error)
@@ -36,13 +36,13 @@ export async function downloadUpdate(downloadUrl: string) {
       file_path: string
       message: string
     }>('updater.download_update', {
-      download_url: downloadUrl
+      download_url: downloadUrl,
     })
-    
+
     return {
       success: true,
       message: result.message,
-      filePath: result.file_path
+      filePath: result.file_path,
     }
   } catch (error) {
     console.error('Failed to download update:', error)
@@ -61,12 +61,12 @@ export async function installUpdate(restart: boolean = true) {
     const result = await call<{
       message: string
     }>('updater.install_update', {
-      restart
+      restart,
     })
-    
+
     return {
       success: true,
-      message: result.message
+      message: result.message,
     }
   } catch (error) {
     console.error('Failed to install update:', error)

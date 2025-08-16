@@ -4,7 +4,7 @@ import { useFunctionActions, useFunctionStore } from '../store/function-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { call } from '@/lib/webview-rpc'
+import { call } from '@/lib/rpc'
 import { Switch } from '@/components/ui/switch'
 
 export function FunctionContent() {

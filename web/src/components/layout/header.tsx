@@ -1,9 +1,9 @@
-import { call } from '@/lib/webview-rpc'
+import { call } from '@/lib/rpc'
 import { Button } from '@/components/ui/button'
 import { Minus, Square, X, Minimize2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
-import './header.css';
+import './header.css'
 
 export function Header() {
   const [isMaximized, setIsMaximized] = useState(false)
@@ -15,41 +15,41 @@ export function Header() {
   }, [])
 
   const handleMinimize = () => {
-    call('webview.minimize').catch(err => {
+    call('webview.minimize').catch((err) => {
       console.error('Failed to minimize window:', err)
     })
   }
 
   const handleMaximizeToggle = () => {
     if (isMaximized) {
-      call('webview.restore').then(() => {
-        setIsMaximized(false)
-      }).catch(err => {
-        console.error('Failed to restore window:', err)
-      })
+      call('webview.restore')
+        .then(() => {
+          setIsMaximized(false)
+        })
+        .catch((err) => {
+          console.error('Failed to restore window:', err)
+        })
     } else {
-      call('webview.maximize').then(() => {
-        setIsMaximized(true)
-      }).catch(err => {
-        console.error('Failed to maximize window:', err)
-      })
+      call('webview.maximize')
+        .then(() => {
+          setIsMaximized(true)
+        })
+        .catch((err) => {
+          console.error('Failed to maximize window:', err)
+        })
     }
   }
 
   const handleClose = () => {
-    call('webview.close').catch(err => {
+    call('webview.close').catch((err) => {
       console.error('Failed to close window:', err)
     })
   }
 
   return (
-    <header 
-      className='h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 gap-2 flex items-center justify-between border-b '
-    >
-      <div 
-        className='drag-region flex-1 h-full'
-      ></div> {/* 可拖动区域 */}
-      <div className='flex gap-2 '>
+    <header className='flex h-12 items-center justify-between gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
+      <div className='drag-region h-full flex-1'></div> {/* 可拖动区域 */}
+      <div className='flex gap-2'>
         <Button
           variant='ghost'
           size='icon'
@@ -59,7 +59,7 @@ export function Header() {
         >
           <Minus className='h-4 w-4' />
         </Button>
-        
+
         <Button
           variant='ghost'
           size='icon'
@@ -69,11 +69,11 @@ export function Header() {
         >
           {isMaximized ? <Minimize2 className='h-4 w-4' /> : <Square className='h-4 w-4' />}
         </Button>
-        
+
         <Button
           variant='ghost'
           size='icon'
-          className='h-8 w-8 hover:bg-destructive hover:text-destructive-foreground'
+          className='hover:text-destructive-foreground h-8 w-8 hover:bg-destructive'
           onClick={handleClose}
           title='Close'
         >
