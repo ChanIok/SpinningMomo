@@ -57,7 +57,10 @@ auto on_frame_arrived(Core::State::AppState& state,
     Window::set_overlay_window_size(state, content_size.Width, content_size.Height);
 
     // 延迟防止闪烁
-    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    if (state.overlay->window.overlay_window_shown) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(400));
+      Logger().debug("Capture size changed, sleeping for 400ms");
+    }
 
     return;
   }
@@ -69,6 +72,13 @@ auto on_frame_arrived(Core::State::AppState& state,
     if (texture) {
       // 触发渲染
       Rendering::render_frame(state, texture);
+
+      // 首次渲染时显示叠加层窗口
+      if (!state.overlay->window.overlay_window_shown) {
+        if (auto result = Window::show_overlay_window_first_time(state); result) {
+          state.overlay->window.overlay_window_shown = true;
+        }
+      }
     }
   }
 }

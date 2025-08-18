@@ -39,6 +39,8 @@ struct WindowState {
   RECT game_window_rect{};
 
   bool use_letterbox_mode = false;
+
+  bool overlay_window_shown = false;
 };
 
 // 渲染状态

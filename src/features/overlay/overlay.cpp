@@ -101,16 +101,15 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool is_pre
     return std::unexpected(result.error());
   }
 
-  // 显示叠加层窗口并设置透明度
-  if (auto result = Window::show_overlay_window_first_time(state); !result) {
-    overlay_state.running = false;
-    return std::unexpected(result.error());
-  }
-
   // 启动线程（只启动钩子和窗口管理线程）
   if (auto result = Threads::start_threads(state); !result) {
     overlay_state.running = false;  // 如果线程启动失败，设置运行状态为false
     return std::unexpected(result.error());
+  }
+
+  // 如果叠加层窗口未显示，则等待100ms，保证画面渲染完成
+  if (!overlay_state.window.overlay_window_shown) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
   return {};

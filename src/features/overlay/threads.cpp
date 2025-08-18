@@ -1,8 +1,11 @@
 module;
 #include <windows.h>
+
 #include <iostream>
 #include <thread>
+
 module Features.Overlay.Threads;
+
 import std;
 import Core.State;
 import Features.Overlay.State;
@@ -10,7 +13,9 @@ import Features.Overlay.Types;
 import Features.Overlay.Interaction;
 import Features.Overlay.Window;
 import Utils.Logger;
+
 namespace Features::Overlay::Threads {
+
 auto start_threads(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
   try {
@@ -29,6 +34,7 @@ auto start_threads(Core::State::AppState& state) -> std::expected<void, std::str
     return std::unexpected(std::format("Failed to start threads: {}", e.what()));
   }
 }
+
 auto stop_threads(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   // 请求停止线程并发送 WM_QUIT 消息
@@ -42,6 +48,7 @@ auto stop_threads(Core::State::AppState& state) -> void {
     PostThreadMessage(overlay_state.threads.window_manager_thread_id, WM_QUIT, 0, 0);
   }
 }
+
 auto wait_for_threads(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (overlay_state.threads.hook_thread.joinable()) {

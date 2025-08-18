@@ -118,6 +118,8 @@ auto hide_overlay_window(Core::State::AppState& state) -> void {
   if (overlay_state.window.overlay_hwnd) {
     ShowWindow(overlay_state.window.overlay_hwnd, SW_HIDE);
   }
+
+  overlay_state.window.overlay_window_shown = false;
 }
 
 auto set_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
