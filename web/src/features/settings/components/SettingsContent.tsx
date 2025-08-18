@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { HotkeyRecorder } from './hotkey-recorder'
+import { HotkeyRecorder } from './HotkeyRecorder'
 
 export function SettingsContent() {
   const { appSettings, updateSettings, isLoading } = useSettingsStore()

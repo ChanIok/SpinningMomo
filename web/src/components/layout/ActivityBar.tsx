@@ -13,7 +13,7 @@ interface MenuItem {
 const menuItems: MenuItem[] = [
   { label: '功能', key: 'function', icon: Wrench },
   { label: '菜单', key: 'menu', icon: Menu },
-  { label: '布局', key: 'layout', icon: Palette },
+  { label: '外观', key: 'appearance', icon: Palette },
   { label: '设置', key: 'settings', icon: Settings },
   { type: 'divider' },
   { label: '关于', key: 'about', icon: Info },

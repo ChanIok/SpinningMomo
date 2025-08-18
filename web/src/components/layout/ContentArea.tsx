@@ -1,9 +1,5 @@
 import { Routes, Route } from 'react-router'
-import { MenuPage } from '@/features/menu'
-import { LayoutPage } from '@/features/layout'
-import { SettingsPage } from '@/features/settings'
-import { FunctionPage } from '@/features/function'
-import { AboutPage } from '@/features/about'
+import { MenuPage, AppearancePage, SettingsPage, FunctionPage, AboutPage } from '@/pages'
 
 export function ContentArea() {
   return (
@@ -16,14 +12,14 @@ export function ContentArea() {
       <main className='h-full flex-1 overflow-auto'>
         <Routes>
           <Route path='/menu/*' element={<MenuPage />} />
-          <Route path='/layout/*' element={<LayoutPage />} />
+          <Route path='/appearance/*' element={<AppearancePage />} />
           <Route path='/function/*' element={<FunctionPage />} />
           <Route path='/settings/*' element={<SettingsPage />} />
           <Route path='/about/*' element={<AboutPage />} />
           <Route
             path='*'
             element={
-              <div className='text-xl font-semibold pt-10 text-center'>欢迎使用 SpinningMomo</div>
+              <div className='pt-10 text-center text-xl font-semibold'>欢迎使用 SpinningMomo</div>
             }
           />
         </Routes>

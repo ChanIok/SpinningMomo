@@ -1,8 +1,8 @@
 import { toast } from 'sonner'
 import { useMenuActions, useMenuStore } from '../store/menu-store'
 import { Button } from '@/components/ui/button'
-import { DraggableFeatureList } from './draggable-feature-list'
-import { DraggablePresetList } from './draggable-preset-list'
+import { DraggableFeatureList } from './DraggableFeatureList'
+import { DraggablePresetList } from './DraggablePresetList'
 import type { FeatureItem, PresetItem } from '../types'
 
 export function MenuContent() {

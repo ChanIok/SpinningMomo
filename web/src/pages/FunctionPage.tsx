@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { FunctionContent } from '../components/function-content'
+import { FunctionContent } from '@/features/function/components/FunctionContent'
 // 模拟store hook，实际应该从store中导入
 const useFunctionStore = () => {
   return {

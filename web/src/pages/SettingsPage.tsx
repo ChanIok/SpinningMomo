@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { SettingsContent } from '../components/settings-content'
+import { SettingsContent } from '@/features/settings/components/SettingsContent'
 import { useSettingsStore } from '@/lib/settings'
 
 export function SettingsPage() {

@@ -1,14 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useLayoutActions, useLayoutStore } from '../store/layout-store'
+import { useAppearanceActions, useAppearanceStore } from '../store/appearance-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { AppWindowLayout } from '../types'
 
-export function LayoutContent() {
-  const { appSettings, error, isInitialized, clearError } = useLayoutStore()
-  const { updateAppWindowLayout } = useLayoutActions()
+export function AppearanceContent() {
+  const { appSettings, error, isInitialized, clearError } = useAppearanceStore()
+  const { updateAppWindowLayout } = useAppearanceActions()
 
   // 保存原始设置用于重置
   const [originalLayoutSettings, setOriginalLayoutSettings] = useState<AppWindowLayout>({
@@ -57,12 +57,12 @@ export function LayoutContent() {
     setIsUpdating(true)
     try {
       await updateAppWindowLayout(layoutSettings)
-      toast.success('布局设置已应用')
+      toast.success('外观设置已应用')
       // 更新原始设置为当前设置
       setOriginalLayoutSettings({ ...layoutSettings })
     } catch (error) {
       console.error('Failed to update layout settings:', error)
-      toast.error('应用布局设置失败')
+      toast.error('应用外观设置失败')
     } finally {
       setIsUpdating(false)
     }
@@ -94,7 +94,7 @@ export function LayoutContent() {
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
           <div className='mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary'></div>
-          <p className='mt-2 text-sm text-muted-foreground'>加载布局设置中...</p>
+          <p className='mt-2 text-sm text-muted-foreground'>加载外观设置中...</p>
         </div>
       </div>
     )
@@ -105,7 +105,7 @@ export function LayoutContent() {
     return (
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
-          <p className='text-sm text-muted-foreground'>无法加载布局设置</p>
+          <p className='text-sm text-muted-foreground'>无法加载外观设置</p>
           <p className='mt-1 text-sm text-red-500'>{error}</p>
           <Button variant='outline' size='sm' onClick={clearError} className='mt-2'>
             重试
@@ -119,8 +119,8 @@ export function LayoutContent() {
     <div className='w-full max-w-[768px] p-6'>
       {/* 页面标题 */}
       <div className='mb-6'>
-        <h1 className='text-2xl font-bold text-foreground'>布局设置</h1>
-        <p className='mt-1 text-muted-foreground'>自定义应用程序窗口的布局参数</p>
+        <h1 className='text-2xl font-bold text-foreground'>外观设置</h1>
+        <p className='mt-1 text-muted-foreground'>自定义应用程序窗口的外观参数</p>
       </div>
 
       {/* 滚动区域 */}
@@ -129,7 +129,7 @@ export function LayoutContent() {
           {/* 布局参数设置 */}
           <div className='space-y-6'>
             <div className='pb-2'>
-              <h3 className='text-lg font-semibold text-foreground'>窗口布局参数</h3>
+              <h3 className='text-lg font-semibold text-foreground'>窗口外观参数</h3>
               <p className='mt-1 text-sm text-muted-foreground'>
                 调整应用程序窗口中各元素的尺寸和间距
               </p>

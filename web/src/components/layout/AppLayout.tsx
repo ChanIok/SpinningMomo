@@ -1,6 +1,6 @@
-import { ActivityBar } from './activity-bar'
-import { ContentArea } from './content-area'
-import { Header } from './header'
+import { ActivityBar } from './ActivityBar'
+import { ContentArea } from './ContentArea'
+import { Header } from './Header'
 import { Toaster } from '@/components/ui/sonner'
 import { isWebView } from '@/lib/environment'
 
