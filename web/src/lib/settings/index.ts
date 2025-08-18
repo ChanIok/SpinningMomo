@@ -1,3 +1,3 @@
-export * from './settings-types'
-export * from './settings-api'
-export * from './settings-store'
+export * from './settingsTypes'
+export * from './settingsApi'
+export * from './settingsStore'

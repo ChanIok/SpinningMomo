@@ -1,5 +1,5 @@
 import { toast } from 'sonner'
-import { useMenuActions, useMenuStore } from '../store/menu-store'
+import { useMenuActions, useMenuStore } from '../store/menuStore'
 import { Button } from '@/components/ui/button'
 import { DraggableFeatureList } from './DraggableFeatureList'
 import { DraggablePresetList } from './DraggablePresetList'

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { AppearanceContent } from '@/features/appearance/components/AppearanceContent'
-import { useAppearanceStore } from '@/features/appearance/store/appearance-store'
+import { useAppearanceStore } from '@/features/appearance/store/appearanceStore'
 
 export function AppearancePage() {
   const { clearError } = useAppearanceStore()

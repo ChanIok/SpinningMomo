@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { MenuContent } from '@/features/menu/components/MenuContent'
-import { useMenuStore } from '@/features/menu/store/menu-store'
+import { useMenuStore } from '@/features/menu/store/menuStore'
 
 export function MenuPage() {
   const { clearError } = useMenuStore()

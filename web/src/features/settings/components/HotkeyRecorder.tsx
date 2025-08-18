@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import { 
   formatHotkeyDisplay, 
   calculateModifiers 
-} from '../utils/hotkey-utils'
+} from '../utils/hotkeyUtils'
 
 interface Hotkey {
   modifiers: number

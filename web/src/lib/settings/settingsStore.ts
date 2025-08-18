@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import type { SettingsState, AppSettings } from './settings-types'
-import { DEFAULT_APP_SETTINGS } from './settings-types'
-import { getAppSettings, updateAppSettings } from './settings-api'
+import type { SettingsState, AppSettings } from './settingsTypes'
+import { DEFAULT_APP_SETTINGS } from './settingsTypes'
+import { getAppSettings, updateAppSettings } from './settingsApi'
 
 interface SettingsStoreState extends SettingsState {
   // 状态更新方法

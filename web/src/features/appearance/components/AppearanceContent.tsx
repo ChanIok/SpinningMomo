@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useAppearanceActions, useAppearanceStore } from '../store/appearance-store'
+import { useAppearanceActions, useAppearanceStore } from '../store/appearanceStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

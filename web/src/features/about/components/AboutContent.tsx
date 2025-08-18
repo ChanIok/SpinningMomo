@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/lib/settings'
 import { Button } from '@/components/ui/button'
-import { checkForUpdates, downloadUpdate, installUpdate } from '@/lib/updater-api'
+import { checkForUpdates, downloadUpdate, installUpdate } from '@/lib/updaterApi'
 
 type UpdateStatus = {
   available: boolean

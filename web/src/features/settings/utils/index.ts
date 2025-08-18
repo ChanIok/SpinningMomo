@@ -1,1 +1,1 @@
-export * from './hotkey-utils'
+export * from './hotkeyUtils'
