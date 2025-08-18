@@ -1,0 +1,1 @@
+export type { AppWindowLayout } from '@/lib/settings'

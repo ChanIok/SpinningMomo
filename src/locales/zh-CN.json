@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+
+  "menu": {
+    "app_show": "显示浮窗",
+    "app_hide": "关闭浮窗",
+    "app_exit": "退出",
+    "app_user_guide": "使用指南",
+    "app_webview": "主界面",
+
+    "window_select": "选择窗口",
+    "window_no_available": "(无可用窗口)",
+    "window_ratio": "窗口比例",
+    "window_resolution": "分辨率",
+    "window_reset": "重置窗口",
+    "window_toggle_borderless": "切换窗口边框",
+    "window_auto_hide": "隐藏任务栏",
+    "window_lower_on_resize": "调整时置底任务栏",
+
+    "screenshot_capture": "截图",
+    "screenshot_open_folder": "打开相册",
+    "overlay_toggle": "叠加层",
+    "preview_toggle": "预览窗",
+    "letterbox_toggle": "黑边模式",
+
+    "settings_hotkey": "修改热键",
+    "settings_config": "打开配置文件",
+    "settings_language": "语言"
+  },
+
+  "message": {
+    "app_startup": "窗口比例调整工具已在后台运行。\n按 [",
+    "app_startup_suffix": "] 可以显示/隐藏调整窗口",
+    "app_feature_not_supported": "此功能需要 Windows 10 1803 或更高版本，已自动禁用。",
+
+    "window_selected": "已选择窗口",
+    "window_adjust_success": "窗口调整成功！",
+    "window_adjust_failed": "窗口调整失败。可能需要管理员权限，或窗口不支持调整大小。",
+    "window_not_found": "未找到目标窗口，请确保窗口已启动。",
+    "window_reset_success": "窗口已重置为屏幕大小。",
+    "window_reset_failed": "重置窗口尺寸失败。",
+
+    "screenshot_success": "截图成功，已保存至: ",
+    "overlay_conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能",
+    "preview_conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能",
+    "preview_start_failed": "预览窗启动失败: ",
+    "overlay_start_failed": "叠加层启动失败: ",
+
+    "settings_hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
+    "settings_hotkey_success": "热键已设置为：",
+    "settings_hotkey_failed": "热键设置失败，已恢复默认热键。",
+    "settings_hotkey_register_failed": "热键注册失败。程序仍可使用，但快捷键将不可用。",
+    "settings_config_help": "配置文件说明：\n1. [AspectRatioItems] 节用于添加自定义比例\n2. [ResolutionItems] 节用于添加自定义分辨率\n3. 保存后重启软件生效",
+    "settings_load_failed": "加载配置失败，请检查配置文件。",
+    "settings_format_error": "格式错误：",
+    "settings_ratio_format_example": "请使用正确格式，如：16:10,17:10",
+    "settings_resolution_format_example": "请使用正确格式，如：3840x2160,7680x4320"
+  },
+
+  "label": {
+    "app_name": "旋转吧大喵",
+    "language_zh_cn": "中文",
+    "language_en_us": "English"
+  }
+}

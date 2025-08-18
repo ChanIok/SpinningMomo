@@ -43,8 +43,24 @@ docs/node_modules/
 ehthumbs.db
 Thumbs.db 
 
-frontend/
 third_party/
 test/
 
 .windsurfrules
+.cursor
+.claude
+
+# Web App (Vite + React)
+web/node_modules/
+web/dist/
+web/dist-ssr/
+web/.env
+web/.env.local
+web/.env.development.local
+web/.env.test.local
+web/.env.production.local
+web/*.log
+web/coverage/
+web/.cache/
+web/.parcel-cache/
+web/.vite/

@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+
+  "menu": {
+    "app_show": "Show",
+    "app_hide": "Hide",
+    "app_exit": "Exit",
+    "app_user_guide": "User Guide",
+    "app_webview": "Main Interface",
+
+    "window_select": "Select Window",
+    "window_no_available": "(No Available Windows)",
+    "window_ratio": "Window Ratio",
+    "window_resolution": "Resolution",
+    "window_reset": "Reset",
+    "window_toggle_borderless": "Toggle Window Border",
+    "window_auto_hide": "Hide Taskbar",
+    "window_lower_on_resize": "Lower Taskbar When Resizing",
+
+    "screenshot_capture": "Capture",
+    "screenshot_open_folder": "Screenshots",
+    "overlay_toggle": "Overlay",
+    "preview_toggle": "Preview",
+    "letterbox_toggle": "Letterbox",
+
+    "settings_hotkey": "Modify Hotkey",
+    "settings_config": "Open Config",
+    "settings_language": "Language"
+  },
+
+  "message": {
+    "app_startup": "Window ratio adjustment tool is running in background.\nPress [",
+    "app_startup_suffix": "] to show/hide the adjustment window",
+    "app_feature_not_supported": "This feature requires Windows 10 1803 or higher and has been disabled.",
+
+    "window_selected": "Window Selected",
+    "window_adjust_success": "Window adjusted successfully!",
+    "window_adjust_failed": "Failed to adjust window. May need administrator privileges, or window doesn't support resizing.",
+    "window_not_found": "Target window not found. Please ensure the window is running.",
+    "window_reset_success": "Window has been reset to screen size.",
+    "window_reset_failed": "Failed to reset window size.",
+
+    "screenshot_success": "Screenshot saved to: ",
+    "overlay_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
+    "preview_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
+    "preview_start_failed": "Failed to start preview window: ",
+    "overlay_start_failed": "Failed to start overlay window: ",
+
+    "settings_hotkey_prompt": "Please press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys",
+    "settings_hotkey_success": "Hotkey set to: ",
+    "settings_hotkey_failed": "Hotkey setting failed, restored to default.",
+    "settings_hotkey_register_failed": "Failed to register hotkey. The program can still be used, but the shortcut will not be available.",
+    "settings_config_help": "Config File Help:\n1. [AspectRatioItems] section for custom ratios\n2. [ResolutionItems] section for custom resolutions\n3. Restart app after saving",
+    "settings_load_failed": "Failed to load config, please check the config file.",
+    "settings_format_error": "Format error: ",
+    "settings_ratio_format_example": "Please use correct format, e.g.: 16:10,17:10",
+    "settings_resolution_format_example": "Please use correct format, e.g.: 3840x2160,7680x4320"
+  },
+
+  "label": {
+    "app_name": "SpinningMomo",
+    "language_zh_cn": "中文",
+    "language_en_us": "English"
+  }
+}
