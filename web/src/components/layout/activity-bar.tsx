@@ -44,7 +44,7 @@ export function ActivityBar() {
   return (
     <div
       className={cn(
-        'flex h-full flex-col border-r border-border bg-background',
+        'flex h-full flex-col bg-background',
         // 桌面端：固定宽度
         'w-16 md:w-16',
         // 移动端：底部导航栏样式 (可选，现在先保持侧边栏)
@@ -52,10 +52,12 @@ export function ActivityBar() {
       )}
     >
       <div className='flex flex-1 flex-col p-2'>
+        {/* 在菜单上方添加图标空格 */}
+        <div className='h-12 w-12 flex-shrink-0' />
         <nav className='flex flex-col space-y-1'>
           {menuItems.map((item, index) =>
             item.type === 'divider' ? (
-              <div key={`divider-${index}`} className='mx-2 my-3 border-t border-border' />
+              <div key={`divider-${index}`} className='mx-2 my-3' />
             ) : (
               <div key={item.key} className='group relative'>
                 <button

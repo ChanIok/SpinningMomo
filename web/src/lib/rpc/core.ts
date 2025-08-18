@@ -1,6 +1,7 @@
 import type { TransportMethods, TransportType } from './transport/types'
 import { createWebViewTransport } from './transport/webview'
 import { createHttpTransport } from './transport/http'
+import { getCurrentEnvironment } from '../environment'
 
 // 模块级状态
 let currentTransport: TransportMethods | null = null
@@ -11,7 +12,7 @@ const isDebugMode = import.meta.env.DEV
  * 检测运行环境
  */
 function detectTransportType(): TransportType {
-  if (typeof window !== 'undefined' && window.chrome?.webview) {
+  if (getCurrentEnvironment() === 'webview') {
     return 'webview'
   }
   return 'http'
