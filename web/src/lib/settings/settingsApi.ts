@@ -1,5 +1,5 @@
 import { call } from '@/lib/rpc'
-import type { AppSettings } from './settings-types'
+import type { AppSettings } from './settingsTypes'
 
 /**
  * 获取当前应用设置
