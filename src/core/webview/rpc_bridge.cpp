@@ -9,7 +9,7 @@ import Core.State;
 import Core.Events;
 import Core.WebView;
 import Core.WebView.State;
-import Core.RpcHandlers;
+import Core.RPC.Engine;
 import Core.Async.Runtime;
 import Core.WebView.Events;
 import Utils.Logger;
@@ -50,7 +50,7 @@ auto handle_webview_message(Core::State::AppState& state, const std::string& mes
 
   try {
     // 在异步线程上处理RPC请求
-    auto response = co_await Core::RpcHandlers::process_request(state, message);
+    auto response = co_await Core::RPC::process_request(state, message);
 
     // 直接投递响应字符串到UI线程处理
     Core::Events::post(*state.event_bus, Core::WebView::Events::WebViewResponseEvent{response});

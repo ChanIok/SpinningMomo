@@ -4,14 +4,14 @@ module;
 #include <rfl.hpp>
 #include <rfl/json.hpp>
 
-export module Core.RpcHandlers;
+export module Core.RPC.Engine;
 
 import std;
 import Core.State;
-import Core.RpcHandlers.Types;
+import Core.RPC.Types;
 import Utils.Logger;
 
-namespace Core::RpcHandlers {
+namespace Core::RPC {
 
 // 异步处理器签名
 template <typename Request, typename Response>
@@ -72,4 +72,4 @@ auto register_method(Core::State::AppState& app_state,
       .name = method_name, .description = description, .handler = std::move(wrapped_handler)};
 }
 
-}  // namespace Core::RpcHandlers
+}  // namespace Core::RPC

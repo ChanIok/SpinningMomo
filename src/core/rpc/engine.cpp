@@ -4,15 +4,15 @@ module;
 #include <rfl.hpp>
 #include <rfl/json.hpp>
 
-module Core.RpcHandlers;
+module Core.RPC.Engine;
 
 import std;
 import Core.State;
-import Core.RpcHandlers.State;
-import Core.RpcHandlers.Types;
+import Core.RPC.State;
+import Core.RPC.Types;
 import Utils.Logger;
 
-namespace Core::RpcHandlers {
+namespace Core::RPC {
 
 // 创建标准错误响应
 auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
@@ -25,14 +25,13 @@ auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
 
 // 检查指定方法是否已注册
 auto method_exists(const Core::State::AppState& app_state, const std::string& method_name) -> bool {
-  return app_state.rpc_handlers->registry.find(method_name) !=
-         app_state.rpc_handlers->registry.end();
+  return app_state.rpc->registry.find(method_name) != app_state.rpc->registry.end();
 }
 
 // 获取所有已注册方法的列表
 auto get_method_list(const Core::State::AppState& app_state) -> std::vector<MethodListItem> {
   std::vector<MethodListItem> methods;
-  const auto& registry = app_state.rpc_handlers->registry;
+  const auto& registry = app_state.rpc->registry;
 
   for (const auto& [name, info] : registry) {
     methods.emplace_back(MethodListItem{.name = name, .description = info.description});
@@ -72,7 +71,7 @@ auto process_request(Core::State::AppState& app_state, const std::string& reques
     }
 
     // 查找已注册的方法
-    auto& registry = app_state.rpc_handlers->registry;
+    auto& registry = app_state.rpc->registry;
     auto method_it = registry.find(request.method);
     if (method_it == registry.end()) {
       Logger().error("Method not found: {}", request.method);
@@ -88,6 +87,7 @@ auto process_request(Core::State::AppState& app_state, const std::string& reques
 
     try {
       auto response_json = co_await method_it->second.handler(params_generic, request_id);
+      Logger().trace("Response: {}", response_json);
       co_return response_json;
     } catch (const std::exception& e) {
       Logger().error("Internal error during method execution: {}", e.what());
@@ -104,4 +104,4 @@ auto process_request(Core::State::AppState& app_state, const std::string& reques
   }
 }
 
-}  // namespace Core::RpcHandlers
+}  // namespace Core::RPC

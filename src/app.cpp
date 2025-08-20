@@ -9,10 +9,10 @@ import Core.Async.Runtime;
 import Core.Async.State;
 import Core.Events;
 import Core.I18n.State;
-import Core.RpcHandlers.State;
 import Core.WebView.State;
 import Core.State.AppInfo;
 import Core.HttpServer.State;
+import Core.RPC.State;
 import Features.Settings.State;
 import Features.Letterbox.State;
 import Features.Letterbox;
@@ -79,10 +79,10 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
   try {
     // 创建 AppState
     m_app_state = std::make_unique<Core::State::AppState>();
+    m_app_state->rpc = std::make_unique<Core::RPC::State::RpcState>();
     m_app_state->async_runtime = std::make_unique<Core::Async::State::AsyncRuntimeState>();
     m_app_state->event_bus = std::make_unique<Core::Events::EventBus>();
     m_app_state->i18n = std::make_unique<Core::I18n::State::I18nState>();
-    m_app_state->rpc_handlers = std::make_unique<Core::RpcHandlers::State::RpcHandlerState>();
     m_app_state->webview = std::make_unique<Core::WebView::State::WebViewState>();
     m_app_state->app_info = std::make_unique<Core::State::AppInfo::AppInfoState>();
     m_app_state->settings = std::make_unique<Features::Settings::State::SettingsState>();

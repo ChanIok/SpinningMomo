@@ -9,9 +9,9 @@ module Core.HttpServer.Routes;
 import std;
 import Core.State;
 import Core.HttpServer.State;
-import Core.RpcHandlers;
 import Core.HttpServer.SseManager;
 import Core.Async.Runtime;
+import Core.RPC.Engine;
 import Utils.Logger;
 
 namespace Core::HttpServer::Routes {
@@ -46,7 +46,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
              res]() -> asio::awaitable<void> {
               try {
                 // 处理RPC请求
-                auto response_json = co_await Core::RpcHandlers::process_request(state, buffer);
+                auto response_json = co_await Core::RPC::process_request(state, buffer);
 
                 // 在事件循环线程中发送响应
                 loop->defer([res, connection_state, response_json = std::move(response_json)]() {

@@ -10,16 +10,13 @@ import Core.HttpServer;
 import Handlers.EventRegistrar;
 import Features.Notifications;
 import Features.Settings;
-import Features.Settings.Rpc;
 import Features.Settings.State;
 import Features.Updater;
-import Features.Updater.Rpc;
-import Features.FileDialog.Rpc;
+import Core.RPC.Registry;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.TrayIcon;
 import UI.ContextMenu;
-import UI.WebViewWindow.Rpc;
 import Vendor.Windows;
 import Utils.Logger;
 import Utils.String;
@@ -55,17 +52,8 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       // 不影响应用启动
     }
 
-    // 5. 注册 Settings RPC 处理器
-    Features::Settings::Rpc::register_handlers(state);
-
-    // 5.1. 注册 Updater RPC 处理器
-    Features::Updater::Rpc::register_handlers(state);
-
-    // 5.2. 注册 FileDialog RPC 处理器
-    Features::FileDialog::Rpc::register_handlers(state);
-
-    // 6. 注册 WebView Window RPC 处理器
-    UI::WebViewWindow::Rpc::register_handlers(state);
+    // 5.3. 注册新的RPC端点
+    Core::RPC::Registry::register_all_endpoints(state);
 
     // 7. 创建窗口
     if (auto result = UI::AppWindow::create_window(state); !result) {

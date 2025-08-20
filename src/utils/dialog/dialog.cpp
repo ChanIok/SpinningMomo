@@ -7,19 +7,14 @@ module;
 
 #include <filesystem>
 
-module Features.FileDialog;
+module Utils.Dialog;
 
 import std;
-import Core.State;
-import Core.WebView.State;
-import Features.WindowControl;
-import Features.Settings.State;
 import Utils.Logger;
-import Utils.Path;
 import Utils.String;
-import Features.FileDialog.Types;
+import Utils.Dialog;
 
-namespace Features::FileDialog {
+namespace Utils::Dialog {
 
 // 定义COM资源的删除器
 struct ComDeleter {
@@ -41,9 +36,10 @@ struct CoTaskMemDeleter {
   }
 };
 
-// 选择文件夹（核心实现）
-auto select_folder_internal(Core::State::AppState& state, const std::string& title)
-    -> std::expected<std::filesystem::path, std::string> {
+// 选择文件夹
+auto select_folder(const FolderSelectorParams& params,
+                   HWND hwnd)
+    -> std::expected<FolderSelectorResult, std::string> {
   // 初始化COM
   HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
   if (FAILED(hr)) {
@@ -75,18 +71,15 @@ auto select_folder_internal(Core::State::AppState& state, const std::string& tit
   }
 
   // 设置标题
-  if (!title.empty()) {
-    std::wstring title_wide = Utils::String::FromUtf8(title);
+  if (!params.title.empty()) {
+    std::wstring title_wide = Utils::String::FromUtf8(params.title);
     pFileDialog->SetTitle(title_wide.c_str());
   } else {
     pFileDialog->SetTitle(L"选择文件夹");
   }
 
-  // 获取webview窗口句柄
-  HWND webview_hwnd = state.webview->window.webview_hwnd;
-
   // 显示对话框
-  hr = pFileDialog->Show(webview_hwnd);
+  hr = pFileDialog->Show(hwnd);
   if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
     return std::unexpected("User cancelled the operation");
   }
@@ -117,13 +110,16 @@ auto select_folder_internal(Core::State::AppState& state, const std::string& tit
   // 转换为std::filesystem::path并返回
   std::filesystem::path result(pszFilePath);
   Logger().info("User selected folder: {}", result.string());
-  return result;
+  
+  FolderSelectorResult folder_result;
+  folder_result.path = result.string();
+  return folder_result;
 }
 
-// 选择文件（核心实现）
-auto select_file_internal(Core::State::AppState& state,
-                          const Features::FileDialog::Types::FileSelectorParams& params)
-    -> std::expected<std::vector<std::filesystem::path>, std::string> {
+// 选择文件
+auto select_file(const FileSelectorParams& params,
+                 HWND hwnd)
+    -> std::expected<FileSelectorResult, std::string> {
   // 初始化COM
   HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
   if (FAILED(hr)) {
@@ -191,11 +187,8 @@ auto select_file_internal(Core::State::AppState& state,
     pFileDialog->SetTitle(title_wide.c_str());
   }
 
-  // 获取webview窗口句柄
-  HWND webview_hwnd = state.webview->window.webview_hwnd;
-
   // 显示对话框
-  hr = pFileDialog->Show(webview_hwnd);
+  hr = pFileDialog->Show(hwnd);
   if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
     return std::unexpected("User cancelled the operation");
   }
@@ -268,41 +261,16 @@ auto select_file_internal(Core::State::AppState& state,
   }
 
   Logger().info("Selected {} file(s)", selected_paths.size());
-  return selected_paths;
-}
-
-// 选择文件夹（对外接口）
-auto select_folder(Core::State::AppState& state,
-                   const Features::FileDialog::Types::FolderSelectorParams& params)
-    -> std::expected<Features::FileDialog::Types::FolderSelectorResult, std::string> {
-  auto result = select_folder_internal(state, params.title);
-  if (!result) {
-    return std::unexpected(result.error());
-  }
-
-  Features::FileDialog::Types::FolderSelectorResult folder_result;
-  folder_result.path = result.value().string();
-  return folder_result;
-}
-
-// 选择文件（对外接口）
-auto select_file(Core::State::AppState& state,
-                 const Features::FileDialog::Types::FileSelectorParams& params)
-    -> std::expected<Features::FileDialog::Types::FileSelectorResult, std::string> {
-  auto result = select_file_internal(state, params);
-  if (!result) {
-    return std::unexpected(result.error());
-  }
-
-  auto selected_paths = result.value();
-  Features::FileDialog::Types::FileSelectorResult file_selector_result;
+  
+  // 转换为FileSelectorResult
+  FileSelectorResult file_selector_result;
   file_selector_result.paths.reserve(selected_paths.size());
-
   for (const auto& path : selected_paths) {
     file_selector_result.paths.push_back(path.string());
   }
-
+  
   return file_selector_result;
 }
 
-}  // namespace Features::FileDialog
+
+}  // namespace Utils::Dialog
