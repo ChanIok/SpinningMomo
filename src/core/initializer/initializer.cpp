@@ -14,7 +14,7 @@ import Features.Settings.Rpc;
 import Features.Settings.State;
 import Features.Updater;
 import Features.Updater.Rpc;
-import Features.Screenshot.Folder.Rpc;
+import Features.FileDialog.Rpc;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.TrayIcon;
@@ -61,8 +61,8 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 5.1. 注册 Updater RPC 处理器
     Features::Updater::Rpc::register_handlers(state);
 
-    // 5.2. 注册 Screenshot RPC 处理器
-    Features::Screenshot::Folder::Rpc::register_handlers(state);
+    // 5.2. 注册 FileDialog RPC 处理器
+    Features::FileDialog::Rpc::register_handlers(state);
 
     // 6. 注册 WebView Window RPC 处理器
     UI::WebViewWindow::Rpc::register_handlers(state);

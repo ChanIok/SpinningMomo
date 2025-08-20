@@ -24,6 +24,7 @@ export function ActivityBar() {
   const navigate = useNavigate()
   const location = useLocation()
   const [activeKey, setActiveKey] = useState<string | null>(null)
+  const isHomePage = location.pathname === '/' || location.pathname.startsWith('/home')
 
   useEffect(() => {
     const currentPath = location.pathname || ''
@@ -45,7 +46,7 @@ export function ActivityBar() {
   return (
     <div
       className={cn(
-        'flex h-full flex-col bg-background',
+        'flex h-full flex-col bg-transparent',
         // 桌面端：固定宽度
         'w-16 md:w-16',
         // 移动端：底部导航栏样式 (可选，现在先保持侧边栏)
@@ -70,7 +71,8 @@ export function ActivityBar() {
                     'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
                     {
                       'bg-primary text-primary-foreground shadow-sm': activeKey === item.key,
-                      'text-muted-foreground': activeKey !== item.key,
+                      'text-gray-100': isHomePage && activeKey !== item.key,
+                      'text-muted-foreground': !isHomePage && activeKey !== item.key,
                     }
                   )}
                 >

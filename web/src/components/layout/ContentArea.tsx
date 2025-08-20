@@ -17,12 +17,7 @@ export function ContentArea() {
           <Route path='/function/*' element={<FunctionPage />} />
           <Route path='/settings/*' element={<SettingsPage />} />
           <Route path='/about/*' element={<AboutPage />} />
-          <Route
-            path='*'
-            element={
-              <div className='pt-10 text-center text-xl font-semibold'>欢迎使用 SpinningMomo</div>
-            }
-          />
+          <Route path='*' element={<HomePage />} />
         </Routes>
       </main>
     </div>

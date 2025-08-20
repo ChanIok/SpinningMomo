@@ -58,7 +58,11 @@ export function FunctionContent() {
   const handleSelectDir = async () => {
     setIsSelectingDir(true)
     try {
-      const result = await call<{ path: string }>('screenshot.folder.select', undefined, 45000)
+      const result = await call<{ path: string }>(
+        'file_dialog.select_folder',
+        { title: '选择截图目录' },
+        45000
+      )
       await updateScreenshotDir(result.path)
       toast.success('截图目录已更新')
     } catch (error) {

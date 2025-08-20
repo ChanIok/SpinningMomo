@@ -119,7 +119,7 @@ export interface SettingsState {
   isInitialized: boolean
 }
 
-// 默认设置值（匹配后端的create_default_app_settings）
+// 默认设置值
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   version: '1.0',
 

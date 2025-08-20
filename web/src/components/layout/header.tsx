@@ -2,11 +2,14 @@ import { call } from '@/lib/rpc'
 import { Button } from '@/components/ui/button'
 import { Minus, Square, X, Minimize2 } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router'
 
 import './header.css'
 
 export function Header() {
+  const location = useLocation()
   const [isMaximized, setIsMaximized] = useState(false)
+  const isHomePage = location.pathname === '/' || location.pathname.startsWith('/home')
 
   // 监听窗口状态变化
   useEffect(() => {
@@ -47,13 +50,13 @@ export function Header() {
   }
 
   return (
-    <header className='flex h-12 items-center justify-between gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
+    <header className='flex h-12 items-center justify-between gap-2 bg-transparent px-4'>
       <div className='drag-region h-full flex-1'></div> {/* 可拖动区域 */}
       <div className='flex gap-2'>
         <Button
           variant='ghost'
           size='icon'
-          className='h-8 w-8'
+          className={`h-8 w-8 ${isHomePage ? 'text-gray-100' : 'text-muted-foreground'}`}
           onClick={handleMinimize}
           title='Minimize'
         >
@@ -63,7 +66,7 @@ export function Header() {
         <Button
           variant='ghost'
           size='icon'
-          className='h-8 w-8'
+          className={`h-8 w-8 ${isHomePage ? 'text-gray-100' : 'text-muted-foreground'}`}
           onClick={handleMaximizeToggle}
           title={isMaximized ? 'Restore' : 'Maximize'}
         >
@@ -73,7 +76,7 @@ export function Header() {
         <Button
           variant='ghost'
           size='icon'
-          className='hover:text-destructive-foreground h-8 w-8 hover:bg-destructive'
+          className={`${isHomePage ? 'text-gray-100' : 'text-muted-foreground'} hover:text-destructive-foreground h-8 w-8 hover:bg-destructive`}
           onClick={handleClose}
           title='Close'
         >

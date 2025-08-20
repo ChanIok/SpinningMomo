@@ -31,7 +31,7 @@ struct SettingsState {
 // 创建默认的设置状态
 inline auto create_default_settings_state() -> SettingsState {
   SettingsState state;
-  state.config = Types::create_default_app_settings();
+  state.config = Types::AppSettings{};
   state.is_initialized = false;
   return state;
 }
