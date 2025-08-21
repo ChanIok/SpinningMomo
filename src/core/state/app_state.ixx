@@ -12,8 +12,8 @@ namespace Core::Async::State {
 export struct AsyncRuntimeState;
 }
 
-namespace Core::Events {
-export struct EventBus;
+namespace Core::Events::State {
+export struct EventsState;
 }
 
 namespace Core::I18n::State {
@@ -78,7 +78,7 @@ export struct AppState {
   // 应用级状态
   std::unique_ptr<Core::RPC::State::RpcState> rpc;
   std::unique_ptr<Core::Async::State::AsyncRuntimeState> async_runtime;
-  std::unique_ptr<Core::Events::EventBus> event_bus;
+  std::unique_ptr<Core::Events::State::EventsState> events;
   std::unique_ptr<Core::I18n::State::I18nState> i18n;
   std::unique_ptr<Core::WebView::State::WebViewState> webview;
   std::unique_ptr<Core::State::AppInfo::AppInfoState> app_info;

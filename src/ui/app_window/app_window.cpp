@@ -45,7 +45,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   const auto window_pos = UI::AppWindow::Layout::calculate_center_position(window_size);
 
   // 发送DPI改变事件来更新渲染状态
-  Core::Events::send(*state.event_bus, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});
+  Core::Events::send(*state.events, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});
 
   register_window_class(state.app_window->window.instance);
 

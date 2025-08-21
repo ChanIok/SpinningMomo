@@ -11,7 +11,7 @@ import Core.State;
 import Core.HttpServer.State;
 import Core.HttpServer.SseManager;
 import Core.Async.Runtime;
-import Core.RPC.Engine;
+import Core.RPC;
 import Utils.Logger;
 
 namespace Core::HttpServer::Routes {

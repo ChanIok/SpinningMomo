@@ -216,7 +216,7 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
                                           .new_settings = app_state.settings->config,
                                           .change_description = "Settings updated via RPC"};
 
-    Core::Events::post(*app_state.event_bus,
+    Core::Events::post(*app_state.events,
                        Features::Settings::Events::SettingsChangeEvent{change_data});
 
     Types::UpdateSettingsResult result;

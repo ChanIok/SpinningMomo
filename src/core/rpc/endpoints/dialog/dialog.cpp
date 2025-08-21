@@ -9,7 +9,7 @@ module Core.RPC.Endpoints.Dialog;
 import std;
 import Core.State;
 import Core.WebView.State;
-import Core.RPC.Engine;
+import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Utils.Dialog;

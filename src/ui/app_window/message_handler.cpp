@@ -64,31 +64,31 @@ auto dispatch_feature_action(Core::State::AppState& state, const std::string& ac
 
   switch (*menu_id) {
     case Id::FeatureTogglePreview:
-      Core::Events::send(*state.event_bus,
+      Core::Events::send(*state.events,
                          PreviewToggleEvent{!state.app_window->ui.preview_enabled});
       break;
     case Id::FeatureToggleOverlay:
-      Core::Events::send(*state.event_bus,
+      Core::Events::send(*state.events,
                          OverlayToggleEvent{!state.app_window->ui.overlay_enabled});
       break;
     case Id::FeatureToggleLetterbox:
-      Core::Events::send(*state.event_bus,
+      Core::Events::send(*state.events,
                          LetterboxToggleEvent{!state.app_window->ui.letterbox_enabled});
       break;
     case Id::ScreenshotCapture:
-      Core::Events::send(*state.event_bus, CaptureEvent{});
+      Core::Events::send(*state.events, CaptureEvent{});
       break;
     case Id::ScreenshotOpenFolder:
-      Core::Events::send(*state.event_bus, ScreenshotsEvent{});
+      Core::Events::send(*state.events, ScreenshotsEvent{});
       break;
     case Id::WindowControlResetTransform:
-      Core::Events::send(*state.event_bus, ResetEvent{});
+      Core::Events::send(*state.events, ResetEvent{});
       break;
     case Id::PanelHide:
-      Core::Events::send(*state.event_bus, ToggleVisibilityEvent{});
+      Core::Events::send(*state.events, ToggleVisibilityEvent{});
       break;
     case Id::AppExit:
-      Core::Events::send(*state.event_bus, ExitEvent{});
+      Core::Events::send(*state.events, ExitEvent{});
       break;
   }
 }
@@ -103,7 +103,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < ratios.size()) {
         const auto& ratio_preset = ratios[item.index];
-        Core::Events::send(*state.event_bus,
+        Core::Events::send(*state.events,
                            RatioChangeEvent{static_cast<size_t>(item.index), ratio_preset.name,
                                             ratio_preset.ratio});
       }
@@ -113,7 +113,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       const auto& resolutions = Common::MenuData::get_current_resolutions(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
         const auto& res_preset = resolutions[item.index];
-        Core::Events::send(*state.event_bus,
+        Core::Events::send(*state.events,
                            ResolutionChangeEvent{static_cast<size_t>(item.index), res_preset.name,
                                                  res_preset.baseWidth *
                                                      static_cast<uint64_t>(res_preset.baseHeight)});
@@ -133,9 +133,9 @@ auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
   
   // 根据热键ID分发不同事件
   if (hotkey_id == state.app_window->window.toggle_visibility_hotkey_id) {
-    Core::Events::send(*state.event_bus, ToggleVisibilityEvent{});
+    Core::Events::send(*state.events, ToggleVisibilityEvent{});
   } else if (hotkey_id == state.app_window->window.screenshot_hotkey_id) {
-    Core::Events::send(*state.event_bus, CaptureEvent{});
+    Core::Events::send(*state.events, CaptureEvent{});
   }
 }
 
@@ -175,7 +175,7 @@ auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
   // 检查是否点击了关闭按钮
   if (is_mouse_on_close_button(state, x, y)) {
     // 发送隐藏事件而不是退出事件
-    Core::Events::send(*state.event_bus, UI::AppWindow::Events::HideEvent{});
+    Core::Events::send(*state.events, UI::AppWindow::Events::HideEvent{});
     return;
   }
 
@@ -206,7 +206,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       const auto window_size = UI::AppWindow::Layout::calculate_window_size(state);
 
       // 发送DPI改变事件来更新渲染状态
-      Core::Events::send(*state.event_bus, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});
+      Core::Events::send(*state.events, UI::AppWindow::Events::DpiChangeEvent{dpi, window_size});
 
       return 0;
     }
@@ -266,7 +266,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     }
 
     case WM_CLOSE:
-      Core::Events::send(*state.event_bus, UI::AppWindow::Events::HideEvent{});
+      Core::Events::send(*state.events, UI::AppWindow::Events::HideEvent{});
       return 0;
 
     case WM_DESTROY:

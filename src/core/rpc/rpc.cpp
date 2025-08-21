@@ -4,7 +4,7 @@ module;
 #include <rfl.hpp>
 #include <rfl/json.hpp>
 
-module Core.RPC.Engine;
+module Core.RPC;
 
 import std;
 import Core.State;

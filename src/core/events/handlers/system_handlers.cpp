@@ -1,6 +1,6 @@
 module;
 
-module Handlers.System;
+module Core.Events.Handlers.System;
 
 import std;
 import Core.Events;
@@ -16,7 +16,7 @@ import UI.WebViewWindow;
 import Utils.Logger;
 import Vendor.Windows;
 
-namespace Handlers {
+namespace Core::Events::Handlers {
 
 // 从 app_state.ixx 迁移的 DPI 更新函数
 auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_dpi,
@@ -48,9 +48,7 @@ auto handle_hide_event(Core::State::AppState& state) -> void { UI::AppWindow::hi
 
 // 处理 webview 命令
 auto handle_webview(Core::State::AppState& state) -> void {
-  Logger().info("WebView command received");
   UI::WebViewWindow::toggle_visibility(state);
-  Logger().info("WebView window visibility toggled");
 }
 
 // 处理退出事件
@@ -66,34 +64,26 @@ auto handle_toggle_visibility_event(Core::State::AppState& state) -> void {
 
 auto register_system_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
-  using namespace UI::AppWindow::Events;
 
-  subscribe<HideEvent>(*app_state.event_bus,
-                       [&app_state](const HideEvent&) { handle_hide_event(app_state); });
+  subscribe<UI::AppWindow::Events::HideEvent>(
+      *app_state.events,
+      [&app_state](const UI::AppWindow::Events::HideEvent&) { handle_hide_event(app_state); });
 
-  subscribe<WebViewEvent>(*app_state.event_bus,
-                          [&app_state](const WebViewEvent&) { handle_webview(app_state); });
+  subscribe<UI::AppWindow::Events::WebViewEvent>(
+      *app_state.events,
+      [&app_state](const UI::AppWindow::Events::WebViewEvent&) { handle_webview(app_state); });
 
-  subscribe<ExitEvent>(*app_state.event_bus,
-                       [&app_state](const ExitEvent&) { handle_exit_event(app_state); });
+  subscribe<UI::AppWindow::Events::ExitEvent>(
+      *app_state.events,
+      [&app_state](const UI::AppWindow::Events::ExitEvent&) { handle_exit_event(app_state); });
 
-  subscribe<Core::WebView::Events::WebViewResponseEvent>(
-      *app_state.event_bus, [&app_state](const Core::WebView::Events::WebViewResponseEvent& event) {
-        try {
-          Logger().debug("Processing WebView response on UI thread");
-
-          // 现在我们在UI线程上，可以安全调用WebView API
-          Core::WebView::post_message(app_state, event.response);
-
-          Logger().debug("WebView response sent successfully from UI thread");
-        } catch (const std::exception& e) {
-          Logger().error("Error processing WebView response event: {}", e.what());
-        }
+  subscribe<UI::AppWindow::Events::ToggleVisibilityEvent>(
+      *app_state.events, [&app_state](const UI::AppWindow::Events::ToggleVisibilityEvent&) {
+        handle_toggle_visibility_event(app_state);
       });
 
-  // 注册DPI改变事件处理器
   subscribe<UI::AppWindow::Events::DpiChangeEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::DpiChangeEvent& event) {
+      *app_state.events, [&app_state](const UI::AppWindow::Events::DpiChangeEvent& event) {
         Logger().debug("DPI changed to: {}, window size: {}x{}", event.new_dpi,
                        event.window_size.cx, event.window_size.cy);
 
@@ -102,12 +92,16 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
         Logger().info("DPI update completed successfully");
       });
 
-  subscribe<UI::AppWindow::Events::ToggleVisibilityEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::ToggleVisibilityEvent&) {
-        handle_toggle_visibility_event(app_state);
-      });
+  subscribe<Core::WebView::Events::WebViewResponseEvent>(
+      *app_state.events, [&app_state](const Core::WebView::Events::WebViewResponseEvent& event) {
+        try {
+          // 在UI线程上安全调用WebView API
+          Core::WebView::post_message(app_state, event.response);
 
-  Logger().info("System handlers (including WebView handlers) registered successfully");
+        } catch (const std::exception& e) {
+          Logger().error("Error processing WebView response event: {}", e.what());
+        }
+      });
 }
 
-}  // namespace Handlers
+}  // namespace Core::Events::Handlers

@@ -81,7 +81,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state = std::make_unique<Core::State::AppState>();
     m_app_state->rpc = std::make_unique<Core::RPC::State::RpcState>();
     m_app_state->async_runtime = std::make_unique<Core::Async::State::AsyncRuntimeState>();
-    m_app_state->event_bus = std::make_unique<Core::Events::EventBus>();
+    m_app_state->events = std::make_unique<Core::Events::State::EventsState>();
     m_app_state->i18n = std::make_unique<Core::I18n::State::I18nState>();
     m_app_state->webview = std::make_unique<Core::WebView::State::WebViewState>();
     m_app_state->app_info = std::make_unique<Core::State::AppInfo::AppInfoState>();
@@ -161,7 +161,7 @@ auto Application::Run() -> int {
 
     // 在处理完消息或超时后，运行我们的更新逻辑
     if (m_app_state) {
-      Core::Events::process_events(*m_app_state->event_bus);
+      Core::Events::process_events(*m_app_state->events);
 
       // 更新通知系统
       Features::Notifications::update_notifications(*m_app_state);

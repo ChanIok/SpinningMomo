@@ -7,7 +7,7 @@ import Core.Async.Runtime;
 import Core.Events;
 import Core.State;
 import Core.HttpServer;
-import Handlers.EventRegistrar;
+import Core.Events.Registrar;
 import Features.Notifications;
 import Features.Settings;
 import Features.Settings.State;
@@ -38,7 +38,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     }
 
     // 3. 注册事件处理器
-    Handlers::register_all_handlers(state);
+    Core::Events::register_all_handlers(state);
 
     // 4. 初始化 settings 模块
     if (auto settings_result = Features::Settings::initialize(state); !settings_result) {

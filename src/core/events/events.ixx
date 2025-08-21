@@ -3,19 +3,13 @@ module;
 export module Core.Events;
 
 import std;
+import Core.Events.State;
 
 namespace Core::Events {
 
-// 事件总线（纯数据结构）
-export struct EventBus {
-  std::unordered_map<std::type_index, std::vector<std::function<void(const std::any&)>>> handlers;
-  std::queue<std::pair<std::type_index, std::any>> event_queue;
-  std::mutex queue_mutex;
-};
-
 // 同步发送事件
 export template <typename T>
-auto send(EventBus& bus, const T& event) -> void {
+auto send(State::EventsState& bus, const T& event) -> void {
   auto key = std::type_index(typeid(T));
   if (auto it = bus.handlers.find(key); it != bus.handlers.end()) {
     for (const auto& handler : it->second) {
@@ -30,7 +24,7 @@ auto send(EventBus& bus, const T& event) -> void {
 
 // 异步投递事件
 export template <typename T>
-auto post(EventBus& bus, T event) -> void {
+auto post(State::EventsState& bus, T event) -> void {
   std::lock_guard<std::mutex> lock(bus.queue_mutex);
   auto key = std::type_index(typeid(T));
   bus.event_queue.emplace(key, std::any(std::move(event)));
@@ -38,7 +32,7 @@ auto post(EventBus& bus, T event) -> void {
 
 // 订阅事件
 export template <typename T>
-auto subscribe(EventBus& bus, std::function<void(const T&)> handler) -> void {
+auto subscribe(State::EventsState& bus, std::function<void(const T&)> handler) -> void {
   if (handler) {
     auto key = std::type_index(typeid(T));
     bus.handlers[key].emplace_back([handler = std::move(handler)](const std::any& data) {
@@ -53,9 +47,9 @@ auto subscribe(EventBus& bus, std::function<void(const T&)> handler) -> void {
 }
 
 // 处理队列中的事件（在消息循环中调用）
-export auto process_events(EventBus& bus) -> void;
+export auto process_events(State::EventsState& bus) -> void;
 
 // 清空事件队列
-export auto clear_events(EventBus& bus) -> void;
+export auto clear_events(State::EventsState& bus) -> void;
 
 }  // namespace Core::Events

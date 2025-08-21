@@ -8,7 +8,7 @@ module Core.RPC.Endpoints.File;
 
 import std;
 import Core.State;
-import Core.RPC.Engine;
+import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Utils.File;

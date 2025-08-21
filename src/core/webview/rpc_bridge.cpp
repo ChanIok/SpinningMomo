@@ -9,7 +9,7 @@ import Core.State;
 import Core.Events;
 import Core.WebView;
 import Core.WebView.State;
-import Core.RPC.Engine;
+import Core.RPC;
 import Core.Async.Runtime;
 import Core.WebView.Events;
 import Utils.Logger;
@@ -53,7 +53,7 @@ auto handle_webview_message(Core::State::AppState& state, const std::string& mes
     auto response = co_await Core::RPC::process_request(state, message);
 
     // 直接投递响应字符串到UI线程处理
-    Core::Events::post(*state.event_bus, Core::WebView::Events::WebViewResponseEvent{response});
+    Core::Events::post(*state.events, Core::WebView::Events::WebViewResponseEvent{response});
 
     Logger().debug("WebView response queued for UI thread processing");
 
@@ -61,7 +61,7 @@ auto handle_webview_message(Core::State::AppState& state, const std::string& mes
     Logger().error("Error handling WebView RPC message: {}", e.what());
 
     // 错误处理：直接投递错误响应字符串
-    Core::Events::post(*state.event_bus, Core::WebView::Events::WebViewResponseEvent{
+    Core::Events::post(*state.events, Core::WebView::Events::WebViewResponseEvent{
                                              create_generic_error_response(e.what())});
 
     Logger().debug("WebView error response queued for UI thread processing");

@@ -108,7 +108,7 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto window_info = std::any_cast<Features::WindowControl::WindowInfo>(action.data);
         // 使用新的事件系统发送窗口选择事件
-        Core::Events::send(*state.event_bus, UI::AppWindow::Events::WindowSelectionEvent{
+        Core::Events::send(*state.events, UI::AppWindow::Events::WindowSelectionEvent{
                                                  window_info.title, window_info.handle});
         Logger().info("Window selected: {}", Utils::String::ToUtf8(window_info.title));
       } catch (const std::bad_any_cast& e) {
@@ -121,7 +121,7 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto ratio_data = std::any_cast<UI::ContextMenu::Types::RatioData>(action.data);
         // 使用新的事件系统发送比例改变事件
-        Core::Events::send(*state.event_bus,
+        Core::Events::send(*state.events,
                            UI::AppWindow::Events::RatioChangeEvent{
                                ratio_data.index, ratio_data.name, ratio_data.ratio});
         Logger().info("Ratio selected: {} ({})", Utils::String::ToUtf8(ratio_data.name),
@@ -136,7 +136,7 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto resolution_data = std::any_cast<UI::ContextMenu::Types::ResolutionData>(action.data);
         // 使用新的事件系统发送分辨率改变事件
-        Core::Events::send(*state.event_bus, UI::AppWindow::Events::ResolutionChangeEvent{
+        Core::Events::send(*state.events, UI::AppWindow::Events::ResolutionChangeEvent{
                                                  resolution_data.index, resolution_data.name,
                                                  resolution_data.total_pixels});
         Logger().info("Resolution selected: {} ({}M pixels)",
@@ -155,22 +155,22 @@ void handle_menu_action(Core::State::AppState& state,
         // 根据action_id确定功能类型和新状态
         if (action_id == "feature.toggle_preview") {
           // 发送预览切换事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::PreviewToggleEvent{
+          Core::Events::send(*state.events, UI::AppWindow::Events::PreviewToggleEvent{
                                                    !state.app_window->ui.preview_enabled});
         } else if (action_id == "feature.toggle_overlay") {
           // 发送叠加层切换事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::OverlayToggleEvent{
+          Core::Events::send(*state.events, UI::AppWindow::Events::OverlayToggleEvent{
                                                    !state.app_window->ui.overlay_enabled});
         } else if (action_id == "feature.toggle_letterbox") {
           // 发送黑边模式切换事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::LetterboxToggleEvent{
+          Core::Events::send(*state.events, UI::AppWindow::Events::LetterboxToggleEvent{
                                                    !state.app_window->ui.letterbox_enabled});
         } else if (action_id == "screenshot.capture") {
           // 发送截图事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::CaptureEvent{});
+          Core::Events::send(*state.events, UI::AppWindow::Events::CaptureEvent{});
         } else if (action_id == "panel.hide") {
           // 发送切换可见性事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::ToggleVisibilityEvent{});
+          Core::Events::send(*state.events, UI::AppWindow::Events::ToggleVisibilityEvent{});
         }
 
         Logger().info("Feature action triggered: {}", action_id);
@@ -187,13 +187,13 @@ void handle_menu_action(Core::State::AppState& state,
         // 根据系统命令发送相应事件
         if (command == "app.exit") {
           // 发送退出事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::ExitEvent{});
+          Core::Events::send(*state.events, UI::AppWindow::Events::ExitEvent{});
         } else if (command == "toggle_visibility") {
           // 发送切换可见性事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::ToggleVisibilityEvent{});
+          Core::Events::send(*state.events, UI::AppWindow::Events::ToggleVisibilityEvent{});
         } else if (command == "app.webview") {
           // 发送WebView事件
-          Core::Events::send(*state.event_bus, UI::AppWindow::Events::WebViewEvent{});
+          Core::Events::send(*state.events, UI::AppWindow::Events::WebViewEvent{});
         }
 
         Logger().info("System command executed: {}", command);

@@ -6,7 +6,7 @@ import std;
 
 namespace Core::Events {
 
-auto process_events(EventBus& bus) -> void {
+auto process_events(State::EventsState& bus) -> void {
   std::queue<std::pair<std::type_index, std::any>> events_to_process;
 
   // 快速获取事件队列的副本，减少锁的持有时间
@@ -37,7 +37,7 @@ auto process_events(EventBus& bus) -> void {
   }
 }
 
-auto clear_events(EventBus& bus) -> void {
+auto clear_events(State::EventsState& bus) -> void {
   std::lock_guard<std::mutex> lock(bus.queue_mutex);
   bus.event_queue = {};  // 清空
 }

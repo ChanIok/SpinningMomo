@@ -515,7 +515,7 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
     if (params.restart) {
       // 立即重启更新：发送退出事件
       Logger().info("Sending exit event for immediate update");
-      Core::Events::post(*app_state.event_bus, UI::AppWindow::Events::ExitEvent{});
+      Core::Events::post(*app_state.events, UI::AppWindow::Events::ExitEvent{});
       result.message = "Update will start immediately after application exits";
     } else {
       // 延迟更新：程序继续运行，更新会在退出时执行

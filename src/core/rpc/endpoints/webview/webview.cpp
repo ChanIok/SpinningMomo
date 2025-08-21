@@ -10,7 +10,7 @@ module Core.RPC.Endpoints.WebView;
 
 import std;
 import Core.State;
-import Core.RPC.Engine;
+import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import UI.WebViewWindow;

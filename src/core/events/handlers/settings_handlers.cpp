@@ -1,6 +1,6 @@
 module;
 
-module Handlers.Settings;
+module Core.Events.Handlers.Settings;
 
 import std;
 import Core.Events;
@@ -10,7 +10,7 @@ import Features.Settings.Types;
 import UI.AppWindow;
 import Utils.Logger;
 
-namespace Handlers {
+namespace Core::Events::Handlers {
 
 // 处理设置变更事件
 auto handle_settings_changed(Core::State::AppState& state,
@@ -33,11 +33,10 @@ auto register_settings_handlers(Core::State::AppState& app_state) -> void {
 
   // 注册设置变更事件处理器
   subscribe<Features::Settings::Events::SettingsChangeEvent>(
-      *app_state.event_bus, [&app_state](const Features::Settings::Events::SettingsChangeEvent& event) {
+      *app_state.events,
+      [&app_state](const Features::Settings::Events::SettingsChangeEvent& event) {
         handle_settings_changed(app_state, event);
       });
-
-  Logger().info("Settings handlers registered successfully");
 }
 
-}  // namespace Handlers
+}  // namespace Core::Events::Handlers

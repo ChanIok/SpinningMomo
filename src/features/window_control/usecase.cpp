@@ -1,29 +1,26 @@
 module;
 
-module Handlers.Window;
+module Features.WindowControl.UseCase;
 
 import std;
 import Common.MenuData;
-import Core.Events;
-import Core.WebView.Events;
-import UI.AppWindow.State;
-import UI.AppWindow.Events;
 import Core.State;
 import Core.I18n.State;
+import UI.AppWindow;
+import UI.AppWindow.Events;
+import UI.AppWindow.State;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Letterbox;
 import Features.WindowControl;
 import Features.Notifications;
-import Features.Preview;
 import Features.Overlay;
 import Features.Overlay.State;
-import UI.AppWindow;
 import Utils.Logger;
 import Utils.String;
 import Vendor.Windows;
 
-namespace Handlers {
+namespace Features::WindowControl::UseCase {
 
 // 获取当前比例
 auto get_current_ratio(const Core::State::AppState& state) -> double {
@@ -249,37 +246,4 @@ auto handle_window_selected(Core::State::AppState& state,
                   Utils::String::ToUtf8(event.window_title)));
 }
 
-// 注册窗口处理器
-auto register_window_handlers(Core::State::AppState& app_state) -> void {
-  using namespace Core::Events;
-
-  // 处理比例改变
-  subscribe<UI::AppWindow::Events::RatioChangeEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::RatioChangeEvent& event) {
-        handle_ratio_changed(app_state, event);
-        UI::AppWindow::request_repaint(app_state);
-      });
-
-  // 处理分辨率改变
-  subscribe<UI::AppWindow::Events::ResolutionChangeEvent>(
-      *app_state.event_bus,
-      [&app_state](const UI::AppWindow::Events::ResolutionChangeEvent& event) {
-        handle_resolution_changed(app_state, event);
-        UI::AppWindow::request_repaint(app_state);
-      });
-
-  // 处理重置窗口
-  subscribe<UI::AppWindow::Events::ResetEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::ResetEvent& event) {
-        handle_reset_event(app_state, event);
-        UI::AppWindow::request_repaint(app_state);
-      });
-
-  // 处理窗口选择
-  subscribe<UI::AppWindow::Events::WindowSelectionEvent>(
-      *app_state.event_bus, [&app_state](const UI::AppWindow::Events::WindowSelectionEvent& event) {
-        handle_window_selected(app_state, event);
-      });
-}
-
-}  // namespace Handlers
+}  // namespace Features::WindowControl::UseCase
