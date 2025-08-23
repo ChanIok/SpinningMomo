@@ -2,7 +2,6 @@ import type { TransportMethods } from './types'
 import {
   JsonRpcError,
   JsonRpcErrorCode,
-  type PendingRequest,
   type JsonRpcRequest,
   type JsonRpcNotification,
   type TransportStats,
@@ -12,8 +11,6 @@ import {
  * 创建HTTP传输方法集合
  */
 export function createHttpTransport(): TransportMethods {
-  // HTTP传输特有的状态
-  const pendingRequests = new Map<string | number, PendingRequest>()
   const eventHandlers = new Map<string, Set<(params: unknown) => void>>()
   let nextId = 1
   const isDebugMode = import.meta.env.DEV
@@ -107,18 +104,21 @@ export function createHttpTransport(): TransportMethods {
           id,
         }
 
-        // 设置超时
+        // 设置超时 (timeout=0 表示永不超时)
         const abortController = new AbortController()
-        const timeoutHandle = setTimeout(() => {
-          abortController.abort()
-          pendingRequests.delete(id)
-          reject(
-            new JsonRpcError(JsonRpcErrorCode.TIMEOUT, `Request timeout: ${method}`, {
-              method,
-              timeout,
-            })
-          )
-        }, timeout)
+        let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+
+        if (timeout > 0) {
+          timeoutHandle = setTimeout(() => {
+            abortController.abort()
+            reject(
+              new JsonRpcError(JsonRpcErrorCode.TIMEOUT, `Request timeout: ${method}`, {
+                method,
+                timeout,
+              })
+            )
+          }, timeout)
+        }
 
         // 发送HTTP请求
         fetch('/rpc', {
@@ -130,7 +130,7 @@ export function createHttpTransport(): TransportMethods {
           signal: abortController.signal,
         })
           .then((response) => {
-            clearTimeout(timeoutHandle)
+            if (timeoutHandle) clearTimeout(timeoutHandle)
 
             if (!response.ok) {
               throw new JsonRpcError(
@@ -157,7 +157,7 @@ export function createHttpTransport(): TransportMethods {
             if (isDebugMode) console.log('[HTTP RPC]', 'RPC response:', method, responseJson)
           })
           .catch((error) => {
-            clearTimeout(timeoutHandle)
+            if (timeoutHandle) clearTimeout(timeoutHandle)
 
             if (error.name === 'AbortError') {
               // 超时已经处理过了，不需要再次reject
@@ -217,12 +217,6 @@ export function createHttpTransport(): TransportMethods {
       if (typeof window !== 'undefined') {
         window.addEventListener('beforeunload', () => {
           // Clean up directly since we're in a closure
-          // 清理待处理的请求
-          for (const [, request] of pendingRequests) {
-            clearTimeout(request.timeout)
-            request.reject(new JsonRpcError(JsonRpcErrorCode.INTERNAL_ERROR, 'HTTP RPC disposed'))
-          }
-          pendingRequests.clear()
           eventHandlers.clear()
 
           // 关闭SSE连接
@@ -235,12 +229,7 @@ export function createHttpTransport(): TransportMethods {
     },
 
     dispose: (): void => {
-      // 清理待处理的请求
-      for (const [, request] of pendingRequests) {
-        clearTimeout(request.timeout)
-        request.reject(new JsonRpcError(JsonRpcErrorCode.INTERNAL_ERROR, 'HTTP RPC disposed'))
-      }
-      pendingRequests.clear()
+      // 清理事件处理器
       eventHandlers.clear()
 
       // 关闭SSE连接
@@ -253,13 +242,9 @@ export function createHttpTransport(): TransportMethods {
       if (isDebugMode) console.log('[HTTP RPC]', 'HTTP RPC disposed')
     },
 
-    isAvailable: (): boolean => {
-      return isHttpAvailable()
-    },
-
     getStats: (): TransportStats => {
       return {
-        pendingRequests: pendingRequests.size,
+        pendingRequests: 0,
         eventHandlers: Array.from(eventHandlers.entries()).map(([method, handlers]) => ({
           method,
           handlerCount: handlers.size,

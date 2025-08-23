@@ -8,6 +8,5 @@ export type TransportMethods = {
   off: (method: string, handler: (params: unknown) => void) => void
   initialize: () => Promise<void>
   dispose: () => void
-  isAvailable: () => boolean
   getStats: () => TransportStats
 }

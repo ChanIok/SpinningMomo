@@ -27,7 +27,7 @@ export interface JsonRpcNotification {
 export interface PendingRequest {
   resolve: (value: unknown) => void
   reject: (error: Error) => void
-  timeout: NodeJS.Timeout
+  timeout: NodeJS.Timeout | null
 }
 
 export interface TransportStats {

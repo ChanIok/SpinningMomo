@@ -13,14 +13,12 @@ import {
  * 创建WebView传输方法集合
  */
 export function createWebViewTransport(): TransportMethods {
-  // 传输特有的状态 - 从原webview-rpc.ts复制
   const pendingRequests = new Map<string | number, PendingRequest>()
   const eventHandlers = new Map<string, Set<(params: unknown) => void>>()
   let nextId = 1
   const isDebugMode = import.meta.env.DEV
   let isInitialized = false
 
-  // 内部辅助函数 - 从原webview-rpc.ts复制并修改
   function isWebViewAvailable(): boolean {
     return typeof window !== 'undefined' && !!window.chrome?.webview
   }
@@ -36,12 +34,11 @@ export function createWebViewTransport(): TransportMethods {
   }
 
   function handleResponse(response: JsonRpcResponse): void {
-    // 从原webview-rpc.ts复制handleResponse函数的完整逻辑
     const pendingRequest = pendingRequests.get(response.id)
     if (!pendingRequest) return
 
     const { resolve, reject, timeout } = pendingRequest
-    clearTimeout(timeout)
+    if (timeout) clearTimeout(timeout)
     pendingRequests.delete(response.id)
 
     if (response.error) {
@@ -59,7 +56,6 @@ export function createWebViewTransport(): TransportMethods {
   }
 
   function handleNotification(notification: JsonRpcNotification): void {
-    // 从原webview-rpc.ts复制handleNotification函数的完整逻辑
     const handlers = eventHandlers.get(notification.method)
     if (handlers && handlers.size > 0) {
       handlers.forEach((handler) => {
@@ -77,7 +73,6 @@ export function createWebViewTransport(): TransportMethods {
   }
 
   function isValidJsonRpcMessage(message: unknown): boolean {
-    // 从原webview-rpc.ts复制isValidJsonRpcMessage函数的完整逻辑
     if (typeof message !== 'object' || !message) return false
 
     const msg = message as Record<string, unknown>
@@ -92,7 +87,6 @@ export function createWebViewTransport(): TransportMethods {
   }
 
   function handleMessage(event: MessageEvent): void {
-    // 从原webview-rpc.ts复制handleMessage函数的完整逻辑
     try {
       const message = event.data
 
@@ -114,7 +108,6 @@ export function createWebViewTransport(): TransportMethods {
   // 返回TransportMethods接口实现
   return {
     call: async <T>(method: string, params?: unknown, timeout = 10000): Promise<T> => {
-      // 从原webview-rpc.ts复制call函数的完整逻辑
       return new Promise((resolve, reject) => {
         if (!isWebViewAvailable()) {
           reject(new JsonRpcError(JsonRpcErrorCode.WEBVIEW_NOT_AVAILABLE, 'WebView2 not available'))
@@ -129,15 +122,20 @@ export function createWebViewTransport(): TransportMethods {
           id,
         }
 
-        const timeoutHandle = setTimeout(() => {
-          pendingRequests.delete(id)
-          reject(
-            new JsonRpcError(JsonRpcErrorCode.TIMEOUT, `Request timeout: ${method}`, {
-              method,
-              timeout,
-            })
-          )
-        }, timeout)
+        // 设置超时 (timeout=0 表示永不超时)
+        let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+
+        if (timeout > 0) {
+          timeoutHandle = setTimeout(() => {
+            pendingRequests.delete(id)
+            reject(
+              new JsonRpcError(JsonRpcErrorCode.TIMEOUT, `Request timeout: ${method}`, {
+                method,
+                timeout,
+              })
+            )
+          }, timeout)
+        }
 
         pendingRequests.set(id, {
           resolve: (value: unknown) => resolve(value as T),
@@ -149,7 +147,7 @@ export function createWebViewTransport(): TransportMethods {
           postMessage(request)
           if (isDebugMode) console.log('[WebView RPC]', 'RPC call:', method, params)
         } catch (error) {
-          clearTimeout(timeoutHandle)
+          if (timeoutHandle) clearTimeout(timeoutHandle)
           pendingRequests.delete(id)
           reject(error)
         }
@@ -157,7 +155,6 @@ export function createWebViewTransport(): TransportMethods {
     },
 
     on: (method: string, handler: (params: unknown) => void): void => {
-      // 从原webview-rpc.ts复制on函数的完整逻辑
       if (!eventHandlers.has(method)) {
         eventHandlers.set(method, new Set())
       }
@@ -166,7 +163,6 @@ export function createWebViewTransport(): TransportMethods {
     },
 
     off: (method: string, handler: (params: unknown) => void): void => {
-      // 从原webview-rpc.ts复制off函数的完整逻辑
       const handlers = eventHandlers.get(method)
       if (handlers) {
         handlers.delete(handler)
@@ -178,7 +174,6 @@ export function createWebViewTransport(): TransportMethods {
     },
 
     initialize: async (): Promise<void> => {
-      // 从原webview-rpc.ts复制initializeRPC函数的完整逻辑
       if (isInitialized) {
         if (isDebugMode) console.log('[WebView RPC]', 'RPC already initialized.')
         return
@@ -199,7 +194,7 @@ export function createWebViewTransport(): TransportMethods {
           // But since we're in a closure, we need to reference it differently
           // For now, we'll just do the cleanup directly
           for (const [, request] of pendingRequests) {
-            clearTimeout(request.timeout)
+            if (request.timeout) clearTimeout(request.timeout)
             request.reject(
               new JsonRpcError(JsonRpcErrorCode.INTERNAL_ERROR, 'WebView RPC disposed')
             )
@@ -211,9 +206,8 @@ export function createWebViewTransport(): TransportMethods {
     },
 
     dispose: (): void => {
-      // 从原webview-rpc.ts复制dispose函数的完整逻辑
       for (const [, request] of pendingRequests) {
-        clearTimeout(request.timeout)
+        if (request.timeout) clearTimeout(request.timeout)
         request.reject(new JsonRpcError(JsonRpcErrorCode.INTERNAL_ERROR, 'WebView RPC disposed'))
       }
       pendingRequests.clear()
@@ -227,12 +221,7 @@ export function createWebViewTransport(): TransportMethods {
       if (isDebugMode) console.log('[WebView RPC]', 'WebView RPC disposed')
     },
 
-    isAvailable: (): boolean => {
-      return isWebViewAvailable()
-    },
-
     getStats: (): TransportStats => {
-      // 从原webview-rpc.ts复制getStats函数的完整逻辑
       return {
         pendingRequests: pendingRequests.size,
         eventHandlers: Array.from(eventHandlers.entries()).map(([method, handlers]) => ({

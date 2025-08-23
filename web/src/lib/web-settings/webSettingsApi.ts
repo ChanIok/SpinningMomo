@@ -1,7 +1,7 @@
 import { call } from '@/lib/rpc'
 import type { WebSettings } from './webSettingsTypes'
 import { DEFAULT_WEB_SETTINGS } from './webSettingsTypes'
-import { CONFIG_PATH, IMAGE_FILE_FILTER } from './constants'
+import { CONFIG_PATH } from './constants'
 import { getCurrentEnvironment } from '@/lib/environment'
 
 /**
@@ -125,7 +125,7 @@ export async function selectBackgroundImage(): Promise<string | null> {
         allow_multiple: false,
         parentWindowMode,
       },
-      -1
+      0
     ) // 永不超时
 
     if (result.paths && result.paths.length > 0) {
