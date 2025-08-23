@@ -1,7 +1,7 @@
 import { call } from '@/lib/rpc'
 import type { WebSettings } from './webSettingsTypes'
 import { DEFAULT_WEB_SETTINGS } from './webSettingsTypes'
-import { CONFIG_PATH } from './constants'
+import { CONFIG_PATH, RESOURCES_DIR, BACKGROUND_IMAGE_NAME } from './constants'
 import { getCurrentEnvironment } from '@/lib/environment'
 
 /**
@@ -11,10 +11,9 @@ export async function readWebSettings(): Promise<WebSettings | null> {
   try {
     const result = await call<{
       content: string
-      exists: boolean
     }>('file.read', { path: CONFIG_PATH })
 
-    if (!result.exists) {
+    if (!result.content) {
       console.log('📁 前端配置文件不存在')
       return null
     }
@@ -62,10 +61,10 @@ export async function checkWebSettingsExists(): Promise<boolean> {
   try {
     const result = await call<{
       exists: boolean
-      is_file: boolean
+      isRegularFile: boolean
     }>('file.getInfo', { path: CONFIG_PATH })
 
-    return result.exists && result.is_file
+    return result.exists && result.isRegularFile
   } catch (error) {
     console.error('检查前端配置文件失败:', error)
     return false
@@ -88,6 +87,8 @@ export async function initializeWebSettings(): Promise<WebSettings> {
         return settings
       }
     }
+
+    console.log('📁 前端配置文件不存在，创建默认配置')
 
     // 创建默认配置
     const defaultSettings = {
@@ -137,5 +138,33 @@ export async function selectBackgroundImage(): Promise<string | null> {
   } catch (error) {
     console.error('选择背景图片失败:', error)
     throw new Error('选择背景图片失败')
+  }
+}
+
+/**
+ * 复制背景图片到资源目录
+ */
+export async function copyBackgroundImageToResources(sourcePath: string): Promise<string> {
+  try {
+    // 从源路径中提取文件扩展名
+    const lastDotIndex = sourcePath.lastIndexOf('.')
+    const ext = lastDotIndex !== -1 ? sourcePath.substring(lastDotIndex) : ''
+    const destPath = `${RESOURCES_DIR}/${BACKGROUND_IMAGE_NAME}${ext}`
+
+    // 调用 file.copy RPC 复制文件
+    await call<{
+      success: boolean
+      message: string
+    }>('file.copy', {
+      sourcePath: sourcePath,
+      destinationPath: destPath,
+      overwrite: true,
+    })
+
+    console.log('📁 背景图片已复制到资源目录:', destPath)
+    return destPath
+  } catch (error) {
+    console.error('复制背景图片失败:', error)
+    throw new Error('复制背景图片失败')
   }
 }

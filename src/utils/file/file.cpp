@@ -39,6 +39,7 @@ auto read_file(const std::filesystem::path &file_path)
     auto file_size = file.size();
 
     FileReadResult result;
+    result.path = file_path.string();
     result.mime_type = Mime::get_mime_type(file_path);
     result.original_size = file_size;
 
@@ -128,7 +129,7 @@ auto write_file(const std::filesystem::path &file_path, const std::string &conte
                      bytes_written);
     }
 
-    FileWriteResult result{.bytes_written = bytes_written};
+    FileWriteResult result{.path = file_path.string(), .bytes_written = bytes_written};
     co_return result;
   } catch (const std::exception &e) {
     co_return std::unexpected(format_file_error("Error writing", file_path, e));
@@ -220,6 +221,197 @@ auto get_file_info(const std::filesystem::path &file_path)
     co_return result;
   } catch (const std::exception &e) {
     co_return std::unexpected(format_file_error("Error getting file info", file_path, e));
+  }
+}
+
+auto delete_path(const std::filesystem::path &path, bool recursive)
+    -> asio::awaitable<std::expected<DeleteResult, std::string>> {
+  try {
+    DeleteResult result{.path = path.string()};
+
+    if (!std::filesystem::exists(path)) {
+      co_return std::unexpected("Path does not exist: " + path.string());
+    }
+
+    // 递归计算要删除的内容统计
+    std::function<void(const std::filesystem::path &)> calculate_stats =
+        [&](const std::filesystem::path &p) {
+          if (std::filesystem::is_regular_file(p)) {
+            result.files_deleted++;
+            try {
+              result.total_bytes_freed += std::filesystem::file_size(p);
+            } catch (...) {
+              // 忽略文件大小获取错误
+            }
+          } else if (std::filesystem::is_directory(p)) {
+            result.directories_deleted++;
+            if (recursive) {
+              for (const auto &entry : std::filesystem::directory_iterator(p)) {
+                calculate_stats(entry.path());
+              }
+            }
+          }
+        };
+
+    // 先统计
+    calculate_stats(path);
+
+    // 执行删除
+    if (std::filesystem::is_regular_file(path)) {
+      std::filesystem::remove(path);
+      Logger().debug("Successfully deleted file: {}", path.string());
+    } else if (std::filesystem::is_directory(path)) {
+      if (recursive) {
+        std::filesystem::remove_all(path);
+        Logger().debug("Successfully deleted directory recursively: {}", path.string());
+      } else {
+        if (!std::filesystem::is_empty(path)) {
+          co_return std::unexpected("Directory is not empty and recursive=false: " + path.string());
+        }
+        std::filesystem::remove(path);
+        Logger().debug("Successfully deleted empty directory: {}", path.string());
+      }
+    }
+
+    Logger().debug("Delete operation completed: {} files, {} directories, {} bytes freed",
+                   result.files_deleted, result.directories_deleted, result.total_bytes_freed);
+    co_return result;
+  } catch (const std::exception &e) {
+    co_return std::unexpected(format_file_error("Error deleting", path, e));
+  }
+}
+
+auto move_path(const std::filesystem::path &source_path,
+               const std::filesystem::path &destination_path, bool overwrite)
+    -> asio::awaitable<std::expected<MoveResult, std::string>> {
+  try {
+    if (!std::filesystem::exists(source_path)) {
+      co_return std::unexpected("Source path does not exist: " + source_path.string());
+    }
+
+    if (std::filesystem::exists(destination_path) && !overwrite) {
+      co_return std::unexpected("Destination already exists and overwrite is disabled: " +
+                                destination_path.string());
+    }
+
+    // 确保目标目录存在
+    auto parent_path = destination_path.parent_path();
+    if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
+      std::filesystem::create_directories(parent_path);
+      Logger().debug("Created parent directories: {}", parent_path.string());
+    }
+
+    MoveResult result{.source_path = source_path.string(),
+                      .destination_path = destination_path.string()};
+
+    // 获取文件/目录大小
+    if (std::filesystem::is_regular_file(source_path)) {
+      result.size = std::filesystem::file_size(source_path);
+    }
+
+    // 判断是重命名还是移动
+    auto source_parent = source_path.parent_path();
+    auto dest_parent = destination_path.parent_path();
+
+    if (source_parent == dest_parent) {
+      result.was_renamed = true;
+    } else {
+      result.was_moved = true;
+    }
+
+    // 执行移动/重命名
+    std::filesystem::rename(source_path, destination_path);
+
+    if (result.was_renamed) {
+      Logger().debug("Successfully renamed: {} -> {}", source_path.string(),
+                     destination_path.string());
+    } else {
+      Logger().debug("Successfully moved: {} -> {}", source_path.string(),
+                     destination_path.string());
+    }
+
+    co_return result;
+  } catch (const std::exception &e) {
+    co_return std::unexpected(format_file_error("Error moving/renaming", source_path, e));
+  }
+}
+
+auto copy_path(const std::filesystem::path &source_path,
+               const std::filesystem::path &destination_path, bool recursive, bool overwrite)
+    -> asio::awaitable<std::expected<CopyResult, std::string>> {
+  try {
+    if (!std::filesystem::exists(source_path)) {
+      co_return std::unexpected("Source path does not exist: " + source_path.string());
+    }
+
+    if (std::filesystem::exists(destination_path) && !overwrite) {
+      co_return std::unexpected("Destination already exists and overwrite is disabled: " +
+                                destination_path.string());
+    }
+
+    // 确保目标目录存在
+    auto parent_path = destination_path.parent_path();
+    if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
+      std::filesystem::create_directories(parent_path);
+      Logger().debug("Created parent directories: {}", parent_path.string());
+    }
+
+    CopyResult result{.source_path = source_path.string(),
+                      .destination_path = destination_path.string(),
+                      .is_recursive_copy = recursive};
+
+    if (std::filesystem::is_regular_file(source_path)) {
+      // 复制文件
+      std::filesystem::copy_file(source_path, destination_path,
+                                 overwrite ? std::filesystem::copy_options::overwrite_existing
+                                           : std::filesystem::copy_options::none);
+      result.files_copied = 1;
+      result.total_bytes_copied = std::filesystem::file_size(source_path);
+      Logger().debug("Successfully copied file: {} -> {}", source_path.string(),
+                     destination_path.string());
+    } else if (std::filesystem::is_directory(source_path)) {
+      if (recursive) {
+        // 递归复制目录
+        std::filesystem::copy_options options = std::filesystem::copy_options::recursive;
+        if (overwrite) {
+          options |= std::filesystem::copy_options::overwrite_existing;
+        }
+
+        std::filesystem::copy(source_path, destination_path, options);
+
+        // 统计复制的文件和目录
+        std::function<void(const std::filesystem::path &)> count_items =
+            [&](const std::filesystem::path &p) {
+              for (const auto &entry : std::filesystem::recursive_directory_iterator(p)) {
+                if (entry.is_regular_file()) {
+                  result.files_copied++;
+                  try {
+                    result.total_bytes_copied += entry.file_size();
+                  } catch (...) {
+                    // 忽略文件大小获取错误
+                  }
+                } else if (entry.is_directory()) {
+                  result.directories_copied++;
+                }
+              }
+            };
+
+        count_items(destination_path);
+        Logger().debug("Successfully copied directory recursively: {} -> {}", source_path.string(),
+                       destination_path.string());
+      } else {
+        // 只创建目录，不复制内容
+        std::filesystem::create_directory(destination_path);
+        result.directories_copied = 1;
+        Logger().debug("Successfully created directory: {}", destination_path.string());
+      }
+    }
+
+    Logger().debug("Copy operation completed: {} files, {} directories, {} bytes copied",
+                   result.files_copied, result.directories_copied, result.total_bytes_copied);
+    co_return result;
+  } catch (const std::exception &e) {
+    co_return std::unexpected(format_file_error("Error copying", source_path, e));
   }
 }
 

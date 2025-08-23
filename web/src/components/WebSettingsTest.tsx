@@ -14,8 +14,6 @@ export function WebSettingsTest() {
     resetToDefault,
   } = useWebSettingsStore()
 
-  // 注意：WebSettings 的初始化已在 AppLayout 中处理，这里不需要重复初始化
-
   if (error) {
     return <div>❌ 错误: {error}</div>
   }
