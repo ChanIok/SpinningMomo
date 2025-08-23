@@ -16,8 +16,7 @@ export default function AppLayout() {
       <div
         className='fixed inset-0 z-[-2] bg-cover bg-center bg-no-repeat'
         style={{
-          backgroundImage:
-            "url('http://localhost:8080/2025_03_30_02_33_09_3140045.jpeg')",
+          backgroundImage: "url('http://localhost:8080/2025_03_30_02_33_09_3140045.jpeg')",
         }}
       />
 

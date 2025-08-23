@@ -11,7 +11,7 @@ export struct FileSelectorParams {
   std::string title;
   std::string filter;
   bool allow_multiple{false};
-  bool parent_to_webview{true};
+  std::int8_t parent_window_mode{0};  // 0 = 无父窗口, 1 = webview2, 2 = 激活窗口
 };
 
 export struct FileSelectorResult {
@@ -20,7 +20,7 @@ export struct FileSelectorResult {
 
 export struct FolderSelectorParams {
   std::string title;
-  bool parent_to_webview{true};
+  std::int8_t parent_window_mode{0};  // 0 = 无父窗口, 1 = webview2, 2 = 激活窗口
 };
 
 export struct FolderSelectorResult {

@@ -43,7 +43,9 @@ auto register_method(Core::State::AppState& app_state,
   auto wrapped_handler = [handler, &app_state](rfl::Generic params_generic,
                                                rfl::Generic id) -> asio::awaitable<std::string> {
     // 从 rfl::Generic 转换为 Request 类型
-    auto request_result = rfl::from_generic<Request, rfl::SnakeCaseToCamelCase>(params_generic);
+    auto request_result =
+        rfl::from_generic<Request, rfl::SnakeCaseToCamelCase, rfl::DefaultIfMissing>(
+            params_generic);
     if (!request_result) {
       co_return create_error_response(id, ErrorCode::InvalidParams,
                                       "Invalid parameters: " + request_result.error().what());

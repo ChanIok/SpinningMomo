@@ -4,6 +4,9 @@ module;
 #include <comdef.h>
 #include <shellapi.h>
 #include <shobjidl.h>
+#include <wil/com.h>
+#include <wil/resource.h>
+#include <wil/result.h>
 
 #include <filesystem>
 
@@ -16,261 +19,209 @@ import Utils.Dialog;
 
 namespace Utils::Dialog {
 
-// 定义COM资源的删除器
-struct ComDeleter {
-  void operator()(void*) const { CoUninitialize(); }
-};
+// 辅助函数：解析文件过滤器 - 修复解析逻辑
+auto parse_file_filter(const std::string& filter)
+    -> std::pair<std::vector<std::wstring>, std::vector<std::wstring>> {
+  std::vector<std::wstring> filter_names;
+  std::vector<std::wstring> filter_patterns;
 
-// 定义COM对象的删除器
-template <typename T>
-struct ComPtrDeleter {
-  void operator()(T* ptr) const {
-    if (ptr) ptr->Release();
+  if (filter.empty()) {
+    return {filter_names, filter_patterns};
   }
-};
 
-// 定义CoTaskMemFree的删除器
-struct CoTaskMemDeleter {
-  void operator()(wchar_t* ptr) const {
-    if (ptr) CoTaskMemFree(ptr);
+  std::wstring filter_wide = Utils::String::FromUtf8(filter);
+
+  // 按'|'分割，确保成对出现
+  std::vector<std::wstring> segments;
+  size_t start = 0;
+  size_t pos = 0;
+
+  while ((pos = filter_wide.find(L'|', start)) != std::wstring::npos) {
+    segments.push_back(filter_wide.substr(start, pos - start));
+    start = pos + 1;
   }
-};
+
+  // 添加最后一个段
+  if (start < filter_wide.length()) {
+    segments.push_back(filter_wide.substr(start));
+  }
+
+  // 确保是偶数个段（name-pattern对）
+  if (segments.size() % 2 != 0) {
+    Logger().warn("Filter string has odd number of segments, ignoring last segment");
+    segments.pop_back();
+  }
+
+  // 分配到name和pattern数组
+  for (size_t i = 0; i < segments.size(); i += 2) {
+    filter_names.push_back(segments[i]);
+    filter_patterns.push_back(segments[i + 1]);
+  }
+
+  return {filter_names, filter_patterns};
+}
 
 // 选择文件夹
-auto select_folder(const FolderSelectorParams& params,
-                   HWND hwnd)
+auto select_folder(const FolderSelectorParams& params, HWND hwnd)
     -> std::expected<FolderSelectorResult, std::string> {
-  // 初始化COM
-  HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to initialize COM library");
+  try {
+    // COM初始化
+    auto com_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
+    // 创建对话框 - 智能指针自动管理
+    wil::com_ptr<IFileDialog> pFileDialog;
+    THROW_IF_FAILED(
+        CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pFileDialog)));
+
+    // 设置选项
+    DWORD dwOptions;
+    THROW_IF_FAILED(pFileDialog->GetOptions(&dwOptions));
+    THROW_IF_FAILED(pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS));
+
+    // 设置标题
+    if (!params.title.empty()) {
+      std::wstring title_wide = Utils::String::FromUtf8(params.title);
+      THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
+    } else {
+      THROW_IF_FAILED(pFileDialog->SetTitle(L"选择文件夹"));
+    }
+
+    // 显示对话框
+    THROW_IF_FAILED(pFileDialog->Show(hwnd));
+
+    // 获取结果
+    wil::com_ptr<IShellItem> pItem;
+    THROW_IF_FAILED(pFileDialog->GetResult(&pItem));
+
+    // 获取路径 - 自动内存管理
+    wil::unique_cotaskmem_string file_path;
+    THROW_IF_FAILED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
+
+    // 返回结果
+    std::filesystem::path result(file_path.get());
+    Logger().info("User selected folder: {}", result.string());
+
+    FolderSelectorResult folder_result;
+    folder_result.path = result.string();
+    return folder_result;
+
+  } catch (const wil::ResultException& ex) {
+    if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+      return std::unexpected("User cancelled the operation");
+    }
+    return std::unexpected(std::string("Dialog operation failed: ") + ex.what());
   }
-
-  // RAII管理COM库的释放
-  auto com_guard = std::unique_ptr<void, ComDeleter>(nullptr);
-
-  // 创建文件对话框实例
-  IFileDialog* pFileDialog = nullptr;
-  hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_IFileDialog,
-                        reinterpret_cast<void**>(&pFileDialog));
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create file dialog instance");
-  }
-
-  // RAII管理COM对象的释放
-  auto dialog_guard = std::unique_ptr<IFileDialog, ComPtrDeleter<IFileDialog>>(pFileDialog);
-
-  // 设置选项，只允许选择文件夹
-  DWORD dwOptions;
-  hr = pFileDialog->GetOptions(&dwOptions);
-  if (SUCCEEDED(hr)) {
-    hr = pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS);
-  }
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to set dialog options");
-  }
-
-  // 设置标题
-  if (!params.title.empty()) {
-    std::wstring title_wide = Utils::String::FromUtf8(params.title);
-    pFileDialog->SetTitle(title_wide.c_str());
-  } else {
-    pFileDialog->SetTitle(L"选择文件夹");
-  }
-
-  // 显示对话框
-  hr = pFileDialog->Show(hwnd);
-  if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
-    return std::unexpected("User cancelled the operation");
-  }
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to show dialog");
-  }
-
-  // 获取结果
-  IShellItem* pItem = nullptr;
-  hr = pFileDialog->GetResult(&pItem);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to get dialog result");
-  }
-
-  // RAII管理ShellItem的释放
-  auto item_guard = std::unique_ptr<IShellItem, ComPtrDeleter<IShellItem>>(pItem);
-
-  // 获取路径
-  PWSTR pszFilePath = nullptr;
-  hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to get selected path");
-  }
-
-  // RAII管理字符串的释放
-  auto string_guard = std::unique_ptr<wchar_t, CoTaskMemDeleter>(pszFilePath);
-
-  // 转换为std::filesystem::path并返回
-  std::filesystem::path result(pszFilePath);
-  Logger().info("User selected folder: {}", result.string());
-  
-  FolderSelectorResult folder_result;
-  folder_result.path = result.string();
-  return folder_result;
 }
 
 // 选择文件
-auto select_file(const FileSelectorParams& params,
-                 HWND hwnd)
+auto select_file(const FileSelectorParams& params, HWND hwnd)
     -> std::expected<FileSelectorResult, std::string> {
-  // 初始化COM
-  HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to initialize COM library");
-  }
+  try {
+    // COM初始化
+    auto com_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
 
-  // RAII管理COM库的释放
-  auto com_guard = std::unique_ptr<void, ComDeleter>(nullptr);
+    // 创建对话框 - 智能指针自动管理
+    wil::com_ptr<IFileOpenDialog> pFileDialog;
+    THROW_IF_FAILED(
+        CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pFileDialog)));
 
-  // 创建文件对话框实例
-  IFileOpenDialog* pFileDialog = nullptr;
-  hr = CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_IFileOpenDialog,
-                        reinterpret_cast<void**>(&pFileDialog));
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create file dialog instance");
-  }
-
-  // RAII管理COM对象的释放
-  auto dialog_guard = std::unique_ptr<IFileOpenDialog, ComPtrDeleter<IFileOpenDialog>>(pFileDialog);
-
-  // 设置选项
-  DWORD dwOptions;
-  hr = pFileDialog->GetOptions(&dwOptions);
-  if (SUCCEEDED(hr)) {
+    // 设置选项
+    DWORD dwOptions;
+    THROW_IF_FAILED(pFileDialog->GetOptions(&dwOptions));
     dwOptions |= FOS_FILEMUSTEXIST;  // 文件必须存在
     if (params.allow_multiple) {
       dwOptions |= FOS_ALLOWMULTISELECT;  // 允许多选
     }
-    hr = pFileDialog->SetOptions(dwOptions);
-  }
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to set dialog options");
-  }
+    THROW_IF_FAILED(pFileDialog->SetOptions(dwOptions));
 
-  // 设置过滤器
-  if (!params.filter.empty()) {
-    std::wstring filter_wide = Utils::String::FromUtf8(params.filter);
+    // 设置过滤器 - 使用修复后的解析逻辑
+    if (!params.filter.empty()) {
+      auto [filter_names, filter_patterns] = parse_file_filter(params.filter);
 
-    // 将过滤器字符串转换为COM格式
-    std::vector<wchar_t> filter_buffer;
-    filter_buffer.reserve(filter_wide.length() + 2);  // +2 for double null termination
+      // 创建COMDLG_FILTERSPEC数组
+      if (!filter_names.empty() && !filter_patterns.empty()) {
+        std::vector<COMDLG_FILTERSPEC> filter_specs;
+        filter_specs.resize(filter_names.size());
 
-    // 复制过滤器字符串并替换 '|' 为 '\0'
-    for (wchar_t c : filter_wide) {
-      if (c == L'|') {
-        filter_buffer.push_back(L'\0');
-      } else {
-        filter_buffer.push_back(c);
+        for (size_t i = 0; i < filter_names.size(); ++i) {
+          filter_specs[i].pszName = filter_names[i].c_str();
+          filter_specs[i].pszSpec = filter_patterns[i].c_str();
+        }
+
+        // 设置文件类型过滤器
+        HRESULT hr =
+            pFileDialog->SetFileTypes(static_cast<UINT>(filter_specs.size()), filter_specs.data());
+        if (FAILED(hr)) {
+          Logger().warn("Failed to set file filters (HRESULT: 0x{}), continuing without filter",
+                        std::to_string(static_cast<unsigned>(hr)));
+        }
       }
     }
-    filter_buffer.push_back(L'\0');  // 结尾双null
-    filter_buffer.push_back(L'\0');
 
-    // 设置文件类型过滤器
-    hr = pFileDialog->SetFileTypes(
-        1, reinterpret_cast<const COMDLG_FILTERSPEC*>(filter_buffer.data()));
-    if (FAILED(hr)) {
-      Logger().warn("Failed to set file filters, continuing without filter");
+    // 设置标题
+    if (!params.title.empty()) {
+      std::wstring title_wide = Utils::String::FromUtf8(params.title);
+      THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
     }
-  }
 
-  // 设置标题
-  if (!params.title.empty()) {
-    std::wstring title_wide = Utils::String::FromUtf8(params.title);
-    pFileDialog->SetTitle(title_wide.c_str());
-  }
+    // 显示对话框
+    THROW_IF_FAILED(pFileDialog->Show(hwnd));
 
-  // 显示对话框
-  hr = pFileDialog->Show(hwnd);
-  if (hr == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
-    return std::unexpected("User cancelled the operation");
-  }
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to show dialog");
-  }
-
-  // 获取结果
-  IShellItemArray* pItemArray = nullptr;
-  if (params.allow_multiple) {
-    hr = pFileDialog->GetResults(&pItemArray);
-  } else {
-    IShellItem* pItem = nullptr;
-    hr = pFileDialog->GetResult(&pItem);
-    if (SUCCEEDED(hr)) {
+    // 获取结果
+    wil::com_ptr<IShellItemArray> pItemArray;
+    if (params.allow_multiple) {
+      THROW_IF_FAILED(pFileDialog->GetResults(&pItemArray));
+    } else {
+      wil::com_ptr<IShellItem> pItem;
+      THROW_IF_FAILED(pFileDialog->GetResult(&pItem));
       // 为单个文件创建一个item array
-      hr = SHCreateShellItemArrayFromShellItem(pItem, IID_IShellItemArray,
-                                               reinterpret_cast<void**>(&pItemArray));
-      pItem->Release();
-    }
-  }
-
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to get dialog result");
-  }
-
-  // RAII管理ShellItemArray的释放
-  auto item_array_guard =
-      std::unique_ptr<IShellItemArray, ComPtrDeleter<IShellItemArray>>(pItemArray);
-
-  // 获取文件数量
-  DWORD count = 0;
-  hr = pItemArray->GetCount(&count);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to get selected items count");
-  }
-
-  // 收集所有文件路径
-  std::vector<std::filesystem::path> selected_paths;
-  selected_paths.reserve(count);
-
-  for (DWORD i = 0; i < count; ++i) {
-    IShellItem* pItem = nullptr;
-    hr = pItemArray->GetItemAt(i, &pItem);
-    if (FAILED(hr)) {
-      Logger().warn("Failed to get item at index {}, skipping", i);
-      continue;
+      THROW_IF_FAILED(SHCreateShellItemArrayFromShellItem(pItem.get(), IID_PPV_ARGS(&pItemArray)));
     }
 
-    // RAII管理ShellItem的释放
-    auto item_guard = std::unique_ptr<IShellItem, ComPtrDeleter<IShellItem>>(pItem);
+    // 获取文件数量
+    DWORD count = 0;
+    THROW_IF_FAILED(pItemArray->GetCount(&count));
 
-    // 获取路径
-    PWSTR pszFilePath = nullptr;
-    hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
-    if (FAILED(hr)) {
-      Logger().warn("Failed to get file path for item at index {}, skipping", i);
-      continue;
+    // 收集所有文件路径
+    std::vector<std::filesystem::path> selected_paths;
+    selected_paths.reserve(count);
+
+    for (DWORD i = 0; i < count; ++i) {
+      wil::com_ptr<IShellItem> pItem;
+      if (SUCCEEDED(pItemArray->GetItemAt(i, &pItem))) {
+        // 获取路径 - 自动内存管理
+        wil::unique_cotaskmem_string file_path;
+        if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path))) {
+          selected_paths.emplace_back(file_path.get());
+        } else {
+          Logger().warn("Failed to get file path for item at index {}, skipping", i);
+        }
+      } else {
+        Logger().warn("Failed to get item at index {}, skipping", i);
+      }
     }
 
-    // RAII管理字符串的释放
-    auto string_guard = std::unique_ptr<wchar_t, CoTaskMemDeleter>(pszFilePath);
+    if (selected_paths.empty()) {
+      return std::unexpected("No valid files were selected");
+    }
 
-    // 添加到结果列表
-    selected_paths.emplace_back(pszFilePath);
-  }
+    Logger().info("Selected {} file(s)", selected_paths.size());
 
-  if (selected_paths.empty()) {
-    return std::unexpected("No valid files were selected");
-  }
+    // 转换为FileSelectorResult
+    FileSelectorResult file_selector_result;
+    file_selector_result.paths.reserve(selected_paths.size());
+    for (const auto& path : selected_paths) {
+      file_selector_result.paths.push_back(path.string());
+    }
 
-  Logger().info("Selected {} file(s)", selected_paths.size());
-  
-  // 转换为FileSelectorResult
-  FileSelectorResult file_selector_result;
-  file_selector_result.paths.reserve(selected_paths.size());
-  for (const auto& path : selected_paths) {
-    file_selector_result.paths.push_back(path.string());
+    return file_selector_result;
+
+  } catch (const wil::ResultException& ex) {
+    if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+      return std::unexpected("User cancelled the operation");
+    }
+    return std::unexpected(std::string("Dialog operation failed: ") + ex.what());
   }
-  
-  return file_selector_result;
 }
-
 
 }  // namespace Utils::Dialog

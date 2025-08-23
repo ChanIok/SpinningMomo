@@ -1,5 +1,7 @@
 module;
 
+#include <windows.h>
+
 #include <asio.hpp>
 #include <rfl.hpp>
 #include <rfl/json.hpp>
@@ -16,12 +18,25 @@ import Utils.Dialog;
 
 namespace Core::RPC::Endpoints::Dialog {
 
+// 获取父窗口句柄的辅助函数
+auto get_parent_window(Core::State::AppState& app_state, int8_t mode) -> HWND {
+  switch (mode) {
+    case 0:  // 无父窗口
+      return nullptr;
+    case 1:  // webview2
+      return app_state.webview->window.webview_hwnd;
+    case 2:  // 激活窗口
+      return GetForegroundWindow();
+    default:
+      return nullptr;  // 默认无父窗口
+  }
+}
+
 auto handle_select_file([[maybe_unused]] Core::State::AppState& app_state,
                         const Utils::Dialog::FileSelectorParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Utils::Dialog::FileSelectorResult>> {
-  auto result = params.parent_to_webview
-                    ? Utils::Dialog::select_file(params, app_state.webview->window.webview_hwnd)
-                    : Utils::Dialog::select_file(params);
+  HWND hwnd = get_parent_window(app_state, params.parent_window_mode);
+  auto result = Utils::Dialog::select_file(params, hwnd);
   if (!result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
@@ -34,9 +49,8 @@ auto handle_select_file([[maybe_unused]] Core::State::AppState& app_state,
 auto handle_select_folder([[maybe_unused]] Core::State::AppState& app_state,
                           const Utils::Dialog::FolderSelectorParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Utils::Dialog::FolderSelectorResult>> {
-  auto result = params.parent_to_webview
-                    ? Utils::Dialog::select_folder(params, app_state.webview->window.webview_hwnd)
-                    : Utils::Dialog::select_folder(params);
+  HWND hwnd = get_parent_window(app_state, params.parent_window_mode);
+  auto result = Utils::Dialog::select_folder(params, hwnd);
   if (!result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
@@ -48,12 +62,12 @@ auto handle_select_folder([[maybe_unused]] Core::State::AppState& app_state,
 
 auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<Utils::Dialog::FileSelectorParams, Utils::Dialog::FileSelectorResult>(
-      app_state, app_state.rpc->registry, "file_dialog.select_file", handle_select_file,
+      app_state, app_state.rpc->registry, "dialog.openFile", handle_select_file,
       "Open a file picker and return selected file paths");
 
   Core::RPC::register_method<Utils::Dialog::FolderSelectorParams,
                              Utils::Dialog::FolderSelectorResult>(
-      app_state, app_state.rpc->registry, "file_dialog.select_folder", handle_select_folder,
+      app_state, app_state.rpc->registry, "dialog.openDirectory", handle_select_folder,
       "Open a folder picker and return selected path");
 }
 
