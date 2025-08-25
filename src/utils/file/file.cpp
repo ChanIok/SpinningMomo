@@ -58,32 +58,63 @@ auto read_file(const std::filesystem::path &file_path)
       result.original_size = bytes_read;
     }
 
-    // 判断文件类型并处理内容
-    bool is_text = is_text_mime_type(result.mime_type);
-    if (!is_text) {
-      // 对于未知类型，尝试UTF-8验证
-      is_text = Utils::String::IsValidUtf8(binary_data);
-    }
+    // 设置原始数据
+    result.data = std::move(binary_data);
 
-    if (is_text) {
-      // 文本文件：直接转换为字符串
-      result.content = std::string(binary_data.begin(), binary_data.end());
-      result.is_binary = false;
-      Logger().debug("Read text file: {}, size: {} chars, mime: {}", file_path.string(),
-                     result.content.size(), result.mime_type);
-    } else {
-      // 二进制文件：Base64编码
-      result.content = Utils::String::ToBase64(binary_data);
-      result.is_binary = true;
-      Logger().debug(
-          "Read binary file: {}, original size: {} bytes, encoded size: {} chars, mime: {}",
-          file_path.string(), result.original_size, result.content.size(), result.mime_type);
-    }
+    Logger().debug("Read file: {}, size: {} bytes, mime: {}", file_path.string(),
+                   result.original_size, result.mime_type);
 
     co_return result;
   } catch (const std::exception &e) {
     co_return std::unexpected(format_file_error("Error reading", file_path, e));
   }
+}
+
+auto read_file_and_encode(const std::filesystem::path &file_path)
+    -> asio::awaitable<std::expected<EncodedFileReadResult, std::string>> {
+  // 首先读取原始数据
+  auto raw_result = co_await read_file(file_path);
+  if (!raw_result) {
+    // 如果读取失败，直接返回错误
+    co_return std::unexpected(raw_result.error());
+  }
+
+  // 获取原始数据
+  auto raw_data = std::move(raw_result.value());
+
+  // 创建编码后的结果结构
+  EncodedFileReadResult result;
+  result.path = raw_data.path;
+  result.mime_type = raw_data.mime_type;
+  result.original_size = raw_data.original_size;
+
+  if (raw_data.original_size == 0) {
+    co_return result;
+  }
+
+  // 判断文件类型
+  bool is_text = is_text_mime_type(result.mime_type);
+  if (!is_text) {
+    // 对于未知类型，尝试UTF-8验证
+    is_text = Utils::String::IsValidUtf8(raw_data.data);
+  }
+
+  if (is_text) {
+    // 文本文件：直接转换为字符串
+    result.content = std::string(raw_data.data.begin(), raw_data.data.end());
+    result.is_binary = false;
+    Logger().debug("Read text file: {}, size: {} chars, mime: {}", file_path.string(),
+                   result.content.size(), result.mime_type);
+  } else {
+    // 二进制文件：Base64编码
+    result.content = Utils::String::ToBase64(raw_data.data);
+    result.is_binary = true;
+    Logger().debug(
+        "Read binary file: {}, original size: {} bytes, encoded size: {} chars, mime: {}",
+        file_path.string(), result.original_size, result.content.size(), result.mime_type);
+  }
+
+  co_return result;
 }
 
 auto write_file(const std::filesystem::path &file_path, const std::string &content, bool is_binary,

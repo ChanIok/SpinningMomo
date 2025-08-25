@@ -30,6 +30,6 @@ export struct HttpServerState {
   std::atomic<bool> is_running{false};
 
   // 服务器配置
-  int port{51205};
+  int port{51206};
 };
 }  // namespace Core::HttpServer::State

@@ -8,8 +8,16 @@ import std;
 
 namespace Utils::File {
 
-// 文件读取结果结构
+// 文件读取结果结构（原始数据）
 export struct FileReadResult {
+  std::string path;         // 文件路径
+  std::vector<char> data;   // 原始文件数据
+  std::string mime_type;    // MIME类型
+  size_t original_size{0};  // 原始文件大小（字节）
+};
+
+// 文件读取结果结构（编码后，用于RPC等需要文本传输的场景）
+export struct EncodedFileReadResult {
   std::string path;         // 文件路径
   std::string content;      // 文件内容（文本文件直接存储，二进制文件base64编码）
   std::string mime_type;    // MIME类型
@@ -80,9 +88,13 @@ export struct CopyResult {
   bool is_recursive_copy{false};  // 是否为递归复制
 };
 
-// 异步读取文件
+// 异步读取文件（原始数据）
 export auto read_file(const std::filesystem::path &file_path)
     -> asio::awaitable<std::expected<FileReadResult, std::string>>;
+
+// 异步读取文件并编码（用于RPC等需要文本传输的场景）
+export auto read_file_and_encode(const std::filesystem::path &file_path)
+    -> asio::awaitable<std::expected<EncodedFileReadResult, std::string>>;
 
 // 异步写入文件（支持文本和二进制/base64解码）
 export auto write_file(const std::filesystem::path &file_path, const std::string &content,

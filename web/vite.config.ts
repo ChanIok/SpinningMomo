@@ -14,12 +14,17 @@ export default defineConfig({
   server: {
     proxy: {
       '/rpc': {
-        target: 'http://localhost:51205',
+        target: 'http://localhost:51206',
         changeOrigin: true,
         secure: false,
       },
       '/sse': {
-        target: 'http://localhost:51205',
+        target: 'http://localhost:51206',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/assets': {
+        target: 'http://localhost:51206',
         changeOrigin: true,
         secure: false,
       },

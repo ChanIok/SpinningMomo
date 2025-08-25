@@ -55,8 +55,8 @@ struct CopyPathParams {
 
 auto handle_read_file([[maybe_unused]] Core::State::AppState& app_state,
                       const ReadFileParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::FileReadResult>> {
-  auto result = co_await Utils::File::read_file(params.path);
+    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::EncodedFileReadResult>> {
+  auto result = co_await Utils::File::read_file_and_encode(params.path);
   if (!result) {
     co_return std::unexpected(
         Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
@@ -148,7 +148,7 @@ auto handle_copy_path([[maybe_unused]] Core::State::AppState& app_state,
 }
 
 auto register_all(Core::State::AppState& app_state) -> void {
-  register_method<ReadFileParams, Utils::File::FileReadResult>(
+  register_method<ReadFileParams, Utils::File::EncodedFileReadResult>(
       app_state, app_state.rpc->registry, "file.read", handle_read_file,
       "Read file content with automatic text/binary detection and encoding");
 

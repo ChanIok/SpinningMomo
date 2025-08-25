@@ -18,7 +18,7 @@ export default function AppLayout() {
 
   // 背景图片URL - 只使用文件名，虚拟主机映射处理前缀
   const backgroundImageUrl = shouldShowBackground
-    ? `/assets/${backgroundSettings.imagePath.split('/').pop()}`
+    ? `/assets/${backgroundSettings.imagePath.split('/').pop()}?t=${new Date(settings.updatedAt).getTime()}`
     : ''
 
   return (
@@ -28,7 +28,6 @@ export default function AppLayout() {
         className='fixed inset-0 z-[-2] bg-cover bg-center bg-no-repeat'
         style={{
           backgroundImage: backgroundImageUrl ? `url('${backgroundImageUrl}')` : "url('')",
-          opacity: shouldShowBackground ? backgroundSettings.opacity : 1,
         }}
       />
 
@@ -39,7 +38,7 @@ export default function AppLayout() {
         }`}
         style={{
           backdropFilter: 'blur(60px)',
-          background: 'rgba(255, 255, 255, 0.9)',
+          background: `rgba(255, 255, 255, ${shouldShowBackground ? backgroundSettings.opacity : 1})`,
         }}
       />
 

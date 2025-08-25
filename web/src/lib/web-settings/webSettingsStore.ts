@@ -153,6 +153,8 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
               type: 'image',
               imagePath: copiedImagePath,
             })
+
+            await get().loadSettings()
           }
         } catch (error) {
           console.error('设置背景图片失败:', error)
