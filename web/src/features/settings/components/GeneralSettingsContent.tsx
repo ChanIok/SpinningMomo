@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/select'
 import { HotkeyRecorder } from './HotkeyRecorder'
 
-export function SettingsContent() {
+export function GeneralSettingsContent() {
   const { appSettings, updateSettings, isLoading } = useSettingsStore()
 
   // 重置为默认值

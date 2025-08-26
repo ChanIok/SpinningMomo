@@ -1,12 +1,13 @@
 import { toast } from 'sonner'
-import { useMenuActions, useMenuStore } from '../store/menuStore'
+import { useSettingsStore } from '@/lib/settings'
+import { useMenuActions } from '@/features/settings/hooks/useMenuActions'
 import { Button } from '@/components/ui/button'
 import { DraggableFeatureList } from './DraggableFeatureList'
 import { DraggablePresetList } from './DraggablePresetList'
-import type { FeatureItem, PresetItem } from '../types'
+import type { FeatureItem, PresetItem } from '@/lib/settings/settingsTypes'
 
 export function MenuContent() {
-  const { appSettings, error, isInitialized, clearError } = useMenuStore()
+  const { appSettings, error, isInitialized, clearError } = useSettingsStore()
   const { updateFeatureItems, updateAspectRatios, updateResolutions } = useMenuActions()
 
   // 安全获取菜单数据的辅助函数（适配新的嵌套结构）

@@ -1,21 +1,7 @@
-import { useEffect } from 'react'
-import { SettingsContent } from '@/features/settings/components/SettingsContent'
-import { useSettingsStore } from '@/lib/settings'
+import { SettingsLayout } from '@/features/settings/components/SettingsLayout'
 
 export function SettingsPage() {
-  const { clearError } = useSettingsStore()
-
-  // 清除之前的错误状态
-  useEffect(() => {
-    clearError()
-  }, [clearError])
-
-  return (
-    <div>
-      {/* 设置内容区域 */}
-      <SettingsContent />
-    </div>
-  )
+  return <SettingsLayout />
 }
 
 export default SettingsPage

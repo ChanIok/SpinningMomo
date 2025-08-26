@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { 
-  formatHotkeyDisplay, 
-  calculateModifiers 
-} from '../utils/hotkeyUtils'
+import { formatHotkeyDisplay, calculateModifiers } from '../utils/hotkeyUtils'
 
 interface Hotkey {
   modifiers: number
@@ -74,9 +71,21 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
 
       // 获取修饰键状态
       const modifiers = calculateModifiers(e.shiftKey, e.ctrlKey, e.altKey)
-      
+
       // 如果是修饰键，只更新修饰键状态并实时显示
-      if (['Control', 'ControlLeft', 'ControlRight', 'Alt', 'AltLeft', 'AltRight', 'Shift', 'ShiftLeft', 'ShiftRight'].includes(e.key)) {
+      if (
+        [
+          'Control',
+          'ControlLeft',
+          'ControlRight',
+          'Alt',
+          'AltLeft',
+          'AltRight',
+          'Shift',
+          'ShiftLeft',
+          'ShiftRight',
+        ].includes(e.key)
+      ) {
         setCurrentModifiers(modifiers)
         return
       }
@@ -88,18 +97,30 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
 
       // 更新值
       onChange({ modifiers, key })
-      
+
       // 停止录制
       stopRecording()
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
       // 当修饰键被释放时更新修饰键状态
-      if (['Control', 'ControlLeft', 'ControlRight', 'Alt', 'AltLeft', 'AltRight', 'Shift', 'ShiftLeft', 'ShiftRight'].includes(e.key)) {
+      if (
+        [
+          'Control',
+          'ControlLeft',
+          'ControlRight',
+          'Alt',
+          'AltLeft',
+          'AltRight',
+          'Shift',
+          'ShiftLeft',
+          'ShiftRight',
+        ].includes(e.key)
+      ) {
         const modifiers = calculateModifiers(
-          e.key.startsWith('Shift') ? false : (e.shiftKey || false),
-          e.key.startsWith('Control') ? false : (e.ctrlKey || false),
-          e.key.startsWith('Alt') ? false : (e.altKey || false)
+          e.key.startsWith('Shift') ? false : e.shiftKey || false,
+          e.key.startsWith('Control') ? false : e.ctrlKey || false,
+          e.key.startsWith('Alt') ? false : e.altKey || false
         )
         setCurrentModifiers(modifiers)
       }
@@ -108,7 +129,7 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
     // 添加事件监听器
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
-    
+
     // 清理函数
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
@@ -133,23 +154,20 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
   }, [isRecording])
 
   return (
-    <div 
-      ref={recorderRef}
-      className={cn('w-full', className)}
-    >
-      <div 
+    <div ref={recorderRef} className={cn('w-full', className)}>
+      <div
         className={cn(
-          'px-3 py-2 rounded-md border border-input bg-background text-sm',
-          'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2',
-          'transition-colors cursor-pointer',
-          isRecording 
-            ? 'border-primary ring-2 ring-primary ring-offset-2' 
+          'rounded-md border border-input bg-background px-3 py-2 text-sm',
+          'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          'cursor-pointer transition-colors',
+          isRecording
+            ? 'border-primary ring-2 ring-primary ring-offset-2'
             : 'hover:border-accent-foreground'
         )}
         onClick={startRecording}
         tabIndex={0}
       >
-        {isRecording ? (displayText || '请按下快捷键...') : displayText}
+        {isRecording ? displayText || '请按下快捷键...' : displayText}
       </div>
     </div>
   )

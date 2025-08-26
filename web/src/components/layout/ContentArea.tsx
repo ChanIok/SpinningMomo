@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router'
-import { MenuPage, AppearancePage, SettingsPage, FunctionPage, AboutPage, HomePage } from '@/pages'
+import { SettingsPage, AboutPage, HomePage } from '@/pages'
 
 export function ContentArea() {
   return (
@@ -12,9 +12,6 @@ export function ContentArea() {
       <main className='h-full flex-1 overflow-auto'>
         <Routes>
           <Route path='/home/*' element={<HomePage />} />
-          <Route path='/menu/*' element={<MenuPage />} />
-          <Route path='/appearance/*' element={<AppearancePage />} />
-          <Route path='/function/*' element={<FunctionPage />} />
           <Route path='/settings/*' element={<SettingsPage />} />
           <Route path='/about/*' element={<AboutPage />} />
           <Route path='*' element={<HomePage />} />

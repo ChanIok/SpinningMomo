@@ -1,9 +1,6 @@
 import { useSettingsStore } from '@/lib/settings'
 
-// 重新导出共享的store钩子
-export const useFunctionStore = useSettingsStore
-
-// 扩展function特有的业务方法（目前与menu共用相同的store）
+// 扩展function特有的业务方法
 export const useFunctionActions = () => {
   const { appSettings, updateSettings } = useSettingsStore()
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
-import { useFunctionActions, useFunctionStore } from '../store/functionStore'
+import { useSettingsStore } from '@/lib/settings'
+import { useFunctionActions } from '@/features/settings/hooks/useFunctionActions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,7 +9,7 @@ import { call } from '@/lib/rpc'
 import { Switch } from '@/components/ui/switch'
 
 export function FunctionContent() {
-  const { appSettings, error, isInitialized, clearError } = useFunctionStore()
+  const { appSettings, error, isInitialized, clearError } = useSettingsStore()
   const {
     updateWindowTitle,
     updateScreenshotDir,

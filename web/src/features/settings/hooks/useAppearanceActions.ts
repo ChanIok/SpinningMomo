@@ -1,8 +1,5 @@
 import { useSettingsStore } from '@/lib/settings'
-import type { AppWindowLayout } from './types'
-
-// 重新导出共享的store钩子
-export const useAppearanceStore = useSettingsStore
+import type { AppWindowLayout } from '@/lib/settings/settingsTypes'
 
 // 扩展appearance特有的业务方法
 export const useAppearanceActions = () => {

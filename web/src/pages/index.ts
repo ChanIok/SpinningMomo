@@ -1,6 +1,4 @@
-export { MenuPage } from './MenuPage'
-export { AppearancePage } from './AppearancePage'
+
 export { SettingsPage } from './SettingsPage'
-export { FunctionPage } from './FunctionPage'
 export { AboutPage } from './AboutPage'
 export { HomePage } from './HomePage'

@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
-import { useAppearanceActions, useAppearanceStore } from '../store/appearanceStore'
+import { useSettingsStore } from '@/lib/settings'
+import { useAppearanceActions } from '@/features/settings/hooks/useAppearanceActions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import type { AppWindowLayout } from '../types'
+import type { AppWindowLayout } from '@/lib/settings/settingsTypes'
 
 export function AppearanceContent() {
-  const { appSettings, error, isInitialized, clearError } = useAppearanceStore()
+  const { appSettings, error, isInitialized, clearError } = useSettingsStore()
   const { updateAppWindowLayout } = useAppearanceActions()
 
   // 保存原始设置用于重置
