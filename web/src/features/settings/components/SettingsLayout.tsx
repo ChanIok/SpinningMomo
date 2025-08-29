@@ -5,6 +5,7 @@ import { FunctionContent } from '@/features/settings/components/FunctionContent'
 import { MenuContent } from '@/features/settings/components/MenuContent'
 import { AppearanceContent } from '@/features/settings/components/AppearanceContent'
 import { GeneralSettingsContent } from '@/features/settings/components/GeneralSettingsContent'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 type SettingsPageKey = 'function' | 'menu' | 'appearance' | 'general'
 
@@ -80,67 +81,58 @@ function SettingsSidebar({
   }
 
   return (
-    <div className='flex h-full w-64 flex-col border-r border-border bg-card'>
-      <div className='border-b border-border p-6'>
-        <div className='flex items-center space-x-3'>
-          <Settings className='h-6 w-6 text-primary' strokeWidth={2.5} />
-          <h1 className='text-xl font-semibold'>设置</h1>
+    <div className='flex h-full w-48 flex-col p-1 pl-0'>
+      <div className='h-full rounded-lg border border-sidebar-border bg-background p-4'>
+        <div className='mb-6 flex items-center space-x-3 pl-2'>
+          <Settings className='h-6 w-6 text-sidebar-primary' strokeWidth={1.8} />
+          <h1 className='text-xl font-semibold text-sidebar-foreground'>设置</h1>
         </div>
+        <nav className='flex-1'>
+          <div className='space-y-1'>
+            {settingsMenus.map((item) => {
+              const isActive = activePage === item.key
+              const Icon = item.icon
+
+              return (
+                <div key={item.key} className='group'>
+                  <button
+                    onClick={() => handleMenuClick(item.key)}
+                    onKeyDown={(e) => handleKeyDown(e, item.key)}
+                    className={cn(
+                      'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-all duration-200',
+                      'text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      {
+                        'bg-sidebar-accent text-sidebar-accent-foreground': isActive,
+                        'text-sidebar-foreground': !isActive,
+                      }
+                    )}
+                    tabIndex={0}
+                  >
+                    <Icon
+                      className={cn('h-5 w-5 flex-shrink-0 transition-colors', {
+                        'text-sidebar-accent-foreground': isActive,
+                        'text-sidebar-foreground group-hover:text-sidebar-primary': !isActive,
+                      })}
+                      strokeWidth={isActive ? 2.5 : 1.8}
+                    />
+                    <div className='min-w-0 flex-1'>
+                      <div
+                        className={cn('font-medium transition-colors', {
+                          'text-sidebar-accent-foreground': isActive,
+                          'text-sidebar-foreground group-hover:text-sidebar-primary': !isActive,
+                        })}
+                      >
+                        {item.label}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </nav>
       </div>
-
-      <nav className='flex-1 p-4'>
-        <div className='space-y-1'>
-          {settingsMenus.map((item) => {
-            const isActive = activePage === item.key
-            const Icon = item.icon
-
-            return (
-              <div key={item.key} className='group'>
-                <button
-                  onClick={() => handleMenuClick(item.key)}
-                  onKeyDown={(e) => handleKeyDown(e, item.key)}
-                  className={cn(
-                    'flex w-full items-center space-x-3 rounded-lg px-4 py-3 transition-all duration-200',
-                    'text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                    'hover:bg-accent hover:text-accent-foreground',
-                    {
-                      'border-r-2 border-primary bg-primary/10 text-primary': isActive,
-                      'text-muted-foreground': !isActive,
-                    }
-                  )}
-                  tabIndex={0}
-                >
-                  <Icon
-                    className={cn('h-5 w-5 flex-shrink-0 transition-colors', {
-                      'text-primary': isActive,
-                      'text-muted-foreground group-hover:text-foreground': !isActive,
-                    })}
-                    strokeWidth={isActive ? 2.5 : 2}
-                  />
-                  <div className='min-w-0 flex-1'>
-                    <div
-                      className={cn('font-medium transition-colors', {
-                        'text-primary': isActive,
-                        'text-foreground group-hover:text-foreground': !isActive,
-                      })}
-                    >
-                      {item.label}
-                    </div>
-                    <div
-                      className={cn('text-sm transition-colors', {
-                        'text-primary/70': isActive,
-                        'text-muted-foreground group-hover:text-muted-foreground/80': !isActive,
-                      })}
-                    >
-                      {item.description}
-                    </div>
-                  </div>
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </nav>
     </div>
   )
 }
@@ -164,17 +156,13 @@ function SettingsMainContent({ activePage }: { activePage: SettingsPageKey }) {
   }
 
   return (
-    <div className='flex h-full flex-1 flex-col overflow-hidden'>
-      <div className='border-b border-border bg-background/95 p-6 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
-        <div>
-          <h2 className='text-2xl font-semibold text-foreground'>{pageInfo.title}</h2>
-          <p className='mt-1 text-muted-foreground'>{pageInfo.description}</p>
+    <div className='flex h-full flex-1 flex-col overflow-hidden p-1 pl-0'>
+      <ScrollArea className='flex-1 overflow-auto rounded-lg border border-border bg-card p-6'>
+        <div className='mx-auto max-w-4xl'>
+          <h2 className='mb-4 text-2xl font-semibold text-card-foreground'>{pageInfo.title}</h2>
+          {renderContent()}
         </div>
-      </div>
-
-      <div className='flex-1 overflow-auto p-6'>
-        <div className='mx-auto max-w-4xl'>{renderContent()}</div>
-      </div>
+      </ScrollArea>
     </div>
   )
 }

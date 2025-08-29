@@ -2,6 +2,7 @@ import { ActivityBar } from './ActivityBar'
 import { ContentArea } from './ContentArea'
 import { Header } from './Header'
 import { Toaster } from '@/components/ui/sonner'
+import { SidebarProvider } from '@/components/ui/sidebar'
 import { isWebView } from '@/lib/environment'
 import { useLocation } from 'react-router'
 import { useWebSettingsStore } from '@/lib/web-settings/webSettingsStore'
@@ -42,18 +43,20 @@ export default function AppLayout() {
         }}
       />
 
-      <div className='relative flex h-screen w-screen flex-col text-foreground'>
-        {showHeader && <Header />}
+      <SidebarProvider>
+        <div className='relative flex h-screen w-screen flex-col text-foreground'>
+          {showHeader && <Header />}
 
-        <div className='flex flex-1 overflow-hidden'>
-          <ActivityBar />
-
-          {/* Main Layout Area (Content) */}
           <div className='flex flex-1 overflow-hidden'>
-            <ContentArea />
+            <ActivityBar />
+
+            {/* Main Layout Area (Content) */}
+            <div className='flex flex-1 overflow-hidden'>
+              <ContentArea />
+            </div>
           </div>
         </div>
-      </div>
+      </SidebarProvider>
       <Toaster />
     </>
   )
