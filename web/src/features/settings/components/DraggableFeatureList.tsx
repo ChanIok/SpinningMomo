@@ -91,12 +91,12 @@ const DraggableFeatureListComponent = React.memo<DraggableFeatureListProps>(
 
     return (
       <div className={`space-y-4 ${className}`}>
-        <div className='pb-2'>
+        <div>
           <h3 className='text-lg font-semibold text-foreground'>{title}</h3>
           <p className='mt-1 text-sm text-muted-foreground'>{description}</p>
         </div>
 
-        <div className='space-y-2 border-l-2 border-border pl-4'>
+        <div className='space-y-4 rounded-md border border-border bg-card p-4'>
           {sortedItems.map((item, index) => (
             <FeatureListItem
               key={item.id}
@@ -158,24 +158,25 @@ const FeatureListItem = React.memo<{
       onDragEnd={onDragEnd}
       className={`flex cursor-move items-center justify-between rounded-lg border bg-card p-3 transition-all duration-200 ${draggedItem === item.id ? 'scale-95 opacity-50' : ''} ${dragOverIndex === index ? 'border-primary bg-primary/5' : 'border-border'} hover:border-primary/50 hover:bg-accent/50`}
     >
-      <div className='flex flex-1 items-center gap-3'>
-        <GripVertical className='h-4 w-4 text-muted-foreground' />
-        <div className='flex-1'>
-          <Label className='cursor-move text-sm font-medium text-foreground'>
-            {getFeatureItemLabel(item.id)}
-          </Label>
+      <div className='flex flex-1 items-center justify-between'>
+        <div className='flex-1 pr-4'>
+          <div className='flex items-center gap-3'>
+            <GripVertical className='h-4 w-4 text-muted-foreground' />
+            <Label className='text-sm font-medium text-foreground'>
+              {getFeatureItemLabel(item.id)}
+            </Label>
+          </div>
         </div>
-      </div>
-
-      <div className='flex items-center gap-2'>
-        <Switch
-          checked={item.enabled}
-          onCheckedChange={(enabled) => onToggle(item.id, enabled)}
-          className='data-[state=checked]:bg-primary'
-        />
-        <span className='min-w-[3rem] text-xs text-muted-foreground'>
-          {item.enabled ? '显示' : '隐藏'}
-        </span>
+        <div className='flex flex-shrink-0 items-center gap-2'>
+          <Switch
+            checked={item.enabled}
+            onCheckedChange={(enabled) => onToggle(item.id, enabled)}
+            className='data-[state=checked]:bg-primary'
+          />
+          <span className='min-w-[3rem] text-xs text-muted-foreground'>
+            {item.enabled ? '显示' : '隐藏'}
+          </span>
+        </div>
       </div>
     </div>
   )

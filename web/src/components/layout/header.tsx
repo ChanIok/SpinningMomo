@@ -56,7 +56,7 @@ export function Header() {
         <Button
           variant='ghost'
           size='icon'
-          className={`h-8 w-8 ${isHomePage ? 'text-gray-100' : 'text-muted-foreground'}`}
+          className={`h-8 w-8 ${isHomePage ? 'text-muted-foreground' : 'text-muted-foreground'}`}
           onClick={handleMinimize}
           title='Minimize'
         >
@@ -66,7 +66,7 @@ export function Header() {
         <Button
           variant='ghost'
           size='icon'
-          className={`h-8 w-8 ${isHomePage ? 'text-gray-100' : 'text-muted-foreground'}`}
+          className={`h-8 w-8 ${isHomePage ? 'text-muted-foreground' : 'text-muted-foreground'}`}
           onClick={handleMaximizeToggle}
           title={isMaximized ? 'Restore' : 'Maximize'}
         >
@@ -76,7 +76,7 @@ export function Header() {
         <Button
           variant='ghost'
           size='icon'
-          className={`${isHomePage ? 'text-gray-100' : 'text-muted-foreground'} hover:text-destructive-foreground h-8 w-8 hover:bg-destructive`}
+          className={`${isHomePage ? 'text-muted-foreground' : 'text-muted-foreground'} hover:text-destructive-foreground h-8 w-8 hover:bg-destructive`}
           onClick={handleClose}
           title='Close'
         >

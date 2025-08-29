@@ -34,7 +34,7 @@ export function ActivityBar() {
   }
 
   return (
-    <Sidebar collapsible='none' className='w-14 bg-transparent'>
+    <Sidebar collapsible='none' className='pt-2 w-14 bg-transparent'>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent className='px-0'>

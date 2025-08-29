@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Settings, Wrench, Menu, Palette } from 'lucide-react'
 import { FunctionContent } from '@/features/settings/components/FunctionContent'
@@ -43,25 +43,6 @@ const settingsMenus: SettingsMenuItem[] = [
   },
 ]
 
-const pageTitles = {
-  function: {
-    title: '功能配置',
-    description: '管理应用功能开关和配置选项',
-  },
-  menu: {
-    title: '菜单管理',
-    description: '自定义菜单项和布局',
-  },
-  appearance: {
-    title: '外观主题',
-    description: '个性化界面外观设置',
-  },
-  general: {
-    title: '系统设置',
-    description: '通用设置和高级选项',
-  },
-}
-
 function SettingsSidebar({
   activePage,
   setActivePage,
@@ -81,12 +62,8 @@ function SettingsSidebar({
   }
 
   return (
-    <div className='flex h-full w-48 flex-col p-1 pl-0'>
-      <div className='h-full rounded-lg border border-sidebar-border bg-background p-4'>
-        <div className='mb-6 flex items-center space-x-3 pl-2'>
-          <Settings className='h-6 w-6 text-sidebar-primary' strokeWidth={1.8} />
-          <h1 className='text-xl font-semibold text-sidebar-foreground'>设置</h1>
-        </div>
+    <div className='flex h-full w-48 flex-col lg:w-56 2xl:w-64'>
+      <div className='h-full p-4'>
         <nav className='flex-1'>
           <div className='space-y-1'>
             {settingsMenus.map((item) => {
@@ -138,7 +115,19 @@ function SettingsSidebar({
 }
 
 function SettingsMainContent({ activePage }: { activePage: SettingsPageKey }) {
-  const pageInfo = pageTitles[activePage]
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  // 当页面切换时，重置滚动位置到顶部
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollableElement = scrollAreaRef.current.querySelector(
+        '[data-radix-scroll-area-viewport]'
+      )
+      if (scrollableElement) {
+        scrollableElement.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    }
+  }, [activePage])
 
   const renderContent = () => {
     switch (activePage) {
@@ -156,12 +145,9 @@ function SettingsMainContent({ activePage }: { activePage: SettingsPageKey }) {
   }
 
   return (
-    <div className='flex h-full flex-1 flex-col overflow-hidden p-1 pl-0'>
-      <ScrollArea className='flex-1 overflow-auto rounded-lg border border-border bg-card p-6'>
-        <div className='mx-auto max-w-4xl'>
-          <h2 className='mb-4 text-2xl font-semibold text-card-foreground'>{pageInfo.title}</h2>
-          {renderContent()}
-        </div>
+    <div className='flex h-full flex-1 flex-col overflow-hidden'>
+      <ScrollArea ref={scrollAreaRef} className='flex-1 overflow-auto'>
+        <div className='mx-auto max-w-4xl p-4'>{renderContent()}</div>
       </ScrollArea>
     </div>
   )
@@ -171,7 +157,7 @@ export function SettingsLayout() {
   const [activePage, setActivePage] = useState<SettingsPageKey>('function')
 
   return (
-    <div className='flex h-full min-h-screen'>
+    <div className='flex h-full'>
       <SettingsSidebar activePage={activePage} setActivePage={setActivePage} />
       <SettingsMainContent activePage={activePage} />
     </div>

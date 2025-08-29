@@ -180,7 +180,7 @@ export function MenuContent() {
   }
 
   return (
-    <div className='w-full max-w-[768px] p-6'>
+    <div className='w-full max-w-[768px]'>
       {/* 页面标题 */}
       <div className='mb-6'>
         <h1 className='text-2xl font-bold text-foreground'>菜单设置</h1>
@@ -188,48 +188,40 @@ export function MenuContent() {
       </div>
 
       <div className='space-y-8'>
-        {/* 浮窗设置 */}
-        <div className='space-y-6'>
-          <div className='pb-2'>
-            <h3 className='text-lg font-semibold text-foreground'>浮窗设置</h3>
-            <p className='mt-1 text-sm text-muted-foreground'>自定义浮窗菜单中显示的功能和选项</p>
-          </div>
+        {/* 功能选择器 */}
+        <DraggableFeatureList
+          items={getFeatureItems()}
+          onReorder={handleFeatureItemsReorder}
+          onToggle={handleFeatureItemToggle}
+          title='功能菜单'
+          description='管理浮窗中显示的功能项，支持拖拽排序'
+        />
 
-          {/* 功能选择器 */}
-          <DraggableFeatureList
-            items={getFeatureItems()}
-            onReorder={handleFeatureItemsReorder}
-            onToggle={handleFeatureItemToggle}
-            title='功能菜单'
-            description='管理浮窗中显示的功能项，支持拖拽排序'
-          />
+        {/* 比例管理器 */}
+        <DraggablePresetList
+          items={getAspectRatios()}
+          onReorder={handleAspectRatiosReorder}
+          onToggle={handleAspectRatioToggle}
+          onAdd={handleAspectRatioAdd}
+          onRemove={handleAspectRatioRemove}
+          title='宽高比设置'
+          description='管理浮窗中显示的宽高比选项，支持添加自定义比例'
+          addPlaceholder='如: 21:9'
+          validateCustom={validateAspectRatio}
+        />
 
-          {/* 比例管理器 */}
-          <DraggablePresetList
-            items={getAspectRatios()}
-            onReorder={handleAspectRatiosReorder}
-            onToggle={handleAspectRatioToggle}
-            onAdd={handleAspectRatioAdd}
-            onRemove={handleAspectRatioRemove}
-            title='宽高比设置'
-            description='管理浮窗中显示的宽高比选项，支持添加自定义比例'
-            addPlaceholder='如: 21:9'
-            validateCustom={validateAspectRatio}
-          />
-
-          {/* 分辨率管理器 */}
-          <DraggablePresetList
-            items={getResolutions()}
-            onReorder={handleResolutionsReorder}
-            onToggle={handleResolutionToggle}
-            onAdd={handleResolutionAdd}
-            onRemove={handleResolutionRemove}
-            title='分辨率设置'
-            description='管理浮窗中显示的分辨率选项，支持添加自定义分辨率'
-            addPlaceholder='如: 3840x2160 或 5K'
-            validateCustom={validateResolution}
-          />
-        </div>
+        {/* 分辨率管理器 */}
+        <DraggablePresetList
+          items={getResolutions()}
+          onReorder={handleResolutionsReorder}
+          onToggle={handleResolutionToggle}
+          onAdd={handleResolutionAdd}
+          onRemove={handleResolutionRemove}
+          title='分辨率设置'
+          description='管理浮窗中显示的分辨率选项，支持添加自定义分辨率'
+          addPlaceholder='如: 3840x2160 或 5K'
+          validateCustom={validateResolution}
+        />
       </div>
     </div>
   )

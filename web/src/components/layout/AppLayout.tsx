@@ -38,8 +38,10 @@ export default function AppLayout() {
           isHomePage ? 'opacity-0' : 'opacity-100'
         }`}
         style={{
-          backdropFilter: 'blur(60px)',
-          background: `rgba(255, 255, 255, ${shouldShowBackground ? backgroundSettings.opacity : 1})`,
+          backdropFilter: 'blur(0px)',
+          background: shouldShowBackground 
+            ? `color-mix(in srgb, var(--background) ${backgroundSettings.opacity * 100}%, transparent)`
+            : 'var(--background-secondary)',
         }}
       />
 

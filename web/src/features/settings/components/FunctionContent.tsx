@@ -102,7 +102,7 @@ export function FunctionContent() {
   }
 
   return (
-    <div className='w-full max-w-[768px] p-6'>
+    <div className='w-full max-w-[768px]'>
       {/* 页面标题 */}
       <div className='mb-6'>
         <h1 className='text-2xl font-bold text-foreground'>功能设置</h1>
@@ -112,13 +112,13 @@ export function FunctionContent() {
       <div className='space-y-8'>
         {/* 窗口控制 */}
         <div className='space-y-4'>
-          <div className='pb-2'>
+          <div>
             <h3 className='text-lg font-semibold text-foreground'>窗口控制</h3>
             <p className='mt-1 text-sm text-muted-foreground'>自定义应用程序窗口的控制设置</p>
           </div>
 
-          <div className='space-y-4 border-l-2 border-border pl-4'>
-            <div className='flex items-center justify-between py-4'>
+          <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+            <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
                 <Label className='text-sm font-medium text-foreground'>窗口标题</Label>
                 <p className='mt-1 text-sm text-muted-foreground'>设置目标窗口的标题栏文本</p>
@@ -142,7 +142,7 @@ export function FunctionContent() {
               </div>
             </div>
 
-            <div className='flex items-center justify-between py-4'>
+            <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
                 <Label className='text-sm font-medium text-foreground'>调整时置底任务栏</Label>
                 <p className='mt-1 text-sm text-muted-foreground'>
@@ -161,13 +161,13 @@ export function FunctionContent() {
 
         {/* 截图设置 */}
         <div className='space-y-4'>
-          <div className='pb-2'>
+          <div>
             <h3 className='text-lg font-semibold text-foreground'>截图设置</h3>
             <p className='mt-1 text-sm text-muted-foreground'>自定义截图相关的设置</p>
           </div>
 
-          <div className='space-y-4 border-l-2 border-border pl-4'>
-            <div className='flex items-center justify-between py-4'>
+          <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+            <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
                 <Label className='text-sm font-medium text-foreground'>截图目录</Label>
                 <p className='mt-1 text-sm text-muted-foreground'>设置截图保存的目录路径</p>
@@ -189,12 +189,12 @@ export function FunctionContent() {
 
         {/* 黑边模式 */}
         <div className='space-y-4'>
-          <div className='pb-2'>
+          <div>
             <h3 className='text-lg font-semibold text-foreground'>黑边模式</h3>
             <p className='mt-1 text-sm text-muted-foreground'>启用后在目标窗口周围添加黑边遮罩</p>
           </div>
-          <div className='space-y-4 border-l-2 border-border pl-4'>
-            <div className='flex items-center justify-between py-4'>
+          <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+            <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
                 <Label className='text-sm font-medium text-foreground'>是否启用黑边模式</Label>
                 <p className='mt-1 text-sm text-muted-foreground'>
