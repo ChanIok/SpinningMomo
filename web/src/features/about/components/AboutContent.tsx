@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { useSettingsStore } from '@/lib/settings'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { checkForUpdates, downloadUpdate, installUpdate } from '@/lib/updaterApi'
 
 type UpdateStatus = {
@@ -12,7 +12,6 @@ type UpdateStatus = {
 } | null
 
 export function AboutContent() {
-  const { appSettings } = useSettingsStore()
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(null)
   const [isChecking, setIsChecking] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -61,93 +60,144 @@ export function AboutContent() {
   }
 
   return (
-    <div className='w-full max-w-[768px] p-6'>
-      {/* 顶部信息卡 */}
-      <div className='flex items-center gap-4 rounded-xl border bg-background/60 p-5 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/40'>
-        <img
-          src='/logo.png'
-          alt='SpinningMomo Logo'
-          className='h-12 w-12 rounded-lg border bg-muted/30'
-          onError={(e) => {
-            const target = e.currentTarget as HTMLImageElement
-            target.style.display = 'none'
-          }}
-        />
-        <div className='flex-1'>
-          <div className='text-2xl font-bold'>旋转吧大喵（SpinningMomo）</div>
-          <div className='text-sm text-muted-foreground'>
-            一个为《无限暖暖》提升摄影体验的窗口调整工具
+    <div className='flex h-full flex-col'>
+      <ScrollArea className='overflow-auto'>
+        <div className='mx-auto max-w-4xl p-4'>
+          {/* 页面标题 */}
+          <div className='mb-6'>
+            <h1 className='text-2xl font-bold text-foreground'>关于</h1>
+            <p className='mt-1 text-muted-foreground'>了解应用程序信息、检查更新和相关资源</p>
+          </div>
+
+          <div className='space-y-8'>
+            {/* 应用程序信息 */}
+            <div className='space-y-4'>
+              <div>
+                <h3 className='text-lg font-semibold text-foreground'>应用程序信息</h3>
+                <p className='mt-1 text-sm text-muted-foreground'>关于旋转吧大喵的基本信息</p>
+              </div>
+
+              <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+                <div className='flex items-center gap-4 py-2'>
+                  <img
+                    src='/logo.png'
+                    alt='SpinningMomo Logo'
+                    className='h-12 w-12 rounded-lg border bg-muted/30'
+                    onError={(e) => {
+                      const target = e.currentTarget as HTMLImageElement
+                      target.style.display = 'none'
+                    }}
+                  />
+                  <div className='flex-1'>
+                    <div className='text-lg font-semibold text-foreground'>
+                      旋转吧大喵
+                    </div>
+                    <div className='text-sm text-muted-foreground'>
+                      一个为《无限暖暖》提升摄影体验的窗口调整工具
+                    </div>
+                  </div>
+                </div>
+
+                <div className='py-2'>
+                  <p className='text-sm text-muted-foreground'>
+                    由开源社区与 AI 协作完成，感谢你的支持。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 版本更新 */}
+            <div className='space-y-4'>
+              <div>
+                <h3 className='text-lg font-semibold text-foreground'>版本更新</h3>
+                <p className='mt-1 text-sm text-muted-foreground'>检查和安装应用程序更新</p>
+              </div>
+
+              <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+                <div className='flex items-center justify-between py-2'>
+                  <div className='flex-1 pr-4'>
+                    <div className='text-sm font-medium text-foreground'>检查更新</div>
+                    <p className='mt-1 text-sm text-muted-foreground'>
+                      检查是否有可用的应用程序更新
+                    </p>
+                  </div>
+                  <div className='flex flex-shrink-0 items-center gap-2'>
+                    <Button onClick={handleCheckForUpdates} disabled={isChecking} size='sm'>
+                      {isChecking ? '检查中...' : '检查更新'}
+                    </Button>
+                    {updateStatus?.available && (
+                      <Button onClick={handleDownloadUpdate} disabled={isDownloading} size='sm'>
+                        {isDownloading ? '更新中...' : '下载并安装'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 更新信息（仅有更新时显示） */}
+                {updateStatus?.available && (
+                  <div className='rounded-lg border border-accent/40 bg-accent/15 p-3'>
+                    <div className='text-sm'>
+                      发现新版本：<b>v{updateStatus.version}</b>
+                      {updateStatus.releaseNotes && showNotes && (
+                        <pre className='mt-2 text-xs whitespace-pre-wrap text-muted-foreground'>
+                          {updateStatus.releaseNotes}
+                        </pre>
+                      )}
+                    </div>
+                    {updateStatus.releaseNotes && (
+                      <div className='mt-2'>
+                        <Button variant='outline' size='sm' onClick={() => setShowNotes((v) => !v)}>
+                          {showNotes ? '收起说明' : '查看说明'}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 相关资源 */}
+            <div className='space-y-4'>
+              <div>
+                <h3 className='text-lg font-semibold text-foreground'>相关资源</h3>
+                <p className='mt-1 text-sm text-muted-foreground'>访问文档、源代码和许可证信息</p>
+              </div>
+
+              <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+                <div className='grid gap-3 sm:grid-cols-3'>
+                  <a
+                    className='flex flex-col items-center gap-2 rounded-md border px-4 py-3 text-center transition hover:bg-accent hover:text-accent-foreground'
+                    href='https://chaniok.github.io/SpinningMomo'
+                    target='_blank'
+                    rel='noreferrer'
+                  >
+                    <div className='text-sm font-medium'>使用文档</div>
+                    <div className='text-xs text-muted-foreground'>查看完整的使用指南</div>
+                  </a>
+                  <a
+                    className='flex flex-col items-center gap-2 rounded-md border px-4 py-3 text-center transition hover:bg-accent hover:text-accent-foreground'
+                    href='https://github.com/ChanIok/SpinningMomo/releases/latest'
+                    target='_blank'
+                    rel='noreferrer'
+                  >
+                    <div className='text-sm font-medium'>GitHub Release</div>
+                    <div className='text-xs text-muted-foreground'>下载最新版本</div>
+                  </a>
+                  <a
+                    className='flex flex-col items-center gap-2 rounded-md border px-4 py-3 text-center transition hover:bg-accent hover:text-accent-foreground'
+                    href='https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE'
+                    target='_blank'
+                    rel='noreferrer'
+                  >
+                    <div className='text-sm font-medium'>MIT License</div>
+                    <div className='text-xs text-muted-foreground'>查看开源许可证</div>
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className='ml-auto flex items-center gap-2'>
-          <span className='rounded-md border px-2 py-1 text-xs text-muted-foreground'>
-            v{appSettings.version}
-          </span>
-          <Button onClick={handleCheckForUpdates} disabled={isChecking}>
-            {isChecking ? '检查中...' : '检查更新'}
-          </Button>
-          {updateStatus?.available && (
-            <Button onClick={handleDownloadUpdate} disabled={isDownloading}>
-              {isDownloading ? '更新中...' : '下载并安装'}
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* 更新条幅（仅有更新时显示） */}
-      {updateStatus?.available && (
-        <div className='flex items-start justify-between gap-4 rounded-lg border border-accent/40 bg-accent/15 p-4'>
-          <div className='text-sm'>
-            发现新版本：<b>v{updateStatus.version}</b>
-            {updateStatus.releaseNotes && showNotes && (
-              <pre className='mt-2 text-xs whitespace-pre-wrap text-muted-foreground'>
-                {updateStatus.releaseNotes}
-              </pre>
-            )}
-          </div>
-          <div className='flex gap-2'>
-            {updateStatus.releaseNotes && (
-              <Button variant='outline' onClick={() => setShowNotes((v) => !v)}>
-                {showNotes ? '收起说明' : '查看说明'}
-              </Button>
-            )}
-            <Button onClick={handleDownloadUpdate} disabled={isDownloading}>
-              {isDownloading ? '更新中...' : '下载并安装'}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* 链接区 */}
-      <div className='flex flex-wrap gap-3'>
-        <a
-          className='rounded-md border px-3 py-2 transition hover:bg-accent hover:text-accent-foreground'
-          href='https://chaniok.github.io/SpinningMomo'
-          target='_blank'
-          rel='noreferrer'
-        >
-          使用文档
-        </a>
-        <a
-          className='rounded-md border px-3 py-2 transition hover:bg-accent hover:text-accent-foreground'
-          href='https://github.com/ChanIok/SpinningMomo/releases/latest'
-          target='_blank'
-          rel='noreferrer'
-        >
-          GitHub Release
-        </a>
-        <a
-          className='rounded-md border px-3 py-2 transition hover:bg-accent hover:text-accent-foreground'
-          href='https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE'
-          target='_blank'
-          rel='noreferrer'
-        >
-          MIT License
-        </a>
-      </div>
-
-      {/* 页脚致谢 */}
-      <div className='text-xs text-muted-foreground'>由开源社区与 AI 协作完成，感谢你的支持。</div>
+      </ScrollArea>
     </div>
   )
 }

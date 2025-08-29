@@ -45,7 +45,7 @@ export function GeneralSettingsContent() {
   }
 
   return (
-    <div className='w-full max-w-[768px]'>
+    <div className='w-full'>
       <div className='mb-6'>
         <h1 className='text-2xl font-bold text-foreground'>通用设置</h1>
         <p className='mt-1 text-muted-foreground'>管理应用程序的核心设置</p>

@@ -1,11 +1,7 @@
 import { AboutContent } from '@/features/about/components/AboutContent'
 
 export function AboutPage() {
-  return (
-    <div>
-      <AboutContent />
-    </div>
-  )
+  return <AboutContent />
 }
 
 export default AboutPage

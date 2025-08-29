@@ -141,7 +141,7 @@ export function AppearanceContent() {
   }
 
   return (
-    <div className='w-full max-w-[768px]'>
+    <div className='w-full'>
       {/* 页面标题 */}
       <div className='mb-6'>
         <h1 className='text-2xl font-bold text-foreground'>外观设置</h1>
