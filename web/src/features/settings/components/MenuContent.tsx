@@ -4,11 +4,13 @@ import { useMenuActions } from '@/features/settings/hooks/useMenuActions'
 import { Button } from '@/components/ui/button'
 import { DraggableFeatureList } from './DraggableFeatureList'
 import { DraggablePresetList } from './DraggablePresetList'
+import { ResetSettingsDialog } from './ResetSettingsDialog'
 import type { FeatureItem, PresetItem } from '@/lib/settings/settingsTypes'
 
 export function MenuContent() {
   const { appSettings, error, isInitialized, clearError } = useSettingsStore()
-  const { updateFeatureItems, updateAspectRatios, updateResolutions } = useMenuActions()
+  const { updateFeatureItems, updateAspectRatios, updateResolutions, resetMenuSettings } =
+    useMenuActions()
 
   // 安全获取菜单数据的辅助函数（适配新的嵌套结构）
   const getFeatureItems = () => appSettings?.ui?.appMenu?.featureItems || []
@@ -19,7 +21,6 @@ export function MenuContent() {
   const handleFeatureItemsReorder = async (items: FeatureItem[]) => {
     try {
       await updateFeatureItems(items)
-      toast.success('功能项顺序已更新')
     } catch (error) {
       console.error('Failed to update feature items:', error)
       toast.error('更新功能项失败')
@@ -43,7 +44,6 @@ export function MenuContent() {
   const handleAspectRatiosReorder = async (items: PresetItem[]) => {
     try {
       await updateAspectRatios(items)
-      toast.success('比例顺序已更新')
     } catch (error) {
       console.error('Failed to update aspect ratios:', error)
       toast.error('更新比例设置失败')
@@ -71,7 +71,6 @@ export function MenuContent() {
       const itemWithOrder = { ...newItem, order: maxOrder + 1 }
       const updatedItems = [...currentItems, itemWithOrder]
       await updateAspectRatios(updatedItems)
-      toast.success('比例已添加')
     } catch (error) {
       console.error('Failed to add aspect ratio:', error)
       toast.error('添加比例失败')
@@ -82,7 +81,6 @@ export function MenuContent() {
     try {
       const updatedItems = getAspectRatios().filter((item) => item.id !== id)
       await updateAspectRatios(updatedItems)
-      toast.success('比例已删除')
     } catch (error) {
       console.error('Failed to remove aspect ratio:', error)
       toast.error('删除比例失败')
@@ -93,7 +91,6 @@ export function MenuContent() {
   const handleResolutionsReorder = async (items: PresetItem[]) => {
     try {
       await updateResolutions(items)
-      toast.success('分辨率顺序已更新')
     } catch (error) {
       console.error('Failed to update resolutions:', error)
       toast.error('更新分辨率设置失败')
@@ -121,7 +118,6 @@ export function MenuContent() {
       const itemWithOrder = { ...newItem, order: maxOrder + 1 }
       const updatedItems = [...currentItems, itemWithOrder]
       await updateResolutions(updatedItems)
-      toast.success('分辨率已添加')
     } catch (error) {
       console.error('Failed to add resolution:', error)
       toast.error('添加分辨率失败')
@@ -132,11 +128,15 @@ export function MenuContent() {
     try {
       const updatedItems = getResolutions().filter((item) => item.id !== id)
       await updateResolutions(updatedItems)
-      toast.success('分辨率已删除')
     } catch (error) {
       console.error('Failed to remove resolution:', error)
       toast.error('删除分辨率失败')
     }
+  }
+
+  const handleResetSettings = async () => {
+    await resetMenuSettings()
+    toast.success('菜单设置已重置为默认值')
   }
 
   // 验证函数
@@ -182,9 +182,17 @@ export function MenuContent() {
   return (
     <div className='w-full'>
       {/* 页面标题 */}
-      <div className='mb-6'>
-        <h1 className='text-2xl font-bold text-foreground'>菜单设置</h1>
-        <p className='mt-1 text-muted-foreground'>管理浮窗菜单项和右键菜单项的设置</p>
+      <div className='mb-6 flex items-center justify-between'>
+        <div>
+          <h1 className='text-2xl font-bold text-foreground'>菜单设置</h1>
+          <p className='mt-1 text-muted-foreground'>管理浮窗菜单项和右键菜单项的设置</p>
+        </div>
+
+        <ResetSettingsDialog
+          title='重置菜单设置'
+          description='此操作将重置当前页面设置为默认值。'
+          onReset={handleResetSettings}
+        />
       </div>
 
       <div className='space-y-8'>

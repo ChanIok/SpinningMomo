@@ -1,5 +1,7 @@
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/lib/settings'
+import { useGeneralActions } from '@/features/settings/hooks/useGeneralActions'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -9,46 +11,64 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { HotkeyRecorder } from './HotkeyRecorder'
+import { ResetSettingsDialog } from './ResetSettingsDialog'
 
 export function GeneralSettingsContent() {
-  const { appSettings, updateSettings, isLoading } = useSettingsStore()
+  const { appSettings, error, isInitialized, clearError } = useSettingsStore()
+  const {
+    updateLanguage,
+    updateLoggerLevel,
+    updateToggleVisibilityHotkey,
+    updateScreenshotHotkey,
+    resetGeneralSettings,
+  } = useGeneralActions()
 
-  // 重置为默认值
-  const handleReset = async () => {
-    try {
-      await updateSettings({
-        app: {
-          ...appSettings.app,
-          language: {
-            current: 'zh-CN',
-          },
-          logger: {
-            level: 'INFO',
-          },
-          hotkey: {
-            toggleVisibility: {
-              modifiers: 3, // Ctrl + Alt
-              key: 82, // R键
-            },
-            screenshot: {
-              modifiers: 0, // 无修饰键
-              key: 44, // 印屏键
-            },
-          },
-        },
-      })
-      toast.success('设置已重置为默认值')
-    } catch (error) {
-      console.error('Failed to reset settings:', error)
-      toast.error('重置设置失败')
-    }
+  const handleResetSettings = async () => {
+    await resetGeneralSettings()
+    toast.success('通用设置已重置为默认值')
+  }
+
+  // 显示加载状态（仅在未初始化时）
+  if (!isInitialized) {
+    return (
+      <div className='flex items-center justify-center p-6'>
+        <div className='text-center'>
+          <div className='mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary'></div>
+          <p className='mt-2 text-sm text-muted-foreground'>加载通用设置中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 显示错误状态
+  if (error) {
+    return (
+      <div className='flex items-center justify-center p-6'>
+        <div className='text-center'>
+          <p className='text-sm text-muted-foreground'>无法加载通用设置</p>
+          <p className='mt-1 text-sm text-red-500'>{error}</p>
+          <Button variant='outline' size='sm' onClick={clearError} className='mt-2'>
+            重试
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className='w-full'>
-      <div className='mb-6'>
-        <h1 className='text-2xl font-bold text-foreground'>通用设置</h1>
-        <p className='mt-1 text-muted-foreground'>管理应用程序的核心设置</p>
+      {/* 页面标题 */}
+      <div className='mb-6 flex items-center justify-between'>
+        <div>
+          <h1 className='text-2xl font-bold text-foreground'>通用设置</h1>
+          <p className='mt-1 text-muted-foreground'>管理应用程序的核心设置</p>
+        </div>
+
+        <ResetSettingsDialog
+          title='重置通用设置'
+          description='此操作将重置当前页面设置为默认值。'
+          onReset={handleResetSettings}
+        />
       </div>
 
       <div className='space-y-8'>
@@ -68,14 +88,7 @@ export function GeneralSettingsContent() {
               <div className='w-48 flex-shrink-0'>
                 <Select
                   value={appSettings.app.language.current}
-                  onValueChange={(value) =>
-                    updateSettings({
-                      app: {
-                        ...appSettings.app,
-                        language: { current: value },
-                      },
-                    })
-                  }
+                  onValueChange={(value) => updateLanguage(value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder='选择语言' />
@@ -106,14 +119,7 @@ export function GeneralSettingsContent() {
               <div className='w-48 flex-shrink-0'>
                 <Select
                   value={appSettings.app.logger.level}
-                  onValueChange={(value) =>
-                    updateSettings({
-                      app: {
-                        ...appSettings.app,
-                        logger: { level: value },
-                      },
-                    })
-                  }
+                  onValueChange={(value) => updateLoggerLevel(value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder='选择日志级别' />
@@ -133,7 +139,8 @@ export function GeneralSettingsContent() {
         <div className='space-y-4'>
           <div>
             <h3 className='text-lg font-semibold text-foreground'>快捷键设置</h3>
-            <p className='mt-1 text-sm text-muted-foreground'>自定义应用程序的快捷键</p>
+
+            <span className='text-sm text-muted-foreground'>自定义应用程序的快捷键</span>
           </div>
 
           <div className='space-y-4 rounded-md border border-border bg-card p-4'>
@@ -149,15 +156,7 @@ export function GeneralSettingsContent() {
                     key: appSettings.app.hotkey.toggleVisibility.key,
                   }}
                   onChange={(newHotkey) =>
-                    updateSettings({
-                      app: {
-                        ...appSettings.app,
-                        hotkey: {
-                          ...appSettings.app.hotkey,
-                          toggleVisibility: newHotkey,
-                        },
-                      },
-                    })
+                    updateToggleVisibilityHotkey(newHotkey.modifiers, newHotkey.key)
                   }
                 />
               </div>
@@ -175,40 +174,12 @@ export function GeneralSettingsContent() {
                     key: appSettings.app.hotkey.screenshot.key,
                   }}
                   onChange={(newHotkey) =>
-                    updateSettings({
-                      app: {
-                        ...appSettings.app,
-                        hotkey: {
-                          ...appSettings.app.hotkey,
-                          screenshot: newHotkey,
-                        },
-                      },
-                    })
+                    updateScreenshotHotkey(newHotkey.modifiers, newHotkey.key)
                   }
                 />
               </div>
             </div>
-
-            <div className='py-2 text-sm text-muted-foreground'>
-              <p>说明:</p>
-              <ul className='mt-1 list-disc space-y-1 pl-5'>
-                <li>点击输入框后按下要设置的快捷键组合</li>
-                <li>按 Backspace 键清除快捷键</li>
-                <li>按 Esc 键取消设置</li>
-              </ul>
-            </div>
           </div>
-        </div>
-
-        {/* 重置按钮 */}
-        <div className='flex justify-end gap-3 py-4'>
-          <button
-            onClick={handleReset}
-            disabled={isLoading}
-            className='rounded-md bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50'
-          >
-            重置默认值
-          </button>
         </div>
       </div>
     </div>

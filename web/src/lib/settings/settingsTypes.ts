@@ -145,7 +145,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
   // window 设置
   window: {
-    targetTitle: '',
+    targetTitle: '无限暖暖  ',
     taskbar: {
       autoHide: false,
       lowerOnResize: true,
@@ -167,16 +167,16 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     appMenu: {
       featureItems: [
         { id: 'screenshot.capture', enabled: true, order: 1 },
-        { id: 'screenshot.openFolder', enabled: true, order: 2 },
-        { id: 'feature.togglePreview', enabled: true, order: 3 },
-        { id: 'feature.toggleOverlay', enabled: true, order: 4 },
-        { id: 'feature.toggleLetterbox', enabled: true, order: 5 },
-        { id: 'window.resetTransform', enabled: true, order: 6 },
-        { id: 'panel.hide', enabled: true, order: 7 },
-        { id: 'app.exit', enabled: false, order: 8 },
+        { id: 'screenshot.open_folder', enabled: true, order: 2 },
+        { id: 'feature.toggle_preview', enabled: true, order: 3 },
+        { id: 'feature.toggle_overlay', enabled: true, order: 4 },
+        { id: 'feature.toggle_letterbox', enabled: true, order: 5 },
+        { id: 'window.reset_transform', enabled: true, order: 6 },
+        { id: 'panel.hide', enabled: false, order: 7 },
+        { id: 'app.exit', enabled: true, order: 8 },
       ],
       aspectRatios: [
-        { id: '32:9', enabled: true, order: 1 },
+        { id: '32:9', enabled: false, order: 1 },
         { id: '21:9', enabled: true, order: 2 },
         { id: '16:9', enabled: true, order: 3 },
         { id: '3:2', enabled: true, order: 4 },

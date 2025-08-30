@@ -1,19 +1,28 @@
 // 修饰键映射
 export const MODIFIER_MAP = {
-  shift: 1,
+  alt: 1,
   ctrl: 2,
-  alt: 4,
+  shift: 4,
+  win: 8,
 } as const
 
 // 修饰键显示映射
 export const MODIFIER_DISPLAY: Record<number, string> = {
-  1: 'Shift',
+  1: 'Alt',
   2: 'Ctrl',
-  4: 'Alt',
-  3: 'Ctrl + Shift',
+  3: 'Ctrl + Alt',
+  4: 'Shift',
   5: 'Shift + Alt',
-  6: 'Ctrl + Alt',
-  7: 'Ctrl + Shift + Alt',
+  6: 'Ctrl + Shift',
+  7: 'Ctrl + Alt + Shift',
+  8: 'Win',
+  9: 'Win + Alt',
+  10: 'Ctrl + Win',
+  11: 'Ctrl + Alt + Win',
+  12: 'Shift + Win',
+  13: 'Shift + Alt + Win',
+  14: 'Ctrl + Shift + Win',
+  15: 'Ctrl + Alt + Shift + Win',
 }
 
 // 主键映射
@@ -129,16 +138,24 @@ export const KEY_NAME_MAP: Record<string, number> = Object.entries(KEY_CODE_MAP)
 )
 
 // 计算修饰键值
-export const calculateModifiers = (shift: boolean, ctrl: boolean, alt: boolean): number => {
+export const calculateModifiers = (
+  shift: boolean,
+  ctrl: boolean,
+  alt: boolean,
+  win: boolean
+): number => {
   return (
-    (shift ? MODIFIER_MAP.shift : 0) | (ctrl ? MODIFIER_MAP.ctrl : 0) | (alt ? MODIFIER_MAP.alt : 0)
+    (shift ? MODIFIER_MAP.shift : 0) |
+    (ctrl ? MODIFIER_MAP.ctrl : 0) |
+    (alt ? MODIFIER_MAP.alt : 0) |
+    (win ? MODIFIER_MAP.win : 0)
   )
 }
 
 // 格式化快捷键显示文本
 export const formatHotkeyDisplay = (modifiers: number, key: number): string => {
-  // 如果既没有修饰键也没有主键，返回"未设置"
-  if (!modifiers && !key) return '未设置'
+  // 如果既没有修饰键也没有主键，返回""
+  if (!modifiers && !key) return ''
 
   const modifierText = MODIFIER_DISPLAY[modifiers] || ''
   const keyText = key ? KEY_CODE_MAP[key] || String.fromCharCode(key) : ''
@@ -155,7 +172,7 @@ export const formatHotkeyDisplay = (modifiers: number, key: number): string => {
 
 // 解析显示文本为修饰键和键码
 export const parseHotkeyDisplay = (display: string): { modifiers: number; key: number } => {
-  if (display === '未设置' || !display) {
+  if (display === '' || !display) {
     return { modifiers: 0, key: 0 }
   }
 
@@ -183,6 +200,9 @@ export const parseHotkeyDisplay = (display: string): { modifiers: number; key: n
         break
       case 'Alt':
         modifiers |= MODIFIER_MAP.alt
+        break
+      case 'Win':
+        modifiers |= MODIFIER_MAP.win
         break
     }
   }

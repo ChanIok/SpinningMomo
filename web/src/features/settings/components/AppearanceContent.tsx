@@ -7,11 +7,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
+import { ResetSettingsDialog } from './ResetSettingsDialog'
 import type { AppWindowLayout } from '@/lib/settings/settingsTypes'
 
 export function AppearanceContent() {
   const { appSettings, error, isInitialized, clearError } = useSettingsStore()
-  const { updateAppWindowLayout } = useAppearanceActions()
+  const { updateAppWindowLayout, resetAppearanceSettings } = useAppearanceActions()
   const {
     settings: webSettings,
     error: webSettingsError,
@@ -113,6 +114,11 @@ export function AppearanceContent() {
     }
   }
 
+  const handleResetSettings = async () => {
+    await resetAppearanceSettings()
+    toast.success('外观设置已重置为默认值')
+  }
+
   // 显示加载状态（仅在未初始化时）
   if (!isInitialized) {
     return (
@@ -143,9 +149,17 @@ export function AppearanceContent() {
   return (
     <div className='w-full'>
       {/* 页面标题 */}
-      <div className='mb-6'>
-        <h1 className='text-2xl font-bold text-foreground'>外观设置</h1>
-        <p className='mt-1 text-muted-foreground'>自定义应用程序窗口的外观参数</p>
+      <div className='mb-6 flex items-center justify-between'>
+        <div>
+          <h1 className='text-2xl font-bold text-foreground'>外观设置</h1>
+          <p className='mt-1 text-muted-foreground'>自定义应用程序窗口的外观参数</p>
+        </div>
+
+        <ResetSettingsDialog
+          title='重置外观设置'
+          description='此操作将重置当前页面设置为默认值。'
+          onReset={handleResetSettings}
+        />
       </div>
 
       <div className='space-y-8'>

@@ -1,4 +1,5 @@
 import { useSettingsStore } from '@/lib/settings'
+import { DEFAULT_APP_SETTINGS } from '@/lib/settings/settingsTypes'
 
 // 扩展function特有的业务方法
 export const useFunctionActions = () => {
@@ -53,11 +54,37 @@ export const useFunctionActions = () => {
     })
   }
 
+  // 重置功能设置为默认值
+  const resetFunctionSettings = async () => {
+    await updateSettings({
+      window: {
+        ...appSettings.window,
+        targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
+        taskbar: {
+          ...appSettings.window.taskbar,
+          lowerOnResize: DEFAULT_APP_SETTINGS.window.taskbar.lowerOnResize,
+        },
+      },
+      features: {
+        ...appSettings.features,
+        screenshot: {
+          ...appSettings.features.screenshot,
+          screenshotDirPath: DEFAULT_APP_SETTINGS.features.screenshot.screenshotDirPath,
+        },
+        letterbox: {
+          ...appSettings.features.letterbox,
+          enabled: DEFAULT_APP_SETTINGS.features.letterbox.enabled,
+        },
+      },
+    })
+  }
+
   return {
     appSettings,
     updateWindowTitle,
     updateScreenshotDir,
     updateTaskbarLowerOnResize,
     updateLetterboxEnabled,
+    resetFunctionSettings,
   }
 }

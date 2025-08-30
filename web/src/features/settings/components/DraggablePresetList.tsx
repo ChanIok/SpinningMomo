@@ -114,12 +114,10 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
       onAdd(newItem)
       setNewItemValue('')
       setIsAdding(false)
-      toast.success('添加成功')
     }
 
     const handleRemove = (id: string) => {
       onRemove(id)
-      toast.success('删除成功')
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -163,7 +161,7 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
 
           {/* 添加新项 */}
           {isAdding ? (
-            <div className='flex items-center gap-2 rounded-lg border border-primary bg-primary/5 p-3'>
+            <div className='flex items-center gap-2 rounded-md border border-primary bg-primary/5 p-3'>
               <Input
                 value={newItemValue}
                 onChange={(e) => setNewItemValue(e.target.value)}
@@ -243,7 +241,7 @@ const PresetListItem = React.memo<{
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, index)}
       onDragEnd={onDragEnd}
-      className={`flex cursor-move items-center justify-between rounded-lg border bg-card p-3 transition-all duration-200 ${draggedItem === item.id ? 'scale-95 opacity-50' : ''} ${dragOverIndex === index ? 'border-primary bg-primary/5' : 'border-border'} hover:border-primary/50 hover:bg-accent/50`}
+      className={`flex cursor-move items-center justify-between rounded-md border bg-card p-3 transition-all duration-200 ${draggedItem === item.id ? 'scale-95 opacity-50' : ''} ${dragOverIndex === index ? 'border-primary bg-primary/5' : 'border-border'} hover:border-primary/50 hover:bg-accent/50`}
     >
       <div className='flex flex-1 items-center justify-between'>
         <div className='flex-1 pr-4'>

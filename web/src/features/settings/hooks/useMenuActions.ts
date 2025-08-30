@@ -1,4 +1,5 @@
 import { useSettingsStore } from '@/lib/settings'
+import { DEFAULT_APP_SETTINGS } from '@/lib/settings/settingsTypes'
 import type { FeatureItem, PresetItem } from '@/lib/settings/settingsTypes'
 
 // 扩展menu特有的业务方法
@@ -44,10 +45,26 @@ export const useMenuActions = () => {
     })
   }
 
+  // 重置菜单设置为默认值
+  const resetMenuSettings = async () => {
+    await updateSettings({
+      ui: {
+        ...appSettings.ui,
+        appMenu: {
+          ...appSettings.ui.appMenu,
+          featureItems: DEFAULT_APP_SETTINGS.ui.appMenu.featureItems,
+          aspectRatios: DEFAULT_APP_SETTINGS.ui.appMenu.aspectRatios,
+          resolutions: DEFAULT_APP_SETTINGS.ui.appMenu.resolutions,
+        },
+      },
+    })
+  }
+
   return {
     appSettings,
     updateFeatureItems,
     updateAspectRatios,
     updateResolutions,
+    resetMenuSettings,
   }
 }

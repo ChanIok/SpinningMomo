@@ -22,8 +22,11 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
 
   // 更新显示文本
   useEffect(() => {
-    setDisplayText(formatHotkeyDisplay(value.modifiers, value.key))
-  }, [value])
+    if (!isRecording) {
+      const text = formatHotkeyDisplay(value.modifiers, value.key)
+      setDisplayText(text || '未设置')
+    }
+  }, [value, isRecording])
 
   // 实时更新录制时的显示文本
   useEffect(() => {
@@ -35,6 +38,7 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
   // 开始录制
   const startRecording = () => {
     setIsRecording(true)
+    console.log('startRecording')
     setCurrentModifiers(0)
     setCurrentKey(0)
   }
@@ -42,6 +46,7 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
   // 停止录制
   const stopRecording = () => {
     setIsRecording(false)
+    console.log('stopRecording')
     setCurrentModifiers(0)
     setCurrentKey(0)
   }
@@ -70,7 +75,7 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
       }
 
       // 获取修饰键状态
-      const modifiers = calculateModifiers(e.shiftKey, e.ctrlKey, e.altKey)
+      const modifiers = calculateModifiers(e.shiftKey, e.ctrlKey, e.altKey, e.metaKey)
 
       // 如果是修饰键，只更新修饰键状态并实时显示
       if (
@@ -84,6 +89,11 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
           'Shift',
           'ShiftLeft',
           'ShiftRight',
+          'Meta',
+          'MetaLeft',
+          'MetaRight',
+          'OS',
+          'Win',
         ].includes(e.key)
       ) {
         setCurrentModifiers(modifiers)
@@ -115,12 +125,20 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
           'Shift',
           'ShiftLeft',
           'ShiftRight',
+          'Meta',
+          'MetaLeft',
+          'MetaRight',
+          'OS',
+          'Win',
         ].includes(e.key)
       ) {
         const modifiers = calculateModifiers(
           e.key.startsWith('Shift') ? false : e.shiftKey || false,
           e.key.startsWith('Control') ? false : e.ctrlKey || false,
-          e.key.startsWith('Alt') ? false : e.altKey || false
+          e.key.startsWith('Alt') ? false : e.altKey || false,
+          e.key.startsWith('Meta') || e.key.startsWith('OS') || e.key === 'Win'
+            ? false
+            : e.metaKey || false
         )
         setCurrentModifiers(modifiers)
       }

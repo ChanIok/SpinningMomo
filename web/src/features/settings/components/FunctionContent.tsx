@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { call } from '@/lib/rpc'
 import { Switch } from '@/components/ui/switch'
+import { getCurrentEnvironment } from '@/lib/environment'
+import { ResetSettingsDialog } from './ResetSettingsDialog'
 
 export function FunctionContent() {
   const { appSettings, error, isInitialized, clearError } = useSettingsStore()
@@ -15,10 +17,10 @@ export function FunctionContent() {
     updateScreenshotDir,
     updateTaskbarLowerOnResize,
     updateLetterboxEnabled,
+    resetFunctionSettings,
   } = useFunctionActions()
 
   const [inputTitle, setInputTitle] = useState('')
-  const [isUpdatingTitle, setIsUpdatingTitle] = useState(false)
   const [screenshotDir, setScreenshotDir] = useState('')
   const [isSelectingDir, setIsSelectingDir] = useState(false)
 
@@ -38,15 +40,12 @@ export function FunctionContent() {
       return
     }
 
-    setIsUpdatingTitle(true)
     try {
       await updateWindowTitle(inputTitle.trim())
       toast.success('窗口标题已更新')
     } catch (error) {
       console.error('Failed to update window title:', error)
       toast.error('更新窗口标题失败')
-    } finally {
-      setIsUpdatingTitle(false)
     }
   }
 
@@ -59,11 +58,18 @@ export function FunctionContent() {
   const handleSelectDir = async () => {
     setIsSelectingDir(true)
     try {
+      // 根据当前环境选择父窗口模式
+      const environment = getCurrentEnvironment()
+      const parentWindowMode = environment === 'webview' ? 1 : 2 // webview: 1, web: 2
+
       const result = await call<{ path: string }>(
-        'file_dialog.select_folder',
-        { title: '选择截图目录' },
-        45000
-      )
+        'dialog.openDirectory',
+        {
+          title: '选择截图目录',
+          parentWindowMode,
+        },
+        0
+      ) // 永不超时
       await updateScreenshotDir(result.path)
       toast.success('截图目录已更新')
     } catch (error) {
@@ -72,6 +78,11 @@ export function FunctionContent() {
     } finally {
       setIsSelectingDir(false)
     }
+  }
+
+  const handleResetSettings = async () => {
+    await resetFunctionSettings()
+    toast.success('功能设置已重置为默认值')
   }
 
   // 显示加载状态（仅在未初始化时）
@@ -104,9 +115,17 @@ export function FunctionContent() {
   return (
     <div className='w-full'>
       {/* 页面标题 */}
-      <div className='mb-6'>
-        <h1 className='text-2xl font-bold text-foreground'>功能设置</h1>
-        <p className='mt-1 text-muted-foreground'>管理应用程序的各项功能设置</p>
+      <div className='mb-6 flex items-center justify-between'>
+        <div>
+          <h1 className='text-2xl font-bold text-foreground'>功能设置</h1>
+          <p className='mt-1 text-muted-foreground'>管理应用程序的各项功能设置</p>
+        </div>
+
+        <ResetSettingsDialog
+          title='重置功能设置'
+          description=' 此操作将重置当前页面设置为默认值。'
+          onReset={handleResetSettings}
+        />
       </div>
 
       <div className='space-y-8'>
@@ -130,14 +149,9 @@ export function FunctionContent() {
                   onKeyDown={handleKeyDown}
                   placeholder='输入窗口标题...'
                   className='w-48'
-                  disabled={isUpdatingTitle}
                 />
-                <Button
-                  onClick={handleUpdateTitle}
-                  disabled={isUpdatingTitle || inputTitle.trim() === ''}
-                  size='sm'
-                >
-                  {isUpdatingTitle ? '更新中...' : '更新'}
+                <Button onClick={handleUpdateTitle} disabled={inputTitle.trim() === ''} size='sm'>
+                  更新
                 </Button>
               </div>
             </div>
@@ -173,12 +187,7 @@ export function FunctionContent() {
                 <p className='mt-1 text-sm text-muted-foreground'>设置截图保存的目录路径</p>
               </div>
               <div className='flex flex-shrink-0 items-center gap-2'>
-                <Input
-                  value={screenshotDir}
-                  readOnly
-                  placeholder='未设置截图目录'
-                  className='w-48'
-                />
+                <Input value={screenshotDir} readOnly placeholder='默认路径' className='w-48' />
                 <Button onClick={handleSelectDir} disabled={isSelectingDir} size='sm'>
                   {isSelectingDir ? '选择中...' : '选择目录'}
                 </Button>

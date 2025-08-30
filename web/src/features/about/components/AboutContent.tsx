@@ -79,7 +79,7 @@ export function AboutContent() {
 
               <div className='space-y-4 rounded-md border border-border bg-card p-4'>
                 <div className='flex items-center gap-4 py-2'>
-                  <img
+                  {/* <img
                     src='/logo.png'
                     alt='SpinningMomo Logo'
                     className='h-12 w-12 rounded-lg border bg-muted/30'
@@ -87,7 +87,8 @@ export function AboutContent() {
                       const target = e.currentTarget as HTMLImageElement
                       target.style.display = 'none'
                     }}
-                  />
+                  /> */}
+                  
                   <div className='flex-1'>
                     <div className='text-lg font-semibold text-foreground'>
                       旋转吧大喵

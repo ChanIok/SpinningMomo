@@ -156,7 +156,7 @@ const FeatureListItem = React.memo<{
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, index)}
       onDragEnd={onDragEnd}
-      className={`flex cursor-move items-center justify-between rounded-lg border bg-card p-3 transition-all duration-200 ${draggedItem === item.id ? 'scale-95 opacity-50' : ''} ${dragOverIndex === index ? 'border-primary bg-primary/5' : 'border-border'} hover:border-primary/50 hover:bg-accent/50`}
+      className={`flex cursor-move items-center justify-between rounded-md border bg-card p-3 transition-all duration-200 ${draggedItem === item.id ? 'scale-95 opacity-50' : ''} ${dragOverIndex === index ? 'border-primary bg-primary/5' : 'border-border'} hover:border-primary/50 hover:bg-accent/50`}
     >
       <div className='flex flex-1 items-center justify-between'>
         <div className='flex-1 pr-4'>
