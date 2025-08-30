@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/select'
 import { HotkeyRecorder } from './HotkeyRecorder'
 import { ResetSettingsDialog } from './ResetSettingsDialog'
+import { useTranslation } from '@/lib/i18n'
 
 export function GeneralSettingsContent() {
+  const { t } = useTranslation()
   const { appSettings, error, isInitialized, clearError } = useSettingsStore()
   const {
     updateLanguage,
@@ -25,7 +27,7 @@ export function GeneralSettingsContent() {
 
   const handleResetSettings = async () => {
     await resetGeneralSettings()
-    toast.success('通用设置已重置为默认值')
+    toast.success(t('settings.reset.success'))
   }
 
   // 显示加载状态（仅在未初始化时）
@@ -34,7 +36,7 @@ export function GeneralSettingsContent() {
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
           <div className='mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary'></div>
-          <p className='mt-2 text-sm text-muted-foreground'>加载通用设置中...</p>
+          <p className='mt-2 text-sm text-muted-foreground'>{t('settings.loading')}</p>
         </div>
       </div>
     )
@@ -45,10 +47,10 @@ export function GeneralSettingsContent() {
     return (
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
-          <p className='text-sm text-muted-foreground'>无法加载通用设置</p>
+          <p className='text-sm text-muted-foreground'>{t('settings.error.title')}</p>
           <p className='mt-1 text-sm text-red-500'>{error}</p>
           <Button variant='outline' size='sm' onClick={clearError} className='mt-2'>
-            重试
+            {t('settings.error.retry')}
           </Button>
         </div>
       </div>
@@ -60,13 +62,13 @@ export function GeneralSettingsContent() {
       {/* 页面标题 */}
       <div className='mb-6 flex items-center justify-between'>
         <div>
-          <h1 className='text-2xl font-bold text-foreground'>通用设置</h1>
-          <p className='mt-1 text-muted-foreground'>管理应用程序的核心设置</p>
+          <h1 className='text-2xl font-bold text-foreground'>{t('settings.general.title')}</h1>
+          <p className='mt-1 text-muted-foreground'>{t('settings.general.description')}</p>
         </div>
 
         <ResetSettingsDialog
-          title='重置通用设置'
-          description='此操作将重置当前页面设置为默认值。'
+          title={t('settings.reset.title')}
+          description={t('settings.reset.description')}
           onReset={handleResetSettings}
         />
       </div>
@@ -75,15 +77,23 @@ export function GeneralSettingsContent() {
         {/* 语言设置 */}
         <div className='space-y-4'>
           <div>
-            <h3 className='text-lg font-semibold text-foreground'>语言设置</h3>
-            <p className='mt-1 text-sm text-muted-foreground'>选择应用程序的显示语言</p>
+            <h3 className='text-lg font-semibold text-foreground'>
+              {t('settings.general.language.title')}
+            </h3>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              {t('settings.general.language.description')}
+            </p>
           </div>
 
           <div className='space-y-4 rounded-md border border-border bg-card p-4'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>显示语言</Label>
-                <p className='mt-1 text-sm text-muted-foreground'>更改应用程序界面的语言</p>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.general.language.displayLanguage')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.general.language.displayLanguageDescription')}
+                </p>
               </div>
               <div className='w-48 flex-shrink-0'>
                 <Select
@@ -91,11 +101,11 @@ export function GeneralSettingsContent() {
                   onValueChange={(value) => updateLanguage(value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder='选择语言' />
+                    <SelectValue placeholder={t('settings.general.language.displayLanguage')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='zh-CN'>简体中文</SelectItem>
-                    <SelectItem value='en-US'>English</SelectItem>
+                    <SelectItem value='zh-CN'>{t('common.languageZhCn')}</SelectItem>
+                    <SelectItem value='en-US'>{t('common.languageEnUs')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -106,15 +116,23 @@ export function GeneralSettingsContent() {
         {/* 日志设置 */}
         <div className='space-y-4'>
           <div>
-            <h3 className='text-lg font-semibold text-foreground'>日志设置</h3>
-            <p className='mt-1 text-sm text-muted-foreground'>配置应用程序的日志记录级别</p>
+            <h3 className='text-lg font-semibold text-foreground'>
+              {t('settings.general.logger.title')}
+            </h3>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              {t('settings.general.logger.description')}
+            </p>
           </div>
 
           <div className='space-y-4 rounded-md border border-border bg-card p-4'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>日志级别</Label>
-                <p className='mt-1 text-sm text-muted-foreground'>控制记录的日志详细程度</p>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.general.logger.level')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.general.logger.levelDescription')}
+                </p>
               </div>
               <div className='w-48 flex-shrink-0'>
                 <Select
@@ -122,12 +140,12 @@ export function GeneralSettingsContent() {
                   onValueChange={(value) => updateLoggerLevel(value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder='选择日志级别' />
+                    <SelectValue placeholder={t('settings.general.logger.level')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value='DEBUG'>调试 (DEBUG)</SelectItem>
-                    <SelectItem value='INFO'>信息 (INFO)</SelectItem>
-                    <SelectItem value='ERROR'>错误 (ERROR)</SelectItem>
+                    <SelectItem value='DEBUG'>DEBUG</SelectItem>
+                    <SelectItem value='INFO'>INFO</SelectItem>
+                    <SelectItem value='ERROR'>ERROR</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -138,16 +156,24 @@ export function GeneralSettingsContent() {
         {/* 快捷键设置 */}
         <div className='space-y-4'>
           <div>
-            <h3 className='text-lg font-semibold text-foreground'>快捷键设置</h3>
+            <h3 className='text-lg font-semibold text-foreground'>
+              {t('settings.general.hotkey.title')}
+            </h3>
 
-            <span className='text-sm text-muted-foreground'>自定义应用程序的快捷键</span>
+            <span className='text-sm text-muted-foreground'>
+              {t('settings.general.hotkey.description')}
+            </span>
           </div>
 
           <div className='space-y-4 rounded-md border border-border bg-card p-4'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>浮窗显示/隐藏快捷键</Label>
-                <p className='mt-1 text-sm text-muted-foreground'>设置显示或隐藏浮窗的快捷键</p>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.general.hotkey.toggleVisibility')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.general.hotkey.toggleVisibilityDescription')}
+                </p>
               </div>
               <div className='w-48 flex-shrink-0'>
                 <HotkeyRecorder
@@ -164,8 +190,12 @@ export function GeneralSettingsContent() {
 
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>截图快捷键</Label>
-                <p className='mt-1 text-sm text-muted-foreground'>设置触发截图功能的快捷键</p>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.general.hotkey.screenshot')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.general.hotkey.screenshotDescription')}
+                </p>
               </div>
               <div className='w-48 flex-shrink-0'>
                 <HotkeyRecorder

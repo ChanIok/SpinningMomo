@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GripVertical, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useTranslation } from '@/lib/i18n'
 import type { PresetItem } from '@/lib/settings/settingsTypes'
 
 // 硬编码的预设项标签映射（比例和分辨率共用id作为label）
@@ -38,6 +39,7 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
     validateCustom,
     className = '',
   }) {
+    const { t } = useTranslation()
     const [draggedItem, setDraggedItem] = useState<string | null>(null)
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
     const [newItemValue, setNewItemValue] = useState('')
@@ -90,19 +92,19 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
     const handleAddItem = () => {
       const value = newItemValue.trim()
       if (!value) {
-        toast.error('请输入有效值')
+        toast.error(t('settings.menu.validation.required'))
         return
       }
 
       // 检查是否已存在
       if (items.some((item) => item.id === value)) {
-        toast.error('该项已存在')
+        toast.error(t('settings.menu.validation.exists'))
         return
       }
 
       // 自定义验证
       if (validateCustom && !validateCustom(value)) {
-        toast.error('格式不正确')
+        toast.error(t('settings.menu.validation.invalidFormat'))
         return
       }
 
@@ -171,7 +173,7 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
                 autoFocus
               />
               <Button size='sm' onClick={handleAddItem}>
-                添加
+                {t('settings.menu.actions.add')}
               </Button>
               <Button
                 variant='ghost'
@@ -181,7 +183,7 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
                   setNewItemValue('')
                 }}
               >
-                取消
+                {t('settings.menu.actions.cancel')}
               </Button>
             </div>
           ) : (
@@ -192,13 +194,15 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
               className='w-full border-dashed hover:border-primary hover:text-primary'
             >
               <Plus className='mr-2 h-4 w-4' />
-              添加自定义项
+              {t('settings.menu.actions.addCustomItem')}
             </Button>
           )}
 
           {sortedItems.length === 0 && !isAdding && (
             <div className='flex items-center justify-center py-8 text-center'>
-              <p className='text-sm text-muted-foreground'>暂无预设项</p>
+              <p className='text-sm text-muted-foreground'>
+                {t('settings.menu.status.noPresetItems')}
+              </p>
             </div>
           )}
         </div>
@@ -233,6 +237,8 @@ const PresetListItem = React.memo<{
   onToggle,
   onRemove,
 }) {
+  const { t } = useTranslation()
+
   return (
     <div
       draggable
@@ -259,7 +265,7 @@ const PresetListItem = React.memo<{
             className='data-[state=checked]:bg-primary'
           />
           <span className='min-w-[3rem] text-xs text-muted-foreground'>
-            {item.enabled ? '显示' : '隐藏'}
+            {item.enabled ? t('settings.menu.status.visible') : t('settings.menu.status.hidden')}
           </span>
           <Button
             variant='ghost'

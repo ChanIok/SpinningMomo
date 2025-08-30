@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { formatHotkeyDisplay, calculateModifiers } from '../utils/hotkeyUtils'
+import { useTranslation } from '@/lib/i18n'
 
 interface Hotkey {
   modifiers: number
@@ -14,6 +15,7 @@ interface HotkeyRecorderProps {
 }
 
 export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderProps) {
+  const { t } = useTranslation()
   const [isRecording, setIsRecording] = useState(false)
   const [displayText, setDisplayText] = useState('')
   const [currentModifiers, setCurrentModifiers] = useState(0)
@@ -24,16 +26,19 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
   useEffect(() => {
     if (!isRecording) {
       const text = formatHotkeyDisplay(value.modifiers, value.key)
-      setDisplayText(text || '未设置')
+      setDisplayText(text || t('settings.general.hotkey.recorder.notSet'))
     }
-  }, [value, isRecording])
+  }, [value, isRecording, t])
 
   // 实时更新录制时的显示文本
   useEffect(() => {
     if (isRecording) {
-      setDisplayText(formatHotkeyDisplay(currentModifiers, currentKey) || '请按下快捷键...')
+      setDisplayText(
+        formatHotkeyDisplay(currentModifiers, currentKey) ||
+          t('settings.general.hotkey.recorder.pressKey')
+      )
     }
-  }, [isRecording, currentModifiers, currentKey])
+  }, [isRecording, currentModifiers, currentKey, t])
 
   // 开始录制
   const startRecording = () => {
@@ -185,7 +190,7 @@ export function HotkeyRecorder({ value, onChange, className }: HotkeyRecorderPro
         onClick={startRecording}
         tabIndex={0}
       >
-        {isRecording ? displayText || '请按下快捷键...' : displayText}
+        {isRecording ? displayText || t('settings.general.hotkey.recorder.pressKey') : displayText}
       </div>
     </div>
   )

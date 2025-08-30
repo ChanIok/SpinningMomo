@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { RotateCcw } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useTranslation } from '@/lib/i18n'
 
 interface ResetSettingsDialogProps {
   title: string
@@ -29,10 +30,11 @@ export function ResetSettingsDialog({
   description,
   onReset,
   trigger,
-  triggerText = '重置默认',
-  confirmText = '确认重置',
-  cancelText = '取消',
+  triggerText,
+  confirmText,
+  cancelText,
 }: ResetSettingsDialogProps) {
+  const { t } = useTranslation()
   const [isResetting, setIsResetting] = useState(false)
 
   const handleReset = async () => {
@@ -50,7 +52,7 @@ export function ResetSettingsDialog({
         {trigger || (
           <Button variant='outline' size='sm' className='shrink-0'>
             <RotateCcw className='mr-2 h-4 w-4' />
-            {triggerText}
+            {triggerText || t('settings.reset.dialog.triggerText')}
           </Button>
         )}
       </AlertDialogTrigger>
@@ -60,9 +62,13 @@ export function ResetSettingsDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{cancelText}</AlertDialogCancel>
+          <AlertDialogCancel>
+            {cancelText || t('settings.reset.dialog.cancelText')}
+          </AlertDialogCancel>
           <AlertDialogAction onClick={handleReset} disabled={isResetting}>
-            {isResetting ? '重置中...' : confirmText}
+            {isResetting
+              ? t('settings.reset.dialog.resetting')
+              : confirmText || t('settings.reset.dialog.confirmText')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

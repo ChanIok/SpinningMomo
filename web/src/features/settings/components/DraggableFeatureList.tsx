@@ -2,19 +2,20 @@ import React, { useState, useMemo } from 'react'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { GripVertical } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n'
 import type { FeatureItem } from '@/lib/settings/settingsTypes'
 
 // 硬编码的功能项标签映射
-const getFeatureItemLabel = (id: string): string => {
+const getFeatureItemLabel = (id: string, t: (key: string) => string): string => {
   const labelMap: Record<string, string> = {
-    'screenshot.capture': '截图',
-    'screenshot.open_folder': '打开相册',
-    'feature.toggle_preview': '预览窗口',
-    'feature.toggle_overlay': '叠加层',
-    'feature.toggle_letterbox': '黑边模式',
-    'window.reset_transform': '重置窗口',
-    'panel.hide': '关闭浮窗',
-    'app.exit': '退出',
+    'screenshot.capture': t('settings.menu.items.screenshotCapture'),
+    'screenshot.open_folder': t('settings.menu.items.screenshotOpenFolder'),
+    'feature.toggle_preview': t('settings.menu.items.featureTogglePreview'),
+    'feature.toggle_overlay': t('settings.menu.items.featureToggleOverlay'),
+    'feature.toggle_letterbox': t('settings.menu.items.featureToggleLetterbox'),
+    'window.reset_transform': t('settings.menu.items.windowResetTransform'),
+    'panel.hide': t('settings.menu.items.panelHide'),
+    'app.exit': t('settings.menu.items.appExit'),
   }
   return labelMap[id] || id
 }
@@ -37,6 +38,7 @@ const DraggableFeatureListComponent = React.memo<DraggableFeatureListProps>(
     description,
     className = '',
   }) {
+    const { t } = useTranslation()
     const [draggedItem, setDraggedItem] = useState<string | null>(null)
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
 
@@ -115,7 +117,9 @@ const DraggableFeatureListComponent = React.memo<DraggableFeatureListProps>(
 
           {sortedItems.length === 0 && (
             <div className='flex items-center justify-center py-8 text-center'>
-              <p className='text-sm text-muted-foreground'>暂无功能项</p>
+              <p className='text-sm text-muted-foreground'>
+                {t('settings.menu.status.noFeatureItems')}
+              </p>
             </div>
           )}
         </div>
@@ -148,6 +152,8 @@ const FeatureListItem = React.memo<{
   onDragEnd,
   onToggle,
 }) {
+  const { t } = useTranslation()
+
   return (
     <div
       draggable
@@ -163,7 +169,7 @@ const FeatureListItem = React.memo<{
           <div className='flex items-center gap-3'>
             <GripVertical className='h-4 w-4 text-muted-foreground' />
             <Label className='text-sm font-medium text-foreground'>
-              {getFeatureItemLabel(item.id)}
+              {getFeatureItemLabel(item.id, t)}
             </Label>
           </div>
         </div>
@@ -174,7 +180,7 @@ const FeatureListItem = React.memo<{
             className='data-[state=checked]:bg-primary'
           />
           <span className='min-w-[3rem] text-xs text-muted-foreground'>
-            {item.enabled ? '显示' : '隐藏'}
+            {item.enabled ? t('settings.menu.status.visible') : t('settings.menu.status.hidden')}
           </span>
         </div>
       </div>

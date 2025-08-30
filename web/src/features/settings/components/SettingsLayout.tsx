@@ -6,6 +6,7 @@ import { MenuContent } from '@/features/settings/components/MenuContent'
 import { AppearanceContent } from '@/features/settings/components/AppearanceContent'
 import { GeneralSettingsContent } from '@/features/settings/components/GeneralSettingsContent'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useTranslation } from '@/lib/i18n'
 
 type SettingsPageKey = 'function' | 'menu' | 'appearance' | 'general'
 
@@ -19,27 +20,27 @@ interface SettingsMenuItem {
 const settingsMenus: SettingsMenuItem[] = [
   {
     key: 'function',
-    label: '功能配置',
+    label: 'settings.layout.function.title',
     icon: Wrench,
-    description: '管理应用功能开关和配置',
+    description: 'settings.layout.function.description',
   },
   {
     key: 'menu',
-    label: '菜单管理',
+    label: 'settings.layout.menu.title',
     icon: Menu,
-    description: '自定义菜单项和布局',
+    description: 'settings.layout.menu.description',
   },
   {
     key: 'appearance',
-    label: '外观主题',
+    label: 'settings.layout.appearance.title',
     icon: Palette,
-    description: '个性化界面外观设置',
+    description: 'settings.layout.appearance.description',
   },
   {
     key: 'general',
-    label: '系统设置',
+    label: 'settings.layout.general.title',
     icon: Settings,
-    description: '通用设置和高级选项',
+    description: 'settings.layout.general.description',
   },
 ]
 
@@ -50,6 +51,7 @@ function SettingsSidebar({
   activePage: SettingsPageKey
   setActivePage: (page: SettingsPageKey) => void
 }) {
+  const { t } = useTranslation()
   const handleMenuClick = (key: SettingsPageKey) => {
     setActivePage(key)
   }
@@ -85,6 +87,7 @@ function SettingsSidebar({
                       }
                     )}
                     tabIndex={0}
+                    title={t(item.description)}
                   >
                     <Icon
                       className={cn('h-5 w-5 flex-shrink-0 transition-colors', {
@@ -100,7 +103,7 @@ function SettingsSidebar({
                           'text-sidebar-foreground group-hover:text-sidebar-primary': !isActive,
                         })}
                       >
-                        {item.label}
+                        {t(item.label)}
                       </div>
                     </div>
                   </button>

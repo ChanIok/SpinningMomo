@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { checkForUpdates, downloadUpdate, installUpdate } from '@/lib/updaterApi'
+import { useTranslation } from '@/lib/i18n'
 
 type UpdateStatus = {
   available: boolean
@@ -12,6 +13,7 @@ type UpdateStatus = {
 } | null
 
 export function AboutContent() {
+  const { t } = useTranslation()
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(null)
   const [isChecking, setIsChecking] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -23,12 +25,12 @@ export function AboutContent() {
       const result = await checkForUpdates()
       setUpdateStatus(result)
       if (result.available) {
-        toast.success(`发现新版本: ${result.version}`)
+        toast.success(t('about.update.newVersionFound', { version: result.version || '' }))
       } else {
-        toast.success('当前已是最新版本')
+        toast.success(t('about.update.latestVersion'))
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '检查更新失败')
+      toast.error(error instanceof Error ? error.message : t('about.update.checkFailed'))
     } finally {
       setIsChecking(false)
     }
@@ -36,7 +38,7 @@ export function AboutContent() {
 
   const handleDownloadUpdate = async () => {
     if (!updateStatus?.downloadUrl) {
-      toast.error('没有可用的下载链接')
+      toast.error(t('about.update.noDownloadUrl'))
       return
     }
     setIsDownloading(true)
@@ -45,15 +47,17 @@ export function AboutContent() {
       if (result.success) {
         try {
           await installUpdate(false)
-          toast.success('更新已下载并将在下次程序重启时自动应用')
+          toast.success(t('about.update.updateDownloaded'))
         } catch (installError) {
-          toast.error(installError instanceof Error ? installError.message : '安装更新失败')
+          toast.error(
+            installError instanceof Error ? installError.message : t('about.update.installFailed')
+          )
         }
       } else {
-        toast.error(result.message || '下载更新失败')
+        toast.error(result.message || t('about.update.downloadFailed'))
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '下载更新失败')
+      toast.error(error instanceof Error ? error.message : t('about.update.downloadFailed'))
     } finally {
       setIsDownloading(false)
     }
@@ -65,16 +69,20 @@ export function AboutContent() {
         <div className='mx-auto max-w-4xl p-4'>
           {/* 页面标题 */}
           <div className='mb-6'>
-            <h1 className='text-2xl font-bold text-foreground'>关于</h1>
-            <p className='mt-1 text-muted-foreground'>了解应用程序信息、检查更新和相关资源</p>
+            <h1 className='text-2xl font-bold text-foreground'>{t('about.title')}</h1>
+            <p className='mt-1 text-muted-foreground'>{t('about.description')}</p>
           </div>
 
           <div className='space-y-8'>
             {/* 应用程序信息 */}
             <div className='space-y-4'>
               <div>
-                <h3 className='text-lg font-semibold text-foreground'>应用程序信息</h3>
-                <p className='mt-1 text-sm text-muted-foreground'>关于旋转吧大喵的基本信息</p>
+                <h3 className='text-lg font-semibold text-foreground'>
+                  {t('about.appInfo.title')}
+                </h3>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('about.appInfo.description')}
+                </p>
               </div>
 
               <div className='space-y-4 rounded-md border border-border bg-card p-4'>
@@ -88,20 +96,20 @@ export function AboutContent() {
                       target.style.display = 'none'
                     }}
                   /> */}
-                  
+
                   <div className='flex-1'>
                     <div className='text-lg font-semibold text-foreground'>
-                      旋转吧大喵
+                      {t('about.appInfo.appName')}
                     </div>
                     <div className='text-sm text-muted-foreground'>
-                      一个为《无限暖暖》提升摄影体验的窗口调整工具
+                      {t('about.appInfo.appDescription')}
                     </div>
                   </div>
                 </div>
 
                 <div className='py-2'>
                   <p className='text-sm text-muted-foreground'>
-                    由开源社区与 AI 协作完成，感谢你的支持。
+                    {t('about.appInfo.communityText')}
                   </p>
                 </div>
               </div>
@@ -110,25 +118,31 @@ export function AboutContent() {
             {/* 版本更新 */}
             <div className='space-y-4'>
               <div>
-                <h3 className='text-lg font-semibold text-foreground'>版本更新</h3>
-                <p className='mt-1 text-sm text-muted-foreground'>检查和安装应用程序更新</p>
+                <h3 className='text-lg font-semibold text-foreground'>{t('about.update.title')}</h3>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('about.update.description')}
+                </p>
               </div>
 
               <div className='space-y-4 rounded-md border border-border bg-card p-4'>
                 <div className='flex items-center justify-between py-2'>
                   <div className='flex-1 pr-4'>
-                    <div className='text-sm font-medium text-foreground'>检查更新</div>
+                    <div className='text-sm font-medium text-foreground'>
+                      {t('about.update.checkUpdate')}
+                    </div>
                     <p className='mt-1 text-sm text-muted-foreground'>
-                      检查是否有可用的应用程序更新
+                      {t('about.update.checkUpdateDescription')}
                     </p>
                   </div>
                   <div className='flex flex-shrink-0 items-center gap-2'>
                     <Button onClick={handleCheckForUpdates} disabled={isChecking} size='sm'>
-                      {isChecking ? '检查中...' : '检查更新'}
+                      {isChecking ? t('about.update.checking') : t('about.update.checkUpdate')}
                     </Button>
                     {updateStatus?.available && (
                       <Button onClick={handleDownloadUpdate} disabled={isDownloading} size='sm'>
-                        {isDownloading ? '更新中...' : '下载并安装'}
+                        {isDownloading
+                          ? t('about.update.updating')
+                          : t('about.update.downloadAndInstall')}
                       </Button>
                     )}
                   </div>
@@ -138,7 +152,7 @@ export function AboutContent() {
                 {updateStatus?.available && (
                   <div className='rounded-lg border border-accent/40 bg-accent/15 p-3'>
                     <div className='text-sm'>
-                      发现新版本：<b>v{updateStatus.version}</b>
+                      {t('about.update.newVersionFound', { version: updateStatus.version || '' })}
                       {updateStatus.releaseNotes && showNotes && (
                         <pre className='mt-2 text-xs whitespace-pre-wrap text-muted-foreground'>
                           {updateStatus.releaseNotes}
@@ -148,7 +162,7 @@ export function AboutContent() {
                     {updateStatus.releaseNotes && (
                       <div className='mt-2'>
                         <Button variant='outline' size='sm' onClick={() => setShowNotes((v) => !v)}>
-                          {showNotes ? '收起说明' : '查看说明'}
+                          {showNotes ? t('about.update.hideNotes') : t('about.update.showNotes')}
                         </Button>
                       </div>
                     )}
@@ -160,8 +174,12 @@ export function AboutContent() {
             {/* 相关资源 */}
             <div className='space-y-4'>
               <div>
-                <h3 className='text-lg font-semibold text-foreground'>相关资源</h3>
-                <p className='mt-1 text-sm text-muted-foreground'>访问文档、源代码和许可证信息</p>
+                <h3 className='text-lg font-semibold text-foreground'>
+                  {t('about.resources.title')}
+                </h3>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('about.resources.description')}
+                </p>
               </div>
 
               <div className='space-y-4 rounded-md border border-border bg-card p-4'>
@@ -172,8 +190,12 @@ export function AboutContent() {
                     target='_blank'
                     rel='noreferrer'
                   >
-                    <div className='text-sm font-medium'>使用文档</div>
-                    <div className='text-xs text-muted-foreground'>查看完整的使用指南</div>
+                    <div className='text-sm font-medium'>
+                      {t('about.resources.documentation.title')}
+                    </div>
+                    <div className='text-xs text-muted-foreground'>
+                      {t('about.resources.documentation.description')}
+                    </div>
                   </a>
                   <a
                     className='flex flex-col items-center gap-2 rounded-md border px-4 py-3 text-center transition hover:bg-accent hover:text-accent-foreground'
@@ -181,8 +203,12 @@ export function AboutContent() {
                     target='_blank'
                     rel='noreferrer'
                   >
-                    <div className='text-sm font-medium'>GitHub Release</div>
-                    <div className='text-xs text-muted-foreground'>下载最新版本</div>
+                    <div className='text-sm font-medium'>
+                      {t('about.resources.githubRelease.title')}
+                    </div>
+                    <div className='text-xs text-muted-foreground'>
+                      {t('about.resources.githubRelease.description')}
+                    </div>
                   </a>
                   <a
                     className='flex flex-col items-center gap-2 rounded-md border px-4 py-3 text-center transition hover:bg-accent hover:text-accent-foreground'
@@ -190,8 +216,10 @@ export function AboutContent() {
                     target='_blank'
                     rel='noreferrer'
                   >
-                    <div className='text-sm font-medium'>MIT License</div>
-                    <div className='text-xs text-muted-foreground'>查看开源许可证</div>
+                    <div className='text-sm font-medium'>{t('about.resources.license.title')}</div>
+                    <div className='text-xs text-muted-foreground'>
+                      {t('about.resources.license.description')}
+                    </div>
                   </a>
                 </div>
               </div>

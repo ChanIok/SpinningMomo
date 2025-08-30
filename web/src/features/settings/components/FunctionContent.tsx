@@ -9,8 +9,10 @@ import { call } from '@/lib/rpc'
 import { Switch } from '@/components/ui/switch'
 import { getCurrentEnvironment } from '@/lib/environment'
 import { ResetSettingsDialog } from './ResetSettingsDialog'
+import { useTranslation } from '@/lib/i18n'
 
 export function FunctionContent() {
+  const { t } = useTranslation()
   const { appSettings, error, isInitialized, clearError } = useSettingsStore()
   const {
     updateWindowTitle,
@@ -36,16 +38,16 @@ export function FunctionContent() {
 
   const handleUpdateTitle = async () => {
     if (inputTitle.trim() === '') {
-      toast.error('窗口标题不能为空')
+      toast.error(t('settings.function.windowControl.windowTitle.emptyError'))
       return
     }
 
     try {
       await updateWindowTitle(inputTitle.trim())
-      toast.success('窗口标题已更新')
+      toast.success(t('settings.function.windowControl.windowTitle.updateSuccess'))
     } catch (error) {
       console.error('Failed to update window title:', error)
-      toast.error('更新窗口标题失败')
+      toast.error(t('settings.function.windowControl.windowTitle.updateFailed'))
     }
   }
 
@@ -65,16 +67,16 @@ export function FunctionContent() {
       const result = await call<{ path: string }>(
         'dialog.openDirectory',
         {
-          title: '选择截图目录',
+          title: t('settings.function.screenshot.directory.dialogTitle'),
           parentWindowMode,
         },
         0
       ) // 永不超时
       await updateScreenshotDir(result.path)
-      toast.success('截图目录已更新')
+      toast.success(t('settings.function.screenshot.directory.selectSuccess'))
     } catch (error) {
       console.error('Failed to select screenshot directory:', error)
-      toast.error('选择截图目录失败')
+      toast.error(t('settings.function.screenshot.directory.selectFailed'))
     } finally {
       setIsSelectingDir(false)
     }
@@ -82,7 +84,7 @@ export function FunctionContent() {
 
   const handleResetSettings = async () => {
     await resetFunctionSettings()
-    toast.success('功能设置已重置为默认值')
+    toast.success(t('settings.function.reset.success'))
   }
 
   // 显示加载状态（仅在未初始化时）
@@ -91,7 +93,7 @@ export function FunctionContent() {
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
           <div className='mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary'></div>
-          <p className='mt-2 text-sm text-muted-foreground'>加载功能设置中...</p>
+          <p className='mt-2 text-sm text-muted-foreground'>{t('settings.function.loading')}</p>
         </div>
       </div>
     )
@@ -102,10 +104,10 @@ export function FunctionContent() {
     return (
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
-          <p className='text-sm text-muted-foreground'>无法加载功能设置</p>
+          <p className='text-sm text-muted-foreground'>{t('settings.function.error.title')}</p>
           <p className='mt-1 text-sm text-red-500'>{error}</p>
           <Button variant='outline' size='sm' onClick={clearError} className='mt-2'>
-            重试
+            {t('settings.function.error.retry')}
           </Button>
         </div>
       </div>
@@ -117,13 +119,13 @@ export function FunctionContent() {
       {/* 页面标题 */}
       <div className='mb-6 flex items-center justify-between'>
         <div>
-          <h1 className='text-2xl font-bold text-foreground'>功能设置</h1>
-          <p className='mt-1 text-muted-foreground'>管理应用程序的各项功能设置</p>
+          <h1 className='text-2xl font-bold text-foreground'>{t('settings.function.title')}</h1>
+          <p className='mt-1 text-muted-foreground'>{t('settings.function.description')}</p>
         </div>
 
         <ResetSettingsDialog
-          title='重置功能设置'
-          description=' 此操作将重置当前页面设置为默认值。'
+          title={t('settings.function.reset.title')}
+          description={t('settings.function.reset.description')}
           onReset={handleResetSettings}
         />
       </div>
@@ -132,35 +134,45 @@ export function FunctionContent() {
         {/* 窗口控制 */}
         <div className='space-y-4'>
           <div>
-            <h3 className='text-lg font-semibold text-foreground'>窗口控制</h3>
-            <p className='mt-1 text-sm text-muted-foreground'>自定义应用程序窗口的控制设置</p>
+            <h3 className='text-lg font-semibold text-foreground'>
+              {t('settings.function.windowControl.title')}
+            </h3>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              {t('settings.function.windowControl.description')}
+            </p>
           </div>
 
           <div className='space-y-4 rounded-md border border-border bg-card p-4'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>窗口标题</Label>
-                <p className='mt-1 text-sm text-muted-foreground'>设置目标窗口的标题栏文本</p>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.function.windowControl.windowTitle.label')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.function.windowControl.windowTitle.description')}
+                </p>
               </div>
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   value={inputTitle}
                   onChange={(e) => setInputTitle(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder='输入窗口标题...'
+                  placeholder={t('settings.function.windowControl.windowTitle.placeholder')}
                   className='w-48'
                 />
                 <Button onClick={handleUpdateTitle} disabled={inputTitle.trim() === ''} size='sm'>
-                  更新
+                  {t('settings.function.windowControl.windowTitle.update')}
                 </Button>
               </div>
             </div>
 
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>调整时置底任务栏</Label>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.function.windowControl.taskbarLowerOnResize.label')}
+                </Label>
                 <p className='mt-1 text-sm text-muted-foreground'>
-                  窗口调整大小时将系统任务栏置于底层，避免遮挡目标窗口
+                  {t('settings.function.windowControl.taskbarLowerOnResize.description')}
                 </p>
               </div>
               <div className='flex-shrink-0'>
@@ -176,20 +188,35 @@ export function FunctionContent() {
         {/* 截图设置 */}
         <div className='space-y-4'>
           <div>
-            <h3 className='text-lg font-semibold text-foreground'>截图设置</h3>
-            <p className='mt-1 text-sm text-muted-foreground'>自定义截图相关的设置</p>
+            <h3 className='text-lg font-semibold text-foreground'>
+              {t('settings.function.screenshot.title')}
+            </h3>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              {t('settings.function.screenshot.description')}
+            </p>
           </div>
 
           <div className='space-y-4 rounded-md border border-border bg-card p-4'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>截图目录</Label>
-                <p className='mt-1 text-sm text-muted-foreground'>设置截图保存的目录路径</p>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.function.screenshot.directory.label')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.function.screenshot.directory.description')}
+                </p>
               </div>
               <div className='flex flex-shrink-0 items-center gap-2'>
-                <Input value={screenshotDir} readOnly placeholder='默认路径' className='w-48' />
+                <Input
+                  value={screenshotDir}
+                  readOnly
+                  placeholder={t('settings.function.screenshot.directory.placeholder')}
+                  className='w-48'
+                />
                 <Button onClick={handleSelectDir} disabled={isSelectingDir} size='sm'>
-                  {isSelectingDir ? '选择中...' : '选择目录'}
+                  {isSelectingDir
+                    ? t('settings.function.screenshot.directory.selecting')
+                    : t('settings.function.screenshot.directory.selectButton')}
                 </Button>
               </div>
             </div>
@@ -199,15 +226,21 @@ export function FunctionContent() {
         {/* 黑边模式 */}
         <div className='space-y-4'>
           <div>
-            <h3 className='text-lg font-semibold text-foreground'>黑边模式</h3>
-            <p className='mt-1 text-sm text-muted-foreground'>启用后在目标窗口周围添加黑边遮罩</p>
+            <h3 className='text-lg font-semibold text-foreground'>
+              {t('settings.function.letterbox.title')}
+            </h3>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              {t('settings.function.letterbox.description')}
+            </p>
           </div>
           <div className='space-y-4 rounded-md border border-border bg-card p-4'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
-                <Label className='text-sm font-medium text-foreground'>是否启用黑边模式</Label>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.function.letterbox.enabled.label')}
+                </Label>
                 <p className='mt-1 text-sm text-muted-foreground'>
-                  为非屏幕原生比例的窗口提供沉浸式体验
+                  {t('settings.function.letterbox.enabled.description')}
                 </p>
               </div>
               <div className='flex-shrink-0'>

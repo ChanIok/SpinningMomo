@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button'
 import { DraggableFeatureList } from './DraggableFeatureList'
 import { DraggablePresetList } from './DraggablePresetList'
 import { ResetSettingsDialog } from './ResetSettingsDialog'
+import { useTranslation } from '@/lib/i18n'
 import type { FeatureItem, PresetItem } from '@/lib/settings/settingsTypes'
 
 export function MenuContent() {
+  const { t } = useTranslation()
   const { appSettings, error, isInitialized, clearError } = useSettingsStore()
   const { updateFeatureItems, updateAspectRatios, updateResolutions, resetMenuSettings } =
     useMenuActions()
@@ -23,7 +25,7 @@ export function MenuContent() {
       await updateFeatureItems(items)
     } catch (error) {
       console.error('Failed to update feature items:', error)
-      toast.error('更新功能项失败')
+      toast.error(t('settings.menu.feature.updateFailed'))
     }
   }
 
@@ -36,7 +38,7 @@ export function MenuContent() {
       // 乐观更新，无需立即显示成功提示，只在失败时显示错误
     } catch (error) {
       console.error('Failed to toggle feature item:', error)
-      toast.error('更新功能项失败')
+      toast.error(t('settings.menu.feature.updateFailed'))
     }
   }
 
@@ -46,7 +48,7 @@ export function MenuContent() {
       await updateAspectRatios(items)
     } catch (error) {
       console.error('Failed to update aspect ratios:', error)
-      toast.error('更新比例设置失败')
+      toast.error(t('settings.menu.aspectRatio.updateFailed'))
     }
   }
 
@@ -59,7 +61,7 @@ export function MenuContent() {
       // 乐观更新，无需立即显示成功提示
     } catch (error) {
       console.error('Failed to toggle aspect ratio:', error)
-      toast.error('更新比例设置失败')
+      toast.error(t('settings.menu.aspectRatio.updateFailed'))
     }
   }
 
@@ -73,7 +75,7 @@ export function MenuContent() {
       await updateAspectRatios(updatedItems)
     } catch (error) {
       console.error('Failed to add aspect ratio:', error)
-      toast.error('添加比例失败')
+      toast.error(t('settings.menu.aspectRatio.addFailed'))
     }
   }
 
@@ -83,7 +85,7 @@ export function MenuContent() {
       await updateAspectRatios(updatedItems)
     } catch (error) {
       console.error('Failed to remove aspect ratio:', error)
-      toast.error('删除比例失败')
+      toast.error(t('settings.menu.aspectRatio.removeFailed'))
     }
   }
 
@@ -93,7 +95,7 @@ export function MenuContent() {
       await updateResolutions(items)
     } catch (error) {
       console.error('Failed to update resolutions:', error)
-      toast.error('更新分辨率设置失败')
+      toast.error(t('settings.menu.resolution.updateFailed'))
     }
   }
 
@@ -106,7 +108,7 @@ export function MenuContent() {
       // 乐观更新，无需立即显示成功提示
     } catch (error) {
       console.error('Failed to toggle resolution:', error)
-      toast.error('更新分辨率设置失败')
+      toast.error(t('settings.menu.resolution.updateFailed'))
     }
   }
 
@@ -120,7 +122,7 @@ export function MenuContent() {
       await updateResolutions(updatedItems)
     } catch (error) {
       console.error('Failed to add resolution:', error)
-      toast.error('添加分辨率失败')
+      toast.error(t('settings.menu.resolution.addFailed'))
     }
   }
 
@@ -130,13 +132,13 @@ export function MenuContent() {
       await updateResolutions(updatedItems)
     } catch (error) {
       console.error('Failed to remove resolution:', error)
-      toast.error('删除分辨率失败')
+      toast.error(t('settings.menu.resolution.removeFailed'))
     }
   }
 
   const handleResetSettings = async () => {
     await resetMenuSettings()
-    toast.success('菜单设置已重置为默认值')
+    toast.success(t('settings.menu.reset.success'))
   }
 
   // 验证函数
@@ -158,7 +160,7 @@ export function MenuContent() {
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
           <div className='mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary'></div>
-          <p className='mt-2 text-sm text-muted-foreground'>加载菜单中...</p>
+          <p className='mt-2 text-sm text-muted-foreground'>{t('settings.menu.loading')}</p>
         </div>
       </div>
     )
@@ -169,10 +171,10 @@ export function MenuContent() {
     return (
       <div className='flex items-center justify-center p-6'>
         <div className='text-center'>
-          <p className='text-sm text-muted-foreground'>无法加载菜单</p>
+          <p className='text-sm text-muted-foreground'>{t('settings.menu.error.title')}</p>
           <p className='mt-1 text-sm text-red-500'>{error}</p>
           <Button variant='outline' size='sm' onClick={clearError} className='mt-2'>
-            重试
+            {t('settings.menu.error.retry')}
           </Button>
         </div>
       </div>
@@ -184,13 +186,13 @@ export function MenuContent() {
       {/* 页面标题 */}
       <div className='mb-6 flex items-center justify-between'>
         <div>
-          <h1 className='text-2xl font-bold text-foreground'>菜单设置</h1>
-          <p className='mt-1 text-muted-foreground'>管理浮窗菜单项和右键菜单项的设置</p>
+          <h1 className='text-2xl font-bold text-foreground'>{t('settings.menu.title')}</h1>
+          <p className='mt-1 text-muted-foreground'>{t('settings.menu.description')}</p>
         </div>
 
         <ResetSettingsDialog
-          title='重置菜单设置'
-          description='此操作将重置当前页面设置为默认值。'
+          title={t('settings.menu.reset.title')}
+          description={t('settings.menu.reset.description')}
           onReset={handleResetSettings}
         />
       </div>
@@ -201,8 +203,8 @@ export function MenuContent() {
           items={getFeatureItems()}
           onReorder={handleFeatureItemsReorder}
           onToggle={handleFeatureItemToggle}
-          title='功能菜单'
-          description='管理浮窗中显示的功能项，支持拖拽排序'
+          title={t('settings.menu.feature.title')}
+          description={t('settings.menu.feature.description')}
         />
 
         {/* 比例管理器 */}
@@ -212,9 +214,9 @@ export function MenuContent() {
           onToggle={handleAspectRatioToggle}
           onAdd={handleAspectRatioAdd}
           onRemove={handleAspectRatioRemove}
-          title='宽高比设置'
-          description='管理浮窗中显示的宽高比选项，支持添加自定义比例'
-          addPlaceholder='如: 21:9'
+          title={t('settings.menu.aspectRatio.title')}
+          description={t('settings.menu.aspectRatio.description')}
+          addPlaceholder={t('settings.menu.aspectRatio.placeholder')}
           validateCustom={validateAspectRatio}
         />
 
@@ -225,9 +227,9 @@ export function MenuContent() {
           onToggle={handleResolutionToggle}
           onAdd={handleResolutionAdd}
           onRemove={handleResolutionRemove}
-          title='分辨率设置'
-          description='管理浮窗中显示的分辨率选项，支持添加自定义分辨率'
-          addPlaceholder='如: 3840x2160 或 5K'
+          title={t('settings.menu.resolution.title')}
+          description={t('settings.menu.resolution.description')}
+          addPlaceholder={t('settings.menu.resolution.placeholder')}
           validateCustom={validateResolution}
         />
       </div>
