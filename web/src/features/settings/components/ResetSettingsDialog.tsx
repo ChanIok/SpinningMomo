@@ -50,7 +50,11 @@ export function ResetSettingsDialog({
     <AlertDialog>
       <AlertDialogTrigger asChild>
         {trigger || (
-          <Button variant='outline' size='sm' className='shrink-0'>
+          <Button
+            variant='outline'
+            size='sm'
+            className='shrink-0 bg-background/80 dark:bg-secondary/80 dark:hover:bg-secondary'
+          >
             <RotateCcw className='mr-2 h-4 w-4' />
             {triggerText || t('settings.reset.dialog.triggerText')}
           </Button>

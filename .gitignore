@@ -64,3 +64,4 @@ web/coverage/
 web/.cache/
 web/.parcel-cache/
 web/.vite/
+web/stats*

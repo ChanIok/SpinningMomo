@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import type { WebSettings, WebBackgroundSettings, WebSettingsState } from './webSettingsTypes'
+import type {
+  WebSettings,
+  WebBackgroundSettings,
+  ThemeSettings,
+  WebSettingsState,
+} from './webSettingsTypes'
 import { DEFAULT_WEB_SETTINGS } from './webSettingsTypes'
 import {
   readWebSettings,
@@ -20,6 +25,7 @@ interface WebSettingsActions {
   // 业务操作
   initialize: () => Promise<void>
   updateBackgroundSettings: (background: Partial<WebBackgroundSettings>) => Promise<void>
+  updateThemeSettings: (theme: Partial<ThemeSettings>) => Promise<void>
   selectAndSetBackgroundImage: () => Promise<void>
   removeBackgroundImage: () => Promise<void>
   loadSettings: () => Promise<void>
@@ -136,6 +142,43 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
             error: error instanceof Error ? error.message : '更新背景设置失败',
           })
           console.error('❌ 背景设置更新失败，已回滚:', error)
+          throw error
+        }
+      },
+
+      // 更新主题设置（乐观更新）
+      updateThemeSettings: async (partialTheme: Partial<ThemeSettings>) => {
+        const { settings } = get()
+        const previousSettings = settings
+
+        // 1. 立即更新本地状态（乐观更新）
+        const optimisticSettings = {
+          ...settings,
+          ui: {
+            ...settings.ui,
+            theme: {
+              ...settings.ui.theme,
+              ...partialTheme,
+            },
+          },
+        }
+
+        set({
+          settings: optimisticSettings,
+          error: null,
+        })
+
+        try {
+          // 2. 同步到文件
+          await writeWebSettings(optimisticSettings)
+          console.log('✅ 主题设置已更新:', partialTheme)
+        } catch (error) {
+          // 3. 失败时回滚
+          set({
+            settings: previousSettings,
+            error: error instanceof Error ? error.message : '更新主题设置失败',
+          })
+          console.error('❌ 主题设置更新失败，已回滚:', error)
           throw error
         }
       },

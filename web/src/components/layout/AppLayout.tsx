@@ -2,6 +2,7 @@ import { ActivityBar } from './ActivityBar'
 import { ContentArea } from './ContentArea'
 import { Header } from './Header'
 import { Toaster } from '@/components/ui/sonner'
+import { ThemeProvider } from '@/components/ThemeProvider'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { isWebView } from '@/lib/environment'
 import { useLocation } from 'react-router'
@@ -23,43 +24,45 @@ export default function AppLayout() {
     : ''
 
   return (
-    <>
-      {/* Background Layer */}
-      <div
-        className='fixed inset-0 z-[-2] bg-cover bg-center bg-no-repeat'
-        style={{
-          backgroundImage: backgroundImageUrl ? `url('${backgroundImageUrl}')` : "url('')",
-        }}
-      />
+    <ThemeProvider>
+      <>
+        {/* Background Layer */}
+        <div
+          className='fixed inset-0 z-[-2] bg-cover bg-center bg-no-repeat'
+          style={{
+            backgroundImage: backgroundImageUrl ? `url('${backgroundImageUrl}')` : "url('')",
+          }}
+        />
 
-      {/* Glass Overlay Layer */}
-      <div
-        className={`fixed inset-0 z-[-1] transition-opacity duration-300 ${
-          isHomePage ? 'opacity-0' : 'opacity-100'
-        }`}
-        style={{
-          backdropFilter: 'blur(0px)',
-          background: shouldShowBackground 
-            ? `color-mix(in srgb, var(--background) ${backgroundSettings.opacity * 100}%, transparent)`
-            : 'var(--background-secondary)',
-        }}
-      />
+        {/* Glass Overlay Layer */}
+        <div
+          className={`fixed inset-0 z-[-1] transition-opacity duration-300 ${
+            isHomePage ? 'opacity-0' : 'opacity-100'
+          }`}
+          style={{
+            backdropFilter: 'blur(0px)',
+            background: shouldShowBackground
+              ? `color-mix(in srgb, var(--background) ${backgroundSettings.opacity * 100}%, transparent)`
+              : 'var(--background-secondary)',
+          }}
+        />
 
-      <SidebarProvider>
-        <div className='relative flex h-screen w-screen flex-col text-foreground'>
-          {showHeader && <Header />}
+        <SidebarProvider>
+          <div className='relative flex h-screen w-screen flex-col text-foreground'>
+            {showHeader && <Header />}
 
-          <div className='flex flex-1 overflow-hidden'>
-            <ActivityBar />
-
-            {/* Main Layout Area (Content) */}
             <div className='flex flex-1 overflow-hidden'>
-              <ContentArea />
+              <ActivityBar />
+
+              {/* Main Layout Area (Content) */}
+              <div className='flex flex-1 overflow-hidden'>
+                <ContentArea />
+              </div>
             </div>
           </div>
-        </div>
-      </SidebarProvider>
-      <Toaster />
-    </>
+        </SidebarProvider>
+        <Toaster />
+      </>
+    </ThemeProvider>
   )
 }

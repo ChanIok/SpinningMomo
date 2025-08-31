@@ -92,7 +92,7 @@ function SettingsSidebar({
                     <Icon
                       className={cn('h-5 w-5 flex-shrink-0 transition-colors', {
                         'text-sidebar-accent-foreground': isActive,
-                        'text-sidebar-foreground group-hover:text-sidebar-primary': !isActive,
+                        'text-sidebar-foreground': !isActive,
                       })}
                       strokeWidth={isActive ? 2.5 : 1.8}
                     />
@@ -100,7 +100,7 @@ function SettingsSidebar({
                       <div
                         className={cn('font-medium transition-colors', {
                           'text-sidebar-accent-foreground': isActive,
-                          'text-sidebar-foreground group-hover:text-sidebar-primary': !isActive,
+                          'text-sidebar-foreground': !isActive,
                         })}
                       >
                         {t(item.label)}

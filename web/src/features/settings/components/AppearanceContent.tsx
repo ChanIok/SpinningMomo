@@ -3,10 +3,18 @@ import { toast } from 'sonner'
 import { useSettingsStore } from '@/lib/settings'
 import { useAppearanceActions } from '@/features/settings/hooks/useAppearanceActions'
 import { useWebSettingsStore } from '@/lib/web-settings'
+import { useTheme } from 'next-themes'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ResetSettingsDialog } from './ResetSettingsDialog'
 import { useTranslation } from '@/lib/i18n'
 import type { AppWindowLayout } from '@/lib/settings/settingsTypes'
@@ -23,6 +31,7 @@ export function AppearanceContent() {
     removeBackgroundImage,
     initialize: initializeWebSettings,
   } = useWebSettingsStore()
+  const { theme, setTheme } = useTheme()
 
   // 当前布局设置状态
   const [layoutSettings, setLayoutSettings] = useState<AppWindowLayout>({
@@ -114,6 +123,18 @@ export function AppearanceContent() {
       console.error('Failed to remove background image:', error)
       toast.error(t('settings.appearance.background.removeFailed'))
     }
+  }
+
+  // 主题选项
+  const themeOptions = [
+    { value: 'light', label: t('settings.appearance.theme.light') },
+    { value: 'dark', label: t('settings.appearance.theme.dark') },
+    { value: 'system', label: t('settings.appearance.theme.system') },
+  ]
+
+  // 主题切换处理
+  const handleThemeChange = (themeMode: 'light' | 'dark' | 'system') => {
+    setTheme(themeMode)
   }
 
   const handleResetSettings = async () => {
@@ -219,10 +240,49 @@ export function AppearanceContent() {
                   variant='outline'
                   size='sm'
                   onClick={handleRemoveBackgroundImage}
-                  disabled={webSettings.ui.background.type === 'none'}
+                  disabled={webSettings.ui?.background?.type === 'none'}
                 >
                   {t('settings.appearance.background.image.removeButton')}
                 </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 主题设置 */}
+        <div className='space-y-4'>
+          <div>
+            <h3 className='text-lg font-semibold text-foreground'>
+              {t('settings.appearance.theme.title')}
+            </h3>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              {t('settings.appearance.theme.description')}
+            </p>
+          </div>
+
+          <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+            <div className='flex items-center justify-between py-2'>
+              <div className='flex-1 pr-4'>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.appearance.theme.mode.label')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.appearance.theme.mode.description')}
+                </p>
+              </div>
+              <div className='flex flex-shrink-0'>
+                <Select value={theme || 'system'} onValueChange={handleThemeChange}>
+                  <SelectTrigger className='w-32'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {themeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

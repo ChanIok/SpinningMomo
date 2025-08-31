@@ -79,7 +79,7 @@
 .dark {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
+  --card: oklch(0.21 0.006 285.885 / 0.8);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.21 0.006 285.885);
   --popover-foreground: oklch(0.985 0 0);
@@ -104,7 +104,7 @@
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
+  --sidebar-accent: oklch(0.274 0.006 286.033 / 0.8);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
@@ -117,4 +117,30 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+[data-slot='input'] {
+  box-shadow: none;
+  background-color: oklch(from var(--background) l c h / 0.8);
+}
+
+.dark [data-slot='input'] {
+  background-color: oklch(from var(--primary) l c h / 0.05);
+}
+
+[data-slot='button'] {
+  box-shadow: none;
+}
+
+[data-slot='alert-dialog-trigger'] {
+  box-shadow: none;
+}
+
+[data-slot='select-trigger'] {
+  box-shadow: none;
+  background-color: oklch(from var(--background) l c h / 0.8);
+}
+
+.dark [data-slot='select-trigger'] {
+  background-color: oklch(from var(--primary) l c h / 0.05);
 }
