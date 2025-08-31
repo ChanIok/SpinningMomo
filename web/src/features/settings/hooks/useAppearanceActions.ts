@@ -12,7 +12,7 @@ import {
 // 扩展appearance特有的业务方法
 export const useAppearanceActions = () => {
   const { appSettings, updateSettings } = useSettingsStore()
-  const { webSettings, setSettings, setError } = useWebSettingsStore()
+  const { webSettings, setSettings, setError, loadSettings } = useWebSettingsStore()
 
   // 乐观更新：更新AppWindow布局设置
   const updateAppWindowLayout = async (layout: AppWindowLayout) => {
@@ -121,6 +121,9 @@ export const useAppearanceActions = () => {
           type: 'image',
           imagePath: copiedImagePath,
         })
+
+        // 重新读取state，刷新背景图片
+        await loadSettings()
       }
     } catch (error) {
       console.error('设置背景图片失败:', error)
