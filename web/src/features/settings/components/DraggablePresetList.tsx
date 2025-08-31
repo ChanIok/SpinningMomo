@@ -143,7 +143,7 @@ const DraggablePresetListComponent = React.memo<DraggablePresetListProps>(
           <p className='mt-1 text-sm text-muted-foreground'>{description}</p>
         </div>
 
-        <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+        <div className='content-panel'>
           {sortedItems.map((item, index) => (
             <PresetListItem
               key={item.id}
@@ -247,7 +247,7 @@ const PresetListItem = React.memo<{
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, index)}
       onDragEnd={onDragEnd}
-      className={`flex cursor-move items-center justify-between rounded-md border bg-card p-3 transition-all duration-200 ${draggedItem === item.id ? 'scale-95 opacity-50' : ''} ${dragOverIndex === index ? 'border-primary bg-primary/5' : 'border-border'} hover:border-primary/50 hover:bg-accent/50`}
+      className={`flex cursor-move items-center justify-between rounded-md p-3 transition-all duration-200 ${draggedItem === item.id ? 'scale-95 opacity-50' : ''} ${dragOverIndex === index ? 'border-primary bg-primary/5' : 'border-border'} hover:border-primary/50 hover:bg-accent/50`}
     >
       <div className='flex flex-1 items-center justify-between'>
         <div className='flex-1 pr-4'>

@@ -85,7 +85,7 @@ export function AboutContent() {
                 </p>
               </div>
 
-              <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+              <div className='content-panel'>
                 <div className='flex items-center gap-4 py-2'>
                   {/* <img
                     src='/logo.png'
@@ -124,7 +124,7 @@ export function AboutContent() {
                 </p>
               </div>
 
-              <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+              <div className='content-panel'>
                 <div className='flex items-center justify-between py-2'>
                   <div className='flex-1 pr-4'>
                     <div className='text-sm font-medium text-foreground'>
@@ -182,7 +182,7 @@ export function AboutContent() {
                 </p>
               </div>
 
-              <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+              <div className='content-panel'>
                 <div className='grid gap-3 sm:grid-cols-3'>
                   <a
                     className='flex flex-col items-center gap-2 rounded-md border px-4 py-3 text-center transition hover:bg-accent hover:text-accent-foreground'

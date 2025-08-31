@@ -142,7 +142,7 @@ export function FunctionContent() {
             </p>
           </div>
 
-          <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+          <div className='content-panel'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
                 <Label className='text-sm font-medium text-foreground'>
@@ -196,7 +196,7 @@ export function FunctionContent() {
             </p>
           </div>
 
-          <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+          <div className='content-panel'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
                 <Label className='text-sm font-medium text-foreground'>
@@ -233,7 +233,7 @@ export function FunctionContent() {
               {t('settings.function.letterbox.description')}
             </p>
           </div>
-          <div className='space-y-4 rounded-md border border-border bg-card p-4'>
+          <div className='content-panel'>
             <div className='flex items-center justify-between py-2'>
               <div className='flex-1 pr-4'>
                 <Label className='text-sm font-medium text-foreground'>

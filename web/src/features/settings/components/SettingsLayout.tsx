@@ -79,32 +79,21 @@ function SettingsSidebar({
                     onKeyDown={(e) => handleKeyDown(e, item.key)}
                     className={cn(
                       'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-all duration-200',
-                      'text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                      'settings-menu-text settings-menu-bg-hover settings-menu-text-hover',
                       {
-                        'bg-sidebar-accent text-sidebar-accent-foreground': isActive,
-                        'text-sidebar-foreground': !isActive,
+                        'settings-menu-bg-active settings-menu-text-active': isActive,
                       }
                     )}
                     tabIndex={0}
                     title={t(item.description)}
                   >
                     <Icon
-                      className={cn('h-5 w-5 flex-shrink-0 transition-colors', {
-                        'text-sidebar-accent-foreground': isActive,
-                        'text-sidebar-foreground': !isActive,
-                      })}
-                      strokeWidth={isActive ? 2.5 : 1.8}
+                      className={cn('h-5 w-5 flex-shrink-0')}
+                      strokeWidth='1.8'
                     />
                     <div className='min-w-0 flex-1'>
-                      <div
-                        className={cn('font-medium transition-colors', {
-                          'text-sidebar-accent-foreground': isActive,
-                          'text-sidebar-foreground': !isActive,
-                        })}
-                      >
-                        {t(item.label)}
-                      </div>
+                      <div className={cn('font-medium')}>{t(item.label)}</div>
                     </div>
                   </button>
                 </div>
