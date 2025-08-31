@@ -77,7 +77,6 @@ export const useGeneralActions = () => {
   }
 
   return {
-    appSettings,
     updateLanguage,
     updateLoggerLevel,
     updateToggleVisibilityHotkey,

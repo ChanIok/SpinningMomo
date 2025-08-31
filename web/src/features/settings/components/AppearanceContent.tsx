@@ -22,15 +22,16 @@ import type { AppWindowLayout } from '@/lib/settings/settingsTypes'
 export function AppearanceContent() {
   const { t } = useTranslation()
   const { appSettings, error, isInitialized, clearError } = useSettingsStore()
-  const { updateAppWindowLayout, resetAppearanceSettings } = useAppearanceActions()
+  const { webSettings } = useWebSettingsStore()
   const {
-    settings: webSettings,
-    error: webSettingsError,
-    updateBackgroundSettings,
-    selectAndSetBackgroundImage,
-    removeBackgroundImage,
-    initialize: initializeWebSettings,
-  } = useWebSettingsStore()
+    updateAppWindowLayout,
+    resetAppearanceSettings,
+    updateBackgroundOpacity,
+    updateBackgroundBlur,
+    handleBackgroundImageSelect,
+    handleBackgroundImageRemove,
+  } = useAppearanceActions()
+  const { error: webSettingsError, initialize: initializeWebSettings } = useWebSettingsStore()
   const { theme, setTheme } = useTheme()
 
   // 当前布局设置状态
@@ -100,16 +101,25 @@ export function AppearanceContent() {
   // Web设置处理函数
   const handleOpacityChange = async (opacity: number) => {
     try {
-      await updateBackgroundSettings({ opacity })
+      await updateBackgroundOpacity(opacity)
     } catch (error) {
       console.error('Failed to update opacity:', error)
       toast.error(t('settings.appearance.background.updateFailed'))
     }
   }
 
+  const handleBlurAmountChange = async (blurAmount: number) => {
+    try {
+      await updateBackgroundBlur(blurAmount)
+    } catch (error) {
+      console.error('Failed to update blur amount:', error)
+      toast.error(t('settings.appearance.background.updateFailed'))
+    }
+  }
+
   const handleSelectBackgroundImage = async () => {
     try {
-      await selectAndSetBackgroundImage()
+      await handleBackgroundImageSelect()
     } catch (error) {
       console.error('Failed to select background image:', error)
       toast.error(t('settings.appearance.background.selectFailed'))
@@ -118,7 +128,7 @@ export function AppearanceContent() {
 
   const handleRemoveBackgroundImage = async () => {
     try {
-      await removeBackgroundImage()
+      await handleBackgroundImageRemove()
     } catch (error) {
       console.error('Failed to remove background image:', error)
       toast.error(t('settings.appearance.background.removeFailed'))
@@ -221,6 +231,33 @@ export function AppearanceContent() {
                 </div>
                 <span className='w-12 text-sm text-muted-foreground'>
                   {(webSettings.ui.background.opacity * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+
+            {/* 背景模糊度 */}
+            <div className='flex items-center justify-between py-2'>
+              <div className='flex-1 pr-4'>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.appearance.background.blurAmount.label')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.appearance.background.blurAmount.description')}
+                </p>
+              </div>
+              <div className='flex flex-shrink-0 items-center gap-2'>
+                <div className='w-36'>
+                  <Slider
+                    value={[webSettings.ui.background.blurAmount]}
+                    onValueChange={(value) => handleBlurAmountChange(value[0])}
+                    min={0}
+                    max={200}
+                    step={1}
+                    className='w-full'
+                  />
+                </div>
+                <span className='w-12 text-sm text-muted-foreground'>
+                  {webSettings.ui.background.blurAmount}px
                 </span>
               </div>
             </div>

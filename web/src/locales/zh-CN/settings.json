@@ -11,6 +11,8 @@
   "settings.appearance.background.description": "自定义应用程序的背景图片和不透明度",
   "settings.appearance.background.opacity.label": "背景不透明度",
   "settings.appearance.background.opacity.description": "调整背景图片的不透明度",
+  "settings.appearance.background.blurAmount.label": "背景模糊度",
+  "settings.appearance.background.blurAmount.description": "调整背景图片的模糊程度",
   "settings.appearance.background.image.label": "背景图片",
   "settings.appearance.background.image.selectButton": "选择图片",
   "settings.appearance.background.image.removeButton": "移除背景",

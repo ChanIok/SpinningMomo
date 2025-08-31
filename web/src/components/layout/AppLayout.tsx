@@ -13,14 +13,14 @@ export default function AppLayout() {
   const location = useLocation()
   const isHomePage = location.pathname === '/' || location.pathname.startsWith('/home')
 
-  const { settings } = useWebSettingsStore()
+  const { webSettings } = useWebSettingsStore()
 
-  const backgroundSettings = settings.ui.background
+  const backgroundSettings = webSettings.ui.background
   const shouldShowBackground = backgroundSettings.type === 'image' && backgroundSettings.imagePath
 
   // 背景图片URL - 只使用文件名，虚拟主机映射处理前缀
   const backgroundImageUrl = shouldShowBackground
-    ? `/assets/${backgroundSettings.imagePath.split('/').pop()}?t=${new Date(settings.updatedAt).getTime()}`
+    ? `/assets/${backgroundSettings.imagePath.split('/').pop()}?t=${new Date(webSettings.updatedAt).getTime()}`
     : ''
 
   return (
@@ -40,7 +40,7 @@ export default function AppLayout() {
             isHomePage ? 'opacity-0' : 'opacity-100'
           }`}
           style={{
-            backdropFilter: 'blur(0px)',
+            backdropFilter: `blur(${backgroundSettings.blurAmount}px)`,
             background: shouldShowBackground
               ? `color-mix(in srgb, var(--background) ${backgroundSettings.opacity * 100}%, transparent)`
               : 'var(--background-secondary)',

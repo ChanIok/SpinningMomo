@@ -11,6 +11,8 @@
   "settings.appearance.background.description": "Customize background image and opacity for the application",
   "settings.appearance.background.opacity.label": "Background Opacity",
   "settings.appearance.background.opacity.description": "Adjust the opacity of the background image",
+  "settings.appearance.background.blurAmount.label": "Background Blur",
+  "settings.appearance.background.blurAmount.description": "Adjust the blur amount of the background image",
   "settings.appearance.background.image.label": "Background Image",
   "settings.appearance.background.image.selectButton": "Select Image",
   "settings.appearance.background.image.removeButton": "Remove Background",

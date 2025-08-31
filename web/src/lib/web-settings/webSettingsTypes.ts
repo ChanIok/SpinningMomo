@@ -8,6 +8,7 @@ export interface WebBackgroundSettings {
   type: 'none' | 'image'
   imagePath: string
   opacity: number
+  blurAmount: number
 }
 
 // 完整的前端设置类型
@@ -23,7 +24,7 @@ export interface WebSettings {
 
 // 设置状态类型
 export interface WebSettingsState {
-  settings: WebSettings
+  webSettings: WebSettings
   isLoading: boolean
   error: string | null
   isInitialized: boolean
@@ -38,7 +39,8 @@ export const DEFAULT_THEME_SETTINGS: ThemeSettings = {
 export const DEFAULT_BACKGROUND_SETTINGS: WebBackgroundSettings = {
   type: 'none',
   imagePath: '',
-  opacity: 1.0,
+  opacity: 0.8,
+  blurAmount: 0,
 } as const
 
 // 默认前端设置

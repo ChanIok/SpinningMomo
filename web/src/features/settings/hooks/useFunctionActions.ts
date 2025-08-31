@@ -80,7 +80,6 @@ export const useFunctionActions = () => {
   }
 
   return {
-    appSettings,
     updateWindowTitle,
     updateScreenshotDir,
     updateTaskbarLowerOnResize,

@@ -61,7 +61,6 @@ export const useMenuActions = () => {
   }
 
   return {
-    appSettings,
     updateFeatureItems,
     updateAspectRatios,
     updateResolutions,

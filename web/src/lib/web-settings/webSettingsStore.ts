@@ -1,19 +1,8 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import type {
-  WebSettings,
-  WebBackgroundSettings,
-  ThemeSettings,
-  WebSettingsState,
-} from './webSettingsTypes'
+import type { WebSettings, WebSettingsState } from './webSettingsTypes'
 import { DEFAULT_WEB_SETTINGS } from './webSettingsTypes'
-import {
-  readWebSettings,
-  writeWebSettings,
-  initializeWebSettings,
-  selectBackgroundImage,
-  copyBackgroundImageToResources,
-} from './webSettingsApi'
+import { readWebSettings, writeWebSettings, initializeWebSettings } from './webSettingsApi'
 
 interface WebSettingsActions {
   // 基础操作
@@ -24,15 +13,9 @@ interface WebSettingsActions {
 
   // 业务操作
   initialize: () => Promise<void>
-  updateBackgroundSettings: (background: Partial<WebBackgroundSettings>) => Promise<void>
-  updateThemeSettings: (theme: Partial<ThemeSettings>) => Promise<void>
-  selectAndSetBackgroundImage: () => Promise<void>
-  removeBackgroundImage: () => Promise<void>
+  updateSettings: (settings: Partial<WebSettings>) => Promise<void>
   loadSettings: () => Promise<void>
   resetToDefault: () => Promise<void>
-
-  // 清理
-  cleanup: () => void
 }
 
 type WebSettingsStoreType = WebSettingsState & WebSettingsActions
@@ -41,13 +24,13 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
   devtools(
     (set, get) => ({
       // 初始状态
-      settings: DEFAULT_WEB_SETTINGS,
+      webSettings: DEFAULT_WEB_SETTINGS,
       error: null,
       isInitialized: false,
 
       // 基础操作
       setSettings: (settings: WebSettings) => {
-        set({ settings })
+        set({ webSettings: settings })
       },
 
       setError: (error: string | null) => {
@@ -72,10 +55,10 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
         try {
           set({ error: null })
 
-          const settings = await initializeWebSettings()
+          const webSettings = await initializeWebSettings()
 
           set({
-            settings,
+            webSettings,
             isInitialized: true,
           })
 
@@ -93,13 +76,13 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
       loadSettings: async () => {
         try {
           set({ error: null })
-          const settings = await readWebSettings()
+          const webSettings = await readWebSettings()
 
-          if (settings) {
-            set({ settings })
+          if (webSettings) {
+            set({ webSettings })
           } else {
             // 文件不存在，使用默认设置
-            set({ settings: DEFAULT_WEB_SETTINGS })
+            set({ webSettings: DEFAULT_WEB_SETTINGS })
           }
         } catch (error) {
           set({
@@ -109,111 +92,46 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
         }
       },
 
-      // 更新背景设置（乐观更新）
-      updateBackgroundSettings: async (partialBackground: Partial<WebBackgroundSettings>) => {
-        const { settings } = get()
-        const previousSettings = settings
+      // 乐观更新：更新设置（支持部分更新）
+      updateSettings: async (partialSettings: Partial<WebSettings>) => {
+        const { webSettings } = get()
+        const previousSettings = webSettings
 
         // 1. 立即更新本地状态（乐观更新）
         const optimisticSettings = {
-          ...settings,
+          ...webSettings,
+          ...partialSettings,
+          // 特殊处理嵌套对象
           ui: {
-            ...settings.ui,
+            ...webSettings.ui,
+            ...(partialSettings.ui || {}),
             background: {
-              ...settings.ui.background,
-              ...partialBackground,
+              ...webSettings.ui.background,
+              ...(partialSettings.ui?.background || {}),
             },
-          },
-        }
-
-        set({
-          settings: optimisticSettings,
-          error: null,
-        })
-
-        try {
-          // 2. 同步到文件
-          await writeWebSettings(optimisticSettings)
-          console.log('✅ 背景设置已更新:', partialBackground)
-        } catch (error) {
-          // 3. 失败时回滚
-          set({
-            settings: previousSettings,
-            error: error instanceof Error ? error.message : '更新背景设置失败',
-          })
-          console.error('❌ 背景设置更新失败，已回滚:', error)
-          throw error
-        }
-      },
-
-      // 更新主题设置（乐观更新）
-      updateThemeSettings: async (partialTheme: Partial<ThemeSettings>) => {
-        const { settings } = get()
-        const previousSettings = settings
-
-        // 1. 立即更新本地状态（乐观更新）
-        const optimisticSettings = {
-          ...settings,
-          ui: {
-            ...settings.ui,
             theme: {
-              ...settings.ui.theme,
-              ...partialTheme,
+              ...webSettings.ui.theme,
+              ...(partialSettings.ui?.theme || {}),
             },
           },
         }
 
         set({
-          settings: optimisticSettings,
+          webSettings: optimisticSettings,
           error: null,
         })
 
         try {
           // 2. 同步到文件
           await writeWebSettings(optimisticSettings)
-          console.log('✅ 主题设置已更新:', partialTheme)
+          console.log('✅ Web设置已更新:', partialSettings)
         } catch (error) {
           // 3. 失败时回滚
           set({
-            settings: previousSettings,
-            error: error instanceof Error ? error.message : '更新主题设置失败',
+            webSettings: previousSettings,
+            error: error instanceof Error ? error.message : '更新Web设置失败',
           })
-          console.error('❌ 主题设置更新失败，已回滚:', error)
-          throw error
-        }
-      },
-
-      // 选择并设置背景图片
-      selectAndSetBackgroundImage: async () => {
-        try {
-          const imagePath = await selectBackgroundImage()
-          if (imagePath) {
-            // 复制图片到资源目录
-            const copiedImagePath = await copyBackgroundImageToResources(imagePath)
-
-            // 使用复制后的路径更新设置
-            await get().updateBackgroundSettings({
-              type: 'image',
-              imagePath: copiedImagePath,
-            })
-
-            await get().loadSettings()
-          }
-        } catch (error) {
-          console.error('设置背景图片失败:', error)
-          throw error
-        }
-      },
-
-      // 移除背景图片
-      removeBackgroundImage: async () => {
-        try {
-          await get().updateBackgroundSettings({
-            type: 'none',
-            imagePath: '',
-          })
-        } catch (error) {
-          console.error('移除背景图片失败:', error)
+          console.error('❌ Web设置更新失败，已回滚:', error)
           throw error
         }
       },
@@ -223,27 +141,17 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
         try {
           const defaultSettings = {
             ...DEFAULT_WEB_SETTINGS,
-            createdAt: get().settings.createdAt, // 保留创建时间
+            createdAt: get().webSettings.createdAt, // 保留创建时间
             updatedAt: new Date().toISOString(),
           }
 
           await writeWebSettings(defaultSettings)
-          set({ settings: defaultSettings })
+          set({ webSettings: defaultSettings })
           console.log('✅ 已重置为默认设置')
         } catch (error) {
           console.error('重置设置失败:', error)
           throw error
         }
-      },
-
-      // 清理资源
-      cleanup: () => {
-        set({
-          settings: DEFAULT_WEB_SETTINGS,
-          error: null,
-          isInitialized: false,
-        })
-        console.log('🧹 前端设置 Store 已清理')
       },
     }),
     {
@@ -252,10 +160,3 @@ export const useWebSettingsStore = create<WebSettingsStoreType>()(
     }
   )
 )
-
-// 页面卸载时清理资源
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    useWebSettingsStore.getState().cleanup()
-  })
-}

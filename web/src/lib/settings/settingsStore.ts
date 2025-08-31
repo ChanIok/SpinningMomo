@@ -9,14 +9,11 @@ interface SettingsStoreState extends SettingsState {
   setAppSettings: (settings: AppSettings) => void
   setError: (error: string | null) => void
   clearError: () => void
-  
+
   // 业务方法（使用乐观更新）
   initialize: () => Promise<void>
   updateSettings: (settings: Partial<AppSettings>) => Promise<void>
   loadAppSettings: () => Promise<void>
-  
-  // 清理方法
-  cleanup: () => void
 }
 
 export const useSettingsStore = create<SettingsStoreState>()(
@@ -51,18 +48,18 @@ export const useSettingsStore = create<SettingsStoreState>()(
 
           // 加载应用设置
           const appSettings = await getAppSettings()
-          
-          set({ 
+
+          set({
             appSettings,
-            isLoading: false, 
-            isInitialized: true 
+            isLoading: false,
+            isInitialized: true,
           })
-          
+
           console.log('✅ Settings store 初始化完成')
         } catch (error) {
-          set({ 
+          set({
             error: error instanceof Error ? error.message : '初始化失败',
-            isLoading: false 
+            isLoading: false,
           })
           console.error('❌ Settings store 初始化失败:', error)
         }
@@ -73,14 +70,14 @@ export const useSettingsStore = create<SettingsStoreState>()(
         try {
           set({ isLoading: true, error: null })
           const appSettings = await getAppSettings()
-          set({ 
+          set({
             appSettings,
-            isLoading: false 
+            isLoading: false,
           })
         } catch (error) {
-          set({ 
+          set({
             error: error instanceof Error ? error.message : '加载应用设置失败',
-            isLoading: false 
+            isLoading: false,
           })
           throw error
         }
@@ -90,7 +87,7 @@ export const useSettingsStore = create<SettingsStoreState>()(
       updateSettings: async (partialSettings: Partial<AppSettings>) => {
         const { appSettings } = get()
         const previousSettings = appSettings
-        
+
         // 1. 立即更新本地状态（乐观更新）
         const optimisticSettings = {
           ...appSettings,
@@ -98,60 +95,49 @@ export const useSettingsStore = create<SettingsStoreState>()(
           // 特殊处理嵌套对象
           app: {
             ...appSettings.app,
-            ...(partialSettings.app || {})
+            ...(partialSettings.app || {}),
           },
           window: {
             ...appSettings.window,
-            ...(partialSettings.window || {})
+            ...(partialSettings.window || {}),
           },
           features: {
             ...appSettings.features,
-            ...(partialSettings.features || {})
+            ...(partialSettings.features || {}),
           },
           ui: {
             ...appSettings.ui,
             ...(partialSettings.ui || {}),
             appMenu: {
               ...appSettings.ui.appMenu,
-              ...(partialSettings.ui?.appMenu || {})
+              ...(partialSettings.ui?.appMenu || {}),
             },
             appWindowLayout: {
               ...appSettings.ui.appWindowLayout,
-              ...(partialSettings.ui?.appWindowLayout || {})
-            }
-          }
+              ...(partialSettings.ui?.appWindowLayout || {}),
+            },
+          },
         }
-        
-        set({ 
+
+        set({
           appSettings: optimisticSettings,
-          error: null 
+          error: null,
         })
-        
+
         try {
           // 2. 同步到后端
           await updateAppSettings(optimisticSettings)
           console.log('✅ 应用设置已更新:', partialSettings)
         } catch (error) {
           // 3. 失败时回滚到之前的状态
-          set({ 
+          set({
             appSettings: previousSettings,
-            error: error instanceof Error ? error.message : '更新应用设置失败'
+            error: error instanceof Error ? error.message : '更新应用设置失败',
           })
           console.error('❌ 应用设置更新失败，已回滚:', error)
           throw error
         }
       },
-
-      // 清理资源
-      cleanup: () => {
-        set({
-          appSettings: DEFAULT_APP_SETTINGS,
-          isLoading: false,
-          error: null,
-          isInitialized: false
-        })
-        console.log('🧹 Settings store 已清理')
-      }
     }),
     {
       name: 'settings-store',
@@ -167,11 +153,4 @@ if (typeof window !== 'undefined') {
   setTimeout(() => {
     useSettingsStore.getState().initialize().catch(console.error)
   }, 100)
-}
-
-// 页面卸载时清理资源
-if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', () => {
-    useSettingsStore.getState().cleanup()
-  })
 }
