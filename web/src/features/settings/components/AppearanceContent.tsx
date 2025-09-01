@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/lib/settings'
 import { useAppearanceActions } from '@/features/settings/hooks/useAppearanceActions'
@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select'
 import { ResetSettingsDialog } from './ResetSettingsDialog'
 import { useTranslation } from '@/lib/i18n'
-import type { AppWindowLayout } from '@/lib/settings/settingsTypes'
+import type { AppWindowLayout, AppWindowThemeMode } from '@/lib/settings/settingsTypes'
 
 export function AppearanceContent() {
   const { t } = useTranslation()
@@ -30,31 +30,12 @@ export function AppearanceContent() {
     updateBackgroundBlur,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,
+    updateAppWindowTheme,
   } = useAppearanceActions()
   const { error: webSettingsError, initialize: initializeWebSettings } = useWebSettingsStore()
   const { theme, setTheme } = useTheme()
 
-  // 当前布局设置状态
-  const [layoutSettings, setLayoutSettings] = useState<AppWindowLayout>({
-    baseItemHeight: 24,
-    baseTitleHeight: 26,
-    baseSeparatorHeight: 1,
-    baseFontSize: 12,
-    baseTextPadding: 12,
-    baseIndicatorWidth: 3,
-    baseRatioIndicatorWidth: 4,
-    baseRatioColumnWidth: 60,
-    baseResolutionColumnWidth: 120,
-    baseSettingsColumnWidth: 120,
-  })
-
-  // 同步store中的布局设置到本地状态
-  useEffect(() => {
-    if (appSettings?.ui?.appWindowLayout) {
-      setLayoutSettings(appSettings.ui.appWindowLayout)
-    }
-  }, [appSettings?.ui?.appWindowLayout])
-
+  const layoutSettings = appSettings?.ui?.appWindowLayout
   // 初始化web设置
   useEffect(() => {
     const initWebSettings = async () => {
@@ -67,13 +48,18 @@ export function AppearanceContent() {
     initWebSettings()
   }, [initializeWebSettings])
 
-  const handleInputChange = (field: keyof AppWindowLayout, value: string) => {
+  const handleLayoutChange = async (field: keyof AppWindowLayout, value: string) => {
     const numValue = parseInt(value, 10)
-    if (!isNaN(numValue) && numValue >= 0) {
-      setLayoutSettings((prev) => ({
-        ...prev,
-        [field]: numValue,
-      }))
+    if (!isNaN(numValue) && numValue >= 0 && layoutSettings) {
+      try {
+        await updateAppWindowLayout({
+          ...layoutSettings,
+          [field]: numValue,
+        })
+      } catch (error) {
+        console.error('Failed to update layout settings:', error)
+        toast.error(t('settings.appearance.layout.updateFailed'))
+      }
     }
   }
 
@@ -82,19 +68,6 @@ export function AppearanceContent() {
       e.preventDefault()
       // 触发失去焦点，从而触发保存
       e.currentTarget.blur()
-    }
-  }
-
-  const handleInputBlur = async (field: keyof AppWindowLayout, value: string) => {
-    const numValue = parseInt(value, 10)
-    if (!isNaN(numValue) && numValue >= 0) {
-      const newSettings = { ...layoutSettings, [field]: numValue }
-      try {
-        await updateAppWindowLayout(newSettings)
-      } catch (error) {
-        console.error('Failed to update layout settings:', error)
-        toast.error(t('settings.appearance.layout.updateFailed'))
-      }
     }
   }
 
@@ -142,9 +115,25 @@ export function AppearanceContent() {
     { value: 'system', label: t('settings.appearance.theme.system') },
   ]
 
+  // AppWindow主题选项
+  const appWindowThemeOptions = [
+    { value: 'light', label: t('settings.appearance.appWindowTheme.light') },
+    { value: 'dark', label: t('settings.appearance.appWindowTheme.dark') },
+  ]
+
   // 主题切换处理
   const handleThemeChange = (themeMode: 'light' | 'dark' | 'system') => {
     setTheme(themeMode)
+  }
+
+  // AppWindow主题切换处理
+  const handleAppWindowThemeChange = async (themeMode: AppWindowThemeMode) => {
+    try {
+      await updateAppWindowTheme(themeMode)
+    } catch (error) {
+      console.error('Failed to update AppWindow theme:', error)
+      toast.error(t('settings.appearance.appWindowTheme.updateFailed'))
+    }
   }
 
   const handleResetSettings = async () => {
@@ -322,6 +311,34 @@ export function AppearanceContent() {
                 </Select>
               </div>
             </div>
+
+            <div className='flex items-center justify-between py-2'>
+              <div className='flex-1 pr-4'>
+                <Label className='text-sm font-medium text-foreground'>
+                  {t('settings.appearance.appWindowTheme.label')}
+                </Label>
+                <p className='mt-1 text-sm text-muted-foreground'>
+                  {t('settings.appearance.appWindowTheme.description')}
+                </p>
+              </div>
+              <div className='flex flex-shrink-0'>
+                <Select
+                  value={appSettings?.ui?.appWindowThemeMode || 'dark'}
+                  onValueChange={handleAppWindowThemeChange}
+                >
+                  <SelectTrigger className='w-32'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {appWindowThemeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -350,9 +367,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseItemHeight}
-                  onChange={(e) => handleInputChange('baseItemHeight', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseItemHeight', e.target.value)}
+                  value={layoutSettings?.baseItemHeight || ''}
+                  onChange={(e) => handleLayoutChange('baseItemHeight', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -376,9 +392,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseTitleHeight}
-                  onChange={(e) => handleInputChange('baseTitleHeight', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseTitleHeight', e.target.value)}
+                  value={layoutSettings?.baseTitleHeight || ''}
+                  onChange={(e) => handleLayoutChange('baseTitleHeight', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -402,9 +417,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseSeparatorHeight}
-                  onChange={(e) => handleInputChange('baseSeparatorHeight', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseSeparatorHeight', e.target.value)}
+                  value={layoutSettings?.baseSeparatorHeight || ''}
+                  onChange={(e) => handleLayoutChange('baseSeparatorHeight', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -428,9 +442,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseFontSize}
-                  onChange={(e) => handleInputChange('baseFontSize', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseFontSize', e.target.value)}
+                  value={layoutSettings?.baseFontSize || ''}
+                  onChange={(e) => handleLayoutChange('baseFontSize', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -454,9 +467,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseTextPadding}
-                  onChange={(e) => handleInputChange('baseTextPadding', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseTextPadding', e.target.value)}
+                  value={layoutSettings?.baseTextPadding || ''}
+                  onChange={(e) => handleLayoutChange('baseTextPadding', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -480,9 +492,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseIndicatorWidth}
-                  onChange={(e) => handleInputChange('baseIndicatorWidth', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseIndicatorWidth', e.target.value)}
+                  value={layoutSettings?.baseIndicatorWidth || ''}
+                  onChange={(e) => handleLayoutChange('baseIndicatorWidth', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -506,9 +517,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseRatioIndicatorWidth}
-                  onChange={(e) => handleInputChange('baseRatioIndicatorWidth', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseRatioIndicatorWidth', e.target.value)}
+                  value={layoutSettings?.baseRatioIndicatorWidth || ''}
+                  onChange={(e) => handleLayoutChange('baseRatioIndicatorWidth', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -532,9 +542,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseRatioColumnWidth}
-                  onChange={(e) => handleInputChange('baseRatioColumnWidth', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseRatioColumnWidth', e.target.value)}
+                  value={layoutSettings?.baseRatioColumnWidth || ''}
+                  onChange={(e) => handleLayoutChange('baseRatioColumnWidth', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -558,9 +567,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseResolutionColumnWidth}
-                  onChange={(e) => handleInputChange('baseResolutionColumnWidth', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseResolutionColumnWidth', e.target.value)}
+                  value={layoutSettings?.baseResolutionColumnWidth || ''}
+                  onChange={(e) => handleLayoutChange('baseResolutionColumnWidth', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'
@@ -584,9 +592,8 @@ export function AppearanceContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   type='number'
-                  value={layoutSettings.baseSettingsColumnWidth}
-                  onChange={(e) => handleInputChange('baseSettingsColumnWidth', e.target.value)}
-                  onBlur={(e) => handleInputBlur('baseSettingsColumnWidth', e.target.value)}
+                  value={layoutSettings?.baseSettingsColumnWidth || ''}
+                  onChange={(e) => handleLayoutChange('baseSettingsColumnWidth', e.target.value)}
                   onKeyDown={handleKeyDown}
                   className='w-24'
                   min='0'

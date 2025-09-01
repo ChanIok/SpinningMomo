@@ -12,6 +12,39 @@ export interface PresetItem {
   order: number // 排序序号
 }
 
+// AppWindow主题模式
+export type AppWindowThemeMode = 'dark' | 'light'
+
+// AppWindow颜色配置
+export interface AppWindowColors {
+  background: string // 主背景色 (包含透明度)
+  separator: string // 分隔线颜色 (包含透明度)
+  text: string // 文字颜色 (包含透明度)
+  indicator: string // 指示器颜色 (包含透明度)
+  hover: string // 悬停背景色 (包含透明度)
+  titleBar: string // 标题栏颜色 (包含透明度)
+}
+
+// 深色主题颜色配置
+export const DARK_APP_WINDOW_COLORS: AppWindowColors = {
+  background: '#282C34A6',
+  separator: '#333842A6',
+  text: '#DEE8FCFF',
+  indicator: '#61AFEFFF',
+  hover: '#383D4AA6',
+  titleBar: '#282C34A6',
+}
+
+// 浅色主题颜色配置
+export const LIGHT_APP_WINDOW_COLORS: AppWindowColors = {
+  background: '#F9FAFBCC',
+  separator: '#E4E5E7CC',
+  text: '#1F2937FF',
+  indicator: '#FFAF50FF',
+  hover: '#F2F2F2CC',
+  titleBar: '#F9FAFBCC',
+}
+
 // AppWindow布局配置
 export interface AppWindowLayout {
   baseItemHeight: number
@@ -90,6 +123,12 @@ export interface AppSettings {
 
     // AppWindow布局配置
     appWindowLayout: AppWindowLayout
+
+    // AppWindow颜色配置
+    appWindowColors: AppWindowColors
+
+    // AppWindow主题模式
+    appWindowThemeMode: AppWindowThemeMode
   }
 }
 
@@ -207,5 +246,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       baseResolutionColumnWidth: 70,
       baseSettingsColumnWidth: 80,
     },
+    appWindowColors: DARK_APP_WINDOW_COLORS,
+    appWindowThemeMode: 'dark' as AppWindowThemeMode,
   },
 } as const

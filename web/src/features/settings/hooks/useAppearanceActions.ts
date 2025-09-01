@@ -1,7 +1,15 @@
 import { useSettingsStore } from '@/lib/settings'
 import { useWebSettingsStore } from '@/lib/web-settings'
-import { DEFAULT_APP_SETTINGS } from '@/lib/settings/settingsTypes'
-import type { AppWindowLayout } from '@/lib/settings/settingsTypes'
+import {
+  DEFAULT_APP_SETTINGS,
+  DARK_APP_WINDOW_COLORS,
+  LIGHT_APP_WINDOW_COLORS,
+} from '@/lib/settings/settingsTypes'
+import type {
+  AppWindowLayout,
+  AppWindowColors,
+  AppWindowThemeMode,
+} from '@/lib/settings/settingsTypes'
 import type { ThemeSettings, WebSettings } from '@/lib/web-settings/webSettingsTypes'
 import {
   writeWebSettings,
@@ -30,6 +38,44 @@ export const useAppearanceActions = () => {
       ui: {
         ...appSettings.ui,
         appWindowLayout: DEFAULT_APP_SETTINGS.ui.appWindowLayout,
+        appWindowColors: DEFAULT_APP_SETTINGS.ui.appWindowColors,
+        appWindowThemeMode: DEFAULT_APP_SETTINGS.ui.appWindowThemeMode,
+      },
+    })
+  }
+
+  // 根据主题模式获取对应的AppWindow颜色
+  const getAppWindowColorsByTheme = (themeMode: AppWindowThemeMode): AppWindowColors => {
+    switch (themeMode) {
+      case 'light':
+        return LIGHT_APP_WINDOW_COLORS
+      case 'dark':
+        return DARK_APP_WINDOW_COLORS
+      default:
+        return DARK_APP_WINDOW_COLORS
+    }
+  }
+
+  // 更新AppWindow主题（包括主题模式和颜色）
+  const updateAppWindowTheme = async (themeMode: AppWindowThemeMode) => {
+    const colors = getAppWindowColorsByTheme(themeMode)
+
+    // 同时更新主题模式和颜色
+    await updateSettings({
+      ui: {
+        ...appSettings.ui,
+        appWindowThemeMode: themeMode,
+        appWindowColors: colors,
+      },
+    })
+  }
+
+  // 更新AppWindow颜色设置
+  const updateAppWindowColors = async (colors: AppWindowColors) => {
+    await updateSettings({
+      ui: {
+        ...appSettings.ui,
+        appWindowColors: colors,
       },
     })
   }
@@ -147,10 +193,13 @@ export const useAppearanceActions = () => {
   return {
     updateAppWindowLayout,
     resetAppearanceSettings,
+    updateAppWindowColors,
     updateBackgroundOpacity,
     updateBackgroundBlur,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,
     updateThemeSettings,
+    getAppWindowColorsByTheme,
+    updateAppWindowTheme,
   }
 }

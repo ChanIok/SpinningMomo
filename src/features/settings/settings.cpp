@@ -90,7 +90,8 @@ auto get_settings_for_initialization() -> std::expected<Types::AppSettings, std:
     }
 
     // 如果版本已经是最新版，直接转换为AppSettings
-    auto app_settings_result = rfl::from_generic<Types::AppSettings>(generic_settings);
+    auto app_settings_result =
+        rfl::from_generic<Types::AppSettings, rfl::DefaultIfMissing>(generic_settings);
     if (!app_settings_result) {
       return std::unexpected("Failed to convert generic JSON to AppSettings: " +
                              app_settings_result.error().what());

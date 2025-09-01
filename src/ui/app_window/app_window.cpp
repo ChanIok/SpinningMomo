@@ -170,26 +170,29 @@ auto set_menu_items_to_show(Core::State::AppState& state, std::span<const std::w
   state.app_window->data.menu_items_to_show.assign(items.begin(), items.end());
 }
 
-auto register_toggle_visibility_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool {
+auto register_toggle_visibility_hotkey(Core::State::AppState& state, UINT modifiers, UINT key)
+    -> bool {
   if (state.app_window->window.hwnd) {
-    return ::RegisterHotKey(state.app_window->window.hwnd, state.app_window->window.toggle_visibility_hotkey_id,
-                            modifiers, key);
+    return ::RegisterHotKey(state.app_window->window.hwnd,
+                            state.app_window->window.toggle_visibility_hotkey_id, modifiers, key);
   }
   return false;
 }
 
 auto register_screenshot_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool {
   if (state.app_window->window.hwnd) {
-    return ::RegisterHotKey(state.app_window->window.hwnd, state.app_window->window.screenshot_hotkey_id,
-                            modifiers, key);
+    return ::RegisterHotKey(state.app_window->window.hwnd,
+                            state.app_window->window.screenshot_hotkey_id, modifiers, key);
   }
   return false;
 }
 
 auto unregister_hotkey(Core::State::AppState& state) -> void {
   if (state.app_window->window.hwnd) {
-    ::UnregisterHotKey(state.app_window->window.hwnd, state.app_window->window.toggle_visibility_hotkey_id);
-    ::UnregisterHotKey(state.app_window->window.hwnd, state.app_window->window.screenshot_hotkey_id);
+    ::UnregisterHotKey(state.app_window->window.hwnd,
+                       state.app_window->window.toggle_visibility_hotkey_id);
+    ::UnregisterHotKey(state.app_window->window.hwnd,
+                       state.app_window->window.screenshot_hotkey_id);
   }
 }
 
@@ -249,6 +252,9 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
 
   // 更新布局配置（基于应用状态）
   UI::AppWindow::Layout::update_layout(state);
+
+  // 更新颜色配置
+  UI::AppWindow::D2DContext::update_all_brush_colors(state);
 
   // 重新计算窗口大小
   const auto new_size = UI::AppWindow::Layout::calculate_window_size(state);

@@ -66,7 +66,7 @@ auto create_context_menu_window(HINSTANCE instance, WNDPROC wnd_proc,
 
   if (hwnd) {
     // 设置窗口样式
-    SetLayeredWindowAttributes(hwnd, 0, 240, LWA_ALPHA);
+    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
     DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
     DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
   }
@@ -269,7 +269,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
   Logger().debug("Created submenu window: {}", (void*)menu_state.submenu_hwnd);
 
   // 设置窗口样式
-  SetLayeredWindowAttributes(menu_state.submenu_hwnd, 0, 240, LWA_ALPHA);
+  SetLayeredWindowAttributes(menu_state.submenu_hwnd, 0, 255, LWA_ALPHA);
   DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
   DwmSetWindowAttribute(menu_state.submenu_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner,
                         sizeof(corner));

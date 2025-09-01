@@ -14,34 +14,68 @@ import UI.AppWindow.Types;
 import UI.AppWindow.State;
 import UI.ContextMenu.State;
 import Utils.Logger;
+import Features.Settings.State;
 
 namespace {
 
 using UI::ContextMenu::State::ContextMenuState;
 
-auto create_brushes_for_target(ID2D1HwndRenderTarget* target, ID2D1SolidColorBrush** white_brush,
+// 辅助函数：从包含透明度的十六进制颜色字符串创建 D2D1_COLOR_F
+auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
+  // 忽略透明度，只使用 RRGGBB 部分
+  std::string color_str = hex_color;
+  if (color_str.starts_with("#")) {
+    color_str = color_str.substr(1);
+  }
+
+  float r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f;
+
+  if (color_str.length() >= 6) {
+    r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
+    g = std::stoi(color_str.substr(2, 2), nullptr, 16) / 255.0f;
+    b = std::stoi(color_str.substr(4, 2), nullptr, 16) / 255.0f;
+    a = 1.0f;
+  }
+
+  return D2D1::ColorF(r, g, b, a);
+}
+
+// 辅助函数：从十六进制颜色字符串创建画刷
+auto create_brush_from_hex(ID2D1RenderTarget* target, const std::string& hex_color,
+                           ID2D1SolidColorBrush** brush) -> bool {
+  return SUCCEEDED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(hex_color), brush));
+}
+
+auto create_brushes_for_target(Core::State::AppState& state, ID2D1HwndRenderTarget* target,
+                               ID2D1SolidColorBrush** background_brush,
                                ID2D1SolidColorBrush** text_brush,
                                ID2D1SolidColorBrush** separator_brush,
                                ID2D1SolidColorBrush** hover_brush,
                                ID2D1SolidColorBrush** indicator_brush) -> bool {
-  if (FAILED(target->CreateSolidColorBrush(UI::AppWindow::Colors::WHITE, white_brush)))
+  const auto& colors = state.settings->config.ui.app_window_colors;
+
+  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.background),
+                                           background_brush)))
     return false;
-  if (FAILED(target->CreateSolidColorBrush(UI::AppWindow::Colors::TEXT, text_brush))) return false;
-  if (FAILED(target->CreateSolidColorBrush(UI::AppWindow::Colors::SEPARATOR, separator_brush)))
+  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.text), text_brush)))
     return false;
-  if (FAILED(target->CreateSolidColorBrush(UI::AppWindow::Colors::HOVER, hover_brush)))
+  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.separator),
+                                           separator_brush)))
     return false;
-  if (FAILED(target->CreateSolidColorBrush(UI::AppWindow::Colors::INDICATOR, indicator_brush)))
+  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.hover), hover_brush)))
+    return false;
+  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.indicator),
+                                           indicator_brush)))
     return false;
   return true;
 }
 
-auto release_brushes(ID2D1SolidColorBrush** white_brush, ID2D1SolidColorBrush** text_brush,
+auto release_brushes(ID2D1SolidColorBrush** background_brush, ID2D1SolidColorBrush** text_brush,
                      ID2D1SolidColorBrush** separator_brush, ID2D1SolidColorBrush** hover_brush,
                      ID2D1SolidColorBrush** indicator_brush) -> void {
-  if (*white_brush) {
-    (*white_brush)->Release();
-    *white_brush = nullptr;
+  if (*background_brush) {
+    (*background_brush)->Release();
+    *background_brush = nullptr;
   }
   if (*text_brush) {
     (*text_brush)->Release();
@@ -87,7 +121,7 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
     return false;
   }
 
-  if (!create_brushes_for_target(menu_state.render_target, &menu_state.white_brush,
+  if (!create_brushes_for_target(state, menu_state.render_target, &menu_state.background_brush,
                                  &menu_state.text_brush, &menu_state.separator_brush,
                                  &menu_state.hover_brush, &menu_state.indicator_brush)) {
     cleanup_context_menu(state);
@@ -100,7 +134,7 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
 
 auto cleanup_context_menu(Core::State::AppState& state) -> void {
   auto& menu_state = *state.context_menu;
-  release_brushes(&menu_state.white_brush, &menu_state.text_brush, &menu_state.separator_brush,
+  release_brushes(&menu_state.background_brush, &menu_state.text_brush, &menu_state.separator_brush,
                   &menu_state.hover_brush, &menu_state.indicator_brush);
   if (menu_state.render_target) {
     menu_state.render_target->Release();
@@ -134,7 +168,7 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
   }
 
   if (!create_brushes_for_target(
-          menu_state.submenu_render_target, &menu_state.submenu_white_brush,
+          state, menu_state.submenu_render_target, &menu_state.submenu_background_brush,
           &menu_state.submenu_text_brush, &menu_state.submenu_separator_brush,
           &menu_state.submenu_hover_brush, &menu_state.submenu_indicator_brush)) {
     Logger().error("Failed to create submenu brushes");
@@ -148,7 +182,7 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
 
 auto cleanup_submenu(Core::State::AppState& state) -> void {
   auto& menu_state = *state.context_menu;
-  release_brushes(&menu_state.submenu_white_brush, &menu_state.submenu_text_brush,
+  release_brushes(&menu_state.submenu_background_brush, &menu_state.submenu_text_brush,
                   &menu_state.submenu_separator_brush, &menu_state.submenu_hover_brush,
                   &menu_state.submenu_indicator_brush);
   if (menu_state.submenu_render_target) {

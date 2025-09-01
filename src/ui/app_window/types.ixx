@@ -79,22 +79,6 @@ struct LayoutConfig {
   static constexpr float FONT_SIZE_STEP = 0.5f;  // 字体大小调整步长
 };
 
-// One Dark Pro风格暗色主题颜色常量 (AppWindow专用)
-struct Colors {
-  // === One Dark Pro主色调 ===
-  static constexpr D2D1_COLOR_F WHITE = {0.16f, 0.17f, 0.21f, 1.0f};      // #282C34 主背景
-  static constexpr D2D1_COLOR_F SEPARATOR = {0.20f, 0.22f, 0.27f, 1.0f};  // #333842 分隔线
-  static constexpr D2D1_COLOR_F TEXT = {0.87f, 0.91f, 0.98f, 1.0f};       // #DEE8FC 更亮的主文字
-  static constexpr D2D1_COLOR_F INDICATOR = {0.38f, 0.68f, 0.84f, 1.0f};  // #61AFEF 青色指示器
-  static constexpr D2D1_COLOR_F HOVER = {0.22f, 0.24f, 0.29f, 1.0f};      // #383D4A 悬停背景
-
-  // === 半透明版本（用于分层窗口） ===
-  static constexpr D2D1_COLOR_F WHITE_SEMI = {0.16f, 0.17f, 0.21f, 0.65f};      // 主背景
-  static constexpr D2D1_COLOR_F SEPARATOR_SEMI = {0.20f, 0.22f, 0.27f, 0.65f};  // 分隔线
-  static constexpr D2D1_COLOR_F TITLE_BAR_SEMI = {0.16f, 0.17f, 0.21f, 0.65f};  // 标题栏
-  static constexpr D2D1_COLOR_F HOVER_SEMI = {0.22f, 0.24f, 0.29f, 0.65f};      // 悬停背景
-};
-
 // AppWindow专用的Direct2D渲染状态
 struct RenderContext {
   // Direct2D 1.3资源句柄
@@ -111,19 +95,12 @@ struct RenderContext {
   SIZE bitmap_size = {0, 0};
 
   // 缓存的画刷（简单的固定数组，避免动态分配）
-  // 不透明画刷（用于文字和指示器）
-  ID2D1SolidColorBrush* white_brush = nullptr;
+  ID2D1SolidColorBrush* background_brush = nullptr;
   ID2D1SolidColorBrush* title_brush = nullptr;
   ID2D1SolidColorBrush* separator_brush = nullptr;
   ID2D1SolidColorBrush* text_brush = nullptr;
   ID2D1SolidColorBrush* indicator_brush = nullptr;
   ID2D1SolidColorBrush* hover_brush = nullptr;
-
-  // 半透明画刷（用于背景和装饰元素）
-  ID2D1SolidColorBrush* white_semi_brush = nullptr;
-  ID2D1SolidColorBrush* title_semi_brush = nullptr;
-  ID2D1SolidColorBrush* separator_semi_brush = nullptr;
-  ID2D1SolidColorBrush* hover_semi_brush = nullptr;
 
   // 文本格式
   IDWriteTextFormat* text_format = nullptr;

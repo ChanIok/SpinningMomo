@@ -83,7 +83,7 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
 auto draw_app_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.app_window->d2d_context;
   // 使用半透明白色背景
-  d2d.render_target->FillRectangle(rect, d2d.white_semi_brush);
+  d2d.render_target->FillRectangle(rect, d2d.background_brush);
 }
 
 // 绘制关闭按钮
@@ -132,10 +132,10 @@ auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& r
   const auto& d2d = state.app_window->d2d_context;
   const auto& render = state.app_window->layout;
 
-  // 绘制标题栏背景（使用半透明画刷）
+  // 绘制标题栏背景
   D2D1_RECT_F title_rect = UI::AppWindow::make_d2d_rect(
       rect.left, rect.top, rect.right, rect.top + static_cast<float>(render.title_height));
-  d2d.render_target->FillRectangle(title_rect, d2d.title_semi_brush);
+  d2d.render_target->FillRectangle(title_rect, d2d.title_brush);
 
   // 绘制标题文本（保持完全不透明）
   D2D1_RECT_F text_rect =
@@ -162,21 +162,21 @@ auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& 
   D2D1_RECT_F h_sep_rect = UI::AppWindow::make_d2d_rect(
       rect.left, rect.top + static_cast<float>(render.title_height), rect.right,
       rect.top + static_cast<float>(render.title_height + render.separator_height));
-  d2d.render_target->FillRectangle(h_sep_rect, d2d.separator_semi_brush);
+  d2d.render_target->FillRectangle(h_sep_rect, d2d.separator_brush);
 
   // 绘制垂直分隔线1（使用半透明画刷）
   D2D1_RECT_F v_sep_rect1 = UI::AppWindow::make_d2d_rect(
       static_cast<float>(bounds.ratio_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.bottom);
-  d2d.render_target->FillRectangle(v_sep_rect1, d2d.separator_semi_brush);
+  d2d.render_target->FillRectangle(v_sep_rect1, d2d.separator_brush);
 
   // 绘制垂直分隔线2（使用半透明画刷）
   D2D1_RECT_F v_sep_rect2 = UI::AppWindow::make_d2d_rect(
       static_cast<float>(bounds.resolution_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.bottom);
-  d2d.render_target->FillRectangle(v_sep_rect2, d2d.separator_semi_brush);
+  d2d.render_target->FillRectangle(v_sep_rect2, d2d.separator_brush);
 }
 
 // 绘制所有菜单项
@@ -243,7 +243,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
 
   // 绘制悬停背景
   if (is_hovered) {
-    d2d.render_target->FillRectangle(item_rect, d2d.hover_semi_brush);
+    d2d.render_target->FillRectangle(item_rect, d2d.hover_brush);
   }
 
   // 绘制选中指示器（保持完全不透明）

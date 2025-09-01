@@ -10,32 +10,52 @@ import std;
 import Core.State;
 import UI.AppWindow.State;
 import UI.AppWindow.Types;
+import Features.Settings.State;
 
 namespace UI::AppWindow::D2DContext {
 
-// 辅助函数：安全创建画刷
-auto create_brush_safe(ID2D1RenderTarget* target, const D2D1_COLOR_F& color,
-                       ID2D1SolidColorBrush** brush) -> bool {
-  return SUCCEEDED(target->CreateSolidColorBrush(color, brush));
+// 辅助函数：从包含透明度的十六进制颜色字符串创建 D2D1_COLOR_F
+auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
+  // 支持 #RRGGBBAA 格式，如果只有6位则默认透明度为FF
+  std::string color_str = hex_color;
+  if (color_str.starts_with("#")) {
+    color_str = color_str.substr(1);
+  }
+
+  float r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f;
+
+  if (color_str.length() == 8) {  // #RRGGBBAA
+    r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
+    g = std::stoi(color_str.substr(2, 2), nullptr, 16) / 255.0f;
+    b = std::stoi(color_str.substr(4, 2), nullptr, 16) / 255.0f;
+    a = std::stoi(color_str.substr(6, 2), nullptr, 16) / 255.0f;
+  } else if (color_str.length() == 6) {  // #RRGGBB
+    r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
+    g = std::stoi(color_str.substr(2, 2), nullptr, 16) / 255.0f;
+    b = std::stoi(color_str.substr(4, 2), nullptr, 16) / 255.0f;
+    a = 1.0f;
+  }
+
+  return D2D1::ColorF(r, g, b, a);
+}
+
+// 辅助函数：从十六进制颜色字符串创建画刷
+auto create_brush_from_hex(ID2D1RenderTarget* target, const std::string& hex_color,
+                           ID2D1SolidColorBrush** brush) -> bool {
+  return SUCCEEDED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(hex_color), brush));
 }
 
 // 辅助函数：批量创建所有画刷
-auto create_all_brushes_simple(UI::AppWindow::RenderContext& d2d) -> bool {
-  return create_brush_safe(d2d.render_target, UI::AppWindow::Colors::WHITE, &d2d.white_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::SEPARATOR,
-                           &d2d.separator_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::TEXT, &d2d.text_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::INDICATOR,
-                           &d2d.indicator_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::HOVER, &d2d.hover_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::WHITE_SEMI,
-                           &d2d.white_semi_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::TITLE_BAR_SEMI,
-                           &d2d.title_semi_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::SEPARATOR_SEMI,
-                           &d2d.separator_semi_brush) &&
-         create_brush_safe(d2d.render_target, UI::AppWindow::Colors::HOVER_SEMI,
-                           &d2d.hover_semi_brush);
+auto create_all_brushes_simple(Core::State::AppState& state, UI::AppWindow::RenderContext& d2d)
+    -> bool {
+  const auto& colors = state.settings->config.ui.app_window_colors;
+
+  return create_brush_from_hex(d2d.render_target, colors.background, &d2d.background_brush) &&
+         create_brush_from_hex(d2d.render_target, colors.separator, &d2d.separator_brush) &&
+         create_brush_from_hex(d2d.render_target, colors.text, &d2d.text_brush) &&
+         create_brush_from_hex(d2d.render_target, colors.indicator, &d2d.indicator_brush) &&
+         create_brush_from_hex(d2d.render_target, colors.title_bar, &d2d.title_brush) &&
+         create_brush_from_hex(d2d.render_target, colors.hover, &d2d.hover_brush);
 }
 
 // 辅助函数：测量文本宽度
@@ -67,6 +87,32 @@ auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format
   }
 
   return metrics.width;
+}
+
+// 更新所有画刷颜色
+auto update_all_brush_colors(Core::State::AppState& state) -> void {
+  const auto& colors = state.settings->config.ui.app_window_colors;
+  auto& d2d = state.app_window->d2d_context;
+
+  // 更新画刷颜色
+  if (d2d.background_brush) {
+    d2d.background_brush->SetColor(hex_with_alpha_to_color_f(colors.background));
+  }
+  if (d2d.title_brush) {
+    d2d.title_brush->SetColor(hex_with_alpha_to_color_f(colors.title_bar));
+  }
+  if (d2d.separator_brush) {
+    d2d.separator_brush->SetColor(hex_with_alpha_to_color_f(colors.separator));
+  }
+  if (d2d.text_brush) {
+    d2d.text_brush->SetColor(hex_with_alpha_to_color_f(colors.text));
+  }
+  if (d2d.indicator_brush) {
+    d2d.indicator_brush->SetColor(hex_with_alpha_to_color_f(colors.indicator));
+  }
+  if (d2d.hover_brush) {
+    d2d.hover_brush->SetColor(hex_with_alpha_to_color_f(colors.hover));
+  }
 }
 
 // 创建具有指定字体大小的文本格式
@@ -180,7 +226,7 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
   // 我们将在绘制时检查是否可用
 
   // 创建所有画刷（使用简化的批量创建函数）
-  if (!create_all_brushes_simple(d2d)) {
+  if (!create_all_brushes_simple(state, d2d)) {
     cleanup_d2d(state);
     return false;
   }
@@ -206,9 +252,9 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
   auto& d2d = state.app_window->d2d_context;
 
   // 释放画刷
-  if (d2d.white_brush) {
-    d2d.white_brush->Release();
-    d2d.white_brush = nullptr;
+  if (d2d.background_brush) {
+    d2d.background_brush->Release();
+    d2d.background_brush = nullptr;
   }
   if (d2d.title_brush) {
     d2d.title_brush->Release();
@@ -229,24 +275,6 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
   if (d2d.hover_brush) {
     d2d.hover_brush->Release();
     d2d.hover_brush = nullptr;
-  }
-
-  // 释放半透明画刷
-  if (d2d.white_semi_brush) {
-    d2d.white_semi_brush->Release();
-    d2d.white_semi_brush = nullptr;
-  }
-  if (d2d.title_semi_brush) {
-    d2d.title_semi_brush->Release();
-    d2d.title_semi_brush = nullptr;
-  }
-  if (d2d.separator_semi_brush) {
-    d2d.separator_semi_brush->Release();
-    d2d.separator_semi_brush = nullptr;
-  }
-  if (d2d.hover_semi_brush) {
-    d2d.hover_semi_brush->Release();
-    d2d.hover_semi_brush = nullptr;
   }
 
   // 释放文本格式

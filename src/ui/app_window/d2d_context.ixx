@@ -31,4 +31,7 @@ export auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text
 export auto create_text_format_with_size(IDWriteFactory7* write_factory, float font_size)
     -> IDWriteTextFormat*;
 
+// 更新所有画刷颜色
+export auto update_all_brush_colors(Core::State::AppState& state) -> void;
+
 }  // namespace UI::AppWindow::D2DContext

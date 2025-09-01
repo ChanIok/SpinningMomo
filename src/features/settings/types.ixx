@@ -125,6 +125,19 @@ struct AppSettings {
       int base_resolution_column_width = 70;
       int base_settings_column_width = 80;
     } app_window_layout;
+
+    // AppWindow颜色配置
+    struct AppWindowColors {
+      std::string background = "#282C34A6";
+      std::string separator = "#333842A6";
+      std::string text = "#DEE8FCFF";
+      std::string indicator = "#61AFEFFF";
+      std::string hover = "#383D4AA6";
+      std::string title_bar = "#282C34A6";
+    } app_window_colors;
+
+    // AppWindow主题模式
+    std::string app_window_theme_mode = "dark";
   } ui;
 };
 

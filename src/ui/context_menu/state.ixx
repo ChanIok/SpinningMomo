@@ -19,14 +19,14 @@ struct ContextMenuState {
 
   // D2D资源
   ID2D1HwndRenderTarget* render_target = nullptr;
-  ID2D1SolidColorBrush* white_brush = nullptr;
+  ID2D1SolidColorBrush* background_brush = nullptr;
   ID2D1SolidColorBrush* text_brush = nullptr;
   ID2D1SolidColorBrush* separator_brush = nullptr;
   ID2D1SolidColorBrush* hover_brush = nullptr;
   ID2D1SolidColorBrush* indicator_brush = nullptr;
-  
+
   ID2D1HwndRenderTarget* submenu_render_target = nullptr;
-  ID2D1SolidColorBrush* submenu_white_brush = nullptr;
+  ID2D1SolidColorBrush* submenu_background_brush = nullptr;
   ID2D1SolidColorBrush* submenu_text_brush = nullptr;
   ID2D1SolidColorBrush* submenu_separator_brush = nullptr;
   ID2D1SolidColorBrush* submenu_hover_brush = nullptr;
@@ -41,7 +41,7 @@ struct ContextMenuState {
   Types::InteractionState interaction;
   SIZE menu_size{};
   POINT position{};
-  
+
   // 子菜单状态
   int submenu_parent_index = -1;
   SIZE submenu_size{};

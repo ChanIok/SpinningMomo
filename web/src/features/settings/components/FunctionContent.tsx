@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/lib/settings'
 import { useFunctionActions } from '@/features/settings/hooks/useFunctionActions'
@@ -22,28 +22,19 @@ export function FunctionContent() {
     resetFunctionSettings,
   } = useFunctionActions()
 
-  const [inputTitle, setInputTitle] = useState('')
-  const [screenshotDir, setScreenshotDir] = useState('')
   const [isSelectingDir, setIsSelectingDir] = useState(false)
 
-  // 同步store中的标题到输入框（适配新的嵌套结构）
-  useEffect(() => {
-    setInputTitle(appSettings?.window?.targetTitle || '')
-  }, [appSettings?.window?.targetTitle])
+  const inputTitle = appSettings?.window?.targetTitle || ''
+  const screenshotDir = appSettings?.features?.screenshot?.screenshotDirPath || ''
 
-  // 同步store中的截图目录到状态
-  useEffect(() => {
-    setScreenshotDir(appSettings?.features?.screenshot?.screenshotDirPath || '')
-  }, [appSettings?.features?.screenshot?.screenshotDirPath])
-
-  const handleUpdateTitle = async () => {
-    if (inputTitle.trim() === '') {
+  const handleTitleChange = async (value: string) => {
+    if (value.trim() === '') {
       toast.error(t('settings.function.windowControl.windowTitle.emptyError'))
       return
     }
 
     try {
-      await updateWindowTitle(inputTitle.trim())
+      await updateWindowTitle(value.trim())
       toast.success(t('settings.function.windowControl.windowTitle.updateSuccess'))
     } catch (error) {
       console.error('Failed to update window title:', error)
@@ -53,7 +44,7 @@ export function FunctionContent() {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleUpdateTitle()
+      handleTitleChange(inputTitle)
     }
   }
 
@@ -155,12 +146,16 @@ export function FunctionContent() {
               <div className='flex flex-shrink-0 items-center gap-2'>
                 <Input
                   value={inputTitle}
-                  onChange={(e) => setInputTitle(e.target.value)}
+                  onChange={(e) => handleTitleChange(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={t('settings.function.windowControl.windowTitle.placeholder')}
                   className='w-48'
                 />
-                <Button onClick={handleUpdateTitle} disabled={inputTitle.trim() === ''} size='sm'>
+                <Button
+                  onClick={() => handleTitleChange(inputTitle)}
+                  disabled={inputTitle.trim() === ''}
+                  size='sm'
+                >
                   {t('settings.function.windowControl.windowTitle.update')}
                 </Button>
               </div>
