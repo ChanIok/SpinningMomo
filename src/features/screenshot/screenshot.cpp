@@ -5,6 +5,9 @@ module;
 #include <windows.h>
 #include <wrl/client.h>
 
+#include <wil/com.h>
+#include <wil/result.h>
+
 #include <functional>
 #include <iostream>
 #include <thread>
@@ -20,6 +23,7 @@ import Utils.Path;
 import Utils.String;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
+import Utils.Image;
 import Vendor.Windows;
 
 namespace Features::Screenshot {
@@ -27,127 +31,65 @@ namespace Features::Screenshot {
 // WIC 编码保存纹理
 auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_path)
     -> std::expected<void, std::string> {
-  if (!texture) {
-    return std::unexpected("Texture cannot be null");
+  try {
+    if (!texture) {
+      return std::unexpected("Texture cannot be null");
+    }
+
+    // 获取纹理描述
+    D3D11_TEXTURE2D_DESC desc;
+    texture->GetDesc(&desc);
+
+    // 获取设备和上下文
+    Microsoft::WRL::ComPtr<ID3D11Device> device;
+    texture->GetDevice(&device);
+    THROW_HR_IF_NULL(E_POINTER, device);
+
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+    device->GetImmediateContext(&context);
+    THROW_HR_IF_NULL(E_POINTER, context);
+
+    // 创建暂存纹理
+    D3D11_TEXTURE2D_DESC staging_desc = desc;
+    staging_desc.Usage = D3D11_USAGE_STAGING;
+    staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+    staging_desc.BindFlags = 0;
+    staging_desc.MiscFlags = 0;
+    staging_desc.ArraySize = 1;
+    staging_desc.MipLevels = 1;
+
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> staging_texture;
+    THROW_IF_FAILED(device->CreateTexture2D(&staging_desc, nullptr, &staging_texture));
+
+    // 复制纹理数据
+    context->CopyResource(staging_texture.Get(), texture);
+
+    // 映射纹理并写入像素数据
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    THROW_IF_FAILED(context->Map(staging_texture.Get(), 0, D3D11_MAP_READ, 0, &mapped));
+
+    // 使用 RAII 确保纹理总是被正确解除映射
+    auto unmap_on_exit = wil::scope_exit([&] { context->Unmap(staging_texture.Get(), 0); });
+
+    // 创建WIC工厂
+    auto wic_factory_result = Utils::Image::create_factory();
+    if (!wic_factory_result) {
+      return std::unexpected("Failed to create WIC imaging factory: " + wic_factory_result.error());
+    }
+    auto wic_factory = wic_factory_result.value();
+
+    auto save_result = Utils::Image::save_pixel_data_to_file(
+        wic_factory.get(), static_cast<const uint8_t*>(mapped.pData), desc.Width, desc.Height,
+        mapped.RowPitch, file_path);
+
+    if (!save_result) {
+      return std::unexpected(save_result.error());
+    }
+
+    return {};
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(std::format("WIC texture save failed: {}", e.what()));
   }
-
-  // 获取纹理描述
-  D3D11_TEXTURE2D_DESC desc;
-  texture->GetDesc(&desc);
-
-  // 获取设备和上下文
-  Microsoft::WRL::ComPtr<ID3D11Device> device;
-  texture->GetDevice(&device);
-  if (!device) {
-    return std::unexpected("Failed to get D3D device from texture");
-  }
-
-  Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-  device->GetImmediateContext(&context);
-  if (!context) {
-    return std::unexpected("Failed to get D3D device context");
-  }
-
-  // 创建暂存纹理
-  D3D11_TEXTURE2D_DESC staging_desc = desc;
-  staging_desc.Usage = D3D11_USAGE_STAGING;
-  staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-  staging_desc.BindFlags = 0;
-  staging_desc.MiscFlags = 0;
-  staging_desc.ArraySize = 1;
-  staging_desc.MipLevels = 1;
-
-  Microsoft::WRL::ComPtr<ID3D11Texture2D> staging_texture;
-  HRESULT hr = device->CreateTexture2D(&staging_desc, nullptr, &staging_texture);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create staging texture");
-  }
-
-  // 复制纹理数据
-  context->CopyResource(staging_texture.Get(), texture);
-
-  // 创建WIC工厂
-  Microsoft::WRL::ComPtr<IWICImagingFactory2> wic_factory;
-  hr = CoCreateInstance(CLSID_WICImagingFactory2, nullptr, CLSCTX_INPROC_SERVER,
-                        IID_PPV_ARGS(&wic_factory));
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create WIC imaging factory");
-  }
-
-  // 创建编码器和流
-  Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
-  hr = wic_factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &encoder);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create PNG encoder");
-  }
-
-  Microsoft::WRL::ComPtr<IWICStream> stream;
-  hr = wic_factory->CreateStream(&stream);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create WIC stream");
-  }
-
-  hr = stream->InitializeFromFilename(file_path.c_str(), GENERIC_WRITE);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to initialize WIC stream to file");
-  }
-
-  hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to initialize PNG encoder");
-  }
-
-  // 创建帧编码器
-  Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
-  hr = encoder->CreateNewFrame(&frame, nullptr);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create PNG frame encoder");
-  }
-
-  hr = frame->Initialize(nullptr);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to initialize WIC frame encoder");
-  }
-
-  hr = frame->SetSize(desc.Width, desc.Height);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to set frame size");
-  }
-
-  WICPixelFormatGUID pixel_format = GUID_WICPixelFormat32bppBGRA;
-  hr = frame->SetPixelFormat(&pixel_format);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to set pixel format");
-  }
-
-  // 映射纹理并写入像素数据
-  D3D11_MAPPED_SUBRESOURCE mapped{};
-  hr = context->Map(staging_texture.Get(), 0, D3D11_MAP_READ, 0, &mapped);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to map staging texture");
-  }
-
-  hr = frame->WritePixels(desc.Height, mapped.RowPitch, mapped.RowPitch * desc.Height,
-                          static_cast<BYTE*>(mapped.pData));
-
-  context->Unmap(staging_texture.Get(), 0);
-
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to write pixel data to frame");
-  }
-
-  // 提交
-  hr = frame->Commit();
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to commit frame");
-  }
-
-  hr = encoder->Commit();
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to commit encoder");
-  }
-
-  return {};
 }
 
 // 安全调用完成回调的辅助函数
@@ -168,104 +110,108 @@ auto safe_call_completion_callback(const Features::Screenshot::State::Screenshot
 auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest& request,
                            Features::Screenshot::State::ScreenshotState& state)
     -> std::expected<void, std::string> {
-  // 获取窗口大小
-  RECT rect;
-  if (!GetWindowRect(request.target_window, &rect)) {
-    return std::unexpected("Failed to get window rectangle");
-  }
+  try {
+    // 获取窗口大小
+    RECT rect;
+    THROW_IF_WIN32_BOOL_FALSE(GetWindowRect(request.target_window, &rect));
 
-  int width = rect.right - rect.left;
-  int height = rect.bottom - rect.top;
-  if (width <= 0 || height <= 0) {
-    return std::unexpected("Invalid window size");
-  }
-
-  // 生成唯一的会话ID
-  auto session_id = state.next_session_id.fetch_add(1);
-
-  // 创建帧回调，通过会话ID管理生命周期
-  auto frame_callback = [&state, session_id](Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
-    bool success = false;
-
-    // 查找对应的会话信息
-    auto it = state.active_sessions.find(session_id);
-    if (it == state.active_sessions.end()) {
-      Logger().error("Session {} not found in frame callback", session_id);
-      return;
+    int width = rect.right - rect.left;
+    int height = rect.bottom - rect.top;
+    if (width <= 0 || height <= 0) {
+      return std::unexpected("Invalid window size");
     }
 
-    auto& session_info = it->second;
+    // 生成唯一的会话ID
+    auto session_id = state.next_session_id.fetch_add(1);
 
-    // 如果使用了手动隐藏光标，在这里恢复光标显示
-    if (session_info.session.need_hide_cursor) {
-      ShowCursor(TRUE);
-    }
+    // 创建帧回调，通过会话ID管理生命周期
+    auto frame_callback = [&state,
+                           session_id](Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
+      bool success = false;
 
-    if (frame) {
-      auto surface = frame.Surface();
-      if (surface) {
-        auto texture = Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
-        if (texture) {
-          // 直接在回调中保存纹理
-          auto save_result = save_texture_with_wic(texture.Get(), session_info.request.file_path);
-          if (save_result) {
-            success = true;
-            Logger().debug("Screenshot saved successfully for session {}", session_id);
-          } else {
-            Logger().error("Failed to save screenshot for session {}: {}", session_id,
-                           save_result.error());
+      // 查找对应的会话信息
+      auto it = state.active_sessions.find(session_id);
+      if (it == state.active_sessions.end()) {
+        Logger().error("Session {} not found in frame callback", session_id);
+        return;
+      }
+
+      auto& session_info = it->second;
+
+      // 如果使用了手动隐藏光标，在这里恢复光标显示
+      if (session_info.session.need_hide_cursor) {
+        ShowCursor(TRUE);
+      }
+
+      if (frame) {
+        auto surface = frame.Surface();
+        if (surface) {
+          auto texture =
+              Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+          if (texture) {
+            // 直接在回调中保存纹理
+            auto save_result = save_texture_with_wic(texture.Get(), session_info.request.file_path);
+            if (save_result) {
+              success = true;
+              Logger().debug("Screenshot saved successfully for session {}", session_id);
+            } else {
+              Logger().error("Failed to save screenshot for session {}: {}", session_id,
+                             save_result.error());
+            }
           }
         }
+      } else {
+        Logger().error("Captured frame is null for session {}", session_id);
       }
-    } else {
-      Logger().error("Captured frame is null for session {}", session_id);
+
+      // 停止并清理捕获会话
+      Utils::Graphics::Capture::stop_capture(session_info.session);
+      Utils::Graphics::Capture::cleanup_capture_session(session_info.session);
+
+      // 调用完成回调
+      safe_call_completion_callback(session_info.request, success);
+
+      // 从活跃会话中移除
+      state.active_sessions.erase(it);
+      Logger().debug("Session {} completed and removed", session_id);
+    };
+
+    // 创建捕获会话
+    auto session_result = Utils::Graphics::Capture::create_capture_session(
+        request.target_window, state.winrt_device, width, height, frame_callback);
+    if (!session_result) {
+      return std::unexpected("Failed to create capture session: " + session_result.error());
     }
 
-    // 停止并清理捕获会话
-    Utils::Graphics::Capture::stop_capture(session_info.session);
-    Utils::Graphics::Capture::cleanup_capture_session(session_info.session);
+    // 创建会话信息并存储到状态中
+    Features::Screenshot::State::SessionInfo session_info;
+    session_info.session = std::move(session_result.value());
+    session_info.request = request;
 
-    // 调用完成回调
-    safe_call_completion_callback(session_info.request, success);
-
-    // 从活跃会话中移除
-    state.active_sessions.erase(it);
-    Logger().debug("Session {} completed and removed", session_id);
-  };
-
-  // 创建捕获会话
-  auto session_result = Utils::Graphics::Capture::create_capture_session(
-      request.target_window, state.winrt_device, width, height, frame_callback);
-  if (!session_result) {
-    return std::unexpected("Failed to create capture session: " + session_result.error());
-  }
-
-  // 创建会话信息并存储到状态中
-  Features::Screenshot::State::SessionInfo session_info;
-  session_info.session = std::move(session_result.value());
-  session_info.request = request;
-
-  // 如果需要手动隐藏光标，则在开始捕获前隐藏光标
-  if (session_info.session.need_hide_cursor) {
-    ShowCursor(FALSE);
-  }
-
-  state.active_sessions[session_id] = std::move(session_info);
-
-  // 开始捕获 - 不等待，直接返回
-  auto start_result =
-      Utils::Graphics::Capture::start_capture(state.active_sessions[session_id].session);
-  if (!start_result) {
-    // 如果启动失败，清理会话，恢复光标显示
-    if (state.active_sessions[session_id].session.need_hide_cursor) {
-      ShowCursor(TRUE);
+    // 如果需要手动隐藏光标，则在开始捕获前隐藏光标
+    if (session_info.session.need_hide_cursor) {
+      ShowCursor(FALSE);
     }
-    state.active_sessions.erase(session_id);
-    return std::unexpected("Failed to start capture: " + start_result.error());
-  }
 
-  Logger().debug("Screenshot capture started for session {}", session_id);
-  return {};
+    state.active_sessions[session_id] = std::move(session_info);
+
+    // 开始捕获 - 不等待，直接返回
+    auto start_result =
+        Utils::Graphics::Capture::start_capture(state.active_sessions[session_id].session);
+    if (!start_result) {
+      // 如果启动失败，清理会话，恢复光标显示
+      if (state.active_sessions[session_id].session.need_hide_cursor) {
+        ShowCursor(TRUE);
+      }
+      state.active_sessions.erase(session_id);
+      return std::unexpected("Failed to start capture: " + start_result.error());
+    }
+
+    Logger().debug("Screenshot capture started for session {}", session_id);
+    return {};
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(std::format("Screenshot capture failed: {}", e.what()));
+  }
 }
 
 // 处理单个截图请求
@@ -380,47 +326,49 @@ auto worker_thread_proc(Core::State::AppState& app_state) -> void {
 // 只初始化D3D资源（不创建工作线程）
 auto initialize_d3d_resources_only(Core::State::AppState& app_state)
     -> std::expected<void, std::string> {
-  auto& state = *app_state.screenshot;
-  Logger().debug("Initializing D3D resources only");
+  try {
+    auto& state = *app_state.screenshot;
+    Logger().debug("Initializing D3D resources only");
 
-  // 检查系统支持
-  if (!app_state.app_info->is_capture_supported) {
-    return std::unexpected("Windows Graphics Capture is not supported");
+    // 检查系统支持
+    if (!app_state.app_info->is_capture_supported) {
+      return std::unexpected("Windows Graphics Capture is not supported");
+    }
+
+    // 使用 WIL 的 RAII COM 初始化
+    // 这会在函数退出时自动调用 CoUninitialize，并正确处理 RPC_E_CHANGED_MODE
+    auto co_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+
+    // 创建无头D3D设备（不需要窗口和交换链）
+    auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
+    if (!d3d_result) {
+      return std::unexpected("Failed to create headless D3D device: " + d3d_result.error());
+    }
+
+    // 创建一个简化的D3DContext，只包含设备和上下文
+    Utils::Graphics::D3D::D3DContext context;
+    context.device = d3d_result->first;
+    context.context = d3d_result->second;
+    // 注意：swap_chain 和 render_target 保持为空，因为截图不需要它们
+
+    state.d3d_context = std::move(context);
+
+    // 创建WinRT设备
+    auto winrt_result =
+        Utils::Graphics::Capture::create_winrt_device(state.d3d_context->device.Get());
+    if (!winrt_result) {
+      state.cleanup_d3d_resources();
+      return std::unexpected("Failed to create WinRT device: " + winrt_result.error());
+    }
+
+    state.winrt_device = std::move(*winrt_result);
+    state.d3d_initialized = true;
+
+    Logger().debug("D3D resources initialized successfully");
+    return {};
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(std::format("D3D initialization failed: {}", e.what()));
   }
-
-  // 初始化COM
-  HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-  if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
-    return std::unexpected("Failed to initialize COM");
-  }
-
-  // 创建无头D3D设备（不需要窗口和交换链）
-  auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
-  if (!d3d_result) {
-    return std::unexpected("Failed to create headless D3D device: " + d3d_result.error());
-  }
-
-  // 创建一个简化的D3DContext，只包含设备和上下文
-  Utils::Graphics::D3D::D3DContext context;
-  context.device = d3d_result->first;
-  context.context = d3d_result->second;
-  // 注意：swap_chain 和 render_target 保持为空，因为截图不需要它们
-
-  state.d3d_context = std::move(context);
-
-  // 创建WinRT设备
-  auto winrt_result =
-      Utils::Graphics::Capture::create_winrt_device(state.d3d_context->device.Get());
-  if (!winrt_result) {
-    state.cleanup_d3d_resources();
-    return std::unexpected("Failed to create WinRT device: " + winrt_result.error());
-  }
-
-  state.winrt_device = std::move(*winrt_result);
-  state.d3d_initialized = true;
-
-  Logger().debug("D3D resources initialized successfully");
-  return {};
 }
 
 // 初始化完整系统

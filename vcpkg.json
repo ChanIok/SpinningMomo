@@ -8,6 +8,9 @@
     "asio",
     "reflectcpp",
     "webview2",
-    "wil"
+    "wil",
+    "xxhash",
+    "sqlitecpp",
+    "libwebp"
   ]
 }

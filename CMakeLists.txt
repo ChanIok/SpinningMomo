@@ -15,6 +15,10 @@ find_package(asio CONFIG REQUIRED)
 find_package(reflectcpp CONFIG REQUIRED)
 find_package(unofficial-webview2 CONFIG REQUIRED)
 find_package(unofficial-uwebsockets CONFIG REQUIRED)
+find_package(wil CONFIG REQUIRED)
+find_package(xxHash CONFIG REQUIRED)
+find_package(SQLiteCpp CONFIG REQUIRED)
+find_package(WebP CONFIG REQUIRED)
 
 # Windows平台相关宏定义
 if(WIN32)
@@ -129,6 +133,10 @@ target_link_libraries(SpinningMomo PRIVATE
     reflectcpp::reflectcpp
     unofficial::webview2::webview2
     unofficial::uwebsockets::uwebsockets
+    WIL::WIL
+    xxHash::xxhash
+    SQLiteCpp
+    WebP::webp
 )
 
 # Web应用资源复制
