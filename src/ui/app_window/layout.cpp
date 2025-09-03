@@ -3,7 +3,7 @@ module;
 #include <dwmapi.h>
 #include <windows.h>
 
-#include <iostream>
+#include <string>
 
 module UI.AppWindow.Layout;
 

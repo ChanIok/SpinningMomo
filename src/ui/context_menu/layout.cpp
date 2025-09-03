@@ -5,7 +5,7 @@ module;
 #include <windows.h>
 #include <wrl/client.h>
 
-#include <iostream>
+#include <string>
 
 module UI.ContextMenu.Layout;
 

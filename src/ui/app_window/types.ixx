@@ -4,7 +4,7 @@ module;
 #include <dwrite_3.h>
 #include <windows.h>
 
-#include <iostream>
+#include <string>
 
 export module UI.AppWindow.Types;
 

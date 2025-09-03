@@ -3,7 +3,7 @@ module;
 #include <windows.h>
 #include <windowsx.h>
 
-#include <iostream>
+#include <string>
 
 module UI.AppWindow.MessageHandler;
 

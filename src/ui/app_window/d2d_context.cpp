@@ -4,9 +4,10 @@ module;
 #include <dwrite_3.h>
 #include <windows.h>
 
+#include <string>
+
 module UI.AppWindow.D2DContext;
 
-import std;
 import Core.State;
 import UI.AppWindow.State;
 import UI.AppWindow.Types;

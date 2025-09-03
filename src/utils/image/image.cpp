@@ -9,6 +9,8 @@ module;
 #include <windows.h>
 #include <winerror.h>
 
+#include <format>
+
 module Utils.Image;
 
 import std;

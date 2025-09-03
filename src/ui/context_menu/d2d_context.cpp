@@ -4,11 +4,10 @@ module;
 #include <dwrite_3.h>
 #include <windows.h>
 
-#include <iostream>
+#include <string>
 
 module UI.ContextMenu.D2DContext;
 
-import std;
 import Core.State;
 import UI.AppWindow.Types;
 import UI.AppWindow.State;

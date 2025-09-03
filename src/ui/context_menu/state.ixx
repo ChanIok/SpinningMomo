@@ -3,7 +3,7 @@ module;
 #include <d2d1.h>
 #include <windows.h>
 
-#include <iostream>
+#include <string>
 
 export module UI.ContextMenu.State;
 
