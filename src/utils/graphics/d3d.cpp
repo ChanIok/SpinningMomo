@@ -3,8 +3,8 @@ module;
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dxgi.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 #include <iostream>
 
@@ -44,7 +44,7 @@ auto create_d3d_context(HWND hwnd, int width, int height)
 
   HRESULT hr = D3D11CreateDeviceAndSwapChain(
       nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, nullptr, 0, D3D11_SDK_VERSION,
-      &scd, &context.swap_chain, &context.device, &featureLevel, &context.context);
+      &scd, context.swap_chain.put(), context.device.put(), &featureLevel, context.context.put());
 
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create D3D device and swap chain, HRESULT: 0x{:08X}",
@@ -62,9 +62,10 @@ auto create_d3d_context(HWND hwnd, int width, int height)
 }
 
 auto create_headless_d3d_device()
-    -> std::expected<std::pair<Microsoft::WRL::ComPtr<ID3D11Device>, Microsoft::WRL::ComPtr<ID3D11DeviceContext>>, std::string> {
-  Microsoft::WRL::ComPtr<ID3D11Device> device;
-  Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
+    -> std::expected<std::pair<wil::com_ptr<ID3D11Device>, wil::com_ptr<ID3D11DeviceContext>>,
+                     std::string> {
+  wil::com_ptr<ID3D11Device> device;
+  wil::com_ptr<ID3D11DeviceContext> context;
 
   UINT createDeviceFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 #ifdef _DEBUG
@@ -72,17 +73,16 @@ auto create_headless_d3d_device()
 #endif
 
   // 创建无头D3D设备（参考旧代码的实现）
-  HRESULT hr = D3D11CreateDevice(
-      nullptr,                    // 使用默认适配器
-      D3D_DRIVER_TYPE_HARDWARE,   // 硬件驱动
-      nullptr,                    // 软件光栅化器句柄
-      createDeviceFlags,          // 创建标志
-      nullptr,                    // 功能级别数组
-      0,                          // 功能级别数组大小
-      D3D11_SDK_VERSION,          // SDK版本
-      &device,                    // 输出设备
-      nullptr,                    // 输出功能级别
-      &context                    // 输出设备上下文
+  HRESULT hr = D3D11CreateDevice(nullptr,                   // 使用默认适配器
+                                 D3D_DRIVER_TYPE_HARDWARE,  // 硬件驱动
+                                 nullptr,                   // 软件光栅化器句柄
+                                 createDeviceFlags,         // 创建标志
+                                 nullptr,                   // 功能级别数组
+                                 0,                         // 功能级别数组大小
+                                 D3D11_SDK_VERSION,         // SDK版本
+                                 device.put(),              // 输出设备
+                                 nullptr,                   // 输出功能级别
+                                 context.put()              // 输出设备上下文
   );
 
   if (FAILED(hr)) {
@@ -98,7 +98,7 @@ auto create_headless_d3d_device()
 
 auto create_render_target(D3DContext& context) -> std::expected<void, std::string> {
   // 获取后缓冲
-  Microsoft::WRL::ComPtr<ID3D11Texture2D> backBuffer;
+  wil::com_ptr<ID3D11Texture2D> backBuffer;
   HRESULT hr = context.swap_chain->GetBuffer(0, IID_PPV_ARGS(&backBuffer));
   if (FAILED(hr)) {
     auto error_msg =
@@ -108,7 +108,7 @@ auto create_render_target(D3DContext& context) -> std::expected<void, std::strin
   }
 
   // 创建渲染目标视图
-  hr = context.device->CreateRenderTargetView(backBuffer.Get(), nullptr, &context.render_target);
+  hr = context.device->CreateRenderTargetView(backBuffer.get(), nullptr, &context.render_target);
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create render target view, HRESULT: 0x{:08X}",
                                  static_cast<unsigned int>(hr));
@@ -121,9 +121,9 @@ auto create_render_target(D3DContext& context) -> std::expected<void, std::strin
 
 auto compile_shader(const std::string& shader_code, const std::string& entry_point,
                     const std::string& target)
-    -> std::expected<Microsoft::WRL::ComPtr<ID3DBlob>, std::string> {
-  Microsoft::WRL::ComPtr<ID3DBlob> blob;
-  Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+    -> std::expected<wil::com_ptr<ID3DBlob>, std::string> {
+  wil::com_ptr<ID3DBlob> blob;
+  wil::com_ptr<ID3DBlob> errorBlob;
 
   UINT compileFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #ifdef _DEBUG
@@ -266,7 +266,7 @@ auto create_viewport_shader_resources(ID3D11Device* device, const std::string& v
 
 auto create_vertex_buffer(ID3D11Device* device, const void* vertices, size_t vertex_count,
                           size_t vertex_size, bool dynamic)
-    -> std::expected<Microsoft::WRL::ComPtr<ID3D11Buffer>, std::string> {
+    -> std::expected<wil::com_ptr<ID3D11Buffer>, std::string> {
   D3D11_BUFFER_DESC bd = {};
   bd.Usage = dynamic ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT;
   bd.ByteWidth = static_cast<UINT>(vertex_count * vertex_size);
@@ -276,7 +276,7 @@ auto create_vertex_buffer(ID3D11Device* device, const void* vertices, size_t ver
   D3D11_SUBRESOURCE_DATA initData = {};
   initData.pSysMem = vertices;
 
-  Microsoft::WRL::ComPtr<ID3D11Buffer> buffer;
+  wil::com_ptr<ID3D11Buffer> buffer;
   HRESULT hr = device->CreateBuffer(&bd, vertices ? &initData : nullptr, &buffer);
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create vertex buffer, HRESULT: 0x{:08X}",
@@ -289,7 +289,7 @@ auto create_vertex_buffer(ID3D11Device* device, const void* vertices, size_t ver
 }
 
 auto create_linear_sampler(ID3D11Device* device)
-    -> std::expected<Microsoft::WRL::ComPtr<ID3D11SamplerState>, std::string> {
+    -> std::expected<wil::com_ptr<ID3D11SamplerState>, std::string> {
   D3D11_SAMPLER_DESC samplerDesc = {};
   samplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
   samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -299,7 +299,7 @@ auto create_linear_sampler(ID3D11Device* device)
   samplerDesc.MinLOD = 0;
   samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-  Microsoft::WRL::ComPtr<ID3D11SamplerState> sampler;
+  wil::com_ptr<ID3D11SamplerState> sampler;
   HRESULT hr = device->CreateSamplerState(&samplerDesc, &sampler);
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create sampler state, HRESULT: 0x{:08X}",
@@ -311,7 +311,7 @@ auto create_linear_sampler(ID3D11Device* device)
 }
 
 auto create_alpha_blend_state(ID3D11Device* device)
-    -> std::expected<Microsoft::WRL::ComPtr<ID3D11BlendState>, std::string> {
+    -> std::expected<wil::com_ptr<ID3D11BlendState>, std::string> {
   D3D11_BLEND_DESC blendDesc = {};
   blendDesc.RenderTarget[0].BlendEnable = TRUE;
   blendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
@@ -322,7 +322,7 @@ auto create_alpha_blend_state(ID3D11Device* device)
   blendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
   blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
-  Microsoft::WRL::ComPtr<ID3D11BlendState> blendState;
+  wil::com_ptr<ID3D11BlendState> blendState;
   HRESULT hr = device->CreateBlendState(&blendDesc, &blendState);
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create blend state, HRESULT: 0x{:08X}",
@@ -336,7 +336,7 @@ auto create_alpha_blend_state(ID3D11Device* device)
 auto resize_swap_chain(D3DContext& context, int width, int height)
     -> std::expected<void, std::string> {
   // 释放渲染目标
-  context.render_target.Reset();
+  context.render_target.reset();
 
   // 调整交换链大小
   HRESULT hr = context.swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
@@ -357,19 +357,19 @@ auto cleanup_d3d_context(D3DContext& context) -> void {
     context.context->Flush();
   }
 
-  context.render_target.Reset();
-  context.swap_chain.Reset();
-  context.context.Reset();
-  context.device.Reset();
+  context.render_target.reset();
+  context.swap_chain.reset();
+  context.context.reset();
+  context.device.reset();
 }
 
 auto cleanup_shader_resources(ShaderResources& resources) -> void {
-  resources.vertex_shader.Reset();
-  resources.pixel_shader.Reset();
-  resources.input_layout.Reset();
-  resources.vertex_buffer.Reset();
-  resources.sampler.Reset();
-  resources.blend_state.Reset();
+  resources.vertex_shader.reset();
+  resources.pixel_shader.reset();
+  resources.input_layout.reset();
+  resources.vertex_buffer.reset();
+  resources.sampler.reset();
+  resources.blend_state.reset();
 }
 
 }  // namespace Utils::Graphics::D3D

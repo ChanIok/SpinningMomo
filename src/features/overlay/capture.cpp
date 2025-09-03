@@ -1,8 +1,8 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 #include <functional>
 #include <iostream>
@@ -102,7 +102,7 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
 
   // 创建WinRT设备
   auto winrt_device_result = ::Utils::Graphics::Capture::create_winrt_device(
-      overlay_state.rendering.d3d_context.device.Get());
+      overlay_state.rendering.d3d_context.device.get());
   if (!winrt_device_result) {
     Logger().error("Failed to create WinRT device for capture");
     return std::unexpected("Failed to create WinRT device");

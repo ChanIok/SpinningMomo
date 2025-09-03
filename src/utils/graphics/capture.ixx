@@ -1,11 +1,11 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
-#include <wrl/client.h>
 
 export module Utils.Graphics.Capture;
 
@@ -53,6 +53,6 @@ export auto recreate_frame_pool(CaptureSession& session, int width, int height) 
 // 从WinRT对象获取DXGI接口的辅助函数
 export template <typename T>
 auto get_dxgi_interface_from_object(const winrt::Windows::Foundation::IInspectable& object)
-    -> Microsoft::WRL::ComPtr<T>;
+    -> wil::com_ptr<T>;
 
 }  // namespace Utils::Graphics::Capture

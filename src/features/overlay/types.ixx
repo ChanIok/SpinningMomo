@@ -1,8 +1,8 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 export module Features.Overlay.Types;
 
@@ -47,8 +47,8 @@ struct WindowState {
 struct RenderingState {
   Utils::Graphics::D3D::D3DContext d3d_context;
   Utils::Graphics::D3D::ShaderResources shader_resources;
-  Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture;
-  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> capture_srv;
+  wil::com_ptr<ID3D11Texture2D> frame_texture;
+  wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
   HANDLE frame_latency_object = nullptr;
   std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
 

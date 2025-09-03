@@ -1,12 +1,10 @@
 module;
 
 #include <d3d11.h>
-#include <wincodec.h>
-#include <windows.h>
-#include <wrl/client.h>
-
 #include <wil/com.h>
 #include <wil/result.h>
+#include <wincodec.h>
+#include <windows.h>
 
 #include <functional>
 #include <iostream>
@@ -41,12 +39,12 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
     texture->GetDesc(&desc);
 
     // 获取设备和上下文
-    Microsoft::WRL::ComPtr<ID3D11Device> device;
-    texture->GetDevice(&device);
+    wil::com_ptr<ID3D11Device> device;
+    texture->GetDevice(device.put());
     THROW_HR_IF_NULL(E_POINTER, device);
 
-    Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
-    device->GetImmediateContext(&context);
+    wil::com_ptr<ID3D11DeviceContext> context;
+    device->GetImmediateContext(context.put());
     THROW_HR_IF_NULL(E_POINTER, context);
 
     // 创建暂存纹理
@@ -58,18 +56,18 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
     staging_desc.ArraySize = 1;
     staging_desc.MipLevels = 1;
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> staging_texture;
-    THROW_IF_FAILED(device->CreateTexture2D(&staging_desc, nullptr, &staging_texture));
+    wil::com_ptr<ID3D11Texture2D> staging_texture;
+    THROW_IF_FAILED(device->CreateTexture2D(&staging_desc, nullptr, staging_texture.put()));
 
     // 复制纹理数据
-    context->CopyResource(staging_texture.Get(), texture);
+    context->CopyResource(staging_texture.get(), texture);
 
     // 映射纹理并写入像素数据
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    THROW_IF_FAILED(context->Map(staging_texture.Get(), 0, D3D11_MAP_READ, 0, &mapped));
+    THROW_IF_FAILED(context->Map(staging_texture.get(), 0, D3D11_MAP_READ, 0, &mapped));
 
     // 使用 RAII 确保纹理总是被正确解除映射
-    auto unmap_on_exit = wil::scope_exit([&] { context->Unmap(staging_texture.Get(), 0); });
+    auto unmap_on_exit = wil::scope_exit([&] { context->Unmap(staging_texture.get(), 0); });
 
     // 创建WIC工厂
     auto wic_factory_result = Utils::Image::create_factory();
@@ -150,7 +148,7 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
               Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
           if (texture) {
             // 直接在回调中保存纹理
-            auto save_result = save_texture_with_wic(texture.Get(), session_info.request.file_path);
+            auto save_result = save_texture_with_wic(texture.get(), session_info.request.file_path);
             if (save_result) {
               success = true;
               Logger().debug("Screenshot saved successfully for session {}", session_id);
@@ -355,7 +353,7 @@ auto initialize_d3d_resources_only(Core::State::AppState& app_state)
 
     // 创建WinRT设备
     auto winrt_result =
-        Utils::Graphics::Capture::create_winrt_device(state.d3d_context->device.Get());
+        Utils::Graphics::Capture::create_winrt_device(state.d3d_context->device.get());
     if (!winrt_result) {
       state.cleanup_d3d_resources();
       return std::unexpected("Failed to create WinRT device: " + winrt_result.error());

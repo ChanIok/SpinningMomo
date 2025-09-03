@@ -1,8 +1,8 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 #include <iostream>
 
@@ -20,7 +20,7 @@ import Features.Preview.Viewport;
 namespace Features::Preview::Rendering {
 
 auto create_basic_vertex_buffer(ID3D11Device* device)
-    -> std::expected<Microsoft::WRL::ComPtr<ID3D11Buffer>, std::string> {
+    -> std::expected<wil::com_ptr<ID3D11Buffer>, std::string> {
   // 创建全屏四边形的顶点数据
   Features::Preview::Types::Vertex vertices[] = {
       {-1.0f, 1.0f, 0.0f, 0.0f},   // 左上
@@ -55,7 +55,7 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
 
   // 创建基本渲染着色器
   auto basic_shader_result = Utils::Graphics::D3D::create_basic_shader_resources(
-      resources.d3d_context.device.Get(), Features::Preview::Shaders::BASIC_VERTEX_SHADER,
+      resources.d3d_context.device.get(), Features::Preview::Shaders::BASIC_VERTEX_SHADER,
       Features::Preview::Shaders::BASIC_PIXEL_SHADER);
 
   if (!basic_shader_result) {
@@ -66,7 +66,7 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
 
   // 创建视口框着色器
   auto viewport_shader_result = Utils::Graphics::D3D::create_viewport_shader_resources(
-      resources.d3d_context.device.Get(), Features::Preview::Shaders::VIEWPORT_VERTEX_SHADER,
+      resources.d3d_context.device.get(), Features::Preview::Shaders::VIEWPORT_VERTEX_SHADER,
       Features::Preview::Shaders::VIEWPORT_PIXEL_SHADER);
 
   if (!viewport_shader_result) {
@@ -76,7 +76,7 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
   resources.viewport_shaders = std::move(viewport_shader_result.value());
 
   // 创建基本顶点缓冲区（全屏四边形）
-  auto vertex_buffer_result = create_basic_vertex_buffer(resources.d3d_context.device.Get());
+  auto vertex_buffer_result = create_basic_vertex_buffer(resources.d3d_context.device.get());
   if (!vertex_buffer_result) {
     return std::unexpected(vertex_buffer_result.error());
   }
@@ -101,9 +101,9 @@ auto cleanup_rendering(Core::State::AppState& state) -> void {
     Utils::Graphics::D3D::cleanup_d3d_context(resources.d3d_context);
 
     // 重置资源
-    resources.capture_srv.Reset();
-    resources.basic_vertex_buffer.Reset();
-    resources.viewport_vertex_buffer.Reset();
+    resources.capture_srv.reset();
+    resources.basic_vertex_buffer.reset();
+    resources.viewport_vertex_buffer.reset();
     resources.initialized = false;
   }
 
@@ -136,8 +136,7 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
   return {};
 }
 
-auto update_capture_srv(Core::State::AppState& state,
-                        Microsoft::WRL::ComPtr<ID3D11Texture2D> texture)
+auto update_capture_srv(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
     -> std::expected<void, std::string> {
   if (!state.preview->rendering_resources.initialized || !texture) {
     return std::unexpected("Invalid rendering resources or texture");
@@ -157,8 +156,8 @@ auto update_capture_srv(Core::State::AppState& state,
   srvDesc.Texture2D.MipLevels = 1;
 
   // 创建新的SRV
-  HRESULT hr = resources.d3d_context.device->CreateShaderResourceView(
-      texture.Get(), &srvDesc, resources.capture_srv.ReleaseAndGetAddressOf());
+  HRESULT hr = resources.d3d_context.device->CreateShaderResourceView(texture.get(), &srvDesc,
+                                                                      resources.capture_srv.put());
   if (FAILED(hr)) {
     Logger().error("Failed to create shader resource view, HRESULT: 0x{:08X}",
                    static_cast<unsigned int>(hr));
@@ -169,24 +168,27 @@ auto update_capture_srv(Core::State::AppState& state,
 }
 
 auto render_basic_quad(const Features::Preview::Types::RenderingResources& resources) -> void {
-  auto* context = resources.d3d_context.context.Get();
+  auto* context = resources.d3d_context.context.get();
 
   // 设置着色器和资源
-  context->IASetInputLayout(resources.basic_shaders.input_layout.Get());
+  context->IASetInputLayout(resources.basic_shaders.input_layout.get());
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
   UINT stride = sizeof(Features::Preview::Types::Vertex);
   UINT offset = 0;
-  context->IASetVertexBuffers(0, 1, resources.basic_vertex_buffer.GetAddressOf(), &stride, &offset);
+  ID3D11Buffer* vertex_buffer = resources.basic_vertex_buffer.get();
+  context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
 
-  context->VSSetShader(resources.basic_shaders.vertex_shader.Get(), nullptr, 0);
-  context->PSSetShader(resources.basic_shaders.pixel_shader.Get(), nullptr, 0);
-  context->PSSetShaderResources(0, 1, resources.capture_srv.GetAddressOf());
-  context->PSSetSamplers(0, 1, resources.basic_shaders.sampler.GetAddressOf());
+  context->VSSetShader(resources.basic_shaders.vertex_shader.get(), nullptr, 0);
+  context->PSSetShader(resources.basic_shaders.pixel_shader.get(), nullptr, 0);
+  ID3D11ShaderResourceView* srv = resources.capture_srv.get();
+  context->PSSetShaderResources(0, 1, &srv);
+  ID3D11SamplerState* sampler = resources.basic_shaders.sampler.get();
+  context->PSSetSamplers(0, 1, &sampler);
 
   // 设置混合状态
   float blendFactor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  context->OMSetBlendState(resources.basic_shaders.blend_state.Get(), blendFactor, 0xffffffff);
+  context->OMSetBlendState(resources.basic_shaders.blend_state.get(), blendFactor, 0xffffffff);
 
   // 绘制
   context->Draw(4, 0);
@@ -199,12 +201,12 @@ auto render_viewport_frame(Core::State::AppState& state,
 
   // 渲染视口框
   Features::Preview::Viewport::render_viewport_frame(
-      state, resources.d3d_context.context.Get(), resources.viewport_shaders.vertex_shader,
+      state, resources.d3d_context.context.get(), resources.viewport_shaders.vertex_shader,
       resources.viewport_shaders.pixel_shader, resources.viewport_shaders.input_layout);
 }
 
-auto render_frame(Core::State::AppState& state,
-                  Microsoft::WRL::ComPtr<ID3D11Texture2D> capture_texture) -> void {
+auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_texture)
+    -> void {
   if (!state.preview->rendering_resources.initialized) {
     return;
   }
@@ -216,7 +218,7 @@ auto render_frame(Core::State::AppState& state,
     return;
   }
 
-  auto* context = resources.d3d_context.context.Get();
+  auto* context = resources.d3d_context.context.get();
 
   // 更新捕获SRV（如果需要）
   if (state.preview->create_new_srv && capture_texture) {
@@ -231,10 +233,10 @@ auto render_frame(Core::State::AppState& state,
 
   // 清除背景
   float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  context->ClearRenderTargetView(resources.d3d_context.render_target.Get(), clearColor);
+  context->ClearRenderTargetView(resources.d3d_context.render_target.get(), clearColor);
 
   // 设置渲染目标
-  ID3D11RenderTargetView* views[] = {resources.d3d_context.render_target.Get()};
+  ID3D11RenderTargetView* views[] = {resources.d3d_context.render_target.get()};
   context->OMSetRenderTargets(1, views, nullptr);
 
   // 设置视口

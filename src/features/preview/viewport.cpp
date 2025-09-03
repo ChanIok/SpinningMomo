@@ -1,8 +1,8 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 #include <iostream>
 
@@ -193,9 +193,9 @@ auto create_viewport_vertices(const Core::State::AppState& state,
 }
 
 auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* context,
-                           const Microsoft::WRL::ComPtr<ID3D11VertexShader>& vertex_shader,
-                           const Microsoft::WRL::ComPtr<ID3D11PixelShader>& pixel_shader,
-                           const Microsoft::WRL::ComPtr<ID3D11InputLayout>& input_layout) -> void {
+                           const wil::com_ptr<ID3D11VertexShader>& vertex_shader,
+                           const wil::com_ptr<ID3D11PixelShader>& pixel_shader,
+                           const wil::com_ptr<ID3D11InputLayout>& input_layout) -> void {
   if (!state.preview->viewport.visible || !context) {
     return;
   }
@@ -217,7 +217,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
 
   // 创建动态顶点缓冲区
   auto buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
-      rendering_resources.d3d_context.device.Get(), vertices.data(), vertices.size(),
+      rendering_resources.d3d_context.device.get(), vertices.data(), vertices.size(),
       sizeof(Features::Preview::Types::ViewportVertex),
       true);  // 动态缓冲区
 
@@ -229,15 +229,16 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   auto viewport_buffer = buffer_result.value();
 
   // 设置渲染状态
-  context->IASetInputLayout(input_layout.Get());
+  context->IASetInputLayout(input_layout.get());
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
 
   UINT stride = sizeof(Features::Preview::Types::ViewportVertex);
   UINT offset = 0;
-  context->IASetVertexBuffers(0, 1, viewport_buffer.GetAddressOf(), &stride, &offset);
+  ID3D11Buffer* buffer = viewport_buffer.get();
+  context->IASetVertexBuffers(0, 1, &buffer, &stride, &offset);
 
-  context->VSSetShader(vertex_shader.Get(), nullptr, 0);
-  context->PSSetShader(pixel_shader.Get(), nullptr, 0);
+  context->VSSetShader(vertex_shader.get(), nullptr, 0);
+  context->PSSetShader(pixel_shader.get(), nullptr, 0);
 
   // 绘制视口框线条
   context->Draw(static_cast<UINT>(vertices.size()), 0);

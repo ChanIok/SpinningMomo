@@ -1,8 +1,8 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 #include <iostream>
 
@@ -23,7 +23,7 @@ auto create_shader_resources(Core::State::AppState& state) -> std::expected<void
   auto& overlay_state = *state.overlay;
 
   auto result = ::Utils::Graphics::D3D::create_basic_shader_resources(
-      overlay_state.rendering.d3d_context.device.Get(),
+      overlay_state.rendering.d3d_context.device.get(),
       Features::Overlay::Shaders::BASIC_VERTEX_SHADER,
       Features::Overlay::Shaders::BASIC_PIXEL_SHADER);
 
@@ -42,7 +42,7 @@ auto create_shader_resources(Core::State::AppState& state) -> std::expected<void
   };
 
   auto vertex_buffer_result = ::Utils::Graphics::D3D::create_vertex_buffer(
-      overlay_state.rendering.d3d_context.device.Get(), vertices, 4, sizeof(Types::Vertex));
+      overlay_state.rendering.d3d_context.device.get(), vertices, 4, sizeof(Types::Vertex));
 
   if (!vertex_buffer_result) {
     return std::unexpected(vertex_buffer_result.error());
@@ -116,8 +116,7 @@ auto resize_rendering(Core::State::AppState& state) -> std::expected<void, std::
   return {};
 }
 
-auto update_capture_srv(Core::State::AppState& state,
-                        Microsoft::WRL::ComPtr<ID3D11Texture2D> texture)
+auto update_capture_srv(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
@@ -138,7 +137,7 @@ auto update_capture_srv(Core::State::AppState& state,
 
   // 创建新的SRV
   HRESULT hr = overlay_state.rendering.d3d_context.device->CreateShaderResourceView(
-      texture.Get(), &srvDesc, overlay_state.rendering.capture_srv.ReleaseAndGetAddressOf());
+      texture.get(), &srvDesc, overlay_state.rendering.capture_srv.put());
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create shader resource view, HRESULT: 0x{:08X}",
                                  static_cast<unsigned int>(hr));
@@ -159,13 +158,11 @@ auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
 
   if (overlay_state.window.use_letterbox_mode) {
     // 使用工具函数计算黑边区域
-    auto [content_left, content_top, content_width, content_height] = 
+    auto [content_left, content_top, content_width, content_height] =
         Utils::calculate_letterbox_area(
-            overlay_state.window.screen_width,
-            overlay_state.window.screen_height,
-            overlay_state.window.cached_game_width,
-            overlay_state.window.cached_game_height);
-    
+            overlay_state.window.screen_width, overlay_state.window.screen_height,
+            overlay_state.window.cached_game_width, overlay_state.window.cached_game_height);
+
     // 将像素坐标转换为标准化设备坐标(-1到1)
     // 注意：Direct3D的Y轴是向上的，而窗口坐标Y轴是向下的
     left = (content_left * 2.0f / overlay_state.window.screen_width) - 1.0f;
@@ -176,18 +173,19 @@ auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
 
   // 更新顶点数据
   Types::Vertex vertices[] = {
-      {left, bottom, 0.0f, 1.0f},  // 左下
-      {left, top, 0.0f, 0.0f},     // 左上
-      {right, bottom, 1.0f, 1.0f}, // 右下
-      {right, top, 1.0f, 0.0f}     // 右上
+      {left, bottom, 0.0f, 1.0f},   // 左下
+      {left, top, 0.0f, 0.0f},      // 左上
+      {right, bottom, 1.0f, 1.0f},  // 右下
+      {right, top, 1.0f, 0.0f}      // 右上
   };
-  
+
   // 更新顶点缓冲区
-  d3d_context.context->UpdateSubresource(shader_resources.vertex_buffer.Get(), 0, nullptr, vertices, 0, 0);
+  d3d_context.context->UpdateSubresource(shader_resources.vertex_buffer.get(), 0, nullptr, vertices,
+                                         0, 0);
 }
 
-auto render_frame(Core::State::AppState& state,
-                  Microsoft::WRL::ComPtr<ID3D11Texture2D> frame_texture) -> void {
+auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> frame_texture)
+    -> void {
   auto& overlay_state = *state.overlay;
   auto& d3d_context = overlay_state.rendering.d3d_context;
   auto& shader_resources = overlay_state.rendering.shader_resources;
@@ -219,8 +217,9 @@ auto render_frame(Core::State::AppState& state,
 
   // 清理渲染目标为黑色（作为黑边的背景色）
   float clear_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-  d3d_context.context->ClearRenderTargetView(d3d_context.render_target.Get(), clear_color);
-  d3d_context.context->OMSetRenderTargets(1, d3d_context.render_target.GetAddressOf(), nullptr);
+  d3d_context.context->ClearRenderTargetView(d3d_context.render_target.get(), clear_color);
+  ID3D11RenderTargetView* render_target_view = d3d_context.render_target.get();
+  d3d_context.context->OMSetRenderTargets(1, &render_target_view, nullptr);
 
   // 根据letterbox模式更新顶点缓冲区
   update_vertex_buffer_for_letterbox(state);
@@ -234,29 +233,31 @@ auto render_frame(Core::State::AppState& state,
   d3d_context.context->RSSetViewports(1, &viewport);
 
   // 设置着色器和资源
-  d3d_context.context->VSSetShader(shader_resources.vertex_shader.Get(), nullptr, 0);
-  d3d_context.context->PSSetShader(shader_resources.pixel_shader.Get(), nullptr, 0);
-  d3d_context.context->IASetInputLayout(shader_resources.input_layout.Get());
+  d3d_context.context->VSSetShader(shader_resources.vertex_shader.get(), nullptr, 0);
+  d3d_context.context->PSSetShader(shader_resources.pixel_shader.get(), nullptr, 0);
+  d3d_context.context->IASetInputLayout(shader_resources.input_layout.get());
 
   // 设置顶点缓冲区
   UINT stride = sizeof(Types::Vertex);
   UINT offset = 0;
-  d3d_context.context->IASetVertexBuffers(0, 1, shader_resources.vertex_buffer.GetAddressOf(),
-                                          &stride, &offset);
+  ID3D11Buffer* vertex_buffer = shader_resources.vertex_buffer.get();
+  d3d_context.context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
   d3d_context.context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
   // 设置纹理和采样器
   if (rendering_state.capture_srv) {
-    d3d_context.context->PSSetShaderResources(0, 1, rendering_state.capture_srv.GetAddressOf());
+    ID3D11ShaderResourceView* srv = rendering_state.capture_srv.get();
+    d3d_context.context->PSSetShaderResources(0, 1, &srv);
   }
   if (shader_resources.sampler) {
-    d3d_context.context->PSSetSamplers(0, 1, shader_resources.sampler.GetAddressOf());
+    ID3D11SamplerState* sampler = shader_resources.sampler.get();
+    d3d_context.context->PSSetSamplers(0, 1, &sampler);
   }
 
   // 设置混合状态
   if (shader_resources.blend_state) {
     float blend_factor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-    d3d_context.context->OMSetBlendState(shader_resources.blend_state.Get(), blend_factor,
+    d3d_context.context->OMSetBlendState(shader_resources.blend_state.get(), blend_factor,
                                          0xffffffff);
   }
 
@@ -264,7 +265,7 @@ auto render_frame(Core::State::AppState& state,
   d3d_context.context->Draw(4, 0);
 
   // 呈现
-  if (auto swap_chain = d3d_context.swap_chain.Get()) {
+  if (auto swap_chain = d3d_context.swap_chain.get()) {
     swap_chain->Present(0, 0);
   }
 }
@@ -275,8 +276,8 @@ auto cleanup_rendering(Core::State::AppState& state) -> void {
   ::Utils::Graphics::D3D::cleanup_shader_resources(overlay_state.rendering.shader_resources);
   ::Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
 
-  overlay_state.rendering.frame_texture.Reset();
-  overlay_state.rendering.capture_srv.Reset();
+  overlay_state.rendering.frame_texture.reset();
+  overlay_state.rendering.capture_srv.reset();
 
   if (overlay_state.rendering.frame_latency_object) {
     CloseHandle(overlay_state.rendering.frame_latency_object);

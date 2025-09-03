@@ -1,8 +1,9 @@
 module;
 
-#include <windows.h>
-#include <wrl/client.h>
 #include <d3d11.h>
+#include <wil/com.h>
+#include <windows.h>
+
 #include <atomic>
 
 export module Features.Preview.Types;
@@ -83,9 +84,9 @@ struct RenderingResources {
   Utils::Graphics::D3D::D3DContext d3d_context;
   Utils::Graphics::D3D::ShaderResources basic_shaders;
   Utils::Graphics::D3D::ShaderResources viewport_shaders;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> basic_vertex_buffer;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> viewport_vertex_buffer;
-  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> capture_srv;
+  wil::com_ptr<ID3D11Buffer> basic_vertex_buffer;
+  wil::com_ptr<ID3D11Buffer> viewport_vertex_buffer;
+  wil::com_ptr<ID3D11ShaderResourceView> capture_srv;
 };
 
 // 捕获会话（业务层封装）

@@ -1,8 +1,8 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 #include <functional>
 #include <iostream>
@@ -20,9 +20,8 @@ import Utils.Logger;
 
 namespace Features::Preview::Capture {
 
-auto on_frame_arrived(Core::State::AppState& state, 
-                      Utils::Graphics::Capture::Direct3D11CaptureFrame frame)
-    -> void {
+auto on_frame_arrived(Core::State::AppState& state,
+                      Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
   if (!state.preview->running || !frame) {
     return;
   }
@@ -31,21 +30,17 @@ auto on_frame_arrived(Core::State::AppState& state,
   auto content_size = frame.ContentSize();
   auto& last_width = state.preview->capture_state.last_frame_width;
   auto& last_height = state.preview->capture_state.last_frame_height;
-  
-  bool size_changed = (content_size.Width != last_width) || 
-                      (content_size.Height != last_height);
-  
+
+  bool size_changed = (content_size.Width != last_width) || (content_size.Height != last_height);
+
   if (size_changed) {
     // 更新记录的尺寸
     last_width = content_size.Width;
     last_height = content_size.Height;
-    
+
     // 重建帧池
-    Utils::Graphics::Capture::recreate_frame_pool(
-        state.preview->capture_state.session,
-        content_size.Width,
-        content_size.Height
-    );
+    Utils::Graphics::Capture::recreate_frame_pool(state.preview->capture_state.session,
+                                                  content_size.Width, content_size.Height);
 
     state.preview->create_new_srv = true;
 
@@ -56,7 +51,8 @@ auto on_frame_arrived(Core::State::AppState& state,
 
   auto surface = frame.Surface();
   if (surface) {
-    auto texture = Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+    auto texture =
+        Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
     if (texture) {
       // 触发渲染
       Features::Preview::Rendering::render_frame(state, texture);
@@ -83,7 +79,7 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
 
   // 创建WinRT设备
   auto winrt_device_result =
-      Utils::Graphics::Capture::create_winrt_device(rendering_resources.d3d_context.device.Get());
+      Utils::Graphics::Capture::create_winrt_device(rendering_resources.d3d_context.device.get());
   if (!winrt_device_result) {
     Logger().error("Failed to create WinRT device for capture");
     return std::unexpected("Failed to create WinRT device");
@@ -125,8 +121,8 @@ auto start_capture(Core::State::AppState& state) -> std::expected<void, std::str
 auto stop_capture(Core::State::AppState& state) -> void {
   auto& session = state.preview->capture_state.session;
 
-    Utils::Graphics::Capture::stop_capture(session);
-    Logger().debug("Capture stopped");
+  Utils::Graphics::Capture::stop_capture(session);
+  Logger().debug("Capture stopped");
 }
 
 auto cleanup_capture(Core::State::AppState& state) -> void {

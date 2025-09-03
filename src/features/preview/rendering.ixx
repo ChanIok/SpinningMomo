@@ -1,8 +1,8 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.h>
-#include <wrl/client.h>
 
 export module Features.Preview.Rendering;
 
@@ -23,7 +23,7 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
     -> std::expected<void, std::string>;
 
 // 渲染一帧
-auto render_frame(Core::State::AppState& state,
-                  Microsoft::WRL::ComPtr<ID3D11Texture2D> capture_texture) -> void;
+auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_texture)
+    -> void;
 
 }  // namespace Features::Preview::Rendering

@@ -1,7 +1,7 @@
 module;
 
 #include <d3d11.h>
-#include <wrl/client.h>
+#include <wil/com.h>
 
 export module Features.Preview.Viewport;
 
@@ -15,8 +15,8 @@ auto update_viewport_rect(Core::State::AppState& state) -> void;
 
 // 渲染视口框到屏幕
 auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* context,
-                           const Microsoft::WRL::ComPtr<ID3D11VertexShader>& vertex_shader,
-                           const Microsoft::WRL::ComPtr<ID3D11PixelShader>& pixel_shader,
-                           const Microsoft::WRL::ComPtr<ID3D11InputLayout>& input_layout) -> void;
+                           const wil::com_ptr<ID3D11VertexShader>& vertex_shader,
+                           const wil::com_ptr<ID3D11PixelShader>& pixel_shader,
+                           const wil::com_ptr<ID3D11InputLayout>& input_layout) -> void;
 
 }  // namespace Features::Preview::Viewport

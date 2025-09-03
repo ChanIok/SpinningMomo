@@ -1,6 +1,7 @@
 module;
 
 #include <d3d11.h>
+#include <wil/com.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
 #include <windows.h>
@@ -8,7 +9,6 @@ module;
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
-#include <wrl/client.h>
 
 module Utils.Graphics.Capture;
 
@@ -24,8 +24,8 @@ auto create_winrt_device(ID3D11Device* d3d_device)
   }
 
   // 获取DXGI设备接口
-  Microsoft::WRL::ComPtr<IDXGIDevice> dxgi_device;
-  HRESULT hr = d3d_device->QueryInterface(IID_PPV_ARGS(&dxgi_device));
+  wil::com_ptr<IDXGIDevice> dxgi_device;
+  HRESULT hr = d3d_device->QueryInterface(IID_PPV_ARGS(dxgi_device.put()));
   if (FAILED(hr)) {
     auto error_msg =
         std::format("Failed to get DXGI device, HRESULT: 0x{:08X}", static_cast<unsigned int>(hr));
@@ -35,7 +35,7 @@ auto create_winrt_device(ID3D11Device* d3d_device)
 
   // 创建WinRT设备
   winrt::com_ptr<::IInspectable> inspectable;
-  hr = CreateDirect3D11DeviceFromDXGIDevice(dxgi_device.Get(), inspectable.put());
+  hr = CreateDirect3D11DeviceFromDXGIDevice(dxgi_device.get(), inspectable.put());
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create WinRT device, HRESULT: 0x{:08X}",
                                  static_cast<unsigned int>(hr));
@@ -176,24 +176,22 @@ auto recreate_frame_pool(CaptureSession& session, int width, int height) -> void
   if (session.frame_pool) {
     session.frame_pool.Recreate(
         session.winrt_device,
-        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-        1,
-        {width, height}
-    );
+        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized, 1,
+        {width, height});
   }
 }
 
 template <typename T>
 auto get_dxgi_interface_from_object(const winrt::Windows::Foundation::IInspectable& object)
-    -> Microsoft::WRL::ComPtr<T> {
+    -> wil::com_ptr<T> {
   auto access = object.as<Windows::Graphics::DirectX::Direct3D11::IDirect3DDxgiInterfaceAccess>();
-  Microsoft::WRL::ComPtr<T> result;
-  winrt::check_hresult(access->GetInterface(IID_PPV_ARGS(&result)));
+  wil::com_ptr<T> result;
+  winrt::check_hresult(access->GetInterface(IID_PPV_ARGS(result.put())));
   return result;
 }
 
 // 显式实例化模板函数
 template auto get_dxgi_interface_from_object<ID3D11Texture2D>(
-    const winrt::Windows::Foundation::IInspectable&) -> Microsoft::WRL::ComPtr<ID3D11Texture2D>;
+    const winrt::Windows::Foundation::IInspectable&) -> wil::com_ptr<ID3D11Texture2D>;
 
 }  // namespace Utils::Graphics::Capture
