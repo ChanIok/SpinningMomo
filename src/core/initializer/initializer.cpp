@@ -8,6 +8,7 @@ import Core.Events;
 import Core.State;
 import Core.HttpServer;
 import Core.Events.Registrar;
+import Core.Initializer.Database;
 import Features.Notifications;
 import Features.Settings;
 import Features.Settings.State;
@@ -40,7 +41,13 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 3. 注册事件处理器
     Core::Events::register_all_handlers(state);
 
-    // 4. 初始化 settings 模块
+    // 4. 初始化数据库
+    if (auto db_result = Core::Initializer::Database::initialize_database(state); !db_result) {
+      Logger().error("Failed to initialize database: {}", db_result.error());
+      return std::unexpected("Failed to initialize database: " + db_result.error());
+    }
+
+    // 5. 初始化 settings 模块
     if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
       Logger().error("Failed to initialize settings: {}", settings_result.error());
       return std::unexpected("Failed to initialize settings: " + settings_result.error());
