@@ -5,38 +5,23 @@ module App;
 import std;
 import Core.Initializer;
 import Core.State;
-import Core.Async.Runtime;
-import Core.Async.State;
 import Core.Events;
-import Core.I18n.State;
-import Core.WebView.State;
 import Core.State.AppInfo;
-import Core.HttpServer.State;
-import Core.RPC.State;
-import Core.Database.State;
-import Features.Settings.State;
-import Features.Letterbox.State;
 import Features.Letterbox;
 import Features.Notifications;
-import Features.Notifications.State;
-import Features.Overlay.State;
 import Features.Overlay;
-import Features.Preview.State;
 import Features.Preview;
 import Features.Screenshot;
-import Features.Screenshot.State;
 import Features.Settings;
 import Features.Updater;
-import Features.Updater.State;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.WebViewWindow;
 import UI.TrayIcon;
-import UI.TrayIcon.State;
 import UI.ContextMenu;
-import UI.ContextMenu.State;
 import Core.WebView;
 import Core.HttpServer;
+import Core.Shutdown;
 import Utils.Logger;
 import Utils.String;
 import Utils.System;
@@ -46,30 +31,7 @@ import Core.I18n;
 Application::Application() = default;
 Application::~Application() {
   if (m_app_state) {
-    // 关闭HTTP服务器
-    Core::HttpServer::shutdown(*m_app_state);
-
-    // 检查是否有待处理的更新
-    if (m_app_state->updater && m_app_state->updater->pending_update) {
-      Logger().info("Executing pending update on program exit");
-      Features::Updater::execute_pending_update(*m_app_state);
-    }
-    Features::Preview::stop_preview(*m_app_state);
-    Features::Preview::cleanup_preview(*m_app_state);
-    Features::Overlay::stop_overlay(*m_app_state);
-    Features::Overlay::cleanup_overlay(*m_app_state);
-    if (auto result = Features::Letterbox::shutdown(*m_app_state); !result) {
-      Logger().error("Failed to shutdown Letterbox: {}", result.error());
-    }
-    Features::Screenshot::cleanup_system(*m_app_state);
-
-    UI::AppWindow::destroy_window(*m_app_state);
-    UI::WebViewWindow::cleanup(*m_app_state);
-
-    UI::ContextMenu::cleanup(*m_app_state);
-    UI::TrayIcon::destroy(*m_app_state);
-
-    Core::Async::stop(*m_app_state->async_runtime);
+    Core::Shutdown::shutdown_application(*m_app_state);
   }
 }
 
@@ -77,35 +39,8 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
   m_h_instance = hInstance;
 
   try {
-    // 创建 AppState
+    // 创建 AppState, 其构造函数会自动初始化所有子状态
     m_app_state = std::make_unique<Core::State::AppState>();
-    m_app_state->rpc = std::make_unique<Core::RPC::State::RpcState>();
-    m_app_state->async_runtime = std::make_unique<Core::Async::State::AsyncRuntimeState>();
-    m_app_state->events = std::make_unique<Core::Events::State::EventsState>();
-    m_app_state->i18n = std::make_unique<Core::I18n::State::I18nState>();
-    m_app_state->webview = std::make_unique<Core::WebView::State::WebViewState>();
-    m_app_state->app_info = std::make_unique<Core::State::AppInfo::AppInfoState>();
-    m_app_state->settings = std::make_unique<Features::Settings::State::SettingsState>();
-
-    // 初始化UI状态
-    m_app_state->app_window = std::make_unique<UI::AppWindow::State::AppWindowState>();
-    m_app_state->tray_icon = std::make_unique<UI::TrayIcon::State::TrayIconState>();
-    m_app_state->context_menu = std::make_unique<UI::ContextMenu::State::ContextMenuState>();
-
-    // 初始化功能模块状态
-    m_app_state->letterbox = std::make_unique<Features::Letterbox::State::LetterboxState>();
-    m_app_state->notifications =
-        std::make_unique<Features::Notifications::State::NotificationSystemState>();
-    m_app_state->overlay = std::make_unique<Features::Overlay::State::OverlayState>();
-    m_app_state->preview = std::make_unique<Features::Preview::State::PreviewState>();
-    m_app_state->screenshot = std::make_unique<Features::Screenshot::State::ScreenshotState>();
-    m_app_state->updater = std::make_unique<Features::Updater::State::UpdateState>();
-
-    // 初始化HTTP服务器状态
-    m_app_state->http_server = std::make_unique<Core::HttpServer::State::HttpServerState>();
-
-    // 初始化数据库状态
-    m_app_state->database = std::make_unique<Core::Database::State::DatabaseState>();
 
     m_app_state->app_window->window.instance = m_h_instance;
 

@@ -8,7 +8,7 @@ module Core.HttpServer.Static;
 
 import std;
 import Core.State;
-import Core.Async.Runtime;
+import Core.Async;
 import Utils.File;
 import Utils.File.Mime;
 import Utils.Path;
@@ -92,7 +92,7 @@ auto handle_static_request(Core::State::AppState& state, const std::string& url_
 
   // 在异步运行时中处理文件读取
   asio::co_spawn(
-      *Core::Async::get_io_context(*state.async_runtime),
+      *Core::Async::get_io_context(*state.async),
       [res, file_path, loop]() -> asio::awaitable<void> {
         try {
           // 检查文件是否存在

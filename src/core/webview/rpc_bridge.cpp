@@ -10,7 +10,7 @@ import Core.Events;
 import Core.WebView;
 import Core.WebView.State;
 import Core.RPC;
-import Core.Async.Runtime;
+import Core.Async;
 import Core.WebView.Events;
 import Utils.Logger;
 
@@ -33,7 +33,7 @@ auto initialize_rpc_bridge(Core::State::AppState& state) -> void {
   Logger().info("Initializing WebView RPC bridge");
 
   // 确保异步运行时已启动
-  if (!Core::Async::is_running(*state.async_runtime)) {
+  if (!Core::Async::is_running(*state.async)) {
     Logger().warn("Async runtime not running when initializing RPC bridge");
   }
 
@@ -91,7 +91,7 @@ auto create_message_handler(Core::State::AppState& state)
   return [&state](const std::string& message) {
     // 在异步运行时中处理消息
     asio::co_spawn(
-        *Core::Async::get_io_context(*state.async_runtime),
+        *Core::Async::get_io_context(*state.async),
         [&state, message]() -> asio::awaitable<void> {
           co_await handle_webview_message(state, message);
         },

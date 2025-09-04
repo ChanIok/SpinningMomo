@@ -8,7 +8,7 @@ import std;
 
 export namespace Core::Async::State {
 
-struct AsyncRuntimeState {
+struct AsyncState {
   // 核心asio状态
   std::unique_ptr<asio::io_context> io_context;
   std::vector<std::jthread> worker_threads;

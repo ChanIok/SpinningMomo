@@ -11,7 +11,7 @@ import Core.State;
 import Core.HttpServer.State;
 import Core.HttpServer.SseManager;
 import Core.HttpServer.Static;
-import Core.Async.Runtime;
+import Core.Async;
 import Core.RPC;
 import Utils.Logger;
 
@@ -41,7 +41,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
 
               // 在异步运行时中处理RPC请求
               asio::co_spawn(
-                  *Core::Async::get_io_context(*state.async_runtime),
+                  *Core::Async::get_io_context(*state.async),
                   [&state, buffer = std::move(buffer), res, loop]() -> asio::awaitable<void> {
                     try {
                       // 处理RPC请求
