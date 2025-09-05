@@ -15,28 +15,35 @@ namespace Core::Database::Migration {
 // 注意：在实际项目中，这个列表可能会从外部配置文件或数据库中加载
 const std::vector<MigrationScript> all_migrations = {
     {1,
-     "创建 photos 表",
+     "创建 media_items 表",
      {
          R"(
-                CREATE TABLE photos (
+                CREATE TABLE media_items (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     filename TEXT NOT NULL,
                     filepath TEXT NOT NULL UNIQUE,
-                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    relative_path TEXT,
+                    type TEXT NOT NULL CHECK (type IN ('photo', 'video', 'live_photo', 'unknown')),
+                    
+                    -- 基本信息
                     width INTEGER,
                     height INTEGER,
                     file_size INTEGER,
-                    metadata TEXT,
-                    photo_time TEXT,
-                    thumbnail_filename TEXT,
-                    deleted_at TEXT,
+                    mime_type TEXT,
+                    
+                    -- 时间信息
+                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                    folder_id INTEGER,
-                    relative_path TEXT
+                    deleted_at TEXT,
+                    
+                    -- 缩略图
+                    thumbnail_path TEXT,
                 );
                 )",
-         "CREATE INDEX idx_photos_filepath ON photos(filepath);",
-         "CREATE INDEX idx_photos_folder_id ON photos(folder_id);"}}
+         "CREATE INDEX idx_media_items_filepath ON media_items(filepath);",
+         "CREATE INDEX idx_media_items_type ON media_items(type);",
+         "CREATE INDEX idx_media_items_created_at ON media_items(created_at);",
+         }}
     // 添加新迁移时，只需要在这里加新的 MigrationScript 即可
 };
 
