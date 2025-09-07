@@ -4,6 +4,7 @@ module Core.Initializer;
 
 import std;
 import Core.Async;
+import Core.WorkerPool;
 import Core.State;
 import Core.HttpServer;
 import Core.Events.Registrar;
@@ -27,6 +28,11 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto result = Core::Async::start(*state.async); !result) {
       return std::unexpected("Failed to start async runtime: " + result.error());
+    }
+
+    // 启动工作线程池
+    if (auto result = Core::WorkerPool::start(*state.worker_pool); !result) {
+      return std::unexpected("Failed to start worker pool: " + result.error());
     }
 
     Core::RPC::Registry::register_all_endpoints(state);

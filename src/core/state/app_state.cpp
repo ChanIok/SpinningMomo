@@ -10,6 +10,7 @@ import Core.I18n.State;
 import Core.RPC.State;
 import Core.State.AppInfo;
 import Core.WebView.State;
+import Core.WorkerPool.State;
 import Features.Letterbox.State;
 import Features.Notifications.State;
 import Features.Asset.State;
@@ -33,6 +34,7 @@ AppState::AppState()
       app_info(std::make_unique<Core::State::AppInfo::AppInfoState>()),
       database(std::make_unique<Core::Database::State::DatabaseState>()),
       http_server(std::make_unique<Core::HttpServer::State::HttpServerState>()),
+      worker_pool(std::make_unique<Core::WorkerPool::State::WorkerPoolState>()),
       settings(std::make_unique<Features::Settings::State::SettingsState>()),
       updater(std::make_unique<Features::Updater::State::UpdateState>()),
       app_window(std::make_unique<UI::AppWindow::State::AppWindowState>()),
