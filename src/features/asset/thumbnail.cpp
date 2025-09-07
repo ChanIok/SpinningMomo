@@ -1,6 +1,7 @@
 module;
 
 #include <format>
+#include <iostream>
 
 module Features.Asset.Thumbnail;
 
@@ -49,63 +50,180 @@ auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
   return {};
 }
 
-auto generate_thumbnail_filename(int64_t asset_id, const std::string& original_filename)
-    -> std::string {
-  // 使用资产ID和原文件名的组合来生成唯一的缩略图文件名
-  std::filesystem::path original_path(original_filename);
-  std::string stem = original_path.stem().string();
+// 确保缩略图路径存在
+auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash,
+                           uint32_t width, uint32_t height)
+    -> std::expected<std::filesystem::path, std::string> {
+  // 检查缩略图目录是否已初始化
+  if (app_state.asset->thumbnails_directory.empty()) {
+    auto ensure_result = ensure_thumbnails_directory_exists(app_state);
+    if (!ensure_result) {
+      return std::unexpected(ensure_result.error());
+    }
+  }
 
-  // 替换可能有问题的字符
-  std::ranges::replace_if(
-      stem,
-      [](char c) {
-        return c == '\\' || c == '/' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' ||
-               c == '>' || c == '|';
-      },
-      '_');
+  // 使用xxh3 64位哈希的前4位作为两级子目录
+  std::string level1 = file_hash.substr(0, 2);
+  std::string level2 = file_hash.substr(2, 2);
+  std::string filename = std::format("{}_{:d}x{:d}.webp", file_hash, width, height);
 
-  return std::format("{}_{}.webp", asset_id, stem);
+  // 构建完整路径
+  auto thumbnail_path = app_state.asset->thumbnails_directory / level1 / level2 / filename;
+
+  // 确保子目录存在
+  std::error_code ec;
+  auto parent_dir = thumbnail_path.parent_path();
+  if (!std::filesystem::exists(parent_dir, ec)) {
+    if (!std::filesystem::create_directories(parent_dir, ec)) {
+      return std::unexpected("Failed to create thumbnail subdirectories: " + ec.message());
+    }
+  }
+
+  return thumbnail_path;
 }
 
-auto get_thumbnail_path(Core::State::AppState& app_state, const Types::Asset& asset)
-    -> std::expected<std::filesystem::path, std::string> {
-  // 直接从状态中获取缩略图目录路径
+// ============= 缩略图清理功能 =============
+
+auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
+    -> std::expected<void, std::string> {
   if (app_state.asset->thumbnails_directory.empty()) {
     return std::unexpected("Thumbnails directory not initialized");
   }
 
-  auto thumbnail_filename = generate_thumbnail_filename(asset.id, asset.filename);
-  return app_state.asset->thumbnails_directory / thumbnail_filename;
+  if (!asset.file_hash.has_value() || asset.file_hash->empty()) {
+    return std::unexpected("Asset has no file hash, cannot determine thumbnail files");
+  }
+
+  int deleted_count = 0;
+  std::error_code ec;
+  const std::string& file_hash = *asset.file_hash;
+
+  std::string level1 = file_hash.substr(0, 2);
+  std::string level2 = file_hash.substr(2, 2);
+  auto target_subdir = app_state.asset->thumbnails_directory / level1 / level2;
+
+  if (std::filesystem::exists(target_subdir, ec) && !ec) {
+    // 遍历特定子目录，删除对应的缩略图
+    for (const auto& entry : std::filesystem::directory_iterator(target_subdir, ec)) {
+      if (ec) break;
+
+      if (entry.is_regular_file(ec) && entry.path().extension() == ".webp") {
+        std::string filename = entry.path().filename().string();
+
+        // 检查文件名是否以文件哈希开头
+        if (filename.starts_with(file_hash + "_")) {
+          std::error_code remove_ec;
+          if (std::filesystem::remove(entry.path(), remove_ec)) {
+            deleted_count++;
+            Logger().debug("Deleted thumbnail: {}", entry.path().string());
+          } else {
+            Logger().warn("Failed to delete thumbnail {}: {}", entry.path().string(),
+                          remove_ec.message());
+          }
+        }
+      }
+    }
+  }
+
+  if (ec) {
+    return std::unexpected("Error during thumbnail deletion: " + ec.message());
+  }
+
+  if (deleted_count > 0) {
+    Logger().info("Deleted {} thumbnail(s) for asset ID {}", deleted_count, asset.id);
+  }
+
+  return {};
 }
 
-// ============= 缩略图生成功能 =============
+auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
+    -> std::expected<int, std::string> {
+  // 直接从状态中获取缩略图目录路径
+  if (app_state.asset->thumbnails_directory.empty()) {
+    return std::unexpected("Thumbnails directory not initialized");
+  }
+  auto thumbnails_dir = app_state.asset->thumbnails_directory;
 
-auto generate_thumbnail_for_asset(Core::State::AppState& app_state,
-                                  Utils::Image::WICFactory& wic_factory, const Types::Asset& asset,
-                                  uint32_t max_width, uint32_t max_height,
-                                  const Utils::Image::WebPEncodeOptions& options)
-    -> std::expected<std::filesystem::path, std::string> {
-  try {
-    // 只为图片类型生成缩略图
-    if (asset.type != "photo") {
-      return std::unexpected("Cannot generate thumbnail for non-photo asset type");
+  std::error_code ec;
+  if (!std::filesystem::exists(thumbnails_dir, ec)) {
+    return 0;  // 目录不存在，没有需要清理的
+  }
+
+  // 使用 load_asset_cache 获取所有资产的文件哈希集合
+  std::unordered_set<std::string> all_file_hashes;
+  auto cache_result = Repository::load_asset_cache(app_state);
+  if (cache_result) {
+    for (const auto& [filepath, metadata] : *cache_result) {
+      if (metadata.file_hash.has_value() && !metadata.file_hash->empty()) {
+        all_file_hashes.insert(*metadata.file_hash);
+      }
+    }
+  }
+
+  int deleted_count = 0;
+
+  // 使用递归遍历器以支持分层目录结构
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(thumbnails_dir, ec)) {
+    if (ec) {
+      return std::unexpected("Failed to iterate thumbnails directory recursively: " + ec.message());
     }
 
-     // 获取缩略图路径
-    auto thumbnail_path_result = get_thumbnail_path(app_state, asset);
+    if (entry.is_regular_file(ec) && entry.path().extension() == ".webp") {
+      std::string filename = entry.path().filename().string();
+
+      // 从文件名提取文件哈希（格式：{file_hash}_{width}x{height}.webp）
+      auto underscore_pos = filename.find('_');
+      if (underscore_pos != std::string::npos) {
+        std::string file_hash = filename.substr(0, underscore_pos);
+
+        // 检查文件哈希是否存在于任何资产中
+        if (all_file_hashes.find(file_hash) == all_file_hashes.end()) {
+          // 文件哈希不存在于任何资产中，删除缩略图
+          std::error_code remove_ec;
+          if (std::filesystem::remove(entry.path(), remove_ec)) {
+            deleted_count++;
+            Logger().debug("Deleted orphaned thumbnail: {}", entry.path().string());
+          } else {
+            Logger().warn("Failed to delete orphaned thumbnail {}: {}", entry.path().string(),
+                          remove_ec.message());
+          }
+        }
+      }
+    }
+  }
+
+  if (ec) {
+    return std::unexpected("Error during orphaned thumbnails cleanup: " + ec.message());
+  }
+
+  return deleted_count;
+}
+
+// ============= 基于哈希的缩略图生成 =============
+
+// 使用文件哈希生成缩略图（多线程优化版）
+auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
+                        const std::filesystem::path& source_file, const std::string& file_hash,
+                        uint32_t max_width, uint32_t max_height)
+    -> std::expected<std::filesystem::path, std::string> {
+  try {
+    auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash, max_width, max_height);
     if (!thumbnail_path_result) {
       return std::unexpected(thumbnail_path_result.error());
     }
     auto thumbnail_path = thumbnail_path_result.value();
 
-    // 检查原文件是否存在
-    std::filesystem::path source_path(asset.filepath);
-    if (!std::filesystem::exists(source_path)) {
-      return std::unexpected("Source file does not exist: " + asset.filepath);
+    // 检查缩略图是否已存在（基于哈希的去重）
+    if (std::filesystem::exists(thumbnail_path)) {
+      Logger().debug("Thumbnail already exists, reusing: {}", thumbnail_path.string());
+      return thumbnail_path;
     }
 
     // 生成 WebP 缩略图
-    auto webp_result = Utils::Image::generate_webp_thumbnail(wic_factory, source_path, max_width,
+    Utils::Image::WebPEncodeOptions options;
+    options.quality = 75.0f;  // 默认质量
+
+    auto webp_result = Utils::Image::generate_webp_thumbnail(wic_factory, source_file, max_width,
                                                              max_height, options);
     if (!webp_result) {
       return std::unexpected("Failed to generate WebP thumbnail: " + webp_result.error());
@@ -127,126 +245,13 @@ auto generate_thumbnail_for_asset(Core::State::AppState& app_state,
       return std::unexpected("Failed to write thumbnail data to file");
     }
 
-    Logger().debug("Generated thumbnail for {}: {} ({} bytes)", asset.filename,
-                   thumbnail_path.string(), webp_data.data.size());
+    Logger().debug("Generated thumbnail: {} ({} bytes)", thumbnail_path.string(),
+                   webp_data.data.size());
 
     return thumbnail_path;
 
   } catch (const std::exception& e) {
-    return std::unexpected("Exception in generate_thumbnail_for_media: " + std::string(e.what()));
-  }
-}
-
-auto batch_generate_thumbnails(Core::State::AppState& app_state,
-                               Utils::Image::WICFactory& wic_factory,
-                               const std::vector<Types::Asset>& assets, uint32_t max_width,
-                               uint32_t max_height)
-    -> std::expected<std::vector<std::filesystem::path>, std::string> {
-  try {
-    std::vector<std::filesystem::path> generated_thumbnails;
-    generated_thumbnails.reserve(assets.size());
-
-    Utils::Image::WebPEncodeOptions options;
-    options.quality = 75.0f;  // 默认质量
-
-    for (const auto& asset : assets) {
-      if (asset.type == "photo") {
-        auto thumbnail_result = generate_thumbnail_for_asset(app_state, wic_factory, asset,
-                                                             max_width, max_height, options);
-
-        if (thumbnail_result) {
-          generated_thumbnails.push_back(thumbnail_result.value());
-        } else {
-          Logger().warn("Failed to generate thumbnail for {}: {}", asset.filename,
-                        thumbnail_result.error());
-          // 继续处理其他项目，不因单个失败而中断
-        }
-      }
-    }
-
-    return generated_thumbnails;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in batch_generate_thumbnails: " + std::string(e.what()));
-  }
-}
-
-// ============= 缩略图清理功能 =============
-
-auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
-    -> std::expected<void, std::string> {
-  try {
-    auto thumbnail_path_result = get_thumbnail_path(app_state, asset);
-    if (!thumbnail_path_result) {
-      return std::unexpected(thumbnail_path_result.error());
-    }
-    auto thumbnail_path = thumbnail_path_result.value();
-
-    if (thumbnail_exists(thumbnail_path)) {
-      std::error_code ec;
-      std::filesystem::remove(thumbnail_path, ec);
-      if (ec) {
-        return std::unexpected("Failed to delete thumbnail: " + ec.message());
-      }
-      Logger().debug("Deleted thumbnail: {}", thumbnail_path.string());
-    }
-
-    return {};
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in delete_thumbnail: " + std::string(e.what()));
-  }
-}
-
-auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
-    -> std::expected<int, std::string> {
-  try {
-    // 直接从状态中获取缩略图目录路径
-    if (app_state.asset->thumbnails_directory.empty()) {
-      return std::unexpected("Thumbnails directory not initialized");
-    }
-    auto thumbnails_dir = app_state.asset->thumbnails_directory;
-
-    if (!std::filesystem::exists(thumbnails_dir)) {
-      return 0;  // 目录不存在，没有需要清理的
-    }
-
-    int deleted_count = 0;
-
-    for (const auto& entry : std::filesystem::directory_iterator(thumbnails_dir)) {
-      if (entry.is_regular_file() && entry.path().extension() == ".webp") {
-        std::string filename = entry.path().filename().string();
-
-        // 从文件名提取资产ID（格式：{asset_id}_{filename}.webp）
-        auto underscore_pos = filename.find('_');
-        if (underscore_pos != std::string::npos) {
-          try {
-            std::string id_str = filename.substr(0, underscore_pos);
-            int64_t asset_id = std::stoll(id_str);
-
-            // 检查资产项是否还存在
-            auto media_exists_result = Repository::get_asset_by_id(app_state, asset_id);
-            if (!media_exists_result || !media_exists_result->has_value()) {
-              // 资产项不存在，删除缩略图
-              std::error_code ec;
-              std::filesystem::remove(entry.path(), ec);
-              if (!ec) {
-                deleted_count++;
-                Logger().debug("Deleted orphaned thumbnail: {}", entry.path().string());
-              }
-            }
-          } catch (const std::exception&) {
-            // 无法解析文件名，跳过
-            continue;
-          }
-        }
-      }
-    }
-
-    return deleted_count;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in cleanup_orphaned_thumbnails: " + std::string(e.what()));
+    return std::unexpected("Exception in generate_thumbnail: " + std::string(e.what()));
   }
 }
 
@@ -254,63 +259,74 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
 
 auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<AssetThumbnailStats, std::string> {
-  try {
-    AssetThumbnailStats stats = {};
+  AssetThumbnailStats stats = {};
 
-    // 直接从状态中获取缩略图目录路径
-    if (app_state.asset->thumbnails_directory.empty()) {
-      return std::unexpected("Thumbnails directory not initialized");
+  // 直接从状态中获取缩略图目录路径
+  if (app_state.asset->thumbnails_directory.empty()) {
+    return std::unexpected("Thumbnails directory not initialized");
+  }
+  auto thumbnails_dir = app_state.asset->thumbnails_directory;
+  stats.thumbnails_directory = thumbnails_dir.string();
+
+  std::error_code ec;
+  if (!std::filesystem::exists(thumbnails_dir, ec)) {
+    return stats;  // 返回空统计
+  }
+
+  // 使用 load_asset_cache 获取所有资产的文件哈希集合
+  std::unordered_set<std::string> all_file_hashes;
+  auto cache_result = Repository::load_asset_cache(app_state);
+  if (cache_result) {
+    for (const auto& [filepath, metadata] : *cache_result) {
+      if (metadata.file_hash.has_value() && !metadata.file_hash->empty()) {
+        all_file_hashes.insert(*metadata.file_hash);
+      }
     }
-    auto thumbnails_dir = app_state.asset->thumbnails_directory;
-    stats.thumbnails_directory = thumbnails_dir.string();
+  }
 
-    if (!std::filesystem::exists(thumbnails_dir)) {
-      return stats;  // 返回空统计
+  int64_t total_size = 0;
+  int total_thumbnails = 0;
+  int orphaned_thumbnails = 0;
+
+  // 使用递归遍历器以支持分层目录结构
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(thumbnails_dir, ec)) {
+    if (ec) {
+      return std::unexpected("Failed to iterate thumbnails directory recursively: " + ec.message());
     }
 
-    int64_t total_size = 0;
-    int total_thumbnails = 0;
-    int orphaned_thumbnails = 0;
+    if (entry.is_regular_file(ec) && entry.path().extension() == ".webp") {
+      total_thumbnails++;
 
-    for (const auto& entry : std::filesystem::directory_iterator(thumbnails_dir)) {
-      if (entry.is_regular_file() && entry.path().extension() == ".webp") {
-        total_thumbnails++;
+      // 累加文件大小
+      std::error_code size_ec;
+      auto file_size = std::filesystem::file_size(entry.path(), size_ec);
+      if (!size_ec) {
+        total_size += file_size;
+      }
 
-        // 累加文件大小
-        std::error_code ec;
-        auto file_size = std::filesystem::file_size(entry.path(), ec);
-        if (!ec) {
-          total_size += file_size;
-        }
+      // 检查是否为孤立缩略图
+      std::string filename = entry.path().filename().string();
+      auto underscore_pos = filename.find('_');
+      if (underscore_pos != std::string::npos) {
+        std::string file_hash = filename.substr(0, underscore_pos);
 
-        // 检查是否为孤立缩略图
-        std::string filename = entry.path().filename().string();
-        auto underscore_pos = filename.find('_');
-        if (underscore_pos != std::string::npos) {
-          try {
-            std::string id_str = filename.substr(0, underscore_pos);
-            int64_t asset_id = std::stoll(id_str);
-
-            auto media_exists_result = Repository::get_asset_by_id(app_state, asset_id);
-            if (!media_exists_result || !media_exists_result->has_value()) {
-              orphaned_thumbnails++;
-            }
-          } catch (const std::exception&) {
-            orphaned_thumbnails++;  // 无法解析ID，当作孤立处理
-          }
+        // 检查文件哈希是否存在于任何资产中
+        if (all_file_hashes.find(file_hash) == all_file_hashes.end()) {
+          orphaned_thumbnails++;  // 文件哈希不存在于任何资产中，当作孤立处理
         }
       }
     }
-
-    stats.total_thumbnails = total_thumbnails;
-    stats.total_size = total_size;
-    stats.orphaned_thumbnails = orphaned_thumbnails;
-
-    return stats;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in get_thumbnail_stats: " + std::string(e.what()));
   }
+
+  if (ec) {
+    return std::unexpected("Error during thumbnail stats collection: " + ec.message());
+  }
+
+  stats.total_thumbnails = total_thumbnails;
+  stats.total_size = total_size;
+  stats.orphaned_thumbnails = orphaned_thumbnails;
+
+  return stats;
 }
 
 }  // namespace Features::Asset::Thumbnail

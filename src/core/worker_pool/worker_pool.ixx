@@ -25,6 +25,6 @@ export auto submit_task(Core::WorkerPool::State::WorkerPoolState& pool, std::fun
 export auto get_thread_count(const Core::WorkerPool::State::WorkerPoolState& pool) -> size_t;
 
 // 获取待处理任务数量
-export auto get_pending_tasks(const Core::WorkerPool::State::WorkerPoolState& pool) -> size_t;
+export auto get_pending_tasks(Core::WorkerPool::State::WorkerPoolState& pool) -> size_t;
 
 }  // namespace Core::WorkerPool

@@ -19,14 +19,12 @@ struct Asset {
   std::optional<std::int32_t> height;
   std::optional<std::int64_t> file_size;
   std::string mime_type;
+  std::optional<std::string> file_hash;  // xxh3哈希值，用于快速比对
 
   // 时间信息
   std::string created_at;                 // 文件创建时间
   std::string updated_at;                 // 数据库更新时间
   std::optional<std::string> deleted_at;  // 软删除
-
-  // 缩略图
-  std::optional<std::string> thumbnail_path;
 };
 
 // 扫描配置
@@ -51,7 +49,7 @@ struct ScanResult {
 };
 
 // 资产信息（从文件提取的基本信息）
-struct AssetInfo {
+struct Info {
   uint32_t width;
   uint32_t height;
   int64_t file_size;
@@ -115,7 +113,7 @@ struct OperationResult {
 };
 
 // 资产统计信息
-struct AssetStats {
+struct Stats {
   int total_count;
   int photo_count;
   int video_count;
@@ -129,9 +127,56 @@ struct AssetStats {
 struct GetStatsParams {};
 
 // 类型统计结果（用于数据库查询）
-struct AssetTypeCountResult {
+struct TypeCountResult {
   std::string type;
   int count;
 };
+
+// ============= 多线程扫描专用类型 =============
+
+// 内存中的资产元数据（用于快速比对）
+struct Metadata {
+  int64_t id;
+  std::string filepath;
+  int64_t file_size;
+  std::string last_modified;
+  std::optional<std::string> file_hash;  // xxh3哈希
+};
+
+// 文件系统信息
+struct FileSystemInfo {
+  std::filesystem::path filepath;
+  int64_t file_size;
+  std::filesystem::file_time_type last_write_time;
+  std::string last_modified_str;
+  std::optional<std::string> file_hash;  // xxh3哈希（在发现阶段为空，后续按需计算）
+};
+
+// 文件状态枚举
+enum class FileStatus {
+  NEW,              // 新文件
+  UNCHANGED,        // 无变化
+  MODIFIED,         // 已修改
+  NEEDS_HASH_CHECK, // 需要进行哈希校验（大小/时间变化，需进一步确认）
+  DELETED           // 数据库中存在但文件系统中不存在
+};
+
+// 文件分析结果
+struct FileAnalysisResult {
+  FileSystemInfo file_info;
+  FileStatus status;
+  std::optional<Metadata> existing_metadata;
+};
+
+// 处理批次结果
+struct ProcessingBatchResult {
+  std::vector<Asset> new_assets;
+  std::vector<Asset> updated_assets;
+  std::vector<std::string> generated_thumbnails;
+  std::vector<std::string> errors;
+};
+
+// 内存缓存类型
+using Cache = std::unordered_map<std::string, Metadata>;  // key: filepath
 
 }  // namespace Features::Asset::Types

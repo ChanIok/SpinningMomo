@@ -150,26 +150,28 @@ auto query_scalar(State::DatabaseState& state, const std::string& sql,
 
 // 事务管理
 export template <typename Func>
-auto execute_transaction(State::DatabaseState& state, Func&& func)
-    -> std::expected<void, std::string> {
+auto execute_transaction(State::DatabaseState& state, Func&& func) -> decltype(auto) {
   try {
     auto& connection = get_connection(state.db_path);
     SQLite::Transaction transaction(connection);
 
     // 执行用户提供的事务逻辑
-    if (auto result = func(state); !result) {
+    auto result = func(state);
+    if (!result) {
       // 如果函数返回错误，事务会在transaction析构时自动回滚
       return result;
     }
 
     // 提交事务
     transaction.commit();
-    return {};
+    return result;
   } catch (const SQLite::Exception& e) {
     // 异常发生时，transaction析构会自动回滚
-    return std::unexpected("Transaction failed: " + std::string(e.what()));
+    using ReturnType = std::decay_t<decltype(func(state))>;
+    return ReturnType{std::unexpected("Transaction failed: " + std::string(e.what()))};
   } catch (const std::exception& e) {
-    return std::unexpected("Transaction error: " + std::string(e.what()));
+    using ReturnType = std::decay_t<decltype(func(state))>;
+    return ReturnType{std::unexpected("Transaction error: " + std::string(e.what()))};
   }
 }
 

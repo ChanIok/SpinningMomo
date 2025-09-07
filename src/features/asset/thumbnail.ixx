@@ -11,31 +11,21 @@ export namespace Features::Asset::Thumbnail {
 
 // ============= 缩略图生成功能 =============
 
-// 为单个资产项生成缩略图
-auto generate_thumbnail_for_asset(Core::State::AppState& app_state,
-                                  Utils::Image::WICFactory& wic_factory, const Types::Asset& asset,
-                                  std::uint32_t max_width = 400, std::uint32_t max_height = 400,
-                                  const Utils::Image::WebPEncodeOptions& options = {})
+// 生成缩略图
+auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
+                        const std::filesystem::path& source_file, const std::string& file_hash,
+                        std::uint32_t max_width, std::uint32_t max_height)
     -> std::expected<std::filesystem::path, std::string>;
-
-// 批量生成缩略图
-auto batch_generate_thumbnails(Core::State::AppState& app_state,
-                               Utils::Image::WICFactory& wic_factory,
-                               const std::vector<Types::Asset>& assets,
-                               std::uint32_t max_width = 400, std::uint32_t max_height = 400)
-    -> std::expected<std::vector<std::filesystem::path>, std::string>;
 
 // ============= 缩略图路径管理 =============
 
 // 确保缩略图目录存在
-auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state) -> std::expected<void, std::string>;
+auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
+    -> std::expected<void, std::string>;
 
-// 根据资产项ID生成缩略图文件名
-auto generate_thumbnail_filename(std::int64_t asset_id, const std::string& original_filename)
-    -> std::string;
-
-// 根据资产项获取缩略图完整路径
-auto get_thumbnail_path(Core::State::AppState& app_state, const Types::Asset& asset)
+// 确保缩略图路径存在（封装路径构建和目录创建）
+auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash,
+                           uint32_t width, uint32_t height)
     -> std::expected<std::filesystem::path, std::string>;
 
 // ============= 缩略图清理功能 =============
@@ -45,7 +35,8 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
     -> std::expected<int, std::string>;
 
 // 删除指定资产项的缩略图
-auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset) -> std::expected<void, std::string>;
+auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
+    -> std::expected<void, std::string>;
 
 // ============= 缩略图统计功能 =============
 

@@ -153,7 +153,7 @@ auto get_thread_count(const Core::WorkerPool::State::WorkerPoolState& pool) -> s
   return pool.worker_threads.size();
 }
 
-auto get_pending_tasks(const Core::WorkerPool::State::WorkerPoolState& pool) -> size_t {
+auto get_pending_tasks(Core::WorkerPool::State::WorkerPoolState& pool) -> size_t {
   std::lock_guard<std::mutex> lock(pool.queue_mutex);
   return pool.task_queue.size();
 }

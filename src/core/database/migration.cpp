@@ -30,20 +30,18 @@ const std::vector<MigrationScript> all_migrations = {
                     height INTEGER,
                     file_size INTEGER,
                     mime_type TEXT,
+                    file_hash TEXT,  -- xxh3哈希值，用于快速比对和去重
                     
                     -- 时间信息
                     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                    deleted_at TEXT,
-                    
-                    -- 缩略图
-                    thumbnail_path TEXT,
+                    deleted_at TEXT
                 );
                 )",
          "CREATE INDEX idx_assets_filepath ON assets(filepath);",
          "CREATE INDEX idx_assets_type ON assets(type);",
-         "CREATE INDEX idx_assets_created_at ON assets(created_at);"
-         }}
+         "CREATE INDEX idx_assets_created_at ON assets(created_at);",
+         "CREATE INDEX idx_assets_file_hash ON assets(file_hash);"}}
     // 添加新迁移时，只需要在这里加新的 MigrationScript 即可
 };
 
