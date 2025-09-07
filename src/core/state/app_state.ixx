@@ -56,6 +56,10 @@ namespace Features::Notifications::State {
 export struct NotificationSystemState;
 }
 
+namespace Features::Asset::State {
+export struct AssetState;
+}
+
 namespace Features::Overlay::State {
 export struct OverlayState;
 }
@@ -106,6 +110,7 @@ export struct AppState {
   // 功能模块状态
   std::unique_ptr<Features::Letterbox::State::LetterboxState> letterbox;
   std::unique_ptr<Features::Notifications::State::NotificationSystemState> notifications;
+  std::unique_ptr<Features::Asset::State::AssetState> asset;
   std::unique_ptr<Features::Overlay::State::OverlayState> overlay;
   std::unique_ptr<Features::Preview::State::PreviewState> preview;
   std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;

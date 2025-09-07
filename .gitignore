@@ -46,9 +46,11 @@ Thumbs.db
 third_party/
 test/
 
+# AI
 .windsurfrules
 .cursor
 .claude
+WARP.md
 
 # Web App (Vite + React)
 web/node_modules/

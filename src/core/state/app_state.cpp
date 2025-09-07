@@ -12,6 +12,7 @@ import Core.State.AppInfo;
 import Core.WebView.State;
 import Features.Letterbox.State;
 import Features.Notifications.State;
+import Features.Asset.State;
 import Features.Overlay.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
@@ -39,6 +40,7 @@ AppState::AppState()
       context_menu(std::make_unique<UI::ContextMenu::State::ContextMenuState>()),
       letterbox(std::make_unique<Features::Letterbox::State::LetterboxState>()),
       notifications(std::make_unique<Features::Notifications::State::NotificationSystemState>()),
+      asset(std::make_unique<Features::Asset::State::AssetState>()),
       overlay(std::make_unique<Features::Overlay::State::OverlayState>()),
       preview(std::make_unique<Features::Preview::State::PreviewState>()),
       screenshot(std::make_unique<Features::Screenshot::State::ScreenshotState>()) {}
