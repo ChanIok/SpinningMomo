@@ -21,25 +21,20 @@ import {
 } from 'lucide-react'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
 import { useAssets } from '@/lib/assets/hooks/useAssets'
+import { useGalleryView, useGallerySelection } from '../hooks'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 
 export function GalleryToolbar() {
-  const {
-    viewConfig,
-    filter,
-    sortBy,
-    sortOrder,
-    selection,
-    isLoading,
-    totalCount,
-    setViewConfig,
-    setFilter,
-    setSorting,
-  } = useAssetsStore()
-
+  // 使用 gallery hooks
+  const view = useGalleryView()
+  const selection = useGallerySelection()
   const { refreshAssets } = useAssets()
   const { t } = useTranslation()
+
+  // 从 store 获取必要的状态
+  const { filter, sortBy, sortOrder, isLoading, totalCount, setFilter, setSorting } =
+    useAssetsStore()
 
   // 视图模式选项
   const viewModes = [
@@ -82,11 +77,11 @@ export function GalleryToolbar() {
           {/* 统计信息 */}
           <div className='flex items-center gap-2 text-sm text-muted-foreground'>
             <span>{t('gallery.toolbar.totalItems', { count: totalCount })}</span>
-            {selection.selectedIds.size > 0 && (
+            {selection.hasSelection && (
               <>
                 <Separator orientation='vertical' className='h-4' />
                 <Badge variant='secondary' className='text-xs'>
-                  {t('gallery.toolbar.selectedItems', { count: selection.selectedIds.size })}
+                  {t('gallery.toolbar.selectedItems', { count: selection.selectedCount })}
                 </Badge>
               </>
             )}
@@ -111,7 +106,7 @@ export function GalleryToolbar() {
               {sortOptions.map((option) => (
                 <DropdownMenuItem
                   key={option.id}
-                  onClick={() => setSorting(option.id as any, sortOrder)}
+                  onClick={() => setSorting(option.id, sortOrder)}
                   className={cn(sortBy === option.id && 'bg-accent')}
                 >
                   {option.label}
@@ -135,7 +130,7 @@ export function GalleryToolbar() {
             <DropdownMenuTrigger asChild>
               <Button variant='outline' size='sm' className='gap-2'>
                 {(() => {
-                  const currentMode = viewModes.find((mode) => mode.id === viewConfig.mode)
+                  const currentMode = viewModes.find((mode) => mode.id === view.viewConfig.mode)
                   const Icon = currentMode?.icon || Columns
                   return (
                     <>
@@ -149,12 +144,12 @@ export function GalleryToolbar() {
             <DropdownMenuContent align='end' className='w-40'>
               {viewModes.map((mode) => {
                 const Icon = mode.icon
-                const isActive = viewConfig.mode === mode.id
+                const isActive = view.viewConfig.mode === mode.id
 
                 return (
                   <DropdownMenuItem
                     key={mode.id}
-                    onClick={() => setViewConfig({ mode: mode.id })}
+                    onClick={() => view.switchViewMode(mode.id)}
                     className={cn(isActive && 'bg-accent')}
                   >
                     <Icon className='mr-2 h-4 w-4' />

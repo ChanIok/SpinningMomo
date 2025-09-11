@@ -259,3 +259,50 @@ export function getMockAssetUrl(assetId: number): string {
   const seed = assetId % 1000
   return `https://picsum.photos/seed/${seed}/${width}/${height}`
 }
+
+// 文件夹类型定义
+export interface Folder {
+  id: string
+  name: string
+  path: string
+  children?: Folder[]
+}
+
+// 标签类型定义
+export interface Tag {
+  id: string
+  name: string
+  count: number
+}
+
+// Mock 文件夹数据
+export const mockFolders: Folder[] = [
+  {
+    id: 'screenshots',
+    name: 'Screenshots',
+    path: '/Screenshots',
+    children: [
+      { id: 'screenshots-2024', name: '2024', path: '/Screenshots/2024' },
+      { id: 'screenshots-2023', name: '2023', path: '/Screenshots/2023' },
+    ],
+  },
+  {
+    id: 'demo',
+    name: 'demo',
+    path: '/demo',
+    children: [
+      { id: 'demo-landscapes', name: 'landscapes', path: '/demo/landscapes' },
+      { id: 'demo-portraits', name: 'portraits', path: '/demo/portraits' },
+      { id: 'demo-nature', name: 'nature', path: '/demo/nature' },
+    ],
+  },
+]
+
+// Mock 标签数据
+export const mockTags: Tag[] = [
+  { id: 'nature', name: '自然', count: 5 },
+  { id: 'landscape', name: '风景', count: 8 },
+  { id: 'portrait', name: '人像', count: 3 },
+  { id: 'urban', name: '城市', count: 4 },
+  { id: 'seasons', name: '季节', count: 2 },
+]

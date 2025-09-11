@@ -5,7 +5,6 @@ import { AssetCard } from './AssetCard'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
 import type { Asset } from '@/lib/assets/types'
 
-interface ListViewProps {}
 
 interface ListRowProps {
   assets: Asset[]
@@ -24,7 +23,7 @@ const ListRow = ({ index, style, assets }: RowComponentProps<ListRowProps>) => {
   )
 }
 
-export function ListView({}: ListViewProps = {}) {
+export function ListView() {
   // 直接从 store 获取数据
   const assets = useAssetsStore((state) => state.assets)
   const viewConfig = useAssetsStore((state) => state.viewConfig)

@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { FileImage, Image as ImageIcon, Video, Zap } from 'lucide-react'
 import type { ViewMode } from '@/lib/assets/types'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGallerySelection, useGalleryLightbox } from '../hooks'
 import { getMockThumbnailUrl } from '@/lib/assets/mockData'
 import { cn, formatBytes } from '@/lib/utils'
 
@@ -16,50 +17,54 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
   // 从 store 获取资产数据
   const asset = useAssetsStore((state) => state.assets.find((a) => a.id === assetId))
 
-  // 从 store 获取状态
-  const isSelected = useAssetsStore((state) => state.selection.selectedIds.has(assetId))
-  const isActive = useAssetsStore((state) => state.selection.activeId === assetId)
+  // 使用 gallery hooks
+  const selection = useGallerySelection()
+  const lightbox = useGalleryLightbox()
 
-  // 从 store 获取 actions
-  const setActiveAsset = useAssetsStore((state) => state.setActiveAsset)
-  const selectAsset = useAssetsStore((state) => state.selectAsset)
-  const openLightbox = useAssetsStore((state) => state.openLightbox)
-  const assets = useAssetsStore((state) => state.assets)
+  // 计算选择和活跃状态
+  const isSelected = selection.selection.selectedIds.has(assetId)
+  const isActive = selection.selection.activeId === assetId
 
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+
+  // 事件处理函数
+  const handleClick = useCallback(() => {
+    if (asset) {
+      selection.handleAssetClick(asset)
+    }
+  }, [asset, selection])
+
+  const handleDoubleClick = useCallback(() => {
+    if (asset) {
+      lightbox.openLightboxWithAsset(asset)
+    }
+  }, [asset, lightbox])
+
+  const handleSelect = useCallback(
+    (selected: boolean) => {
+      selection.handleAssetSelect(assetId, selected, true)
+    },
+    [assetId, selection]
+  )
+
+  // 计算真实长宽比
+  const aspectRatio = useMemo(() => {
+    if (
+      !asset ||
+      (viewMode !== 'masonry' && viewMode !== 'adaptive') ||
+      !asset.width ||
+      !asset.height
+    ) {
+      return undefined
+    }
+    return asset.height / asset.width
+  }, [asset?.width, asset?.height, viewMode])
 
   // 如果找不到资产，不渲染
   if (!asset) {
     return null
   }
-
-  // 事件处理函数
-  const handleClick = useCallback(() => {
-    setActiveAsset(assetId)
-  }, [assetId, setActiveAsset])
-
-  const handleDoubleClick = useCallback(() => {
-    const assetIndex = assets.findIndex((a) => a.id === assetId)
-    if (assetIndex !== -1) {
-      openLightbox(assets, assetIndex)
-    }
-  }, [assetId, assets, openLightbox])
-
-  const handleSelect = useCallback(
-    (selected: boolean) => {
-      selectAsset(assetId, selected, true)
-    },
-    [assetId, selectAsset]
-  )
-
-  // 计算真实长宽比
-  const aspectRatio = useMemo(() => {
-    if ((viewMode !== 'masonry' && viewMode !== 'adaptive') || !asset.width || !asset.height) {
-      return undefined
-    }
-    return asset.height / asset.width
-  }, [asset.width, asset.height, viewMode])
 
   // 获取资产类型图标
   const getTypeIcon = () => {
@@ -164,7 +169,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
       className={cn(
         'group relative cursor-pointer transition-all hover:scale-[1.02]',
         isActive && 'ring-2 ring-primary ring-offset-2',
-(viewMode === 'masonry' || viewMode === 'adaptive') ? 'w-full' : 'aspect-square'
+        viewMode === 'masonry' || viewMode === 'adaptive' ? 'w-full' : 'aspect-square'
       )}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -191,10 +196,10 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
       <div
         className={cn(
           'relative overflow-hidden rounded-lg bg-muted',
-(viewMode === 'masonry' || viewMode === 'adaptive') ? 'w-full' : 'h-full w-full'
+          viewMode === 'masonry' || viewMode === 'adaptive' ? 'w-full' : 'h-full w-full'
         )}
         style={
-(viewMode === 'masonry' || viewMode === 'adaptive') && aspectRatio
+          (viewMode === 'masonry' || viewMode === 'adaptive') && aspectRatio
             ? { aspectRatio: `1 / ${aspectRatio}` }
             : undefined
         }
@@ -203,10 +208,10 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
           <div
             className={cn(
               'absolute inset-0 animate-pulse bg-muted',
-(viewMode === 'masonry' || viewMode === 'adaptive') ? 'w-full' : 'h-full w-full'
+              viewMode === 'masonry' || viewMode === 'adaptive' ? 'w-full' : 'h-full w-full'
             )}
             style={
-(viewMode === 'masonry' || viewMode === 'adaptive') && aspectRatio
+              (viewMode === 'masonry' || viewMode === 'adaptive') && aspectRatio
                 ? { aspectRatio: `1 / ${aspectRatio}` }
                 : undefined
             }

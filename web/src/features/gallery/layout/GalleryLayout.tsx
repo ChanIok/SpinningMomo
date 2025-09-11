@@ -2,6 +2,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
 import { useAssets } from '@/lib/assets/hooks/useAssets'
+import { useGalleryKeyboard, useGalleryView } from '../hooks'
 import { GallerySidebar } from './GallerySidebar'
 import { GalleryViewer } from './GalleryViewer'
 import { GalleryDetails } from './GalleryDetails'
@@ -9,7 +10,15 @@ import { GalleryLightbox } from '../components/GalleryLightbox'
 
 export function GalleryLayout() {
   const { sidebar, detailsOpen, lightbox } = useAssetsStore()
-  // Layout state is controlled by the store directly
+
+  // 初始化 hooks
+  const view = useGalleryView()
+
+  // 启用键盘快捷键支持
+  useGalleryKeyboard({
+    enableGlobalShortcuts: true,
+    columnsPerRow: view.columnCount,
+  })
 
   // 初始化资产数据
   useAssets({ useMockData: true, autoLoad: true })

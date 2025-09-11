@@ -1,11 +1,10 @@
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { Grid } from 'react-window'
 import type { CellComponentProps } from 'react-window'
 import { AssetCard } from './AssetCard'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryView } from '../hooks'
 import type { Asset } from '@/lib/assets/types'
-
-interface GridViewProps {}
 
 interface GridCellProps {
   assets: Asset[]
@@ -28,50 +27,24 @@ const GridCell = ({
 
   return (
     <div style={{ ...style, padding: 8 }}>
-      <AssetCard
-        assetId={asset.id}
-        viewMode='grid'
-      />
+      <AssetCard assetId={asset.id} viewMode='grid' />
     </div>
   )
 }
 
-export function GridView({}: GridViewProps = {}) {
-  // 直接从 store 获取数据
+export function GridView() {
+  // 从 store 获取数据
   const assets = useAssetsStore((state) => state.assets)
-  const viewConfig = useAssetsStore((state) => state.viewConfig)
-  const [containerSize, setContainerSize] = useState({ width: 1200, height: 800 })
 
-  // 根据 size 计算基础网格尺寸
-  const cellSize = useMemo(() => {
-    const sizeMultiplier = (viewConfig.size - 1) * 0.5 + 1 // 1-3倍大小
-    const baseSize = 160
-    return Math.floor(baseSize * sizeMultiplier) + 16 // +16px for padding
-  }, [viewConfig.size])
+  // 使用 gallery view hook
+  const view = useGalleryView({ headerHeight: 200 })
 
-  // 响应式列数计算
-  const columnCount = useMemo(() => {
-    const availableWidth = containerSize.width - 32 // 减去容器padding
-    return Math.max(2, Math.floor(availableWidth / cellSize))
-  }, [containerSize.width, cellSize])
+  // 获取网格配置
+  const { columnCount, columnWidth, rowHeight, containerWidth, containerHeight } =
+    view.getGridConfig
 
   // 计算行数
-  const rowCount = useMemo(() => {
-    return Math.ceil(assets.length / columnCount)
-  }, [assets.length, columnCount])
-
-  useEffect(() => {
-    const updateSize = () => {
-      setContainerSize({
-        width: window.innerWidth,
-        height: window.innerHeight - 200, // 减去头部高度
-      })
-    }
-
-    updateSize()
-    window.addEventListener('resize', updateSize)
-    return () => window.removeEventListener('resize', updateSize)
-  }, [])
+  const rowCount = view.getRowCount(assets.length)
 
   // Grid cell props
   const cellProps = useMemo(
@@ -91,15 +64,15 @@ export function GridView({}: GridViewProps = {}) {
   }
 
   return (
-    <div className='w-full' style={{ height: containerSize.height }}>
+    <div className='w-full' style={{ height: containerHeight }}>
       <Grid
         cellComponent={GridCell}
         columnCount={columnCount}
-        columnWidth={cellSize}
+        columnWidth={columnWidth}
         rowCount={rowCount}
-        rowHeight={cellSize}
+        rowHeight={rowHeight}
         cellProps={cellProps}
-        style={{ height: containerSize.height, width: containerSize.width }}
+        style={{ height: containerHeight, width: containerWidth }}
       />
     </div>
   )

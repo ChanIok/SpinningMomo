@@ -2,36 +2,105 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Images, FolderTree, Tag, Settings2 } from 'lucide-react'
+import { Images, Tag, Settings2, ChevronRight, FolderOpen, Plus } from 'lucide-react'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGallerySidebar } from '../hooks'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
+import type { Folder } from '@/lib/assets/mockData'
+// 文件夹树项组件
+function FolderTreeItem({
+  folder,
+  level = 0,
+  isSelected,
+  selectedFolder,
+  onToggle,
+  onSelect,
+  isExpanded,
+  checkExpanded,
+}: {
+  folder: Folder
+  level?: number
+  isSelected: boolean
+  selectedFolder: string | null
+  onToggle: (id: string) => void
+  onSelect: (id: string, name: string) => void
+  isExpanded: boolean
+  checkExpanded: (id: string) => boolean
+}) {
+  const toggleExpanded = () => {
+    onToggle(folder.id)
+  }
+
+  const handleSelect = () => {
+    onSelect(folder.id, folder.name)
+  }
+
+  return (
+    <div className='space-y-1'>
+      <Button
+        variant={isSelected ? 'secondary' : 'ghost'}
+        className={cn('h-8 w-full justify-start gap-2 px-2', isSelected && 'bg-accent')}
+        style={{ paddingLeft: `${8 + level * 16}px` }}
+        onClick={handleSelect}
+      >
+        {folder.children && (
+          <div
+            className='flex-shrink-0 cursor-pointer'
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleExpanded()
+            }}
+          >
+            <ChevronRight
+              className={`h-3 w-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            />
+          </div>
+        )}
+        <FolderOpen className='h-3 w-3 flex-shrink-0' />
+        <span className='flex-1 text-left text-sm'>{folder.name}</span>
+      </Button>
+
+      {isExpanded && folder.children && (
+        <div className='space-y-1'>
+          {folder.children?.map((child: Folder) => (
+            <FolderTreeItem
+              key={child.id}
+              folder={child}
+              level={level + 1}
+              isSelected={selectedFolder === child.id}
+              selectedFolder={selectedFolder}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              isExpanded={checkExpanded(child.id)}
+              checkExpanded={checkExpanded}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function GallerySidebar() {
-  const { sidebar, totalCount } = useAssetsStore()
-  const { setSidebarActiveSection } = useAssetsStore()
+  const { totalCount } = useAssetsStore()
   const { t } = useTranslation()
 
-  const menuItems = [
-    {
-      id: 'all' as const,
-      label: t('gallery.sidebar.allItems'),
-      icon: Images,
-      count: totalCount,
-    },
-    {
-      id: 'folders' as const,
-      label: t('gallery.sidebar.folders'),
-      icon: FolderTree,
-      count: undefined,
-    },
-    {
-      id: 'tags' as const,
-      label: t('gallery.sidebar.tags'),
-      icon: Tag,
-      count: undefined,
-    },
-  ]
+  // 使用 gallery sidebar hook
+  const sidebarHook = useGallerySidebar({ useMockData: true })
+  const {
+    folders,
+    tags,
+    sidebar,
+    selectedFolder,
+    selectedTag,
+    selectFolder,
+    selectTag,
+    selectAllMedia,
+    toggleFolderExpanded,
+    isFolderExpanded,
+    addNewTag,
+  } = sidebarHook
 
   return (
     <div className='flex h-full flex-col border-r bg-muted/10'>
@@ -45,40 +114,73 @@ export function GallerySidebar() {
 
       {/* 导航菜单 */}
       <ScrollArea className='flex-1 p-4'>
-        <div className='space-y-2'>
-          {menuItems.map((item) => {
-            const Icon = item.icon
-            const isActive = sidebar.activeSection === item.id
+        {/* 上面区域 - 媒体和文件夹 */}
+        <div className='space-y-4'>
+          {/* 所有媒体 */}
+          <Button
+            variant={sidebar.activeSection === 'all' ? 'secondary' : 'ghost'}
+            className={cn(
+              'h-9 w-full justify-start gap-3',
+              sidebar.activeSection === 'all' && 'bg-accent'
+            )}
+            onClick={selectAllMedia}
+          >
+            <Images className='h-4 w-4 flex-shrink-0' />
+            <span className='flex-1 text-left'>{t('gallery.sidebar.allItems')}</span>
+            <Badge variant='secondary' className='px-1.5 py-0.5 text-xs'>
+              {totalCount}
+            </Badge>
+          </Button>
 
-            return (
-              <Button
-                key={item.id}
-                variant={isActive ? 'secondary' : 'ghost'}
-                className={cn('h-9 w-full justify-start gap-3', isActive && 'bg-accent')}
-                onClick={() => setSidebarActiveSection(item.id)}
-              >
-                <Icon className='h-4 w-4 flex-shrink-0' />
-                <span className='flex-1 text-left'>{item.label}</span>
-                {typeof item.count === 'number' && (
-                  <Badge variant='secondary' className='px-1.5 py-0.5 text-xs'>
-                    {item.count}
-                  </Badge>
-                )}
-              </Button>
-            )
-          })}
+          {/* 文件夹区域 */}
+          <div className='space-y-2'>
+            <h3 className='px-2 text-xs font-medium tracking-wider text-muted-foreground uppercase'>
+              文件夹
+            </h3>
+            {folders.map((folder) => (
+              <FolderTreeItem
+                key={folder.id}
+                folder={folder}
+                isSelected={selectedFolder === folder.id}
+                selectedFolder={selectedFolder}
+                onToggle={toggleFolderExpanded}
+                onSelect={selectFolder}
+                isExpanded={isFolderExpanded(folder.id)}
+                checkExpanded={isFolderExpanded}
+              />
+            ))}
+          </div>
         </div>
 
         <Separator className='my-4' />
 
-        {/* 筛选器部分 - 暂时留空，后续实现 */}
+        {/* 下面区域 - 标签 */}
         <div className='space-y-2'>
-          <h3 className='px-2 text-xs font-medium tracking-wider text-muted-foreground uppercase'>
-            {t('gallery.sidebar.filters')}
-          </h3>
-          <div className='px-2 py-4 text-center text-xs text-muted-foreground'>
-            {t('gallery.sidebar.comingSoon')}
+          <div className='flex items-center justify-between px-2'>
+            <h3 className='text-xs font-medium tracking-wider text-muted-foreground uppercase'>
+              标签
+            </h3>
+            <Button variant='ghost' size='icon' className='h-6 w-6' onClick={addNewTag}>
+              <Plus className='h-3 w-3' />
+            </Button>
           </div>
+          {tags.map((tag) => (
+            <Button
+              key={tag.id}
+              variant={selectedTag === tag.id ? 'secondary' : 'ghost'}
+              className={cn(
+                'h-8 w-full justify-start gap-2 px-2',
+                selectedTag === tag.id && 'bg-accent'
+              )}
+              onClick={() => selectTag(tag.id, tag.name)}
+            >
+              <Tag className='h-3 w-3 flex-shrink-0' />
+              <span className='flex-1 text-left text-sm'>{tag.name}</span>
+              <Badge variant='outline' className='px-1.5 py-0.5 text-xs'>
+                {tag.count}
+              </Badge>
+            </Button>
+          ))}
         </div>
       </ScrollArea>
 
