@@ -8,7 +8,7 @@ import {
   SidebarGroupContent,
 } from '@/components/ui/sidebar'
 import { useNavigate, useLocation } from 'react-router'
-import { Settings, Info, Home } from 'lucide-react'
+import { Settings, Info, Home, Images } from 'lucide-react'
 
 interface MenuItem {
   key?: string
@@ -19,6 +19,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { title: '主页', key: 'home', icon: Home },
+  { title: '图库', key: 'gallery', icon: Images },
   { title: '设置', key: 'settings', icon: Settings },
   { type: 'divider' },
   { title: '关于', key: 'about', icon: Info },
@@ -34,7 +35,7 @@ export function ActivityBar() {
   }
 
   return (
-    <Sidebar collapsible='none' className='pt-2 w-14 bg-transparent'>
+    <Sidebar collapsible='none' className='w-14 bg-transparent pt-2'>
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent className='px-0'>

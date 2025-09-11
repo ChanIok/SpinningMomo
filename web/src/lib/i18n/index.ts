@@ -52,7 +52,7 @@ function handlePlural(template: string, count: number): string {
 async function loadLanguageResources(lang: SupportedLanguage): Promise<TranslationResources> {
   try {
     // 加载所有模块
-    const modules = ['common', 'about', 'settings', 'home']
+    const modules = ['common', 'about', 'settings', 'home', 'gallery']
     const resources: TranslationResources = {}
 
     // 并行加载所有模块

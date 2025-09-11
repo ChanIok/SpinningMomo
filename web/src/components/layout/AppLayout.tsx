@@ -1,6 +1,6 @@
 import { ActivityBar } from './ActivityBar'
 import { ContentArea } from './ContentArea'
-import { Header } from './Header'
+import { Header } from './header'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { SidebarProvider } from '@/components/ui/sidebar'
