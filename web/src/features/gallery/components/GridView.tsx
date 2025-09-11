@@ -1,61 +1,49 @@
-import { useMemo } from 'react'
-import { Grid } from 'react-window'
-import type { CellComponentProps } from 'react-window'
+import { forwardRef, useMemo } from 'react'
+import { VirtuosoGrid } from 'react-virtuoso'
 import { AssetCard } from './AssetCard'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
-import { useGalleryView } from '../hooks'
-import type { Asset } from '@/lib/assets/types'
 
-interface GridCellProps {
-  assets: Asset[]
-  columnCount: number
-}
-
-const GridCell = ({
-  columnIndex,
-  rowIndex,
-  style,
-  assets,
-  columnCount,
-}: CellComponentProps<GridCellProps>) => {
-  const index = rowIndex * columnCount + columnIndex
-  const asset = assets[index]
-
-  if (!asset) {
-    return <div style={style} />
-  }
-
-  return (
-    <div style={{ ...style, padding: 8 }}>
-      <AssetCard assetId={asset.id} viewMode='grid' />
+// 定义 gridComponents，确保它在组件外部以避免重新挂载
+const gridComponents = {
+  // List 容器使用 Flexbox wrap 来实现自动换行
+  List: forwardRef<HTMLDivElement, React.HTMLProps<HTMLDivElement>>(({ style, children, ...props }, ref) => (
+    <div
+      ref={ref}
+      {...props}
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        padding: '16px', // 统一的内边距
+        ...style,
+      }}
+    >
+      {children}
     </div>
-  )
+  )),
+  // Item 容器定义每个单元格的尺寸和间距
+  Item: ({ children, ...props }: { children: React.ReactNode }) => (
+    <div
+      {...props}
+      style={{
+        padding: '8px', // 单元格之间的间距，通过padding实现
+        flex: '1 0 250px', // 响应式的核心：基础宽度250px，可放大
+        minWidth: '250px', // 确保不会被过度压缩
+        boxSizing: 'border-box',
+      }}
+    >
+      {children}
+    </div>
+  ),
 }
 
 export function GridView() {
-  // 从 store 获取数据
+  // 直接从 store 获取数据
   const assets = useAssetsStore((state) => state.assets)
 
-  // 使用 gallery view hook
-  const view = useGalleryView({ headerHeight: 200 })
+  // 过滤出有效的资产
+  const validAssets = assets.filter((asset) => asset.type === 'photo' && asset.width && asset.height)
 
-  // 获取网格配置
-  const { columnCount, columnWidth, rowHeight, containerWidth, containerHeight } =
-    view.getGridConfig
-
-  // 计算行数
-  const rowCount = view.getRowCount(assets.length)
-
-  // Grid cell props
-  const cellProps = useMemo(
-    () => ({
-      assets,
-      columnCount,
-    }),
-    [assets, columnCount]
-  )
-
-  if (assets.length === 0) {
+  if (validAssets.length === 0) {
     return (
       <div className='flex h-32 items-center justify-center text-muted-foreground'>
         <p>No items to display</p>
@@ -64,15 +52,19 @@ export function GridView() {
   }
 
   return (
-    <div className='w-full' style={{ height: containerHeight }}>
-      <Grid
-        cellComponent={GridCell}
-        columnCount={columnCount}
-        columnWidth={columnWidth}
-        rowCount={rowCount}
-        rowHeight={rowHeight}
-        cellProps={cellProps}
-        style={{ height: containerHeight, width: containerWidth }}
+    <div className='h-full w-full'>
+      <VirtuosoGrid
+        totalCount={validAssets.length}
+        components={gridComponents} // 使用定义好的静态组件
+        itemContent={(index) => {
+          const asset = validAssets[index]
+          return (
+            <AssetCard
+              assetId={asset.id}
+              viewMode='grid'
+            />
+          )
+        }}
       />
     </div>
   )

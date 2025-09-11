@@ -56,18 +56,16 @@ export function GalleryViewer() {
       {/* 工具栏 */}
       <GalleryToolbar />
 
-      {/* 资产网格 */}
-      <ScrollArea className='flex-1'>
-        <div className='p-4'>
-          <GalleryContent />
+      {/* 资产网格 - Virtuoso 自带滚动，不再需要 ScrollArea */}
+      <div className='flex-1'>
+        <GalleryContent />
 
-          {isLoading && (
-            <div className='mt-4'>
-              <GalleryContentSkeleton />
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+        {isLoading && (
+          <div className='mt-4 p-4'>
+            <GalleryContentSkeleton />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

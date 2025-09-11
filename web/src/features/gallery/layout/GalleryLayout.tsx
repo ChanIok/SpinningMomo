@@ -1,65 +1,59 @@
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/components/ui/resizable'
+import { Allotment } from 'allotment'
+import 'allotment/dist/style.css'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
 import { useAssets } from '@/lib/assets/hooks/useAssets'
-import { useGalleryKeyboard, useGalleryView } from '../hooks'
+import { useGalleryKeyboard, useGalleryView, useGalleryLayout } from '../hooks'
 import { GallerySidebar } from './GallerySidebar'
 import { GalleryViewer } from './GalleryViewer'
 import { GalleryDetails } from './GalleryDetails'
 import { GalleryLightbox } from '../components/GalleryLightbox'
 
 export function GalleryLayout() {
-  const { sidebar, detailsOpen, lightbox } = useAssetsStore()
+  const { isSidebarOpen, isDetailsOpen } = useGalleryLayout()
 
-  // 初始化 hooks
+  const { lightbox } = useAssetsStore()
+
   const view = useGalleryView()
 
-  // 启用键盘快捷键支持
   useGalleryKeyboard({
     enableGlobalShortcuts: true,
     columnsPerRow: view.columnCount,
   })
 
-  // 初始化资产数据
   useAssets({ useMockData: true, autoLoad: true })
 
   return (
     <>
-      {/* 主布局 */}
+      {/* Main Layout */}
       <div className='flex h-full w-full'>
-        <ResizablePanelGroup direction='horizontal' className='h-full w-full'>
-          {/* 左侧边栏 */}
-          {sidebar.isOpen && (
-            <>
-              <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
-                <GallerySidebar />
-              </ResizablePanel>
-              <ResizableHandle />
-            </>
+        <Allotment>
+          {/* Left Sidebar */}
+          {isSidebarOpen && (
+            <Allotment.Pane preferredSize={250} minSize={150} maxSize={400} snap>
+              <GallerySidebar />
+            </Allotment.Pane>
           )}
 
-          {/* 主内容区域 */}
-          <ResizablePanel defaultSize={detailsOpen ? 50 : 75} minSize={30}>
+          {/* Main Content Area */}
+          <Allotment.Pane minSize={500}>
             <GalleryViewer />
-          </ResizablePanel>
+          </Allotment.Pane>
 
-          {/* 右侧详情面板 */}
-          {detailsOpen && (
-            <>
-              <ResizableHandle />
-              <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
-                <ScrollArea className='h-full'>
-                  <div className='border-l'>
-                    <GalleryDetails />
-                  </div>
-                </ScrollArea>
-              </ResizablePanel>
-            </>
+          {/* Right Details Panel */}
+          {isDetailsOpen && (
+            <Allotment.Pane preferredSize={300} minSize={200} maxSize={500} snap>
+              <ScrollArea className='h-full'>
+                <div className='border-l'>
+                  <GalleryDetails />
+                </div>
+              </ScrollArea>
+            </Allotment.Pane>
           )}
-        </ResizablePanelGroup>
+        </Allotment>
       </div>
 
-      {/* Lightbox 弹层 */}
+      {/* Lightbox Overlay */}
       {lightbox.isOpen && <GalleryLightbox />}
     </>
   )
