@@ -1,13 +1,13 @@
 module;
 
-export module Features.Asset.Thumbnail;
+export module Features.Gallery.Asset.Thumbnail;
 
 import std;
 import Core.State;
-import Features.Asset.Types;
+import Features.Gallery.Types;
 import Utils.Image;
 
-export namespace Features::Asset::Thumbnail {
+export namespace Features::Gallery::Asset::Thumbnail {
 
 // ============= 缩略图生成功能 =============
 
@@ -53,4 +53,4 @@ struct AssetThumbnailStats {
 auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<AssetThumbnailStats, std::string>;
 
-}  // namespace Features::Asset::Thumbnail
+}  // namespace Features::Gallery::Asset::Thumbnail

@@ -3,27 +3,28 @@ module;
 #include <format>
 #include <iostream>
 
-module Features.Asset.Thumbnail;
+module Features.Gallery.Asset.Thumbnail;
 
 import std;
 import Core.State;
-import Features.Asset.State;
-import Features.Asset.Types;
-import Features.Asset.Repository;
+import Features.Gallery.Types;
+import Features.Gallery.State;
+import Features.Gallery.Asset.Repository;
+import Core.Database;
 import Utils.Image;
 import Utils.Path;
 import Utils.Logger;
 
-namespace Features::Asset::Thumbnail {
+namespace Features::Gallery::Asset::Thumbnail {
 
 // ============= 缩略图路径管理 =============
 
 auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
     -> std::expected<void, std::string> {
   // 如果状态中已经有缩略图目录路径，确保目录存在
-  if (!app_state.asset->thumbnails_directory.empty()) {
+  if (!app_state.gallery->thumbnails_directory.empty()) {
     auto ensure_dir_result =
-        Utils::Path::EnsureDirectoryExists(app_state.asset->thumbnails_directory);
+        Utils::Path::EnsureDirectoryExists(app_state.gallery->thumbnails_directory);
     if (!ensure_dir_result) {
       return std::unexpected("Failed to ensure thumbnails directory exists: " +
                              ensure_dir_result.error());
@@ -45,7 +46,7 @@ auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
     return std::unexpected("Failed to create thumbnails directory: " + ensure_dir_result.error());
   }
 
-  app_state.asset->thumbnails_directory = thumbnails_dir;
+  app_state.gallery->thumbnails_directory = thumbnails_dir;
 
   return {};
 }
@@ -55,7 +56,7 @@ auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& 
                            uint32_t width, uint32_t height)
     -> std::expected<std::filesystem::path, std::string> {
   // 检查缩略图目录是否已初始化
-  if (app_state.asset->thumbnails_directory.empty()) {
+  if (app_state.gallery->thumbnails_directory.empty()) {
     auto ensure_result = ensure_thumbnails_directory_exists(app_state);
     if (!ensure_result) {
       return std::unexpected(ensure_result.error());
@@ -68,7 +69,7 @@ auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& 
   std::string filename = std::format("{}_{:d}x{:d}.webp", file_hash, width, height);
 
   // 构建完整路径
-  auto thumbnail_path = app_state.asset->thumbnails_directory / level1 / level2 / filename;
+  auto thumbnail_path = app_state.gallery->thumbnails_directory / level1 / level2 / filename;
 
   // 确保子目录存在
   std::error_code ec;
@@ -86,7 +87,7 @@ auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& 
 
 auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
     -> std::expected<void, std::string> {
-  if (app_state.asset->thumbnails_directory.empty()) {
+  if (app_state.gallery->thumbnails_directory.empty()) {
     return std::unexpected("Thumbnails directory not initialized");
   }
 
@@ -100,7 +101,7 @@ auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asse
 
   std::string level1 = file_hash.substr(0, 2);
   std::string level2 = file_hash.substr(2, 2);
-  auto target_subdir = app_state.asset->thumbnails_directory / level1 / level2;
+  auto target_subdir = app_state.gallery->thumbnails_directory / level1 / level2;
 
   if (std::filesystem::exists(target_subdir, ec) && !ec) {
     // 遍历特定子目录，删除对应的缩略图
@@ -139,10 +140,10 @@ auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asse
 auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
     -> std::expected<int, std::string> {
   // 直接从状态中获取缩略图目录路径
-  if (app_state.asset->thumbnails_directory.empty()) {
+  if (app_state.gallery->thumbnails_directory.empty()) {
     return std::unexpected("Thumbnails directory not initialized");
   }
-  auto thumbnails_dir = app_state.asset->thumbnails_directory;
+  auto thumbnails_dir = app_state.gallery->thumbnails_directory;
 
   std::error_code ec;
   if (!std::filesystem::exists(thumbnails_dir, ec)) {
@@ -262,10 +263,10 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
   AssetThumbnailStats stats = {};
 
   // 直接从状态中获取缩略图目录路径
-  if (app_state.asset->thumbnails_directory.empty()) {
+  if (app_state.gallery->thumbnails_directory.empty()) {
     return std::unexpected("Thumbnails directory not initialized");
   }
-  auto thumbnails_dir = app_state.asset->thumbnails_directory;
+  auto thumbnails_dir = app_state.gallery->thumbnails_directory;
   stats.thumbnails_directory = thumbnails_dir.string();
 
   std::error_code ec;
@@ -329,4 +330,4 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
   return stats;
 }
 
-}  // namespace Features::Asset::Thumbnail
+}  // namespace Features::Gallery::Asset::Thumbnail

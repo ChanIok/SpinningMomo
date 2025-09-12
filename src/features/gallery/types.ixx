@@ -1,10 +1,10 @@
 module;
 
-export module Features.Asset.Types;
+export module Features.Gallery.Types;
 
 import std;
 
-export namespace Features::Asset::Types {
+export namespace Features::Gallery::Types {
 
 // 资产项核心结构
 struct Asset {
@@ -179,4 +179,4 @@ struct ProcessingBatchResult {
 // 内存缓存类型
 using Cache = std::unordered_map<std::string, Metadata>;  // key: filepath
 
-}  // namespace Features::Asset::Types
+}  // namespace Features::Gallery::Types

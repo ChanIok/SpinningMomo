@@ -2,19 +2,19 @@ module;
 
 #include <format>
 
-module Features.Asset;
+module Features.Gallery;
 
 import std;
 import Core.State;
-import Features.Asset.State;
-import Features.Asset.Types;
-import Features.Asset.Repository;
-import Features.Asset.Scanner;
-import Features.Asset.Thumbnail;
+import Features.Gallery.State;
+import Features.Gallery.Types;
+import Features.Gallery.Asset.Repository;
+import Features.Gallery.Scanner;
+import Features.Gallery.Asset.Thumbnail;
 import Utils.Image;
 import Utils.Logger;
 
-namespace Features::Asset {
+namespace Features::Gallery {
 
 // ============= 初始化和清理 =============
 
@@ -23,7 +23,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     Logger().info("Initializing asset module...");
 
     // 确保缩略图目录存在
-    auto ensure_dir_result = Thumbnail::ensure_thumbnails_directory_exists(app_state);
+    auto ensure_dir_result = Asset::Thumbnail::ensure_thumbnails_directory_exists(app_state);
     if (!ensure_dir_result) {
       Logger().error("Failed to ensure thumbnails directory exists: {}", ensure_dir_result.error());
       return std::unexpected("Failed to ensure thumbnails directory exists: " +
@@ -31,7 +31,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     }
 
     Logger().info("Asset module initialized successfully");
-    Logger().info("Thumbnail directory set to: {}", app_state.asset->thumbnails_directory.string());
+    Logger().info("Thumbnail directory set to: {}", app_state.gallery->thumbnails_directory.string());
     return {};
 
   } catch (const std::exception& e) {
@@ -45,7 +45,7 @@ auto cleanup(Core::State::AppState& app_state) -> void {
     Logger().info("Cleaning up asset module resources...");
 
     // 重置缩略图路径状态
-    app_state.asset->thumbnails_directory.clear();
+    app_state.gallery->thumbnails_directory.clear();
 
     Logger().info("Asset module cleanup completed");
   } catch (const std::exception& e) {
@@ -59,7 +59,7 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
     -> std::expected<Types::OperationResult, std::string> {
   try {
     // 获取要删除的资产项
-    auto asset_result = Repository::get_asset_by_id(app_state, params.id);
+    auto asset_result = Asset::Repository::get_asset_by_id(app_state, params.id);
     if (!asset_result) {
       return std::unexpected("Failed to get asset item: " + asset_result.error());
     }
@@ -75,7 +75,7 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
     auto asset = asset_result->value();
 
     // 删除缩略图
-    auto delete_thumbnail_result = Thumbnail::delete_thumbnail(app_state, asset);
+    auto delete_thumbnail_result = Asset::Thumbnail::delete_thumbnail(app_state, asset);
     if (!delete_thumbnail_result) {
       Logger().warn("Failed to delete thumbnail for asset item {}: {}", params.id,
                     delete_thumbnail_result.error());
@@ -98,9 +98,9 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
     // 从数据库删除（软删除或硬删除）
     std::expected<void, std::string> delete_result;
     if (params.delete_file.value_or(false)) {
-      delete_result = Repository::hard_delete_asset(app_state, params.id);
+      delete_result = Asset::Repository::hard_delete_asset(app_state, params.id);
     } else {
-      delete_result = Repository::soft_delete_asset(app_state, params.id);
+      delete_result = Asset::Repository::soft_delete_asset(app_state, params.id);
     }
 
     Types::OperationResult result;
@@ -167,7 +167,7 @@ auto scan_directories(Core::State::AppState& app_state, const Types::ScanParams&
 auto cleanup_thumbnails(Core::State::AppState& app_state)
     -> std::expected<Types::OperationResult, std::string> {
   try {
-    auto cleanup_result = Thumbnail::cleanup_orphaned_thumbnails(app_state);
+    auto cleanup_result = Asset::Thumbnail::cleanup_orphaned_thumbnails(app_state);
 
     Types::OperationResult result;
     if (cleanup_result) {
@@ -192,13 +192,13 @@ auto cleanup_thumbnails(Core::State::AppState& app_state)
 
 auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
     -> std::expected<Types::Stats, std::string> {
-  return Repository::get_asset_stats(app_state, params);
+  return Asset::Repository::get_asset_stats(app_state, params);
 }
 
 auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string> {
   try {
-    auto stats_result = Thumbnail::get_thumbnail_stats(app_state);
+    auto stats_result = Asset::Thumbnail::get_thumbnail_stats(app_state);
     if (!stats_result) {
       return std::unexpected(stats_result.error());
     }
@@ -227,7 +227,7 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
 auto cleanup_deleted_assets(Core::State::AppState& app_state, int days_old)
     -> std::expected<Types::OperationResult, std::string> {
   try {
-    auto cleanup_result = Repository::cleanup_soft_deleted_assets(app_state, days_old);
+    auto cleanup_result = Asset::Repository::cleanup_soft_deleted_assets(app_state, days_old);
 
     Types::OperationResult result;
     if (cleanup_result) {
@@ -296,4 +296,4 @@ auto validate_asset_scan_params(const Types::ScanParams& params)
   return {};
 }
 
-}  // namespace Features::Asset
+}  // namespace Features::Gallery

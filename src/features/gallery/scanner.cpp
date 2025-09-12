@@ -7,18 +7,18 @@ module;
 #include <functional>
 #include <iostream>
 
-module Features.Asset.Scanner;
+module Features.Gallery.Scanner;
 
 import std;
 import Core.State;
 import Core.WorkerPool;
-import Features.Asset.Types;
-import Features.Asset.Repository;
-import Features.Asset.Thumbnail;
+import Features.Gallery.Types;
+import Features.Gallery.Asset.Repository;
+import Features.Gallery.Asset.Thumbnail;
 import Utils.Image;
 import Utils.Logger;
 
-namespace Features::Asset::Scanner {
+namespace Features::Gallery::Scanner {
 
 // ============= 工具函数 =============
 
@@ -548,7 +548,7 @@ auto process_single_file_optimized(Core::State::AppState& app_state,
 
     // 生成缩略图（如果需要）
     if (options.generate_thumbnails) {
-      auto thumbnail_result = Thumbnail::generate_thumbnail(
+      auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
           app_state, wic_factory, file_path, file_info.file_hash.value_or(""),
           options.thumbnail_max_width, options.thumbnail_max_height);
 
@@ -575,7 +575,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
                 options.directories.size());
 
   // 加载资产缓存
-  auto asset_cache_result = Repository::load_asset_cache(app_state);
+  auto asset_cache_result = Asset::Repository::load_asset_cache(app_state);
   if (!asset_cache_result) {
     return std::unexpected("Failed to load asset cache: " + asset_cache_result.error());
   }
@@ -643,7 +643,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   bool all_db_success = true;
 
   if (!batch_result.new_assets.empty()) {
-    auto create_result = Repository::batch_create_asset(app_state, batch_result.new_assets);
+    auto create_result = Asset::Repository::batch_create_asset(app_state, batch_result.new_assets);
     if (create_result) {
       Logger().info("Successfully created {} new asset items", batch_result.new_assets.size());
     } else {
@@ -653,7 +653,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   if (!batch_result.updated_assets.empty()) {
-    auto update_result = Repository::batch_update_asset(app_state, batch_result.updated_assets);
+    auto update_result = Asset::Repository::batch_update_asset(app_state, batch_result.updated_assets);
     if (update_result) {
       Logger().info("Successfully updated {} asset items", batch_result.updated_assets.size());
     } else {
@@ -687,4 +687,4 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   return result;
 }
 
-}  // namespace Features::Asset::Scanner
+}  // namespace Features::Gallery::Scanner

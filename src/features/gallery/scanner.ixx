@@ -1,13 +1,13 @@
 module;
 
-export module Features.Asset.Scanner;
+export module Features.Gallery.Scanner;
 
 import std;
 import Core.State;
-import Features.Asset.Types;
+import Features.Gallery.Types;
 import Utils.Image;
 
-export namespace Features::Asset::Scanner {
+export namespace Features::Gallery::Scanner {
 
 // ============= 文件扫描功能 =============
 
@@ -75,4 +75,4 @@ auto process_single_file_optimized(Core::State::AppState& app_state,
                                    const Types::ScanOptions& options)
     -> std::expected<Types::Asset, std::string>;
 
-}  // namespace Features::Asset::Scanner
+}  // namespace Features::Gallery::Scanner

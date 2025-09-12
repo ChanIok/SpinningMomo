@@ -1,19 +1,19 @@
 module;
 
-export module Features.Asset;
+export module Features.Gallery;
 
 import std;
 import Core.State;
-import Features.Asset.Types;
+import Features.Gallery.Types;
 
-export namespace Features::Asset {
+export namespace Features::Gallery {
 
 // ============= 初始化和清理 =============
 
-// 初始化资产模块
+// 初始化gallery模块
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string>;
 
-// 清理资产模块资源
+// 清理gallery模块资源
 auto cleanup(Core::State::AppState& app_state) -> void;
 
 // ============= 资产项管理 =============
@@ -59,4 +59,4 @@ auto get_default_asset_scan_options() -> Types::ScanOptions;
 auto validate_asset_scan_params(const Types::ScanParams& params)
     -> std::expected<void, std::string>;
 
-}  // namespace Features::Asset
+}  // namespace Features::Gallery

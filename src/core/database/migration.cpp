@@ -11,11 +11,10 @@ import Core.Database.Types;
 import Utils.Logger;
 
 namespace Core::Database::Migration {
-// 所有迁移脚本 - 您只需要在这里添加新的迁移
-// 注意：在实际项目中，这个列表可能会从外部配置文件或数据库中加载
+
 const std::vector<MigrationScript> all_migrations = {
     {1,
-     "创建 assets 表",
+     "创建所有初始表（assets、folders、tags、asset_tags）",
      {
          R"(
                 CREATE TABLE assets (
@@ -30,7 +29,8 @@ const std::vector<MigrationScript> all_migrations = {
                     height INTEGER,
                     file_size INTEGER,
                     mime_type TEXT,
-                    file_hash TEXT,  -- xxh3哈希值，用于快速比对和去重
+                    file_hash TEXT,
+                    folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
                     
                     -- 时间信息
                     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -41,7 +41,55 @@ const std::vector<MigrationScript> all_migrations = {
          "CREATE INDEX idx_assets_filepath ON assets(filepath);",
          "CREATE INDEX idx_assets_type ON assets(type);",
          "CREATE INDEX idx_assets_created_at ON assets(created_at);",
-         "CREATE INDEX idx_assets_file_hash ON assets(file_hash);"}}
+         "CREATE INDEX idx_assets_file_hash ON assets(file_hash);",
+         "CREATE INDEX idx_assets_folder_id ON assets(folder_id);",
+         R"(
+                CREATE TABLE folders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    path TEXT NOT NULL UNIQUE,
+                    parent_path TEXT,
+                    name TEXT NOT NULL,
+                    display_name TEXT,
+                    cover_asset_id INTEGER,
+                    sort_order INTEGER DEFAULT 0,
+                    asset_count INTEGER DEFAULT 0,
+                    is_watch_root BOOLEAN DEFAULT 0,
+                    is_hidden BOOLEAN DEFAULT 0,
+                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    
+                    FOREIGN KEY (cover_asset_id) REFERENCES assets(id) ON DELETE SET NULL
+                );
+                )",
+         "CREATE INDEX idx_folders_parent_sort ON folders(parent_path, sort_order);",
+         "CREATE INDEX idx_folders_path ON folders(path);",
+         "CREATE INDEX idx_folders_watch_root ON folders(is_watch_root);",
+         R"(
+                CREATE TABLE tags (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    parent_id INTEGER,
+                    sort_order INTEGER DEFAULT 0,
+                    color TEXT,
+                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    
+                    FOREIGN KEY (parent_id) REFERENCES tags(id) ON DELETE CASCADE,
+                    UNIQUE(parent_id, name)
+                );
+                )",
+         R"(
+                CREATE TABLE asset_tags (
+                    asset_id INTEGER NOT NULL,
+                    tag_id INTEGER NOT NULL,
+                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    PRIMARY KEY (asset_id, tag_id),
+                    FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE,
+                    FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+                );
+                )",
+         "CREATE INDEX idx_tags_parent_sort ON tags(parent_id, sort_order);",
+         "CREATE INDEX idx_asset_tags_tag ON asset_tags(tag_id);"}}
     // 添加新迁移时，只需要在这里加新的 MigrationScript 即可
 };
 

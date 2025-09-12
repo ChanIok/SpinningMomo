@@ -1,13 +1,13 @@
 module;
 
-export module Features.Asset.Repository;
+export module Features.Gallery.Asset.Repository;
 
 import std;
 import Core.State;
 import Core.Database.Types;
-import Features.Asset.Types;
+import Features.Gallery.Types;
 
-export namespace Features::Asset::Repository {
+export namespace Features::Gallery::Asset::Repository {
 
 // ============= 基本 CRUD 操作 =============
 
@@ -78,4 +78,4 @@ struct AssetQueryBuilder {
 
 auto build_asset_list_query_conditions(const Types::ListParams& params) -> AssetQueryBuilder;
 
-}  // namespace Features::Asset::Repository
+}  // namespace Features::Gallery::Asset::Repository

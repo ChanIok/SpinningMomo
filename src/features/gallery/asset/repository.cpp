@@ -2,17 +2,17 @@ module;
 
 #include <rfl.hpp>  // 用于反射
 
-module Features.Asset.Repository;
+module Features.Gallery.Asset.Repository;
 
 import std;
 import Core.State;
 import Core.Database;
 import Core.Database.Types;
-import Core.Database.DataMapper;
-import Features.Asset.Types;
+import Features.Gallery.Types;
+import Features.Gallery.Types;
 import Utils.Logger;
 
-namespace Features::Asset::Repository {
+namespace Features::Gallery::Asset::Repository {
 
 // ============= 基本 CRUD 操作 =============
 
@@ -557,4 +557,4 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
         return {};
       });
 }
-}  // namespace Features::Asset::Repository
+}  // namespace Features::Gallery::Asset::Repository
