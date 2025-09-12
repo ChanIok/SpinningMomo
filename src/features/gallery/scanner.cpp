@@ -3,9 +3,9 @@ module;
 #include <xxhash.h>
 
 #include <format>
-#include <latch>
 #include <functional>
 #include <iostream>
+#include <latch>
 
 module Features.Gallery.Scanner;
 
@@ -174,7 +174,7 @@ auto extract_asset_info(Utils::Image::WICFactory& wic_factory,
     auto asset_type = detect_asset_type(file_path);
 
     Types::Info info;
-    info.file_size = static_cast<int64_t>(file_size);
+    info.size = static_cast<int64_t>(file_size);
     info.detected_type = asset_type;
 
     // 如果是图片，使用 Utils::Image 获取详细信息
@@ -254,7 +254,7 @@ auto discover_files_parallel(Core::State::AppState& app_state,
         if (ec) continue;
         Types::FileSystemInfo info;
         info.filepath = file_path;
-        info.file_size = static_cast<int64_t>(file_size);
+        info.size = static_cast<int64_t>(file_size);
         info.last_write_time = last_write_time;
         info.last_modified_str =
             std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
@@ -310,7 +310,7 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& discovered_f
       analysis.existing_metadata = cached_metadata;
 
       // 先用快速条件筛选出需要进一步校验的文件
-      if (cached_metadata.file_size != file_info.file_size) {
+      if (cached_metadata.size != file_info.size) {
         analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
       } else {
         analysis.status = Types::FileStatus::UNCHANGED;
@@ -398,11 +398,11 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
   // 根据哈希结果更新状态与信息
   for (const auto& [idx, hash] : all_hashes) {
     auto& analysis = analysis_results[idx];
-    analysis.file_info.file_hash = hash;
+    analysis.file_info.hash = hash;
 
     if (analysis.status == Types::FileStatus::NEEDS_HASH_CHECK) {
-      if (analysis.existing_metadata && analysis.existing_metadata->file_hash &&
-          analysis.existing_metadata->file_hash.value() == hash) {
+      if (analysis.existing_metadata && analysis.existing_metadata->hash &&
+          analysis.existing_metadata->hash.value() == hash) {
         analysis.status = Types::FileStatus::UNCHANGED;
       } else {
         analysis.status = Types::FileStatus::MODIFIED;
@@ -522,12 +522,12 @@ auto process_single_file_optimized(Core::State::AppState& app_state,
     asset.id = analysis.existing_metadata->id;
   }
 
-  asset.filename = file_path.filename().string();
+  asset.name = file_path.filename().string();
   asset.filepath = file_path.string();
   asset.relative_path = file_path.filename().string();  // 简化
   asset.type = asset_type;
-  asset.file_size = file_info.file_size;
-  asset.file_hash = file_info.file_hash.value_or("");
+  asset.size = file_info.size;
+  asset.hash = file_info.hash.value_or("");
   asset.created_at = file_info.last_modified_str;
   asset.updated_at = file_info.last_modified_str;
 
@@ -549,7 +549,7 @@ auto process_single_file_optimized(Core::State::AppState& app_state,
     // 生成缩略图（如果需要）
     if (options.generate_thumbnails) {
       auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
-          app_state, wic_factory, file_path, file_info.file_hash.value_or(""),
+          app_state, wic_factory, file_path, file_info.hash.value_or(""),
           options.thumbnail_max_width, options.thumbnail_max_height);
 
       if (!thumbnail_result) {
@@ -653,7 +653,8 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   if (!batch_result.updated_assets.empty()) {
-    auto update_result = Asset::Repository::batch_update_asset(app_state, batch_result.updated_assets);
+    auto update_result =
+        Asset::Repository::batch_update_asset(app_state, batch_result.updated_assets);
     if (update_result) {
       Logger().info("Successfully updated {} asset items", batch_result.updated_assets.size());
     } else {

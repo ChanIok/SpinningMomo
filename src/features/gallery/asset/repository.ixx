@@ -20,7 +20,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
 // 根据文件路径获取资产项
-auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& filepath)
+auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
 // 更新资产项

@@ -19,17 +19,16 @@ const std::vector<MigrationScript> all_migrations = {
          R"(
                 CREATE TABLE assets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    filename TEXT NOT NULL,
-                    filepath TEXT NOT NULL UNIQUE,
-                    relative_path TEXT,
+                    name TEXT NOT NULL,
+                    path TEXT NOT NULL UNIQUE,
                     type TEXT NOT NULL CHECK (type IN ('photo', 'video', 'live_photo', 'unknown')),
                     
                     -- 基本信息
                     width INTEGER,
                     height INTEGER,
-                    file_size INTEGER,
+                    size INTEGER,
                     mime_type TEXT,
-                    file_hash TEXT,
+                    hash TEXT,
                     folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
                     
                     -- 时间信息
@@ -38,22 +37,21 @@ const std::vector<MigrationScript> all_migrations = {
                     deleted_at TEXT
                 );
                 )",
-         "CREATE INDEX idx_assets_filepath ON assets(filepath);",
+         "CREATE INDEX idx_assets_path ON assets(path);",
          "CREATE INDEX idx_assets_type ON assets(type);",
          "CREATE INDEX idx_assets_created_at ON assets(created_at);",
-         "CREATE INDEX idx_assets_file_hash ON assets(file_hash);",
+         "CREATE INDEX idx_assets_hash ON assets(hash);",
          "CREATE INDEX idx_assets_folder_id ON assets(folder_id);",
          R"(
                 CREATE TABLE folders (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     path TEXT NOT NULL UNIQUE,
-                    parent_path TEXT,
+                    parent_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
                     name TEXT NOT NULL,
                     display_name TEXT,
                     cover_asset_id INTEGER,
                     sort_order INTEGER DEFAULT 0,
                     asset_count INTEGER DEFAULT 0,
-                    is_watch_root BOOLEAN DEFAULT 0,
                     is_hidden BOOLEAN DEFAULT 0,
                     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -61,16 +59,14 @@ const std::vector<MigrationScript> all_migrations = {
                     FOREIGN KEY (cover_asset_id) REFERENCES assets(id) ON DELETE SET NULL
                 );
                 )",
-         "CREATE INDEX idx_folders_parent_sort ON folders(parent_path, sort_order);",
+         "CREATE INDEX idx_folders_parent_sort ON folders(parent_id, sort_order);",
          "CREATE INDEX idx_folders_path ON folders(path);",
-         "CREATE INDEX idx_folders_watch_root ON folders(is_watch_root);",
          R"(
                 CREATE TABLE tags (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     parent_id INTEGER,
                     sort_order INTEGER DEFAULT 0,
-                    color TEXT,
                     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     

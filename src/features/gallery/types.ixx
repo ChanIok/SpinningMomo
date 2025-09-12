@@ -9,7 +9,7 @@ export namespace Features::Gallery::Types {
 // 资产项核心结构
 struct Asset {
   std::int64_t id;
-  std::string filename;
+  std::string name;
   std::string filepath;       // 完整路径
   std::string relative_path;  // 相对于监控目录的路径
   std::string type;           // "photo", "video", "live_photo", "unknown"
@@ -17,9 +17,9 @@ struct Asset {
   // 基本信息（来自 Utils::Image::get_image_info）
   std::optional<std::int32_t> width;
   std::optional<std::int32_t> height;
-  std::optional<std::int64_t> file_size;
+  std::optional<std::int64_t> size;
   std::string mime_type;
-  std::optional<std::string> file_hash;  // xxh3哈希值，用于快速比对
+  std::optional<std::string> hash;  // xxh3哈希值，用于快速比对
 
   // 时间信息
   std::string created_at;                 // 文件创建时间
@@ -52,7 +52,7 @@ struct ScanResult {
 struct Info {
   uint32_t width;
   uint32_t height;
-  int64_t file_size;
+  int64_t size;
   std::string mime_type;
   std::string detected_type;  // "photo", "video", "live_photo", "unknown"
 };
@@ -63,7 +63,7 @@ struct Info {
 struct ListParams {
   std::optional<std::int32_t> page = 1;
   std::optional<std::int32_t> per_page = 50;
-  std::optional<std::string> sort_by = "created_at";  // created_at, filename, file_size
+  std::optional<std::string> sort_by = "created_at";  // created_at, name, size
   std::optional<std::string> sort_order = "desc";     // asc, desc
   std::optional<std::string> filter_type;             // photo, video, live_photo
   std::optional<std::string> search_query;            // 搜索文件名
@@ -138,27 +138,27 @@ struct TypeCountResult {
 struct Metadata {
   int64_t id;
   std::string filepath;
-  int64_t file_size;
+  int64_t size;
   std::string last_modified;
-  std::optional<std::string> file_hash;  // xxh3哈希
+  std::optional<std::string> hash;  // xxh3哈希
 };
 
 // 文件系统信息
 struct FileSystemInfo {
   std::filesystem::path filepath;
-  int64_t file_size;
+  int64_t size;
   std::filesystem::file_time_type last_write_time;
   std::string last_modified_str;
-  std::optional<std::string> file_hash;  // xxh3哈希（在发现阶段为空，后续按需计算）
+  std::optional<std::string> hash;  // xxh3哈希（在发现阶段为空，后续按需计算）
 };
 
 // 文件状态枚举
 enum class FileStatus {
-  NEW,              // 新文件
-  UNCHANGED,        // 无变化
-  MODIFIED,         // 已修改
-  NEEDS_HASH_CHECK, // 需要进行哈希校验（大小/时间变化，需进一步确认）
-  DELETED           // 数据库中存在但文件系统中不存在
+  NEW,               // 新文件
+  UNCHANGED,         // 无变化
+  MODIFIED,          // 已修改
+  NEEDS_HASH_CHECK,  // 需要进行哈希校验（大小/时间变化，需进一步确认）
+  DELETED            // 数据库中存在但文件系统中不存在
 };
 
 // 文件分析结果

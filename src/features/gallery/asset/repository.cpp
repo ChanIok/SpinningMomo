@@ -20,16 +20,15 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
     -> std::expected<int64_t, std::string> {
   std::string sql = R"(
             INSERT INTO assets (
-                filename, filepath, relative_path, type,
-                width, height, file_size, mime_type, file_hash,
+                name, path, type,
+                width, height, size, mime_type, hash,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
-  params.push_back(item.filename);
+  params.push_back(item.name);
   params.push_back(item.filepath);
-  params.push_back(item.relative_path);
   params.push_back(item.type);
 
   // 处理 optional 类型字段
@@ -39,14 +38,14 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.height.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
                        : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.file_size.has_value()
-                       ? Core::Database::Types::DbParam{item.file_size.value()}
+  params.push_back(item.size.has_value()
+                       ? Core::Database::Types::DbParam{item.size.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.mime_type);
 
-  params.push_back(item.file_hash.has_value()
-                       ? Core::Database::Types::DbParam{item.file_hash.value()}
+  params.push_back(item.hash.has_value()
+                       ? Core::Database::Types::DbParam{item.hash.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.created_at);
@@ -70,8 +69,8 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
 auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
-            SELECT id, filename, filepath, relative_path, type,
-                   width, height, file_size, mime_type, file_hash,
+            SELECT id, name, path, type,
+                   width, height, size, mime_type, hash,
                    created_at, updated_at, deleted_at
             FROM assets
             WHERE id = ? AND deleted_at IS NULL
@@ -87,21 +86,21 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
   return result.value();
 }
 
-auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& filepath)
+auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
-            SELECT id, filename, filepath, relative_path, type,
-                   width, height, file_size, mime_type, file_hash,
+            SELECT id, name, path, type,
+                   width, height, size, mime_type, hash,
                    created_at, updated_at, deleted_at
             FROM assets
-            WHERE filepath = ? AND deleted_at IS NULL
+            WHERE path = ? AND deleted_at IS NULL
         )";
 
-  std::vector<Core::Database::Types::DbParam> params = {filepath};
+  std::vector<Core::Database::Types::DbParam> params = {path};
 
   auto result = Core::Database::query_single<Types::Asset>(*app_state.database, sql, params);
   if (!result) {
-    return std::unexpected("Failed to query asset item by filepath: " + result.error());
+    return std::unexpected("Failed to query asset item by path: " + result.error());
   }
 
   return result.value();
@@ -111,16 +110,15 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
     -> std::expected<void, std::string> {
   std::string sql = R"(
             UPDATE assets SET
-                filename = ?, filepath = ?, relative_path = ?, type = ?,
-                width = ?, height = ?, file_size = ?, mime_type = ?, file_hash = ?,
+                name = ?, path = ?, type = ?,
+                width = ?, height = ?, size = ?, mime_type = ?, hash = ?,
                 updated_at = ?
             WHERE id = ?
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
-  params.push_back(item.filename);
+  params.push_back(item.name);
   params.push_back(item.filepath);
-  params.push_back(item.relative_path);
   params.push_back(item.type);
 
   // 处理 optional 类型字段
@@ -130,14 +128,14 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.height.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
                        : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.file_size.has_value()
-                       ? Core::Database::Types::DbParam{item.file_size.value()}
+  params.push_back(item.size.has_value()
+                       ? Core::Database::Types::DbParam{item.size.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.mime_type);
 
-  params.push_back(item.file_hash.has_value()
-                       ? Core::Database::Types::DbParam{item.file_hash.value()}
+  params.push_back(item.hash.has_value()
+                       ? Core::Database::Types::DbParam{item.hash.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.updated_at);
@@ -197,7 +195,7 @@ auto build_asset_list_query_conditions(const Types::ListParams& params) -> Asset
 
   // 搜索查询
   if (params.search_query.has_value() && !params.search_query->empty()) {
-    conditions.push_back("filename LIKE ?");
+    conditions.push_back("name LIKE ?");
     builder.params.push_back("%" + *params.search_query + "%");
   }
 
@@ -234,7 +232,7 @@ auto list_asset(Core::State::AppState& app_state, const Types::ListParams& param
   std::string sort_order = params.sort_order.value_or("desc");
 
   // 安全的排序字段验证
-  if (sort_by != "created_at" && sort_by != "filename" && sort_by != "file_size") {
+  if (sort_by != "created_at" && sort_by != "name" && sort_by != "size") {
     sort_by = "created_at";
   }
   if (sort_order != "asc" && sort_order != "desc") {
@@ -245,8 +243,8 @@ auto list_asset(Core::State::AppState& app_state, const Types::ListParams& param
 
   // 构建主查询
   std::string sql = std::format(R"(
-            SELECT id, filename, filepath, relative_path, type,
-                   width, height, file_size, mime_type, file_hash,
+            SELECT id, name, path, type,
+                   width, height, size, mime_type, hash,
                    created_at, updated_at, deleted_at
             FROM assets
             {}
@@ -326,7 +324,7 @@ auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsPara
   }
 
   // 总大小
-  std::string size_sql = "SELECT SUM(file_size) FROM assets " + base_where;
+  std::string size_sql = "SELECT SUM(size) FROM assets " + base_where;
   auto size_result =
       Core::Database::query_scalar<int64_t>(*app_state.database, size_sql, where_params);
   if (size_result) {
@@ -379,8 +377,8 @@ auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old)
 auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<Types::Cache, std::string> {
   std::string sql = R"(
-    SELECT id, filename, filepath, relative_path, type,
-           width, height, file_size, mime_type, file_hash,
+    SELECT id, name, path, type,
+           width, height, size, mime_type, hash,
            created_at, updated_at, deleted_at
     FROM assets
     WHERE deleted_at IS NULL
@@ -398,15 +396,15 @@ auto load_asset_cache(Core::State::AppState& app_state)
   for (const auto& asset : assets) {
     Types::Metadata metadata;
     metadata.id = asset.id;
-    metadata.filepath = asset.filepath;
-    metadata.file_size = asset.file_size.value_or(0);
+    metadata.filepath = asset.filepath;  // 这里保持使用filepath，因为Metadata结构体中的字段名可能没有改变
+    metadata.size = asset.size.value_or(0);
     metadata.last_modified = asset.updated_at;
 
-    if (asset.file_hash && !asset.file_hash->empty()) {
-      metadata.file_hash = *asset.file_hash;
+    if (asset.hash && !asset.hash->empty()) {
+      metadata.hash = *asset.hash;
     }
 
-    cache[asset.filepath] = std::move(metadata);
+    cache[asset.filepath] = std::move(metadata);  // 这里保持使用filepath，因为Metadata结构体中的字段名可能没有改变
   }
 
   Logger().info("Loaded {} assets into memory cache", cache.size());
@@ -422,8 +420,8 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
   // 构建批量插入SQL
   std::string sql = R"(
     INSERT INTO assets (
-      filename, filepath, relative_path, type,
-      width, height, file_size, mime_type, file_hash,
+      name, path, type,
+      width, height, size, mime_type, hash,
       created_at, updated_at
     ) VALUES
   )";
@@ -434,12 +432,11 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
   all_params.reserve(items.size() * 11);  // 11个字段
 
   for (const auto& item : items) {
-    value_placeholders.push_back("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    value_placeholders.push_back("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     // 按顺序添加所有参数
-    all_params.push_back(item.filename);
+    all_params.push_back(item.name);
     all_params.push_back(item.filepath);
-    all_params.push_back(item.relative_path);
     all_params.push_back(item.type);
 
     all_params.push_back(
@@ -450,14 +447,14 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
         item.height.has_value()
             ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
             : Core::Database::Types::DbParam{std::monostate{}});
-    all_params.push_back(item.file_size.has_value()
-                             ? Core::Database::Types::DbParam{item.file_size.value()}
+    all_params.push_back(item.size.has_value()
+                             ? Core::Database::Types::DbParam{item.size.value()}
                              : Core::Database::Types::DbParam{std::monostate{}});
 
     all_params.push_back(item.mime_type);
 
-    all_params.push_back(item.file_hash.has_value()
-                             ? Core::Database::Types::DbParam{item.file_hash.value()}
+    all_params.push_back(item.hash.has_value()
+                             ? Core::Database::Types::DbParam{item.hash.value()}
                              : Core::Database::Types::DbParam{std::monostate{}});
 
     all_params.push_back(item.created_at);
@@ -513,17 +510,16 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
       [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
         std::string sql = R"(
         UPDATE assets SET
-          filename = ?, filepath = ?, relative_path = ?, type = ?,
-          width = ?, height = ?, file_size = ?, mime_type = ?, file_hash = ?,
+          name = ?, path = ?, type = ?,
+          width = ?, height = ?, size = ?, mime_type = ?, hash = ?,
           updated_at = ?
         WHERE id = ?
       )";
 
         for (const auto& item : items) {
           std::vector<Core::Database::Types::DbParam> params;
-          params.push_back(item.filename);
+          params.push_back(item.name);
           params.push_back(item.filepath);
-          params.push_back(item.relative_path);
           params.push_back(item.type);
 
           params.push_back(
@@ -534,14 +530,14 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
               item.height.has_value()
                   ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
                   : Core::Database::Types::DbParam{std::monostate{}});
-          params.push_back(item.file_size.has_value()
-                               ? Core::Database::Types::DbParam{item.file_size.value()}
+          params.push_back(item.size.has_value()
+                               ? Core::Database::Types::DbParam{item.size.value()}
                                : Core::Database::Types::DbParam{std::monostate{}});
 
           params.push_back(item.mime_type);
 
-          params.push_back(item.file_hash.has_value()
-                               ? Core::Database::Types::DbParam{item.file_hash.value()}
+          params.push_back(item.hash.has_value()
+                               ? Core::Database::Types::DbParam{item.hash.value()}
                                : Core::Database::Types::DbParam{std::monostate{}});
 
           params.push_back(item.updated_at);

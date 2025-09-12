@@ -91,13 +91,13 @@ auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asse
     return std::unexpected("Thumbnails directory not initialized");
   }
 
-  if (!asset.file_hash.has_value() || asset.file_hash->empty()) {
+  if (!asset.hash.has_value() || asset.hash->empty()) {
     return std::unexpected("Asset has no file hash, cannot determine thumbnail files");
   }
 
   int deleted_count = 0;
   std::error_code ec;
-  const std::string& file_hash = *asset.file_hash;
+  const std::string& file_hash = *asset.hash;
 
   std::string level1 = file_hash.substr(0, 2);
   std::string level2 = file_hash.substr(2, 2);
@@ -155,8 +155,8 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
   auto cache_result = Repository::load_asset_cache(app_state);
   if (cache_result) {
     for (const auto& [filepath, metadata] : *cache_result) {
-      if (metadata.file_hash.has_value() && !metadata.file_hash->empty()) {
-        all_file_hashes.insert(*metadata.file_hash);
+      if (metadata.hash.has_value() && !metadata.hash->empty()) {
+        all_file_hashes.insert(*metadata.hash);
       }
     }
   }
@@ -279,8 +279,8 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
   auto cache_result = Repository::load_asset_cache(app_state);
   if (cache_result) {
     for (const auto& [filepath, metadata] : *cache_result) {
-      if (metadata.file_hash.has_value() && !metadata.file_hash->empty()) {
-        all_file_hashes.insert(*metadata.file_hash);
+      if (metadata.hash.has_value() && !metadata.hash->empty()) {
+        all_file_hashes.insert(*metadata.hash);
       }
     }
   }
