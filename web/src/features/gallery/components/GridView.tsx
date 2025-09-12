@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from 'react'
+import { forwardRef } from 'react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import { AssetCard } from './AssetCard'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
@@ -6,22 +6,24 @@ import { useAssetsStore } from '@/lib/assets/assetsStore'
 // 定义 gridComponents，确保它在组件外部以避免重新挂载
 const gridComponents = {
   // List 容器使用 Flexbox wrap 来实现自动换行
-  List: forwardRef<HTMLDivElement, React.HTMLProps<HTMLDivElement>>(({ style, children, ...props }, ref) => (
-    <div
-      ref={ref}
-      {...props}
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        padding: '16px', // 统一的内边距
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  )),
+  List: forwardRef<HTMLDivElement, React.HTMLProps<HTMLDivElement>>(
+    ({ style, children, ...props }, ref) => (
+      <div
+        ref={ref}
+        {...props}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          padding: '16px', // 统一的内边距
+          ...style,
+        }}
+      >
+        {children}
+      </div>
+    )
+  ),
   // Item 容器定义每个单元格的尺寸和间距
-  Item: ({ children, ...props }: { children: React.ReactNode }) => (
+  Item: ({ children, ...props }: { children?: React.ReactNode }) => (
     <div
       {...props}
       style={{
@@ -41,7 +43,9 @@ export function GridView() {
   const assets = useAssetsStore((state) => state.assets)
 
   // 过滤出有效的资产
-  const validAssets = assets.filter((asset) => asset.type === 'photo' && asset.width && asset.height)
+  const validAssets = assets.filter(
+    (asset) => asset.type === 'photo' && asset.width && asset.height
+  )
 
   if (validAssets.length === 0) {
     return (
@@ -58,12 +62,7 @@ export function GridView() {
         components={gridComponents} // 使用定义好的静态组件
         itemContent={(index) => {
           const asset = validAssets[index]
-          return (
-            <AssetCard
-              assetId={asset.id}
-              viewMode='grid'
-            />
-          )
+          return <AssetCard assetId={asset.id} viewMode='grid' />
         }}
       />
     </div>

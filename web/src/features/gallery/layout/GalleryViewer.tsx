@@ -1,4 +1,3 @@
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
 import { GalleryToolbar } from '../components/GalleryToolbar'

@@ -1,5 +1,4 @@
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Allotment } from 'allotment'
 import 'allotment/dist/style.css'
 import { useAssetsStore } from '@/lib/assets/assetsStore'
 import { useAssets } from '@/lib/assets/hooks/useAssets'
@@ -8,6 +7,7 @@ import { GallerySidebar } from './GallerySidebar'
 import { GalleryViewer } from './GalleryViewer'
 import { GalleryDetails } from './GalleryDetails'
 import { GalleryLightbox } from '../components/GalleryLightbox'
+import { PanelGroup, Panel, PanelResizer } from '@window-splitter/react'
 
 export function GalleryLayout() {
   const { isSidebarOpen, isDetailsOpen } = useGalleryLayout()
@@ -25,35 +25,30 @@ export function GalleryLayout() {
 
   return (
     <>
-      {/* Main Layout */}
       <div className='flex h-full w-full'>
-        <Allotment>
-          {/* Left Sidebar */}
-          {isSidebarOpen && (
-            <Allotment.Pane preferredSize={250} minSize={150} maxSize={400} snap>
-              <GallerySidebar />
-            </Allotment.Pane>
-          )}
+        <PanelGroup className='flex h-full w-full' autosaveId='autosave'>
+          <Panel id='sidebar-panel' collapsible min='100px' max='400px' default='280px' isStaticAtRest >
+            {isSidebarOpen && <GallerySidebar />}
+          </Panel>
+          <PanelResizer size='4px' id='sidebar-resizer' />
 
-          {/* Main Content Area */}
-          <Allotment.Pane minSize={500}>
+          <Panel min='400px' id='viewer-panel'>
             <GalleryViewer />
-          </Allotment.Pane>
+          </Panel>
 
-          {/* Right Details Panel */}
-          {isDetailsOpen && (
-            <Allotment.Pane preferredSize={300} minSize={200} maxSize={500} snap>
+          <PanelResizer size='4px' id='details-resizer' />
+          <Panel id='details-panel' collapsible min='100px' max='400px' default='280px' isStaticAtRest>
+            {isDetailsOpen && (
               <ScrollArea className='h-full'>
                 <div className='border-l'>
                   <GalleryDetails />
                 </div>
               </ScrollArea>
-            </Allotment.Pane>
-          )}
-        </Allotment>
+            )}
+          </Panel>
+        </PanelGroup>
       </div>
 
-      {/* Lightbox Overlay */}
       {lightbox.isOpen && <GalleryLightbox />}
     </>
   )
