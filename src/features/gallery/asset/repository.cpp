@@ -38,15 +38,13 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.height.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
                        : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.size.has_value()
-                       ? Core::Database::Types::DbParam{item.size.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
+                                         : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.mime_type);
 
-  params.push_back(item.hash.has_value()
-                       ? Core::Database::Types::DbParam{item.hash.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
+                                         : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.created_at);
   params.push_back(item.updated_at);
@@ -128,15 +126,13 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.height.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
                        : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.size.has_value()
-                       ? Core::Database::Types::DbParam{item.size.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
+                                         : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.mime_type);
 
-  params.push_back(item.hash.has_value()
-                       ? Core::Database::Types::DbParam{item.hash.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
+                                         : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.updated_at);
 
@@ -243,7 +239,7 @@ auto list_asset(Core::State::AppState& app_state, const Types::ListParams& param
 
   // 构建主查询
   std::string sql = std::format(R"(
-            SELECT id, name, path, type,
+            SELECT id, name, path as filepath, type,
                    width, height, size, mime_type, hash,
                    created_at, updated_at, deleted_at
             FROM assets
@@ -265,7 +261,7 @@ auto list_asset(Core::State::AppState& app_state, const Types::ListParams& param
 
   // 构建响应
   Types::ListResponse response;
-  response.items = std::move(*items_result);
+  response.items = std::move(items_result.value());
   response.total_count = total_count;
   response.current_page = page;
   response.per_page = per_page;
@@ -336,14 +332,14 @@ auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsPara
   auto oldest_result =
       Core::Database::query_scalar<std::string>(*app_state.database, oldest_sql, where_params);
   if (oldest_result && oldest_result->has_value()) {
-    stats.oldest_item_date = *oldest_result.value();
+    stats.oldest_item_date = oldest_result.value().value();
   }
 
   std::string newest_sql = "SELECT MAX(created_at) FROM assets " + base_where;
   auto newest_result =
       Core::Database::query_scalar<std::string>(*app_state.database, newest_sql, where_params);
   if (newest_result && newest_result->has_value()) {
-    stats.newest_item_date = *newest_result.value();
+    stats.newest_item_date = newest_result.value().value();
   }
 
   return stats;
@@ -375,9 +371,9 @@ auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old)
 
 // 加载数据库中的资产到内存缓存
 auto load_asset_cache(Core::State::AppState& app_state)
-    -> std::expected<Types::Cache, std::string> {
+    -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {
   std::string sql = R"(
-    SELECT id, name, path, type,
+    SELECT id, name, path as filepath, type,
            width, height, size, mime_type, hash,
            created_at, updated_at, deleted_at
     FROM assets
@@ -389,24 +385,18 @@ auto load_asset_cache(Core::State::AppState& app_state)
     return std::unexpected("Failed to load asset cache: " + result.error());
   }
 
-  auto assets = std::move(*result);
-  Types::Cache cache;
+  auto assets = std::move(result.value());
+  std::unordered_map<std::string, Types::Metadata> cache;
   cache.reserve(assets.size());
-
   for (const auto& asset : assets) {
-    Types::Metadata metadata;
-    metadata.id = asset.id;
-    metadata.filepath = asset.filepath;  // 这里保持使用filepath，因为Metadata结构体中的字段名可能没有改变
-    metadata.size = asset.size.value_or(0);
-    metadata.last_modified = asset.updated_at;
+    Types::Metadata metadata{.id = asset.id,
+                             .filepath = asset.filepath,
+                             .size = asset.size.value_or(0),
+                             .last_modified = asset.updated_at,
+                             .hash = asset.hash.value_or("")};
 
-    if (asset.hash && !asset.hash->empty()) {
-      metadata.hash = *asset.hash;
-    }
-
-    cache[asset.filepath] = std::move(metadata);  // 这里保持使用filepath，因为Metadata结构体中的字段名可能没有改变
+    cache.emplace(asset.filepath, std::move(metadata));
   }
-
   Logger().info("Loaded {} assets into memory cache", cache.size());
   return cache;
 }
@@ -447,15 +437,13 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
         item.height.has_value()
             ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
             : Core::Database::Types::DbParam{std::monostate{}});
-    all_params.push_back(item.size.has_value()
-                             ? Core::Database::Types::DbParam{item.size.value()}
-                             : Core::Database::Types::DbParam{std::monostate{}});
+    all_params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
+                                               : Core::Database::Types::DbParam{std::monostate{}});
 
     all_params.push_back(item.mime_type);
 
-    all_params.push_back(item.hash.has_value()
-                             ? Core::Database::Types::DbParam{item.hash.value()}
-                             : Core::Database::Types::DbParam{std::monostate{}});
+    all_params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
+                                               : Core::Database::Types::DbParam{std::monostate{}});
 
     all_params.push_back(item.created_at);
     all_params.push_back(item.updated_at);

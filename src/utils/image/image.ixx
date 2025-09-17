@@ -10,6 +10,10 @@ namespace Utils::Image {
     // WIC工厂类型别名
     export using WICFactory = wil::com_ptr<IWICImagingFactory>;
     
+    // 线程局部存储，为每个线程维护独立的COM环境和WIC工厂
+    thread_local std::optional<wil::unique_couninitialize_call> thread_com_init;
+    thread_local WICFactory thread_wic_factory;
+    
     // 图像信息结构
     export struct ImageInfo {
         uint32_t width;
@@ -33,6 +37,9 @@ namespace Utils::Image {
     
     // 创建WIC工厂
     export auto create_factory() -> std::expected<WICFactory, std::string>;
+    
+    // 获取当前线程的WIC工厂。如果工厂不存在，则创建它。
+    export auto get_thread_wic_factory() -> std::expected<WICFactory, std::string>;
     
     // 获取图像信息（需要传递工厂）
     export auto get_image_info(IWICImagingFactory* factory, const std::filesystem::path& path)

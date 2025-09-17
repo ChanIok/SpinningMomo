@@ -1,6 +1,5 @@
 module;
 
-#include <format>
 #include <regex>
 
 module Features.Gallery.Ignore.Processor;

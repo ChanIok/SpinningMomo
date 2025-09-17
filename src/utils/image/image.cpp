@@ -117,6 +117,23 @@ auto create_factory() -> std::expected<WICFactory, std::string> {
   }
 }
 
+// 获取当前线程的WIC工厂
+auto get_thread_wic_factory() -> std::expected<WICFactory, std::string> {
+  if (!thread_wic_factory) {
+    if (!thread_com_init.has_value()) {
+      thread_com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    }
+
+    auto factory_result = create_factory();
+    if (!factory_result) {
+      return std::unexpected(factory_result.error());
+    }
+    thread_wic_factory = std::move(factory_result.value());
+  }
+
+  return thread_wic_factory;
+}
+
 // 获取图像信息
 auto get_image_info(IWICImagingFactory* factory, const std::filesystem::path& path)
     -> std::expected<ImageInfo, std::string> {
@@ -263,6 +280,23 @@ auto encode_bitmap_to_webp(IWICBitmap* bitmap, const WebPEncodeOptions& options)
     // 获取位图尺寸
     UINT width, height;
     THROW_IF_FAILED(bitmap->GetSize(&width, &height));
+
+    // 进行格式转换，确保是BGRA格式
+    wil::com_ptr<IWICImagingFactory> factory;
+    THROW_IF_FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                     IID_PPV_ARGS(&factory)));
+
+    wil::com_ptr<IWICFormatConverter> converter;
+    THROW_IF_FAILED(factory->CreateFormatConverter(converter.put()));
+
+    THROW_IF_FAILED(converter->Initialize(bitmap, GUID_WICPixelFormat32bppBGRA,
+                                          WICBitmapDitherTypeNone, nullptr, 0.0,
+                                          WICBitmapPaletteTypeCustom));
+
+    wil::com_ptr<IWICBitmap> bgra_bitmap;
+    THROW_IF_FAILED(factory->CreateBitmapFromSource(converter.get(), WICBitmapCacheOnDemand,
+                                                    bgra_bitmap.put()));
+    bitmap = bgra_bitmap.get();
 
     // 获取位图锁
     WICRect rect = {0, 0, static_cast<INT>(width), static_cast<INT>(height)};

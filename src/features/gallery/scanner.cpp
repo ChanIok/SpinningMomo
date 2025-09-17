@@ -1,5 +1,6 @@
 module;
 
+#include <wil/com.h>
 #include <xxhash.h>
 
 #include <format>
@@ -15,6 +16,8 @@ import Core.WorkerPool;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.Folder.Repository;
+import Features.Gallery.Ignore.Repository;
 import Features.Gallery.Ignore.Processor;
 import Utils.Image;
 import Utils.Logger;
@@ -45,11 +48,8 @@ auto calculate_file_hash(const std::filesystem::path& file_path)
   return std::format("{:016x}", hash);
 }
 
-// ============= 文件扫描 =============
-auto find_files(const std::filesystem::path& directory,
-                const std::vector<std::string>& supported_extensions, bool recursive,
-                const std::optional<Types::IgnoreContext>& ignore_context,
-                std::optional<std::int64_t> folder_id)
+auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& directory,
+                const Types::ScanOptions& options, std::optional<std::int64_t> folder_id)
     -> std::expected<std::vector<std::filesystem::path>, std::string> {
   if (!std::filesystem::exists(directory)) {
     return std::unexpected("Directory does not exist: " + directory.string());
@@ -60,65 +60,61 @@ auto find_files(const std::filesystem::path& directory,
   }
 
   try {
-    std::vector<std::filesystem::path> found_files;
+    // 构建ignore规则上下文，加载数据库中的规则
+    Types::IgnoreContext ignore_context;
 
-    if (recursive) {
-      for (const auto& entry : std::filesystem::recursive_directory_iterator(directory)) {
-        try {
-          if (entry.is_regular_file()) {
-            if (is_supported_file(entry.path(), supported_extensions)) {
-              // 应用忽略规则过滤
-              if (ignore_context.has_value()) {
-                if (Ignore::Processor::should_ignore_file(entry.path(), directory,
-                                                          ignore_context.value(), folder_id)) {
-                  Logger().debug("File ignored by rules: {}", entry.path().string());
-                  continue;  // 跳过被忽略的文件
-                }
-              }
+    // 加载全局规则
+    auto global_rules_result = Ignore::Repository::get_global_rules(app_state);
+    if (global_rules_result) {
+      ignore_context.global_rules = std::move(global_rules_result.value());
+    }
 
-              found_files.push_back(entry.path());
-            }
-          }
-        } catch (const std::filesystem::filesystem_error& e) {
-          // 跳过无法访问的文件，但不中断整个扫描
-          Logger().warn("Skipping file due to access error: {}", e.what());
-          continue;
-        }
-      }
-    } else {
-      for (const auto& entry : std::filesystem::directory_iterator(directory)) {
-        try {
-          if (entry.is_regular_file()) {
-            if (is_supported_file(entry.path(), supported_extensions)) {
-              // 应用忽略规则过滤
-              if (ignore_context.has_value()) {
-                if (Ignore::Processor::should_ignore_file(entry.path(), directory,
-                                                          ignore_context.value(), folder_id)) {
-                  Logger().debug("File ignored by rules: {}", entry.path().string());
-                  continue;  // 跳过被忽略的文件
-                }
-              }
-
-              found_files.push_back(entry.path());
-            }
-          }
-        } catch (const std::filesystem::filesystem_error& e) {
-          // 跳过无法访问的文件，但不中断整个扫描
-          Logger().warn("Skipping file due to access error: {}", e.what());
-          continue;
-        }
+    // 加载文件夹特定规则
+    if (folder_id.has_value()) {
+      auto folder_rules_result = Ignore::Repository::get_rules_by_folder_id(app_state, *folder_id);
+      if (folder_rules_result) {
+        ignore_context.folder_rules[folder_id.value()] = std::move(folder_rules_result.value());
       }
     }
+
+    // 使用递归目录迭代器和ranges管道进行函数式过滤和转换
+    auto found_files =
+        std::ranges::subrange(std::filesystem::recursive_directory_iterator(directory),
+                              std::filesystem::recursive_directory_iterator{}) |
+        std::views::filter([](const std::filesystem::directory_entry& entry) {
+          try {
+            return entry.is_regular_file();
+          } catch (const std::filesystem::filesystem_error& e) {
+            Logger().warn("Skipping file due to access error: {}", e.what());
+            return false;
+          }
+        }) |
+        std::views::filter([&options](const std::filesystem::directory_entry& entry) {
+          return is_supported_file(entry.path(), options.supported_extensions);
+        }) |
+        std::views::filter([&directory, &ignore_context,
+                            folder_id](const std::filesystem::directory_entry& entry) {
+          bool should_ignore = Ignore::Processor::should_ignore_file(entry.path(), directory,
+                                                                     ignore_context, folder_id);
+
+          if (should_ignore) {
+            Logger().debug("File ignored by rules: {}", entry.path().string());
+          }
+
+          return !should_ignore;
+        }) |
+        std::views::transform(
+            [](const std::filesystem::directory_entry& entry) { return entry.path(); }) |
+        std::ranges::to<std::vector>();
 
     return found_files;
 
   } catch (const std::filesystem::filesystem_error& e) {
     return std::unexpected("Filesystem error: " + std::string(e.what()));
   } catch (const std::exception& e) {
-    return std::unexpected("Exception in find_media_files: " + std::string(e.what()));
+    return std::unexpected("Exception in scan_paths: " + std::string(e.what()));
   }
 }
-
 auto is_supported_file(const std::filesystem::path& file_path,
                        const std::vector<std::string>& supported_extensions) -> bool {
   if (!file_path.has_extension()) {
@@ -164,17 +160,6 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   }
 
   return "unknown";
-}
-
-auto calculate_asset_relative_path(const std::filesystem::path& file_path,
-                                   const std::filesystem::path& base_directory) -> std::string {
-  try {
-    auto relative = std::filesystem::relative(file_path, base_directory);
-    return relative.string();
-  } catch (const std::filesystem::filesystem_error&) {
-    // 如果无法计算相对路径，返回文件名
-    return file_path.filename().string();
-  }
 }
 
 // ============= 资产信息提取 =============
@@ -227,105 +212,52 @@ auto extract_asset_info(Utils::Image::WICFactory& wic_factory,
   }
 }
 
-// ============= 多线程扫描 =============
-
-// 并行发现文件
-auto discover_files_parallel(Core::State::AppState& app_state,
-                             const std::vector<std::filesystem::path>& directories,
-                             const Types::ScanOptions& options)
+// 扫描目录中的文件信息
+auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::path& directory,
+                    const Types::ScanOptions& options, std::optional<std::int64_t> folder_id)
     -> std::expected<std::vector<Types::FileSystemInfo>, std::string> {
-  if (directories.empty()) {
-    return std::vector<Types::FileSystemInfo>{};
-  }
-
-  // 构建忽略规则上下文
-  Types::IgnoreContext ignore_context;
-  ignore_context.global_rules = options.ignore_rules;
-  // TODO: 这里可以添加文件夹特定规则的加载逻辑
-
-  // 使用latch等待所有目录扫描完成
-  std::latch completion_latch(directories.size());
-
-  // 线程安全的结果收集
-  std::vector<std::vector<Types::FileSystemInfo>> results(directories.size());
-
-  for (size_t i = 0; i < directories.size(); ++i) {
-    const auto& directory = directories[i];
-
-    bool submitted = Core::WorkerPool::submit_task(
-        *app_state.worker_pool,
-        [&results, i, &completion_latch, directory, &options, &ignore_context]() {
-          // 使用支持忽略规则的find_files版本
-          auto files_result = find_files(directory, options.supported_extensions, options.recursive,
-                                         ignore_context, std::nullopt);
-          if (!files_result) {
-            Logger().error("Failed to scan directory {}: {}", directory.string(),
+  auto files_result = scan_paths(app_state, directory, options, folder_id);
+  if (!files_result) {
+    return std::unexpected("Failed to scan directory " + directory.string() + ": " +
                            files_result.error());
-            completion_latch.count_down();
-            return;
-          }
-
-          auto found_files = std::move(*files_result);
-          results[i].reserve(found_files.size());
-
-          for (const auto& file_path : found_files) {
-            if (!is_file_accessible(file_path)) {
-              continue;
-            }
-
-            // 使用 error_code 避免异常
-            std::error_code ec;
-            auto file_size = std::filesystem::file_size(file_path, ec);
-            if (ec) continue;
-
-            auto last_write_time = std::filesystem::last_write_time(file_path, ec);
-            if (ec) continue;
-            Types::FileSystemInfo info;
-            info.filepath = file_path;
-            info.size = static_cast<int64_t>(file_size);
-            info.last_write_time = last_write_time;
-            info.last_modified_str =
-                std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
-
-            results[i].push_back(std::move(info));
-          }
-
-          completion_latch.count_down();
-        });
-
-    if (!submitted) {
-      return std::unexpected("Failed to submit directory scan task to worker pool");
-    }
   }
 
-  // 优雅地等待所有任务完成，无CPU浪费
-  completion_latch.wait();
+  auto found_files = std::move(files_result.value());
+  std::vector<Types::FileSystemInfo> result;
+  result.reserve(found_files.size());
 
-  // 合并结果
-  std::vector<Types::FileSystemInfo> all_files;
-  size_t total_size = 0;
-  for (const auto& result : results) {
-    total_size += result.size();
+  for (const auto& file_path : found_files) {
+    std::error_code ec;
+    auto file_size = std::filesystem::file_size(file_path, ec);
+    if (ec) continue;
+
+    auto last_write_time = std::filesystem::last_write_time(file_path, ec);
+    if (ec) continue;
+
+    Types::FileSystemInfo info{
+        .filepath = file_path,
+        .size = static_cast<int64_t>(file_size),
+        .last_write_time = last_write_time,
+        .last_modified_str =
+            std::format("{:%Y-%m-%d %H:%M:%S}",
+                        std::chrono::clock_cast<std::chrono::system_clock>(last_write_time)),
+        .hash = ""};
+
+    result.push_back(std::move(info));
   }
-  all_files.reserve(total_size);
 
-  for (auto& result : results) {
-    all_files.insert(all_files.end(), std::make_move_iterator(result.begin()),
-                     std::make_move_iterator(result.end()));
-  }
-
-  Logger().info("Discovered {} files with ignore rules applied", all_files.size());
-  return all_files;
+  Logger().info("Scanned {} files with ignore rules applied", result.size());
+  return result;
 }
 
 // 分析文件变化
-auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& discovered_files,
-                          const Types::Cache& asset_cache)
+auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
+                          const std::unordered_map<std::string, Types::Metadata>& asset_cache)
     -> std::vector<Types::FileAnalysisResult> {
   std::vector<Types::FileAnalysisResult> results;
-  results.reserve(discovered_files.size());
+  results.reserve(file_infos.size());
 
-  for (const auto& file_info : discovered_files) {
+  for (const auto& file_info : file_infos) {
     Types::FileAnalysisResult analysis;
     analysis.file_info = file_info;
 
@@ -399,7 +331,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
 
             auto hash_result = calculate_file_hash(file_path);
             if (hash_result) {
-              batch_hashes.emplace_back(idx, *hash_result);
+              batch_hashes.emplace_back(idx, hash_result.value());
             } else {
               Logger().warn("Failed to calculate hash for {}: {}", file_path.string(),
                             hash_result.error());
@@ -430,8 +362,8 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
     analysis.file_info.hash = hash;
 
     if (analysis.status == Types::FileStatus::NEEDS_HASH_CHECK) {
-      if (analysis.existing_metadata && analysis.existing_metadata->hash &&
-          analysis.existing_metadata->hash.value() == hash) {
+      if (analysis.existing_metadata && !analysis.existing_metadata->hash.empty() &&
+          analysis.existing_metadata->hash == hash) {
         analysis.status = Types::FileStatus::UNCHANGED;
       } else {
         analysis.status = Types::FileStatus::MODIFIED;
@@ -471,16 +403,17 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
     bool submitted = Core::WorkerPool::submit_task(
         *app_state.worker_pool, [&final_result, &results_mutex, &completion_latch, &app_state,
                                  &files_to_process, start, end, &options]() {
-          // 每个工作批次需要自己的WIC工厂
-          auto thread_wic_factory = Utils::Image::create_factory();
-          if (!thread_wic_factory) {
+          auto thread_wic_factory_result = Utils::Image::get_thread_wic_factory();
+          if (!thread_wic_factory_result) {
             {
               std::lock_guard<std::mutex> lock(results_mutex);
-              final_result.errors.push_back("Failed to create WIC factory in worker thread");
+              final_result.errors.push_back("Failed to get thread WIC factory: " +
+                                            thread_wic_factory_result.error());
             }
             completion_latch.count_down();
             return;
           }
+          auto thread_wic_factory = std::move(thread_wic_factory_result.value());
 
           // 本批次的结果
           Types::ProcessingBatchResult batch_result;
@@ -489,12 +422,12 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
             const auto& analysis = files_to_process[idx];
 
             auto asset_result =
-                process_single_file_optimized(app_state, *thread_wic_factory, analysis, options);
+                process_single_file_optimized(app_state, thread_wic_factory, analysis, options);
             if (asset_result) {
               if (analysis.status == Types::FileStatus::NEW) {
-                batch_result.new_assets.push_back(std::move(*asset_result));
+                batch_result.new_assets.push_back(std::move(asset_result.value()));
               } else if (analysis.status == Types::FileStatus::MODIFIED) {
-                batch_result.updated_assets.push_back(std::move(*asset_result));
+                batch_result.updated_assets.push_back(std::move(asset_result.value()));
               }
             } else {
               batch_result.errors.push_back(std::format(
@@ -553,10 +486,9 @@ auto process_single_file_optimized(Core::State::AppState& app_state,
 
   asset.name = file_path.filename().string();
   asset.filepath = file_path.string();
-  asset.relative_path = file_path.filename().string();  // 简化
   asset.type = asset_type;
   asset.size = file_info.size;
-  asset.hash = file_info.hash.value_or("");
+  asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
   asset.created_at = file_info.last_modified_str;
   asset.updated_at = file_info.last_modified_str;
 
@@ -578,8 +510,8 @@ auto process_single_file_optimized(Core::State::AppState& app_state,
     // 生成缩略图（如果需要）
     if (options.generate_thumbnails) {
       auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
-          app_state, wic_factory, file_path, file_info.hash.value_or(""),
-          options.thumbnail_max_width, options.thumbnail_max_height);
+          app_state, wic_factory, file_path, file_info.hash, options.thumbnail_max_width,
+          options.thumbnail_max_height);
 
       if (!thumbnail_result) {
         Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
@@ -600,39 +532,57 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     -> std::expected<Types::ScanResult, std::string> {
   auto start_time = std::chrono::steady_clock::now();
 
-  Logger().info("Starting folder-aware asset scan with {} directories and {} ignore rules",
-                options.directories.size(), options.ignore_rules.size());
+  Logger().info("Starting folder-aware asset scan for directory '{}' with {} ignore rules",
+                options.directory, options.ignore_rules.size());
 
-  // 加载资产缓存
+  // 1. 确保文件夹记录存在
+  auto folder_id_result =
+      Folder::Repository::get_or_create_folder_for_path(app_state, options.directory);
+  if (!folder_id_result) {
+    return std::unexpected("Failed to create folder record: " + folder_id_result.error());
+  }
+  std::int64_t folder_id = folder_id_result.value();
+
+  // 2. 持久化前端提供的ignore规则
+  if (!options.ignore_rules.empty()) {
+    auto persist_result =
+        Ignore::Repository::batch_create_ignore_rules(app_state, folder_id, options.ignore_rules);
+    if (!persist_result) {
+      Logger().warn("Failed to persist ignore rules: {}", persist_result.error());
+    } else {
+      Logger().info("Persisted {} new ignore rules for folder_id {}", persist_result.value().size(),
+                    folder_id);
+    }
+  }
+
+  // 3. 加载资产缓存
   auto asset_cache_result = Asset::Repository::load_asset_cache(app_state);
   if (!asset_cache_result) {
     return std::unexpected("Failed to load asset cache: " + asset_cache_result.error());
   }
-  auto asset_cache = std::move(*asset_cache_result);
+  auto asset_cache = std::move(asset_cache_result.value());
 
-  // 转换目录路径
-  std::vector<std::filesystem::path> directories;
-  for (const auto& dir_str : options.directories) {
-    directories.emplace_back(dir_str);
+  std::filesystem::path directory(options.directory);
+
+  // 4. 使用支持忽略规则的文件信息扫描（传递folder_id）
+  auto file_info_result = scan_file_info(app_state, directory, options, folder_id);
+  if (!file_info_result) {
+    return std::unexpected("File info scanning failed: " + file_info_result.error());
   }
+  auto file_infos = file_info_result.value();
 
-  // 使用支持忽略规则的并行发现文件
-  auto discovered_files_result = discover_files_parallel(app_state, directories, options);
-  if (!discovered_files_result) {
-    return std::unexpected("File discovery failed: " + discovered_files_result.error());
-  }
-  auto discovered_files = discovered_files_result.value();
-
-  Logger().info("Discovered {} files across {} directories (after ignore rules)",
-                discovered_files.size(), directories.size());
+  Logger().info("Scanned {} files in directory '{}' (after ignore rules)", file_infos.size(),
+                options.directory);
 
   // 分析文件变化
-  auto analysis_results = analyze_file_changes(discovered_files, asset_cache);
+  auto analysis_results = analyze_file_changes(file_infos, asset_cache);
 
   // 计算文件哈希
   if (auto hash_phase = calculate_hash_for_targets(app_state, analysis_results); !hash_phase) {
     return std::unexpected("Hash calculation failed: " + hash_phase.error());
   }
+
+  Logger().info("Calculated hashes for {} files", analysis_results.size());
 
   // 筛选需要处理的文件
   std::vector<Types::FileAnalysisResult> files_to_process;
@@ -647,7 +597,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   if (files_to_process.empty()) {
     // 无需处理文件
     Types::ScanResult result;
-    result.total_files = static_cast<int>(discovered_files.size());
+    result.total_files = static_cast<int>(file_infos.size());
     result.new_items = 0;
     result.updated_items = 0;
     result.deleted_items = 0;
@@ -702,7 +652,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
   // 构建扫描结果
   Types::ScanResult result;
-  result.total_files = static_cast<int>(discovered_files.size());
+  result.total_files = static_cast<int>(file_infos.size());
   result.new_items = static_cast<int>(batch_result.new_assets.size());
   result.updated_items = static_cast<int>(batch_result.updated_assets.size());
   result.deleted_items = 0;

@@ -69,28 +69,20 @@ auto handle_delete_asset(Core::State::AppState& app_state,
 
 // ============= 扫描和索引 RPC 处理函数 =============
 
-auto handle_scan_asset(Core::State::AppState& app_state,
-                       const Features::Gallery::Types::ScanParams& params)
+auto handle_scan_directory(Core::State::AppState& app_state,
+                           const Features::Gallery::Types::ScanParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::ScanResult>> {
-  // 转换ScanParams为ScanOptions
-  Features::Gallery::Types::ScanOptions options;
+   Features::Gallery::Types::ScanOptions options{
+      .directory = params.directory,
+      .generate_thumbnails = params.generate_thumbnails,
+      .thumbnail_max_width = params.thumbnail_max_width,
+      .thumbnail_max_height = params.thumbnail_max_height,
+      .supported_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"},
+      .ignore_rules = params.ignore_rules,
+      .create_folder_records = params.create_folder_records,
+      .update_folder_counts = params.update_folder_counts};
 
-  // 基础扫描参数
-  options.directories = params.directories;
-  options.recursive = params.recursive.value_or(true);
-  options.generate_thumbnails = params.generate_thumbnails.value_or(true);
-  options.thumbnail_max_width = params.thumbnail_max_width.value_or(400);
-  options.thumbnail_max_height = params.thumbnail_max_height.value_or(400);
-
-  // 忽略规则参数
-  options.ignore_rules =
-      params.ignore_rules.value_or(std::vector<Features::Gallery::Types::IgnoreRule>{});
-
-  // 文件夹功能参数
-  options.create_folder_records = params.create_folder_records.value_or(true);
-  options.update_folder_counts = params.update_folder_counts.value_or(true);
-
-  auto result = Features::Gallery::scan_directories(app_state, options);
+  auto result = Features::Gallery::scan_directory(app_state, options);
 
   if (!result) {
     co_return std::unexpected(
@@ -187,8 +179,8 @@ auto register_all(Core::State::AppState& app_state) -> void {
   // 扫描和索引
   Core::RPC::register_method<Features::Gallery::Types::ScanParams,
                              Features::Gallery::Types::ScanResult>(
-      app_state, app_state.rpc->registry, "gallery.scan", handle_scan_asset,
-      "Scan directories for asset files and add them to the library. Supports ignore rules and "
+      app_state, app_state.rpc->registry, "gallery.scan", handle_scan_directory,
+      "Scan directory for asset files and add them to the library. Supports ignore rules and "
       "folder management.");
 
   // 缩略图操作

@@ -45,6 +45,7 @@ Thumbs.db
 
 third_party/
 test/
+playground/
 
 # AI
 .windsurfrules

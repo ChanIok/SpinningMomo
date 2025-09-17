@@ -68,7 +68,8 @@ auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old 
     -> std::expected<int, std::string>;
 
 // 加载数据库中的资产到内存缓存
-auto load_asset_cache(Core::State::AppState& app_state) -> std::expected<Types::Cache, std::string>;
+auto load_asset_cache(Core::State::AppState& app_state)
+    -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;
 
 // 构建 WHERE 子句和参数（内部辅助函数）
 struct AssetQueryBuilder {

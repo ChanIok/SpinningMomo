@@ -129,28 +129,19 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
 
 // ============= 扫描和索引 =============
 
-auto scan_directories(Core::State::AppState& app_state, const Types::ScanOptions& options)
+auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options)
     -> std::expected<Types::ScanResult, std::string> {
-  try {
-    Logger().info("Starting asset scan with {} directories and {} ignore rules",
-                  options.directories.size(), options.ignore_rules.size());
-
-    // 执行扫描
-    auto scan_result = Scanner::scan_asset_directory(app_state, options);
-    if (!scan_result) {
-      Logger().error("Asset scan failed: {}", scan_result.error());
-      return std::unexpected("Asset scan failed: " + scan_result.error());
-    }
-
-    auto result = scan_result.value();
-    Logger().info("Asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}",
-                  result.total_files, result.new_items, result.updated_items, result.errors.size());
-
-    return result;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in scan_directories: " + std::string(e.what()));
+  auto scan_result = Scanner::scan_asset_directory(app_state, options);
+  if (!scan_result) {
+    Logger().error("Asset scan failed: {}", scan_result.error());
+    return std::unexpected("Asset scan failed: " + scan_result.error());
   }
+
+  auto result = scan_result.value();
+  Logger().info("Asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}",
+                result.total_files, result.new_items, result.updated_items, result.errors.size());
+
+  return result;
 }
 
 auto cleanup_thumbnails(Core::State::AppState& app_state)
@@ -236,18 +227,6 @@ auto cleanup_deleted_assets(Core::State::AppState& app_state, int days_old)
   } catch (const std::exception& e) {
     return std::unexpected("Exception in cleanup_deleted_items: " + std::string(e.what()));
   }
-}
-
-// ============= 配置管理 =============
-
-auto get_default_asset_scan_options() -> Types::ScanOptions {
-  Types::ScanOptions options;
-  options.recursive = true;
-  options.generate_thumbnails = true;
-  options.thumbnail_max_width = 400;
-  options.thumbnail_max_height = 400;
-  options.supported_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"};
-  return options;
 }
 
 }  // namespace Features::Gallery

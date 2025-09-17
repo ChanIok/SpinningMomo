@@ -25,7 +25,7 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
 // ============= 扫描和索引 =============
 
 // 扫描资产目录并建立索引（支持文件夹和忽略规则）
-auto scan_directories(Core::State::AppState& app_state, const Types::ScanOptions& options)
+auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options)
     -> std::expected<Types::ScanResult, std::string>;
 
 // ============= 缩略图管理 =============
@@ -49,10 +49,5 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
 // 数据库维护：清理软删除的记录
 auto cleanup_deleted_assets(Core::State::AppState& app_state, int days_old = 30)
     -> std::expected<Types::OperationResult, std::string>;
-
-// ============= 配置管理 =============
-
-// 获取默认扫描选项
-auto get_default_asset_scan_options() -> Types::ScanOptions;
 
 }  // namespace Features::Gallery

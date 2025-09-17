@@ -12,7 +12,6 @@ struct Asset {
   std::int64_t id;
   std::string name;
   std::string filepath;
-  std::string relative_path;
   std::string type;  // photo, video, live_photo, unknown
 
   std::optional<std::int32_t> width;
@@ -46,7 +45,7 @@ struct IgnoreRule {
   std::string rule_pattern;
   std::string pattern_type = "glob";
   std::string rule_type = "exclude";
-  bool is_enabled = true;
+  int is_enabled = 1;
   std::optional<std::string> description;
   std::string created_at;
   std::string updated_at;
@@ -63,11 +62,11 @@ struct Info {
 };
 
 struct Stats {
-  int total_count;
-  int photo_count;
-  int video_count;
-  int live_photo_count;
-  std::int64_t total_size;
+  int total_count = 0;
+  int photo_count = 0;
+  int video_count = 0;
+  int live_photo_count = 0;
+  std::int64_t total_size = 0;
   std::string oldest_item_date;
   std::string newest_item_date;
 };
@@ -91,15 +90,22 @@ struct IgnoreContext {
 
 // ============= 扫描相关类型 =============
 
+// 轻量级的忽略规则（用于前端请求）
+struct ScanIgnoreRule {
+  std::string pattern;                     // 模式字符串，如 "*.tmp", "node_modules/**"
+  std::string pattern_type = "glob";       // "glob" 或 "regex"
+  std::string rule_type = "exclude";       // "exclude" 或 "include"
+  std::optional<std::string> description;  // 可选的描述
+};
+
 struct ScanOptions {
-  std::vector<std::string> directories;
-  bool recursive = true;
+  std::string directory;
   bool generate_thumbnails = true;
   std::uint32_t thumbnail_max_width = 400;
   std::uint32_t thumbnail_max_height = 400;
   std::vector<std::string> supported_extensions = {".jpg",  ".jpeg", ".png", ".bmp",
                                                    ".webp", ".tiff", ".tif"};
-  std::vector<IgnoreRule> ignore_rules;
+  std::vector<ScanIgnoreRule> ignore_rules;
   bool create_folder_records = true;
   bool update_folder_counts = true;
 };
@@ -120,7 +126,7 @@ struct Metadata {
   std::string filepath;
   int64_t size;
   std::string last_modified;
-  std::optional<std::string> hash;
+  std::string hash;
 };
 
 struct FileSystemInfo {
@@ -128,7 +134,7 @@ struct FileSystemInfo {
   int64_t size;
   std::filesystem::file_time_type last_write_time;
   std::string last_modified_str;
-  std::optional<std::string> hash;
+  std::string hash;
 };
 
 struct FileAnalysisResult {
@@ -143,8 +149,6 @@ struct ProcessingBatchResult {
   std::vector<std::string> generated_thumbnails;
   std::vector<std::string> errors;
 };
-
-using Cache = std::unordered_map<std::string, Metadata>;
 
 // ============= RPC参数类型 =============
 
@@ -170,14 +174,13 @@ struct GetParams {
 };
 
 struct ScanParams {
-  std::vector<std::string> directories;
-  std::optional<bool> recursive = true;
-  std::optional<bool> generate_thumbnails = true;
-  std::optional<std::uint32_t> thumbnail_max_width = 400;
-  std::optional<std::uint32_t> thumbnail_max_height = 400;
-  std::optional<std::vector<IgnoreRule>> ignore_rules;
-  std::optional<bool> create_folder_records = true;
-  std::optional<bool> update_folder_counts = true;
+  std::string directory;
+  bool generate_thumbnails = true;
+  std::uint32_t thumbnail_max_width = 400;
+  std::uint32_t thumbnail_max_height = 400;
+  std::vector<ScanIgnoreRule> ignore_rules;
+  bool create_folder_records = true;
+  bool update_folder_counts = true;
 };
 
 struct GetThumbnailParams {
