@@ -14,7 +14,7 @@ namespace Core::Database::Migration {
 
 const std::vector<MigrationScript> all_migrations = {
     {1,
-     "创建所有初始表（assets、folders、tags、asset_tags）",
+     "Initialize database",
      {
          R"(
                 CREATE TABLE assets (
@@ -23,7 +23,6 @@ const std::vector<MigrationScript> all_migrations = {
                     path TEXT NOT NULL UNIQUE,
                     type TEXT NOT NULL CHECK (type IN ('photo', 'video', 'live_photo', 'unknown')),
                     
-                    -- 基本信息
                     width INTEGER,
                     height INTEGER,
                     size INTEGER,
@@ -31,7 +30,6 @@ const std::vector<MigrationScript> all_migrations = {
                     hash TEXT,
                     folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
                     
-                    -- 时间信息
                     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     deleted_at TEXT
@@ -85,7 +83,33 @@ const std::vector<MigrationScript> all_migrations = {
                 );
                 )",
          "CREATE INDEX idx_tags_parent_sort ON tags(parent_id, sort_order);",
-         "CREATE INDEX idx_asset_tags_tag ON asset_tags(tag_id);"}}
+         "CREATE INDEX idx_asset_tags_tag ON asset_tags(tag_id);",
+         R"(
+                CREATE TABLE ignore_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    
+                    -- 如果为 NULL，表示这是一个全局规则
+                    -- 如果有值，它将关联到 folders 表中的一个根目录 (即 parent_id IS NULL 的记录)
+                    folder_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
+                    
+                    -- 规则模式，可以是 glob 或正则表达式
+                    rule_pattern TEXT NOT NULL,
+                    
+                    -- 规则的类型，'glob' 类似于 .gitignore, 'regex' 则是标准的正则表达式
+                    pattern_type TEXT NOT NULL CHECK (pattern_type IN ('glob', 'regex')) DEFAULT 'glob',
+                    
+                    rule_type TEXT NOT NULL CHECK (rule_type IN ('exclude', 'include')) DEFAULT 'exclude',
+                    is_enabled BOOLEAN NOT NULL DEFAULT 1,
+                    description TEXT,
+                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    
+                    UNIQUE(folder_id, rule_pattern)
+                );
+                )",
+         "CREATE INDEX idx_ignore_rules_folder_id ON ignore_rules(folder_id);",
+         "CREATE INDEX idx_ignore_rules_enabled ON ignore_rules(is_enabled);",
+         "CREATE INDEX idx_ignore_rules_pattern_type ON ignore_rules(pattern_type);"}}
     // 添加新迁移时，只需要在这里加新的 MigrationScript 即可
 };
 

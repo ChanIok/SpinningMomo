@@ -9,6 +9,7 @@ import Core.RPC.Endpoints.File;
 import Core.RPC.Endpoints.Settings;
 import Core.RPC.Endpoints.Updater;
 import Core.RPC.Endpoints.WebView;
+import Core.RPC.Endpoints.Gallery;
 import Utils.Logger;
 
 namespace Core::RPC::Registry {
@@ -31,6 +32,9 @@ export auto register_all_endpoints(Core::State::AppState& state) -> void {
 
   // 注册Webview端点
   Endpoints::WebView::register_all(state);
+
+  // 注册Gallery端点
+  Endpoints::Gallery::register_all(state);
 
   Logger().info("RPC endpoints registration completed");
 }

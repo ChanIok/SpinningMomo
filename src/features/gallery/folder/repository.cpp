@@ -1,0 +1,301 @@
+module;
+
+#include <rfl.hpp>
+
+module Features.Gallery.Folder.Repository;
+
+import std;
+import Core.State;
+import Core.Database;
+import Core.Database.Types;
+import Features.Gallery.Types;
+import Utils.Logger;
+
+namespace Features::Gallery::Folder::Repository {
+
+// ============= 基础CRUD操作 =============
+
+auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder)
+    -> std::expected<std::int64_t, std::string> {
+  std::string sql = R"(
+            INSERT INTO folders (
+                path, parent_id, name, display_name, 
+                sort_order, asset_count, is_hidden,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        )";
+
+  std::vector<Core::Database::Types::DbParam> params;
+  params.push_back(folder.path);
+
+  // 处理 optional parent_id
+  params.push_back(folder.parent_id.has_value()
+                       ? Core::Database::Types::DbParam{folder.parent_id.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(folder.name);
+
+  // 处理 optional display_name
+  params.push_back(folder.display_name.has_value()
+                       ? Core::Database::Types::DbParam{folder.display_name.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(static_cast<int64_t>(folder.sort_order));
+  params.push_back(static_cast<int64_t>(folder.asset_count));
+  params.push_back(folder.is_hidden);
+  params.push_back(folder.created_at);
+  params.push_back(folder.updated_at);
+
+  auto result = Core::Database::execute(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to insert folder: " + result.error());
+  }
+
+  // 获取插入的 ID
+  auto id_result =
+      Core::Database::query_scalar<int64_t>(*app_state.database, "SELECT last_insert_rowid()");
+  if (!id_result) {
+    return std::unexpected("Failed to get inserted folder ID: " + id_result.error());
+  }
+
+  return id_result->value_or(0);
+}
+
+auto get_folder_by_path(Core::State::AppState& app_state, const std::string& path)
+    -> std::expected<std::optional<Types::Folder>, std::string> {
+  std::string sql = R"(
+            SELECT id, path, parent_id, name, display_name, 
+                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   created_at, updated_at
+            FROM folders
+            WHERE path = ?
+        )";
+
+  std::vector<Core::Database::Types::DbParam> params = {path};
+
+  auto result = Core::Database::query_single<Types::Folder>(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to query folder by path: " + result.error());
+  }
+
+  return result.value();
+}
+
+auto get_folder_by_id(Core::State::AppState& app_state, std::int64_t id)
+    -> std::expected<std::optional<Types::Folder>, std::string> {
+  std::string sql = R"(
+            SELECT id, path, parent_id, name, display_name, 
+                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   created_at, updated_at
+            FROM folders
+            WHERE id = ?
+        )";
+
+  std::vector<Core::Database::Types::DbParam> params = {id};
+
+  auto result = Core::Database::query_single<Types::Folder>(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to query folder by id: " + result.error());
+  }
+
+  return result.value();
+}
+
+auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder)
+    -> std::expected<void, std::string> {
+  std::string sql = R"(
+            UPDATE folders SET
+                path = ?, parent_id = ?, name = ?, display_name = ?,
+                cover_asset_id = ?, sort_order = ?, asset_count = ?, is_hidden = ?,
+                updated_at = ?
+            WHERE id = ?
+        )";
+
+  std::vector<Core::Database::Types::DbParam> params;
+  params.push_back(folder.path);
+
+  // 处理 optional parent_id
+  params.push_back(folder.parent_id.has_value()
+                       ? Core::Database::Types::DbParam{folder.parent_id.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(folder.name);
+
+  // 处理 optional display_name
+  params.push_back(folder.display_name.has_value()
+                       ? Core::Database::Types::DbParam{folder.display_name.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  // 处理 optional cover_asset_id
+  params.push_back(folder.cover_asset_id.has_value()
+                       ? Core::Database::Types::DbParam{folder.cover_asset_id.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(static_cast<int64_t>(folder.sort_order));
+  params.push_back(static_cast<int64_t>(folder.asset_count));
+  params.push_back(folder.is_hidden);
+  params.push_back(folder.updated_at);
+  params.push_back(folder.id);
+
+  auto result = Core::Database::execute(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to update folder: " + result.error());
+  }
+
+  return {};
+}
+
+auto delete_folder(Core::State::AppState& app_state, std::int64_t id)
+    -> std::expected<void, std::string> {
+  // 暂时实现硬删除，实际项目中可能需要考虑级联删除等问题
+  std::string sql = "DELETE FROM folders WHERE id = ?";
+  std::vector<Core::Database::Types::DbParam> params = {id};
+
+  auto result = Core::Database::execute(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to delete folder: " + result.error());
+  }
+
+  return {};
+}
+
+// ============= 层次结构操作 =============
+
+auto list_all_folders(Core::State::AppState& app_state)
+    -> std::expected<std::vector<Types::Folder>, std::string> {
+  std::string sql = R"(
+            SELECT id, path, parent_id, name, display_name, 
+                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   created_at, updated_at
+            FROM folders
+            ORDER BY path
+        )";
+
+  auto result = Core::Database::query<Types::Folder>(*app_state.database, sql);
+  if (!result) {
+    return std::unexpected("Failed to list all folders: " + result.error());
+  }
+
+  return result.value();
+}
+
+auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int64_t> parent_id)
+    -> std::expected<std::vector<Types::Folder>, std::string> {
+  std::string sql;
+  std::vector<Core::Database::Types::DbParam> params;
+
+  if (parent_id.has_value()) {
+    sql = R"(
+            SELECT id, path, parent_id, name, display_name, 
+                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   created_at, updated_at
+            FROM folders
+            WHERE parent_id = ?
+            ORDER BY sort_order, name
+        )";
+    params.push_back(parent_id.value());
+  } else {
+    // 获取根文件夹（parent_id 为 NULL）
+    sql = R"(
+            SELECT id, path, parent_id, name, display_name, 
+                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   created_at, updated_at
+            FROM folders
+            WHERE parent_id IS NULL
+            ORDER BY sort_order, name
+        )";
+  }
+
+  auto result = Core::Database::query<Types::Folder>(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to get child folders: " + result.error());
+  }
+
+  return result.value();
+}
+
+auto update_folder_asset_count(Core::State::AppState& app_state, std::int64_t folder_id, int count)
+    -> std::expected<void, std::string> {
+  std::string timestamp = std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
+  std::string sql = "UPDATE folders SET asset_count = ?, updated_at = ? WHERE id = ?";
+
+  std::vector<Core::Database::Types::DbParam> params = {static_cast<int64_t>(count), timestamp,
+                                                        folder_id};
+
+  auto result = Core::Database::execute(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to update folder asset count: " + result.error());
+  }
+
+  return {};
+}
+
+auto recalculate_folder_asset_count(Core::State::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<int, std::string> {
+  std::string sql = "SELECT COUNT(*) FROM assets WHERE folder_id = ? AND deleted_at IS NULL";
+  std::vector<Core::Database::Types::DbParam> params = {folder_id};
+
+  auto count_result = Core::Database::query_scalar<int>(*app_state.database, sql, params);
+  if (!count_result) {
+    return std::unexpected("Failed to count assets in folder: " + count_result.error());
+  }
+
+  int asset_count = count_result->value_or(0);
+
+  // 更新文件夹的资产计数
+  auto update_result = update_folder_asset_count(app_state, folder_id, asset_count);
+  if (!update_result) {
+    return std::unexpected("Failed to update folder asset count: " + update_result.error());
+  }
+
+  return asset_count;
+}
+
+// ============= 辅助函数 =============
+
+auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::string& path)
+    -> std::expected<std::int64_t, std::string> {
+  // 首先尝试查找现有文件夹
+  auto existing_result = get_folder_by_path(app_state, path);
+  if (!existing_result) {
+    return std::unexpected("Failed to query existing folder: " + existing_result.error());
+  }
+
+  if (existing_result->has_value()) {
+    // 文件夹已存在，返回ID
+    return existing_result->value().id;
+  }
+
+  // 文件夹不存在，需要创建
+  std::filesystem::path fs_path(path);
+  std::string folder_name = fs_path.filename().string();
+  std::string timestamp = std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
+
+  Types::Folder new_folder;
+  new_folder.id = 0;  // 将由数据库生成
+  new_folder.path = path;
+  new_folder.name = folder_name;
+  new_folder.created_at = timestamp;
+  new_folder.updated_at = timestamp;
+
+  // 处理父文件夹关系
+  auto parent_path = fs_path.parent_path();
+  if (!parent_path.empty() && parent_path != fs_path.root_path()) {
+    auto parent_result = get_or_create_folder_for_path(app_state, parent_path.string());
+    if (!parent_result) {
+      return std::unexpected("Failed to create parent folder: " + parent_result.error());
+    }
+    new_folder.parent_id = parent_result.value();
+  }
+
+  // 创建文件夹记录
+  auto create_result = create_folder(app_state, new_folder);
+  if (!create_result) {
+    return std::unexpected("Failed to create folder record: " + create_result.error());
+  }
+
+  Logger().debug("Created folder record for path '{}' with ID {}", path, create_result.value());
+  return create_result.value();
+}
+
+}  // namespace Features::Gallery::Folder::Repository

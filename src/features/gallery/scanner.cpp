@@ -15,6 +15,7 @@ import Core.WorkerPool;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.Ignore.Processor;
 import Utils.Image;
 import Utils.Logger;
 
@@ -45,9 +46,10 @@ auto calculate_file_hash(const std::filesystem::path& file_path)
 }
 
 // ============= 文件扫描 =============
-
 auto find_files(const std::filesystem::path& directory,
-                const std::vector<std::string>& supported_extensions, bool recursive)
+                const std::vector<std::string>& supported_extensions, bool recursive,
+                const std::optional<Types::IgnoreContext>& ignore_context,
+                std::optional<std::int64_t> folder_id)
     -> std::expected<std::vector<std::filesystem::path>, std::string> {
   if (!std::filesystem::exists(directory)) {
     return std::unexpected("Directory does not exist: " + directory.string());
@@ -65,6 +67,15 @@ auto find_files(const std::filesystem::path& directory,
         try {
           if (entry.is_regular_file()) {
             if (is_supported_file(entry.path(), supported_extensions)) {
+              // 应用忽略规则过滤
+              if (ignore_context.has_value()) {
+                if (Ignore::Processor::should_ignore_file(entry.path(), directory,
+                                                          ignore_context.value(), folder_id)) {
+                  Logger().debug("File ignored by rules: {}", entry.path().string());
+                  continue;  // 跳过被忽略的文件
+                }
+              }
+
               found_files.push_back(entry.path());
             }
           }
@@ -79,6 +90,15 @@ auto find_files(const std::filesystem::path& directory,
         try {
           if (entry.is_regular_file()) {
             if (is_supported_file(entry.path(), supported_extensions)) {
+              // 应用忽略规则过滤
+              if (ignore_context.has_value()) {
+                if (Ignore::Processor::should_ignore_file(entry.path(), directory,
+                                                          ignore_context.value(), folder_id)) {
+                  Logger().debug("File ignored by rules: {}", entry.path().string());
+                  continue;  // 跳过被忽略的文件
+                }
+              }
+
               found_files.push_back(entry.path());
             }
           }
@@ -218,6 +238,11 @@ auto discover_files_parallel(Core::State::AppState& app_state,
     return std::vector<Types::FileSystemInfo>{};
   }
 
+  // 构建忽略规则上下文
+  Types::IgnoreContext ignore_context;
+  ignore_context.global_rules = options.ignore_rules;
+  // TODO: 这里可以添加文件夹特定规则的加载逻辑
+
   // 使用latch等待所有目录扫描完成
   std::latch completion_latch(directories.size());
 
@@ -227,43 +252,46 @@ auto discover_files_parallel(Core::State::AppState& app_state,
   for (size_t i = 0; i < directories.size(); ++i) {
     const auto& directory = directories[i];
 
-    bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&results, i,
-                                                                            &completion_latch,
-                                                                            directory, &options]() {
-      auto files_result = find_files(directory, options.supported_extensions, options.recursive);
-      if (!files_result) {
-        Logger().error("Failed to scan directory {}: {}", directory.string(), files_result.error());
-        completion_latch.count_down();
-        return;
-      }
+    bool submitted = Core::WorkerPool::submit_task(
+        *app_state.worker_pool,
+        [&results, i, &completion_latch, directory, &options, &ignore_context]() {
+          // 使用支持忽略规则的find_files版本
+          auto files_result = find_files(directory, options.supported_extensions, options.recursive,
+                                         ignore_context, std::nullopt);
+          if (!files_result) {
+            Logger().error("Failed to scan directory {}: {}", directory.string(),
+                           files_result.error());
+            completion_latch.count_down();
+            return;
+          }
 
-      auto found_files = std::move(*files_result);
-      results[i].reserve(found_files.size());
+          auto found_files = std::move(*files_result);
+          results[i].reserve(found_files.size());
 
-      for (const auto& file_path : found_files) {
-        if (!is_file_accessible(file_path)) {
-          continue;
-        }
+          for (const auto& file_path : found_files) {
+            if (!is_file_accessible(file_path)) {
+              continue;
+            }
 
-        // 使用 error_code 避免异常
-        std::error_code ec;
-        auto file_size = std::filesystem::file_size(file_path, ec);
-        if (ec) continue;
+            // 使用 error_code 避免异常
+            std::error_code ec;
+            auto file_size = std::filesystem::file_size(file_path, ec);
+            if (ec) continue;
 
-        auto last_write_time = std::filesystem::last_write_time(file_path, ec);
-        if (ec) continue;
-        Types::FileSystemInfo info;
-        info.filepath = file_path;
-        info.size = static_cast<int64_t>(file_size);
-        info.last_write_time = last_write_time;
-        info.last_modified_str =
-            std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
+            auto last_write_time = std::filesystem::last_write_time(file_path, ec);
+            if (ec) continue;
+            Types::FileSystemInfo info;
+            info.filepath = file_path;
+            info.size = static_cast<int64_t>(file_size);
+            info.last_write_time = last_write_time;
+            info.last_modified_str =
+                std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
 
-        results[i].push_back(std::move(info));
-      }
+            results[i].push_back(std::move(info));
+          }
 
-      completion_latch.count_down();
-    });
+          completion_latch.count_down();
+        });
 
     if (!submitted) {
       return std::unexpected("Failed to submit directory scan task to worker pool");
@@ -286,6 +314,7 @@ auto discover_files_parallel(Core::State::AppState& app_state,
                      std::make_move_iterator(result.end()));
   }
 
+  Logger().info("Discovered {} files with ignore rules applied", all_files.size());
   return all_files;
 }
 
@@ -571,8 +600,8 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     -> std::expected<Types::ScanResult, std::string> {
   auto start_time = std::chrono::steady_clock::now();
 
-  Logger().info("Starting optimized multi-threaded asset scan with {} directories",
-                options.directories.size());
+  Logger().info("Starting folder-aware asset scan with {} directories and {} ignore rules",
+                options.directories.size(), options.ignore_rules.size());
 
   // 加载资产缓存
   auto asset_cache_result = Asset::Repository::load_asset_cache(app_state);
@@ -587,15 +616,15 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     directories.emplace_back(dir_str);
   }
 
-  // 并行发现文件
+  // 使用支持忽略规则的并行发现文件
   auto discovered_files_result = discover_files_parallel(app_state, directories, options);
   if (!discovered_files_result) {
     return std::unexpected("File discovery failed: " + discovered_files_result.error());
   }
   auto discovered_files = discovered_files_result.value();
 
-  Logger().info("Discovered {} files across {} directories", discovered_files.size(),
-                directories.size());
+  Logger().info("Discovered {} files across {} directories (after ignore rules)",
+                discovered_files.size(), directories.size());
 
   // 分析文件变化
   auto analysis_results = analyze_file_changes(discovered_files, asset_cache);
@@ -627,7 +656,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
     result.scan_duration = std::format("{}ms", duration.count());
 
-    Logger().info("Asset scan completed - no changes detected");
+    Logger().info("Folder-aware asset scan completed - no changes detected");
     return result;
   }
 
@@ -638,6 +667,14 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   auto batch_result = processing_result.value();
+
+  // TODO: 这里可以添加文件夹关联逻辑
+  // 使用 Folder::Processor::associate_assets_with_folders 将资产与文件夹关联
+  if (options.create_folder_records &&
+      (!batch_result.new_assets.empty() || !batch_result.updated_assets.empty())) {
+    Logger().info("Creating folder records for processed assets...");
+    // 这里将在后续实现文件夹关联功能
+  }
 
   // 批量数据库操作
   bool all_db_success = true;
@@ -680,7 +717,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   Logger().info(
-      "Multi-threaded asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}, Duration: "
+      "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}, Duration: "
       "{}",
       result.total_files, result.new_items, result.updated_items, result.errors.size(),
       result.scan_duration);

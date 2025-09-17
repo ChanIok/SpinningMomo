@@ -4,7 +4,7 @@ module;
 #include <rfl.hpp>
 #include <rfl/json.hpp>
 
-module Core.RPC.Endpoints.Asset;
+module Core.RPC.Endpoints.Gallery;
 
 import std;
 import Core.State;
@@ -15,7 +15,7 @@ import Features.Gallery;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
 
-namespace Core::RPC::Endpoints::Asset {
+namespace Core::RPC::Endpoints::Gallery {
 
 // ============= 资产项管理 RPC 处理函数 =============
 
@@ -72,7 +72,25 @@ auto handle_delete_asset(Core::State::AppState& app_state,
 auto handle_scan_asset(Core::State::AppState& app_state,
                        const Features::Gallery::Types::ScanParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::ScanResult>> {
-  auto result = Features::Gallery::scan_directories(app_state, params);
+  // 转换ScanParams为ScanOptions
+  Features::Gallery::Types::ScanOptions options;
+
+  // 基础扫描参数
+  options.directories = params.directories;
+  options.recursive = params.recursive.value_or(true);
+  options.generate_thumbnails = params.generate_thumbnails.value_or(true);
+  options.thumbnail_max_width = params.thumbnail_max_width.value_or(400);
+  options.thumbnail_max_height = params.thumbnail_max_height.value_or(400);
+
+  // 忽略规则参数
+  options.ignore_rules =
+      params.ignore_rules.value_or(std::vector<Features::Gallery::Types::IgnoreRule>{});
+
+  // 文件夹功能参数
+  options.create_folder_records = params.create_folder_records.value_or(true);
+  options.update_folder_counts = params.update_folder_counts.value_or(true);
+
+  auto result = Features::Gallery::scan_directories(app_state, options);
 
   if (!result) {
     co_return std::unexpected(
@@ -170,7 +188,8 @@ auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<Features::Gallery::Types::ScanParams,
                              Features::Gallery::Types::ScanResult>(
       app_state, app_state.rpc->registry, "gallery.scan", handle_scan_asset,
-      "Scan directories for asset files and add them to the library");
+      "Scan directories for asset files and add them to the library. Supports ignore rules and "
+      "folder management.");
 
   // 缩略图操作
   Core::RPC::register_method<rfl::Generic, Features::Gallery::Types::OperationResult>(
@@ -178,7 +197,8 @@ auto register_all(Core::State::AppState& app_state) -> void {
       "Clean up orphaned thumbnail files");
 
   // 统计信息
-  Core::RPC::register_method<Features::Gallery::Types::GetStatsParams, Features::Gallery::Types::Stats>(
+  Core::RPC::register_method<Features::Gallery::Types::GetStatsParams,
+                             Features::Gallery::Types::Stats>(
       app_state, app_state.rpc->registry, "gallery.stats", handle_get_asset_stats,
       "Get asset library statistics");
 
@@ -190,7 +210,6 @@ auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<CleanupDeletedParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.cleanupDeleted", handle_cleanup_deleted,
       "Clean up soft-deleted items older than specified days");
-
 }
 
-}  // namespace Core::RPC::Endpoints::Asset
+}  // namespace Core::RPC::Endpoints::Gallery

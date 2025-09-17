@@ -11,13 +11,15 @@ export namespace Features::Gallery::Scanner {
 
 // ============= 文件扫描功能 =============
 
-// 扫描指定目录中的资产文件
+// 扫描指定目录中的资产文件（支持文件夹和忽略规则）
 auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOptions& options)
     -> std::expected<Types::ScanResult, std::string>;
 
-// 递归扫描目录，返回符合条件的文件路径列表
+// 递归扫描目录，返回符合条件的文件路径列表（支持忽略规则）
 auto find_files(const std::filesystem::path& directory,
-                const std::vector<std::string>& supported_extensions, bool recursive = true)
+                const std::vector<std::string>& supported_extensions, bool recursive = true,
+                const std::optional<Types::IgnoreContext>& ignore_context = std::nullopt,
+                std::optional<std::int64_t> folder_id = std::nullopt)
     -> std::expected<std::vector<std::filesystem::path>, std::string>;
 
 // ============= 资产信息提取功能 =============
@@ -51,7 +53,7 @@ auto is_file_accessible(const std::filesystem::path& file_path) -> bool;
 auto calculate_file_hash(const std::filesystem::path& file_path)
     -> std::expected<std::string, std::string>;
 
-// 并行发现文件
+// 并行发现文件（支持忽略规则）
 auto discover_files_parallel(Core::State::AppState& app_state,
                              const std::vector<std::filesystem::path>& directories,
                              const Types::ScanOptions& options)

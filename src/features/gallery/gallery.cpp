@@ -11,6 +11,9 @@ import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Scanner;
 import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.Folder.Repository;
+import Features.Gallery.Folder.Processor;
+import Features.Gallery.Ignore.Processor;
 import Utils.Image;
 import Utils.Logger;
 
@@ -31,7 +34,8 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     }
 
     Logger().info("Asset module initialized successfully");
-    Logger().info("Thumbnail directory set to: {}", app_state.gallery->thumbnails_directory.string());
+    Logger().info("Thumbnail directory set to: {}",
+                  app_state.gallery->thumbnails_directory.string());
     return {};
 
   } catch (const std::exception& e) {
@@ -125,42 +129,27 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
 
 // ============= 扫描和索引 =============
 
-auto scan_directories(Core::State::AppState& app_state, const Types::ScanParams& params)
+auto scan_directories(Core::State::AppState& app_state, const Types::ScanOptions& options)
     -> std::expected<Types::ScanResult, std::string> {
   try {
-    // 验证参数
-    auto validation_result = validate_asset_scan_params(params);
-    if (!validation_result) {
-      return std::unexpected(validation_result.error());
-    }
+    Logger().info("Starting asset scan with {} directories and {} ignore rules",
+                  options.directories.size(), options.ignore_rules.size());
 
-    // 转换参数为 Scanner 需要的格式
-    Types::ScanOptions scan_options;
-    scan_options.directories = params.directories;
-    scan_options.recursive = params.recursive.value_or(true);
-    scan_options.generate_thumbnails = params.generate_thumbnails.value_or(true);
-    scan_options.thumbnail_max_width = params.thumbnail_max_width.value_or(400);
-    scan_options.thumbnail_max_height = params.thumbnail_max_height.value_or(400);
-
-    Logger().info("Starting optimized multi-threaded asset scan of {} directories",
-                  scan_options.directories.size());
-
-    // 执行多线程扫描
-    auto scan_result = Scanner::scan_asset_directory(app_state, scan_options);
+    // 执行扫描
+    auto scan_result = Scanner::scan_asset_directory(app_state, options);
     if (!scan_result) {
-      Logger().error("Multi-threaded asset scan failed: {}", scan_result.error());
-      return std::unexpected("Multi-threaded scan failed: " + scan_result.error());
+      Logger().error("Asset scan failed: {}", scan_result.error());
+      return std::unexpected("Asset scan failed: " + scan_result.error());
     }
 
     auto result = scan_result.value();
-    Logger().info("Multi-threaded asset scan completed. New: {}, Updated: {}, Errors: {}",
-                  result.new_items, result.updated_items, result.errors.size());
+    Logger().info("Asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}",
+                  result.total_files, result.new_items, result.updated_items, result.errors.size());
 
     return result;
 
   } catch (const std::exception& e) {
-    return std::unexpected("Exception in multi-threaded scan_asset_directories: " +
-                           std::string(e.what()));
+    return std::unexpected("Exception in scan_directories: " + std::string(e.what()));
   }
 }
 
@@ -259,41 +248,6 @@ auto get_default_asset_scan_options() -> Types::ScanOptions {
   options.thumbnail_max_height = 400;
   options.supported_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"};
   return options;
-}
-
-auto validate_asset_scan_params(const Types::ScanParams& params)
-    -> std::expected<void, std::string> {
-  if (params.directories.empty()) {
-    return std::unexpected("No directories specified for scanning");
-  }
-
-  // 验证每个目录是否存在
-  for (const auto& dir_str : params.directories) {
-    std::filesystem::path dir_path(dir_str);
-    if (!std::filesystem::exists(dir_path)) {
-      return std::unexpected("Directory does not exist: " + dir_str);
-    }
-    if (!std::filesystem::is_directory(dir_path)) {
-      return std::unexpected("Path is not a directory: " + dir_str);
-    }
-  }
-
-  // 验证缩略图尺寸参数
-  if (params.thumbnail_max_width.has_value() && params.thumbnail_max_width.value() < 32) {
-    return std::unexpected("Thumbnail width too small (minimum 32px)");
-  }
-  if (params.thumbnail_max_width.has_value() && params.thumbnail_max_width.value() > 2048) {
-    return std::unexpected("Thumbnail width too large (maximum 2048px)");
-  }
-
-  if (params.thumbnail_max_height.has_value() && params.thumbnail_max_height.value() < 32) {
-    return std::unexpected("Thumbnail height too small (minimum 32px)");
-  }
-  if (params.thumbnail_max_height.has_value() && params.thumbnail_max_height.value() > 2048) {
-    return std::unexpected("Thumbnail height too large (maximum 2048px)");
-  }
-
-  return {};
 }
 
 }  // namespace Features::Gallery
