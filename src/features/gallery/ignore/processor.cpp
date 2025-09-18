@@ -16,19 +16,12 @@ namespace Features::Gallery::Ignore::Processor {
 auto normalize_path_for_matching(const std::filesystem::path& file_path,
                                  const std::filesystem::path& base_path) -> std::string {
   try {
-    // 计算相对路径并转换为字符串
+    // 计算相对路径，自动规范化，并使用统一的正斜杠格式
     auto relative = std::filesystem::relative(file_path, base_path);
-    auto path_str = relative.string();
-
-    // 统一使用正斜杠（Unix风格），便于模式匹配
-    std::ranges::replace(path_str, '\\', '/');
-
-    return path_str;
+    return relative.lexically_normal().generic_string();
   } catch (const std::filesystem::filesystem_error&) {
-    // 如果无法计算相对路径，返回文件名
-    auto filename = file_path.filename().string();
-    std::ranges::replace(filename, '\\', '/');
-    return filename;
+    // 如果无法计算相对路径，返回规范化的文件名
+    return file_path.filename().lexically_normal().generic_string();
   }
 }
 
@@ -171,67 +164,6 @@ auto apply_ignore_rules(const std::filesystem::path& file_path,
 
       Logger().debug("File '{}' {} by rule '{}' ({})", normalized_path,
                      should_ignore ? "excluded" : "included", rule.rule_pattern, rule.pattern_type);
-    }
-  }
-
-  return should_ignore;
-}
-
-// ============= 辅助函数 =============
-
-// 检查规则是否匹配文件
-auto check_rule_match(const Types::IgnoreRule& rule, const std::string& normalized_path) -> bool {
-  if (!rule.is_enabled) {
-    return false;
-  }
-
-  bool matches = false;
-  if (rule.pattern_type == "glob") {
-    matches = match_glob_pattern(rule.rule_pattern, normalized_path);
-  } else if (rule.pattern_type == "regex") {
-    matches = match_regex_pattern(rule.rule_pattern, normalized_path);
-  } else {
-    Logger().warn("Unknown pattern type '{}' for rule: {}", rule.pattern_type, rule.rule_pattern);
-    return false;
-  }
-
-  return matches;
-}
-
-// 应用规则组并返回最终的忽略状态
-auto apply_rules_with_logging(const std::vector<Types::IgnoreRule>& rules,
-                              const std::string& normalized_path, const std::string& rule_type_name,
-                              bool initial_state = false) -> bool {
-  bool should_ignore = initial_state;
-
-  for (const auto& rule : rules) {
-    if (check_rule_match(rule, normalized_path)) {
-      should_ignore = (rule.rule_type == "exclude");
-      Logger().debug("File '{}' {} by {} rule '{}' ({})", normalized_path,
-                     should_ignore ? "excluded" : "included", rule_type_name, rule.rule_pattern,
-                     rule.pattern_type);
-    }
-  }
-
-  return should_ignore;
-}
-
-// ============= 主要处理函数 =============
-
-auto should_ignore_file(const std::filesystem::path& file_path,
-                        const std::filesystem::path& base_path, const Types::IgnoreContext& context,
-                        std::optional<std::int64_t> folder_id) -> bool {
-  auto normalized_path = normalize_path_for_matching(file_path, base_path);
-
-  // 第一阶段：应用全局规则
-  bool should_ignore = apply_rules_with_logging(context.global_rules, normalized_path, "GLOBAL");
-
-  // 第二阶段：如果有文件夹规则，在全局规则的基础上继续应用（可以覆盖）
-  if (folder_id.has_value()) {
-    auto it = context.folder_rules.find(folder_id.value());
-    if (it != context.folder_rules.end()) {
-      should_ignore =
-          apply_rules_with_logging(it->second, normalized_path, "FOLDER", should_ignore);
     }
   }
 

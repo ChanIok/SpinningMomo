@@ -83,10 +83,6 @@ struct FolderHierarchy {
   int level = 0;
 };
 
-struct IgnoreContext {
-  std::vector<IgnoreRule> global_rules;
-  std::unordered_map<std::int64_t, std::vector<IgnoreRule>> folder_rules;
-};
 
 // ============= 扫描相关类型 =============
 

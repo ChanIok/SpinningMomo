@@ -204,15 +204,12 @@ auto batch_create_ignore_rules(Core::State::AppState& app_state, std::int64_t fo
 
           // 创建新规则
           Types::IgnoreRule db_rule{
-              .id = 0,  // 自动生成
               .folder_id = folder_id,
               .rule_pattern = scan_rule.pattern,
               .pattern_type = scan_rule.pattern_type,
               .rule_type = scan_rule.rule_type,
               .is_enabled = 1,
               .description = scan_rule.description,
-              .created_at = "",  // 数据库自动生成
-              .updated_at = ""   // 数据库自动生成
           };
 
           std::string insert_sql = R"(

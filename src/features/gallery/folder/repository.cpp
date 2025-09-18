@@ -251,18 +251,15 @@ auto recalculate_folder_asset_count(Core::State::AppState& app_state, std::int64
   return asset_count;
 }
 
-// ============= 辅助函数 =============
-
 auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::int64_t, std::string> {
-  // 首先尝试查找现有文件夹
+  // 首先尝试查找现有文件夹id
   auto existing_result = get_folder_by_path(app_state, path);
   if (!existing_result) {
     return std::unexpected("Failed to query existing folder: " + existing_result.error());
   }
 
   if (existing_result->has_value()) {
-    // 文件夹已存在，返回ID
     return existing_result->value().id;
   }
 
@@ -271,24 +268,11 @@ auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::
   std::string folder_name = fs_path.filename().string();
   std::string timestamp = std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
 
-  Types::Folder new_folder;
-  new_folder.id = 0;  // 将由数据库生成
-  new_folder.path = path;
-  new_folder.name = folder_name;
-  new_folder.created_at = timestamp;
-  new_folder.updated_at = timestamp;
+  Types::Folder new_folder{
+      .path = path, .name = folder_name, .created_at = timestamp, .updated_at = timestamp
 
-  // 处理父文件夹关系
-  auto parent_path = fs_path.parent_path();
-  if (!parent_path.empty() && parent_path != fs_path.root_path()) {
-    auto parent_result = get_or_create_folder_for_path(app_state, parent_path.string());
-    if (!parent_result) {
-      return std::unexpected("Failed to create parent folder: " + parent_result.error());
-    }
-    new_folder.parent_id = parent_result.value();
-  }
+  };
 
-  // 创建文件夹记录
   auto create_result = create_folder(app_state, new_folder);
   if (!create_result) {
     return std::unexpected("Failed to create folder record: " + create_result.error());

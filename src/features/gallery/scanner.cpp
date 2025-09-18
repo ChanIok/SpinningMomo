@@ -60,20 +60,21 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
   }
 
   try {
-    // 构建ignore规则上下文，加载数据库中的规则
-    Types::IgnoreContext ignore_context;
+    // 加载并合并忽略规则
+    std::vector<Types::IgnoreRule> combined_rules;
 
-    // 加载全局规则
+    // 先加载全局规则
     auto global_rules_result = Ignore::Repository::get_global_rules(app_state);
     if (global_rules_result) {
-      ignore_context.global_rules = std::move(global_rules_result.value());
+      combined_rules = std::move(global_rules_result.value());
     }
 
-    // 加载文件夹特定规则
+    // 然后追加文件夹特定规则
     if (folder_id.has_value()) {
       auto folder_rules_result = Ignore::Repository::get_rules_by_folder_id(app_state, *folder_id);
       if (folder_rules_result) {
-        ignore_context.folder_rules[folder_id.value()] = std::move(folder_rules_result.value());
+        auto& folder_rules = folder_rules_result.value();
+        combined_rules.insert(combined_rules.end(), folder_rules.begin(), folder_rules.end());
       }
     }
 
@@ -92,17 +93,17 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
         std::views::filter([&options](const std::filesystem::directory_entry& entry) {
           return is_supported_file(entry.path(), options.supported_extensions);
         }) |
-        std::views::filter([&directory, &ignore_context,
-                            folder_id](const std::filesystem::directory_entry& entry) {
-          bool should_ignore = Ignore::Processor::should_ignore_file(entry.path(), directory,
-                                                                     ignore_context, folder_id);
+        std::views::filter(
+            [&directory, &combined_rules](const std::filesystem::directory_entry& entry) {
+              bool should_ignore =
+                  Ignore::Processor::apply_ignore_rules(entry.path(), directory, combined_rules);
 
-          if (should_ignore) {
-            Logger().debug("File ignored by rules: {}", entry.path().string());
-          }
+              if (should_ignore) {
+                Logger().debug("File ignored by rules: {}", entry.path().string());
+              }
 
-          return !should_ignore;
-        }) |
+              return !should_ignore;
+            }) |
         std::views::transform(
             [](const std::filesystem::directory_entry& entry) { return entry.path(); }) |
         std::ranges::to<std::vector>();

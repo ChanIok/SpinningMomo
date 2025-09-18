@@ -10,10 +10,6 @@ export namespace Features::Gallery::Ignore::Processor {
 
 // ============= 基础忽略规则处理函数 =============
 
-// 检查单个文件是否应该被忽略
-auto should_ignore_file(const std::filesystem::path& file_path,
-                        const std::filesystem::path& base_path, const Types::IgnoreContext& context,
-                        std::optional<std::int64_t> folder_id = std::nullopt) -> bool;
 
 // 匹配glob模式（gitignore风格）
 auto match_glob_pattern(const std::string& pattern, const std::string& path) -> bool;
