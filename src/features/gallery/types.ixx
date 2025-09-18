@@ -21,9 +21,12 @@ struct Asset {
   std::optional<std::string> hash;  // xxh3哈希
   std::optional<std::int64_t> folder_id;
 
-  std::string created_at;
-  std::string updated_at;
-  std::optional<std::string> deleted_at;
+  std::optional<std::int64_t> file_created_at;
+  std::optional<std::int64_t> file_modified_at;
+
+  std::int64_t created_at;
+  std::int64_t updated_at;
+  std::optional<std::int64_t> deleted_at;
 };
 
 struct Folder {
@@ -35,8 +38,8 @@ struct Folder {
   std::optional<std::int64_t> cover_asset_id;
   int sort_order = 0;
   int is_hidden = 0;
-  std::string created_at;
-  std::string updated_at;
+  std::int64_t created_at;
+  std::int64_t updated_at;
 };
 
 struct IgnoreRule {
@@ -47,8 +50,8 @@ struct IgnoreRule {
   std::string rule_type = "exclude";
   int is_enabled = 1;
   std::optional<std::string> description;
-  std::string created_at;
-  std::string updated_at;
+  std::int64_t created_at;
+  std::int64_t updated_at;
 };
 
 // ============= 辅助数据类型 =============
@@ -118,15 +121,15 @@ struct Metadata {
   int64_t id;
   std::string filepath;
   int64_t size;
-  std::string last_modified;
+  std::int64_t file_modified_at;
   std::string hash;
 };
 
 struct FileSystemInfo {
   std::filesystem::path filepath;
   int64_t size;
-  std::filesystem::file_time_type last_write_time;
-  std::string last_modified_str;
+  std::int64_t file_modified_millis;
+  std::int64_t file_created_millis;
   std::string hash;
 };
 

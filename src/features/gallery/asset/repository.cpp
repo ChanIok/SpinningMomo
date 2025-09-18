@@ -9,8 +9,8 @@ import Core.State;
 import Core.Database;
 import Core.Database.Types;
 import Features.Gallery.Types;
-import Features.Gallery.Types;
 import Utils.Logger;
+import Utils.Time;
 
 namespace Features::Gallery::Asset::Repository {
 
@@ -22,7 +22,7 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
             INSERT INTO assets (
                 name, path, type,
                 width, height, size, mime_type, hash, folder_id,
-                created_at, updated_at
+                file_created_at, file_modified_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         )";
 
@@ -50,8 +50,12 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
                        ? Core::Database::Types::DbParam{item.folder_id.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
-  params.push_back(item.created_at);
-  params.push_back(item.updated_at);
+  params.push_back(item.file_created_at.has_value()
+                       ? Core::Database::Types::DbParam{item.file_created_at.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.file_modified_at.has_value()
+                       ? Core::Database::Types::DbParam{item.file_modified_at.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
 
   auto result = Core::Database::execute(*app_state.database, sql, params);
   if (!result) {
@@ -73,6 +77,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
   std::string sql = R"(
             SELECT id, name, path, type,
                    width, height, size, mime_type, hash, folder_id,
+                   file_created_at, file_modified_at,
                    created_at, updated_at, deleted_at
             FROM assets
             WHERE id = ? AND deleted_at IS NULL
@@ -93,6 +98,7 @@ auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& 
   std::string sql = R"(
             SELECT id, name, path, type,
                    width, height, size, mime_type, hash, folder_id,
+                   file_created_at, file_modified_at,
                    created_at, updated_at, deleted_at
             FROM assets
             WHERE path = ? AND deleted_at IS NULL
@@ -113,8 +119,8 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   std::string sql = R"(
             UPDATE assets SET
                 name = ?, path = ?, type = ?,
-                width = ?, height = ?, size = ?, mime_type = ?, hash = ?,
-                updated_at = ?
+                width = ?, height = ?, size = ?, mime_type = ?, hash = ?, folder_id = ?,
+                file_created_at = ?, file_modified_at = ?
             WHERE id = ?
         )";
 
@@ -138,7 +144,16 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
 
-  params.push_back(item.updated_at);
+  params.push_back(item.folder_id.has_value()
+                       ? Core::Database::Types::DbParam{item.folder_id.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(item.file_created_at.has_value()
+                       ? Core::Database::Types::DbParam{item.file_created_at.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.file_modified_at.has_value()
+                       ? Core::Database::Types::DbParam{item.file_modified_at.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.id);
 
@@ -152,10 +167,9 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
 
 auto soft_delete_asset(Core::State::AppState& app_state, int64_t id)
     -> std::expected<void, std::string> {
-  std::string timestamp = std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
-  std::string sql = "UPDATE assets SET deleted_at = ? WHERE id = ?";
+  std::string sql = "UPDATE assets SET deleted_at = (unixepoch('subsec') * 1000) WHERE id = ?";
 
-  std::vector<Core::Database::Types::DbParam> params = {timestamp, id};
+  std::vector<Core::Database::Types::DbParam> params = {id};
 
   auto result = Core::Database::execute(*app_state.database, sql, params);
   if (!result) {
@@ -245,6 +259,7 @@ auto list_asset(Core::State::AppState& app_state, const Types::ListParams& param
   std::string sql = std::format(R"(
             SELECT id, name, path as filepath, type,
                    width, height, size, mime_type, hash, folder_id,
+                   file_created_at, file_modified_at,
                    created_at, updated_at, deleted_at
             FROM assets
             {}
@@ -378,7 +393,8 @@ auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {
   std::string sql = R"(
     SELECT id, name, path as filepath, type,
-           width, height, size, mime_type, hash,
+           width, height, size, mime_type, hash, folder_id,
+           file_created_at, file_modified_at,
            created_at, updated_at, deleted_at
     FROM assets
     WHERE deleted_at IS NULL
@@ -396,7 +412,7 @@ auto load_asset_cache(Core::State::AppState& app_state)
     Types::Metadata metadata{.id = asset.id,
                              .filepath = asset.filepath,
                              .size = asset.size.value_or(0),
-                             .last_modified = asset.updated_at,
+                             .file_modified_at = asset.file_modified_at.value_or(0),
                              .hash = asset.hash.value_or("")};
 
     cache.emplace(asset.filepath, std::move(metadata));
@@ -416,14 +432,14 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
     INSERT INTO assets (
       name, path, type,
       width, height, size, mime_type, hash, folder_id,
-      created_at, updated_at
+      file_created_at, file_modified_at
     ) VALUES
   )";
 
   std::vector<std::string> value_placeholders;
   std::vector<Core::Database::Types::DbParam> all_params;
   value_placeholders.reserve(items.size());
-  all_params.reserve(items.size() * 12);  // 12个字段
+  all_params.reserve(items.size() * 11);  // 11个字段
 
   for (const auto& item : items) {
     value_placeholders.push_back("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -453,8 +469,12 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
                              ? Core::Database::Types::DbParam{item.folder_id.value()}
                              : Core::Database::Types::DbParam{std::monostate{}});
 
-    all_params.push_back(item.created_at);
-    all_params.push_back(item.updated_at);
+    all_params.push_back(item.file_created_at.has_value()
+                             ? Core::Database::Types::DbParam{item.file_created_at.value()}
+                             : Core::Database::Types::DbParam{std::monostate{}});
+    all_params.push_back(item.file_modified_at.has_value()
+                             ? Core::Database::Types::DbParam{item.file_modified_at.value()}
+                             : Core::Database::Types::DbParam{std::monostate{}});
   }
 
   // 合并所有 VALUES 子句
@@ -508,7 +528,7 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
         UPDATE assets SET
           name = ?, path = ?, type = ?,
           width = ?, height = ?, size = ?, mime_type = ?, hash = ?, folder_id = ?,
-          updated_at = ?
+          file_created_at = ?, file_modified_at = ?
         WHERE id = ?
       )";
 
@@ -540,7 +560,12 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
                                ? Core::Database::Types::DbParam{item.folder_id.value()}
                                : Core::Database::Types::DbParam{std::monostate{}});
 
-          params.push_back(item.updated_at);
+          params.push_back(item.file_created_at.has_value()
+                               ? Core::Database::Types::DbParam{item.file_created_at.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+          params.push_back(item.file_modified_at.has_value()
+                               ? Core::Database::Types::DbParam{item.file_modified_at.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
 
           params.push_back(item.id);
 

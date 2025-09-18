@@ -18,9 +18,8 @@ auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder
   std::string sql = R"(
             INSERT INTO folders (
                 path, parent_id, name, display_name, 
-                sort_order, is_hidden,
-                created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                sort_order, is_hidden
+            ) VALUES (?, ?, ?, ?, ?, ?)
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
@@ -38,8 +37,6 @@ auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder
 
   params.push_back(static_cast<int64_t>(folder.sort_order));
   params.push_back(folder.is_hidden);
-  params.push_back(folder.created_at);
-  params.push_back(folder.updated_at);
 
   auto result = Core::Database::execute(*app_state.database, sql, params);
   if (!result) {
@@ -101,8 +98,7 @@ auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder
   std::string sql = R"(
             UPDATE folders SET
                 path = ?, parent_id = ?, name = ?, display_name = ?,
-                cover_asset_id = ?, sort_order = ?, is_hidden = ?,
-                updated_at = ?
+                cover_asset_id = ?, sort_order = ?, is_hidden = ?
             WHERE id = ?
         )";
 
@@ -125,7 +121,6 @@ auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder
 
   params.push_back(static_cast<int64_t>(folder.sort_order));
   params.push_back(folder.is_hidden);
-  params.push_back(folder.updated_at);
   params.push_back(folder.id);
 
   auto result = Core::Database::execute(*app_state.database, sql, params);
@@ -203,7 +198,6 @@ auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int6
   return result.value();
 }
 
-
 auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::int64_t, std::string> {
   // 首先尝试查找现有文件夹id
@@ -219,12 +213,8 @@ auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::
   // 文件夹不存在，需要创建
   std::filesystem::path fs_path(path);
   std::string folder_name = fs_path.filename().string();
-  std::string timestamp = std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
 
-  Types::Folder new_folder{
-      .path = path, .name = folder_name, .created_at = timestamp, .updated_at = timestamp
-
-  };
+  Types::Folder new_folder{.path = path, .name = folder_name};
 
   auto create_result = create_folder(app_state, new_folder);
   if (!create_result) {

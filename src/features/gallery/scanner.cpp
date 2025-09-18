@@ -23,12 +23,10 @@ import Features.Gallery.Ignore.Processor;
 import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
+import Utils.Time;
 
 namespace Features::Gallery::Scanner {
 
-// ============= 工具函数 =============
-
-// 计算文件哈希值
 auto calculate_file_hash(const std::filesystem::path& file_path)
     -> std::expected<std::string, std::string> {
   std::ifstream file(file_path, std::ios::binary);
@@ -48,6 +46,21 @@ auto calculate_file_hash(const std::filesystem::path& file_path)
   auto hash = XXH3_64bits(buffer.data(), buffer.size());
 
   return std::format("{:016x}", hash);
+}
+
+auto is_supported_file(const std::filesystem::path& file_path,
+                       const std::vector<std::string>& supported_extensions) -> bool {
+  if (!file_path.has_extension()) {
+    return false;
+  }
+
+  std::string extension = file_path.extension().string();
+
+  // 转换为小写进行比较
+  std::ranges::transform(extension, extension.begin(),
+                         [](unsigned char c) { return static_cast<char>(::tolower(c)); });
+
+  return std::ranges::find(supported_extensions, extension) != supported_extensions.end();
 }
 
 auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& directory,
@@ -118,28 +131,6 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
     return std::unexpected("Exception in scan_paths: " + std::string(e.what()));
   }
 }
-auto is_supported_file(const std::filesystem::path& file_path,
-                       const std::vector<std::string>& supported_extensions) -> bool {
-  if (!file_path.has_extension()) {
-    return false;
-  }
-
-  std::string extension = file_path.extension().string();
-
-  // 转换为小写进行比较
-  std::ranges::transform(extension, extension.begin(),
-                         [](unsigned char c) { return static_cast<char>(::tolower(c)); });
-
-  return std::ranges::find(supported_extensions, extension) != supported_extensions.end();
-}
-
-auto is_file_accessible(const std::filesystem::path& file_path) -> bool {
-  try {
-    return std::filesystem::exists(file_path) && std::filesystem::is_regular_file(file_path);
-  } catch (const std::filesystem::filesystem_error&) {
-    return false;
-  }
-}
 
 auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   if (!file_path.has_extension()) {
@@ -165,57 +156,7 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   return "unknown";
 }
 
-// ============= 资产信息提取 =============
-
-auto extract_asset_info(Utils::Image::WICFactory& wic_factory,
-                        const std::filesystem::path& file_path)
-    -> std::expected<Types::Info, std::string> {
-  try {
-    // 获取文件大小
-    std::error_code ec;
-    auto file_size = std::filesystem::file_size(file_path, ec);
-    if (ec) {
-      return std::unexpected("Failed to get file size: " + ec.message());
-    }
-
-    // 检测资产类型
-    auto asset_type = detect_asset_type(file_path);
-
-    Types::Info info;
-    info.size = static_cast<int64_t>(file_size);
-    info.detected_type = asset_type;
-
-    // 如果是图片，使用 Utils::Image 获取详细信息
-    if (asset_type == "photo") {
-      auto image_info_result = Utils::Image::get_image_info(wic_factory.get(), file_path);
-      if (image_info_result) {
-        auto image_info = image_info_result.value();
-        info.width = image_info.width;
-        info.height = image_info.height;
-        info.mime_type = image_info.mime_type;
-      } else {
-        // 无法获取图像信息，但不失败，设置默认值
-        Logger().warn("Could not extract image info from {}: {}", file_path.string(),
-                      image_info_result.error());
-        info.width = 0;
-        info.height = 0;
-        info.mime_type = "application/octet-stream";
-      }
-    } else {
-      // 非图片类型，设置默认值
-      info.width = 0;
-      info.height = 0;
-      info.mime_type = "application/octet-stream";
-    }
-
-    return info;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in extract_media_info: " + std::string(e.what()));
-  }
-}
-
-// 扫描目录中的文件信息
+// 扫描目录并获取文件信息
 auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::path& directory,
                     const Types::ScanOptions& options, std::optional<std::int64_t> folder_id)
     -> std::expected<std::vector<Types::FileSystemInfo>, std::string> {
@@ -237,13 +178,18 @@ auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::pat
     auto last_write_time = std::filesystem::last_write_time(file_path, ec);
     if (ec) continue;
 
+    auto creation_time_result = Utils::Time::get_file_creation_time_millis(file_path);
+    if (!creation_time_result) {
+      Logger().debug("Could not get creation time for {}: {}", file_path.string(),
+                     creation_time_result.error());
+      continue;
+    }
+
     Types::FileSystemInfo info{
         .filepath = file_path,
         .size = static_cast<int64_t>(file_size),
-        .last_write_time = last_write_time,
-        .last_modified_str =
-            std::format("{:%Y-%m-%d %H:%M:%S}",
-                        std::chrono::clock_cast<std::chrono::system_clock>(last_write_time)),
+        .file_modified_millis = Utils::Time::file_time_to_millis(last_write_time),
+        .file_created_millis = creation_time_result.value(),
         .hash = ""};
 
     result.push_back(std::move(info));
@@ -275,7 +221,7 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
 
       // 检查文件大小和修改时间，任一不同都需要重新计算哈希
       if (cached_metadata.size != file_info.size ||
-          cached_metadata.updated_at != file_info.last_modified_str) {
+          cached_metadata.file_modified_at != file_info.file_modified_millis) {
         analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
       } else {
         // 大小和修改时间都相同，很可能未发生变化
@@ -375,6 +321,84 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
   return {};
 }
 
+// 处理单个文件
+auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
+                         const Types::FileAnalysisResult& analysis,
+                         const Types::ScanOptions& options,
+                         const std::unordered_map<std::string, std::int64_t>& folder_mapping)
+    -> std::expected<Types::Asset, std::string> {
+  const auto& file_info = analysis.file_info;
+  const auto& file_path = file_info.filepath;
+
+  auto asset_type = detect_asset_type(file_path);
+
+  Types::Asset asset;
+
+  // 如果是更新，保留原有ID
+  if (analysis.status == Types::FileStatus::MODIFIED && analysis.existing_metadata) {
+    asset.id = analysis.existing_metadata->id;
+  }
+
+  asset.name = file_path.filename().string();
+  asset.filepath = file_path.string();
+  asset.type = asset_type;
+  asset.size = file_info.size;
+  asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
+
+  // 设置文件系统时间戳
+  asset.file_created_at = file_info.file_created_millis;
+  asset.file_modified_at = file_info.file_modified_millis;
+
+  // 数据库记录管理时间戳由数据库自动设置
+
+  // 根据文件路径查找对应的 folder_id
+  if (!folder_mapping.empty()) {
+    auto parent_path_result = Utils::Path::NormalizePath(file_path.parent_path());
+    if (!parent_path_result) {
+      return std::unexpected(std::format("Failed to normalize parent path for '{}': {}",
+                                         file_path.string(), parent_path_result.error()));
+    }
+    auto parent_path = parent_path_result.value().string();
+    if (auto it = folder_mapping.find(parent_path); it != folder_mapping.end()) {
+      asset.folder_id = it->second;
+    }
+  }
+
+  if (asset_type == "photo") {
+    auto image_info_result = Utils::Image::get_image_info(wic_factory.get(), file_path);
+    if (image_info_result) {
+      auto image_info = std::move(*image_info_result);
+      asset.width = image_info.width;
+      asset.height = image_info.height;
+      asset.mime_type = std::move(image_info.mime_type);
+    } else {
+      Logger().warn("Could not extract image info from {}: {}", file_path.string(),
+                    image_info_result.error());
+      asset.width = 0;
+      asset.height = 0;
+      asset.mime_type = "application/octet-stream";
+    }
+
+    // 生成缩略图（如果需要）
+    if (options.generate_thumbnails) {
+      auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
+          app_state, wic_factory, file_path, file_info.hash, options.thumbnail_max_width,
+          options.thumbnail_max_height);
+
+      if (!thumbnail_result) {
+        Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
+                      thumbnail_result.error());
+      }
+    }
+  } else {
+    asset.width = 0;
+    asset.height = 0;
+    asset.mime_type = "application/octet-stream";
+  }
+
+  return asset;
+}
+
 // 并行处理文件
 auto process_files_in_parallel(Core::State::AppState& app_state,
                                const std::vector<Types::FileAnalysisResult>& files_to_process,
@@ -463,79 +487,6 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
   completion_latch.wait();
 
   return final_result;
-}
-// 单文件处理
-auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
-                         const Types::FileAnalysisResult& analysis,
-                         const Types::ScanOptions& options,
-                         const std::unordered_map<std::string, std::int64_t>& folder_mapping)
-    -> std::expected<Types::Asset, std::string> {
-  const auto& file_info = analysis.file_info;
-  const auto& file_path = file_info.filepath;
-
-  auto asset_type = detect_asset_type(file_path);
-
-  Types::Asset asset;
-
-  // 如果是更新，保留原有ID
-  if (analysis.status == Types::FileStatus::MODIFIED && analysis.existing_metadata) {
-    asset.id = analysis.existing_metadata->id;
-  }
-
-  asset.name = file_path.filename().string();
-  asset.filepath = file_path.string();
-  asset.type = asset_type;
-  asset.size = file_info.size;
-  asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
-  asset.created_at = file_info.last_modified_str;
-  asset.updated_at = file_info.last_modified_str;
-
-  // 根据文件路径查找对应的 folder_id
-  if (!folder_mapping.empty()) {
-    auto parent_path_result = Utils::Path::NormalizePath(file_path.parent_path());
-    if (!parent_path_result) {
-      return std::unexpected(std::format("Failed to normalize parent path for '{}': {}", 
-                                        file_path.string(), parent_path_result.error()));
-    }
-    auto parent_path = parent_path_result.value().string();
-    if (auto it = folder_mapping.find(parent_path); it != folder_mapping.end()) {
-      asset.folder_id = it->second;
-    }
-  }
-
-  if (asset_type == "photo") {
-    auto image_info_result = Utils::Image::get_image_info(wic_factory.get(), file_path);
-    if (image_info_result) {
-      auto image_info = std::move(*image_info_result);
-      asset.width = image_info.width;
-      asset.height = image_info.height;
-      asset.mime_type = std::move(image_info.mime_type);
-    } else {
-      Logger().warn("Could not extract image info from {}: {}", file_path.string(),
-                    image_info_result.error());
-      asset.width = 0;
-      asset.height = 0;
-      asset.mime_type = "application/octet-stream";
-    }
-
-    // 生成缩略图（如果需要）
-    if (options.generate_thumbnails) {
-      auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
-          app_state, wic_factory, file_path, file_info.hash, options.thumbnail_max_width,
-          options.thumbnail_max_height);
-
-      if (!thumbnail_result) {
-        Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
-                      thumbnail_result.error());
-      }
-    }
-  } else {
-    asset.width = 0;
-    asset.height = 0;
-    asset.mime_type = "application/octet-stream";
-  }
-
-  return asset;
 }
 
 // 主扫描函数

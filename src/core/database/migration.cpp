@@ -30,9 +30,12 @@ const std::vector<MigrationScript> all_migrations = {
                     hash TEXT,
                     folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
                     
-                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                    deleted_at TEXT
+                    file_created_at INTEGER,
+                    file_modified_at INTEGER,
+                    
+                    created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
+                    updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
+                    deleted_at INTEGER
                 );
                 )",
          "CREATE INDEX idx_assets_path ON assets(path);",
@@ -40,6 +43,15 @@ const std::vector<MigrationScript> all_migrations = {
          "CREATE INDEX idx_assets_created_at ON assets(created_at);",
          "CREATE INDEX idx_assets_hash ON assets(hash);",
          "CREATE INDEX idx_assets_folder_id ON assets(folder_id);",
+         R"(
+                CREATE TRIGGER update_assets_updated_at 
+                AFTER UPDATE ON assets 
+                FOR EACH ROW
+                BEGIN 
+                    UPDATE assets SET updated_at = (unixepoch('subsec') * 1000)
+                    WHERE id = NEW.id;
+                END;
+                )",
          R"(
                 CREATE TABLE folders (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,8 +62,8 @@ const std::vector<MigrationScript> all_migrations = {
                     cover_asset_id INTEGER,
                     sort_order INTEGER DEFAULT 0,
                     is_hidden BOOLEAN DEFAULT 0,
-                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
+                    updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
                     
                     FOREIGN KEY (cover_asset_id) REFERENCES assets(id) ON DELETE SET NULL
                 );
@@ -59,13 +71,22 @@ const std::vector<MigrationScript> all_migrations = {
          "CREATE INDEX idx_folders_parent_sort ON folders(parent_id, sort_order);",
          "CREATE INDEX idx_folders_path ON folders(path);",
          R"(
+                CREATE TRIGGER update_folders_updated_at 
+                AFTER UPDATE ON folders 
+                FOR EACH ROW
+                BEGIN 
+                    UPDATE folders SET updated_at = (unixepoch('subsec') * 1000)
+                    WHERE id = NEW.id;
+                END;
+                )",
+         R"(
                 CREATE TABLE tags (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     parent_id INTEGER,
                     sort_order INTEGER DEFAULT 0,
-                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
+                    updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
                     
                     FOREIGN KEY (parent_id) REFERENCES tags(id) ON DELETE CASCADE,
                     UNIQUE(parent_id, name)
@@ -75,13 +96,22 @@ const std::vector<MigrationScript> all_migrations = {
                 CREATE TABLE asset_tags (
                     asset_id INTEGER NOT NULL,
                     tag_id INTEGER NOT NULL,
-                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
                     PRIMARY KEY (asset_id, tag_id),
                     FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE,
                     FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
                 );
                 )",
          "CREATE INDEX idx_tags_parent_sort ON tags(parent_id, sort_order);",
+         R"(
+                CREATE TRIGGER update_tags_updated_at 
+                AFTER UPDATE ON tags 
+                FOR EACH ROW
+                BEGIN 
+                    UPDATE tags SET updated_at = (unixepoch('subsec') * 1000)
+                    WHERE id = NEW.id;
+                END;
+                )",
          "CREATE INDEX idx_asset_tags_tag ON asset_tags(tag_id);",
          R"(
                 CREATE TABLE ignore_rules (
@@ -100,15 +130,24 @@ const std::vector<MigrationScript> all_migrations = {
                     rule_type TEXT NOT NULL CHECK (rule_type IN ('exclude', 'include')) DEFAULT 'exclude',
                     is_enabled BOOLEAN NOT NULL DEFAULT 1,
                     description TEXT,
-                    created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-                    updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+                    created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
+                    updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
                     
                     UNIQUE(folder_id, rule_pattern)
                 );
                 )",
          "CREATE INDEX idx_ignore_rules_folder_id ON ignore_rules(folder_id);",
          "CREATE INDEX idx_ignore_rules_enabled ON ignore_rules(is_enabled);",
-         "CREATE INDEX idx_ignore_rules_pattern_type ON ignore_rules(pattern_type);"}}
+         "CREATE INDEX idx_ignore_rules_pattern_type ON ignore_rules(pattern_type);",
+         R"(
+                CREATE TRIGGER update_ignore_rules_updated_at 
+                AFTER UPDATE ON ignore_rules 
+                FOR EACH ROW
+                BEGIN 
+                    UPDATE ignore_rules SET updated_at = (unixepoch('subsec') * 1000)
+                    WHERE id = NEW.id;
+                END;
+                )"}}
     // 添加新迁移时，只需要在这里加新的 MigrationScript 即可
 };
 
