@@ -17,10 +17,12 @@ import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
+import Features.Gallery.Folder.Processor;
 import Features.Gallery.Ignore.Repository;
 import Features.Gallery.Ignore.Processor;
 import Utils.Image;
 import Utils.Logger;
+import Utils.Path;
 
 namespace Features::Gallery::Scanner {
 
@@ -271,10 +273,12 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
       const auto& cached_metadata = it->second;
       analysis.existing_metadata = cached_metadata;
 
-      // 先用快速条件筛选出需要进一步校验的文件
-      if (cached_metadata.size != file_info.size) {
+      // 检查文件大小和修改时间，任一不同都需要重新计算哈希
+      if (cached_metadata.size != file_info.size ||
+          cached_metadata.updated_at != file_info.last_modified_str) {
         analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
       } else {
+        // 大小和修改时间都相同，很可能未发生变化
         analysis.status = Types::FileStatus::UNCHANGED;
       }
     }
@@ -289,58 +293,53 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
 auto calculate_hash_for_targets(Core::State::AppState& app_state,
                                 std::vector<Types::FileAnalysisResult>& analysis_results)
     -> std::expected<void, std::string> {
-  // 收集需要计算哈希的索引：新文件和需要校验的文件
-  std::vector<size_t> target_indices;
-  target_indices.reserve(analysis_results.size());
-  for (size_t i = 0; i < analysis_results.size(); ++i) {
-    const auto& a = analysis_results[i];
-    if (a.status == Types::FileStatus::NEW || a.status == Types::FileStatus::NEEDS_HASH_CHECK) {
-      target_indices.push_back(i);
-    }
-  }
+  // 1. 使用ranges找到需要处理的文件，保持原始索引
+  auto targets_with_index = analysis_results | std::views::enumerate |
+                            std::views::filter([](const auto& pair) {
+                              const auto& [idx, analysis] = pair;
+                              return analysis.status == Types::FileStatus::NEW ||
+                                     analysis.status == Types::FileStatus::NEEDS_HASH_CHECK;
+                            }) |
+                            std::ranges::to<std::vector>();
 
-  if (target_indices.empty()) {
+  if (targets_with_index.empty()) {
     return {};
   }
 
-  // 使用小批量分配，而不是按线程数分配
-  constexpr size_t HASH_BATCH_SIZE = 32;  // 每批处理32个文件
-  size_t total_batches = (target_indices.size() + HASH_BATCH_SIZE - 1) / HASH_BATCH_SIZE;
+  constexpr size_t HASH_BATCH_SIZE = 32;
+  auto batches =
+      targets_with_index | std::views::chunk(HASH_BATCH_SIZE) | std::ranges::to<std::vector>();
 
-  // 使用latch等待所有批次完成
-  std::latch completion_latch(total_batches);
-
-  // 线程安全的结果收集 - 使用mutex保护的向量
+  std::latch completion_latch(batches.size());
   std::vector<std::pair<size_t, std::string>> all_hashes;
   std::mutex results_mutex;
 
-  // 提交所有批次任务
-  for (size_t batch_idx = 0; batch_idx < total_batches; ++batch_idx) {
-    size_t start = batch_idx * HASH_BATCH_SIZE;
-    size_t end = std::min(start + HASH_BATCH_SIZE, target_indices.size());
-
+  // 2. 并行处理批次
+  for (const auto& batch : batches) {
     bool submitted = Core::WorkerPool::submit_task(
-        *app_state.worker_pool, [&all_hashes, &results_mutex, &completion_latch, start, end,
-                                 &target_indices, &analysis_results]() {
-          // 本批次的哈希结果
-          std::vector<std::pair<size_t, std::string>> batch_hashes;
-          batch_hashes.reserve(end - start);
+        *app_state.worker_pool,
+        [&all_hashes, &results_mutex, &completion_latch, batch, &analysis_results]() {
+          auto batch_hashes =
+              batch |
+              std::views::transform(
+                  [](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
+                    const auto& [idx, analysis] = pair;
 
-          for (size_t t = start; t < end; ++t) {
-            size_t idx = target_indices[t];
-            const auto& file_path = analysis_results[idx].file_info.filepath;
+                    auto hash_result = calculate_file_hash(analysis.file_info.filepath);
+                    if (hash_result) {
+                      return std::make_pair(idx, std::move(hash_result.value()));
+                    } else {
+                      Logger().warn("Failed to calculate hash for {}: {}",
+                                    analysis.file_info.filepath.string(), hash_result.error());
+                      return std::nullopt;
+                    }
+                  }) |
+              std::views::filter([](const auto& opt) { return opt.has_value(); }) |
+              std::views::transform([](auto&& opt) { return std::move(opt.value()); }) |
+              std::ranges::to<std::vector>();
 
-            auto hash_result = calculate_file_hash(file_path);
-            if (hash_result) {
-              batch_hashes.emplace_back(idx, hash_result.value());
-            } else {
-              Logger().warn("Failed to calculate hash for {}: {}", file_path.string(),
-                            hash_result.error());
-            }
-          }
-
-          // 线程安全地合并结果
-          {
+          // 合并结果
+          if (!batch_hashes.empty()) {
             std::lock_guard<std::mutex> lock(results_mutex);
             all_hashes.insert(all_hashes.end(), std::make_move_iterator(batch_hashes.begin()),
                               std::make_move_iterator(batch_hashes.end()));
@@ -354,24 +353,24 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
     }
   }
 
-  // 优雅地等待所有批次完成
+  // 等待所有批次完成
   completion_latch.wait();
 
-  // 根据哈希结果更新状态与信息
-  for (const auto& [idx, hash] : all_hashes) {
+  // 3. 更新分析结果
+  std::ranges::for_each(all_hashes, [&analysis_results](const auto& hash_pair) {
+    const auto& [idx, hash] = hash_pair;
     auto& analysis = analysis_results[idx];
     analysis.file_info.hash = hash;
 
+    // 根据哈希结果更新状态
     if (analysis.status == Types::FileStatus::NEEDS_HASH_CHECK) {
-      if (analysis.existing_metadata && !analysis.existing_metadata->hash.empty() &&
-          analysis.existing_metadata->hash == hash) {
-        analysis.status = Types::FileStatus::UNCHANGED;
-      } else {
-        analysis.status = Types::FileStatus::MODIFIED;
-      }
+      const bool hash_unchanged = analysis.existing_metadata &&
+                                  !analysis.existing_metadata->hash.empty() &&
+                                  analysis.existing_metadata->hash == hash;
+
+      analysis.status = hash_unchanged ? Types::FileStatus::UNCHANGED : Types::FileStatus::MODIFIED;
     }
-    // NEW 保持 NEW 状态，后续处理用到 file_hash
-  }
+  });
 
   return {};
 }
@@ -379,20 +378,18 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
 // 并行处理文件
 auto process_files_in_parallel(Core::State::AppState& app_state,
                                const std::vector<Types::FileAnalysisResult>& files_to_process,
-                               const Types::ScanOptions& options)
+                               const Types::ScanOptions& options,
+                               const std::unordered_map<std::string, std::int64_t>& folder_mapping)
     -> std::expected<Types::ProcessingBatchResult, std::string> {
   if (files_to_process.empty()) {
     return Types::ProcessingBatchResult{};
   }
 
-  // 使用小批量分配，每批处理较少的文件以保证负载均衡
   constexpr size_t PROCESS_BATCH_SIZE = 16;  // 每批处理16个文件，可根据实际情况调整
   size_t total_batches = (files_to_process.size() + PROCESS_BATCH_SIZE - 1) / PROCESS_BATCH_SIZE;
 
-  // 使用latch等待所有批次完成
   std::latch completion_latch(total_batches);
 
-  // 线程安全的结果收集
   Types::ProcessingBatchResult final_result;
   std::mutex results_mutex;
 
@@ -403,7 +400,7 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
 
     bool submitted = Core::WorkerPool::submit_task(
         *app_state.worker_pool, [&final_result, &results_mutex, &completion_latch, &app_state,
-                                 &files_to_process, start, end, &options]() {
+                                 &files_to_process, start, end, &options, &folder_mapping]() {
           auto thread_wic_factory_result = Utils::Image::get_thread_wic_factory();
           if (!thread_wic_factory_result) {
             {
@@ -422,8 +419,8 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
           for (size_t idx = start; idx < end; ++idx) {
             const auto& analysis = files_to_process[idx];
 
-            auto asset_result =
-                process_single_file_optimized(app_state, thread_wic_factory, analysis, options);
+            auto asset_result = process_single_file(app_state, thread_wic_factory, analysis,
+                                                    options, folder_mapping);
             if (asset_result) {
               if (analysis.status == Types::FileStatus::NEW) {
                 batch_result.new_assets.push_back(std::move(asset_result.value()));
@@ -436,7 +433,7 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
             }
           }
 
-          // 线程安全地合并批次结果到最终结果
+          // 合并批次结果到最终结果
           {
             std::lock_guard<std::mutex> lock(results_mutex);
 
@@ -462,16 +459,16 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
     }
   }
 
-  // 优雅地等待所有批次完成
+  // 等待所有批次完成
   completion_latch.wait();
 
   return final_result;
 }
-// 优化版单文件处理
-auto process_single_file_optimized(Core::State::AppState& app_state,
-                                   Utils::Image::WICFactory& wic_factory,
-                                   const Types::FileAnalysisResult& analysis,
-                                   const Types::ScanOptions& options)
+// 单文件处理
+auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
+                         const Types::FileAnalysisResult& analysis,
+                         const Types::ScanOptions& options,
+                         const std::unordered_map<std::string, std::int64_t>& folder_mapping)
     -> std::expected<Types::Asset, std::string> {
   const auto& file_info = analysis.file_info;
   const auto& file_path = file_info.filepath;
@@ -492,6 +489,19 @@ auto process_single_file_optimized(Core::State::AppState& app_state,
   asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
   asset.created_at = file_info.last_modified_str;
   asset.updated_at = file_info.last_modified_str;
+
+  // 根据文件路径查找对应的 folder_id
+  if (!folder_mapping.empty()) {
+    auto parent_path_result = Utils::Path::NormalizePath(file_path.parent_path());
+    if (!parent_path_result) {
+      return std::unexpected(std::format("Failed to normalize parent path for '{}': {}", 
+                                        file_path.string(), parent_path_result.error()));
+    }
+    auto parent_path = parent_path_result.value().string();
+    if (auto it = folder_mapping.find(parent_path); it != folder_mapping.end()) {
+      asset.folder_id = it->second;
+    }
+  }
 
   if (asset_type == "photo") {
     auto image_info_result = Utils::Image::get_image_info(wic_factory.get(), file_path);
@@ -585,7 +595,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
   Logger().info("Calculated hashes for {} files", analysis_results.size());
 
-  // 筛选需要处理的文件
+  // 5. 筛选需要处理的文件
   std::vector<Types::FileAnalysisResult> files_to_process;
   std::ranges::copy_if(analysis_results, std::back_inserter(files_to_process),
                        [](const Types::FileAnalysisResult& result) {
@@ -597,11 +607,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
   if (files_to_process.empty()) {
     // 无需处理文件
-    Types::ScanResult result;
-    result.total_files = static_cast<int>(file_infos.size());
-    result.new_items = 0;
-    result.updated_items = 0;
-    result.deleted_items = 0;
+    Types::ScanResult result{.total_files = static_cast<int>(file_infos.size())};
 
     auto end_time = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
@@ -611,23 +617,36 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     return result;
   }
 
-  // 并行处理文件
-  auto processing_result = process_files_in_parallel(app_state, files_to_process, options);
+  // 6. 提前准备文件夹映射，批量创建文件夹记录
+  std::unordered_map<std::string, std::int64_t> path_to_folder_id;
+  std::vector<std::filesystem::path> file_paths;
+  file_paths.reserve(files_to_process.size());
+
+  for (const auto& analysis : files_to_process) {
+    file_paths.push_back(analysis.file_info.filepath);
+  }
+
+  auto folder_paths = Folder::Processor::extract_unique_folder_paths(file_paths);
+
+  auto folder_mapping_result =
+      Folder::Processor::batch_create_folders_for_paths(app_state, folder_paths);
+  if (folder_mapping_result) {
+    path_to_folder_id = std::move(folder_mapping_result.value());
+    Logger().info("Pre-created {} folder records", path_to_folder_id.size());
+  } else {
+    Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
+  }
+
+  // 7. 并行处理文件
+  auto processing_result =
+      process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id);
   if (!processing_result) {
     return std::unexpected("File processing failed: " + processing_result.error());
   }
 
   auto batch_result = processing_result.value();
 
-  // TODO: 这里可以添加文件夹关联逻辑
-  // 使用 Folder::Processor::associate_assets_with_folders 将资产与文件夹关联
-  if (options.create_folder_records &&
-      (!batch_result.new_assets.empty() || !batch_result.updated_assets.empty())) {
-    Logger().info("Creating folder records for processed assets...");
-    // 这里将在后续实现文件夹关联功能
-  }
-
-  // 批量数据库操作
+  // 8. 批量更新资产记录
   bool all_db_success = true;
 
   if (!batch_result.new_assets.empty()) {
@@ -651,13 +670,11 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     }
   }
 
-  // 构建扫描结果
-  Types::ScanResult result;
-  result.total_files = static_cast<int>(file_infos.size());
-  result.new_items = static_cast<int>(batch_result.new_assets.size());
-  result.updated_items = static_cast<int>(batch_result.updated_assets.size());
-  result.deleted_items = 0;
-  result.errors = std::move(batch_result.errors);
+  // 9. 构建扫描结果
+  Types::ScanResult result{.total_files = static_cast<int>(file_infos.size()),
+                           .new_items = static_cast<int>(batch_result.new_assets.size()),
+                           .updated_items = static_cast<int>(batch_result.updated_assets.size()),
+                           .errors = std::move(batch_result.errors)};
 
   auto end_time = std::chrono::steady_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);

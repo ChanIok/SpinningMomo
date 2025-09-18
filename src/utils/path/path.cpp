@@ -1,41 +1,54 @@
 module;
 
 #include <windows.h>
-#include <filesystem>
-#include <expected>
-#include <vector>
-#include <string>
+
 #include <exception>
+#include <expected>
+#include <filesystem>
+#include <string>
+#include <vector>
 
 module Utils.Path;
 
 // 获取当前程序的完整路径
 auto Utils::Path::GetExecutablePath() -> std::expected<std::filesystem::path, std::string> {
-  try {
-    std::vector<wchar_t> buffer(MAX_PATH);
+  // 静态缓存，只在第一次调用时初始化
+  static std::optional<std::filesystem::path> cached_path;
+  static std::optional<std::string> cached_error;
 
-    while (true) {
-      DWORD size = GetModuleFileNameW(NULL, buffer.data(), static_cast<DWORD>(buffer.size()));
+  if (!cached_path.has_value() && !cached_error.has_value()) {
+    try {
+      std::vector<wchar_t> buffer(MAX_PATH);
 
-      if (size == 0) {
-        return std::unexpected("Failed to get executable path, error: " +
-                               std::to_string(GetLastError()));
+      while (true) {
+        DWORD size = GetModuleFileNameW(NULL, buffer.data(), static_cast<DWORD>(buffer.size()));
+
+        if (size == 0) {
+          cached_error = "Failed to get executable path, error: " + std::to_string(GetLastError());
+          break;
+        }
+
+        if (size < buffer.size()) {
+          cached_path = std::filesystem::path(buffer.data(), buffer.data() + size);
+          break;
+        }
+
+        if (buffer.size() >= 32767) {
+          cached_error = "Path too long for GetModuleFileNameW";
+          break;
+        }
+
+        buffer.resize(buffer.size() * 2);
       }
-
-      if (size < buffer.size()) {
-        // 成功获取完整路径
-        return std::filesystem::path(buffer.data(), buffer.data() + size);
-      }
-
-      // 需要更大的缓冲区
-      if (buffer.size() >= 32767) {
-        return std::unexpected("Path too long for GetModuleFileNameW");
-      }
-
-      buffer.resize(buffer.size() * 2);
+    } catch (const std::exception& e) {
+      cached_error = "Exception: " + std::string(e.what());
     }
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception: " + std::string(e.what()));
+  }
+
+  if (cached_path.has_value()) {
+    return cached_path.value();
+  } else {
+    return std::unexpected(cached_error.value());
   }
 }
 
@@ -70,4 +83,42 @@ auto Utils::Path::EnsureDirectoryExists(const std::filesystem::path& dir)
 auto Utils::Path::Combine(const std::filesystem::path& base, const std::string& filename)
     -> std::filesystem::path {
   return base / filename;
+}
+
+// 规范化路径为绝对路径，默认相对于程序目录
+auto Utils::Path::NormalizePath(const std::filesystem::path& path,
+                                std::optional<std::filesystem::path> base)
+    -> std::expected<std::filesystem::path, std::string> {
+  try {
+    std::filesystem::path base_path;
+
+    if (base.has_value()) {
+      base_path = base.value();
+    } else {
+      // 默认使用程序目录作为base
+      auto exe_dir_result = GetExecutableDirectory();
+      if (!exe_dir_result) {
+        return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+      }
+      base_path = exe_dir_result.value();
+    }
+
+    if (!base_path.is_absolute()) {
+      return std::unexpected("Base path must be an absolute path.");
+    }
+
+    std::filesystem::path combined_path;
+    if (path.is_absolute()) {
+      combined_path = path;
+    } else {
+      combined_path = base_path / path;
+    }
+
+    std::filesystem::path normalized_path = std::filesystem::weakly_canonical(combined_path);
+
+    return normalized_path;
+
+  } catch (const std::filesystem::filesystem_error& e) {
+    return std::unexpected(std::string(e.what()));
+  }
 }

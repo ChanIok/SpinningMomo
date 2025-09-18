@@ -19,6 +19,7 @@ struct Asset {
   std::optional<std::int64_t> size;
   std::string mime_type;
   std::optional<std::string> hash;  // xxh3哈希
+  std::optional<std::int64_t> folder_id;
 
   std::string created_at;
   std::string updated_at;
@@ -33,7 +34,6 @@ struct Folder {
   std::optional<std::string> display_name;
   std::optional<std::int64_t> cover_asset_id;
   int sort_order = 0;
-  int asset_count = 0;
   int is_hidden = 0;
   std::string created_at;
   std::string updated_at;
@@ -83,15 +83,14 @@ struct FolderHierarchy {
   int level = 0;
 };
 
-
 // ============= 扫描相关类型 =============
 
-// 轻量级的忽略规则（用于前端请求）
+//  忽略规则（用于前端请求）
 struct ScanIgnoreRule {
-  std::string pattern;                     // 模式字符串，如 "*.tmp", "node_modules/**"
-  std::string pattern_type = "glob";       // "glob" 或 "regex"
-  std::string rule_type = "exclude";       // "exclude" 或 "include"
-  std::optional<std::string> description;  // 可选的描述
+  std::string pattern;
+  std::string pattern_type = "glob";  // "glob" 或 "regex"
+  std::string rule_type = "exclude";  // "exclude" 或 "include"
+  std::optional<std::string> description;
 };
 
 struct ScanOptions {
@@ -102,17 +101,15 @@ struct ScanOptions {
   std::vector<std::string> supported_extensions = {".jpg",  ".jpeg", ".png", ".bmp",
                                                    ".webp", ".tiff", ".tif"};
   std::vector<ScanIgnoreRule> ignore_rules;
-  bool create_folder_records = true;
-  bool update_folder_counts = true;
 };
 
 struct ScanResult {
-  int total_files;
-  int new_items;
-  int updated_items;
-  int deleted_items;
-  std::vector<std::string> errors;
-  std::string scan_duration;
+  int total_files = 0;
+  int new_items = 0;
+  int updated_items = 0;
+  int deleted_items = 0;
+  std::vector<std::string> errors = {};
+  std::string scan_duration = "";
 };
 
 enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
@@ -175,8 +172,6 @@ struct ScanParams {
   std::uint32_t thumbnail_max_width = 400;
   std::uint32_t thumbnail_max_height = 400;
   std::vector<ScanIgnoreRule> ignore_rules;
-  bool create_folder_records = true;
-  bool update_folder_counts = true;
 };
 
 struct GetThumbnailParams {

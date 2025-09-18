@@ -49,7 +49,6 @@ const std::vector<MigrationScript> all_migrations = {
                     display_name TEXT,
                     cover_asset_id INTEGER,
                     sort_order INTEGER DEFAULT 0,
-                    asset_count INTEGER DEFAULT 0,
                     is_hidden BOOLEAN DEFAULT 0,
                     created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
                     updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),

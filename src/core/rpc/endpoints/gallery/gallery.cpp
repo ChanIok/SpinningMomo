@@ -72,15 +72,13 @@ auto handle_delete_asset(Core::State::AppState& app_state,
 auto handle_scan_directory(Core::State::AppState& app_state,
                            const Features::Gallery::Types::ScanParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::ScanResult>> {
-   Features::Gallery::Types::ScanOptions options{
+  Features::Gallery::Types::ScanOptions options{
       .directory = params.directory,
       .generate_thumbnails = params.generate_thumbnails,
       .thumbnail_max_width = params.thumbnail_max_width,
       .thumbnail_max_height = params.thumbnail_max_height,
       .supported_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"},
-      .ignore_rules = params.ignore_rules,
-      .create_folder_records = params.create_folder_records,
-      .update_folder_counts = params.update_folder_counts};
+      .ignore_rules = params.ignore_rules};
 
   auto result = Features::Gallery::scan_directory(app_state, options);
 

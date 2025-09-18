@@ -13,35 +13,30 @@ import Utils.Logger;
 
 namespace Features::Gallery::Folder::Repository {
 
-// ============= 基础CRUD操作 =============
-
 auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder)
     -> std::expected<std::int64_t, std::string> {
   std::string sql = R"(
             INSERT INTO folders (
                 path, parent_id, name, display_name, 
-                sort_order, asset_count, is_hidden,
+                sort_order, is_hidden,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
   params.push_back(folder.path);
 
-  // 处理 optional parent_id
   params.push_back(folder.parent_id.has_value()
                        ? Core::Database::Types::DbParam{folder.parent_id.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(folder.name);
 
-  // 处理 optional display_name
   params.push_back(folder.display_name.has_value()
                        ? Core::Database::Types::DbParam{folder.display_name.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(static_cast<int64_t>(folder.sort_order));
-  params.push_back(static_cast<int64_t>(folder.asset_count));
   params.push_back(folder.is_hidden);
   params.push_back(folder.created_at);
   params.push_back(folder.updated_at);
@@ -65,7 +60,7 @@ auto get_folder_by_path(Core::State::AppState& app_state, const std::string& pat
     -> std::expected<std::optional<Types::Folder>, std::string> {
   std::string sql = R"(
             SELECT id, path, parent_id, name, display_name, 
-                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   cover_asset_id, sort_order, is_hidden,
                    created_at, updated_at
             FROM folders
             WHERE path = ?
@@ -85,7 +80,7 @@ auto get_folder_by_id(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<std::optional<Types::Folder>, std::string> {
   std::string sql = R"(
             SELECT id, path, parent_id, name, display_name, 
-                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   cover_asset_id, sort_order, is_hidden,
                    created_at, updated_at
             FROM folders
             WHERE id = ?
@@ -106,7 +101,7 @@ auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder
   std::string sql = R"(
             UPDATE folders SET
                 path = ?, parent_id = ?, name = ?, display_name = ?,
-                cover_asset_id = ?, sort_order = ?, asset_count = ?, is_hidden = ?,
+                cover_asset_id = ?, sort_order = ?, is_hidden = ?,
                 updated_at = ?
             WHERE id = ?
         )";
@@ -114,25 +109,21 @@ auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder
   std::vector<Core::Database::Types::DbParam> params;
   params.push_back(folder.path);
 
-  // 处理 optional parent_id
   params.push_back(folder.parent_id.has_value()
                        ? Core::Database::Types::DbParam{folder.parent_id.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(folder.name);
 
-  // 处理 optional display_name
   params.push_back(folder.display_name.has_value()
                        ? Core::Database::Types::DbParam{folder.display_name.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
-  // 处理 optional cover_asset_id
   params.push_back(folder.cover_asset_id.has_value()
                        ? Core::Database::Types::DbParam{folder.cover_asset_id.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(static_cast<int64_t>(folder.sort_order));
-  params.push_back(static_cast<int64_t>(folder.asset_count));
   params.push_back(folder.is_hidden);
   params.push_back(folder.updated_at);
   params.push_back(folder.id);
@@ -159,13 +150,11 @@ auto delete_folder(Core::State::AppState& app_state, std::int64_t id)
   return {};
 }
 
-// ============= 层次结构操作 =============
-
 auto list_all_folders(Core::State::AppState& app_state)
     -> std::expected<std::vector<Types::Folder>, std::string> {
   std::string sql = R"(
             SELECT id, path, parent_id, name, display_name, 
-                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   cover_asset_id, sort_order, is_hidden,
                    created_at, updated_at
             FROM folders
             ORDER BY path
@@ -187,7 +176,7 @@ auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int6
   if (parent_id.has_value()) {
     sql = R"(
             SELECT id, path, parent_id, name, display_name, 
-                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   cover_asset_id, sort_order, is_hidden,
                    created_at, updated_at
             FROM folders
             WHERE parent_id = ?
@@ -198,7 +187,7 @@ auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int6
     // 获取根文件夹（parent_id 为 NULL）
     sql = R"(
             SELECT id, path, parent_id, name, display_name, 
-                   cover_asset_id, sort_order, asset_count, is_hidden,
+                   cover_asset_id, sort_order, is_hidden,
                    created_at, updated_at
             FROM folders
             WHERE parent_id IS NULL
@@ -214,42 +203,6 @@ auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int6
   return result.value();
 }
 
-auto update_folder_asset_count(Core::State::AppState& app_state, std::int64_t folder_id, int count)
-    -> std::expected<void, std::string> {
-  std::string timestamp = std::format("{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now());
-  std::string sql = "UPDATE folders SET asset_count = ?, updated_at = ? WHERE id = ?";
-
-  std::vector<Core::Database::Types::DbParam> params = {static_cast<int64_t>(count), timestamp,
-                                                        folder_id};
-
-  auto result = Core::Database::execute(*app_state.database, sql, params);
-  if (!result) {
-    return std::unexpected("Failed to update folder asset count: " + result.error());
-  }
-
-  return {};
-}
-
-auto recalculate_folder_asset_count(Core::State::AppState& app_state, std::int64_t folder_id)
-    -> std::expected<int, std::string> {
-  std::string sql = "SELECT COUNT(*) FROM assets WHERE folder_id = ? AND deleted_at IS NULL";
-  std::vector<Core::Database::Types::DbParam> params = {folder_id};
-
-  auto count_result = Core::Database::query_scalar<int>(*app_state.database, sql, params);
-  if (!count_result) {
-    return std::unexpected("Failed to count assets in folder: " + count_result.error());
-  }
-
-  int asset_count = count_result->value_or(0);
-
-  // 更新文件夹的资产计数
-  auto update_result = update_folder_asset_count(app_state, folder_id, asset_count);
-  if (!update_result) {
-    return std::unexpected("Failed to update folder asset count: " + update_result.error());
-  }
-
-  return asset_count;
-}
 
 auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::int64_t, std::string> {

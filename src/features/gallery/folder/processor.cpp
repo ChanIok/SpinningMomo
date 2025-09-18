@@ -9,22 +9,11 @@ import Core.State;
 import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
 import Utils.Logger;
+import Utils.Path;
 
 namespace Features::Gallery::Folder::Processor {
 
 // ============= 路径处理辅助函数 =============
-
-auto normalize_folder_path(const std::filesystem::path& folder_path) -> std::filesystem::path {
-  try {
-    // 获取绝对路径并规范化
-    auto absolute_path = std::filesystem::absolute(folder_path);
-    auto canonical_path = std::filesystem::weakly_canonical(absolute_path);
-    return canonical_path;
-  } catch (const std::filesystem::filesystem_error&) {
-    // 如果无法规范化，返回原路径
-    return folder_path;
-  }
-}
 
 auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_paths)
     -> std::vector<std::filesystem::path> {
@@ -34,7 +23,13 @@ auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_
   for (const auto& file_path : file_paths) {
     auto parent_path = file_path.parent_path();
     if (!parent_path.empty()) {
-      auto normalized = normalize_folder_path(parent_path);
+      auto normalized_result = Utils::Path::NormalizePath(parent_path);
+      if (!normalized_result) {
+        Logger().warn("Failed to normalize path '{}': {}", parent_path.string(),
+                      normalized_result.error());
+        continue;
+      }
+      auto normalized = normalized_result.value();
       auto path_str = normalized.string();
 
       if (unique_paths.insert(path_str).second) {
@@ -42,9 +37,6 @@ auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_
       }
     }
   }
-
-  // 按路径字符串排序，确保父目录在子目录之前处理
-  std::ranges::sort(result, [](const auto& a, const auto& b) { return a.string() < b.string(); });
 
   return result;
 }
@@ -87,7 +79,11 @@ auto get_or_create_folder_for_file_path(Core::State::AppState& app_state,
   }
 
   // 规范化路径
-  auto normalized_path = normalize_folder_path(parent_path);
+  auto normalized_result = Utils::Path::NormalizePath(parent_path);
+  if (!normalized_result) {
+    return std::unexpected("Failed to normalize path: " + normalized_result.error());
+  }
+  auto normalized_path = normalized_result.value();
 
   // 使用Repository的get_or_create功能
   auto folder_id_result =
@@ -117,10 +113,8 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   });
 
   for (const auto& folder_path : sorted_paths) {
-    auto normalized_path = normalize_folder_path(folder_path);
-    auto path_str = normalized_path.string();
+    auto path_str = folder_path.string();
 
-    // 如果已经处理过，跳过
     if (path_to_id_map.contains(path_str)) {
       continue;
     }
@@ -129,7 +123,7 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
     if (!folder_id_result) {
       Logger().error("Failed to create folder for path '{}': {}", path_str,
                      folder_id_result.error());
-      continue;  // 继续处理其他文件夹
+      continue;
     }
 
     path_to_id_map[path_str] = folder_id_result.value();
@@ -139,69 +133,6 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   return path_to_id_map;
 }
 
-// ============= 资产与文件夹关联功能 =============
-
-auto associate_assets_with_folders(Core::State::AppState& app_state,
-                                   const std::vector<Types::Asset>& assets)
-    -> std::expected<void, std::string> {
-  if (assets.empty()) {
-    return {};
-  }
-
-  // 提取所有文件路径的父目录
-  std::vector<std::filesystem::path> file_paths;
-  file_paths.reserve(assets.size());
-
-  for (const auto& asset : assets) {
-    file_paths.emplace_back(asset.filepath);
-  }
-
-  auto folder_paths = extract_unique_folder_paths(file_paths);
-
-  // 批量创建文件夹记录
-  auto path_to_id_result = batch_create_folders_for_paths(app_state, folder_paths);
-  if (!path_to_id_result) {
-    return std::unexpected("Failed to batch create folders: " + path_to_id_result.error());
-  }
-
-  auto path_to_id_map = path_to_id_result.value();
-
-  // TODO: 更新assets表中的folder_id字段
-  // 这部分需要在asset repository中实现批量更新folder_id的功能
-  // 或者在这里实现直接的SQL更新
-
-  Logger().info("Associated {} assets with their folders", assets.size());
-  return {};
-}
-
-auto recalculate_all_folder_asset_counts(Core::State::AppState& app_state)
-    -> std::expected<std::vector<std::pair<std::int64_t, int>>, std::string> {
-  // 获取所有文件夹
-  auto folders_result = Repository::list_all_folders(app_state);
-  if (!folders_result) {
-    return std::unexpected("Failed to list all folders: " + folders_result.error());
-  }
-
-  auto folders = folders_result.value();
-  std::vector<std::pair<std::int64_t, int>> results;
-  results.reserve(folders.size());
-
-  // 为每个文件夹重新计算资产数量
-  for (const auto& folder : folders) {
-    auto count_result = Repository::recalculate_folder_asset_count(app_state, folder.id);
-    if (count_result) {
-      results.emplace_back(folder.id, count_result.value());
-      Logger().debug("Folder '{}' (ID: {}) has {} assets", folder.path, folder.id,
-                     count_result.value());
-    } else {
-      Logger().warn("Failed to recalculate asset count for folder '{}' (ID: {}): {}", folder.path,
-                    folder.id, count_result.error());
-      results.emplace_back(folder.id, 0);  // 默认为0
-    }
-  }
-
-  Logger().info("Recalculated asset counts for {} folders", results.size());
-  return results;
-}
+ 
 
 }  // namespace Features::Gallery::Folder::Processor

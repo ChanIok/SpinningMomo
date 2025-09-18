@@ -1,6 +1,6 @@
 module;
 
-#include <rfl.hpp>  // 用于反射
+#include <rfl.hpp>
 
 module Features.Gallery.Asset.Repository;
 
@@ -21,9 +21,9 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   std::string sql = R"(
             INSERT INTO assets (
                 name, path, type,
-                width, height, size, mime_type, hash,
+                width, height, size, mime_type, hash, folder_id,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
@@ -45,6 +45,10 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
 
   params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(item.folder_id.has_value()
+                       ? Core::Database::Types::DbParam{item.folder_id.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.created_at);
   params.push_back(item.updated_at);
@@ -68,7 +72,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
-                   width, height, size, mime_type, hash,
+                   width, height, size, mime_type, hash, folder_id,
                    created_at, updated_at, deleted_at
             FROM assets
             WHERE id = ? AND deleted_at IS NULL
@@ -88,7 +92,7 @@ auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& 
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
-                   width, height, size, mime_type, hash,
+                   width, height, size, mime_type, hash, folder_id,
                    created_at, updated_at, deleted_at
             FROM assets
             WHERE path = ? AND deleted_at IS NULL
@@ -240,7 +244,7 @@ auto list_asset(Core::State::AppState& app_state, const Types::ListParams& param
   // 构建主查询
   std::string sql = std::format(R"(
             SELECT id, name, path as filepath, type,
-                   width, height, size, mime_type, hash,
+                   width, height, size, mime_type, hash, folder_id,
                    created_at, updated_at, deleted_at
             FROM assets
             {}
@@ -411,7 +415,7 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
   std::string sql = R"(
     INSERT INTO assets (
       name, path, type,
-      width, height, size, mime_type, hash,
+      width, height, size, mime_type, hash, folder_id,
       created_at, updated_at
     ) VALUES
   )";
@@ -419,10 +423,10 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
   std::vector<std::string> value_placeholders;
   std::vector<Core::Database::Types::DbParam> all_params;
   value_placeholders.reserve(items.size());
-  all_params.reserve(items.size() * 11);  // 11个字段
+  all_params.reserve(items.size() * 12);  // 12个字段
 
   for (const auto& item : items) {
-    value_placeholders.push_back("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    value_placeholders.push_back("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     // 按顺序添加所有参数
     all_params.push_back(item.name);
@@ -444,6 +448,10 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
 
     all_params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                                : Core::Database::Types::DbParam{std::monostate{}});
+
+    all_params.push_back(item.folder_id.has_value()
+                             ? Core::Database::Types::DbParam{item.folder_id.value()}
+                             : Core::Database::Types::DbParam{std::monostate{}});
 
     all_params.push_back(item.created_at);
     all_params.push_back(item.updated_at);
@@ -499,7 +507,7 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
         std::string sql = R"(
         UPDATE assets SET
           name = ?, path = ?, type = ?,
-          width = ?, height = ?, size = ?, mime_type = ?, hash = ?,
+          width = ?, height = ?, size = ?, mime_type = ?, hash = ?, folder_id = ?,
           updated_at = ?
         WHERE id = ?
       )";
@@ -526,6 +534,10 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
 
           params.push_back(item.hash.has_value()
                                ? Core::Database::Types::DbParam{item.hash.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+
+          params.push_back(item.folder_id.has_value()
+                               ? Core::Database::Types::DbParam{item.folder_id.value()}
                                : Core::Database::Types::DbParam{std::monostate{}});
 
           params.push_back(item.updated_at);

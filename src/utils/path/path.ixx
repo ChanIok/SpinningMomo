@@ -21,4 +21,9 @@ export auto EnsureDirectoryExists(const std::filesystem::path& dir)
 export auto Combine(const std::filesystem::path& base, const std::string& filename)
     -> std::filesystem::path;
 
+// 规范化路径为绝对路径，默认相对于程序目录
+export auto NormalizePath(const std::filesystem::path& path,
+                          std::optional<std::filesystem::path> base = std::nullopt)
+    -> std::expected<std::filesystem::path, std::string>;
+
 }  // namespace Utils::Path

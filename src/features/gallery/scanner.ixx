@@ -48,13 +48,15 @@ export auto analyze_file_changes(
 export auto process_files_in_parallel(
     Core::State::AppState& app_state,
     const std::vector<Types::FileAnalysisResult>& files_to_process,
-    const Types::ScanOptions& options) -> std::expected<Types::ProcessingBatchResult, std::string>;
+    const Types::ScanOptions& options,
+    const std::unordered_map<std::string, std::int64_t>& folder_mapping = {})
+    -> std::expected<Types::ProcessingBatchResult, std::string>;
 
 // 优化的单文件处理
-export auto process_single_file_optimized(Core::State::AppState& app_state,
-                                          Utils::Image::WICFactory& wic_factory,
-                                          const Types::FileAnalysisResult& analysis,
-                                          const Types::ScanOptions& options)
+export auto process_single_file(
+    Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
+    const Types::FileAnalysisResult& analysis, const Types::ScanOptions& options,
+    const std::unordered_map<std::string, std::int64_t>& folder_mapping = {})
     -> std::expected<Types::Asset, std::string>;
 
 }  // namespace Features::Gallery::Scanner
