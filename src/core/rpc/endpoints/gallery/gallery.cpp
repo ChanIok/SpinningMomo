@@ -177,7 +177,7 @@ auto register_all(Core::State::AppState& app_state) -> void {
   // 扫描和索引
   Core::RPC::register_method<Features::Gallery::Types::ScanParams,
                              Features::Gallery::Types::ScanResult>(
-      app_state, app_state.rpc->registry, "gallery.scan", handle_scan_directory,
+      app_state, app_state.rpc->registry, "gallery.scanDirectory", handle_scan_directory,
       "Scan directory for asset files and add them to the library. Supports ignore rules and "
       "folder management.");
 

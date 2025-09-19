@@ -148,6 +148,79 @@ auto query_scalar(State::DatabaseState& state, const std::string& sql,
   }
 }
 
+// 批量INSERT操作（自动分批处理）
+export template <typename T, typename ParamExtractor>
+auto execute_batch_insert(State::DatabaseState& state, const std::string& insert_prefix,
+                          const std::string& values_placeholder, const std::vector<T>& items,
+                          ParamExtractor param_extractor, size_t max_params_per_batch = 999)
+    -> std::expected<std::vector<int64_t>, std::string> {
+  if (items.empty()) {
+    return std::vector<int64_t>{};
+  }
+
+  // 计算每个item需要的参数数量
+  auto sample_params = param_extractor(items[0]);
+  size_t params_per_item = sample_params.size();
+  size_t max_items_per_batch = max_params_per_batch / params_per_item;
+
+  if (max_items_per_batch == 0) {
+    return std::unexpected("Single item exceeds maximum parameter limit");
+  }
+
+  std::vector<int64_t> all_inserted_ids;
+  all_inserted_ids.reserve(items.size());
+
+  return execute_transaction(
+      state,
+      [&](State::DatabaseState& db_state) -> std::expected<std::vector<int64_t>, std::string> {
+        for (size_t batch_start = 0; batch_start < items.size();
+             batch_start += max_items_per_batch) {
+          size_t batch_end = std::min(batch_start + max_items_per_batch, items.size());
+          size_t batch_size = batch_end - batch_start;
+
+          // 构建当前批次的SQL
+          std::string batch_sql = insert_prefix;
+          std::vector<std::string> value_clauses;
+          std::vector<Types::DbParam> all_params;
+
+          value_clauses.reserve(batch_size);
+          all_params.reserve(batch_size * params_per_item);
+
+          for (size_t i = batch_start; i < batch_end; ++i) {
+            value_clauses.push_back(values_placeholder);
+            auto item_params = param_extractor(items[i]);
+            all_params.insert(all_params.end(), item_params.begin(), item_params.end());
+          }
+
+          // 合并VALUES子句
+          for (size_t i = 0; i < value_clauses.size(); ++i) {
+            if (i > 0) batch_sql += ", ";
+            batch_sql += value_clauses[i];
+          }
+
+          auto result = execute(db_state, batch_sql, all_params);
+          if (!result) {
+            return std::unexpected("Batch insert failed: " + result.error());
+          }
+
+          // 获取插入的ID范围
+          auto last_id_result = query_scalar<int64_t>(db_state, "SELECT last_insert_rowid()");
+          if (!last_id_result || !last_id_result->has_value()) {
+            return std::unexpected("Failed to get last insert ID");
+          }
+
+          int64_t last_id = last_id_result->value();
+          int64_t first_id = last_id - static_cast<int64_t>(batch_size) + 1;
+
+          // 添加当前批次的ID到结果中
+          for (int64_t id = first_id; id <= last_id; ++id) {
+            all_inserted_ids.push_back(id);
+          }
+        }
+        return all_inserted_ids;
+      });
+}
+
 // 事务管理
 export template <typename Func>
 auto execute_transaction(State::DatabaseState& state, Func&& func) -> decltype(auto) {

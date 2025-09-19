@@ -427,91 +427,57 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
     return std::vector<int64_t>{};
   }
 
-  // 构建批量插入SQL
-  std::string sql = R"(
+  std::string insert_prefix = R"(
     INSERT INTO assets (
       name, path, type,
       width, height, size, mime_type, hash, folder_id,
       file_created_at, file_modified_at
-    ) VALUES
+    ) VALUES 
   )";
 
-  std::vector<std::string> value_placeholders;
-  std::vector<Core::Database::Types::DbParam> all_params;
-  value_placeholders.reserve(items.size());
-  all_params.reserve(items.size() * 11);  // 11个字段
+  std::string values_placeholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-  for (const auto& item : items) {
-    value_placeholders.push_back("(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+  // 参数提取器，将Asset对象转换为参数列表
+  auto param_extractor =
+      [](const Types::Asset& item) -> std::vector<Core::Database::Types::DbParam> {
+    std::vector<Core::Database::Types::DbParam> params;
+    params.reserve(11);  // 11个字段
 
-    // 按顺序添加所有参数
-    all_params.push_back(item.name);
-    all_params.push_back(item.filepath);
-    all_params.push_back(item.type);
+    params.push_back(item.name);
+    params.push_back(item.filepath);
+    params.push_back(item.type);
 
-    all_params.push_back(
-        item.width.has_value()
-            ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
-            : Core::Database::Types::DbParam{std::monostate{}});
-    all_params.push_back(
-        item.height.has_value()
-            ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
-            : Core::Database::Types::DbParam{std::monostate{}});
-    all_params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
-                                               : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.width.has_value()
+                         ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.height.has_value()
+                         ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
+                                           : Core::Database::Types::DbParam{std::monostate{}});
 
-    all_params.push_back(item.mime_type);
+    params.push_back(item.mime_type);
 
-    all_params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
-                                               : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
+                                           : Core::Database::Types::DbParam{std::monostate{}});
 
-    all_params.push_back(item.folder_id.has_value()
-                             ? Core::Database::Types::DbParam{item.folder_id.value()}
-                             : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.folder_id.has_value()
+                         ? Core::Database::Types::DbParam{item.folder_id.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
 
-    all_params.push_back(item.file_created_at.has_value()
-                             ? Core::Database::Types::DbParam{item.file_created_at.value()}
-                             : Core::Database::Types::DbParam{std::monostate{}});
-    all_params.push_back(item.file_modified_at.has_value()
-                             ? Core::Database::Types::DbParam{item.file_modified_at.value()}
-                             : Core::Database::Types::DbParam{std::monostate{}});
-  }
+    params.push_back(item.file_created_at.has_value()
+                         ? Core::Database::Types::DbParam{item.file_created_at.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.file_modified_at.has_value()
+                         ? Core::Database::Types::DbParam{item.file_modified_at.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
 
-  // 合并所有 VALUES 子句
-  for (size_t i = 0; i < value_placeholders.size(); ++i) {
-    if (i > 0) sql += ", ";
-    sql += value_placeholders[i];
-  }
+    return params;
+  };
 
-  // 在事务中执行批量插入
-  return Core::Database::execute_transaction(
-      *app_state.database,
-      [&](Core::Database::State::DatabaseState& db_state)
-          -> std::expected<std::vector<int64_t>, std::string> {
-        auto result = Core::Database::execute(db_state, sql, all_params);
-        if (!result) {
-          return std::unexpected("Failed to execute batch insert: " + result.error());
-        }
-
-        // 获取批量插入的ID范围
-        auto last_id_result =
-            Core::Database::query_scalar<int64_t>(db_state, "SELECT last_insert_rowid()");
-        if (!last_id_result || !last_id_result->has_value()) {
-          return std::unexpected("Failed to get last insert ID");
-        }
-
-        int64_t last_id = last_id_result->value();
-        int64_t first_id = last_id - static_cast<int64_t>(items.size()) + 1;
-
-        // 生成ID列表
-        std::vector<int64_t> inserted_ids;
-        inserted_ids.reserve(items.size());
-        for (int64_t id = first_id; id <= last_id; ++id) {
-          inserted_ids.push_back(id);
-        }
-
-        return inserted_ids;
-      });
+  // 使用批量插入接口，自动处理分批
+  return Core::Database::execute_batch_insert(*app_state.database, insert_prefix,
+                                              values_placeholder, items, param_extractor);
 }
 
 auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Types::Asset>& items)
@@ -520,20 +486,23 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
     return {};
   }
 
-  // 使用事务批量执行update（目前SQLite不支持真正的bulk update）
+  // 使用事务批量执行update（SQLite不支持bulk update）
   return Core::Database::execute_transaction(
       *app_state.database,
       [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
         std::string sql = R"(
-        UPDATE assets SET
-          name = ?, path = ?, type = ?,
-          width = ?, height = ?, size = ?, mime_type = ?, hash = ?, folder_id = ?,
-          file_created_at = ?, file_modified_at = ?
-        WHERE id = ?
-      )";
+          UPDATE assets SET
+            name = ?, path = ?, type = ?,
+            width = ?, height = ?, size = ?, mime_type = ?, hash = ?, folder_id = ?,
+            file_created_at = ?, file_modified_at = ?
+          WHERE id = ?
+        )";
 
-        for (const auto& item : items) {
+        // 提取参数的lambda，避免在循环中重复代码
+        auto extract_params = [](const Types::Asset& item) {
           std::vector<Core::Database::Types::DbParam> params;
+          params.reserve(12);  // 11个更新字段 + 1个WHERE条件
+
           params.push_back(item.name);
           params.push_back(item.filepath);
           params.push_back(item.type);
@@ -567,11 +536,18 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
                                ? Core::Database::Types::DbParam{item.file_modified_at.value()}
                                : Core::Database::Types::DbParam{std::monostate{}});
 
-          params.push_back(item.id);
+          params.push_back(item.id);  // WHERE id = ?
 
+          return params;
+        };
+
+        // 执行批量更新
+        for (const auto& item : items) {
+          auto params = extract_params(item);
           auto result = Core::Database::execute(db_state, sql, params);
           if (!result) {
-            return std::unexpected("Failed to update asset item: " + result.error());
+            return std::unexpected("Failed to update asset item (id=" + std::to_string(item.id) +
+                                   "): " + result.error());
           }
         }
 

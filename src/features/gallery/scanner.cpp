@@ -24,11 +24,19 @@ import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
 import Utils.Time;
+import Vendor.BuildConfig;
 
 namespace Features::Gallery::Scanner {
 
 auto calculate_file_hash(const std::filesystem::path& file_path)
     -> std::expected<std::string, std::string> {
+  if (Vendor::BuildConfig::is_debug_build()) {
+    // Debug模式：直接hash文件路径，避免XXH3性能问题
+    auto path_str = file_path.string();
+    auto hash = std::hash<std::string>{}(path_str);
+    return std::format("{:016x}", hash);
+  }
+
   std::ifstream file(file_path, std::ios::binary);
   if (!file) {
     return std::unexpected("Cannot open file for hashing: " + file_path.string());
