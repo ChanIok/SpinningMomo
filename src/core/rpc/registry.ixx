@@ -4,39 +4,10 @@ export module Core.RPC.Registry;
 
 import std;
 import Core.State;
-import Core.RPC.Endpoints.Dialog;
-import Core.RPC.Endpoints.File;
-import Core.RPC.Endpoints.Settings;
-import Core.RPC.Endpoints.Updater;
-import Core.RPC.Endpoints.WebView;
-import Core.RPC.Endpoints.Gallery;
-import Utils.Logger;
 
 namespace Core::RPC::Registry {
 
 // 注册所有RPC端点
-export auto register_all_endpoints(Core::State::AppState& state) -> void {
-  Logger().info("Starting RPC endpoints registration...");
-
-  // 注册文件操作端点
-  Endpoints::File::register_all(state);
-
-  // 注册设置端点
-  Endpoints::Settings::register_all(state);
-
-  // 注册对话框端点
-  Endpoints::Dialog::register_all(state);
-
-  // 注册更新端点
-  Endpoints::Updater::register_all(state);
-
-  // 注册Webview端点
-  Endpoints::WebView::register_all(state);
-
-  // 注册Gallery端点
-  Endpoints::Gallery::register_all(state);
-
-  Logger().info("RPC endpoints registration completed");
-}
+export auto register_all_endpoints(Core::State::AppState& state) -> void;
 
 }  // namespace Core::RPC::Registry
