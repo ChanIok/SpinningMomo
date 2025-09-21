@@ -1,8 +1,7 @@
 module;
 
-#include <wil/resource.h>
-#include <wil/result.h>
-#include <windows.h>
+#include <strsafe.h>
+#include <string>
 
 module Plugins.InfinityNikki;
 
@@ -10,6 +9,8 @@ import std;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.String;
+import Vendor.Windows;
+import Vendor.WIL;
 
 namespace Plugins::InfinityNikki {
 
@@ -18,9 +19,9 @@ auto get_config_file_path() -> std::filesystem::path {
   // 获取用户主目录
   wchar_t* user_profile = nullptr;
   size_t len = 0;
-  if (_wdupenv_s(&user_profile, &len, L"USERPROFILE") == 0 && user_profile != nullptr) {
+  if (Vendor::WIL::_wdupenv_s(&user_profile, &len, L"USERPROFILE") == 0 && user_profile != nullptr) {
     std::filesystem::path config_path = user_profile;
-    free(user_profile);  // _wdupenv_s 分配的内存需要手动释放
+    Vendor::WIL::free(user_profile);  // _wdupenv_s 分配的内存需要手动释放
 
     config_path /= L"AppData\\Local\\InfinityNikki Launcher\\config.ini";
     return config_path;
@@ -35,14 +36,14 @@ auto get_game_directory_from_config(const std::filesystem::path& config_path)
     -> std::expected<std::string, std::string> {
   try {
     // 固定大小的缓冲区对于路径来说通常足够
-    constexpr DWORD buffer_size = MAX_PATH * 2;  // 给予足够的空间
-    auto buffer = wil::make_unique_hlocal_nothrow<wchar_t[]>(buffer_size);
+    constexpr Vendor::Windows::DWORD buffer_size = Vendor::Windows::c_MAX_PATH * 2;  // 给予足够的空间
+    auto buffer = Vendor::WIL::make_unique_hlocal_nothrow<wchar_t[]>(buffer_size);
 
     if (!buffer) {
       return std::unexpected("Memory allocation failed");
     }
 
-    DWORD result = GetPrivateProfileStringW(L"Download", L"gameDir", L"", buffer.get(), buffer_size,
+    Vendor::Windows::DWORD result = Vendor::Windows::GetPrivateProfileStringW(L"Download", L"gameDir", L"", buffer.get(), buffer_size,
                                             config_path.wstring().c_str());
 
     if (result == 0) {

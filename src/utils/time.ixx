@@ -1,10 +1,9 @@
 module;
 
-#include <windows.h>
-
 export module Utils.Time;
 
 import std;
+import Vendor.Windows;
 
 namespace Utils::Time {
 
@@ -25,17 +24,17 @@ export auto file_time_to_millis(const std::filesystem::file_time_type& file_time
 // 获取文件创建时间的毫秒时间戳
 export auto get_file_creation_time_millis(const std::filesystem::path& file_path)
     -> std::expected<std::int64_t, std::string> {
-  WIN32_FILE_ATTRIBUTE_DATA fileAttr;
+  Vendor::Windows::WIN32_FILE_ATTRIBUTE_DATA fileAttr;
 
-  if (!GetFileAttributesExW(file_path.c_str(), GetFileExInfoStandard, &fileAttr)) {
-    DWORD error = GetLastError();
+  if (!Vendor::Windows::GetFileAttributesExW(file_path.c_str(), Vendor::Windows::c_GetFileExInfoStandard, &fileAttr)) {
+    Vendor::Windows::DWORD error = Vendor::Windows::GetLastError();
     return std::unexpected(std::format("Failed to get file attributes: {}", error));
   }
 
   // 转换创建时间
-  FILETIME& creationTime = fileAttr.ftCreationTime;
+  Vendor::Windows::FILETIME& creationTime = fileAttr.ftCreationTime;
 
-  ULARGE_INTEGER ull;
+  Vendor::Windows::ULARGE_INTEGER ull;
   ull.LowPart = creationTime.dwLowDateTime;
   ull.HighPart = creationTime.dwHighDateTime;
 

@@ -73,6 +73,22 @@ export auto MsgWaitForMultipleObjectsEx(DWORD nCount, const HANDLE* pHandles, DW
   return ::MsgWaitForMultipleObjectsEx(nCount, pHandles, dwMilliseconds, dwWakeMask, dwFlags);
 }
 
+// 文件操作相关的包装函数
+export auto GetFileAttributesExW(LPCWSTR lpFileName, GET_FILEEX_INFO_LEVELS fInfoLevelId,
+                                LPVOID lpFileInformation) -> BOOL {
+  return ::GetFileAttributesExW(lpFileName, fInfoLevelId, lpFileInformation);
+}
+
+export auto GetLastError() -> DWORD {
+  return ::GetLastError();
+}
+
+// INI 配置文件相关的包装函数
+export auto GetPrivateProfileStringW(LPCWSTR lpAppName, LPCWSTR lpKeyName, LPCWSTR lpDefault,
+                                   LPWSTR lpReturnedString, DWORD nSize, LPCWSTR lpFileName) -> DWORD {
+  return ::GetPrivateProfileStringW(lpAppName, lpKeyName, lpDefault, lpReturnedString, nSize, lpFileName);
+}
+
 // Windows 常量导出
 export constexpr UINT MB_ICONERROR_t = 0x00000010L;
 export constexpr UINT WM_USER_t = 0x0400;
@@ -117,5 +133,20 @@ export using DWORD = ::DWORD;
 // 窗口相关类型
 export using RECT = ::RECT;
 export using SIZE = ::SIZE;
+
+// 文件操作相关类型
+export using WIN32_FILE_ATTRIBUTE_DATA = ::WIN32_FILE_ATTRIBUTE_DATA;
+export using FILETIME = ::FILETIME;
+export using ULARGE_INTEGER = ::ULARGE_INTEGER;
+export using LPCWSTR = ::LPCWSTR;
+export using LPVOID = ::LPVOID;
+
+// 文件信息级别枚举
+export using GET_FILEEX_INFO_LEVELS = ::GET_FILEEX_INFO_LEVELS;
+
+
+export constexpr GET_FILEEX_INFO_LEVELS c_GetFileExInfoStandard = ::GetFileExInfoStandard;
+
+export constexpr DWORD c_MAX_PATH = MAX_PATH;
 
 }  // namespace Vendor::Windows

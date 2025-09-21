@@ -1,50 +1,47 @@
-function(embed_json_as_module input_file output_file module_name variable_name)
-    # 读取JSON文件内容
-    file(READ ${input_file} json_content)
-    
-    # 使用Raw字符串字面量，避免转义问题
-    # 生成C++模块代码
-    set(cpp_content "// Auto-generated from ${input_file} - DO NOT EDIT
-module;
-
-export module ${module_name};
-
-import std;
-
-export namespace EmbeddedLocales {
-    constexpr std::string_view ${variable_name} = R\"EmbeddedJson(${json_content})EmbeddedJson\";
-}
-")
-    
-    # 写入生成的C++文件
-    file(WRITE ${output_file} "${cpp_content}")
-endfunction()
-
 # 嵌入所有语言文件的函数
+# 使用add_custom_command实现增量构建
 function(embed_all_locales)
     # 确保生成目录存在
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/generated/locales)
     
-    # 嵌入中文
-    embed_json_as_module(
-        "${CMAKE_SOURCE_DIR}/src/locales/zh-CN.json"
-        "${CMAKE_BINARY_DIR}/generated/locales/zh_cn_embedded.ixx"
-        "Core.I18n.Embedded.ZhCN"
-        "zh_cn_json"
+    # 中文语言文件
+    set(zh_input "${CMAKE_SOURCE_DIR}/src/locales/zh-CN.json")
+    set(zh_output "${CMAKE_BINARY_DIR}/generated/locales/zh_cn_embedded.ixx")
+    add_custom_command(
+        OUTPUT "${zh_output}"
+        COMMAND ${CMAKE_COMMAND}
+            -DINPUT_FILE=${zh_input}
+            -DOUTPUT_FILE=${zh_output}
+            -DMODULE_NAME=Core.I18n.Embedded.ZhCN
+            -DVARIABLE_NAME=zh_cn_json
+            -P ${CMAKE_SOURCE_DIR}/cmake/generate_locale.cmake
+        DEPENDS "${zh_input}" "${CMAKE_SOURCE_DIR}/cmake/generate_locale.cmake"
+        COMMENT "Generating zh-CN embedded locale"
+        VERBATIM
     )
     
-    # 嵌入英文
-    embed_json_as_module(
-        "${CMAKE_SOURCE_DIR}/src/locales/en-US.json"
-        "${CMAKE_BINARY_DIR}/generated/locales/en_us_embedded.ixx"
-        "Core.I18n.Embedded.EnUS"
-        "en_us_json"
+    # 英文语言文件
+    set(en_input "${CMAKE_SOURCE_DIR}/src/locales/en-US.json")
+    set(en_output "${CMAKE_BINARY_DIR}/generated/locales/en_us_embedded.ixx")
+    add_custom_command(
+        OUTPUT "${en_output}"
+        COMMAND ${CMAKE_COMMAND}
+            -DINPUT_FILE=${en_input}
+            -DOUTPUT_FILE=${en_output}
+            -DMODULE_NAME=Core.I18n.Embedded.EnUS
+            -DVARIABLE_NAME=en_us_json
+            -P ${CMAKE_SOURCE_DIR}/cmake/generate_locale.cmake
+        DEPENDS "${en_input}" "${CMAKE_SOURCE_DIR}/cmake/generate_locale.cmake"
+        COMMENT "Generating en-US embedded locale"
+        VERBATIM
     )
     
     # 返回生成的文件列表给父作用域
     set(EMBEDDED_LOCALE_SOURCES
-        "${CMAKE_BINARY_DIR}/generated/locales/zh_cn_embedded.ixx"
-        "${CMAKE_BINARY_DIR}/generated/locales/en_us_embedded.ixx"
+        "${zh_output}"
+        "${en_output}"
         PARENT_SCOPE
     )
-endfunction() 
+    
+    message(STATUS "Configured embedded locale modules for incremental build")
+endfunction()
