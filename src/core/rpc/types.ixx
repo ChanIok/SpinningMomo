@@ -1,7 +1,6 @@
 module;
 
 #include <asio.hpp>
-#include <rfl.hpp>
 #include <rfl/json.hpp>
 
 export module Core.RPC.Types;

@@ -1,7 +1,5 @@
 module;
 
-#include <format>
-
 module Features.Gallery.Folder.Processor;
 
 import std;

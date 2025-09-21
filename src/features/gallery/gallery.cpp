@@ -1,7 +1,5 @@
 module;
 
-#include <format>
-
 module Features.Gallery;
 
 import std;

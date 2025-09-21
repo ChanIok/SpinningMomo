@@ -8,6 +8,7 @@ module;
 #include <format>
 #include <fstream>
 #include <iostream>
+#include <regex>
 #include <rfl/json.hpp>
 #include <string>
 
@@ -69,4 +70,11 @@ export [[maybe_unused]] auto force_rfl_linkage() -> void {
   const auto dummy_obj = RflLinkWorkaround{1, "test"};
   const auto json_string = rfl::json::write(dummy_obj);
   (void)rfl::json::read<RflLinkWorkaround>(json_string);
+}
+
+// 正则表达式链接器解决方案
+export [[maybe_unused]] auto force_regex_linkage() -> void {
+  // 强制实例化带有 icase 标志的 std::regex，确保 tolower 符号被链接
+  std::regex dummy_regex(".*", std::regex_constants::icase);
+  (void)dummy_regex;
 }

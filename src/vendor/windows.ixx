@@ -6,10 +6,6 @@ export module Vendor.Windows;
 
 namespace Vendor::Windows {
 
-export auto OutputDebugStringW(const wchar_t* lpOutputString) -> void {
-  ::OutputDebugStringW(lpOutputString);
-}
-
 // 获取系统度量信息的包装函数
 export auto GetSystemMetrics(int nIndex) -> int { return ::GetSystemMetrics(nIndex); }
 
@@ -60,11 +56,6 @@ export auto PostQuitMessage(int nExitCode) -> void { ::PostQuitMessage(nExitCode
 // 窗口重绘相关的包装函数
 export auto InvalidateRect(HWND hWnd, const RECT* lpRect, BOOL bErase) -> BOOL {
   return ::InvalidateRect(hWnd, lpRect, bErase);
-}
-
-// 系统信息相关的包装函数
-export auto GetVersionExW(LPOSVERSIONINFOW lpVersionInformation) -> BOOL {
-  return ::GetVersionExW(lpVersionInformation);
 }
 
 // 同步相关的包装函数

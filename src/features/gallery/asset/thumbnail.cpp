@@ -1,8 +1,5 @@
 module;
 
-#include <format>
-#include <iostream>
-
 module Features.Gallery.Asset.Thumbnail;
 
 import std;

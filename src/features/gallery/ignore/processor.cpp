@@ -1,7 +1,5 @@
 module;
 
-#include <regex>
-
 module Features.Gallery.Ignore.Processor;
 
 import std;

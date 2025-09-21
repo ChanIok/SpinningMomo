@@ -1,13 +1,5 @@
 module;
 
-#include <wil/com.h>
-#include <xxhash.h>
-
-#include <format>
-#include <functional>
-#include <iostream>
-#include <latch>
-
 module Features.Gallery.Scanner;
 
 import std;
@@ -25,6 +17,7 @@ import Utils.Logger;
 import Utils.Path;
 import Utils.Time;
 import Vendor.BuildConfig;
+import Vendor.XXHash;
 
 namespace Features::Gallery::Scanner {
 
@@ -51,9 +44,9 @@ auto calculate_file_hash(const std::filesystem::path& file_path)
   }
 
   // 计算XXH3哈希
-  auto hash = XXH3_64bits(buffer.data(), buffer.size());
+  auto hash = Vendor::XXHash::HashCharVectorToHex(buffer);
 
-  return std::format("{:016x}", hash);
+  return hash;
 }
 
 auto is_supported_file(const std::filesystem::path& file_path,
@@ -66,7 +59,7 @@ auto is_supported_file(const std::filesystem::path& file_path,
 
   // 转换为小写进行比较
   std::ranges::transform(extension, extension.begin(),
-                         [](unsigned char c) { return static_cast<char>(::tolower(c)); });
+                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
   return std::ranges::find(supported_extensions, extension) != supported_extensions.end();
 }
@@ -147,7 +140,7 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
 
   std::string extension = file_path.extension().string();
   std::ranges::transform(extension, extension.begin(),
-                         [](unsigned char c) { return static_cast<char>(::tolower(c)); });
+                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
   // 图片格式
   if (extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".bmp" ||
