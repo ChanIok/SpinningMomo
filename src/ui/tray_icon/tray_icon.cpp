@@ -106,9 +106,8 @@ auto build_tray_menu_items(Core::State::AppState& state)
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      state.app_window->window.is_visible ? 
-      Utils::String::FromUtf8(texts.menu.app_hide) : 
-      Utils::String::FromUtf8(texts.menu.app_show),
+      state.app_window->window.is_visible ? Utils::String::FromUtf8(texts.menu.app_hide)
+                                          : Utils::String::FromUtf8(texts.menu.app_show),
       "panel.hide"));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
@@ -129,12 +128,12 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   nid.hWnd = state.app_window->window.hwnd;
   nid.uID = UI::TrayIcon::Types::HOTKEY_ID;
   nid.uFlags =
-      Vendor::ShellApi::NIF_ICON_t | Vendor::ShellApi::NIF_MESSAGE_t | Vendor::ShellApi::NIF_TIP_t;
+      Vendor::ShellApi::kNIF_ICON | Vendor::ShellApi::kNIF_MESSAGE | Vendor::ShellApi::kNIF_TIP;
   nid.uCallbackMessage = UI::TrayIcon::Types::WM_TRAYICON;
 
   nid.hIcon = static_cast<HICON>(LoadImageW(
-      state.app_window->window.instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1), IMAGE_ICON,
-      GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
+      state.app_window->window.instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1),
+      IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
   if (!nid.hIcon) nid.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
   if (!nid.hIcon) return std::unexpected("Failed to load tray icon.");
 
@@ -144,7 +143,7 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   app_name.copy(nid.szTip, copy_len);
   nid.szTip[copy_len] = L'\0';
 
-  if (!Vendor::ShellApi::Shell_NotifyIconW(Vendor::ShellApi::NIM_ADD_t, &nid)) {
+  if (!Vendor::ShellApi::Shell_NotifyIconW(Vendor::ShellApi::kNIM_ADD, &nid)) {
     return std::unexpected("Failed to add tray icon to the shell.");
   }
   state.tray_icon->is_created = true;
@@ -155,7 +154,7 @@ auto destroy(Core::State::AppState& state) -> void {
   if (!state.tray_icon->is_created) {
     return;
   }
-  Vendor::ShellApi::Shell_NotifyIconW(Vendor::ShellApi::NIM_DELETE_t, &state.tray_icon->nid);
+  Vendor::ShellApi::Shell_NotifyIconW(Vendor::ShellApi::kNIM_DELETE, &state.tray_icon->nid);
   if (state.tray_icon->nid.hIcon) {
     DestroyIcon(state.tray_icon->nid.hIcon);
     state.tray_icon->nid.hIcon = nullptr;

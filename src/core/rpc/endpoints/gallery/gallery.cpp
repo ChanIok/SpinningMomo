@@ -1,7 +1,6 @@
 module;
 
 #include <asio.hpp>
-#include <rfl.hpp>
 #include <rfl/json.hpp>
 
 module Core.RPC.Endpoints.Gallery;
@@ -94,7 +93,7 @@ auto handle_scan_directory(Core::State::AppState& app_state,
 // ============= 缩略图 RPC 处理函数 =============
 
 auto handle_cleanup_thumbnails(Core::State::AppState& app_state,
-                               [[maybe_unused]] const rfl::Generic& params)
+                               [[maybe_unused]] const Core::RPC::EmptyParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::OperationResult>> {
   auto result = Features::Gallery::cleanup_thumbnails(app_state);
 
@@ -124,7 +123,7 @@ auto handle_get_asset_stats(Core::State::AppState& app_state,
 }
 
 auto handle_get_thumbnail_stats(Core::State::AppState& app_state,
-                                [[maybe_unused]] const rfl::Generic& params)
+                                [[maybe_unused]] const Core::RPC::EmptyParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<std::string>> {
   auto result = Features::Gallery::get_thumbnail_stats(app_state);
 
@@ -182,7 +181,7 @@ auto register_all(Core::State::AppState& app_state) -> void {
       "folder management.");
 
   // 缩略图操作
-  Core::RPC::register_method<rfl::Generic, Features::Gallery::Types::OperationResult>(
+  Core::RPC::register_method<Core::RPC::EmptyParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.cleanupThumbnails", handle_cleanup_thumbnails,
       "Clean up orphaned thumbnail files");
 
@@ -192,7 +191,7 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.stats", handle_get_asset_stats,
       "Get asset library statistics");
 
-  Core::RPC::register_method<rfl::Generic, std::string>(
+  Core::RPC::register_method<Core::RPC::EmptyParams, std::string>(
       app_state, app_state.rpc->registry, "gallery.thumbnailStats", handle_get_thumbnail_stats,
       "Get thumbnail storage statistics");
 

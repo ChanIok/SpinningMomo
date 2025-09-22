@@ -1,13 +1,16 @@
 module;
 
-#include <wil/resource.h>
+#include <wil/result.h>
 
 export module Vendor.WIL;
 
 namespace Vendor::WIL {
 
-export using ::wil::make_unique_hlocal_nothrow;
-export using ::_wdupenv_s;
-export using ::free;
+// Modern error handling - replaces THROW_IF_FAILED macro
+export auto throw_if_failed(HRESULT hr) -> void {
+  if (FAILED(hr)) {
+    throw wil::ResultException(hr);
+  }
+}
 
-} // namespace Vendor::WIL
+}  // namespace Vendor::WIL

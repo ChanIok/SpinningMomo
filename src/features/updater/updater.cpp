@@ -1,14 +1,6 @@
 module;
 
-#include <shlobj.h>
-#include <windows.h>
-#include <winhttp.h>
-#include <shellapi.h>  // 必须放最后
-
-#include <fstream>
-#include <rfl.hpp>
 #include <rfl/json.hpp>
-#include <sstream>
 
 module Features.Updater;
 
@@ -21,7 +13,10 @@ import Features.Updater.Types;
 import Features.Settings.State;
 import Utils.Logger;
 import Utils.Path;
+import Vendor.ShellApi;
 import Vendor.Version;
+import Vendor.Windows;
+import Vendor.WinHttp;
 
 namespace Features::Updater {
 
@@ -64,13 +59,14 @@ auto is_update_needed(const std::string& current_version, const std::string& lat
 }
 
 auto http_get(const std::wstring& url) -> std::expected<std::string, std::string> {
-  HINTERNET hSession = WinHttpOpen(L"SpinningMomo/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-                                   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+  Vendor::WinHttp::HINTERNET hSession = Vendor::WinHttp::WinHttpOpen(
+      L"SpinningMomo/1.0", Vendor::WinHttp::kWINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+      Vendor::WinHttp::kWINHTTP_NO_PROXY_NAME, Vendor::WinHttp::kWINHTTP_NO_PROXY_BYPASS, 0);
   if (!hSession) {
     return std::unexpected("Failed to open WinHTTP session");
   }
 
-  URL_COMPONENTS urlComponents = {sizeof(urlComponents)};
+  Vendor::WinHttp::URL_COMPONENTS urlComponents = {sizeof(urlComponents)};
   wchar_t szHostName[256] = {0};
   wchar_t szUrlPath[1024] = {0};
 
@@ -79,65 +75,71 @@ auto http_get(const std::wstring& url) -> std::expected<std::string, std::string
   urlComponents.lpszUrlPath = szUrlPath;
   urlComponents.dwUrlPathLength = sizeof(szUrlPath) / sizeof(wchar_t);
 
-  if (!WinHttpCrackUrl(url.c_str(), url.length(), 0, &urlComponents)) {
-    WinHttpCloseHandle(hSession);
+  if (!Vendor::WinHttp::WinHttpCrackUrl(url.c_str(), url.length(), 0, &urlComponents)) {
+    Vendor::WinHttp::WinHttpCloseHandle(hSession);
     return std::unexpected("Failed to parse URL");
   }
 
-  HINTERNET hConnect = WinHttpConnect(hSession, szHostName, urlComponents.nPort, 0);
+  Vendor::WinHttp::HINTERNET hConnect =
+      Vendor::WinHttp::WinHttpConnect(hSession, szHostName, urlComponents.nPort, 0);
   if (!hConnect) {
-    WinHttpCloseHandle(hSession);
+    Vendor::WinHttp::WinHttpCloseHandle(hSession);
     return std::unexpected("Failed to connect to server");
   }
 
   // 根据URL scheme判断是否需要HTTPS
-  DWORD flags = (urlComponents.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0;
-  HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", szUrlPath, nullptr, WINHTTP_NO_REFERER,
-                                          WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+  Vendor::WinHttp::DWORD flags = (urlComponents.nScheme == Vendor::WinHttp::kINTERNET_SCHEME_HTTPS)
+                                     ? Vendor::WinHttp::kWINHTTP_FLAG_SECURE
+                                     : 0;
+  Vendor::WinHttp::HINTERNET hRequest = Vendor::WinHttp::WinHttpOpenRequest(
+      hConnect, L"GET", szUrlPath, nullptr, Vendor::WinHttp::kWINHTTP_NO_REFERER,
+      Vendor::WinHttp::kWINHTTP_DEFAULT_ACCEPT_TYPES, flags);
   if (!hRequest) {
-    WinHttpCloseHandle(hConnect);
-    WinHttpCloseHandle(hSession);
+    Vendor::WinHttp::WinHttpCloseHandle(hConnect);
+    Vendor::WinHttp::WinHttpCloseHandle(hSession);
     return std::unexpected("Failed to open HTTP request");
   }
 
-  if (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0,
-                          0)) {
-    WinHttpCloseHandle(hRequest);
-    WinHttpCloseHandle(hConnect);
-    WinHttpCloseHandle(hSession);
+  if (!Vendor::WinHttp::WinHttpSendRequest(hRequest,
+                                           Vendor::WinHttp::kWINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                                           Vendor::WinHttp::kWINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
+    Vendor::WinHttp::WinHttpCloseHandle(hRequest);
+    Vendor::WinHttp::WinHttpCloseHandle(hConnect);
+    Vendor::WinHttp::WinHttpCloseHandle(hSession);
     return std::unexpected("Failed to send HTTP request");
   }
 
-  if (!WinHttpReceiveResponse(hRequest, nullptr)) {
-    WinHttpCloseHandle(hRequest);
-    WinHttpCloseHandle(hConnect);
-    WinHttpCloseHandle(hSession);
+  if (!Vendor::WinHttp::WinHttpReceiveResponse(hRequest, nullptr)) {
+    Vendor::WinHttp::WinHttpCloseHandle(hRequest);
+    Vendor::WinHttp::WinHttpCloseHandle(hConnect);
+    Vendor::WinHttp::WinHttpCloseHandle(hSession);
     return std::unexpected("Failed to receive HTTP response");
   }
 
   // 检查HTTP状态码
-  DWORD dwStatusCode = 0;
-  DWORD headerSize = sizeof(dwStatusCode);
-  if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                          WINHTTP_HEADER_NAME_BY_INDEX, &dwStatusCode, &headerSize,
-                          WINHTTP_NO_HEADER_INDEX)) {
+  Vendor::WinHttp::DWORD dwStatusCode = 0;
+  Vendor::WinHttp::DWORD headerSize = sizeof(dwStatusCode);
+  if (Vendor::WinHttp::WinHttpQueryHeaders(
+          hRequest,
+          Vendor::WinHttp::kWINHTTP_QUERY_STATUS_CODE | Vendor::WinHttp::kWINHTTP_QUERY_FLAG_NUMBER,
+          Vendor::WinHttp::kWINHTTP_HEADER_NAME_BY_INDEX, &dwStatusCode, &headerSize, nullptr)) {
     if (dwStatusCode != 200) {
-      WinHttpCloseHandle(hRequest);
-      WinHttpCloseHandle(hConnect);
-      WinHttpCloseHandle(hSession);
+      Vendor::WinHttp::WinHttpCloseHandle(hRequest);
+      Vendor::WinHttp::WinHttpCloseHandle(hConnect);
+      Vendor::WinHttp::WinHttpCloseHandle(hSession);
       return std::unexpected("HTTP error: " + std::to_string(dwStatusCode));
     }
   }
 
   // 读取响应数据
   std::string response;
-  DWORD dwSize = 0;
-  DWORD dwDownloaded = 0;
+  Vendor::WinHttp::DWORD dwSize = 0;
+  Vendor::WinHttp::DWORD dwDownloaded = 0;
   char buffer[4096];
 
   do {
     dwSize = 0;
-    if (!WinHttpQueryDataAvailable(hRequest, &dwSize)) {
+    if (!Vendor::WinHttp::WinHttpQueryDataAvailable(hRequest, &dwSize)) {
       break;
     }
 
@@ -145,18 +147,19 @@ auto http_get(const std::wstring& url) -> std::expected<std::string, std::string
       break;
     }
 
-    ZeroMemory(buffer, sizeof(buffer));
-    DWORD bytesToRead = std::min(dwSize, static_cast<DWORD>(sizeof(buffer)));
-    if (!WinHttpReadData(hRequest, buffer, bytesToRead, &dwDownloaded)) {
+    std::memset(buffer, 0, sizeof(buffer));
+    Vendor::WinHttp::DWORD bytesToRead =
+        std::min(dwSize, static_cast<Vendor::WinHttp::DWORD>(sizeof(buffer)));
+    if (!Vendor::WinHttp::WinHttpReadData(hRequest, buffer, bytesToRead, &dwDownloaded)) {
       break;
     }
 
     response.append(buffer, dwDownloaded);
   } while (dwSize > 0);
 
-  WinHttpCloseHandle(hRequest);
-  WinHttpCloseHandle(hConnect);
-  WinHttpCloseHandle(hSession);
+  Vendor::WinHttp::WinHttpCloseHandle(hRequest);
+  Vendor::WinHttp::WinHttpCloseHandle(hConnect);
+  Vendor::WinHttp::WinHttpCloseHandle(hSession);
   return response;
 }
 
@@ -314,7 +317,7 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
     script << "echo Extracting update package...\n";
     script << "powershell -Command \"Expand-Archive -Path '" << update_package_path.string()
            << "' -DestinationPath '" << current_dir.string() << "' -Force\"\n";
-    
+
     if (restart) {
       script << "echo Update completed, restarting application...\n";
       script << "start \"\" \"" << Utils::Path::Combine(current_dir, "SpinningMomo.exe").string()
@@ -322,7 +325,7 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
     } else {
       script << "echo Update completed successfully.\n";
     }
-    
+
     script << "echo Cleaning up temporary files...\n";
     script << "timeout /t 3 /nobreak >nul\n";
     script << "del \"" << update_package_path.string() << "\"\n";
@@ -401,28 +404,28 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
     return;
   }
 
-  Logger().info("Executing pending update script: {}", 
+  Logger().info("Executing pending update script: {}",
                 app_state.updater->update_script_path.string());
-  
+
   // 启动更新脚本
-  SHELLEXECUTEINFOW sei = {sizeof(sei)};
-  sei.fMask = SEE_MASK_NOCLOSEPROCESS;
+  Vendor::ShellApi::SHELLEXECUTEINFOW sei = {sizeof(sei)};
+  sei.fMask = Vendor::ShellApi::kSEE_MASK_NOCLOSEPROCESS;
   sei.hwnd = nullptr;
   sei.lpVerb = L"open";
   sei.lpFile = app_state.updater->update_script_path.c_str();
   sei.lpParameters = nullptr;
   sei.lpDirectory = nullptr;
-  sei.nShow = SW_HIDE;
+  sei.nShow = Vendor::ShellApi::kSW_HIDE;
   sei.hInstApp = nullptr;
 
-  if (ShellExecuteExW(&sei) && sei.hProcess) {
+  if (Vendor::ShellApi::ShellExecuteExW(&sei) && sei.hProcess) {
     // 关闭进程句柄
-    CloseHandle(sei.hProcess);
+    Vendor::Windows::CloseHandle(sei.hProcess);
     Logger().info("Update script started successfully");
   } else {
     Logger().error("Failed to execute update script");
   }
-  
+
   // 清除待处理更新标志
   app_state.updater->pending_update = false;
 }
@@ -511,7 +514,7 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
     app_state.updater->pending_update = true;
 
     Types::InstallUpdateResult result;
-    
+
     if (params.restart) {
       // 立即重启更新：发送退出事件
       Logger().info("Sending exit event for immediate update");

@@ -26,7 +26,8 @@ export auto get_file_creation_time_millis(const std::filesystem::path& file_path
     -> std::expected<std::int64_t, std::string> {
   Vendor::Windows::WIN32_FILE_ATTRIBUTE_DATA fileAttr;
 
-  if (!Vendor::Windows::GetFileAttributesExW(file_path.c_str(), Vendor::Windows::c_GetFileExInfoStandard, &fileAttr)) {
+  if (!Vendor::Windows::GetFileAttributesExW(file_path.c_str(),
+                                             Vendor::Windows::kGetFileExInfoStandard, &fileAttr)) {
     Vendor::Windows::DWORD error = Vendor::Windows::GetLastError();
     return std::unexpected(std::format("Failed to get file attributes: {}", error));
   }

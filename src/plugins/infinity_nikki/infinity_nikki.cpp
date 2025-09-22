@@ -1,7 +1,6 @@
 module;
 
-#include <strsafe.h>
-#include <string>
+#include <wil/com.h>
 
 module Plugins.InfinityNikki;
 
@@ -9,21 +8,25 @@ import std;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.String;
-import Vendor.Windows;
 import Vendor.WIL;
+import Vendor.Windows;
+import Vendor.ShellApi;
 
 namespace Plugins::InfinityNikki {
 
 // 获取用户配置文件路径
 auto get_config_file_path() -> std::filesystem::path {
-  // 获取用户主目录
-  wchar_t* user_profile = nullptr;
-  size_t len = 0;
-  if (Vendor::WIL::_wdupenv_s(&user_profile, &len, L"USERPROFILE") == 0 && user_profile != nullptr) {
-    std::filesystem::path config_path = user_profile;
-    Vendor::WIL::free(user_profile);  // _wdupenv_s 分配的内存需要手动释放
+  wil::unique_cotaskmem_string local_app_data_path;
 
-    config_path /= L"AppData\\Local\\InfinityNikki Launcher\\config.ini";
+  HRESULT hr = Vendor::ShellApi::SHGetKnownFolderPath(Vendor::ShellApi::kFOLDERID_LocalAppData,  // 直接获取LocalAppData文件夹
+                                    0,                      // 默认标志
+                                    nullptr,                // 当前用户
+                                    &local_app_data_path    // 输出路径
+  );
+
+  if (Vendor::Windows::_SUCCEEDED(hr) && local_app_data_path) {
+    std::filesystem::path config_path = local_app_data_path.get();
+    config_path /= L"InfinityNikki Launcher\\config.ini";
     return config_path;
   }
 
@@ -36,15 +39,16 @@ auto get_game_directory_from_config(const std::filesystem::path& config_path)
     -> std::expected<std::string, std::string> {
   try {
     // 固定大小的缓冲区对于路径来说通常足够
-    constexpr Vendor::Windows::DWORD buffer_size = Vendor::Windows::c_MAX_PATH * 2;  // 给予足够的空间
-    auto buffer = Vendor::WIL::make_unique_hlocal_nothrow<wchar_t[]>(buffer_size);
+    constexpr Vendor::Windows::DWORD buffer_size =
+        Vendor::Windows::kMAX_PATH * 2;  // 给予足够的空间
+    auto buffer = wil::make_unique_hlocal_nothrow<wchar_t[]>(buffer_size);
 
     if (!buffer) {
       return std::unexpected("Memory allocation failed");
     }
 
-    Vendor::Windows::DWORD result = Vendor::Windows::GetPrivateProfileStringW(L"Download", L"gameDir", L"", buffer.get(), buffer_size,
-                                            config_path.wstring().c_str());
+    Vendor::Windows::DWORD result = Vendor::Windows::GetPrivateProfileStringW(
+        L"Download", L"gameDir", L"", buffer.get(), buffer_size, config_path.wstring().c_str());
 
     if (result == 0) {
       return std::unexpected("gameDir not found in config file");

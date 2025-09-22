@@ -1,21 +1,15 @@
 module;
 
-#include <windows.h>  // 必须放在最前面
-#include <comdef.h>
-#include <shellapi.h>
 #include <shobjidl.h>
 #include <wil/com.h>
-#include <wil/resource.h>
-#include <wil/result.h>
-
-#include <filesystem>
 
 module Utils.Dialog;
 
 import std;
 import Utils.Logger;
 import Utils.String;
-import Utils.Dialog;
+import Vendor.WIL;
+import Vendor.Windows;
 
 namespace Utils::Dialog {
 
@@ -70,32 +64,32 @@ auto select_folder(const FolderSelectorParams& params, HWND hwnd)
 
     // 创建对话框 - 智能指针自动管理
     wil::com_ptr<IFileDialog> pFileDialog;
-    THROW_IF_FAILED(
+    Vendor::WIL::throw_if_failed(
         CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pFileDialog)));
 
     // 设置选项
     DWORD dwOptions;
-    THROW_IF_FAILED(pFileDialog->GetOptions(&dwOptions));
-    THROW_IF_FAILED(pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS));
+    Vendor::WIL::throw_if_failed(pFileDialog->GetOptions(&dwOptions));
+    Vendor::WIL::throw_if_failed(pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS));
 
     // 设置标题
     if (!params.title.empty()) {
       std::wstring title_wide = Utils::String::FromUtf8(params.title);
-      THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
+      Vendor::WIL::throw_if_failed(pFileDialog->SetTitle(title_wide.c_str()));
     } else {
-      THROW_IF_FAILED(pFileDialog->SetTitle(L"选择文件夹"));
+      Vendor::WIL::throw_if_failed(pFileDialog->SetTitle(L"选择文件夹"));
     }
 
     // 显示对话框
-    THROW_IF_FAILED(pFileDialog->Show(hwnd));
+    Vendor::WIL::throw_if_failed(pFileDialog->Show(hwnd));
 
     // 获取结果
     wil::com_ptr<IShellItem> pItem;
-    THROW_IF_FAILED(pFileDialog->GetResult(&pItem));
+    Vendor::WIL::throw_if_failed(pFileDialog->GetResult(&pItem));
 
     // 获取路径 - 自动内存管理
     wil::unique_cotaskmem_string file_path;
-    THROW_IF_FAILED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
+    Vendor::WIL::throw_if_failed(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
 
     // 返回结果
     std::filesystem::path result(file_path.get());
@@ -106,7 +100,8 @@ auto select_folder(const FolderSelectorParams& params, HWND hwnd)
     return folder_result;
 
   } catch (const wil::ResultException& ex) {
-    if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+    if (ex.GetErrorCode() ==
+        Vendor::Windows::_HRESULT_FROM_WIN32(Vendor::Windows::kERROR_CANCELLED)) {
       return std::unexpected("User cancelled the operation");
     }
     return std::unexpected(std::string("Dialog operation failed: ") + ex.what());
@@ -122,17 +117,17 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
 
     // 创建对话框 - 智能指针自动管理
     wil::com_ptr<IFileOpenDialog> pFileDialog;
-    THROW_IF_FAILED(
+    Vendor::WIL::throw_if_failed(
         CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pFileDialog)));
 
     // 设置选项
     DWORD dwOptions;
-    THROW_IF_FAILED(pFileDialog->GetOptions(&dwOptions));
+    Vendor::WIL::throw_if_failed(pFileDialog->GetOptions(&dwOptions));
     dwOptions |= FOS_FILEMUSTEXIST;  // 文件必须存在
     if (params.allow_multiple) {
       dwOptions |= FOS_ALLOWMULTISELECT;  // 允许多选
     }
-    THROW_IF_FAILED(pFileDialog->SetOptions(dwOptions));
+    Vendor::WIL::throw_if_failed(pFileDialog->SetOptions(dwOptions));
 
     // 设置过滤器 - 使用修复后的解析逻辑
     if (!params.filter.empty()) {
@@ -161,44 +156,46 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
     // 设置标题
     if (!params.title.empty()) {
       std::wstring title_wide = Utils::String::FromUtf8(params.title);
-      THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
+      Vendor::WIL::throw_if_failed(pFileDialog->SetTitle(title_wide.c_str()));
     }
 
     // 显示对话框
-    THROW_IF_FAILED(pFileDialog->Show(hwnd));
+    Vendor::WIL::throw_if_failed(pFileDialog->Show(hwnd));
 
     // 获取结果
-    wil::com_ptr<IShellItemArray> pItemArray;
-    if (params.allow_multiple) {
-      THROW_IF_FAILED(pFileDialog->GetResults(&pItemArray));
-    } else {
-      wil::com_ptr<IShellItem> pItem;
-      THROW_IF_FAILED(pFileDialog->GetResult(&pItem));
-      // 为单个文件创建一个item array
-      THROW_IF_FAILED(SHCreateShellItemArrayFromShellItem(pItem.get(), IID_PPV_ARGS(&pItemArray)));
-    }
-
-    // 获取文件数量
-    DWORD count = 0;
-    THROW_IF_FAILED(pItemArray->GetCount(&count));
-
-    // 收集所有文件路径
     std::vector<std::filesystem::path> selected_paths;
-    selected_paths.reserve(count);
 
-    for (DWORD i = 0; i < count; ++i) {
-      wil::com_ptr<IShellItem> pItem;
-      if (SUCCEEDED(pItemArray->GetItemAt(i, &pItem))) {
-        // 获取路径 - 自动内存管理
-        wil::unique_cotaskmem_string file_path;
-        if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path))) {
-          selected_paths.emplace_back(file_path.get());
+    if (params.allow_multiple) {
+      // 多文件选择
+      wil::com_ptr<IShellItemArray> pItemArray;
+      Vendor::WIL::throw_if_failed(pFileDialog->GetResults(&pItemArray));
+
+      // 获取文件数量
+      DWORD count = 0;
+      Vendor::WIL::throw_if_failed(pItemArray->GetCount(&count));
+      selected_paths.reserve(count);
+
+      for (DWORD i = 0; i < count; ++i) {
+        wil::com_ptr<IShellItem> pItem;
+        if (SUCCEEDED(pItemArray->GetItemAt(i, &pItem))) {
+          wil::unique_cotaskmem_string file_path;
+          if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path))) {
+            selected_paths.emplace_back(file_path.get());
+          } else {
+            Logger().warn("Failed to get file path for item at index {}, skipping", i);
+          }
         } else {
-          Logger().warn("Failed to get file path for item at index {}, skipping", i);
+          Logger().warn("Failed to get item at index {}, skipping", i);
         }
-      } else {
-        Logger().warn("Failed to get item at index {}, skipping", i);
       }
+    } else {
+      // 单文件选择
+      wil::com_ptr<IShellItem> pItem;
+      Vendor::WIL::throw_if_failed(pFileDialog->GetResult(&pItem));
+
+      wil::unique_cotaskmem_string file_path;
+      Vendor::WIL::throw_if_failed(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
+      selected_paths.emplace_back(file_path.get());
     }
 
     if (selected_paths.empty()) {
@@ -217,7 +214,8 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
     return file_selector_result;
 
   } catch (const wil::ResultException& ex) {
-    if (ex.GetErrorCode() == HRESULT_FROM_WIN32(ERROR_CANCELLED)) {
+    if (ex.GetErrorCode() ==
+        Vendor::Windows::_HRESULT_FROM_WIN32(Vendor::Windows::kERROR_CANCELLED)) {
       return std::unexpected("User cancelled the operation");
     }
     return std::unexpected(std::string("Dialog operation failed: ") + ex.what());

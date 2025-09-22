@@ -1,7 +1,7 @@
 module;
 
 #include <asio.hpp>
-#include <rfl/json.hpp>
+#include <rfl.hpp>
 
 export module Core.RPC.Types;
 
@@ -63,5 +63,8 @@ struct MethodInfo {
   std::string description;
   std::function<asio::awaitable<std::string>(rfl::Generic, rfl::Generic)> handler;
 };
+
+// 空参数结构，用于不需要参数的RPC方法
+struct EmptyParams {};
 
 }  // namespace Core::RPC

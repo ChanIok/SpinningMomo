@@ -34,7 +34,7 @@ auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_d
 
     Vendor::Windows::SetWindowPos(
         state.app_window->window.hwnd, nullptr, currentRect.left, currentRect.top, window_size.cx,
-        window_size.cy, Vendor::Windows::SWP_NOZORDER_t | Vendor::Windows::SWP_NOACTIVATE_t);
+        window_size.cy, Vendor::Windows::kSWP_NOZORDER | Vendor::Windows::kSWP_NOACTIVATE);
 
     // 如果Direct2D已初始化，调整渲染目标大小
     if (state.app_window->d2d_context.is_initialized) {

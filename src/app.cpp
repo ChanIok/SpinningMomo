@@ -84,13 +84,12 @@ auto Application::Run() -> int {
 
   while (true) {
     // 等待消息或超时
-    Vendor::Windows::MsgWaitForMultipleObjectsEx(0, nullptr, timeout,
-                                                 Vendor::Windows::QS_ALLINPUT_t,
-                                                 Vendor::Windows::MWMO_INPUTAVAILABLE_t);
+    Vendor::Windows::MsgWaitForMultipleObjectsEx(0, nullptr, timeout, Vendor::Windows::kQS_ALLINPUT,
+                                                 Vendor::Windows::kMWMO_INPUTAVAILABLE);
 
     // 处理所有挂起的消息
-    while (Vendor::Windows::PeekMessageW(&msg, nullptr, 0, 0, Vendor::Windows::PM_REMOVE_t)) {
-      if (msg.message == Vendor::Windows::WM_QUIT_t) {
+    while (Vendor::Windows::PeekMessageW(&msg, nullptr, 0, 0, Vendor::Windows::kPM_REMOVE)) {
+      if (msg.message == Vendor::Windows::kWM_QUIT) {
         return static_cast<int>(msg.wParam);
       }
       Vendor::Windows::TranslateWindowMessage(&msg);
