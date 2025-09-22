@@ -188,7 +188,7 @@
 
 ### 构建步骤
 
-1. 克隆仓库到本地
+1. 克隆仓库到本地，切换到最新标签
 2. 使用 Visual Studio 打开 CMakeLists.txt
 3. 选择 Release/x64 配置
 4. 生成解决方案

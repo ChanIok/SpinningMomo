@@ -6,9 +6,6 @@
 - **Visual Studio 2022** - 包含"使用C++的桌面开发"工作负载，确保包含C++模块支持
 - **Node.js** - 前端构建
 
-### 环境配置
-- **Ninja路径**: 将 `C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja` 添加到PATH
-
 ## vcpkg 配置
 
 ### 安装 vcpkg
@@ -48,4 +45,4 @@ out/build/x64-Release/SpinningMomo.exe
 
 ---
 
-此构建指南基于项目当前的CMake配置和vcpkg依赖管理，如需调整构建选项请参考 `CMakeLists.txt` 和 `CMakePresets.json`。
+此构建指南基于项目当前的CMake配置，如需调整构建选项请参考 `CMakeLists.txt` 和 `CMakePresets.json`。
