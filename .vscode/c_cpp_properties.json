@@ -14,6 +14,7 @@
             "compilerPath": "cl.exe",
             "cStandard": "c23",
             "cppStandard": "c++23",
+            "compileCommands": ".vscode/compile_commands.json",
             "intelliSenseMode": "windows-msvc-x64",
             "configurationProvider": "ms-vscode.cmake-tools"
         }

@@ -29,6 +29,9 @@ CMakeFiles/
 cmake_install.cmake
 compile_commands.json
 
+# Xmake generated files
+.xmake/
+
 # VitePress docs
 docs/.vitepress/dist/
 docs/.vitepress/cache/
