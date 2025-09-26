@@ -1,17 +1,36 @@
+// import { useEffect } from 'react'
 import { MasonryView } from './MasonryView'
 import { GridView } from './GridView'
 import { ListView } from './ListView'
 import { AdaptiveView } from './AdaptiveView'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import { useAutoGalleryData } from '@/lib/gallery'
 import { useTranslation } from '@/lib/i18n'
 
 export function GalleryContent() {
-  // 直接从 store 获取数据
-  const assets = useAssetsStore((state) => state.assets)
-  const viewMode = useAssetsStore((state) => state.viewConfig.mode)
+  // 使用真实数据
+  const galleryData = useAutoGalleryData()
+  const viewMode = useGalleryStore((state) => state.viewConfig.mode)
   const { t } = useTranslation()
 
-  if (assets.length === 0) {
+  // 处理加载状态
+  if (galleryData.isInitialLoading) {
+    return (
+      <div className='flex h-32 items-center justify-center text-muted-foreground'>
+        <p>加载中...</p>
+      </div>
+    )
+  }
+
+  if (galleryData.error) {
+    return (
+      <div className='flex h-32 items-center justify-center text-destructive'>
+        <p>{galleryData.error}</p>
+      </div>
+    )
+  }
+
+  if (galleryData.assets.length === 0) {
     return (
       <div className='flex h-32 items-center justify-center text-muted-foreground'>
         <p>{t('gallery.grid.noItems')}</p>

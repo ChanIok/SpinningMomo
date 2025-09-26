@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react'
-import { useAssetsStore } from '../assetsStore'
-import { listAssets, getAssetStats } from '../assetsApi'
+import { useGalleryStore } from '../galleryStore'
+import { listAssets, getAssetStats } from '../galleryApi'
 import { createMockListResponse, mockAssetStats } from '../mockData'
 import type { ListAssetsParams, AssetStats } from '../types'
 
@@ -18,7 +18,7 @@ export function useAssets(options: UseAssetsOptions = {}) {
   } = options
 
   // 从store获取状态和操作
-  const store = useAssetsStore()
+  const store = useGalleryStore()
 
   // 加载资产列表
   const loadAssets = useCallback(

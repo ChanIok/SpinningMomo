@@ -3,11 +3,11 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Images, Tag, Settings2, ChevronRight, FolderOpen, Plus } from 'lucide-react'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
 import { useGallerySidebar } from '../hooks'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import type { Folder } from '@/lib/assets/mockData'
+import type { Folder } from '@/lib/gallery/mockData'
 // 文件夹树项组件
 function FolderTreeItem({
   folder,
@@ -83,7 +83,7 @@ function FolderTreeItem({
 }
 
 export function GallerySidebar() {
-  const { totalCount } = useAssetsStore()
+  const { totalCount } = useGalleryStore()
   const { t } = useTranslation()
 
   // 使用 gallery sidebar hook

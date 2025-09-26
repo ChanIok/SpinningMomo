@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import { mockFolders, mockTags } from '@/lib/assets/mockData'
-import type { Folder, Tag } from '@/lib/assets/mockData'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import { mockFolders, mockTags } from '@/lib/gallery/mockData'
+import type { Folder, Tag } from '@/lib/gallery/mockData'
 
 interface UseGallerySidebarOptions {
   useMockData?: boolean
@@ -11,7 +11,7 @@ export function useGallerySidebar(options: UseGallerySidebarOptions = {}) {
   const { useMockData = true } = options
 
   // 获取 store 状态
-  const { sidebar, setSidebarActiveSection } = useAssetsStore()
+  const { sidebar, setSidebarActiveSection } = useGalleryStore()
 
   // 本地选择状态
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null)

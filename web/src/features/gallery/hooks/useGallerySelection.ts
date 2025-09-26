@@ -1,15 +1,15 @@
 import { useCallback, useMemo } from 'react'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import type { Asset } from '@/lib/assets/types'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import type { Asset } from '@/lib/gallery/types'
 
 export function useGallerySelection() {
   // 从 store 获取状态和操作
-  const assets = useAssetsStore((state) => state.assets)
-  const selection = useAssetsStore((state) => state.selection)
-  const selectAsset = useAssetsStore((state) => state.selectAsset)
-  const selectAll = useAssetsStore((state) => state.selectAll)
-  const clearSelection = useAssetsStore((state) => state.clearSelection)
-  const setActiveAsset = useAssetsStore((state) => state.setActiveAsset)
+  const assets = useGalleryStore((state) => state.assets)
+  const selection = useGalleryStore((state) => state.selection)
+  const selectAsset = useGalleryStore((state) => state.selectAsset)
+  const selectAll = useGalleryStore((state) => state.selectAll)
+  const clearSelection = useGalleryStore((state) => state.clearSelection)
+  const setActiveAsset = useGalleryStore((state) => state.setActiveAsset)
 
   // 计算选择状态
   const selectedAssets = useMemo(() => {

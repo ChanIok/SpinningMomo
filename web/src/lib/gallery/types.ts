@@ -1,34 +1,36 @@
-// Assets模块类型定义 - 基于后端API结构
+// Gallery模块类型定义 - 直接匹配后端C++结构
 export interface Asset {
   id: number
-  filename: string
-  filepath: string
-  relative_path: string
-  type: 'photo' | 'video' | 'live_photo' | 'unknown'
+  name: string
+  path: string // 文件路径
+  type: string // photo, video, live_photo, unknown
 
   // 基本信息
   width?: number
   height?: number
-  file_size?: number
+  size?: number // 文件大小（字节）
   mime_type: string
-  file_hash?: string
+  hash?: string // 文件哈希
+  folder_id?: number
 
-  // 时间信息
-  created_at: string
-  updated_at: string
-  deleted_at?: string
+  // 时间信息（统一使用时间戳）
+  file_created_at?: number
+  file_modified_at?: number
+  created_at: number
+  updated_at: number
+  deleted_at?: number
 }
 
 // 视图模式
 export type ViewMode = 'masonry' | 'grid' | 'list' | 'adaptive'
 
 // 排序选项
-export type SortBy = 'created_at' | 'filename' | 'file_size'
+export type SortBy = 'created_at' | 'filename' | 'size'
 export type SortOrder = 'asc' | 'desc'
 
 // 筛选器
 export interface AssetFilter {
-  type?: string // photo, video, live_photo
+  type?: string // photo, video, live_photo, unknown
   search_query?: string
 }
 

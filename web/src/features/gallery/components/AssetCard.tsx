@@ -2,10 +2,10 @@ import { useState, useMemo, useCallback, type MouseEvent } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { FileImage, Image as ImageIcon, Video, Zap } from 'lucide-react'
-import type { ViewMode } from '@/lib/assets/types'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import type { ViewMode } from '@/lib/gallery/types'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
 import { useGallerySelection, useGalleryLightbox } from '../hooks'
-import { getMockThumbnailUrl } from '@/lib/assets/mockData'
+import { getAssetThumbnailUrl } from '@/lib/gallery/galleryApi'
 import { cn, formatBytes } from '@/lib/utils'
 
 interface AssetCardProps {
@@ -15,7 +15,7 @@ interface AssetCardProps {
 
 export function AssetCard({ assetId, viewMode }: AssetCardProps) {
   // 从 store 获取资产数据
-  const asset = useAssetsStore((state) => state.assets.find((a) => a.id === assetId))
+  const asset = useGalleryStore((state) => state.assets.find((a) => a.id === assetId))
 
   // 使用 gallery hooks
   const selection = useGallerySelection()
@@ -125,8 +125,8 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
           )}
           {!imageError ? (
             <img
-              src={getMockThumbnailUrl(assetId)}
-              alt={asset.filename}
+              src={getAssetThumbnailUrl(assetId)}
+              alt={asset.name}
               className={cn(
                 'h-full w-full rounded object-cover transition-opacity',
                 imageLoaded ? 'opacity-100' : 'opacity-0'
@@ -144,7 +144,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
         {/* 文件信息 */}
         <div className='min-w-0 flex-1'>
           <div className='mb-1 flex items-center gap-2'>
-            <p className='truncate text-sm font-medium'>{asset.filename}</p>
+            <p className='truncate text-sm font-medium'>{asset.name}</p>
             <Badge variant='secondary' className='px-1.5 text-xs'>
               {asset.type}
             </Badge>
@@ -155,7 +155,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
                 {asset.width} × {asset.height}
               </span>
             )}
-            {asset.file_size && <span>{formatBytes(asset.file_size)}</span>}
+            {asset.size && <span>{formatBytes(asset.size)}</span>}
             <span>{new Date(asset.created_at).toLocaleDateString()}</span>
           </div>
         </div>
@@ -220,7 +220,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
 
         {!imageError ? (
           <img
-            src={getMockThumbnailUrl(assetId)}
+            src={getAssetThumbnailUrl(assetId)}
             alt={asset.filename}
             className={cn(
               'object-cover transition-all duration-300 group-hover:scale-110',
@@ -240,7 +240,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
         {/* 悬浮信息覆层 */}
         <div className='absolute inset-0 flex items-end bg-black/60 opacity-0 transition-opacity group-hover:opacity-100'>
           <div className='w-full p-3 text-white'>
-            <p className='mb-1 truncate text-sm font-medium'>{asset.filename}</p>
+            <p className='mb-1 truncate text-sm font-medium'>{asset.name}</p>
             <div className='flex items-center justify-between text-xs'>
               <div>
                 {asset.width && asset.height && (
@@ -249,7 +249,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
                   </span>
                 )}
               </div>
-              <div>{asset.file_size && formatBytes(asset.file_size)}</div>
+              <div>{asset.size && formatBytes(asset.size)}</div>
             </div>
           </div>
         </div>
@@ -258,7 +258,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
       {/* 底部标题（仅在网格模式且不悬浮时显示） */}
       {viewMode === 'grid' && (
         <div className='mt-2 px-1'>
-          <p className='truncate text-xs text-muted-foreground'>{asset.filename}</p>
+          <p className='truncate text-xs text-muted-foreground'>{asset.name}</p>
         </div>
       )}
     </div>

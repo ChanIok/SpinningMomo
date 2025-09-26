@@ -1,13 +1,13 @@
 import { useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import { getMockAssetUrl } from '@/lib/assets/mockData'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import { getAssetUrl, getAssetThumbnailUrl } from '@/lib/gallery/galleryApi'
 import { cn } from '@/lib/utils'
 
 export function GalleryLightbox() {
   const { lightbox, closeLightbox, goToPreviousLightbox, goToNextLightbox, goToLightboxIndex } =
-    useAssetsStore()
+    useGalleryStore()
 
   const currentAsset = lightbox.assets[lightbox.currentIndex]
 
@@ -55,7 +55,7 @@ export function GalleryLightbox() {
       <div className='absolute top-0 right-0 left-0 z-10 bg-gradient-to-b from-black/50 to-transparent p-4'>
         <div className='flex items-center justify-between'>
           <div className='text-white'>
-            <h2 className='max-w-md truncate text-lg font-medium'>{currentAsset.filename}</h2>
+            <h2 className='max-w-md truncate text-lg font-medium'>{currentAsset.name}</h2>
             <p className='text-sm text-white/70'>
               {lightbox.currentIndex + 1} / {lightbox.assets.length}
               {currentAsset.width && currentAsset.height && (
@@ -88,8 +88,8 @@ export function GalleryLightbox() {
       >
         <div className='relative max-h-full max-w-full'>
           <img
-            src={getMockAssetUrl(currentAsset.id)}
-            alt={currentAsset.filename}
+            src={getAssetUrl(currentAsset.id)}
+            alt={currentAsset.name}
             className='max-h-full max-w-full object-contain'
             draggable={false}
           />
@@ -134,8 +134,8 @@ export function GalleryLightbox() {
               onClick={() => goToLightboxIndex(index)}
             >
               <img
-                src={getMockAssetUrl(asset.id)}
-                alt={asset.filename}
+                src={getAssetThumbnailUrl(asset.id)}
+                alt={asset.name}
                 className='h-full w-full object-cover'
               />
             </button>

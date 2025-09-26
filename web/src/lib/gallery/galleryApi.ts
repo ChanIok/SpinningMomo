@@ -16,7 +16,7 @@ import type {
  */
 export async function listAssets(params: ListAssetsParams = {}): Promise<ListAssetsResponse> {
   try {
-    const result = await call<ListAssetsResponse>('asset.list', params)
+    const result = await call<ListAssetsResponse>('gallery.list', params)
 
     console.log('📸 获取资产列表成功:', {
       count: result.items.length,
@@ -36,7 +36,7 @@ export async function listAssets(params: ListAssetsParams = {}): Promise<ListAss
  */
 export async function getAsset(params: GetAssetParams): Promise<Asset> {
   try {
-    const result = await call<Asset>('asset.get', params)
+    const result = await call<Asset>('gallery.get', params)
 
     console.log('📸 获取资产详情成功:', result.filename)
 
@@ -54,7 +54,7 @@ export async function deleteAsset(params: DeleteAssetParams): Promise<OperationR
   try {
     console.log('📸 删除资产:', params)
 
-    const result = await call<OperationResult>('asset.delete', params)
+    const result = await call<OperationResult>('gallery.delete', params)
 
     console.log('✅ 资产删除成功:', result.message)
 
@@ -70,7 +70,7 @@ export async function deleteAsset(params: DeleteAssetParams): Promise<OperationR
  */
 export async function getAssetStats(): Promise<AssetStats> {
   try {
-    const result = await call<AssetStats>('asset.stats', {})
+    const result = await call<AssetStats>('gallery.stats', {})
 
     console.log('📊 获取资产统计成功:', result)
 
@@ -88,7 +88,7 @@ export async function scanAssets(params: ScanAssetsParams): Promise<ScanAssetsRe
   try {
     console.log('🔍 开始扫描资产目录:', params.directories)
 
-    const result = await call<ScanAssetsResult>('asset.scan', params)
+    const result = await call<ScanAssetsResult>('gallery.scanDirectory', params)
 
     console.log('✅ 资产扫描完成:', {
       total: result.total_files,
@@ -111,7 +111,7 @@ export async function cleanupThumbnails(): Promise<OperationResult> {
   try {
     console.log('🧹 开始清理缩略图')
 
-    const result = await call<OperationResult>('asset.cleanupThumbnails', {})
+    const result = await call<OperationResult>('gallery.cleanupThumbnails', {})
 
     console.log('✅ 缩略图清理完成:', result.message)
 
@@ -127,7 +127,7 @@ export async function cleanupThumbnails(): Promise<OperationResult> {
  */
 export async function getThumbnailStats(): Promise<string> {
   try {
-    const result = await call<string>('asset.thumbnailStats', {})
+    const result = await call<string>('gallery.thumbnailStats', {})
 
     console.log('📊 获取缩略图统计成功')
 
@@ -145,7 +145,7 @@ export async function cleanupDeletedAssets(daysOld = 30): Promise<OperationResul
   try {
     console.log('🧹 清理已删除资产:', { daysOld })
 
-    const result = await call<OperationResult>('asset.cleanupDeleted', { days_old: daysOld })
+    const result = await call<OperationResult>('gallery.cleanupDeleted', { days_old: daysOld })
 
     console.log('✅ 已删除资产清理完成:', result.message)
 
@@ -157,16 +157,19 @@ export async function cleanupDeletedAssets(daysOld = 30): Promise<OperationResul
 }
 
 /**
- * 获取资产缩略图URL
+ * 获取资产缩略图URL - 使用HTTP接口
  */
 export function getAssetThumbnailUrl(assetId: number, width = 400, height = 400): string {
-  // 假设后端提供了缩略图URL的端点
-  return `/api/thumbnails/${assetId}?w=${width}&h=${height}`
+  // 先使用mock数据，后续添加HTTP接口后更换
+  const seed = assetId % 1000
+  return `https://picsum.photos/seed/${seed}/${width}/${height}`
 }
 
 /**
- * 获取资产原图URL
+ * 获取资产原图URL - 使用HTTP接口
  */
 export function getAssetUrl(assetId: number): string {
-  return `/api/assets/${assetId}/file`
+  // 先使用mock数据，后续添加HTTP接口后更换
+  const seed = assetId % 1000
+  return `https://picsum.photos/seed/${seed}/1920/1080`
 }

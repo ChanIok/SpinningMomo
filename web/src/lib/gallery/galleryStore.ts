@@ -12,7 +12,7 @@ import type {
 } from './types'
 
 // Store状态接口
-interface AssetsState {
+interface GalleryState {
   // 资产数据
   assets: Asset[]
   isLoading: boolean
@@ -39,7 +39,7 @@ interface AssetsState {
   detailsOpen: boolean
 }
 
-interface AssetsActions {
+interface GalleryActions {
   // 数据操作
   setAssets: (assets: Asset[]) => void
   addAssets: (assets: Asset[]) => void
@@ -79,10 +79,10 @@ interface AssetsActions {
   reset: () => void
 }
 
-type AssetsStoreType = AssetsState & AssetsActions
+type GalleryStoreType = GalleryState & GalleryActions
 
 // 初始状态
-const initialState: AssetsState = {
+const initialState: GalleryState = {
   assets: [],
   isLoading: false,
   isInitialLoading: false,
@@ -118,7 +118,7 @@ const initialState: AssetsState = {
   detailsOpen: true,
 }
 
-export const useAssetsStore = create<AssetsStoreType>()(
+export const useGalleryStore = create<GalleryStoreType>()(
   devtools(
     (set, get) => ({
       // 初始状态
@@ -370,15 +370,15 @@ export const useAssetsStore = create<AssetsStoreType>()(
       },
     }),
     {
-      name: 'assets-store',
+      name: 'gallery-store',
       enabled: import.meta.env.DEV,
     }
   )
 )
 
 // 便捷选择器
-export const useAssets = () => useAssetsStore((state) => state.assets)
-export const useAssetsLoading = () => useAssetsStore((state) => state.isLoading)
-export const useAssetsSelection = () => useAssetsStore((state) => state.selection)
-export const useAssetsLightbox = () => useAssetsStore((state) => state.lightbox)
-export const useAssetsViewConfig = () => useAssetsStore((state) => state.viewConfig)
+export const useAssets = () => useGalleryStore((state) => state.assets)
+export const useAssetsLoading = () => useGalleryStore((state) => state.isLoading)
+export const useAssetsSelection = () => useGalleryStore((state) => state.selection)
+export const useAssetsLightbox = () => useGalleryStore((state) => state.lightbox)
+export const useAssetsViewConfig = () => useGalleryStore((state) => state.viewConfig)

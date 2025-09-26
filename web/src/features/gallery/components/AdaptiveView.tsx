@@ -3,14 +3,14 @@ import { RowsPhotoAlbum } from 'react-photo-album'
 import InfiniteScroll from 'react-photo-album/scroll'
 import 'react-photo-album/rows.css'
 import { AssetCard } from './AssetCard'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import type { Asset } from '@/lib/assets/types'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import type { Asset } from '@/lib/gallery/types'
 import type { Photo } from 'react-photo-album'
 
 export function AdaptiveView() {
   // 直接从 store 获取数据
-  const assets = useAssetsStore((state) => state.assets)
-  const viewConfig = useAssetsStore((state) => state.viewConfig)
+  const assets = useGalleryStore((state) => state.assets)
+  const viewConfig = useGalleryStore((state) => state.viewConfig)
   const [containerHeight, setContainerHeight] = useState(800)
 
   // 转换 Asset 为 Photo 格式
@@ -24,7 +24,7 @@ export function AdaptiveView() {
             width: asset.width!,
             height: asset.height!,
             key: asset.id.toString(),
-            alt: asset.filename,
+            alt: asset.name,
             // 保存原始asset数据供后续使用
             asset,
           }) as Photo & { asset: Asset }
@@ -59,7 +59,7 @@ export function AdaptiveView() {
     const { photo, width, height } = context
     return (
       <div style={{ width, height }}>
-          <AssetCard assetId={photo.asset.id} viewMode='adaptive' />
+        <AssetCard assetId={photo.asset.id} viewMode='adaptive' />
       </div>
     )
   }, [])
@@ -78,7 +78,7 @@ export function AdaptiveView() {
       )
 
       // 如果已经加载了所有数据，返回null表示结束
-      const loadedAssets = useAssetsStore.getState().assets
+      const loadedAssets = useGalleryStore.getState().assets
       if (loadedAssets.length >= (index + 1) * 50) {
         return null
       }

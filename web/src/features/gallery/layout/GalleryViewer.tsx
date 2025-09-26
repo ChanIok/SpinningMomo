@@ -1,12 +1,12 @@
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
 import { GalleryToolbar } from '../components/GalleryToolbar'
 import { GalleryContent } from '../components/GalleryContent'
 import { useTranslation } from '@/lib/i18n'
 
 export function GalleryViewer() {
   // 只获取布局需要的状态
-  const { assets, isLoading, isInitialLoading, error } = useAssetsStore()
+  const { assets, isLoading, isInitialLoading, error } = useGalleryStore()
   const { t } = useTranslation()
 
   if (isInitialLoading) {

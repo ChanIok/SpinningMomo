@@ -1,7 +1,7 @@
 import { forwardRef } from 'react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import { AssetCard } from './AssetCard'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
 
 // 定义 gridComponents，确保它在组件外部以避免重新挂载
 const gridComponents = {
@@ -40,7 +40,7 @@ const gridComponents = {
 
 export function GridView() {
   // 直接从 store 获取数据
-  const assets = useAssetsStore((state) => state.assets)
+  const assets = useGalleryStore((state) => state.assets)
 
   // 过滤出有效的资产
   const validAssets = assets.filter(

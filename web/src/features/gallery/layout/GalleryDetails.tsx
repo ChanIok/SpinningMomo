@@ -1,4 +1,4 @@
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -7,7 +7,7 @@ import { formatBytes } from '@/lib/utils'
 import { useTranslation } from '@/lib/i18n'
 
 export function GalleryDetails() {
-  const { assets, selection, setActiveAsset } = useAssetsStore()
+  const { assets, selection, setActiveAsset } = useGalleryStore()
   const { t } = useTranslation()
 
   // 获取当前激活的资产
@@ -36,7 +36,7 @@ export function GalleryDetails() {
           <Button
             variant='ghost'
             size='icon'
-            onClick={() => useAssetsStore.getState().clearSelection()}
+            onClick={() => useGalleryStore.getState().clearSelection()}
           >
             <X className='h-4 w-4' />
           </Button>
@@ -111,10 +111,10 @@ export function GalleryDetails() {
                 </span>
               </div>
             )}
-            {activeAsset.file_size && (
+            {activeAsset.size && (
               <div className='flex justify-between'>
                 <span className='text-muted-foreground'>{t('gallery.details.fileSize')}</span>
-                <span>{formatBytes(activeAsset.file_size)}</span>
+                <span>{formatBytes(activeAsset.size)}</span>
               </div>
             )}
           </div>

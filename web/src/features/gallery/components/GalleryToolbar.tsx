@@ -19,8 +19,8 @@ import {
   Plus,
   MoreVertical,
 } from 'lucide-react'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import { useAssets } from '@/lib/assets/hooks/useAssets'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import { useAssets } from '@/lib/gallery/hooks/useAssets'
 import { useGalleryView, useGallerySelection } from '../hooks'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -34,7 +34,7 @@ export function GalleryToolbar() {
 
   // 从 store 获取必要的状态
   const { filter, sortBy, sortOrder, isLoading, totalCount, setFilter, setSorting } =
-    useAssetsStore()
+    useGalleryStore()
 
   // 视图模式选项
   const viewModes = [
@@ -48,7 +48,7 @@ export function GalleryToolbar() {
   const sortOptions = [
     { id: 'created_at', label: t('gallery.toolbar.sortBy.createdAt') },
     { id: 'filename', label: t('gallery.toolbar.sortBy.filename') },
-    { id: 'file_size', label: t('gallery.toolbar.sortBy.fileSize') },
+    { id: 'size', label: t('gallery.toolbar.sortBy.fileSize') },
   ] as const
 
   return (

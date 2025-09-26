@@ -1,7 +1,7 @@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import 'allotment/dist/style.css'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import { useAssets } from '@/lib/assets/hooks/useAssets'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import { useAssets } from '@/lib/gallery/hooks/useAssets'
 import { useGalleryKeyboard, useGalleryView, useGalleryLayout } from '../hooks'
 import { GallerySidebar } from './GallerySidebar'
 import { GalleryViewer } from './GalleryViewer'
@@ -12,7 +12,7 @@ import { PanelGroup, Panel, PanelResizer } from '@window-splitter/react'
 export function GalleryLayout() {
   const { isSidebarOpen, isDetailsOpen } = useGalleryLayout()
 
-  const { lightbox } = useAssetsStore()
+  const { lightbox } = useGalleryStore()
 
   const view = useGalleryView()
 

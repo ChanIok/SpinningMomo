@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import type { ViewMode } from '@/lib/assets/types'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import type { ViewMode } from '@/lib/gallery/types'
 
 interface UseGalleryViewOptions {
   containerRef?: React.RefObject<HTMLElement>
@@ -11,8 +11,8 @@ export function useGalleryView(options: UseGalleryViewOptions = {}) {
   const { headerHeight = 200 } = options
 
   // 从 store 获取视图配置
-  const viewConfig = useAssetsStore((state) => state.viewConfig)
-  const setViewConfig = useAssetsStore((state) => state.setViewConfig)
+  const viewConfig = useGalleryStore((state) => state.viewConfig)
+  const setViewConfig = useGalleryStore((state) => state.setViewConfig)
 
   // 容器尺寸状态
   const [containerSize, setContainerSize] = useState({

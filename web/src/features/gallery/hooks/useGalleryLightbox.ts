@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo } from 'react'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
-import type { Asset } from '@/lib/assets/types'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
+import type { Asset } from '@/lib/gallery/types'
 
 export function useGalleryLightbox() {
   // 从 store 获取状态和操作
-  const lightbox = useAssetsStore((state) => state.lightbox)
-  const assets = useAssetsStore((state) => state.assets)
-  const openLightbox = useAssetsStore((state) => state.openLightbox)
-  const closeLightbox = useAssetsStore((state) => state.closeLightbox)
-  const goToLightboxIndex = useAssetsStore((state) => state.goToLightboxIndex)
-  const goToPreviousLightbox = useAssetsStore((state) => state.goToPreviousLightbox)
-  const goToNextLightbox = useAssetsStore((state) => state.goToNextLightbox)
+  const lightbox = useGalleryStore((state) => state.lightbox)
+  const assets = useGalleryStore((state) => state.assets)
+  const openLightbox = useGalleryStore((state) => state.openLightbox)
+  const closeLightbox = useGalleryStore((state) => state.closeLightbox)
+  const goToLightboxIndex = useGalleryStore((state) => state.goToLightboxIndex)
+  const goToPreviousLightbox = useGalleryStore((state) => state.goToPreviousLightbox)
+  const goToNextLightbox = useGalleryStore((state) => state.goToNextLightbox)
 
   // 计算当前资产和相关状态
   const currentAsset = useMemo(() => {

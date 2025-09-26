@@ -1,10 +1,10 @@
 import { Virtuoso } from 'react-virtuoso'
 import { AssetCard } from './AssetCard'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
 
 export function ListView() {
   // 直接从 store 获取数据
-  const assets = useAssetsStore((state) => state.assets)
+  const assets = useGalleryStore((state) => state.assets)
 
   // 过滤出有效的资产（与工作正常的视图保持一致）
   const validAssets = assets.filter((asset) => asset.type === 'photo' && asset.width && asset.height)

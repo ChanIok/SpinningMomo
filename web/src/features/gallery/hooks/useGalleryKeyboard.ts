@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useMemo } from 'react'
 import { useGallerySelection } from './useGallerySelection'
 import { useGalleryView } from './useGalleryView'
-import { useAssetsStore } from '@/lib/assets/assetsStore'
+import { useGalleryStore } from '@/lib/gallery/galleryStore'
 
 type KeyboardHandler = (event: KeyboardEvent) => void
 type KeyCombination = string // e.g., 'Ctrl+a', 'Shift+ArrowLeft'
@@ -17,7 +17,7 @@ export function useGalleryKeyboard(options: UseGalleryKeyboardOptions = {}) {
   // 获取相关 hooks
   const selection = useGallerySelection()
   const view = useGalleryView()
-  const lightboxIsOpen = useAssetsStore((state) => state.lightbox.isOpen)
+  const lightboxIsOpen = useGalleryStore((state) => state.lightbox.isOpen)
 
   // 将键盘事件转换为组合键字符串
   const getKeyCombo = useCallback((event: KeyboardEvent): string => {
