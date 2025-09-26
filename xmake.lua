@@ -3,6 +3,7 @@ add_rules("mode.debug", "mode.release")
 -- 引入自定义任务
 includes("tasks/build-all.lua")
 includes("tasks/release.lua")
+includes("tasks/vs.lua")
 
 -- 设置C++23标准
 set_languages("c++23")
