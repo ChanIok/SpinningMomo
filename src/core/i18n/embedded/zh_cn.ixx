@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
     // Embedded Chinese JSON content as string_view
-    // Size: 2565 bytes
+    // Size: 2867 bytes
     constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -78,5 +78,6 @@ export namespace EmbeddedLocales {
     "language_zh_cn": "中文",
     "language_en_us": "English"
   }
-})EmbeddedJson";
+}
+)EmbeddedJson";
 }
