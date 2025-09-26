@@ -1,17 +1,14 @@
 module;
 
-#include <spdlog/spdlog.h>
-
 export module Utils.Logger;
 
 import std;
-
-export using LoggerError = std::string;
+import <spdlog/spdlog.h>;
 
 namespace Utils::Logging {
 
 // 日志管理函数
-export auto initialize() -> std::expected<void, LoggerError>;
+export auto initialize() -> std::expected<void, std::string>;
 export auto shutdown() -> void;
 export auto flush() -> void;
 

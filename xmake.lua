@@ -6,6 +6,8 @@ set_languages("c++23")
 -- 设置运行时库
 set_runtimes(is_mode("debug") and "MD" or "MT")
 
+set_policy("package.requires_lock", true)
+
 -- 添加vcpkg依赖包
 add_requires("vcpkg::uwebsockets", "vcpkg::spdlog", "vcpkg::asio", "vcpkg::reflectcpp", 
              "vcpkg::webview2", "vcpkg::wil", "vcpkg::xxhash", "vcpkg::sqlitecpp", "vcpkg::libwebp", "vcpkg::zlib")
@@ -21,9 +23,6 @@ target("SpinningMomo")
     
     -- Windows特定宏定义
     add_defines("NOMINMAX", "UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN", "_WIN32_WINNT=0x0A00", "SPDLOG_COMPILED_LIB")
-    
-    -- MSVC编译选项
-    add_cxflags("/utf-8", "/EHsc", "/std:c++latest")
     
     -- 添加包含目录
     add_includedirs("src")

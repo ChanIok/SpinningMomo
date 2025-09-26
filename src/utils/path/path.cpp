@@ -1,14 +1,9 @@
 module;
 
-#include <windows.h>
-
-#include <exception>
-#include <expected>
-#include <filesystem>
-#include <string>
-#include <vector>
-
 module Utils.Path;
+
+import std;
+import <windows.h>;
 
 // 获取当前程序的完整路径
 auto Utils::Path::GetExecutablePath() -> std::expected<std::filesystem::path, std::string> {

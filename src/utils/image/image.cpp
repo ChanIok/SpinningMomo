@@ -1,20 +1,17 @@
 module;
 
-#include <shlwapi.h>
-#include <webp/encode.h>
-#include <webp/types.h>
 #include <wil/com.h>
-#include <wil/result.h>
-#include <wincodec.h>
-#include <windows.h>
-#include <winerror.h>
-
-#include <format>
 
 module Utils.Image;
 
 import std;
 import Utils.Logger;
+import <shlwapi.h>;
+import <webp/encode.h>;
+import <webp/types.h>;
+import <wincodec.h>;
+import <windows.h>;
+import <winerror.h>;
 
 namespace Utils::Image {
 

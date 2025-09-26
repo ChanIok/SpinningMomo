@@ -1,6 +1,5 @@
 module;
 
-#include <asio.hpp>
 #include <rfl/json.hpp>
 
 module Core.RPC.Endpoints.Dialog;
@@ -13,6 +12,7 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Utils.Dialog;
+import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Dialog {
 

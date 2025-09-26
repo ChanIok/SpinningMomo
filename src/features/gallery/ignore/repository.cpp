@@ -1,7 +1,5 @@
 module;
 
-#include <rfl.hpp>
-
 module Features.Gallery.Ignore.Repository;
 
 import std;
@@ -11,6 +9,7 @@ import Core.Database.Types;
 import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
 import Utils.Logger;
+import <rfl.hpp>;
 
 namespace Features::Gallery::Ignore::Repository {
 

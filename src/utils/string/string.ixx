@@ -1,12 +1,9 @@
 module;
 
-#include <windows.h>
-
-#include <chrono>
-#include <format>
-#include <string>
-
 export module Utils.String;
+
+import std;
+import <windows.h>;
 
 // 字符串工具命名空间
 namespace Utils::String {
@@ -72,7 +69,7 @@ export [[nodiscard]] auto ToBase64(const std::vector<char>& binary_data) -> std:
   for (size_t i = 0; i < data_size; i += 3) {
     const auto bytes_left = std::min<size_t>(3, data_size - i);
 
-    uint32_t chunk = 0;
+    std::uint32_t chunk = 0;
     for (size_t j = 0; j < bytes_left; ++j) {
       chunk |= (static_cast<uint8_t>(binary_data[i + j]) << (8 * (2 - j)));
     }

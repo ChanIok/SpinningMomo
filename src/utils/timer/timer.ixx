@@ -1,10 +1,9 @@
 module;
 
-#include <windows.h>
-
 export module Utils.Timer;
 
 import std;
+import <windows.h>;
 
 namespace Utils::Timer {
 

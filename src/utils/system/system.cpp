@@ -1,11 +1,9 @@
 module;
 
-#include <windows.h>
-
-#include <expected>
-#include <string>
-
 module Utils.System;
+
+import std;
+import <windows.h>;
 
 namespace Utils::System {
 

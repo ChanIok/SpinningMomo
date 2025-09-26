@@ -1,0 +1,37 @@
+{
+    __meta__ = {
+        version = "1.0"
+    },
+    ["windows|x64"] = {
+        ["vcpkg::asio#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::libwebp#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::reflectcpp#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::spdlog#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::sqlitecpp#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::uwebsockets#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::webview2#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::wil#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::xxhash#31fecfc4"] = {
+            version = "latest"
+        },
+        ["vcpkg::zlib#31fecfc4"] = {
+            version = "latest"
+        }
+    }
+}

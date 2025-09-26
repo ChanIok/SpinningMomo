@@ -1,14 +1,13 @@
 module;
 
-#include <spdlog/async.h>
-#include <spdlog/sinks/msvc_sink.h>
-#include <spdlog/sinks/rotating_file_sink.h>
-#include <spdlog/spdlog.h>
-
 module Utils.Logger;
 
 import std;
 import Vendor.BuildConfig;
+import <spdlog/async.h>;
+import <spdlog/sinks/msvc_sink.h>;
+import <spdlog/sinks/rotating_file_sink.h>;
+import <spdlog/spdlog.h>;
 
 // 构造函数实现
 Logger::Logger(std::source_location loc) : loc_(std::move(loc)) {}
@@ -53,7 +52,7 @@ auto Logger::critical(std::string_view msg) const -> void {
 // 日志管理函数实现
 namespace Utils::Logging {
 
-auto initialize() -> std::expected<void, LoggerError> {
+auto initialize() -> std::expected<void, std::string> {
   try {
     spdlog::init_thread_pool(8192, 1);
 

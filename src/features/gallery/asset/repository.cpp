@@ -1,7 +1,5 @@
 module;
 
-#include <rfl.hpp>
-
 module Features.Gallery.Asset.Repository;
 
 import std;
@@ -11,6 +9,7 @@ import Core.Database.Types;
 import Features.Gallery.Types;
 import Utils.Logger;
 import Utils.Time;
+import <rfl.hpp>;
 
 namespace Features::Gallery::Asset::Repository {
 

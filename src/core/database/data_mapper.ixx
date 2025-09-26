@@ -1,13 +1,11 @@
 module;
 
-#include <SQLiteCpp/SQLiteCpp.h>
-
-#include <rfl.hpp>
-
 export module Core.Database.DataMapper;
 
 import std;
 import Core.Database.Types;
+import <SQLiteCpp/SQLiteCpp.h>;
+import <rfl.hpp>;
 
 namespace Core::Database::DataMapper {
 

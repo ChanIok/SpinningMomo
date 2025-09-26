@@ -1,7 +1,5 @@
 module;
 
-#include <SQLiteCpp/SQLiteCpp.h>
-
 module Core.Database.Migration;
 
 import std;
@@ -9,6 +7,7 @@ import Core.Database;
 import Core.Database.State;
 import Core.Database.Types;
 import Utils.Logger;
+import <SQLiteCpp/SQLiteCpp.h>;
 
 namespace Core::Database::Migration {
 

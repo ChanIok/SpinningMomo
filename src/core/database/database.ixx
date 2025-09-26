@@ -1,13 +1,12 @@
 module;
 
-#include <SQLiteCpp/SQLiteCpp.h>
-
 export module Core.Database;
 
 import std;
 import Core.Database.State;
 import Core.Database.Types;
 import Core.Database.DataMapper;
+import <SQLiteCpp/SQLiteCpp.h>;
 
 namespace Core::Database {
 

@@ -1,6 +1,5 @@
 module;
 
-#include <shobjidl.h>
 #include <wil/com.h>
 
 module Utils.Dialog;
@@ -10,6 +9,7 @@ import Utils.Logger;
 import Utils.String;
 import Vendor.WIL;
 import Vendor.Windows;
+import <shobjidl.h>;
 
 namespace Utils::Dialog {
 

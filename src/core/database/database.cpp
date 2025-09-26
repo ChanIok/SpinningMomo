@@ -1,7 +1,5 @@
 module;
 
-#include <SQLiteCpp/SQLiteCpp.h>
-
 module Core.Database;
 
 import std;
@@ -10,6 +8,7 @@ import Core.Database.State;
 import Core.Database.Types;
 import Utils.Logger;
 import Utils.Path;
+import <SQLiteCpp/SQLiteCpp.h>;
 
 namespace Core::Database {
 

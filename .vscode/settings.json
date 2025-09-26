@@ -123,6 +123,7 @@
     "syncstream": "cpp",
     "resumable": "cpp",
     "*.ipp": "cpp",
-    "*.rh": "cpp"
+    "*.rh": "cpp",
+    "generator": "cpp"
   }
 }

@@ -1,7 +1,5 @@
 module;
 
-#include <rfl.hpp>
-
 module Features.Gallery.Folder.Repository;
 
 import std;
@@ -10,6 +8,7 @@ import Core.Database;
 import Core.Database.Types;
 import Features.Gallery.Types;
 import Utils.Logger;
+import <rfl.hpp>;
 
 namespace Features::Gallery::Folder::Repository {
 
