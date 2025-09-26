@@ -341,7 +341,14 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   }
 
   asset.name = file_path.filename().string();
-  asset.filepath = file_path.string();
+  
+  // 规范化文件路径，确保斜杠格式统一
+  auto normalized_path_result = Utils::Path::NormalizePath(file_path);
+  if (!normalized_path_result) {
+    return std::unexpected(std::format("Failed to normalize file path '{}': {}", 
+                                       file_path.string(), normalized_path_result.error()));
+  }
+  asset.filepath = normalized_path_result.value().string();
   asset.type = asset_type;
   asset.size = file_info.size;
   asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};

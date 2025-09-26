@@ -111,7 +111,8 @@ auto Utils::Path::NormalizePath(const std::filesystem::path& path,
 
     std::filesystem::path normalized_path = std::filesystem::weakly_canonical(combined_path);
 
-    return normalized_path;
+    // 统一使用正斜杠格式，确保跨平台一致性
+    return std::filesystem::path(normalized_path.generic_string());
 
   } catch (const std::filesystem::filesystem_error& e) {
     return std::unexpected(std::string(e.what()));

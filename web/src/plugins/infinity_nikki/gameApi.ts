@@ -61,7 +61,7 @@ export async function scanInfinityNikkiPhotos(): Promise<InfinityNikkiScanResult
     const scanConfig = createScanConfig(gameDirectory)
     console.log('⚙️ 扫描配置:', {
       directory: scanConfig.directory,
-      ignore_rules_count: scanConfig.ignore_rules.length,
+      ignoreRulesCount: scanConfig.ignoreRules.length,
     })
 
     // 3. 执行扫描
