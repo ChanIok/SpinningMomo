@@ -31,6 +31,7 @@ compile_commands.json
 
 # Xmake generated files
 .xmake/
+vsxmake2022/
 
 # VitePress docs
 docs/.vitepress/dist/
