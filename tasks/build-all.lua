@@ -36,7 +36,7 @@ task("build-all")
         local web_target = path.join(outputdir, "resources/web")
         
         os.mkdir(path.join(outputdir, "resources"))
-        os.cp(web_dist, web_target)
+        os.cp(web_dist .. "/*", web_target)
         
         print("Build completed: " .. outputdir)
     end)

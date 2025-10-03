@@ -1,19 +1,24 @@
 module;
 
 #include <wil/com.h>
-#include <windows.h>
-#include <wrl.h>
 #include <WebView2.h>  // 必须放最后面
-#include <WebView2EnvironmentOptions.h>
 
 module Core.WebView;
 
 import std;
+import Core.State;
+import Features.Gallery.State;
 import Core.WebView.State;
 import Core.WebView.RpcBridge;
 import Core.WebView.DragHandler;
 import Utils.Logger;
 import Utils.String;
+import Vendor.BuildConfig;
+import Vendor.WIL;
+import <Shlwapi.h>;
+import <WebView2EnvironmentOptions.h>;
+import <windows.h>;
+import <wrl.h>;
 
 // 匿名命名空间，用于封装辅助函数
 namespace {
@@ -42,6 +47,133 @@ bool is_drag_region_supported() {
 
   // 默认假设不支持，使用后备方案
   return false;
+}
+
+auto extract_thumbnail_relative_path(const std::wstring& uri, const std::wstring& prefix)
+    -> std::optional<std::wstring> {
+  if (uri.rfind(prefix, 0) != 0) {
+    return std::nullopt;
+  }
+
+  std::wstring relative_path = uri.substr(prefix.size());
+
+  if (relative_path.empty()) {
+    return std::nullopt;
+  }
+
+  if (relative_path.front() == L'/') {
+    relative_path.erase(relative_path.begin());
+  }
+
+  if (auto query_pos = relative_path.find(L'?'); query_pos != std::wstring::npos) {
+    relative_path.erase(query_pos);
+  }
+
+  if (auto fragment_pos = relative_path.find(L'#'); fragment_pos != std::wstring::npos) {
+    relative_path.erase(fragment_pos);
+  }
+
+  if (relative_path.empty()) {
+    return std::nullopt;
+  }
+
+  return relative_path;
+}
+
+auto resolve_thumbnail_path(Core::State::AppState& state, const std::wstring& relative_path)
+    -> std::optional<std::filesystem::path> {
+  if (!state.gallery || state.gallery->thumbnails_directory.empty()) {
+    return std::nullopt;
+  }
+
+  std::filesystem::path base_dir = state.gallery->thumbnails_directory;
+  std::filesystem::path combined_path = base_dir / std::filesystem::path(relative_path);
+
+  std::error_code ec;
+  auto normalized_base = std::filesystem::weakly_canonical(base_dir, ec);
+  if (ec) {
+    normalized_base = base_dir.lexically_normal();
+    ec.clear();
+  }
+
+  auto normalized_target = std::filesystem::weakly_canonical(combined_path, ec);
+  if (ec) {
+    return std::nullopt;
+  }
+
+  auto relative = std::filesystem::relative(normalized_target, normalized_base, ec);
+  if (ec || relative.native().starts_with(L"..")) {
+    return std::nullopt;
+  }
+
+  if (!std::filesystem::exists(normalized_target, ec) || ec) {
+    return std::nullopt;
+  }
+
+  return normalized_target;
+}
+
+auto create_thumbnail_response_headers() -> std::wstring {
+  return L"Content-Type: image/webp\r\nCache-Control: public, max-age=86400\r\n";
+}
+
+auto handle_thumbnail_web_resource_request(Core::State::AppState& state,
+                                           const std::wstring& thumbnail_prefix,
+                                           ICoreWebView2Environment* environment,
+                                           ICoreWebView2WebResourceRequestedEventArgs* args)
+    -> HRESULT {
+  Logger().info("Handling thumbnail web resource request: {}",
+                Utils::String::ToUtf8(thumbnail_prefix));
+  if (!environment) return S_OK;
+
+  wil::com_ptr<ICoreWebView2WebResourceRequest> request;
+  if (FAILED(args->get_Request(request.put())) || !request) return S_OK;
+
+  wil::unique_cotaskmem_string uri_raw;
+  if (FAILED(request->get_Uri(&uri_raw)) || !uri_raw) return S_OK;
+
+  std::wstring uri(uri_raw.get());
+
+  auto relative_path = extract_thumbnail_relative_path(uri, thumbnail_prefix);
+  if (!relative_path) return S_OK;
+
+  auto thumbnail_path = resolve_thumbnail_path(state, *relative_path);
+  if (!thumbnail_path) {
+    Logger().warn("Thumbnail not found or inaccessible: {}", Utils::String::ToUtf8(*relative_path));
+
+    wil::com_ptr<ICoreWebView2WebResourceResponse> not_found_response;
+    if (SUCCEEDED(environment->CreateWebResourceResponse(nullptr, 404, L"Not Found", nullptr,
+                                                         not_found_response.put()))) {
+      args->put_Response(not_found_response.get());
+    }
+    return S_OK;
+  }
+
+  wil::com_ptr<IStream> stream;
+  HRESULT hr = SHCreateStreamOnFileEx(thumbnail_path->c_str(), STGM_READ | STGM_SHARE_DENY_WRITE,
+                                      FILE_ATTRIBUTE_NORMAL, FALSE, nullptr, stream.put());
+
+  if (FAILED(hr) || !stream) {
+    Logger().error("Failed to open thumbnail file: {} (hr={})",
+                   Utils::String::ToUtf8(thumbnail_path->wstring()), hr);
+    return S_OK;
+  }
+
+  wil::com_ptr<ICoreWebView2WebResourceResponse> response;
+  auto headers = create_thumbnail_response_headers();
+
+  if (FAILED(environment->CreateWebResourceResponse(stream.get(), 200, L"OK", headers.c_str(),
+                                                    response.put())) ||
+      !response) {
+    Logger().error("Failed to create WebView2 response for thumbnail {}",
+                   Utils::String::ToUtf8(thumbnail_path->wstring()));
+    return S_OK;
+  }
+
+  args->put_Response(response.get());
+  Logger().debug("Served thumbnail via WebResourceRequested: {}",
+                 Utils::String::ToUtf8(thumbnail_path->wstring()));
+  return S_OK;
 }
 
 }  // namespace
@@ -106,47 +238,36 @@ class ControllerCompletedHandler
  private:
   Core::State::AppState* m_state;
 
- public:
-  ControllerCompletedHandler(Core::State::AppState* state) : m_state(state) {}
-
-  HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Controller* controller) {
-    if (!m_state) return E_FAIL;
-    auto& webview_state = *m_state->webview;
-
-    if (FAILED(result)) {
-      Logger().error("Failed to create WebView2 controller: {}", result);
-      return result;
-    }
-
-    webview_state.resources.controller = controller;
-
-    // 获取 WebView 核心接口
-    auto hr = controller->get_CoreWebView2(webview_state.resources.webview.put());
+  // 辅助方法：设置导航事件
+  HRESULT setup_navigation_events(ICoreWebView2* webview,
+                                  Core::WebView::State::CoreResources& resources) {
+    auto navigation_starting_handler =
+        Microsoft::WRL::Make<NavigationStartingEventHandler>(m_state);
+    HRESULT hr = webview->add_NavigationStarting(navigation_starting_handler.Get(),
+                                                 &resources.navigation_starting_token);
     if (FAILED(hr)) {
-      Logger().error("Failed to get CoreWebView2: {}", hr);
+      Logger().error("Failed to register NavigationStarting event: {}", hr);
       return hr;
     }
 
-    RECT bounds = {0, 0, webview_state.window.width, webview_state.window.height};
-    controller->put_Bounds(bounds);
-
-    // 使用有状态的处理器设置事件回调
-    EventRegistrationToken token;
-
-    auto navigation_starting_handler =
-        Microsoft::WRL::Make<NavigationStartingEventHandler>(m_state);
-    webview_state.resources.webview.get()->add_NavigationStarting(navigation_starting_handler.Get(),
-                                                                  &token);
-
     auto navigation_completed_handler =
         Microsoft::WRL::Make<NavigationCompletedEventHandler>(m_state);
-    webview_state.resources.webview.get()->add_NavigationCompleted(
-        navigation_completed_handler.Get(), &token);
+    hr = webview->add_NavigationCompleted(navigation_completed_handler.Get(),
+                                          &resources.navigation_completed_token);
+    if (FAILED(hr)) {
+      Logger().error("Failed to register NavigationCompleted event: {}", hr);
+      return hr;
+    }
 
-    // 注册WebView消息处理器
+    Logger().debug("Navigation events registered successfully");
+    return S_OK;
+  }
+
+  // 辅助方法：设置消息处理器
+  HRESULT setup_message_handler(ICoreWebView2* webview,
+                                Core::WebView::State::CoreResources& resources) {
     auto message_handler = Core::WebView::RpcBridge::create_message_handler(*m_state);
 
-    // 创建COM消息处理器
     auto webview_message_handler =
         Microsoft::WRL::Callback<ICoreWebView2WebMessageReceivedEventHandler>(
             [message_handler](ICoreWebView2* sender,
@@ -168,62 +289,209 @@ class ControllerCompletedHandler
               }
             });
 
-    webview_state.resources.webview.get()->add_WebMessageReceived(webview_message_handler.Get(),
-                                                                  &token);
-    Logger().info("WebView message handler registered");
-
-    // 设置Virtual Host映射到前端构建目录
-    auto dist_path = std::filesystem::absolute(webview_state.config.frontend_dist_path).wstring();
-
-    // 获取ICoreWebView2_3接口用于虚拟主机映射
-    wil::com_ptr<ICoreWebView2_3> webview3;
-    auto query_hr = webview_state.resources.webview->QueryInterface(IID_PPV_ARGS(&webview3));
-    if (SUCCEEDED(query_hr) && webview3) {
-      auto mapping_hr = webview3->SetVirtualHostNameToFolderMapping(
-          webview_state.config.virtual_host_name.c_str(), dist_path.c_str(),
-          COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
-      if (SUCCEEDED(mapping_hr)) {
-        Logger().info("Virtual host mapping established: {} -> {}",
-                      Utils::String::ToUtf8(webview_state.config.virtual_host_name),
-                      Utils::String::ToUtf8(dist_path));
-      }
+    HRESULT hr = webview->add_WebMessageReceived(webview_message_handler.Get(),
+                                                 &resources.web_message_received_token);
+    if (FAILED(hr)) {
+      Logger().error("Failed to register WebMessageReceived handler: {}", hr);
+      return hr;
     }
 
-    // 根据编译模式选择URL
-#ifdef _DEBUG
-    // 开发环境：连接Vite dev server (热重载)
-    webview_state.config.initial_url = webview_state.config.dev_server_url;
-    Logger().info("Debug mode: Using Vite dev server at {}",
-                  Utils::String::ToUtf8(webview_state.config.dev_server_url));
-#else
-    // 生产环境：使用构建产物
-    webview_state.config.initial_url =
-        L"https://" + webview_state.config.virtual_host_name + L"/index.html";
-    Logger().info("Release mode: Using built frontend from resources/web");
-#endif
+    Logger().debug("Message handler registered successfully");
+    return S_OK;
+  }
 
-    // 注册拖动处理对象（仅在需要时作为后备方案）
-    // 检查是否支持拖拽区域功能
+  // 辅助方法：设置虚拟主机映射
+  HRESULT setup_virtual_host_mapping(ICoreWebView2* webview,
+                                     Core::WebView::State::WebViewConfig& config) {
+    auto dist_path = std::filesystem::absolute(config.frontend_dist_path).wstring();
+
+    wil::com_ptr<ICoreWebView2_3> webview3;
+    HRESULT hr = webview->QueryInterface(IID_PPV_ARGS(&webview3));
+    if (FAILED(hr)) {
+      Logger().error("Failed to query ICoreWebView2_3 interface: {}", hr);
+      return hr;
+    }
+
+    if (!webview3) {
+      Logger().error("ICoreWebView2_3 interface not available");
+      return E_NOINTERFACE;
+    }
+
+    hr = webview3->SetVirtualHostNameToFolderMapping(
+        config.virtual_host_name.c_str(), dist_path.c_str(),
+        COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+    if (FAILED(hr)) {
+      Logger().error("Failed to set virtual host mapping: {}", hr);
+      return hr;
+    }
+
+    Logger().info("Virtual host mapping established: {} -> {}",
+                  Utils::String::ToUtf8(config.virtual_host_name),
+                  Utils::String::ToUtf8(dist_path));
+    return S_OK;
+  }
+
+  // 辅助方法：设置资源拦截
+  HRESULT setup_resource_interception(ICoreWebView2* webview, ICoreWebView2Environment* environment,
+                                      Core::WebView::State::CoreResources& resources,
+                                      Core::WebView::State::WebViewConfig& config) {
+    auto webview2 = wil::com_ptr<ICoreWebView2>(webview).try_query<ICoreWebView2_2>();
+    if (!webview2) {
+      Logger().warn("ICoreWebView2_2 interface not available, thumbnail interception disabled");
+      return S_OK;
+    }
+
+    // 根据 debug 模式选择拦截路径
+    std::wstring filter;
+    std::wstring thumbnail_prefix;
+    if (Vendor::BuildConfig::is_debug_build()) {
+      // debug 模式：拦截开发服务器的静态资源路径
+      filter = config.dev_server_url + L"/static/thumbnails/*";
+      thumbnail_prefix = config.dev_server_url + L"/static/thumbnails/";
+      Logger().info("Debug mode: Intercepting thumbnails from {}", Utils::String::ToUtf8(filter));
+    } else {
+      // release 模式：拦截静态资源路径的所有请求
+      filter = L"https://" + config.static_host_name + L"/*";
+      thumbnail_prefix = L"https://" + config.static_host_name + L"/static/thumbnails/";
+      Logger().info("Release mode: Intercepting all requests from {}",
+                    Utils::String::ToUtf8(filter));
+    }
+
+    HRESULT hr = webview2->AddWebResourceRequestedFilter(filter.c_str(),
+                                                         COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE);
+    if (FAILED(hr)) {
+      Logger().warn("Failed to add WebResourceRequested filter: {}", hr);
+      return hr;
+    }
+
+    auto app_state_ptr = m_state;
+    auto web_resource_requested_handler =
+        Microsoft::WRL::Callback<ICoreWebView2WebResourceRequestedEventHandler>(
+            [app_state_ptr, thumbnail_prefix, environment](
+                ICoreWebView2* sender,
+                ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
+              return handle_thumbnail_web_resource_request(*app_state_ptr, thumbnail_prefix,
+                                                           environment, args);
+            });
+
+    EventRegistrationToken token;
+    hr = webview->add_WebResourceRequested(web_resource_requested_handler.Get(), &token);
+    if (FAILED(hr)) {
+      Logger().warn("Failed to register WebResourceRequested handler: {}", hr);
+      return hr;
+    }
+
+    resources.webresource_requested_tokens.push_back(token);
+    Logger().info("Thumbnail WebResourceRequested handler registered");
+    return S_OK;
+  }
+
+  // 辅助方法：选择初始URL
+  void select_initial_url(Core::WebView::State::WebViewConfig& config) {
+    if (Vendor::BuildConfig::is_debug_build()) {
+      // 开发环境：连接Vite dev server (热重载)
+      config.initial_url = config.dev_server_url;
+      Logger().info("Debug mode: Using Vite dev server at {}",
+                    Utils::String::ToUtf8(config.dev_server_url));
+    } else {
+      // 生产环境：使用构建产物
+      config.initial_url = L"https://" + config.virtual_host_name + L"/index.html";
+      Logger().info("Release mode: Using built frontend from resources/web");
+    }
+  }
+
+  // 辅助方法：设置拖动处理
+  HRESULT setup_drag_handling() {
     bool drag_supported = is_drag_region_supported();
     if (!drag_supported) {
       if (auto result = Core::WebView::DragHandler::register_drag_handler(*m_state); !result) {
         Logger().warn("Failed to register drag handler: {}", result.error());
-      } else {
-        Logger().info("Drag handler registered as fallback for older WebView2 versions");
+        return E_FAIL;
       }
+      Logger().info("Drag handler registered as fallback for older WebView2 versions");
     } else {
       Logger().info("Using native drag region support, COM-based drag handler not needed");
     }
+    return S_OK;
+  }
 
-    // 导航到选定的 URL
-    webview_state.resources.webview.get()->Navigate(webview_state.config.initial_url.c_str());
+  // 辅助方法：初始化导航
+  HRESULT initialize_navigation(ICoreWebView2* webview, const std::wstring& initial_url) {
+    HRESULT hr = webview->Navigate(initial_url.c_str());
+    if (FAILED(hr)) {
+      Logger().error("Failed to navigate to initial URL: {}", hr);
+      return hr;
+    }
+
+    Logger().info("WebView2 ready, navigating to: {}", Utils::String::ToUtf8(initial_url));
+    return S_OK;
+  }
+
+ public:
+  ControllerCompletedHandler(Core::State::AppState* state) : m_state(state) {}
+
+  HRESULT STDMETHODCALLTYPE Invoke(HRESULT result, ICoreWebView2Controller* controller) {
+    if (!m_state) return E_FAIL;
+    auto& webview_state = *m_state->webview;
+
+    if (FAILED(result)) {
+      Logger().error("Failed to create WebView2 controller: {}", result);
+      return result;
+    }
+
+    // 1. 保存控制器并获取 WebView 核心接口
+    webview_state.resources.controller = controller;
+    HRESULT hr = controller->get_CoreWebView2(webview_state.resources.webview.put());
+    if (FAILED(hr)) {
+      Logger().error("Failed to get CoreWebView2: {}", hr);
+      return hr;
+    }
+
+    auto* webview = webview_state.resources.webview.get();
+    auto* environment = webview_state.resources.environment.get();
+
+    // 2. 设置窗口边界
+    RECT bounds = {0, 0, webview_state.window.width, webview_state.window.height};
+    controller->put_Bounds(bounds);
+
+    // 3. 设置导航事件
+    hr = setup_navigation_events(webview, webview_state.resources);
+    if (FAILED(hr)) return hr;
+
+    // 4. 设置消息处理器
+    hr = setup_message_handler(webview, webview_state.resources);
+    if (FAILED(hr)) return hr;
+
+    // 5. 设置虚拟主机映射
+    hr = setup_virtual_host_mapping(webview, webview_state.config);
+    if (FAILED(hr)) return hr;
+
+    // 6. 设置资源拦截（缩略图）
+    hr = setup_resource_interception(webview, environment, webview_state.resources,
+                                     webview_state.config);
+
+    if (FAILED(hr)) {
+      // 资源拦截失败不是致命错误，继续执行
+      Logger().warn("Resource interception setup failed, continuing without thumbnail support");
+    }
+
+    // 7. 选择初始 URL
+    select_initial_url(webview_state.config);
+
+    // 8. 设置拖动处理
+    hr = setup_drag_handling();
+    if (FAILED(hr)) {
+      // 拖动处理失败不是致命错误
+      Logger().warn("Drag handling setup failed, continuing without drag support");
+    }
+
+    // 9. 初始化导航
+    hr = initialize_navigation(webview, webview_state.config.initial_url);
+    if (FAILED(hr)) return hr;
+
+    // 10. 标记就绪并初始化 RPC 桥接
     webview_state.is_ready = true;
-
-    // 初始化RPC桥接
     Core::WebView::RpcBridge::initialize_rpc_bridge(*m_state);
-
-    Logger().info("WebView2 ready, navigating to: {}",
-                  Utils::String::ToUtf8(webview_state.config.initial_url));
 
     return S_OK;
   }
@@ -271,40 +539,48 @@ auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     return std::unexpected("WebView already initialized");
   }
 
-  // 初始化 COM (如果尚未初始化)
-  HRESULT com_hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-  if (FAILED(com_hr) && com_hr != RPC_E_CHANGED_MODE) {
-    return std::unexpected("Failed to initialize COM");
+  try {
+    // 使用 wil RAII 初始化 COM，static 确保整个应用生命周期内有效
+    static auto coinit = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
+
+    // 创建环境选项对象并添加浏览器参数
+    auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
+
+    if (options) {
+      // 添加启用拖拽区域的参数（在旧版本上会被忽略，不会造成错误）
+      Vendor::WIL::throw_if_failed(options->put_AdditionalBrowserArguments(
+          L"--enable-features=msWebView2EnableDraggableRegions"));
+    }
+
+    // 使用有状态处理器创建环境
+    auto environment_handler =
+        Microsoft::WRL::Make<EnvironmentCompletedHandler>(&state, webview_hwnd);
+
+    HRESULT hr;
+    if (options) {
+      hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, options.Get(),
+                                                    environment_handler.Get());
+    } else {
+      Logger().warn("Failed to create WebView2 environment options, trying without options");
+      hr = CreateCoreWebView2Environment(environment_handler.Get());
+    }
+
+    Vendor::WIL::throw_if_failed(hr);
+
+    webview_state.is_initialized = true;
+    Logger().info("WebView2 initialization started with draggable regions support flag");
+    return {};
+
+  } catch (const wil::ResultException& e) {
+    auto error_msg = std::format("Failed to initialize WebView2: {} (HRESULT: 0x{:08X})", e.what(),
+                                 static_cast<unsigned>(e.GetErrorCode()));
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  } catch (const std::exception& e) {
+    auto error_msg = std::format("Unexpected error during WebView2 initialization: {}", e.what());
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
   }
-
-  // 创建环境选项对象并添加浏览器参数
-  auto options = Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
-  if (options) {
-    // 添加启用拖拽区域的参数（在旧版本上会被忽略，不会造成错误）
-    options->put_AdditionalBrowserArguments(L"--enable-features=msWebView2EnableDraggableRegions");
-  }
-
-  // 使用我们的有状态处理器创建环境，带参数
-  auto environment_handler =
-      Microsoft::WRL::Make<EnvironmentCompletedHandler>(&state, webview_hwnd);
-  HRESULT hr = E_FAIL;
-
-  if (options) {
-    hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, options.Get(),
-                                                  environment_handler.Get());
-  } else {
-    // 如果创建选项对象失败，尝试不带参数的创建
-    Logger().warn("Failed to create WebView2 environment options, trying without options");
-    hr = CreateCoreWebView2Environment(environment_handler.Get());
-  }
-
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create WebView2 environment: " + std::to_string(hr));
-  }
-
-  webview_state.is_initialized = true;
-  Logger().info("WebView2 initialization started with draggable regions support flag");
-  return {};
 }
 
 auto resize_webview(Core::State::AppState& state, int width, int height) -> void {

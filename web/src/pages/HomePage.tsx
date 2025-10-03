@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from '@/lib/i18n'
 import { scanInfinityNikkiPhotos } from '@/plugins/infinity_nikki'
 import type { InfinityNikkiScanResult } from '@/plugins/infinity_nikki'
+import { getStaticUrl } from '@/lib/environment'
 
 export function HomePage() {
   const { t } = useTranslation()
@@ -37,6 +38,17 @@ export function HomePage() {
     <div className='flex h-full flex-col'>
       <div className='mt-auto mb-32 ml-16'>
         <div className='mb-8 text-2xl text-muted-foreground'>{t('home.welcome')}</div>
+
+        {/* 图片测试 */}
+        <div className='w-96 rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>
+          <h3 className='mb-2 text-lg font-semibold'>🎨 图片测试</h3>
+          <p className='mb-4 text-sm text-gray-600'>测试图片显示功能，验证后端响应</p>
+          <img
+            src={getStaticUrl('/static/thumbnails/0b/6e/0b6e6bbb133e6c7f_400x400.webp')}
+            alt='图片测试'
+            className='h-auto w-full'
+          />
+        </div>
 
         {/* Infinity Nikki 测试区域 */}
         <div className='w-96 rounded-lg border border-gray-200 bg-white p-6 shadow-sm'>

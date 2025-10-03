@@ -1,12 +1,12 @@
 module;
 
 #include <wil/com.h>
-#include <windows.h>
 #include <WebView2.h>  // 必须放最后面
 
 export module Core.WebView.State;
 
 import std;
+import <windows.h>;
 
 export namespace Core::WebView::State {
 
@@ -25,6 +25,13 @@ struct CoreResources {
   wil::com_ptr<ICoreWebView2Environment> environment;
   wil::com_ptr<ICoreWebView2Controller> controller;
   wil::com_ptr<ICoreWebView2> webview;
+  
+  // 事件注册令牌，用于清理时取消注册
+  EventRegistrationToken navigation_starting_token{};
+  EventRegistrationToken navigation_completed_token{};
+  EventRegistrationToken web_message_received_token{};
+  std::vector<EventRegistrationToken> webresource_requested_tokens;
+  
   std::wstring user_data_folder;
   std::wstring current_url;
 };
@@ -48,7 +55,8 @@ struct WebViewConfig {
 
   // 前端加载配置
   std::wstring frontend_dist_path = L"./resources/web";    // 前端构建产物路径
-  std::wstring virtual_host_name = L"app.local";           // 虚拟主机名
+  std::wstring virtual_host_name = L"app.local";           // 前端虚拟主机名
+  std::wstring static_host_name = L"static.app.local";     // 静态资源路径
   std::wstring dev_server_url = L"http://localhost:5173";  // 开发服务器URL
 };
 

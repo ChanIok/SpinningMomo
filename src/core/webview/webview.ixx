@@ -1,12 +1,11 @@
 module;
 
-#include <windows.h>
-
 export module Core.WebView;
 
 import std;
 import Core.State;
 import Core.WebView.State;
+import <windows.h>;
 
 namespace Core::WebView {
 

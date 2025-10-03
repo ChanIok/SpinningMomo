@@ -20,7 +20,7 @@ import {
   MoreVertical,
 } from 'lucide-react'
 import { useGalleryStore } from '@/lib/gallery/galleryStore'
-import { useAssets } from '@/lib/gallery/hooks/useAssets'
+import { useGalleryData } from '@/lib/gallery'
 import { useGalleryView, useGallerySelection } from '../hooks'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -29,7 +29,7 @@ export function GalleryToolbar() {
   // 使用 gallery hooks
   const view = useGalleryView()
   const selection = useGallerySelection()
-  const { refreshAssets } = useAssets()
+  const { reload } = useGalleryData()
   const { t } = useTranslation()
 
   // 从 store 获取必要的状态
@@ -68,7 +68,7 @@ export function GalleryToolbar() {
           </div>
 
           {/* 刷新按钮 */}
-          <Button variant='outline' size='icon' onClick={refreshAssets} disabled={isLoading}>
+          <Button variant='outline' size='icon' onClick={reload} disabled={isLoading}>
             <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
           </Button>
 

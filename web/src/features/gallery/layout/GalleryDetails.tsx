@@ -77,8 +77,8 @@ export function GalleryDetails() {
           <div className='space-y-2 text-xs'>
             <div className='flex justify-between'>
               <span className='text-muted-foreground'>{t('gallery.details.filename')}</span>
-              <span className='max-w-32 truncate font-mono' title={activeAsset.filename}>
-                {activeAsset.filename}
+              <span className='max-w-32 truncate font-mono' title={activeAsset.name}>
+                {activeAsset.name}
               </span>
             </div>
             <div className='flex justify-between'>
@@ -152,7 +152,7 @@ export function GalleryDetails() {
             <div>
               <span className='text-muted-foreground'>{t('gallery.details.relativePath')}</span>
               <p className='mt-1 rounded bg-muted/50 p-2 font-mono text-xs break-all'>
-                {activeAsset.relative_path}
+                {activeAsset.path}
               </p>
             </div>
           </div>

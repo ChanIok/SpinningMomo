@@ -24,7 +24,7 @@ export function MasonryView() {
             width: asset.width!,
             height: asset.height!,
             key: asset.id.toString(),
-            alt: asset.filename,
+            alt: asset.name,
             // 保存原始asset数据供后续使用
             asset,
           }) as Photo & { asset: Asset }

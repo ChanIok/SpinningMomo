@@ -221,7 +221,7 @@ export function AssetCard({ assetId, viewMode }: AssetCardProps) {
         {!imageError ? (
           <img
             src={getAssetThumbnailUrl(assetId)}
-            alt={asset.filename}
+            alt={asset.name}
             className={cn(
               'object-cover transition-all duration-300 group-hover:scale-110',
               imageLoaded ? 'opacity-100' : 'opacity-0',

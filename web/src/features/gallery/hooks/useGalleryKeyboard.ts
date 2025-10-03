@@ -115,7 +115,7 @@ export function useGalleryKeyboard(options: UseGalleryKeyboardOptions = {}) {
           // 这里可以触发删除确认对话框
           console.log(
             'Delete selected assets:',
-            selection.selectedAssets.map((a) => a.filename)
+            selection.selectedAssets.map((a) => a.name)
           )
         }
       },

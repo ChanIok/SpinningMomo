@@ -1,7 +1,7 @@
 import { ScrollArea } from '@/components/ui/scroll-area'
 import 'allotment/dist/style.css'
 import { useGalleryStore } from '@/lib/gallery/galleryStore'
-import { useAssets } from '@/lib/gallery/hooks/useAssets'
+import { useAutoGalleryData } from '@/lib/gallery'
 import { useGalleryKeyboard, useGalleryView, useGalleryLayout } from '../hooks'
 import { GallerySidebar } from './GallerySidebar'
 import { GalleryViewer } from './GalleryViewer'
@@ -21,7 +21,7 @@ export function GalleryLayout() {
     columnsPerRow: view.columnCount,
   })
 
-  useAssets({ useMockData: true, autoLoad: true })
+  useAutoGalleryData()
 
   return (
     <>

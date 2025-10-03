@@ -10,6 +10,7 @@ import Core.HttpServer;
 import Core.Events.Registrar;
 import Core.RPC.Registry;
 import Core.Initializer.Database;
+import Features.Gallery;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Updater;
@@ -63,6 +64,10 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto result = UI::ContextMenu::initialize(state); !result) {
       return std::unexpected("Failed to initialize tray menu: " + result.error());
+    }
+
+    if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {
+      return std::unexpected("Failed to initialize gallery: " + gallery_result.error());
     }
 
     // 默认显示窗口

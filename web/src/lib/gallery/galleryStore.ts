@@ -92,7 +92,7 @@ const initialState: GalleryState = {
   hasNextPage: false,
 
   viewConfig: {
-    mode: 'grid',
+    mode: 'adaptive',
     size: 3,
   },
   filter: {},
@@ -377,8 +377,3 @@ export const useGalleryStore = create<GalleryStoreType>()(
 )
 
 // 便捷选择器
-export const useAssets = () => useGalleryStore((state) => state.assets)
-export const useAssetsLoading = () => useGalleryStore((state) => state.isLoading)
-export const useAssetsSelection = () => useGalleryStore((state) => state.selection)
-export const useAssetsLightbox = () => useGalleryStore((state) => state.lightbox)
-export const useAssetsViewConfig = () => useGalleryStore((state) => state.viewConfig)

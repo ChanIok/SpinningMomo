@@ -38,7 +38,7 @@ export async function getAsset(params: GetAssetParams): Promise<Asset> {
   try {
     const result = await call<Asset>('gallery.get', params)
 
-    console.log('📸 获取资产详情成功:', result.filename)
+    console.log('📸 获取资产详情成功:', result.name)
 
     return result
   } catch (error) {
