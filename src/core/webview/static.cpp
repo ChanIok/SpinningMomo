@@ -1,7 +1,7 @@
 module;
 
 #include <wil/com.h>
-#include <WebView2.h>    // 必须放最后面
+#include <WebView2.h>  // 必须放最后面
 
 module Core.WebView.Static;
 
@@ -25,9 +25,10 @@ auto try_web_resource_resolve(Core::State::AppState& state, std::wstring_view ur
   }
 
   auto& registry = *state.webview->resources.web_resolvers;
-  std::shared_lock lock(registry.mutex);
+  // 无锁读取（RCU 模式）
+  auto resolvers = registry.resolvers.load();
 
-  for (const auto& entry : registry.resolvers) {
+  for (const auto& entry : *resolvers) {
     if (url.starts_with(entry.prefix)) {
       auto result = entry.resolver(url);
       if (result.success) {
@@ -120,8 +121,14 @@ auto register_web_resource_resolver(Core::State::AppState& state, std::wstring p
   }
 
   auto& registry = *state.webview->resources.web_resolvers;
-  std::unique_lock lock(registry.mutex);
-  registry.resolvers.push_back({std::move(prefix), std::move(resolver)});
+  std::unique_lock lock(registry.write_mutex);
+
+  // RCU 写入：复制当前 vector，添加新项，然后原子替换
+  auto current = registry.resolvers.load();
+  auto new_resolvers = std::make_shared<std::vector<Types::WebResolverEntry>>(*current);
+  new_resolvers->push_back({std::move(prefix), std::move(resolver)});
+  registry.resolvers.store(new_resolvers);
+
   Logger().debug("Registered WebView resource resolver for: {}", Utils::String::ToUtf8(prefix));
 }
 
@@ -132,8 +139,13 @@ auto unregister_web_resource_resolver(Core::State::AppState& state, std::wstring
   }
 
   auto& registry = *state.webview->resources.web_resolvers;
-  std::unique_lock lock(registry.mutex);
-  std::erase_if(registry.resolvers, [prefix](const auto& entry) { return entry.prefix == prefix; });
+  std::unique_lock lock(registry.write_mutex);
+
+  // RCU 写入：复制当前 vector，删除匹配项，然后原子替换
+  auto current = registry.resolvers.load();
+  auto new_resolvers = std::make_shared<std::vector<Types::WebResolverEntry>>(*current);
+  std::erase_if(*new_resolvers, [prefix](const auto& entry) { return entry.prefix == prefix; });
+  registry.resolvers.store(new_resolvers);
 
   Logger().debug("Unregistered WebView resource resolver for: {}",
                  Utils::String::ToUtf8(std::wstring(prefix)));

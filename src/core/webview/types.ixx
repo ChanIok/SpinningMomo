@@ -21,9 +21,15 @@ struct WebResolverEntry {
   WebResourceResolver resolver;
 };
 
+// 使用 RCU 模式的注册表（无锁读取）
 struct WebResolverRegistry {
-  std::vector<WebResolverEntry> resolvers;
-  mutable std::shared_mutex mutex;
+  // 使用 atomic shared_ptr 实现无锁读取（RCU 模式）
+  // 读取时无需加锁，写入时复制整个 vector
+  std::atomic<std::shared_ptr<const std::vector<WebResolverEntry>>> resolvers{
+      std::make_shared<const std::vector<WebResolverEntry>>()};
+
+  // 写锁：仅用于保护写操作之间的竞争
+  std::mutex write_mutex;
 };
 
 }  // namespace Core::WebView::Types
