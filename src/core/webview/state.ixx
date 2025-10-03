@@ -6,6 +6,7 @@ module;
 export module Core.WebView.State;
 
 import std;
+import Core.WebView.Types;
 import <windows.h>;
 
 export namespace Core::WebView::State {
@@ -34,6 +35,12 @@ struct CoreResources {
   
   std::wstring user_data_folder;
   std::wstring current_url;
+
+  // WebView 资源解析器注册表
+  std::unique_ptr<Types::WebResolverRegistry> web_resolvers;
+
+  // 构造函数：初始化解析器注册表
+  CoreResources() : web_resolvers(std::make_unique<Types::WebResolverRegistry>()) {}
 };
 
 // 消息通信状态

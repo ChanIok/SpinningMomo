@@ -49,7 +49,7 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      '/assets': {
+      '/static': {
         target: 'http://localhost:51206',
         changeOrigin: true,
         secure: false,

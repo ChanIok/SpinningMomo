@@ -7,6 +7,7 @@ module Core.HttpServer.SseManager;
 import std;
 import Core.State;
 import Core.HttpServer.State;
+import Core.HttpServer.Types;
 import Utils.Logger;
 
 namespace Core::HttpServer::SseManager {
@@ -26,7 +27,7 @@ namespace Core::HttpServer::SseManager {
         
         std::lock_guard<std::mutex> lock(mtx);
         
-        auto connection = std::make_shared<State::SseConnection>();
+        auto connection = std::make_shared<Types::SseConnection>();
         connection->response = response;
         connection->client_id = std::to_string(++counter);
         connection->connected_at = std::chrono::system_clock::now();
@@ -43,7 +44,7 @@ namespace Core::HttpServer::SseManager {
             
             std::lock_guard<std::mutex> lock(mtx);
             auto it = std::remove_if(connections.begin(), connections.end(),
-                [&client_id](const std::shared_ptr<State::SseConnection>& conn) {
+                [&client_id](const std::shared_ptr<Types::SseConnection>& conn) {
                     return conn && conn->client_id == client_id;
                 });
             connections.erase(it, connections.end());
@@ -66,7 +67,7 @@ namespace Core::HttpServer::SseManager {
         
         auto old_size = connections.size();
         auto it = std::remove_if(connections.begin(), connections.end(),
-            [&client_id](const std::shared_ptr<State::SseConnection>& conn) {
+            [&client_id](const std::shared_ptr<Types::SseConnection>& conn) {
                 return conn && conn->client_id == client_id;
             });
         connections.erase(it, connections.end());
@@ -89,7 +90,7 @@ namespace Core::HttpServer::SseManager {
         
         // 使用erase-remove惯用法清理已关闭的连接并广播事件
         auto it = std::remove_if(connections.begin(), connections.end(),
-            [&event_data](const std::shared_ptr<State::SseConnection>& conn) {
+            [&event_data](const std::shared_ptr<Types::SseConnection>& conn) {
                 if (!conn || conn->is_closed) {
                     return true;
                 }

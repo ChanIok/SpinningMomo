@@ -5,12 +5,14 @@ export module Core.WebView;
 import std;
 import Core.State;
 import Core.WebView.State;
+import Core.WebView.Static;
+import Core.WebView.Types;
 import <windows.h>;
 
-namespace Core::WebView {
+export namespace Core::WebView {
 
 // 初始化函数
-export auto initialize(Core::State::AppState& state, HWND webview_hwnd)
+auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string>;
 
 // 销毁函数

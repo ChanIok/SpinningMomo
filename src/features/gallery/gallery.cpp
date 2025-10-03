@@ -12,6 +12,7 @@ import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Processor;
 import Features.Gallery.Ignore.Processor;
+import Features.Gallery.StaticResolver;
 import Utils.Image;
 import Utils.Logger;
 
@@ -21,7 +22,7 @@ namespace Features::Gallery {
 
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   try {
-    Logger().info("Initializing asset module...");
+    Logger().info("Initializing gallery module...");
 
     // 确保缩略图目录存在
     auto ensure_dir_result = Asset::Thumbnail::ensure_thumbnails_directory_exists(app_state);
@@ -31,7 +32,11 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
                              ensure_dir_result.error());
     }
 
-    Logger().info("Asset module initialized successfully");
+    // 注册静态服务解析器
+    StaticResolver::register_http_resolvers(app_state);
+    StaticResolver::register_webview_resolvers(app_state);
+
+    Logger().info("Gallery module initialized successfully");
     Logger().info("Thumbnail directory set to: {}",
                   app_state.gallery->thumbnails_directory.string());
     return {};
@@ -44,12 +49,15 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
 auto cleanup(Core::State::AppState& app_state) -> void {
   try {
-    Logger().info("Cleaning up asset module resources...");
+    Logger().info("Cleaning up gallery module resources...");
+
+    // 注销静态服务解析器
+    StaticResolver::unregister_all_resolvers(app_state);
 
     // 重置缩略图路径状态
     app_state.gallery->thumbnails_directory.clear();
 
-    Logger().info("Asset module cleanup completed");
+    Logger().info("Gallery module cleanup completed");
   } catch (const std::exception& e) {
     Logger().error("Exception during asset module cleanup: {}", e.what());
   }

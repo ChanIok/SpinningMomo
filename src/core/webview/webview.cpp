@@ -8,9 +8,10 @@ module Core.WebView;
 import std;
 import Core.State;
 import Features.Gallery.State;
-import Core.WebView.State;
-import Core.WebView.RpcBridge;
 import Core.WebView.DragHandler;
+import Core.WebView.RpcBridge;
+import Core.WebView.State;
+import Core.WebView.Static;
 import Utils.Logger;
 import Utils.String;
 import Vendor.BuildConfig;
@@ -20,8 +21,10 @@ import <WebView2EnvironmentOptions.h>;
 import <windows.h>;
 import <wrl.h>;
 
-// 匿名命名空间，用于封装辅助函数
+// 匿名命名空间，用于封装辅助函数和 COM 回调处理器
 namespace {
+
+// ============= 辅助函数 =============
 
 // 检查WebView2运行时版本是否支持拖拽区域功能
 bool is_drag_region_supported() {
@@ -48,138 +51,6 @@ bool is_drag_region_supported() {
   // 默认假设不支持，使用后备方案
   return false;
 }
-
-auto extract_thumbnail_relative_path(const std::wstring& uri, const std::wstring& prefix)
-    -> std::optional<std::wstring> {
-  if (uri.rfind(prefix, 0) != 0) {
-    return std::nullopt;
-  }
-
-  std::wstring relative_path = uri.substr(prefix.size());
-
-  if (relative_path.empty()) {
-    return std::nullopt;
-  }
-
-  if (relative_path.front() == L'/') {
-    relative_path.erase(relative_path.begin());
-  }
-
-  if (auto query_pos = relative_path.find(L'?'); query_pos != std::wstring::npos) {
-    relative_path.erase(query_pos);
-  }
-
-  if (auto fragment_pos = relative_path.find(L'#'); fragment_pos != std::wstring::npos) {
-    relative_path.erase(fragment_pos);
-  }
-
-  if (relative_path.empty()) {
-    return std::nullopt;
-  }
-
-  return relative_path;
-}
-
-auto resolve_thumbnail_path(Core::State::AppState& state, const std::wstring& relative_path)
-    -> std::optional<std::filesystem::path> {
-  if (!state.gallery || state.gallery->thumbnails_directory.empty()) {
-    return std::nullopt;
-  }
-
-  std::filesystem::path base_dir = state.gallery->thumbnails_directory;
-  std::filesystem::path combined_path = base_dir / std::filesystem::path(relative_path);
-
-  std::error_code ec;
-  auto normalized_base = std::filesystem::weakly_canonical(base_dir, ec);
-  if (ec) {
-    normalized_base = base_dir.lexically_normal();
-    ec.clear();
-  }
-
-  auto normalized_target = std::filesystem::weakly_canonical(combined_path, ec);
-  if (ec) {
-    return std::nullopt;
-  }
-
-  auto relative = std::filesystem::relative(normalized_target, normalized_base, ec);
-  if (ec || relative.native().starts_with(L"..")) {
-    return std::nullopt;
-  }
-
-  if (!std::filesystem::exists(normalized_target, ec) || ec) {
-    return std::nullopt;
-  }
-
-  return normalized_target;
-}
-
-auto create_thumbnail_response_headers() -> std::wstring {
-  return L"Content-Type: image/webp\r\nCache-Control: public, max-age=86400\r\n";
-}
-
-auto handle_thumbnail_web_resource_request(Core::State::AppState& state,
-                                           const std::wstring& thumbnail_prefix,
-                                           ICoreWebView2Environment* environment,
-                                           ICoreWebView2WebResourceRequestedEventArgs* args)
-    -> HRESULT {
-  Logger().info("Handling thumbnail web resource request: {}",
-                Utils::String::ToUtf8(thumbnail_prefix));
-  if (!environment) return S_OK;
-
-  wil::com_ptr<ICoreWebView2WebResourceRequest> request;
-  if (FAILED(args->get_Request(request.put())) || !request) return S_OK;
-
-  wil::unique_cotaskmem_string uri_raw;
-  if (FAILED(request->get_Uri(&uri_raw)) || !uri_raw) return S_OK;
-
-  std::wstring uri(uri_raw.get());
-
-  auto relative_path = extract_thumbnail_relative_path(uri, thumbnail_prefix);
-  if (!relative_path) return S_OK;
-
-  auto thumbnail_path = resolve_thumbnail_path(state, *relative_path);
-  if (!thumbnail_path) {
-    Logger().warn("Thumbnail not found or inaccessible: {}", Utils::String::ToUtf8(*relative_path));
-
-    wil::com_ptr<ICoreWebView2WebResourceResponse> not_found_response;
-    if (SUCCEEDED(environment->CreateWebResourceResponse(nullptr, 404, L"Not Found", nullptr,
-                                                         not_found_response.put()))) {
-      args->put_Response(not_found_response.get());
-    }
-    return S_OK;
-  }
-
-  wil::com_ptr<IStream> stream;
-  HRESULT hr = SHCreateStreamOnFileEx(thumbnail_path->c_str(), STGM_READ | STGM_SHARE_DENY_WRITE,
-                                      FILE_ATTRIBUTE_NORMAL, FALSE, nullptr, stream.put());
-
-  if (FAILED(hr) || !stream) {
-    Logger().error("Failed to open thumbnail file: {} (hr={})",
-                   Utils::String::ToUtf8(thumbnail_path->wstring()), hr);
-    return S_OK;
-  }
-
-  wil::com_ptr<ICoreWebView2WebResourceResponse> response;
-  auto headers = create_thumbnail_response_headers();
-
-  if (FAILED(environment->CreateWebResourceResponse(stream.get(), 200, L"OK", headers.c_str(),
-                                                    response.put())) ||
-      !response) {
-    Logger().error("Failed to create WebView2 response for thumbnail {}",
-                   Utils::String::ToUtf8(thumbnail_path->wstring()));
-    return S_OK;
-  }
-
-  args->put_Response(response.get());
-  Logger().debug("Served thumbnail via WebResourceRequested: {}",
-                 Utils::String::ToUtf8(thumbnail_path->wstring()));
-  return S_OK;
-}
-
-}  // namespace
-
-// 匿名命名空间，用于封装 COM 回调处理器
-namespace {
 
 // 1. 导航事件处理器
 class NavigationStartingEventHandler
@@ -331,61 +202,6 @@ class ControllerCompletedHandler
     return S_OK;
   }
 
-  // 辅助方法：设置资源拦截
-  HRESULT setup_resource_interception(ICoreWebView2* webview, ICoreWebView2Environment* environment,
-                                      Core::WebView::State::CoreResources& resources,
-                                      Core::WebView::State::WebViewConfig& config) {
-    auto webview2 = wil::com_ptr<ICoreWebView2>(webview).try_query<ICoreWebView2_2>();
-    if (!webview2) {
-      Logger().warn("ICoreWebView2_2 interface not available, thumbnail interception disabled");
-      return S_OK;
-    }
-
-    // 根据 debug 模式选择拦截路径
-    std::wstring filter;
-    std::wstring thumbnail_prefix;
-    if (Vendor::BuildConfig::is_debug_build()) {
-      // debug 模式：拦截开发服务器的静态资源路径
-      filter = config.dev_server_url + L"/static/thumbnails/*";
-      thumbnail_prefix = config.dev_server_url + L"/static/thumbnails/";
-      Logger().info("Debug mode: Intercepting thumbnails from {}", Utils::String::ToUtf8(filter));
-    } else {
-      // release 模式：拦截静态资源路径的所有请求
-      filter = L"https://" + config.static_host_name + L"/*";
-      thumbnail_prefix = L"https://" + config.static_host_name + L"/static/thumbnails/";
-      Logger().info("Release mode: Intercepting all requests from {}",
-                    Utils::String::ToUtf8(filter));
-    }
-
-    HRESULT hr = webview2->AddWebResourceRequestedFilter(filter.c_str(),
-                                                         COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE);
-    if (FAILED(hr)) {
-      Logger().warn("Failed to add WebResourceRequested filter: {}", hr);
-      return hr;
-    }
-
-    auto app_state_ptr = m_state;
-    auto web_resource_requested_handler =
-        Microsoft::WRL::Callback<ICoreWebView2WebResourceRequestedEventHandler>(
-            [app_state_ptr, thumbnail_prefix, environment](
-                ICoreWebView2* sender,
-                ICoreWebView2WebResourceRequestedEventArgs* args) -> HRESULT {
-              return handle_thumbnail_web_resource_request(*app_state_ptr, thumbnail_prefix,
-                                                           environment, args);
-            });
-
-    EventRegistrationToken token;
-    hr = webview->add_WebResourceRequested(web_resource_requested_handler.Get(), &token);
-    if (FAILED(hr)) {
-      Logger().warn("Failed to register WebResourceRequested handler: {}", hr);
-      return hr;
-    }
-
-    resources.webresource_requested_tokens.push_back(token);
-    Logger().info("Thumbnail WebResourceRequested handler registered");
-    return S_OK;
-  }
-
   // 辅助方法：选择初始URL
   void select_initial_url(Core::WebView::State::WebViewConfig& config) {
     if (Vendor::BuildConfig::is_debug_build()) {
@@ -467,8 +283,8 @@ class ControllerCompletedHandler
     if (FAILED(hr)) return hr;
 
     // 6. 设置资源拦截（缩略图）
-    hr = setup_resource_interception(webview, environment, webview_state.resources,
-                                     webview_state.config);
+    hr = Core::WebView::Static::setup_resource_interception(
+        *m_state, webview, environment, webview_state.resources, webview_state.config);
 
     if (FAILED(hr)) {
       // 资源拦截失败不是致命错误，继续执行
@@ -530,6 +346,8 @@ class EnvironmentCompletedHandler
 }  // namespace
 
 namespace Core::WebView {
+
+// ============= 初始化和生命周期管理 =============
 
 auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string> {
