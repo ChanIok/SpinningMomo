@@ -72,3 +72,5 @@ web/.cache/
 web/.parcel-cache/
 web/.vite/
 web/stats*
+
+web_react/
