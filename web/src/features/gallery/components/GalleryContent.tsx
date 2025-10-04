@@ -4,7 +4,7 @@ import { GridView } from './GridView'
 import { ListView } from './ListView'
 import { AdaptiveView } from './AdaptiveView'
 import { useGalleryStore } from '@/lib/gallery/galleryStore'
-import { useAutoGalleryData } from '@/lib/gallery'
+import { useAutoGalleryData } from '@/lib/gallery/hooks/useGalleryData'
 import { useTranslation } from '@/lib/i18n'
 
 export function GalleryContent() {

@@ -10,10 +10,10 @@ export const mockAssets: Asset[] = [
     width: 3840,
     height: 2160,
     size: 2458624,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: 'abc123def456',
-    created_at: new Date('2024-01-15T10:30:00Z').getTime(),
-    updated_at: new Date('2024-01-15T10:30:00Z').getTime(),
+    createdAt: new Date('2024-01-15T10:30:00Z').getTime(),
+    updatedAt: new Date('2024-01-15T10:30:00Z').getTime(),
   },
   {
     id: 2,
@@ -23,10 +23,10 @@ export const mockAssets: Asset[] = [
     width: 4096,
     height: 2304,
     size: 3145728,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: 'def789abc012',
-    created_at: new Date('2024-01-14T14:20:00Z').getTime(),
-    updated_at: new Date('2024-01-14T14:20:00Z').getTime(),
+    createdAt: new Date('2024-01-14T14:20:00Z').getTime(),
+    updatedAt: new Date('2024-01-14T14:20:00Z').getTime(),
   },
   {
     id: 3,
@@ -36,10 +36,10 @@ export const mockAssets: Asset[] = [
     width: 2560,
     height: 1440,
     size: 1536000,
-    mime_type: 'image/png',
+    mimeType: 'image/png',
     hash: '789012def345',
-    created_at: new Date('2024-01-13T20:15:00Z').getTime(),
-    updated_at: new Date('2024-01-13T20:15:00Z').getTime(),
+    createdAt: new Date('2024-01-13T20:15:00Z').getTime(),
+    updatedAt: new Date('2024-01-13T20:15:00Z').getTime(),
   },
   {
     id: 4,
@@ -49,10 +49,10 @@ export const mockAssets: Asset[] = [
     width: 3200,
     height: 1800,
     size: 2097152,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: '012345abc678',
-    created_at: new Date('2024-01-12T08:45:00Z').getTime(),
-    updated_at: new Date('2024-01-12T08:45:00Z').getTime(),
+    createdAt: new Date('2024-01-12T08:45:00Z').getTime(),
+    updatedAt: new Date('2024-01-12T08:45:00Z').getTime(),
   },
   {
     id: 5,
@@ -62,10 +62,10 @@ export const mockAssets: Asset[] = [
     width: 5120,
     height: 2880,
     size: 4194304,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: '345678def901',
-    created_at: new Date('2024-01-11T16:30:00Z').getTime(),
-    updated_at: new Date('2024-01-11T16:30:00Z').getTime(),
+    createdAt: new Date('2024-01-11T16:30:00Z').getTime(),
+    updatedAt: new Date('2024-01-11T16:30:00Z').getTime(),
   },
   {
     id: 6,
@@ -75,10 +75,10 @@ export const mockAssets: Asset[] = [
     width: 6000,
     height: 4000,
     size: 8388608,
-    mime_type: 'image/tiff',
+    mimeType: 'image/tiff',
     hash: '678901abc234',
-    created_at: new Date('2024-01-10T12:00:00Z').getTime(),
-    updated_at: new Date('2024-01-10T12:00:00Z').getTime(),
+    createdAt: new Date('2024-01-10T12:00:00Z').getTime(),
+    updatedAt: new Date('2024-01-10T12:00:00Z').getTime(),
   },
   {
     id: 7,
@@ -88,10 +88,10 @@ export const mockAssets: Asset[] = [
     width: 2048,
     height: 1536,
     size: 1048576,
-    mime_type: 'image/webp',
+    mimeType: 'image/webp',
     hash: '901234def567',
-    created_at: new Date('2024-01-09T09:15:00Z').getTime(),
-    updated_at: new Date('2024-01-09T09:15:00Z').getTime(),
+    createdAt: new Date('2024-01-09T09:15:00Z').getTime(),
+    updatedAt: new Date('2024-01-09T09:15:00Z').getTime(),
   },
   {
     id: 8,
@@ -101,10 +101,10 @@ export const mockAssets: Asset[] = [
     width: 4608,
     height: 3456,
     size: 5242880,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: '234567abc890',
-    created_at: new Date('2024-01-08T15:45:00Z').getTime(),
-    updated_at: new Date('2024-01-08T15:45:00Z').getTime(),
+    createdAt: new Date('2024-01-08T15:45:00Z').getTime(),
+    updatedAt: new Date('2024-01-08T15:45:00Z').getTime(),
   },
   {
     id: 9,
@@ -114,10 +114,10 @@ export const mockAssets: Asset[] = [
     width: 7360,
     height: 4912,
     size: 12582912,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: '567890def123',
-    created_at: new Date('2024-01-07T22:30:00Z').getTime(),
-    updated_at: new Date('2024-01-07T22:30:00Z').getTime(),
+    createdAt: new Date('2024-01-07T22:30:00Z').getTime(),
+    updatedAt: new Date('2024-01-07T22:30:00Z').getTime(),
   },
   {
     id: 10,
@@ -127,10 +127,10 @@ export const mockAssets: Asset[] = [
     width: 3840,
     height: 5760,
     size: 7340032,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: '890123abc456',
-    created_at: new Date('2024-01-06T11:20:00Z').getTime(),
-    updated_at: new Date('2024-01-06T11:20:00Z').getTime(),
+    createdAt: new Date('2024-01-06T11:20:00Z').getTime(),
+    updatedAt: new Date('2024-01-06T11:20:00Z').getTime(),
   },
   {
     id: 11,
@@ -140,10 +140,10 @@ export const mockAssets: Asset[] = [
     width: 5760,
     height: 3840,
     size: 9437184,
-    mime_type: 'image/png',
+    mimeType: 'image/png',
     hash: '123456def789',
-    created_at: new Date('2024-01-05T01:45:00Z').getTime(),
-    updated_at: new Date('2024-01-05T01:45:00Z').getTime(),
+    createdAt: new Date('2024-01-05T01:45:00Z').getTime(),
+    updatedAt: new Date('2024-01-05T01:45:00Z').getTime(),
   },
   {
     id: 12,
@@ -153,10 +153,10 @@ export const mockAssets: Asset[] = [
     width: 4000,
     height: 3000,
     size: 3670016,
-    mime_type: 'image/jpeg',
+    mimeType: 'image/jpeg',
     hash: '456789abc012',
-    created_at: new Date('2024-01-04T13:30:00Z').getTime(),
-    updated_at: new Date('2024-01-04T13:30:00Z').getTime(),
+    createdAt: new Date('2024-01-04T13:30:00Z').getTime(),
+    updatedAt: new Date('2024-01-04T13:30:00Z').getTime(),
   },
 ]
 
@@ -186,10 +186,10 @@ export function generateMoreMockAssets(count: number, startId = 13): Asset[] {
       width: 1920 + Math.floor(Math.random() * 2000),
       height: 1080 + Math.floor(Math.random() * 1500),
       size: 1024 * 1024 + Math.floor(Math.random() * 5 * 1024 * 1024), // 1MB - 6MB
-      mime_type: mimeTypes[Math.floor(Math.random() * mimeTypes.length)],
+      mimeType: mimeTypes[Math.floor(Math.random() * mimeTypes.length)],
       hash: Math.random().toString(36).substring(2, 15),
-      created_at: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000),
-      updated_at: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000),
+      createdAt: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000),
+      updatedAt: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000),
     }
   })
 }
@@ -206,22 +206,22 @@ export function createMockListResponse(
 
   return {
     items,
-    total_count: totalAssets,
-    current_page: page,
-    per_page: perPage,
-    total_pages: Math.ceil(totalAssets / perPage),
+    totalCount: totalAssets,
+    currentPage: page,
+    perPage: perPage,
+    totalPages: Math.ceil(totalAssets / perPage),
   }
 }
 
 // Mock 统计数据
 export const mockAssetStats: AssetStats = {
-  total_count: 156,
-  photo_count: 152,
-  video_count: 3,
-  live_photo_count: 1,
-  total_size: 1024 * 1024 * 1024 * 2.5, // 2.5GB
-  oldest_item_date: '2023-06-15T10:30:00Z',
-  newest_item_date: '2024-01-15T10:30:00Z',
+  totalCount: 156,
+  photoCount: 152,
+  videoCount: 3,
+  livePhotoCount: 1,
+  totalSize: 1024 * 1024 * 1024 * 2.5, // 2.5GB
+  oldestItemDate: '2023-06-15T10:30:00Z',
+  newestItemDate: '2024-01-15T10:30:00Z',
 }
 
 // 根据文件名生成mock缩略图URL

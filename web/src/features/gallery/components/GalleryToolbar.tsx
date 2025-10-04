@@ -20,7 +20,7 @@ import {
   MoreVertical,
 } from 'lucide-react'
 import { useGalleryStore } from '@/lib/gallery/galleryStore'
-import { useGalleryData } from '@/lib/gallery'
+import { useGalleryData } from '@/lib/gallery/hooks/useGalleryData'
 import { useGalleryView, useGallerySelection } from '../hooks'
 import { useTranslation } from '@/lib/i18n'
 import { cn } from '@/lib/utils'

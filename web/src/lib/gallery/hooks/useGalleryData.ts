@@ -1,7 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useGalleryStore } from '../galleryStore'
 import { listAssets, getAssetStats } from '../galleryApi'
-// import { adaptAssetsFromBackend } from '../adapters'
 import type { ListAssetsParams } from '../types'
 
 /**
@@ -30,15 +29,15 @@ export function useGalleryData() {
         }
 
         store.setPagination(
-          response.total_count,
-          response.current_page,
-          response.current_page < response.total_pages
+          response.totalCount,
+          response.currentPage,
+          response.currentPage < response.totalPages
         )
 
         console.log('🖼️ Gallery数据加载成功:', {
           count: assets.length,
-          total: response.total_count,
-          page: response.current_page,
+          total: response.totalCount,
+          page: response.currentPage,
         })
       } catch (error) {
         console.error('Failed to load gallery assets:', error)
@@ -54,7 +53,7 @@ export function useGalleryData() {
   const initialize = useCallback(async () => {
     try {
       store.setInitialLoading(true)
-      await loadAssets({ page: 1, per_page: 50 })
+      await loadAssets({ page: 1, perPage: 50 })
     } catch (error) {
       console.error('Failed to initialize gallery:', error)
     } finally {
@@ -66,11 +65,11 @@ export function useGalleryData() {
   const reload = useCallback(() => {
     const currentParams: ListAssetsParams = {
       page: 1,
-      per_page: 50,
-      sort_by: store.sortBy,
-      sort_order: store.sortOrder,
-      filter_type: store.filter.type,
-      search_query: store.filter.search_query,
+      perPage: 50,
+      sortBy: store.sortBy,
+      sortOrder: store.sortOrder,
+      filterType: store.filter.type,
+      searchQuery: store.filter.searchQuery,
     }
     return loadAssets(currentParams)
   }, [loadAssets, store.sortBy, store.sortOrder, store.filter])
@@ -81,11 +80,11 @@ export function useGalleryData() {
 
     const nextParams: ListAssetsParams = {
       page: store.currentPage + 1,
-      per_page: 50,
-      sort_by: store.sortBy,
-      sort_order: store.sortOrder,
-      filter_type: store.filter.type,
-      search_query: store.filter.search_query,
+      perPage: 50,
+      sortBy: store.sortBy,
+      sortOrder: store.sortOrder,
+      filterType: store.filter.type,
+      searchQuery: store.filter.searchQuery,
     }
 
     return loadAssets(nextParams)

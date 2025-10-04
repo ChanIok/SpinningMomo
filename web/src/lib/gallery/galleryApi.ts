@@ -20,8 +20,8 @@ export async function listAssets(params: ListAssetsParams = {}): Promise<ListAss
 
     console.log('📸 获取资产列表成功:', {
       count: result.items.length,
-      total: result.total_count,
-      page: result.current_page,
+      total: result.totalCount,
+      page: result.currentPage,
     })
 
     return result
@@ -91,10 +91,10 @@ export async function scanAssets(params: ScanAssetsParams): Promise<ScanAssetsRe
     const result = await call<ScanAssetsResult>('gallery.scanDirectory', params)
 
     console.log('✅ 资产扫描完成:', {
-      total: result.total_files,
-      new: result.new_items,
-      updated: result.updated_items,
-      duration: result.scan_duration,
+      total: result.totalFiles,
+      new: result.newItems,
+      updated: result.updatedItems,
+      duration: result.scanDuration,
     })
 
     return result
@@ -145,7 +145,7 @@ export async function cleanupDeletedAssets(daysOld = 30): Promise<OperationResul
   try {
     console.log('🧹 清理已删除资产:', { daysOld })
 
-    const result = await call<OperationResult>('gallery.cleanupDeleted', { days_old: daysOld })
+    const result = await call<OperationResult>('gallery.cleanupDeleted', { daysOld: daysOld })
 
     console.log('✅ 已删除资产清理完成:', result.message)
 

@@ -1,7 +1,6 @@
 import { ScrollArea } from '@/components/ui/scroll-area'
-import 'allotment/dist/style.css'
 import { useGalleryStore } from '@/lib/gallery/galleryStore'
-import { useAutoGalleryData } from '@/lib/gallery'
+import { useAutoGalleryData } from '@/lib/gallery/hooks/useGalleryData'
 import { useGalleryKeyboard, useGalleryView, useGalleryLayout } from '../hooks'
 import { GallerySidebar } from './GallerySidebar'
 import { GalleryViewer } from './GalleryViewer'
@@ -27,7 +26,14 @@ export function GalleryLayout() {
     <>
       <div className='flex h-full w-full'>
         <PanelGroup className='flex h-full w-full' autosaveId='autosave'>
-          <Panel id='sidebar-panel' collapsible min='100px' max='400px' default='280px' isStaticAtRest >
+          <Panel
+            id='sidebar-panel'
+            collapsible
+            min='100px'
+            max='400px'
+            default='280px'
+            isStaticAtRest
+          >
             {isSidebarOpen && <GallerySidebar />}
           </Panel>
           <PanelResizer size='4px' id='sidebar-resizer' />
@@ -37,7 +43,14 @@ export function GalleryLayout() {
           </Panel>
 
           <PanelResizer size='4px' id='details-resizer' />
-          <Panel id='details-panel' collapsible min='100px' max='400px' default='280px' isStaticAtRest>
+          <Panel
+            id='details-panel'
+            collapsible
+            min='100px'
+            max='400px'
+            default='280px'
+            isStaticAtRest
+          >
             {isDetailsOpen && (
               <ScrollArea className='h-full'>
                 <div className='border-l'>

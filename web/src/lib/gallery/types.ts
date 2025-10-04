@@ -1,37 +1,84 @@
-// Gallery模块类型定义 - 直接匹配后端C++结构
+// Gallery模块类型定义 - 匹配后端C++结构（使用驼峰命名）
 export interface Asset {
   id: number
   name: string
-  path: string // 文件路径
-  type: string // photo, video, live_photo, unknown
+  path: string
+  type: AssetType // photo, video, live_photo, unknown
 
   // 基本信息
   width?: number
   height?: number
   size?: number // 文件大小（字节）
-  mime_type: string
-  hash?: string // 文件哈希
-  folder_id?: number
+  mimeType?: string
+  hash?: string
+  folderId?: number
 
   // 时间信息（统一使用时间戳）
-  file_created_at?: number
-  file_modified_at?: number
-  created_at: number
-  updated_at: number
-  deleted_at?: number
+  fileCreatedAt?: number
+  fileModifiedAt?: number
+  createdAt: number
+  updatedAt: number
+  deletedAt?: number
+}
+
+// 资产类型枚举
+export type AssetType = 'photo' | 'video' | 'live_photo' | 'unknown'
+
+// 文件夹类型
+export interface Folder {
+  id: number
+  path: string
+  parentId?: number
+  name: string
+  displayName?: string
+  coverAssetId?: number
+  sortOrder: number
+  isHidden: boolean
+  createdAt: number
+  updatedAt: number
+}
+
+// 标签类型
+export interface Tag {
+  id: number
+  name: string
+  parentId?: number
+  sortOrder: number
+  createdAt: number
+  updatedAt: number
+}
+
+// 资产标签关联类型
+export interface AssetTag {
+  assetId: number
+  tagId: number
+  createdAt: number
+}
+
+// 忽略规则类型
+export interface IgnoreRule {
+  id: number
+  folderId?: number
+  rulePattern: string
+  patternType: 'glob' | 'regex'
+  ruleType: 'exclude' | 'include'
+  isEnabled: boolean
+  description?: string
+  createdAt: number
+  updatedAt: number
 }
 
 // 视图模式
 export type ViewMode = 'masonry' | 'grid' | 'list' | 'adaptive'
 
 // 排序选项
-export type SortBy = 'created_at' | 'filename' | 'size'
+export type SortBy = 'createdAt' | 'name' | 'size'
 export type SortOrder = 'asc' | 'desc'
 
 // 筛选器
 export interface AssetFilter {
-  type?: string // photo, video, live_photo, unknown
-  search_query?: string
+  type?: AssetType // photo, video, live_photo, unknown
+  searchQuery?: string
 }
 
 // 视图配置
@@ -45,20 +92,20 @@ export interface ViewConfig {
 // 列表查询参数
 export interface ListAssetsParams {
   page?: number
-  per_page?: number
-  sort_by?: SortBy
-  sort_order?: SortOrder
-  filter_type?: string
-  search_query?: string
+  perPage?: number
+  sortBy?: SortBy
+  sortOrder?: SortOrder
+  filterType?: AssetType
+  searchQuery?: string
 }
 
 // 列表查询响应
 export interface ListAssetsResponse {
   items: Asset[]
-  total_count: number
-  current_page: number
-  per_page: number
-  total_pages: number
+  totalCount: number
+  currentPage: number
+  perPage: number
+  totalPages: number
 }
 
 // 获取单个资产参数
@@ -69,44 +116,142 @@ export interface GetAssetParams {
 // 删除资产参数
 export interface DeleteAssetParams {
   id: number
-  delete_file?: boolean
+  deleteFile?: boolean
 }
 
 // 操作结果
 export interface OperationResult {
   success: boolean
   message: string
-  affected_count?: number
+  affectedCount?: number
 }
 
 // 资产统计
 export interface AssetStats {
-  total_count: number
-  photo_count: number
-  video_count: number
-  live_photo_count: number
-  total_size: number
-  oldest_item_date: string
-  newest_item_date: string
+  totalCount: number
+  photoCount: number
+  videoCount: number
+  livePhotoCount: number
+  totalSize: number
+  oldestItemDate: string
+  newestItemDate: string
 }
 
 // 扫描参数
 export interface ScanAssetsParams {
   directories: string[]
   recursive?: boolean
-  generate_thumbnails?: boolean
-  thumbnail_max_width?: number
-  thumbnail_max_height?: number
+  generateThumbnails?: boolean
+  thumbnailMaxWidth?: number
+  thumbnailMaxHeight?: number
 }
 
 // 扫描结果
 export interface ScanAssetsResult {
-  total_files: number
-  new_items: number
-  updated_items: number
-  deleted_items: number
+  totalFiles: number
+  newItems: number
+  updatedItems: number
+  deletedItems: number
   errors: string[]
-  scan_duration: string
+  scanDuration: string
+}
+
+// ============= 文件夹相关类型 =============
+
+// 文件夹查询参数
+export interface ListFoldersParams {
+  parentId?: number
+  includeHidden?: boolean
+}
+
+// 文件夹查询响应
+export interface ListFoldersResponse {
+  items: Folder[]
+  totalCount: number
+}
+
+// 创建文件夹参数
+export interface CreateFolderParams {
+  path: string
+  parentId?: number
+  name: string
+  displayName?: string
+}
+
+// 更新文件夹参数
+export interface UpdateFolderParams {
+  id: number
+  name?: string
+  displayName?: string
+  coverAssetId?: number
+  sortOrder?: number
+  isHidden?: boolean
+}
+
+// ============= 标签相关类型 =============
+
+// 标签查询参数
+export interface ListTagsParams {
+  parentId?: number
+}
+
+// 标签查询响应
+export interface ListTagsResponse {
+  items: Tag[]
+  totalCount: number
+}
+
+// 创建标签参数
+export interface CreateTagParams {
+  name: string
+  parentId?: number
+}
+
+// 更新标签参数
+export interface UpdateTagParams {
+  id: number
+  name?: string
+  parentId?: number
+  sortOrder?: number
+}
+
+// 资产标签关联参数
+export interface AssetTagParams {
+  assetId: number
+  tagIds: number[]
+}
+
+// ============= 忽略规则相关类型 =============
+
+// 忽略规则查询参数
+export interface ListIgnoreRulesParams {
+  folderId?: number
+  isEnabled?: boolean
+}
+
+// 忽略规则查询响应
+export interface ListIgnoreRulesResponse {
+  items: IgnoreRule[]
+  totalCount: number
+}
+
+// 创建忽略规则参数
+export interface CreateIgnoreRuleParams {
+  folderId?: number
+  rulePattern: string
+  patternType: 'glob' | 'regex'
+  ruleType: 'exclude' | 'include'
+  description?: string
+}
+
+// 更新忽略规则参数
+export interface UpdateIgnoreRuleParams {
+  id: number
+  rulePattern?: string
+  patternType?: 'glob' | 'regex'
+  ruleType?: 'exclude' | 'include'
+  isEnabled?: boolean
+  description?: string
 }
 
 // ============= UI状态类型 =============
