@@ -1,8 +1,9 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import AppLayout from '@/components/layout/AppLayout.vue'
+</script>
 
 <template>
-  <span class="text-2xl font-bold">app</span>
+  <AppLayout />
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>

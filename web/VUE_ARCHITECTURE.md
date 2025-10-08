@@ -257,7 +257,7 @@ export default [
    - [x] 配置 Vite + Vue + TypeScript
    - [x] 集成 shadcn-vue + Tailwind CSS 4
    - [x] 设置 Pinia + Router
-   - [ ] 配置 RPC 通信层
+   - [x] 配置 RPC 通信层
 
 2. **第二阶段**：核心功能
    - [ ] 迁移 Layout 组件
