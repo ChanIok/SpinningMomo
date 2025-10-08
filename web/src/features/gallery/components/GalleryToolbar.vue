@@ -1,13 +1,13 @@
 <template>
-  <div class="flex items-center gap-4 border-b bg-background p-4">
-    <!-- 快速操作按钮 -->
+  <div class="flex items-center gap-3 bg-background p-4">
+    <!-- 左侧：快速操作 -->
     <div class="flex items-center gap-2">
       <TooltipProvider>
         <Tooltip v-if="hasSelection">
           <TooltipTrigger as-child>
-            <Button variant="outline" size="sm" @click="$emit('deleteSelected')">
-              <Trash2 class="mr-2 h-4 w-4" />
-              删除选中 ({{ selectedCount }})
+            <Button variant="ghost" size="sm" @click="$emit('deleteSelected')">
+              <Trash2 class="h-4 w-4" />
+              <span class="ml-1.5 hidden sm:inline">删除 ({{ selectedCount }})</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
@@ -17,9 +17,8 @@
 
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="outline" size="sm" @click="$emit('refresh')" :disabled="isLoading">
-              <RefreshCw class="mr-2 h-4 w-4" :class="{ 'animate-spin': isLoading }" />
-              {{ isLoading ? '刷新中...' : '刷新' }}
+            <Button variant="ghost" size="sm" @click="$emit('refresh')" :disabled="isLoading">
+              <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isLoading }" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>
@@ -29,10 +28,8 @@
       </TooltipProvider>
     </div>
 
-    <Separator orientation="vertical" class="h-6" />
-
-    <!-- 搜索框 -->
-    <div class="max-w-[400px] min-w-[200px] flex-1">
+    <!-- 中间：搜索框 -->
+    <div class="max-w-md min-w-[200px] flex-1">
       <div class="relative">
         <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -43,7 +40,7 @@
         />
         <button
           v-if="searchQuery"
-          class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
           @click="clearSearch"
         >
           <X class="h-4 w-4" />
@@ -51,106 +48,128 @@
       </div>
     </div>
 
-    <Separator orientation="vertical" class="h-6" />
-
-    <!-- 类型筛选 -->
+    <!-- 右侧：筛选、排序、视图控制 -->
     <div class="flex items-center gap-2">
-      <span class="text-sm font-medium">类型:</span>
-      <Select :model-value="filter.type || 'all'" @update:model-value="onTypeFilterChange">
-        <SelectTrigger class="w-[140px]">
-          <SelectValue placeholder="选择类型" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">全部</SelectItem>
-          <SelectItem value="photo">📷 照片</SelectItem>
-          <SelectItem value="video">🎥 视频</SelectItem>
-          <SelectItem value="live_photo">📸 实况</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-
-    <Separator orientation="vertical" class="h-6" />
-
-    <!-- 排序控制 -->
-    <div class="flex items-center gap-2">
-      <span class="text-sm font-medium">排序:</span>
-      <Select :model-value="sortBy" @update:model-value="onSortByChange">
-        <SelectTrigger class="w-[140px]">
-          <SelectValue placeholder="选择排序" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="createdAt">📅 创建日期</SelectItem>
-          <SelectItem value="name">📝 名称</SelectItem>
-          <SelectItem value="size">📏 大小</SelectItem>
-        </SelectContent>
-      </Select>
-
+      <!-- 筛选与排序下拉菜单 -->
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="outline" size="sm" @click="toggleSortOrder">
-              <ArrowUpDown class="h-4 w-4" :class="{ 'rotate-180': sortOrder === 'desc' }" />
-              <span class="ml-1">{{ sortOrder === 'asc' ? '升序' : '降序' }}</span>
-            </Button>
+            <div>
+              <DropdownMenu>
+                <DropdownMenuTrigger as-child>
+                  <Button variant="ghost" size="sm">
+                    <SlidersHorizontal class="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" class="w-56">
+                  <!-- 类型筛选 -->
+                  <DropdownMenuLabel>资产类型</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    :model-value="filter.type || 'all'"
+                    @update:model-value="onTypeFilterChange"
+                  >
+                    <DropdownMenuRadioItem value="all">全部类型</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="photo">📷 照片</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="video">🎥 视频</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="live_photo">📸 实况</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+
+                  <DropdownMenuSeparator />
+
+                  <!-- 排序方式 -->
+                  <DropdownMenuLabel>排序方式</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    :model-value="sortBy"
+                    @update:model-value="onSortByChange"
+                  >
+                    <DropdownMenuRadioItem value="createdAt">📅 创建日期</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="name">📝 名称</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="size">📏 大小</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+
+                  <DropdownMenuSeparator />
+
+                  <!-- 排序顺序 -->
+                  <DropdownMenuItem @click="toggleSortOrder">
+                    <ArrowUpDown class="mr-2 h-4 w-4" />
+                    <span>{{ sortOrder === 'asc' ? '升序排列' : '降序排列' }}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </TooltipTrigger>
           <TooltipContent>
-            <p>切换排序顺序</p>
+            <p>筛选与排序</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-    </div>
 
-    <Separator orientation="vertical" class="h-6" />
+      <!-- 视图设置（模式 + 大小调整） -->
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <div>
+              <Popover>
+                <PopoverTrigger as-child>
+                  <Button variant="ghost" size="sm">
+                    <component :is="currentViewModeIcon" class="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" class="w-72">
+                  <div class="space-y-6">
+                    <!-- 视图模式选择 -->
+                    <div class="space-y-3">
+                      <p class="text-sm font-medium">视图模式</p>
+                      <div class="grid grid-cols-4 gap-2">
+                        <Button
+                          v-for="mode in viewModes"
+                          :key="mode.value"
+                          :variant="viewMode === mode.value ? 'default' : 'outline'"
+                          size="sm"
+                          class="flex h-auto flex-col items-center gap-1.5 py-3"
+                          @click="setViewMode(mode.value)"
+                        >
+                          <component :is="mode.icon" class="h-5 w-5" />
+                          <span class="text-xs">{{ mode.label }}</span>
+                        </Button>
+                      </div>
+                    </div>
 
-    <!-- 视图控制 -->
-    <div class="flex items-center gap-2">
-      <span class="text-sm font-medium">视图:</span>
+                    <!-- 分隔线 -->
+                    <div class="border-t" />
 
-      <!-- 视图模式切换 -->
-      <ToggleGroup type="single" :model-value="viewMode" @update:model-value="setViewMode">
-        <TooltipProvider>
-          <Tooltip v-for="mode in viewModes" :key="mode.value">
-            <TooltipTrigger as-child>
-              <ToggleGroupItem :value="mode.value" aria-label="Toggle bold">
-                <component :is="mode.icon" class="h-4 w-4" />
-                <span class="ml-1 hidden sm:inline">{{ mode.label }}</span>
-              </ToggleGroupItem>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{{ mode.label }}视图</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </ToggleGroup>
-
-      <!-- 视图大小调节 -->
-      <div class="flex items-center gap-1">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="outline" size="sm" @click="decreaseSize" :disabled="viewSize <= 1">
-                <Minus class="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>缩小</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <span class="min-w-[3rem] text-center text-sm">{{ viewSize }}/5</span>
-
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="outline" size="sm" @click="increaseSize" :disabled="viewSize >= 5">
-                <Plus class="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>放大</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+                    <!-- 缩略图大小调整 -->
+                    <div class="space-y-3">
+                      <div class="flex items-center justify-between">
+                        <p class="text-sm font-medium">缩略图大小</p>
+                        <span class="text-sm text-muted-foreground">{{ viewSizeLabel }}</span>
+                      </div>
+                      <Slider
+                        :model-value="[viewSize]"
+                        @update:model-value="onViewSizeSliderChange"
+                        :min="1"
+                        :max="5"
+                        :step="1"
+                        class="w-full"
+                      />
+                      <div class="flex justify-between text-xs text-muted-foreground">
+                        <span>超小</span>
+                        <span>小</span>
+                        <span>中</span>
+                        <span>大</span>
+                        <span>超大</span>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>视图设置</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   </div>
 </template>
@@ -159,16 +178,19 @@
 import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Slider } from '@/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Trash2,
   RefreshCw,
@@ -179,8 +201,7 @@ import {
   LayoutGrid,
   List,
   Rows3,
-  Minus,
-  Plus,
+  SlidersHorizontal,
 } from 'lucide-vue-next'
 import { useGalleryView } from '../composables'
 import type { ViewMode, SortBy, AssetType } from '../types'
@@ -215,6 +236,17 @@ const searchQuery = computed(() => filter.value.searchQuery || '')
 
 const hasSelection = computed(() => props.selectedCount > 0)
 
+// 视图大小标签映射
+const viewSizeLabels: Record<number, string> = {
+  1: '超小',
+  2: '小',
+  3: '中',
+  4: '大',
+  5: '超大',
+}
+
+const viewSizeLabel = computed(() => viewSizeLabels[viewSize.value] || '中')
+
 // 视图模式选项
 const viewModes = [
   { value: 'grid' as ViewMode, icon: Grid3x3, label: '网格' },
@@ -222,6 +254,12 @@ const viewModes = [
   { value: 'list' as ViewMode, icon: List, label: '列表' },
   { value: 'adaptive' as ViewMode, icon: Rows3, label: '自适应' },
 ]
+
+// 当前视图模式的图标
+const currentViewModeIcon = computed(() => {
+  const mode = viewModes.find((m) => m.value === viewMode.value)
+  return mode?.icon || Grid3x3
+})
 
 // 方法
 function updateSearchQuery(query: string | number) {
@@ -263,11 +301,9 @@ function setViewMode(
   }
 }
 
-function increaseSize() {
-  galleryView.increaseSize()
-}
-
-function decreaseSize() {
-  galleryView.decreaseSize()
+function onViewSizeSliderChange(value: number[] | undefined) {
+  if (value && value.length > 0 && value[0] !== undefined) {
+    galleryView.setViewSize(value[0])
+  }
 }
 </script>
