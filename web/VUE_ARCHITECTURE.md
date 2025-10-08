@@ -153,26 +153,26 @@ import { routes as galleryRoutes, useGalleryStore } from '@/features/gallery'
 
 ```typescript
 // features/gallery/api.ts - 业务 API（可组合多个服务）
-import { rpcCall } from '@/core/rpc'
+import { call } from '@/core/rpc'
 import type { GalleryItem, GalleryFilter } from './types'
 
 export const galleryApi = {
   async getItems(filter?: GalleryFilter): Promise<GalleryItem[]> {
     // 可以组合多个底层调用
-    const items = await rpcCall('gallery.list', filter)
-    const settings = await rpcCall('settings.getGalleryConfig')
+    const items = await call('gallery.list', filter)
+    const settings = await call('settings.getGalleryConfig')
     return processItems(items, settings)
   },
 
   async deleteItem(id: string): Promise<void> {
-    return rpcCall('gallery.delete', { id })
+    return call('gallery.delete', { id })
   }
 }
 ```
 
 ```typescript
 // core/rpc/core.ts - 底层 RPC 服务（纯技术实现）
-export async function rpcCall<T = any>(
+export async function call<T = any>(
   method: string,
   params?: any
 ): Promise<T> {
@@ -260,7 +260,7 @@ export default [
    - [x] 配置 RPC 通信层
 
 2. **第二阶段**：核心功能
-   - [ ] 迁移 Layout 组件
+   - [x] 迁移 Layout 组件
    - [ ] 迁移 Gallery 功能
    - [ ] 迁移 Settings 功能
 
