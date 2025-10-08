@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import router from './router'
 import { setupRouterGuards } from './router/guards'
+import { initializeRPC } from '@/core/rpc'
 import './index.css'
 import App from './App.vue'
 
@@ -16,5 +17,8 @@ app.use(router)
 
 // 设置路由守卫
 setupRouterGuards(router)
+
+// 初始化 RPC 通信
+initializeRPC()
 
 app.mount('#app')
