@@ -13,6 +13,7 @@ import Core.RPC.Types;
 import Features.Gallery;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Folder.Repository;
 
 namespace Core::RPC::Endpoints::Gallery {
 
@@ -155,6 +156,23 @@ auto handle_cleanup_deleted(Core::State::AppState& app_state, const CleanupDelet
   co_return result.value();
 }
 
+// ============= 文件夹树 RPC 处理函数 =============
+
+auto handle_get_folder_tree(Core::State::AppState& app_state,
+                             [[maybe_unused]] const Core::RPC::EmptyParams& params)
+    -> asio::awaitable<
+        Core::RPC::RpcResult<std::vector<Features::Gallery::Types::FolderTreeNode>>> {
+  auto result = Features::Gallery::Folder::Repository::get_folder_tree(app_state);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 // ============= RPC 方法注册 =============
 
 auto register_all(Core::State::AppState& app_state) -> void {
@@ -199,6 +217,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<CleanupDeletedParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.cleanupDeleted", handle_cleanup_deleted,
       "Clean up soft-deleted items older than specified days");
+
+  // 文件夹树
+  Core::RPC::register_method<Core::RPC::EmptyParams,
+                             std::vector<Features::Gallery::Types::FolderTreeNode>>(
+      app_state, app_state.rpc->registry, "gallery.getFolderTree", handle_get_folder_tree,
+      "Get folder tree structure for navigation");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery

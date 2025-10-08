@@ -41,4 +41,8 @@ export auto get_child_folders(Core::State::AppState& app_state,
 export auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::int64_t, std::string>;
 
+// 获取文件夹树（用于前端显示）
+export auto get_folder_tree(Core::State::AppState& app_state)
+    -> std::expected<std::vector<Types::FolderTreeNode>, std::string>;
+
 }  // namespace Features::Gallery::Folder::Repository

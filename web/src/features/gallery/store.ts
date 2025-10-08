@@ -27,10 +27,10 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   // ============= 视图配置 =============
   const viewConfig = ref<ViewConfig>({
-    mode: 'adaptive',
+    mode: 'grid',
     size: 3,
   })
-  
+
   const filter = ref<AssetFilter>({})
   const sortBy = ref<SortBy>('createdAt')
   const sortOrder = ref<SortOrder>('desc')
@@ -54,30 +54,30 @@ export const useGalleryStore = defineStore('gallery', () => {
     isOpen: true,
     activeSection: 'all',
   })
-  
+
   const detailsOpen = ref(true)
 
   // ============= 计算属性 =============
   const selectedCount = computed(() => selection.selectedIds.size)
   const hasSelection = computed(() => selectedCount.value > 0)
-  const isAllSelected = computed(() => 
-    assets.value.length > 0 && selectedCount.value === assets.value.length
+  const isAllSelected = computed(
+    () => assets.value.length > 0 && selectedCount.value === assets.value.length
   )
 
   // ============= 数据操作 Actions =============
-  
+
   function setAssets(newAssets: Asset[]) {
     assets.value = newAssets
   }
 
   function addAssets(newAssets: Asset[]) {
-    const existingIds = new Set(assets.value.map(a => a.id))
-    const uniqueAssets = newAssets.filter(a => !existingIds.has(a.id))
+    const existingIds = new Set(assets.value.map((a) => a.id))
+    const uniqueAssets = newAssets.filter((a) => !existingIds.has(a.id))
     assets.value = [...assets.value, ...uniqueAssets]
   }
 
   function updateAsset(id: number, updates: Partial<Asset>) {
-    const index = assets.value.findIndex(asset => asset.id === id)
+    const index = assets.value.findIndex((asset) => asset.id === id)
     if (index !== -1 && assets.value[index]) {
       // 直接更新属性，避免类型推导问题
       Object.assign(assets.value[index], updates)
@@ -86,8 +86,8 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   function removeAsset(id: number) {
     // 移除资产
-    assets.value = assets.value.filter(a => a.id !== id)
-    
+    assets.value = assets.value.filter((a) => a.id !== id)
+
     // 清理选择状态
     selection.selectedIds.delete(id)
     if (selection.activeId === id) {
@@ -99,7 +99,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     // 更新lightbox
     if (lightbox.isOpen) {
-      lightbox.assets = lightbox.assets.filter(a => a.id !== id)
+      lightbox.assets = lightbox.assets.filter((a) => a.id !== id)
       if (lightbox.currentIndex >= lightbox.assets.length) {
         lightbox.currentIndex = Math.max(0, lightbox.assets.length - 1)
       }
@@ -110,7 +110,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   // ============= 状态操作 Actions =============
-  
+
   function setLoading(loading: boolean) {
     isLoading.value = loading
   }
@@ -130,7 +130,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   // ============= 视图操作 Actions =============
-  
+
   function setViewConfig(config: Partial<ViewConfig>) {
     viewConfig.value = { ...viewConfig.value, ...config }
   }
@@ -145,7 +145,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   // ============= 选择操作 Actions =============
-  
+
   function selectAsset(id: number, selected: boolean, multi = false) {
     if (!multi) {
       selection.selectedIds.clear()
@@ -161,7 +161,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   function selectAll() {
     selection.selectedIds.clear()
-    assets.value.forEach(asset => {
+    assets.value.forEach((asset) => {
       selection.selectedIds.add(asset.id)
     })
   }
@@ -176,7 +176,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   // ============= Lightbox操作 Actions =============
-  
+
   function openLightbox(lightboxAssets: Asset[], startIndex: number) {
     const validIndex = Math.max(0, Math.min(startIndex, lightboxAssets.length - 1))
     lightbox.isOpen = true
@@ -210,7 +210,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   // ============= UI操作 Actions =============
-  
+
   function setSidebarOpen(open: boolean) {
     sidebar.isOpen = open
   }
@@ -224,7 +224,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   // ============= 重置操作 =============
-  
+
   function reset() {
     assets.value = []
     isLoading.value = false
@@ -233,20 +233,20 @@ export const useGalleryStore = defineStore('gallery', () => {
     totalCount.value = 0
     currentPage.value = 1
     hasNextPage.value = false
-    
+
     viewConfig.value = { mode: 'adaptive', size: 3 }
     filter.value = {}
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'
-    
+
     selection.selectedIds.clear()
     selection.activeId = undefined
     selection.lastSelectedId = undefined
-    
+
     lightbox.isOpen = false
     lightbox.currentIndex = 0
     lightbox.assets = []
-    
+
     sidebar.isOpen = true
     sidebar.activeSection = 'all'
     detailsOpen.value = true
@@ -261,52 +261,52 @@ export const useGalleryStore = defineStore('gallery', () => {
     totalCount,
     currentPage,
     hasNextPage,
-    
+
     viewConfig,
     filter,
     sortBy,
     sortOrder,
-    
+
     selection,
     lightbox,
     sidebar,
     detailsOpen,
-    
+
     // 计算属性
     selectedCount,
     hasSelection,
     isAllSelected,
-    
+
     // Actions
     setAssets,
     addAssets,
     updateAsset,
     removeAsset,
-    
+
     setLoading,
     setInitialLoading,
     setError,
     setPagination,
-    
+
     setViewConfig,
     setFilter,
     setSorting,
-    
+
     selectAsset,
     selectAll,
     clearSelection,
     setActiveAsset,
-    
+
     openLightbox,
     closeLightbox,
     goToLightboxIndex,
     goToPreviousLightbox,
     goToNextLightbox,
-    
+
     setSidebarOpen,
     setSidebarActiveSection,
     setDetailsOpen,
-    
+
     reset,
   }
 })

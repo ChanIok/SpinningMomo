@@ -7,6 +7,9 @@ const GalleryPage = () => import('@/features/gallery/pages/GalleryPage.vue')
 const SettingsPage = () => import('@/features/settings/pages/SettingsPage.vue')
 const AboutPage = () => import('@/features/about/pages/AboutPage.vue')
 
+// 导入playground路由
+import { routes as playgroundRoutes } from '@/features/playground'
+
 // 临时的 404 页面
 const NotFoundPage = {
   template:
@@ -51,6 +54,8 @@ const routes: RouteRecordRaw[] = [
       title: '关于',
     },
   },
+  // 添加playground路由
+  ...playgroundRoutes,
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',

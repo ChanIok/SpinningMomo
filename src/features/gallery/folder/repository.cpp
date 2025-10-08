@@ -224,4 +224,92 @@ auto get_or_create_folder_for_path(Core::State::AppState& app_state, const std::
   return create_result.value();
 }
 
+auto get_folder_tree(Core::State::AppState& app_state)
+    -> std::expected<std::vector<Types::FolderTreeNode>, std::string> {
+  // 1. 获取所有文件夹
+  auto folders_result = list_all_folders(app_state);
+  if (!folders_result) {
+    return std::unexpected("Failed to get all folders: " + folders_result.error());
+  }
+
+  const auto& folders = folders_result.value();
+
+  // 2. 创建 id -> FolderTreeNode 的映射，用于快速查找
+  std::unordered_map<std::int64_t, Types::FolderTreeNode> node_map;
+
+  // 第一次遍历：创建所有节点
+  for (const auto& folder : folders) {
+    Types::FolderTreeNode node{.id = folder.id,
+                               .path = folder.path,
+                               .parent_id = folder.parent_id,
+                               .name = folder.name,
+                               .display_name = folder.display_name,
+                               .cover_asset_id = folder.cover_asset_id,
+                               .sort_order = folder.sort_order,
+                               .is_hidden = folder.is_hidden,
+                               .created_at = folder.created_at,
+                               .updated_at = folder.updated_at,
+                               .children = {}};
+
+    node_map[folder.id] = std::move(node);
+  }
+
+  // 3. 第二次遍历：构建父子关系
+  std::vector<Types::FolderTreeNode> root_nodes;
+
+  for (const auto& folder : folders) {
+    if (folder.parent_id.has_value()) {
+      // 有父节点，添加到父节点的 children 中
+      auto parent_it = node_map.find(folder.parent_id.value());
+      if (parent_it != node_map.end()) {
+        // 从 node_map 中移动节点到父节点的 children
+        auto node_it = node_map.find(folder.id);
+        if (node_it != node_map.end()) {
+          parent_it->second.children.push_back(std::move(node_it->second));
+        }
+      } else {
+        Logger().warn("Folder {} has parent_id {} but parent not found", folder.id,
+                      folder.parent_id.value());
+      }
+    } else {
+      // 没有父节点，是根节点
+      auto node_it = node_map.find(folder.id);
+      if (node_it != node_map.end()) {
+        root_nodes.push_back(std::move(node_it->second));
+      }
+    }
+  }
+
+  // 4. 对根节点按 sort_order 和 name 排序
+  std::sort(root_nodes.begin(), root_nodes.end(),
+            [](const Types::FolderTreeNode& a, const Types::FolderTreeNode& b) {
+              if (a.sort_order != b.sort_order) {
+                return a.sort_order < b.sort_order;
+              }
+              return a.name < b.name;
+            });
+
+  // 递归排序所有子节点
+  std::function<void(Types::FolderTreeNode&)> sort_children;
+  sort_children = [&](Types::FolderTreeNode& node) {
+    std::sort(node.children.begin(), node.children.end(),
+              [](const Types::FolderTreeNode& a, const Types::FolderTreeNode& b) {
+                if (a.sort_order != b.sort_order) {
+                  return a.sort_order < b.sort_order;
+                }
+                return a.name < b.name;
+              });
+
+    for (auto& child : node.children) {
+      sort_children(child);
+    }
+  };
+
+  for (auto& root : root_nodes) {
+    sort_children(root);
+  }
+
+  return root_nodes;
+}
+
 }  // namespace Features::Gallery::Folder::Repository

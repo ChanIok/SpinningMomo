@@ -42,6 +42,20 @@ struct Folder {
   std::int64_t updated_at;
 };
 
+struct FolderTreeNode {
+  std::int64_t id;
+  std::string path;
+  std::optional<std::int64_t> parent_id;
+  std::string name;
+  std::optional<std::string> display_name;
+  std::optional<std::int64_t> cover_asset_id;
+  int sort_order = 0;
+  int is_hidden = 0;
+  std::int64_t created_at;
+  std::int64_t updated_at;
+  std::vector<FolderTreeNode> children;
+};
+
 struct IgnoreRule {
   std::int64_t id;
   std::optional<std::int64_t> folder_id;
