@@ -254,9 +254,9 @@ export default [
 从 `web_react` 迁移到新架构：
 
 1. **第一阶段**：搭建基础
-   - [ ] 配置 Vite + Vue + TypeScript
-   - [ ] 集成 shadcn-vue + Tailwind CSS 4
-   - [ ] 设置 Pinia + Router
+   - [x] 配置 Vite + Vue + TypeScript
+   - [x] 集成 shadcn-vue + Tailwind CSS 4
+   - [x] 设置 Pinia + Router
    - [ ] 配置 RPC 通信层
 
 2. **第二阶段**：核心功能
