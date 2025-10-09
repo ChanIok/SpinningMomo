@@ -20,7 +20,7 @@ export function useGalleryData() {
   const hasNextPage = computed(() => store.hasNextPage)
 
   // ============= 数据加载操作 =============
-  
+
   /**
    * 加载资产列表
    */
@@ -80,8 +80,8 @@ export function useGalleryData() {
       perPage: 50,
       sortBy: store.sortBy,
       sortOrder: store.sortOrder,
-      filterType: store.filter.type,
-      searchQuery: store.filter.searchQuery,
+      folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
+      includeSubfolders: store.includeSubfolders,
     }
     return loadAssets(currentParams)
   }
@@ -97,8 +97,8 @@ export function useGalleryData() {
       perPage: 50,
       sortBy: store.sortBy,
       sortOrder: store.sortOrder,
-      filterType: store.filter.type,
-      searchQuery: store.filter.searchQuery,
+      folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
+      includeSubfolders: store.includeSubfolders,
     }
 
     return loadAssets(nextParams)
@@ -110,12 +110,12 @@ export function useGalleryData() {
   async function deleteAsset(id: number, deleteFile = false) {
     try {
       store.setLoading(true)
-      
+
       await galleryApi.deleteAsset({ id, deleteFile })
-      
+
       // 从 store 中移除资产
       store.removeAsset(id)
-      
+
       console.log('✅ 资产删除成功:', id)
     } catch (error) {
       console.error('Failed to delete asset:', error)
@@ -135,20 +135,18 @@ export function useGalleryData() {
 
     try {
       store.setLoading(true)
-      
+
       // 并发删除
-      const promises = selectedIds.map(id => 
-        galleryApi.deleteAsset({ id, deleteFile })
-      )
-      
+      const promises = selectedIds.map((id) => galleryApi.deleteAsset({ id, deleteFile }))
+
       await Promise.all(promises)
-      
+
       // 从 store 中移除资产
-      selectedIds.forEach(id => store.removeAsset(id))
-      
+      selectedIds.forEach((id) => store.removeAsset(id))
+
       // 清空选择
       store.clearSelection()
-      
+
       console.log('✅ 批量删除成功:', selectedIds.length)
     } catch (error) {
       console.error('Failed to delete selected assets:', error)
@@ -178,15 +176,15 @@ export function useGalleryData() {
    */
   async function scanAssets(directories: string[]) {
     try {
-      const result = await galleryApi.scanAssets({ 
+      const result = await galleryApi.scanAssets({
         directories,
         recursive: true,
-        generateThumbnails: true 
+        generateThumbnails: true,
       })
-      
+
       // 扫描完成后重新加载列表
       await reload()
-      
+
       return result
     } catch (error) {
       console.error('Failed to scan assets:', error)
@@ -205,6 +203,7 @@ export function useGalleryData() {
     hasNextPage,
 
     // 操作
+    loadAssets,
     initialize,
     reload,
     loadMore,

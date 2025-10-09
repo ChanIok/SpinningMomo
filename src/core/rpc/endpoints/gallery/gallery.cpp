@@ -70,16 +70,8 @@ auto handle_delete_asset(Core::State::AppState& app_state,
 // ============= 扫描和索引 RPC 处理函数 =============
 
 auto handle_scan_directory(Core::State::AppState& app_state,
-                           const Features::Gallery::Types::ScanParams& params)
+                           const Features::Gallery::Types::ScanOptions& options)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::ScanResult>> {
-  Features::Gallery::Types::ScanOptions options{
-      .directory = params.directory,
-      .generate_thumbnails = params.generate_thumbnails,
-      .thumbnail_max_width = params.thumbnail_max_width,
-      .thumbnail_max_height = params.thumbnail_max_height,
-      .supported_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"},
-      .ignore_rules = params.ignore_rules};
-
   auto result = Features::Gallery::scan_directory(app_state, options);
 
   if (!result) {
@@ -159,10 +151,26 @@ auto handle_cleanup_deleted(Core::State::AppState& app_state, const CleanupDelet
 // ============= 文件夹树 RPC 处理函数 =============
 
 auto handle_get_folder_tree(Core::State::AppState& app_state,
-                             [[maybe_unused]] const Core::RPC::EmptyParams& params)
+                            [[maybe_unused]] const Core::RPC::EmptyParams& params)
     -> asio::awaitable<
         Core::RPC::RpcResult<std::vector<Features::Gallery::Types::FolderTreeNode>>> {
   auto result = Features::Gallery::Folder::Repository::get_folder_tree(app_state);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
+// ============= 资产项列表查询 RPC 处理函数 =============
+
+auto handle_list_assets(Core::State::AppState& app_state,
+                        const Features::Gallery::Types::ListAssetsParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::ListResponse>> {
+  auto result = Features::Gallery::Asset::Repository::list_assets(app_state, params);
 
   if (!result) {
     co_return std::unexpected(
@@ -192,7 +200,7 @@ auto register_all(Core::State::AppState& app_state) -> void {
       "Delete a asset item, optionally including the physical file");
 
   // 扫描和索引
-  Core::RPC::register_method<Features::Gallery::Types::ScanParams,
+  Core::RPC::register_method<Features::Gallery::Types::ScanOptions,
                              Features::Gallery::Types::ScanResult>(
       app_state, app_state.rpc->registry, "gallery.scanDirectory", handle_scan_directory,
       "Scan directory for asset files and add them to the library. Supports ignore rules and "
@@ -223,6 +231,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
                              std::vector<Features::Gallery::Types::FolderTreeNode>>(
       app_state, app_state.rpc->registry, "gallery.getFolderTree", handle_get_folder_tree,
       "Get folder tree structure for navigation");
+
+  // 资产项列表查询
+  Core::RPC::register_method<Features::Gallery::Types::ListAssetsParams,
+                             Features::Gallery::Types::ListResponse>(
+      app_state, app_state.rpc->registry, "gallery.listAssets", handle_list_assets,
+      "Get paginated list of assets with optional folder filtering and subfolder inclusion");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery

@@ -107,7 +107,9 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
           }
         }) |
         std::views::filter([&options](const std::filesystem::directory_entry& entry) {
-          return is_supported_file(entry.path(), options.supported_extensions);
+          const auto& extensions = options.supported_extensions.value_or(
+              std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"});
+          return is_supported_file(entry.path(), extensions);
         }) |
         std::views::filter(
             [&directory, &combined_rules](const std::filesystem::directory_entry& entry) {
@@ -384,10 +386,10 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
     }
 
     // 生成缩略图（如果需要）
-    if (options.generate_thumbnails) {
-      auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
-          app_state, wic_factory, file_path, file_info.hash, options.thumbnail_max_width,
-          options.thumbnail_max_height);
+    if (options.generate_thumbnails.value_or(true)) {
+      auto thumbnail_result =
+          Asset::Thumbnail::generate_thumbnail(app_state, wic_factory, file_path, file_info.hash,
+                                               options.thumbnail_short_edge.value_or(480));
 
       if (!thumbnail_result) {
         Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
@@ -499,7 +501,8 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto start_time = std::chrono::steady_clock::now();
 
   Logger().info("Starting folder-aware asset scan for directory '{}' with {} ignore rules",
-                options.directory, options.ignore_rules.size());
+                options.directory,
+                options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{}).size());
 
   // 1. 为扫描根目录预创建文件夹记录
   std::vector<std::filesystem::path> root_folder_paths = {options.directory};
@@ -515,9 +518,10 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   std::int64_t folder_id = root_folder_map.at(options.directory);
 
   // 2. 持久化前端提供的ignore规则
-  if (!options.ignore_rules.empty()) {
+  auto ignore_rules = options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{});
+  if (!ignore_rules.empty()) {
     auto persist_result =
-        Ignore::Repository::batch_create_ignore_rules(app_state, folder_id, options.ignore_rules);
+        Ignore::Repository::batch_create_ignore_rules(app_state, folder_id, ignore_rules);
     if (!persist_result) {
       Logger().warn("Failed to persist ignore rules: {}", persist_result.error());
     } else {

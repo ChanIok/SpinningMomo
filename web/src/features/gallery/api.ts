@@ -11,31 +11,12 @@ import type {
   ScanAssetsResult,
   FolderTreeNode,
 } from './types'
+import { getStaticUrl } from '@/core/env'
 
 /**
  * Gallery API 层
  * 基于 core/rpc 封装业务语义化的接口
  */
-
-/**
- * 获取资产列表
- */
-export async function listAssets(params: ListAssetsParams = {}): Promise<ListAssetsResponse> {
-  try {
-    const result = await call<ListAssetsResponse>('gallery.list', params)
-
-    console.log('📸 获取资产列表成功:', {
-      count: result.items.length,
-      total: result.totalCount,
-      page: result.currentPage,
-    })
-
-    return result
-  } catch (error) {
-    console.error('Failed to list assets:', error)
-    throw new Error('获取资产列表失败')
-  }
-}
 
 /**
  * 获取单个资产详情
@@ -100,6 +81,28 @@ export async function getFolderTree(): Promise<FolderTreeNode[]> {
   } catch (error) {
     console.error('Failed to get folder tree:', error)
     throw new Error('获取文件夹树失败')
+  }
+}
+
+/**
+ * 获取资产列表（可按文件夹筛选，可选包含子文件夹）
+ */
+export async function listAssets(params: ListAssetsParams = {}): Promise<ListAssetsResponse> {
+  try {
+    const result = await call<ListAssetsResponse>('gallery.listAssets', params)
+
+    console.log('📸 获取资产列表成功:', {
+      count: result.items.length,
+      total: result.totalCount,
+      page: result.currentPage,
+      folderId: params.folderId,
+      includeSubfolders: params.includeSubfolders,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to list assets:', error)
+    throw new Error('获取资产列表失败')
   }
 }
 
@@ -179,13 +182,19 @@ export async function cleanupDeletedAssets(daysOld = 30): Promise<OperationResul
 }
 
 /**
- * 获取资产缩略图URL - 使用HTTP接口
+ * 获取资产缩略图URL - 从 asset对象直接构建
+ * 路径格式: thumbnails/[hash前2位]/[hash第3-4位]/{hash}.webp
  */
-export function getAssetThumbnailUrl(assetId: number, width = 400, height = 400): string {
-  // TODO: 后续添加HTTP接口后更换为真实URL
-  // 目前使用mock数据
-  const seed = assetId % 1000
-  return `https://picsum.photos/seed/${seed}/${width}/${height}`
+export function getAssetThumbnailUrl(asset: Asset): string {
+  const hash = asset.hash
+  if (!hash) {
+    return ''
+  }
+
+  const prefix1 = hash.slice(0, 2)
+  const prefix2 = hash.slice(2, 4)
+
+  return getStaticUrl(`/static/thumbnails/${prefix1}/${prefix2}/${hash}.webp`)
 }
 
 /**

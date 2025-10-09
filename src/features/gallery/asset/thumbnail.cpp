@@ -49,8 +49,7 @@ auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
 }
 
 // 确保缩略图路径存在
-auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash,
-                           uint32_t width, uint32_t height)
+auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash)
     -> std::expected<std::filesystem::path, std::string> {
   // 检查缩略图目录是否已初始化
   if (app_state.gallery->thumbnails_directory.empty()) {
@@ -63,7 +62,7 @@ auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& 
   // 使用xxh3 64位哈希的前4位作为两级子目录
   std::string level1 = file_hash.substr(0, 2);
   std::string level2 = file_hash.substr(2, 2);
-  std::string filename = std::format("{}_{:d}x{:d}.webp", file_hash, width, height);
+  std::string filename = std::format("{}.webp", file_hash);
 
   // 构建完整路径
   auto thumbnail_path = app_state.gallery->thumbnails_directory / level1 / level2 / filename;
@@ -199,13 +198,13 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
 
 // ============= 基于哈希的缩略图生成 =============
 
-// 使用文件哈希生成缩略图（多线程优化版）
+// 使用文件哈希生成缩略图（按短边等比例缩放）
 auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
                         const std::filesystem::path& source_file, const std::string& file_hash,
-                        uint32_t max_width, uint32_t max_height)
+                        uint32_t short_edge_size)
     -> std::expected<std::filesystem::path, std::string> {
   try {
-    auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash, max_width, max_height);
+    auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
     if (!thumbnail_path_result) {
       return std::unexpected(thumbnail_path_result.error());
     }
@@ -221,8 +220,8 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
     Utils::Image::WebPEncodeOptions options;
     options.quality = 75.0f;  // 默认质量
 
-    auto webp_result = Utils::Image::generate_webp_thumbnail(wic_factory, source_file, max_width,
-                                                             max_height, options);
+    auto webp_result =
+        Utils::Image::generate_webp_thumbnail(wic_factory, source_file, short_edge_size, options);
     if (!webp_result) {
       return std::unexpected("Failed to generate WebP thumbnail: " + webp_result.error());
     }

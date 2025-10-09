@@ -1,9 +1,40 @@
 <script setup lang="ts">
+import { watch } from 'vue'
 import { useGalleryData } from '../composables'
+import { useGalleryStore } from '../store'
 import GalleryToolbar from '../components/GalleryToolbar.vue'
 import GalleryContent from '../components/GalleryContent.vue'
+import type { ListAssetsParams } from '../types'
 
 const galleryData = useGalleryData()
+const store = useGalleryStore()
+
+// 监听筛选条件和文件夹选项变化，自动重新加载资产
+watch(
+  () => [
+    store.filter.folderId,
+    store.filter.type,
+    store.filter.searchQuery,
+    store.includeSubfolders,
+    store.sortBy,
+    store.sortOrder,
+  ],
+  async () => {
+    // 构建加载参数
+    const params: ListAssetsParams = {
+      page: 1,
+      perPage: 50,
+      sortBy: store.sortBy,
+      sortOrder: store.sortOrder,
+      folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
+      includeSubfolders: store.includeSubfolders,
+    }
+
+    console.log('🔄 筛选条件变化，重新加载资产:', params)
+    await galleryData.loadAssets(params)
+  },
+  { deep: true }
+)
 </script>
 
 <template>

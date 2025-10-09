@@ -94,6 +94,17 @@
                     <ArrowUpDown class="mr-2 h-4 w-4" />
                     <span>{{ sortOrder === 'asc' ? '升序排列' : '降序排列' }}</span>
                   </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+
+                  <!-- 文件夹选项 -->
+                  <DropdownMenuLabel>文件夹选项</DropdownMenuLabel>
+                  <DropdownMenuCheckboxItem
+                    :model-value="includeSubfolders"
+                    @update:model-value="toggleIncludeSubfolders"
+                  >
+                    📂 包含子文件夹
+                  </DropdownMenuCheckboxItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -190,6 +201,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import {
   Trash2,
@@ -233,6 +245,7 @@ const sortBy = computed(() => galleryView.sortBy.value)
 const sortOrder = computed(() => galleryView.sortOrder.value)
 const filter = computed(() => galleryView.filter.value)
 const searchQuery = computed(() => filter.value.searchQuery || '')
+const includeSubfolders = computed(() => galleryView.includeSubfolders.value)
 
 const hasSelection = computed(() => props.selectedCount > 0)
 
@@ -285,6 +298,10 @@ function onSortByChange(value: string | number | bigint | Record<string, any> | 
 
 function toggleSortOrder() {
   galleryView.toggleSortOrder()
+}
+
+function toggleIncludeSubfolders() {
+  galleryView.setIncludeSubfolders(!includeSubfolders.value)
 }
 
 function setViewMode(

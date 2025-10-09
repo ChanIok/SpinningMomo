@@ -14,7 +14,7 @@ export namespace Features::Gallery::Asset::Thumbnail {
 // 生成缩略图
 auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
                         const std::filesystem::path& source_file, const std::string& file_hash,
-                        std::uint32_t max_width, std::uint32_t max_height)
+                        std::uint32_t short_edge_size)
     -> std::expected<std::filesystem::path, std::string>;
 
 // ============= 缩略图路径管理 =============

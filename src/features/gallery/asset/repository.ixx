@@ -51,6 +51,10 @@ auto count_asset(Core::State::AppState& app_state,
 auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
     -> std::expected<Types::Stats, std::string>;
 
+// 获取资产项列表（可按文件夹筛选，可选包含子文件夹）
+auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
+    -> std::expected<Types::ListResponse, std::string>;
+
 // ============= 批量操作 =============
 
 // 批量插入资产项

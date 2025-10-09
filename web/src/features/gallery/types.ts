@@ -119,8 +119,9 @@ export interface ListAssetsParams {
   perPage?: number
   sortBy?: SortBy
   sortOrder?: SortOrder
-  filterType?: AssetType
-  searchQuery?: string
+  // 文件夹筛选参数（可选）
+  folderId?: number
+  includeSubfolders?: boolean
 }
 
 // 列表查询响应
@@ -166,8 +167,7 @@ export interface ScanAssetsParams {
   directories: string[]
   recursive?: boolean
   generateThumbnails?: boolean
-  thumbnailMaxWidth?: number
-  thumbnailMaxHeight?: number
+  thumbnailShortEdge?: number
 }
 
 // 扫描结果

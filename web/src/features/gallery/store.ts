@@ -13,7 +13,6 @@ import type {
 
 /**
  * Gallery Pinia Store
- * 使用 setup 语法，保持与 React 版本相同的状态结构
  */
 export const useGalleryStore = defineStore('gallery', () => {
   // ============= 数据状态 =============
@@ -34,6 +33,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   const filter = ref<AssetFilter>({})
   const sortBy = ref<SortBy>('createdAt')
   const sortOrder = ref<SortOrder>('desc')
+  const includeSubfolders = ref(true) // 默认包含子文件夹
 
   // ============= 选择状态 =============
   const selection = reactive<SelectionState>({
@@ -144,6 +144,10 @@ export const useGalleryStore = defineStore('gallery', () => {
     sortOrder.value = newSortOrder
   }
 
+  function setIncludeSubfolders(include: boolean) {
+    includeSubfolders.value = include
+  }
+
   // ============= 选择操作 Actions =============
 
   function selectAsset(id: number, selected: boolean, multi = false) {
@@ -238,6 +242,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     filter.value = {}
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'
+    includeSubfolders.value = true
 
     selection.selectedIds.clear()
     selection.activeId = undefined
@@ -266,6 +271,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     filter,
     sortBy,
     sortOrder,
+    includeSubfolders,
 
     selection,
     lightbox,
@@ -291,6 +297,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     setViewConfig,
     setFilter,
     setSorting,
+    setIncludeSubfolders,
 
     selectAsset,
     selectAll,

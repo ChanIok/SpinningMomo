@@ -167,9 +167,9 @@ const emit = defineEmits<{
 const isImageLoading = ref(true)
 const imageError = ref(false)
 
-// 缩略图URL
+// 缩略图URL - 直接从asset对象构建
 const thumbnailUrl = computed(() => {
-  return galleryApi.getAssetThumbnailUrl(props.asset.id, props.size, props.size)
+  return galleryApi.getAssetThumbnailUrl(props.asset)
 })
 
 // 事件处理

@@ -553,4 +553,133 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
         return {};
       });
 }
+
+// ============= 文件夹资产查询 =============
+
+auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
+    -> std::expected<Types::ListResponse, std::string> {
+  // 获取分页和排序参数
+  int page = params.page.value_or(1);
+  int per_page = params.per_page.value_or(50);
+  std::string sort_by = params.sort_by.value_or("created_at");
+  std::string sort_order = params.sort_order.value_or("desc");
+
+  // 安全的排序字段验证
+  if (sort_by != "created_at" && sort_by != "name" && sort_by != "size" &&
+      sort_by != "file_created_at") {
+    sort_by = "created_at";
+  }
+  if (sort_order != "asc" && sort_order != "desc") {
+    sort_order = "desc";
+  }
+
+  int offset = (page - 1) * per_page;
+
+  std::vector<Core::Database::Types::DbParam> query_params;
+  std::string sql;
+
+  // 如果没有指定folder_id，查询所有资产
+  if (!params.folder_id.has_value()) {
+    sql = std::format(R"(
+      SELECT id, name, path as filepath, type,
+             width, height, size, mime_type, hash, folder_id,
+             file_created_at, file_modified_at,
+             created_at, updated_at, deleted_at
+      FROM assets
+      WHERE deleted_at IS NULL
+      ORDER BY {} {}
+      LIMIT ? OFFSET ?
+    )",
+                      sort_by, sort_order);
+  } else if (params.include_subfolders.value_or(false)) {
+    // 使用递归CTE查询当前文件夹及所有子文件夹
+    sql = std::format(R"(
+      WITH RECURSIVE folder_hierarchy AS (
+        SELECT id FROM folders WHERE id = ?
+        UNION ALL
+        SELECT f.id FROM folders f
+        INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
+      )
+      SELECT id, name, path as filepath, type,
+             width, height, size, mime_type, hash, folder_id,
+             file_created_at, file_modified_at,
+             created_at, updated_at, deleted_at
+      FROM assets
+      WHERE deleted_at IS NULL 
+        AND folder_id IN (SELECT id FROM folder_hierarchy)
+      ORDER BY {} {}
+      LIMIT ? OFFSET ?
+    )",
+                      sort_by, sort_order);
+
+    query_params.push_back(params.folder_id.value());
+  } else {
+    // 只查询当前文件夹
+    sql = std::format(R"(
+      SELECT id, name, path as filepath, type,
+             width, height, size, mime_type, hash, folder_id,
+             file_created_at, file_modified_at,
+             created_at, updated_at, deleted_at
+      FROM assets
+      WHERE deleted_at IS NULL AND folder_id = ?
+      ORDER BY {} {}
+      LIMIT ? OFFSET ?
+    )",
+                      sort_by, sort_order);
+
+    query_params.push_back(params.folder_id.value());
+  }
+
+  // 添加分页参数
+  query_params.push_back(per_page);
+  query_params.push_back(offset);
+
+  // 执行查询
+  auto items_result = Core::Database::query<Types::Asset>(*app_state.database, sql, query_params);
+  if (!items_result) {
+    return std::unexpected("Failed to query assets: " + items_result.error());
+  }
+
+  // 获取总数（用于分页）
+  std::string count_sql;
+  std::vector<Core::Database::Types::DbParam> count_params;
+
+  if (!params.folder_id.has_value()) {
+    count_sql = "SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL";
+  } else if (params.include_subfolders.value_or(false)) {
+    count_sql = R"(
+      WITH RECURSIVE folder_hierarchy AS (
+        SELECT id FROM folders WHERE id = ?
+        UNION ALL
+        SELECT f.id FROM folders f
+        INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
+      )
+      SELECT COUNT(*) FROM assets
+      WHERE deleted_at IS NULL 
+        AND folder_id IN (SELECT id FROM folder_hierarchy)
+    )";
+    count_params.push_back(params.folder_id.value());
+  } else {
+    count_sql = "SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND folder_id = ?";
+    count_params.push_back(params.folder_id.value());
+  }
+
+  auto count_result =
+      Core::Database::query_scalar<int>(*app_state.database, count_sql, count_params);
+  if (!count_result) {
+    return std::unexpected("Failed to count assets: " + count_result.error());
+  }
+  int total_count = count_result->value_or(0);
+
+  // 构建响应
+  Types::ListResponse response;
+  response.items = std::move(items_result.value());
+  response.total_count = total_count;
+  response.current_page = page;
+  response.per_page = per_page;
+  response.total_pages = (total_count + per_page - 1) / per_page;
+
+  return response;
+}
+
 }  // namespace Features::Gallery::Asset::Repository

@@ -113,12 +113,11 @@ struct ScanIgnoreRule {
 
 struct ScanOptions {
   std::string directory;
-  bool generate_thumbnails = true;
-  std::uint32_t thumbnail_max_width = 400;
-  std::uint32_t thumbnail_max_height = 400;
-  std::vector<std::string> supported_extensions = {".jpg",  ".jpeg", ".png", ".bmp",
-                                                   ".webp", ".tiff", ".tif"};
-  std::vector<ScanIgnoreRule> ignore_rules;
+  std::optional<bool> generate_thumbnails = true;
+  std::optional<std::uint32_t> thumbnail_short_edge = 480;
+  std::optional<std::vector<std::string>> supported_extensions =
+      std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"};
+  std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };
 
 struct ScanResult {
@@ -184,26 +183,22 @@ struct GetParams {
   std::int64_t id;
 };
 
-struct ScanParams {
-  std::string directory;
-  bool generate_thumbnails = true;
-  std::uint32_t thumbnail_max_width = 400;
-  std::uint32_t thumbnail_max_height = 400;
-  std::vector<ScanIgnoreRule> ignore_rules;
-};
-
-struct GetThumbnailParams {
-  std::int64_t asset_id;
-  std::optional<std::uint32_t> width = 400;
-  std::optional<std::uint32_t> height = 400;
-};
-
 struct DeleteParams {
   std::int64_t id;
   std::optional<bool> delete_file = false;
 };
 
 struct GetStatsParams {};
+
+struct ListAssetsParams {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  // 分页和排序参数（复用ListParams的逻辑）
+  std::optional<std::int32_t> page = 1;
+  std::optional<std::int32_t> per_page = 50;
+  std::optional<std::string> sort_by = "created_at";
+  std::optional<std::string> sort_order = "desc";
+};
 
 struct OperationResult {
   bool success;

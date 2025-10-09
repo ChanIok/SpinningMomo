@@ -16,21 +16,28 @@ export function useGalleryView() {
   const filter = computed(() => store.filter)
   const sortBy = computed(() => store.sortBy)
   const sortOrder = computed(() => store.sortOrder)
+  const includeSubfolders = computed(() => store.includeSubfolders)
 
   // ============= 计算属性 =============
-  
+
   /**
    * 根据视图大小计算列数
    */
   const columnCount = computed(() => {
     const size = viewSize.value
     switch (size) {
-      case 1: return 2  // 最小
-      case 2: return 3  // 小
-      case 3: return 4  // 中等（默认）
-      case 4: return 5  // 大
-      case 5: return 6  // 最大
-      default: return 4
+      case 1:
+        return 2 // 最小
+      case 2:
+        return 3 // 小
+      case 3:
+        return 4 // 中等（默认）
+      case 4:
+        return 5 // 大
+      case 5:
+        return 6 // 最大
+      default:
+        return 4
     }
   })
 
@@ -40,12 +47,18 @@ export function useGalleryView() {
   const thumbnailSize = computed(() => {
     const size = viewSize.value
     switch (size) {
-      case 1: return 120  // 最小
-      case 2: return 160  // 小
-      case 3: return 200  // 中等（默认）
-      case 4: return 240  // 大
-      case 5: return 280  // 最大
-      default: return 200
+      case 1:
+        return 120 // 最小
+      case 2:
+        return 160 // 小
+      case 3:
+        return 200 // 中等（默认）
+      case 4:
+        return 240 // 大
+      case 5:
+        return 280 // 最大
+      default:
+        return 200
     }
   })
 
@@ -54,21 +67,21 @@ export function useGalleryView() {
    */
   const filteredAssets = computed(() => {
     let result = store.assets
-    
+
     // 按类型筛选
     if (filter.value.type) {
-      result = result.filter(asset => asset.type === filter.value.type)
+      result = result.filter((asset) => asset.type === filter.value.type)
     }
-    
+
     // 按搜索关键词筛选
     if (filter.value.searchQuery) {
       const query = filter.value.searchQuery.toLowerCase()
-      result = result.filter(asset => 
-        asset.name.toLowerCase().includes(query) ||
-        asset.path.toLowerCase().includes(query)
+      result = result.filter(
+        (asset) =>
+          asset.name.toLowerCase().includes(query) || asset.path.toLowerCase().includes(query)
       )
     }
-    
+
     return result
   })
 
@@ -77,11 +90,11 @@ export function useGalleryView() {
    */
   const sortedAssets = computed(() => {
     const result = [...filteredAssets.value]
-    
+
     result.sort((a, b) => {
       let aValue: any
       let bValue: any
-      
+
       switch (sortBy.value) {
         case 'name':
           aValue = a.name.toLowerCase()
@@ -97,7 +110,7 @@ export function useGalleryView() {
           bValue = b.createdAt
           break
       }
-      
+
       if (aValue < bValue) {
         return sortOrder.value === 'asc' ? -1 : 1
       }
@@ -106,12 +119,12 @@ export function useGalleryView() {
       }
       return 0
     })
-    
+
     return result
   })
 
   // ============= 视图操作 =============
-  
+
   /**
    * 设置视图模式
    */
@@ -193,8 +206,16 @@ export function useGalleryView() {
     setFilter({ type })
   }
 
+  /**
+   * 设置是否包含子文件夹
+   */
+  function setIncludeSubfolders(include: boolean) {
+    store.setIncludeSubfolders(include)
+    console.log('📁 包含子文件夹设置:', include)
+  }
+
   // ============= 视图模式预设 =============
-  
+
   /**
    * 网格视图预设
    */
@@ -231,29 +252,31 @@ export function useGalleryView() {
     filter,
     sortBy,
     sortOrder,
-    
+    includeSubfolders,
+
     // 计算属性
     columnCount,
     thumbnailSize,
     filteredAssets,
     sortedAssets,
-    
+
     // 视图操作
     setViewMode,
     setViewSize,
     increaseSize,
     decreaseSize,
-    
+
     // 排序操作
     setSorting,
     toggleSortOrder,
-    
+
     // 筛选操作
     setFilter,
     clearFilter,
     setSearchQuery,
     setTypeFilter,
-    
+    setIncludeSubfolders,
+
     // 视图模式预设
     setGridView,
     setMasonryView,
