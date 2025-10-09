@@ -64,7 +64,7 @@ const executeTest = async () => {
   try {
     // 从 ParamInputPanel 获取当前参数
     const params = paramInputPanelRef.value?.getCurrentParams() ?? currentParams.value
-    
+
     const response = await testApi({
       method: props.method.name,
       params,
@@ -115,9 +115,9 @@ const canExecuteTest = computed(() => {
     </div>
 
     <!-- 测试面板 -->
-    <div v-if="method" class="flex flex-1 flex-col min-h-0">
+    <div v-if="method" class="flex flex-1 flex-col overflow-y-auto">
       <!-- 参数输入面板 -->
-      <div class="flex-1 border-b">
+      <div class="flex-1 overflow-y-auto border-b">
         <ParamInputPanel
           ref="paramInputPanelRef"
           :method-name="method.name"
@@ -127,7 +127,7 @@ const canExecuteTest = computed(() => {
 
       <!-- 执行按钮 -->
       <div class="border-b p-4">
-        <div class="text-xs text-muted-foreground mb-2">提示：按 Ctrl+Enter 快速执行测试</div>
+        <div class="mb-2 text-xs text-muted-foreground">提示：按 Ctrl+Enter 快速执行测试</div>
         <Button @click="executeTest" :disabled="!canExecuteTest" class="w-full">
           <PlayIcon v-if="!loading" class="mr-2 h-4 w-4" />
           <div
@@ -139,7 +139,7 @@ const canExecuteTest = computed(() => {
       </div>
 
       <!-- 响应结果 -->
-      <div class="flex-1 overflow-y-auto p-4">
+      <div class="min-h-0 flex-1 p-4">
         <h4 class="mb-3 text-sm font-medium">响应结果</h4>
         <JsonResponseViewer :response="lastResponse" :loading="loading" />
       </div>

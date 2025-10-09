@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { call } from '@/core/rpc'
-import type { MethodSignatureResponse, JSONSchema, FormField } from '../types'
+import type { MethodSignatureResponse, JSONSchema, FormField, JSONSchemaType } from '../types'
 
 /**
  * 获取方法签名的 composable
@@ -102,8 +102,37 @@ export function useMethodSignature() {
     propSchema: JSONSchema,
     isRequired: boolean
   ): FormField | null => {
+    // 处理 anyOf/oneOf，转换为标准的 type
+    let normalizedSchema = { ...propSchema }
+
+    if (propSchema.anyOf || propSchema.oneOf) {
+      const union = propSchema.anyOf || propSchema.oneOf
+      // 从 anyOf/oneOf 中提取所有 type
+      const types: string[] = []
+      union!.forEach((subSchema) => {
+        if (subSchema.type) {
+          if (Array.isArray(subSchema.type)) {
+            types.push(...subSchema.type)
+          } else {
+            types.push(subSchema.type)
+          }
+        }
+      })
+
+      // 去重
+      const uniqueTypes = Array.from(new Set(types))
+
+      // 如果提取到类型，归一化为 type
+      if (uniqueTypes.length > 0) {
+        normalizedSchema.type =
+          uniqueTypes.length === 1
+            ? (uniqueTypes[0] as JSONSchemaType)
+            : (uniqueTypes as JSONSchemaType[])
+      }
+    }
+
     // 确定字段类型
-    let fieldType = propSchema.type
+    let fieldType = normalizedSchema.type
     if (Array.isArray(fieldType)) {
       // 如果是联合类型，取第一个非 null 的类型
       fieldType = fieldType.find((t) => t !== 'null') || fieldType[0]

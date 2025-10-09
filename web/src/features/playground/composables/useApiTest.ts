@@ -12,7 +12,7 @@ export function useApiTest() {
     const startTime = Date.now()
 
     try {
-      const result = await call(request.method, request.params)
+      const result = await call(request.method, request.params, 0)
       const duration = Date.now() - startTime
 
       const response: ApiTestResponse = {

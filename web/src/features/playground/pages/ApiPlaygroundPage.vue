@@ -73,10 +73,10 @@ const handleRefresh = () => {
     </div>
 
     <!-- 主要内容 -->
-    <div class="flex-1 p-4 overflow-y-auto">
+    <div class="flex-1 overflow-y-auto p-4">
       <div class="flex h-full gap-4">
         <!-- 左侧方法列表 -->
-        <div class="w-1/3 min-w-80 max-w-96 overflow-hidden rounded-lg border">
+        <div class="w-72 overflow-hidden rounded-lg border">
           <ApiMethodList
             :methods="methods"
             :loading="loading"

@@ -66,12 +66,11 @@ watch(
   { immediate: true }
 )
 
-// 表单数据变化时同步到 JSON
+// 表单数据变化时，通知父组件
 watch(
   formData,
   (newData) => {
     if (currentMode.value === 'form') {
-      jsonInput.value = JSON.stringify(newData, null, 2)
       emit('update:params', newData)
     }
   },

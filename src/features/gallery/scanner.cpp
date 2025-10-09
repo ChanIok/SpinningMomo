@@ -186,8 +186,16 @@ auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::pat
       continue;
     }
 
+    // 规范化路径，确保路径格式统一（统一使用正斜杠）
+    auto normalized_path_result = Utils::Path::NormalizePath(file_path);
+    if (!normalized_path_result) {
+      Logger().warn("Failed to normalize path '{}': {}", file_path.string(),
+                    normalized_path_result.error());
+      continue;
+    }
+
     Types::FileSystemInfo info{
-        .filepath = file_path,
+        .filepath = normalized_path_result.value(),
         .size = static_cast<int64_t>(file_size),
         .file_modified_millis = Utils::Time::file_time_to_millis(last_write_time),
         .file_created_millis = creation_time_result.value(),
@@ -341,14 +349,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   }
 
   asset.name = file_path.filename().string();
-  
-  // 规范化文件路径，确保斜杠格式统一
-  auto normalized_path_result = Utils::Path::NormalizePath(file_path);
-  if (!normalized_path_result) {
-    return std::unexpected(std::format("Failed to normalize file path '{}': {}", 
-                                       file_path.string(), normalized_path_result.error()));
-  }
-  asset.filepath = normalized_path_result.value().string();
+  asset.filepath = file_path.string();
   asset.type = asset_type;
   asset.size = file_info.size;
   asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
@@ -361,12 +362,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
 
   // 根据文件路径查找对应的 folder_id
   if (!folder_mapping.empty()) {
-    auto parent_path_result = Utils::Path::NormalizePath(file_path.parent_path());
-    if (!parent_path_result) {
-      return std::unexpected(std::format("Failed to normalize parent path for '{}': {}",
-                                         file_path.string(), parent_path_result.error()));
-    }
-    auto parent_path = parent_path_result.value().string();
+    auto parent_path = file_path.parent_path().string();
     if (auto it = folder_mapping.find(parent_path); it != folder_mapping.end()) {
       asset.folder_id = it->second;
     }
@@ -505,13 +501,18 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   Logger().info("Starting folder-aware asset scan for directory '{}' with {} ignore rules",
                 options.directory, options.ignore_rules.size());
 
-  // 1. 确保文件夹记录存在
-  auto folder_id_result =
-      Folder::Repository::get_or_create_folder_for_path(app_state, options.directory);
-  if (!folder_id_result) {
-    return std::unexpected("Failed to create folder record: " + folder_id_result.error());
+  // 1. 为扫描根目录预创建文件夹记录
+  std::vector<std::filesystem::path> root_folder_paths = {options.directory};
+
+  auto root_folder_mapping_result =
+      Folder::Processor::batch_create_folders_for_paths(app_state, root_folder_paths);
+  if (!root_folder_mapping_result) {
+    return std::unexpected("Failed to create root folder record: " +
+                           root_folder_mapping_result.error());
   }
-  std::int64_t folder_id = folder_id_result.value();
+
+  auto root_folder_map = std::move(root_folder_mapping_result.value());
+  std::int64_t folder_id = root_folder_map.at(options.directory);
 
   // 2. 持久化前端提供的ignore规则
   if (!options.ignore_rules.empty()) {
@@ -585,13 +586,15 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     file_paths.push_back(analysis.file_info.filepath);
   }
 
-  auto folder_paths = Folder::Processor::extract_unique_folder_paths(file_paths);
+  // 提取所有需要的文件夹路径（包含祖先目录直到扫描根目录）
+  auto folder_paths = Folder::Processor::extract_unique_folder_paths(file_paths, directory);
 
   auto folder_mapping_result =
       Folder::Processor::batch_create_folders_for_paths(app_state, folder_paths);
   if (folder_mapping_result) {
     path_to_folder_id = std::move(folder_mapping_result.value());
-    Logger().info("Pre-created {} folder records", path_to_folder_id.size());
+    Logger().info("Pre-created {} folder records with complete hierarchy",
+                  path_to_folder_id.size());
   } else {
     Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
   }

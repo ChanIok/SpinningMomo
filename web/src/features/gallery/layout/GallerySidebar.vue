@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useGalleryStore } from '../store'
 import { useGallerySidebar } from '../composables'
+import FolderTreeItem from '../components/FolderTreeItem.vue'
 
 // 使用 composables
 const store = useGalleryStore()
@@ -13,6 +14,8 @@ const {
   sidebar,
   selectedFolder,
   selectedTag,
+  loading,
+  error,
   selectFolder,
   selectTag,
   selectAllMedia,
@@ -88,34 +91,22 @@ const totalCount = computed(() => store.totalCount)
         <h3 class="px-2 text-xs font-medium tracking-wider text-muted-foreground uppercase">
           文件夹
         </h3>
-        <!-- 文件夹树 - 简化版，暂不实现嵌套展开 -->
-        <div v-for="folder in folders" :key="folder.id" class="space-y-1">
-          <Button
-            :variant="selectedFolder === folder.id ? 'secondary' : 'ghost'"
-            :class="[
-              'h-8 w-full justify-start gap-2 px-2',
-              selectedFolder === folder.id && 'bg-accent',
-            ]"
-            @click="selectFolder(folder.id, folder.name)"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="flex-shrink-0"
-            >
-              <path
-                d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"
-              />
-            </svg>
-            <span class="flex-1 text-left text-sm">{{ folder.name }}</span>
-          </Button>
+        <!-- 加载状态 -->
+        <div v-if="loading" class="px-2 text-xs text-muted-foreground">加载中...</div>
+        <!-- 错误状态 -->
+        <div v-else-if="error" class="px-2 text-xs text-destructive">
+          {{ error }}
+        </div>
+        <!-- 文件夹树 -->
+        <div v-else class="space-y-1">
+          <FolderTreeItem
+            v-for="folder in folders"
+            :key="folder.id"
+            :folder="folder"
+            :selected-folder="selectedFolder"
+            :depth="0"
+            @select="selectFolder"
+          />
         </div>
       </div>
 

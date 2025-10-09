@@ -53,6 +53,7 @@ struct FolderTreeNode {
   int is_hidden = 0;
   std::int64_t created_at;
   std::int64_t updated_at;
+  std::int64_t asset_count = 0;
   std::vector<FolderTreeNode> children;
 };
 

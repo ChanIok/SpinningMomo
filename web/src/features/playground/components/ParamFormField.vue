@@ -38,12 +38,12 @@ const value = computed({
       return String(currentValue ?? '')
     }
 
-    // 对于数字类型，确保是数字或空字符串（供input处理）
+    // 对于数字类型，确保是数字或 null
     if (props.field.type === 'number' || props.field.type === 'integer') {
       if (typeof currentValue === 'number') {
         return currentValue
       }
-      return '' // 返回空字符串让input组件处理
+      return null // 返回 null 让 input 组件处理
     }
 
     return currentValue
@@ -74,12 +74,11 @@ const getDefaultValue = () => {
 const handleNumberInput = (event: Event) => {
   const target = event.target as HTMLInputElement
   const num = props.field.type === 'integer' ? parseInt(target.value, 10) : parseFloat(target.value)
-  value.value = isNaN(num) ? 0 : num
+  value.value = isNaN(num) ? null : num
 }
 
-// 处理 checkbox 变化
-const handleCheckboxChange = (checked: boolean) => {
-  value.value = checked
+const handleCheckboxChange = (newValue: boolean | 'indeterminate') => {
+  value.value = newValue === true
 }
 </script>
 
@@ -137,7 +136,7 @@ const handleCheckboxChange = (checked: boolean) => {
     <Input
       v-else-if="field.type === 'number' || field.type === 'integer'"
       :id="field.name"
-      :value="value"
+      :model-value="value !== null ? String(value) : ''"
       :type="field.type === 'integer' ? 'number' : 'number'"
       :step="field.type === 'integer' ? '1' : 'any'"
       :min="field.minimum"
@@ -148,7 +147,11 @@ const handleCheckboxChange = (checked: boolean) => {
 
     <!-- 布尔类型 -->
     <div v-else-if="field.type === 'boolean'" class="flex items-center space-x-2">
-      <Checkbox :id="field.name" :checked="!!value" @update:checked="handleCheckboxChange" />
+      <Checkbox
+        :id="field.name"
+        :model-value="!!value"
+        @update:model-value="handleCheckboxChange"
+      />
       <Label :for="field.name" class="cursor-pointer text-sm font-normal">
         {{ value ? '是' : '否' }}
       </Label>

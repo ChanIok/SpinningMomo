@@ -1,13 +1,7 @@
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useGalleryStore } from '../store'
-
-// 临时类型定义，未来可以移到 types.ts
-export interface Folder {
-  id: string
-  name: string
-  count: number
-  children?: Folder[]
-}
+import type { FolderTreeNode } from '../types'
+import { getFolderTree } from '../api'
 
 export interface Tag {
   id: string
@@ -25,20 +19,12 @@ export function useGallerySidebar() {
   // ============= 本地状态 =============
 
   // 文件夹展开状态
-  const expandedFolders = ref<Set<string>>(new Set(['root']))
+  const expandedFolders = ref<Set<number>>(new Set())
 
-  // 模拟数据（未来从后端获取）
-  const folders = ref<Folder[]>([
-    {
-      id: 'root',
-      name: '所有文件夹',
-      count: 0,
-      children: [
-        { id: 'folder-1', name: '我的图片', count: 0 },
-        { id: 'folder-2', name: '截图', count: 0 },
-      ],
-    },
-  ])
+  // 文件夹树数据（从后端获取）
+  const folders = ref<FolderTreeNode[]>([])
+  const loading = ref(false)
+  const error = ref<string | null>(null)
 
   const tags = ref<Tag[]>([
     { id: 'tag-1', name: '收藏', count: 0 },
@@ -48,9 +34,13 @@ export function useGallerySidebar() {
   // ============= 计算属性 =============
 
   const sidebar = computed(() => store.sidebar)
-  const selectedFolder = computed(() =>
-    sidebar.value.activeSection === 'folders' ? store.filter.folderId : null
-  )
+  const selectedFolder = computed(() => {
+    if (sidebar.value.activeSection === 'folders' && store.filter.folderId) {
+      const folderId = Number(store.filter.folderId)
+      return isNaN(folderId) ? null : folderId
+    }
+    return null
+  })
   const selectedTag = computed(() =>
     sidebar.value.activeSection === 'tags' ? store.filter.tagId : null
   )
@@ -58,9 +48,26 @@ export function useGallerySidebar() {
   // ============= 操作方法 =============
 
   /**
+   * 加载文件夹树
+   */
+  async function loadFolderTree() {
+    loading.value = true
+    error.value = null
+    try {
+      folders.value = await getFolderTree()
+      console.log('📁 文件夹树加载成功')
+    } catch (e) {
+      error.value = '加载文件夹树失败'
+      console.error('加载文件夹树失败:', e)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 切换文件夹展开/收起
    */
-  function toggleFolderExpanded(folderId: string) {
+  function toggleFolderExpanded(folderId: number) {
     if (expandedFolders.value.has(folderId)) {
       expandedFolders.value.delete(folderId)
     } else {
@@ -71,16 +78,16 @@ export function useGallerySidebar() {
   /**
    * 检查文件夹是否展开
    */
-  function isFolderExpanded(folderId: string): boolean {
+  function isFolderExpanded(folderId: number): boolean {
     return expandedFolders.value.has(folderId)
   }
 
   /**
    * 选择文件夹
    */
-  function selectFolder(folderId: string, folderName: string) {
+  function selectFolder(folderId: number, folderName: string) {
     store.setSidebarActiveSection('folders')
-    store.setFilter({ folderId })
+    store.setFilter({ folderId: String(folderId) })
     console.log('📁 选择文件夹:', folderName)
   }
 
@@ -110,6 +117,11 @@ export function useGallerySidebar() {
     // TODO: 实现添加标签逻辑
   }
 
+  // 组件加载时自动获取文件夹树
+  onMounted(() => {
+    loadFolderTree()
+  })
+
   return {
     // 状态
     folders,
@@ -117,8 +129,11 @@ export function useGallerySidebar() {
     sidebar,
     selectedFolder,
     selectedTag,
+    loading,
+    error,
 
     // 操作
+    loadFolderTree,
     toggleFolderExpanded,
     isFolderExpanded,
     selectFolder,

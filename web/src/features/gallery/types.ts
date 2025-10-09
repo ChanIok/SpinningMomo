@@ -42,6 +42,22 @@ export interface Folder {
   updatedAt: number
 }
 
+// 文件夹树节点类型（用于侧边栏导航）
+export interface FolderTreeNode {
+  id: number
+  path: string
+  parentId?: number
+  name: string
+  displayName?: string
+  coverAssetId?: number
+  sortOrder: number
+  isHidden: boolean
+  createdAt: number
+  updatedAt: number
+  assetCount: number // 包含所有子文件夹的 assets 总数
+  children: FolderTreeNode[]
+}
+
 // 标签类型
 export interface Tag {
   id: number

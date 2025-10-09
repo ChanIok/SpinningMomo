@@ -9,6 +9,7 @@ import type {
   AssetStats,
   ScanAssetsParams,
   ScanAssetsResult,
+  FolderTreeNode,
 } from './types'
 
 /**
@@ -77,12 +78,28 @@ export async function getAssetStats(): Promise<AssetStats> {
   try {
     const result = await call<AssetStats>('gallery.stats', {})
 
-    console.log('📊 获取资产统计成功:', result)
+    console.log('📋 获取资产统计成功:', result)
 
     return result
   } catch (error) {
     console.error('Failed to get asset stats:', error)
     throw new Error('获取资产统计失败')
+  }
+}
+
+/**
+ * 获取文件夹树结构
+ */
+export async function getFolderTree(): Promise<FolderTreeNode[]> {
+  try {
+    const result = await call<FolderTreeNode[]>('gallery.getFolderTree', {})
+
+    console.log('📁 获取文件夹树成功:', result.length, '个根文件夹')
+
+    return result
+  } catch (error) {
+    console.error('Failed to get folder tree:', error)
+    throw new Error('获取文件夹树失败')
   }
 }
 
@@ -189,16 +206,17 @@ export const galleryApi = {
   listAssets,
   getAsset,
   getAssetStats,
-  
+  getFolderTree,
+
   // 数据操作
   deleteAsset,
   scanAssets,
-  
+
   // 维护操作
   cleanupThumbnails,
   getThumbnailStats,
   cleanupDeletedAssets,
-  
+
   // URL 工具
   getAssetThumbnailUrl,
   getAssetUrl,
