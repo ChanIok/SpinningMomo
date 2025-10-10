@@ -33,13 +33,7 @@ const handleRefresh = () => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col bg-background">
-    <!-- 页面标题 -->
-    <div class="border-b p-4">
-      <h1 class="text-2xl font-bold">API 测试工具</h1>
-      <p class="mt-1 text-sm text-muted-foreground">测试后端API方法，查看响应结果</p>
-    </div>
-
+  <div class="flex h-full flex-col">
     <!-- 错误提示 -->
     <div v-if="error" class="border-l-4 border-red-500 bg-red-50 p-4 text-red-700">
       <div class="flex">
@@ -73,7 +67,7 @@ const handleRefresh = () => {
     </div>
 
     <!-- 主要内容 -->
-    <div class="flex-1 overflow-y-auto p-4">
+    <div class="flex-1 overflow-hidden p-4">
       <div class="flex h-full gap-4">
         <!-- 左侧方法列表 -->
         <div class="w-72 overflow-hidden rounded-lg border">

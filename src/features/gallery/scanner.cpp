@@ -500,12 +500,19 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     -> std::expected<Types::ScanResult, std::string> {
   auto start_time = std::chrono::steady_clock::now();
 
+  auto normalized_scan_root_result = Utils::Path::NormalizePath(options.directory);
+  if (!normalized_scan_root_result) {
+    return std::unexpected("Failed to normalize scan root path: " +
+                           normalized_scan_root_result.error());
+  }
+  auto normalized_scan_root = normalized_scan_root_result.value();
+
   Logger().info("Starting folder-aware asset scan for directory '{}' with {} ignore rules",
-                options.directory,
+                normalized_scan_root.string(),
                 options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{}).size());
 
   // 1. 为扫描根目录预创建文件夹记录
-  std::vector<std::filesystem::path> root_folder_paths = {options.directory};
+  std::vector<std::filesystem::path> root_folder_paths = {normalized_scan_root};
 
   auto root_folder_mapping_result =
       Folder::Processor::batch_create_folders_for_paths(app_state, root_folder_paths);
@@ -515,7 +522,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   auto root_folder_map = std::move(root_folder_mapping_result.value());
-  std::int64_t folder_id = root_folder_map.at(options.directory);
+  std::int64_t folder_id = root_folder_map.at(normalized_scan_root.string());
 
   // 2. 持久化前端提供的ignore规则
   auto ignore_rules = options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{});
@@ -537,7 +544,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
   auto asset_cache = std::move(asset_cache_result.value());
 
-  std::filesystem::path directory(options.directory);
+  std::filesystem::path directory(normalized_scan_root);
 
   // 4. 使用支持忽略规则的文件信息扫描（传递folder_id）
   auto file_info_result = scan_file_info(app_state, directory, options, folder_id);
@@ -547,7 +554,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto file_infos = file_info_result.value();
 
   Logger().info("Scanned {} files in directory '{}' (after ignore rules)", file_infos.size(),
-                options.directory);
+                normalized_scan_root.string());
 
   // 分析文件变化
   auto analysis_results = analyze_file_changes(file_infos, asset_cache);

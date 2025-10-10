@@ -4,9 +4,9 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/playground',
     name: 'playground',
-    component: () => import('./pages/ApiPlaygroundPage.vue'),
+    component: () => import('./pages/PlaygroundPage.vue'),
     meta: {
-      title: 'API 测试工具',
+      title: '开发工具',
     },
   },
 ]
