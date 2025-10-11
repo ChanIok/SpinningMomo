@@ -153,22 +153,19 @@
                     <div class="space-y-3">
                       <div class="flex items-center justify-between">
                         <p class="text-sm font-medium">缩略图大小</p>
-                        <span class="text-sm text-muted-foreground">{{ viewSizeLabel }}</span>
+                        <span class="text-sm text-muted-foreground">{{ viewSize }}px</span>
                       </div>
                       <Slider
-                        :model-value="[viewSize]"
+                        :model-value="[currentSliderPosition]"
                         @update:model-value="onViewSizeSliderChange"
-                        :min="1"
-                        :max="5"
+                        :min="0"
+                        :max="100"
                         :step="1"
                         class="w-full"
                       />
                       <div class="flex justify-between text-xs text-muted-foreground">
-                        <span>超小</span>
-                        <span>小</span>
-                        <span>中</span>
-                        <span>大</span>
-                        <span>超大</span>
+                        <span>精致</span>
+                        <span>展示</span>
                       </div>
                     </div>
                   </div>
@@ -247,18 +244,10 @@ const filter = computed(() => galleryView.filter.value)
 const searchQuery = computed(() => filter.value.searchQuery || '')
 const includeSubfolders = computed(() => galleryView.includeSubfolders.value)
 
+// 当前slider位置（从实际尺寸反向计算）
+const currentSliderPosition = computed(() => galleryView.getSliderPosition())
+
 const hasSelection = computed(() => props.selectedCount > 0)
-
-// 视图大小标签映射
-const viewSizeLabels: Record<number, string> = {
-  1: '超小',
-  2: '小',
-  3: '中',
-  4: '大',
-  5: '超大',
-}
-
-const viewSizeLabel = computed(() => viewSizeLabels[viewSize.value] || '中')
 
 // 视图模式选项
 const viewModes = [
@@ -320,7 +309,8 @@ function setViewMode(
 
 function onViewSizeSliderChange(value: number[] | undefined) {
   if (value && value.length > 0 && value[0] !== undefined) {
-    galleryView.setViewSize(value[0])
+    // 使用非线性映射函数设置尺寸
+    galleryView.setViewSizeFromSlider(value[0])
   }
 }
 </script>

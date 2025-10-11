@@ -27,7 +27,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= 视图配置 =============
   const viewConfig = ref<ViewConfig>({
     mode: 'grid',
-    size: 3,
+    size: 200, // 默认缩略图尺寸 200px（中等大小，对应slider约41%位置）
   })
 
   const filter = ref<AssetFilter>({})
@@ -238,7 +238,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     currentPage.value = 1
     hasNextPage.value = false
 
-    viewConfig.value = { mode: 'adaptive', size: 3 }
+    viewConfig.value = { mode: 'adaptive', size: 200 }
     filter.value = {}
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'

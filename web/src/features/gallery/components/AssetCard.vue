@@ -1,18 +1,15 @@
 <template>
   <div
-    class="group relative overflow-hidden rounded-lg bg-background transition-all duration-200 select-none"
+    class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 select-none"
     :class="[
       {
         'ring-2 ring-primary ring-offset-2': isSelected,
         'ring-1 ring-border': isActive && !isSelected,
         'shadow-md hover:shadow-lg': !isSelected,
-        'scale-105 shadow-lg': isSelected,
+        'shadow-lg': isSelected,
       },
     ]"
-    :style="{
-      width: `${size}px`,
-      height: `${size}px`,
-    }"
+    style="aspect-ratio: 1/1"
     @click="handleClick"
     @dblclick="handleDoubleClick"
     @contextmenu="handleContextMenu"
@@ -137,7 +134,6 @@ interface AssetCardProps {
   asset: Asset
   isSelected?: boolean
   isActive?: boolean
-  size?: number
   showName?: boolean
   showSize?: boolean
   showTypeLabel?: boolean
@@ -147,7 +143,6 @@ interface AssetCardProps {
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
   isActive: false,
-  size: 200,
   showName: true,
   showSize: false,
   showTypeLabel: false,

@@ -218,7 +218,7 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
 
     // 生成 WebP 缩略图
     Utils::Image::WebPEncodeOptions options;
-    options.quality = 75.0f;  // 默认质量
+    options.quality = 90.0f;  // 默认质量
 
     auto webp_result =
         Utils::Image::generate_webp_thumbnail(wic_factory, source_file, short_edge_size, options);

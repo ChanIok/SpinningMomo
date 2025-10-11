@@ -3,6 +3,36 @@ import { useGalleryStore } from '../store'
 import type { ViewMode, SortBy, SortOrder, AssetFilter } from '../types'
 
 /**
+ * 非线性映射
+ * 使用平方函数，让小尺寸调整更细腻，大尺寸跳跃更大
+ */
+function sliderToSize(position: number): number {
+  const min = 120
+  const max = 768
+  const normalized = position / 100
+
+  // 平方函数：前半段变化缓慢，后半段加速
+  const squared = Math.pow(normalized, 2)
+  const size = min + (max - min) * squared
+
+  return Math.round(size)
+}
+
+/**
+ * 反向映射
+ */
+function sizeToSlider(size: number): number {
+  const min = 120
+  const max = 768
+  const normalized = (size - min) / (max - min)
+
+  // 开平方（平方的逆运算）
+  const position = Math.sqrt(Math.max(0, Math.min(1, normalized))) * 100
+
+  return Math.round(position)
+}
+
+/**
  * Gallery视图管理 Composable
  * 负责视图模式切换、排序、筛选等视图相关逻辑
  */
@@ -19,48 +49,6 @@ export function useGalleryView() {
   const includeSubfolders = computed(() => store.includeSubfolders)
 
   // ============= 计算属性 =============
-
-  /**
-   * 根据视图大小计算列数
-   */
-  const columnCount = computed(() => {
-    const size = viewSize.value
-    switch (size) {
-      case 1:
-        return 2 // 最小
-      case 2:
-        return 3 // 小
-      case 3:
-        return 4 // 中等（默认）
-      case 4:
-        return 5 // 大
-      case 5:
-        return 6 // 最大
-      default:
-        return 4
-    }
-  })
-
-  /**
-   * 缩略图尺寸（像素）
-   */
-  const thumbnailSize = computed(() => {
-    const size = viewSize.value
-    switch (size) {
-      case 1:
-        return 120 // 最小
-      case 2:
-        return 160 // 小
-      case 3:
-        return 200 // 中等（默认）
-      case 4:
-        return 240 // 大
-      case 5:
-        return 280 // 最大
-      default:
-        return 200
-    }
-  })
 
   /**
    * 筛选后的资产列表
@@ -134,29 +122,52 @@ export function useGalleryView() {
   }
 
   /**
-   * 设置视图大小
+   * 设置视图大小（从 slider 位置设置）
+   * @param sliderPosition - Slider位置 (0-100)
    */
-  function setViewSize(size: number) {
-    const validSize = Math.max(1, Math.min(5, size))
+  function setViewSizeFromSlider(sliderPosition: number) {
+    const size = sliderToSize(sliderPosition)
+    const validSize = Math.max(120, Math.min(768, size))
     store.setViewConfig({ size: validSize })
-    console.log('📏 视图大小调整:', validSize)
+    console.log('📏 视图大小调整:', validSize, 'px (slider:', sliderPosition, '%)')
   }
 
   /**
-   * 增加视图大小
+   * 直接设置视图大小（从实际px值设置）
+   * @param size - 实际尼寸 (120-768px)
+   */
+  function setViewSize(size: number) {
+    const validSize = Math.max(120, Math.min(768, size))
+    store.setViewConfig({ size: validSize })
+    console.log('📏 视图大小调整:', validSize, 'px')
+  }
+
+  /**
+   * 获取当前尺寸对应的 slider 位置
+   */
+  function getSliderPosition(): number {
+    return sizeToSlider(viewSize.value)
+  }
+
+  /**
+   * 增加视图大小（键盘快捷键）
    */
   function increaseSize() {
-    if (viewSize.value < 5) {
-      setViewSize(viewSize.value + 1)
+    const currentSlider = getSliderPosition()
+    if (currentSlider < 100) {
+      // 每次增加 5% slider 位置
+      setViewSizeFromSlider(Math.min(100, currentSlider + 5))
     }
   }
 
   /**
-   * 减少视图大小
+   * 减少视图大小（键盘快捷键）
    */
   function decreaseSize() {
-    if (viewSize.value > 1) {
-      setViewSize(viewSize.value - 1)
+    const currentSlider = getSliderPosition()
+    if (currentSlider > 0) {
+      // 每次减少 5% slider 位置
+      setViewSizeFromSlider(Math.max(0, currentSlider - 5))
     }
   }
 
@@ -255,14 +266,14 @@ export function useGalleryView() {
     includeSubfolders,
 
     // 计算属性
-    columnCount,
-    thumbnailSize,
     filteredAssets,
     sortedAssets,
 
     // 视图操作
     setViewMode,
     setViewSize,
+    setViewSizeFromSlider,
+    getSliderPosition,
     increaseSize,
     decreaseSize,
 

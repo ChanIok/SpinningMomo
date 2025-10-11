@@ -96,7 +96,7 @@ export function useIntegrationTest() {
         params = {
           directory: context.gameDir,
           generateThumbnails: true,
-          thumbnailShortEdge: 400,
+          thumbnailShortEdge: 480,
           ignoreRules: [
             {
               pattern: '**',

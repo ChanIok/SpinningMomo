@@ -29,7 +29,7 @@ function handleAssetPreview(asset: any) {
     <div
       class="grid justify-items-center gap-4"
       :style="{
-        gridTemplateColumns: `repeat(auto-fill, minmax(${galleryView.thumbnailSize.value}px, 1fr))`,
+        gridTemplateColumns: `repeat(auto-fill, minmax(${galleryView.viewSize.value}px, 1fr))`,
       }"
     >
       <AssetCard
@@ -38,10 +38,9 @@ function handleAssetPreview(asset: any) {
         :asset="asset"
         :is-selected="gallerySelection.isAssetSelected(asset.id)"
         :is-active="gallerySelection.isAssetActive(asset.id)"
-        :size="galleryView.thumbnailSize.value"
-        :show-name="galleryView.viewSize.value >= 3"
-        :show-size="galleryView.viewSize.value >= 4"
-        :show-type-label="galleryView.viewSize.value >= 4"
+        :show-name="galleryView.viewSize.value >= 200"
+        :show-size="galleryView.viewSize.value >= 280"
+        :show-type-label="galleryView.viewSize.value >= 280"
         @click="handleAssetClick"
         @double-click="handleAssetDoubleClick"
         @context-menu="handleAssetContextMenu"
