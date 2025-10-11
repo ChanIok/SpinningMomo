@@ -77,8 +77,12 @@ function handleAssetPreview(asset: any) {
 
 <template>
   <!-- 时间线模式 -->
-  <div v-if="isTimelineMode" class="flex h-full p-6 pr-0">
-    <div ref="scrollContainerRef" class=" flex-1 overflow-auto  hide-scrollbar" @scroll="handleScroll">
+  <div v-if="isTimelineMode" class="flex h-full">
+    <div
+      ref="scrollContainerRef"
+      class="hide-scrollbar flex-1 overflow-auto pl-6 pr-2"
+      @scroll="handleScroll"
+    >
       <div
         :style="{ height: `${timeline.virtualizer.value.getTotalSize()}px`, position: 'relative' }"
       >

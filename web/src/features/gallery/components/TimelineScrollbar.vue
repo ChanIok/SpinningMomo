@@ -1,20 +1,20 @@
 <template>
   <div
     ref="timelineRef"
-    class="timeline-scrollbar w-12 bg-background/80 backdrop-blur transition-all select-none"
+    class="timeline-scrollbar w-10 bg-background/80 backdrop-blur transition-all select-none"
     @mousedown="handleMouseDown"
     @mousemove="handleMouseMove"
     @mouseleave="handleMouseLeave"
     @wheel="handleWheel"
   >
-    <div class="relative h-full px-2">
+    <div class="relative h-full">
       <!-- 月份圆点 -->
       <div
         v-for="marker in monthMarkers"
         :key="marker.month"
-        class="pointer-events-none absolute left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-border"
+        class="pointer-events-none absolute right-2 h-1.5 w-1.5 rounded-full bg-border"
         :style="{
-          top: `${marker.offsetTop}px`,
+          top: `${marker.offsetTop - 3}px`,
         }"
       />
 
@@ -22,7 +22,7 @@
       <div
         v-for="year in years"
         :key="year.year"
-        class="pointer-events-none absolute right-0 left-0 bg-background/90 px-2 py-1 text-sm font-semibold text-foreground"
+        class="pointer-events-none absolute right-0 left-0 px-2 py-1 text-right text-xs text-foreground"
         :style="{
           top: `${year.offsetTop}px`,
         }"
@@ -33,28 +33,29 @@
       <!-- Hover 预览横杠（最低层级） -->
       <div
         v-if="hoverY !== null && !isDragging"
-        class="pointer-events-none absolute right-2 left-2 rounded-sm bg-primary/40"
+        class="pointer-events-none absolute right-1 left-2 rounded-sm bg-primary/40"
         :style="{
-          top: `${hoverY - 3}px`,
-          height: '6px',
+          top: `${hoverY - 2}px`,
+          height: '4px',
         }"
       />
 
       <!-- 视口指示器（横杠，视频播放器风格） -->
       <div
-        class="pointer-events-none absolute right-2 left-2 rounded-sm bg-primary shadow-lg"
+        class="pointer-events-none absolute right-1 left-2 rounded-sm bg-primary shadow-lg"
         :style="{
-          top: `${indicatorTop - 3}px`,
-          height: '6px',
+          top: `${indicatorTop - 2}px`,
+          height: '4px',
         }"
       />
 
       <!-- Tooltip（自定义浮层） -->
       <div
         v-if="hoverMonth"
-        class="animate-fade-in pointer-events-none absolute -left-24 z-20 h-8 rounded-sm bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md"
+        class="animate-fade-in pointer-events-none absolute -left-20 z-20 rounded-sm bg-popover/90 px-2 text-xs leading-6 text-popover-foreground shadow-md"
         :style="{
-          top: `${hoverY! - 16}px`,
+          top: `${hoverY! - 12}px`,
+          height: '24px',
         }"
       >
         {{ hoverMonth }}
@@ -95,8 +96,8 @@ const props = defineProps<{
 const timelineRef = ref<HTMLElement | null>(null)
 
 // ============= 坐标系统配置 =============
-const CONTENT_OFFSET_TOP = 0 // 顶部预留空间（年份标签）
-const CONTENT_OFFSET_BOTTOM = 10 // 底部预留空间
+const CONTENT_OFFSET_TOP = 24 // 顶部预留空间（年份标签）
+const CONTENT_OFFSET_BOTTOM = 24 // 底部预留空间
 
 // 计算可用高度（去除顶部和底部偏移）
 const availableHeight = computed(() => {
@@ -333,10 +334,6 @@ function formatMonthFull(monthStr: string): string {
 </script>
 
 <style scoped>
-.timeline-scrollbar {
-  z-index: 10;
-}
-
 @keyframes fade-in {
   from {
     opacity: 0;

@@ -79,6 +79,8 @@ export function useTimeline(options: {
     },
     getScrollElement: () => containerRef.value,
     estimateSize: () => estimatedRowHeight.value,
+    paddingStart: 24,  // 与 GridView 的 px-6 对应
+    paddingEnd: 24,
     overscan: 20, // 上下各预渲染行数
   })
 
