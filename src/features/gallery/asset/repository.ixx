@@ -55,6 +55,18 @@ auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsPara
 auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
     -> std::expected<Types::ListResponse, std::string>;
 
+// ============= 时间线视图查询 =============
+
+// 获取时间线桶（月份统计）
+auto get_timeline_buckets(Core::State::AppState& app_state,
+                          const Types::TimelineBucketsParams& params)
+    -> std::expected<Types::TimelineBucketsResponse, std::string>;
+
+// 按月查询资产
+auto get_assets_by_month(Core::State::AppState& app_state,
+                         const Types::GetAssetsByMonthParams& params)
+    -> std::expected<Types::GetAssetsByMonthResponse, std::string>;
+
 // ============= 批量操作 =============
 
 // 批量插入资产项

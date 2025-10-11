@@ -206,4 +206,34 @@ struct OperationResult {
   std::optional<std::int64_t> affected_count;
 };
 
+// ============= 时间线相关类型 =============
+
+struct TimelineBucket {
+  std::string month;              // "2024-10" 格式
+  int count;                      // 该月照片数量
+};
+
+struct TimelineBucketsParams {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+};
+
+struct TimelineBucketsResponse {
+  std::vector<TimelineBucket> buckets;
+  int total_count;                // 总照片数
+};
+
+struct GetAssetsByMonthParams {
+  std::string month;                          // "2024-10" 格式
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
+};
+
+struct GetAssetsByMonthResponse {
+  std::string month;
+  std::vector<Asset> assets;
+  int count;
+};
+
 }  // namespace Features::Gallery::Types

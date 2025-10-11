@@ -682,4 +682,168 @@ auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams
   return response;
 }
 
+// ============= 时间线视图查询 =============
+
+// 工具函数：将时间戳转换为月份字符串
+auto timestamp_to_month(int64_t timestamp_ms) -> std::string {
+  // 将毫秒时间戳转换为 system_clock::time_point
+  auto time_point = std::chrono::system_clock::time_point{std::chrono::milliseconds{timestamp_ms}};
+
+  // 转换为 year_month_day
+  auto ymd = std::chrono::year_month_day{std::chrono::floor<std::chrono::days>(time_point)};
+
+  // 格式化为 YYYY-MM
+  return std::format("{:%Y-%m}", ymd);
+}
+
+// 验证月份格式（YYYY-MM）
+auto validate_month_format(const std::string& month) -> bool {
+  if (month.length() != 7 || month[4] != '-') {
+    return false;
+  }
+
+  // 简单验证：前4位和后2位是否为数字
+  for (size_t i = 0; i < month.length(); ++i) {
+    if (i == 4) continue;  // 跳过 '-'
+    if (!std::isdigit(static_cast<unsigned char>(month[i]))) {
+      return false;
+    }
+  }
+
+  // 验证月份范围 01-12
+  int month_num = std::stoi(month.substr(5, 2));
+  return month_num >= 1 && month_num <= 12;
+}
+
+auto get_timeline_buckets(Core::State::AppState& app_state,
+                          const Types::TimelineBucketsParams& params)
+    -> std::expected<Types::TimelineBucketsResponse, std::string> {
+  std::vector<Core::Database::Types::DbParam> query_params;
+  std::string folder_filter;
+
+  // 构建文件夹筛选条件
+  if (params.folder_id.has_value()) {
+    if (params.include_subfolders.value_or(false)) {
+      // 递归查询子文件夹
+      folder_filter = R"(
+        AND folder_id IN (
+          WITH RECURSIVE folder_hierarchy AS (
+            SELECT id FROM folders WHERE id = ?
+            UNION ALL
+            SELECT f.id FROM folders f
+            INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
+          )
+          SELECT id FROM folder_hierarchy
+        )
+      )";
+      query_params.push_back(params.folder_id.value());
+    } else {
+      folder_filter = "AND folder_id = ?";
+      query_params.push_back(params.folder_id.value());
+    }
+  }
+
+  // 构建查询
+  std::string sql = std::format(R"(
+    SELECT 
+      strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) as month,
+      COUNT(*) as count
+    FROM assets 
+    WHERE deleted_at IS NULL
+      {}
+    GROUP BY month
+    ORDER BY month DESC
+  )",
+                                folder_filter);
+
+  auto result =
+      Core::Database::query<Types::TimelineBucket>(*app_state.database, sql, query_params);
+
+  if (!result) {
+    return std::unexpected("Failed to query timeline buckets: " + result.error());
+  }
+
+  // 计算总数
+  int total_count = 0;
+  for (const auto& bucket : result.value()) {
+    total_count += bucket.count;
+  }
+
+  Types::TimelineBucketsResponse response;
+  response.buckets = std::move(result.value());
+  response.total_count = total_count;
+
+  return response;
+}
+
+auto get_assets_by_month(Core::State::AppState& app_state,
+                         const Types::GetAssetsByMonthParams& params)
+    -> std::expected<Types::GetAssetsByMonthResponse, std::string> {
+  // 验证月份格式
+  if (!validate_month_format(params.month)) {
+    return std::unexpected("Invalid month format. Expected: YYYY-MM");
+  }
+
+  // 验证排序参数
+  std::string sort_order = params.sort_order.value_or("desc");
+  if (sort_order != "asc" && sort_order != "desc") {
+    sort_order = "desc";
+  }
+
+  std::vector<Core::Database::Types::DbParam> query_params;
+  std::string folder_filter;
+
+  // 构建文件夹筛选条件
+  if (params.folder_id.has_value()) {
+    if (params.include_subfolders.value_or(false)) {
+      folder_filter = R"(
+        AND folder_id IN (
+          WITH RECURSIVE folder_hierarchy AS (
+            SELECT id FROM folders WHERE id = ?
+            UNION ALL
+            SELECT f.id FROM folders f
+            INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
+          )
+          SELECT id FROM folder_hierarchy
+        )
+      )";
+      query_params.push_back(params.folder_id.value());
+    } else {
+      folder_filter = "AND folder_id = ?";
+      query_params.push_back(params.folder_id.value());
+    }
+  }
+
+  // 构建查询
+  std::string sql = std::format(R"(
+    SELECT 
+      id, name, path as filepath, type,
+      width, height, size, mime_type, hash, folder_id,
+      file_created_at, file_modified_at,
+      created_at, updated_at, deleted_at
+    FROM assets
+    WHERE deleted_at IS NULL
+      AND strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) = ?
+      {}
+    ORDER BY COALESCE(file_created_at, created_at) {}
+  )",
+                                folder_filter, sort_order);
+
+  // 添加月份参数
+  query_params.push_back(params.month);
+
+  auto result = Core::Database::query<Types::Asset>(*app_state.database, sql, query_params);
+
+  if (!result) {
+    return std::unexpected("Failed to query assets by month: " + result.error());
+  }
+
+  Types::GetAssetsByMonthResponse response;
+  response.month = params.month;
+  response.assets = std::move(result.value());
+  response.count = static_cast<int>(response.assets.size());
+
+  return response;
+}
+
 }  // namespace Features::Gallery::Asset::Repository

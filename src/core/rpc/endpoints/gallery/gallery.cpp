@@ -181,6 +181,38 @@ auto handle_list_assets(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+// ============= 时间线视图 RPC 处理函数 =============
+
+auto handle_get_timeline_buckets(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::TimelineBucketsParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::TimelineBucketsResponse>> {
+  auto result = Features::Gallery::Asset::Repository::get_timeline_buckets(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
+auto handle_get_assets_by_month(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::GetAssetsByMonthParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::GetAssetsByMonthResponse>> {
+  auto result = Features::Gallery::Asset::Repository::get_assets_by_month(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 // ============= RPC 方法注册 =============
 
 auto register_all(Core::State::AppState& app_state) -> void {
@@ -237,6 +269,18 @@ auto register_all(Core::State::AppState& app_state) -> void {
                              Features::Gallery::Types::ListResponse>(
       app_state, app_state.rpc->registry, "gallery.listAssets", handle_list_assets,
       "Get paginated list of assets with optional folder filtering and subfolder inclusion");
+
+  // 时间线视图
+  Core::RPC::register_method<Features::Gallery::Types::TimelineBucketsParams,
+                             Features::Gallery::Types::TimelineBucketsResponse>(
+      app_state, app_state.rpc->registry, "gallery.getTimelineBuckets",
+      handle_get_timeline_buckets,
+      "Get timeline buckets (months) with asset counts for timeline view");
+
+  Core::RPC::register_method<Features::Gallery::Types::GetAssetsByMonthParams,
+                             Features::Gallery::Types::GetAssetsByMonthResponse>(
+      app_state, app_state.rpc->registry, "gallery.getAssetsByMonth", handle_get_assets_by_month,
+      "Get all assets for a specific month in timeline view");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery

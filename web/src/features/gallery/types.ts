@@ -180,6 +180,41 @@ export interface ScanAssetsResult {
   scanDuration: string
 }
 
+// ============= 时间线相关类型 =============
+
+// 时间线桶（月份元数据）
+export interface TimelineBucket {
+  month: string // "2024-10" 格式
+  count: number // 该月照片数量
+}
+
+// 获取时间线桶参数
+export interface GetTimelineBucketsParams {
+  folderId?: number
+  includeSubfolders?: boolean
+}
+
+// 获取时间线桶响应
+export interface TimelineBucketsResponse {
+  buckets: TimelineBucket[]
+  totalCount: number
+}
+
+// 获取指定月份资产参数
+export interface GetAssetsByMonthParams {
+  month: string // "2024-10" 格式
+  folderId?: number
+  includeSubfolders?: boolean
+  sortOrder?: 'asc' | 'desc'
+}
+
+// 获取指定月份资产响应
+export interface GetAssetsByMonthResponse {
+  month: string
+  assets: Asset[]
+  count: number
+}
+
 // ============= UI状态类型 =============
 
 // 选择状态

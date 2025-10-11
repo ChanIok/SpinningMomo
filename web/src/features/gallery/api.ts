@@ -10,6 +10,10 @@ import type {
   ScanAssetsParams,
   ScanAssetsResult,
   FolderTreeNode,
+  GetTimelineBucketsParams,
+  TimelineBucketsResponse,
+  GetAssetsByMonthParams,
+  GetAssetsByMonthResponse,
 } from './types'
 import { getStaticUrl } from '@/core/env'
 
@@ -208,6 +212,50 @@ export function getAssetUrl(assetId: number): string {
 }
 
 /**
+ * 获取时间线桶（月份元数据）
+ */
+export async function getTimelineBuckets(
+  params: GetTimelineBucketsParams = {}
+): Promise<TimelineBucketsResponse> {
+  try {
+    const result = await call<TimelineBucketsResponse>('gallery.getTimelineBuckets', params)
+
+    console.log('📅 获取时间线桶成功:', {
+      buckets: result.buckets.length,
+      totalCount: result.totalCount,
+      folderId: params.folderId,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to get timeline buckets:', error)
+    throw new Error('获取时间线桶失败')
+  }
+}
+
+/**
+ * 获取指定月份的资产
+ */
+export async function getAssetsByMonth(
+  params: GetAssetsByMonthParams
+): Promise<GetAssetsByMonthResponse> {
+  try {
+    const result = await call<GetAssetsByMonthResponse>('gallery.getAssetsByMonth', params)
+
+    console.log('📸 获取月份资产成功:', {
+      month: result.month,
+      count: result.count,
+      folderId: params.folderId,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to get assets by month:', error)
+    throw new Error('获取月份资产失败')
+  }
+}
+
+/**
  * Gallery API 统一导出
  */
 export const galleryApi = {
@@ -216,6 +264,10 @@ export const galleryApi = {
   getAsset,
   getAssetStats,
   getFolderTree,
+
+  // 时间线查询
+  getTimelineBuckets,
+  getAssetsByMonth,
 
   // 数据操作
   deleteAsset,
