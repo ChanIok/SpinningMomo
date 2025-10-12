@@ -9,6 +9,8 @@ import type {
   SidebarState,
   SortBy,
   SortOrder,
+  TimelineBucket,
+  FolderTreeNode,
 } from './types'
 
 /**
@@ -23,6 +25,16 @@ export const useGalleryStore = defineStore('gallery', () => {
   const totalCount = ref(0)
   const currentPage = ref(1)
   const hasNextPage = ref(false)
+
+  // ============= 时间线数据状态 =============
+  const timelineBuckets = ref<TimelineBucket[]>([])
+  const timelineMonthData = ref<Map<string, Asset[]>>(new Map())
+  const timelineTotalCount = ref(0)
+
+  // ============= 文件夹树状态 =============
+  const folders = ref<FolderTreeNode[]>([])
+  const foldersLoading = ref(false)
+  const foldersError = ref<string | null>(null)
 
   // ============= 视图配置 =============
   const viewConfig = ref<ViewConfig>({
@@ -63,6 +75,12 @@ export const useGalleryStore = defineStore('gallery', () => {
   const isAllSelected = computed(
     () => assets.value.length > 0 && selectedCount.value === assets.value.length
   )
+  const isTimelineMode = computed(() => sortBy.value === 'createdAt')
+
+  // 文件夹树根节点资产总数（所有根节点的 assetCount 之和）
+  const foldersAssetTotalCount = computed(() => {
+    return folders.value.reduce((sum, folder) => sum + folder.assetCount, 0)
+  })
 
   // ============= 数据操作 Actions =============
 
@@ -127,6 +145,73 @@ export const useGalleryStore = defineStore('gallery', () => {
     totalCount.value = total
     currentPage.value = page
     hasNextPage.value = hasNext
+  }
+
+  // ============= 时间线数据操作 Actions =============
+
+  function setTimelineBuckets(buckets: TimelineBucket[]) {
+    timelineBuckets.value = buckets
+  }
+
+  function setTimelineTotalCount(count: number) {
+    timelineTotalCount.value = count
+  }
+
+  /**
+   * 生成月份数据的缓存键
+   * 格式: 'month:folderId:includeSubfolders'
+   * 例如: '2025-01:123:true' 或 '2025-01:all:false'
+   */
+  function getMonthCacheKey(
+    month: string,
+    folderId?: number,
+    includeSubfoldersFlag?: boolean
+  ): string {
+    const folderKey = folderId !== undefined ? folderId.toString() : 'all'
+    const subfoldersKey =
+      includeSubfoldersFlag !== undefined
+        ? includeSubfoldersFlag.toString()
+        : includeSubfolders.value.toString()
+    return `${month}:${folderKey}:${subfoldersKey}`
+  }
+
+  function setMonthAssets(
+    month: string,
+    monthAssets: Asset[],
+    folderId?: number,
+    includeSubfoldersFlag?: boolean
+  ) {
+    const cacheKey = getMonthCacheKey(month, folderId, includeSubfoldersFlag)
+    timelineMonthData.value.set(cacheKey, monthAssets)
+  }
+
+  function getMonthAssets(
+    month: string,
+    folderId?: number,
+    includeSubfoldersFlag?: boolean
+  ): Asset[] | undefined {
+    const cacheKey = getMonthCacheKey(month, folderId, includeSubfoldersFlag)
+    return timelineMonthData.value.get(cacheKey)
+  }
+
+  function clearTimelineData() {
+    timelineBuckets.value = []
+    timelineMonthData.value.clear()
+    timelineTotalCount.value = 0
+  }
+
+  // ============= 文件夹树操作 Actions =============
+
+  function setFolders(newFolders: FolderTreeNode[]) {
+    folders.value = newFolders
+  }
+
+  function setFoldersLoading(loading: boolean) {
+    foldersLoading.value = loading
+  }
+
+  function setFoldersError(errorMessage: string | null) {
+    foldersError.value = errorMessage
   }
 
   // ============= 视图操作 Actions =============
@@ -238,6 +323,14 @@ export const useGalleryStore = defineStore('gallery', () => {
     currentPage.value = 1
     hasNextPage.value = false
 
+    // 清空时间线数据
+    clearTimelineData()
+
+    // 清空文件夹树数据
+    folders.value = []
+    foldersLoading.value = false
+    foldersError.value = null
+
     viewConfig.value = { mode: 'adaptive', size: 200 }
     filter.value = {}
     sortBy.value = 'createdAt'
@@ -267,6 +360,16 @@ export const useGalleryStore = defineStore('gallery', () => {
     currentPage,
     hasNextPage,
 
+    // 时间线状态
+    timelineBuckets,
+    timelineMonthData,
+    timelineTotalCount,
+
+    // 文件夹树状态
+    folders,
+    foldersLoading,
+    foldersError,
+
     viewConfig,
     filter,
     sortBy,
@@ -282,6 +385,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     selectedCount,
     hasSelection,
     isAllSelected,
+    isTimelineMode,
+    foldersAssetTotalCount,
 
     // Actions
     setAssets,
@@ -293,6 +398,19 @@ export const useGalleryStore = defineStore('gallery', () => {
     setInitialLoading,
     setError,
     setPagination,
+
+    // 时间线 Actions
+    setTimelineBuckets,
+    setTimelineTotalCount,
+    setMonthAssets,
+    getMonthAssets,
+    getMonthCacheKey,
+    clearTimelineData,
+
+    // 文件夹树 Actions
+    setFolders,
+    setFoldersLoading,
+    setFoldersError,
 
     setViewConfig,
     setFilter,

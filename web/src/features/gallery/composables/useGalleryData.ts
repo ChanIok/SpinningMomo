@@ -19,15 +19,105 @@ export function useGalleryData() {
   const currentPage = computed(() => store.currentPage)
   const hasNextPage = computed(() => store.hasNextPage)
 
+  // 时间线状态
+  const isTimelineMode = computed(() => store.isTimelineMode)
+  const timelineBuckets = computed(() => store.timelineBuckets)
+  const timelineTotalCount = computed(() => store.timelineTotalCount)
+
+  // 文件夹树状态
+  const folders = computed(() => store.folders)
+  const foldersLoading = computed(() => store.foldersLoading)
+  const foldersError = computed(() => store.foldersError)
+
   // ============= 数据加载操作 =============
 
   /**
-   * 加载资产列表
+   * 统一加载入口 - 根据模式自动选择加载方式
+   */
+  async function load() {
+    if (isTimelineMode.value) {
+      return loadTimelineData()
+    } else {
+      return loadAssets({ page: 1, perPage: 50 })
+    }
+  }
+
+  /**
+   * 加载时间线数据（月份元数据）
+   */
+  async function loadTimelineData() {
+    try {
+      store.setLoading(true)
+      store.setError(null)
+
+      // 清空普通模式的数据（节省内存）
+      store.setAssets([])
+
+      const response = await galleryApi.getTimelineBuckets({
+        folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
+        includeSubfolders: store.includeSubfolders,
+      })
+
+      store.setTimelineBuckets(response.buckets)
+      store.setTimelineTotalCount(response.totalCount)
+
+      console.log('📅 时间线数据加载成功:', {
+        months: response.buckets.length,
+        total: response.totalCount,
+      })
+    } catch (error) {
+      console.error('Failed to load timeline data:', error)
+      store.setError('加载时间线数据失败')
+    } finally {
+      store.setLoading(false)
+    }
+  }
+
+  /**
+   * 加载指定月份的资产数据
+   */
+  async function loadMonthAssets(month: string) {
+    const folderId = store.filter.folderId ? Number(store.filter.folderId) : undefined
+    const includeSubfolders = store.includeSubfolders
+
+    // 检查是否已加载（使用复合缓存键）
+    const cachedAssets = store.getMonthAssets(month, folderId, includeSubfolders)
+    if (cachedAssets?.length) {
+      const cacheKey = store.getMonthCacheKey(month, folderId, includeSubfolders)
+      console.log('⏭️ 月份数据已缓存:', cacheKey)
+      return
+    }
+
+    try {
+      const cacheKey = store.getMonthCacheKey(month, folderId, includeSubfolders)
+      console.log('📸 加载月份数据:', cacheKey)
+
+      const response = await galleryApi.getAssetsByMonth({
+        month: month,
+        folderId: folderId,
+        includeSubfolders: includeSubfolders,
+        sortOrder: 'desc',
+      })
+
+      store.setMonthAssets(month, response.assets, folderId, includeSubfolders)
+
+      console.log('✅ 月份数据加载完成:', cacheKey, response.count)
+    } catch (error) {
+      console.error('加载月份数据失败:', month, error)
+      throw error
+    }
+  }
+
+  /**
+   * 加载资产列表（普通分页模式）
    */
   async function loadAssets(params: ListAssetsParams = {}) {
     try {
       store.setLoading(true)
       store.setError(null)
+
+      // 清空时间线数据（节省内存）
+      store.clearTimelineData()
 
       const response = await galleryApi.listAssets(params)
 
@@ -63,7 +153,7 @@ export function useGalleryData() {
   async function initialize() {
     try {
       store.setInitialLoading(true)
-      await loadAssets({ page: 1, perPage: 50 })
+      await load()
     } catch (error) {
       console.error('Failed to initialize gallery:', error)
     } finally {
@@ -72,18 +162,10 @@ export function useGalleryData() {
   }
 
   /**
-   * 重新加载（保持当前筛选和排序）
+   * 重新加载（保持当前模式和筛选）
    */
   async function reload() {
-    const currentParams: ListAssetsParams = {
-      page: 1,
-      perPage: 50,
-      sortBy: store.sortBy,
-      sortOrder: store.sortOrder,
-      folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
-      includeSubfolders: store.includeSubfolders,
-    }
-    return loadAssets(currentParams)
+    return load()
   }
 
   /**
@@ -105,69 +187,23 @@ export function useGalleryData() {
   }
 
   /**
-   * 删除资产
+   * 加载文件夹树
    */
-  async function deleteAsset(id: number, deleteFile = false) {
+  async function loadFolderTree() {
     try {
-      store.setLoading(true)
+      store.setFoldersLoading(true)
+      store.setFoldersError(null)
 
-      await galleryApi.deleteAsset({ id, deleteFile })
+      const folderTree = await galleryApi.getFolderTree()
+      store.setFolders(folderTree)
 
-      // 从 store 中移除资产
-      store.removeAsset(id)
-
-      console.log('✅ 资产删除成功:', id)
+      console.log('📁 文件夹树加载成功:', folderTree.length)
     } catch (error) {
-      console.error('Failed to delete asset:', error)
-      store.setError('删除资产失败')
+      console.error('Failed to load folder tree:', error)
+      store.setFoldersError('加载文件夹树失败')
       throw error
     } finally {
-      store.setLoading(false)
-    }
-  }
-
-  /**
-   * 批量删除选中的资产
-   */
-  async function deleteSelectedAssets(deleteFile = false) {
-    const selectedIds = Array.from(store.selection.selectedIds)
-    if (selectedIds.length === 0) return
-
-    try {
-      store.setLoading(true)
-
-      // 并发删除
-      const promises = selectedIds.map((id) => galleryApi.deleteAsset({ id, deleteFile }))
-
-      await Promise.all(promises)
-
-      // 从 store 中移除资产
-      selectedIds.forEach((id) => store.removeAsset(id))
-
-      // 清空选择
-      store.clearSelection()
-
-      console.log('✅ 批量删除成功:', selectedIds.length)
-    } catch (error) {
-      console.error('Failed to delete selected assets:', error)
-      store.setError('批量删除失败')
-      throw error
-    } finally {
-      store.setLoading(false)
-    }
-  }
-
-  /**
-   * 加载统计数据
-   */
-  async function loadStats() {
-    try {
-      const stats = await galleryApi.getAssetStats()
-      console.log('📊 Gallery统计数据:', stats)
-      return stats
-    } catch (error) {
-      console.error('Failed to load gallery stats:', error)
-      throw error
+      store.setFoldersLoading(false)
     }
   }
 
@@ -202,14 +238,25 @@ export function useGalleryData() {
     currentPage,
     hasNextPage,
 
+    // 时间线状态
+    isTimelineMode,
+    timelineBuckets,
+    timelineTotalCount,
+
+    // 文件夹树状态
+    folders,
+    foldersLoading,
+    foldersError,
+
     // 操作
-    loadAssets,
+    load, // 统一加载入口
+    loadTimelineData, // 时间线元数据
+    loadMonthAssets, // 月份数据
+    loadAssets, // 普通分页
+    loadFolderTree, // 文件夹树
     initialize,
     reload,
     loadMore,
-    deleteAsset,
-    deleteSelectedAssets,
-    loadStats,
     scanAssets,
   }
 }

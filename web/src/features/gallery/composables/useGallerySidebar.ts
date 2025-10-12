@@ -1,7 +1,5 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useGalleryStore } from '../store'
-import type { FolderTreeNode } from '../types'
-import { getFolderTree } from '../api'
 
 export interface Tag {
   id: string
@@ -11,27 +9,29 @@ export interface Tag {
 
 /**
  * Gallery 侧边栏管理 Composable
- * 管理文件夹树和标签的逻辑
+ * 管理侧边栏UI交互逻辑（展开/收起、选择等）
+ * 数据获取由 useGalleryData 负责
  */
 export function useGallerySidebar() {
   const store = useGalleryStore()
 
-  // ============= 本地状态 =============
+  // ============= 本地 UI 状态 =============
 
-  // 文件夹展开状态
+  // 文件夹展开状态（纯 UI 状态）
   const expandedFolders = ref<Set<number>>(new Set())
 
-  // 文件夹树数据（从后端获取）
-  const folders = ref<FolderTreeNode[]>([])
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-
+  // 标签数据（TODO: 未来从 API 获取）
   const tags = ref<Tag[]>([
     { id: 'tag-1', name: '收藏', count: 0 },
     { id: 'tag-2', name: '重要', count: 0 },
   ])
 
   // ============= 计算属性 =============
+
+  // 从 store 读取文件夹树数据
+  const folders = computed(() => store.folders)
+  const loading = computed(() => store.foldersLoading)
+  const error = computed(() => store.foldersError)
 
   const sidebar = computed(() => store.sidebar)
   const selectedFolder = computed(() => {
@@ -45,24 +45,7 @@ export function useGallerySidebar() {
     sidebar.value.activeSection === 'tags' ? store.filter.tagId : null
   )
 
-  // ============= 操作方法 =============
-
-  /**
-   * 加载文件夹树
-   */
-  async function loadFolderTree() {
-    loading.value = true
-    error.value = null
-    try {
-      folders.value = await getFolderTree()
-      console.log('📁 文件夹树加载成功')
-    } catch (e) {
-      error.value = '加载文件夹树失败'
-      console.error('加载文件夹树失败:', e)
-    } finally {
-      loading.value = false
-    }
-  }
+  // ============= UI 交互操作方法 =============
 
   /**
    * 切换文件夹展开/收起
@@ -117,23 +100,17 @@ export function useGallerySidebar() {
     // TODO: 实现添加标签逻辑
   }
 
-  // 组件加载时自动获取文件夹树
-  onMounted(() => {
-    loadFolderTree()
-  })
-
   return {
-    // 状态
+    // 状态（从 store 读取）
     folders,
+    loading,
+    error,
     tags,
     sidebar,
     selectedFolder,
     selectedTag,
-    loading,
-    error,
 
-    // 操作
-    loadFolderTree,
+    // UI 交互操作
     toggleFolderExpanded,
     isFolderExpanded,
     selectFolder,

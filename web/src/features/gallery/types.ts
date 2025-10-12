@@ -133,33 +133,11 @@ export interface ListAssetsResponse {
   totalPages: number
 }
 
-// 获取单个资产参数
-export interface GetAssetParams {
-  id: number
-}
-
-// 删除资产参数
-export interface DeleteAssetParams {
-  id: number
-  deleteFile?: boolean
-}
-
 // 操作结果
 export interface OperationResult {
   success: boolean
   message: string
   affectedCount?: number
-}
-
-// 资产统计
-export interface AssetStats {
-  totalCount: number
-  photoCount: number
-  videoCount: number
-  livePhotoCount: number
-  totalSize: number
-  oldestItemDate: string
-  newestItemDate: string
 }
 
 // 扫描参数

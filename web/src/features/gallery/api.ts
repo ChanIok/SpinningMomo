@@ -3,10 +3,7 @@ import type {
   Asset,
   ListAssetsParams,
   ListAssetsResponse,
-  GetAssetParams,
-  DeleteAssetParams,
   OperationResult,
-  AssetStats,
   ScanAssetsParams,
   ScanAssetsResult,
   FolderTreeNode,
@@ -16,61 +13,7 @@ import type {
   GetAssetsByMonthResponse,
 } from './types'
 import { getStaticUrl } from '@/core/env'
-
-/**
- * Gallery API 层
- * 基于 core/rpc 封装业务语义化的接口
- */
-
-/**
- * 获取单个资产详情
- */
-export async function getAsset(params: GetAssetParams): Promise<Asset> {
-  try {
-    const result = await call<Asset>('gallery.get', params)
-
-    console.log('📸 获取资产详情成功:', result.name)
-
-    return result
-  } catch (error) {
-    console.error('Failed to get asset:', error)
-    throw new Error('获取资产详情失败')
-  }
-}
-
-/**
- * 删除资产
- */
-export async function deleteAsset(params: DeleteAssetParams): Promise<OperationResult> {
-  try {
-    console.log('📸 删除资产:', params)
-
-    const result = await call<OperationResult>('gallery.delete', params)
-
-    console.log('✅ 资产删除成功:', result.message)
-
-    return result
-  } catch (error) {
-    console.error('Failed to delete asset:', error)
-    throw new Error('删除资产失败')
-  }
-}
-
-/**
- * 获取资产统计信息
- */
-export async function getAssetStats(): Promise<AssetStats> {
-  try {
-    const result = await call<AssetStats>('gallery.stats', {})
-
-    console.log('📋 获取资产统计成功:', result)
-
-    return result
-  } catch (error) {
-    console.error('Failed to get asset stats:', error)
-    throw new Error('获取资产统计失败')
-  }
-}
+import { transformInfinityNikkiTree } from '@/plugins/infinity_nikki'
 
 /**
  * 获取文件夹树结构
@@ -81,7 +24,10 @@ export async function getFolderTree(): Promise<FolderTreeNode[]> {
 
     console.log('📁 获取文件夹树成功:', result.length, '个根文件夹')
 
-    return result
+    // 应用 InfinityNikki 插件转换
+    const transformedResult = transformInfinityNikkiTree(result)
+
+    return transformedResult
   } catch (error) {
     console.error('Failed to get folder tree:', error)
     throw new Error('获取文件夹树失败')
@@ -220,12 +166,6 @@ export async function getTimelineBuckets(
   try {
     const result = await call<TimelineBucketsResponse>('gallery.getTimelineBuckets', params)
 
-    console.log('📅 获取时间线桶成功:', {
-      buckets: result.buckets.length,
-      totalCount: result.totalCount,
-      folderId: params.folderId,
-    })
-
     return result
   } catch (error) {
     console.error('Failed to get timeline buckets:', error)
@@ -242,12 +182,6 @@ export async function getAssetsByMonth(
   try {
     const result = await call<GetAssetsByMonthResponse>('gallery.getAssetsByMonth', params)
 
-    console.log('📸 获取月份资产成功:', {
-      month: result.month,
-      count: result.count,
-      folderId: params.folderId,
-    })
-
     return result
   } catch (error) {
     console.error('Failed to get assets by month:', error)
@@ -261,8 +195,6 @@ export async function getAssetsByMonth(
 export const galleryApi = {
   // 数据查询
   listAssets,
-  getAsset,
-  getAssetStats,
   getFolderTree,
 
   // 时间线查询
@@ -270,7 +202,6 @@ export const galleryApi = {
   getAssetsByMonth,
 
   // 数据操作
-  deleteAsset,
   scanAssets,
 
   // 维护操作

@@ -79,17 +79,8 @@ function handleItemClick() {
         </span>
       </div>
 
-      <!-- 右侧：资产数 + 箭头 -->
+      <!-- 右侧：箭头 -->
       <div class="flex flex-shrink-0 items-center gap-2">
-        <!-- Assets 数量 -->
-        <span
-          v-if="folder.assetCount > 0"
-          class="rounded bg-secondary px-1.5 py-0.5 text-xs tabular-nums"
-        >
-          {{ folder.assetCount }}
-        </span>
-
-        <!-- 展开/收起箭头 - 右侧，可独立点击，用 span 扩大点击区域 -->
         <span
           v-if="folder.children && folder.children.length > 0"
           class="-mr-1.5 flex-shrink-0 rounded p-1.5 hover:bg-accent/80"

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useGalleryView, useGallerySelection, useTimeline } from '../composables'
+import { useGalleryView, useGallerySelection, useGalleryData, useTimeline } from '../composables'
 import { useElementSize } from '@vueuse/core'
 import AssetCard from './AssetCard.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
@@ -8,6 +8,7 @@ import TimelineScrollbar from './TimelineScrollbar.vue'
 // Composables
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
+const galleryData = useGalleryData()
 
 // 响应式变量和引用
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -15,7 +16,7 @@ const scrollTop = ref(0)
 const viewportHeight = ref(0)
 
 // 计算属性
-const isTimelineMode = computed(() => galleryView.sortBy.value === 'createdAt')
+const isTimelineMode = computed(() => galleryData.isTimelineMode.value)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
@@ -25,27 +26,35 @@ const columns = computed(() => {
 
 // 时间线 composable
 const timeline = useTimeline({
-  folderId: computed(() => {
-    const folderId = galleryView.filter.value.folderId
-    return folderId ? Number(folderId) : undefined
-  }),
-  includeSubfolders: computed(() => galleryView.includeSubfolders.value),
   columns: columns,
   containerRef: scrollContainerRef,
-  containerWidth: containerWidth, // 添加响应式容器宽度
+  containerWidth: containerWidth,
 })
 
-// 生命周期钩子
-onMounted(() => {
-  if (isTimelineMode.value) {
+// 监听可见项变化，加载对应月份
+watch(
+  () => timeline.virtualizer.value.getVirtualItems(),
+  () => {
+    if (isTimelineMode.value) {
+      // 传入 galleryData 的加载月份方法
+      timeline.checkAndLoadVisibleMonths((month) => galleryData.loadMonthAssets(month))
+    }
+  },
+  { deep: true }
+)
+
+// 监听时间线模式切换
+watch(isTimelineMode, (newValue) => {
+  if (newValue && galleryData.timelineBuckets.value.length > 0) {
     timeline.init()
   }
 })
 
-// 监听器
-watch(isTimelineMode, (newValue) => {
-  if (newValue) {
+// 生命周期钩子
+onMounted(() => {
+  if (isTimelineMode.value && galleryData.timelineBuckets.value.length > 0) {
     timeline.init()
+    console.log('时间线模式初始化')
   }
 })
 
@@ -80,7 +89,7 @@ function handleAssetPreview(asset: any) {
   <div v-if="isTimelineMode" class="flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar flex-1 overflow-auto pl-6 pr-2"
+      class="hide-scrollbar flex-1 overflow-auto pr-2 pl-6"
       @scroll="handleScroll"
     >
       <div

@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useGalleryStore } from '../store'
-import { useGallerySidebar } from '../composables'
+import { useGallerySidebar, useGalleryData } from '../composables'
 import FolderTreeItem from '../components/FolderTreeItem.vue'
 
-// 使用 composables
 const store = useGalleryStore()
+const galleryData = useGalleryData()
+
 const {
   folders,
   tags,
@@ -22,8 +23,11 @@ const {
   addNewTag,
 } = useGallerySidebar()
 
-// 计算属性
-const totalCount = computed(() => store.totalCount)
+onMounted(() => {
+  galleryData.loadFolderTree()
+})
+
+const totalCount = computed(() => store.foldersAssetTotalCount)
 </script>
 
 <template>

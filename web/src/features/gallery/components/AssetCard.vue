@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 select-none"
+    class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 select-none contain-[layout_size_paint]"
     :class="[
       {
         'ring-2 ring-primary ring-offset-2': isSelected,

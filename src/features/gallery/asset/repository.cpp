@@ -807,10 +807,8 @@ auto get_assets_by_month(Core::State::AppState& app_state,
           SELECT id FROM folder_hierarchy
         )
       )";
-      query_params.push_back(params.folder_id.value());
     } else {
       folder_filter = "AND folder_id = ?";
-      query_params.push_back(params.folder_id.value());
     }
   }
 
@@ -829,8 +827,11 @@ auto get_assets_by_month(Core::State::AppState& app_state,
   )",
                                 folder_filter, sort_order);
 
-  // 添加月份参数
   query_params.push_back(params.month);
+
+  if (params.folder_id.has_value()) {
+    query_params.push_back(params.folder_id.value());
+  }
 
   auto result = Core::Database::query<Types::Asset>(*app_state.database, sql, query_params);
 

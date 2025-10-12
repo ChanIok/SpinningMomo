@@ -1,7 +1,7 @@
 import { ref, watch, isRef, computed, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { galleryApi } from '../api'
-import type { Asset, TimelineBucket } from '../types'
+import { useGalleryStore } from '../store'
+import type { Asset } from '../types'
 
 /**
  * 虚拟行类型
@@ -32,16 +32,11 @@ interface MonthData {
  * 管理时间线数据、虚拟滚动和按需加载
  */
 export function useTimeline(options: {
-  folderId?: Ref<number | undefined> | number
-  includeSubfolders?: Ref<boolean | undefined> | boolean
   columns: Ref<number> | number
   containerRef: Ref<HTMLElement | null>
-  containerWidth?: Ref<number> | number // 添加响应式容器宽度
+  containerWidth?: Ref<number> | number
 }) {
-  const folderId = ref(isRef(options.folderId) ? options.folderId.value : options.folderId)
-  const includeSubfolders = ref(
-    isRef(options.includeSubfolders) ? options.includeSubfolders.value : options.includeSubfolders
-  )
+  const store = useGalleryStore()
   const columns = isRef(options.columns) ? options.columns : ref(options.columns)
   const containerRef = options.containerRef
   const containerWidth = options.containerWidth
@@ -51,11 +46,13 @@ export function useTimeline(options: {
     : ref(0)
 
   // ============= 状态 =============
-  const buckets = ref<TimelineBucket[]>([])
+  // 从 Store 读取数据
+  const buckets = computed(() => store.timelineBuckets)
+  const totalPhotos = computed(() => store.timelineTotalCount)
+
+  // 本地 UI 状态
   const monthsData = ref<Map<string, MonthData>>(new Map())
   const virtualRows = ref<VirtualRow[]>([])
-  const isLoading = ref(false)
-  const totalPhotos = ref(0)
 
   // ============= 虚拟滚动配置 =============
   // 动态计算行高（基于容器宽度和列数）
@@ -79,7 +76,7 @@ export function useTimeline(options: {
     },
     getScrollElement: () => containerRef.value,
     estimateSize: () => estimatedRowHeight.value,
-    paddingStart: 24,  // 与 GridView 的 px-6 对应
+    paddingStart: 24, // 与 GridView 的 px-6 对应
     paddingEnd: 24,
     overscan: 20, // 上下各预渲染行数
   })
@@ -87,32 +84,14 @@ export function useTimeline(options: {
   // ============= 核心方法 =============
 
   /**
-   * 初始化：获取所有月份的元数据
+   * 初始化 - 不再请求数据，只构建虚拟行
    */
-  async function init() {
-    isLoading.value = true
-    try {
-      const response = await galleryApi.getTimelineBuckets({
-        folderId: folderId.value,
-        includeSubfolders: includeSubfolders.value,
-      })
-
-      buckets.value = response.buckets
-      totalPhotos.value = response.totalCount
-
-      // 构建月份数据和虚拟行
-      buildVirtualRows()
-
-      console.log('📅 时间线初始化完成:', {
-        months: buckets.value.length,
-        totalPhotos: totalPhotos.value,
-        totalRows: virtualRows.value.length,
-      })
-    } catch (error) {
-      console.error('时间线初始化失败:', error)
-    } finally {
-      isLoading.value = false
-    }
+  function init() {
+    console.log('📅 时间线UI初始化:', {
+      months: buckets.value.length,
+      totalPhotos: totalPhotos.value,
+    })
+    buildVirtualRows()
   }
 
   /**
@@ -157,34 +136,23 @@ export function useTimeline(options: {
   }
 
   /**
-   * 加载指定月份的数据
+   * 从 Store 获取指定月份的数据并更新 UI
    */
-  async function loadMonth(month: string) {
+  function syncMonthFromStore(month: string) {
     const monthData = monthsData.value.get(month)
     if (!monthData || monthData.isLoaded) {
       return
     }
 
-    try {
-      console.log('📸 加载月份数据:', month)
-
-      const response = await galleryApi.getAssetsByMonth({
-        month: month,
-        folderId: folderId.value,
-        includeSubfolders: includeSubfolders.value,
-        sortOrder: 'desc',
-      })
-
-      // 更新月份数据
-      monthData.assets = response.assets
+    // 从 Store 获取缓存的数据（使用复合缓存键）
+    const folderId = store.filter.folderId ? Number(store.filter.folderId) : undefined
+    const includeSubfolders = store.includeSubfolders
+    const cachedAssets = store.getMonthAssets(month, folderId, includeSubfolders)
+    if (cachedAssets) {
+      monthData.assets = cachedAssets
       monthData.isLoaded = true
-
-      // 更新虚拟行的资产数据
-      updateVirtualRowsForMonth(month, response.assets)
-
-      console.log('✅ 月份数据加载完成:', month, response.count)
-    } catch (error) {
-      console.error('加载月份数据失败:', month, error)
+      updateVirtualRowsForMonth(month, cachedAssets)
+      console.log('✅ 月份数据同步完成:', month, cachedAssets.length)
     }
   }
 
@@ -211,13 +179,13 @@ export function useTimeline(options: {
   }
 
   /**
-   * 检查并加载可见行的数据
+   * 检查并加载可见月份 - 需要外部传入加载函数
    */
-  async function checkAndLoadVisibleMonths() {
+  async function checkAndLoadVisibleMonths(loadMonthFn: (month: string) => Promise<void>) {
     const virtualItems = virtualizer.value.getVirtualItems()
     const visibleMonths = new Set<string>()
 
-    // 收集可见行所属的月份
+    // 收集需要加载的月份
     for (const virtualItem of virtualItems) {
       const row = virtualRows.value[virtualItem.index]
       if (row && !row.isLoaded) {
@@ -225,8 +193,14 @@ export function useTimeline(options: {
       }
     }
 
-    // 加载这些月份（并行）
-    await Promise.all(Array.from(visibleMonths).map((month) => loadMonth(month)))
+    // 使用外部传入的加载函数（并行）
+    await Promise.all(
+      Array.from(visibleMonths).map(async (month) => {
+        await loadMonthFn(month)
+        // 加载完成后，从 Store 同步到 UI
+        syncMonthFromStore(month)
+      })
+    )
   }
 
   /**
@@ -243,6 +217,17 @@ export function useTimeline(options: {
 
   // ============= 监听器 =============
 
+  // 监听 buckets 变化，重建虚拟行
+  watch(
+    buckets,
+    () => {
+      if (buckets.value.length > 0) {
+        buildVirtualRows()
+      }
+    },
+    { immediate: true }
+  )
+
   // 🐛 调试：监听行高变化
   watch(estimatedRowHeight, (newHeight, oldHeight) => {
     console.log('📏 行高变化:', {
@@ -254,63 +239,38 @@ export function useTimeline(options: {
     })
 
     // 🔄 重要：通知 virtualizer 重新测量所有项目
-    // 当行高变化时（比如窗口大小改变），需要告诉 virtualizer 重新计算布局
     if (virtualRows.value.length > 0) {
       virtualizer.value.measure()
       console.log('🔄 virtualizer 已重新测量，新的总高度:', virtualizer.value.getTotalSize())
     }
   })
 
-  // 监听可见项变化，按需加载
-  watch(
-    () => virtualizer.value.getVirtualItems(),
-    () => {
-      checkAndLoadVisibleMonths()
-    },
-    { deep: true }
-  )
-
   // 监听列数变化，重建虚拟行
   watch(columns, () => {
     if (buckets.value.length > 0) {
       buildVirtualRows()
-      // 重新加载可见月份
-      checkAndLoadVisibleMonths()
     }
   })
-
-  // 监听文件夹筛选变化，重新初始化
-  watch(
-    [folderId, includeSubfolders],
-    () => {
-      if (buckets.value.length > 0) {
-        // 清空缓存，重新初始化
-        monthsData.value.clear()
-        init()
-      }
-    },
-    { deep: true }
-  )
 
   // ============= 返回 =============
 
   return {
-    // 状态
+    // 状态（从 Store 读取）
     buckets,
+    totalPhotos,
+
+    // 本地 UI 状态
     monthsData,
     virtualRows,
-    isLoading,
-    totalPhotos,
 
     // 虚拟滚动
     virtualizer,
+    estimatedRowHeight,
 
     // 方法
     init,
-    loadMonth,
+    syncMonthFromStore,
+    checkAndLoadVisibleMonths, // 需要传入加载函数
     scrollToOffset,
-
-    // 动态行高（用于 TimelineScrollbar）
-    estimatedRowHeight,
   }
 }
