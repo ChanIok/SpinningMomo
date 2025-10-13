@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 select-none contain-[layout_size_paint]"
+    class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 contain-[layout_size_paint] select-none"
     :class="[
       {
         'ring-2 ring-primary ring-offset-2': isSelected,
@@ -71,14 +71,6 @@
         class="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/60 to-transparent p-2"
       >
         <div class="flex items-center justify-between text-white">
-          <!-- 类型图标 -->
-          <div class="flex items-center space-x-1">
-            <span class="text-sm">
-              {{ getTypeIcon(asset.type) }}
-            </span>
-            <span v-if="showTypeLabel" class="text-xs">{{ getTypeLabel(asset.type) }}</span>
-          </div>
-
           <!-- 文件大小（可选） -->
           <span v-if="showSize && asset.size" class="text-xs opacity-80">
             {{ formatFileSize(asset.size) }}
@@ -136,7 +128,6 @@ interface AssetCardProps {
   isActive?: boolean
   showName?: boolean
   showSize?: boolean
-  showTypeLabel?: boolean
   showQuickActions?: boolean
 }
 
@@ -145,7 +136,6 @@ const props = withDefaults(defineProps<AssetCardProps>(), {
   isActive: false,
   showName: true,
   showSize: false,
-  showTypeLabel: false,
   showQuickActions: true,
 })
 
@@ -195,33 +185,6 @@ function onImageLoad() {
 function onImageError() {
   isImageLoading.value = false
   imageError.value = true
-}
-
-// 工具函数
-function getTypeIcon(type: Asset['type']): string {
-  switch (type) {
-    case 'photo':
-      return '📷'
-    case 'video':
-      return '🎥'
-    case 'live_photo':
-      return '📸'
-    default:
-      return '📄'
-  }
-}
-
-function getTypeLabel(type: Asset['type']): string {
-  switch (type) {
-    case 'photo':
-      return '照片'
-    case 'video':
-      return '视频'
-    case 'live_photo':
-      return '实况'
-    default:
-      return '未知'
-  }
 }
 
 function formatFileSize(bytes: number): string {
