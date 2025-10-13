@@ -6,13 +6,14 @@ interface UseSplitResizeOptions {
   dividerSize: Ref<number>
   min: Ref<number | string>
   max: Ref<number | string>
+  reverse: Ref<boolean>
   onUpdate: (size: number | string) => void
   onDragStart?: (e: MouseEvent) => void
   onDragEnd?: (e: MouseEvent) => void
 }
 
 export function useSplitResize(options: UseSplitResizeOptions) {
-  const { direction, dividerSize, min, max, onUpdate, onDragStart, onDragEnd } = options
+  const { direction, dividerSize, min, max, reverse, onUpdate, onDragStart, onDragEnd } = options
 
   const containerRef = ref<HTMLElement>()
   const dividerRef = ref<HTMLElement>()
@@ -47,9 +48,23 @@ export function useSplitResize(options: UseSplitResizeOptions) {
       : containerRect.height - dividerSize.value
 
     // 计算鼠标相对位置
-    const mousePosition = isHorizontal
-      ? e.clientX - containerRect.left - startOffset
-      : e.clientY - containerRect.top + startOffset // 垂直方向用加法
+    let mousePosition: number
+
+    if (reverse.value) {
+      // 反向模式：计算从右侧/底部到鼠标的距离（第二个面板的尺寸）
+      if (isHorizontal) {
+        mousePosition = containerRect.right - e.clientX + startOffset
+      } else {
+        mousePosition = containerRect.bottom - e.clientY - startOffset
+      }
+    } else {
+      // 正常模式：计算从左侧/顶部到鼠标的距离（第一个面板的尺寸）
+      if (isHorizontal) {
+        mousePosition = e.clientX - containerRect.left - startOffset
+      } else {
+        mousePosition = e.clientY - containerRect.top + startOffset
+      }
+    }
 
     // 计算 min/max 的像素值
     const minPx = parseSizeToPixels(min.value, containerUsableSize)
@@ -80,11 +95,20 @@ export function useSplitResize(options: UseSplitResizeOptions) {
     const dividerRect = divider.getBoundingClientRect()
     const isHorizontal = direction.value === 'horizontal'
 
-    if (isHorizontal) {
-      startOffset = e.clientX - dividerRect.left
+    if (reverse.value) {
+      // 反向模式：从分隔条右侧/底部计算偏移
+      if (isHorizontal) {
+        startOffset = dividerRect.right - e.clientX
+      } else {
+        startOffset = e.clientY - dividerRect.bottom
+      }
     } else {
-      // 垂直方向：offset 需要反过来（与 Naive UI 保持一致）
-      startOffset = dividerRect.top - e.clientY
+      // 正常模式：从分隔条左侧/顶部计算偏移
+      if (isHorizontal) {
+        startOffset = e.clientX - dividerRect.left
+      } else {
+        startOffset = dividerRect.top - e.clientY
+      }
     }
 
     isDragging.value = true
@@ -125,6 +149,32 @@ export function useSplitResize(options: UseSplitResizeOptions) {
    * 计算第一个面板的样式
    */
   function getFirstPaneStyle(size: number | string) {
+    // 反向模式：第一个面板自适应
+    if (reverse.value) {
+      return { flex: '1' }
+    }
+
+    // 正常模式：第一个面板使用固定尺寸
+    if (typeof size === 'string' && size.endsWith('px')) {
+      return { flex: `0 0 ${size}` }
+    } else if (typeof size === 'number') {
+      const percentage = size * 100
+      const offset = dividerSize.value * size
+      return { flex: `0 0 calc(${percentage}% - ${offset}px)` }
+    }
+    return { flex: `0 0 50%` }
+  }
+
+  /**
+   * 计算第二个面板的样式
+   */
+  function getSecondPaneStyle(size: number | string) {
+    // 正常模式：第二个面板自适应
+    if (!reverse.value) {
+      return { flex: '1' }
+    }
+
+    // 反向模式：第二个面板使用固定尺寸
     if (typeof size === 'string' && size.endsWith('px')) {
       return { flex: `0 0 ${size}` }
     } else if (typeof size === 'number') {
@@ -160,5 +210,6 @@ export function useSplitResize(options: UseSplitResizeOptions) {
     dividerCursor,
     handleMouseDown,
     getFirstPaneStyle,
+    getSecondPaneStyle,
   }
 }

@@ -64,6 +64,14 @@ export interface SplitProps {
    * 面板 2 自定义类名
    */
   pane2Class?: string
+
+  /**
+   * 反向模式：控制第二个面板的尺寸而非第一个
+   * - false（默认）：尺寸参数控制 template #1，template #2 自适应
+   * - true：尺寸参数控制 template #2，template #1 自适应
+   * @default false
+   */
+  reverse?: boolean
 }
 
 const props = withDefaults(defineProps<SplitProps>(), {
@@ -76,6 +84,7 @@ const props = withDefaults(defineProps<SplitProps>(), {
   dividerClass: '',
   pane1Class: '',
   pane2Class: '',
+  reverse: false,
 })
 
 const emit = defineEmits<{
@@ -118,11 +127,13 @@ const {
   dividerCursor,
   handleMouseDown,
   getFirstPaneStyle,
+  getSecondPaneStyle,
 } = useSplitResize({
   direction: toRef(props, 'direction'),
   dividerSize: toRef(props, 'dividerSize'),
   min: toRef(props, 'min'),
   max: toRef(props, 'max'),
+  reverse: toRef(props, 'reverse'),
   onUpdate: (size) => {
     internalSize.value = size
   },
@@ -137,6 +148,7 @@ const containerClass = computed(() => [
 ])
 
 const firstPaneStyle = computed(() => getFirstPaneStyle(internalSize.value))
+const secondPaneStyle = computed(() => getSecondPaneStyle(internalSize.value))
 
 const dividerClasses = computed(() => [
   'group flex-shrink-0 transition-colors duration-200',
@@ -174,7 +186,7 @@ const onMouseDown = (e: MouseEvent) => {
     </div>
 
     <!-- 面板 2 -->
-    <div :class="['flex-1 overflow-hidden', pane2Class]">
+    <div :class="['overflow-hidden', pane2Class]" :style="secondPaneStyle">
       <slot name="2" :panel="2">
         <slot :panel="2" />
       </slot>
