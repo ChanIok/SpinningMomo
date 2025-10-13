@@ -19,7 +19,7 @@ export function useGallerySelection() {
 
   // 获取选中的资产列表
   const selectedAssets = computed(() => {
-    return store.assets.filter(asset => selectedIds.value.has(asset.id))
+    return store.assets.filter((asset) => selectedIds.value.has(asset.id))
   })
 
   // ============= 选择操作 =============
@@ -56,6 +56,8 @@ export function useGallerySelection() {
    */
   function clearSelection() {
     store.clearSelection()
+    // 清除选择时，也清除详情焦点
+    store.clearDetailsFocus()
   }
 
   /**
@@ -80,8 +82,8 @@ export function useGallerySelection() {
     }
 
     // 找到两个资产在列表中的索引
-    const lastIndex = assets.findIndex(asset => asset.id === lastId)
-    const targetIndex = assets.findIndex(asset => asset.id === targetId)
+    const lastIndex = assets.findIndex((asset) => asset.id === lastId)
+    const targetIndex = assets.findIndex((asset) => asset.id === targetId)
 
     if (lastIndex === -1 || targetIndex === -1) {
       // 如果找不到索引，只选择当前资产
@@ -107,7 +109,7 @@ export function useGallerySelection() {
    * @param assets 当前显示的资产列表
    */
   function invertSelection(assets: Asset[]) {
-    assets.forEach(asset => {
+    assets.forEach((asset) => {
       const isSelected = selectedIds.value.has(asset.id)
       selectAsset(asset.id, !isSelected, true)
     })
@@ -119,8 +121,8 @@ export function useGallerySelection() {
    * @param assets 当前显示的资产列表
    */
   function selectByType(type: Asset['type'], assets: Asset[]) {
-    const assetsOfType = assets.filter(asset => asset.type === type)
-    assetsOfType.forEach(asset => {
+    const assetsOfType = assets.filter((asset) => asset.type === type)
+    assetsOfType.forEach((asset) => {
       selectAsset(asset.id, true, true)
     })
   }
@@ -140,12 +142,24 @@ export function useGallerySelection() {
     if (event.shiftKey) {
       // Shift + 点击：范围选择
       selectRange(asset.id, assets)
+      // Shift 多选后，显示批量操作面板
+      if (store.selectedCount > 1) {
+        store.setDetailsFocus({ type: 'batch' })
+      }
     } else if (event.ctrlKey || event.metaKey) {
       // Ctrl/Cmd + 点击：切换选择状态
       toggleAsset(asset.id, true)
+      // Ctrl 多选后，判断选中数量
+      if (store.selectedCount > 1) {
+        store.setDetailsFocus({ type: 'batch' })
+      } else if (store.selectedCount === 1) {
+        store.setDetailsFocus({ type: 'asset', assetId: asset.id })
+      }
     } else {
       // 普通点击：单选
       selectAsset(asset.id, true, false)
+      // 单选时显示资产详情
+      store.setDetailsFocus({ type: 'asset', assetId: asset.id })
     }
   }
 
@@ -157,7 +171,7 @@ export function useGallerySelection() {
   function handleAssetDoubleClick(asset: Asset, _event: MouseEvent) {
     // 双击时不改变选择状态，只设置激活
     setActiveAsset(asset.id)
-    
+
     // 可以在这里触发其他操作，比如预览
     console.log('双击资产:', asset.name)
   }
@@ -172,9 +186,9 @@ export function useGallerySelection() {
     if (!selectedIds.value.has(asset.id)) {
       selectAsset(asset.id, true, false)
     }
-    
+
     setActiveAsset(asset.id)
-    
+
     // TODO: 显示上下文菜单
     console.log('右键菜单:', asset.name, '选中数量:', selectedCount.value)
   }
@@ -206,7 +220,7 @@ export function useGallerySelection() {
       return
     }
 
-    const currentIndex = assets.findIndex(asset => asset.id === currentId)
+    const currentIndex = assets.findIndex((asset) => asset.id === currentId)
     if (currentIndex === -1) return
 
     let nextIndex = currentIndex
@@ -229,7 +243,7 @@ export function useGallerySelection() {
     const nextAsset = assets[nextIndex]
     if (nextAsset) {
       setActiveAsset(nextAsset.id)
-      
+
       if (extend) {
         // Shift + 方向键：扩展选择
         selectRange(nextAsset.id, assets)
@@ -270,7 +284,7 @@ export function useGallerySelection() {
     const currentId = activeId.value
     if (!currentId) return assets[0]?.id
 
-    const currentIndex = assets.findIndex(asset => asset.id === currentId)
+    const currentIndex = assets.findIndex((asset) => asset.id === currentId)
     if (currentIndex === -1) return assets[0]?.id
 
     if (direction === 'next') {

@@ -215,6 +215,13 @@ export interface SidebarState {
   activeSection: 'all' | 'folders' | 'tags'
 }
 
+// 详情面板焦点状态
+export type DetailsPanelFocus =
+  | { type: 'none' }
+  | { type: 'folder'; folderId: number }
+  | { type: 'asset'; assetId: number }
+  | { type: 'batch' }
+
 // ============= 错误类型 =============
 
 export interface AssetError {

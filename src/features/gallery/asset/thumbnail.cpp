@@ -150,7 +150,7 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
   std::unordered_set<std::string> all_file_hashes;
   auto cache_result = Repository::load_asset_cache(app_state);
   if (cache_result) {
-    for (const auto& [filepath, metadata] : cache_result.value()) {
+    for (const auto& [path, metadata] : cache_result.value()) {
       if (!metadata.hash.empty()) {
         all_file_hashes.insert(metadata.hash);
       }
@@ -274,7 +274,7 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
   std::unordered_set<std::string> all_file_hashes;
   auto cache_result = Repository::load_asset_cache(app_state);
   if (cache_result) {
-    for (const auto& [filepath, metadata] : cache_result.value()) {
+    for (const auto& [path, metadata] : cache_result.value()) {
       if (!metadata.hash.empty()) {
         all_file_hashes.insert(metadata.hash);
       }

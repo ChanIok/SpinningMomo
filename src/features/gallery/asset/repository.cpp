@@ -27,7 +27,7 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
 
   std::vector<Core::Database::Types::DbParam> params;
   params.push_back(item.name);
-  params.push_back(item.filepath);
+  params.push_back(item.path);
   params.push_back(item.type);
 
   // 处理 optional 类型字段
@@ -92,7 +92,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
   return result.value();
 }
 
-auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& path)
+auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
@@ -125,7 +125,7 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
 
   std::vector<Core::Database::Types::DbParam> params;
   params.push_back(item.name);
-  params.push_back(item.filepath);
+  params.push_back(item.path);
   params.push_back(item.type);
 
   // 处理 optional 类型字段
@@ -256,7 +256,7 @@ auto list_asset(Core::State::AppState& app_state, const Types::ListParams& param
 
   // 构建主查询
   std::string sql = std::format(R"(
-            SELECT id, name, path as filepath, type,
+            SELECT id, name, path, type,
                    width, height, size, mime_type, hash, folder_id,
                    file_created_at, file_modified_at,
                    created_at, updated_at, deleted_at
@@ -391,7 +391,7 @@ auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old)
 auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {
   std::string sql = R"(
-    SELECT id, name, path as filepath, type,
+    SELECT id, name, path, type,
            width, height, size, mime_type, hash, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at, deleted_at
@@ -409,12 +409,12 @@ auto load_asset_cache(Core::State::AppState& app_state)
   cache.reserve(assets.size());
   for (const auto& asset : assets) {
     Types::Metadata metadata{.id = asset.id,
-                             .filepath = asset.filepath,
+                             .path = asset.path,
                              .size = asset.size.value_or(0),
                              .file_modified_at = asset.file_modified_at.value_or(0),
                              .hash = asset.hash.value_or("")};
 
-    cache.emplace(asset.filepath, std::move(metadata));
+    cache.emplace(asset.path, std::move(metadata));
   }
   Logger().info("Loaded {} assets into memory cache", cache.size());
   return cache;
@@ -443,7 +443,7 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
     params.reserve(11);  // 11个字段
 
     params.push_back(item.name);
-    params.push_back(item.filepath);
+    params.push_back(item.path);
     params.push_back(item.type);
 
     params.push_back(item.width.has_value()
@@ -503,7 +503,7 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
           params.reserve(12);  // 11个更新字段 + 1个WHERE条件
 
           params.push_back(item.name);
-          params.push_back(item.filepath);
+          params.push_back(item.path);
           params.push_back(item.type);
 
           params.push_back(
@@ -581,7 +581,7 @@ auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams
   // 如果没有指定folder_id，查询所有资产
   if (!params.folder_id.has_value()) {
     sql = std::format(R"(
-      SELECT id, name, path as filepath, type,
+      SELECT id, name, path, type,
              width, height, size, mime_type, hash, folder_id,
              file_created_at, file_modified_at,
              created_at, updated_at, deleted_at
@@ -600,7 +600,7 @@ auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams
         SELECT f.id FROM folders f
         INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
       )
-      SELECT id, name, path as filepath, type,
+      SELECT id, name, path, type,
              width, height, size, mime_type, hash, folder_id,
              file_created_at, file_modified_at,
              created_at, updated_at, deleted_at
@@ -616,7 +616,7 @@ auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams
   } else {
     // 只查询当前文件夹
     sql = std::format(R"(
-      SELECT id, name, path as filepath, type,
+      SELECT id, name, path, type,
              width, height, size, mime_type, hash, folder_id,
              file_created_at, file_modified_at,
              created_at, updated_at, deleted_at
@@ -815,7 +815,7 @@ auto get_assets_by_month(Core::State::AppState& app_state,
   // 构建查询
   std::string sql = std::format(R"(
     SELECT 
-      id, name, path as filepath, type,
+      id, name, path, type,
       width, height, size, mime_type, hash, folder_id,
       file_created_at, file_modified_at,
       created_at, updated_at, deleted_at

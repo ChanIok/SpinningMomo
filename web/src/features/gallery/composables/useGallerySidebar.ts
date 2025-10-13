@@ -71,6 +71,10 @@ export function useGallerySidebar() {
   function selectFolder(folderId: number, folderName: string) {
     store.setSidebarActiveSection('folders')
     store.setFilter({ folderId: String(folderId) })
+
+    // 设置详情面板显示文件夹
+    store.setDetailsFocus({ type: 'folder', folderId })
+
     console.log('📁 选择文件夹:', folderName)
   }
 
@@ -89,6 +93,10 @@ export function useGallerySidebar() {
   function selectAllMedia() {
     store.setSidebarActiveSection('all')
     store.setFilter({})
+
+    // 清除详情面板焦点
+    store.clearDetailsFocus()
+
     console.log('📷 显示所有媒体')
   }
 

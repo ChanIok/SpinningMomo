@@ -197,7 +197,7 @@ auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::pat
     }
 
     Types::FileSystemInfo info{
-        .filepath = normalized_path_result.value(),
+        .path = normalized_path_result.value(),
         .size = static_cast<int64_t>(file_size),
         .file_modified_millis = Utils::Time::file_time_to_millis(last_write_time),
         .file_created_millis = creation_time_result.value(),
@@ -221,7 +221,7 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
     Types::FileAnalysisResult analysis;
     analysis.file_info = file_info;
 
-    auto it = asset_cache.find(file_info.filepath.string());
+    auto it = asset_cache.find(file_info.path.string());
     if (it == asset_cache.end()) {
       // 新文件
       analysis.status = Types::FileStatus::NEW;
@@ -282,12 +282,12 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
                   [](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
                     const auto& [idx, analysis] = pair;
 
-                    auto hash_result = calculate_file_hash(analysis.file_info.filepath);
+                    auto hash_result = calculate_file_hash(analysis.file_info.path);
                     if (hash_result) {
                       return std::make_pair(idx, std::move(hash_result.value()));
                     } else {
                       Logger().warn("Failed to calculate hash for {}: {}",
-                                    analysis.file_info.filepath.string(), hash_result.error());
+                                    analysis.file_info.path.string(), hash_result.error());
                       return std::nullopt;
                     }
                   }) |
@@ -339,7 +339,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
                          const std::unordered_map<std::string, std::int64_t>& folder_mapping)
     -> std::expected<Types::Asset, std::string> {
   const auto& file_info = analysis.file_info;
-  const auto& file_path = file_info.filepath;
+  const auto& file_path = file_info.path;
 
   auto asset_type = detect_asset_type(file_path);
 
@@ -351,7 +351,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   }
 
   asset.name = file_path.filename().string();
-  asset.filepath = file_path.string();
+  asset.path = file_path.string();
   asset.type = asset_type;
   asset.size = file_info.size;
   asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
@@ -459,7 +459,7 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
               }
             } else {
               batch_result.errors.push_back(std::format(
-                  "{}: {}", analysis.file_info.filepath.string(), asset_result.error()));
+                  "{}: {}", analysis.file_info.path.string(), asset_result.error()));
             }
           }
 
@@ -594,7 +594,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   file_paths.reserve(files_to_process.size());
 
   for (const auto& analysis : files_to_process) {
-    file_paths.push_back(analysis.file_info.filepath);
+    file_paths.push_back(analysis.file_info.path);
   }
 
   // 提取所有需要的文件夹路径（包含祖先目录直到扫描根目录）

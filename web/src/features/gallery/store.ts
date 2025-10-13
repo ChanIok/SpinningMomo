@@ -11,6 +11,7 @@ import type {
   SortOrder,
   TimelineBucket,
   FolderTreeNode,
+  DetailsPanelFocus,
 } from './types'
 
 /**
@@ -65,6 +66,11 @@ export const useGalleryStore = defineStore('gallery', () => {
   const sidebar = reactive<SidebarState>({
     isOpen: true,
     activeSection: 'all',
+  })
+
+  // 详情面板焦点状态
+  const detailsPanel = reactive<DetailsPanelFocus>({
+    type: 'none',
   })
 
   const detailsOpen = ref(true)
@@ -312,6 +318,15 @@ export const useGalleryStore = defineStore('gallery', () => {
     detailsOpen.value = open
   }
 
+  // 详情面板焦点操作
+  function setDetailsFocus(focus: DetailsPanelFocus) {
+    Object.assign(detailsPanel, focus)
+  }
+
+  function clearDetailsFocus() {
+    detailsPanel.type = 'none'
+  }
+
   // ============= 重置操作 =============
 
   function reset() {
@@ -379,6 +394,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     selection,
     lightbox,
     sidebar,
+    detailsPanel,
     detailsOpen,
 
     // 计算属性
@@ -431,6 +447,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     setSidebarOpen,
     setSidebarActiveSection,
     setDetailsOpen,
+    setDetailsFocus,
+    clearDetailsFocus,
 
     reset,
   }

@@ -11,7 +11,7 @@ export namespace Features::Gallery::Types {
 struct Asset {
   std::int64_t id;
   std::string name;
-  std::string filepath;
+  std::string path;
   std::string type;  // photo, video, live_photo, unknown
 
   std::optional<std::int32_t> width;
@@ -133,14 +133,14 @@ enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
 
 struct Metadata {
   int64_t id;
-  std::string filepath;
+  std::string path;
   int64_t size;
   std::int64_t file_modified_at;
   std::string hash;
 };
 
 struct FileSystemInfo {
-  std::filesystem::path filepath;
+  std::filesystem::path path;
   int64_t size;
   std::int64_t file_modified_millis;
   std::int64_t file_created_millis;
