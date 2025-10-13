@@ -93,14 +93,14 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
 
     // 删除物理文件（如果请求）
     if (params.delete_file.value_or(false)) {
-      std::filesystem::path file_path(asset.filepath);
+      std::filesystem::path file_path(asset.path);
       if (std::filesystem::exists(file_path)) {
         std::error_code ec;
         std::filesystem::remove(file_path, ec);
         if (ec) {
-          Logger().warn("Failed to delete physical file {}: {}", asset.filepath, ec.message());
+          Logger().warn("Failed to delete physical file {}: {}", asset.path, ec.message());
         } else {
-          Logger().info("Deleted physical file: {}", asset.filepath);
+          Logger().info("Deleted physical file: {}", asset.path);
         }
       }
     }
@@ -180,6 +180,7 @@ auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsPara
     -> std::expected<Types::Stats, std::string> {
   return Asset::Repository::get_asset_stats(app_state, params);
 }
+
 
 auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string> {

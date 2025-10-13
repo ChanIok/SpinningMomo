@@ -42,6 +42,9 @@ const std::vector<MigrationScript> all_migrations = {
          "CREATE INDEX idx_assets_created_at ON assets(created_at);",
          "CREATE INDEX idx_assets_hash ON assets(hash);",
          "CREATE INDEX idx_assets_folder_id ON assets(folder_id);",
+         "CREATE INDEX idx_assets_file_created_at ON assets(file_created_at);",
+         "CREATE INDEX idx_assets_file_modified_at ON assets(file_modified_at);",
+         "CREATE INDEX idx_assets_folder_time ON assets(folder_id, file_created_at);",
          R"(
                 CREATE TRIGGER update_assets_updated_at 
                 AFTER UPDATE ON assets 

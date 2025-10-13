@@ -11,7 +11,7 @@ export namespace Features::Gallery::Types {
 struct Asset {
   std::int64_t id;
   std::string name;
-  std::string filepath;
+  std::string path;
   std::string type;  // photo, video, live_photo, unknown
 
   std::optional<std::int32_t> width;
@@ -40,6 +40,21 @@ struct Folder {
   int is_hidden = 0;
   std::int64_t created_at;
   std::int64_t updated_at;
+};
+
+struct FolderTreeNode {
+  std::int64_t id;
+  std::string path;
+  std::optional<std::int64_t> parent_id;
+  std::string name;
+  std::optional<std::string> display_name;
+  std::optional<std::int64_t> cover_asset_id;
+  int sort_order = 0;
+  int is_hidden = 0;
+  std::int64_t created_at;
+  std::int64_t updated_at;
+  std::int64_t asset_count = 0;
+  std::vector<FolderTreeNode> children;
 };
 
 struct IgnoreRule {
@@ -98,12 +113,11 @@ struct ScanIgnoreRule {
 
 struct ScanOptions {
   std::string directory;
-  bool generate_thumbnails = true;
-  std::uint32_t thumbnail_max_width = 400;
-  std::uint32_t thumbnail_max_height = 400;
-  std::vector<std::string> supported_extensions = {".jpg",  ".jpeg", ".png", ".bmp",
-                                                   ".webp", ".tiff", ".tif"};
-  std::vector<ScanIgnoreRule> ignore_rules;
+  std::optional<bool> generate_thumbnails = true;
+  std::optional<std::uint32_t> thumbnail_short_edge = 480;
+  std::optional<std::vector<std::string>> supported_extensions =
+      std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"};
+  std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };
 
 struct ScanResult {
@@ -119,14 +133,14 @@ enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
 
 struct Metadata {
   int64_t id;
-  std::string filepath;
+  std::string path;
   int64_t size;
   std::int64_t file_modified_at;
   std::string hash;
 };
 
 struct FileSystemInfo {
-  std::filesystem::path filepath;
+  std::filesystem::path path;
   int64_t size;
   std::int64_t file_modified_millis;
   std::int64_t file_created_millis;
@@ -169,20 +183,6 @@ struct GetParams {
   std::int64_t id;
 };
 
-struct ScanParams {
-  std::string directory;
-  bool generate_thumbnails = true;
-  std::uint32_t thumbnail_max_width = 400;
-  std::uint32_t thumbnail_max_height = 400;
-  std::vector<ScanIgnoreRule> ignore_rules;
-};
-
-struct GetThumbnailParams {
-  std::int64_t asset_id;
-  std::optional<std::uint32_t> width = 400;
-  std::optional<std::uint32_t> height = 400;
-};
-
 struct DeleteParams {
   std::int64_t id;
   std::optional<bool> delete_file = false;
@@ -190,10 +190,50 @@ struct DeleteParams {
 
 struct GetStatsParams {};
 
+struct ListAssetsParams {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  // 分页和排序参数（复用ListParams的逻辑）
+  std::optional<std::int32_t> page = 1;
+  std::optional<std::int32_t> per_page = 50;
+  std::optional<std::string> sort_by = "created_at";
+  std::optional<std::string> sort_order = "desc";
+};
+
 struct OperationResult {
   bool success;
   std::string message;
   std::optional<std::int64_t> affected_count;
+};
+
+// ============= 时间线相关类型 =============
+
+struct TimelineBucket {
+  std::string month;              // "2024-10" 格式
+  int count;                      // 该月照片数量
+};
+
+struct TimelineBucketsParams {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+};
+
+struct TimelineBucketsResponse {
+  std::vector<TimelineBucket> buckets;
+  int total_count;                // 总照片数
+};
+
+struct GetAssetsByMonthParams {
+  std::string month;                          // "2024-10" 格式
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
+};
+
+struct GetAssetsByMonthResponse {
+  std::string month;
+  std::vector<Asset> assets;
+  int count;
 };
 
 }  // namespace Features::Gallery::Types

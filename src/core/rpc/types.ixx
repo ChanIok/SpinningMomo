@@ -35,6 +35,18 @@ struct MethodListItem {
   std::string description;
 };
 
+// 方法签名请求结构
+struct MethodSignatureRequest {
+  std::string method;  // 要查询的方法名
+};
+
+// 方法签名响应结构
+struct MethodSignatureResponse {
+  std::string method;         // 方法名
+  std::string description;    // 方法描述
+  std::string params_schema;  // 参数的JSON Schema
+};
+
 // JSON-RPC请求结构
 struct JsonRpcRequest {
   std::string jsonrpc;                 // 必须为 "2.0"
@@ -61,6 +73,7 @@ struct JsonRpcErrorResponse {
 struct MethodInfo {
   std::string name;
   std::string description;
+  std::string params_schema;  // 参数的JSON Schema
   std::function<asio::awaitable<std::string>(rfl::Generic, rfl::Generic)> handler;
 };
 

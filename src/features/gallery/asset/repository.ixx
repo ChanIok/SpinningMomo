@@ -20,7 +20,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
 // 根据文件路径获取资产项
-auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& path)
+auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
 // 更新资产项
@@ -50,6 +50,22 @@ auto count_asset(Core::State::AppState& app_state,
 // 获取资产统计信息
 auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
     -> std::expected<Types::Stats, std::string>;
+
+// 获取资产项列表（可按文件夹筛选，可选包含子文件夹）
+auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
+    -> std::expected<Types::ListResponse, std::string>;
+
+// ============= 时间线视图查询 =============
+
+// 获取时间线桶（月份统计）
+auto get_timeline_buckets(Core::State::AppState& app_state,
+                          const Types::TimelineBucketsParams& params)
+    -> std::expected<Types::TimelineBucketsResponse, std::string>;
+
+// 按月查询资产
+auto get_assets_by_month(Core::State::AppState& app_state,
+                         const Types::GetAssetsByMonthParams& params)
+    -> std::expected<Types::GetAssetsByMonthResponse, std::string>;
 
 // ============= 批量操作 =============
 

@@ -13,27 +13,62 @@ namespace Features::Gallery::Folder::Processor {
 
 // ============= 路径处理辅助函数 =============
 
-auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_paths)
+auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_paths,
+                                 const std::filesystem::path& scan_root)
     -> std::vector<std::filesystem::path> {
   std::unordered_set<std::string> unique_paths;
   std::vector<std::filesystem::path> result;
 
-  for (const auto& file_path : file_paths) {
-    auto parent_path = file_path.parent_path();
-    if (!parent_path.empty()) {
-      auto normalized_result = Utils::Path::NormalizePath(parent_path);
-      if (!normalized_result) {
-        Logger().warn("Failed to normalize path '{}': {}", parent_path.string(),
-                      normalized_result.error());
-        continue;
-      }
-      auto normalized = normalized_result.value();
-      auto path_str = normalized.string();
+  // 规范化扫描根目录
+  auto normalized_scan_root_result = Utils::Path::NormalizePath(scan_root);
+  if (!normalized_scan_root_result) {
+    Logger().error("Failed to normalize scan root path '{}': {}", scan_root.string(),
+                   normalized_scan_root_result.error());
+    return result;
+  }
+  auto normalized_scan_root = normalized_scan_root_result.value();
+  std::string scan_root_str = normalized_scan_root.string();
 
+  for (const auto& file_path : file_paths) {
+    auto current_path = file_path.parent_path();
+
+    // 从文件的父目录开始，递归向上直到扫描根目录
+    while (!current_path.empty()) {
+      auto normalized_result = Utils::Path::NormalizePath(current_path);
+      if (!normalized_result) {
+        Logger().warn("Failed to normalize path '{}': {}", current_path.string(),
+                      normalized_result.error());
+        break;
+      }
+
+      auto normalized = normalized_result.value();
+      std::string path_str = normalized.string();
+
+      // 如果已经到达或超出扫描根目录，停止
+      if (path_str == scan_root_str) {
+        break;
+      }
+
+      // 检查是否是扫描根目录的子路径
+      if (path_str.size() < scan_root_str.size() ||
+          path_str.substr(0, scan_root_str.size()) != scan_root_str) {
+        // 已经超出扫描根目录范围，停止
+        break;
+      }
+
+      // 添加到结果集
       if (unique_paths.insert(path_str).second) {
         result.push_back(normalized);
       }
+
+      // 继续向上遍历
+      current_path = current_path.parent_path();
     }
+  }
+
+  // 确保根目录本身也在结果中，以便子文件夹能找到父ID
+  if (unique_paths.insert(scan_root_str).second) {
+    result.push_back(normalized_scan_root);
   }
 
   return result;
@@ -66,33 +101,7 @@ auto build_folder_hierarchy(const std::vector<std::filesystem::path>& paths)
   return result;
 }
 
-// ============= 文件夹处理核心功能 =============
-
-auto get_or_create_folder_for_file_path(Core::State::AppState& app_state,
-                                        const std::filesystem::path& file_path)
-    -> std::expected<std::int64_t, std::string> {
-  auto parent_path = file_path.parent_path();
-  if (parent_path.empty()) {
-    return std::unexpected("File has no parent directory: " + file_path.string());
-  }
-
-  // 规范化路径
-  auto normalized_result = Utils::Path::NormalizePath(parent_path);
-  if (!normalized_result) {
-    return std::unexpected("Failed to normalize path: " + normalized_result.error());
-  }
-  auto normalized_path = normalized_result.value();
-
-  // 使用Repository的get_or_create功能
-  auto folder_id_result =
-      Repository::get_or_create_folder_for_path(app_state, normalized_path.string());
-  if (!folder_id_result) {
-    return std::unexpected("Failed to get or create folder for path: " + folder_id_result.error());
-  }
-
-  return folder_id_result.value();
-}
-
+// 批量创建文件夹记录（统一的文件夹创建接口）
 auto batch_create_folders_for_paths(Core::State::AppState& app_state,
                                     const std::vector<std::filesystem::path>& folder_paths)
     -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string> {
@@ -113,24 +122,61 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   for (const auto& folder_path : sorted_paths) {
     auto path_str = folder_path.string();
 
+    // 如果已经处理过，跳过
     if (path_to_id_map.contains(path_str)) {
       continue;
     }
 
-    auto folder_id_result = Repository::get_or_create_folder_for_path(app_state, path_str);
-    if (!folder_id_result) {
-      Logger().error("Failed to create folder for path '{}': {}", path_str,
-                     folder_id_result.error());
+    // 首先检查数据库中是否已存在
+    auto existing_folder_result = Repository::get_folder_by_path(app_state, path_str);
+    if (!existing_folder_result) {
+      Logger().error("Failed to query folder for path '{}': {}", path_str,
+                     existing_folder_result.error());
       continue;
     }
 
-    path_to_id_map[path_str] = folder_id_result.value();
-    Logger().debug("Created/found folder '{}' with ID {}", path_str, folder_id_result.value());
+    if (existing_folder_result->has_value()) {
+      // 文件夹已存在，直接使用
+      auto folder_id = existing_folder_result->value().id;
+      path_to_id_map[path_str] = folder_id;
+      Logger().debug("Found existing folder '{}' with ID {}", path_str, folder_id);
+      continue;
+    }
+
+    // 文件夹不存在，需要创建
+    // 计算父路径和 parent_id
+    std::optional<std::int64_t> parent_id;
+    auto parent_path = folder_path.parent_path();
+
+    if (!parent_path.empty() && parent_path != folder_path.root_path()) {
+      std::string parent_path_str = parent_path.string();
+
+      // 由于已经按深度排序，父目录的 ID 应该已经在 map 中
+      if (auto it = path_to_id_map.find(parent_path_str); it != path_to_id_map.end()) {
+        parent_id = it->second;
+      } else {
+        Logger().info("Parent folder '{}' not found in map for child '{}'", parent_path_str,
+                      path_str);
+      }
+    }
+
+    // 创建新文件夹
+    std::string folder_name = folder_path.filename().string();
+    Types::Folder new_folder{.path = path_str, .parent_id = parent_id, .name = folder_name};
+
+    auto create_result = Repository::create_folder(app_state, new_folder);
+    if (!create_result) {
+      Logger().error("Failed to create folder for path '{}': {}", path_str, create_result.error());
+      continue;
+    }
+
+    auto folder_id = create_result.value();
+    path_to_id_map[path_str] = folder_id;
+    Logger().debug("Created folder '{}' with ID {} (parent_id: {})", path_str, folder_id,
+                   parent_id.has_value() ? std::to_string(parent_id.value()) : "NULL");
   }
 
   return path_to_id_map;
 }
-
- 
 
 }  // namespace Features::Gallery::Folder::Processor
