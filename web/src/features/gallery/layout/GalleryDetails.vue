@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useGalleryStore } from '../store'
+import { useGalleryData } from '../composables/useGalleryData'
 import type { FolderTreeNode } from '../types'
 
 const store = useGalleryStore()
@@ -35,7 +36,16 @@ const activeAsset = computed(() => {
   return null
 })
 
+// 使用gallery数据composable
+const { getAssetThumbnailUrl } = useGalleryData()
+
 const selectedCount = computed(() => store.selectedCount)
+
+// 计算缩略图URL
+const thumbnailUrl = computed(() => {
+  if (!activeAsset.value) return ''
+  return getAssetThumbnailUrl(activeAsset.value)
+})
 
 /**
  * 递归查找文件夹节点
@@ -129,6 +139,16 @@ function formatFileSize(bytes: number): string {
           </svg>
         </Button>
       </div>
+
+      <!-- 资产缩略图 -->
+      <div>
+        <h4 class="mb-2 text-sm font-medium">预览</h4>
+        <div class="flex justify-center">
+          <img :src="thumbnailUrl" :alt="activeAsset.name" class="max-w-full rounded shadow-md" />
+        </div>
+      </div>
+
+      <Separator />
 
       <!-- 基本信息 -->
       <div>

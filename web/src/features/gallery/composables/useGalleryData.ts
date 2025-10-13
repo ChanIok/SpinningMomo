@@ -228,6 +228,13 @@ export function useGalleryData() {
     }
   }
 
+  /**
+   * 获取资产缩略图URL
+   */
+  function getAssetThumbnailUrl(asset: any) {
+    return galleryApi.getAssetThumbnailUrl(asset)
+  }
+
   return {
     // 状态
     assets,
@@ -258,5 +265,8 @@ export function useGalleryData() {
     reload,
     loadMore,
     scanAssets,
+
+    // 工具函数
+    getAssetThumbnailUrl,
   }
 }
