@@ -4,6 +4,7 @@ import { useGalleryData } from '../composables'
 import { useGalleryStore } from '../store'
 import GalleryToolbar from '../components/GalleryToolbar.vue'
 import GalleryContent from '../components/GalleryContent.vue'
+import GalleryLightbox from '../components/lightbox/GalleryLightbox.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
@@ -28,13 +29,16 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-full flex-col bg-background">
-    <!-- 工具栏 -->
-    <GalleryToolbar />
+  <div class="h-full">
+    <!-- 当lightbox打开时，只显示lightbox -->
+    <GalleryLightbox v-if="store.lightbox.isOpen" />
 
-    <!-- 内容区域 -->
-    <div class="flex-1 overflow-hidden">
-      <GalleryContent />
+    <!-- 当lightbox关闭时，显示正常的工具栏和内容区域 -->
+    <div v-else class="flex h-full flex-col bg-background">
+      <GalleryToolbar />
+      <div class="flex-1 overflow-hidden">
+        <GalleryContent />
+      </div>
     </div>
   </div>
 </template>

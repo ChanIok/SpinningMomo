@@ -168,7 +168,7 @@ const onMouseDown = (e: MouseEvent) => {
 <template>
   <div ref="containerRef" :class="containerClass">
     <!-- 面板 1 -->
-    <div :class="['overflow-hidden', pane1Class]" :style="firstPaneStyle">
+    <div :class="['min-h-0 min-w-0 overflow-hidden', pane1Class]" :style="firstPaneStyle">
       <slot name="1" :panel="1">
         <slot :panel="1" />
       </slot>
@@ -186,7 +186,7 @@ const onMouseDown = (e: MouseEvent) => {
     </div>
 
     <!-- 面板 2 -->
-    <div :class="['overflow-hidden', pane2Class]" :style="secondPaneStyle">
+    <div :class="['min-h-0 min-w-0 overflow-hidden', pane2Class]" :style="secondPaneStyle">
       <slot name="2" :panel="2">
         <slot :panel="2" />
       </slot>

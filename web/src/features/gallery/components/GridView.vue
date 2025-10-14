@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useGalleryView, useGallerySelection, useGalleryData, useTimeline } from '../composables'
+import {
+  useGalleryView,
+  useGallerySelection,
+  useGalleryData,
+  useTimeline,
+  useGalleryLightbox,
+} from '../composables'
 import { useElementSize } from '@vueuse/core'
 import AssetCard from './AssetCard.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
@@ -9,6 +15,7 @@ import TimelineScrollbar from './TimelineScrollbar.vue'
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryData = useGalleryData()
+const galleryLightbox = useGalleryLightbox()
 
 // 响应式变量和引用
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -71,8 +78,7 @@ function handleAssetClick(asset: any, event: MouseEvent) {
 
 function handleAssetDoubleClick(asset: any, event: MouseEvent) {
   gallerySelection.handleAssetDoubleClick(asset, event)
-  // TODO: 打开 lightbox 预览
-  console.log('打开预览:', asset.name)
+  galleryLightbox.openLightbox(asset)
 }
 
 function handleAssetContextMenu(asset: any, event: MouseEvent) {
@@ -80,7 +86,7 @@ function handleAssetContextMenu(asset: any, event: MouseEvent) {
 }
 
 function handleAssetPreview(asset: any) {
-  console.log('预览资产:', asset.name)
+  galleryLightbox.openLightbox(asset)
 }
 </script>
 

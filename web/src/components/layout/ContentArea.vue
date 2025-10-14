@@ -3,7 +3,7 @@
 </script>
 
 <template>
-  <div class="flex h-full flex-1 flex-col">
+  <div class="flex h-full w-full flex-1 flex-col">
     <main class="h-full flex-1 overflow-auto">
       <router-view />
     </main>

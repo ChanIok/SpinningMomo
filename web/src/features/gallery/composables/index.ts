@@ -7,7 +7,7 @@ export { useGallerySelection } from './useGallerySelection'
 export { useGalleryLayout } from './useGalleryLayout'
 export { useGallerySidebar } from './useGallerySidebar'
 export { useTimeline } from './useTimeline'
+export { useGalleryLightbox } from './useGalleryLightbox'
 
 // TODO: 后续添加的 composables
-// export { useGalleryLightbox } from './useGalleryLightbox'
 // export { useGalleryKeyboard } from './useGalleryKeyboard'

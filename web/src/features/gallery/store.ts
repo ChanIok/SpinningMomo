@@ -60,6 +60,11 @@ export const useGalleryStore = defineStore('gallery', () => {
     isOpen: false,
     currentIndex: 0,
     assets: [],
+    isFullscreen: false,
+    showFilmstrip: true,
+    zoom: 1.0,
+    fitMode: 'contain',
+    selectedInLightbox: new Set<number>(),
   })
 
   // ============= UI状态 =============
@@ -283,6 +288,15 @@ export const useGalleryStore = defineStore('gallery', () => {
     lightbox.isOpen = false
     lightbox.currentIndex = 0
     lightbox.assets = []
+    lightbox.zoom = 1.0
+    lightbox.fitMode = 'contain'
+    lightbox.selectedInLightbox.clear()
+
+    // 退出全屏（如果在全屏状态）
+    if (lightbox.isFullscreen && document.fullscreenElement) {
+      document.exitFullscreen()
+      lightbox.isFullscreen = false
+    }
   }
 
   function goToLightboxIndex(index: number) {
@@ -302,6 +316,34 @@ export const useGalleryStore = defineStore('gallery', () => {
     if (lightbox.isOpen && lightbox.currentIndex < lightbox.assets.length - 1) {
       lightbox.currentIndex = lightbox.currentIndex + 1
     }
+  }
+
+  function toggleLightboxFullscreen() {
+    lightbox.isFullscreen = !lightbox.isFullscreen
+  }
+
+  function toggleLightboxFilmstrip() {
+    lightbox.showFilmstrip = !lightbox.showFilmstrip
+  }
+
+  function setLightboxZoom(zoom: number) {
+    lightbox.zoom = Math.max(0.5, Math.min(5, zoom))
+  }
+
+  function setLightboxFitMode(mode: LightboxState['fitMode']) {
+    lightbox.fitMode = mode
+  }
+
+  function toggleLightboxAssetSelection(assetId: number) {
+    if (lightbox.selectedInLightbox.has(assetId)) {
+      lightbox.selectedInLightbox.delete(assetId)
+    } else {
+      lightbox.selectedInLightbox.add(assetId)
+    }
+  }
+
+  function clearLightboxSelection() {
+    lightbox.selectedInLightbox.clear()
   }
 
   // ============= UI操作 Actions =============
@@ -443,6 +485,12 @@ export const useGalleryStore = defineStore('gallery', () => {
     goToLightboxIndex,
     goToPreviousLightbox,
     goToNextLightbox,
+    toggleLightboxFullscreen,
+    toggleLightboxFilmstrip,
+    setLightboxZoom,
+    setLightboxFitMode,
+    toggleLightboxAssetSelection,
+    clearLightboxSelection,
 
     setSidebarOpen,
     setSidebarActiveSection,
