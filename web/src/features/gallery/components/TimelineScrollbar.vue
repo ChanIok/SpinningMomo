@@ -135,19 +135,25 @@ function timelineToContent(timelineY: number): number {
 
 /**
  * 计算每个月在时间线上的标记位置
- * 使用简单的线性映射：内容高度 → 时间线高度
+ * 基于全局资产索引计算，支持连续排列
  */
 const monthMarkers = computed((): MonthMarker[] => {
   if (props.buckets.length === 0 || props.totalContentHeight === 0) return []
 
   const markers: MonthMarker[] = []
-  let currentRowIndex = 0
+  let globalAssetIndex = 0
 
   for (const bucket of props.buckets) {
-    // 计算该月在虚拟列表中的起始位置（内容坐标）
-    const contentY = currentRowIndex * props.estimatedRowHeight
+    // 该月第一个资产的全局索引
+    const monthStartIndex = globalAssetIndex
 
-    // 使用映射函数转换到时间线坐标
+    // 计算该资产在第几行（行号从 0 开始）
+    const rowIndex = Math.floor(monthStartIndex / props.columns)
+
+    // 计算该行在内容中的位置（像素）
+    const contentY = rowIndex * props.estimatedRowHeight
+
+    // 转换为时间线坐标
     const timelineY = contentToTimeline(contentY)
 
     markers.push({
@@ -155,9 +161,7 @@ const monthMarkers = computed((): MonthMarker[] => {
       offsetTop: timelineY,
     })
 
-    // 累加该月的行数
-    const rowsInMonth = Math.ceil(bucket.count / props.columns)
-    currentRowIndex += rowsInMonth
+    globalAssetIndex += bucket.count
   }
 
   return markers

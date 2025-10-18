@@ -1,3 +1,91 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useGalleryData } from '../composables/useGalleryData'
+import type { Asset } from '../types'
+
+// Props 定义
+interface AssetCardProps {
+  asset: Asset
+  isSelected?: boolean
+  isActive?: boolean
+  showName?: boolean
+  showSize?: boolean
+  showQuickActions?: boolean
+}
+
+const props = withDefaults(defineProps<AssetCardProps>(), {
+  isSelected: false,
+  isActive: false,
+  showName: true,
+  showSize: false,
+  showQuickActions: true,
+})
+
+// Emits 定义
+const emit = defineEmits<{
+  click: [asset: Asset, event: MouseEvent]
+  doubleClick: [asset: Asset, event: MouseEvent]
+  select: [assetId: number, selected: boolean, event: MouseEvent]
+  contextMenu: [asset: Asset, event: MouseEvent]
+  preview: [asset: Asset]
+}>()
+
+// 响应式状态
+const isImageLoading = ref(true)
+const imageError = ref(false)
+
+// 使用useGalleryData获取缩略图URL
+const { getAssetThumbnailUrl } = useGalleryData()
+
+// 缩略图URL - 从useGalleryData中获取
+const thumbnailUrl = computed(() => {
+  return getAssetThumbnailUrl(props.asset)
+})
+
+// 事件处理
+function handleClick(event: MouseEvent) {
+  emit('click', props.asset, event)
+
+  // 如果是 Ctrl/Cmd + 点击，切换选择状态
+  if (event.ctrlKey || event.metaKey) {
+    emit('select', props.asset.id, !props.isSelected, event)
+  }
+}
+
+function handleDoubleClick(event: MouseEvent) {
+  emit('doubleClick', props.asset, event)
+}
+
+function handleContextMenu(event: MouseEvent) {
+  event.preventDefault()
+  emit('contextMenu', props.asset, event)
+}
+
+// 图片加载处理
+function onImageLoad() {
+  isImageLoading.value = false
+  imageError.value = false
+}
+
+function onImageError() {
+  isImageLoading.value = false
+  imageError.value = true
+}
+
+function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB']
+  let size = bytes
+  let unitIndex = 0
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex++
+  }
+
+  return `${size.toFixed(unitIndex === 0 ? 0 : 1)}${units[unitIndex]}`
+}
+</script>
+
 <template>
   <div
     class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 contain-[layout_size_paint] select-none"
@@ -115,88 +203,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed } from 'vue'
-import { galleryApi } from '../api'
-import type { Asset } from '../types'
-
-// Props 定义
-interface AssetCardProps {
-  asset: Asset
-  isSelected?: boolean
-  isActive?: boolean
-  showName?: boolean
-  showSize?: boolean
-  showQuickActions?: boolean
-}
-
-const props = withDefaults(defineProps<AssetCardProps>(), {
-  isSelected: false,
-  isActive: false,
-  showName: true,
-  showSize: false,
-  showQuickActions: true,
-})
-
-// Emits 定义
-const emit = defineEmits<{
-  click: [asset: Asset, event: MouseEvent]
-  doubleClick: [asset: Asset, event: MouseEvent]
-  select: [assetId: number, selected: boolean, event: MouseEvent]
-  contextMenu: [asset: Asset, event: MouseEvent]
-  preview: [asset: Asset]
-}>()
-
-// 响应式状态
-const isImageLoading = ref(true)
-const imageError = ref(false)
-
-// 缩略图URL - 直接从asset对象构建
-const thumbnailUrl = computed(() => {
-  return galleryApi.getAssetThumbnailUrl(props.asset)
-})
-
-// 事件处理
-function handleClick(event: MouseEvent) {
-  emit('click', props.asset, event)
-
-  // 如果是 Ctrl/Cmd + 点击，切换选择状态
-  if (event.ctrlKey || event.metaKey) {
-    emit('select', props.asset.id, !props.isSelected, event)
-  }
-}
-
-function handleDoubleClick(event: MouseEvent) {
-  emit('doubleClick', props.asset, event)
-}
-
-function handleContextMenu(event: MouseEvent) {
-  event.preventDefault()
-  emit('contextMenu', props.asset, event)
-}
-
-// 图片加载处理
-function onImageLoad() {
-  isImageLoading.value = false
-  imageError.value = false
-}
-
-function onImageError() {
-  isImageLoading.value = false
-  imageError.value = true
-}
-
-function formatFileSize(bytes: number): string {
-  const units = ['B', 'KB', 'MB', 'GB']
-  let size = bytes
-  let unitIndex = 0
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024
-    unitIndex++
-  }
-
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)}${units[unitIndex]}`
-}
-</script>

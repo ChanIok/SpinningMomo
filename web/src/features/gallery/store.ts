@@ -37,7 +37,6 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   // ============= 时间线数据状态 =============
   const timelineBuckets = ref<TimelineBucket[]>([])
-  const timelineMonthData = ref<Map<string, Asset[]>>(new Map())
   const timelineTotalCount = ref(0)
 
   // ============= 文件夹树状态 =============
@@ -221,46 +220,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     timelineTotalCount.value = count
   }
 
-  /**
-   * 生成月份数据的缓存键
-   * 格式: 'month:folderId:includeSubfolders'
-   * 例如: '2025-01:123:true' 或 '2025-01:all:false'
-   */
-  function getMonthCacheKey(
-    month: string,
-    folderId?: number,
-    includeSubfoldersFlag?: boolean
-  ): string {
-    const folderKey = folderId !== undefined ? folderId.toString() : 'all'
-    const subfoldersKey =
-      includeSubfoldersFlag !== undefined
-        ? includeSubfoldersFlag.toString()
-        : includeSubfolders.value.toString()
-    return `${month}:${folderKey}:${subfoldersKey}`
-  }
-
-  function setMonthAssets(
-    month: string,
-    monthAssets: Asset[],
-    folderId?: number,
-    includeSubfoldersFlag?: boolean
-  ) {
-    const cacheKey = getMonthCacheKey(month, folderId, includeSubfoldersFlag)
-    timelineMonthData.value.set(cacheKey, monthAssets)
-  }
-
-  function getMonthAssets(
-    month: string,
-    folderId?: number,
-    includeSubfoldersFlag?: boolean
-  ): Asset[] | undefined {
-    const cacheKey = getMonthCacheKey(month, folderId, includeSubfoldersFlag)
-    return timelineMonthData.value.get(cacheKey)
-  }
-
   function clearTimelineData() {
     timelineBuckets.value = []
-    timelineMonthData.value.clear()
     timelineTotalCount.value = 0
   }
 
@@ -479,7 +440,6 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     // 时间线状态
     timelineBuckets,
-    timelineMonthData,
     timelineTotalCount,
 
     // 文件夹树状态
@@ -527,9 +487,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     // 时间线 Actions
     setTimelineBuckets,
     setTimelineTotalCount,
-    setMonthAssets,
-    getMonthAssets,
-    getMonthCacheKey,
     clearTimelineData,
 
     // 文件夹树 Actions

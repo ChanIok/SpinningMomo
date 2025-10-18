@@ -24,7 +24,7 @@ export function useGalleryData() {
   }
 
   /**
-   * 加载时间线数据（月份元数据）
+   * 加载时间线数据（月份元数据 + 第一页）
    */
   async function loadTimelineData() {
     try {
@@ -34,6 +34,10 @@ export function useGalleryData() {
       // 清空普通模式的数据（节省内存）
       store.setAssets([])
 
+      // 清空分页缓存（重新加载时）
+      store.clearPaginatedAssets()
+
+      // 1. 获取月份元数据
       const response = await galleryApi.getTimelineBuckets({
         folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
         includeSubfolders: store.includeSubfolders,
@@ -42,10 +46,16 @@ export function useGalleryData() {
       store.setTimelineBuckets(response.buckets)
       store.setTimelineTotalCount(response.totalCount)
 
+      // 2. 设置分页总数（用于虚拟滚动）
+      store.setPagination(response.totalCount, 1, false)
+
       console.log('📅 时间线数据加载成功:', {
         months: response.buckets.length,
         total: response.totalCount,
       })
+
+      // 3. 加载第一页数据（可选，也可以等滚动时按需加载）
+      await loadPage(1)
     } catch (error) {
       console.error('Failed to load timeline data:', error)
       store.setError('加载时间线数据失败')
@@ -54,40 +64,6 @@ export function useGalleryData() {
     }
   }
 
-  /**
-   * 加载指定月份的资产数据
-   */
-  async function loadMonthAssets(month: string) {
-    const folderId = store.filter.folderId ? Number(store.filter.folderId) : undefined
-    const includeSubfolders = store.includeSubfolders
-
-    // 检查是否已加载（使用复合缓存键）
-    const cachedAssets = store.getMonthAssets(month, folderId, includeSubfolders)
-    if (cachedAssets?.length) {
-      const cacheKey = store.getMonthCacheKey(month, folderId, includeSubfolders)
-      console.log('⏭️ 月份数据已缓存:', cacheKey)
-      return
-    }
-
-    try {
-      const cacheKey = store.getMonthCacheKey(month, folderId, includeSubfolders)
-      console.log('📸 加载月份数据:', cacheKey)
-
-      const response = await galleryApi.getAssetsByMonth({
-        month: month,
-        folderId: folderId,
-        includeSubfolders: includeSubfolders,
-        sortOrder: 'desc',
-      })
-
-      store.setMonthAssets(month, response.assets, folderId, includeSubfolders)
-
-      console.log('✅ 月份数据加载完成:', cacheKey, response.count)
-    } catch (error) {
-      console.error('加载月份数据失败:', month, error)
-      throw error
-    }
-  }
 
   /**
    * 加载普通模式资产 - 首次请求获取总数和第一页
@@ -300,7 +276,6 @@ export function useGalleryData() {
     // 数据加载方法
     load, // 统一加载入口
     loadTimelineData, // 时间线元数据
-    loadMonthAssets, // 月份数据
     loadAllAssets, // 普通模式首次加载
     loadPage, // 加载指定页（虚拟列表用）
     loadAssets, // 普通分页（保留兼容）

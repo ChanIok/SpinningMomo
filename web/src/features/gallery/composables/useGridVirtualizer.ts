@@ -33,8 +33,13 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
   const galleryData = useGalleryData()
 
   // 从 store 获取数据状态
-  const totalCount = computed(() => store.totalCount)
+  const isTimelineMode = computed(() => store.isTimelineMode)
+  const totalCount = computed(() => {
+    // 时间线模式使用 timelineTotalCount，非时间线模式使用 totalCount
+    return isTimelineMode.value ? store.timelineTotalCount : store.totalCount
+  })
   const perPage = computed(() => store.perPage)
+  const paginatedAssets = computed(() => store.paginatedAssets)
 
   // 计算总行数
   const totalRows = computed(() => Math.ceil(totalCount.value / columns.value))
@@ -63,39 +68,46 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     overscan: 10,
   })
 
-  // 虚拟行数据（包含资产或占位）
-  const virtualRows = computed<VirtualRow[]>(() => {
-    return virtualizer.value.getVirtualItems().map((virtualRow) => {
-      const startIndex = virtualRow.index * columns.value
-      const endIndex = Math.min(startIndex + columns.value - 1, totalCount.value - 1)
-
-      const assets = galleryData.getAssetsInRange(startIndex, endIndex)
-
-      return {
-        index: virtualRow.index,
-        assets: assets,
-        start: virtualRow.start,
-        size: virtualRow.size,
-      }
-    })
-  })
+  // 虚拟行数据（使用 ref 存储，避免重复计算）
+  const virtualRows = ref<VirtualRow[]>([])
 
   // 加载状态跟踪（防止重复加载）
   const loadingPages = ref<Set<number>>(new Set())
 
   /**
-   * 监听可见项变化，触发按需加载
+   * 统一监听器：同步更新 virtualRows + 异步加载数据
    */
   watch(
-    () => virtualizer.value.getVirtualItems(),
-    async (items) => {
+    () => ({
+      items: virtualizer.value.getVirtualItems(),
+      columns: columns.value,
+      totalCount: totalCount.value,
+      // 关键：监听分页缓存变化，作为数据加载完成的触发器
+      paginatedAssets: paginatedAssets.value,
+    }),
+    async ({ items, columns: cols, totalCount: total, paginatedAssets: _paginatedAssets }) => {
       if (items.length === 0) return
 
-      // 计算所有可见索引
+      // 1️⃣ 同步更新 virtualRows（UI 立即渲染）
+      virtualRows.value = items.map((virtualRow) => {
+        const startIndex = virtualRow.index * cols
+        const endIndex = Math.min(startIndex + cols - 1, total - 1)
+
+        const assets = galleryData.getAssetsInRange(startIndex, endIndex)
+
+        return {
+          index: virtualRow.index,
+          assets: assets,
+          start: virtualRow.start,
+          size: virtualRow.size,
+        }
+      })
+
+      // 2️⃣ 异步加载缺失的数据
       const visibleIndexes: number[] = []
       items.forEach((item) => {
-        const start = item.index * columns.value
-        const end = Math.min(start + columns.value, totalCount.value)
+        const start = item.index * cols
+        const end = Math.min(start + cols, total)
         for (let i = start; i < end; i++) {
           visibleIndexes.push(i)
         }
@@ -120,21 +132,28 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       if (loadPromises.length > 0) {
         await Promise.all(loadPromises)
       }
-    },
-    { deep: true }
+    }
   )
 
   /**
    * 初始化 - 加载第一页数据
    */
   async function init() {
-    console.log('📋 普通模式初始化:', {
-      totalCount: totalCount.value,
-      columns: columns.value,
-    })
-
-    // 调用 galleryData.loadAllAssets 获取总数并加载第一页
-    await galleryData.loadAllAssets()
+    if (isTimelineMode.value) {
+      console.log('📅 时间线模式初始化:', {
+        totalCount: totalCount.value,
+        columns: columns.value,
+      })
+      // 调用 galleryData.loadTimelineData 获取月份元数据和第一页
+      await galleryData.loadTimelineData()
+    } else {
+      console.log('📋 普通模式初始化:', {
+        totalCount: totalCount.value,
+        columns: columns.value,
+      })
+      // 调用 galleryData.loadAllAssets 获取总数并加载第一页
+      await galleryData.loadAllAssets()
+    }
   }
 
   /**

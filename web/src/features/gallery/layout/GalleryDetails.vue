@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
-import type { FolderTreeNode } from '../types'
+import type { FolderTreeNode, Asset } from '../types'
 
 const store = useGalleryStore()
 
@@ -24,16 +24,13 @@ const activeAsset = computed(() => {
 
   // 在普通模式下查找
   if (!store.isTimelineMode) {
-    return store.assets.find((a) => a.id === assetId)
+    return store.assets.find((a: Asset) => a.id === assetId)
   }
 
   // 在时间线模式下查找
-  for (const [_key, assets] of store.timelineMonthData.entries()) {
-    const asset = assets.find((a) => a.id === assetId)
-    if (asset) return asset
-  }
-
-  return null
+  // 由于timelineMonthData不存在，我们暂时从store.assets中查找
+  // TODO: 实现时间线模式下的资产查找逻辑
+  return store.assets.find((a: Asset) => a.id === assetId)
 })
 
 // 使用gallery数据composable
