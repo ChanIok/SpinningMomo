@@ -11,6 +11,8 @@ import type {
   TimelineBucketsResponse,
   GetAssetsByMonthParams,
   GetAssetsByMonthResponse,
+  QueryAssetsParams,
+  QueryAssetsResponse,
 } from './types'
 import { getStaticUrl } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/plugins/infinity_nikki'
@@ -190,12 +192,34 @@ export async function getAssetsByMonth(
 }
 
 /**
+ * 统一资产查询接口（支持灵活过滤器和可选分页）
+ */
+export async function queryAssets(params: QueryAssetsParams): Promise<QueryAssetsResponse> {
+  try {
+    const result = await call<QueryAssetsResponse>('gallery.queryAssets', params)
+
+    console.log('🔍 查询资产成功:', {
+      count: result.items.length,
+      total: result.totalCount,
+      page: result.currentPage,
+      filters: params.filters,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to query assets:', error)
+    throw new Error('查询资产失败')
+  }
+}
+
+/**
  * Gallery API 统一导出
  */
 export const galleryApi = {
   // 数据查询
   listAssets,
   getFolderTree,
+  queryAssets, // 统一查询接口
 
   // 时间线查询
   getTimelineBuckets,

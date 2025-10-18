@@ -558,128 +558,17 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
 
 auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
     -> std::expected<Types::ListResponse, std::string> {
-  // 获取分页和排序参数
-  int page = params.page.value_or(1);
-  int per_page = params.per_page.value_or(50);
-  std::string sort_by = params.sort_by.value_or("created_at");
-  std::string sort_order = params.sort_order.value_or("desc");
+  // 转换为统一查询参数
+  Types::QueryAssetsParams query_params;
+  query_params.filters.folder_id = params.folder_id;
+  query_params.filters.include_subfolders = params.include_subfolders;
+  query_params.sort_by = params.sort_by;
+  query_params.sort_order = params.sort_order;
+  query_params.page = params.page;
+  query_params.per_page = params.per_page;
 
-  // 安全的排序字段验证
-  if (sort_by != "created_at" && sort_by != "name" && sort_by != "size" &&
-      sort_by != "file_created_at") {
-    sort_by = "created_at";
-  }
-  if (sort_order != "asc" && sort_order != "desc") {
-    sort_order = "desc";
-  }
-
-  int offset = (page - 1) * per_page;
-
-  std::vector<Core::Database::Types::DbParam> query_params;
-  std::string sql;
-
-  // 如果没有指定folder_id，查询所有资产
-  if (!params.folder_id.has_value()) {
-    sql = std::format(R"(
-      SELECT id, name, path, type,
-             width, height, size, mime_type, hash, folder_id,
-             file_created_at, file_modified_at,
-             created_at, updated_at, deleted_at
-      FROM assets
-      WHERE deleted_at IS NULL
-      ORDER BY {} {}
-      LIMIT ? OFFSET ?
-    )",
-                      sort_by, sort_order);
-  } else if (params.include_subfolders.value_or(false)) {
-    // 使用递归CTE查询当前文件夹及所有子文件夹
-    sql = std::format(R"(
-      WITH RECURSIVE folder_hierarchy AS (
-        SELECT id FROM folders WHERE id = ?
-        UNION ALL
-        SELECT f.id FROM folders f
-        INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
-      )
-      SELECT id, name, path, type,
-             width, height, size, mime_type, hash, folder_id,
-             file_created_at, file_modified_at,
-             created_at, updated_at, deleted_at
-      FROM assets
-      WHERE deleted_at IS NULL 
-        AND folder_id IN (SELECT id FROM folder_hierarchy)
-      ORDER BY {} {}
-      LIMIT ? OFFSET ?
-    )",
-                      sort_by, sort_order);
-
-    query_params.push_back(params.folder_id.value());
-  } else {
-    // 只查询当前文件夹
-    sql = std::format(R"(
-      SELECT id, name, path, type,
-             width, height, size, mime_type, hash, folder_id,
-             file_created_at, file_modified_at,
-             created_at, updated_at, deleted_at
-      FROM assets
-      WHERE deleted_at IS NULL AND folder_id = ?
-      ORDER BY {} {}
-      LIMIT ? OFFSET ?
-    )",
-                      sort_by, sort_order);
-
-    query_params.push_back(params.folder_id.value());
-  }
-
-  // 添加分页参数
-  query_params.push_back(per_page);
-  query_params.push_back(offset);
-
-  // 执行查询
-  auto items_result = Core::Database::query<Types::Asset>(*app_state.database, sql, query_params);
-  if (!items_result) {
-    return std::unexpected("Failed to query assets: " + items_result.error());
-  }
-
-  // 获取总数（用于分页）
-  std::string count_sql;
-  std::vector<Core::Database::Types::DbParam> count_params;
-
-  if (!params.folder_id.has_value()) {
-    count_sql = "SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL";
-  } else if (params.include_subfolders.value_or(false)) {
-    count_sql = R"(
-      WITH RECURSIVE folder_hierarchy AS (
-        SELECT id FROM folders WHERE id = ?
-        UNION ALL
-        SELECT f.id FROM folders f
-        INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
-      )
-      SELECT COUNT(*) FROM assets
-      WHERE deleted_at IS NULL 
-        AND folder_id IN (SELECT id FROM folder_hierarchy)
-    )";
-    count_params.push_back(params.folder_id.value());
-  } else {
-    count_sql = "SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND folder_id = ?";
-    count_params.push_back(params.folder_id.value());
-  }
-
-  auto count_result =
-      Core::Database::query_scalar<int>(*app_state.database, count_sql, count_params);
-  if (!count_result) {
-    return std::unexpected("Failed to count assets: " + count_result.error());
-  }
-  int total_count = count_result->value_or(0);
-
-  // 构建响应
-  Types::ListResponse response;
-  response.items = std::move(items_result.value());
-  response.total_count = total_count;
-  response.current_page = page;
-  response.per_page = per_page;
-  response.total_pages = (total_count + per_page - 1) / per_page;
-
-  return response;
+  // 调用统一查询接口
+  return query_assets(app_state, query_params);
 }
 
 // ============= 时间线视图查询 =============
@@ -784,65 +673,189 @@ auto get_assets_by_month(Core::State::AppState& app_state,
     return std::unexpected("Invalid month format. Expected: YYYY-MM");
   }
 
-  // 验证排序参数
+  // 转换为统一查询参数
+  Types::QueryAssetsParams query_params;
+  query_params.filters.folder_id = params.folder_id;
+  query_params.filters.include_subfolders = params.include_subfolders;
+  query_params.filters.month = params.month;  // 关键：月份变成筛选条件
+  query_params.sort_by = "created_at";
+  query_params.sort_order = params.sort_order;
+  // 注意：不传 page，所以返回该月全部数据
+
+  // 调用统一查询接口
+  auto result = query_assets(app_state, query_params);
+  if (!result) {
+    return std::unexpected(result.error());
+  }
+
+  // 转换为 GetAssetsByMonthResponse 格式
+  Types::GetAssetsByMonthResponse response;
+  response.month = params.month;
+  response.assets = std::move(result.value().items);
+  response.count = static_cast<int>(response.assets.size());
+
+  return response;
+}
+
+// ============= 统一查询接口 =============
+
+// 构建统一的WHERE条件
+auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
+    -> std::pair<std::string, std::vector<Core::Database::Types::DbParam>> {
+  std::vector<std::string> conditions;
+  std::vector<Core::Database::Types::DbParam> params;
+
+  // 基础条件：排除软删除的记录
+  conditions.push_back("deleted_at IS NULL");
+
+  // 文件夹筛选
+  if (filters.folder_id.has_value()) {
+    if (filters.include_subfolders.value_or(false)) {
+      // 使用递归CTE查询当前文件夹及所有子文件夹
+      conditions.push_back(R"(folder_id IN (
+        WITH RECURSIVE folder_hierarchy AS (
+          SELECT id FROM folders WHERE id = ?
+          UNION ALL
+          SELECT f.id FROM folders f
+          INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
+        )
+        SELECT id FROM folder_hierarchy
+      ))");
+      params.push_back(filters.folder_id.value());
+    } else {
+      // 只查询当前文件夹
+      conditions.push_back("folder_id = ?");
+      params.push_back(filters.folder_id.value());
+    }
+  }
+
+  // 月份筛选（关键：这只是众多筛选条件之一）
+  if (filters.month.has_value()) {
+    if (!validate_month_format(filters.month.value())) {
+      // 注意：这里如果格式不对，我们就忽略这个条件
+      // 或者可以在上层进行验证
+    } else {
+      conditions.push_back(
+          "strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) = "
+          "?");
+      params.push_back(filters.month.value());
+    }
+  }
+
+  // 年份筛选
+  if (filters.year.has_value()) {
+    conditions.push_back(
+        "strftime('%Y', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) = ?");
+    params.push_back(filters.year.value());
+  }
+
+  // 类型筛选
+  if (filters.type.has_value() && !filters.type->empty()) {
+    conditions.push_back("type = ?");
+    params.push_back(filters.type.value());
+  }
+
+  // 搜索
+  if (filters.search.has_value() && !filters.search->empty()) {
+    conditions.push_back("name LIKE ?");
+    params.push_back("%" + filters.search.value() + "%");
+  }
+
+  // 构建 WHERE 子句
+  std::string where_clause =
+      "WHERE " + std::ranges::fold_left(conditions, std::string{},
+                                        [](const std::string& acc, const std::string& cond) {
+                                          return acc.empty() ? cond : acc + " AND " + cond;
+                                        });
+
+  return {where_clause, params};
+}
+
+// 统一的资产查询函数
+auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsParams& params)
+    -> std::expected<Types::ListResponse, std::string> {
+  // 1. 构建通用WHERE条件
+  auto [where_clause, where_params] = build_unified_where_clause(params.filters);
+
+  // 2. 验证和构建 ORDER BY
+  std::string sort_by = params.sort_by.value_or("created_at");
   std::string sort_order = params.sort_order.value_or("desc");
+
+  // 安全的排序字段验证
+  if (sort_by != "created_at" && sort_by != "name" && sort_by != "size" &&
+      sort_by != "file_created_at") {
+    sort_by = "created_at";
+  }
   if (sort_order != "asc" && sort_order != "desc") {
     sort_order = "desc";
   }
 
-  std::vector<Core::Database::Types::DbParam> query_params;
-  std::string folder_filter;
-
-  // 构建文件夹筛选条件
-  if (params.folder_id.has_value()) {
-    if (params.include_subfolders.value_or(false)) {
-      folder_filter = R"(
-        AND folder_id IN (
-          WITH RECURSIVE folder_hierarchy AS (
-            SELECT id FROM folders WHERE id = ?
-            UNION ALL
-            SELECT f.id FROM folders f
-            INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
-          )
-          SELECT id FROM folder_hierarchy
-        )
-      )";
-    } else {
-      folder_filter = "AND folder_id = ?";
-    }
+  // 对于时间相关的排序，使用 COALESCE 处理
+  std::string order_field = sort_by;
+  if (sort_by == "created_at") {
+    order_field = "COALESCE(file_created_at, created_at)";
   }
 
-  // 构建查询
+  std::string order_clause = std::format("ORDER BY {} {}", order_field, sort_order);
+
+  // 3. 获取总数（用于分页计算或前端显示）
+  std::string count_sql = std::format("SELECT COUNT(*) FROM assets {}", where_clause);
+  auto total_count_result =
+      Core::Database::query_scalar<int>(*app_state.database, count_sql, where_params);
+  if (!total_count_result) {
+    return std::unexpected("Failed to count assets: " + total_count_result.error());
+  }
+  int total_count = total_count_result->value_or(0);
+
+  // 4. 构建主查询
   std::string sql = std::format(R"(
-    SELECT 
-      id, name, path, type,
-      width, height, size, mime_type, hash, folder_id,
-      file_created_at, file_modified_at,
-      created_at, updated_at, deleted_at
+    SELECT id, name, path, type,
+           width, height, size, mime_type, hash, folder_id,
+           file_created_at, file_modified_at,
+           created_at, updated_at, deleted_at
     FROM assets
-    WHERE deleted_at IS NULL
-      AND strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) = ?
-      {}
-    ORDER BY COALESCE(file_created_at, created_at) {}
+    {}
+    {}
   )",
-                                folder_filter, sort_order);
+                                where_clause, order_clause);
 
-  query_params.push_back(params.month);
+  auto final_params = where_params;
 
-  if (params.folder_id.has_value()) {
-    query_params.push_back(params.folder_id.value());
+  // 5. 如果需要分页，添加 LIMIT/OFFSET
+  int page = 1;
+  int per_page = 50;
+  bool has_pagination = params.page.has_value() && params.per_page.has_value();
+
+  if (has_pagination) {
+    page = params.page.value();
+    per_page = params.per_page.value();
+    int offset = (page - 1) * per_page;
+    sql += " LIMIT ? OFFSET ?";
+    final_params.push_back(per_page);
+    final_params.push_back(offset);
   }
 
-  auto result = Core::Database::query<Types::Asset>(*app_state.database, sql, query_params);
-
-  if (!result) {
-    return std::unexpected("Failed to query assets by month: " + result.error());
+  // 6. 执行查询
+  auto assets_result = Core::Database::query<Types::Asset>(*app_state.database, sql, final_params);
+  if (!assets_result) {
+    return std::unexpected("Failed to query assets: " + assets_result.error());
   }
 
-  Types::GetAssetsByMonthResponse response;
-  response.month = params.month;
-  response.assets = std::move(result.value());
-  response.count = static_cast<int>(response.assets.size());
+  // 7. 构建响应
+  Types::ListResponse response;
+  response.items = std::move(assets_result.value());
+  response.total_count = total_count;
+
+  if (has_pagination) {
+    response.current_page = page;
+    response.per_page = per_page;
+    response.total_pages = (total_count + per_page - 1) / per_page;
+  } else {
+    // 不分页时，返回简单的分页信息
+    response.current_page = 1;
+    response.per_page = total_count;
+    response.total_pages = 1;
+  }
 
   return response;
 }

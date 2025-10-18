@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useGalleryView } from '../composables'
+import { useGalleryStore } from '../store'
 
-const galleryView = useGalleryView()
+const store = useGalleryStore()
 </script>
 
 <template>
@@ -9,7 +9,7 @@ const galleryView = useGalleryView()
     <div class="text-center text-muted-foreground">
       <p class="mb-2">瀑布流视图</p>
       <p class="text-sm">暂未实现（需要瀑布流库）</p>
-      <p class="mt-4 text-xs">共 {{ galleryView.sortedAssets.value.length }} 项</p>
+      <p class="mt-4 text-xs">共 {{ store.totalCount }} 项</p>
     </div>
   </div>
 </template>

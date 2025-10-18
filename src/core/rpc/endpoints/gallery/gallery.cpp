@@ -213,6 +213,22 @@ auto handle_get_assets_by_month(
   co_return result.value();
 }
 
+// ============= 统一查询 RPC 处理函数 =============
+
+auto handle_query_assets(Core::State::AppState& app_state,
+                         const Features::Gallery::Types::QueryAssetsParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Gallery::Types::ListResponse>> {
+  auto result = Features::Gallery::Asset::Repository::query_assets(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 // ============= RPC 方法注册 =============
 
 auto register_all(Core::State::AppState& app_state) -> void {
@@ -281,6 +297,13 @@ auto register_all(Core::State::AppState& app_state) -> void {
                              Features::Gallery::Types::GetAssetsByMonthResponse>(
       app_state, app_state.rpc->registry, "gallery.getAssetsByMonth", handle_get_assets_by_month,
       "Get all assets for a specific month in timeline view");
+
+  // 统一查询接口
+  Core::RPC::register_method<Features::Gallery::Types::QueryAssetsParams,
+                             Features::Gallery::Types::ListResponse>(
+      app_state, app_state.rpc->registry, "gallery.queryAssets", handle_query_assets,
+      "Unified asset query interface with flexible filters (folder, month, year, type, search) "
+      "and optional pagination");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery

@@ -67,6 +67,12 @@ auto get_assets_by_month(Core::State::AppState& app_state,
                          const Types::GetAssetsByMonthParams& params)
     -> std::expected<Types::GetAssetsByMonthResponse, std::string>;
 
+// ============= 统一查询接口 =============
+
+// 统一的资产查询函数（支持组合筛选、可选分页）
+auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsParams& params)
+    -> std::expected<Types::ListResponse, std::string>;
+
 // ============= 批量操作 =============
 
 // 批量插入资产项

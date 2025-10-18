@@ -8,6 +8,7 @@ export { useGalleryLayout } from './useGalleryLayout'
 export { useGallerySidebar } from './useGallerySidebar'
 export { useTimeline } from './useTimeline'
 export { useGalleryLightbox } from './useGalleryLightbox'
+export { useGridVirtualizer } from './useGridVirtualizer'
 
 // TODO: 后续添加的 composables
 // export { useGalleryKeyboard } from './useGalleryKeyboard'

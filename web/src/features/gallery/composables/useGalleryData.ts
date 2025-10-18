@@ -1,33 +1,14 @@
-import { computed } from 'vue'
 import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
 import type { ListAssetsParams } from '../types'
 
 /**
  * Gallery数据管理 Composable
- * 负责从后端获取和管理资产数据
+ * 负责协调 API 调用和 Store 操作
+ * 组件应直接从 Store 读取状态，而不是通过这里的 computed 属性
  */
 export function useGalleryData() {
   const store = useGalleryStore()
-
-  // ============= 状态 =============
-  const assets = computed(() => store.assets)
-  const isLoading = computed(() => store.isLoading)
-  const isInitialLoading = computed(() => store.isInitialLoading)
-  const error = computed(() => store.error)
-  const totalCount = computed(() => store.totalCount)
-  const currentPage = computed(() => store.currentPage)
-  const hasNextPage = computed(() => store.hasNextPage)
-
-  // 时间线状态
-  const isTimelineMode = computed(() => store.isTimelineMode)
-  const timelineBuckets = computed(() => store.timelineBuckets)
-  const timelineTotalCount = computed(() => store.timelineTotalCount)
-
-  // 文件夹树状态
-  const folders = computed(() => store.folders)
-  const foldersLoading = computed(() => store.foldersLoading)
-  const foldersError = computed(() => store.foldersError)
 
   // ============= 数据加载操作 =============
 
@@ -35,10 +16,10 @@ export function useGalleryData() {
    * 统一加载入口 - 根据模式自动选择加载方式
    */
   async function load() {
-    if (isTimelineMode.value) {
+    if (store.isTimelineMode) {
       return loadTimelineData()
     } else {
-      return loadAssets({ page: 1, perPage: 50 })
+      return loadAllAssets() // 使用新的分页加载方式
     }
   }
 
@@ -109,7 +90,87 @@ export function useGalleryData() {
   }
 
   /**
-   * 加载资产列表（普通分页模式）
+   * 加载普通模式资产 - 首次请求获取总数和第一页
+   */
+  async function loadAllAssets() {
+    try {
+      store.setLoading(true)
+      store.setError(null)
+
+      // 清空时间线数据
+      store.clearTimelineData()
+
+      // 清空分页缓存（重新加载时）
+      store.clearPaginatedAssets()
+
+      // 首次请求获取总数和第一页
+      const response = await galleryApi.queryAssets({
+        filters: {
+          folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
+          includeSubfolders: store.includeSubfolders,
+          type: store.filter.type,
+          search: store.filter.searchQuery,
+        },
+        sortBy: store.sortBy,
+        sortOrder: store.sortOrder,
+        page: 1,
+        perPage: store.perPage,
+      })
+
+      // 设置总数（用于构建虚拟列表）
+      store.setPagination(response.totalCount, 1, false)
+
+      // 缓存第一页数据
+      store.setPageAssets(1, response.items)
+
+      console.log('📊 加载完成:', {
+        totalCount: response.totalCount,
+        firstPage: response.items.length,
+        perPage: store.perPage,
+      })
+    } catch (error) {
+      console.error('加载失败:', error)
+      store.setError('加载数据失败')
+    } finally {
+      store.setLoading(false)
+    }
+  }
+
+  /**
+   * 加载指定页（用于虚拟列表按需加载）
+   */
+  async function loadPage(pageNum: number) {
+    if (store.isPageLoaded(pageNum)) {
+      return
+    }
+
+    console.log('📄 加载第', pageNum, '页')
+
+    try {
+      const response = await galleryApi.queryAssets({
+        filters: {
+          folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
+          includeSubfolders: store.includeSubfolders,
+          type: store.filter.type,
+          search: store.filter.searchQuery,
+        },
+        sortBy: store.sortBy,
+        sortOrder: store.sortOrder,
+        page: pageNum,
+        perPage: store.perPage,
+      })
+
+      store.setPageAssets(pageNum, response.items)
+
+      console.log('✅ 第', pageNum, '页加载完成:', response.items.length, '个资产')
+    } catch (error) {
+      console.error('加载第', pageNum, '页失败:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 加载资产列表（普通分页模式 - 保留用于兼容）
    */
   async function loadAssets(params: ListAssetsParams = {}) {
     try {
@@ -236,30 +297,13 @@ export function useGalleryData() {
   }
 
   return {
-    // 状态
-    assets,
-    isLoading,
-    isInitialLoading,
-    error,
-    totalCount,
-    currentPage,
-    hasNextPage,
-
-    // 时间线状态
-    isTimelineMode,
-    timelineBuckets,
-    timelineTotalCount,
-
-    // 文件夹树状态
-    folders,
-    foldersLoading,
-    foldersError,
-
-    // 操作
+    // 数据加载方法
     load, // 统一加载入口
     loadTimelineData, // 时间线元数据
     loadMonthAssets, // 月份数据
-    loadAssets, // 普通分页
+    loadAllAssets, // 普通模式首次加载
+    loadPage, // 加载指定页（虚拟列表用）
+    loadAssets, // 普通分页（保留兼容）
     loadFolderTree, // 文件夹树
     initialize,
     reload,
@@ -268,5 +312,10 @@ export function useGalleryData() {
 
     // 工具函数
     getAssetThumbnailUrl,
+
+    // 虚拟滚动所需方法（直接传递 store 方法）
+    getAssetsInRange: (start: number, end: number) => store.getAssetsInRange(start, end),
+    isPageLoaded: (pageNum: number) => store.isPageLoaded(pageNum),
+    getPerPage: () => store.perPage,
   }
 }

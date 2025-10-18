@@ -16,6 +16,10 @@ import type {
 
 /**
  * Gallery Pinia Store
+ *
+ * 数据流设计:
+ * - Store 是单一数据来源，组件应直接从这里读取状态
+ * - Composable 只负责协调 API 调用和调用 Store Actions
  */
 export const useGalleryStore = defineStore('gallery', () => {
   // ============= 数据状态 =============
@@ -26,6 +30,10 @@ export const useGalleryStore = defineStore('gallery', () => {
   const totalCount = ref(0)
   const currentPage = ref(1)
   const hasNextPage = ref(false)
+
+  // ============= 分页缓存状态（普通模式使用） =============
+  const paginatedAssets = ref<Map<number, Asset[]>>(new Map()) // key: pageNumber
+  const perPage = ref(50) // 每页数量
 
   // ============= 时间线数据状态 =============
   const timelineBuckets = ref<TimelineBucket[]>([])
@@ -156,6 +164,51 @@ export const useGalleryStore = defineStore('gallery', () => {
     totalCount.value = total
     currentPage.value = page
     hasNextPage.value = hasNext
+  }
+
+  // ============= 分页缓存操作 Actions =============
+
+  function setPerPage(count: number) {
+    perPage.value = count
+  }
+
+  /**
+   * 获取指定索引范围的资产（用于虚拟列表）
+   * @returns Asset[] | null[] - null 表示该位置数据未加载
+   */
+  function getAssetsInRange(startIndex: number, endIndex: number): (Asset | null)[] {
+    const result: (Asset | null)[] = []
+
+    for (let i = startIndex; i <= endIndex; i++) {
+      const pageNum = Math.floor(i / perPage.value) + 1
+      const indexInPage = i % perPage.value
+      const page = paginatedAssets.value.get(pageNum)
+
+      result.push(page?.[indexInPage] ?? null)
+    }
+
+    return result
+  }
+
+  /**
+   * 检查某个页是否已加载
+   */
+  function isPageLoaded(pageNum: number): boolean {
+    return paginatedAssets.value.has(pageNum)
+  }
+
+  /**
+   * 设置某页数据
+   */
+  function setPageAssets(pageNum: number, pageAssets: Asset[]) {
+    paginatedAssets.value.set(pageNum, pageAssets)
+  }
+
+  /**
+   * 清空分页缓存（切换筛选条件时调用）
+   */
+  function clearPaginatedAssets() {
+    paginatedAssets.value.clear()
   }
 
   // ============= 时间线数据操作 Actions =============
@@ -383,6 +436,9 @@ export const useGalleryStore = defineStore('gallery', () => {
     // 清空时间线数据
     clearTimelineData()
 
+    // 清空分页缓存
+    clearPaginatedAssets()
+
     // 清空文件夹树数据
     folders.value = []
     foldersLoading.value = false
@@ -416,6 +472,10 @@ export const useGalleryStore = defineStore('gallery', () => {
     totalCount,
     currentPage,
     hasNextPage,
+
+    // 分页缓存状态
+    paginatedAssets,
+    perPage,
 
     // 时间线状态
     timelineBuckets,
@@ -456,6 +516,13 @@ export const useGalleryStore = defineStore('gallery', () => {
     setInitialLoading,
     setError,
     setPagination,
+
+    // 分页缓存 Actions
+    setPerPage,
+    getAssetsInRange,
+    isPageLoaded,
+    setPageAssets,
+    clearPaginatedAssets,
 
     // 时间线 Actions
     setTimelineBuckets,

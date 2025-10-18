@@ -1,6 +1,5 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useGalleryStore } from '../store'
-import { useGalleryView } from './useGalleryView'
 import { galleryApi } from '../api'
 import type { Asset } from '../types'
 
@@ -10,16 +9,15 @@ import type { Asset } from '../types'
  */
 export function useGalleryLightbox() {
   const store = useGalleryStore()
-  const galleryView = useGalleryView()
 
   /**
    * 打开Lightbox
    * @param asset 要打开的资产
    */
   function openLightbox(asset: Asset) {
-    // 使用当前筛选和排序后的资产列表（与GridView一致）
-    const assets = galleryView.sortedAssets.value
-    const startIndex = assets.findIndex((a) => a.id === asset.id)
+    // 使用 store 中的资产列表（后端已排序）
+    const assets = store.assets
+    const startIndex = assets.findIndex((a: Asset) => a.id === asset.id)
 
     if (startIndex === -1) {
       console.error('Asset not found in current view')

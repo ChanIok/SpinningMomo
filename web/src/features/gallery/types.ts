@@ -158,6 +158,31 @@ export interface ScanAssetsResult {
   scanDuration: string
 }
 
+// ============= 统一查询相关类型 =============
+
+// 查询过滤器
+export interface QueryAssetsFilters {
+  folderId?: number
+  includeSubfolders?: boolean
+  month?: string // "2024-10" 格式
+  year?: string // "2024" 格式
+  type?: AssetType // photo, video, live_photo
+  search?: string // 搜索关键词
+}
+
+// 查询参数
+export interface QueryAssetsParams {
+  filters: QueryAssetsFilters
+  sortBy?: SortBy
+  sortOrder?: SortOrder
+  // 分页是可选的：传page就分页，不传就返回所有结果
+  page?: number
+  perPage?: number
+}
+
+// 查询响应（复用 ListAssetsResponse）
+export type QueryAssetsResponse = ListAssetsResponse
+
 // ============= 时间线相关类型 =============
 
 // 时间线桶（月份元数据）

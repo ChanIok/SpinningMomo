@@ -46,33 +46,45 @@ export function useMethodSignature() {
   }
 
   /**
+   * 统一的 $ref 解析工具
+   */
+  const resolveRef = (rootSchema: JSONSchema, ref: string): JSONSchema | null => {
+    if (!ref.startsWith('#/')) {
+      return null
+    }
+
+    // 同时支持 definitions 和 $defs (JSON Schema 2020-12)
+    const defs = rootSchema.definitions ?? (rootSchema as any).$defs ?? {}
+
+    // 处理不同的 $ref 格式
+    let refPath = ref
+    if (refPath.startsWith('#/definitions/')) {
+      refPath = refPath.replace('#/definitions/', '')
+    } else if (refPath.startsWith('#/$defs/')) {
+      refPath = refPath.replace('#/$defs/', '')
+    } else if (refPath.startsWith('#/')) {
+      refPath = refPath.replace('#/', '')
+    }
+
+    return defs[refPath] ?? null
+  }
+
+  /**
    * 解析 JSON Schema 为表单字段配置
    */
   const parseSchemaToFormFields = (jsonSchema: JSONSchema): FormField[] => {
     const fields: FormField[] = []
 
-    // 处理 $ref 引用
+    // 处理顶层 $ref 引用
     let actualSchema = jsonSchema
-    if (jsonSchema.$ref && jsonSchema.definitions) {
-      // 解析 $ref 路径，例如 "#/definitions/SomeType"
-      let refPath = jsonSchema.$ref
-
-      // 处理不同的 $ref 格式
-      if (refPath.startsWith('#/definitions/')) {
-        refPath = refPath.replace('#/definitions/', '')
-      } else if (refPath.startsWith('#/')) {
-        refPath = refPath.replace('#/', '')
-      }
-
-      console.log('Resolving $ref:', jsonSchema.$ref, '-> refPath:', refPath)
-      console.log('Available definitions:', Object.keys(jsonSchema.definitions))
-
-      if (jsonSchema.definitions[refPath]) {
-        actualSchema = jsonSchema.definitions[refPath] as JSONSchema
-        console.log('Resolved schema:', actualSchema)
+    if (jsonSchema.$ref) {
+      const resolved = resolveRef(jsonSchema, jsonSchema.$ref)
+      if (resolved) {
+        actualSchema = resolved
+        console.log('Resolved top-level $ref:', jsonSchema.$ref, '-> schema:', actualSchema)
       } else {
-        console.warn('Definition not found for:', refPath)
-        console.warn('Tried to find:', refPath, 'in', jsonSchema.definitions)
+        console.warn('Definition not found for:', jsonSchema.$ref)
+        console.warn('Available definitions:', Object.keys(jsonSchema.definitions || {}))
       }
     }
 
@@ -85,7 +97,12 @@ export function useMethodSignature() {
 
     // 遍历所有属性
     for (const [propName, propSchema] of Object.entries(actualSchema.properties)) {
-      const field = parsePropertyToField(propName, propSchema, requiredFields.includes(propName))
+      const field = parsePropertyToField(
+        propName,
+        propSchema,
+        requiredFields.includes(propName),
+        jsonSchema
+      )
       if (field) {
         fields.push(field)
       }
@@ -100,13 +117,36 @@ export function useMethodSignature() {
   const parsePropertyToField = (
     name: string,
     propSchema: JSONSchema,
-    isRequired: boolean
+    isRequired: boolean,
+    rootSchema: JSONSchema
   ): FormField | null => {
-    // 处理 anyOf/oneOf，转换为标准的 type
+    // 1. 先处理属性级别的 $ref 引用
     let normalizedSchema = { ...propSchema }
 
-    if (propSchema.anyOf || propSchema.oneOf) {
-      const union = propSchema.anyOf || propSchema.oneOf
+    if (propSchema.$ref) {
+      const resolved = resolveRef(rootSchema, propSchema.$ref)
+      if (resolved) {
+        // 合并 $ref 解析结果，保留原属性上可能声明的 title/description
+        normalizedSchema = {
+          ...resolved,
+          title: propSchema.title ?? resolved.title,
+          description: propSchema.description ?? resolved.description,
+        }
+        console.log(
+          'Resolved property $ref:',
+          name,
+          propSchema.$ref,
+          '-> type:',
+          normalizedSchema.type
+        )
+      } else {
+        console.warn('Definition not found for property:', name, propSchema.$ref)
+      }
+    }
+
+    // 2. 处理 anyOf/oneOf，转换为标准的 type
+    if (normalizedSchema.anyOf || normalizedSchema.oneOf) {
+      const union = normalizedSchema.anyOf || normalizedSchema.oneOf
       // 从 anyOf/oneOf 中提取所有 type
       const types: string[] = []
       union!.forEach((subSchema) => {
@@ -185,15 +225,16 @@ export function useMethodSignature() {
         break
 
       case 'object':
-        if (propSchema.properties) {
+        if (normalizedSchema.properties) {
           // 递归解析嵌套对象
           field.properties = []
-          const nestedRequired = propSchema.required || []
-          for (const [nestedName, nestedSchema] of Object.entries(propSchema.properties)) {
+          const nestedRequired = normalizedSchema.required || []
+          for (const [nestedName, nestedSchema] of Object.entries(normalizedSchema.properties)) {
             const nestedField = parsePropertyToField(
               nestedName,
               nestedSchema,
-              nestedRequired.includes(nestedName)
+              nestedRequired.includes(nestedName),
+              rootSchema
             )
             if (nestedField) {
               field.properties.push(nestedField)

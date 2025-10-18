@@ -209,8 +209,8 @@ struct OperationResult {
 // ============= 时间线相关类型 =============
 
 struct TimelineBucket {
-  std::string month;              // "2024-10" 格式
-  int count;                      // 该月照片数量
+  std::string month;  // "2024-10" 格式
+  int count;          // 该月照片数量
 };
 
 struct TimelineBucketsParams {
@@ -220,11 +220,11 @@ struct TimelineBucketsParams {
 
 struct TimelineBucketsResponse {
   std::vector<TimelineBucket> buckets;
-  int total_count;                // 总照片数
+  int total_count;  // 总照片数
 };
 
 struct GetAssetsByMonthParams {
-  std::string month;                          // "2024-10" 格式
+  std::string month;  // "2024-10" 格式
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
   std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
@@ -234,6 +234,26 @@ struct GetAssetsByMonthResponse {
   std::string month;
   std::vector<Asset> assets;
   int count;
+};
+
+// ============= 统一查询相关类型 =============
+
+struct QueryAssetsFilters {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  std::optional<std::string> month;   // "2024-10" 格式
+  std::optional<std::string> year;    // "2024" 格式
+  std::optional<std::string> type;    // "photo" | "video" | "live_photo"
+  std::optional<std::string> search;  // 搜索关键词
+};
+
+struct QueryAssetsParams {
+  QueryAssetsFilters filters;
+  std::optional<std::string> sort_by = "created_at";
+  std::optional<std::string> sort_order = "desc";
+  // 分页是可选的：传page就分页，不传就返回所有结果
+  std::optional<std::int32_t> page;
+  std::optional<std::int32_t> per_page;
 };
 
 }  // namespace Features::Gallery::Types

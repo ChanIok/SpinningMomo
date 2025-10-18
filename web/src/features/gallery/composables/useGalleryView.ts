@@ -48,69 +48,6 @@ export function useGalleryView() {
   const sortOrder = computed(() => store.sortOrder)
   const includeSubfolders = computed(() => store.includeSubfolders)
 
-  // ============= 计算属性 =============
-
-  /**
-   * 筛选后的资产列表
-   */
-  const filteredAssets = computed(() => {
-    let result = store.assets
-
-    // 按类型筛选
-    if (filter.value.type) {
-      result = result.filter((asset) => asset.type === filter.value.type)
-    }
-
-    // 按搜索关键词筛选
-    if (filter.value.searchQuery) {
-      const query = filter.value.searchQuery.toLowerCase()
-      result = result.filter(
-        (asset) =>
-          asset.name.toLowerCase().includes(query) || asset.path.toLowerCase().includes(query)
-      )
-    }
-
-    return result
-  })
-
-  /**
-   * 排序后的资产列表
-   */
-  const sortedAssets = computed(() => {
-    const result = [...filteredAssets.value]
-
-    result.sort((a, b) => {
-      let aValue: any
-      let bValue: any
-
-      switch (sortBy.value) {
-        case 'name':
-          aValue = a.name.toLowerCase()
-          bValue = b.name.toLowerCase()
-          break
-        case 'size':
-          aValue = a.size || 0
-          bValue = b.size || 0
-          break
-        case 'createdAt':
-        default:
-          aValue = a.createdAt
-          bValue = b.createdAt
-          break
-      }
-
-      if (aValue < bValue) {
-        return sortOrder.value === 'asc' ? -1 : 1
-      }
-      if (aValue > bValue) {
-        return sortOrder.value === 'asc' ? 1 : -1
-      }
-      return 0
-    })
-
-    return result
-  })
-
   // ============= 视图操作 =============
 
   /**
@@ -264,10 +201,6 @@ export function useGalleryView() {
     sortBy,
     sortOrder,
     includeSubfolders,
-
-    // 计算属性
-    filteredAssets,
-    sortedAssets,
 
     // 视图操作
     setViewMode,

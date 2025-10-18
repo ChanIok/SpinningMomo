@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useGalleryStore } from '../store'
 import {
   useGalleryView,
   useGallerySelection,
   useGalleryData,
   useTimeline,
   useGalleryLightbox,
+  useGridVirtualizer,
 } from '../composables'
 import { useElementSize } from '@vueuse/core'
 import AssetCard from './AssetCard.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
 
-// Composables
+// Store 和 Composables
+const store = useGalleryStore()
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryData = useGalleryData()
@@ -22,12 +25,12 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
 
-// 计算属性
-const isTimelineMode = computed(() => galleryData.isTimelineMode.value)
+const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
   const gap = 16 // gap-4 对应 16px (1rem)
+  console.log('containerWidth', containerWidth.value, itemSize, gap)
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 
@@ -35,6 +38,13 @@ const columns = computed(() => {
 const timeline = useTimeline({
   columns: columns,
   containerRef: scrollContainerRef,
+  containerWidth: containerWidth,
+})
+
+// 普通模式虚拟列表 composable
+const gridVirtualizer = useGridVirtualizer({
+  containerRef: scrollContainerRef,
+  columns: columns,
   containerWidth: containerWidth,
 })
 
@@ -51,17 +61,24 @@ watch(
 )
 
 // 监听时间线模式切换
-watch(isTimelineMode, (newValue) => {
-  if (newValue && galleryData.timelineBuckets.value.length > 0) {
+watch(isTimelineMode, async (newValue) => {
+  if (newValue && store.timelineBuckets.length > 0) {
     timeline.init()
+  } else if (!newValue) {
+    // 切换到普通模式时初始化
+    await gridVirtualizer.init()
   }
 })
 
 // 生命周期钩子
-onMounted(() => {
-  if (isTimelineMode.value && galleryData.timelineBuckets.value.length > 0) {
+onMounted(async () => {
+  if (isTimelineMode.value && store.timelineBuckets.length > 0) {
     timeline.init()
     console.log('时间线模式初始化')
+  } else if (!isTimelineMode.value) {
+    // 普通模式初始化
+    await gridVirtualizer.init()
+    console.log('普通模式初始化')
   }
 })
 
@@ -73,7 +90,9 @@ function handleScroll(event: Event) {
 }
 
 function handleAssetClick(asset: any, event: MouseEvent) {
-  gallerySelection.handleAssetClick(asset, event, galleryView.sortedAssets.value)
+  // 注: 使用当前视图中的资产列表，不再使用 sortedAssets
+  // 因为后端已经处理了排序，这里需要根据实际情况调整
+  gallerySelection.handleAssetClick(asset, event, [])
 }
 
 function handleAssetDoubleClick(asset: any, event: MouseEvent) {
@@ -153,27 +172,63 @@ function handleAssetPreview(asset: any) {
     />
   </div>
 
-  <!-- 普通网格模式 -->
-  <div v-else class="h-full overflow-auto p-6">
+  <!-- 普通网格模式（虚拟列表） -->
+  <div v-else ref="scrollContainerRef" class="h-full overflow-auto p-6">
     <div
-      class="grid justify-items-center gap-4"
       :style="{
-        gridTemplateColumns: `repeat(auto-fill, minmax(${galleryView.viewSize.value}px, 1fr))`,
+        height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
+        position: 'relative',
       }"
     >
-      <AssetCard
-        v-for="asset in galleryView.sortedAssets.value"
-        :key="asset.id"
-        :asset="asset"
-        :is-selected="gallerySelection.isAssetSelected(asset.id)"
-        :is-active="gallerySelection.isAssetActive(asset.id)"
-        :show-name="galleryView.viewSize.value >= 256"
-        :show-size="galleryView.viewSize.value >= 256"
-        @click="handleAssetClick"
-        @double-click="handleAssetDoubleClick"
-        @context-menu="handleAssetContextMenu"
-        @preview="handleAssetPreview"
-      />
+      <div
+        v-for="virtualRow in gridVirtualizer.virtualRows.value"
+        :key="virtualRow.index"
+        :data-index="virtualRow.index"
+        :style="{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: `${virtualRow.size}px`,
+          transform: `translateY(${virtualRow.start}px)`,
+        }"
+      >
+        <div
+          class="grid justify-items-center gap-4"
+          :style="{
+            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+          }"
+        >
+          <template
+            v-for="(asset, idx) in virtualRow.assets"
+            :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
+          >
+            <!-- 已加载的资产 -->
+            <AssetCard
+              v-if="asset !== null"
+              :asset="asset"
+              :is-selected="gallerySelection.isAssetSelected(asset.id)"
+              :is-active="gallerySelection.isAssetActive(asset.id)"
+              :show-name="galleryView.viewSize.value >= 256"
+              :show-size="galleryView.viewSize.value >= 256"
+              @click="handleAssetClick"
+              @double-click="handleAssetDoubleClick"
+              @context-menu="handleAssetContextMenu"
+              @preview="handleAssetPreview"
+            />
+
+            <!-- 骨架屏占位 -->
+            <div
+              v-else
+              class="skeleton-card rounded-lg"
+              :style="{
+                width: `${galleryView.viewSize.value}px`,
+                height: `${galleryView.viewSize.value}px`,
+              }"
+            />
+          </template>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -187,5 +242,21 @@ function handleAssetPreview(asset: any) {
 /* 隐藏滚动条 - Firefox */
 .hide-scrollbar {
   scrollbar-width: none;
+}
+
+/* 骨架屏动画 */
+.skeleton-card {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 </style>
