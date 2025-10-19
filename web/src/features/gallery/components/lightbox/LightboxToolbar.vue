@@ -7,7 +7,7 @@ const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 
 const currentIndex = computed(() => store.lightbox.currentIndex)
-const totalCount = computed(() => store.lightbox.assets.length)
+const totalCount = computed(() => store.totalCount)
 const selectedCount = computed(() => store.selection.selectedIds.size)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
 const isFullscreen = computed(() => store.lightbox.isFullscreen)

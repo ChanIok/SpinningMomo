@@ -10,9 +10,11 @@ const lightbox = useGalleryLightbox()
 const isLoading = ref(true)
 const imageError = ref(false)
 
+// 从 virtualizer 获取当前资产
 const currentAsset = computed(() => {
-  const { assets, currentIndex } = store.lightbox
-  return assets[currentIndex]
+  const currentIdx = store.lightbox.currentIndex
+  // 直接使用 store.getAssetsInRange 获取当前资产
+  return store.getAssetsInRange(currentIdx, currentIdx)[0]
 })
 
 const imageUrl = computed(() => {
@@ -25,12 +27,18 @@ const imageUrl = computed(() => {
 })
 
 const canGoToPrevious = computed(() => store.lightbox.currentIndex > 0)
-const canGoToNext = computed(() => store.lightbox.currentIndex < store.lightbox.assets.length - 1)
+const canGoToNext = computed(() => store.lightbox.currentIndex < store.totalCount - 1)
 
-// 监听当前资产变化，重置加载状态
-watch(currentAsset, () => {
+// 监听当前资产变化，重置加载状态并更新详情面板
+watch(currentAsset, (newAsset) => {
   isLoading.value = true
   imageError.value = false
+
+  // 更新选中状态和详情面板焦点
+  if (newAsset) {
+    store.selectAsset(newAsset.id, true, false)
+    store.setDetailsFocus({ type: 'asset', asset: newAsset })
+  }
 })
 
 function handleImageLoad() {
@@ -54,7 +62,6 @@ function handleNext() {
 function handleImageClick() {
   // 可以添加点击图片的交互，比如切换工具栏显示
 }
-
 </script>
 
 <template>

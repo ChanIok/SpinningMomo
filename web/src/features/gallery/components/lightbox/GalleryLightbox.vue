@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { onKeyStroke, useThrottleFn } from '@vueuse/core'
 import { useGalleryStore } from '../../store'
 import { useGalleryLightbox } from '../../composables'
 import LightboxToolbar from './LightboxToolbar.vue'
@@ -8,6 +9,33 @@ import LightboxFilmstrip from './LightboxFilmstrip.vue'
 
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
+
+// 键盘事件监听（只在父组件注册一次）
+const throttledPrevious = useThrottleFn(() => {
+  if (store.lightbox.isOpen) lightbox.goToPrevious()
+}, 200)
+
+const throttledNext = useThrottleFn(() => {
+  if (store.lightbox.isOpen) lightbox.goToNext()
+}, 200)
+
+onKeyStroke('ArrowLeft', throttledPrevious)
+onKeyStroke('ArrowRight', throttledNext)
+onKeyStroke('Escape', () => {
+  if (store.lightbox.isOpen) lightbox.closeLightbox()
+})
+onKeyStroke(['f', 'F'], (e) => {
+  if (store.lightbox.isOpen) {
+    e.preventDefault()
+    lightbox.toggleFullscreen()
+  }
+})
+onKeyStroke('Tab', (e) => {
+  if (store.lightbox.isOpen) {
+    e.preventDefault()
+    lightbox.toggleFilmstrip()
+  }
+})
 
 const isFullscreen = computed(() => store.lightbox.isFullscreen)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)

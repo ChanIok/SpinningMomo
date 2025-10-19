@@ -230,7 +230,6 @@ export interface SelectionState {
 export interface LightboxState {
   isOpen: boolean
   currentIndex: number
-  assets: Asset[]
   isFullscreen: boolean
   showFilmstrip: boolean
   zoom: number

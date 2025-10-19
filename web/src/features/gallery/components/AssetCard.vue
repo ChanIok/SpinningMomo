@@ -92,7 +92,6 @@ function formatFileSize(bytes: number): string {
     :class="[
       {
         'ring-2 ring-primary ring-offset-2': isSelected,
-        'ring-1 ring-border': isActive && !isSelected,
         'shadow-md hover:shadow-lg': !isSelected,
         'shadow-lg': isSelected,
       },

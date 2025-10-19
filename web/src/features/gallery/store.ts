@@ -64,7 +64,6 @@ export const useGalleryStore = defineStore('gallery', () => {
   const lightbox = reactive<LightboxState>({
     isOpen: false,
     currentIndex: 0,
-    assets: [],
     isFullscreen: false,
     showFilmstrip: true,
     zoom: 1.0,
@@ -229,17 +228,18 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   // ============= Lightbox操作 Actions =============
 
-  function openLightbox(lightboxAssets: Asset[], startIndex: number) {
-    const validIndex = Math.max(0, Math.min(startIndex, lightboxAssets.length - 1))
+  /**
+   * 打开 Lightbox
+   * @param index - 要打开的资产的全局索引
+   */
+  function openLightbox(index: number) {
     lightbox.isOpen = true
-    lightbox.assets = lightboxAssets
-    lightbox.currentIndex = validIndex
+    lightbox.currentIndex = index
   }
 
   function closeLightbox() {
     lightbox.isOpen = false
     lightbox.currentIndex = 0
-    lightbox.assets = []
     lightbox.zoom = 1.0
     lightbox.fitMode = 'contain'
 
@@ -251,8 +251,8 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   function goToLightboxIndex(index: number) {
-    if (lightbox.isOpen && lightbox.assets.length > 0) {
-      const validIndex = Math.max(0, Math.min(index, lightbox.assets.length - 1))
+    if (lightbox.isOpen) {
+      const validIndex = Math.max(0, Math.min(index, totalCount.value - 1))
       lightbox.currentIndex = validIndex
     }
   }
@@ -264,7 +264,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   function goToNextLightbox() {
-    if (lightbox.isOpen && lightbox.currentIndex < lightbox.assets.length - 1) {
+    if (lightbox.isOpen && lightbox.currentIndex < totalCount.value - 1) {
       lightbox.currentIndex = lightbox.currentIndex + 1
     }
   }
@@ -341,7 +341,6 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     lightbox.isOpen = false
     lightbox.currentIndex = 0
-    lightbox.assets = []
 
     sidebar.isOpen = true
     sidebar.activeSection = 'all'

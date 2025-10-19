@@ -1,45 +1,18 @@
-import { onMounted, onUnmounted } from 'vue'
 import { useGalleryStore } from '../store'
-import { galleryApi } from '../api'
-import type { Asset } from '../types'
 
 /**
  * Gallery Lightbox Composable
- * 负责lightbox的业务逻辑：打开/关闭、导航、键盘事件、预加载等
+ * 负责lightbox的业务逻辑：打开/关闭、导航等
  */
 export function useGalleryLightbox() {
   const store = useGalleryStore()
 
   /**
    * 打开Lightbox
-   * @param asset 要打开的资产
+   * @param index 要打开的资产的全局索引
    */
-  function openLightbox(asset: Asset) {
-    // 从 paginatedAssets 中收集所有已加载的资产
-    const allLoadedAssets: Asset[] = []
-    const pageNumbers = Array.from(store.paginatedAssets.keys()).sort((a, b) => a - b)
-
-    pageNumbers.forEach((pageNum) => {
-      const pageAssets = store.paginatedAssets.get(pageNum)
-      if (pageAssets) {
-        allLoadedAssets.push(...pageAssets)
-      }
-    })
-
-    if (allLoadedAssets.length === 0) {
-      console.error('No assets loaded')
-      return
-    }
-
-    const startIndex = allLoadedAssets.findIndex((a: Asset) => a.id === asset.id)
-
-    if (startIndex === -1) {
-      console.error('Asset not found in loaded assets')
-      return
-    }
-
-    store.openLightbox(allLoadedAssets, startIndex)
-    preloadAdjacentImages()
+  function openLightbox(index: number) {
+    store.openLightbox(index)
   }
 
   /**
@@ -68,7 +41,6 @@ export function useGalleryLightbox() {
    */
   function goToPrevious() {
     store.goToPreviousLightbox()
-    preloadAdjacentImages()
   }
 
   /**
@@ -76,7 +48,6 @@ export function useGalleryLightbox() {
    */
   function goToNext() {
     store.goToNextLightbox()
-    preloadAdjacentImages()
   }
 
   /**
@@ -84,31 +55,6 @@ export function useGalleryLightbox() {
    */
   function goToIndex(index: number) {
     store.goToLightboxIndex(index)
-    preloadAdjacentImages()
-  }
-
-  /**
-   * 预加载前后几张图片
-   */
-  function preloadAdjacentImages() {
-    const { currentIndex, assets } = store.lightbox
-    const preloadCount = 2 // 前后各预加载2张
-
-    for (let i = -preloadCount; i <= preloadCount; i++) {
-      const index = currentIndex + i
-      if (index >= 0 && index < assets.length && i !== 0) {
-        const asset = assets[index]
-        if (asset) {
-          // TODO: 等待后端原图API
-          // const img = new Image()
-          // img.src = galleryApi.getAssetOriginalUrl(asset)
-
-          // 暂时预加载缩略图
-          const img = new Image()
-          img.src = galleryApi.getAssetThumbnailUrl(asset)
-        }
-      }
-    }
   }
 
   /**
@@ -118,47 +64,6 @@ export function useGalleryLightbox() {
     store.closeLightbox()
   }
 
-  /**
-   * 处理键盘事件
-   */
-  function handleKeyboard(event: KeyboardEvent) {
-    if (!store.lightbox.isOpen) return
-
-    switch (event.key) {
-      case 'Escape':
-        closeLightbox()
-        break
-      case 'ArrowLeft':
-        goToPrevious()
-        break
-      case 'ArrowRight':
-        goToNext()
-        break
-      case 'f':
-      case 'F':
-        event.preventDefault()
-        toggleFullscreen()
-        break
-      case 'Tab':
-        event.preventDefault()
-        toggleFilmstrip()
-        break
-      case ' ':
-        event.preventDefault()
-        // 空格键：切换暂停/播放（如果有自动播放功能）
-        break
-    }
-  }
-
-  // 监听键盘事件
-  onMounted(() => {
-    window.addEventListener('keydown', handleKeyboard)
-  })
-
-  onUnmounted(() => {
-    window.removeEventListener('keydown', handleKeyboard)
-  })
-
   return {
     openLightbox,
     closeLightbox,
@@ -167,6 +72,5 @@ export function useGalleryLightbox() {
     goToPrevious,
     goToNext,
     goToIndex,
-    handleKeyboard,
   }
 }
