@@ -1,6 +1,5 @@
 import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
-import type { ListAssetsParams } from '../types'
 
 /**
  * Gallery数据管理 Composable
@@ -11,17 +10,6 @@ export function useGalleryData() {
   const store = useGalleryStore()
 
   // ============= 数据加载操作 =============
-
-  /**
-   * 统一加载入口 - 根据模式自动选择加载方式
-   */
-  async function load() {
-    if (store.isTimelineMode) {
-      return loadTimelineData()
-    } else {
-      return loadAllAssets() // 使用新的分页加载方式
-    }
-  }
 
   /**
    * 加载时间线数据（月份元数据 + 第一页）
@@ -53,9 +41,6 @@ export function useGalleryData() {
         months: response.buckets.length,
         total: response.totalCount,
       })
-
-      // 3. 加载第一页数据（可选，也可以等滚动时按需加载）
-      await loadPage(1)
     } catch (error) {
       console.error('Failed to load timeline data:', error)
       store.setError('加载时间线数据失败')
@@ -63,7 +48,6 @@ export function useGalleryData() {
       store.setLoading(false)
     }
   }
-
 
   /**
    * 加载普通模式资产 - 首次请求获取总数和第一页
@@ -120,8 +104,6 @@ export function useGalleryData() {
       return
     }
 
-    console.log('📄 加载第', pageNum, '页')
-
     try {
       const response = await galleryApi.queryAssets({
         filters: {
@@ -146,84 +128,6 @@ export function useGalleryData() {
   }
 
   /**
-   * 加载资产列表（普通分页模式 - 保留用于兼容）
-   */
-  async function loadAssets(params: ListAssetsParams = {}) {
-    try {
-      store.setLoading(true)
-      store.setError(null)
-
-      // 清空时间线数据（节省内存）
-      store.clearTimelineData()
-
-      const response = await galleryApi.listAssets(params)
-
-      // 第一页替换，其他页追加
-      if (params.page === 1) {
-        store.setAssets(response.items)
-      } else {
-        store.addAssets(response.items)
-      }
-
-      store.setPagination(
-        response.totalCount,
-        response.currentPage,
-        response.currentPage < response.totalPages
-      )
-
-      console.log('🖼️ Gallery数据加载成功:', {
-        count: response.items.length,
-        total: response.totalCount,
-        page: response.currentPage,
-      })
-    } catch (error) {
-      console.error('Failed to load gallery assets:', error)
-      store.setError('加载资产数据失败')
-    } finally {
-      store.setLoading(false)
-    }
-  }
-
-  /**
-   * 初始化加载
-   */
-  async function initialize() {
-    try {
-      store.setInitialLoading(true)
-      await load()
-    } catch (error) {
-      console.error('Failed to initialize gallery:', error)
-    } finally {
-      store.setInitialLoading(false)
-    }
-  }
-
-  /**
-   * 重新加载（保持当前模式和筛选）
-   */
-  async function reload() {
-    return load()
-  }
-
-  /**
-   * 加载更多（分页）
-   */
-  async function loadMore() {
-    if (!store.hasNextPage || store.isLoading) return
-
-    const nextParams: ListAssetsParams = {
-      page: store.currentPage + 1,
-      perPage: 50,
-      sortBy: store.sortBy,
-      sortOrder: store.sortOrder,
-      folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
-      includeSubfolders: store.includeSubfolders,
-    }
-
-    return loadAssets(nextParams)
-  }
-
-  /**
    * 加载文件夹树
    */
   async function loadFolderTree() {
@@ -233,8 +137,6 @@ export function useGalleryData() {
 
       const folderTree = await galleryApi.getFolderTree()
       store.setFolders(folderTree)
-
-      console.log('📁 文件夹树加载成功:', folderTree.length)
     } catch (error) {
       console.error('Failed to load folder tree:', error)
       store.setFoldersError('加载文件夹树失败')
@@ -255,9 +157,6 @@ export function useGalleryData() {
         generateThumbnails: true,
       })
 
-      // 扫描完成后重新加载列表
-      await reload()
-
       return result
     } catch (error) {
       console.error('Failed to scan assets:', error)
@@ -274,23 +173,13 @@ export function useGalleryData() {
 
   return {
     // 数据加载方法
-    load, // 统一加载入口
     loadTimelineData, // 时间线元数据
     loadAllAssets, // 普通模式首次加载
     loadPage, // 加载指定页（虚拟列表用）
-    loadAssets, // 普通分页（保留兼容）
     loadFolderTree, // 文件夹树
-    initialize,
-    reload,
-    loadMore,
     scanAssets,
 
     // 工具函数
     getAssetThumbnailUrl,
-
-    // 虚拟滚动所需方法（直接传递 store 方法）
-    getAssetsInRange: (start: number, end: number) => store.getAssetsInRange(start, end),
-    isPageLoaded: (pageNum: number) => store.isPageLoaded(pageNum),
-    getPerPage: () => store.perPage,
   }
 }

@@ -21,8 +21,12 @@ watch(
   ],
   async () => {
     console.log('🔄 筛选条件变化，重新加载数据')
-    // 使用统一加载方法，自动根据模式选择
-    await galleryData.load()
+    // 根据当前模式选择合适的加载方法
+    if (store.isTimelineMode) {
+      await galleryData.loadTimelineData()
+    } else {
+      await galleryData.loadAllAssets()
+    }
   },
   { deep: true }
 )

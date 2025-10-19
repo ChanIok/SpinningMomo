@@ -39,7 +39,6 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     return isTimelineMode.value ? store.timelineTotalCount : store.totalCount
   })
   const perPage = computed(() => store.perPage)
-  const paginatedAssets = computed(() => store.paginatedAssets)
 
   // 计算总行数
   const totalRows = computed(() => Math.ceil(totalCount.value / columns.value))
@@ -65,6 +64,8 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     },
     getScrollElement: () => containerRef.value,
     estimateSize: () => estimatedRowHeight.value,
+    paddingStart: 24,
+    paddingEnd: 24,
     overscan: 10,
   })
 
@@ -75,63 +76,90 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
   const loadingPages = ref<Set<number>>(new Set())
 
   /**
-   * 统一监听器：同步更新 virtualRows + 异步加载数据
+   * 根据当前可见的虚拟项、列数和总数，更新 virtualRows
+   */
+  function syncVirtualRows(
+    items: ReturnType<typeof virtualizer.value.getVirtualItems>,
+    cols: number,
+    total: number
+  ) {
+    if (items.length === 0) return
+
+    virtualRows.value = items.map((virtualRow) => {
+      const startIndex = virtualRow.index * cols
+      const endIndex = Math.min(startIndex + cols - 1, total - 1)
+
+      const assets = store.getAssetsInRange(startIndex, endIndex)
+
+      return {
+        index: virtualRow.index,
+        assets: assets,
+        start: virtualRow.start,
+        size: virtualRow.size,
+      }
+    })
+  }
+
+  /**
+   * 异步加载缺失的数据
+   * @returns Promise - 所有数据加载完成后 resolve
+   */
+  async function loadMissingData(
+    items: ReturnType<typeof virtualizer.value.getVirtualItems>,
+    cols: number,
+    total: number
+  ): Promise<void> {
+    if (items.length === 0) return
+
+    // 收集所有可见的索引
+    const visibleIndexes: number[] = []
+    items.forEach((item) => {
+      const start = item.index * cols
+      const end = Math.min(start + cols, total)
+      for (let i = start; i < end; i++) {
+        visibleIndexes.push(i)
+      }
+    })
+
+    // 计算需要的页
+    const neededPages = new Set(visibleIndexes.map((idx) => Math.floor(idx / perPage.value) + 1))
+
+    // 加载缺失的页
+    const loadPromises: Promise<void>[] = []
+    neededPages.forEach((pageNum) => {
+      if (!store.isPageLoaded(pageNum) && !loadingPages.value.has(pageNum)) {
+        loadingPages.value.add(pageNum)
+        const loadPromise = galleryData.loadPage(pageNum).finally(() => {
+          loadingPages.value.delete(pageNum)
+        })
+        loadPromises.push(loadPromise)
+      }
+    })
+
+    // 等待所有加载完成
+    if (loadPromises.length > 0) {
+      await Promise.all(loadPromises)
+    }
+  }
+
+  /**
+   * 统一监听器：监听 UI 变化（滚动、列数、总数）
    */
   watch(
     () => ({
       items: virtualizer.value.getVirtualItems(),
       columns: columns.value,
       totalCount: totalCount.value,
-      // 关键：监听分页缓存变化，作为数据加载完成的触发器
-      paginatedAssets: paginatedAssets.value,
     }),
-    async ({ items, columns: cols, totalCount: total, paginatedAssets: _paginatedAssets }) => {
-      if (items.length === 0) return
+    async ({ items, columns: cols, totalCount: total }) => {
+      // 1️⃣ 立即同步更新 UI（即使数据未加载，先显示骨架屏）
+      syncVirtualRows(items, cols, total)
 
-      // 1️⃣ 同步更新 virtualRows（UI 立即渲染）
-      virtualRows.value = items.map((virtualRow) => {
-        const startIndex = virtualRow.index * cols
-        const endIndex = Math.min(startIndex + cols - 1, total - 1)
+      // 2️⃣ 异步加载缺失的数据，加载完成后再次同步 UI
+      await loadMissingData(items, cols, total)
 
-        const assets = galleryData.getAssetsInRange(startIndex, endIndex)
-
-        return {
-          index: virtualRow.index,
-          assets: assets,
-          start: virtualRow.start,
-          size: virtualRow.size,
-        }
-      })
-
-      // 2️⃣ 异步加载缺失的数据
-      const visibleIndexes: number[] = []
-      items.forEach((item) => {
-        const start = item.index * cols
-        const end = Math.min(start + cols, total)
-        for (let i = start; i < end; i++) {
-          visibleIndexes.push(i)
-        }
-      })
-
-      // 计算需要的页
-      const neededPages = new Set(visibleIndexes.map((idx) => Math.floor(idx / perPage.value) + 1))
-
-      // 加载缺失的页
-      const loadPromises: Promise<void>[] = []
-      neededPages.forEach((pageNum) => {
-        if (!galleryData.isPageLoaded(pageNum) && !loadingPages.value.has(pageNum)) {
-          loadingPages.value.add(pageNum)
-          const loadPromise = galleryData.loadPage(pageNum).finally(() => {
-            loadingPages.value.delete(pageNum)
-          })
-          loadPromises.push(loadPromise)
-        }
-      })
-
-      // 等待所有加载完成（可选：如果不需要等待，移除 await）
-      if (loadPromises.length > 0) {
-        await Promise.all(loadPromises)
-      }
+      // 3️⃣ 数据加载完成后，手动触发一次 UI 同步（更新已加载的数据）
+      syncVirtualRows(virtualizer.value.getVirtualItems(), columns.value, totalCount.value)
     }
   )
 
@@ -144,7 +172,7 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
         totalCount: totalCount.value,
         columns: columns.value,
       })
-      // 调用 galleryData.loadTimelineData 获取月份元数据和第一页
+      // 调用 galleryData.loadTimelineData 获取月份元数据
       await galleryData.loadTimelineData()
     } else {
       console.log('📋 普通模式初始化:', {
@@ -154,20 +182,6 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       // 调用 galleryData.loadAllAssets 获取总数并加载第一页
       await galleryData.loadAllAssets()
     }
-  }
-
-  /**
-   * 滚动到指定偏移量
-   */
-  function scrollToOffset(offset: number) {
-    virtualizer.value.scrollToOffset(offset, { behavior: 'smooth' })
-  }
-
-  /**
-   * 滚动到指定索引
-   */
-  function scrollToIndex(index: number) {
-    virtualizer.value.scrollToIndex(index, { behavior: 'smooth' })
   }
 
   // 监听行高变化，通知 virtualizer 重新测量
@@ -190,7 +204,5 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     totalRows,
     estimatedRowHeight,
     init,
-    scrollToOffset,
-    scrollToIndex,
   }
 }

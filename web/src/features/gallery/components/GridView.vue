@@ -10,6 +10,7 @@ import {
 import { useElementSize } from '@vueuse/core'
 import AssetCard from './AssetCard.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
+import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 
 // Store 和 Composables
 const store = useGalleryStore()
@@ -18,6 +19,7 @@ const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 
 // 响应式变量和引用
+const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 const viewportHeight = ref(0)
@@ -40,14 +42,24 @@ const gridVirtualizer = useGridVirtualizer({
 
 // 监听模式切换，重新初始化
 watch(isTimelineMode, async (newValue) => {
-  await gridVirtualizer.init()
-  console.log(newValue ? '时间线模式初始化' : '普通模式初始化')
+  // 切换到普通模式时，确保 scrollContainerRef 指向 ScrollArea 的 viewport
+  setTimeout(async () => {
+    if (!newValue && scrollAreaRef.value) {
+      scrollContainerRef.value = scrollAreaRef.value.viewportElement
+    }
+    console.log('scrollAreaRef', scrollAreaRef.value)
+    await gridVirtualizer.init()
+  }, 1000)
 })
 
 // 生命周期钩子
 onMounted(async () => {
+  // 对于普通模式，从 ScrollArea 获取内部的 viewport ref
+  if (!isTimelineMode.value && scrollAreaRef.value) {
+    scrollContainerRef.value = scrollAreaRef.value.viewportElement
+  }
+
   await gridVirtualizer.init()
-  console.log(isTimelineMode.value ? '时间线模式初始化' : '普通模式初始化')
 })
 
 // 事件处理函数
@@ -58,7 +70,6 @@ function handleScroll(event: Event) {
 }
 
 function handleAssetClick(asset: any, event: MouseEvent) {
-  console.log('handleAssetClick', asset, event)
   gallerySelection.handleAssetClick(asset, event, [])
 }
 
@@ -146,75 +157,76 @@ function handleAssetPreview(asset: any) {
     <TimelineScrollbar
       v-if="store.timelineBuckets.length > 0"
       :buckets="store.timelineBuckets"
-      :total-content-height="gridVirtualizer.virtualizer.value.getTotalSize()"
       :container-height="containerHeight"
       :scroll-top="scrollTop"
       :viewport-height="viewportHeight"
       :estimated-row-height="gridVirtualizer.estimatedRowHeight.value"
       :columns="columns"
-      :on-scroll-to-offset="gridVirtualizer.scrollToOffset"
+      :virtualizer="gridVirtualizer.virtualizer.value"
     />
   </div>
 
   <!-- 普通网格模式（虚拟列表） -->
-  <div v-else ref="scrollContainerRef" class="h-full overflow-auto p-6">
-    <div
-      :style="{
-        height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
-        position: 'relative',
-      }"
-    >
+  <ScrollArea v-else ref="scrollAreaRef" class="mr-1 h-full">
+    <div class="px-6">
       <div
-        v-for="virtualRow in gridVirtualizer.virtualRows.value"
-        :key="virtualRow.index"
-        :data-index="virtualRow.index"
         :style="{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: `${virtualRow.size}px`,
-          transform: `translateY(${virtualRow.start}px)`,
+          height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
+          position: 'relative',
         }"
       >
         <div
-          class="grid justify-items-center gap-4"
+          v-for="virtualRow in gridVirtualizer.virtualRows.value"
+          :key="virtualRow.index"
+          :data-index="virtualRow.index"
           :style="{
-            gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: `${virtualRow.size}px`,
+            transform: `translateY(${virtualRow.start}px)`,
           }"
         >
-          <template
-            v-for="(asset, idx) in virtualRow.assets"
-            :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
+          <div
+            class="grid justify-items-center gap-4"
+            :style="{
+              gridTemplateColumns: `repeat(${columns}, 1fr)`,
+            }"
           >
-            <!-- 已加载的资产 -->
-            <AssetCard
-              v-if="asset !== null"
-              :asset="asset"
-              :is-selected="gallerySelection.isAssetSelected(asset.id)"
-              :is-active="gallerySelection.isAssetActive(asset.id)"
-              :show-name="galleryView.viewSize.value >= 256"
-              :show-size="galleryView.viewSize.value >= 256"
-              @click="handleAssetClick"
-              @double-click="handleAssetDoubleClick"
-              @context-menu="handleAssetContextMenu"
-              @preview="handleAssetPreview"
-            />
+            <template
+              v-for="(asset, idx) in virtualRow.assets"
+              :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
+            >
+              <!-- 已加载的资产 -->
+              <AssetCard
+                v-if="asset !== null"
+                :asset="asset"
+                :is-selected="gallerySelection.isAssetSelected(asset.id)"
+                :is-active="gallerySelection.isAssetActive(asset.id)"
+                :show-name="galleryView.viewSize.value >= 256"
+                :show-size="galleryView.viewSize.value >= 256"
+                @click="handleAssetClick"
+                @double-click="handleAssetDoubleClick"
+                @context-menu="handleAssetContextMenu"
+                @preview="handleAssetPreview"
+              />
 
-            <!-- 骨架屏占位 -->
-            <div
-              v-else
-              class="skeleton-card rounded-lg"
-              :style="{
-                width: `${galleryView.viewSize.value}px`,
-                height: `${galleryView.viewSize.value}px`,
-              }"
-            />
-          </template>
+              <!-- 骨架屏占位 -->
+              <div
+                v-else
+                class="skeleton-card rounded-lg"
+                :style="{
+                  width: `${galleryView.viewSize.value}px`,
+                  height: `${galleryView.viewSize.value}px`,
+                }"
+              />
+            </template>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </ScrollArea>
 </template>
 
 <style scoped>
