@@ -146,17 +146,14 @@ export function getAssetThumbnailUrl(asset: Asset): string {
   const prefix1 = hash.slice(0, 2)
   const prefix2 = hash.slice(2, 4)
 
-  return getStaticUrl(`/static/thumbnails/${prefix1}/${prefix2}/${hash}.webp`)
+  return getStaticUrl(`/static/assets/thumbnails/${prefix1}/${prefix2}/${hash}.webp`)
 }
 
 /**
- * 获取资产原图URL - 使用HTTP接口
+ * 获取资产原图URL
  */
 export function getAssetUrl(assetId: number): string {
-  // TODO: 后续添加HTTP接口后更换为真实URL
-  // 目前使用mock数据
-  const seed = assetId % 1000
-  return `https://picsum.photos/seed/${seed}/1920/1080`
+  return getStaticUrl(`/static/assets/originals/${assetId}`)
 }
 
 /**

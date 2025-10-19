@@ -7,8 +7,10 @@ import Core.State;
 import Core.Database;
 import Core.Database.Types;
 import Features.Gallery.Types;
+import Features.Gallery.State;
 import Utils.Logger;
 import Utils.Time;
+import Utils.LRUCache;
 import <rfl.hpp>;
 
 namespace Features::Gallery::Asset::Repository {
@@ -855,6 +857,19 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
     response.current_page = 1;
     response.per_page = total_count;
     response.total_pages = 1;
+  }
+
+  // 8. 预热缓存：将查询结果的 id->path 映射加入缓存
+  if (app_state.gallery && !response.items.empty()) {
+    std::vector<std::pair<std::int64_t, std::filesystem::path>> cache_items;
+    cache_items.reserve(response.items.size());
+
+    for (const auto& asset : response.items) {
+      cache_items.emplace_back(asset.id, std::filesystem::path(asset.path));
+    }
+
+    Utils::LRUCache::warm_up(app_state.gallery->image_path_cache, cache_items);
+    Logger().debug("Warmed up image path cache with {} items", cache_items.size());
   }
 
   return response;

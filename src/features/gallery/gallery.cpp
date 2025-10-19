@@ -15,6 +15,7 @@ import Features.Gallery.Ignore.Processor;
 import Features.Gallery.StaticResolver;
 import Utils.Image;
 import Utils.Logger;
+import Utils.LRUCache;
 
 namespace Features::Gallery {
 
@@ -180,7 +181,6 @@ auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsPara
     -> std::expected<Types::Stats, std::string> {
   return Asset::Repository::get_asset_stats(app_state, params);
 }
-
 
 auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string> {

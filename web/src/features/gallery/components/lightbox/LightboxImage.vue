@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { useGalleryStore } from '../../store'
 import { useGalleryLightbox } from '../../composables'
+import { useGalleryData } from '../../composables'
 import { galleryApi } from '../../api'
 
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
+const galleryData = useGalleryData()
 
-const isLoading = ref(true)
 const imageError = ref(false)
+const originalLoaded = ref(false)
+
+// 使用 useElementSize 获取容器实际大小
+const containerRef = ref<HTMLElement>()
+const { width, height } = useElementSize(containerRef)
+
+// 计算可用空间（用于限制图片最大尺寸）
+const availableWidth = computed(() => width.value)
+const availableHeight = computed(() => height.value)
 
 // 从 virtualizer 获取当前资产
 const currentAsset = computed(() => {
@@ -17,21 +28,30 @@ const currentAsset = computed(() => {
   return store.getAssetsInRange(currentIdx, currentIdx)[0]
 })
 
-const imageUrl = computed(() => {
+// 缩略图URL
+const thumbnailUrl = computed(() => {
   if (!currentAsset.value) return ''
-  // TODO: 等待后端原图API
-  // return galleryApi.getAssetOriginalUrl(currentAsset.value)
-
-  // 暂时使用缩略图
   return galleryApi.getAssetThumbnailUrl(currentAsset.value)
+})
+
+// 原图URL
+const originalUrl = computed(() => {
+  if (!currentAsset.value) return ''
+  return galleryData.getAssetUrl(currentAsset.value.id)
+})
+
+// 获取当前图片加载状态
+const imageState = computed(() => {
+  if (!currentAsset.value) return { status: 'idle' as const }
+  return lightbox.getImageState(currentAsset.value.id)
 })
 
 const canGoToPrevious = computed(() => store.lightbox.currentIndex > 0)
 const canGoToNext = computed(() => store.lightbox.currentIndex < store.totalCount - 1)
 
-// 监听当前资产变化，重置加载状态并更新详情面板
+// 监听当前资产变化，重置状态并更新详情面板
 watch(currentAsset, (newAsset) => {
-  isLoading.value = true
+  originalLoaded.value = false
   imageError.value = false
 
   // 更新选中状态和详情面板焦点
@@ -41,13 +61,16 @@ watch(currentAsset, (newAsset) => {
   }
 })
 
-function handleImageLoad() {
-  isLoading.value = false
-  imageError.value = false
-}
+// 监听原图加载状态
+watch(imageState, (state) => {
+  if (state.status === 'loaded') {
+    originalLoaded.value = true
+  } else if (state.status === 'error') {
+    imageError.value = true
+  }
+})
 
 function handleImageError() {
-  isLoading.value = false
   imageError.value = true
 }
 
@@ -65,7 +88,10 @@ function handleImageClick() {
 </script>
 
 <template>
-  <div class="relative flex h-full w-full items-center justify-center bg-background">
+  <div
+    ref="containerRef"
+    class="relative flex h-full w-full items-center justify-center bg-background"
+  >
     <!-- 左侧导航按钮 -->
     <button
       v-if="canGoToPrevious"
@@ -79,43 +105,54 @@ function handleImageClick() {
     </button>
 
     <!-- 主图片区域 -->
-    <div class="relative flex h-full w-full items-center justify-center p-8">
-      <img
-        v-if="currentAsset && !imageError"
-        :src="imageUrl"
-        :alt="currentAsset.name"
-        class="max-h-full max-w-full object-contain select-none"
-        @load="handleImageLoad"
-        @error="handleImageError"
-        @click.self="handleImageClick"
-      />
+    <div class="flex h-full w-full items-center justify-center p-8">
+      <div class="relative grid place-items-center">
+        <!-- 缩略图层 -->
+        <img
+          v-if="currentAsset && !imageError"
+          :src="thumbnailUrl"
+          :alt="currentAsset.name"
+          :style="{
+            minWidth: `${currentAsset.width! < availableWidth ? currentAsset.width! : availableWidth}px`,
+            minHeight: `${currentAsset.height! < availableHeight ? currentAsset.height! : availableHeight}px`,
+            maxWidth: `${availableWidth}px`,
+            maxHeight: `${availableHeight}px`,
+          }"
+          class="col-start-1 row-start-1 object-contain select-none"
+          @click.self="handleImageClick"
+        />
 
-      <!-- 加载状态 -->
-      <div
-        v-if="isLoading"
-        class="absolute inset-0 flex items-center justify-center bg-card/50 backdrop-blur-sm"
-      >
-        <div class="flex flex-col items-center gap-3 text-foreground">
-          <div class="h-12 w-12 animate-spin rounded-full border-b-2 border-foreground"></div>
-          <span class="text-sm">加载中...</span>
+        <!-- 原图层 -->
+        <img
+          v-if="currentAsset && !imageError"
+          :src="originalUrl"
+          :alt="currentAsset.name"
+          :style="{
+            maxWidth: `${availableWidth}px`,
+            maxHeight: `${availableHeight}px`,
+            opacity: originalLoaded ? 1 : 0,
+          }"
+          class="col-start-1 row-start-1 object-contain select-none"
+          @error="handleImageError"
+          @click.self="handleImageClick"
+        />
+
+        <!-- 错误状态 -->
+        <div
+          v-if="imageError"
+          class="col-start-1 row-start-1 flex flex-col items-center justify-center text-muted-foreground"
+        >
+          <svg class="mb-4 h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <p class="text-lg">图片加载失败</p>
+          <p class="mt-2 text-sm text-muted-foreground/70">{{ currentAsset?.name }}</p>
         </div>
-      </div>
-
-      <!-- 错误状态 -->
-      <div
-        v-if="imageError"
-        class="flex flex-col items-center justify-center text-muted-foreground"
-      >
-        <svg class="mb-4 h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-        <p class="text-lg">图片加载失败</p>
-        <p class="mt-2 text-sm text-muted-foreground/70">{{ currentAsset?.name }}</p>
       </div>
     </div>
 

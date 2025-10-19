@@ -168,6 +168,10 @@ export function useGalleryData() {
     return galleryApi.getAssetThumbnailUrl(asset)
   }
 
+  function getAssetUrl(assetId: number) {
+    return galleryApi.getAssetUrl(assetId)
+  }
+
   return {
     // 数据加载方法
     loadTimelineData, // 时间线元数据
@@ -178,5 +182,6 @@ export function useGalleryData() {
 
     // 工具函数
     getAssetThumbnailUrl,
+    getAssetUrl,
   }
 }
