@@ -15,16 +15,30 @@ export function useGalleryLightbox() {
    * @param asset 要打开的资产
    */
   function openLightbox(asset: Asset) {
-    // 使用 store 中的资产列表（后端已排序）
-    const assets = store.assets
-    const startIndex = assets.findIndex((a: Asset) => a.id === asset.id)
+    // 从 paginatedAssets 中收集所有已加载的资产
+    const allLoadedAssets: Asset[] = []
+    const pageNumbers = Array.from(store.paginatedAssets.keys()).sort((a, b) => a - b)
 
-    if (startIndex === -1) {
-      console.error('Asset not found in current view')
+    pageNumbers.forEach((pageNum) => {
+      const pageAssets = store.paginatedAssets.get(pageNum)
+      if (pageAssets) {
+        allLoadedAssets.push(...pageAssets)
+      }
+    })
+
+    if (allLoadedAssets.length === 0) {
+      console.error('No assets loaded')
       return
     }
 
-    store.openLightbox(assets, startIndex)
+    const startIndex = allLoadedAssets.findIndex((a: Asset) => a.id === asset.id)
+
+    if (startIndex === -1) {
+      console.error('Asset not found in loaded assets')
+      return
+    }
+
+    store.openLightbox(allLoadedAssets, startIndex)
     preloadAdjacentImages()
   }
 

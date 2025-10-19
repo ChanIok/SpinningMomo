@@ -4,33 +4,19 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
-import type { FolderTreeNode, Asset } from '../types'
 
 const store = useGalleryStore()
 
 // 获取详情面板焦点
 const detailsFocus = computed(() => store.detailsPanel)
 
-// 根据焦点获取对应数据
+// 根据焦点直接获取对象引用
 const currentFolder = computed(() => {
-  if (detailsFocus.value.type !== 'folder') return null
-  const folderId = detailsFocus.value.folderId
-  return findFolderById(store.folders, folderId)
+  return detailsFocus.value.type === 'folder' ? detailsFocus.value.folder : null
 })
 
 const activeAsset = computed(() => {
-  if (detailsFocus.value.type !== 'asset') return null
-  const assetId = detailsFocus.value.assetId
-
-  // 在普通模式下查找
-  if (!store.isTimelineMode) {
-    return store.assets.find((a: Asset) => a.id === assetId)
-  }
-
-  // 在时间线模式下查找
-  // 由于timelineMonthData不存在，我们暂时从store.assets中查找
-  // TODO: 实现时间线模式下的资产查找逻辑
-  return store.assets.find((a: Asset) => a.id === assetId)
+  return detailsFocus.value.type === 'asset' ? detailsFocus.value.asset : null
 })
 
 // 使用gallery数据composable
@@ -43,20 +29,6 @@ const thumbnailUrl = computed(() => {
   if (!activeAsset.value) return ''
   return getAssetThumbnailUrl(activeAsset.value)
 })
-
-/**
- * 递归查找文件夹节点
- */
-function findFolderById(folders: FolderTreeNode[], id: number): FolderTreeNode | null {
-  for (const folder of folders) {
-    if (folder.id === id) return folder
-    if (folder.children) {
-      const found = findFolderById(folder.children, id)
-      if (found) return found
-    }
-  }
-  return null
-}
 
 function formatFileSize(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB']

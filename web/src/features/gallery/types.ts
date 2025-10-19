@@ -223,7 +223,6 @@ export interface GetAssetsByMonthResponse {
 // 选择状态
 export interface SelectionState {
   selectedIds: Set<number>
-  activeId?: number
   lastSelectedId?: number
 }
 
@@ -236,7 +235,6 @@ export interface LightboxState {
   showFilmstrip: boolean
   zoom: number
   fitMode: 'contain' | 'cover' | 'actual'
-  selectedInLightbox: Set<number>
 }
 
 // 侧边栏状态
@@ -248,8 +246,8 @@ export interface SidebarState {
 // 详情面板焦点状态
 export type DetailsPanelFocus =
   | { type: 'none' }
-  | { type: 'folder'; folderId: number }
-  | { type: 'asset'; assetId: number }
+  | { type: 'folder'; folder: FolderTreeNode }
+  | { type: 'asset'; asset: Asset }
   | { type: 'batch' }
 
 // ============= 错误类型 =============

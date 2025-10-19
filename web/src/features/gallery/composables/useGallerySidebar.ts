@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { useGalleryStore } from '../store'
+import type { FolderTreeNode } from '../types'
 
 export interface Tag {
   id: string
@@ -45,6 +46,22 @@ export function useGallerySidebar() {
     sidebar.value.activeSection === 'tags' ? store.filter.tagId : null
   )
 
+  // ============= 工具函数 =============
+
+  /**
+   * 递归查找文件夹节点
+   */
+  function findFolderById(folders: FolderTreeNode[], id: number): FolderTreeNode | null {
+    for (const folder of folders) {
+      if (folder.id === id) return folder
+      if (folder.children) {
+        const found = findFolderById(folder.children, id)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
   // ============= UI 交互操作方法 =============
 
   /**
@@ -72,8 +89,11 @@ export function useGallerySidebar() {
     store.setSidebarActiveSection('folders')
     store.setFilter({ folderId: String(folderId) })
 
-    // 设置详情面板显示文件夹
-    store.setDetailsFocus({ type: 'folder', folderId })
+    // 查找文件夹对象并设置详情面板
+    const folder = findFolderById(store.folders, folderId)
+    if (folder) {
+      store.setDetailsFocus({ type: 'folder', folder })
+    }
 
     console.log('📁 选择文件夹:', folderName)
   }

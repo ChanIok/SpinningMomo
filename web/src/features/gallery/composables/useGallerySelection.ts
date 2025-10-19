@@ -13,14 +13,7 @@ export function useGallerySelection() {
   const selectedIds = computed(() => store.selection.selectedIds)
   const selectedCount = computed(() => store.selectedCount)
   const hasSelection = computed(() => store.hasSelection)
-  const isAllSelected = computed(() => store.isAllSelected)
-  const activeId = computed(() => store.selection.activeId)
   const lastSelectedId = computed(() => store.selection.lastSelectedId)
-
-  // 获取选中的资产列表
-  const selectedAssets = computed(() => {
-    return store.assets.filter((asset) => selectedIds.value.has(asset.id))
-  })
 
   // ============= 选择操作 =============
 
@@ -45,27 +38,12 @@ export function useGallerySelection() {
   }
 
   /**
-   * 选择全部资产
-   */
-  function selectAll() {
-    store.selectAll()
-  }
-
-  /**
    * 清空选择
    */
   function clearSelection() {
     store.clearSelection()
     // 清除选择时，也清除详情焦点
     store.clearDetailsFocus()
-  }
-
-  /**
-   * 设置激活的资产
-   * @param id 资产ID
-   */
-  function setActiveAsset(id?: number) {
-    store.setActiveAsset(id)
   }
 
   /**
@@ -136,9 +114,6 @@ export function useGallerySelection() {
    * @param assets 当前显示的资产列表
    */
   function handleAssetClick(asset: Asset, event: MouseEvent, assets: Asset[]) {
-    // 设置为激活资产
-    setActiveAsset(asset.id)
-
     if (event.shiftKey) {
       // Shift + 点击：范围选择
       selectRange(asset.id, assets)
@@ -153,13 +128,13 @@ export function useGallerySelection() {
       if (store.selectedCount > 1) {
         store.setDetailsFocus({ type: 'batch' })
       } else if (store.selectedCount === 1) {
-        store.setDetailsFocus({ type: 'asset', assetId: asset.id })
+        store.setDetailsFocus({ type: 'asset', asset })
       }
     } else {
       // 普通点击：单选
       selectAsset(asset.id, true, false)
       // 单选时显示资产详情
-      store.setDetailsFocus({ type: 'asset', assetId: asset.id })
+      store.setDetailsFocus({ type: 'asset', asset })
     }
   }
 
@@ -169,9 +144,6 @@ export function useGallerySelection() {
    * @param _event 鼠标事件
    */
   function handleAssetDoubleClick(asset: Asset, _event: MouseEvent) {
-    // 双击时不改变选择状态，只设置激活
-    setActiveAsset(asset.id)
-
     // 可以在这里触发其他操作，比如预览
     console.log('双击资产:', asset.name)
   }
@@ -186,8 +158,6 @@ export function useGallerySelection() {
     if (!selectedIds.value.has(asset.id)) {
       selectAsset(asset.id, true, false)
     }
-
-    setActiveAsset(asset.id)
 
     // TODO: 显示上下文菜单
     console.log('右键菜单:', asset.name, '选中数量:', selectedCount.value)
@@ -208,14 +178,13 @@ export function useGallerySelection() {
     columnCount: number,
     extend = false
   ) {
-    const currentId = activeId.value
+    // 通过 lastSelectedId 确定当前焦点
+    const currentId = lastSelectedId.value
     if (!currentId || assets.length === 0) {
-      // 如果没有激活资产，激活第一个
+      // 如枟没有当前选中，选择第一个
       if (assets[0]) {
-        setActiveAsset(assets[0].id)
-        if (!extend) {
-          selectAsset(assets[0].id, true, false)
-        }
+        selectAsset(assets[0].id, true, false)
+        store.setDetailsFocus({ type: 'asset', asset: assets[0] })
       }
       return
     }
@@ -242,14 +211,13 @@ export function useGallerySelection() {
 
     const nextAsset = assets[nextIndex]
     if (nextAsset) {
-      setActiveAsset(nextAsset.id)
-
       if (extend) {
         // Shift + 方向键：扩展选择
         selectRange(nextAsset.id, assets)
       } else {
         // 普通方向键：单选
         selectAsset(nextAsset.id, true, false)
+        store.setDetailsFocus({ type: 'asset', asset: nextAsset })
       }
     }
   }
@@ -265,14 +233,6 @@ export function useGallerySelection() {
   }
 
   /**
-   * 检查资产是否为激活状态
-   * @param id 资产ID
-   */
-  function isAssetActive(id: number): boolean {
-    return activeId.value === id
-  }
-
-  /**
    * 获取下一个资产ID
    * @param assets 资产列表
    * @param direction 方向
@@ -281,7 +241,7 @@ export function useGallerySelection() {
     assets: Asset[],
     direction: 'next' | 'prev' = 'next'
   ): number | undefined {
-    const currentId = activeId.value
+    const currentId = lastSelectedId.value
     if (!currentId) return assets[0]?.id
 
     const currentIndex = assets.findIndex((asset) => asset.id === currentId)
@@ -301,17 +261,12 @@ export function useGallerySelection() {
     selectedIds,
     selectedCount,
     hasSelection,
-    isAllSelected,
-    activeId,
     lastSelectedId,
-    selectedAssets,
 
     // 基本操作
     selectAsset,
     toggleAsset,
-    selectAll,
     clearSelection,
-    setActiveAsset,
 
     // 高级操作
     selectRange,
@@ -326,7 +281,6 @@ export function useGallerySelection() {
 
     // 工具方法
     isAssetSelected,
-    isAssetActive,
     getNextAssetId,
   }
 }

@@ -16,8 +16,8 @@ const THUMBNAIL_GAP = 8
 
 const assets = computed(() => store.lightbox.assets)
 const currentIndex = computed(() => store.lightbox.currentIndex)
-const selectedInLightbox = computed(() => store.lightbox.selectedInLightbox)
-const selectedCount = computed(() => selectedInLightbox.value.size)
+const selectedIds = computed(() => store.selection.selectedIds)
+const selectedCount = computed(() => selectedIds.value.size)
 
 // 虚拟滚动配置
 const virtualizer = useVirtualizer({
@@ -48,7 +48,9 @@ function handleThumbnailClick(index: number, event: MouseEvent) {
     // Ctrl/Cmd + 点击：多选
     const asset = assets.value[index]
     if (asset) {
-      store.toggleLightboxAssetSelection(asset.id)
+      // 使用全局选择
+      const isSelected = selectedIds.value.has(asset.id)
+      store.selectAsset(asset.id, !isSelected, true)
     }
   } else {
     // 普通点击：跳转
@@ -59,7 +61,7 @@ function handleThumbnailClick(index: number, event: MouseEvent) {
 // 检查是否选中
 function isSelected(index: number): boolean {
   const asset = assets.value[index]
-  return asset ? selectedInLightbox.value.has(asset.id) : false
+  return asset ? selectedIds.value.has(asset.id) : false
 }
 
 // 获取缩略图URL

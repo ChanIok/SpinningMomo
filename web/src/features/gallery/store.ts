@@ -23,7 +23,6 @@ import type {
  */
 export const useGalleryStore = defineStore('gallery', () => {
   // ============= 数据状态 =============
-  const assets = ref<Asset[]>([])
   const isLoading = ref(false)
   const isInitialLoading = ref(false)
   const error = ref<string | null>(null)
@@ -33,7 +32,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   // ============= 分页缓存状态（普通模式使用） =============
   const paginatedAssets = ref<Map<number, Asset[]>>(new Map()) // key: pageNumber
-  const perPage = ref(50) // 每页数量
+  const perPage = ref(100) // 每页数量
 
   // ============= 时间线数据状态 =============
   const timelineBuckets = ref<TimelineBucket[]>([])
@@ -58,7 +57,6 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= 选择状态 =============
   const selection = reactive<SelectionState>({
     selectedIds: new Set<number>(),
-    activeId: undefined,
     lastSelectedId: undefined,
   })
 
@@ -71,7 +69,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     showFilmstrip: true,
     zoom: 1.0,
     fitMode: 'contain',
-    selectedInLightbox: new Set<number>(),
   })
 
   // ============= UI状态 =============
@@ -81,7 +78,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   })
 
   // 详情面板焦点状态
-  const detailsPanel = reactive<DetailsPanelFocus>({
+  const detailsPanel: DetailsPanelFocus = reactive<DetailsPanelFocus>({
     type: 'none',
   })
 
@@ -90,60 +87,12 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= 计算属性 =============
   const selectedCount = computed(() => selection.selectedIds.size)
   const hasSelection = computed(() => selectedCount.value > 0)
-  const isAllSelected = computed(
-    () => assets.value.length > 0 && selectedCount.value === assets.value.length
-  )
   const isTimelineMode = computed(() => sortBy.value === 'createdAt')
 
   // 文件夹树根节点资产总数（所有根节点的 assetCount 之和）
   const foldersAssetTotalCount = computed(() => {
     return folders.value.reduce((sum, folder) => sum + folder.assetCount, 0)
   })
-
-  // ============= 数据操作 Actions =============
-
-  function setAssets(newAssets: Asset[]) {
-    assets.value = newAssets
-  }
-
-  function addAssets(newAssets: Asset[]) {
-    const existingIds = new Set(assets.value.map((a) => a.id))
-    const uniqueAssets = newAssets.filter((a) => !existingIds.has(a.id))
-    assets.value = [...assets.value, ...uniqueAssets]
-  }
-
-  function updateAsset(id: number, updates: Partial<Asset>) {
-    const index = assets.value.findIndex((asset) => asset.id === id)
-    if (index !== -1 && assets.value[index]) {
-      // 直接更新属性，避免类型推导问题
-      Object.assign(assets.value[index], updates)
-    }
-  }
-
-  function removeAsset(id: number) {
-    // 移除资产
-    assets.value = assets.value.filter((a) => a.id !== id)
-
-    // 清理选择状态
-    selection.selectedIds.delete(id)
-    if (selection.activeId === id) {
-      selection.activeId = undefined
-    }
-    if (selection.lastSelectedId === id) {
-      selection.lastSelectedId = undefined
-    }
-
-    // 更新lightbox
-    if (lightbox.isOpen) {
-      lightbox.assets = lightbox.assets.filter((a) => a.id !== id)
-      if (lightbox.currentIndex >= lightbox.assets.length) {
-        lightbox.currentIndex = Math.max(0, lightbox.assets.length - 1)
-      }
-      if (lightbox.assets.length === 0) {
-        lightbox.isOpen = false
-      }
-    }
-  }
 
   // ============= 状态操作 Actions =============
 
@@ -273,20 +222,9 @@ export const useGalleryStore = defineStore('gallery', () => {
     }
   }
 
-  function selectAll() {
-    selection.selectedIds.clear()
-    assets.value.forEach((asset) => {
-      selection.selectedIds.add(asset.id)
-    })
-  }
-
   function clearSelection() {
     selection.selectedIds.clear()
     selection.lastSelectedId = undefined
-  }
-
-  function setActiveAsset(activeId?: number) {
-    selection.activeId = activeId
   }
 
   // ============= Lightbox操作 Actions =============
@@ -304,7 +242,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     lightbox.assets = []
     lightbox.zoom = 1.0
     lightbox.fitMode = 'contain'
-    lightbox.selectedInLightbox.clear()
 
     // 退出全屏（如果在全屏状态）
     if (lightbox.isFullscreen && document.fullscreenElement) {
@@ -348,18 +285,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     lightbox.fitMode = mode
   }
 
-  function toggleLightboxAssetSelection(assetId: number) {
-    if (lightbox.selectedInLightbox.has(assetId)) {
-      lightbox.selectedInLightbox.delete(assetId)
-    } else {
-      lightbox.selectedInLightbox.add(assetId)
-    }
-  }
-
-  function clearLightboxSelection() {
-    lightbox.selectedInLightbox.clear()
-  }
-
   // ============= UI操作 Actions =============
 
   function setSidebarOpen(open: boolean) {
@@ -386,7 +311,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= 重置操作 =============
 
   function reset() {
-    assets.value = []
+    paginatedAssets.value.clear()
     isLoading.value = false
     isInitialLoading.value = false
     error.value = null
@@ -412,7 +337,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     includeSubfolders.value = true
 
     selection.selectedIds.clear()
-    selection.activeId = undefined
     selection.lastSelectedId = undefined
 
     lightbox.isOpen = false
@@ -426,7 +350,6 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   return {
     // 状态
-    assets,
     isLoading,
     isInitialLoading,
     error,
@@ -462,15 +385,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     // 计算属性
     selectedCount,
     hasSelection,
-    isAllSelected,
     isTimelineMode,
     foldersAssetTotalCount,
-
-    // Actions
-    setAssets,
-    addAssets,
-    updateAsset,
-    removeAsset,
 
     setLoading,
     setInitialLoading,
@@ -500,9 +416,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     setIncludeSubfolders,
 
     selectAsset,
-    selectAll,
     clearSelection,
-    setActiveAsset,
 
     openLightbox,
     closeLightbox,
@@ -513,8 +427,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     toggleLightboxFilmstrip,
     setLightboxZoom,
     setLightboxFitMode,
-    toggleLightboxAssetSelection,
-    clearLightboxSelection,
 
     setSidebarOpen,
     setSidebarActiveSection,

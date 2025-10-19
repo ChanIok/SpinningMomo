@@ -19,9 +19,6 @@ export function useGalleryData() {
       store.setLoading(true)
       store.setError(null)
 
-      // 清空普通模式的数据（节省内存）
-      store.setAssets([])
-
       // 清空分页缓存（重新加载时）
       store.clearPaginatedAssets()
 
