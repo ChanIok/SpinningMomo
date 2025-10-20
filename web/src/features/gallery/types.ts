@@ -70,6 +70,57 @@ export interface Tag {
   updatedAt: number
 }
 
+// 标签树节点类型（用于侧边栏导航）
+export interface TagTreeNode {
+  id: number
+  name: string
+  parentId?: number
+  sortOrder: number
+  createdAt: number
+  updatedAt: number
+  assetCount: number // 包含所有子标签的 assets 总数
+  children: TagTreeNode[]
+}
+
+// 标签统计类型
+export interface TagStats {
+  id: number
+  name: string
+  assetCount: number
+}
+
+// 创建标签参数
+export interface CreateTagParams {
+  name: string
+  parentId?: number
+  sortOrder?: number
+}
+
+// 更新标签参数
+export interface UpdateTagParams {
+  id: number
+  name?: string
+  parentId?: number
+  sortOrder?: number
+}
+
+// 为资产添加标签参数
+export interface AddTagsToAssetParams {
+  assetId: number
+  tagIds: number[]
+}
+
+// 从资产移除标签参数
+export interface RemoveTagsFromAssetParams {
+  assetId: number
+  tagIds: number[]
+}
+
+// 获取资产标签参数
+export interface GetAssetTagsParams {
+  assetId: number
+}
+
 // 资产标签关联类型
 export interface AssetTag {
   assetId: number
@@ -200,6 +251,10 @@ export interface TimelineBucket {
 export interface GetTimelineBucketsParams {
   folderId?: number
   includeSubfolders?: boolean
+  type?: AssetType
+  search?: string
+  tagIds?: number[]
+  tagMatchMode?: 'any' | 'all'
 }
 
 // 获取时间线桶响应
@@ -251,6 +306,7 @@ export interface SidebarState {
 export type DetailsPanelFocus =
   | { type: 'none' }
   | { type: 'folder'; folder: FolderTreeNode }
+  | { type: 'tag'; tag: TagTreeNode }
   | { type: 'asset'; asset: Asset }
   | { type: 'batch' }
 

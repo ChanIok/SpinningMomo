@@ -22,10 +22,14 @@ export function useGalleryData() {
       // 清空分页缓存（重新加载时）
       store.clearPaginatedAssets()
 
-      // 1. 获取月份元数据
+      // 1. 获取月份元数据（使用完整过滤条件）
       const response = await galleryApi.getTimelineBuckets({
         folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
         includeSubfolders: store.includeSubfolders,
+        type: store.filter.type,
+        search: store.filter.searchQuery,
+        tagIds: store.filter.tagIds,
+        tagMatchMode: store.filter.tagMatchMode,
       })
 
       store.setTimelineBuckets(response.buckets)

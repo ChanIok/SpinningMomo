@@ -68,4 +68,10 @@ auto get_tags_by_asset_ids(Core::State::AppState& app_state,
 auto get_tag_stats(Core::State::AppState& app_state)
     -> std::expected<std::vector<Types::TagStats>, std::string>;
 
+// ============= 标签树构建 =============
+
+// 获取标签树结构
+auto get_tag_tree(Core::State::AppState& app_state)
+    -> std::expected<std::vector<Types::TagTreeNode>, std::string>;
+
 }  // namespace Features::Gallery::Tag::Repository

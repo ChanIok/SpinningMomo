@@ -11,6 +11,7 @@ import type {
   SortOrder,
   TimelineBucket,
   FolderTreeNode,
+  TagTreeNode,
   DetailsPanelFocus,
 } from './types'
 
@@ -42,6 +43,11 @@ export const useGalleryStore = defineStore('gallery', () => {
   const folders = ref<FolderTreeNode[]>([])
   const foldersLoading = ref(false)
   const foldersError = ref<string | null>(null)
+
+  // ============= 标签树状态 =============
+  const tags = ref<TagTreeNode[]>([])
+  const tagsLoading = ref(false)
+  const tagsError = ref<string | null>(null)
 
   // ============= 视图配置 =============
   const viewConfig = ref<ViewConfig>({
@@ -91,6 +97,11 @@ export const useGalleryStore = defineStore('gallery', () => {
   // 文件夹树根节点资产总数（所有根节点的 assetCount 之和）
   const foldersAssetTotalCount = computed(() => {
     return folders.value.reduce((sum, folder) => sum + folder.assetCount, 0)
+  })
+
+  // 标签树根节点资产总数（所有根节点的 assetCount 之和）
+  const tagsAssetTotalCount = computed(() => {
+    return tags.value.reduce((sum, tag) => sum + tag.assetCount, 0)
   })
 
   // ============= 状态操作 Actions =============
@@ -185,6 +196,20 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   function setFoldersError(errorMessage: string | null) {
     foldersError.value = errorMessage
+  }
+
+  // ============= 标签树操作 Actions =============
+
+  function setTags(newTags: TagTreeNode[]) {
+    tags.value = newTags
+  }
+
+  function setTagsLoading(loading: boolean) {
+    tagsLoading.value = loading
+  }
+
+  function setTagsError(errorMessage: string | null) {
+    tagsError.value = errorMessage
   }
 
   // ============= 视图操作 Actions =============
@@ -330,6 +355,11 @@ export const useGalleryStore = defineStore('gallery', () => {
     foldersLoading.value = false
     foldersError.value = null
 
+    // 清空标签树数据
+    tags.value = []
+    tagsLoading.value = false
+    tagsError.value = null
+
     viewConfig.value = { mode: 'adaptive', size: 200 }
     filter.value = {}
     sortBy.value = 'createdAt'
@@ -369,6 +399,11 @@ export const useGalleryStore = defineStore('gallery', () => {
     foldersLoading,
     foldersError,
 
+    // 标签树状态
+    tags,
+    tagsLoading,
+    tagsError,
+
     viewConfig,
     filter,
     sortBy,
@@ -386,6 +421,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     hasSelection,
     isTimelineMode,
     foldersAssetTotalCount,
+    tagsAssetTotalCount,
 
     setLoading,
     setInitialLoading,
@@ -408,6 +444,11 @@ export const useGalleryStore = defineStore('gallery', () => {
     setFolders,
     setFoldersLoading,
     setFoldersError,
+
+    // 标签树 Actions
+    setTags,
+    setTagsLoading,
+    setTagsError,
 
     setViewConfig,
     setFilter,

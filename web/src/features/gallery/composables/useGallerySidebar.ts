@@ -1,12 +1,7 @@
 import { ref, computed } from 'vue'
 import { useGalleryStore } from '../store'
-import type { FolderTreeNode } from '../types'
-
-export interface Tag {
-  id: string
-  name: string
-  count: number
-}
+import { galleryApi } from '../api'
+import type { FolderTreeNode, TagTreeNode } from '../types'
 
 /**
  * Gallery 侧边栏管理 Composable
@@ -21,18 +16,20 @@ export function useGallerySidebar() {
   // 文件夹展开状态（纯 UI 状态）
   const expandedFolders = ref<Set<number>>(new Set())
 
-  // 标签数据（TODO: 未来从 API 获取）
-  const tags = ref<Tag[]>([
-    { id: 'tag-1', name: '收藏', count: 0 },
-    { id: 'tag-2', name: '重要', count: 0 },
-  ])
+  // 标签展开状态（纯 UI 状态）
+  const expandedTags = ref<Set<number>>(new Set())
 
   // ============= 计算属性 =============
 
   // 从 store 读取文件夹树数据
   const folders = computed(() => store.folders)
-  const loading = computed(() => store.foldersLoading)
-  const error = computed(() => store.foldersError)
+  const foldersLoading = computed(() => store.foldersLoading)
+  const foldersError = computed(() => store.foldersError)
+
+  // 从 store 读取标签树数据
+  const tags = computed(() => store.tags)
+  const tagsLoading = computed(() => store.tagsLoading)
+  const tagsError = computed(() => store.tagsError)
 
   const sidebar = computed(() => store.sidebar)
   const selectedFolder = computed(() => {
@@ -42,9 +39,16 @@ export function useGallerySidebar() {
     }
     return null
   })
-  const selectedTag = computed(() =>
-    sidebar.value.activeSection === 'tags' ? store.filter.tagId : null
-  )
+  const selectedTag = computed(() => {
+    if (
+      sidebar.value.activeSection === 'tags' &&
+      store.filter.tagIds &&
+      store.filter.tagIds.length > 0
+    ) {
+      return store.filter.tagIds[0] ?? null
+    }
+    return null
+  })
 
   // ============= 工具函数 =============
 
@@ -56,6 +60,20 @@ export function useGallerySidebar() {
       if (folder.id === id) return folder
       if (folder.children) {
         const found = findFolderById(folder.children, id)
+        if (found) return found
+      }
+    }
+    return null
+  }
+
+  /**
+   * 递归查找标签节点
+   */
+  function findTagById(tags: TagTreeNode[], id: number): TagTreeNode | null {
+    for (const tag of tags) {
+      if (tag.id === id) return tag
+      if (tag.children) {
+        const found = findTagById(tag.children, id)
         if (found) return found
       }
     }
@@ -99,12 +117,44 @@ export function useGallerySidebar() {
   }
 
   /**
+   * 切换标签展开/收起
+   */
+  function toggleTagExpanded(tagId: number) {
+    if (expandedTags.value.has(tagId)) {
+      expandedTags.value.delete(tagId)
+    } else {
+      expandedTags.value.add(tagId)
+    }
+  }
+
+  /**
+   * 检查标签是否展开
+   */
+  function isTagExpanded(tagId: number): boolean {
+    return expandedTags.value.has(tagId)
+  }
+
+  /**
    * 选择标签
    */
-  function selectTag(tagId: string, tagName: string) {
-    store.setSidebarActiveSection('tags')
-    store.setFilter({ tagId })
-    console.log('🏷️ 选择标签:', tagName)
+  function selectTag(tagId: number, tagName: string) {
+    // 检查是否点击了当前已选中的标签
+    if (selectedTag.value === tagId) {
+      store.setFilter({ tagIds: [], tagMatchMode: 'any' })
+      console.log('🏷️ 取消标签筛选:', tagName)
+    } else {
+      // 选中新标签
+      store.setSidebarActiveSection('tags')
+      store.setFilter({ tagIds: [tagId], tagMatchMode: 'any' })
+
+      // 查找标签对象并设置详情面板
+      const tag = findTagById(store.tags, tagId)
+      if (tag) {
+        store.setDetailsFocus({ type: 'tag', tag })
+      }
+
+      console.log('🏷️ 选择标签:', tagName)
+    }
   }
 
   /**
@@ -121,6 +171,25 @@ export function useGallerySidebar() {
   }
 
   /**
+   * 加载标签树
+   */
+  async function loadTagTree() {
+    try {
+      store.setTagsLoading(true)
+      store.setTagsError(null)
+
+      const tagTree = await galleryApi.getTagTree()
+      store.setTags(tagTree)
+    } catch (error) {
+      console.error('Failed to load tag tree:', error)
+      store.setTagsError('加载标签树失败')
+      throw error
+    } finally {
+      store.setTagsLoading(false)
+    }
+  }
+
+  /**
    * 添加新标签（占位）
    */
   function addNewTag() {
@@ -131,9 +200,11 @@ export function useGallerySidebar() {
   return {
     // 状态（从 store 读取）
     folders,
-    loading,
-    error,
+    foldersLoading,
+    foldersError,
     tags,
+    tagsLoading,
+    tagsError,
     sidebar,
     selectedFolder,
     selectedTag,
@@ -141,9 +212,12 @@ export function useGallerySidebar() {
     // UI 交互操作
     toggleFolderExpanded,
     isFolderExpanded,
+    toggleTagExpanded,
+    isTagExpanded,
     selectFolder,
     selectTag,
     selectAllMedia,
+    loadTagTree,
     addNewTag,
   }
 }

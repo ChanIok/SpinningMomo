@@ -20,7 +20,7 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   std::string sql = R"(
             INSERT INTO assets (
                 name, path, type,
-                width, height, size, mime_type, extension, description, hash, folder_id,
+                description, width, height, size, extension, mime_type, hash, folder_id,
                 file_created_at, file_modified_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         )";
@@ -29,6 +29,10 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.name);
   params.push_back(item.path);
   params.push_back(item.type);
+
+  params.push_back(item.description.has_value()
+                       ? Core::Database::Types::DbParam{item.description.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.width.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
@@ -39,14 +43,11 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
 
-  params.push_back(item.mime_type);
-
   params.push_back(item.extension.has_value()
                        ? Core::Database::Types::DbParam{item.extension.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.description.has_value()
-                       ? Core::Database::Types::DbParam{item.description.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(item.mime_type);
 
   params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
@@ -81,7 +82,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
-                   width, height, size, mime_type, hash, folder_id,
+                   description, width, height, size, extension, mime_type, hash, folder_id,
                    file_created_at, file_modified_at,
                    created_at, updated_at, deleted_at
             FROM assets
@@ -91,8 +92,9 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
   std::vector<Core::Database::Types::DbParam> params = {id};
 
   auto result = Core::Database::query_single<Types::Asset>(*app_state.database, sql, params);
+
   if (!result) {
-    return std::unexpected("Failed to query asset item: " + result.error());
+    return std::unexpected("Failed to get asset by id: " + result.error());
   }
 
   return result.value();
@@ -102,7 +104,7 @@ auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
-                   width, height, size, mime_type, hash, folder_id,
+                   description, width, height, size, extension, mime_type, hash, folder_id,
                    file_created_at, file_modified_at,
                    created_at, updated_at, deleted_at
             FROM assets
@@ -124,7 +126,7 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   std::string sql = R"(
             UPDATE assets SET
                 name = ?, path = ?, type = ?,
-                width = ?, height = ?, size = ?, mime_type = ?, extension = ?, description = ?, hash = ?, folder_id = ?,
+                description = ?, width = ?, height = ?, size = ?, extension = ?, mime_type = ?, hash = ?, folder_id = ?,
                 file_created_at = ?, file_modified_at = ?
             WHERE id = ?
         )";
@@ -133,6 +135,10 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.name);
   params.push_back(item.path);
   params.push_back(item.type);
+
+  params.push_back(item.description.has_value()
+                       ? Core::Database::Types::DbParam{item.description.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.width.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
@@ -143,14 +149,11 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
 
-  params.push_back(item.mime_type);
-
   params.push_back(item.extension.has_value()
                        ? Core::Database::Types::DbParam{item.extension.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
-  params.push_back(item.description.has_value()
-                       ? Core::Database::Types::DbParam{item.description.value()}
-                       : Core::Database::Types::DbParam{std::monostate{}});
+
+  params.push_back(item.mime_type);
 
   params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
@@ -203,413 +206,6 @@ auto hard_delete_asset(Core::State::AppState& app_state, int64_t id)
   return {};
 }
 
-auto build_asset_list_query_conditions(const Types::ListParams& params) -> AssetQueryBuilder {
-  AssetQueryBuilder builder;
-  std::vector<std::string> conditions;
-
-  // 基础条件：排除软删除的记录
-  conditions.push_back("deleted_at IS NULL");
-
-  // 类型筛选
-  if (params.filter_type.has_value() && !params.filter_type->empty()) {
-    conditions.push_back("type = ?");
-    builder.params.push_back(*params.filter_type);
-  }
-
-  // 搜索查询
-  if (params.search_query.has_value() && !params.search_query->empty()) {
-    conditions.push_back("name LIKE ?");
-    builder.params.push_back("%" + *params.search_query + "%");
-  }
-
-  // 构建 WHERE 子句
-  if (!conditions.empty()) {
-    builder.where_clause =
-        "WHERE " + std::ranges::fold_left(conditions, std::string{},
-                                          [](const std::string& acc, const std::string& cond) {
-                                            return acc.empty() ? cond : acc + " AND " + cond;
-                                          });
-  }
-
-  return builder;
-}
-
-auto list_asset(Core::State::AppState& app_state, const Types::ListParams& params)
-    -> std::expected<Types::ListResponse, std::string> {
-  // 构建查询条件
-  auto query_builder = build_asset_list_query_conditions(params);
-
-  // 获取总数
-  std::string count_sql = "SELECT COUNT(*) FROM assets " + query_builder.where_clause;
-  auto count_result =
-      Core::Database::query_scalar<int>(*app_state.database, count_sql, query_builder.params);
-  if (!count_result) {
-    return std::unexpected("Failed to count asset items: " + count_result.error());
-  }
-  int total_count = count_result->value_or(0);
-
-  // 构建分页和排序
-  int page = params.page.value_or(1);
-  int per_page = params.per_page.value_or(50);
-  std::string sort_by = params.sort_by.value_or("created_at");
-  std::string sort_order = params.sort_order.value_or("desc");
-
-  // 安全的排序字段验证
-  if (sort_by != "created_at" && sort_by != "name" && sort_by != "size") {
-    sort_by = "created_at";
-  }
-  if (sort_order != "asc" && sort_order != "desc") {
-    sort_order = "desc";
-  }
-
-  int offset = (page - 1) * per_page;
-
-  // 构建主查询
-  std::string sql = std::format(R"(
-            SELECT id, name, path, type,
-                   width, height, size, mime_type, hash, folder_id,
-                   file_created_at, file_modified_at,
-                   created_at, updated_at, deleted_at
-            FROM assets
-            {}
-            ORDER BY {} {}
-            LIMIT ? OFFSET ?
-        )",
-                                query_builder.where_clause, sort_by, sort_order);
-
-  // 添加分页参数
-  auto final_params = query_builder.params;
-  final_params.push_back(per_page);
-  final_params.push_back(offset);
-
-  auto items_result = Core::Database::query<Types::Asset>(*app_state.database, sql, final_params);
-  if (!items_result) {
-    return std::unexpected("Failed to query asset items: " + items_result.error());
-  }
-
-  // 构建响应
-  Types::ListResponse response;
-  response.items = std::move(items_result.value());
-  response.total_count = total_count;
-  response.current_page = page;
-  response.per_page = per_page;
-  response.total_pages = (total_count + per_page - 1) / per_page;
-
-  return response;
-}
-
-auto count_asset(Core::State::AppState& app_state, const std::optional<std::string>& filter_type,
-                 const std::optional<std::string>& search_query)
-    -> std::expected<int, std::string> {
-  Types::ListParams params;
-  params.filter_type = filter_type;
-  params.search_query = search_query;
-
-  auto query_builder = build_asset_list_query_conditions(params);
-
-  std::string sql = "SELECT COUNT(*) FROM assets " + query_builder.where_clause;
-  auto result = Core::Database::query_scalar<int>(*app_state.database, sql, query_builder.params);
-  if (!result) {
-    return std::unexpected("Failed to count asset items: " + result.error());
-  }
-
-  return result->value_or(0);
-}
-
-auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
-    -> std::expected<Types::Stats, std::string> {
-  std::string base_where = "WHERE deleted_at IS NULL";
-  std::vector<Core::Database::Types::DbParam> where_params;
-
-  Types::Stats stats;
-
-  // 总数
-  std::string total_sql = "SELECT COUNT(*) FROM assets " + base_where;
-  auto total_result =
-      Core::Database::query_scalar<int>(*app_state.database, total_sql, where_params);
-  if (!total_result) {
-    return std::unexpected("Failed to get total count: " + total_result.error());
-  }
-  stats.total_count = total_result->value_or(0);
-
-  // 按类型统计
-  std::string type_sql = "SELECT type, COUNT(*) FROM assets " + base_where + " GROUP BY type";
-  auto type_result =
-      Core::Database::query<Types::TypeCountResult>(*app_state.database, type_sql, where_params);
-  if (type_result) {
-    for (const auto& result : type_result.value()) {
-      if (result.type == "photo")
-        stats.photo_count = result.count;
-      else if (result.type == "video")
-        stats.video_count = result.count;
-      else if (result.type == "live_photo")
-        stats.live_photo_count = result.count;
-    }
-  }
-
-  // 总大小
-  std::string size_sql = "SELECT SUM(size) FROM assets " + base_where;
-  auto size_result =
-      Core::Database::query_scalar<int64_t>(*app_state.database, size_sql, where_params);
-  if (size_result) {
-    stats.total_size = size_result->value_or(0);
-  }
-
-  // 最早和最新时间
-  std::string oldest_sql = "SELECT MIN(created_at) FROM assets " + base_where;
-  auto oldest_result =
-      Core::Database::query_scalar<std::string>(*app_state.database, oldest_sql, where_params);
-  if (oldest_result && oldest_result->has_value()) {
-    stats.oldest_item_date = oldest_result.value().value();
-  }
-
-  std::string newest_sql = "SELECT MAX(created_at) FROM assets " + base_where;
-  auto newest_result =
-      Core::Database::query_scalar<std::string>(*app_state.database, newest_sql, where_params);
-  if (newest_result && newest_result->has_value()) {
-    stats.newest_item_date = newest_result.value().value();
-  }
-
-  return stats;
-}
-
-auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old)
-    -> std::expected<int, std::string> {
-  std::string cutoff_date = std::format(
-      "{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now() - std::chrono::days(days_old));
-
-  std::string sql = "DELETE FROM assets WHERE deleted_at IS NOT NULL AND deleted_at < ?";
-  std::vector<Core::Database::Types::DbParam> params = {cutoff_date};
-
-  auto result = Core::Database::execute(*app_state.database, sql, params);
-  if (!result) {
-    return std::unexpected("Failed to cleanup soft deleted items: " + result.error());
-  }
-
-  // 获取删除的行数（这是简化版，实际可能需要在执行前先计数）
-  std::string count_sql = "SELECT changes()";
-  auto count_result = Core::Database::query_scalar<int>(*app_state.database, count_sql);
-  if (!count_result) {
-    Logger().warn("Could not get cleanup count, but cleanup operation succeeded");
-    return 0;
-  }
-
-  return count_result->value_or(0);
-}
-
-// 加载数据库中的资产到内存缓存
-auto load_asset_cache(Core::State::AppState& app_state)
-    -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {
-  std::string sql = R"(
-    SELECT id, name, path, type,
-           width, height, size, mime_type, hash, folder_id,
-           file_created_at, file_modified_at,
-           created_at, updated_at, deleted_at
-    FROM assets
-    WHERE deleted_at IS NULL
-  )";
-
-  auto result = Core::Database::query<Types::Asset>(*app_state.database, sql);
-  if (!result) {
-    return std::unexpected("Failed to load asset cache: " + result.error());
-  }
-
-  auto assets = std::move(result.value());
-  std::unordered_map<std::string, Types::Metadata> cache;
-  cache.reserve(assets.size());
-  for (const auto& asset : assets) {
-    Types::Metadata metadata{.id = asset.id,
-                             .path = asset.path,
-                             .size = asset.size.value_or(0),
-                             .file_modified_at = asset.file_modified_at.value_or(0),
-                             .hash = asset.hash.value_or("")};
-
-    cache.emplace(asset.path, std::move(metadata));
-  }
-  Logger().info("Loaded {} assets into memory cache", cache.size());
-  return cache;
-}
-
-auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Types::Asset>& items)
-    -> std::expected<std::vector<std::int64_t>, std::string> {
-  if (items.empty()) {
-    return std::vector<int64_t>{};
-  }
-
-  std::string insert_prefix = R"(
-    INSERT INTO assets (
-      name, path, type,
-      width, height, size, mime_type, extension, description, hash, folder_id,
-      file_created_at, file_modified_at
-    ) VALUES 
-  )";
-
-  std::string values_placeholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-
-  // 参数提取器，将Asset对象转换为参数列表
-  auto param_extractor =
-      [](const Types::Asset& item) -> std::vector<Core::Database::Types::DbParam> {
-    std::vector<Core::Database::Types::DbParam> params;
-    params.reserve(13);  // 13个字段
-
-    params.push_back(item.name);
-    params.push_back(item.path);
-    params.push_back(item.type);
-
-    params.push_back(item.width.has_value()
-                         ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
-                         : Core::Database::Types::DbParam{std::monostate{}});
-    params.push_back(item.height.has_value()
-                         ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
-                         : Core::Database::Types::DbParam{std::monostate{}});
-    params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
-                                           : Core::Database::Types::DbParam{std::monostate{}});
-
-    params.push_back(item.mime_type);
-
-    params.push_back(item.extension.has_value()
-                         ? Core::Database::Types::DbParam{item.extension.value()}
-                         : Core::Database::Types::DbParam{std::monostate{}});
-    params.push_back(item.description.has_value()
-                         ? Core::Database::Types::DbParam{item.description.value()}
-                         : Core::Database::Types::DbParam{std::monostate{}});
-
-    params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
-                                           : Core::Database::Types::DbParam{std::monostate{}});
-
-    params.push_back(item.folder_id.has_value()
-                         ? Core::Database::Types::DbParam{item.folder_id.value()}
-                         : Core::Database::Types::DbParam{std::monostate{}});
-
-    params.push_back(item.file_created_at.has_value()
-                         ? Core::Database::Types::DbParam{item.file_created_at.value()}
-                         : Core::Database::Types::DbParam{std::monostate{}});
-    params.push_back(item.file_modified_at.has_value()
-                         ? Core::Database::Types::DbParam{item.file_modified_at.value()}
-                         : Core::Database::Types::DbParam{std::monostate{}});
-
-    return params;
-  };
-
-  // 使用批量插入接口，自动处理分批
-  return Core::Database::execute_batch_insert(*app_state.database, insert_prefix,
-                                              values_placeholder, items, param_extractor);
-}
-
-auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Types::Asset>& items)
-    -> std::expected<void, std::string> {
-  if (items.empty()) {
-    return {};
-  }
-
-  // 使用事务批量执行update（SQLite不支持bulk update）
-  return Core::Database::execute_transaction(
-      *app_state.database,
-      [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
-        std::string sql = R"(
-          UPDATE assets SET
-            name = ?, path = ?, type = ?,
-            width = ?, height = ?, size = ?, mime_type = ?, extension = ?, description = ?, hash = ?, folder_id = ?,
-            file_created_at = ?, file_modified_at = ?
-          WHERE id = ?
-        )";
-
-        // 提取参数的lambda，避免在循环中重复代码
-        auto extract_params = [](const Types::Asset& item) {
-          std::vector<Core::Database::Types::DbParam> params;
-          params.reserve(14);  // 13个更新字段 + 1个WHERE条件
-
-          params.push_back(item.name);
-          params.push_back(item.path);
-          params.push_back(item.type);
-
-          params.push_back(
-              item.width.has_value()
-                  ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
-                  : Core::Database::Types::DbParam{std::monostate{}});
-          params.push_back(
-              item.height.has_value()
-                  ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
-                  : Core::Database::Types::DbParam{std::monostate{}});
-          params.push_back(item.size.has_value()
-                               ? Core::Database::Types::DbParam{item.size.value()}
-                               : Core::Database::Types::DbParam{std::monostate{}});
-
-          params.push_back(item.mime_type);
-
-          // 处理 extension 和 description 字段
-          params.push_back(item.extension.has_value()
-                               ? Core::Database::Types::DbParam{item.extension.value()}
-                               : Core::Database::Types::DbParam{std::monostate{}});
-          params.push_back(item.description.has_value()
-                               ? Core::Database::Types::DbParam{item.description.value()}
-                               : Core::Database::Types::DbParam{std::monostate{}});
-
-          params.push_back(item.hash.has_value()
-                               ? Core::Database::Types::DbParam{item.hash.value()}
-                               : Core::Database::Types::DbParam{std::monostate{}});
-
-          params.push_back(item.folder_id.has_value()
-                               ? Core::Database::Types::DbParam{item.folder_id.value()}
-                               : Core::Database::Types::DbParam{std::monostate{}});
-
-          params.push_back(item.file_created_at.has_value()
-                               ? Core::Database::Types::DbParam{item.file_created_at.value()}
-                               : Core::Database::Types::DbParam{std::monostate{}});
-          params.push_back(item.file_modified_at.has_value()
-                               ? Core::Database::Types::DbParam{item.file_modified_at.value()}
-                               : Core::Database::Types::DbParam{std::monostate{}});
-
-          params.push_back(item.id);  // WHERE id = ?
-
-          return params;
-        };
-
-        // 执行批量更新
-        for (const auto& item : items) {
-          auto params = extract_params(item);
-          auto result = Core::Database::execute(db_state, sql, params);
-          if (!result) {
-            return std::unexpected("Failed to update asset item (id=" + std::to_string(item.id) +
-                                   "): " + result.error());
-          }
-        }
-
-        return {};
-      });
-}
-
-// ============= 文件夹资产查询 =============
-
-auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
-    -> std::expected<Types::ListResponse, std::string> {
-  // 转换为统一查询参数
-  Types::QueryAssetsParams query_params;
-  query_params.filters.folder_id = params.folder_id;
-  query_params.filters.include_subfolders = params.include_subfolders;
-  query_params.sort_by = params.sort_by;
-  query_params.sort_order = params.sort_order;
-  query_params.page = params.page;
-  query_params.per_page = params.per_page;
-
-  // 调用统一查询接口
-  return query_assets(app_state, query_params);
-}
-
-// ============= 时间线视图查询 =============
-
-// 工具函数：将时间戳转换为月份字符串
-auto timestamp_to_month(int64_t timestamp_ms) -> std::string {
-  // 将毫秒时间戳转换为 system_clock::time_point
-  auto time_point = std::chrono::system_clock::time_point{std::chrono::milliseconds{timestamp_ms}};
-
-  // 转换为 year_month_day
-  auto ymd = std::chrono::year_month_day{std::chrono::floor<std::chrono::days>(time_point)};
-
-  // 格式化为 YYYY-MM
-  return std::format("{:%Y-%m}", ymd);
-}
-
 // 验证月份格式（YYYY-MM）
 auto validate_month_format(const std::string& month) -> bool {
   if (month.length() != 7 || month[4] != '-') {
@@ -628,101 +224,6 @@ auto validate_month_format(const std::string& month) -> bool {
   int month_num = std::stoi(month.substr(5, 2));
   return month_num >= 1 && month_num <= 12;
 }
-
-auto get_timeline_buckets(Core::State::AppState& app_state,
-                          const Types::TimelineBucketsParams& params)
-    -> std::expected<Types::TimelineBucketsResponse, std::string> {
-  std::vector<Core::Database::Types::DbParam> query_params;
-  std::string folder_filter;
-
-  // 构建文件夹筛选条件
-  if (params.folder_id.has_value()) {
-    if (params.include_subfolders.value_or(false)) {
-      // 递归查询子文件夹
-      folder_filter = R"(
-        AND folder_id IN (
-          WITH RECURSIVE folder_hierarchy AS (
-            SELECT id FROM folders WHERE id = ?
-            UNION ALL
-            SELECT f.id FROM folders f
-            INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
-          )
-          SELECT id FROM folder_hierarchy
-        )
-      )";
-      query_params.push_back(params.folder_id.value());
-    } else {
-      folder_filter = "AND folder_id = ?";
-      query_params.push_back(params.folder_id.value());
-    }
-  }
-
-  // 构建查询
-  std::string sql = std::format(R"(
-    SELECT 
-      strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) as month,
-      COUNT(*) as count
-    FROM assets 
-    WHERE deleted_at IS NULL
-      {}
-    GROUP BY month
-    ORDER BY month DESC
-  )",
-                                folder_filter);
-
-  auto result =
-      Core::Database::query<Types::TimelineBucket>(*app_state.database, sql, query_params);
-
-  if (!result) {
-    return std::unexpected("Failed to query timeline buckets: " + result.error());
-  }
-
-  // 计算总数
-  int total_count = 0;
-  for (const auto& bucket : result.value()) {
-    total_count += bucket.count;
-  }
-
-  Types::TimelineBucketsResponse response;
-  response.buckets = std::move(result.value());
-  response.total_count = total_count;
-
-  return response;
-}
-
-auto get_assets_by_month(Core::State::AppState& app_state,
-                         const Types::GetAssetsByMonthParams& params)
-    -> std::expected<Types::GetAssetsByMonthResponse, std::string> {
-  // 验证月份格式
-  if (!validate_month_format(params.month)) {
-    return std::unexpected("Invalid month format. Expected: YYYY-MM");
-  }
-
-  // 转换为统一查询参数
-  Types::QueryAssetsParams query_params;
-  query_params.filters.folder_id = params.folder_id;
-  query_params.filters.include_subfolders = params.include_subfolders;
-  query_params.filters.month = params.month;  // 关键：月份变成筛选条件
-  query_params.sort_by = "created_at";
-  query_params.sort_order = params.sort_order;
-  // 注意：不传 page，所以返回该月全部数据
-
-  // 调用统一查询接口
-  auto result = query_assets(app_state, query_params);
-  if (!result) {
-    return std::unexpected(result.error());
-  }
-
-  // 转换为 GetAssetsByMonthResponse 格式
-  Types::GetAssetsByMonthResponse response;
-  response.month = params.month;
-  response.assets = std::move(result.value().items);
-  response.count = static_cast<int>(response.assets.size());
-
-  return response;
-}
-
-// ============= 统一查询接口 =============
 
 // 构建统一的WHERE条件
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
@@ -820,6 +321,381 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
   return {where_clause, params};
 }
 
+auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
+    -> std::expected<Types::Stats, std::string> {
+  std::string base_where = "WHERE deleted_at IS NULL";
+  std::vector<Core::Database::Types::DbParam> where_params;
+
+  Types::Stats stats;
+
+  // 总数
+  std::string total_sql = "SELECT COUNT(*) FROM assets " + base_where;
+  auto total_result =
+      Core::Database::query_scalar<int>(*app_state.database, total_sql, where_params);
+  if (!total_result) {
+    return std::unexpected("Failed to get total count: " + total_result.error());
+  }
+  stats.total_count = total_result->value_or(0);
+
+  // 按类型统计
+  std::string type_sql = "SELECT type, COUNT(*) FROM assets " + base_where + " GROUP BY type";
+  auto type_result =
+      Core::Database::query<Types::TypeCountResult>(*app_state.database, type_sql, where_params);
+  if (type_result) {
+    for (const auto& result : type_result.value()) {
+      if (result.type == "photo")
+        stats.photo_count = result.count;
+      else if (result.type == "video")
+        stats.video_count = result.count;
+      else if (result.type == "live_photo")
+        stats.live_photo_count = result.count;
+    }
+  }
+
+  // 总大小
+  std::string size_sql = "SELECT SUM(size) FROM assets " + base_where;
+  auto size_result =
+      Core::Database::query_scalar<int64_t>(*app_state.database, size_sql, where_params);
+  if (size_result) {
+    stats.total_size = size_result->value_or(0);
+  }
+
+  // 最早和最新时间
+  std::string oldest_sql = "SELECT MIN(created_at) FROM assets " + base_where;
+  auto oldest_result =
+      Core::Database::query_scalar<std::string>(*app_state.database, oldest_sql, where_params);
+  if (oldest_result && oldest_result->has_value()) {
+    stats.oldest_item_date = oldest_result.value().value();
+  }
+
+  std::string newest_sql = "SELECT MAX(created_at) FROM assets " + base_where;
+  auto newest_result =
+      Core::Database::query_scalar<std::string>(*app_state.database, newest_sql, where_params);
+  if (newest_result && newest_result->has_value()) {
+    stats.newest_item_date = newest_result.value().value();
+  }
+
+  return stats;
+}
+
+auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old)
+    -> std::expected<int, std::string> {
+  std::string cutoff_date = std::format(
+      "{:%Y-%m-%d %H:%M:%S}", std::chrono::system_clock::now() - std::chrono::days(days_old));
+
+  std::string sql = "DELETE FROM assets WHERE deleted_at IS NOT NULL AND deleted_at < ?";
+  std::vector<Core::Database::Types::DbParam> params = {cutoff_date};
+
+  auto result = Core::Database::execute(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to cleanup soft deleted items: " + result.error());
+  }
+
+  // 获取删除的行数（这是简化版，实际可能需要在执行前先计数）
+  std::string count_sql = "SELECT changes()";
+  auto count_result = Core::Database::query_scalar<int>(*app_state.database, count_sql);
+  if (!count_result) {
+    Logger().warn("Could not get cleanup count, but cleanup operation succeeded");
+    return 0;
+  }
+
+  return count_result->value_or(0);
+}
+
+// 加载数据库中的资产到内存缓存
+auto load_asset_cache(Core::State::AppState& app_state)
+    -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {
+  std::string sql = R"(
+    SELECT id, name, path, type,
+           description, width, height, size, extension, mime_type, hash, folder_id,
+           file_created_at, file_modified_at,
+           created_at, updated_at, deleted_at
+    FROM assets
+    WHERE deleted_at IS NULL
+  )";
+
+  auto result = Core::Database::query<Types::Asset>(*app_state.database, sql);
+  if (!result) {
+    return std::unexpected("Failed to load asset cache: " + result.error());
+  }
+
+  auto assets = std::move(result.value());
+  std::unordered_map<std::string, Types::Metadata> cache;
+  cache.reserve(assets.size());
+  for (const auto& asset : assets) {
+    Types::Metadata metadata{.id = asset.id,
+                             .path = asset.path,
+                             .size = asset.size.value_or(0),
+                             .file_modified_at = asset.file_modified_at.value_or(0),
+                             .hash = asset.hash.value_or("")};
+
+    cache.emplace(asset.path, std::move(metadata));
+  }
+  Logger().info("Loaded {} assets into memory cache", cache.size());
+  return cache;
+}
+
+auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Types::Asset>& items)
+    -> std::expected<std::vector<std::int64_t>, std::string> {
+  if (items.empty()) {
+    return std::vector<int64_t>{};
+  }
+
+  std::string insert_prefix = R"(
+    INSERT INTO assets (
+      name, path, type,
+      description, width, height, size, extension, mime_type, hash, folder_id,
+      file_created_at, file_modified_at
+    ) VALUES 
+  )";
+
+  std::string values_placeholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+  // 参数提取器，将Asset对象转换为参数列表
+  auto param_extractor =
+      [](const Types::Asset& item) -> std::vector<Core::Database::Types::DbParam> {
+    std::vector<Core::Database::Types::DbParam> params;
+    params.reserve(13);  // 13个字段
+
+    params.push_back(item.name);
+    params.push_back(item.path);
+    params.push_back(item.type);
+
+    params.push_back(item.description.has_value()
+                         ? Core::Database::Types::DbParam{item.description.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.width.has_value()
+                         ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.height.has_value()
+                         ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.size.has_value() ? Core::Database::Types::DbParam{item.size.value()}
+                                           : Core::Database::Types::DbParam{std::monostate{}});
+
+    params.push_back(item.extension.has_value()
+                         ? Core::Database::Types::DbParam{item.extension.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+
+    params.push_back(item.mime_type);
+
+    params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
+                                           : Core::Database::Types::DbParam{std::monostate{}});
+
+    params.push_back(item.folder_id.has_value()
+                         ? Core::Database::Types::DbParam{item.folder_id.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+
+    params.push_back(item.file_created_at.has_value()
+                         ? Core::Database::Types::DbParam{item.file_created_at.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.file_modified_at.has_value()
+                         ? Core::Database::Types::DbParam{item.file_modified_at.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+
+    return params;
+  };
+
+  // 使用批量插入接口，自动处理分批
+  return Core::Database::execute_batch_insert(*app_state.database, insert_prefix,
+                                              values_placeholder, items, param_extractor);
+}
+
+auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Types::Asset>& items)
+    -> std::expected<void, std::string> {
+  if (items.empty()) {
+    return {};
+  }
+
+  // 使用事务批量执行update（SQLite不支持bulk update）
+  return Core::Database::execute_transaction(
+      *app_state.database,
+      [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+        std::string sql = R"(
+          UPDATE assets SET
+            name = ?, path = ?, type = ?,
+            description = ?, width = ?, height = ?, size = ?, extension = ?, mime_type = ?, hash = ?, folder_id = ?,
+            file_created_at = ?, file_modified_at = ?
+          WHERE id = ?
+        )";
+
+        // 提取参数的lambda，避免在循环中重复代码
+        auto extract_params = [](const Types::Asset& item) {
+          std::vector<Core::Database::Types::DbParam> params;
+          params.reserve(14);  // 13个更新字段 + 1个WHERE条件
+
+          params.push_back(item.name);
+          params.push_back(item.path);
+          params.push_back(item.type);
+
+          params.push_back(item.description.has_value()
+                               ? Core::Database::Types::DbParam{item.description.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+
+          params.push_back(
+              item.width.has_value()
+                  ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
+                  : Core::Database::Types::DbParam{std::monostate{}});
+          params.push_back(
+              item.height.has_value()
+                  ? Core::Database::Types::DbParam{static_cast<int64_t>(item.height.value())}
+                  : Core::Database::Types::DbParam{std::monostate{}});
+          params.push_back(item.size.has_value()
+                               ? Core::Database::Types::DbParam{item.size.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+
+          params.push_back(item.extension.has_value()
+                               ? Core::Database::Types::DbParam{item.extension.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+
+          params.push_back(item.mime_type);
+
+          params.push_back(item.hash.has_value()
+                               ? Core::Database::Types::DbParam{item.hash.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+
+          params.push_back(item.folder_id.has_value()
+                               ? Core::Database::Types::DbParam{item.folder_id.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+
+          params.push_back(item.file_created_at.has_value()
+                               ? Core::Database::Types::DbParam{item.file_created_at.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+          params.push_back(item.file_modified_at.has_value()
+                               ? Core::Database::Types::DbParam{item.file_modified_at.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+
+          params.push_back(item.id);  // WHERE id = ?
+
+          return params;
+        };
+
+        // 执行批量更新
+        for (const auto& item : items) {
+          auto params = extract_params(item);
+          auto result = Core::Database::execute(db_state, sql, params);
+          if (!result) {
+            return std::unexpected("Failed to update asset item (id=" + std::to_string(item.id) +
+                                   "): " + result.error());
+          }
+        }
+
+        return {};
+      });
+}
+
+// ============= 文件夹资产查询 =============
+
+auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
+    -> std::expected<Types::ListResponse, std::string> {
+  // 转换为统一查询参数
+  Types::QueryAssetsParams query_params;
+  query_params.filters.folder_id = params.folder_id;
+  query_params.filters.include_subfolders = params.include_subfolders;
+  query_params.sort_by = params.sort_by;
+  query_params.sort_order = params.sort_order;
+  query_params.page = params.page;
+  query_params.per_page = params.per_page;
+
+  // 调用统一查询接口
+  return query_assets(app_state, query_params);
+}
+
+// ============= 时间线视图查询 =============
+
+// 工具函数：将时间戳转换为月份字符串
+auto timestamp_to_month(int64_t timestamp_ms) -> std::string {
+  // 将毫秒时间戳转换为 system_clock::time_point
+  auto time_point = std::chrono::system_clock::time_point{std::chrono::milliseconds{timestamp_ms}};
+
+  // 转换为 year_month_day
+  auto ymd = std::chrono::year_month_day{std::chrono::floor<std::chrono::days>(time_point)};
+
+  // 格式化为 YYYY-MM
+  return std::format("{:%Y-%m}", ymd);
+}
+
+auto get_timeline_buckets(Core::State::AppState& app_state,
+                          const Types::TimelineBucketsParams& params)
+    -> std::expected<Types::TimelineBucketsResponse, std::string> {
+  // 将 TimelineBucketsParams 转换为 QueryAssetsFilters，复用统一的过滤逻辑
+  Types::QueryAssetsFilters filters;
+  filters.folder_id = params.folder_id;
+  filters.include_subfolders = params.include_subfolders;
+  filters.type = params.type;
+  filters.search = params.search;
+  filters.tag_ids = params.tag_ids;
+  filters.tag_match_mode = params.tag_match_mode;
+
+  // 复用统一的 WHERE 条件构建器
+  auto [where_clause, query_params] = build_unified_where_clause(filters);
+
+  // 构建查询
+  std::string sql = std::format(R"(
+    SELECT 
+      strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) as month,
+      COUNT(*) as count
+    FROM assets 
+    {}
+    GROUP BY month
+    ORDER BY month DESC
+  )",
+                                where_clause);
+
+  auto result =
+      Core::Database::query<Types::TimelineBucket>(*app_state.database, sql, query_params);
+
+  if (!result) {
+    return std::unexpected("Failed to query timeline buckets: " + result.error());
+  }
+
+  // 计算总数
+  int total_count = 0;
+  for (const auto& bucket : result.value()) {
+    total_count += bucket.count;
+  }
+
+  Types::TimelineBucketsResponse response;
+  response.buckets = std::move(result.value());
+  response.total_count = total_count;
+
+  return response;
+}
+
+auto get_assets_by_month(Core::State::AppState& app_state,
+                         const Types::GetAssetsByMonthParams& params)
+    -> std::expected<Types::GetAssetsByMonthResponse, std::string> {
+  // 验证月份格式
+  if (!validate_month_format(params.month)) {
+    return std::unexpected("Invalid month format. Expected: YYYY-MM");
+  }
+
+  // 转换为统一查询参数
+  Types::QueryAssetsParams query_params;
+  query_params.filters.folder_id = params.folder_id;
+  query_params.filters.include_subfolders = params.include_subfolders;
+  query_params.filters.month = params.month;  // 关键：月份变成筛选条件
+  query_params.sort_by = "created_at";
+  query_params.sort_order = params.sort_order;
+  // 注意：不传 page，所以返回该月全部数据
+
+  // 调用统一查询接口
+  auto result = query_assets(app_state, query_params);
+  if (!result) {
+    return std::unexpected(result.error());
+  }
+
+  // 转换为 GetAssetsByMonthResponse 格式
+  Types::GetAssetsByMonthResponse response;
+  response.month = params.month;
+  response.assets = std::move(result.value().items);
+  response.count = static_cast<int>(response.assets.size());
+
+  return response;
+}
+
+// ============= 统一查询接口 =============
+
 // 统一的资产查询函数
 auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsParams& params)
     -> std::expected<Types::ListResponse, std::string> {
@@ -859,7 +735,7 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
   // 4. 构建主查询
   std::string sql = std::format(R"(
     SELECT id, name, path, type,
-           width, height, size, mime_type, hash, folder_id,
+           description, width, height, size, extension, mime_type, hash, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at, deleted_at
     FROM assets

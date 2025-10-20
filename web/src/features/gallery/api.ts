@@ -13,6 +13,13 @@ import type {
   GetAssetsByMonthResponse,
   QueryAssetsParams,
   QueryAssetsResponse,
+  Tag,
+  TagTreeNode,
+  TagStats,
+  CreateTagParams,
+  UpdateTagParams,
+  AddTagsToAssetParams,
+  RemoveTagsFromAssetParams,
 } from './types'
 import { getStaticUrl } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/plugins/infinity_nikki'
@@ -210,6 +217,174 @@ export async function queryAssets(params: QueryAssetsParams): Promise<QueryAsset
 }
 
 /**
+ * 获取标签树结构
+ */
+export async function getTagTree(): Promise<TagTreeNode[]> {
+  try {
+    const result = await call<TagTreeNode[]>('gallery.getTagTree', {})
+
+    console.log('🏷️ 获取标签树成功:', result.length, '个根标签')
+
+    return result
+  } catch (error) {
+    console.error('Failed to get tag tree:', error)
+    throw new Error('获取标签树失败')
+  }
+}
+
+/**
+ * 获取所有标签（扫平列表）
+ */
+export async function listTags(): Promise<Tag[]> {
+  try {
+    const result = await call<Tag[]>('gallery.listTags', {})
+
+    console.log('🏷️ 获取标签列表成功:', result.length, '个标签')
+
+    return result
+  } catch (error) {
+    console.error('Failed to list tags:', error)
+    throw new Error('获取标签列表失败')
+  }
+}
+
+/**
+ * 创建标签
+ */
+export async function createTag(params: CreateTagParams): Promise<{ id: number }> {
+  try {
+    console.log('➕ 创建标签:', params.name)
+
+    const result = await call<number>('gallery.createTag', params)
+
+    console.log('✅ 标签创建成功:', result)
+
+    return { id: result }
+  } catch (error) {
+    console.error('Failed to create tag:', error)
+    throw new Error('创建标签失败')
+  }
+}
+
+/**
+ * 更新标签
+ */
+export async function updateTag(params: UpdateTagParams): Promise<OperationResult> {
+  try {
+    console.log('✏️ 更新标签:', params.id)
+
+    const result = await call<OperationResult>('gallery.updateTag', params)
+
+    console.log('✅ 标签更新成功:', result.message)
+
+    return result
+  } catch (error) {
+    console.error('Failed to update tag:', error)
+    throw new Error('更新标签失败')
+  }
+}
+
+/**
+ * 删除标签
+ */
+export async function deleteTag(tagId: number): Promise<OperationResult> {
+  try {
+    console.log('🗑️ 删除标签:', tagId)
+
+    const result = await call<OperationResult>('gallery.deleteTag', { id: tagId })
+
+    console.log('✅ 标签删除成功:', result.message)
+
+    return result
+  } catch (error) {
+    console.error('Failed to delete tag:', error)
+    throw new Error('删除标签失败')
+  }
+}
+
+/**
+ * 获取标签统计
+ */
+export async function getTagStats(): Promise<TagStats[]> {
+  try {
+    const result = await call<TagStats[]>('gallery.getTagStats', {})
+
+    console.log('📊 获取标签统计成功')
+
+    return result
+  } catch (error) {
+    console.error('Failed to get tag stats:', error)
+    throw new Error('获取标签统计失败')
+  }
+}
+
+/**
+ * 为资产添加标签
+ */
+export async function addTagsToAsset(params: AddTagsToAssetParams): Promise<OperationResult> {
+  try {
+    console.log('🏷️ 为资产添加标签:', params.assetId, params.tagIds)
+
+    const result = await call<OperationResult>('gallery.addTagsToAsset', params)
+
+    console.log('✅ 标签添加成功:', result.message)
+
+    return result
+  } catch (error) {
+    console.error('Failed to add tags to asset:', error)
+    throw new Error('添加标签失败')
+  }
+}
+
+/**
+ * 从资产移除标签
+ */
+export async function removeTagsFromAsset(
+  params: RemoveTagsFromAssetParams
+): Promise<OperationResult> {
+  try {
+    console.log('🗑️ 从资产移除标签:', params.assetId, params.tagIds)
+
+    const result = await call<OperationResult>('gallery.removeTagsFromAsset', params)
+
+    console.log('✅ 标签移除成功:', result.message)
+
+    return result
+  } catch (error) {
+    console.error('Failed to remove tags from asset:', error)
+    throw new Error('移除标签失败')
+  }
+}
+
+/**
+ * 获取资产的所有标签
+ */
+export async function getAssetTags(assetId: number): Promise<Tag[]> {
+  try {
+    const result = await call<Tag[]>('gallery.getAssetTags', { assetId })
+
+    return result
+  } catch (error) {
+    console.error('Failed to get asset tags:', error)
+    throw new Error('获取资产标签失败')
+  }
+}
+
+/**
+ * 批量获取多个资产的标签
+ */
+export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<number, Tag[]>> {
+  try {
+    const result = await call<Record<number, Tag[]>>('gallery.getTagsByAssetIds', { assetIds })
+
+    return result
+  } catch (error) {
+    console.error('Failed to get tags by asset ids:', error)
+    throw new Error('批量获取资产标签失败')
+  }
+}
+
+/**
  * Gallery API 统一导出
  */
 export const galleryApi = {
@@ -229,6 +404,20 @@ export const galleryApi = {
   cleanupThumbnails,
   getThumbnailStats,
   cleanupDeletedAssets,
+
+  // 标签管理
+  getTagTree,
+  listTags,
+  createTag,
+  updateTag,
+  deleteTag,
+  getTagStats,
+
+  // 资产-标签关联
+  addTagsToAsset,
+  removeTagsFromAsset,
+  getAssetTags,
+  getTagsByAssetIds,
 
   // URL 工具
   getAssetThumbnailUrl,

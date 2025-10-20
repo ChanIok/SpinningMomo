@@ -37,23 +37,9 @@ auto hard_delete_asset(Core::State::AppState& app_state, std::int64_t id)
 
 // ============= 查询操作 =============
 
-// 分页获取资产项列表
-auto list_asset(Core::State::AppState& app_state, const Types::ListParams& params)
-    -> std::expected<Types::ListResponse, std::string>;
-
-// 获取资产项总数
-auto count_asset(Core::State::AppState& app_state,
-                 const std::optional<std::string>& filter_type = {},
-                 const std::optional<std::string>& search_query = {})
-    -> std::expected<int, std::string>;
-
 // 获取资产统计信息
 auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
     -> std::expected<Types::Stats, std::string>;
-
-// 获取资产项列表（可按文件夹筛选，可选包含子文件夹）
-auto list_assets(Core::State::AppState& app_state, const Types::ListAssetsParams& params)
-    -> std::expected<Types::ListResponse, std::string>;
 
 // ============= 时间线视图查询 =============
 
@@ -92,13 +78,5 @@ auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old 
 // 加载数据库中的资产到内存缓存
 auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;
-
-// 构建 WHERE 子句和参数（内部辅助函数）
-struct AssetQueryBuilder {
-  std::string where_clause;
-  std::vector<Core::Database::Types::DbParam> params;
-};
-
-auto build_asset_list_query_conditions(const Types::ListParams& params) -> AssetQueryBuilder;
 
 }  // namespace Features::Gallery::Asset::Repository

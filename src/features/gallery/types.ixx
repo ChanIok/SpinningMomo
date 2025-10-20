@@ -14,12 +14,12 @@ struct Asset {
   std::string path;
   std::string type;  // photo, video, live_photo, unknown
 
+  std::optional<std::string> description;
   std::optional<std::int32_t> width;
   std::optional<std::int32_t> height;
   std::optional<std::int64_t> size;
-  std::string mime_type;
-  std::optional<std::string> description;
   std::optional<std::string> extension;
+  std::string mime_type;
   std::optional<std::string> hash;  // xxh3哈希
   std::optional<std::int64_t> folder_id;
 
@@ -78,6 +78,17 @@ struct Tag {
   int sort_order = 0;
   std::int64_t created_at;
   std::int64_t updated_at;
+};
+
+struct TagTreeNode {
+  std::int64_t id;
+  std::string name;
+  std::optional<std::int64_t> parent_id;
+  int sort_order = 0;
+  std::int64_t created_at;
+  std::int64_t updated_at;
+  std::int64_t asset_count = 0;  // 使用该标签（包含子标签）的资产总数
+  std::vector<TagTreeNode> children;
 };
 
 struct AssetTag {
@@ -185,15 +196,6 @@ struct ProcessingBatchResult {
 
 // ============= RPC参数类型 =============
 
-struct ListParams {
-  std::optional<std::int32_t> page = 1;
-  std::optional<std::int32_t> per_page = 50;
-  std::optional<std::string> sort_by = "created_at";
-  std::optional<std::string> sort_order = "desc";
-  std::optional<std::string> filter_type;
-  std::optional<std::string> search_query;
-};
-
 struct ListResponse {
   std::vector<Asset> items;
   std::int32_t total_count;
@@ -239,6 +241,10 @@ struct TimelineBucket {
 struct TimelineBucketsParams {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
+  std::optional<std::string> type;
+  std::optional<std::string> search;
+  std::optional<std::vector<std::int64_t>> tag_ids;
+  std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
 };
 
 struct TimelineBucketsResponse {

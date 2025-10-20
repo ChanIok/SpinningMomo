@@ -5,26 +5,31 @@ import { Separator } from '@/components/ui/separator'
 import { useGalleryStore } from '../store'
 import { useGallerySidebar, useGalleryData } from '../composables'
 import FolderTreeItem from '../components/FolderTreeItem.vue'
+import TagTreeItem from '../components/TagTreeItem.vue'
 
 const store = useGalleryStore()
 const galleryData = useGalleryData()
 
 const {
   folders,
+  foldersLoading,
+  foldersError,
   tags,
+  tagsLoading,
+  tagsError,
   sidebar,
   selectedFolder,
   selectedTag,
-  loading,
-  error,
   selectFolder,
   selectTag,
   selectAllMedia,
+  loadTagTree,
   addNewTag,
 } = useGallerySidebar()
 
 onMounted(() => {
   galleryData.loadFolderTree()
+  loadTagTree()
 })
 
 const totalCount = computed(() => store.foldersAssetTotalCount)
@@ -96,10 +101,10 @@ const totalCount = computed(() => store.foldersAssetTotalCount)
           文件夹
         </h3>
         <!-- 加载状态 -->
-        <div v-if="loading" class="px-2 text-xs text-muted-foreground">加载中...</div>
+        <div v-if="foldersLoading" class="px-2 text-xs text-muted-foreground">加载中...</div>
         <!-- 错误状态 -->
-        <div v-else-if="error" class="px-2 text-xs text-destructive">
-          {{ error }}
+        <div v-else-if="foldersError" class="px-2 text-xs text-destructive">
+          {{ foldersError }}
         </div>
         <!-- 文件夹树 -->
         <div v-else class="space-y-1">
@@ -137,32 +142,22 @@ const totalCount = computed(() => store.foldersAssetTotalCount)
             </svg>
           </Button>
         </div>
-        <div v-for="tag in tags" :key="tag.id">
-          <Button
-            :variant="selectedTag === tag.id ? 'secondary' : 'ghost'"
-            :class="['h-8 w-full justify-start gap-2 px-2', selectedTag === tag.id && 'bg-accent']"
-            @click="selectTag(tag.id, tag.name)"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="flex-shrink-0"
-            >
-              <path
-                d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"
-              />
-              <path d="M7 7h.01" />
-            </svg>
-            <span class="flex-1 text-left text-sm">{{ tag.name }}</span>
-            <span class="rounded border px-1.5 py-0.5 text-xs">{{ tag.count }}</span>
-          </Button>
+        <!-- 加载状态 -->
+        <div v-if="tagsLoading" class="px-2 text-xs text-muted-foreground">加载中...</div>
+        <!-- 错误状态 -->
+        <div v-else-if="tagsError" class="px-2 text-xs text-destructive">
+          {{ tagsError }}
+        </div>
+        <!-- 标签树 -->
+        <div v-else class="space-y-1">
+          <TagTreeItem
+            v-for="tag in tags"
+            :key="tag.id"
+            :tag="tag"
+            :selected-tag="selectedTag"
+            :depth="0"
+            @select="selectTag"
+          />
         </div>
       </div>
     </div>

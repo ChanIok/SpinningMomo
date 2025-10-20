@@ -12,9 +12,7 @@ const store = useGalleryStore()
 // 监听筛选条件和文件夹选项变化，自动重新加载资产
 watch(
   () => [
-    store.filter.folderId,
-    store.filter.type,
-    store.filter.searchQuery,
+    store.filter,
     store.includeSubfolders,
     store.sortBy,
     store.sortOrder,
