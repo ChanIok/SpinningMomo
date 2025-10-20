@@ -18,6 +18,8 @@ struct Asset {
   std::optional<std::int32_t> height;
   std::optional<std::int64_t> size;
   std::string mime_type;
+  std::optional<std::string> description;
+  std::optional<std::string> extension;
   std::optional<std::string> hash;  // xxh3哈希
   std::optional<std::int64_t> folder_id;
 
@@ -69,6 +71,21 @@ struct IgnoreRule {
   std::int64_t updated_at;
 };
 
+struct Tag {
+  std::int64_t id;
+  std::string name;
+  std::optional<std::int64_t> parent_id;
+  int sort_order = 0;
+  std::int64_t created_at;
+  std::int64_t updated_at;
+};
+
+struct AssetTag {
+  std::int64_t asset_id;
+  std::int64_t tag_id;
+  std::int64_t created_at;
+};
+
 // ============= 辅助数据类型 =============
 
 struct Info {
@@ -87,6 +104,12 @@ struct Stats {
   std::int64_t total_size = 0;
   std::string oldest_item_date;
   std::string newest_item_date;
+};
+
+struct TagStats {
+  std::int64_t tag_id;
+  std::string tag_name;
+  std::int64_t asset_count;  // 使用该标签的资产数量
 };
 
 struct TypeCountResult {
@@ -245,6 +268,8 @@ struct QueryAssetsFilters {
   std::optional<std::string> year;    // "2024" 格式
   std::optional<std::string> type;    // "photo" | "video" | "live_photo"
   std::optional<std::string> search;  // 搜索关键词
+  std::optional<std::vector<std::int64_t>> tag_ids;
+  std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
 };
 
 struct QueryAssetsParams {
@@ -255,5 +280,36 @@ struct QueryAssetsParams {
   std::optional<std::int32_t> page;
   std::optional<std::int32_t> per_page;
 };
+
+// ============= 标签相关参数 =============
+
+struct CreateTagParams {
+  std::string name;
+  std::optional<std::int64_t> parent_id;
+  std::optional<int> sort_order = 0;
+};
+
+struct UpdateTagParams {
+  std::int64_t id;
+  std::optional<std::string> name;
+  std::optional<std::int64_t> parent_id;
+  std::optional<int> sort_order;
+};
+
+struct AddTagsToAssetParams {
+  std::int64_t asset_id;
+  std::vector<std::int64_t> tag_ids;
+};
+
+struct RemoveTagsFromAssetParams {
+  std::int64_t asset_id;
+  std::vector<std::int64_t> tag_ids;
+};
+
+struct GetAssetTagsParams {
+  std::int64_t asset_id;
+};
+
+struct GetTagStatsParams {};
 
 }  // namespace Features::Gallery::Types

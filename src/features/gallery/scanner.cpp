@@ -354,6 +354,17 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   asset.path = file_path.string();
   asset.type = asset_type;
   asset.size = file_info.size;
+
+  // 设置文件扩展名（小写格式，包含点号）
+  if (file_path.has_extension()) {
+    std::string extension = file_path.extension().string();
+    std::ranges::transform(extension, extension.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    asset.extension = extension;
+  } else {
+    asset.extension = std::nullopt;
+  }
+
   asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
 
   // 设置文件系统时间戳
@@ -458,8 +469,8 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
                 batch_result.updated_assets.push_back(std::move(asset_result.value()));
               }
             } else {
-              batch_result.errors.push_back(std::format(
-                  "{}: {}", analysis.file_info.path.string(), asset_result.error()));
+              batch_result.errors.push_back(
+                  std::format("{}: {}", analysis.file_info.path.string(), asset_result.error()));
             }
           }
 

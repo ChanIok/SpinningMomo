@@ -16,6 +16,8 @@ export interface Asset {
   mimeType?: string
   hash?: string
   folderId?: number
+  description?: string
+  extension?: string
 
   // 时间信息（统一使用时间戳）
   fileCreatedAt?: number
@@ -102,7 +104,8 @@ export interface AssetFilter {
   type?: AssetType // photo, video, live_photo, unknown
   searchQuery?: string
   folderId?: string
-  tagId?: string
+  tagIds?: number[]
+  tagMatchMode?: 'any' | 'all'
 }
 
 // 视图配置
@@ -168,6 +171,8 @@ export interface QueryAssetsFilters {
   year?: string // "2024" 格式
   type?: AssetType // photo, video, live_photo
   search?: string // 搜索关键词
+  tagIds?: number[]
+  tagMatchMode?: 'any' | 'all'
 }
 
 // 查询参数

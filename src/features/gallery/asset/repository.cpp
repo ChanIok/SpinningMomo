@@ -15,16 +15,14 @@ import <rfl.hpp>;
 
 namespace Features::Gallery::Asset::Repository {
 
-// ============= 基本 CRUD 操作 =============
-
 auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
     -> std::expected<int64_t, std::string> {
   std::string sql = R"(
             INSERT INTO assets (
                 name, path, type,
-                width, height, size, mime_type, hash, folder_id,
+                width, height, size, mime_type, extension, description, hash, folder_id,
                 file_created_at, file_modified_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
@@ -32,7 +30,6 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.path);
   params.push_back(item.type);
 
-  // 处理 optional 类型字段
   params.push_back(item.width.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
                        : Core::Database::Types::DbParam{std::monostate{}});
@@ -43,6 +40,13 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
                                          : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.mime_type);
+
+  params.push_back(item.extension.has_value()
+                       ? Core::Database::Types::DbParam{item.extension.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.description.has_value()
+                       ? Core::Database::Types::DbParam{item.description.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
@@ -120,7 +124,7 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   std::string sql = R"(
             UPDATE assets SET
                 name = ?, path = ?, type = ?,
-                width = ?, height = ?, size = ?, mime_type = ?, hash = ?, folder_id = ?,
+                width = ?, height = ?, size = ?, mime_type = ?, extension = ?, description = ?, hash = ?, folder_id = ?,
                 file_created_at = ?, file_modified_at = ?
             WHERE id = ?
         )";
@@ -130,7 +134,6 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   params.push_back(item.path);
   params.push_back(item.type);
 
-  // 处理 optional 类型字段
   params.push_back(item.width.has_value()
                        ? Core::Database::Types::DbParam{static_cast<int64_t>(item.width.value())}
                        : Core::Database::Types::DbParam{std::monostate{}});
@@ -141,6 +144,13 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
                                          : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.mime_type);
+
+  params.push_back(item.extension.has_value()
+                       ? Core::Database::Types::DbParam{item.extension.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
+  params.push_back(item.description.has_value()
+                       ? Core::Database::Types::DbParam{item.description.value()}
+                       : Core::Database::Types::DbParam{std::monostate{}});
 
   params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                          : Core::Database::Types::DbParam{std::monostate{}});
@@ -192,8 +202,6 @@ auto hard_delete_asset(Core::State::AppState& app_state, int64_t id)
 
   return {};
 }
-
-// ============= 查询操作 =============
 
 auto build_asset_list_query_conditions(const Types::ListParams& params) -> AssetQueryBuilder {
   AssetQueryBuilder builder;
@@ -431,18 +439,18 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
   std::string insert_prefix = R"(
     INSERT INTO assets (
       name, path, type,
-      width, height, size, mime_type, hash, folder_id,
+      width, height, size, mime_type, extension, description, hash, folder_id,
       file_created_at, file_modified_at
     ) VALUES 
   )";
 
-  std::string values_placeholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  std::string values_placeholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
   // 参数提取器，将Asset对象转换为参数列表
   auto param_extractor =
       [](const Types::Asset& item) -> std::vector<Core::Database::Types::DbParam> {
     std::vector<Core::Database::Types::DbParam> params;
-    params.reserve(11);  // 11个字段
+    params.reserve(13);  // 13个字段
 
     params.push_back(item.name);
     params.push_back(item.path);
@@ -458,6 +466,13 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
                                            : Core::Database::Types::DbParam{std::monostate{}});
 
     params.push_back(item.mime_type);
+
+    params.push_back(item.extension.has_value()
+                         ? Core::Database::Types::DbParam{item.extension.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
+    params.push_back(item.description.has_value()
+                         ? Core::Database::Types::DbParam{item.description.value()}
+                         : Core::Database::Types::DbParam{std::monostate{}});
 
     params.push_back(item.hash.has_value() ? Core::Database::Types::DbParam{item.hash.value()}
                                            : Core::Database::Types::DbParam{std::monostate{}});
@@ -494,7 +509,7 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
         std::string sql = R"(
           UPDATE assets SET
             name = ?, path = ?, type = ?,
-            width = ?, height = ?, size = ?, mime_type = ?, hash = ?, folder_id = ?,
+            width = ?, height = ?, size = ?, mime_type = ?, extension = ?, description = ?, hash = ?, folder_id = ?,
             file_created_at = ?, file_modified_at = ?
           WHERE id = ?
         )";
@@ -502,7 +517,7 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
         // 提取参数的lambda，避免在循环中重复代码
         auto extract_params = [](const Types::Asset& item) {
           std::vector<Core::Database::Types::DbParam> params;
-          params.reserve(12);  // 11个更新字段 + 1个WHERE条件
+          params.reserve(14);  // 13个更新字段 + 1个WHERE条件
 
           params.push_back(item.name);
           params.push_back(item.path);
@@ -521,6 +536,14 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
                                : Core::Database::Types::DbParam{std::monostate{}});
 
           params.push_back(item.mime_type);
+
+          // 处理 extension 和 description 字段
+          params.push_back(item.extension.has_value()
+                               ? Core::Database::Types::DbParam{item.extension.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
+          params.push_back(item.description.has_value()
+                               ? Core::Database::Types::DbParam{item.description.value()}
+                               : Core::Database::Types::DbParam{std::monostate{}});
 
           params.push_back(item.hash.has_value()
                                ? Core::Database::Types::DbParam{item.hash.value()}
@@ -761,6 +784,30 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
   if (filters.search.has_value() && !filters.search->empty()) {
     conditions.push_back("name LIKE ?");
     params.push_back("%" + filters.search.value() + "%");
+  }
+
+  // 标签筛选
+  if (filters.tag_ids.has_value() && !filters.tag_ids->empty()) {
+    std::string match_mode = filters.tag_match_mode.value_or("any");
+
+    if (match_mode == "all") {
+      // 匹配所有标签（AND）：资产必须拥有所有指定的标签
+      for (const auto& tag_id : filters.tag_ids.value()) {
+        conditions.push_back("id IN (SELECT asset_id FROM asset_tags WHERE tag_id = ?)");
+        params.push_back(tag_id);
+      }
+    } else {
+      // 匹配任一标签（OR）：资产拥有任意一个标签即可
+      std::string placeholders = std::string(filters.tag_ids->size() * 2 - 1, '?');
+      for (size_t i = 1; i < filters.tag_ids->size(); ++i) {
+        placeholders[i * 2 - 1] = ',';
+      }
+      conditions.push_back(std::format(
+          "id IN (SELECT asset_id FROM asset_tags WHERE tag_id IN ({}))", placeholders));
+      for (const auto& tag_id : filters.tag_ids.value()) {
+        params.push_back(tag_id);
+      }
+    }
   }
 
   // 构建 WHERE 子句
