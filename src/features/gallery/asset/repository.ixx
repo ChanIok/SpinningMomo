@@ -35,12 +35,6 @@ auto soft_delete_asset(Core::State::AppState& app_state, std::int64_t id)
 auto hard_delete_asset(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<void, std::string>;
 
-// ============= 查询操作 =============
-
-// 获取资产统计信息
-auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
-    -> std::expected<Types::Stats, std::string>;
-
 // ============= 时间线视图查询 =============
 
 // 获取时间线桶（月份统计）

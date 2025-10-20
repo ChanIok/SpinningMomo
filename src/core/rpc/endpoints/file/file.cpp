@@ -54,12 +54,11 @@ struct CopyPathParams {
 
 auto handle_read_file([[maybe_unused]] Core::State::AppState& app_state,
                       const ReadFileParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::EncodedFileReadResult>> {
+    -> RpcAwaitable<Utils::File::EncodedFileReadResult> {
   auto result = co_await Utils::File::read_file_and_encode(params.path);
   if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to read file: " + result.error()});
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Failed to read file: " + result.error()});
   }
 
   co_return result.value();
@@ -67,13 +66,12 @@ auto handle_read_file([[maybe_unused]] Core::State::AppState& app_state,
 
 auto handle_write_file([[maybe_unused]] Core::State::AppState& app_state,
                        const WriteFileParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::FileWriteResult>> {
+    -> RpcAwaitable<Utils::File::FileWriteResult> {
   auto result = co_await Utils::File::write_file(params.path, params.content, params.is_binary,
                                                  params.overwrite);
   if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to write file: " + result.error()});
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Failed to write file: " + result.error()});
   }
 
   co_return result.value();
@@ -81,12 +79,11 @@ auto handle_write_file([[maybe_unused]] Core::State::AppState& app_state,
 
 auto handle_list_directory([[maybe_unused]] Core::State::AppState& app_state,
                            const ListDirectoryParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::DirectoryListResult>> {
+    -> RpcAwaitable<Utils::File::DirectoryListResult> {
   auto result = co_await Utils::File::list_directory(params.path, params.extensions);
   if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to list directory: " + result.error()});
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Failed to list directory: " + result.error()});
   }
 
   co_return result.value();
@@ -94,53 +91,46 @@ auto handle_list_directory([[maybe_unused]] Core::State::AppState& app_state,
 
 auto handle_get_file_info([[maybe_unused]] Core::State::AppState& app_state,
                           const GetFileInfoParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::FileInfoResult>> {
+    -> RpcAwaitable<Utils::File::FileInfoResult> {
   auto result = co_await Utils::File::get_file_info(params.path);
   if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to get file info: " + result.error()});
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Failed to get file info: " + result.error()});
   }
 
   co_return result.value();
 }
 
 auto handle_delete_path([[maybe_unused]] Core::State::AppState& app_state,
-                        const DeletePathParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::DeleteResult>> {
+                        const DeletePathParams& params) -> RpcAwaitable<Utils::File::DeleteResult> {
   auto result = co_await Utils::File::delete_path(params.path, params.recursive);
   if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to delete path: " + result.error()});
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Failed to delete path: " + result.error()});
   }
 
   co_return result.value();
 }
 
 auto handle_move_path([[maybe_unused]] Core::State::AppState& app_state,
-                      const MovePathParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::MoveResult>> {
+                      const MovePathParams& params) -> RpcAwaitable<Utils::File::MoveResult> {
   auto result = co_await Utils::File::move_path(params.source_path, params.destination_path,
                                                 params.overwrite);
   if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to move path: " + result.error()});
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Failed to move path: " + result.error()});
   }
 
   co_return result.value();
 }
 
 auto handle_copy_path([[maybe_unused]] Core::State::AppState& app_state,
-                      const CopyPathParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Utils::File::CopyResult>> {
+                      const CopyPathParams& params) -> RpcAwaitable<Utils::File::CopyResult> {
   auto result = co_await Utils::File::copy_path(params.source_path, params.destination_path,
                                                 params.recursive, params.overwrite);
   if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to copy path: " + result.error()});
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Failed to copy path: " + result.error()});
   }
 
   co_return result.value();

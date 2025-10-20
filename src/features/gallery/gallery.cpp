@@ -177,11 +177,6 @@ auto cleanup_thumbnails(Core::State::AppState& app_state)
 
 // ============= 统计和信息 =============
 
-auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
-    -> std::expected<Types::Stats, std::string> {
-  return Asset::Repository::get_asset_stats(app_state, params);
-}
-
 auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string> {
   try {

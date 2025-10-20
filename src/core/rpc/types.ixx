@@ -30,6 +30,9 @@ struct RpcError {
 template <typename T>
 using RpcResult = std::expected<T, RpcError>;
 
+template <typename T>
+using RpcAwaitable = asio::awaitable<RpcResult<T>>;
+
 struct MethodListItem {
   std::string name;
   std::string description;

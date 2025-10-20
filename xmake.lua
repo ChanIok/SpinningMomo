@@ -27,7 +27,7 @@ target("SpinningMomo")
     set_policy("build.c++.modules", true)
     
     -- Windows特定宏定义
-    add_defines("NOMINMAX", "UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN", "_WIN32_WINNT=0x0A00", "SPDLOG_COMPILED_LIB")
+    add_defines("NOMINMAX", "UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN", "_WIN32_WINNT=0x0A00", "SPDLOG_COMPILED_LIB", "yyjson_api_inline=yyjson_inline")
     
     -- 添加包含目录
     add_includedirs("src")

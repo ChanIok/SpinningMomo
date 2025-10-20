@@ -1,9 +1,5 @@
 module;
 
-#include <asio.hpp>
-#include <rfl.hpp>
-#include <rfl/json.hpp>
-
 module Core.RPC.Endpoints.PluginEndpoints;
 
 import std;
@@ -14,13 +10,15 @@ import Core.RPC.Types;
 import Plugins.InfinityNikki;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
+import <asio.hpp>;
+import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::PluginEndpoints {
 
 auto handle_infinity_nikki_get_game_directory(
     [[maybe_unused]] Core::State::AppState& app_state,
     const Plugins::InfinityNikki::InfinityNikkiGameDirRequest& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Plugins::InfinityNikki::InfinityNikkiGameDirResult>> {
+    -> Core::RPC::RpcAwaitable<Plugins::InfinityNikki::InfinityNikkiGameDirResult> {
   auto result = Plugins::InfinityNikki::get_game_directory();
   if (!result) {
     co_return std::unexpected(Core::RPC::RpcError{

@@ -226,41 +226,6 @@ auto remove_tags_from_asset(Core::State::AppState& app_state,
   return {};
 }
 
-auto replace_asset_tags(Core::State::AppState& app_state, std::int64_t asset_id,
-                        const std::vector<std::int64_t>& tag_ids)
-    -> std::expected<void, std::string> {
-  // 使用事务：先删除所有标签，再添加新标签
-  return Core::Database::execute_transaction(
-      *app_state.database,
-      [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
-        // 1. 删除所有现有标签
-        std::string delete_sql = "DELETE FROM asset_tags WHERE asset_id = ?";
-        std::vector<Core::Database::Types::DbParam> delete_params = {asset_id};
-        auto delete_result = Core::Database::execute(db_state, delete_sql, delete_params);
-        if (!delete_result) {
-          return std::unexpected("Failed to delete existing tags: " + delete_result.error());
-        }
-
-        // 2. 添加新标签
-        if (!tag_ids.empty()) {
-          std::string insert_sql = R"(
-                    INSERT INTO asset_tags (asset_id, tag_id)
-                    VALUES (?, ?)
-                )";
-
-          for (const auto& tag_id : tag_ids) {
-            std::vector<Core::Database::Types::DbParam> insert_params = {asset_id, tag_id};
-            auto insert_result = Core::Database::execute(db_state, insert_sql, insert_params);
-            if (!insert_result) {
-              return std::unexpected("Failed to add new tag: " + insert_result.error());
-            }
-          }
-        }
-
-        return {};
-      });
-}
-
 auto get_asset_tags(Core::State::AppState& app_state, std::int64_t asset_id)
     -> std::expected<std::vector<Types::Tag>, std::string> {
   std::string sql = R"(
