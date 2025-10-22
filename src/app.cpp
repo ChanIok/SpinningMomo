@@ -27,6 +27,7 @@ import Utils.String;
 import Utils.System;
 import Vendor.Windows;
 import Core.I18n;
+import Core.I18n.Types;
 
 Application::Application() = default;
 Application::~Application() {

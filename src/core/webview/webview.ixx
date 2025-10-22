@@ -9,10 +9,10 @@ import Core.WebView.Static;
 import Core.WebView.Types;
 import <windows.h>;
 
-export namespace Core::WebView {
+namespace Core::WebView {
 
 // 初始化函数
-auto initialize(Core::State::AppState& state, HWND webview_hwnd)
+export auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string>;
 
 // 销毁函数

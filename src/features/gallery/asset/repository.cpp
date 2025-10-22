@@ -5,6 +5,7 @@ module Features.Gallery.Asset.Repository;
 import std;
 import Core.State;
 import Core.Database;
+import Core.Database.State;
 import Core.Database.Types;
 import Features.Gallery.Types;
 import Features.Gallery.State;

@@ -19,6 +19,7 @@ import UI.AppWindow.Layout;
 import UI.AppWindow.D2DContext;
 import UI.AppWindow.Painter;
 import UI.AppWindow.State;
+import UI.AppWindow.Types;
 import Utils.Logger;
 
 namespace UI::AppWindow {

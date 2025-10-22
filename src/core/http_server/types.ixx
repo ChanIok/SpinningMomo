@@ -65,7 +65,7 @@ struct ResolverRegistry {
 };
 
 // SSE连接信息结构
-export struct SseConnection {
+struct SseConnection {
   uWS::HttpResponse<false>* response = nullptr;
   std::string client_id;
   std::chrono::system_clock::time_point connected_at;

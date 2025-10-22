@@ -5,7 +5,7 @@ export module Features.Screenshot.UseCase;
 import Core.State;
 import UI.AppWindow.Events;
 
-export namespace Features::Screenshot::UseCase {
+namespace Features::Screenshot::UseCase {
 
 // 处理截图事件
 export auto handle_capture_event(Core::State::AppState& state,

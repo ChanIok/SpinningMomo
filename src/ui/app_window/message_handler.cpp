@@ -17,6 +17,7 @@ import UI.AppWindow.Events;
 import UI.AppWindow.Layout;
 import UI.AppWindow.Painter;
 import UI.AppWindow.State;
+import UI.AppWindow.Types;
 import UI.TrayIcon;
 import UI.TrayIcon.Types;
 import UI.ContextMenu;

@@ -10,7 +10,7 @@ import Core.HttpServer.Types;
 export namespace Core::HttpServer::State {
 
 // HTTP服务器状态
-export struct HttpServerState {
+struct HttpServerState {
   // 服务器核心
   std::jthread server_thread{};
   us_listen_socket_t* listen_socket{nullptr};

@@ -7,7 +7,7 @@ import Core.State;
 import Features.Updater.State;
 import Features.Updater.Types;
 
-export namespace Features::Updater {
+namespace Features::Updater {
 
 // 初始化Updater模块
 export auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string>;

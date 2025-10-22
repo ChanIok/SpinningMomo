@@ -13,8 +13,6 @@ struct ComputedPresets {
   std::vector<Common::MenuData::Types::RatioPreset> aspect_ratios;
   std::vector<Common::MenuData::Types::ResolutionPreset> resolutions;
   std::vector<Common::MenuData::Types::ComputedFeatureItem> feature_items;
-
-  ComputedPresets() = default;
 };
 
 // Settings 模块的完整运行时状态
@@ -22,8 +20,6 @@ struct SettingsState {
   Types::AppSettings config;         // 配置数据（可序列化）
   ComputedPresets computed_presets;  // 计算状态
   bool is_initialized = false;
-
-  SettingsState() = default;
 };
 
 // === 状态管理函数 ===

@@ -8,6 +8,7 @@ import Core.HttpServer.Static;
 import Core.HttpServer.Types;
 import Core.WebView.Static;
 import Core.WebView.State;
+import Core.WebView.Types;
 import Features.Gallery.State;
 import Features.Gallery.Asset.Repository;
 import Utils.Logger;

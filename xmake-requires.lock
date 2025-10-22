@@ -3,34 +3,34 @@
         version = "1.0"
     },
     ["windows|x64"] = {
-        ["vcpkg::asio#31fecfc4"] = {
+        ["vcpkg::asio#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::libwebp#31fecfc4"] = {
+        ["vcpkg::libwebp#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::reflectcpp#31fecfc4"] = {
+        ["vcpkg::reflectcpp#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::spdlog#31fecfc4"] = {
+        ["vcpkg::spdlog#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::sqlitecpp#31fecfc4"] = {
+        ["vcpkg::sqlitecpp#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::uwebsockets#31fecfc4"] = {
+        ["vcpkg::uwebsockets#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::webview2#31fecfc4"] = {
+        ["vcpkg::webview2#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::wil#31fecfc4"] = {
+        ["vcpkg::wil#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::xxhash#31fecfc4"] = {
+        ["vcpkg::xxhash#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::zlib#31fecfc4"] = {
+        ["vcpkg::zlib#f56260b5"] = {
             version = "latest"
         }
     }

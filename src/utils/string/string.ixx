@@ -71,7 +71,7 @@ export [[nodiscard]] auto ToBase64(const std::vector<char>& binary_data) -> std:
 
     std::uint32_t chunk = 0;
     for (size_t j = 0; j < bytes_left; ++j) {
-      chunk |= (static_cast<uint8_t>(binary_data[i + j]) << (8 * (2 - j)));
+      chunk |= (static_cast<std::uint8_t>(binary_data[i + j]) << (8 * (2 - j)));
     }
 
     result.push_back(kBase64Chars[(chunk >> 18) & 0x3F]);
@@ -92,7 +92,7 @@ export [[nodiscard]] auto FromBase64(const std::string& base64_str) -> std::vect
   int decode_table[256];
   std::fill(std::begin(decode_table), std::end(decode_table), -1);
   for (int i = 0; i < 64; ++i) {
-    decode_table[static_cast<uint8_t>(kBase64Chars[i])] = i;
+    decode_table[static_cast<std::uint8_t>(kBase64Chars[i])] = i;
   }
 
   const auto input_len = base64_str.length();
@@ -101,12 +101,12 @@ export [[nodiscard]] auto FromBase64(const std::string& base64_str) -> std::vect
   for (size_t i = 0; i < input_len; i += 4) {
     if (i + 3 >= input_len) break;
 
-    const auto a = decode_table[static_cast<uint8_t>(base64_str[i])];
-    const auto b = decode_table[static_cast<uint8_t>(base64_str[i + 1])];
+    const auto a = decode_table[static_cast<std::uint8_t>(base64_str[i])];
+    const auto b = decode_table[static_cast<std::uint8_t>(base64_str[i + 1])];
     const auto c =
-        base64_str[i + 2] == '=' ? -1 : decode_table[static_cast<uint8_t>(base64_str[i + 2])];
+        base64_str[i + 2] == '=' ? -1 : decode_table[static_cast<std::uint8_t>(base64_str[i + 2])];
     const auto d =
-        base64_str[i + 3] == '=' ? -1 : decode_table[static_cast<uint8_t>(base64_str[i + 3])];
+        base64_str[i + 3] == '=' ? -1 : decode_table[static_cast<std::uint8_t>(base64_str[i + 3])];
 
     if (a == -1 || b == -1) break;
 
@@ -127,29 +127,29 @@ export [[nodiscard]] auto FromBase64(const std::string& base64_str) -> std::vect
 // 检查字符串是否为有效的UTF-8
 export [[nodiscard]] auto IsValidUtf8(const std::vector<char>& data) -> bool {
   for (size_t i = 0; i < data.size(); ++i) {
-    const auto byte = static_cast<uint8_t>(data[i]);
+    const auto byte = static_cast<std::uint8_t>(data[i]);
 
     if (byte < 0x80) {
       // ASCII字符
       continue;
     } else if ((byte >> 5) == 0x06) {
       // 2字节UTF-8
-      if (i + 1 >= data.size() || (static_cast<uint8_t>(data[i + 1]) >> 6) != 0x02) {
+      if (i + 1 >= data.size() || (static_cast<std::uint8_t>(data[i + 1]) >> 6) != 0x02) {
         return false;
       }
       i += 1;
     } else if ((byte >> 4) == 0x0E) {
       // 3字节UTF-8
-      if (i + 2 >= data.size() || (static_cast<uint8_t>(data[i + 1]) >> 6) != 0x02 ||
-          (static_cast<uint8_t>(data[i + 2]) >> 6) != 0x02) {
+      if (i + 2 >= data.size() || (static_cast<std::uint8_t>(data[i + 1]) >> 6) != 0x02 ||
+          (static_cast<std::uint8_t>(data[i + 2]) >> 6) != 0x02) {
         return false;
       }
       i += 2;
     } else if ((byte >> 3) == 0x1E) {
       // 4字节UTF-8
-      if (i + 3 >= data.size() || (static_cast<uint8_t>(data[i + 1]) >> 6) != 0x02 ||
-          (static_cast<uint8_t>(data[i + 2]) >> 6) != 0x02 ||
-          (static_cast<uint8_t>(data[i + 3]) >> 6) != 0x02) {
+      if (i + 3 >= data.size() || (static_cast<std::uint8_t>(data[i + 1]) >> 6) != 0x02 ||
+          (static_cast<std::uint8_t>(data[i + 2]) >> 6) != 0x02 ||
+          (static_cast<std::uint8_t>(data[i + 3]) >> 6) != 0x02) {
         return false;
       }
       i += 3;

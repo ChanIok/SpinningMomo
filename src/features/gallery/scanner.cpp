@@ -198,7 +198,7 @@ auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::pat
 
     Types::FileSystemInfo info{
         .path = normalized_path_result.value(),
-        .size = static_cast<int64_t>(file_size),
+        .size = static_cast<std::int64_t>(file_size),
         .file_modified_millis = Utils::Time::file_time_to_millis(last_write_time),
         .file_created_millis = creation_time_result.value(),
         .hash = ""};

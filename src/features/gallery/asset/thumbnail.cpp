@@ -201,7 +201,7 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
 // 使用文件哈希生成缩略图（按短边等比例缩放）
 auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
                         const std::filesystem::path& source_file, const std::string& file_hash,
-                        uint32_t short_edge_size)
+                        std::uint32_t short_edge_size)
     -> std::expected<std::filesystem::path, std::string> {
   try {
     auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
@@ -281,7 +281,7 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
     }
   }
 
-  int64_t total_size = 0;
+  std::int64_t total_size = 0;
   int total_thumbnails = 0;
   int orphaned_thumbnails = 0;
 

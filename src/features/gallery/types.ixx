@@ -29,6 +29,7 @@ struct Asset {
   std::int64_t created_at;
   std::int64_t updated_at;
   std::optional<std::int64_t> deleted_at;
+  // std::int64_t test;
 };
 
 struct Folder {
@@ -166,16 +167,16 @@ struct ScanResult {
 enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
 
 struct Metadata {
-  int64_t id;
+  std::int64_t id;
   std::string path;
-  int64_t size;
+  std::int64_t size;
   std::int64_t file_modified_at;
   std::string hash;
 };
 
 struct FileSystemInfo {
   std::filesystem::path path;
-  int64_t size;
+  std::int64_t size;
   std::int64_t file_modified_millis;
   std::int64_t file_created_millis;
   std::string hash;

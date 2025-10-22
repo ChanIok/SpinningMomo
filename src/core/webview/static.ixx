@@ -10,7 +10,7 @@ import Core.State;
 import Core.WebView.Types;
 import Core.WebView.State;
 
-export namespace Core::WebView::Static {
+namespace Core::WebView::Static {
 
 // 注册 WebView 资源解析器（接受 AppState）
 export auto register_web_resource_resolver(Core::State::AppState& state, std::wstring prefix,

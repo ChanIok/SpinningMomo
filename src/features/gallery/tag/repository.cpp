@@ -5,6 +5,7 @@ module Features.Gallery.Tag.Repository;
 import std;
 import Core.State;
 import Core.Database;
+import Core.Database.State;
 import Core.Database.Types;
 import Features.Gallery.Types;
 import Utils.Logger;
@@ -27,7 +28,7 @@ auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& 
                           ? Core::Database::Types::DbParam{params.parent_id.value()}
                           : Core::Database::Types::DbParam{std::monostate{}});
 
-  db_params.push_back(static_cast<int64_t>(params.sort_order.value_or(0)));
+  db_params.push_back(static_cast<std::int64_t>(params.sort_order.value_or(0)));
 
   auto result = Core::Database::execute(*app_state.database, sql, db_params);
   if (!result) {
@@ -36,7 +37,7 @@ auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& 
 
   // 获取插入的 ID
   auto id_result =
-      Core::Database::query_scalar<int64_t>(*app_state.database, "SELECT last_insert_rowid()");
+      Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT last_insert_rowid()");
   if (!id_result) {
     return std::unexpected("Failed to get inserted tag ID: " + id_result.error());
   }
@@ -113,7 +114,7 @@ auto update_tag(Core::State::AppState& app_state, const Types::UpdateTagParams& 
 
   if (params.sort_order.has_value()) {
     set_clauses.push_back("sort_order = ?");
-    db_params.push_back(static_cast<int64_t>(params.sort_order.value()));
+    db_params.push_back(static_cast<std::int64_t>(params.sort_order.value()));
   }
 
   if (set_clauses.empty()) {
