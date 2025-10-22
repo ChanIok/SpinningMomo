@@ -11,12 +11,14 @@ export namespace Features::Gallery::Types {
 struct Asset {
   std::int64_t id;
   std::string name;
-  std::string filepath;
+  std::string path;
   std::string type;  // photo, video, live_photo, unknown
 
+  std::optional<std::string> description;
   std::optional<std::int32_t> width;
   std::optional<std::int32_t> height;
   std::optional<std::int64_t> size;
+  std::optional<std::string> extension;
   std::string mime_type;
   std::optional<std::string> hash;  // xxh3哈希
   std::optional<std::int64_t> folder_id;
@@ -42,6 +44,21 @@ struct Folder {
   std::int64_t updated_at;
 };
 
+struct FolderTreeNode {
+  std::int64_t id;
+  std::string path;
+  std::optional<std::int64_t> parent_id;
+  std::string name;
+  std::optional<std::string> display_name;
+  std::optional<std::int64_t> cover_asset_id;
+  int sort_order = 0;
+  int is_hidden = 0;
+  std::int64_t created_at;
+  std::int64_t updated_at;
+  std::int64_t asset_count = 0;
+  std::vector<FolderTreeNode> children;
+};
+
 struct IgnoreRule {
   std::int64_t id;
   std::optional<std::int64_t> folder_id;
@@ -52,6 +69,32 @@ struct IgnoreRule {
   std::optional<std::string> description;
   std::int64_t created_at;
   std::int64_t updated_at;
+};
+
+struct Tag {
+  std::int64_t id;
+  std::string name;
+  std::optional<std::int64_t> parent_id;
+  int sort_order = 0;
+  std::int64_t created_at;
+  std::int64_t updated_at;
+};
+
+struct TagTreeNode {
+  std::int64_t id;
+  std::string name;
+  std::optional<std::int64_t> parent_id;
+  int sort_order = 0;
+  std::int64_t created_at;
+  std::int64_t updated_at;
+  std::int64_t asset_count = 0;  // 使用该标签（包含子标签）的资产总数
+  std::vector<TagTreeNode> children;
+};
+
+struct AssetTag {
+  std::int64_t asset_id;
+  std::int64_t tag_id;
+  std::int64_t created_at;
 };
 
 // ============= 辅助数据类型 =============
@@ -72,6 +115,12 @@ struct Stats {
   std::int64_t total_size = 0;
   std::string oldest_item_date;
   std::string newest_item_date;
+};
+
+struct TagStats {
+  std::int64_t tag_id;
+  std::string tag_name;
+  std::int64_t asset_count;  // 使用该标签的资产数量
 };
 
 struct TypeCountResult {
@@ -98,12 +147,11 @@ struct ScanIgnoreRule {
 
 struct ScanOptions {
   std::string directory;
-  bool generate_thumbnails = true;
-  std::uint32_t thumbnail_max_width = 400;
-  std::uint32_t thumbnail_max_height = 400;
-  std::vector<std::string> supported_extensions = {".jpg",  ".jpeg", ".png", ".bmp",
-                                                   ".webp", ".tiff", ".tif"};
-  std::vector<ScanIgnoreRule> ignore_rules;
+  std::optional<bool> generate_thumbnails = true;
+  std::optional<std::uint32_t> thumbnail_short_edge = 480;
+  std::optional<std::vector<std::string>> supported_extensions =
+      std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"};
+  std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };
 
 struct ScanResult {
@@ -119,14 +167,14 @@ enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
 
 struct Metadata {
   int64_t id;
-  std::string filepath;
+  std::string path;
   int64_t size;
   std::int64_t file_modified_at;
   std::string hash;
 };
 
 struct FileSystemInfo {
-  std::filesystem::path filepath;
+  std::filesystem::path path;
   int64_t size;
   std::int64_t file_modified_millis;
   std::int64_t file_created_millis;
@@ -148,15 +196,6 @@ struct ProcessingBatchResult {
 
 // ============= RPC参数类型 =============
 
-struct ListParams {
-  std::optional<std::int32_t> page = 1;
-  std::optional<std::int32_t> per_page = 50;
-  std::optional<std::string> sort_by = "created_at";
-  std::optional<std::string> sort_order = "desc";
-  std::optional<std::string> filter_type;
-  std::optional<std::string> search_query;
-};
-
 struct ListResponse {
   std::vector<Asset> items;
   std::int32_t total_count;
@@ -169,20 +208,6 @@ struct GetParams {
   std::int64_t id;
 };
 
-struct ScanParams {
-  std::string directory;
-  bool generate_thumbnails = true;
-  std::uint32_t thumbnail_max_width = 400;
-  std::uint32_t thumbnail_max_height = 400;
-  std::vector<ScanIgnoreRule> ignore_rules;
-};
-
-struct GetThumbnailParams {
-  std::int64_t asset_id;
-  std::optional<std::uint32_t> width = 400;
-  std::optional<std::uint32_t> height = 400;
-};
-
 struct DeleteParams {
   std::int64_t id;
   std::optional<bool> delete_file = false;
@@ -190,10 +215,107 @@ struct DeleteParams {
 
 struct GetStatsParams {};
 
+struct ListAssetsParams {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  // 分页和排序参数（复用ListParams的逻辑）
+  std::optional<std::int32_t> page = 1;
+  std::optional<std::int32_t> per_page = 50;
+  std::optional<std::string> sort_by = "created_at";
+  std::optional<std::string> sort_order = "desc";
+};
+
 struct OperationResult {
   bool success;
   std::string message;
   std::optional<std::int64_t> affected_count;
 };
+
+// ============= 时间线相关类型 =============
+
+struct TimelineBucket {
+  std::string month;  // "2024-10" 格式
+  int count;          // 该月照片数量
+};
+
+struct TimelineBucketsParams {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  std::optional<std::string> type;
+  std::optional<std::string> search;
+  std::optional<std::vector<std::int64_t>> tag_ids;
+  std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
+};
+
+struct TimelineBucketsResponse {
+  std::vector<TimelineBucket> buckets;
+  int total_count;  // 总照片数
+};
+
+struct GetAssetsByMonthParams {
+  std::string month;  // "2024-10" 格式
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
+};
+
+struct GetAssetsByMonthResponse {
+  std::string month;
+  std::vector<Asset> assets;
+  int count;
+};
+
+// ============= 统一查询相关类型 =============
+
+struct QueryAssetsFilters {
+  std::optional<std::int64_t> folder_id;
+  std::optional<bool> include_subfolders = false;
+  std::optional<std::string> month;   // "2024-10" 格式
+  std::optional<std::string> year;    // "2024" 格式
+  std::optional<std::string> type;    // "photo" | "video" | "live_photo"
+  std::optional<std::string> search;  // 搜索关键词
+  std::optional<std::vector<std::int64_t>> tag_ids;
+  std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
+};
+
+struct QueryAssetsParams {
+  QueryAssetsFilters filters;
+  std::optional<std::string> sort_by = "created_at";
+  std::optional<std::string> sort_order = "desc";
+  // 分页是可选的：传page就分页，不传就返回所有结果
+  std::optional<std::int32_t> page;
+  std::optional<std::int32_t> per_page;
+};
+
+// ============= 标签相关参数 =============
+
+struct CreateTagParams {
+  std::string name;
+  std::optional<std::int64_t> parent_id;
+  std::optional<int> sort_order = 0;
+};
+
+struct UpdateTagParams {
+  std::int64_t id;
+  std::optional<std::string> name;
+  std::optional<std::int64_t> parent_id;
+  std::optional<int> sort_order;
+};
+
+struct AddTagsToAssetParams {
+  std::int64_t asset_id;
+  std::vector<std::int64_t> tag_ids;
+};
+
+struct RemoveTagsFromAssetParams {
+  std::int64_t asset_id;
+  std::vector<std::int64_t> tag_ids;
+};
+
+struct GetAssetTagsParams {
+  std::int64_t asset_id;
+};
+
+struct GetTagStatsParams {};
 
 }  // namespace Features::Gallery::Types

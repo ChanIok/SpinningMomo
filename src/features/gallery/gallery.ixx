@@ -36,10 +36,6 @@ auto cleanup_thumbnails(Core::State::AppState& app_state)
 
 // ============= 统计和信息 =============
 
-// 获取资产库统计信息
-auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
-    -> std::expected<Types::Stats, std::string>;
-
 // 获取缩略图统计信息
 auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string>;  // 返回格式化的统计信息字符串

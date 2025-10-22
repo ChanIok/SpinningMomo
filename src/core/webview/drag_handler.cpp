@@ -1,8 +1,6 @@
 module;
 
 #include <wil/com.h>
-#include <windows.h>
-#include <wrl.h>
 #include <WebView2.h>  // 必须放最后面
 
 module Core.WebView.DragHandler;
@@ -11,7 +9,8 @@ import std;
 import Core.State;
 import Core.WebView.State;
 import Utils.Logger;
-import Vendor.Windows;
+import <windows.h>;
+import <wrl.h>;
 
 // COM对象实现，用于处理前端拖动请求
 class DragHandlerHostObject

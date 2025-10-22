@@ -21,10 +21,12 @@ const std::vector<MigrationScript> all_migrations = {
                     name TEXT NOT NULL,
                     path TEXT NOT NULL UNIQUE,
                     type TEXT NOT NULL CHECK (type IN ('photo', 'video', 'live_photo', 'unknown')),
+                    description TEXT,
                     
                     width INTEGER,
                     height INTEGER,
                     size INTEGER,
+                    extension TEXT,
                     mime_type TEXT,
                     hash TEXT,
                     folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL,
@@ -39,9 +41,13 @@ const std::vector<MigrationScript> all_migrations = {
                 )",
          "CREATE INDEX idx_assets_path ON assets(path);",
          "CREATE INDEX idx_assets_type ON assets(type);",
+         "CREATE INDEX idx_assets_extension ON assets(extension);",
          "CREATE INDEX idx_assets_created_at ON assets(created_at);",
          "CREATE INDEX idx_assets_hash ON assets(hash);",
          "CREATE INDEX idx_assets_folder_id ON assets(folder_id);",
+         "CREATE INDEX idx_assets_file_created_at ON assets(file_created_at);",
+         "CREATE INDEX idx_assets_file_modified_at ON assets(file_modified_at);",
+         "CREATE INDEX idx_assets_folder_time ON assets(folder_id, file_created_at);",
          R"(
                 CREATE TRIGGER update_assets_updated_at 
                 AFTER UPDATE ON assets 
@@ -87,10 +93,9 @@ const std::vector<MigrationScript> all_migrations = {
                     created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
                     updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
                     
-                    FOREIGN KEY (parent_id) REFERENCES tags(id) ON DELETE CASCADE,
-                    UNIQUE(parent_id, name)
+                    FOREIGN KEY (parent_id) REFERENCES tags(id) ON DELETE CASCADE
                 );
-                )",
+                )"
          R"(
                 CREATE TABLE asset_tags (
                     asset_id INTEGER NOT NULL,

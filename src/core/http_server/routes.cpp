@@ -26,8 +26,6 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
 
   // 注册RPC端点
   app.post("/rpc", [&state](auto* res, auto* req) {
-    Logger().debug("RPC request received");
-
     std::string buffer;
     res->onData(
         [&state, buffer = std::move(buffer), res](std::string_view data, bool last) mutable {

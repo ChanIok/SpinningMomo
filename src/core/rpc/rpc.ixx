@@ -1,7 +1,6 @@
 module;
 
 #include <asio.hpp>
-#include <rfl/json.hpp>
 
 export module Core.RPC;
 
@@ -9,6 +8,7 @@ import std;
 import Core.State;
 import Core.RPC.Types;
 import Utils.Logger;
+import <rfl/json.hpp>;
 
 namespace Core::RPC {
 
@@ -18,19 +18,12 @@ using AsyncHandler =
     std::function<asio::awaitable<RpcResult<Response>>(Core::State::AppState&, const Request&)>;
 
 // 创建标准错误响应
-export auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
+auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
                                   const std::string& message) -> std::string;
 
 // 处理JSON-RPC请求
 export auto process_request(Core::State::AppState& app_state, const std::string& request_json)
     -> asio::awaitable<std::string>;
-
-// 获取已注册方法列表
-export auto get_method_list(const Core::State::AppState& app_state) -> std::vector<MethodListItem>;
-
-// 检查方法是否存在
-export auto method_exists(const Core::State::AppState& app_state, const std::string& method_name)
-    -> bool;
 
 // 注册RPC方法
 export template <typename Request, typename Response>
@@ -68,9 +61,14 @@ auto register_method(Core::State::AppState& app_state,
     }
   };
 
+  // 自动生成参数的 JSON Schema
+  auto params_schema = rfl::json::to_schema<Request, rfl::SnakeCaseToCamelCase>();
+
   // 存储到注册表
-  registry[method_name] = MethodInfo{
-      .name = method_name, .description = description, .handler = std::move(wrapped_handler)};
+  registry[method_name] = MethodInfo{.name = method_name,
+                                     .description = description,
+                                     .params_schema = params_schema,
+                                     .handler = std::move(wrapped_handler)};
 }
 
 }  // namespace Core::RPC

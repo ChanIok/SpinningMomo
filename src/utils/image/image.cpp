@@ -81,19 +81,21 @@ auto get_mime_type(IWICBitmapDecoder* decoder) -> std::string {
   return "application/octet-stream";
 }
 
-// 计算缩放尺寸
-auto calculate_scaled_size(uint32_t original_width, uint32_t original_height, uint32_t max_width,
-                           uint32_t max_height) -> std::pair<uint32_t, uint32_t> {
-  // 如果原始尺寸小于等于最大尺寸，直接返回
-  if (original_width <= max_width && original_height <= max_height) {
+// 计算缩放尺寸（按短边等比例缩放）
+auto calculate_scaled_size(uint32_t original_width, uint32_t original_height,
+                           uint32_t short_edge_size) -> std::pair<uint32_t, uint32_t> {
+  // 判断哪边是短边
+  uint32_t short_edge = std::min(original_width, original_height);
+
+  // 如果短边已经小于或等于目标尺寸，不缩放
+  if (short_edge <= short_edge_size) {
     return {original_width, original_height};
   }
 
-  // 计算缩放比例
-  double scale_x = static_cast<double>(max_width) / original_width;
-  double scale_y = static_cast<double>(max_height) / original_height;
-  double scale = std::min(scale_x, scale_y);
+  // 计算缩放比例（基于短边）
+  double scale = static_cast<double>(short_edge_size) / short_edge;
 
+  // 等比例计算两边
   uint32_t new_width = static_cast<uint32_t>(original_width * scale);
   uint32_t new_height = static_cast<uint32_t>(original_height * scale);
 
@@ -225,8 +227,8 @@ auto convert_to_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source)
 }
 
 // 缩放图像
-auto scale_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source, uint32_t max_width,
-                  uint32_t max_height) -> std::expected<wil::com_ptr<IWICBitmap>, std::string> {
+auto scale_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source, uint32_t short_edge_size)
+    -> std::expected<wil::com_ptr<IWICBitmap>, std::string> {
   if (!factory) {
     return std::unexpected("WIC factory is null");
   }
@@ -242,7 +244,7 @@ auto scale_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source, uint32_
 
     // 计算缩放后尺寸
     auto [new_width, new_height] =
-        calculate_scaled_size(original_width, original_height, max_width, max_height);
+        calculate_scaled_size(original_width, original_height, short_edge_size);
 
     // 如果尺寸相同，直接转换
     if (new_width == original_width && new_height == original_height) {
@@ -335,8 +337,7 @@ auto encode_bitmap_to_webp(IWICBitmap* bitmap, const WebPEncodeOptions& options)
 
 // 直接从文件生成WebP缩略图
 auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& path,
-                             uint32_t max_width, uint32_t max_height,
-                             const WebPEncodeOptions& options)
+                             uint32_t short_edge_size, const WebPEncodeOptions& options)
     -> std::expected<WebPEncodedResult, std::string> {
   if (!factory) {
     return std::unexpected("WIC factory is null");
@@ -350,7 +351,7 @@ auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& p
   auto frame = std::move(frame_result.value());
 
   // 缩放图像
-  auto scaled_result = scale_bitmap(factory.get(), frame.get(), max_width, max_height);
+  auto scaled_result = scale_bitmap(factory.get(), frame.get(), short_edge_size);
   if (!scaled_result) {
     return std::unexpected(scaled_result.error());
   }

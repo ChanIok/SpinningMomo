@@ -20,7 +20,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
 // 根据文件路径获取资产项
-auto get_asset_by_filepath(Core::State::AppState& app_state, const std::string& path)
+auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
 // 更新资产项
@@ -35,21 +35,23 @@ auto soft_delete_asset(Core::State::AppState& app_state, std::int64_t id)
 auto hard_delete_asset(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<void, std::string>;
 
-// ============= 查询操作 =============
+// ============= 时间线视图查询 =============
 
-// 分页获取资产项列表
-auto list_asset(Core::State::AppState& app_state, const Types::ListParams& params)
+// 获取时间线桶（月份统计）
+auto get_timeline_buckets(Core::State::AppState& app_state,
+                          const Types::TimelineBucketsParams& params)
+    -> std::expected<Types::TimelineBucketsResponse, std::string>;
+
+// 按月查询资产
+auto get_assets_by_month(Core::State::AppState& app_state,
+                         const Types::GetAssetsByMonthParams& params)
+    -> std::expected<Types::GetAssetsByMonthResponse, std::string>;
+
+// ============= 统一查询接口 =============
+
+// 统一的资产查询函数（支持组合筛选、可选分页）
+auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsParams& params)
     -> std::expected<Types::ListResponse, std::string>;
-
-// 获取资产项总数
-auto count_asset(Core::State::AppState& app_state,
-                 const std::optional<std::string>& filter_type = {},
-                 const std::optional<std::string>& search_query = {})
-    -> std::expected<int, std::string>;
-
-// 获取资产统计信息
-auto get_asset_stats(Core::State::AppState& app_state, const Types::GetStatsParams& params)
-    -> std::expected<Types::Stats, std::string>;
 
 // ============= 批量操作 =============
 
@@ -70,13 +72,5 @@ auto cleanup_soft_deleted_assets(Core::State::AppState& app_state, int days_old 
 // 加载数据库中的资产到内存缓存
 auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;
-
-// 构建 WHERE 子句和参数（内部辅助函数）
-struct AssetQueryBuilder {
-  std::string where_clause;
-  std::vector<Core::Database::Types::DbParam> params;
-};
-
-auto build_asset_list_query_conditions(const Types::ListParams& params) -> AssetQueryBuilder;
 
 }  // namespace Features::Gallery::Asset::Repository

@@ -107,7 +107,9 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
           }
         }) |
         std::views::filter([&options](const std::filesystem::directory_entry& entry) {
-          return is_supported_file(entry.path(), options.supported_extensions);
+          const auto& extensions = options.supported_extensions.value_or(
+              std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"});
+          return is_supported_file(entry.path(), extensions);
         }) |
         std::views::filter(
             [&directory, &combined_rules](const std::filesystem::directory_entry& entry) {
@@ -186,8 +188,16 @@ auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::pat
       continue;
     }
 
+    // 规范化路径，确保路径格式统一（统一使用正斜杠）
+    auto normalized_path_result = Utils::Path::NormalizePath(file_path);
+    if (!normalized_path_result) {
+      Logger().warn("Failed to normalize path '{}': {}", file_path.string(),
+                    normalized_path_result.error());
+      continue;
+    }
+
     Types::FileSystemInfo info{
-        .filepath = file_path,
+        .path = normalized_path_result.value(),
         .size = static_cast<int64_t>(file_size),
         .file_modified_millis = Utils::Time::file_time_to_millis(last_write_time),
         .file_created_millis = creation_time_result.value(),
@@ -211,7 +221,7 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
     Types::FileAnalysisResult analysis;
     analysis.file_info = file_info;
 
-    auto it = asset_cache.find(file_info.filepath.string());
+    auto it = asset_cache.find(file_info.path.string());
     if (it == asset_cache.end()) {
       // 新文件
       analysis.status = Types::FileStatus::NEW;
@@ -272,12 +282,12 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
                   [](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
                     const auto& [idx, analysis] = pair;
 
-                    auto hash_result = calculate_file_hash(analysis.file_info.filepath);
+                    auto hash_result = calculate_file_hash(analysis.file_info.path);
                     if (hash_result) {
                       return std::make_pair(idx, std::move(hash_result.value()));
                     } else {
                       Logger().warn("Failed to calculate hash for {}: {}",
-                                    analysis.file_info.filepath.string(), hash_result.error());
+                                    analysis.file_info.path.string(), hash_result.error());
                       return std::nullopt;
                     }
                   }) |
@@ -329,7 +339,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
                          const std::unordered_map<std::string, std::int64_t>& folder_mapping)
     -> std::expected<Types::Asset, std::string> {
   const auto& file_info = analysis.file_info;
-  const auto& file_path = file_info.filepath;
+  const auto& file_path = file_info.path;
 
   auto asset_type = detect_asset_type(file_path);
 
@@ -341,16 +351,20 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   }
 
   asset.name = file_path.filename().string();
-  
-  // 规范化文件路径，确保斜杠格式统一
-  auto normalized_path_result = Utils::Path::NormalizePath(file_path);
-  if (!normalized_path_result) {
-    return std::unexpected(std::format("Failed to normalize file path '{}': {}", 
-                                       file_path.string(), normalized_path_result.error()));
-  }
-  asset.filepath = normalized_path_result.value().string();
+  asset.path = file_path.string();
   asset.type = asset_type;
   asset.size = file_info.size;
+
+  // 设置文件扩展名（小写格式，包含点号）
+  if (file_path.has_extension()) {
+    std::string extension = file_path.extension().string();
+    std::ranges::transform(extension, extension.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    asset.extension = extension;
+  } else {
+    asset.extension = std::nullopt;
+  }
+
   asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
 
   // 设置文件系统时间戳
@@ -361,12 +375,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
 
   // 根据文件路径查找对应的 folder_id
   if (!folder_mapping.empty()) {
-    auto parent_path_result = Utils::Path::NormalizePath(file_path.parent_path());
-    if (!parent_path_result) {
-      return std::unexpected(std::format("Failed to normalize parent path for '{}': {}",
-                                         file_path.string(), parent_path_result.error()));
-    }
-    auto parent_path = parent_path_result.value().string();
+    auto parent_path = file_path.parent_path().string();
     if (auto it = folder_mapping.find(parent_path); it != folder_mapping.end()) {
       asset.folder_id = it->second;
     }
@@ -388,10 +397,10 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
     }
 
     // 生成缩略图（如果需要）
-    if (options.generate_thumbnails) {
-      auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
-          app_state, wic_factory, file_path, file_info.hash, options.thumbnail_max_width,
-          options.thumbnail_max_height);
+    if (options.generate_thumbnails.value_or(true)) {
+      auto thumbnail_result =
+          Asset::Thumbnail::generate_thumbnail(app_state, wic_factory, file_path, file_info.hash,
+                                               options.thumbnail_short_edge.value_or(480));
 
       if (!thumbnail_result) {
         Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
@@ -460,8 +469,8 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
                 batch_result.updated_assets.push_back(std::move(asset_result.value()));
               }
             } else {
-              batch_result.errors.push_back(std::format(
-                  "{}: {}", analysis.file_info.filepath.string(), asset_result.error()));
+              batch_result.errors.push_back(
+                  std::format("{}: {}", analysis.file_info.path.string(), asset_result.error()));
             }
           }
 
@@ -502,21 +511,35 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
     -> std::expected<Types::ScanResult, std::string> {
   auto start_time = std::chrono::steady_clock::now();
 
-  Logger().info("Starting folder-aware asset scan for directory '{}' with {} ignore rules",
-                options.directory, options.ignore_rules.size());
-
-  // 1. 确保文件夹记录存在
-  auto folder_id_result =
-      Folder::Repository::get_or_create_folder_for_path(app_state, options.directory);
-  if (!folder_id_result) {
-    return std::unexpected("Failed to create folder record: " + folder_id_result.error());
+  auto normalized_scan_root_result = Utils::Path::NormalizePath(options.directory);
+  if (!normalized_scan_root_result) {
+    return std::unexpected("Failed to normalize scan root path: " +
+                           normalized_scan_root_result.error());
   }
-  std::int64_t folder_id = folder_id_result.value();
+  auto normalized_scan_root = normalized_scan_root_result.value();
+
+  Logger().info("Starting folder-aware asset scan for directory '{}' with {} ignore rules",
+                normalized_scan_root.string(),
+                options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{}).size());
+
+  // 1. 为扫描根目录预创建文件夹记录
+  std::vector<std::filesystem::path> root_folder_paths = {normalized_scan_root};
+
+  auto root_folder_mapping_result =
+      Folder::Processor::batch_create_folders_for_paths(app_state, root_folder_paths);
+  if (!root_folder_mapping_result) {
+    return std::unexpected("Failed to create root folder record: " +
+                           root_folder_mapping_result.error());
+  }
+
+  auto root_folder_map = std::move(root_folder_mapping_result.value());
+  std::int64_t folder_id = root_folder_map.at(normalized_scan_root.string());
 
   // 2. 持久化前端提供的ignore规则
-  if (!options.ignore_rules.empty()) {
+  auto ignore_rules = options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{});
+  if (!ignore_rules.empty()) {
     auto persist_result =
-        Ignore::Repository::batch_create_ignore_rules(app_state, folder_id, options.ignore_rules);
+        Ignore::Repository::batch_create_ignore_rules(app_state, folder_id, ignore_rules);
     if (!persist_result) {
       Logger().warn("Failed to persist ignore rules: {}", persist_result.error());
     } else {
@@ -532,7 +555,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
   auto asset_cache = std::move(asset_cache_result.value());
 
-  std::filesystem::path directory(options.directory);
+  std::filesystem::path directory(normalized_scan_root);
 
   // 4. 使用支持忽略规则的文件信息扫描（传递folder_id）
   auto file_info_result = scan_file_info(app_state, directory, options, folder_id);
@@ -542,7 +565,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto file_infos = file_info_result.value();
 
   Logger().info("Scanned {} files in directory '{}' (after ignore rules)", file_infos.size(),
-                options.directory);
+                normalized_scan_root.string());
 
   // 分析文件变化
   auto analysis_results = analyze_file_changes(file_infos, asset_cache);
@@ -582,16 +605,18 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   file_paths.reserve(files_to_process.size());
 
   for (const auto& analysis : files_to_process) {
-    file_paths.push_back(analysis.file_info.filepath);
+    file_paths.push_back(analysis.file_info.path);
   }
 
-  auto folder_paths = Folder::Processor::extract_unique_folder_paths(file_paths);
+  // 提取所有需要的文件夹路径（包含祖先目录直到扫描根目录）
+  auto folder_paths = Folder::Processor::extract_unique_folder_paths(file_paths, directory);
 
   auto folder_mapping_result =
       Folder::Processor::batch_create_folders_for_paths(app_state, folder_paths);
   if (folder_mapping_result) {
     path_to_folder_id = std::move(folder_mapping_result.value());
-    Logger().info("Pre-created {} folder records", path_to_folder_id.size());
+    Logger().info("Pre-created {} folder records with complete hierarchy",
+                  path_to_folder_id.size());
   } else {
     Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
   }

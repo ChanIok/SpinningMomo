@@ -49,7 +49,7 @@ Thumbs.db
 
 third_party/
 test/
-playground/
+/playground/
 
 # AI
 .windsurfrules
@@ -72,3 +72,5 @@ web/.cache/
 web/.parcel-cache/
 web/.vite/
 web/stats*
+
+web_react/
