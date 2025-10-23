@@ -2,9 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
-import { getAssetTags } from '../api'
+import { getAssetTags, removeTagsFromAsset, addTagsToAsset } from '../api'
+import TagSelectorPopover from '../components/TagSelectorPopover.vue'
 import type { Tag } from '../types'
 
 const store = useGalleryStore()
@@ -67,6 +69,49 @@ function formatFileSize(bytes: number): string {
     unitIndex++
   }
   return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
+}
+
+// Popover 状态
+const showTagSelector = ref(false)
+
+// 移除标签
+async function handleRemoveTag(tagId: number) {
+  if (!activeAsset.value) return
+
+  try {
+    await removeTagsFromAsset({
+      assetId: activeAsset.value.id,
+      tagIds: [tagId],
+    })
+
+    // 更新本地标签列表
+    assetTags.value = assetTags.value.filter((tag) => tag.id !== tagId)
+  } catch (error) {
+    console.error('Failed to remove tag:', error)
+  }
+}
+
+// 添加标签
+async function handleAddTag(tagId: number) {
+  if (!activeAsset.value) return
+
+  // 检查是否已有此标签
+  if (assetTags.value.some((tag) => tag.id === tagId)) {
+    console.log('标签已存在')
+    return
+  }
+
+  try {
+    await addTagsToAsset({
+      assetId: activeAsset.value.id,
+      tagIds: [tagId],
+    })
+
+    // 重新加载标签列表
+    assetTags.value = await getAssetTags(activeAsset.value.id)
+  } catch (error) {
+    console.error('Failed to add tag:', error)
+  }
 }
 </script>
 
@@ -185,14 +230,66 @@ function formatFileSize(bytes: number): string {
 
       <!-- 标签信息 -->
       <div>
-        <h4 class="mb-2 text-sm font-medium">标签</h4>
+        <div class="mb-2 flex items-center justify-between">
+          <h4 class="text-sm font-medium">标签</h4>
+          <!-- 添加标签按钮 -->
+          <Popover v-model:open="showTagSelector">
+            <PopoverTrigger as-child>
+              <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+                添加标签
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" class="p-0">
+              <TagSelectorPopover
+                :tags="store.tags"
+                :selected-tag-ids="assetTags.map((t) => t.id)"
+                @select="handleAddTag"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <!-- 标签列表 -->
         <div v-if="assetTags.length > 0" class="flex flex-wrap gap-1.5">
           <span
             v-for="tag in assetTags"
             :key="tag.id"
-            class="rounded bg-primary/10 px-2 py-1 text-xs text-primary"
+            class="group inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs text-primary transition-colors hover:bg-primary/20"
           >
-            {{ tag.name }}
+            <span>{{ tag.name }}</span>
+            <button
+              class="flex h-3 w-3 items-center justify-center rounded-full opacity-60 transition-opacity hover:opacity-100 hover:bg-primary/30"
+              @click="handleRemoveTag(tag.id)"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
           </span>
         </div>
         <div v-else class="text-xs text-muted-foreground">暂无标签</div>

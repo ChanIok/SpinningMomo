@@ -190,11 +190,73 @@ export function useGallerySidebar() {
   }
 
   /**
-   * 添加新标签（占位）
+   * 创建标签
    */
-  function addNewTag() {
-    console.log('➕ 添加新标签')
-    // TODO: 实现添加标签逻辑
+  async function createTag(name: string, parentId?: number) {
+    try {
+      console.log('➕ 创建标签:', name, parentId ? `(父标签ID: ${parentId})` : '')
+      
+      const result = await galleryApi.createTag({
+        name,
+        parentId,
+      })
+
+      // 重新加载标签树
+      await loadTagTree()
+
+      console.log('✅ 标签创建成功:', result.id)
+      return result.id
+    } catch (error) {
+      console.error('Failed to create tag:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 更新标签
+   */
+  async function updateTag(id: number, name: string) {
+    try {
+      console.log('✏️ 更新标签:', id, name)
+
+      await galleryApi.updateTag({
+        id,
+        name,
+      })
+
+      // 重新加载标签树
+      await loadTagTree()
+
+      console.log('✅ 标签更新成功')
+    } catch (error) {
+      console.error('Failed to update tag:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 删除标签
+   */
+  async function deleteTag(id: number) {
+    try {
+      console.log('🗑️ 删除标签:', id)
+
+      await galleryApi.deleteTag(id)
+
+      // 重新加载标签树
+      await loadTagTree()
+
+      // 如果删除的是当前选中的标签，清除筛选
+      if (selectedTag.value === id) {
+        store.setFilter({ tagIds: [], tagMatchMode: 'any' })
+        store.clearDetailsFocus()
+      }
+
+      console.log('✅ 标签删除成功')
+    } catch (error) {
+      console.error('Failed to delete tag:', error)
+      throw error
+    }
   }
 
   return {
@@ -218,6 +280,8 @@ export function useGallerySidebar() {
     selectTag,
     selectAllMedia,
     loadTagTree,
-    addNewTag,
+    createTag,
+    updateTag,
+    deleteTag,
   }
 }

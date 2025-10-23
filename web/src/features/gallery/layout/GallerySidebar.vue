@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { useGalleryStore } from '../store'
 import { useGallerySidebar, useGalleryData } from '../composables'
 import FolderTreeItem from '../components/FolderTreeItem.vue'
 import TagTreeItem from '../components/TagTreeItem.vue'
+import TagInlineEditor from '../components/TagInlineEditor.vue'
 
 const store = useGalleryStore()
 const galleryData = useGalleryData()
@@ -24,8 +25,54 @@ const {
   selectTag,
   selectAllMedia,
   loadTagTree,
-  addNewTag,
+  createTag,
+  updateTag,
+  deleteTag,
 } = useGallerySidebar()
+
+// 标签创建状态
+const isCreatingTag = ref(false)
+
+function startCreateTag() {
+  isCreatingTag.value = true
+}
+
+async function handleCreateTag(name: string) {
+  try {
+    await createTag(name)
+    isCreatingTag.value = false
+  } catch (error) {
+    console.error('Failed to create tag:', error)
+  }
+}
+
+function handleCancelCreateTag() {
+  isCreatingTag.value = false
+}
+
+async function handleRenameTag(tagId: number, newName: string) {
+  try {
+    await updateTag(tagId, newName)
+  } catch (error) {
+    console.error('Failed to rename tag:', error)
+  }
+}
+
+async function handleCreateChildTag(parentId: number, name: string) {
+  try {
+    await createTag(name, parentId)
+  } catch (error) {
+    console.error('Failed to create child tag:', error)
+  }
+}
+
+async function handleDeleteTag(tagId: number) {
+  try {
+    await deleteTag(tagId)
+  } catch (error) {
+    console.error('Failed to delete tag:', error)
+  }
+}
 
 onMounted(() => {
   galleryData.loadFolderTree()
@@ -125,7 +172,7 @@ const totalCount = computed(() => store.foldersAssetTotalCount)
       <div class="space-y-2">
         <div class="flex items-center justify-between px-2">
           <h3 class="text-xs font-medium tracking-wider text-muted-foreground uppercase">标签</h3>
-          <Button variant="ghost" size="icon" class="h-6 w-6" @click="addNewTag">
+          <Button variant="ghost" size="icon" class="h-6 w-6" @click="startCreateTag">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="12"
@@ -150,6 +197,15 @@ const totalCount = computed(() => store.foldersAssetTotalCount)
         </div>
         <!-- 标签树 -->
         <div v-else class="space-y-1">
+          <!-- 快速创建标签 -->
+          <div v-if="isCreatingTag" class="px-2">
+            <TagInlineEditor
+              placeholder="输入标签名..."
+              @confirm="handleCreateTag"
+              @cancel="handleCancelCreateTag"
+            />
+          </div>
+          <!-- 标签列表 -->
           <TagTreeItem
             v-for="tag in tags"
             :key="tag.id"
@@ -157,6 +213,9 @@ const totalCount = computed(() => store.foldersAssetTotalCount)
             :selected-tag="selectedTag"
             :depth="0"
             @select="selectTag"
+            @rename="handleRenameTag"
+            @create-child="handleCreateChildTag"
+            @delete="handleDeleteTag"
           />
         </div>
       </div>
