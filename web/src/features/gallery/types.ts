@@ -24,7 +24,6 @@ export interface Asset {
   fileModifiedAt?: number
   createdAt: number
   updatedAt: number
-  deletedAt?: number
 }
 
 // 资产类型枚举

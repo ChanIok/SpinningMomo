@@ -8,7 +8,7 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Features.Gallery.Types;
-import Features.Gallery.Asset.Repository;
+import Features.Gallery.Asset.Service;
 import <asio.hpp>;
 import <rfl/json.hpp>;
 
@@ -19,7 +19,7 @@ namespace Core::RPC::Endpoints::Gallery::Asset {
 auto handle_get_timeline_buckets(Core::State::AppState& app_state,
                                  const Features::Gallery::Types::TimelineBucketsParams& params)
     -> RpcAwaitable<Features::Gallery::Types::TimelineBucketsResponse> {
-  auto result = Features::Gallery::Asset::Repository::get_timeline_buckets(app_state, params);
+  auto result = Features::Gallery::Asset::Service::get_timeline_buckets(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -32,7 +32,7 @@ auto handle_get_timeline_buckets(Core::State::AppState& app_state,
 auto handle_get_assets_by_month(Core::State::AppState& app_state,
                                 const Features::Gallery::Types::GetAssetsByMonthParams& params)
     -> RpcAwaitable<Features::Gallery::Types::GetAssetsByMonthResponse> {
-  auto result = Features::Gallery::Asset::Repository::get_assets_by_month(app_state, params);
+  auto result = Features::Gallery::Asset::Service::get_assets_by_month(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -47,7 +47,7 @@ auto handle_get_assets_by_month(Core::State::AppState& app_state,
 auto handle_query_assets(Core::State::AppState& app_state,
                          const Features::Gallery::Types::QueryAssetsParams& params)
     -> RpcAwaitable<Features::Gallery::Types::ListResponse> {
-  auto result = Features::Gallery::Asset::Repository::query_assets(app_state, params);
+  auto result = Features::Gallery::Asset::Service::query_assets(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),

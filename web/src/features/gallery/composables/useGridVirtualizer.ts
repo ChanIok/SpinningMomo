@@ -83,7 +83,10 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     cols: number,
     total: number
   ) {
-    if (items.length === 0) return
+    if (items.length === 0) {
+      virtualRows.value = []
+      return
+    }
 
     virtualRows.value = items.map((virtualRow) => {
       const startIndex = virtualRow.index * cols

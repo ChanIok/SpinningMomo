@@ -7,6 +7,7 @@ import Core.State;
 import Features.Gallery.Types;
 import Features.Gallery.State;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Asset.Service;
 import Core.Database;
 import Utils.Image;
 import Utils.Path;
@@ -148,7 +149,7 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
 
   // 使用 load_asset_cache 获取所有资产的文件哈希集合
   std::unordered_set<std::string> all_file_hashes;
-  auto cache_result = Repository::load_asset_cache(app_state);
+  auto cache_result = Service::load_asset_cache(app_state);
   if (cache_result) {
     for (const auto& [path, metadata] : cache_result.value()) {
       if (!metadata.hash.empty()) {
@@ -272,7 +273,7 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
 
   // 使用 load_asset_cache 获取所有资产的文件哈希集合
   std::unordered_set<std::string> all_file_hashes;
-  auto cache_result = Repository::load_asset_cache(app_state);
+  auto cache_result = Service::load_asset_cache(app_state);
   if (cache_result) {
     for (const auto& [path, metadata] : cache_result.value()) {
       if (!metadata.hash.empty()) {

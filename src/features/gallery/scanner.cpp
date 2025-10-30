@@ -7,6 +7,7 @@ import Core.State;
 import Core.WorkerPool;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Processor;
@@ -549,7 +550,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   // 3. 加载资产缓存
-  auto asset_cache_result = Asset::Repository::load_asset_cache(app_state);
+  auto asset_cache_result = Asset::Service::load_asset_cache(app_state);
   if (!asset_cache_result) {
     return std::unexpected("Failed to load asset cache: " + asset_cache_result.error());
   }

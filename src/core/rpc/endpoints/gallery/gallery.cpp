@@ -62,24 +62,6 @@ auto handle_get_thumbnail_stats(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-// ============= 维护和优化 RPC 处理函数 =============
-
-struct CleanupDeletedParams {
-  std::optional<int> days_old = 30;
-};
-
-auto handle_cleanup_deleted(Core::State::AppState& app_state, const CleanupDeletedParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result = Features::Gallery::cleanup_deleted_assets(app_state, params.days_old.value_or(30));
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  co_return result.value();
-}
-
 // ============= RPC 方法注册 =============
 
 auto register_all(Core::State::AppState& app_state) -> void {
@@ -102,11 +84,6 @@ auto register_all(Core::State::AppState& app_state) -> void {
   register_method<EmptyParams, std::string>(app_state, app_state.rpc->registry,
                                             "gallery.thumbnailStats", handle_get_thumbnail_stats,
                                             "Get thumbnail storage statistics");
-
-  // 维护操作
-  register_method<CleanupDeletedParams, Features::Gallery::Types::OperationResult>(
-      app_state, app_state.rpc->registry, "gallery.cleanupDeleted", handle_cleanup_deleted,
-      "Clean up soft-deleted items older than specified days");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery

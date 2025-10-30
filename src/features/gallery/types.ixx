@@ -28,8 +28,6 @@ struct Asset {
 
   std::int64_t created_at;
   std::int64_t updated_at;
-  std::optional<std::int64_t> deleted_at;
-  // std::int64_t test;
 };
 
 struct Folder {

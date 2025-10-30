@@ -35,8 +35,7 @@ const std::vector<MigrationScript> all_migrations = {
                     file_modified_at INTEGER,
                     
                     created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
-                    updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
-                    deleted_at INTEGER
+                    updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000)
                 );
                 )",
          "CREATE INDEX idx_assets_path ON assets(path);",

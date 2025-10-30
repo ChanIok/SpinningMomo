@@ -7,6 +7,7 @@ import Core.State;
 import Features.Gallery.State;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Asset.Service;
 import Features.Gallery.Scanner;
 import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
@@ -106,20 +107,15 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
       }
     }
 
-    // 从数据库删除（软删除或硬删除）
-    std::expected<void, std::string> delete_result;
-    if (params.delete_file.value_or(false)) {
-      delete_result = Asset::Repository::hard_delete_asset(app_state, params.id);
-    } else {
-      delete_result = Asset::Repository::soft_delete_asset(app_state, params.id);
-    }
+    // 从数据库删除
+    auto delete_result = Asset::Repository::delete_asset(app_state, params.id);
 
     Types::OperationResult result;
     if (delete_result) {
       result.success = true;
       result.message = params.delete_file.value_or(false)
                            ? "Asset item and file deleted successfully"
-                           : "Asset item deleted successfully";
+                           : "Asset item removed from library successfully";
       result.affected_count = 1;
     } else {
       result.success = false;
@@ -201,33 +197,6 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
 
   } catch (const std::exception& e) {
     return std::unexpected("Exception in get_thumbnail_stats: " + std::string(e.what()));
-  }
-}
-
-// ============= 维护和优化 =============
-
-auto cleanup_deleted_assets(Core::State::AppState& app_state, int days_old)
-    -> std::expected<Types::OperationResult, std::string> {
-  try {
-    auto cleanup_result = Asset::Repository::cleanup_soft_deleted_assets(app_state, days_old);
-
-    Types::OperationResult result;
-    if (cleanup_result) {
-      result.success = true;
-      result.message = std::format("Cleaned up {} deleted items older than {} days",
-                                   cleanup_result.value(), days_old);
-      result.affected_count = cleanup_result.value();
-      Logger().info("Database cleanup completed: {} items removed", cleanup_result.value());
-    } else {
-      result.success = false;
-      result.message = "Failed to cleanup deleted items: " + cleanup_result.error();
-      result.affected_count = 0;
-    }
-
-    return result;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception in cleanup_deleted_items: " + std::string(e.what()));
   }
 }
 
