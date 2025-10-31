@@ -1,6 +1,6 @@
 module;
 
-module Features.Gallery.Folder.Processor;
+module Features.Gallery.Folder.Service;
 
 import std;
 import Core.State;
@@ -9,7 +9,7 @@ import Features.Gallery.Folder.Repository;
 import Utils.Logger;
 import Utils.Path;
 
-namespace Features::Gallery::Folder::Processor {
+namespace Features::Gallery::Folder::Service {
 
 // ============= 路径处理辅助函数 =============
 
@@ -179,4 +179,4 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   return path_to_id_map;
 }
 
-}  // namespace Features::Gallery::Folder::Processor
+}  // namespace Features::Gallery::Folder::Service

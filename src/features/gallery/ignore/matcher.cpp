@@ -1,13 +1,11 @@
 module;
 
-module Features.Gallery.Ignore.Processor;
+module Features.Gallery.Ignore.Matcher;
 
 import std;
-import Core.State;
-import Features.Gallery.Types;
 import Utils.Logger;
 
-namespace Features::Gallery::Ignore::Processor {
+namespace Features::Gallery::Ignore::Matcher {
 
 // ============= 路径处理辅助函数 =============
 
@@ -126,46 +124,4 @@ auto match_regex_pattern(const std::string& pattern, const std::string& path) ->
   }
 }
 
-// ============= 忽略规则应用 =============
-
-auto apply_ignore_rules(const std::filesystem::path& file_path,
-                        const std::filesystem::path& base_path,
-                        const std::vector<Types::IgnoreRule>& rules) -> bool {
-  if (rules.empty()) {
-    return false;  // 没有规则，不忽略
-  }
-
-  auto normalized_path = normalize_path_for_matching(file_path, base_path);
-  bool should_ignore = false;
-
-  // 按顺序应用规则，后面的规则会覆盖前面的结果
-  for (const auto& rule : rules) {
-    if (!rule.is_enabled) {
-      continue;  // 跳过禁用的规则
-    }
-
-    bool matches = false;
-
-    // 根据模式类型选择匹配方法
-    if (rule.pattern_type == "glob") {
-      matches = match_glob_pattern(rule.rule_pattern, normalized_path);
-    } else if (rule.pattern_type == "regex") {
-      matches = match_regex_pattern(rule.rule_pattern, normalized_path);
-    } else {
-      Logger().warn("Unknown pattern type '{}' for rule: {}", rule.pattern_type, rule.rule_pattern);
-      continue;
-    }
-
-    if (matches) {
-      // 根据规则类型设置忽略状态
-      should_ignore = (rule.rule_type == "exclude");
-
-      Logger().debug("File '{}' {} by rule '{}' ({})", normalized_path,
-                     should_ignore ? "excluded" : "included", rule.rule_pattern, rule.pattern_type);
-    }
-  }
-
-  return should_ignore;
-}
-
-}  // namespace Features::Gallery::Ignore::Processor
+}  // namespace Features::Gallery::Ignore::Matcher

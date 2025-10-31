@@ -1,12 +1,12 @@
 module;
 
-export module Features.Gallery.Folder.Processor;
+export module Features.Gallery.Folder.Service;
 
 import std;
 import Core.State;
 import Features.Gallery.Types;
 
-namespace Features::Gallery::Folder::Processor {
+namespace Features::Gallery::Folder::Service {
 
 // 构建文件夹层次结构信息
 export auto build_folder_hierarchy(const std::vector<std::filesystem::path>& paths)
@@ -22,5 +22,4 @@ export auto batch_create_folders_for_paths(Core::State::AppState& app_state,
                                            const std::vector<std::filesystem::path>& folder_paths)
     -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string>;
 
-
-}  // namespace Features::Gallery::Folder::Processor
+}  // namespace Features::Gallery::Folder::Service

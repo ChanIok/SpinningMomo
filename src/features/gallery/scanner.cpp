@@ -10,9 +10,9 @@ import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
-import Features.Gallery.Folder.Processor;
+import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
-import Features.Gallery.Ignore.Processor;
+import Features.Gallery.Ignore.Service;
 import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
@@ -78,22 +78,11 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
 
   try {
     // 加载并合并忽略规则
-    std::vector<Types::IgnoreRule> combined_rules;
-
-    // 先加载全局规则
-    auto global_rules_result = Ignore::Repository::get_global_rules(app_state);
-    if (global_rules_result) {
-      combined_rules = std::move(global_rules_result.value());
+    auto rules_result = Ignore::Service::load_ignore_rules(app_state, folder_id);
+    if (!rules_result) {
+      Logger().warn("Failed to load ignore rules: {}", rules_result.error());
     }
-
-    // 然后追加文件夹特定规则
-    if (folder_id.has_value()) {
-      auto folder_rules_result = Ignore::Repository::get_rules_by_folder_id(app_state, *folder_id);
-      if (folder_rules_result) {
-        auto& folder_rules = folder_rules_result.value();
-        combined_rules.insert(combined_rules.end(), folder_rules.begin(), folder_rules.end());
-      }
-    }
+    auto combined_rules = rules_result.value_or(std::vector<Types::IgnoreRule>{});
 
     // 使用递归目录迭代器和ranges管道进行函数式过滤和转换
     auto found_files =
@@ -115,7 +104,7 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
         std::views::filter(
             [&directory, &combined_rules](const std::filesystem::directory_entry& entry) {
               bool should_ignore =
-                  Ignore::Processor::apply_ignore_rules(entry.path(), directory, combined_rules);
+                  Ignore::Service::apply_ignore_rules(entry.path(), directory, combined_rules);
 
               if (should_ignore) {
                 Logger().debug("File ignored by rules: {}", entry.path().string());
@@ -527,7 +516,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   std::vector<std::filesystem::path> root_folder_paths = {normalized_scan_root};
 
   auto root_folder_mapping_result =
-      Folder::Processor::batch_create_folders_for_paths(app_state, root_folder_paths);
+      Folder::Service::batch_create_folders_for_paths(app_state, root_folder_paths);
   if (!root_folder_mapping_result) {
     return std::unexpected("Failed to create root folder record: " +
                            root_folder_mapping_result.error());
@@ -610,10 +599,10 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   // 提取所有需要的文件夹路径（包含祖先目录直到扫描根目录）
-  auto folder_paths = Folder::Processor::extract_unique_folder_paths(file_paths, directory);
+  auto folder_paths = Folder::Service::extract_unique_folder_paths(file_paths, directory);
 
   auto folder_mapping_result =
-      Folder::Processor::batch_create_folders_for_paths(app_state, folder_paths);
+      Folder::Service::batch_create_folders_for_paths(app_state, folder_paths);
   if (folder_mapping_result) {
     path_to_folder_id = std::move(folder_mapping_result.value());
     Logger().info("Pre-created {} folder records with complete hierarchy",
