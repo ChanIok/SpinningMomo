@@ -12,8 +12,8 @@ import Features.Letterbox;
 import Features.Overlay;
 import Features.Preview;
 import Features.Screenshot;
-import Features.Updater;
-import Features.Updater.State;
+import Features.Update;
+import Features.Update.State;
 import UI.AppWindow;
 import UI.ContextMenu;
 import UI.TrayIcon;
@@ -37,7 +37,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   // 检查是否有待处理的更新
   if (state.updater && state.updater->pending_update) {
     Logger().info("Executing pending update on program exit");
-    Features::Updater::execute_pending_update(state);
+    Features::Update::execute_pending_update(state);
   }
   Features::Preview::stop_preview(state);
   Features::Preview::cleanup_preview(state);

@@ -18,7 +18,7 @@ import Features.Overlay.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
 import Features.Settings.State;
-import Features.Updater.State;
+import Features.Update.State;
 import UI.AppWindow.State;
 import UI.ContextMenu.State;
 import UI.TrayIcon.State;
@@ -36,7 +36,7 @@ AppState::AppState()
       http_server(std::make_unique<Core::HttpServer::State::HttpServerState>()),
       worker_pool(std::make_unique<Core::WorkerPool::State::WorkerPoolState>()),
       settings(std::make_unique<Features::Settings::State::SettingsState>()),
-      updater(std::make_unique<Features::Updater::State::UpdateState>()),
+      updater(std::make_unique<Features::Update::State::UpdateState>()),
       app_window(std::make_unique<UI::AppWindow::State::AppWindowState>()),
       tray_icon(std::make_unique<UI::TrayIcon::State::TrayIconState>()),
       context_menu(std::make_unique<UI::ContextMenu::State::ContextMenuState>()),

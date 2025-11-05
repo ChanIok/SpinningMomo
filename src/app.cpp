@@ -13,7 +13,7 @@ import Features.Overlay;
 import Features.Preview;
 import Features.Screenshot;
 import Features.Settings;
-import Features.Updater;
+import Features.Update;
 import UI.AppWindow;
 import UI.AppWindow.State;
 import UI.WebViewWindow;

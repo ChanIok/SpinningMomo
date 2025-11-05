@@ -2,14 +2,14 @@ module;
 
 #include <rfl/json.hpp>
 
-module Features.Updater;
+module Features.Update;
 
 import std;
 import Core.Events;
 import UI.AppWindow.Events;
 import Core.State;
-import Features.Updater.State;
-import Features.Updater.Types;
+import Features.Update.State;
+import Features.Update.Types;
 import Features.Settings.State;
 import Utils.Logger;
 import Utils.Path;
@@ -18,7 +18,7 @@ import Vendor.Version;
 import Vendor.Windows;
 import Vendor.WinHttp;
 
-namespace Features::Updater {
+namespace Features::Update {
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)
     -> bool {
@@ -533,4 +533,4 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
   }
 }
 
-}  // namespace Features::Updater
+}  // namespace Features::Update

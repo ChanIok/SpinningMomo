@@ -10,10 +10,11 @@ import Core.HttpServer;
 import Core.Events.Registrar;
 import Core.RPC.Registry;
 import Core.Initializer.Database;
+import Core.Migration;
 import Features.Gallery;
 import Features.Settings;
 import Features.Settings.State;
-import Features.Updater;
+import Features.Update;
 import UI.AppWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
@@ -50,7 +51,11 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize settings: " + settings_result.error());
     }
 
-    if (auto updater_result = Features::Updater::initialize(state); !updater_result) {
+    if (!Core::Migration::run_migration_if_needed(state)) {
+      return std::unexpected("Application migration failed. Please check logs for details.");
+    }
+
+    if (auto updater_result = Features::Update::initialize(state); !updater_result) {
       return std::unexpected("Failed to initialize updater: " + updater_result.error());
     }
 

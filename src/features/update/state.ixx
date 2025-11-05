@@ -1,11 +1,11 @@
 module;
 
-export module Features.Updater.State;
+export module Features.Update.State;
 
 import std;
-import Features.Updater.Types;
+import Features.Update.Types;
 
-export namespace Features::Updater::State {
+export namespace Features::Update::State {
 
 struct UpdateState {
   // 运行时状态
@@ -38,4 +38,4 @@ inline auto create_default_update_state() -> UpdateState {
   return state;
 }
 
-}  // namespace Features::Updater::State
+}  // namespace Features::Update::State

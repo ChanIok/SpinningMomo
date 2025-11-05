@@ -1,10 +1,10 @@
 module;
 
-export module Features.Updater.Types;
+export module Features.Update.Types;
 
 import std;
 
-export namespace Features::Updater::Types {
+export namespace Features::Update::Types {
 
 // GitHub Release Asset - 发布资源
 struct GitHubAsset {
@@ -50,4 +50,4 @@ struct InstallUpdateResult {
   std::string message;  // 结果消息
 };
 
-}  // namespace Features::Updater::Types
+}  // namespace Features::Update::Types
