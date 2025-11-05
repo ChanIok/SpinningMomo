@@ -1,24 +1,16 @@
-// Auto-generated migration module
+// Auto-generated SQL schema module
 // DO NOT EDIT - This file is generated from src/migrations/001_initial_schema.sql
-//
-// Version: 1
-// Description: Initialize database schema
-// Statements: 25
 
 module;
 
-export module Core.Migration.Migrations.V001;
+export module Core.Migration.Schema.V001;
 
 import std;
 
-export namespace Core::Migration::Migrations::V001 {
+export namespace Core::Migration::Schema {
 
-// Migration metadata
-constexpr int version = 1;
-constexpr std::string_view description = "Initialize database schema";
-
-// SQL statements
-constexpr std::array<std::string_view, 25> statements = {
+struct V001 {
+  static constexpr std::array<std::string_view, 25> statements = {
         R"SQL(
 CREATE TABLE assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -195,6 +187,7 @@ WHERE
     id = NEW.id;
 END
         )SQL"
+  };
 };
 
-}  // namespace Core::Migration::Migrations::V001
+}  // namespace Core::Migration::Schema

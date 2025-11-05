@@ -37,38 +37,16 @@ const generatedDir = path.join(
 // ============================================================================
 
 /**
- * 从 SQL 文件注释中提取元数据
+ * 从 SQL 文件名中提取版本号
  *
- * 格式:
- *     -- Version: 1
- *     -- Description: Initialize database schema
+ * 格式: 001_description.sql -> version: 1
  *
- * @param {string} sqlContent - SQL 文件内容
- * @returns {{version: number|null, description: string|null}}
+ * @param {string} fileName - SQL 文件名
+ * @returns {number|null} 版本号
  */
-function extractMetadataFromSql(sqlContent) {
-  let version = null;
-  let description = null;
-
-  const lines = sqlContent.split("\n");
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    // 匹配版本号
-    const versionMatch = trimmed.match(/^--\s*Version:\s*(\d+)/i);
-    if (versionMatch) {
-      version = parseInt(versionMatch[1], 10);
-    }
-
-    // 匹配描述
-    const descMatch = trimmed.match(/^--\s*Description:\s*(.+)/i);
-    if (descMatch) {
-      description = descMatch[1].trim();
-    }
-  }
-
-  return { version, description };
+function extractVersionFromFilename(fileName) {
+  const match = fileName.match(/^(\d+)_/);
+  return match ? parseInt(match[1], 10) : null;
 }
 
 /**
@@ -160,15 +138,14 @@ function splitSqlStatements(sqlContent) {
  *
  * @param {string} migrationFile - 迁移文件名
  * @param {number} version - 版本号
- * @param {string} description - 描述
  * @param {string[]} sqlStatements - SQL 语句数组
  * @returns {string} C++ 模块文件内容
  */
-function generateCppModule(migrationFile, version, description, sqlStatements) {
+function generateCppModule(migrationFile, version, sqlStatements) {
   // 模块名称格式: V001, V002, ...
   const moduleSuffix = `V${String(version).padStart(3, "0")}`;
-  const moduleName = `Core.Migration.Migrations.${moduleSuffix}`;
-  const namespaceName = moduleSuffix; // 命名空间名称，如 V001
+  const moduleName = `Core.Migration.Schema.${moduleSuffix}`;
+  const structName = moduleSuffix; // 结构体名称，如 V001
 
   // 生成语句数组
   const statementsCode = sqlStatements.map((stmt) => {
@@ -186,12 +163,8 @@ ${stmt}
 
   const statementsArray = statementsCode.join(",\n");
 
-  return `// Auto-generated migration module
+  return `// Auto-generated SQL schema module
 // DO NOT EDIT - This file is generated from src/migrations/${migrationFile}
-//
-// Version: ${version}
-// Description: ${description}
-// Statements: ${sqlStatements.length}
 
 module;
 
@@ -199,18 +172,15 @@ export module ${moduleName};
 
 import std;
 
-export namespace Core::Migration::Migrations::${namespaceName} {
+export namespace Core::Migration::Schema {
 
-// Migration metadata
-constexpr int version = ${version};
-constexpr std::string_view description = "${description}";
-
-// SQL statements
-constexpr std::array<std::string_view, ${sqlStatements.length}> statements = {
+struct ${structName} {
+  static constexpr std::array<std::string_view, ${sqlStatements.length}> statements = {
 ${statementsArray}
+  };
 };
 
-}  // namespace Core::Migration::Migrations::${namespaceName}
+}  // namespace Core::Migration::Schema
 `;
 }
 
@@ -229,21 +199,18 @@ function processMigrationFile(sqlFile) {
   console.log(`Processing: ${fileName}`);
 
   try {
-    // 读取 SQL 文件
-    const sqlContent = fs.readFileSync(sqlFile, "utf8");
-
-    // 提取元数据
-    const { version, description } = extractMetadataFromSql(sqlContent);
+    // 从文件名提取版本号
+    const version = extractVersionFromFilename(fileName);
 
     if (version === null) {
-      console.log(`  ⚠️  Warning: No version found in ${fileName}, skipping`);
+      console.log(
+        `  ⚠️  Warning: Cannot extract version from filename ${fileName}, skipping`
+      );
       return false;
     }
 
-    const finalDescription = description || "No description";
-    if (description === null) {
-      console.log(`  ⚠️  Warning: No description found in ${fileName}`);
-    }
+    // 读取 SQL 文件
+    const sqlContent = fs.readFileSync(sqlFile, "utf8");
 
     // 分割 SQL 语句
     const statements = splitSqlStatements(sqlContent);
@@ -254,21 +221,15 @@ function processMigrationFile(sqlFile) {
     }
 
     console.log(`  Version: ${version}`);
-    console.log(`  Description: ${finalDescription}`);
     console.log(`  Statements: ${statements.length}`);
 
     // 生成 C++ 代码
-    const cppContent = generateCppModule(
-      fileName,
-      version,
-      finalDescription,
-      statements
-    );
+    const cppContent = generateCppModule(fileName, version, statements);
 
     // 输出文件路径
     const outputFile = path.join(
       generatedDir,
-      `migration_${String(version).padStart(3, "0")}.ixx`
+      `schema_${String(version).padStart(3, "0")}.ixx`
     );
     fs.writeFileSync(outputFile, cppContent, "utf8");
 
@@ -285,7 +246,7 @@ function processMigrationFile(sqlFile) {
 }
 
 /**
- * 生成索引模块，导出所有迁移
+ * 生成索引模块，导出所有 Schema
  *
  * @param {number[]} processedVersions - 已处理的版本号数组
  */
@@ -298,7 +259,7 @@ function generateIndexModule(processedVersions) {
 
   // 生成 import 语句
   const imports = processedVersions.map((ver) => {
-    return `export import Core.Migration.Migrations.V${String(ver).padStart(
+    return `export import Core.Migration.Schema.V${String(ver).padStart(
       3,
       "0"
     )};`;
@@ -306,18 +267,18 @@ function generateIndexModule(processedVersions) {
 
   const importsCode = imports.join("\n");
 
-  const indexContent = `// Auto-generated migration index
-// DO NOT EDIT - This file imports all generated migration modules
+  const indexContent = `// Auto-generated schema index
+// DO NOT EDIT - This file imports all generated schema modules
 
 module;
 
-export module Core.Migration.Migrations;
+export module Core.Migration.Schema;
 
-// Import all migration modules
+// Import all schema modules
 ${importsCode}
 `;
 
-  const indexFile = path.join(generatedDir, "migrations.ixx");
+  const indexFile = path.join(generatedDir, "schema.ixx");
   fs.writeFileSync(indexFile, indexContent, "utf8");
 
   const relativePath = path
@@ -396,7 +357,7 @@ function main() {
   // 输出总结
   console.log("=".repeat(70));
   console.log(
-    `✓ Successfully generated ${successCount}/${sqlFiles.length} migration(s)`
+    `✓ Successfully generated ${successCount}/${sqlFiles.length} schema module(s)`
   );
   console.log("=".repeat(70));
 

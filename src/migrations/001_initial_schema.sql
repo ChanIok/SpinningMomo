@@ -1,5 +1,4 @@
--- Version: 1
--- Description: Initialize database schema
+-- Initialize database schema
 -- This migration creates the initial database schema for SpinningMomo
 -- Tables: assets, folders, tags, asset_tags, ignore_rules
 -- ============================================================================

@@ -5,35 +5,31 @@ module Core.Migration;
 import std;
 import Core.State;
 import Core.Database;
-import Core.Migration.Migrations;
-import Features.Settings.Migration;
+import Core.Migration.Schema;
 import Utils.Logger;
 import Utils.Path;
 import Vendor.Version;
 
 namespace Core::Migration {
-  
+
+// 执行 SQL Schema 迁移的辅助函数
+template <typename SchemaModule>
+auto execute_sql_schema(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  for (const auto& sql : SchemaModule::statements) {
+    auto result = Core::Database::execute(*app_state.database, std::string(sql));
+    if (!result) {
+      return std::unexpected(std::format("SQL execution failed: {}", result.error()));
+    }
+  }
+  return {};
+}
+
 const std::vector<MigrationScript> MIGRATION_SCRIPTS = {
 
     // 从 0.0.0.0 (首次启动) 迁移到 1.0.0.0
     {"1.0.0.0", "Initialize database schema",
-     [](Core::State::AppState& app) -> std::expected<void, std::string> {
-       // 首次启动：初始化数据库
-       // 使用生成的迁移: V001
-       using namespace Core::Migration::Migrations::V001;
-
-       Logger().info("Executing migration {}: {}", version, description);
-
-       // 执行所有 SQL 语句
-       for (const auto& sql : statements) {
-         auto result = Core::Database::execute(*app.database, std::string(sql));
-         if (!result) {
-           return std::unexpected(std::format("Migration {} failed: {}", version, result.error()));
-         }
-       }
-
-       Logger().info("Database initialized successfully");
-       return {};
+     [](Core::State::AppState& app_state) -> std::expected<void, std::string> {
+       return execute_sql_schema<Core::Migration::Schema::V001>(app_state);
      }},
 
     // 继续添加更多版本的迁移脚本...
@@ -156,7 +152,7 @@ auto compare_versions(const std::string& v1, const std::string& v2) -> int {
   return 0;
 }
 
-auto run_migration_if_needed(Core::State::AppState& app) -> bool {
+auto run_migration_if_needed(Core::State::AppState& app_state) -> bool {
   Logger().info("=== Migration Check Started ===");
 
   auto current_version = Vendor::Version::get_app_version();
@@ -213,7 +209,7 @@ auto run_migration_if_needed(Core::State::AppState& app) -> bool {
     Logger().info("--- Executing migration to {} ---", script->target_version);
     Logger().info("Description: {}", script->description);
 
-    auto result = script->migration_fn(app);
+    auto result = script->migration_fn(app_state);
 
     if (!result) {
       Logger().error("Migration to {} failed: {}", script->target_version, result.error());
