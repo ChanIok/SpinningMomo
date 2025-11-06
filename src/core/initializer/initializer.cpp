@@ -32,7 +32,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to start async runtime: " + result.error());
     }
 
-    // 启动工作线程池
     if (auto result = Core::WorkerPool::start(*state.worker_pool); !result) {
       return std::unexpected("Failed to start worker pool: " + result.error());
     }
@@ -47,12 +46,12 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize database: " + db_result.error());
     }
 
-    if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
-      return std::unexpected("Failed to initialize settings: " + settings_result.error());
-    }
-
     if (!Core::Migration::run_migration_if_needed(state)) {
       return std::unexpected("Application migration failed. Please check logs for details.");
+    }
+
+    if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
+      return std::unexpected("Failed to initialize settings: " + settings_result.error());
     }
 
     if (auto updater_result = Features::Update::initialize(state); !updater_result) {

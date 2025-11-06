@@ -4,36 +4,12 @@ module Core.Migration;
 
 import std;
 import Core.State;
-import Core.Database;
-import Core.Migration.Schema;
+import Core.Migration.Scripts;
 import Utils.Logger;
 import Utils.Path;
 import Vendor.Version;
 
 namespace Core::Migration {
-
-// 执行 SQL Schema 迁移的辅助函数
-template <typename SchemaModule>
-auto execute_sql_schema(Core::State::AppState& app_state) -> std::expected<void, std::string> {
-  for (const auto& sql : SchemaModule::statements) {
-    auto result = Core::Database::execute(*app_state.database, std::string(sql));
-    if (!result) {
-      return std::unexpected(std::format("SQL execution failed: {}", result.error()));
-    }
-  }
-  return {};
-}
-
-const std::vector<MigrationScript> MIGRATION_SCRIPTS = {
-
-    // 从 0.0.0.0 (首次启动) 迁移到 1.0.0.0
-    {"1.0.0.0", "Initialize database schema",
-     [](Core::State::AppState& app_state) -> std::expected<void, std::string> {
-       return execute_sql_schema<Core::Migration::Schema::V001>(app_state);
-     }},
-
-    // 继续添加更多版本的迁移脚本...
-};
 
 auto get_version_file_path() -> std::expected<std::filesystem::path, std::string> {
   // 存储在程序所在目录的 data 子目录下
@@ -173,9 +149,10 @@ auto run_migration_if_needed(Core::State::AppState& app_state) -> bool {
   }
 
   // 收集需要执行的迁移脚本
-  std::vector<const MigrationScript*> scripts_to_run;
+  const auto& all_migrations = Scripts::get_all_migrations();
+  std::vector<const Scripts::MigrationScript*> scripts_to_run;
 
-  for (const auto& script : MIGRATION_SCRIPTS) {
+  for (const auto& script : all_migrations) {
     // 选择版本号在 (last_version, current_version] 区间的脚本
     if (compare_versions(script.target_version, last_version) > 0 &&
         compare_versions(script.target_version, current_version) <= 0) {

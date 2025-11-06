@@ -23,4 +23,8 @@ export auto save_settings_to_file(const std::filesystem::path& settings_path,
                                   const Types::AppSettings& config)
     -> std::expected<void, std::string>;
 
+// Migration专用接口：迁移settings文件到指定版本
+export auto migrate_settings_file(const std::filesystem::path& file_path, int target_version)
+    -> std::expected<void, std::string>;
+
 }  // namespace Features::Settings
