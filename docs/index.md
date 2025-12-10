@@ -14,6 +14,9 @@ hero:
     - theme: alt
       text: 在 GitHub 上查看
       link: https://github.com/ChanIok/SpinningMomo
+    - theme: alt
+      text: 搬砖吧大喵
+      link: https://infinitymomo.com/
 
 features:
   - icon: 🎮

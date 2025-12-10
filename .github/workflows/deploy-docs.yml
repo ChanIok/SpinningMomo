@@ -31,6 +31,8 @@ jobs:
   # 构建任务
   build:
     runs-on: ubuntu-latest
+    env:
+      VITE_BASE_PATH: /SpinningMomo/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
