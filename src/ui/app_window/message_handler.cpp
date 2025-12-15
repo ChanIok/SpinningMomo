@@ -76,6 +76,10 @@ auto dispatch_feature_action(Core::State::AppState& state, const std::string& ac
       Core::Events::send(*state.events,
                          LetterboxToggleEvent{!state.app_window->ui.letterbox_enabled});
       break;
+    case Id::FeatureToggleRecording:
+      Core::Events::send(*state.events,
+                         RecordingToggleEvent{!state.app_window->ui.recording_enabled});
+      break;
     case Id::ScreenshotCapture:
       Core::Events::send(*state.events, CaptureEvent{});
       break;

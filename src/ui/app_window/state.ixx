@@ -37,6 +37,8 @@ auto is_item_selected(const AppWindow::MenuItem& item,
           return ui_state.overlay_enabled;
         case Common::MenuIds::Id::FeatureToggleLetterbox:
           return ui_state.letterbox_enabled;
+        case Common::MenuIds::Id::FeatureToggleRecording:
+          return ui_state.recording_enabled;
         default:
           return false;
       }

@@ -101,9 +101,10 @@ struct AppSettings {
                                                 {"feature.toggle_preview", true, 3},
                                                 {"feature.toggle_overlay", true, 4},
                                                 {"feature.toggle_letterbox", true, 5},
-                                                {"window.reset_transform", true, 6},
-                                                {"panel.hide", false, 7},
-                                                {"app.exit", true, 8}};
+                                                {"feature.toggle_recording", true, 6},
+                                                {"window.reset_transform", true, 7},
+                                                {"panel.hide", false, 8},
+                                                {"app.exit", true, 9}};
       std::vector<PresetItem> aspect_ratios = {
           {"32:9", false, 1}, {"21:9", true, 2}, {"16:9", true, 3}, {"3:2", true, 4},
           {"1:1", true, 5},   {"3:4", true, 6},  {"2:3", true, 7},  {"9:16", true, 8}};

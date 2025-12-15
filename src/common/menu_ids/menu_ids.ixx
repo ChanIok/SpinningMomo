@@ -36,6 +36,7 @@ enum class Id : int {
   FeatureTogglePreview = 3100,    // 预览窗口
   FeatureToggleOverlay = 3101,    // 叠加层
   FeatureToggleLetterbox = 3102,  // 黑边模式
+  FeatureToggleRecording = 3103,  // 录屏
 
   // === 设置相关 (3200-3299) ===
   SettingsConfig = 3200,
@@ -58,6 +59,8 @@ constexpr std::string_view to_string(Id id) {
       return "feature.toggle_overlay";
     case Id::FeatureToggleLetterbox:
       return "feature.toggle_letterbox";
+    case Id::FeatureToggleRecording:
+      return "feature.toggle_recording";
     case Id::WindowControlResetTransform:
       return "window.reset_transform";
     case Id::PanelHide:
@@ -85,6 +88,7 @@ constexpr std::optional<Id> from_string(std::string_view str) {
   if (str == "feature.toggle_preview") return Id::FeatureTogglePreview;
   if (str == "feature.toggle_overlay") return Id::FeatureToggleOverlay;
   if (str == "feature.toggle_letterbox") return Id::FeatureToggleLetterbox;
+  if (str == "feature.toggle_recording") return Id::FeatureToggleRecording;
   if (str == "window.reset_transform") return Id::WindowControlResetTransform;
   if (str == "panel.hide") return Id::PanelHide;
   if (str == "app.exit") return Id::AppExit;

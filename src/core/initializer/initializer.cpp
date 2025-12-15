@@ -14,6 +14,7 @@ import Core.Migration;
 import Features.Gallery;
 import Features.Settings;
 import Features.Settings.State;
+import Features.Recording;
 import Features.Update;
 import UI.AppWindow;
 import UI.TrayIcon;
@@ -68,6 +69,10 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto result = UI::ContextMenu::initialize(state); !result) {
       return std::unexpected("Failed to initialize tray menu: " + result.error());
+    }
+
+    if (auto result = Features::Recording::initialize(*state.recording); !result) {
+      return std::unexpected(result.error());
     }
 
     if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {

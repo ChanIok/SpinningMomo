@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
     // Embedded English JSON content as string_view
-    // Size: 3040 bytes
+    // Size: 3194 bytes
     constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -37,6 +37,7 @@ export namespace EmbeddedLocales {
     "screenshot_open_folder": "Screenshots",
     "overlay_toggle": "Overlay",
     "preview_toggle": "Preview",
+    "recording_toggle": "Record",
     "letterbox_toggle": "Letterbox",
 
     "settings_hotkey": "Modify Hotkey",
@@ -61,6 +62,8 @@ export namespace EmbeddedLocales {
     "preview_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
     "preview_start_failed": "Failed to start preview window: ",
     "overlay_start_failed": "Failed to start overlay window: ",
+    "recording_start_failed": "Failed to start recording: ",
+    "recording_stop_failed": "Failed to stop recording: ",
 
     "settings_hotkey_prompt": "Please press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys",
     "settings_hotkey_success": "Hotkey set to: ",

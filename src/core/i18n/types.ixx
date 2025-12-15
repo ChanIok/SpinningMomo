@@ -36,6 +36,7 @@ struct TextData {
     std::string screenshot_open_folder;  // 打开相册
     std::string overlay_toggle;          // 叠加层
     std::string preview_toggle;          // 预览窗
+    std::string recording_toggle;        // 录屏
     std::string letterbox_toggle;        // 黑边模式
 
     // 设置菜单项
@@ -65,6 +66,8 @@ struct TextData {
     std::string preview_conflict;    // 预览窗冲突
     std::string preview_start_failed; // 预览窗启动失败
     std::string overlay_start_failed; // 叠加层启动失败
+    std::string recording_start_failed; // 录屏启动失败
+    std::string recording_stop_failed;  // 录屏停止失败
 
     // 设置消息
     std::string settings_hotkey_prompt;              // 热键设置提示

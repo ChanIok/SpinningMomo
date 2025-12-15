@@ -1,0 +1,126 @@
+module;
+
+#include <windows.h>
+#include <filesystem>
+
+module Features.Recording.UseCase;
+
+import std;
+import Core.State;
+import Features.Recording;
+import Features.Recording.Types;
+import Features.Recording.State;
+import Features.Settings.Types;
+import Features.Settings.State;
+import UI.AppWindow.State;
+import Utils.Logger;
+import Utils.Path;
+import Utils.String;
+
+namespace Features::Recording::UseCase {
+
+// 查找目标窗口（复制自 Screenshot 模块）
+auto find_target_window(const Core::State::AppState& state) -> HWND {
+  const auto& target_title = state.settings->config.window.target_title;
+  const std::wstring title_w = Utils::String::FromUtf8(target_title);
+
+  HWND hwnd = FindWindowW(nullptr, title_w.c_str());
+  if (!hwnd) {
+    // 尝试模糊匹配 (TODO: 提取公共逻辑)
+    HWND current = GetWindow(GetDesktopWindow(), GW_CHILD);
+    while (current) {
+      if (IsWindowVisible(current)) {
+        wchar_t buf[256];
+        GetWindowTextW(current, buf, 256);
+        std::wstring window_title = buf;
+        if (window_title.find(title_w) != std::wstring::npos) {
+          hwnd = current;
+          break;
+        }
+      }
+      current = GetWindow(current, GW_HWNDNEXT);
+    }
+  }
+  return hwnd;
+}
+
+// 生成输出文件路径
+auto generate_output_path() -> std::expected<std::filesystem::path, std::string> {
+  auto exe_dir_result = Utils::Path::GetExecutableDirectory();
+  if (!exe_dir_result) {
+    return std::unexpected("Failed to get executable directory");
+  }
+
+  auto recordings_dir = *exe_dir_result / "recordings";
+  auto ensure_result = Utils::Path::EnsureDirectoryExists(recordings_dir);
+  if (!ensure_result) {
+    return std::unexpected("Failed to create recordings directory");
+  }
+
+  auto now = std::chrono::system_clock::now();
+  auto filename = std::format("recording_{:%Y%m%d_%H%M%S}.mp4", now);
+  
+  return recordings_dir / filename;
+}
+
+auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::string> {
+  // 如果尚未初始化，应该先初始化（如果 RecordingState 是 unique_ptr）
+  if (!state.recording) {
+    return std::unexpected("Recording state is not initialized");
+  }
+
+  if (state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
+    // 停止录制
+    Features::Recording::stop(*state.recording);
+    
+    // 更新UI状态
+    if (state.app_window) {
+      state.app_window->ui.recording_enabled = false;
+    }
+  } else if (state.recording->status == Features::Recording::Types::RecordingStatus::Idle) {
+    // 开始录制
+    
+    // 1. 查找窗口
+    HWND target = find_target_window(state);
+    if (!target) {
+      return std::unexpected("Target window not found");
+    }
+
+    // 2. 准备配置
+    auto path_result = generate_output_path();
+    if (!path_result) {
+      return std::unexpected(path_result.error());
+    }
+
+    Features::Recording::Types::RecordingConfig config;
+    config.output_path = *path_result;
+    config.fps = 60; // 默认 60fps，可以从设置读取
+    config.bitrate = 80'000'000; // 默认 80Mbps
+
+    // 3. 启动
+    auto result = Features::Recording::start(*state.recording, target, config);
+    if (!result) {
+      return result;
+    }
+
+    // 更新UI状态
+    if (state.app_window) {
+      state.app_window->ui.recording_enabled = true;
+    }
+  } else {
+    return std::unexpected("Recording is in a transitional state");
+  }
+
+  return {};
+}
+
+auto stop_recording_if_running(Core::State::AppState& state) -> void {
+  if (state.recording && state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
+    Features::Recording::stop(*state.recording);
+    if (state.app_window) {
+      state.app_window->ui.recording_enabled = false;
+    }
+  }
+}
+
+}  // namespace Features::Recording::UseCase

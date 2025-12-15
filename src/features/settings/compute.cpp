@@ -27,6 +27,8 @@ auto get_localized_text_for_menu_id(const std::string& menu_id,
     return Utils::String::FromUtf8(texts.menu.overlay_toggle);
   } else if (menu_id == "feature.toggle_letterbox") {
     return Utils::String::FromUtf8(texts.menu.letterbox_toggle);
+  } else if (menu_id == "feature.toggle_recording") {
+    return Utils::String::FromUtf8(texts.menu.recording_toggle);
   } else if (menu_id == "window.reset_transform") {
     return Utils::String::FromUtf8(texts.menu.window_reset);
   } else if (menu_id == "panel.hide") {

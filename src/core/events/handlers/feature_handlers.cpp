@@ -11,6 +11,7 @@ import Features.Preview.UseCase;
 import Features.Overlay.UseCase;
 import Features.Letterbox.UseCase;
 import Features.Screenshot.UseCase;
+import Features.Recording.UseCase;
 import Features.WindowControl.UseCase;
 
 namespace Core::Events::Handlers {
@@ -34,6 +35,15 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
   subscribe<UI::AppWindow::Events::LetterboxToggleEvent>(
       *app_state.events, [&app_state](const UI::AppWindow::Events::LetterboxToggleEvent& event) {
         Features::Letterbox::UseCase::handle_letterbox_toggle(app_state, event);
+        UI::AppWindow::request_repaint(app_state);
+      });
+
+  subscribe<UI::AppWindow::Events::RecordingToggleEvent>(
+      *app_state.events, [&app_state](const UI::AppWindow::Events::RecordingToggleEvent& event) {
+        // 调用 UseCase 处理录制切换
+        if (auto result = Features::Recording::UseCase::toggle_recording(app_state); !result) {
+          // 这里可以添加错误处理，例如发送通知或显示消息
+        }
         UI::AppWindow::request_repaint(app_state);
       });
 

@@ -72,6 +72,10 @@ namespace Features::Screenshot::State {
 export struct ScreenshotState;
 }
 
+namespace Features::Recording::State {
+export struct RecordingState;
+}
+
 namespace Core::HttpServer::State {
 export struct HttpServerState;
 }
@@ -119,6 +123,7 @@ export struct AppState {
   std::unique_ptr<Features::Overlay::State::OverlayState> overlay;
   std::unique_ptr<Features::Preview::State::PreviewState> preview;
   std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;
+  std::unique_ptr<Features::Recording::State::RecordingState> recording;
 };
 
 }  // namespace Core::State

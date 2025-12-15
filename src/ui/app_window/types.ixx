@@ -50,6 +50,7 @@ struct InteractionState {
   bool preview_enabled = false;
   bool overlay_enabled = false;
   bool letterbox_enabled = false;
+  bool recording_enabled = false;
   bool close_button_hovered = false;
 };
 

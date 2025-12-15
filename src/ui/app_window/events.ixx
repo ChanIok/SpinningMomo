@@ -52,6 +52,12 @@ export struct LetterboxToggleEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
+export struct RecordingToggleEvent {
+  bool enabled;
+
+  std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
+};
+
 // 窗口动作事件
 export struct CaptureEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
