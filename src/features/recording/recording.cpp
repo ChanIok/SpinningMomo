@@ -1,9 +1,10 @@
 module;
 
-#include <d3d11.h>
+#include <d3d11_4.h>
+#include <mfapi.h>
+#include <wil/com.h>
 #include <windows.h>
 #include <winrt/Windows.Graphics.Capture.h>
-#include <mfapi.h>
 
 module Features.Recording;
 
@@ -54,7 +55,8 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
 
   // 编码
   auto result = Features::Recording::Encoder::encode_frame(state.encoder, state.context.get(),
-                                                           texture.get(), timestamp);
+                                                           texture.get(), timestamp,
+                                                           state.config.fps);
   if (!result) {
     Logger().error("Failed to encode frame: {}", result.error());
     // 可以选择停止录制或记录错误
@@ -101,6 +103,12 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   state.device = d3d_result->first;
   state.context = d3d_result->second;
 
+  // 2.5. 启用 D3D11 多线程保护 (对 GPU 编码很重要)
+  wil::com_ptr<ID3D11Multithread> multithread;
+  if (SUCCEEDED(state.device->QueryInterface(IID_PPV_ARGS(multithread.put())))) {
+    multithread->SetMultithreadProtected(TRUE);
+  }
+
   // 3. 创建 WinRT 设备
   auto winrt_device_result = Utils::Graphics::Capture::create_winrt_device(state.device.get());
   if (!winrt_device_result) {
@@ -109,7 +117,8 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
 
   // 4. 创建编码器
   auto encoder_result = Features::Recording::Encoder::create_encoder(
-      config.output_path, width, height, config.fps, config.bitrate);
+      config.output_path, width, height, config.fps, config.bitrate, state.device.get(),
+      config.encoder_mode);
   if (!encoder_result) {
     return std::unexpected("Failed to create encoder: " + encoder_result.error());
   }
