@@ -55,7 +55,6 @@ test/
 .windsurfrules
 .cursor
 .claude
-WARP.md
 
 # Web App (Vite + React)
 web/node_modules/

@@ -1,10 +1,8 @@
-
 <script setup lang="ts">
 import { useSettingsStore } from '../store'
 import { useMenuActions } from '../composables/useMenuActions'
 import { storeToRefs } from 'pinia'
-import DraggableFeatureList from './DraggableFeatureList.vue'
-import DraggablePresetList from './DraggablePresetList.vue'
+import DraggableSettingsList from './DraggableSettingsList.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
@@ -26,6 +24,20 @@ const getFeatureItems = () => appSettings.value?.ui?.appMenu?.featureItems || []
 const getAspectRatios = () => appSettings.value?.ui?.appMenu?.aspectRatios || []
 const getResolutions = () => appSettings.value?.ui?.appMenu?.resolutions || []
 
+// Feature Label Helper
+const getFeatureItemLabel = (id: string): string => {
+  const labelMap: Record<string, string> = {
+    'screenshot.capture': t('settings.menu.items.screenshotCapture'),
+    'screenshot.open_folder': t('settings.menu.items.screenshotOpenFolder'),
+    'feature.toggle_preview': t('settings.menu.items.featureTogglePreview'),
+    'feature.toggle_overlay': t('settings.menu.items.featureToggleOverlay'),
+    'feature.toggle_letterbox': t('settings.menu.items.featureToggleLetterbox'),
+    'window.reset_transform': t('settings.menu.items.windowResetTransform'),
+    'panel.hide': t('settings.menu.items.panelHide'),
+    'app.exit': t('settings.menu.items.appExit'),
+  }
+  return labelMap[id] || id
+}
 
 const validateAspectRatio = (value: string): boolean => {
     const regex = /^\d+:\d+$/
@@ -117,32 +129,37 @@ const handleResetSettings = async () => {
     </div>
 
     <div class="space-y-8">
-        <DraggableFeatureList
+        <DraggableSettingsList
             :items="getFeatureItems()"
             :title="t('settings.menu.feature.title')"
             :description="t('settings.menu.feature.description')"
+            :get-label="getFeatureItemLabel"
             @reorder="updateFeatureItems"
             @toggle="handleFeatureToggle"
         />
 
-        <DraggablePresetList
+        <DraggableSettingsList
             :items="getAspectRatios()"
             :title="t('settings.menu.aspectRatio.title')"
             :description="t('settings.menu.aspectRatio.description')"
+            :allow-add="true"
+            :allow-remove="true"
             :add-placeholder="t('settings.menu.aspectRatio.placeholder')"
-            :validate-custom="validateAspectRatio"
+            :validate-input="validateAspectRatio"
             @reorder="updateAspectRatios"
             @toggle="handleAspectRatioToggle"
             @add="handleAspectRatioAdd"
             @remove="handleAspectRatioRemove"
         />
 
-        <DraggablePresetList
+        <DraggableSettingsList
             :items="getResolutions()"
              :title="t('settings.menu.resolution.title')"
             :description="t('settings.menu.resolution.description')"
+             :allow-add="true"
+             :allow-remove="true"
              :add-placeholder="t('settings.menu.resolution.placeholder')"
-             :validate-custom="validateResolution"
+             :validate-input="validateResolution"
             @reorder="updateResolutions"
             @toggle="handleResolutionToggle"
             @add="handleResolutionAdd"
