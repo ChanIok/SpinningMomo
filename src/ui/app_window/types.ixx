@@ -10,7 +10,7 @@ export module UI.AppWindow.Types;
 
 import std;
 import Features.WindowControl;
-import Common.MenuIds;
+import Features.Settings.Menu;
 
 export namespace UI::AppWindow {
 

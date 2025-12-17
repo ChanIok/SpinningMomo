@@ -8,8 +8,7 @@ module;
 module UI.AppWindow.MessageHandler;
 
 import std;
-import Common.MenuData;
-import Common.MenuIds;
+import Features.Settings.Menu;
 import Core.Events;
 import Core.State;
 import UI.AppWindow;
@@ -54,7 +53,7 @@ auto is_mouse_on_close_button(const Core::State::AppState& state, int x, int y) 
 
 // 基于 action_id 分发功能事件
 auto dispatch_feature_action(Core::State::AppState& state, const std::string& action_id) -> void {
-  using namespace Common::MenuIds;
+  using namespace Features::Settings::Menu;
   using namespace UI::AppWindow::Events;
 
   // 将字符串转换为强类型ID
@@ -105,7 +104,7 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
 
   switch (item.category) {
     case UI::AppWindow::MenuItemCategory::AspectRatio: {
-      const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+      const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
       if (item.index >= 0 && static_cast<size_t>(item.index) < ratios.size()) {
         const auto& ratio_preset = ratios[item.index];
         Core::Events::send(*state.events,
@@ -115,13 +114,13 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       break;
     }
     case UI::AppWindow::MenuItemCategory::Resolution: {
-      const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+      const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
       if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
         const auto& res_preset = resolutions[item.index];
         Core::Events::send(*state.events,
                            ResolutionChangeEvent{static_cast<size_t>(item.index), res_preset.name,
-                                                 res_preset.baseWidth *
-                                                     static_cast<uint64_t>(res_preset.baseHeight)});
+                                                 res_preset.base_width *
+                                                     static_cast<uint64_t>(res_preset.base_height)});
       }
       break;
     }

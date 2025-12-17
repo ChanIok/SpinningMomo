@@ -10,6 +10,7 @@ import Features.Settings.Types;
 import Features.Settings.State;
 import Features.Settings.Compute;
 import Features.Settings.Migration;
+import Features.Settings.Menu;
 import Utils.Path;
 import Utils.Logger;
 import <rfl/json.hpp>;
@@ -106,7 +107,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
       auto default_state = State::create_default_settings_state();
 
-      auto json_str = rfl::json::write(default_state.config, rfl::json::pretty);
+      auto json_str = rfl::json::write(default_state.raw, rfl::json::pretty);
       std::ofstream file(settings_path.value());
       if (!file) {
         return std::unexpected("Failed to create settings file");
@@ -115,7 +116,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
       // 计算预设并初始化内存状态
       *app_state.settings = default_state;
-      Compute::update_computed_state(app_state);
+      Compute::trigger_compute(app_state);
       app_state.settings->is_initialized = true;
 
       Logger().info("Default settings created successfully");
@@ -140,11 +141,11 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
     // 创建完整状态
     State::SettingsState state;
-    state.config = config;
+    state.raw = config;
 
     // 先设置到app_state，然后计算预设
     *app_state.settings = state;
-    Compute::update_computed_state(app_state);
+    Compute::trigger_compute(app_state);
     app_state.settings->is_initialized = true;
 
     Logger().info("Settings loaded successfully (version {})", config.version);
@@ -198,26 +199,26 @@ auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettin
     }
 
     // 保存旧设置用于事件通知
-    Types::AppSettings old_settings = app_state.settings->config;
+    Types::AppSettings old_settings = app_state.settings->raw;
 
     // 更新配置
-    app_state.settings->config = params;
+    app_state.settings->raw = params;
 
     // 重新计算预设状态
-    Compute::update_computed_state(app_state);
+    Compute::trigger_compute(app_state);
 
     // 保存到文件
     auto save_result = save_settings_to_file(settings_path.value(), params);
     if (!save_result) {
       // 回滚状态
-      app_state.settings->config = old_settings;
-      Compute::update_computed_state(app_state);
+      app_state.settings->raw = old_settings;
+      Compute::trigger_compute(app_state);
       return std::unexpected(save_result.error());
     }
 
     // 发送设置变更事件
     Types::SettingsChangeData change_data{.old_settings = old_settings,
-                                          .new_settings = app_state.settings->config,
+                                          .new_settings = app_state.settings->raw,
                                           .change_description = "Settings updated via RPC"};
 
     Core::Events::post(*app_state.events,

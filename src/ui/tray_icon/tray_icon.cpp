@@ -10,7 +10,7 @@ import std;
 import Core.State;
 import Core.I18n.Types;
 import Core.I18n.State;
-import Common.MenuData;
+import Features.Settings.Menu;
 import Features.WindowControl;
 import UI.ContextMenu;
 import UI.ContextMenu.Types;
@@ -46,7 +46,7 @@ auto build_window_submenu(Core::State::AppState& state)
 auto build_ratio_submenu(Core::State::AppState& state)
     -> std::vector<UI::ContextMenu::Types::MenuItem> {
   std::vector<UI::ContextMenu::Types::MenuItem> items;
-  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   for (size_t i = 0; i < ratios.size(); ++i) {
     items.emplace_back(UI::ContextMenu::Types::MenuItem::ratio_item(
         ratios[i], i, i == state.app_window->ui.current_ratio_index));
@@ -57,7 +57,7 @@ auto build_ratio_submenu(Core::State::AppState& state)
 auto build_resolution_submenu(Core::State::AppState& state)
     -> std::vector<UI::ContextMenu::Types::MenuItem> {
   std::vector<UI::ContextMenu::Types::MenuItem> items;
-  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
   for (size_t i = 0; i < resolutions.size(); ++i) {
     items.emplace_back(UI::ContextMenu::Types::MenuItem::resolution_item(
         resolutions[i], i, i == state.app_window->ui.current_resolution_index));

@@ -15,7 +15,7 @@ import Core.State;
 import Core.I18n.State;
 import Core.I18n.Types;
 import Core.Events;
-import Common.MenuIds;
+import Features.Settings.Menu;
 import UI.AppWindow.Types;
 import UI.AppWindow.State;
 import UI.AppWindow.Events;
@@ -29,7 +29,6 @@ import Utils.Logger;
 import Utils.String;
 import Vendor.Windows;
 import Features.WindowControl;
-import Common.MenuData;
 
 namespace UI::ContextMenu {
 

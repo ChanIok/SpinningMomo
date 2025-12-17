@@ -10,7 +10,7 @@ export namespace Features::Settings::Types {
 constexpr int CURRENT_SETTINGS_VERSION = 1;
 
 // 功能项（应用菜单中的功能）
-struct FeatureItem {
+export struct FeatureItem {
   std::string id;       // 如: "screenshot.capture", "screenshot.open_folder"
   bool enabled = true;  // 是否显示在菜单中
   int order = 0;        // 排序序号
@@ -24,7 +24,7 @@ struct PresetItem {
 };
 
 // 完整的应用设置（重构后的结构）
-struct AppSettings {
+export struct AppSettings {
   int version = CURRENT_SETTINGS_VERSION;
 
   // app 分组 - 应用核心设置
@@ -143,22 +143,22 @@ struct AppSettings {
 };
 
 // 设置变更事件数据
-struct SettingsChangeData {
+export struct SettingsChangeData {
   AppSettings old_settings;
   AppSettings new_settings;
   std::string change_description;
 };
 
 // 获取设置
-struct GetSettingsParams {
+export struct GetSettingsParams {
   // 空结构体，未来可扩展
 };
 
-using GetSettingsResult = AppSettings;
+export using GetSettingsResult = AppSettings;
 
-using UpdateSettingsParams = AppSettings;
+export using UpdateSettingsParams = AppSettings;
 
-struct UpdateSettingsResult {
+export struct UpdateSettingsResult {
   bool success;
   std::string message;
 };

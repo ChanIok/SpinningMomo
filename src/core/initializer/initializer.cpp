@@ -84,11 +84,11 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 注册热键（从settings中读取配置）
     UI::AppWindow::register_toggle_visibility_hotkey(
-        state, state.settings->config.app.hotkey.toggle_visibility.modifiers,
-        state.settings->config.app.hotkey.toggle_visibility.key);
+        state, state.settings->raw.app.hotkey.toggle_visibility.modifiers,
+        state.settings->raw.app.hotkey.toggle_visibility.key);
     UI::AppWindow::register_screenshot_hotkey(
-        state, state.settings->config.app.hotkey.screenshot.modifiers,
-        state.settings->config.app.hotkey.screenshot.key);
+        state, state.settings->raw.app.hotkey.screenshot.modifiers,
+        state.settings->raw.app.hotkey.screenshot.key);
 
     Logger().info("Application initialized successfully");
     return {};

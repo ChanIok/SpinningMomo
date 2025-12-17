@@ -228,7 +228,7 @@ auto get_release_info(Core::State::AppState& app_state)
       return std::unexpected("Settings or updater not initialized");
     }
 
-    const auto& updater_config = app_state.settings->config.updater;
+    const auto& updater_config = app_state.settings->raw.updater;
     if (updater_config.servers.empty()) {
       return std::unexpected("No update servers configured");
     }

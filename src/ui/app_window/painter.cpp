@@ -12,7 +12,7 @@ import UI.AppWindow.Layout;
 import UI.AppWindow.State;
 import UI.AppWindow.Types;
 import UI.AppWindow.D2DContext;
-import Common.MenuIds;
+import Features.Settings.Menu;
 
 namespace UI::AppWindow::Painter {
 
@@ -222,13 +222,13 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     if ((i + 1 < items.size()) && (items[i + 1].category == item.category)) {
       if (item.category != UI::AppWindow::MenuItemCategory::Feature ||
           item.action_id !=
-              Common::MenuIds::to_string(Common::MenuIds::Id::WindowControlResetTransform)) {
+              Features::Settings::Menu::to_string(Features::Settings::Menu::Id::WindowControlResetTransform)) {
         y += static_cast<float>(render.item_height);
       }
     } else if (i + 1 < items.size() && items[i + 1].category != item.category) {
       if (items[i + 1].category != UI::AppWindow::MenuItemCategory::Feature ||
           items[i + 1].action_id !=
-              Common::MenuIds::to_string(Common::MenuIds::Id::WindowControlResetTransform)) {
+              Features::Settings::Menu::to_string(Features::Settings::Menu::Id::WindowControlResetTransform)) {
         y = rect.top + static_cast<float>(render.title_height + render.separator_height);
       }
     }

@@ -23,7 +23,7 @@ auto handle_preview_toggle(Core::State::AppState& state,
   UI::AppWindow::set_preview_enabled(state, event.enabled);
 
   if (event.enabled) {
-    std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+    std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
     auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Preview::start_preview(state, target_window.value());

@@ -25,13 +25,13 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
   // 更新状态
   UI::AppWindow::set_letterbox_enabled(state, event.enabled);
   Features::Overlay::set_letterbox_mode(state, event.enabled);
-  state.settings->config.features.letterbox.enabled = event.enabled;
+  state.settings->raw.features.letterbox.enabled = event.enabled;
 
   // 保存设置到文件
   auto settings_path = Features::Settings::get_settings_path();
   if (settings_path) {
     auto save_result =
-        Features::Settings::save_settings_to_file(settings_path.value(), state.settings->config);
+        Features::Settings::save_settings_to_file(settings_path.value(), state.settings->raw);
     if (!save_result) {
       Logger().error("Failed to save settings: {}", save_result.error());
     }
@@ -39,7 +39,7 @@ auto handle_letterbox_toggle(Core::State::AppState& state,
     Logger().error("Failed to get settings path: {}", settings_path.error());
   }
 
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
 
   // 根据叠加层是否运行采取不同的处理方式

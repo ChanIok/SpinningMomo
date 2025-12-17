@@ -9,8 +9,7 @@ module;
 module UI.AppWindow;
 
 import std;
-import Common.MenuData;
-import Common.MenuData.Types;
+import Features.Settings.Menu;
 import Core.Events;
 import Core.State;
 import UI.AppWindow.Events;
@@ -128,7 +127,7 @@ auto set_current_ratio(Core::State::AppState& state, size_t index) -> void {
 }
 
 auto set_current_resolution(Core::State::AppState& state, size_t index) -> void {
-  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
   if (index < resolutions.size()) {
     state.app_window->ui.current_resolution_index = index;
     if (state.app_window->window.hwnd) {
@@ -214,9 +213,9 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   state.app_window->data.menu_items.clear();
 
   // 通过统一的 MenuData API 获取所有数据
-  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
-  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
-  const auto& feature_items = Common::MenuData::get_current_feature_items(state);
+  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  const auto& feature_items = Features::Settings::Menu::get_feature_items(*state.settings);
 
   // 添加比例选项
   for (size_t i = 0; i < ratios.size(); ++i) {

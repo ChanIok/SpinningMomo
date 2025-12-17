@@ -4,30 +4,34 @@ export module Features.Settings.State;
 
 import std;
 import Features.Settings.Types;
-import Common.MenuData.Types;
+import Features.Settings.Menu;
 
-export namespace Features::Settings::State {
+namespace Features::Settings::State {
 
 // 计算后的预设状态
-struct ComputedPresets {
-  std::vector<Common::MenuData::Types::RatioPreset> aspect_ratios;
-  std::vector<Common::MenuData::Types::ResolutionPreset> resolutions;
-  std::vector<Common::MenuData::Types::ComputedFeatureItem> feature_items;
+export struct ComputedPresets {
+  std::vector<Features::Settings::Menu::RatioPreset> aspect_ratios;
+  std::vector<Features::Settings::Menu::ResolutionPreset> resolutions;
+  std::vector<Features::Settings::Menu::ComputedFeatureItem> feature_items;
 };
 
-// Settings 模块的完整运行时状态
-struct SettingsState {
-  Types::AppSettings config;         // 配置数据（可序列化）
-  ComputedPresets computed_presets;  // 计算状态
+// Settings 模块的完整运行时状态 (Vue/Pinia Style)
+export struct SettingsState {
+  // [Raw State] 原始配置数据 (Source of Truth)
+  Types::AppSettings raw;
+
+  // [Computed State] 计算后的缓存 (Derived State)
+  ComputedPresets computed;
+
   bool is_initialized = false;
 };
 
 // === 状态管理函数 ===
 
 // 创建默认的设置状态
-inline auto create_default_settings_state() -> SettingsState {
+export auto create_default_settings_state() -> SettingsState {
   SettingsState state;
-  state.config = Types::AppSettings{};
+  state.raw = Types::AppSettings{};
   state.is_initialized = false;
   return state;
 }

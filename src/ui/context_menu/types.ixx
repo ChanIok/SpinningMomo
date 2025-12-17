@@ -9,7 +9,7 @@ export module UI.ContextMenu.Types;
 
 import std;
 import Features.WindowControl;
-import Common.MenuData.Types;
+import Features.Settings.Menu;
 
 export namespace UI::ContextMenu::Types {
 
@@ -107,24 +107,24 @@ struct MenuItem {
     return MenuItem(window.title, MenuAction::window_selection(window));
   }
 
-  static auto ratio_item(const Common::MenuData::Types::RatioPreset& ratio, size_t index,
+  static auto ratio_item(const Features::Settings::Menu::RatioPreset& ratio, size_t index,
                          bool selected = false) -> MenuItem {
     return MenuItem(ratio.name, MenuAction::ratio_selection(index, ratio.name, ratio.ratio),
                     selected);
   }
 
-  static auto resolution_item(const Common::MenuData::Types::ResolutionPreset& resolution,
+  static auto resolution_item(const Features::Settings::Menu::ResolutionPreset& resolution,
                               size_t index, bool selected = false) -> MenuItem {
     std::wstring display_text;
-    if (resolution.baseWidth == 0 && resolution.baseHeight == 0) {
+    if (resolution.base_width == 0 && resolution.base_height == 0) {
       display_text = resolution.name;
     } else {
-      const double megaPixels = resolution.totalPixels / 1000000.0;
+      const double megaPixels = resolution.total_pixels / 1000000.0;
       display_text = std::format(L"{} ({:.1f}M)", resolution.name, megaPixels);
     }
     return MenuItem(
         display_text,
-        MenuAction::resolution_selection(index, resolution.name, resolution.totalPixels), selected);
+        MenuAction::resolution_selection(index, resolution.name, resolution.total_pixels), selected);
   }
 
   static auto feature_item(const std::wstring& text, const std::string& action_id,

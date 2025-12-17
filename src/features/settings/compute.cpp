@@ -6,7 +6,7 @@ import std;
 import Core.State;
 import Core.I18n.Types;
 import Core.I18n.State;
-import Common.MenuData.Types;
+import Features.Settings.Menu;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Utils.String;
@@ -102,8 +102,8 @@ auto parse_resolution(const std::string& id) -> std::optional<std::pair<int, int
 // 计算功能项预设
 auto compute_feature_items_from_config(const Types::AppSettings& config,
                                        const Core::I18n::Types::TextData& texts)
-    -> std::vector<Common::MenuData::Types::ComputedFeatureItem> {
-  std::vector<Common::MenuData::Types::ComputedFeatureItem> computed_items;
+    -> std::vector<Features::Settings::Menu::ComputedFeatureItem> {
+  std::vector<Features::Settings::Menu::ComputedFeatureItem> computed_items;
 
   // 处理功能项，过滤启用的项目并按顺序排序
   std::vector<std::pair<Types::FeatureItem, int>> enabled_items;
@@ -158,9 +158,9 @@ auto compute_presets_from_config(const Types::AppSettings& config,
   return computed;
 }
 
-auto update_computed_state(Core::State::AppState& app_state) -> bool {
-  app_state.settings->computed_presets =
-      compute_presets_from_config(app_state.settings->config, app_state.i18n->texts);
+auto trigger_compute(Core::State::AppState& app_state) -> bool {
+  app_state.settings->computed =
+      compute_presets_from_config(app_state.settings->raw, app_state.i18n->texts);
   return true;
 }
 

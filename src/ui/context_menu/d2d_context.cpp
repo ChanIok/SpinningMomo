@@ -51,7 +51,7 @@ auto create_brushes_for_target(Core::State::AppState& state, ID2D1HwndRenderTarg
                                ID2D1SolidColorBrush** separator_brush,
                                ID2D1SolidColorBrush** hover_brush,
                                ID2D1SolidColorBrush** indicator_brush) -> bool {
-  const auto& colors = state.settings->config.ui.app_window_colors;
+  const auto& colors = state.settings->raw.ui.app_window_colors;
 
   if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.background),
                                            background_brush)))

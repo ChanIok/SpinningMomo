@@ -21,7 +21,7 @@ namespace Features::Recording::UseCase {
 
 // 查找目标窗口（复制自 Screenshot 模块）
 auto find_target_window(const Core::State::AppState& state) -> HWND {
-  const auto& target_title = state.settings->config.window.target_title;
+  const auto& target_title = state.settings->raw.window.target_title;
   const std::wstring title_w = Utils::String::FromUtf8(target_title);
 
   HWND hwnd = FindWindowW(nullptr, title_w.c_str());

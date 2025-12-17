@@ -3,7 +3,7 @@ module;
 module Features.WindowControl.UseCase;
 
 import std;
-import Common.MenuData;
+import Features.Settings.Menu;
 import Core.State;
 import Core.I18n.State;
 import UI.AppWindow;
@@ -24,7 +24,7 @@ namespace Features::WindowControl::UseCase {
 
 // 获取当前比例
 auto get_current_ratio(const Core::State::AppState& state) -> double {
-  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   if (state.app_window->ui.current_ratio_index < ratios.size()) {
     return ratios[state.app_window->ui.current_ratio_index].ratio;
   }
@@ -37,9 +37,9 @@ auto get_current_ratio(const Core::State::AppState& state) -> double {
 
 // 获取当前总像素数
 auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64_t {
-  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
   if (state.app_window->ui.current_resolution_index < resolutions.size()) {
-    return resolutions[state.app_window->ui.current_resolution_index].totalPixels;
+    return resolutions[state.app_window->ui.current_resolution_index].total_pixels;
   }
   return 0;  // 表示使用屏幕尺寸
 }
@@ -74,7 +74,7 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
 // 处理重置窗口事件
 auto handle_reset_event(Core::State::AppState& state,
                         const UI::AppWindow::Events::ResetEvent& event) -> void {
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
@@ -83,7 +83,7 @@ auto handle_reset_event(Core::State::AppState& state,
   }
 
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
+      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize,
       .activate_window = true};
 
   auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
@@ -108,7 +108,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
   Logger().debug("Handling ratio change to index {}, ratio: {}", event.index, event.ratio_value);
 
   // 查找目标窗口
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
@@ -131,7 +131,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
 
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
+      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize,
       .activate_window = true};
 
   auto result =
@@ -149,7 +149,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
   post_transform_actions(state, target_window.value());
 
   // 更新当前比例索引
-  const auto& ratios = Common::MenuData::get_current_aspect_ratios(state);
+  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   if (event.index < ratios.size() || event.index == std::numeric_limits<size_t>::max()) {
     state.app_window->ui.current_ratio_index = event.index;
   }
@@ -162,7 +162,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
                  event.total_pixels);
 
   // 查找目标窗口
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
@@ -186,7 +186,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
 
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->config.window.taskbar.lower_on_resize,
+      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize,
       .activate_window = true};
 
   auto result =
@@ -204,7 +204,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
   post_transform_actions(state, target_window.value());
 
   // 更新当前分辨率索引
-  const auto& resolutions = Common::MenuData::get_current_resolutions(state);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
   if (event.index < resolutions.size()) {
     state.app_window->ui.current_resolution_index = event.index;
   }
@@ -216,13 +216,13 @@ auto handle_window_selected(Core::State::AppState& state,
   Logger().info("Window selected: {}", Utils::String::ToUtf8(event.window_title));
 
   // 更新设置状态中的目标窗口标题
-  state.settings->config.window.target_title = Utils::String::ToUtf8(event.window_title);
+  state.settings->raw.window.target_title = Utils::String::ToUtf8(event.window_title);
 
   // 保存设置到文件
   auto settings_path = Features::Settings::get_settings_path();
   if (settings_path) {
     auto save_result =
-        Features::Settings::save_settings_to_file(settings_path.value(), state.settings->config);
+        Features::Settings::save_settings_to_file(settings_path.value(), state.settings->raw);
     if (!save_result) {
       Logger().error("Failed to save settings: {}", save_result.error());
       // 可能需要通知用户保存失败

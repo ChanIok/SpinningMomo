@@ -3,7 +3,7 @@ module;
 export module UI.AppWindow.State;
 
 import std;
-import Common.MenuIds;
+import Features.Settings.Menu;
 import UI.AppWindow.Types;
 
 export namespace UI::AppWindow::State {
@@ -27,17 +27,17 @@ auto is_item_selected(const AppWindow::MenuItem& item,
       return item.index == static_cast<int>(ui_state.current_resolution_index);
     case AppWindow::MenuItemCategory::Feature: {
       // 基于 action_id 判断功能项的选中状态
-      auto menu_id = Common::MenuIds::from_string(item.action_id);
+      auto menu_id = Features::Settings::Menu::from_string(item.action_id);
       if (!menu_id) return false;
 
       switch (*menu_id) {
-        case Common::MenuIds::Id::FeatureTogglePreview:
+        case Features::Settings::Menu::Id::FeatureTogglePreview:
           return ui_state.preview_enabled;
-        case Common::MenuIds::Id::FeatureToggleOverlay:
+        case Features::Settings::Menu::Id::FeatureToggleOverlay:
           return ui_state.overlay_enabled;
-        case Common::MenuIds::Id::FeatureToggleLetterbox:
+        case Features::Settings::Menu::Id::FeatureToggleLetterbox:
           return ui_state.letterbox_enabled;
-        case Common::MenuIds::Id::FeatureToggleRecording:
+        case Features::Settings::Menu::Id::FeatureToggleRecording:
           return ui_state.recording_enabled;
         default:
           return false;

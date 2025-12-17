@@ -19,7 +19,7 @@ namespace Features::Screenshot::UseCase {
 // 处理截图事件
 auto handle_capture_event(Core::State::AppState& state,
                           const UI::AppWindow::Events::CaptureEvent& event) -> void {
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
     Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,

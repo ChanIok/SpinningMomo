@@ -17,7 +17,7 @@ import Utils.Logger;
 namespace UI::AppWindow::Layout {
 
 auto update_layout(Core::State::AppState& state) -> void {
-  const auto& settings = state.settings->config;
+  const auto& settings = state.settings->raw;
   const auto& layout_settings = settings.ui.app_window_layout;
   const UINT dpi = state.app_window->window.dpi;
   const double scale = static_cast<double>(dpi) / 96.0;

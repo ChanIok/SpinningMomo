@@ -25,13 +25,13 @@ auto handle_overlay_toggle(Core::State::AppState& state,
 
   if (event.enabled) {
     // 如果启用了黑边模式，关闭黑边窗口
-    if (state.settings->config.features.letterbox.enabled) {
+    if (state.settings->raw.features.letterbox.enabled) {
       if (auto result = Features::Letterbox::shutdown(state); !result) {
         Logger().error("Failed to shutdown letterbox: {}", result.error());
       }
     }
 
-    std::wstring window_title = Utils::String::FromUtf8(state.settings->config.window.target_title);
+    std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
     auto target_window = Features::WindowControl::find_target_window(window_title);
     if (target_window) {
       if (auto result = Features::Overlay::start_overlay(state, target_window.value()); !result) {
@@ -54,9 +54,9 @@ auto handle_overlay_toggle(Core::State::AppState& state,
     Features::Overlay::stop_overlay(state);
 
     // 如果启用了黑边模式，重新显示黑边窗口
-    if (state.settings->config.features.letterbox.enabled) {
+    if (state.settings->raw.features.letterbox.enabled) {
       std::wstring window_title =
-          Utils::String::FromUtf8(state.settings->config.window.target_title);
+          Utils::String::FromUtf8(state.settings->raw.window.target_title);
       auto target_window = Features::WindowControl::find_target_window(window_title);
       if (target_window) {
         if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
