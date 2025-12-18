@@ -7,8 +7,7 @@ import UI.AppWindow.Events;
 
 namespace Features::Preview::UseCase {
 
-// 处理预览功能切换
-export auto handle_preview_toggle(Core::State::AppState& state,
-                                 const UI::AppWindow::Events::PreviewToggleEvent& event) -> void;
+// 切换预览功能
+export auto toggle_preview(Core::State::AppState& state) -> void;
 
 }  // namespace Features::Preview::UseCase

@@ -4,7 +4,9 @@ export module UI.AppWindow.State;
 
 import std;
 import Features.Settings.Menu;
+import Features.Registry;
 import UI.AppWindow.Types;
+import Core.State;
 
 export namespace UI::AppWindow::State {
 
@@ -18,8 +20,8 @@ struct AppWindowState {
 };
 
 // 辅助函数
-auto is_item_selected(const AppWindow::MenuItem& item,
-                      const AppWindow::InteractionState& ui_state) -> bool {
+auto is_item_selected(const AppWindow::MenuItem& item, const AppWindow::InteractionState& ui_state)
+    -> bool {
   switch (item.category) {
     case AppWindow::MenuItemCategory::AspectRatio:
       return item.index == static_cast<int>(ui_state.current_ratio_index);
@@ -35,6 +37,35 @@ auto is_item_selected(const AppWindow::MenuItem& item,
         return ui_state.letterbox_enabled;
       } else if (item.action_id == "feature.toggle_recording") {
         return ui_state.recording_enabled;
+      }
+      return false;
+    }
+    default:
+      return false;
+  }
+}
+
+}  // namespace UI::AppWindow::State
+
+export namespace UI::AppWindow::State {
+
+// 重载版本：支持 AppState 以便访问注册表
+auto is_item_selected(const AppWindow::MenuItem& item, const Core::State::AppState& app_state)
+    -> bool {
+  switch (item.category) {
+    case AppWindow::MenuItemCategory::AspectRatio:
+      return item.index == static_cast<int>(app_state.app_window->ui.current_ratio_index);
+    case AppWindow::MenuItemCategory::Resolution:
+      return item.index == static_cast<int>(app_state.app_window->ui.current_resolution_index);
+    case AppWindow::MenuItemCategory::Feature: {
+      // 从注册表查询功能状态
+      if (app_state.feature_registry) {
+        if (auto feature_opt =
+                Features::Registry::get_feature(*app_state.feature_registry, item.action_id)) {
+          if (feature_opt->is_toggle && feature_opt->get_state) {
+            return feature_opt->get_state();
+          }
+        }
       }
       return false;
     }

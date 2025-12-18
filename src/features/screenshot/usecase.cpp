@@ -16,9 +16,8 @@ import Utils.String;
 
 namespace Features::Screenshot::UseCase {
 
-// 处理截图事件
-auto handle_capture_event(Core::State::AppState& state,
-                          const UI::AppWindow::Events::CaptureEvent& event) -> void {
+// 截图
+auto capture(Core::State::AppState& state) -> void {
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
@@ -55,16 +54,10 @@ auto handle_capture_event(Core::State::AppState& state,
   }
 }
 
-// 处理打开截图文件夹事件
-auto handle_screenshots_event(Core::State::AppState& state,
-                            const UI::AppWindow::Events::ScreenshotsEvent& event) -> void {
-  Logger().debug("Opening screenshot folder");
-
-  if (auto result = Features::Screenshot::Folder::open_folder(state); !result) {
-    Logger().error("Failed to open screenshot folder: {}", result.error());
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_adjust_failed);
-  }
+// 处理截图事件（Event版本，用于热键系统）
+auto handle_capture_event(Core::State::AppState& state,
+                          const UI::AppWindow::Events::CaptureEvent& event) -> void {
+  capture(state);
 }
 
 }  // namespace Features::Screenshot::UseCase

@@ -71,37 +71,6 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
   Logger().debug("Post-transform actions completed");
 }
 
-// 处理重置窗口事件
-auto handle_reset_event(Core::State::AppState& state,
-                        const UI::AppWindow::Events::ResetEvent& event) -> void {
-  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
-  auto target_window = Features::WindowControl::find_target_window(window_title);
-  if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_not_found);
-    return;
-  }
-
-  Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize,
-      .activate_window = true};
-
-  auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
-  if (!result) {
-    Features::Notifications::show_notification(
-        state, state.i18n->texts.label.app_name,
-        state.i18n->texts.message.window_reset_failed + ": " + result.error());
-    return;
-  }
-
-  // 重置UI状态到默认值
-  state.app_window->ui.current_ratio_index =
-      std::numeric_limits<size_t>::max();  // 表示使用屏幕比例
-  state.app_window->ui.current_resolution_index = 0;
-
-  Logger().debug("Window reset to screen size successfully");
-}
-
 // 处理比例改变事件
 auto handle_ratio_changed(Core::State::AppState& state,
                           const UI::AppWindow::Events::RatioChangeEvent& event) -> void {
@@ -131,8 +100,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
 
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize,
-      .activate_window = true};
+      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -186,8 +154,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
 
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize,
-      .activate_window = true};
+      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -244,6 +211,24 @@ auto handle_window_selected(Core::State::AppState& state,
       state, state.i18n->texts.label.app_name,
       std::format("{}: {}", state.i18n->texts.message.window_selected,
                   Utils::String::ToUtf8(event.window_title)));
+}
+
+// 重置窗口变换（直接调用版本）
+auto reset_window_transform(Core::State::AppState& state) -> void {
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
+  auto target_window = Features::WindowControl::find_target_window(window_title);
+  if (!target_window) {
+    Logger().error("Failed to find target window");
+    return;
+  }
+
+  Features::WindowControl::TransformOptions options{
+      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
+
+  auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
+  if (!result) {
+    Logger().error("Failed to reset window: {}", result.error());
+  }
 }
 
 }  // namespace Features::WindowControl::UseCase

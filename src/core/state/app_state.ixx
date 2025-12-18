@@ -88,6 +88,10 @@ namespace Core::WorkerPool::State {
 export struct WorkerPoolState;
 }
 
+namespace Features::Registry {
+export struct FeatureRegistry;
+}
+
 namespace Core::State {
 
 export struct AppState {
@@ -104,6 +108,7 @@ export struct AppState {
   std::unique_ptr<Core::Database::State::DatabaseState> database;
   std::unique_ptr<Core::HttpServer::State::HttpServerState> http_server;
   std::unique_ptr<Core::WorkerPool::State::WorkerPoolState> worker_pool;
+  std::unique_ptr<Features::Registry::FeatureRegistry> feature_registry;
 
   // 应用设置状态（包含配置和计算状态）
   std::unique_ptr<Features::Settings::State::SettingsState> settings;

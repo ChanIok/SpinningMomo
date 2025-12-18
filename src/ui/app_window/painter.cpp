@@ -245,7 +245,7 @@ auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindo
   }
 
   // 绘制选中指示器（保持完全不透明）
-  const bool is_selected = UI::AppWindow::State::is_item_selected(item, state.app_window->ui);
+  const bool is_selected = UI::AppWindow::State::is_item_selected(item, state);
   if (is_selected) {
     const int indicator_width = UI::AppWindow::Layout::get_indicator_width(item, state);
     D2D1_RECT_F indicator_rect = UI::AppWindow::make_d2d_rect(

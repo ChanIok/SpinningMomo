@@ -7,8 +7,7 @@ import UI.AppWindow.Events;
 
 namespace Features::Letterbox::UseCase {
 
-// 处理letterbox功能切换
-export auto handle_letterbox_toggle(Core::State::AppState& state,
-                                    const UI::AppWindow::Events::LetterboxToggleEvent& event) -> void;
+// 切换黑边模式
+export auto toggle_letterbox(Core::State::AppState& state) -> void;
 
 }  // namespace Features::Letterbox::UseCase

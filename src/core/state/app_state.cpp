@@ -18,6 +18,7 @@ import Features.Overlay.State;
 import Features.Preview.State;
 import Features.Screenshot.State;
 import Features.Recording.State;
+import Features.Registry;
 import Features.Settings.State;
 import Features.Update.State;
 import UI.AppWindow.State;
@@ -47,7 +48,9 @@ AppState::AppState()
       overlay(std::make_unique<Features::Overlay::State::OverlayState>()),
       preview(std::make_unique<Features::Preview::State::PreviewState>()),
       screenshot(std::make_unique<Features::Screenshot::State::ScreenshotState>()),
-      recording(std::make_unique<Features::Recording::State::RecordingState>()) {}
+      recording(std::make_unique<Features::Recording::State::RecordingState>()),
+      feature_registry(std::make_unique<Features::Registry::FeatureRegistry>(
+          Features::Registry::create_registry())) {}
 
 AppState::~AppState() = default;
 

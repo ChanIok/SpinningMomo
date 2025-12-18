@@ -22,12 +22,6 @@ export struct WebBackgroundSettings {
   int blur_amount = 0;   // 0 - 200
 };
 
-// 功能项结构
-export struct FeatureItem {
-  std::string id;
-  bool enabled = true;
-};
-
 // 完整的应用设置（重构后的结构）
 export struct AppSettings {
   int version = CURRENT_SETTINGS_VERSION;
@@ -109,17 +103,12 @@ export struct AppSettings {
   struct UI {
     // 应用菜单配置
     struct AppMenu {
-      // 所有功能项（包含启用状态和顺序）
-      std::vector<FeatureItem> features = {
-          {"screenshot.capture", true},
-          {"screenshot.open_folder", true},
-          {"feature.toggle_preview", true},
-          {"feature.toggle_overlay", true},
-          {"feature.toggle_letterbox", true},
-          {"feature.toggle_recording", true},
-          {"window.reset_transform", true},
-          {"panel.hide", false},
-          {"app.exit", true},
+      // 启用的功能项（有则启用，顺序即菜单显示顺序）
+      std::vector<std::string> features = {
+          "screenshot.capture",       "screenshot.open_folder",
+          "feature.toggle_preview",   "feature.toggle_overlay",
+          "feature.toggle_letterbox", "feature.toggle_recording",
+          "window.reset_transform",   "app.exit",
       };
       // 启用的比例列表（顺序即为菜单显示顺序）
       std::vector<std::string> aspect_ratios = {"21:9", "16:9", "3:2", "1:1", "3:4", "2:3", "9:16"};
@@ -179,6 +168,21 @@ export using UpdateSettingsParams = AppSettings;
 export struct UpdateSettingsResult {
   bool success;
   std::string message;
+};
+
+// 获取可用功能列表
+export struct GetAvailableFeaturesParams {
+  // 空结构体，未来可扩展
+};
+
+export struct FeatureDescriptorData {
+  std::string id;
+  std::string icon;
+  bool is_toggle;
+};
+
+export struct GetAvailableFeaturesResult {
+  std::vector<FeatureDescriptorData> features;
 };
 
 }  // namespace Features::Settings::Types

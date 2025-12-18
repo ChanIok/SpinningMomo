@@ -67,10 +67,6 @@ export struct ScreenshotsEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
-export struct ResetEvent {
-  std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
-};
-
 export struct HideEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };

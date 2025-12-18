@@ -13,6 +13,7 @@ import Core.Initializer.Database;
 import Core.Migration;
 import Features.Gallery;
 import Features.Settings;
+import Features.Registry;
 import Features.Settings.State;
 import Features.Recording;
 import Features.Update;
@@ -59,6 +60,11 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize updater: " + updater_result.error());
     }
 
+    // 初始化功能注册表
+    Features::Registry::register_builtin_features(state, *state.feature_registry);
+    Logger().info("Feature registry initialized with {} features",
+                  state.feature_registry->descriptors.size());
+
     if (auto result = UI::AppWindow::create_window(state); !result) {
       return std::unexpected("Failed to create app window: " + result.error());
     }
@@ -86,9 +92,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     UI::AppWindow::register_toggle_visibility_hotkey(
         state, state.settings->raw.app.hotkey.toggle_visibility.modifiers,
         state.settings->raw.app.hotkey.toggle_visibility.key);
-    UI::AppWindow::register_screenshot_hotkey(
-        state, state.settings->raw.app.hotkey.screenshot.modifiers,
-        state.settings->raw.app.hotkey.screenshot.key);
+    UI::AppWindow::register_screenshot_hotkey(state,
+                                              state.settings->raw.app.hotkey.screenshot.modifiers,
+                                              state.settings->raw.app.hotkey.screenshot.key);
 
     Logger().info("Application initialized successfully");
     return {};

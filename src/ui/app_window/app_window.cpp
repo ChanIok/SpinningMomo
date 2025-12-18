@@ -12,6 +12,7 @@ import std;
 import Features.Settings.Menu;
 import Features.Settings.Types;
 import Features.Settings.State;
+import Features.Registry;
 import Core.Events;
 import Core.State;
 import Core.I18n.Types;
@@ -203,30 +204,31 @@ auto unregister_hotkey(Core::State::AppState& state) -> void {
 
 // 内部辅助函数实现
 
-// 根据功能项 ID 获取本地化文本
-auto get_localized_text_for_feature(const std::string& feature_id,
-                                    const Core::I18n::Types::TextData& texts) -> std::wstring {
-  if (feature_id == "screenshot.capture") {
+// 根据 i18n_key 获取本地化文本
+auto get_text_by_i18n_key(const std::string& i18n_key, const Core::I18n::Types::TextData& texts)
+    -> std::wstring {
+  // 直接映射 i18n_key 到 texts 中的字段
+  if (i18n_key == "menu.screenshot_capture") {
     return Utils::String::FromUtf8(texts.menu.screenshot_capture);
-  } else if (feature_id == "screenshot.open_folder") {
+  } else if (i18n_key == "menu.screenshot_open_folder") {
     return Utils::String::FromUtf8(texts.menu.screenshot_open_folder);
-  } else if (feature_id == "feature.toggle_preview") {
+  } else if (i18n_key == "menu.preview_toggle") {
     return Utils::String::FromUtf8(texts.menu.preview_toggle);
-  } else if (feature_id == "feature.toggle_overlay") {
+  } else if (i18n_key == "menu.overlay_toggle") {
     return Utils::String::FromUtf8(texts.menu.overlay_toggle);
-  } else if (feature_id == "feature.toggle_letterbox") {
+  } else if (i18n_key == "menu.letterbox_toggle") {
     return Utils::String::FromUtf8(texts.menu.letterbox_toggle);
-  } else if (feature_id == "feature.toggle_recording") {
+  } else if (i18n_key == "menu.recording_toggle") {
     return Utils::String::FromUtf8(texts.menu.recording_toggle);
-  } else if (feature_id == "window.reset_transform") {
+  } else if (i18n_key == "menu.window_reset") {
     return Utils::String::FromUtf8(texts.menu.window_reset);
-  } else if (feature_id == "panel.hide") {
+  } else if (i18n_key == "menu.app_hide") {
     return Utils::String::FromUtf8(texts.menu.app_hide);
-  } else if (feature_id == "app.exit") {
+  } else if (i18n_key == "menu.app_exit") {
     return Utils::String::FromUtf8(texts.menu.app_exit);
   }
-  // Fallback: 返回 ID 本身
-  return Utils::String::FromUtf8(feature_id);
+  // Fallback: 返回 key 本身
+  return Utils::String::FromUtf8(i18n_key);
 }
 
 auto register_window_class(HINSTANCE instance) -> void {
@@ -248,7 +250,7 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
 
-  // 直接从配置中获取功能项
+  // 从配置获取功能项顺序
   const auto& feature_config = state.settings->raw.ui.app_menu.features;
   const auto& texts = state.i18n->texts;
 
@@ -265,14 +267,19 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
         preset.name, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
   }
 
-  // 添加功能项（只添加启用的项）
-  for (size_t i = 0; i < feature_config.size(); ++i) {
-    const auto& feature = feature_config[i];
-    if (feature.enabled) {
-      // 渲染时动态查找本地化文本
-      std::wstring text = get_localized_text_for_feature(feature.id, texts);
-      state.app_window->data.menu_items.emplace_back(text, UI::AppWindow::MenuItemCategory::Feature,
-                                                     static_cast<int>(i), feature.id);
+  // 添加功能项（从注册表获取）
+  if (state.feature_registry) {
+    for (size_t i = 0; i < feature_config.size(); ++i) {
+      const auto& feature_id = feature_config[i];
+      // 从注册表获取功能描述
+      if (auto feature_opt = Features::Registry::get_feature(*state.feature_registry, feature_id)) {
+        // 使用 i18n_key 获取文本
+        std::wstring text = get_text_by_i18n_key(feature_opt->i18n_key, texts);
+        state.app_window->data.menu_items.emplace_back(
+            text, UI::AppWindow::MenuItemCategory::Feature, static_cast<int>(i), feature_id);
+      } else {
+        Logger().warn("Feature not found in registry: {}", feature_id);
+      }
     }
   }
 }

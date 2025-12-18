@@ -7,8 +7,7 @@ import UI.AppWindow.Events;
 
 namespace Features::Overlay::UseCase {
 
-// 处理叠加层功能切换
-export auto handle_overlay_toggle(Core::State::AppState& state,
-                                 const UI::AppWindow::Events::OverlayToggleEvent& event) -> void;
+// 切换叠加层功能
+export auto toggle_overlay(Core::State::AppState& state) -> void;
 
 }  // namespace Features::Overlay::UseCase

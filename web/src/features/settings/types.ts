@@ -1,9 +1,8 @@
-// UI 交互用的菜单项类型
-// enabled 字段用于功能列表的启用/禁用状态
-// 对于比例和分辨率列表，enabled 字段保持为 true（不显示切换开关）
-export interface MenuItem {
-  id: string
-  enabled: boolean
+// 功能描述符（从后端获取）
+export interface FeatureDescriptor {
+  id: string // 唯一标识
+  icon: string // lucide 图标名
+  isToggle: boolean // 是否为切换类型
 }
 
 // Web 主题模式（页面主题）
@@ -134,7 +133,7 @@ export interface AppSettings {
   ui: {
     // 应用菜单配置
     appMenu: {
-      features: MenuItem[] // 所有功能项（包含启用状态和顺序）
+      features: string[] // 启用的功能项（有则启用，顺序即菜单显示顺序）
       aspectRatios: string[] // 启用的比例列表
       resolutions: string[] // 启用的分辨率列表
     }
@@ -205,15 +204,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   ui: {
     appMenu: {
       features: [
-        { id: 'screenshot.capture', enabled: true },
-        { id: 'screenshot.open_folder', enabled: true },
-        { id: 'feature.toggle_preview', enabled: true },
-        { id: 'feature.toggle_overlay', enabled: true },
-        { id: 'feature.toggle_letterbox', enabled: true },
-        { id: 'feature.toggle_recording', enabled: true },
-        { id: 'window.reset_transform', enabled: true },
-        { id: 'panel.hide', enabled: false },
-        { id: 'app.exit', enabled: true },
+        'screenshot.capture',
+        'screenshot.open_folder',
+        'feature.toggle_preview',
+        'feature.toggle_overlay',
+        'feature.toggle_letterbox',
+        'feature.toggle_recording',
+        'window.reset_transform',
+        'app.exit',
       ],
       aspectRatios: ['21:9', '16:9', '3:2', '1:1', '3:4', '2:3', '9:16'],
       resolutions: ['Default', '1080P', '2K', '4K', '6K', '8K', '12K'],
