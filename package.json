@@ -1,0 +1,21 @@
+{
+  "name": "spinning-momo",
+  "private": true,
+  "scripts": {
+    "prepare": "husky",
+    "format:cpp": "node scripts/format-cpp.js",
+    "format:web": "cd web && prettier --write ."
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.4"
+  },
+  "lint-staged": {
+    "src/**/*.{cpp,ixx,h,hpp}": [
+      "node scripts/format-cpp.js --files"
+    ],
+    "web/**/*.{js,ts,vue,json,css,md}": [
+      "node scripts/format-web.js"
+    ]
+  }
+}

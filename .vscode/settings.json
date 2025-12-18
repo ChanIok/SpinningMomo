@@ -1,10 +1,10 @@
 {
   "cmake.configureOnOpen": true,
   "C_Cpp.default.cppStandard": "c++23",
-  "C_Cpp.clang_format_style": "{BasedOnStyle: Google, ColumnLimit: 100}",
+  "C_Cpp.clang_format_style": "file",
   "C_Cpp.default.compilerArgs": ["/std:c++latest", "/experimental:module"],
   "C_Cpp.experimentalFeatures": "enabled",
-  "C_Cpp.intelliSenseEngine": "default",
+  "C_Cpp.intelliSenseEngine": "Tag Parser",
   "C_Cpp.enhancedColorization": "enabled",
   "C_Cpp.errorSquiggles": "disabled",
   "files.associations": {

@@ -1,0 +1,11 @@
+# SpinningMomo C++ Code Style
+# Based on Google style with minimal overrides
+
+BasedOnStyle: Google
+Language: Cpp
+
+# 主要差异：使用100字符行宽而非Google默认的80
+ColumnLimit: 100
+
+# 保持include分组结构，只在组内排序（适合模块化项目）
+IncludeBlocks: Preserve
