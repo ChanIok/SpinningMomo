@@ -12,9 +12,9 @@ export module Core.I18n.Embedded.ZhCN;
 import std;
 
 export namespace EmbeddedLocales {
-    // Embedded Chinese JSON content as string_view
-    // Size: 3008 bytes
-    constexpr std::string_view zh_cn_json = R"EmbeddedJson({
+// Embedded Chinese JSON content as string_view
+// Size: 3008 bytes
+constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
   "menu": {
@@ -37,7 +37,7 @@ export namespace EmbeddedLocales {
     "screenshot_open_folder": "打开相册",
     "overlay_toggle": "叠加层",
     "preview_toggle": "预览窗",
-    "recording_toggle": "录屏",
+    "recording_toggle": "录制",
     "letterbox_toggle": "黑边模式",
 
     "settings_hotkey": "修改热键",
@@ -62,8 +62,8 @@ export namespace EmbeddedLocales {
     "preview_conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能",
     "preview_start_failed": "预览窗启动失败: ",
     "overlay_start_failed": "叠加层启动失败: ",
-    "recording_start_failed": "录屏启动失败: ",
-    "recording_stop_failed": "录屏停止失败: ",
+    "recording_start_failed": "录制启动失败: ",
+    "recording_stop_failed": "录制停止失败: ",
 
     "settings_hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
     "settings_hotkey_success": "热键已设置为：",
@@ -83,4 +83,4 @@ export namespace EmbeddedLocales {
   }
 }
 )EmbeddedJson";
-}
+}  // namespace EmbeddedLocales

@@ -31,18 +31,6 @@ export struct ResolutionPreset {
       : name(n), total_pixels(static_cast<std::uint64_t>(w) * h), base_width(w), base_height(h) {}
 };
 
-// 计算后的功能项
-export struct ComputedFeatureItem {
-  std::wstring text;      // 显示文本
-  std::string action_id;  // 操作标识
-  bool enabled;           // 是否启用
-  int order;              // 排序
-
-  ComputedFeatureItem(const std::wstring& t, const std::string& id, bool en = true, int ord = 0)
-      : text(t), action_id(id), enabled(en), order(ord) {}
-};
-
-
 // === Getters Interface ===
 
 // 获取当前的比例预设数据
@@ -52,9 +40,5 @@ export auto get_ratios(const Features::Settings::State::SettingsState& state)
 // 获取当前的分辨率预设数据
 export auto get_resolutions(const Features::Settings::State::SettingsState& state)
     -> const std::vector<ResolutionPreset>&;
-
-// 获取当前的功能项数据
-export auto get_feature_items(const Features::Settings::State::SettingsState& state)
-    -> const std::vector<ComputedFeatureItem>&;
 
 }  // namespace Features::Settings::Menu

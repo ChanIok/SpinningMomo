@@ -12,7 +12,6 @@ namespace Features::Settings::State {
 export struct ComputedPresets {
   std::vector<Features::Settings::Menu::RatioPreset> aspect_ratios;
   std::vector<Features::Settings::Menu::ResolutionPreset> resolutions;
-  std::vector<Features::Settings::Menu::ComputedFeatureItem> feature_items;
 };
 
 // Settings 模块的完整运行时状态 (Vue/Pinia Style)

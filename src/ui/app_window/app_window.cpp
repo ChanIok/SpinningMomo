@@ -10,8 +10,12 @@ module UI.AppWindow;
 
 import std;
 import Features.Settings.Menu;
+import Features.Settings.Types;
+import Features.Settings.State;
 import Core.Events;
 import Core.State;
+import Core.I18n.Types;
+import Core.I18n.State;
 import UI.AppWindow.Events;
 import UI.AppWindow.MessageHandler;
 import UI.AppWindow.Layout;
@@ -20,6 +24,7 @@ import UI.AppWindow.Painter;
 import UI.AppWindow.State;
 import UI.AppWindow.Types;
 import Utils.Logger;
+import Utils.String;
 
 namespace UI::AppWindow {
 
@@ -197,6 +202,33 @@ auto unregister_hotkey(Core::State::AppState& state) -> void {
 }
 
 // 内部辅助函数实现
+
+// 根据功能项 ID 获取本地化文本
+auto get_localized_text_for_feature(const std::string& feature_id,
+                                    const Core::I18n::Types::TextData& texts) -> std::wstring {
+  if (feature_id == "screenshot.capture") {
+    return Utils::String::FromUtf8(texts.menu.screenshot_capture);
+  } else if (feature_id == "screenshot.open_folder") {
+    return Utils::String::FromUtf8(texts.menu.screenshot_open_folder);
+  } else if (feature_id == "feature.toggle_preview") {
+    return Utils::String::FromUtf8(texts.menu.preview_toggle);
+  } else if (feature_id == "feature.toggle_overlay") {
+    return Utils::String::FromUtf8(texts.menu.overlay_toggle);
+  } else if (feature_id == "feature.toggle_letterbox") {
+    return Utils::String::FromUtf8(texts.menu.letterbox_toggle);
+  } else if (feature_id == "feature.toggle_recording") {
+    return Utils::String::FromUtf8(texts.menu.recording_toggle);
+  } else if (feature_id == "window.reset_transform") {
+    return Utils::String::FromUtf8(texts.menu.window_reset);
+  } else if (feature_id == "panel.hide") {
+    return Utils::String::FromUtf8(texts.menu.app_hide);
+  } else if (feature_id == "app.exit") {
+    return Utils::String::FromUtf8(texts.menu.app_exit);
+  }
+  // Fallback: 返回 ID 本身
+  return Utils::String::FromUtf8(feature_id);
+}
+
 auto register_window_class(HINSTANCE instance) -> void {
   WNDCLASSEXW wc{};
   wc.cbSize = sizeof(WNDCLASSEXW);
@@ -212,10 +244,13 @@ auto register_window_class(HINSTANCE instance) -> void {
 auto initialize_menu_items(Core::State::AppState& state) -> void {
   state.app_window->data.menu_items.clear();
 
-  // 通过统一的 MenuData API 获取所有数据
+  // 获取比例和分辨率预设
   const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
-  const auto& feature_items = Features::Settings::Menu::get_feature_items(*state.settings);
+
+  // 直接从配置中获取功能项
+  const auto& feature_config = state.settings->raw.ui.app_menu.features;
+  const auto& texts = state.i18n->texts;
 
   // 添加比例选项
   for (size_t i = 0; i < ratios.size(); ++i) {
@@ -225,18 +260,20 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
 
   // 添加分辨率选项
   for (size_t i = 0; i < resolutions.size(); ++i) {
-    std::wstring displayText;
     const auto& preset = resolutions[i];
-    displayText = preset.name;
     state.app_window->data.menu_items.emplace_back(
-        displayText, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
+        preset.name, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
   }
 
-  // 添加功能项（使用新的统一API，现在文本已经通过i18n系统本地化了）
-  for (size_t i = 0; i < feature_items.size(); ++i) {
-    const auto& item = feature_items[i];
-    state.app_window->data.menu_items.emplace_back(
-        item.text, UI::AppWindow::MenuItemCategory::Feature, static_cast<int>(i), item.action_id);
+  // 添加功能项（只添加启用的项）
+  for (size_t i = 0; i < feature_config.size(); ++i) {
+    const auto& feature = feature_config[i];
+    if (feature.enabled) {
+      // 渲染时动态查找本地化文本
+      std::wstring text = get_localized_text_for_feature(feature.id, texts);
+      state.app_window->data.menu_items.emplace_back(text, UI::AppWindow::MenuItemCategory::Feature,
+                                                     static_cast<int>(i), feature.id);
+    }
   }
 }
 

@@ -134,7 +134,7 @@ export interface AppSettings {
   ui: {
     // 应用菜单配置
     appMenu: {
-      enabledFeatures: string[] // 启用的功能项列表（顺序即显示顺序）
+      features: MenuItem[] // 所有功能项（包含启用状态和顺序）
       aspectRatios: string[] // 启用的比例列表
       resolutions: string[] // 启用的分辨率列表
     }
@@ -204,15 +204,16 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // ui 设置
   ui: {
     appMenu: {
-      enabledFeatures: [
-        'screenshot.capture',
-        'screenshot.open_folder',
-        'feature.toggle_preview',
-        'feature.toggle_overlay',
-        'feature.toggle_letterbox',
-        'feature.toggle_recording',
-        'window.reset_transform',
-        'app.exit',
+      features: [
+        { id: 'screenshot.capture', enabled: true },
+        { id: 'screenshot.open_folder', enabled: true },
+        { id: 'feature.toggle_preview', enabled: true },
+        { id: 'feature.toggle_overlay', enabled: true },
+        { id: 'feature.toggle_letterbox', enabled: true },
+        { id: 'feature.toggle_recording', enabled: true },
+        { id: 'window.reset_transform', enabled: true },
+        { id: 'panel.hide', enabled: false },
+        { id: 'app.exit', enabled: true },
       ],
       aspectRatios: ['21:9', '16:9', '3:2', '1:1', '3:4', '2:3', '9:16'],
       resolutions: ['Default', '1080P', '2K', '4K', '6K', '8K', '12K'],

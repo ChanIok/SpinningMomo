@@ -1,4 +1,3 @@
-
 import { useSettingsStore } from '../store'
 import { DEFAULT_APP_SETTINGS } from '../types'
 import type { MenuItem } from '../types'
@@ -9,22 +8,21 @@ export const useMenuActions = () => {
   const { appSettings } = storeToRefs(store)
 
   const updateFeatureItems = async (items: MenuItem[]) => {
-    // 提取启用的 ID 列表（保持顺序）
-    const enabledIds = items.filter(item => item.enabled).map(item => item.id)
+    // 直接存储完整的 items 数组（包含顺序和启用状态）
     await store.updateSettings({
       ...appSettings.value,
       ui: {
         ...appSettings.value.ui,
         appMenu: {
           ...appSettings.value.ui.appMenu,
-          enabledFeatures: enabledIds,
+          features: items,
         },
       },
     })
   }
 
   const updateAspectRatios = async (items: MenuItem[]) => {
-    const enabledIds = items.filter(item => item.enabled).map(item => item.id)
+    const enabledIds = items.filter((item) => item.enabled).map((item) => item.id)
     await store.updateSettings({
       ...appSettings.value,
       ui: {
@@ -38,7 +36,7 @@ export const useMenuActions = () => {
   }
 
   const updateResolutions = async (items: MenuItem[]) => {
-    const enabledIds = items.filter(item => item.enabled).map(item => item.id)
+    const enabledIds = items.filter((item) => item.enabled).map((item) => item.id)
     await store.updateSettings({
       ...appSettings.value,
       ui: {
@@ -58,7 +56,7 @@ export const useMenuActions = () => {
         ...appSettings.value.ui,
         appMenu: {
           ...appSettings.value.ui.appMenu,
-          enabledFeatures: DEFAULT_APP_SETTINGS.ui.appMenu.enabledFeatures,
+          features: DEFAULT_APP_SETTINGS.ui.appMenu.features,
           aspectRatios: DEFAULT_APP_SETTINGS.ui.appMenu.aspectRatios,
           resolutions: DEFAULT_APP_SETTINGS.ui.appMenu.resolutions,
         },

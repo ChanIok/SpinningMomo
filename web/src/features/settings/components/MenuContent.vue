@@ -7,7 +7,6 @@ import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
 import type { MenuItem } from '../types'
-import { ALL_FEATURES } from '../constants'
 import { computed } from 'vue'
 
 const store = useSettingsStore()
@@ -17,14 +16,9 @@ const { updateFeatureItems, updateAspectRatios, updateResolutions, resetMenuSett
 const { clearError } = store
 const { t } = useI18n()
 
-// 将 string[] 转换为 MenuItem[] （用于 UI 交互）
+// 直接从 store 中获取功能项（已包含顺序和启用状态）
 const getFeatureItems = computed((): MenuItem[] => {
-  const enabledIds = appSettings.value?.ui?.appMenu?.enabledFeatures || []
-  // 包含所有可用功能，标记哪些已启用
-  return ALL_FEATURES.map((id) => ({
-    id,
-    enabled: enabledIds.includes(id),
-  }))
+  return appSettings.value?.ui?.appMenu?.features || []
 })
 
 const getAspectRatios = computed((): MenuItem[] => {
@@ -45,6 +39,7 @@ const getFeatureItemLabel = (id: string): string => {
     'feature.toggle_preview': t('settings.menu.items.featureTogglePreview'),
     'feature.toggle_overlay': t('settings.menu.items.featureToggleOverlay'),
     'feature.toggle_letterbox': t('settings.menu.items.featureToggleLetterbox'),
+    'feature.toggle_recording': t('settings.menu.items.featureToggleRecording'),
     'window.reset_transform': t('settings.menu.items.windowResetTransform'),
     'panel.hide': t('settings.menu.items.panelHide'),
     'app.exit': t('settings.menu.items.appExit'),

@@ -17,9 +17,4 @@ auto get_resolutions(const Features::Settings::State::SettingsState& state)
   return state.computed.resolutions;
 }
 
-auto get_feature_items(const Features::Settings::State::SettingsState& state)
-    -> const std::vector<ComputedFeatureItem>& {
-  return state.computed.feature_items;
-}
-
 }  // namespace Features::Settings::Menu
