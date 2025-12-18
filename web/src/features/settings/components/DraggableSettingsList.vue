@@ -317,11 +317,11 @@ onUnmounted(() => {
                 v-if="allowRemove"
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                class="h-6 w-6 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 @click="emit('remove', item.id)"
                 @pointerdown.stop
               >
-                <Trash2 class="h-4 w-4" />
+                <Trash2 class="size-4" />
               </Button>
             </div>
           </div>

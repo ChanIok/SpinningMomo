@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.2.8",
     "@tailwindcss/vite": "^4.1.14",
     "@tanstack/vue-virtual": "^3.13.12",
     "@vueuse/core": "^13.9.0",
