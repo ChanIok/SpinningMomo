@@ -6,7 +6,9 @@ import DraggableSettingsList from './DraggableSettingsList.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
-import type { FeatureItem, PresetItem } from '../types'
+import type { MenuItem } from '../types'
+import { ALL_FEATURES } from '../constants'
+import { computed } from 'vue'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
@@ -19,10 +21,25 @@ const {
 const { clearError } = store
 const { t } = useI18n()
 
-// Safely access arrays
-const getFeatureItems = () => appSettings.value?.ui?.appMenu?.featureItems || []
-const getAspectRatios = () => appSettings.value?.ui?.appMenu?.aspectRatios || []
-const getResolutions = () => appSettings.value?.ui?.appMenu?.resolutions || []
+// 将 string[] 转换为 MenuItem[] （用于 UI 交互）
+const getFeatureItems = computed((): MenuItem[] => {
+  const enabledIds = appSettings.value?.ui?.appMenu?.enabledFeatures || []
+  // 包含所有可用功能，标记哪些已启用
+  return ALL_FEATURES.map(id => ({
+    id,
+    enabled: enabledIds.includes(id)
+  }))
+})
+
+const getAspectRatios = computed((): MenuItem[] => {
+  const ids = appSettings.value?.ui?.appMenu?.aspectRatios || []
+  return ids.map(id => ({ id, enabled: true }))
+})
+
+const getResolutions = computed((): MenuItem[] => {
+  const ids = appSettings.value?.ui?.appMenu?.resolutions || []
+  return ids.map(id => ({ id, enabled: true }))
+})
 
 // Feature Label Helper
 const getFeatureItemLabel = (id: string): string => {
@@ -50,43 +67,44 @@ const validateResolution = (value: string): boolean => {
     return resolutionRegex.test(value) || presetRegex.test(value)
 }
 
-const handleAspectRatioAdd = async (newItem: Omit<PresetItem, 'order'>) => {
-    const currentItems = getAspectRatios()
-    const maxOrder = currentItems.length > 0 ? Math.max(...currentItems.map(item => item.order)) : 0
-    // Fix: cast to correct type or ensure types are consistent
-    const itemWithOrder = { ...newItem, order: maxOrder + 1 } as PresetItem
-    await updateAspectRatios([...currentItems, itemWithOrder])
+const handleAspectRatioAdd = async (newItem: { id: string; enabled: boolean }) => {
+    const currentItems = getAspectRatios.value
+    await updateAspectRatios([...currentItems, { id: newItem.id, enabled: true }])
 }
 
-const handleResolutionAdd = async (newItem: Omit<PresetItem, 'order'>) => {
-    const currentItems = getResolutions()
-    const maxOrder = currentItems.length > 0 ? Math.max(...currentItems.map(item => item.order)) : 0
-    const itemWithOrder = { ...newItem, order: maxOrder + 1 } as PresetItem
-    await updateResolutions([...currentItems, itemWithOrder])
+const handleResolutionAdd = async (newItem: { id: string; enabled: boolean }) => {
+    const currentItems = getResolutions.value
+    await updateResolutions([...currentItems, { id: newItem.id, enabled: true }])
 }
 
 const handleFeatureToggle = async (id: string, enabled: boolean) => {
-    const items = getFeatureItems().map(item => item.id === id ? { ...item, enabled } : item)
+    const items = getFeatureItems.value.map(item => 
+        item.id === id ? { ...item, enabled } : item
+    )
     await updateFeatureItems(items)
 }
 
 const handleAspectRatioToggle = async (id: string, enabled: boolean) => {
-    const items = getAspectRatios().map(item => item.id === id ? { ...item, enabled } : item)
+    const items = getAspectRatios.value.map(item => 
+        item.id === id ? { ...item, enabled } : item
+    )
     await updateAspectRatios(items)
 }
 
 const handleResolutionToggle = async (id: string, enabled: boolean) => {
-    const items = getResolutions().map(item => item.id === id ? { ...item, enabled } : item)
+    const items = getResolutions.value.map(item => 
+        item.id === id ? { ...item, enabled } : item
+    )
     await updateResolutions(items)
 }
 
 const handleAspectRatioRemove = async (id: string) => {
-    const items = getAspectRatios().filter(item => item.id !== id)
+    const items = getAspectRatios.value.filter(item => item.id !== id)
     await updateAspectRatios(items)
 }
 
 const handleResolutionRemove = async (id: string) => {
-    const items = getResolutions().filter(item => item.id !== id)
+    const items = getResolutions.value.filter(item => item.id !== id)
     await updateResolutions(items)
 }
 
@@ -130,7 +148,7 @@ const handleResetSettings = async () => {
 
     <div class="space-y-8">
         <DraggableSettingsList
-            :items="getFeatureItems()"
+            :items="getFeatureItems"
             :title="t('settings.menu.feature.title')"
             :description="t('settings.menu.feature.description')"
             :get-label="getFeatureItemLabel"
@@ -139,7 +157,7 @@ const handleResetSettings = async () => {
         />
 
         <DraggableSettingsList
-            :items="getAspectRatios()"
+            :items="getAspectRatios"
             :title="t('settings.menu.aspectRatio.title')"
             :description="t('settings.menu.aspectRatio.description')"
             :allow-add="true"
@@ -153,7 +171,7 @@ const handleResetSettings = async () => {
         />
 
         <DraggableSettingsList
-            :items="getResolutions()"
+            :items="getResolutions"
              :title="t('settings.menu.resolution.title')"
             :description="t('settings.menu.resolution.description')"
              :allow-add="true"

@@ -10,37 +10,18 @@ import Features.Settings.Types;
 
 namespace Features::Settings::Migration {
 
-// v1到v2的迁移函数
-auto migrate_v1_to_v2(rfl::Generic::Object& settings)
-    -> std::expected<rfl::Generic::Object, std::string> {
-  try {
-    // 1. 更新版本号
-    settings["version"] = 2;
-
-    // 2. 添加新字段示例（根据实际需要修改）
-    // settings["new_field"] = "default_value";
-
-    Logger().info("Successfully migrated settings from v1 to v2");
-    return settings;
-  } catch (const std::exception& e) {
-    Logger().error("Failed to migrate settings from v1 to v2: {}", e.what());
-    return std::unexpected("Migration failed: " + std::string(e.what()));
-  }
-}
-
 // 未来的迁移函数在此添加
 // 示例：
-// auto migrate_v2_to_v3(rfl::Generic::Object& settings)
+// auto migrate_v1_to_v2(rfl::Generic::Object& settings)
 //     -> std::expected<rfl::Generic::Object, std::string> {
-//   settings["version"] = 3;
+//   settings["version"] = 2;
 //   // 迁移逻辑
 //   return settings;
 // }
 
 auto get_all_migration_functions() -> const std::unordered_map<int, MigrationFunction>& {
   static const std::unordered_map<int, MigrationFunction> functions = {
-      {1, migrate_v1_to_v2},
-      // 未来可以继续添加：{2, migrate_v2_to_v3}, ...
+      // 未来可以添加：{1, migrate_v1_to_v2}, ...
   };
   return functions;
 }

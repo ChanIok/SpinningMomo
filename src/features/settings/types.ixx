@@ -9,20 +9,6 @@ namespace Features::Settings::Types {
 // 当前设置版本
 export constexpr int CURRENT_SETTINGS_VERSION = 1;
 
-// 功能项（应用菜单中的功能）
-export struct FeatureItem {
-  std::string id;       // 如: "screenshot.capture", "screenshot.open_folder"
-  bool enabled = true;  // 是否显示在菜单中
-  int order = 0;        // 排序序号
-};
-
-// 预设项（比例/分辨率）
-export struct PresetItem {
-  std::string id;       // 如: "16:9", "1080P"
-  bool enabled = true;  // 是否显示在菜单中
-  int order = 0;        // 排序序号
-};
-
 // Web 主题设置
 export struct WebThemeSettings {
   std::string mode = "system";  // "light" | "dark" | "system"
@@ -117,21 +103,21 @@ export struct AppSettings {
   struct UI {
     // 应用菜单配置
     struct AppMenu {
-      std::vector<FeatureItem> feature_items = {{"screenshot.capture", true, 1},
-                                                {"screenshot.open_folder", true, 2},
-                                                {"feature.toggle_preview", true, 3},
-                                                {"feature.toggle_overlay", true, 4},
-                                                {"feature.toggle_letterbox", true, 5},
-                                                {"feature.toggle_recording", true, 6},
-                                                {"window.reset_transform", true, 7},
-                                                {"panel.hide", false, 8},
-                                                {"app.exit", true, 9}};
-      std::vector<PresetItem> aspect_ratios = {
-          {"32:9", false, 1}, {"21:9", true, 2}, {"16:9", true, 3}, {"3:2", true, 4},
-          {"1:1", true, 5},   {"3:4", true, 6},  {"2:3", true, 7},  {"9:16", true, 8}};
-      std::vector<PresetItem> resolutions = {
-          {"Default", true, 1}, {"1080P", true, 2}, {"2K", true, 3}, {"4K", true, 4},
-          {"6K", true, 5},      {"8K", true, 6},    {"12K", true, 7}};
+      // 启用的功能项列表（顺序即为菜单显示顺序）
+      std::vector<std::string> enabled_features = {"screenshot.capture",
+                                                   "screenshot.open_folder",
+                                                   "feature.toggle_preview",
+                                                   "feature.toggle_overlay",
+                                                   "feature.toggle_letterbox",
+                                                   "feature.toggle_recording",
+                                                   "window.reset_transform",
+                                                   "app.exit"};
+      // 启用的比例列表（顺序即为菜单显示顺序）
+      std::vector<std::string> aspect_ratios = {"21:9", "16:9", "3:2", "1:1", "3:4",
+                                                "2:3",  "9:16"};
+      // 启用的分辨率列表（顺序即为菜单显示顺序）
+      std::vector<std::string> resolutions = {"Default", "1080P", "2K", "4K", "6K", "8K",
+                                              "12K"};
     } app_menu;
 
     // AppWindow布局配置

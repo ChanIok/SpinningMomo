@@ -27,21 +27,16 @@ auto is_item_selected(const AppWindow::MenuItem& item,
       return item.index == static_cast<int>(ui_state.current_resolution_index);
     case AppWindow::MenuItemCategory::Feature: {
       // 基于 action_id 判断功能项的选中状态
-      auto menu_id = Features::Settings::Menu::from_string(item.action_id);
-      if (!menu_id) return false;
-
-      switch (*menu_id) {
-        case Features::Settings::Menu::Id::FeatureTogglePreview:
-          return ui_state.preview_enabled;
-        case Features::Settings::Menu::Id::FeatureToggleOverlay:
-          return ui_state.overlay_enabled;
-        case Features::Settings::Menu::Id::FeatureToggleLetterbox:
-          return ui_state.letterbox_enabled;
-        case Features::Settings::Menu::Id::FeatureToggleRecording:
-          return ui_state.recording_enabled;
-        default:
-          return false;
+      if (item.action_id == "feature.toggle_preview") {
+        return ui_state.preview_enabled;
+      } else if (item.action_id == "feature.toggle_overlay") {
+        return ui_state.overlay_enabled;
+      } else if (item.action_id == "feature.toggle_letterbox") {
+        return ui_state.letterbox_enabled;
+      } else if (item.action_id == "feature.toggle_recording") {
+        return ui_state.recording_enabled;
       }
+      return false;
     }
     default:
       return false;

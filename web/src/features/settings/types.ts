@@ -1,16 +1,8 @@
 
-// 功能项（应用菜单中的功能）
-export interface FeatureItem {
-  id: string // 如: 'screenshot.capture', 'screenshot.openFolder'
-  enabled: boolean // 是否显示在菜单中
-  order: number // 排序序号
-}
-
-// 预设项（比例/分辨率）
-export interface PresetItem {
-  id: string // 如: '16:9', '1080P'
-  enabled: boolean // 是否显示在菜单中
-  order: number // 排序序号
+// UI 交互用的菜单项类型（包含 enabled 状态）
+export interface MenuItem {
+  id: string
+  enabled: boolean // 是否在启用列表中
 }
 
 // Web 主题模式（页面主题）
@@ -78,7 +70,7 @@ export interface AppWindowLayout {
 
 // 完整的应用设置类型
 export interface AppSettings {
-  version: string
+  version?: number
 
   // app 分组 - 应用核心设置
   app: {
@@ -141,9 +133,9 @@ export interface AppSettings {
   ui: {
     // 应用菜单配置
     appMenu: {
-      featureItems: FeatureItem[]
-      aspectRatios: PresetItem[]
-      resolutions: PresetItem[]
+      enabledFeatures: string[] // 启用的功能项列表（顺序即显示顺序）
+      aspectRatios: string[] // 启用的比例列表
+      resolutions: string[] // 启用的分辨率列表
     }
 
     // AppWindow布局配置
@@ -163,7 +155,6 @@ export interface AppSettings {
 
 // 默认设置值
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  version: '1.0',
 
   // app 设置
   app: {
@@ -213,35 +204,18 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // ui 设置
   ui: {
     appMenu: {
-      featureItems: [
-        { id: 'screenshot.capture', enabled: true, order: 1 },
-        { id: 'screenshot.open_folder', enabled: true, order: 2 },
-        { id: 'feature.toggle_preview', enabled: true, order: 3 },
-        { id: 'feature.toggle_overlay', enabled: true, order: 4 },
-        { id: 'feature.toggle_letterbox', enabled: true, order: 5 },
-        { id: 'window.reset_transform', enabled: true, order: 6 },
-        { id: 'panel.hide', enabled: false, order: 7 },
-        { id: 'app.exit', enabled: true, order: 8 },
+      enabledFeatures: [
+        'screenshot.capture',
+        'screenshot.open_folder',
+        'feature.toggle_preview',
+        'feature.toggle_overlay',
+        'feature.toggle_letterbox',
+        'feature.toggle_recording',
+        'window.reset_transform',
+        'app.exit',
       ],
-      aspectRatios: [
-        { id: '32:9', enabled: false, order: 1 },
-        { id: '21:9', enabled: true, order: 2 },
-        { id: '16:9', enabled: true, order: 3 },
-        { id: '3:2', enabled: true, order: 4 },
-        { id: '1:1', enabled: true, order: 5 },
-        { id: '3:4', enabled: true, order: 6 },
-        { id: '2:3', enabled: true, order: 7 },
-        { id: '9:16', enabled: true, order: 8 },
-      ],
-      resolutions: [
-        { id: 'Default', enabled: true, order: 1 },
-        { id: '1080P', enabled: true, order: 2 },
-        { id: '2K', enabled: true, order: 3 },
-        { id: '4K', enabled: true, order: 4 },
-        { id: '6K', enabled: true, order: 5 },
-        { id: '8K', enabled: true, order: 6 },
-        { id: '12K', enabled: true, order: 7 },
-      ],
+      aspectRatios: ['21:9', '16:9', '3:2', '1:1', '3:4', '2:3', '9:16'],
+      resolutions: ['Default', '1080P', '2K', '4K', '6K', '8K', '12K'],
     },
     appWindowLayout: {
       baseItemHeight: 24,

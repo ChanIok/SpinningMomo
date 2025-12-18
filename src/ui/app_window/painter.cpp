@@ -221,14 +221,12 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
     // 只有在同一列中才增加y坐标（复制现有逻辑）
     if ((i + 1 < items.size()) && (items[i + 1].category == item.category)) {
       if (item.category != UI::AppWindow::MenuItemCategory::Feature ||
-          item.action_id !=
-              Features::Settings::Menu::to_string(Features::Settings::Menu::Id::WindowControlResetTransform)) {
+          item.action_id != "window.reset_transform") {
         y += static_cast<float>(render.item_height);
       }
     } else if (i + 1 < items.size() && items[i + 1].category != item.category) {
       if (items[i + 1].category != UI::AppWindow::MenuItemCategory::Feature ||
-          items[i + 1].action_id !=
-              Features::Settings::Menu::to_string(Features::Settings::Menu::Id::WindowControlResetTransform)) {
+          items[i + 1].action_id != "window.reset_transform") {
         y = rect.top + static_cast<float>(render.title_height + render.separator_height);
       }
     }

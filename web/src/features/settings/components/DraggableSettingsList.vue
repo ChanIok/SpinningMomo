@@ -6,13 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GripVertical, Plus, Trash2 } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
-import type { FeatureItem, PresetItem } from '../types'
-
-// Define a common type for items since they share the same structure
-type SettingsItem = FeatureItem | PresetItem
+import type { MenuItem } from '../types'
 
 const props = defineProps<{
-  items: SettingsItem[]
+  items: MenuItem[]
   title: string
   description: string
 
@@ -27,9 +24,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'reorder', items: SettingsItem[]): void
+  (e: 'reorder', items: MenuItem[]): void
   (e: 'toggle', id: string, enabled: boolean): void
-  (e: 'add', item: Omit<SettingsItem, 'order'>): void
+  (e: 'add', item: { id: string; enabled: boolean }): void
   (e: 'remove', id: string): void
 }>()
 
@@ -234,7 +231,7 @@ const performSwap = (fromIndex: number, toIndex: number, _offsetAdjust: number) 
   const moved = newItems.splice(fromIndex, 1)[0]
   if (moved) {
     newItems.splice(toIndex, 0, moved)
-    newItems.forEach((item, index) => (item.order = index + 1))
+    // 不再需要设置 order，数组顺序即为显示顺序
     emit('reorder', newItems)
 
     // Re-cache rects after DOM update

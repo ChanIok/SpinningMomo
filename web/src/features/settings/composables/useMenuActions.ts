@@ -1,47 +1,51 @@
 
 import { useSettingsStore } from '../store'
 import { DEFAULT_APP_SETTINGS } from '../types'
-import type { FeatureItem, PresetItem } from '../types'
+import type { MenuItem } from '../types'
 import { storeToRefs } from 'pinia'
 
 export const useMenuActions = () => {
   const store = useSettingsStore()
   const { appSettings } = storeToRefs(store)
 
-  const updateFeatureItems = async (items: FeatureItem[]) => {
+  const updateFeatureItems = async (items: MenuItem[]) => {
+    // 提取启用的 ID 列表（保持顺序）
+    const enabledIds = items.filter(item => item.enabled).map(item => item.id)
     await store.updateSettings({
       ...appSettings.value,
       ui: {
         ...appSettings.value.ui,
         appMenu: {
           ...appSettings.value.ui.appMenu,
-          featureItems: items,
+          enabledFeatures: enabledIds,
         },
       },
     })
   }
 
-  const updateAspectRatios = async (items: PresetItem[]) => {
+  const updateAspectRatios = async (items: MenuItem[]) => {
+    const enabledIds = items.filter(item => item.enabled).map(item => item.id)
     await store.updateSettings({
       ...appSettings.value,
       ui: {
         ...appSettings.value.ui,
         appMenu: {
           ...appSettings.value.ui.appMenu,
-          aspectRatios: items,
+          aspectRatios: enabledIds,
         },
       },
     })
   }
 
-  const updateResolutions = async (items: PresetItem[]) => {
+  const updateResolutions = async (items: MenuItem[]) => {
+    const enabledIds = items.filter(item => item.enabled).map(item => item.id)
     await store.updateSettings({
       ...appSettings.value,
       ui: {
         ...appSettings.value.ui,
         appMenu: {
           ...appSettings.value.ui.appMenu,
-          resolutions: items,
+          resolutions: enabledIds,
         },
       },
     })
@@ -54,7 +58,7 @@ export const useMenuActions = () => {
         ...appSettings.value.ui,
         appMenu: {
           ...appSettings.value.ui.appMenu,
-          featureItems: DEFAULT_APP_SETTINGS.ui.appMenu.featureItems,
+          enabledFeatures: DEFAULT_APP_SETTINGS.ui.appMenu.enabledFeatures,
           aspectRatios: DEFAULT_APP_SETTINGS.ui.appMenu.aspectRatios,
           resolutions: DEFAULT_APP_SETTINGS.ui.appMenu.resolutions,
         },

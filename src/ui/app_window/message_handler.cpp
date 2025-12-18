@@ -53,48 +53,33 @@ auto is_mouse_on_close_button(const Core::State::AppState& state, int x, int y) 
 
 // 基于 action_id 分发功能事件
 auto dispatch_feature_action(Core::State::AppState& state, const std::string& action_id) -> void {
-  using namespace Features::Settings::Menu;
   using namespace UI::AppWindow::Events;
 
-  // 将字符串转换为强类型ID
-  auto menu_id = from_string(action_id);
-  if (!menu_id) {
-    return;  // 未知的菜单ID，忽略
+  // 直接使用字符串比较分发事件
+  if (action_id == "feature.toggle_preview") {
+    Core::Events::send(*state.events,
+                       PreviewToggleEvent{!state.app_window->ui.preview_enabled});
+  } else if (action_id == "feature.toggle_overlay") {
+    Core::Events::send(*state.events,
+                       OverlayToggleEvent{!state.app_window->ui.overlay_enabled});
+  } else if (action_id == "feature.toggle_letterbox") {
+    Core::Events::send(*state.events,
+                       LetterboxToggleEvent{!state.app_window->ui.letterbox_enabled});
+  } else if (action_id == "feature.toggle_recording") {
+    Core::Events::send(*state.events,
+                       RecordingToggleEvent{!state.app_window->ui.recording_enabled});
+  } else if (action_id == "screenshot.capture") {
+    Core::Events::send(*state.events, CaptureEvent{});
+  } else if (action_id == "screenshot.open_folder") {
+    Core::Events::send(*state.events, ScreenshotsEvent{});
+  } else if (action_id == "window.reset_transform") {
+    Core::Events::send(*state.events, ResetEvent{});
+  } else if (action_id == "panel.hide") {
+    Core::Events::send(*state.events, ToggleVisibilityEvent{});
+  } else if (action_id == "app.exit") {
+    Core::Events::send(*state.events, ExitEvent{});
   }
-
-  switch (*menu_id) {
-    case Id::FeatureTogglePreview:
-      Core::Events::send(*state.events,
-                         PreviewToggleEvent{!state.app_window->ui.preview_enabled});
-      break;
-    case Id::FeatureToggleOverlay:
-      Core::Events::send(*state.events,
-                         OverlayToggleEvent{!state.app_window->ui.overlay_enabled});
-      break;
-    case Id::FeatureToggleLetterbox:
-      Core::Events::send(*state.events,
-                         LetterboxToggleEvent{!state.app_window->ui.letterbox_enabled});
-      break;
-    case Id::FeatureToggleRecording:
-      Core::Events::send(*state.events,
-                         RecordingToggleEvent{!state.app_window->ui.recording_enabled});
-      break;
-    case Id::ScreenshotCapture:
-      Core::Events::send(*state.events, CaptureEvent{});
-      break;
-    case Id::ScreenshotOpenFolder:
-      Core::Events::send(*state.events, ScreenshotsEvent{});
-      break;
-    case Id::WindowControlResetTransform:
-      Core::Events::send(*state.events, ResetEvent{});
-      break;
-    case Id::PanelHide:
-      Core::Events::send(*state.events, ToggleVisibilityEvent{});
-      break;
-    case Id::AppExit:
-      Core::Events::send(*state.events, ExitEvent{});
-      break;
-  }
+  // 未知的菜单ID，忽略
 }
 
 // 将菜单项点击转换为具体的高层应用事件
