@@ -56,6 +56,58 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateRecordingOutputDir = async (dirPath: string) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          outputDirPath: dirPath,
+        },
+      },
+    })
+  }
+
+  const updateRecordingFps = async (fps: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          fps,
+        },
+      },
+    })
+  }
+
+  const updateRecordingBitrate = async (bitrate: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          bitrate,
+        },
+      },
+    })
+  }
+
+  const updateRecordingEncoderMode = async (encoderMode: 'auto' | 'gpu' | 'cpu') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          encoderMode,
+        },
+      },
+    })
+  }
+
   const resetFunctionSettings = async () => {
     await store.updateSettings({
       ...appSettings.value,
@@ -77,6 +129,13 @@ export const useFunctionActions = () => {
           ...appSettings.value.features.letterbox,
           enabled: DEFAULT_APP_SETTINGS.features.letterbox.enabled,
         },
+        recording: {
+          ...appSettings.value.features.recording,
+          outputDirPath: DEFAULT_APP_SETTINGS.features.recording.outputDirPath,
+          fps: DEFAULT_APP_SETTINGS.features.recording.fps,
+          bitrate: DEFAULT_APP_SETTINGS.features.recording.bitrate,
+          encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
+        },
       },
     })
   }
@@ -86,6 +145,10 @@ export const useFunctionActions = () => {
     updateScreenshotDir,
     updateTaskbarLowerOnResize,
     updateLetterboxEnabled,
+    updateRecordingOutputDir,
+    updateRecordingFps,
+    updateRecordingBitrate,
+    updateRecordingEncoderMode,
     resetFunctionSettings
   }
 }

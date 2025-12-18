@@ -4,8 +4,6 @@ import { useSettingsStore } from '../store'
 import { storeToRefs } from 'pinia'
 import type { WebThemeMode } from '../types'
 
-const THEME_STORAGE_KEY = 'web-theme-mode'
-
 /**
  * 主题管理 Composable
  * 负责 Web UI 的主题切换、持久化和系统主题检测

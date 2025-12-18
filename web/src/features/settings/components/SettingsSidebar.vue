@@ -67,7 +67,7 @@ const handleMenuClick = (key: SettingsPageKey) => {
                 'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-all duration-200',
                 'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
                 'hover:bg-accent hover:text-accent-foreground',
-                activePage === item.key ? 'bg-accent text-accent-foreground font-medium shadow-sm' : 'text-muted-foreground'
+                activePage === item.key ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
               )"
               :title="t(item.description)"
             >

@@ -4,10 +4,10 @@ export module Features.Settings.Types;
 
 import std;
 
-export namespace Features::Settings::Types {
+namespace Features::Settings::Types {
 
 // 当前设置版本
-constexpr int CURRENT_SETTINGS_VERSION = 1;
+export constexpr int CURRENT_SETTINGS_VERSION = 1;
 
 // 功能项（应用菜单中的功能）
 export struct FeatureItem {
@@ -17,7 +17,7 @@ export struct FeatureItem {
 };
 
 // 预设项（比例/分辨率）
-struct PresetItem {
+export struct PresetItem {
   std::string id;       // 如: "16:9", "1080P"
   bool enabled = true;  // 是否显示在菜单中
   int order = 0;        // 排序序号
@@ -30,10 +30,10 @@ export struct WebThemeSettings {
 
 // Web 背景设置
 export struct WebBackgroundSettings {
-  std::string type = "none";        // "none" | "image"
+  std::string type = "none";  // "none" | "image"
   std::string image_path = "";
-  double opacity = 0.8;             // 0.0 - 1.0
-  int blur_amount = 0;              // 0 - 200
+  double opacity = 0.8;  // 0.0 - 1.0
+  int blur_amount = 0;   // 0 - 200
 };
 
 // 完整的应用设置（重构后的结构）
@@ -88,6 +88,14 @@ export struct AppSettings {
     struct Letterbox {
       bool enabled = false;  // 是否启用黑边模式
     } letterbox;
+
+    // 录制功能设置
+    struct Recording {
+      std::string output_dir_path = "";    // 输出目录
+      std::uint32_t fps = 60;              // 帧率
+      std::uint32_t bitrate = 80'000'000;  // 比特率 (bps)，默认 80Mbps
+      std::string encoder_mode = "auto";   // 编码器模式: "auto" | "gpu" | "cpu"
+    } recording;
   } features;
 
   // updater 分组 - 更新设置

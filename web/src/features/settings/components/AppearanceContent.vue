@@ -1,14 +1,13 @@
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
 import { useSettingsStore } from '../store'
 import { useAppearanceActions } from '../composables/useAppearanceActions'
 import { useTheme } from '../composables/useTheme'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup } from '@/components/ui/item'
 import {
   Select,
   SelectContent,
@@ -152,83 +151,83 @@ const handleClearError = () => {
           </p>
         </div>
 
-        <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-             <!-- Opacity -->
-             <div class="flex items-center justify-between py-2">
-                <div class="flex-1 pr-4">
-                    <Label class="text-sm font-medium text-foreground">
-                       {{ t('settings.appearance.background.opacity.label') }}
-                    </Label>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                       {{ t('settings.appearance.background.opacity.description') }}
-                    </p>
-                </div>
-                <div class="flex flex-shrink-0 items-center gap-2">
-                    <div class="w-36">
-                        <Slider
-                            :model-value="[appSettings.ui.background.opacity]"
-                            @update:model-value="handleOpacityChange"
-                            :min="0"
-                            :max="1"
-                            :step="0.1"
-                            class="w-full"
-                        />
-                    </div>
-                    <span class="w-12 text-sm text-muted-foreground">
-                        {{ (appSettings.ui.background.opacity * 100).toFixed(0) }}%
-                    </span>
-                </div>
-             </div>
+        <ItemGroup>
+          <!-- Opacity -->
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.opacity.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.opacity.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <div class="flex items-center gap-2">
+                <Slider
+                  :model-value="[appSettings.ui.background.opacity]"
+                  @update:model-value="handleOpacityChange"
+                  :min="0"
+                  :max="1"
+                  :step="0.1"
+                  class="w-36"
+                />
+                <span class="w-12 text-sm text-muted-foreground">
+                  {{ (appSettings.ui.background.opacity * 100).toFixed(0) }}%
+                </span>
+              </div>
+            </ItemActions>
+          </Item>
 
-             <!-- Blur -->
-             <div class="flex items-center justify-between py-2">
-                <div class="flex-1 pr-4">
-                    <Label class="text-sm font-medium text-foreground">
-                       {{ t('settings.appearance.background.blurAmount.label') }}
-                    </Label>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                       {{ t('settings.appearance.background.blurAmount.description') }}
-                    </p>
-                </div>
-                 <div class="flex flex-shrink-0 items-center gap-2">
-                    <div class="w-36">
-                        <Slider
-                            :model-value="[appSettings.ui.background.blurAmount]"
-                            @update:model-value="handleBlurAmountChange"
-                            :min="0"
-                            :max="200"
-                            :step="1"
-                            class="w-full"
-                        />
-                    </div>
-                    <span class="w-12 text-sm text-muted-foreground">
-                        {{ appSettings.ui.background.blurAmount }}px
-                    </span>
-                 </div>
-             </div>
+          <!-- Blur -->
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.blurAmount.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.blurAmount.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <div class="flex items-center gap-2">
+                <Slider
+                  :model-value="[appSettings.ui.background.blurAmount]"
+                  @update:model-value="handleBlurAmountChange"
+                  :min="0"
+                  :max="200"
+                  :step="1"
+                  class="w-36"
+                />
+                <span class="w-12 text-sm text-muted-foreground">
+                  {{ appSettings.ui.background.blurAmount }}px
+                </span>
+              </div>
+            </ItemActions>
+          </Item>
 
-             <!-- Background Image -->
-             <div class="flex items-center justify-between py-2">
-                <div class="flex-1 pr-4">
-                   <Label class="text-sm font-medium text-foreground">
-                       {{ t('settings.appearance.background.image.label') }}
-                   </Label>
-                </div>
-                <div class="flex flex-shrink-0 gap-2">
-                   <Button variant="outline" size="sm" @click="handleBackgroundImageSelect">
-                       {{ t('settings.appearance.background.image.selectButton') }}
-                   </Button>
-                    <Button
-                     variant="outline"
-                     size="sm"
-                     @click="handleBackgroundImageRemove"
-                     :disabled="appSettings.ui?.background?.type === 'none'"
-                   >
-                       {{ t('settings.appearance.background.image.removeButton') }}
-                   </Button>
-                </div>
-             </div>
-        </div>
+          <!-- Background Image -->
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.image.label') }}
+              </ItemTitle>
+            </ItemContent>
+            <ItemActions>
+              <Button variant="outline" size="sm" @click="handleBackgroundImageSelect">
+                {{ t('settings.appearance.background.image.selectButton') }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                @click="handleBackgroundImageRemove"
+                :disabled="appSettings.ui?.background?.type === 'none'"
+              >
+                {{ t('settings.appearance.background.image.removeButton') }}
+              </Button>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
       </div>
 
       <!-- Theme Settings -->
@@ -242,56 +241,56 @@ const handleClearError = () => {
              </p>
          </div>
 
-         <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-             <div class="flex items-center justify-between py-2">
-                 <div class="flex-1 pr-4">
-                   <Label class="text-sm font-medium text-foreground">
-                       {{ t('settings.appearance.theme.mode.label') }}
-                   </Label>
-                   <p class="mt-1 text-sm text-muted-foreground">
-                       {{ t('settings.appearance.theme.mode.description') }}
-                   </p>
-                 </div>
-                <div class="flex flex-shrink-0">
-                    <Select :model-value="appSettings.ui.webTheme.mode" @update:model-value="(v) => handleThemeChange(v as string)">
-                        <SelectTrigger class="w-32">
-                           <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                           <SelectItem v-for="option in themeOptions" :key="option.value" :value="option.value">
-                              {{ option.label }}
-                           </SelectItem>
-                        </SelectContent>
-                    </Select>
-                 </div>
-             </div>
+         <ItemGroup>
+           <Item variant="outline" size="sm">
+             <ItemContent>
+               <ItemTitle>
+                 {{ t('settings.appearance.theme.mode.label') }}
+               </ItemTitle>
+               <ItemDescription>
+                 {{ t('settings.appearance.theme.mode.description') }}
+               </ItemDescription>
+             </ItemContent>
+             <ItemActions>
+               <Select :model-value="appSettings.ui.webTheme.mode" @update:model-value="(v) => handleThemeChange(v as string)">
+                 <SelectTrigger class="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem v-for="option in themeOptions" :key="option.value" :value="option.value">
+                     {{ option.label }}
+                   </SelectItem>
+                 </SelectContent>
+               </Select>
+             </ItemActions>
+           </Item>
 
-             <div class="flex items-center justify-between py-2">
-                 <div class="flex-1 pr-4">
-                   <Label class="text-sm font-medium text-foreground">
-                       {{ t('settings.appearance.appWindowTheme.label') }}
-                   </Label>
-                   <p class="mt-1 text-sm text-muted-foreground">
-                       {{ t('settings.appearance.appWindowTheme.description') }}
-                   </p>
-                 </div>
-                 <div class="flex flex-shrink-0">
-                    <Select
-                       :model-value="appSettings?.ui?.appWindowThemeMode || 'dark'"
-                       @update:model-value="(v) => updateAppWindowTheme(v as AppWindowThemeMode)"
-                    >
-                        <SelectTrigger class="w-32">
-                           <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                           <SelectItem v-for="option in appWindowThemeOptions" :key="option.value" :value="option.value">
-                              {{ option.label }}
-                           </SelectItem>
-                        </SelectContent>
-                    </Select>
-                 </div>
-             </div>
-         </div>
+           <Item variant="outline" size="sm">
+             <ItemContent>
+               <ItemTitle>
+                 {{ t('settings.appearance.appWindowTheme.label') }}
+               </ItemTitle>
+               <ItemDescription>
+                 {{ t('settings.appearance.appWindowTheme.description') }}
+               </ItemDescription>
+             </ItemContent>
+             <ItemActions>
+               <Select
+                 :model-value="appSettings?.ui?.appWindowThemeMode || 'dark'"
+                 @update:model-value="(v) => updateAppWindowTheme(v as AppWindowThemeMode)"
+               >
+                 <SelectTrigger class="w-32">
+                   <SelectValue />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem v-for="option in appWindowThemeOptions" :key="option.value" :value="option.value">
+                     {{ option.label }}
+                   </SelectItem>
+                 </SelectContent>
+               </Select>
+             </ItemActions>
+           </Item>
+         </ItemGroup>
       </div>
 
       <!-- Layout Settings -->
@@ -305,37 +304,42 @@ const handleClearError = () => {
             </p>
          </div>
 
-         <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-            <template v-for="(key) in ([
+         <ItemGroup>
+            <Item
+              v-for="(key) in ([
                 'baseItemHeight', 'baseTitleHeight', 'baseSeparatorHeight', 'baseFontSize',
                 'baseTextPadding', 'baseIndicatorWidth', 'baseRatioIndicatorWidth',
                 'baseRatioColumnWidth', 'baseResolutionColumnWidth', 'baseSettingsColumnWidth'
-            ] as const)" :key="key">
-                <div class="flex items-center justify-between py-2">
-                   <div class="flex-1 pr-4">
-                       <Label class="text-sm font-medium text-foreground">
-                           {{ t(`settings.appearance.layout.${key}.label`) }}
-                       </Label>
-                       <p class="mt-1 text-sm text-muted-foreground">
-                           {{ t(`settings.appearance.layout.${key}.description`) }}
-                       </p>
-                   </div>
-                   <div class="flex flex-shrink-0 items-center gap-2">
-                       <Input
-                           type="number"
-                           :model-value="appSettings?.ui?.appWindowLayout?.[key]"
-                           @input="(e: Event) => handleLayoutChange(key as keyof AppWindowLayout, (e.target as HTMLInputElement).value)"
-                           @keydown="handleKeyDown"
-                           class="w-24"
-                           min="0"
-                       />
-                       <span class="text-sm text-muted-foreground">
-                           {{ t('settings.appearance.layout.unit') }}
-                       </span>
-                   </div>
+              ] as const)"
+              :key="key"
+              variant="outline"
+              size="sm"
+            >
+              <ItemContent>
+                <ItemTitle>
+                  {{ t(`settings.appearance.layout.${key}.label`) }}
+                </ItemTitle>
+                <ItemDescription>
+                  {{ t(`settings.appearance.layout.${key}.description`) }}
+                </ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                <div class="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    :model-value="appSettings?.ui?.appWindowLayout?.[key]"
+                    @input="(e: Event) => handleLayoutChange(key as keyof AppWindowLayout, (e.target as HTMLInputElement).value)"
+                    @keydown="handleKeyDown"
+                    class="w-24"
+                    min="0"
+                  />
+                  <span class="text-sm text-muted-foreground">
+                    {{ t('settings.appearance.layout.unit') }}
+                  </span>
                 </div>
-            </template>
-         </div>
+              </ItemActions>
+            </Item>
+         </ItemGroup>
       </div>
     </div>
   </div>

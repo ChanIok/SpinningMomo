@@ -10,8 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup } from '@/components/ui/item'
 import HotkeyRecorder from './HotkeyRecorder.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
@@ -89,32 +89,30 @@ const handleReset = async () => {
           </p>
         </div>
         
-        <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-          <div class="flex items-center justify-between py-2">
-            <div class="flex-1 pr-4">
-              <Label class="text-sm font-medium text-foreground">
-                {{ t('settings.general.language.displayLanguage') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {{ t('settings.general.language.displayLanguageDescription') }}
-              </p>
-            </div>
-            <div class="w-48 flex-shrink-0">
-              <Select
-                :model-value="appSettings.app.language.current"
-                @update:model-value="(v) => updateLanguage(v as string)"
-              >
-                <SelectTrigger>
-                  <SelectValue :placeholder="t('settings.general.language.displayLanguage')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="zh-CN">{{ t('common.languageZhCn') }}</SelectItem>
-                  <SelectItem value="en-US">{{ t('common.languageEnUs') }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
+        <Item variant="outline" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.general.language.displayLanguage') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.general.language.displayLanguageDescription') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="appSettings.app.language.current"
+              @update:model-value="(v) => updateLanguage(v as string)"
+            >
+              <SelectTrigger class="w-48">
+                <SelectValue :placeholder="t('settings.general.language.displayLanguage')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="zh-CN">{{ t('common.languageZhCn') }}</SelectItem>
+                <SelectItem value="en-US">{{ t('common.languageEnUs') }}</SelectItem>
+              </SelectContent>
+            </Select>
+          </ItemActions>
+        </Item>
       </div>
 
       <!-- Logger -->
@@ -128,33 +126,31 @@ const handleReset = async () => {
           </p>
         </div>
         
-        <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-          <div class="flex items-center justify-between py-2">
-            <div class="flex-1 pr-4">
-              <Label class="text-sm font-medium text-foreground">
-                {{ t('settings.general.logger.level') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {{ t('settings.general.logger.levelDescription') }}
-              </p>
-            </div>
-            <div class="w-48 flex-shrink-0">
-              <Select
-                :model-value="appSettings.app.logger.level"
-                @update:model-value="(v) => updateLoggerLevel(v as string)"
-              >
-                <SelectTrigger>
-                  <SelectValue :placeholder="t('settings.general.logger.level')" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DEBUG">DEBUG</SelectItem>
-                  <SelectItem value="INFO">INFO</SelectItem>
-                  <SelectItem value="ERROR">ERROR</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
+        <Item variant="outline" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.general.logger.level') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.general.logger.levelDescription') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="appSettings.app.logger.level"
+              @update:model-value="(v) => updateLoggerLevel(v as string)"
+            >
+              <SelectTrigger class="w-48">
+                <SelectValue :placeholder="t('settings.general.logger.level')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DEBUG">DEBUG</SelectItem>
+                <SelectItem value="INFO">INFO</SelectItem>
+                <SelectItem value="ERROR">ERROR</SelectItem>
+              </SelectContent>
+            </Select>
+          </ItemActions>
+        </Item>
       </div>
 
       <!-- Hotkeys -->
@@ -168,41 +164,43 @@ const handleReset = async () => {
           </p>
         </div>
         
-        <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-          <div class="flex items-center justify-between py-2">
-            <div class="flex-1 pr-4">
-              <Label class="text-sm font-medium text-foreground">
+        <ItemGroup>
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
                 {{ t('settings.general.hotkey.toggleVisibility') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
+              </ItemTitle>
+              <ItemDescription>
                 {{ t('settings.general.hotkey.toggleVisibilityDescription') }}
-              </p>
-            </div>
-            <div class="w-48 flex-shrink-0">
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
               <HotkeyRecorder
                 :value="getHotkey('toggleVisibility')"
                 @change="(v) => updateToggleVisibilityHotkey(v.modifiers, v.key)"
+                class="w-48"
               />
-            </div>
-          </div>
+            </ItemActions>
+          </Item>
 
-          <div class="flex items-center justify-between py-2 mt-4 border-t pt-4">
-            <div class="flex-1 pr-4">
-              <Label class="text-sm font-medium text-foreground">
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
                 {{ t('settings.general.hotkey.screenshot') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
+              </ItemTitle>
+              <ItemDescription>
                 {{ t('settings.general.hotkey.screenshotDescription') }}
-              </p>
-            </div>
-            <div class="w-48 flex-shrink-0">
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
               <HotkeyRecorder
                 :value="getHotkey('screenshot')"
                 @change="(v) => updateScreenshotHotkey(v.modifiers, v.key)"
+                class="w-48"
               />
-            </div>
-          </div>
-        </div>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
       </div>
     </div>
   </div>

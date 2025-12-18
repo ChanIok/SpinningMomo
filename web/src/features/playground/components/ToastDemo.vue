@@ -75,7 +75,10 @@ const showPromiseToast = async () => {
   toast.promise(simulateAsync(), {
     loading: '正在保存设置...',
     success: '设置已保存',
-    error: (err) => `保存失败: ${err.message}`,
+    error: (err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err)
+      return `保存失败: ${message}`
+    },
   })
 }
 

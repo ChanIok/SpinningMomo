@@ -1,6 +1,5 @@
 import { useToast } from '@/composables/useToast'
 import { useSettingsStore } from '../store'
-import { settingsApi } from '../api'
 import type { AppSettings } from '../types'
 
 /**
@@ -121,7 +120,7 @@ export function useSettingsOperations() {
       {
         loading: '正在保存...',
         success: '设置已保存',
-        error: (err) => {
+        error: (err: unknown) => {
           const message = err instanceof Error ? err.message : '保存失败'
           return `保存失败: ${message}`
         },

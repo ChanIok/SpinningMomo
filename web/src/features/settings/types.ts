@@ -127,6 +127,14 @@ export interface AppSettings {
     letterbox: {
       enabled: boolean // 是否启用黑边模式
     }
+
+    // 录制功能设置
+    recording: {
+      outputDirPath: string // 输出目录（空=默认使用 exe/recordings/）
+      fps: number // 帧率: 30, 60, 120
+      bitrate: number // 比特率 (bps)
+      encoderMode: 'auto' | 'gpu' | 'cpu' // 编码器模式
+    }
   }
 
   // ui 分组 - UI界面设置
@@ -193,6 +201,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     letterbox: {
       enabled: false,
+    },
+    recording: {
+      outputDirPath: '',
+      fps: 60,
+      bitrate: 80000000,
+      encoderMode: 'auto',
     },
   },
 
