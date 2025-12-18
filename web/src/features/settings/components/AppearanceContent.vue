@@ -3,7 +3,7 @@
 import { onMounted } from 'vue'
 import { useSettingsStore } from '../store'
 import { useAppearanceActions } from '../composables/useAppearanceActions'
-import { useWebSettingsStore } from '@/features/web-settings/store'
+import { useTheme } from '../composables/useTheme'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,14 +18,11 @@ import {
 } from '@/components/ui/select'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
-import type { AppWindowLayout, AppWindowThemeMode } from '../types'
-// import { useTheme } from 'next-themes' // Not readily available in Vue, ignore for now or mock if needed
+import type { AppWindowLayout, AppWindowThemeMode, WebThemeMode } from '../types'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const webSettingsStore = useWebSettingsStore()
-const { webSettings, error: webSettingsError } = storeToRefs(webSettingsStore)
-const { initialize: initializeWebSettings, clearError: clearWebError } = webSettingsStore
+const { setTheme } = useTheme()
 
 const {
     updateAppWindowLayout,
@@ -39,15 +36,6 @@ const {
 
 const { clearError } = store
 const { t } = useI18n()
-
-// Initialize web settings
-onMounted(async () => {
-    try {
-        await initializeWebSettings()
-    } catch (error) {
-        console.error('Failed to initialize web settings:', error)
-    }
-})
 
 const themeOptions = [
     { value: 'light', label: t('settings.appearance.theme.light') },
@@ -101,11 +89,13 @@ const handleBlurAmountChange = async (val: number[] | undefined) => {
     }
 }
 
-const handleThemeChange = (themeMode: string) => {
-    // In React this was utilizing next-themes. In Vue we might need a similar mechanism or custom logic.
-    // For now, let's just log it or ignore if no provider.
-    // Ideally we update webSettings theme mode here too
-    console.log('Theme changed to', themeMode)
+const handleThemeChange = async (themeMode: string) => {
+    try {
+        await setTheme(themeMode as WebThemeMode)
+    } catch (error) {
+        console.error('Failed to update theme:', error)
+        // TODO: toast error
+    }
 }
 
 const handleResetSettings = async () => {
@@ -115,7 +105,6 @@ const handleResetSettings = async () => {
 
 const handleClearError = () => {
     clearError()
-    clearWebError()
 }
 </script>
 
@@ -127,10 +116,10 @@ const handleClearError = () => {
     </div>
   </div>
 
-  <div v-else-if="error || webSettingsError" class="flex items-center justify-center p-6">
+  <div v-else-if="error" class="flex items-center justify-center p-6">
     <div class="text-center">
       <p class="text-sm text-muted-foreground">{{ t('settings.appearance.error.title') }}</p>
-      <p class="mt-1 text-sm text-red-500">{{ error || webSettingsError }}</p>
+      <p class="mt-1 text-sm text-red-500">{{ error }}</p>
       <Button variant="outline" size="sm" @click="handleClearError" class="mt-2">
         {{ t('settings.appearance.error.retry') }}
       </Button>
@@ -177,7 +166,7 @@ const handleClearError = () => {
                 <div class="flex flex-shrink-0 items-center gap-2">
                     <div class="w-36">
                         <Slider
-                            :model-value="[webSettings.ui.background.opacity]"
+                            :model-value="[appSettings.ui.background.opacity]"
                             @update:model-value="handleOpacityChange"
                             :min="0"
                             :max="1"
@@ -186,7 +175,7 @@ const handleClearError = () => {
                         />
                     </div>
                     <span class="w-12 text-sm text-muted-foreground">
-                        {{ (webSettings.ui.background.opacity * 100).toFixed(0) }}%
+                        {{ (appSettings.ui.background.opacity * 100).toFixed(0) }}%
                     </span>
                 </div>
              </div>
@@ -204,7 +193,7 @@ const handleClearError = () => {
                  <div class="flex flex-shrink-0 items-center gap-2">
                     <div class="w-36">
                         <Slider
-                            :model-value="[webSettings.ui.background.blurAmount]"
+                            :model-value="[appSettings.ui.background.blurAmount]"
                             @update:model-value="handleBlurAmountChange"
                             :min="0"
                             :max="200"
@@ -213,7 +202,7 @@ const handleClearError = () => {
                         />
                     </div>
                     <span class="w-12 text-sm text-muted-foreground">
-                        {{ webSettings.ui.background.blurAmount }}px
+                        {{ appSettings.ui.background.blurAmount }}px
                     </span>
                  </div>
              </div>
@@ -233,7 +222,7 @@ const handleClearError = () => {
                      variant="outline"
                      size="sm"
                      @click="handleBackgroundImageRemove"
-                     :disabled="webSettings.ui?.background?.type === 'none'"
+                     :disabled="appSettings.ui?.background?.type === 'none'"
                    >
                        {{ t('settings.appearance.background.image.removeButton') }}
                    </Button>
@@ -264,7 +253,7 @@ const handleClearError = () => {
                    </p>
                  </div>
                 <div class="flex flex-shrink-0">
-                    <Select :model-value="'system'" @update:model-value="(v) => handleThemeChange(v as string)">
+                    <Select :model-value="appSettings.ui.webTheme.mode" @update:model-value="(v) => handleThemeChange(v as string)">
                         <SelectTrigger class="w-32">
                            <SelectValue />
                         </SelectTrigger>

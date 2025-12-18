@@ -1,18 +1,13 @@
 
 import { useSettingsStore } from '../store'
-import { useWebSettingsStore } from '@/features/web-settings/store'
 import { DEFAULT_APP_SETTINGS, DARK_APP_WINDOW_COLORS, LIGHT_APP_WINDOW_COLORS } from '../types'
-import type { AppWindowLayout, AppWindowColors, AppWindowThemeMode } from '../types'
-import type { ThemeSettings, WebSettings } from '@/features/web-settings/types'
-import { selectBackgroundImage, copyBackgroundImageToResources } from '@/features/web-settings/api'
+import type { AppWindowLayout, AppWindowColors, AppWindowThemeMode, WebBackgroundSettings } from '../types'
+import { selectBackgroundImage, copyBackgroundImageToResources } from '../api'
 import { storeToRefs } from 'pinia'
 
 export const useAppearanceActions = () => {
     const store = useSettingsStore()
     const { appSettings } = storeToRefs(store)
-    const webSettingsStore = useWebSettingsStore()
-    const { webSettings } = storeToRefs(webSettingsStore)
-    const { loadSettings, updateSettings: updateWebSettings } = webSettingsStore
 
     const updateAppWindowLayout = async (layout: AppWindowLayout) => {
         await store.updateSettings({
@@ -32,6 +27,8 @@ export const useAppearanceActions = () => {
                 appWindowLayout: DEFAULT_APP_SETTINGS.ui.appWindowLayout,
                 appWindowColors: DEFAULT_APP_SETTINGS.ui.appWindowColors,
                 appWindowThemeMode: DEFAULT_APP_SETTINGS.ui.appWindowThemeMode,
+                webTheme: DEFAULT_APP_SETTINGS.ui.webTheme,
+                background: DEFAULT_APP_SETTINGS.ui.background,
             }
         })
     }
@@ -66,25 +63,14 @@ export const useAppearanceActions = () => {
         })
     }
 
-    const updateBackgroundSettings = async (partialBackground: Partial<WebSettings['ui']['background']>) => {
-        await updateWebSettings({
+    const updateBackgroundSettings = async (partialBackground: Partial<WebBackgroundSettings>) => {
+        await store.updateSettings({
+            ...appSettings.value,
             ui: {
-                ...webSettings.value.ui,
+                ...appSettings.value.ui,
                 background: {
-                    ...webSettings.value.ui.background,
+                    ...appSettings.value.ui.background,
                     ...partialBackground
-                }
-            }
-        })
-    }
-
-    const updateThemeSettings = async (partialTheme: Partial<ThemeSettings>) => {
-        await updateWebSettings({
-            ui: {
-                ...webSettings.value.ui,
-                theme: {
-                    ...webSettings.value.ui.theme,
-                    ...partialTheme
                 }
             }
         })
@@ -107,7 +93,6 @@ export const useAppearanceActions = () => {
                     type: 'image',
                     imagePath: copiedImagePath
                 })
-                await loadSettings()
             }
         } catch (error) {
             console.error('设置背景图片失败:', error)
@@ -135,7 +120,6 @@ export const useAppearanceActions = () => {
         updateBackgroundBlur,
         handleBackgroundImageSelect,
         handleBackgroundImageRemove,
-        updateThemeSettings,
         getAppWindowColorsByTheme,
         updateAppWindowTheme
     }

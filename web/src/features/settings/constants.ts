@@ -1,7 +1,4 @@
 
-// 配置文件路径
-export const CONFIG_PATH = './web-settings.json'
-
 // 资源目录路径
 export const RESOURCES_DIR = './resources/web/assets'
 
@@ -12,6 +9,14 @@ export const BACKGROUND_IMAGE_NAME = 'background'
 export const OPACITY_RANGE = {
   MIN: 0,
   MAX: 1,
-  DEFAULT: 1.0,
+  DEFAULT: 0.8,
   STEP: 0.1,
+} as const
+
+// 模糊范围
+export const BLUR_RANGE = {
+  MIN: 0,
+  MAX: 200,
+  DEFAULT: 0,
+  STEP: 1,
 } as const

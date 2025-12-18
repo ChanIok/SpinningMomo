@@ -10,6 +10,7 @@ import GeneralSettingsContent from '../components/GeneralSettingsContent.vue'
 import { useSettingsStore } from '../store'
 
 const activePage = ref<SettingsPageKey>('function')
+const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const store = useSettingsStore()
 
 // 初始化时加载设置
@@ -18,13 +19,11 @@ onMounted(() => {
 })
 
 const scrollToTop = () => {
-    // Scroll area reset logic if needed, usually managed natively or via ref access
-    // Shadcn vue ScrollArea might not expose direct method easily without accessing underlying viewportElement
-    // For now we rely on content replacement
+  scrollAreaRef.value?.viewportElement?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 watch(activePage, () => {
-    scrollToTop()
+  scrollToTop()
 })
 </script>
 
@@ -32,7 +31,7 @@ watch(activePage, () => {
   <div class="flex h-full bg-background text-foreground">
     <SettingsSidebar v-model:activePage="activePage" />
     <div class="flex h-full flex-1 flex-col overflow-hidden">
-      <ScrollArea class="flex-1 w-full">
+      <ScrollArea ref="scrollAreaRef" class="h-full flex-1 w-full">
         <div class="mx-auto max-w-4xl p-8">
            <FunctionContent v-if="activePage === 'function'" />
            <MenuContent v-if="activePage === 'menu'" />

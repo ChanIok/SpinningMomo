@@ -13,7 +13,10 @@ export interface PresetItem {
   order: number // 排序序号
 }
 
-// AppWindow主题模式
+// Web 主题模式（页面主题）
+export type WebThemeMode = 'light' | 'dark' | 'system'
+
+// AppWindow主题模式（原生窗口主题）
 export type AppWindowThemeMode = 'dark' | 'light'
 
 // AppWindow颜色配置
@@ -24,6 +27,19 @@ export interface AppWindowColors {
   indicator: string // 指示器颜色 (包含透明度)
   hover: string // 悬停背景色 (包含透明度)
   titleBar: string // 标题栏颜色 (包含透明度)
+}
+
+// Web 背景设置
+export interface WebBackgroundSettings {
+  type: 'none' | 'image'
+  imagePath: string
+  opacity: number
+  blurAmount: number
+}
+
+// Web 主题设置
+export interface WebThemeSettings {
+  mode: WebThemeMode
 }
 
 // 深色主题颜色配置
@@ -130,6 +146,10 @@ export interface AppSettings {
 
     // AppWindow主题模式
     appWindowThemeMode: AppWindowThemeMode
+
+    // Web UI 设置
+    webTheme: WebThemeSettings
+    background: WebBackgroundSettings
   }
 }
 
@@ -223,5 +243,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     appWindowColors: DARK_APP_WINDOW_COLORS,
     appWindowThemeMode: 'dark',
+    webTheme: {
+      mode: 'system',
+    },
+    background: {
+      type: 'none',
+      imagePath: '',
+      opacity: 0.8,
+      blurAmount: 0,
+    },
   },
 } as const

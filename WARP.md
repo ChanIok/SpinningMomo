@@ -125,12 +125,13 @@ src/
 │   │   ├── encoder.ixx        # Video encoding
 │   │   └── usecase.ixx        # Recording use cases
 │   ├── settings/              # Settings management + menu data
-│   │   ├── menu_data/         # Menu structure definitions (moved from common/)
-│   │   ├── menu_ids/          # Menu identifier constants (moved from common/)
 │   │   ├── settings.ixx       # Public API
-│   │   ├── state.ixx          # Settings state
-│   │   ├── types.ixx          # Settings types
-│   │   └── compute.ixx        # Settings computation logic
+│   │   ├── state.ixx          # Settings state (contains raw + computed states)
+│   │   ├── types.ixx          # Settings types (layered configuration structure)
+│   │   ├── compute.ixx        # Settings computation logic
+│   │   ├── menu.ixx           # Menu data management (presets, functional items)
+│   │   ├── events.ixx         # Settings-related events
+│   │   └── migration.ixx      # Settings file migration logic
 │   └── notifications/         # Windows toast notifications
 ├── utils/                     # Utility functions
 │   ├── logger/                # spdlog wrapper
@@ -145,6 +146,13 @@ web/                           # Vue 3 frontend
 │   ├── features/              # Feature-first architecture
 │   │   ├── gallery/           # Gallery pages + components
 │   │   ├── settings/          # Settings management
+│   │   │   ├── api.ts        # RPC API call wrappers
+│   │   │   ├── store.ts      # Pinia state management
+│   │   │   ├── types.ts      # TypeScript type definitions
+│   │   │   ├── constants.ts  # Constant definitions
+│   │   │   ├── pages/        # Page components
+│   │   │   ├── components/   # Functional components (appearance, functionality, menus, etc.)
+│   │   │   └── composables/  # Composable functions (theme, operation logic, etc.)
 │   │   └── home/              # Home page
 │   ├── components/            # Global components (shadcn-vue)
 │   ├── composables/           # Global composables (useTheme, useI18n, useRpc)

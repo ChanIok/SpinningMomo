@@ -23,6 +23,19 @@ struct PresetItem {
   int order = 0;        // 排序序号
 };
 
+// Web 主题设置
+export struct WebThemeSettings {
+  std::string mode = "system";  // "light" | "dark" | "system"
+};
+
+// Web 背景设置
+export struct WebBackgroundSettings {
+  std::string type = "none";        // "none" | "image"
+  std::string image_path = "";
+  double opacity = 0.8;             // 0.0 - 1.0
+  int blur_amount = 0;              // 0 - 200
+};
+
 // 完整的应用设置（重构后的结构）
 export struct AppSettings {
   int version = CURRENT_SETTINGS_VERSION;
@@ -139,6 +152,10 @@ export struct AppSettings {
 
     // AppWindow主题模式
     std::string app_window_theme_mode = "dark";
+
+    // Web UI 设置
+    WebThemeSettings web_theme;
+    WebBackgroundSettings background;
   } ui;
 };
 

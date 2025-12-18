@@ -11,7 +11,14 @@ const props = defineProps<{
   <div
     role="list"
     data-slot="item-group"
-    :class="cn('group/item-group flex flex-col', props.class)"
+    :class="cn(
+      'group/item-group flex flex-col',
+      '[&>[data-slot=item]:not(:first-child)]:border-t-0',
+      '[&>[data-slot=item]:not(:first-child):not(:last-child)]:rounded-none',
+      '[&>[data-slot=item]:first-child]:rounded-b-none',
+      '[&>[data-slot=item]:last-child]:rounded-t-none',
+      props.class
+    )"
   >
     <slot />
   </div>

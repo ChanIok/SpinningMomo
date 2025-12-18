@@ -4,10 +4,10 @@ import { ref } from 'vue'
 import { useSettingsStore } from '../store'
 import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
-import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup } from '@/components/ui/item'
 import { useI18n } from '@/composables/useI18n'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { call } from '@/core/rpc'
@@ -123,17 +123,17 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-          <div class="flex items-center justify-between py-2">
-            <div class="flex-1 pr-4">
-              <Label class="text-sm font-medium text-foreground">
+        <ItemGroup>
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
                 {{ t('settings.function.windowControl.windowTitle.label') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
+              </ItemTitle>
+              <ItemDescription>
                 {{ t('settings.function.windowControl.windowTitle.description') }}
-              </p>
-            </div>
-            <div class="flex flex-shrink-0 items-center gap-2">
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
               <Input
                 v-model="inputTitle"
                 @keydown="handleKeyDown"
@@ -147,26 +147,26 @@ const handleResetSettings = async () => {
               >
                 {{ t('settings.function.windowControl.windowTitle.update') }}
               </Button>
-            </div>
-          </div>
+            </ItemActions>
+          </Item>
 
-          <div class="flex items-center justify-between py-2 mt-4 border-t pt-4">
-            <div class="flex-1 pr-4">
-              <Label class="text-sm font-medium text-foreground">
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
                 {{ t('settings.function.windowControl.taskbarLowerOnResize.label') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
+              </ItemTitle>
+              <ItemDescription>
                 {{ t('settings.function.windowControl.taskbarLowerOnResize.description') }}
-              </p>
-            </div>
-            <div class="flex-shrink-0">
-               <Switch
-                  :checked="appSettings?.window?.taskbar?.lowerOnResize"
-                  @update:checked="updateTaskbarLowerOnResize"
-               />
-            </div>
-          </div>
-        </div>
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :checked="appSettings?.window?.taskbar?.lowerOnResize"
+                @update:checked="updateTaskbarLowerOnResize"
+              />
+            </ItemActions>
+          </Item>
+        </ItemGroup>
       </div>
 
        <!-- Screenshot -->
@@ -180,33 +180,31 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-           <div class="flex items-center justify-between py-2">
-            <div class="flex-1 pr-4">
-              <Label class="text-sm font-medium text-foreground">
-                {{ t('settings.function.screenshot.directory.label') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
-                {{ t('settings.function.screenshot.directory.description') }}
-              </p>
-            </div>
-            <div class="flex flex-shrink-0 items-center gap-2">
-              <Input
-                :model-value="appSettings?.features?.screenshot?.screenshotDirPath"
-                readonly
-                :placeholder="t('settings.function.screenshot.directory.placeholder')"
-                class="w-48"
-              />
-               <Button
-                @click="handleSelectDir"
-                :disabled="isSelectingDir"
-                size="sm"
-              >
-                {{ isSelectingDir ? t('settings.function.screenshot.directory.selecting') : t('settings.function.screenshot.directory.selectButton') }}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Item variant="outline" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.screenshot.directory.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.screenshot.directory.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Input
+              :model-value="appSettings?.features?.screenshot?.screenshotDirPath"
+              readonly
+              :placeholder="t('settings.function.screenshot.directory.placeholder')"
+              class="w-48"
+            />
+            <Button
+              @click="handleSelectDir"
+              :disabled="isSelectingDir"
+              size="sm"
+            >
+              {{ isSelectingDir ? t('settings.function.screenshot.directory.selecting') : t('settings.function.screenshot.directory.selectButton') }}
+            </Button>
+          </ItemActions>
+        </Item>
       </div>
 
        <!-- Letterbox -->
@@ -220,24 +218,22 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <div class="rounded-lg border bg-card p-4 text-card-foreground shadow-sm">
-           <div class="flex items-center justify-between py-2">
-            <div class="flex-1 pr-4">
-               <Label class="text-sm font-medium text-foreground">
-                {{ t('settings.function.letterbox.enabled.label') }}
-              </Label>
-              <p class="mt-1 text-sm text-muted-foreground">
-                 {{ t('settings.function.letterbox.enabled.description') }}
-              </p>
-            </div>
-             <div class="flex-shrink-0">
-               <Switch
-                  :checked="appSettings?.features?.letterbox?.enabled"
-                  @update:checked="updateLetterboxEnabled"
-               />
-            </div>
-          </div>
-        </div>
+        <Item variant="outline" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.letterbox.enabled.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.letterbox.enabled.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :checked="appSettings?.features?.letterbox?.enabled"
+              @update:checked="updateLetterboxEnabled"
+            />
+          </ItemActions>
+        </Item>
       </div>
 
     </div>

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { isWebView } from '@/core/env'
 import { SidebarProvider } from '@/components/ui/sidebar'
+import { Toaster } from '@/components/ui/sonner'
 import ActivityBar from './ActivityBar.vue'
 import AppHeader from './AppHeader.vue'
 import ContentArea from './ContentArea.vue'
+import 'vue-sonner/style.css'
 
 const showHeader = isWebView()
 </script>
@@ -25,5 +27,8 @@ const showHeader = isWebView()
         </div>
       </div>
     </div>
+    
+    <!-- Toast 通知 -->
+    <Toaster position="bottom-right" richColors closeButton />
   </SidebarProvider>
 </template>
