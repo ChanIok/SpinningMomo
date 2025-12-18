@@ -1,8 +1,9 @@
-
-// UI 交互用的菜单项类型（包含 enabled 状态）
+// UI 交互用的菜单项类型
+// enabled 字段用于功能列表的启用/禁用状态
+// 对于比例和分辨率列表，enabled 字段保持为 true（不显示切换开关）
 export interface MenuItem {
   id: string
-  enabled: boolean // 是否在启用列表中
+  enabled: boolean
 }
 
 // Web 主题模式（页面主题）
@@ -155,7 +156,6 @@ export interface AppSettings {
 
 // 默认设置值
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-
   // app 设置
   app: {
     hotkey: {

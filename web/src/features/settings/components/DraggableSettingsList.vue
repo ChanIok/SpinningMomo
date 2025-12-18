@@ -16,6 +16,7 @@ const props = defineProps<{
   // Optional features
   allowAdd?: boolean
   allowRemove?: boolean
+  showToggle?: boolean // 是否显示启用/禁用切换开关
 
   // Customization
   addPlaceholder?: string
@@ -276,19 +277,19 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-3">
     <div>
-      <h3 class="text-lg font-semibold text-foreground">{{ title }}</h3>
+      <h3 class="text-base font-semibold text-foreground">{{ title }}</h3>
       <p class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
     </div>
 
-    <div class="rounded-md border bg-card p-4 text-card-foreground">
+    <div class="rounded-md border bg-card p-3 text-card-foreground">
       <div ref="itemsContainer" class="relative flex flex-col gap-1">
         <TransitionGroup name="list">
           <div
             v-for="item in items"
             :key="item.id"
-            class="draggable-item group flex cursor-grab items-center justify-between rounded-md border border-transparent bg-card p-3 transition-colors hover:border-primary/20 hover:bg-accent/50 active:cursor-grabbing"
+            class="draggable-item group flex cursor-grab items-center justify-between rounded-md border border-transparent bg-card p-2.5 transition-colors hover:border-primary/20 hover:bg-accent/50 active:cursor-grabbing"
             :class="{
               'is-dragging-source': draggingId === item.id,
             }"
@@ -306,20 +307,12 @@ onUnmounted(() => {
             </div>
             <div class="flex flex-shrink-0 items-center gap-2">
               <Switch
-                :checked="item.enabled"
-                @update:checked="(v: boolean) => handleToggle(item.id, v)"
+                v-if="showToggle"
+                :model-value="item.enabled"
+                @update:model-value="(v: boolean) => handleToggle(item.id, v)"
                 @click.stop
                 @pointerdown.stop
               />
-              <span
-                class="pointer-events-none min-w-[3rem] text-right text-xs text-muted-foreground"
-              >
-                {{
-                  item.enabled
-                    ? t('settings.menu.status.visible')
-                    : t('settings.menu.status.hidden')
-                }}
-              </span>
               <Button
                 v-if="allowRemove"
                 variant="ghost"
@@ -336,7 +329,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Add Item Section (only if allowAdd is true) -->
-      <div v-if="allowAdd" class="mt-4 border-t pt-4">
+      <div v-if="allowAdd" class="mt-3 border-t pt-3">
         <div
           v-if="isAdding"
           class="flex items-center gap-2 rounded-md border border-primary bg-primary/5 p-3"

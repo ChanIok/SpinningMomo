@@ -210,8 +210,8 @@ const handleResetSettings = async () => {
             </ItemContent>
             <ItemActions>
               <Switch
-                :checked="appSettings?.window?.taskbar?.lowerOnResize"
-                @update:checked="updateTaskbarLowerOnResize"
+                :model-value="appSettings?.window?.taskbar?.lowerOnResize"
+                @update:model-value="updateTaskbarLowerOnResize"
               />
             </ItemActions>
           </Item>
@@ -278,8 +278,8 @@ const handleResetSettings = async () => {
           </ItemContent>
           <ItemActions>
             <Switch
-              :checked="appSettings?.features?.letterbox?.enabled"
-              @update:checked="updateLetterboxEnabled"
+              :model-value="appSettings?.features?.letterbox?.enabled"
+              @update:model-value="updateLetterboxEnabled"
             />
           </ItemActions>
         </Item>

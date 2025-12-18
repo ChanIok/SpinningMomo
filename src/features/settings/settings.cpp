@@ -131,13 +131,12 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 
     std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-    auto config_result = rfl::json::read<Types::AppSettings>(json_str);
+    auto config_result = rfl::json::read<Types::AppSettings, rfl::DefaultIfMissing>(json_str);
     if (!config_result) {
       return std::unexpected("Failed to parse settings: " + config_result.error().what());
     }
 
     auto config = config_result.value();
-
 
     // 创建完整状态
     State::SettingsState state;
