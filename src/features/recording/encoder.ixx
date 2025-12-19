@@ -12,7 +12,8 @@ export namespace Features::Recording::Encoder {
 // 创建编码器
 auto create_encoder(const std::filesystem::path& output_path, std::uint32_t width,
                     std::uint32_t height, std::uint32_t fps, std::uint32_t bitrate,
-                    ID3D11Device* device, Features::Recording::Types::EncoderMode mode)
+                    ID3D11Device* device, Features::Recording::Types::EncoderMode mode,
+                    Features::Recording::Types::VideoCodec codec)
     -> std::expected<Features::Recording::State::EncoderContext, std::string>;
 
 // 编码一帧

@@ -117,7 +117,7 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   // 4. 创建编码器
   auto encoder_result = Features::Recording::Encoder::create_encoder(
       config.output_path, width, height, config.fps, config.bitrate, state.device.get(),
-      config.encoder_mode);
+      config.encoder_mode, config.codec);
   if (!encoder_result) {
     return std::unexpected("Failed to create encoder: " + encoder_result.error());
   }

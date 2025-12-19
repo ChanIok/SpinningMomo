@@ -88,6 +88,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     config.bitrate = recording_settings.bitrate;
     config.encoder_mode =
         Features::Recording::Types::encoder_mode_from_string(recording_settings.encoder_mode);
+    config.codec = Features::Recording::Types::video_codec_from_string(recording_settings.codec);
 
     // 3. 启动
     auto result = Features::Recording::start(*state.recording, target.value(), config);

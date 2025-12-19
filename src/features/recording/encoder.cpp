@@ -16,12 +16,17 @@ import <windows.h>;
 namespace Features::Recording::Encoder {
 
 // 辅助函数：创建输出媒体类型
-auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uint32_t bitrate)
+auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uint32_t bitrate,
+                              Features::Recording::Types::VideoCodec codec)
     -> wil::com_ptr<IMFMediaType> {
   wil::com_ptr<IMFMediaType> media_type;
   if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
-  if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264))) return nullptr;
+
+  // 根据 codec 选择编码格式
+  GUID subtype = (codec == Features::Recording::Types::VideoCodec::H265) ? MFVideoFormat_HEVC
+                                                                         : MFVideoFormat_H264;
+  if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, subtype))) return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_AVG_BITRATE, bitrate))) return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive)))
     return nullptr;
@@ -56,7 +61,8 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
 // 尝试创建 GPU 编码器
 auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
                             const std::filesystem::path& output_path, uint32_t width,
-                            uint32_t height, uint32_t fps, uint32_t bitrate, ID3D11Device* device)
+                            uint32_t height, uint32_t fps, uint32_t bitrate, ID3D11Device* device,
+                            Features::Recording::Types::VideoCodec codec)
     -> std::expected<void, std::string> {
   // 1. 创建 DXGI Device Manager
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
@@ -94,7 +100,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 5. 创建输出媒体类型
-  auto media_type_out = create_output_media_type(width, height, fps, bitrate);
+  auto media_type_out = create_output_media_type(width, height, fps, bitrate, codec);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -146,7 +152,9 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
 // 创建 CPU 编码器 (fallback)
 auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
                         const std::filesystem::path& output_path, uint32_t width, uint32_t height,
-                        uint32_t fps, uint32_t bitrate) -> std::expected<void, std::string> {
+                        uint32_t fps, uint32_t bitrate,
+                        Features::Recording::Types::VideoCodec codec)
+    -> std::expected<void, std::string> {
   // 创建 Sink Writer 属性
   wil::com_ptr<IMFAttributes> attributes;
   if (FAILED(MFCreateAttributes(attributes.put(), 1))) {
@@ -168,7 +176,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 创建输出媒体类型
-  auto media_type_out = create_output_media_type(width, height, fps, bitrate);
+  auto media_type_out = create_output_media_type(width, height, fps, bitrate, codec);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -202,7 +210,8 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
 
 auto create_encoder(const std::filesystem::path& output_path, uint32_t width, uint32_t height,
                     uint32_t fps, uint32_t bitrate, ID3D11Device* device,
-                    Features::Recording::Types::EncoderMode mode)
+                    Features::Recording::Types::EncoderMode mode,
+                    Features::Recording::Types::VideoCodec codec)
     -> std::expected<Features::Recording::State::EncoderContext, std::string> {
   Features::Recording::State::EncoderContext ctx;
 
@@ -210,10 +219,15 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
                   mode == Features::Recording::Types::EncoderMode::GPU) &&
                  device != nullptr;
 
+  const char* codec_name =
+      (codec == Features::Recording::Types::VideoCodec::H265) ? "H.265" : "H.264";
+
   if (try_gpu) {
-    auto gpu_result = try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device);
+    auto gpu_result =
+        try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device, codec);
     if (gpu_result) {
-      Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps", width, height, fps, bitrate);
+      Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
+                    bitrate, codec_name);
       return ctx;
     }
 
@@ -231,16 +245,15 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
   }
 
   // CPU 编码
-  auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate);
+  auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate, codec);
   if (!cpu_result) {
     return std::unexpected(cpu_result.error());
   }
 
-  Logger().info("CPU encoder created: {}x{} @ {}fps, {} bps", width, height, fps, bitrate);
+  Logger().info("CPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
+                bitrate, codec_name);
   return ctx;
 }
-
-// GPU 编码帧
 auto encode_frame_gpu(Features::Recording::State::EncoderContext& encoder,
                       ID3D11DeviceContext* context, ID3D11Texture2D* frame_texture,
                       int64_t timestamp_100ns, uint32_t fps) -> std::expected<void, std::string> {

@@ -20,14 +20,27 @@ export constexpr EncoderMode encoder_mode_from_string(std::string_view str) {
   return EncoderMode::Auto;  // 默认或 "auto"
 }
 
+// 视频编码格式
+export enum class VideoCodec {
+  H264,  // H.264/AVC
+  H265   // H.265/HEVC
+};
+
+// 从字符串转换为 VideoCodec
+export constexpr VideoCodec video_codec_from_string(std::string_view str) {
+  if (str == "h265" || str == "hevc") return VideoCodec::H265;
+  return VideoCodec::H264;  // 默认
+}
+
 // 录制配置
 export struct RecordingConfig {
   std::filesystem::path output_path;             // 输出文件路径
-  std::uint32_t width = 0;                            // 视频宽度
-  std::uint32_t height = 0;                           // 视频高度
-  std::uint32_t fps = 30;                             // 帧率
-  std::uint32_t bitrate = 80'000'000;                 // 比特率 (默认 80Mbps)
+  std::uint32_t width = 0;                       // 视频宽度
+  std::uint32_t height = 0;                      // 视频高度
+  std::uint32_t fps = 30;                        // 帧率
+  std::uint32_t bitrate = 80'000'000;            // 比特率 (默认 80Mbps)
   EncoderMode encoder_mode = EncoderMode::Auto;  // 编码器模式
+  VideoCodec codec = VideoCodec::H264;           // 视频编码格式 (默认 H.264)
 };
 
 // 录制状态枚举
