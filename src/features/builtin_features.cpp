@@ -1,17 +1,14 @@
 module;
 
-#include <windows.h>
-
 module Features.Registry;
 
 import std;
 import Core.State;
-import Features.Settings.State;
 import Features.Registry;
+import Features.Settings.State;
 import Features.Screenshot.UseCase;
 import Features.Screenshot.Folder;
 import Features.Recording.UseCase;
-import Features.Recording.Types;
 import Features.Letterbox.UseCase;
 import Features.Overlay.UseCase;
 import Features.Preview.UseCase;
@@ -19,7 +16,6 @@ import Features.Letterbox.State;
 import Features.Recording.State;
 import Features.Overlay.State;
 import Features.Preview.State;
-import Features.WindowControl;
 import Features.WindowControl.UseCase;
 import UI.AppWindow;
 import Utils.Logger;
@@ -36,8 +32,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
   register_feature(registry,
                    {
                        .id = "screenshot.capture",
-                       .icon = "camera",
-                       .category = "screenshot",
                        .i18n_key = "menu.screenshot_capture",
                        .is_toggle = false,
                        .action = [&state]() { Features::Screenshot::UseCase::capture(state); },
@@ -47,8 +41,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
   register_feature(
       registry, {
                     .id = "screenshot.open_folder",
-                    .icon = "folder-open",
-                    .category = "screenshot",
                     .i18n_key = "menu.screenshot_open_folder",
                     .is_toggle = false,
                     .action =
@@ -65,8 +57,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
   // 切换预览窗口
   register_feature(registry, {
                                  .id = "feature.toggle_preview",
-                                 .icon = "monitor",
-                                 .category = "feature",
                                  .i18n_key = "menu.preview_toggle",
                                  .is_toggle = true,
                                  .action =
@@ -82,8 +72,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
   // 切换叠加层
   register_feature(registry, {
                                  .id = "feature.toggle_overlay",
-                                 .icon = "layers",
-                                 .category = "feature",
                                  .i18n_key = "menu.overlay_toggle",
                                  .is_toggle = true,
                                  .action =
@@ -99,8 +87,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
   // 切换黑边模式
   register_feature(registry, {
                                  .id = "feature.toggle_letterbox",
-                                 .icon = "square",
-                                 .category = "feature",
                                  .i18n_key = "menu.letterbox_toggle",
                                  .is_toggle = true,
                                  .action =
@@ -119,8 +105,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
       registry,
       {
           .id = "feature.toggle_recording",
-          .icon = "video",
-          .category = "feature",
           .i18n_key = "menu.recording_toggle",
           .is_toggle = true,
           .action =
@@ -143,8 +127,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
       registry,
       {
           .id = "window.reset_transform",
-          .icon = "maximize",
-          .category = "window",
           .i18n_key = "menu.window_reset",
           .is_toggle = false,
           .action = [&state]() { Features::WindowControl::UseCase::reset_window_transform(state); },
@@ -155,8 +137,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
   // 隐藏面板
   register_feature(registry, {
                                  .id = "panel.hide",
-                                 .icon = "eye-off",
-                                 .category = "panel",
                                  .i18n_key = "menu.app_hide",
                                  .is_toggle = false,
                                  .action = [&state]() { UI::AppWindow::hide_window(state); },
@@ -167,8 +147,6 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
   // 退出应用
   register_feature(registry, {
                                  .id = "app.exit",
-                                 .icon = "power",
-                                 .category = "app",
                                  .i18n_key = "menu.app_exit",
                                  .is_toggle = false,
                                  .action = []() { ::PostQuitMessage(0); },

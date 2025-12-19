@@ -17,10 +17,6 @@ export auto update_settings(Core::State::AppState& app_state,
                             const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string>;
 
-export auto get_available_features(Core::State::AppState& app_state,
-                                   const Types::GetAvailableFeaturesParams& params)
-    -> std::expected<Types::GetAvailableFeaturesResult, std::string>;
-
 export auto get_settings_path() -> std::expected<std::filesystem::path, std::string>;
 
 export auto save_settings_to_file(const std::filesystem::path& settings_path,

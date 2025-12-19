@@ -185,33 +185,6 @@ auto get_settings(const Types::GetSettingsParams& params)
   }
 }
 
-auto get_available_features(Core::State::AppState& app_state,
-                            [[maybe_unused]] const Types::GetAvailableFeaturesParams& params)
-    -> std::expected<Types::GetAvailableFeaturesResult, std::string> {
-  try {
-    if (!app_state.feature_registry) {
-      return std::unexpected("Feature registry not initialized");
-    }
-
-    auto all_features = Features::Registry::get_all_features(*app_state.feature_registry);
-
-    Types::GetAvailableFeaturesResult result;
-    result.features.reserve(all_features.size());
-
-    for (const auto& feature : all_features) {
-      Types::FeatureDescriptorData data;
-      data.id = feature.id;
-      data.icon = feature.icon;
-      data.is_toggle = feature.is_toggle;
-      result.features.push_back(std::move(data));
-    }
-
-    return result;
-  } catch (const std::exception& e) {
-    return std::unexpected("Failed to get available features: " + std::string(e.what()));
-  }
-}
-
 auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string> {
   try {

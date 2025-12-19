@@ -170,19 +170,4 @@ export struct UpdateSettingsResult {
   std::string message;
 };
 
-// 获取可用功能列表
-export struct GetAvailableFeaturesParams {
-  // 空结构体，未来可扩展
-};
-
-export struct FeatureDescriptorData {
-  std::string id;
-  std::string icon;
-  bool is_toggle;
-};
-
-export struct GetAvailableFeaturesResult {
-  std::vector<FeatureDescriptorData> features;
-};
-
 }  // namespace Features::Settings::Types

@@ -1,8 +1,15 @@
 // 功能描述符（从后端获取）
 export interface FeatureDescriptor {
   id: string // 唯一标识
-  icon: string // lucide 图标名
+  i18nKey: string // i18n 键
   isToggle: boolean // 是否为切换类型
+}
+
+// 菜单项（用于显示和编辑）
+export interface MenuItem {
+  id: string // 项目 ID
+  enabled: boolean // 是否启用
+  order?: number // 显示顺序（-1 表示未启用/无顺序）
 }
 
 // Web 主题模式（页面主题）
@@ -70,7 +77,7 @@ export interface AppWindowLayout {
 
 // 完整的应用设置类型
 export interface AppSettings {
-  version?: number
+  version: number
 
   // app 分组 - 应用核心设置
   app: {
@@ -129,6 +136,16 @@ export interface AppSettings {
     }
   }
 
+  // updater 分组 - 更新设置
+  updater: {
+    autoCheck: boolean // 是否自动检查更新
+    checkIntervalHours: number // 检查间隔（小时）
+    servers: Array<{
+      name: string // 服务器名称
+      url: string // 服务器API地址
+    }>
+  }
+
   // ui 分组 - UI界面设置
   ui: {
     // 应用菜单配置
@@ -155,6 +172,8 @@ export interface AppSettings {
 
 // 默认设置值
 export const DEFAULT_APP_SETTINGS: AppSettings = {
+  version: 1,
+
   // app 设置
   app: {
     hotkey: {
@@ -198,6 +217,18 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       bitrate: 80000000,
       encoderMode: 'auto',
     },
+  },
+
+  // updater 设置
+  updater: {
+    autoCheck: true,
+    checkIntervalHours: 24,
+    servers: [
+      {
+        name: 'GitHub官方',
+        url: 'https://api.github.com/repos/ChanIok/SpinningMomo/releases/latest',
+      },
+    ],
   },
 
   // ui 设置

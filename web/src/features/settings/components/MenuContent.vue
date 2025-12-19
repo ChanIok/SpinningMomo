@@ -1,35 +1,45 @@
 <script setup lang="ts">
 import { useSettingsStore } from '../store'
-import { useMenuActions } from '../composables/useMenuActions'
 import { storeToRefs } from 'pinia'
 import DraggableSettingsList from './DraggableSettingsList.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/composables/useI18n'
-import type { MenuItem } from '../types'
-import { computed } from 'vue'
+import { useMenuActions } from '../composables/useMenuActions'
+import { watch } from 'vue'
 
 const store = useSettingsStore()
-const { appSettings, error, isInitialized } = storeToRefs(store)
-const { updateFeatureItems, updateAspectRatios, updateResolutions, resetMenuSettings } =
-  useMenuActions()
+const { error, isInitialized } = storeToRefs(store)
 const { clearError } = store
 const { t } = useI18n()
 
-// 直接从 store 中获取功能项（已包含顺序和启用状态）
-const getFeatureItems = computed((): MenuItem[] => {
-  return appSettings.value?.ui?.appMenu?.features || []
-})
+// 使用 composable 管理菜单操作
+const {
+  featureItems,
+  aspectRatios,
+  resolutions,
+  loadFeatureItems,
+  handleFeatureToggle,
+  handleFeatureReorder,
+  handleAspectRatioAdd,
+  handleAspectRatioRemove,
+  handleAspectRatioReorder,
+  handleResolutionAdd,
+  handleResolutionRemove,
+  handleResolutionReorder,
+  handleResetSettings,
+} = useMenuActions()
 
-const getAspectRatios = computed((): MenuItem[] => {
-  const ids = appSettings.value?.ui?.appMenu?.aspectRatios || []
-  return ids.map((id) => ({ id, enabled: true }))
-})
-
-const getResolutions = computed((): MenuItem[] => {
-  const ids = appSettings.value?.ui?.appMenu?.resolutions || []
-  return ids.map((id) => ({ id, enabled: true }))
-})
+// 当 settings 初始化完成后加载功能项
+watch(
+  isInitialized,
+  (initialized) => {
+    if (initialized) {
+      loadFeatureItems()
+    }
+  },
+  { immediate: true }
+)
 
 // Feature Label Helper
 const getFeatureItemLabel = (id: string): string => {
@@ -47,6 +57,7 @@ const getFeatureItemLabel = (id: string): string => {
   return labelMap[id] || id
 }
 
+// UI 验证函数
 const validateAspectRatio = (value: string): boolean => {
   const regex = /^\d+:\d+$/
   return regex.test(value) && !value.includes('0:') && !value.includes(':0')
@@ -56,36 +67,6 @@ const validateResolution = (value: string): boolean => {
   const resolutionRegex = /^\d+x\d+$/
   const presetRegex = /^\d+[KkPp]?$/
   return resolutionRegex.test(value) || presetRegex.test(value)
-}
-
-const handleAspectRatioAdd = async (newItem: { id: string; enabled: boolean }) => {
-  const currentItems = getAspectRatios.value
-  await updateAspectRatios([...currentItems, { id: newItem.id, enabled: true }])
-}
-
-const handleResolutionAdd = async (newItem: { id: string; enabled: boolean }) => {
-  const currentItems = getResolutions.value
-  await updateResolutions([...currentItems, { id: newItem.id, enabled: true }])
-}
-
-const handleFeatureToggle = async (id: string, enabled: boolean) => {
-  const items = getFeatureItems.value.map((item) => (item.id === id ? { ...item, enabled } : item))
-  await updateFeatureItems(items)
-}
-
-const handleAspectRatioRemove = async (id: string) => {
-  const items = getAspectRatios.value.filter((item) => item.id !== id)
-  await updateAspectRatios(items)
-}
-
-const handleResolutionRemove = async (id: string) => {
-  const items = getResolutions.value.filter((item) => item.id !== id)
-  await updateResolutions(items)
-}
-
-const handleResetSettings = async () => {
-  await resetMenuSettings()
-  // TODO: toast success
 }
 </script>
 
@@ -126,19 +107,19 @@ const handleResetSettings = async () => {
     <div class="space-y-6">
       <!-- 功能项目：全宽显示 -->
       <DraggableSettingsList
-        :items="getFeatureItems"
+        :items="featureItems"
         :title="t('settings.menu.feature.title')"
         :description="t('settings.menu.feature.description')"
         :show-toggle="true"
         :get-label="getFeatureItemLabel"
-        @reorder="updateFeatureItems"
+        @reorder="handleFeatureReorder"
         @toggle="handleFeatureToggle"
       />
 
       <!-- 比例预设 + 分辨率预设：两列网格布局 -->
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <DraggableSettingsList
-          :items="getAspectRatios"
+          :items="aspectRatios"
           :title="t('settings.menu.aspectRatio.title')"
           :description="t('settings.menu.aspectRatio.description')"
           :allow-add="true"
@@ -146,13 +127,13 @@ const handleResetSettings = async () => {
           :show-toggle="false"
           :add-placeholder="t('settings.menu.aspectRatio.placeholder')"
           :validate-input="validateAspectRatio"
-          @reorder="updateAspectRatios"
+          @reorder="handleAspectRatioReorder"
           @add="handleAspectRatioAdd"
           @remove="handleAspectRatioRemove"
         />
 
         <DraggableSettingsList
-          :items="getResolutions"
+          :items="resolutions"
           :title="t('settings.menu.resolution.title')"
           :description="t('settings.menu.resolution.description')"
           :allow-add="true"
@@ -160,7 +141,7 @@ const handleResetSettings = async () => {
           :show-toggle="false"
           :add-placeholder="t('settings.menu.resolution.placeholder')"
           :validate-input="validateResolution"
-          @reorder="updateResolutions"
+          @reorder="handleResolutionReorder"
           @add="handleResolutionAdd"
           @remove="handleResolutionRemove"
         />

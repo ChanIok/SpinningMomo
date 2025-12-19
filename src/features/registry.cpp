@@ -10,7 +10,7 @@ namespace Features::Registry {
 auto create_registry() -> FeatureRegistry { return FeatureRegistry{}; }
 
 auto register_feature(FeatureRegistry& registry, FeatureDescriptor descriptor) -> void {
-  const auto& id = descriptor.id;
+  const std::string id = descriptor.id;
 
   if (registry.descriptors.contains(id)) {
     Logger().warn("Feature already registered: {}", id);

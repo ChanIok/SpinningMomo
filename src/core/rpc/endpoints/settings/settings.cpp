@@ -1,9 +1,5 @@
 module;
 
-#include <asio.hpp>
-#include <rfl.hpp>
-#include <rfl/json.hpp>
-
 module Core.RPC.Endpoints.Settings;
 
 import std;
@@ -13,6 +9,7 @@ import Core.RPC.State;
 import Core.RPC.Types;
 import Features.Settings;
 import Features.Settings.Types;
+import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Settings {
 
@@ -44,22 +41,6 @@ auto handle_update_settings(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_get_available_features(
-    Core::State::AppState& app_state,
-    const Features::Settings::Types::GetAvailableFeaturesParams& params)
-    -> asio::awaitable<
-        Core::RPC::RpcResult<Features::Settings::Types::GetAvailableFeaturesResult>> {
-  auto result = Features::Settings::get_available_features(app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Service error: " + result.error()});
-  }
-
-  co_return result.value();
-}
-
 auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<Features::Settings::Types::GetSettingsParams,
                              Features::Settings::Types::GetSettingsResult>(
@@ -70,11 +51,6 @@ auto register_all(Core::State::AppState& app_state) -> void {
                              Features::Settings::Types::UpdateSettingsResult>(
       app_state, app_state.rpc->registry, "settings.update", handle_update_settings,
       "Update settings configuration");
-
-  Core::RPC::register_method<Features::Settings::Types::GetAvailableFeaturesParams,
-                             Features::Settings::Types::GetAvailableFeaturesResult>(
-      app_state, app_state.rpc->registry, "settings.getAvailableFeatures",
-      handle_get_available_features, "Get all available features from registry");
 }
 
 }  // namespace Core::RPC::Endpoints::Settings

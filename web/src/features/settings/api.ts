@@ -1,4 +1,3 @@
-
 import { call } from '@/core/rpc'
 import type { AppSettings } from './types'
 import { RESOURCES_DIR, BACKGROUND_IMAGE_NAME } from './constants'
@@ -10,7 +9,7 @@ export const settingsApi = {
 
   update: async (settings: AppSettings): Promise<void> => {
     await call('settings.update', settings)
-  }
+  },
 }
 
 /**

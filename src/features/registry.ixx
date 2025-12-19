@@ -9,8 +9,6 @@ namespace Features::Registry {
 // 功能描述符
 export struct FeatureDescriptor {
   std::string id;        // 唯一标识，如 "screenshot.capture"
-  std::string icon;      // lucide 图标名，如 "camera"（保留用于未来前端使用）
-  std::string category;  // 功能分类，如 "screenshot", "feature", "window", "panel", "app"
   std::string i18n_key;  // i18n 键，如 "menu.screenshot_capture"
 
   bool is_toggle = false;  // 是否为切换类型
@@ -42,6 +40,23 @@ export auto get_all_features(const FeatureRegistry& registry) -> std::vector<Fea
 // 获取单个功能描述符
 export auto get_feature(const FeatureRegistry& registry, const std::string& id)
     -> std::optional<FeatureDescriptor>;
+
+// === RPC Types ===
+
+// 用于 RPC 传输的功能描述符（不包含 function 字段）
+export struct FeatureDescriptorData {
+  std::string id;
+  std::string i18n_key;
+  bool is_toggle;
+};
+
+export struct GetAllFeaturesParams {
+  // 空结构体，未来可扩展
+};
+
+export struct GetAllFeaturesResult {
+  std::vector<FeatureDescriptorData> features;
+};
 
 }  // namespace Features::Registry
 
