@@ -35,7 +35,10 @@ const {
   updateRecordingOutputDir,
   updateRecordingFps,
   updateRecordingBitrate,
+  updateRecordingQuality,
+  updateRecordingRateControl,
   updateRecordingEncoderMode,
+  updateRecordingCodec,
   resetFunctionSettings,
 } = useFunctionActions()
 const { clearError } = store
@@ -48,6 +51,7 @@ const inputTitle = ref(appSettings.value?.window?.targetTitle || '')
 const inputBitrateMbps = ref(
   (appSettings.value?.features?.recording?.bitrate || 80000000) / 1000000
 )
+const inputQuality = ref(appSettings.value?.features?.recording?.quality || 70)
 
 const handleTitleChange = async () => {
   const value = inputTitle.value.trim()
@@ -123,9 +127,15 @@ const handleBitrateChange = async () => {
   // TODO: toast success
 }
 
+const handleQualityChange = async () => {
+  await updateRecordingQuality(inputQuality.value)
+  // TODO: toast success
+}
+
 const handleResetSettings = async () => {
   await resetFunctionSettings()
   inputBitrateMbps.value = 80 // Reset to default
+  inputQuality.value = 70 // Reset to default
   // TODO: toast success
 }
 </script>
@@ -356,6 +366,39 @@ const handleResetSettings = async () => {
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
+                {{ t('settings.function.recording.rateControl.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.rateControl.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.recording?.rateControl"
+                @update:model-value="(value) => updateRecordingRateControl(value as 'cbr' | 'vbr')"
+              >
+                <SelectTrigger class="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cbr">{{
+                    t('settings.function.recording.rateControl.cbr')
+                  }}</SelectItem>
+                  <SelectItem value="vbr">{{
+                    t('settings.function.recording.rateControl.vbr')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.recording?.rateControl === 'cbr'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
                 {{ t('settings.function.recording.bitrate.label') }}
               </ItemTitle>
               <ItemDescription>
@@ -374,6 +417,53 @@ const handleResetSettings = async () => {
               <Button @click="handleBitrateChange" size="sm">
                 {{ t('settings.function.windowControl.windowTitle.update') }}
               </Button>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.recording?.rateControl === 'vbr'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.quality.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.quality.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input v-model.number="inputQuality" type="number" :min="0" :max="100" class="w-24" />
+              <span class="text-sm text-muted-foreground">(0-100)</span>
+              <Button @click="handleQualityChange" size="sm">
+                {{ t('settings.function.windowControl.windowTitle.update') }}
+              </Button>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.codec.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.codec.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.recording?.codec"
+                @update:model-value="(value) => updateRecordingCodec(value as 'h264' | 'h265')"
+              >
+                <SelectTrigger class="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="h264">H.264 / AVC</SelectItem>
+                  <SelectItem value="h265">H.265 / HEVC</SelectItem>
+                </SelectContent>
+              </Select>
             </ItemActions>
           </Item>
 

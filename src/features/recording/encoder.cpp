@@ -12,6 +12,8 @@ import <mfapi.h>;
 import <mferror.h>;
 import <wil/com.h>;
 import <windows.h>;
+import <codecapi.h>;
+import <strmif.h>;
 
 namespace Features::Recording::Encoder {
 
@@ -58,12 +60,60 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
   return media_type;
 }
 
+// 辅助函数：配置码率控制模式
+auto configure_rate_control(IMFSinkWriter* sink_writer, DWORD stream_index,
+                            Features::Recording::Types::RateControlMode rate_control,
+                            uint32_t quality) -> void {
+  wil::com_ptr<ICodecAPI> codec_api;
+  HRESULT hr = sink_writer->GetServiceForStream(stream_index, GUID_NULL, IID_ICodecAPI,
+                                                reinterpret_cast<void**>(codec_api.put()));
+
+  if (FAILED(hr) || !codec_api) {
+    Logger().warn("Failed to get ICodecAPI for rate control configuration");
+    return;
+  }
+
+  VARIANT var;
+  VariantInit(&var);
+  var.vt = VT_UI4;
+
+  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
+    // 设置为质量 VBR 模式
+    var.ulVal = eAVEncCommonRateControlMode_Quality;
+    hr = codec_api->SetValue(&CODECAPI_AVEncCommonRateControlMode, &var);
+    if (SUCCEEDED(hr)) {
+      // 设置质量值 (0-100)
+      var.ulVal = quality;
+      hr = codec_api->SetValue(&CODECAPI_AVEncCommonQuality, &var);
+      if (SUCCEEDED(hr)) {
+        Logger().info("Rate control set to VBR with quality: {}", quality);
+      } else {
+        Logger().warn("Failed to set VBR quality value");
+      }
+    } else {
+      Logger().warn("Failed to set VBR rate control mode");
+    }
+  } else {
+    // 设置为 CBR 模式
+    var.ulVal = eAVEncCommonRateControlMode_CBR;
+    hr = codec_api->SetValue(&CODECAPI_AVEncCommonRateControlMode, &var);
+    if (SUCCEEDED(hr)) {
+      Logger().info("Rate control set to CBR");
+    } else {
+      Logger().warn("Failed to set CBR rate control mode");
+    }
+  }
+
+  VariantClear(&var);
+}
+
 // 尝试创建 GPU 编码器
 auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
                             const std::filesystem::path& output_path, uint32_t width,
                             uint32_t height, uint32_t fps, uint32_t bitrate, ID3D11Device* device,
-                            Features::Recording::Types::VideoCodec codec)
-    -> std::expected<void, std::string> {
+                            Features::Recording::Types::VideoCodec codec,
+                            Features::Recording::Types::RateControlMode rate_control,
+                            uint32_t quality) -> std::expected<void, std::string> {
   // 1. 创建 DXGI Device Manager
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
     return std::unexpected("Failed to create DXGI Device Manager");
@@ -136,7 +186,10 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to create shared texture for GPU encoding");
   }
 
-  // 8. 开始写入
+  // 8. 配置码率控制模式 (必须在 BeginWriting 之前)
+  configure_rate_control(ctx.sink_writer.get(), ctx.video_stream_index, rate_control, quality);
+
+  // 9. 开始写入
   if (FAILED(ctx.sink_writer->BeginWriting())) {
     return std::unexpected("Failed to begin writing with GPU encoder");
   }
@@ -153,7 +206,8 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
 auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
                         const std::filesystem::path& output_path, uint32_t width, uint32_t height,
                         uint32_t fps, uint32_t bitrate,
-                        Features::Recording::Types::VideoCodec codec)
+                        Features::Recording::Types::VideoCodec codec,
+                        Features::Recording::Types::RateControlMode rate_control, uint32_t quality)
     -> std::expected<void, std::string> {
   // 创建 Sink Writer 属性
   wil::com_ptr<IMFAttributes> attributes;
@@ -196,6 +250,9 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to set input media type");
   }
 
+  // 配置码率控制模式 (必须在 BeginWriting 之前)
+  configure_rate_control(ctx.sink_writer.get(), ctx.video_stream_index, rate_control, quality);
+
   if (FAILED(ctx.sink_writer->BeginWriting())) {
     return std::unexpected("Failed to begin writing");
   }
@@ -211,7 +268,8 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
 auto create_encoder(const std::filesystem::path& output_path, uint32_t width, uint32_t height,
                     uint32_t fps, uint32_t bitrate, ID3D11Device* device,
                     Features::Recording::Types::EncoderMode mode,
-                    Features::Recording::Types::VideoCodec codec)
+                    Features::Recording::Types::VideoCodec codec,
+                    Features::Recording::Types::RateControlMode rate_control, uint32_t quality)
     -> std::expected<Features::Recording::State::EncoderContext, std::string> {
   Features::Recording::State::EncoderContext ctx;
 
@@ -223,8 +281,8 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
       (codec == Features::Recording::Types::VideoCodec::H265) ? "H.265" : "H.264";
 
   if (try_gpu) {
-    auto gpu_result =
-        try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device, codec);
+    auto gpu_result = try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device,
+                                             codec, rate_control, quality);
     if (gpu_result) {
       Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
                     bitrate, codec_name);
@@ -245,7 +303,8 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
   }
 
   // CPU 编码
-  auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate, codec);
+  auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate, codec,
+                                       rate_control, quality);
   if (!cpu_result) {
     return std::unexpected(cpu_result.error());
   }

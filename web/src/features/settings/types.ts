@@ -131,8 +131,11 @@ export interface AppSettings {
     recording: {
       outputDirPath: string // 输出目录（空=默认使用 exe/recordings/）
       fps: number // 帧率: 30, 60, 120
-      bitrate: number // 比特率 (bps)
+      bitrate: number // 比特率 (bps)，CBR 模式使用
+      quality: number // 质量值 (0-100)，VBR 模式使用
+      rateControl: 'cbr' | 'vbr' // 码率控制模式
       encoderMode: 'auto' | 'gpu' | 'cpu' // 编码器模式
+      codec: 'h264' | 'h265' // 视频编码格式
     }
   }
 
@@ -215,7 +218,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       outputDirPath: '',
       fps: 60,
       bitrate: 80000000,
+      quality: 70,
+      rateControl: 'cbr',
       encoderMode: 'auto',
+      codec: 'h264',
     },
   },
 

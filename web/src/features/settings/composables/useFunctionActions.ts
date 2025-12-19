@@ -1,4 +1,3 @@
-
 import { useSettingsStore } from '../store'
 import { DEFAULT_APP_SETTINGS } from '../types'
 import { storeToRefs } from 'pinia'
@@ -108,6 +107,45 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateRecordingQuality = async (quality: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          quality,
+        },
+      },
+    })
+  }
+
+  const updateRecordingRateControl = async (rateControl: 'cbr' | 'vbr') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          rateControl,
+        },
+      },
+    })
+  }
+
+  const updateRecordingCodec = async (codec: 'h264' | 'h265') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          codec,
+        },
+      },
+    })
+  }
+
   const resetFunctionSettings = async () => {
     await store.updateSettings({
       ...appSettings.value,
@@ -134,7 +172,10 @@ export const useFunctionActions = () => {
           outputDirPath: DEFAULT_APP_SETTINGS.features.recording.outputDirPath,
           fps: DEFAULT_APP_SETTINGS.features.recording.fps,
           bitrate: DEFAULT_APP_SETTINGS.features.recording.bitrate,
+          quality: DEFAULT_APP_SETTINGS.features.recording.quality,
+          rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
           encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
+          codec: DEFAULT_APP_SETTINGS.features.recording.codec,
         },
       },
     })
@@ -148,7 +189,10 @@ export const useFunctionActions = () => {
     updateRecordingOutputDir,
     updateRecordingFps,
     updateRecordingBitrate,
+    updateRecordingQuality,
+    updateRecordingRateControl,
     updateRecordingEncoderMode,
-    resetFunctionSettings
+    updateRecordingCodec,
+    resetFunctionSettings,
   }
 }

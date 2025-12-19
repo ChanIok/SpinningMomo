@@ -45,7 +45,7 @@ target("SpinningMomo")
     -- Windows系统库
     add_links("dwmapi", "windowsapp", "RuntimeObject", "d3d11", "dxgi", "d3dcompiler", 
               "d2d1", "dwrite", "shell32", "Shlwapi", "gdi32", "user32", "Ws2_32", "Secur32", 
-              "Advapi32", "Dbghelp", "Userenv", "mf", "mfplat", "mfreadwrite", "mfuuid")
+              "Advapi32", "Dbghelp", "Userenv", "mf", "mfplat", "mfreadwrite", "mfuuid", "strmiids")
 
     -- vcpkg的传递依赖
     add_links("fmt", "yyjson", "sqlite3", "uSockets", "libuv")

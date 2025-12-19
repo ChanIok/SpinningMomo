@@ -174,7 +174,7 @@ auto get_settings(const Types::GetSettingsParams& params)
 
     std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-    auto result = rfl::json::read<Types::AppSettings>(json_str);
+    auto result = rfl::json::read<Types::AppSettings, rfl::DefaultIfMissing>(json_str);
     if (!result) {
       return std::unexpected("Failed to parse settings: " + result.error().what());
     }

@@ -6,6 +6,18 @@ import std;
 
 namespace Features::Recording::Types {
 
+// 码率控制模式
+export enum class RateControlMode {
+  CBR,  // 固定码率 - 使用 bitrate
+  VBR   // 质量优先 VBR - 使用 quality (0-100)
+};
+
+// 从字符串转换为 RateControlMode
+export constexpr RateControlMode rate_control_mode_from_string(std::string_view str) {
+  if (str == "vbr") return RateControlMode::VBR;
+  return RateControlMode::CBR;  // 默认
+}
+
 // 编码器模式
 export enum class EncoderMode {
   Auto,  // 自动检测，优先 GPU
@@ -34,13 +46,15 @@ export constexpr VideoCodec video_codec_from_string(std::string_view str) {
 
 // 录制配置
 export struct RecordingConfig {
-  std::filesystem::path output_path;             // 输出文件路径
-  std::uint32_t width = 0;                       // 视频宽度
-  std::uint32_t height = 0;                      // 视频高度
-  std::uint32_t fps = 30;                        // 帧率
-  std::uint32_t bitrate = 80'000'000;            // 比特率 (默认 80Mbps)
-  EncoderMode encoder_mode = EncoderMode::Auto;  // 编码器模式
-  VideoCodec codec = VideoCodec::H264;           // 视频编码格式 (默认 H.264)
+  std::filesystem::path output_path;                    // 输出文件路径
+  std::uint32_t width = 0;                              // 视频宽度
+  std::uint32_t height = 0;                             // 视频高度
+  std::uint32_t fps = 30;                               // 帧率
+  std::uint32_t bitrate = 80'000'000;                   // 比特率 (默认 80Mbps, CBR 模式使用)
+  std::uint32_t quality = 70;                           // 质量值 (0-100, VBR 模式使用)
+  RateControlMode rate_control = RateControlMode::CBR;  // 码率控制模式
+  EncoderMode encoder_mode = EncoderMode::Auto;         // 编码器模式
+  VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
 };
 
 // 录制状态枚举
