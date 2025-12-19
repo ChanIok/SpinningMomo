@@ -1,9 +1,5 @@
 module;
 
-#include <d3d11_4.h>
-#include <mfapi.h>
-#include <wil/com.h>
-#include <windows.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
 module Features.Recording;
@@ -14,6 +10,10 @@ import Features.Recording.Encoder;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import Utils.Logger;
+import <d3d11_4.h>;
+import <mfapi.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 namespace Features::Recording {
 
@@ -44,8 +44,8 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   }
 
   // 获取纹理
-  auto texture = Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(
-      frame.Surface());
+  auto texture =
+      Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(frame.Surface());
   if (!texture) {
     return;
   }
@@ -54,9 +54,8 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   int64_t timestamp = state.frame_index * (10'000'000 / state.config.fps);
 
   // 编码
-  auto result = Features::Recording::Encoder::encode_frame(state.encoder, state.context.get(),
-                                                           texture.get(), timestamp,
-                                                           state.config.fps);
+  auto result = Features::Recording::Encoder::encode_frame(
+      state.encoder, state.context.get(), texture.get(), timestamp, state.config.fps);
   if (!result) {
     Logger().error("Failed to encode frame: {}", result.error());
     // 可以选择停止录制或记录错误
@@ -86,11 +85,11 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   // 确保尺寸有效 (偶数)
   width = (width / 2) * 2;
   height = (height / 2) * 2;
-  
+
   if (width <= 0 || height <= 0) {
-      return std::unexpected("Invalid window size");
+    return std::unexpected("Invalid window size");
   }
-  
+
   // 更新配置中的尺寸
   state.config.width = width;
   state.config.height = height;

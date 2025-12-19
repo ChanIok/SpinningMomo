@@ -1,19 +1,17 @@
 module;
 
-#include <codecvt>
-#include <d3d11.h>
-#include <dxgi.h>
-#include <mfapi.h>
-#include <mferror.h>
 #include <mfidl.h>
 #include <mfreadwrite.h>
-#include <wil/com.h>
-#include <windows.h>
 
 module Features.Recording.Encoder;
 
 import std;
 import Utils.Logger;
+import <d3d11.h>;
+import <mfapi.h>;
+import <mferror.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 namespace Features::Recording::Encoder {
 
@@ -25,7 +23,8 @@ auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uin
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264))) return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_AVG_BITRATE, bitrate))) return nullptr;
-  if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive))) return nullptr;
+  if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive)))
+    return nullptr;
   if (FAILED(MFSetAttributeSize(media_type.get(), MF_MT_FRAME_SIZE, width, height))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_FRAME_RATE, fps, 1))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1))) return nullptr;
@@ -33,33 +32,22 @@ auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uin
 }
 
 // 辅助函数：创建输入媒体类型
-auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps)
-    -> wil::com_ptr<IMFMediaType> {
-  wil::com_ptr<IMFMediaType> media_type;
-  if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
-  if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
- 
-  if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_ARGB32))) return nullptr;
-  if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive))) return nullptr;
-  if (FAILED(MFSetAttributeSize(media_type.get(), MF_MT_FRAME_SIZE, width, height))) return nullptr;
-
-  const INT32 stride = -static_cast<INT32>(width * 4);
-  if (FAILED(media_type->SetUINT32(MF_MT_DEFAULT_STRIDE, static_cast<UINT32>(stride)))) return nullptr;
-
-  if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_FRAME_RATE, fps, 1))) return nullptr;
-  if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1))) return nullptr;
-  return media_type;
-}
-
-// 创建 GPU 编码的输入媒体类型 (ARGB32，但不设置 stride，让 MF 自动处理)
-auto create_gpu_input_media_type(uint32_t width, uint32_t height, uint32_t fps)
+auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool set_stride)
     -> wil::com_ptr<IMFMediaType> {
   wil::com_ptr<IMFMediaType> media_type;
   if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_ARGB32))) return nullptr;
-  if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive))) return nullptr;
+  if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive)))
+    return nullptr;
   if (FAILED(MFSetAttributeSize(media_type.get(), MF_MT_FRAME_SIZE, width, height))) return nullptr;
+
+  if (set_stride) {
+    const INT32 stride = -static_cast<INT32>(width * 4);
+    if (FAILED(media_type->SetUINT32(MF_MT_DEFAULT_STRIDE, static_cast<UINT32>(stride))))
+      return nullptr;
+  }
+
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_FRAME_RATE, fps, 1))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1))) return nullptr;
   return media_type;
@@ -116,7 +104,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 6. 创建 GPU 输入媒体类型
-  auto media_type_in = create_gpu_input_media_type(width, height, fps);
+  auto media_type_in = create_input_media_type(width, height, fps, false);
   if (!media_type_in) {
     return std::unexpected("Failed to create GPU input media type");
   }
@@ -147,6 +135,10 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to begin writing with GPU encoder");
   }
 
+  // 缓存尺寸信息
+  ctx.frame_width = width;
+  ctx.frame_height = height;
+  ctx.buffer_size = width * height * 4;
   ctx.gpu_encoding = true;
   return {};
 }
@@ -186,7 +178,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 创建输入媒体类型
-  auto media_type_in = create_input_media_type(width, height, fps);
+  auto media_type_in = create_input_media_type(width, height, fps, true);
   if (!media_type_in) {
     return std::unexpected("Failed to create input media type");
   }
@@ -200,6 +192,10 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to begin writing");
   }
 
+  // 缓存尺寸信息
+  ctx.frame_width = width;
+  ctx.frame_height = height;
+  ctx.buffer_size = width * height * 4;
   ctx.gpu_encoding = false;
   return {};
 }
@@ -210,14 +206,12 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
     -> std::expected<Features::Recording::State::EncoderContext, std::string> {
   Features::Recording::State::EncoderContext ctx;
 
-  bool try_gpu =
-      (mode == Features::Recording::Types::EncoderMode::Auto ||
-       mode == Features::Recording::Types::EncoderMode::GPU) &&
-      device != nullptr;
+  bool try_gpu = (mode == Features::Recording::Types::EncoderMode::Auto ||
+                  mode == Features::Recording::Types::EncoderMode::GPU) &&
+                 device != nullptr;
 
   if (try_gpu) {
-    auto gpu_result =
-        try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device);
+    auto gpu_result = try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device);
     if (gpu_result) {
       Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps", width, height, fps, bitrate);
       return ctx;
@@ -266,11 +260,8 @@ auto encode_frame_gpu(Features::Recording::State::EncoderContext& encoder,
     return std::unexpected("Failed to create DXGI surface buffer");
   }
 
-  // 获取纹理尺寸并设置 buffer 长度
-  D3D11_TEXTURE2D_DESC desc;
-  encoder.shared_texture->GetDesc(&desc);
-  const DWORD buffer_size = desc.Width * desc.Height * 4;
-  buffer->SetCurrentLength(buffer_size);
+  // 设置 buffer 长度（使用缓存的尺寸）
+  buffer->SetCurrentLength(encoder.buffer_size);
 
   // 3. 创建 Sample
   wil::com_ptr<IMFSample> sample;
@@ -313,54 +304,51 @@ auto encode_frame_cpu(Features::Recording::State::EncoderContext& encoder,
     }
   }
 
-  // 3. 复制纹理数据
+  // 3. 首次使用时创建可复用的 Sample 和 Buffer
+  if (!encoder.reusable_sample) {
+    if (FAILED(MFCreateSample(encoder.reusable_sample.put()))) {
+      return std::unexpected("Failed to create reusable sample");
+    }
+    if (FAILED(MFCreateMemoryBuffer(encoder.buffer_size, encoder.reusable_buffer.put()))) {
+      return std::unexpected("Failed to create reusable buffer");
+    }
+    encoder.reusable_sample->AddBuffer(encoder.reusable_buffer.get());
+  }
+
+  // 4. 复制纹理数据
   context->CopyResource(encoder.staging_texture.get(), frame_texture);
 
-  // 4. 映射 staging texture 读取数据
+  // 5. 映射 staging texture 读取数据
   D3D11_MAPPED_SUBRESOURCE mapped;
   if (FAILED(context->Map(encoder.staging_texture.get(), 0, D3D11_MAP_READ, 0, &mapped))) {
     return std::unexpected("Failed to map staging texture");
   }
 
-  // 5. 创建 MF Sample
-  wil::com_ptr<IMFSample> sample;
-  wil::com_ptr<IMFMediaBuffer> buffer;
+  // 6. 将数据写入复用的 buffer
+  BYTE* dest = nullptr;
+  HRESULT hr = encoder.reusable_buffer->Lock(&dest, nullptr, nullptr);
+  if (SUCCEEDED(hr)) {
+    const BYTE* src = static_cast<const BYTE*>(mapped.pData);
+    const UINT row_pitch = encoder.frame_width * 4;
 
-  const DWORD buffer_size = desc.Width * desc.Height * 4;  // RGBA
-
-  HRESULT hr = E_FAIL;
-
-  // 创建内存 buffer
-  if (SUCCEEDED(MFCreateMemoryBuffer(buffer_size, buffer.put()))) {
-    BYTE* dest = nullptr;
-    if (SUCCEEDED(buffer->Lock(&dest, nullptr, nullptr))) {
-      // 复制数据 (处理 padding)
-      const BYTE* src = static_cast<const BYTE*>(mapped.pData);
-      const UINT row_pitch = desc.Width * 4;
-
-      if (row_pitch == mapped.RowPitch) {
-        // 直接复制
-        std::memcpy(dest, src, buffer_size);
-      } else {
-        // 逐行复制
-        for (UINT y = 0; y < desc.Height; ++y) {
-          std::memcpy(dest + y * row_pitch, src + y * mapped.RowPitch, row_pitch);
-        }
-      }
-
-      buffer->Unlock();
-      buffer->SetCurrentLength(buffer_size);
-
-      // 创建 sample 并添加 buffer
-      if (SUCCEEDED(MFCreateSample(sample.put()))) {
-        sample->AddBuffer(buffer.get());
-        sample->SetSampleTime(timestamp_100ns);
-        sample->SetSampleDuration(10'000'000 / fps);
-
-        // 写入 sample
-        hr = encoder.sink_writer->WriteSample(encoder.video_stream_index, sample.get());
+    if (row_pitch == mapped.RowPitch) {
+      // 直接复制
+      std::memcpy(dest, src, encoder.buffer_size);
+    } else {
+      // 逐行复制
+      for (UINT y = 0; y < encoder.frame_height; ++y) {
+        std::memcpy(dest + y * row_pitch, src + y * mapped.RowPitch, row_pitch);
       }
     }
+
+    encoder.reusable_buffer->Unlock();
+    encoder.reusable_buffer->SetCurrentLength(encoder.buffer_size);
+
+    // 7. 设置时间戳并写入
+    encoder.reusable_sample->SetSampleTime(timestamp_100ns);
+    encoder.reusable_sample->SetSampleDuration(10'000'000 / fps);
+    hr =
+        encoder.sink_writer->WriteSample(encoder.video_stream_index, encoder.reusable_sample.get());
   }
 
   context->Unmap(encoder.staging_texture.get(), 0);
@@ -393,7 +381,14 @@ auto finalize_encoder(Features::Recording::State::EncoderContext& encoder)
     }
     encoder.sink_writer = nullptr;
   }
+
+  // 清理所有资源
   encoder.staging_texture = nullptr;
+  encoder.reusable_sample = nullptr;
+  encoder.reusable_buffer = nullptr;
+  encoder.shared_texture = nullptr;
+  encoder.dxgi_manager = nullptr;
+
   return {};
 }
 

@@ -1,12 +1,11 @@
 module;
 
-#include <windows.h>
-
 export module Features.Recording;
 
 import std;
 import Features.Recording.Types;
 import Features.Recording.State;
+import <windows.h>;
 
 export namespace Features::Recording {
 

@@ -9,6 +9,7 @@ import Features.Recording.Types;
 import Features.Recording.State;
 import Features.Settings.Types;
 import Features.Settings.State;
+import Features.WindowControl;
 import UI.AppWindow.State;
 import Utils.Logger;
 import Utils.Path;
@@ -16,31 +17,6 @@ import Utils.String;
 import <windows.h>;
 
 namespace Features::Recording::UseCase {
-
-// 查找目标窗口（复制自 Screenshot 模块）
-auto find_target_window(const Core::State::AppState& state) -> HWND {
-  const auto& target_title = state.settings->raw.window.target_title;
-  const std::wstring title_w = Utils::String::FromUtf8(target_title);
-
-  HWND hwnd = FindWindowW(nullptr, title_w.c_str());
-  if (!hwnd) {
-    // 尝试模糊匹配 (TODO: 提取公共逻辑)
-    HWND current = GetWindow(GetDesktopWindow(), GW_CHILD);
-    while (current) {
-      if (IsWindowVisible(current)) {
-        wchar_t buf[256];
-        GetWindowTextW(current, buf, 256);
-        std::wstring window_title = buf;
-        if (window_title.find(title_w) != std::wstring::npos) {
-          hwnd = current;
-          break;
-        }
-      }
-      current = GetWindow(current, GW_HWNDNEXT);
-    }
-  }
-  return hwnd;
-}
 
 // 生成输出文件路径
 auto generate_output_path(const Core::State::AppState& state)
@@ -91,7 +67,8 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     // 开始录制
 
     // 1. 查找窗口
-    HWND target = find_target_window(state);
+    std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
+    auto target = Features::WindowControl::find_target_window(window_title);
     if (!target) {
       return std::unexpected("Target window not found");
     }
@@ -113,7 +90,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
         Features::Recording::Types::encoder_mode_from_string(recording_settings.encoder_mode);
 
     // 3. 启动
-    auto result = Features::Recording::start(*state.recording, target, config);
+    auto result = Features::Recording::start(*state.recording, target.value(), config);
     if (!result) {
       return result;
     }
