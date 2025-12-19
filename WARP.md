@@ -103,9 +103,13 @@ src/
 │   └── shutdown/              # Graceful shutdown logic
 │
 ├── ui/                        # Native Win32 UI components
-│   ├── AppWindow/             # Main application window
-│   ├── TrayIcon/              # System tray icon
-│   └── ContextMenu/           # Right-click menu
+│   ├── app_window/            # Main application window (native controls)
+│   ├── webview_window/        # WebView2 host window (browser container)
+│   ├── tray_icon/             # System tray icon
+│   └── context_menu/          # Right-click menu
+│
+├── plugins/                   # Game-specific adapters
+│   └── infinity_nikki/        # Infinity Nikki game integration
 │
 ├── features/                  # Business features (high cohesion)
 │   ├── gallery/               # Photo gallery management
@@ -115,6 +119,7 @@ src/
 │   │   ├── folder/            # Folder management
 │   │   ├── tag/               # Tagging system
 │   │   └── ignore/            # .gitignore-style pattern matching
+│   ├── screenshot/            # Screenshot capture & management
 │   ├── letterbox/             # Window resizing/aspect ratio control
 │   ├── overlay/               # Full-screen overlay rendering (Direct3D 11)
 │   ├── preview/               # Preview window (DirectX capture)
@@ -124,6 +129,8 @@ src/
 │   │   ├── types.ixx          # Recording types
 │   │   ├── encoder.ixx        # Video encoding
 │   │   └── usecase.ixx        # Recording use cases
+│   ├── window_control/        # Window manipulation & control
+│   ├── update/                # Application update system
 │   ├── settings/              # Settings management + menu data
 │   │   ├── settings.ixx       # Public API
 │   │   ├── state.ixx          # Settings state (contains raw + computed states)
@@ -138,8 +145,11 @@ src/
 │   ├── file/                  # File operations
 │   └── graphics/              # Windows Graphics Capture API helpers
 │
-└── vendor/                    # Third-party wrappers
-    └── windows/               # Windows API type aliases
+└── vendor/                    # Third-party wrappers & type aliases
+    ├── windows.ixx            # Windows API type aliases
+    ├── wil.ixx, winhttp.ixx   # Windows Integration Library, WinHTTP
+    ├── std.ixx, xxhash.ixx    # Standard library module, hashing utilities
+    └── version.ixx, build_config.ixx, shellapi.ixx
 
 web/                           # Vue 3 frontend
 ├── src/
@@ -153,10 +163,15 @@ web/                           # Vue 3 frontend
 │   │   │   ├── pages/        # Page components
 │   │   │   ├── components/   # Functional components (appearance, functionality, menus, etc.)
 │   │   │   └── composables/  # Composable functions (theme, operation logic, etc.)
-│   │   └── home/              # Home page
+│   │   ├── home/              # Home page
+│   │   ├── about/             # About page
+│   │   └── playground/        # [Dev] API testing & integration test UI
 │   ├── components/            # Global components (shadcn-vue)
-│   ├── composables/           # Global composables (useTheme, useI18n, useRpc)
-│   ├── core/                  # Core infrastructure (RPC, HTTP, i18n)
+│   ├── composables/           # Global composables (useI18n, useRpc, useToast)
+│   ├── core/                  # Core infrastructure
+│   │   ├── rpc/              # RPC client (transport: HTTP & WebView2)
+│   │   ├── i18n/             # Internationalization
+│   │   └── env/              # Environment configuration
 │   ├── store/                 # Pinia global state
 │   └── router/                # Vue Router configuration
 └── VUE_ARCHITECTURE.md        # Detailed frontend architecture docs
@@ -199,12 +214,15 @@ Events::post(*state.events, WindowResizeEvent{...});
 ```
 
 #### 3. RPC Communication (Backend ↔ Frontend)
-- **Backend**: HTTP server on `localhost:9527` with JSON-RPC endpoints
-- **Frontend**: Calls backend via `core/rpc/core.ts`
-- **Real-time Updates**: Server-Sent Events (SSE) for backend-to-frontend notifications
+The application uses a **transport-agnostic RPC system** that works in both WebView2 (embedded) and browser (standalone) environments:
 
-RPC methods are registered using `Core::RPC::register_method`:
+- **Backend**: HTTP server on `localhost:51206` with JSON-RPC endpoints
+- **Frontend RPC Layer**: `core/rpc/` automatically selects transport based on environment:
+  - **WebView2 mode**: Direct message passing via `window.chrome.webview.postMessage` (bidirectional)
+  - **Browser mode**: HTTP fetch to `/rpc` endpoint + Server-Sent Events (`/sse`) for backend-to-frontend notifications
+- **Environment Detection**: `core/env/` detects runtime environment (`webview` vs `web`) and configures transport accordingly
 
+**Backend RPC Registration:**
 ```cpp
 Core::RPC::register_method<RequestType, ResponseType>(
   app_state,
@@ -214,6 +232,10 @@ Core::RPC::register_method<RequestType, ResponseType>(
   "Method description"
 );
 ```
+
+**WebView2 Integration Points:**
+- **`core/webview/`**: WebView2 control lifecycle, RPC message bridge, and event handling
+- **`ui/webview_window/`**: Native window that hosts the WebView2 control
 
 #### 4. Module System (C++23)
 - **Interface files** (`.ixx`): Export public API using `export module`
@@ -352,7 +374,7 @@ Use `std::string` and `std::wstring`. Convert between them using utilities in `u
 
 ### Modifying the Database Schema
 
-1. **Edit SQL in** `src/migrations/` (numbered files like `001_initial.sql`)
+1. **Edit SQL in** `src/migrations/` (numbered files like `001_initial_schema.sql`)
 2. **Run migration generator**:
    ```powershell
    node scripts/generate-migrations.js
@@ -398,6 +420,9 @@ For web frontend:
 1. Run `npm run dev` in `web/` directory
 2. Frontend dev server will proxy RPC calls to the backend
 
+### Frontend Development Tools
+The `web/src/features/playground/` feature provides an RPC method explorer and integration testing UI. Access it during development to test backend endpoints interactively.
+
 ## Dependencies & Package Management
 
 ### C++ Dependencies (via vcpkg/xmake)
@@ -418,6 +443,9 @@ Managed in `web/package.json`:
 - Build: vite (rolldown-vite fork), vue-tsc
 
 ## Additional Notes
+
+### Game Adapters (Plugins)
+The `src/plugins/` directory contains game-specific integration modules (currently only `infinity_nikki`). These adapters expose game-specific RPC endpoints via `core/rpc/endpoints/plugins/` and provide tailored functionality for individual games.
 
 ### Code Generation
 Two scripts generate code:
