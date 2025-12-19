@@ -57,7 +57,8 @@ auto create_winrt_device(ID3D11Device* d3d_device)
 auto create_capture_session(
     HWND target_window,
     const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
-    int height, FrameCallback frame_callback) -> std::expected<CaptureSession, std::string> {
+    int height, FrameCallback frame_callback, int frame_pool_size)
+    -> std::expected<CaptureSession, std::string> {
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Target window is invalid");
   }
@@ -87,8 +88,8 @@ auto create_capture_session(
   // 创建帧池
   session.frame_pool =
       winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
-          device, winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized, 1,
-          {width, height});
+          device, winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
+          frame_pool_size, {width, height});
 
   if (!session.frame_pool) {
     auto error_msg = "Failed to create frame pool";

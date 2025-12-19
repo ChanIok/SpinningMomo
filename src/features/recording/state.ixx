@@ -56,6 +56,9 @@ struct RecordingState {
   std::chrono::steady_clock::time_point start_time;
   uint64_t frame_index = 0;
 
+  // 最后编码的帧纹理（用于帧重复填充）
+  wil::com_ptr<ID3D11Texture2D> last_encoded_texture;
+
   // 目标窗口信息
   HWND target_window = nullptr;
 

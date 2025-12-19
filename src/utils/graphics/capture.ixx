@@ -36,7 +36,8 @@ export auto create_winrt_device(ID3D11Device* d3d_device)
 export auto create_capture_session(
     HWND target_window,
     const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
-    int height, FrameCallback frame_callback) -> std::expected<CaptureSession, std::string>;
+    int height, FrameCallback frame_callback, int frame_pool_size = 1)
+    -> std::expected<CaptureSession, std::string>;
 
 // 开始捕获
 export auto start_capture(CaptureSession& session) -> std::expected<void, std::string>;
