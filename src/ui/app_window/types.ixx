@@ -14,6 +14,12 @@ import Features.Settings.Menu;
 
 export namespace UI::AppWindow {
 
+// 菜单布局模式
+enum class MenuLayoutMode {
+  AutoHeight,  // 自适应高度：高度由最大列决定
+  Paged        // 翻页模式：固定高度 + 独立列翻页
+};
+
 // 菜单项类别枚举（简化版本）
 enum class MenuItemCategory { AspectRatio, Resolution, Feature };
 
@@ -52,6 +58,12 @@ struct InteractionState {
   bool letterbox_enabled = false;
   bool recording_enabled = false;
   bool close_button_hovered = false;
+
+  // 翻页模式状态（仅 Paged 模式使用）
+  size_t ratio_scroll_offset = 0;
+  size_t resolution_scroll_offset = 0;
+  size_t feature_scroll_offset = 0;
+  int hovered_column = -1;  // -1: 无, 0: 比例列, 1: 分辨率列, 2: 功能列
 };
 
 // 数据状态（拥有或引用外部数据）
@@ -74,10 +86,15 @@ struct LayoutConfig {
   int ratio_column_width = 60;
   int resolution_column_width = 120;
   int settings_column_width = 120;
+  int scroll_indicator_width = 2;  // 滚动条宽度
 
   // 字体大小调整相关常量
   static constexpr float MIN_FONT_SIZE = 8.0f;   // 最小字体大小
   static constexpr float FONT_SIZE_STEP = 0.5f;  // 字体大小调整步长
+
+  // 翻页模式配置
+  MenuLayoutMode layout_mode = MenuLayoutMode::Paged;
+  static constexpr int MAX_VISIBLE_ROWS = 7;  // 翻页模式下每页最大可见行数
 };
 
 // AppWindow专用的Direct2D渲染状态
@@ -102,6 +119,7 @@ struct RenderContext {
   ID2D1SolidColorBrush* text_brush = nullptr;
   ID2D1SolidColorBrush* indicator_brush = nullptr;
   ID2D1SolidColorBrush* hover_brush = nullptr;
+  ID2D1SolidColorBrush* scroll_indicator_brush = nullptr;  // 滚动条画刷
 
   // 文本格式
   IDWriteTextFormat* text_format = nullptr;

@@ -38,6 +38,8 @@ auto update_layout(Core::State::AppState& state) -> void {
       static_cast<int>(layout_settings.base_resolution_column_width * scale);
   layout.settings_column_width =
       static_cast<int>(layout_settings.base_settings_column_width * scale);
+  layout.scroll_indicator_width =
+      static_cast<int>(layout_settings.base_scroll_indicator_width * scale);
 }
 
 auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
@@ -50,8 +52,16 @@ auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
 }
 
 auto calculate_window_height(const Core::State::AppState& state) -> int {
-  const auto counts = count_items_per_column(state.app_window->data.menu_items);
   const auto& render = state.app_window->layout;
+
+  // 翻页模式：返回固定高度
+  if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+    return render.title_height + render.separator_height +
+           render.item_height * UI::AppWindow::LayoutConfig::MAX_VISIBLE_ROWS;
+  }
+
+  // 自适应高度模式：由最大列决定高度
+  const auto counts = count_items_per_column(state.app_window->data.menu_items);
 
   // 计算每列的高度
   const int ratio_height = counts.ratio_count * render.item_height;
@@ -82,6 +92,7 @@ auto calculate_center_position(const SIZE& window_size) -> POINT {
 auto get_item_index_from_point(const Core::State::AppState& state, int x, int y) -> int {
   const auto& render = state.app_window->layout;
   const auto& items = state.app_window->data.menu_items;
+  const auto& ui = state.app_window->ui;
 
   // 检查是否在标题栏或分隔线区域
   if (y < render.title_height + render.separator_height) {
@@ -92,24 +103,41 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
 
   // 确定点击的是哪一列
   UI::AppWindow::MenuItemCategory target_category;
+  size_t scroll_offset = 0;
+
   if (x < bounds.ratio_column_right) {
     target_category = UI::AppWindow::MenuItemCategory::AspectRatio;
+    if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+      scroll_offset = ui.ratio_scroll_offset;
+    }
   } else if (x < bounds.resolution_column_right) {
     target_category = UI::AppWindow::MenuItemCategory::Resolution;
+    if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+      scroll_offset = ui.resolution_scroll_offset;
+    }
   } else {
     // 设置列的特殊处理
     return get_settings_item_index(state, y);
   }
 
   // 处理比例和分辨率列
+  size_t visible_index = 0;
   int item_y = render.title_height + render.separator_height;
+
   for (size_t i = 0; i < items.size(); ++i) {
     const auto& item = items[i];
     if (item.category == target_category) {
+      // 翻页模式下跳过不可见项
+      if (visible_index < scroll_offset) {
+        visible_index++;
+        continue;
+      }
+
       if (y >= item_y && y < item_y + render.item_height) {
         return static_cast<int>(i);
       }
       item_y += render.item_height;
+      visible_index++;
     }
   }
 
@@ -148,17 +176,32 @@ auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds {
 auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
   const auto& render = state.app_window->layout;
   const auto& items = state.app_window->data.menu_items;
+  const auto& ui = state.app_window->ui;
 
+  size_t scroll_offset = 0;
+  if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+    scroll_offset = ui.feature_scroll_offset;
+  }
+
+  size_t visible_index = 0;
   int settings_y = render.title_height + render.separator_height;
+
   for (size_t i = 0; i < items.size(); ++i) {
     const auto& item = items[i];
 
     // 判断是否为功能项
     if (item.category == UI::AppWindow::MenuItemCategory::Feature) {
+      // 翻页模式下跳过不可见项
+      if (visible_index < scroll_offset) {
+        visible_index++;
+        continue;
+      }
+
       if (y >= settings_y && y < settings_y + render.item_height) {
         return static_cast<int>(i);
       }
       settings_y += render.item_height;
+      visible_index++;
     }
   }
   return -1;
@@ -171,4 +214,4 @@ auto get_indicator_width(const UI::AppWindow::MenuItem& item, const Core::State:
              : state.app_window->layout.indicator_width;
 }
 
-}  // namespace UI::AppWindow
+}  // namespace UI::AppWindow::Layout

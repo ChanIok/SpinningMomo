@@ -56,7 +56,9 @@ auto create_all_brushes_simple(Core::State::AppState& state, UI::AppWindow::Rend
          create_brush_from_hex(d2d.render_target, colors.text, &d2d.text_brush) &&
          create_brush_from_hex(d2d.render_target, colors.indicator, &d2d.indicator_brush) &&
          create_brush_from_hex(d2d.render_target, colors.title_bar, &d2d.title_brush) &&
-         create_brush_from_hex(d2d.render_target, colors.hover, &d2d.hover_brush);
+         create_brush_from_hex(d2d.render_target, colors.hover, &d2d.hover_brush) &&
+         create_brush_from_hex(d2d.render_target, colors.scroll_indicator,
+                               &d2d.scroll_indicator_brush);
 }
 
 // 辅助函数：测量文本宽度
@@ -113,6 +115,9 @@ auto update_all_brush_colors(Core::State::AppState& state) -> void {
   }
   if (d2d.hover_brush) {
     d2d.hover_brush->SetColor(hex_with_alpha_to_color_f(colors.hover));
+  }
+  if (d2d.scroll_indicator_brush) {
+    d2d.scroll_indicator_brush->SetColor(hex_with_alpha_to_color_f(colors.scroll_indicator));
   }
 }
 
@@ -276,6 +281,10 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
   if (d2d.hover_brush) {
     d2d.hover_brush->Release();
     d2d.hover_brush = nullptr;
+  }
+  if (d2d.scroll_indicator_brush) {
+    d2d.scroll_indicator_brush->Release();
+    d2d.scroll_indicator_brush = nullptr;
   }
 
   // 释放文本格式

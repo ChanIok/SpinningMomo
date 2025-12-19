@@ -18,6 +18,8 @@ auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& 
 auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;
 auto draw_app_single_item(const Core::State::AppState& state, const UI::AppWindow::MenuItem& item,
                           const D2D1_RECT_F& item_rect, bool is_hovered) -> void;
+auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F& column_rect,
+                           size_t total_items, size_t scroll_offset, bool is_hovered) -> void;
 
 // 分层窗口更新函数
 export auto update_layered_window(const Core::State::AppState& state, HWND hwnd) -> void;

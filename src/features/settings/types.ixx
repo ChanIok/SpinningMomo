@@ -128,6 +128,7 @@ export struct AppSettings {
       int base_ratio_column_width = 60;
       int base_resolution_column_width = 70;
       int base_settings_column_width = 80;
+      int base_scroll_indicator_width = 3;  // 滚动条宽度
     } app_window_layout;
 
     // AppWindow颜色配置
@@ -138,6 +139,7 @@ export struct AppSettings {
       std::string indicator = "#61AFEFFF";
       std::string hover = "#383D4AA6";
       std::string title_bar = "#282C34A6";
+      std::string scroll_indicator = "#b5bac4ee";  // 滚动条颜色
     } app_window_colors;
 
     // AppWindow主题模式

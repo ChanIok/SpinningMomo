@@ -16,6 +16,118 @@ import Features.Settings.Menu;
 
 namespace UI::AppWindow::Painter {
 
+// 列数据结构：包含原始索引和项指针
+struct ColumnItems {
+  std::vector<size_t> indices;                        // 在原数组中的索引（用于 hover 判断）
+  std::vector<const UI::AppWindow::MenuItem*> items;  // 项指针
+};
+
+// 列绘制参数
+struct ColumnDrawParams {
+  float x_left;
+  float x_right;
+  size_t scroll_offset;
+  size_t max_visible;
+  bool is_paged;
+};
+
+// 按类别分组菜单项
+auto group_items_by_column(const std::vector<UI::AppWindow::MenuItem>& items)
+    -> std::tuple<ColumnItems, ColumnItems, ColumnItems> {
+  ColumnItems ratio, resolution, feature;
+
+  for (size_t i = 0; i < items.size(); ++i) {
+    switch (items[i].category) {
+      case UI::AppWindow::MenuItemCategory::AspectRatio:
+        ratio.indices.push_back(i);
+        ratio.items.push_back(&items[i]);
+        break;
+      case UI::AppWindow::MenuItemCategory::Resolution:
+        resolution.indices.push_back(i);
+        resolution.items.push_back(&items[i]);
+        break;
+      case UI::AppWindow::MenuItemCategory::Feature:
+        feature.indices.push_back(i);
+        feature.items.push_back(&items[i]);
+        break;
+    }
+  }
+
+  return {ratio, resolution, feature};
+}
+
+// 绘制单个列
+auto draw_single_column(const Core::State::AppState& state, const D2D1_RECT_F& rect,
+                        const ColumnItems& column, const ColumnDrawParams& params) -> void {
+  const auto& render = state.app_window->layout;
+  float y = rect.top + static_cast<float>(render.title_height + render.separator_height);
+
+  // 确定可见范围
+  const size_t start_index = params.is_paged ? params.scroll_offset : 0;
+  const size_t end_index = params.is_paged
+                               ? std::min(start_index + params.max_visible, column.items.size())
+                               : column.items.size();
+
+  // 绘制可见项
+  for (size_t i = start_index; i < end_index; ++i) {
+    const auto& item = *column.items[i];
+    const size_t original_index = column.indices[i];
+
+    D2D1_RECT_F item_rect = UI::AppWindow::make_d2d_rect(
+        params.x_left, y, params.x_right, y + static_cast<float>(render.item_height));
+
+    const bool is_hovered = (static_cast<int>(original_index) == state.app_window->ui.hover_index);
+    draw_app_single_item(state, item, item_rect, is_hovered);
+
+    y += static_cast<float>(render.item_height);
+  }
+}
+
+// 绘制滚动条指示器
+auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F& column_rect,
+                           size_t total_items, size_t scroll_offset, bool is_hovered,
+                           bool is_last_column) -> void {
+  if (!is_hovered || total_items <= UI::AppWindow::LayoutConfig::MAX_VISIBLE_ROWS) {
+    return;  // 不需要显示滚动条
+  }
+
+  const auto& render = state.app_window->layout;
+  const auto& d2d = state.app_window->d2d_context;
+
+  // 计算轨道高度
+  const float track_height =
+      static_cast<float>(render.item_height * UI::AppWindow::LayoutConfig::MAX_VISIBLE_ROWS);
+  const float track_top =
+      column_rect.top + static_cast<float>(render.title_height + render.separator_height);
+
+  // 分页模式：计算总页数和当前页号
+  const int page_size = static_cast<int>(UI::AppWindow::LayoutConfig::MAX_VISIBLE_ROWS);
+  const int total_pages = (static_cast<int>(total_items) + page_size - 1) / page_size;
+  const int current_page = static_cast<int>(scroll_offset) / page_size;
+
+  // 滑块高度 = 轨道高度 / 总页数
+  const float thumb_height = track_height / static_cast<float>(total_pages);
+
+  // 滑块位置：根据当前页号分布在轨道上
+  const float thumb_top =
+      (total_pages > 1)
+          ? track_top + (track_height - thumb_height) *
+                            (static_cast<float>(current_page) / static_cast<float>(total_pages - 1))
+          : track_top;
+
+  // 滚动条宽度和位置（与分隔线右边界对齐，最后一列除外）
+  const float indicator_width = static_cast<float>(render.scroll_indicator_width);
+  const float indicator_right =
+      is_last_column ? column_rect.right - 1.0f
+                     : column_rect.right + static_cast<float>(render.separator_height);
+  const float indicator_left = indicator_right - indicator_width;
+
+  // 绘制滑块
+  D2D1_RECT_F thumb_rect = UI::AppWindow::make_d2d_rect(indicator_left, thumb_top, indicator_right,
+                                                        thumb_top + thumb_height);
+  d2d.render_target->FillRectangle(thumb_rect, d2d.scroll_indicator_brush);
+}
+
 // 主绘制函数实现
 auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
   auto& d2d = state.app_window->d2d_context;
@@ -182,54 +294,63 @@ auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& 
 // 绘制所有菜单项
 auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& render = state.app_window->layout;
+  const auto& ui = state.app_window->ui;
   const auto& items = state.app_window->data.menu_items;
   const auto bounds = UI::AppWindow::Layout::get_column_bounds(state);
 
-  float y = rect.top + static_cast<float>(render.title_height + render.separator_height);
-  float settings_y = y;
+  // 按类别分组
+  auto [ratio_col, resolution_col, feature_col] = group_items_by_column(items);
 
-  for (size_t i = 0; i < items.size(); ++i) {
-    const auto& item = items[i];
-    D2D1_RECT_F item_rect{};
+  const bool is_paged = (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged);
+  const size_t max_visible = UI::AppWindow::LayoutConfig::MAX_VISIBLE_ROWS;
 
-    // 根据项目类别确定绘制位置
-    switch (item.category) {
-      case UI::AppWindow::MenuItemCategory::AspectRatio:
-        item_rect = UI::AppWindow::make_d2d_rect(rect.left, y,
-                                                 static_cast<float>(bounds.ratio_column_right),
-                                                 y + static_cast<float>(render.item_height));
-        break;
-      case UI::AppWindow::MenuItemCategory::Resolution:
-        item_rect = UI::AppWindow::make_d2d_rect(
-            static_cast<float>(bounds.ratio_column_right + render.separator_height), y,
-            static_cast<float>(bounds.resolution_column_right),
-            y + static_cast<float>(render.item_height));
-        break;
-      case UI::AppWindow::MenuItemCategory::Feature:
-        item_rect = UI::AppWindow::make_d2d_rect(
-            static_cast<float>(bounds.resolution_column_right + render.separator_height),
-            settings_y, rect.right, settings_y + static_cast<float>(render.item_height));
-        settings_y += static_cast<float>(render.item_height);
-        break;
-      default:
-        continue;
-    }
+  // 绘制比例列
+  draw_single_column(state, rect, ratio_col,
+                     {.x_left = rect.left,
+                      .x_right = static_cast<float>(bounds.ratio_column_right),
+                      .scroll_offset = ui.ratio_scroll_offset,
+                      .max_visible = max_visible,
+                      .is_paged = is_paged});
 
-    const bool is_hovered = (static_cast<int>(i) == state.app_window->ui.hover_index);
-    draw_app_single_item(state, item, item_rect, is_hovered);
+  // 绘制分辨率列
+  draw_single_column(
+      state, rect, resolution_col,
+      {.x_left = static_cast<float>(bounds.ratio_column_right + render.separator_height),
+       .x_right = static_cast<float>(bounds.resolution_column_right),
+       .scroll_offset = ui.resolution_scroll_offset,
+       .max_visible = max_visible,
+       .is_paged = is_paged});
 
-    // 只有在同一列中才增加y坐标（复制现有逻辑）
-    if ((i + 1 < items.size()) && (items[i + 1].category == item.category)) {
-      if (item.category != UI::AppWindow::MenuItemCategory::Feature ||
-          item.action_id != "window.reset_transform") {
-        y += static_cast<float>(render.item_height);
-      }
-    } else if (i + 1 < items.size() && items[i + 1].category != item.category) {
-      if (items[i + 1].category != UI::AppWindow::MenuItemCategory::Feature ||
-          items[i + 1].action_id != "window.reset_transform") {
-        y = rect.top + static_cast<float>(render.title_height + render.separator_height);
-      }
-    }
+  // 绘制功能列
+  draw_single_column(
+      state, rect, feature_col,
+      {.x_left = static_cast<float>(bounds.resolution_column_right + render.separator_height),
+       .x_right = rect.right,
+       .scroll_offset = ui.feature_scroll_offset,
+       .max_visible = max_visible,
+       .is_paged = is_paged});
+
+  // 绘制滚动条指示器（仅在翻页模式下）
+  if (is_paged) {
+    // 比例列滚动条
+    D2D1_RECT_F ratio_column_rect = UI::AppWindow::make_d2d_rect(
+        rect.left, rect.top, static_cast<float>(bounds.ratio_column_right), rect.bottom);
+    draw_scroll_indicator(state, ratio_column_rect, ratio_col.items.size(), ui.ratio_scroll_offset,
+                          ui.hovered_column == 0, false);
+
+    // 分辨率列滚动条
+    D2D1_RECT_F resolution_column_rect = UI::AppWindow::make_d2d_rect(
+        static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.top,
+        static_cast<float>(bounds.resolution_column_right), rect.bottom);
+    draw_scroll_indicator(state, resolution_column_rect, resolution_col.items.size(),
+                          ui.resolution_scroll_offset, ui.hovered_column == 1, false);
+
+    // 功能列滚动条
+    D2D1_RECT_F feature_column_rect = UI::AppWindow::make_d2d_rect(
+        static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.top,
+        rect.right, rect.bottom);
+    draw_scroll_indicator(state, feature_column_rect, feature_col.items.size(),
+                          ui.feature_scroll_offset, ui.hovered_column == 2, true);
   }
 }
 

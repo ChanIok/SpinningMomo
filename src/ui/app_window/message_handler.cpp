@@ -27,6 +27,18 @@ import Utils.Logger;
 
 namespace UI::AppWindow::MessageHandler {
 
+// 统计指定列的项目数量
+auto count_column_items(const std::vector<UI::AppWindow::MenuItem>& items,
+                        UI::AppWindow::MenuItemCategory category) -> size_t {
+  size_t count = 0;
+  for (const auto& item : items) {
+    if (item.category == category) {
+      count++;
+    }
+  }
+  return count;
+}
+
 // 确保窗口能接收到WM_MOUSELEAVE消息
 auto ensure_mouse_tracking(HWND hwnd) -> void {
   TRACKMOUSEEVENT tme{};
@@ -108,6 +120,9 @@ auto handle_mouse_leave(Core::State::AppState& state) -> void {
   // 重置关闭按钮悬停状态
   state.app_window->ui.close_button_hovered = false;
 
+  // 重置 hovered_column
+  state.app_window->ui.hovered_column = -1;
+
   UI::AppWindow::request_repaint(state);
 }
 
@@ -128,6 +143,27 @@ auto handle_mouse_move(Core::State::AppState& state, int x, int y) -> void {
     state.app_window->ui.close_button_hovered = close_hovered;
     UI::AppWindow::request_repaint(state);
     ensure_mouse_tracking(state.app_window->window.hwnd);
+  }
+
+  // 更新 hovered_column 状态
+  const auto& render = state.app_window->layout;
+  const auto bounds = UI::AppWindow::Layout::get_column_bounds(state);
+
+  int new_hovered_column = -1;
+  if (y >= render.title_height + render.separator_height) {
+    if (x < bounds.ratio_column_right) {
+      new_hovered_column = 0;  // 比例列
+    } else if (x >= bounds.ratio_column_right + render.separator_height &&
+               x < bounds.resolution_column_right) {
+      new_hovered_column = 1;  // 分辨率列
+    } else if (x >= bounds.resolution_column_right + render.separator_height) {
+      new_hovered_column = 2;  // 功能列
+    }
+  }
+
+  if (new_hovered_column != state.app_window->ui.hovered_column) {
+    state.app_window->ui.hovered_column = new_hovered_column;
+    UI::AppWindow::request_repaint(state);
   }
 }
 
@@ -195,6 +231,63 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_LBUTTONDOWN: {
       handle_left_click(state, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+      return 0;
+    }
+
+    case WM_MOUSEWHEEL: {
+      // 只在翻页模式下处理滚轮
+      if (state.app_window->layout.layout_mode != UI::AppWindow::MenuLayoutMode::Paged) {
+        return 0;
+      }
+
+      // 将屏幕坐标转换为客户端坐标
+      POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+      ScreenToClient(hwnd, &pt);
+
+      // 判断鼠标在哪一列（排除分隔线区域）
+      const auto& render = state.app_window->layout;
+      const auto bounds = UI::AppWindow::Layout::get_column_bounds(state);
+      const auto& items = state.app_window->data.menu_items;
+      auto& ui = state.app_window->ui;
+
+      size_t* target_offset = nullptr;
+      size_t column_item_count = 0;
+
+      if (pt.x < bounds.ratio_column_right) {
+        // 比例列
+        target_offset = &ui.ratio_scroll_offset;
+        column_item_count = count_column_items(items, UI::AppWindow::MenuItemCategory::AspectRatio);
+      } else if (pt.x >= bounds.ratio_column_right + render.separator_height &&
+                 pt.x < bounds.resolution_column_right) {
+        // 分辨率列（排除第一条分隔线）
+        target_offset = &ui.resolution_scroll_offset;
+        column_item_count = count_column_items(items, UI::AppWindow::MenuItemCategory::Resolution);
+      } else if (pt.x >= bounds.resolution_column_right + render.separator_height) {
+        // 功能列（排除第二条分隔线）
+        target_offset = &ui.feature_scroll_offset;
+        column_item_count = count_column_items(items, UI::AppWindow::MenuItemCategory::Feature);
+      } else {
+        // 在分隔线上，不处理
+        return 0;
+      }
+
+      // 计算当前页号
+      const int page_size = static_cast<int>(UI::AppWindow::LayoutConfig::MAX_VISIBLE_ROWS);
+      const int current_page = static_cast<int>(*target_offset) / page_size;
+
+      // 滚轮方向：向上滚-1页，向下滚+1页
+      const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+      const int page_delta = (delta > 0) ? -1 : 1;
+      const int new_page = current_page + page_delta;
+
+      // 计算总页数
+      const int total_pages = (static_cast<int>(column_item_count) + page_size - 1) / page_size;
+
+      // 限制页号范围并计算新的offset（必须是页大小的整数倍）
+      const int clamped_page = std::clamp(new_page, 0, std::max(0, total_pages - 1));
+      *target_offset = static_cast<size_t>(clamped_page * page_size);
+
+      UI::AppWindow::request_repaint(state);
       return 0;
     }
 
