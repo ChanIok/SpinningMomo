@@ -81,7 +81,8 @@ export struct AppSettings {
       std::uint32_t fps = 60;              // 帧率
       std::uint32_t bitrate = 80'000'000;  // 比特率 (bps)，默认 80Mbps，CBR 模式使用
       std::uint32_t quality = 70;          // 质量值 (0-100)，VBR 模式使用
-      std::string rate_control = "cbr";    // 码率控制模式: "cbr" | "vbr"
+      std::uint32_t qp = 23;               // 量化参数 (0-51)，ManualQP 模式使用
+      std::string rate_control = "cbr";    // 码率控制模式: "cbr" | "vbr" | "manual_qp"
       std::string encoder_mode = "auto";   // 编码器模式: "auto" | "gpu" | "cpu"
       std::string codec = "h264";          // 视频编码格式: "h264" | "h265"
     } recording;

@@ -120,7 +120,20 @@ export const useFunctionActions = () => {
     })
   }
 
-  const updateRecordingRateControl = async (rateControl: 'cbr' | 'vbr') => {
+  const updateRecordingQp = async (qp: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          qp,
+        },
+      },
+    })
+  }
+
+  const updateRecordingRateControl = async (rateControl: 'cbr' | 'vbr' | 'manual_qp') => {
     await store.updateSettings({
       ...appSettings.value,
       features: {
@@ -173,6 +186,7 @@ export const useFunctionActions = () => {
           fps: DEFAULT_APP_SETTINGS.features.recording.fps,
           bitrate: DEFAULT_APP_SETTINGS.features.recording.bitrate,
           quality: DEFAULT_APP_SETTINGS.features.recording.quality,
+          qp: DEFAULT_APP_SETTINGS.features.recording.qp,
           rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
           encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
@@ -190,6 +204,7 @@ export const useFunctionActions = () => {
     updateRecordingFps,
     updateRecordingBitrate,
     updateRecordingQuality,
+    updateRecordingQp,
     updateRecordingRateControl,
     updateRecordingEncoderMode,
     updateRecordingCodec,

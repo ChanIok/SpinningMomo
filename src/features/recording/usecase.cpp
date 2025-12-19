@@ -87,6 +87,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     config.fps = recording_settings.fps;
     config.bitrate = recording_settings.bitrate;
     config.quality = recording_settings.quality;
+    config.qp = recording_settings.qp;
     config.rate_control =
         Features::Recording::Types::rate_control_mode_from_string(recording_settings.rate_control);
     config.encoder_mode =

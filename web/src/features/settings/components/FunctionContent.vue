@@ -36,6 +36,7 @@ const {
   updateRecordingFps,
   updateRecordingBitrate,
   updateRecordingQuality,
+  updateRecordingQp,
   updateRecordingRateControl,
   updateRecordingEncoderMode,
   updateRecordingCodec,
@@ -52,6 +53,7 @@ const inputBitrateMbps = ref(
   (appSettings.value?.features?.recording?.bitrate || 80000000) / 1000000
 )
 const inputQuality = ref(appSettings.value?.features?.recording?.quality || 70)
+const inputQp = ref(appSettings.value?.features?.recording?.qp || 23)
 
 const handleTitleChange = async () => {
   const value = inputTitle.value.trim()
@@ -132,10 +134,16 @@ const handleQualityChange = async () => {
   // TODO: toast success
 }
 
+const handleQpChange = async () => {
+  await updateRecordingQp(inputQp.value)
+  // TODO: toast success
+}
+
 const handleResetSettings = async () => {
   await resetFunctionSettings()
   inputBitrateMbps.value = 80 // Reset to default
   inputQuality.value = 70 // Reset to default
+  inputQp.value = 23 // Reset to default
   // TODO: toast success
 }
 </script>
@@ -375,7 +383,9 @@ const handleResetSettings = async () => {
             <ItemActions>
               <Select
                 :model-value="appSettings?.features?.recording?.rateControl"
-                @update:model-value="(value) => updateRecordingRateControl(value as 'cbr' | 'vbr')"
+                @update:model-value="
+                  (value) => updateRecordingRateControl(value as 'cbr' | 'vbr' | 'manual_qp')
+                "
               >
                 <SelectTrigger class="w-48">
                   <SelectValue />
@@ -386,6 +396,9 @@ const handleResetSettings = async () => {
                   }}</SelectItem>
                   <SelectItem value="vbr">{{
                     t('settings.function.recording.rateControl.vbr')
+                  }}</SelectItem>
+                  <SelectItem value="manual_qp">{{
+                    t('settings.function.recording.rateControl.manualQp')
                   }}</SelectItem>
                 </SelectContent>
               </Select>
@@ -437,6 +450,28 @@ const handleResetSettings = async () => {
               <Input v-model.number="inputQuality" type="number" :min="0" :max="100" class="w-24" />
               <span class="text-sm text-muted-foreground">(0-100)</span>
               <Button @click="handleQualityChange" size="sm">
+                {{ t('settings.function.windowControl.windowTitle.update') }}
+              </Button>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.recording?.rateControl === 'manual_qp'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.qp.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.qp.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input v-model.number="inputQp" type="number" :min="0" :max="51" class="w-24" />
+              <span class="text-sm text-muted-foreground">(0-51)</span>
+              <Button @click="handleQpChange" size="sm">
                 {{ t('settings.function.windowControl.windowTitle.update') }}
               </Button>
             </ItemActions>

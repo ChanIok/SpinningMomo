@@ -60,60 +60,13 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
   return media_type;
 }
 
-// 辅助函数：配置码率控制模式
-auto configure_rate_control(IMFSinkWriter* sink_writer, DWORD stream_index,
-                            Features::Recording::Types::RateControlMode rate_control,
-                            uint32_t quality) -> void {
-  wil::com_ptr<ICodecAPI> codec_api;
-  HRESULT hr = sink_writer->GetServiceForStream(stream_index, GUID_NULL, IID_ICodecAPI,
-                                                reinterpret_cast<void**>(codec_api.put()));
-
-  if (FAILED(hr) || !codec_api) {
-    Logger().warn("Failed to get ICodecAPI for rate control configuration");
-    return;
-  }
-
-  VARIANT var;
-  VariantInit(&var);
-  var.vt = VT_UI4;
-
-  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
-    // 设置为质量 VBR 模式
-    var.ulVal = eAVEncCommonRateControlMode_Quality;
-    hr = codec_api->SetValue(&CODECAPI_AVEncCommonRateControlMode, &var);
-    if (SUCCEEDED(hr)) {
-      // 设置质量值 (0-100)
-      var.ulVal = quality;
-      hr = codec_api->SetValue(&CODECAPI_AVEncCommonQuality, &var);
-      if (SUCCEEDED(hr)) {
-        Logger().info("Rate control set to VBR with quality: {}", quality);
-      } else {
-        Logger().warn("Failed to set VBR quality value");
-      }
-    } else {
-      Logger().warn("Failed to set VBR rate control mode");
-    }
-  } else {
-    // 设置为 CBR 模式
-    var.ulVal = eAVEncCommonRateControlMode_CBR;
-    hr = codec_api->SetValue(&CODECAPI_AVEncCommonRateControlMode, &var);
-    if (SUCCEEDED(hr)) {
-      Logger().info("Rate control set to CBR");
-    } else {
-      Logger().warn("Failed to set CBR rate control mode");
-    }
-  }
-
-  VariantClear(&var);
-}
-
 // 尝试创建 GPU 编码器
 auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
                             const std::filesystem::path& output_path, uint32_t width,
                             uint32_t height, uint32_t fps, uint32_t bitrate, ID3D11Device* device,
                             Features::Recording::Types::VideoCodec codec,
                             Features::Recording::Types::RateControlMode rate_control,
-                            uint32_t quality) -> std::expected<void, std::string> {
+                            uint32_t quality, uint32_t qp) -> std::expected<void, std::string> {
   // 1. 创建 DXGI Device Manager
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
     return std::unexpected("Failed to create DXGI Device Manager");
@@ -124,9 +77,25 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to reset DXGI device");
   }
 
-  // 3. 创建 Sink Writer 属性
+  // 3. 确保目录存在
+  std::filesystem::create_directories(output_path.parent_path());
+
+  // 4. 创建 Byte Stream
+  wil::com_ptr<IMFByteStream> byte_stream;
+  if (FAILED(MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE,
+                          output_path.c_str(), byte_stream.put()))) {
+    return std::unexpected("Failed to create byte stream");
+  }
+
+  // 5. 创建 Media Sink
+  wil::com_ptr<IMFMediaSink> media_sink;
+  if (FAILED(MFCreateMPEG4MediaSink(byte_stream.get(), nullptr, nullptr, media_sink.put()))) {
+    return std::unexpected("Failed to create MPEG4 media sink");
+  }
+
+  // 6. 创建 Sink Writer 属性并预设编码器参数
   wil::com_ptr<IMFAttributes> attributes;
-  if (FAILED(MFCreateAttributes(attributes.put(), 3))) {
+  if (FAILED(MFCreateAttributes(attributes.put(), 8))) {
     return std::unexpected("Failed to create MF attributes");
   }
 
@@ -140,16 +109,42 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to set D3D manager");
   }
 
-  // 确保目录存在
-  std::filesystem::create_directories(output_path.parent_path());
+  // 在创建 Sink Writer 前预设 Rate Control Mode
+  UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
 
-  // 4. 创建 Sink Writer
-  if (FAILED(MFCreateSinkWriterFromURL(output_path.c_str(), nullptr, attributes.get(),
-                                       ctx.sink_writer.put()))) {
-    return std::unexpected("Failed to create Sink Writer with GPU support");
+  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
+    rate_control_mode = eAVEncCommonRateControlMode_Quality;
+  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+    rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
   }
 
-  // 5. 创建输出媒体类型
+  if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonRateControlMode, rate_control_mode))) {
+    Logger().warn("Failed to set rate control mode attribute");
+  }
+
+  // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
+  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, quality))) {
+      Logger().warn("Failed to set quality attribute");
+    }
+    Logger().info("GPU encoder configured for VBR mode with quality: {}", quality);
+  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+    // 尝试设置 QP 参数（可能不被所有编码器支持）
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, qp))) {
+      Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
+    }
+    Logger().info("GPU encoder configured for Manual QP mode with QP: {}", qp);
+  } else {
+    Logger().info("GPU encoder configured for CBR mode");
+  }
+
+  // 7. 用预设属性创建 Sink Writer
+  if (FAILED(MFCreateSinkWriterFromMediaSink(media_sink.get(), attributes.get(),
+                                             ctx.sink_writer.put()))) {
+    return std::unexpected("Failed to create Sink Writer from media sink");
+  }
+
+  // 8. 创建输出媒体类型
   auto media_type_out = create_output_media_type(width, height, fps, bitrate, codec);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
@@ -159,7 +154,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to add video stream");
   }
 
-  // 6. 创建 GPU 输入媒体类型
+  // 9. 创建 GPU 输入媒体类型
   auto media_type_in = create_input_media_type(width, height, fps, false);
   if (!media_type_in) {
     return std::unexpected("Failed to create GPU input media type");
@@ -170,7 +165,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to set GPU input media type");
   }
 
-  // 7. 创建共享纹理 (编码器专用)
+  // 10. 创建共享纹理 (编码器专用)
   D3D11_TEXTURE2D_DESC tex_desc = {};
   tex_desc.Width = width;
   tex_desc.Height = height;
@@ -186,10 +181,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to create shared texture for GPU encoding");
   }
 
-  // 8. 配置码率控制模式 (必须在 BeginWriting 之前)
-  configure_rate_control(ctx.sink_writer.get(), ctx.video_stream_index, rate_control, quality);
-
-  // 9. 开始写入
+  // 11. 开始写入
   if (FAILED(ctx.sink_writer->BeginWriting())) {
     return std::unexpected("Failed to begin writing with GPU encoder");
   }
@@ -207,29 +199,71 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
                         const std::filesystem::path& output_path, uint32_t width, uint32_t height,
                         uint32_t fps, uint32_t bitrate,
                         Features::Recording::Types::VideoCodec codec,
-                        Features::Recording::Types::RateControlMode rate_control, uint32_t quality)
-    -> std::expected<void, std::string> {
-  // 创建 Sink Writer 属性
+                        Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
+                        uint32_t qp) -> std::expected<void, std::string> {
+  // 确保目录存在
+  std::filesystem::create_directories(output_path.parent_path());
+
+  // 1. 创建 Byte Stream
+  wil::com_ptr<IMFByteStream> byte_stream;
+  if (FAILED(MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE,
+                          output_path.c_str(), byte_stream.put()))) {
+    return std::unexpected("Failed to create byte stream");
+  }
+
+  // 2. 创建 Media Sink
+  wil::com_ptr<IMFMediaSink> media_sink;
+  if (FAILED(MFCreateMPEG4MediaSink(byte_stream.get(), nullptr, nullptr, media_sink.put()))) {
+    return std::unexpected("Failed to create MPEG4 media sink");
+  }
+
+  // 3. 创建 Sink Writer 属性并预设编码器参数
   wil::com_ptr<IMFAttributes> attributes;
-  if (FAILED(MFCreateAttributes(attributes.put(), 1))) {
+  if (FAILED(MFCreateAttributes(attributes.put(), 8))) {
     return std::unexpected("Failed to create MF attributes");
   }
 
-  // 启用硬件加速 (仅对编码，输入仍然是 CPU 内存)
+  // 启用硬件加速 (仅对编码,输入仍然是 CPU 内存)
   if (FAILED(attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE))) {
     Logger().warn("Failed to enable hardware transforms for encoder");
   }
 
-  // 确保目录存在
-  std::filesystem::create_directories(output_path.parent_path());
+  // 在创建 Sink Writer 前预设 Rate Control Mode
+  UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
 
-  // 创建 Sink Writer
-  if (FAILED(MFCreateSinkWriterFromURL(output_path.c_str(), nullptr, attributes.get(),
-                                       ctx.sink_writer.put()))) {
-    return std::unexpected("Failed to create Sink Writer");
+  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
+    rate_control_mode = eAVEncCommonRateControlMode_Quality;
+  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+    rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
   }
 
-  // 创建输出媒体类型
+  if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonRateControlMode, rate_control_mode))) {
+    Logger().warn("Failed to set rate control mode attribute");
+  }
+
+  // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
+  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, quality))) {
+      Logger().warn("Failed to set quality attribute");
+    }
+    Logger().info("CPU encoder configured for VBR mode with quality: {}", quality);
+  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+    // 尝试设置 QP 参数（可能不被所有编码器支持）
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, qp))) {
+      Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
+    }
+    Logger().info("CPU encoder configured for Manual QP mode with QP: {}", qp);
+  } else {
+    Logger().info("CPU encoder configured for CBR mode");
+  }
+
+  // 4. 用预设属性创建 Sink Writer
+  if (FAILED(MFCreateSinkWriterFromMediaSink(media_sink.get(), attributes.get(),
+                                             ctx.sink_writer.put()))) {
+    return std::unexpected("Failed to create Sink Writer from media sink");
+  }
+
+  // 5. 创建输出媒体类型
   auto media_type_out = create_output_media_type(width, height, fps, bitrate, codec);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
@@ -239,7 +273,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to add video stream");
   }
 
-  // 创建输入媒体类型
+  // 6. 创建输入媒体类型
   auto media_type_in = create_input_media_type(width, height, fps, true);
   if (!media_type_in) {
     return std::unexpected("Failed to create input media type");
@@ -250,9 +284,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to set input media type");
   }
 
-  // 配置码率控制模式 (必须在 BeginWriting 之前)
-  configure_rate_control(ctx.sink_writer.get(), ctx.video_stream_index, rate_control, quality);
-
+  // 7. 开始写入
   if (FAILED(ctx.sink_writer->BeginWriting())) {
     return std::unexpected("Failed to begin writing");
   }
@@ -269,7 +301,8 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
                     uint32_t fps, uint32_t bitrate, ID3D11Device* device,
                     Features::Recording::Types::EncoderMode mode,
                     Features::Recording::Types::VideoCodec codec,
-                    Features::Recording::Types::RateControlMode rate_control, uint32_t quality)
+                    Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
+                    uint32_t qp)
     -> std::expected<Features::Recording::State::EncoderContext, std::string> {
   Features::Recording::State::EncoderContext ctx;
 
@@ -282,7 +315,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
 
   if (try_gpu) {
     auto gpu_result = try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device,
-                                             codec, rate_control, quality);
+                                             codec, rate_control, quality, qp);
     if (gpu_result) {
       Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
                     bitrate, codec_name);
@@ -304,7 +337,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
 
   // CPU 编码
   auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate, codec,
-                                       rate_control, quality);
+                                       rate_control, quality, qp);
   if (!cpu_result) {
     return std::unexpected(cpu_result.error());
   }
