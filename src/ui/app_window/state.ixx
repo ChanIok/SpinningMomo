@@ -4,7 +4,8 @@ export module UI.AppWindow.State;
 
 import std;
 import Features.Settings.Menu;
-import Features.Registry;
+import Core.Commands;
+import Core.Commands.State;
 import UI.AppWindow.Types;
 import Core.State;
 
@@ -29,13 +30,13 @@ auto is_item_selected(const AppWindow::MenuItem& item, const AppWindow::Interact
       return item.index == static_cast<int>(ui_state.current_resolution_index);
     case AppWindow::MenuItemCategory::Feature: {
       // 基于 action_id 判断功能项的选中状态
-      if (item.action_id == "feature.toggle_preview") {
+      if (item.action_id == "preview.toggle") {
         return ui_state.preview_enabled;
-      } else if (item.action_id == "feature.toggle_overlay") {
+      } else if (item.action_id == "overlay.toggle") {
         return ui_state.overlay_enabled;
-      } else if (item.action_id == "feature.toggle_letterbox") {
+      } else if (item.action_id == "letterbox.toggle") {
         return ui_state.letterbox_enabled;
-      } else if (item.action_id == "feature.toggle_recording") {
+      } else if (item.action_id == "recording.toggle") {
         return ui_state.recording_enabled;
       }
       return false;
@@ -58,12 +59,12 @@ auto is_item_selected(const AppWindow::MenuItem& item, const Core::State::AppSta
     case AppWindow::MenuItemCategory::Resolution:
       return item.index == static_cast<int>(app_state.app_window->ui.current_resolution_index);
     case AppWindow::MenuItemCategory::Feature: {
-      // 从注册表查询功能状态
-      if (app_state.feature_registry) {
-        if (auto feature_opt =
-                Features::Registry::get_feature(*app_state.feature_registry, item.action_id)) {
-          if (feature_opt->is_toggle && feature_opt->get_state) {
-            return feature_opt->get_state();
+      // 从注册表查询命令状态
+      if (app_state.commands) {
+        if (auto command_opt =
+                Core::Commands::get_command(app_state.commands->registry, item.action_id)) {
+          if (command_opt->is_toggle && command_opt->get_state) {
+            return command_opt->get_state();
           }
         }
       }

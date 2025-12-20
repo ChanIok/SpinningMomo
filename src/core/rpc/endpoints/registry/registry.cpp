@@ -7,50 +7,51 @@ import Core.State;
 import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
-import Features.Registry;
+import Core.Commands;
+import Core.Commands.State;
 import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Registry {
 
-auto handle_get_all_features(Core::State::AppState& app_state,
-                             const Features::Registry::GetAllFeaturesParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Registry::GetAllFeaturesResult>> {
+auto handle_get_all_commands(Core::State::AppState& app_state,
+                             const Core::Commands::GetAllCommandsParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Core::Commands::GetAllCommandsResult>> {
   try {
-    if (!app_state.feature_registry) {
+    if (!app_state.commands) {
       co_return std::unexpected(
           Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                              .message = "Feature registry not initialized"});
+                              .message = "Command registry not initialized"});
     }
 
-    // 获取所有功能描述符
-    auto all_features = Features::Registry::get_all_features(*app_state.feature_registry);
+    // 获取所有命令描述符
+    auto all_commands = Core::Commands::get_all_commands(app_state.commands->registry);
 
     // 转换为 RPC 传输格式
-    Features::Registry::GetAllFeaturesResult result;
-    result.features.reserve(all_features.size());
+    Core::Commands::GetAllCommandsResult result;
+    result.commands.reserve(all_commands.size());
 
-    for (const auto& feature : all_features) {
-      Features::Registry::FeatureDescriptorData data{
-          .id = feature.id,
-          .i18n_key = feature.i18n_key,
-          .is_toggle = feature.is_toggle,
+    for (const auto& command : all_commands) {
+      Core::Commands::CommandDescriptorData data{
+          .id = command.id,
+          .i18n_key = command.i18n_key,
+          .is_toggle = command.is_toggle,
       };
-      result.features.push_back(std::move(data));
+      result.commands.push_back(std::move(data));
     }
 
     co_return result;
   } catch (const std::exception& e) {
     co_return std::unexpected(
         Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to get features: " + std::string(e.what())});
+                            .message = "Failed to get commands: " + std::string(e.what())});
   }
 }
 
 auto register_all(Core::State::AppState& app_state) -> void {
-  Core::RPC::register_method<Features::Registry::GetAllFeaturesParams,
-                             Features::Registry::GetAllFeaturesResult>(
-      app_state, app_state.rpc->registry, "features.getAll", handle_get_all_features,
-      "Get all available feature descriptors");
+  Core::RPC::register_method<Core::Commands::GetAllCommandsParams,
+                             Core::Commands::GetAllCommandsResult>(
+      app_state, app_state.rpc->registry, "commands.getAll", handle_get_all_commands,
+      "Get all available command descriptors");
 }
 
 }  // namespace Core::RPC::Endpoints::Registry

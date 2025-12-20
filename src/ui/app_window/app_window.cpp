@@ -12,7 +12,8 @@ import std;
 import Features.Settings.Menu;
 import Features.Settings.Types;
 import Features.Settings.State;
-import Features.Registry;
+import Core.Commands;
+import Core.Commands.State;
 import Core.Events;
 import Core.State;
 import Core.I18n.Types;
@@ -208,7 +209,13 @@ auto unregister_hotkey(Core::State::AppState& state) -> void {
 auto get_text_by_i18n_key(const std::string& i18n_key, const Core::I18n::Types::TextData& texts)
     -> std::wstring {
   // 直接映射 i18n_key 到 texts 中的字段
-  if (i18n_key == "menu.screenshot_capture") {
+  if (i18n_key == "menu.app_main") {
+    return Utils::String::FromUtf8(texts.menu.app_main);
+  } else if (i18n_key == "menu.app_exit") {
+    return Utils::String::FromUtf8(texts.menu.app_exit);
+  } else if (i18n_key == "menu.float_toggle") {
+    return Utils::String::FromUtf8(texts.menu.float_toggle);
+  } else if (i18n_key == "menu.screenshot_capture") {
     return Utils::String::FromUtf8(texts.menu.screenshot_capture);
   } else if (i18n_key == "menu.screenshot_open_folder") {
     return Utils::String::FromUtf8(texts.menu.screenshot_open_folder);
@@ -222,10 +229,6 @@ auto get_text_by_i18n_key(const std::string& i18n_key, const Core::I18n::Types::
     return Utils::String::FromUtf8(texts.menu.recording_toggle);
   } else if (i18n_key == "menu.window_reset") {
     return Utils::String::FromUtf8(texts.menu.window_reset);
-  } else if (i18n_key == "menu.app_hide") {
-    return Utils::String::FromUtf8(texts.menu.app_hide);
-  } else if (i18n_key == "menu.app_exit") {
-    return Utils::String::FromUtf8(texts.menu.app_exit);
   }
   // Fallback: 返回 key 本身
   return Utils::String::FromUtf8(i18n_key);
@@ -267,18 +270,18 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
         preset.name, UI::AppWindow::MenuItemCategory::Resolution, static_cast<int>(i));
   }
 
-  // 添加功能项（从注册表获取）
-  if (state.feature_registry) {
+  // 添加功能项（从命令注册表获取）
+  if (state.commands) {
     for (size_t i = 0; i < feature_config.size(); ++i) {
-      const auto& feature_id = feature_config[i];
-      // 从注册表获取功能描述
-      if (auto feature_opt = Features::Registry::get_feature(*state.feature_registry, feature_id)) {
+      const auto& command_id = feature_config[i];
+      // 从注册表获取命令描述
+      if (auto command_opt = Core::Commands::get_command(state.commands->registry, command_id)) {
         // 使用 i18n_key 获取文本
-        std::wstring text = get_text_by_i18n_key(feature_opt->i18n_key, texts);
+        std::wstring text = get_text_by_i18n_key(command_opt->i18n_key, texts);
         state.app_window->data.menu_items.emplace_back(
-            text, UI::AppWindow::MenuItemCategory::Feature, static_cast<int>(i), feature_id);
+            text, UI::AppWindow::MenuItemCategory::Feature, static_cast<int>(i), command_id);
       } else {
-        Logger().warn("Feature not found in registry: {}", feature_id);
+        Logger().warn("Command not found in registry: {}", command_id);
       }
     }
   }

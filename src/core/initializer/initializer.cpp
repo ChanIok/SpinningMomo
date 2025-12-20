@@ -13,7 +13,8 @@ import Core.Initializer.Database;
 import Core.Migration;
 import Features.Gallery;
 import Features.Settings;
-import Features.Registry;
+import Core.Commands;
+import Core.Commands.State;
 import Features.Settings.State;
 import Features.Recording;
 import Features.Update;
@@ -60,10 +61,10 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize updater: " + updater_result.error());
     }
 
-    // 初始化功能注册表
-    Features::Registry::register_builtin_features(state, *state.feature_registry);
-    Logger().info("Feature registry initialized with {} features",
-                  state.feature_registry->descriptors.size());
+    // 初始化命令注册表
+    Core::Commands::register_builtin_commands(state, state.commands->registry);
+    Logger().info("Command registry initialized with {} commands",
+                  state.commands->registry.descriptors.size());
 
     if (auto result = UI::AppWindow::create_window(state); !result) {
       return std::unexpected("Failed to create app window: " + result.error());

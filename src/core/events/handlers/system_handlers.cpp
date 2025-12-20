@@ -46,11 +46,6 @@ auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_d
 // 处理 hide 命令
 auto handle_hide_event(Core::State::AppState& state) -> void { UI::AppWindow::hide_window(state); }
 
-// 处理 webview 命令
-auto handle_webview(Core::State::AppState& state) -> void {
-  UI::WebViewWindow::toggle_visibility(state);
-}
-
 // 处理退出事件
 auto handle_exit_event(Core::State::AppState& state) -> void {
   Logger().info("Exit event received, posting quit message");
@@ -68,10 +63,6 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
   subscribe<UI::AppWindow::Events::HideEvent>(
       *app_state.events,
       [&app_state](const UI::AppWindow::Events::HideEvent&) { handle_hide_event(app_state); });
-
-  subscribe<UI::AppWindow::Events::WebViewEvent>(
-      *app_state.events,
-      [&app_state](const UI::AppWindow::Events::WebViewEvent&) { handle_webview(app_state); });
 
   subscribe<UI::AppWindow::Events::ExitEvent>(
       *app_state.events,

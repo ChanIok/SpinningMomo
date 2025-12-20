@@ -91,6 +91,7 @@ src/
 ├── core/                      # Core infrastructure (technology layer)
 │   ├── state/                 # Central AppState definition
 │   ├── events/                # Event bus (type-safe, template-based)
+│   ├── commands/              # Command registry (unified action dispatcher)
 │   ├── rpc/                   # JSON-RPC bridge for frontend communication
 │   ├── http_server/           # HTTP server (uWebSockets) + SSE support
 │   ├── webview/               # WebView2 integration + drag handling
@@ -186,6 +187,7 @@ All application state is stored in `AppState` (defined in `src/core/state/app_st
 struct AppState {
   std::unique_ptr<RpcState> rpc;
   std::unique_ptr<EventsState> events;
+  std::unique_ptr<CommandRegistry> command_registry;
   std::unique_ptr<WebViewState> webview;
   std::unique_ptr<GalleryState> gallery;
   std::unique_ptr<OverlayState> overlay;
@@ -213,7 +215,28 @@ Events::send(*state.events, WindowResizeEvent{...});
 Events::post(*state.events, WindowResizeEvent{...});
 ```
 
-#### 3. RPC Communication (Backend ↔ Frontend)
+#### 3. Command System (Unified Action Dispatcher)
+The command system (`src/core/commands/`) provides a unified way to invoke actions from different input sources (hotkeys, menus, RPC, etc.):
+
+- **Command Registry**: Central registry mapping command IDs to actions and metadata
+- **Builtin Commands**: Registered in `builtin.cpp` (e.g., `app.main`, `float.toggle`, `screenshot.capture`)
+- **Command Invocation**: All inputs (hotkeys, context menus, RPC) invoke commands through the registry
+
+```cpp
+// Register a command
+Core::Commands::register_command(registry, {
+  .id = "feature.action",
+  .i18n_key = "menu.feature_action",
+  .is_toggle = true,
+  .action = [&state]() { /* implementation */ },
+  .get_state = [&state]() -> bool { return state.feature->enabled; }
+});
+
+// Invoke a command
+Core::Commands::invoke_command(*state.command_registry, "feature.action");
+```
+
+#### 4. RPC Communication (Backend ↔ Frontend)
 The application uses a **transport-agnostic RPC system** that works in both WebView2 (embedded) and browser (standalone) environments:
 
 - **Backend**: HTTP server on `localhost:51206` with JSON-RPC endpoints
@@ -237,7 +260,7 @@ Core::RPC::register_method<RequestType, ResponseType>(
 - **`core/webview/`**: WebView2 control lifecycle, RPC message bridge, and event handling
 - **`ui/webview_window/`**: Native window that hosts the WebView2 control
 
-#### 4. Module System (C++23)
+#### 5. Module System (C++23)
 - **Interface files** (`.ixx`): Export public API using `export module`
 - **Implementation files** (`.cpp`): Import the module and implement functions
 - **Import syntax**: `import ModuleName;` instead of `#include`
@@ -255,7 +278,7 @@ auto Features::Gallery::initialize(AppState& state) -> std::expected<void, std::
 }
 ```
 
-#### 5. Feature Independence
+#### 6. Feature Independence
 Each feature in `src/features/` is self-contained with:
 - Public API (`.ixx` file)
 - Internal implementation (`.cpp` files)
@@ -358,8 +381,9 @@ Use `std::string` and `std::wstring`. Convert between them using utilities in `u
    export auto initialize(Core::State::AppState& state) -> std::expected<void, std::string>;
    ```
 5. **Implement in** `your_feature.cpp`
-6. **Add RPC endpoints** if frontend needs to call this feature
-7. **Register event handlers** if it needs to respond to events
+6. **Register commands** in `src/core/commands/builtin.cpp` if the feature should be invokable via hotkeys/menus/RPC
+7. **Add RPC endpoints** if frontend needs to call this feature
+8. **Register event handlers** if it needs to respond to events
 
 ### Adding an RPC Endpoint
 

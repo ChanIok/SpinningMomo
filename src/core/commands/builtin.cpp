@@ -1,10 +1,10 @@
 module;
 
-module Features.Registry;
+module Core.Commands;
 
 import std;
 import Core.State;
-import Features.Registry;
+import Core.Commands;
 import Features.Settings.State;
 import Features.Screenshot.UseCase;
 import Features.Screenshot.Folder;
@@ -18,18 +18,49 @@ import Features.Overlay.State;
 import Features.Preview.State;
 import Features.WindowControl.UseCase;
 import UI.AppWindow;
+import UI.WebViewWindow;
 import Utils.Logger;
+import Vendor.Windows;
 
-namespace Features::Registry {
+namespace Core::Commands {
 
-// 注册所有内置功能
-auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& registry) -> void {
-  Logger().info("Registering builtin features...");
+// 注册所有内置命令
+auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& registry) -> void {
+  Logger().info("Registering builtin commands...");
 
-  // === Screenshot 分组 ===
+  // === 应用层命令 ===
+
+  // 打开主界面（WebView2 或浏览器）
+  register_command(registry,
+                   {
+                       .id = "app.main",
+                       .i18n_key = "menu.app_main",
+                       .is_toggle = false,
+                       .action = [&state]() { UI::WebViewWindow::toggle_visibility(state); },
+                   });
+
+  // 退出应用
+  register_command(registry, {
+                                 .id = "app.exit",
+                                 .i18n_key = "menu.app_exit",
+                                 .is_toggle = false,
+                                 .action = []() { Vendor::Windows::PostQuitMessage(0); },
+                             });
+
+  // === 悬浮窗控制 ===
+
+  // 切换悬浮窗显示/隐藏
+  register_command(registry, {
+                                 .id = "float.toggle",
+                                 .i18n_key = "menu.float_toggle",
+                                 .is_toggle = false,
+                                 .action = [&state]() { UI::AppWindow::toggle_visibility(state); },
+                             });
+
+  // === 截图功能 ===
 
   // 截图
-  register_feature(registry,
+  register_command(registry,
                    {
                        .id = "screenshot.capture",
                        .i18n_key = "menu.screenshot_capture",
@@ -38,7 +69,7 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
                    });
 
   // 打开截图文件夹
-  register_feature(
+  register_command(
       registry, {
                     .id = "screenshot.open_folder",
                     .i18n_key = "menu.screenshot_open_folder",
@@ -52,11 +83,11 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
                         },
                 });
 
-  // === Feature 分组 ===
+  // === 独立功能 ===
 
-  // 切换预览窗口
-  register_feature(registry, {
-                                 .id = "feature.toggle_preview",
+  // 切换预览窗
+  register_command(registry, {
+                                 .id = "preview.toggle",
                                  .i18n_key = "menu.preview_toggle",
                                  .is_toggle = true,
                                  .action =
@@ -70,8 +101,8 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
                              });
 
   // 切换叠加层
-  register_feature(registry, {
-                                 .id = "feature.toggle_overlay",
+  register_command(registry, {
+                                 .id = "overlay.toggle",
                                  .i18n_key = "menu.overlay_toggle",
                                  .is_toggle = true,
                                  .action =
@@ -85,8 +116,8 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
                              });
 
   // 切换黑边模式
-  register_feature(registry, {
-                                 .id = "feature.toggle_letterbox",
+  register_command(registry, {
+                                 .id = "letterbox.toggle",
                                  .i18n_key = "menu.letterbox_toggle",
                                  .is_toggle = true,
                                  .action =
@@ -101,10 +132,10 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
                              });
 
   // 切换录制
-  register_feature(
+  register_command(
       registry,
       {
-          .id = "feature.toggle_recording",
+          .id = "recording.toggle",
           .i18n_key = "menu.recording_toggle",
           .is_toggle = true,
           .action =
@@ -120,39 +151,19 @@ auto register_builtin_features(Core::State::AppState& state, FeatureRegistry& re
           },
       });
 
-  // === Window 分组 ===
+  // === 窗口操作 ===
 
   // 重置窗口变换
-  register_feature(
+  register_command(
       registry,
       {
-          .id = "window.reset_transform",
+          .id = "window.reset",
           .i18n_key = "menu.window_reset",
           .is_toggle = false,
           .action = [&state]() { Features::WindowControl::UseCase::reset_window_transform(state); },
       });
 
-  // === Panel 分组 ===
-
-  // 隐藏面板
-  register_feature(registry, {
-                                 .id = "panel.hide",
-                                 .i18n_key = "menu.app_hide",
-                                 .is_toggle = false,
-                                 .action = [&state]() { UI::AppWindow::hide_window(state); },
-                             });
-
-  // === App 分组 ===
-
-  // 退出应用
-  register_feature(registry, {
-                                 .id = "app.exit",
-                                 .i18n_key = "menu.app_exit",
-                                 .is_toggle = false,
-                                 .action = []() { ::PostQuitMessage(0); },
-                             });
-
-  Logger().info("Registered {} builtin features", registry.descriptors.size());
+  Logger().info("Registered {} builtin commands", registry.descriptors.size());
 }
 
-}  // namespace Features::Registry
+}  // namespace Core::Commands

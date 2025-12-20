@@ -13,7 +13,7 @@ import Features.WindowControl.UseCase;
 namespace Core::Events::Handlers {
 
 // 注册功能相关的事件处理器
-// 注：大部分功能已迁移至功能注册表（Features.Registry）
+// 注:大部分功能已迁移至命令系统(Core.Commands)
 // 此处仅保留通过热键/系统事件触发的处理器
 auto register_feature_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;

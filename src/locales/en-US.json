@@ -2,11 +2,13 @@
   "version": "1.0",
 
   "menu": {
-    "app_show": "Show",
-    "app_hide": "Hide",
+    "app_main": "Main",
     "app_exit": "Exit",
     "app_user_guide": "User Guide",
-    "app_webview": "Main Interface",
+    
+    "float_toggle": "Toggle Floating Window",
+    "float_show": "Show Floating Window",
+    "float_hide": "Hide Floating Window",
 
     "window_select": "Select Window",
     "window_no_available": "(No Available Windows)",

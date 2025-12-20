@@ -5,7 +5,6 @@ module Features.Settings;
 import std;
 import Core.State;
 import Core.Events;
-import Features.Registry;
 import Features.Settings.Events;
 import Features.Settings.Types;
 import Features.Settings.State;

@@ -16,7 +16,8 @@ import Core.I18n.State;
 import Core.I18n.Types;
 import Core.Events;
 import Features.Settings.Menu;
-import Features.Registry;
+import Core.Commands;
+import Core.Commands.State;
 import UI.AppWindow.Types;
 import UI.AppWindow.State;
 import UI.AppWindow.Events;
@@ -152,9 +153,9 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto action_id = std::any_cast<std::string>(action.data);
 
-        // 通过注册表调用功能
-        if (state.feature_registry) {
-          Features::Registry::invoke_feature(*state.feature_registry, action_id);
+        // 通过注册表调用命令
+        if (state.commands) {
+          Core::Commands::invoke_command(state.commands->registry, action_id);
         }
 
         Logger().info("Feature action triggered: {}", action_id);

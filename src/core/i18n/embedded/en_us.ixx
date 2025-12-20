@@ -12,17 +12,19 @@ export module Core.I18n.Embedded.EnUS;
 import std;
 
 export namespace EmbeddedLocales {
-    // Embedded English JSON content as string_view
-    // Size: 3194 bytes
-    constexpr std::string_view en_us_json = R"EmbeddedJson({
+// Embedded English JSON content as string_view
+// Size: 3268 bytes
+constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
   "menu": {
-    "app_show": "Show",
-    "app_hide": "Hide",
+    "app_main": "Main",
     "app_exit": "Exit",
     "app_user_guide": "User Guide",
-    "app_webview": "Main Interface",
+    
+    "float_toggle": "Toggle Floating Window",
+    "float_show": "Show Floating Window",
+    "float_hide": "Hide Floating Window",
 
     "window_select": "Select Window",
     "window_no_available": "(No Available Windows)",
@@ -83,4 +85,4 @@ export namespace EmbeddedLocales {
   }
 }
 )EmbeddedJson";
-}
+}  // namespace EmbeddedLocales

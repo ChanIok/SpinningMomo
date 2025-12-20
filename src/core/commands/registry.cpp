@@ -1,52 +1,50 @@
 module;
 
-module Features.Registry;
+module Core.Commands;
 
 import std;
 import Utils.Logger;
 
-namespace Features::Registry {
+namespace Core::Commands {
 
-auto create_registry() -> FeatureRegistry { return FeatureRegistry{}; }
-
-auto register_feature(FeatureRegistry& registry, FeatureDescriptor descriptor) -> void {
+auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -> void {
   const std::string id = descriptor.id;
 
   if (registry.descriptors.contains(id)) {
-    Logger().warn("Feature already registered: {}", id);
+    Logger().warn("Command already registered: {}", id);
     return;
   }
 
   registry.descriptors.emplace(id, std::move(descriptor));
   registry.registration_order.push_back(id);
 
-  Logger().debug("Registered feature: {}", id);
+  Logger().debug("Registered command: {}", id);
 }
 
-auto invoke_feature(FeatureRegistry& registry, const std::string& id) -> bool {
+auto invoke_command(CommandRegistry& registry, const std::string& id) -> bool {
   auto it = registry.descriptors.find(id);
   if (it == registry.descriptors.end()) {
-    Logger().warn("Feature not found: {}", id);
+    Logger().warn("Command not found: {}", id);
     return false;
   }
 
   if (!it->second.action) {
-    Logger().warn("Feature has no action: {}", id);
+    Logger().warn("Command has no action: {}", id);
     return false;
   }
 
   try {
     it->second.action();
-    Logger().debug("Invoked feature: {}", id);
+    Logger().debug("Invoked command: {}", id);
     return true;
   } catch (const std::exception& e) {
-    Logger().error("Failed to invoke feature {}: {}", id, e.what());
+    Logger().error("Failed to invoke command {}: {}", id, e.what());
     return false;
   }
 }
 
-auto get_all_features(const FeatureRegistry& registry) -> std::vector<FeatureDescriptor> {
-  std::vector<FeatureDescriptor> result;
+auto get_all_commands(const CommandRegistry& registry) -> std::vector<CommandDescriptor> {
+  std::vector<CommandDescriptor> result;
   result.reserve(registry.registration_order.size());
 
   for (const auto& id : registry.registration_order) {
@@ -59,8 +57,8 @@ auto get_all_features(const FeatureRegistry& registry) -> std::vector<FeatureDes
   return result;
 }
 
-auto get_feature(const FeatureRegistry& registry, const std::string& id)
-    -> std::optional<FeatureDescriptor> {
+auto get_command(const CommandRegistry& registry, const std::string& id)
+    -> std::optional<CommandDescriptor> {
   auto it = registry.descriptors.find(id);
   if (it != registry.descriptors.end()) {
     return it->second;
@@ -68,4 +66,4 @@ auto get_feature(const FeatureRegistry& registry, const std::string& id)
   return std::nullopt;
 }
 
-}  // namespace Features::Registry
+}  // namespace Core::Commands

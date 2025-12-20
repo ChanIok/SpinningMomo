@@ -92,23 +92,23 @@ auto build_tray_menu_items(Core::State::AppState& state)
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
       Utils::String::FromUtf8(texts.menu.screenshot_capture), "screenshot.capture"));
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.menu.preview_toggle), "feature.toggle_preview",
+      Utils::String::FromUtf8(texts.menu.preview_toggle), "preview.toggle",
       state.app_window->ui.preview_enabled));
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.menu.overlay_toggle), "feature.toggle_overlay",
+      Utils::String::FromUtf8(texts.menu.overlay_toggle), "overlay.toggle",
       state.app_window->ui.overlay_enabled));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
-      Utils::String::FromUtf8(texts.menu.app_webview), "app.webview"));
+      Utils::String::FromUtf8(texts.menu.app_main), "app.main"));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      state.app_window->window.is_visible ? Utils::String::FromUtf8(texts.menu.app_hide)
-                                          : Utils::String::FromUtf8(texts.menu.app_show),
-      "panel.hide"));
+      state.app_window->window.is_visible ? Utils::String::FromUtf8(texts.menu.float_hide)
+                                          : Utils::String::FromUtf8(texts.menu.float_show),
+      "float.toggle"));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
       Utils::String::FromUtf8(texts.menu.app_exit), "app.exit"));

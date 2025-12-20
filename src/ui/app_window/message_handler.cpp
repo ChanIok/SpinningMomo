@@ -9,7 +9,8 @@ module UI.AppWindow.MessageHandler;
 
 import std;
 import Features.Settings.Menu;
-import Features.Registry;
+import Core.Commands;
+import Core.Commands.State;
 import Core.Events;
 import Core.State;
 import UI.AppWindow;
@@ -91,24 +92,26 @@ auto dispatch_item_click_event(Core::State::AppState& state, const UI::AppWindow
       break;
     }
     case UI::AppWindow::MenuItemCategory::Feature: {
-      // 通过注册表调用功能
-      if (state.feature_registry) {
-        Features::Registry::invoke_feature(*state.feature_registry, item.action_id);
+      // 通过注册表调用命令
+      if (state.commands) {
+        Core::Commands::invoke_command(state.commands->registry, item.action_id);
       }
       break;
     }
   }
 }
 
-// 处理热键，发送系统命令事件
+// 处理热键，通过命令注册表调用
 auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
-  using namespace UI::AppWindow::Events;
-
-  // 根据热键ID分发不同事件
+  // 根据热键ID调用对应命令
   if (hotkey_id == state.app_window->window.toggle_visibility_hotkey_id) {
-    Core::Events::send(*state.events, ToggleVisibilityEvent{});
+    if (state.commands) {
+      Core::Commands::invoke_command(state.commands->registry, "float.toggle");
+    }
   } else if (hotkey_id == state.app_window->window.screenshot_hotkey_id) {
-    Core::Events::send(*state.events, CaptureEvent{});
+    if (state.commands) {
+      Core::Commands::invoke_command(state.commands->registry, "screenshot.capture");
+    }
   }
 }
 
