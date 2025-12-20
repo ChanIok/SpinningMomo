@@ -113,10 +113,8 @@ export struct AppSettings {
     struct AppMenu {
       // 启用的功能项（有则启用，顺序即菜单显示顺序）
       std::vector<std::string> features = {
-          "screenshot.capture",       "screenshot.open_folder",
-          "feature.toggle_preview",   "feature.toggle_overlay",
-          "feature.toggle_letterbox", "feature.toggle_recording",
-          "window.reset_transform",   "app.exit",
+          "screenshot.capture", "screenshot.open_folder", "preview.toggle", "overlay.toggle",
+          "letterbox.toggle",   "recording.toggle",       "window.reset",   "app.exit",
       };
       // 启用的比例列表（顺序即为菜单显示顺序）
       std::vector<std::string> aspect_ratios = {"21:9", "16:9", "3:2", "1:1", "3:4", "2:3", "9:16"};

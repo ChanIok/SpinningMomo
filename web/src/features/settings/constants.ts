@@ -1,4 +1,3 @@
-
 // 资源目录路径
 export const RESOURCES_DIR = './resources/web/assets'
 
@@ -27,12 +26,12 @@ export const BLUR_RANGE = {
 export const ALL_FEATURES = [
   'screenshot.capture',
   'screenshot.open_folder',
-  'feature.toggle_preview',
-  'feature.toggle_overlay',
-  'feature.toggle_letterbox',
-  'feature.toggle_recording',
-  'window.reset_transform',
-  'panel.hide',
+  'preview.toggle',
+  'overlay.toggle',
+  'letterbox.toggle',
+  'recording.toggle',
+  'window.reset',
+  'float.toggle',
   'app.exit',
 ] as const
 

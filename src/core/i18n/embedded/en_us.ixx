@@ -13,16 +13,16 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3268 bytes
+// Size: 3258 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
   "menu": {
     "app_main": "Main",
+    "app_float": "Floating Window",
     "app_exit": "Exit",
     "app_user_guide": "User Guide",
     
-    "float_toggle": "Toggle Floating Window",
     "float_show": "Show Floating Window",
     "float_hide": "Hide Floating Window",
 

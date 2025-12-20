@@ -3,10 +3,10 @@
 
   "menu": {
     "app_main": "Main",
+    "app_float": "Floating Window",
     "app_exit": "Exit",
     "app_user_guide": "User Guide",
     
-    "float_toggle": "Toggle Floating Window",
     "float_show": "Show Floating Window",
     "float_hide": "Hide Floating Window",
 

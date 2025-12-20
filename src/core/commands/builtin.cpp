@@ -49,10 +49,10 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
 
   // === 悬浮窗控制 ===
 
-  // 切换悬浮窗显示/隐藏
+  // 激活悬浮窗
   register_command(registry, {
-                                 .id = "float.toggle",
-                                 .i18n_key = "menu.float_toggle",
+                                 .id = "app.float",
+                                 .i18n_key = "menu.app_float",
                                  .is_toggle = false,
                                  .action = [&state]() { UI::AppWindow::toggle_visibility(state); },
                              });

@@ -44,15 +44,16 @@ watch(
 // Feature Label Helper
 const getFeatureItemLabel = (id: string): string => {
   const labelMap: Record<string, string> = {
-    'screenshot.capture': t('settings.menu.items.screenshotCapture'),
-    'screenshot.open_folder': t('settings.menu.items.screenshotOpenFolder'),
-    'feature.toggle_preview': t('settings.menu.items.featureTogglePreview'),
-    'feature.toggle_overlay': t('settings.menu.items.featureToggleOverlay'),
-    'feature.toggle_letterbox': t('settings.menu.items.featureToggleLetterbox'),
-    'feature.toggle_recording': t('settings.menu.items.featureToggleRecording'),
-    'window.reset_transform': t('settings.menu.items.windowResetTransform'),
-    'panel.hide': t('settings.menu.items.panelHide'),
-    'app.exit': t('settings.menu.items.appExit'),
+    'screenshot.capture': t('menu.screenshot_capture'),
+    'screenshot.open_folder': t('menu.screenshot_open_folder'),
+    'preview.toggle': t('menu.preview_toggle'),
+    'overlay.toggle': t('menu.overlay_toggle'),
+    'letterbox.toggle': t('menu.letterbox_toggle'),
+    'recording.toggle': t('menu.recording_toggle'),
+    'window.reset': t('menu.window_reset'),
+    'app.float': t('menu.app_float'),
+    'app.main': t('menu.app_main'),
+    'app.exit': t('menu.app_exit'),
   }
   return labelMap[id] || id
 }
