@@ -40,6 +40,8 @@ const {
   updateRecordingRateControl,
   updateRecordingEncoderMode,
   updateRecordingCodec,
+  updateRecordingAudioSource,
+  updateRecordingAudioBitrate,
   resetFunctionSettings,
 } = useFunctionActions()
 const { clearError } = store
@@ -54,6 +56,9 @@ const inputBitrateMbps = ref(
 )
 const inputQuality = ref(appSettings.value?.features?.recording?.quality || 70)
 const inputQp = ref(appSettings.value?.features?.recording?.qp || 23)
+const inputAudioBitrateKbps = ref(
+  (appSettings.value?.features?.recording?.audioBitrate || 320000) / 1000
+)
 
 const handleTitleChange = async () => {
   const value = inputTitle.value.trim()
@@ -139,11 +144,18 @@ const handleQpChange = async () => {
   // TODO: toast success
 }
 
+const handleAudioBitrateChange = async () => {
+  const audioBitrateBps = inputAudioBitrateKbps.value * 1000
+  await updateRecordingAudioBitrate(audioBitrateBps)
+  // TODO: toast success
+}
+
 const handleResetSettings = async () => {
   await resetFunctionSettings()
   inputBitrateMbps.value = 80 // Reset to default
   inputQuality.value = 70 // Reset to default
   inputQp.value = 23 // Reset to default
+  inputAudioBitrateKbps.value = 320 // Reset to default
   // TODO: toast success
 }
 </script>
@@ -533,6 +545,64 @@ const handleResetSettings = async () => {
                   }}</SelectItem>
                 </SelectContent>
               </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.audioSource.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.audioSource.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.recording?.audioSource"
+                @update:model-value="
+                  (value) => updateRecordingAudioSource(value as 'none' | 'system' | 'game_only')
+                "
+              >
+                <SelectTrigger class="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{{
+                    t('settings.function.recording.audioSource.none')
+                  }}</SelectItem>
+                  <SelectItem value="system">{{
+                    t('settings.function.recording.audioSource.system')
+                  }}</SelectItem>
+                  <SelectItem value="game_only">{{
+                    t('settings.function.recording.audioSource.gameOnly')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.audioBitrate.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.audioBitrate.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputAudioBitrateKbps"
+                type="number"
+                :min="64"
+                :max="512"
+                class="w-24"
+              />
+              <span class="text-sm text-muted-foreground">kbps</span>
+              <Button @click="handleAudioBitrateChange" size="sm">
+                {{ t('settings.function.windowControl.windowTitle.update') }}
+              </Button>
             </ItemActions>
           </Item>
         </ItemGroup>

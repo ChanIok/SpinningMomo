@@ -40,6 +40,20 @@ export enum class VideoCodec {
   H265   // H.265/HEVC
 };
 
+// 音频源类型
+export enum class AudioSource {
+  None,     // 不录制音频
+  System,   // 系统全部音频（传统 Loopback）
+  GameOnly  // 仅游戏音频（Process Loopback，需 Windows 10 2004+）
+};
+
+// 从字符串转换为 AudioSource
+export constexpr AudioSource audio_source_from_string(std::string_view str) {
+  if (str == "none") return AudioSource::None;
+  if (str == "game_only") return AudioSource::GameOnly;
+  return AudioSource::System;  // 默认
+}
+
 // 从字符串转换为 VideoCodec
 export constexpr VideoCodec video_codec_from_string(std::string_view str) {
   if (str == "h265" || str == "hevc") return VideoCodec::H265;
@@ -52,12 +66,16 @@ export struct RecordingConfig {
   std::uint32_t width = 0;                              // 视频宽度
   std::uint32_t height = 0;                             // 视频高度
   std::uint32_t fps = 30;                               // 帧率
-  std::uint32_t bitrate = 80'000'000;                   // 比特率 (默认 80Mbps, CBR 模式使用)
+  std::uint32_t bitrate = 80'000'000;                   // 视频比特率 (默认 80Mbps, CBR 模式使用)
   std::uint32_t quality = 70;                           // 质量值 (0-100, VBR 模式使用)
   std::uint32_t qp = 23;                                // 量化参数 (0-51, ManualQP 模式使用)
   RateControlMode rate_control = RateControlMode::CBR;  // 码率控制模式
   EncoderMode encoder_mode = EncoderMode::Auto;         // 编码器模式
   VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
+
+  // 音频配置
+  AudioSource audio_source = AudioSource::System;  // 音频源类型 (默认系统音频)
+  std::uint32_t audio_bitrate = 256'000;           // 音频码率 (默认 256kbps)
 };
 
 // 录制状态枚举

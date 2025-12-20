@@ -159,6 +159,32 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateRecordingAudioSource = async (audioSource: 'none' | 'system' | 'game_only') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          audioSource,
+        },
+      },
+    })
+  }
+
+  const updateRecordingAudioBitrate = async (audioBitrate: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          audioBitrate,
+        },
+      },
+    })
+  }
+
   const resetFunctionSettings = async () => {
     await store.updateSettings({
       ...appSettings.value,
@@ -190,6 +216,8 @@ export const useFunctionActions = () => {
           rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
           encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
+          audioSource: DEFAULT_APP_SETTINGS.features.recording.audioSource,
+          audioBitrate: DEFAULT_APP_SETTINGS.features.recording.audioBitrate,
         },
       },
     })
@@ -208,6 +236,8 @@ export const useFunctionActions = () => {
     updateRecordingRateControl,
     updateRecordingEncoderMode,
     updateRecordingCodec,
+    updateRecordingAudioSource,
+    updateRecordingAudioBitrate,
     resetFunctionSettings,
   }
 }

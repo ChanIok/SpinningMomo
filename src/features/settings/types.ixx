@@ -85,6 +85,10 @@ export struct AppSettings {
       std::string rate_control = "cbr";    // 码率控制模式: "cbr" | "vbr" | "manual_qp"
       std::string encoder_mode = "auto";   // 编码器模式: "auto" | "gpu" | "cpu"
       std::string codec = "h264";          // 视频编码格式: "h264" | "h265"
+
+      // 音频配置
+      std::string audio_source = "system";    // 音频源: "none" | "system" | "game_only"
+      std::uint32_t audio_bitrate = 320'000;  // 音频码率 (bps)，默认 320kbps
     } recording;
   } features;
 

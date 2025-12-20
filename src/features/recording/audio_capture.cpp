@@ -1,5 +1,8 @@
 module;
 
+#include <audioclientactivationparams.h>
+#include <wil/result.h>
+
 module Features.Recording.AudioCapture;
 
 import std;
@@ -11,6 +14,162 @@ import <mfapi.h>;
 import <mmdeviceapi.h>;
 import <wil/com.h>;
 import <windows.h>;
+import <wrl/implements.h>;
+
+namespace {
+
+// 版本检测：是否支持 Process Loopback API (Windows 10 2004+)
+auto is_process_loopback_supported() -> bool {
+  OSVERSIONINFOEXW osvi = {sizeof(osvi)};
+  osvi.dwMajorVersion = 10;
+  osvi.dwMinorVersion = 0;
+  osvi.dwBuildNumber = 19041;  // Windows 10 2004
+
+  DWORDLONG mask = 0;
+  VER_SET_CONDITION(mask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+  VER_SET_CONDITION(mask, VER_MINORVERSION, VER_GREATER_EQUAL);
+  VER_SET_CONDITION(mask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
+
+  return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, mask);
+}
+
+// Process Loopback 激活回调类
+class ProcessLoopbackActivator : public Microsoft::WRL::RuntimeClass<
+                                     Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
+                                     IActivateAudioInterfaceCompletionHandler> {
+ private:
+  wil::com_ptr<IAudioClient> m_audio_client;
+  HRESULT m_activation_result = E_PENDING;
+  wil::unique_event_nothrow m_completion_event;
+
+ public:
+  ProcessLoopbackActivator() { m_completion_event.create(); }
+
+  // IActivateAudioInterfaceCompletionHandler
+  STDMETHOD(ActivateCompleted)(IActivateAudioInterfaceAsyncOperation* operation) {
+    // 获取激活结果
+    wil::com_ptr<IUnknown> audio_interface;
+    HRESULT hr = operation->GetActivateResult(&m_activation_result, &audio_interface);
+
+    if (SUCCEEDED(hr) && SUCCEEDED(m_activation_result)) {
+      // 获取 IAudioClient
+      audio_interface.query_to(&m_audio_client);
+    }
+
+    // 通知主线程
+    m_completion_event.SetEvent();
+    return S_OK;
+  }
+
+  // 等待并获取结果
+  auto wait_and_get_client() -> std::expected<wil::com_ptr<IAudioClient>, std::string> {
+    m_completion_event.wait();
+
+    if (FAILED(m_activation_result)) {
+      return std::unexpected(std::format("Audio activation failed: {:08X}",
+                                         static_cast<uint32_t>(m_activation_result)));
+    }
+
+    if (!m_audio_client) {
+      return std::unexpected("Audio client is null after activation");
+    }
+
+    return m_audio_client;
+  }
+};
+
+// Process Loopback 初始化
+auto initialize_process_loopback(Features::Recording::State::AudioCaptureContext& ctx,
+                                 std::uint32_t process_id) -> std::expected<void, std::string> {
+  HRESULT hr;
+
+  // 1. 构造激活参数
+  AUDIOCLIENT_ACTIVATION_PARAMS activation_params = {};
+  activation_params.ActivationType = AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;
+  activation_params.ProcessLoopbackParams.TargetProcessId = process_id;
+  activation_params.ProcessLoopbackParams.ProcessLoopbackMode =
+      PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE;
+
+  // 2. 包装为 PROPVARIANT
+  PROPVARIANT activate_params = {};
+  activate_params.vt = VT_BLOB;
+  activate_params.blob.cbSize = sizeof(activation_params);
+  activate_params.blob.pBlobData = reinterpret_cast<BYTE*>(&activation_params);
+
+  // 3. 创建回调处理器
+  auto activator = Microsoft::WRL::Make<ProcessLoopbackActivator>();
+  if (!activator) {
+    return std::unexpected("Failed to create activation callback handler");
+  }
+
+  // 4. 异步激活
+  wil::com_ptr<IActivateAudioInterfaceAsyncOperation> async_op;
+  hr = ActivateAudioInterfaceAsync(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, __uuidof(IAudioClient),
+                                   &activate_params, activator.Get(), &async_op);
+
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to activate audio interface async: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  // 5. 等待完成并获取 AudioClient
+  auto client_result = activator->wait_and_get_client();
+  if (!client_result) {
+    return std::unexpected(client_result.error());
+  }
+  ctx.audio_client = *client_result;
+
+  // 6. 硬编码格式 (GetMixFormat 在此模式不可用)
+  // 使用 48000Hz 16-bit Stereo PCM
+  ctx.wave_format = reinterpret_cast<WAVEFORMATEX*>(CoTaskMemAlloc(sizeof(WAVEFORMATEX)));
+  if (!ctx.wave_format) {
+    return std::unexpected("Failed to allocate memory for wave format");
+  }
+
+  ctx.wave_format->wFormatTag = WAVE_FORMAT_PCM;
+  ctx.wave_format->nChannels = 2;
+  ctx.wave_format->nSamplesPerSec = 48000;  // 48kHz
+  ctx.wave_format->wBitsPerSample = 16;
+  ctx.wave_format->nBlockAlign = ctx.wave_format->nChannels * ctx.wave_format->wBitsPerSample / 8;
+  ctx.wave_format->nAvgBytesPerSec = ctx.wave_format->nSamplesPerSec * ctx.wave_format->nBlockAlign;
+  ctx.wave_format->cbSize = 0;
+
+  Logger().info("Process Loopback audio format: {} Hz, {} channels, {} bits",
+                ctx.wave_format->nSamplesPerSec, ctx.wave_format->nChannels,
+                ctx.wave_format->wBitsPerSample);
+
+  // 7. 初始化（带自动格式转换）
+  REFERENCE_TIME buffer_duration = 10'000'000;  // 1 秒缓冲
+  hr = ctx.audio_client->Initialize(
+      AUDCLNT_SHAREMODE_SHARED,
+      AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,  // 自动转换
+      buffer_duration, 0, ctx.wave_format, nullptr);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to initialize audio client: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  // 8. 获取捕获客户端
+  hr = ctx.audio_client->GetService(__uuidof(IAudioCaptureClient),
+                                    reinterpret_cast<void**>(ctx.capture_client.put()));
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to get capture client: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  // 9. 获取缓冲区大小
+  hr = ctx.audio_client->GetBufferSize(&ctx.buffer_frame_count);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to get buffer size: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  Logger().info("Process Loopback audio capture initialized: buffer size = {} frames",
+                ctx.buffer_frame_count);
+  return {};
+}
+
+}  // namespace
 
 namespace Features::Recording::AudioCapture {
 
@@ -124,7 +283,8 @@ auto audio_capture_loop(Features::Recording::State::RecordingState& state) -> vo
   Logger().info("Audio capture thread stopped");
 }
 
-auto initialize(Features::Recording::State::AudioCaptureContext& ctx)
+// System Loopback 初始化（原 initialize 函数）
+auto initialize_system_loopback(Features::Recording::State::AudioCaptureContext& ctx)
     -> std::expected<void, std::string> {
   HRESULT hr;
 
@@ -239,8 +399,39 @@ auto initialize(Features::Recording::State::AudioCaptureContext& ctx)
         std::format("Failed to get buffer size: {:08X}", static_cast<uint32_t>(hr)));
   }
 
-  Logger().info("Audio capture initialized: buffer size = {} frames", ctx.buffer_frame_count);
+  Logger().info("System Loopback audio capture initialized: buffer size = {} frames",
+                ctx.buffer_frame_count);
   return {};
+}
+
+// 公开 API: 初始化音频捕获（根据音频源分派）
+auto initialize(Features::Recording::State::AudioCaptureContext& ctx,
+                Features::Recording::Types::AudioSource source, std::uint32_t process_id)
+    -> std::expected<void, std::string> {
+  using Features::Recording::Types::AudioSource;
+
+  // 不录制音频
+  if (source == AudioSource::None) {
+    Logger().info("Audio capture disabled by configuration");
+    return {};
+  }
+
+  // 如果选择仅游戏音频，先检查系统支持
+  if (source == AudioSource::GameOnly) {
+    if (!is_process_loopback_supported()) {
+      Logger().warn(
+          "Process Loopback API not supported (requires Windows 10 2004+), falling back to "
+          "System Loopback");
+      source = AudioSource::System;
+    } else {
+      Logger().info("Using Process Loopback mode (Game audio only)");
+      return initialize_process_loopback(ctx, process_id);
+    }
+  }
+
+  // 系统全部音频（默认）
+  Logger().info("Using System Loopback mode (All system audio)");
+  return initialize_system_loopback(ctx);
 }
 
 auto start_capture_thread(Features::Recording::State::RecordingState& state) -> void {

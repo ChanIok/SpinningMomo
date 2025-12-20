@@ -61,7 +61,8 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
 }
 
 auto add_audio_stream(Features::Recording::State::EncoderContext& encoder,
-                      WAVEFORMATEX* wave_format) -> std::expected<void, std::string> {
+                      WAVEFORMATEX* wave_format, uint32_t audio_bitrate)
+    -> std::expected<void, std::string> {
   if (!encoder.sink_writer) {
     return std::unexpected("Sink writer not initialized");
   }
@@ -96,8 +97,8 @@ auto add_audio_stream(Features::Recording::State::EncoderContext& encoder,
     return std::unexpected("Failed to set audio bits per sample");
   }
 
-  // 设置 AAC 码率（192 kbps）
-  if (FAILED(audio_out->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 192000 / 8))) {
+  // 设置 AAC 码率（使用配置的码率）
+  if (FAILED(audio_out->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, audio_bitrate / 8))) {
     return std::unexpected("Failed to set audio bitrate");
   }
 
@@ -124,8 +125,8 @@ auto add_audio_stream(Features::Recording::State::EncoderContext& encoder,
   }
 
   encoder.has_audio = true;
-  Logger().info("Audio stream added: {} Hz, {} channels", wave_format->nSamplesPerSec,
-                wave_format->nChannels);
+  Logger().info("Audio stream added: {} Hz, {} channels, {} kbps", wave_format->nSamplesPerSec,
+                wave_format->nChannels, audio_bitrate / 1000);
 
   return {};
 }
@@ -136,8 +137,8 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
                             uint32_t height, uint32_t fps, uint32_t bitrate, ID3D11Device* device,
                             Features::Recording::Types::VideoCodec codec,
                             Features::Recording::Types::RateControlMode rate_control,
-                            uint32_t quality, uint32_t qp, WAVEFORMATEX* wave_format)
-    -> std::expected<void, std::string> {
+                            uint32_t quality, uint32_t qp, WAVEFORMATEX* wave_format,
+                            uint32_t audio_bitrate) -> std::expected<void, std::string> {
   // 1. 创建 DXGI Device Manager
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
     return std::unexpected("Failed to create DXGI Device Manager");
@@ -254,7 +255,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
 
   // 11. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
   if (wave_format) {
-    auto audio_result = add_audio_stream(ctx, wave_format);
+    auto audio_result = add_audio_stream(ctx, wave_format, audio_bitrate);
     if (!audio_result) {
       Logger().warn("Failed to add audio stream to GPU encoder: {}", audio_result.error());
     }
@@ -279,7 +280,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
                         uint32_t fps, uint32_t bitrate,
                         Features::Recording::Types::VideoCodec codec,
                         Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
-                        uint32_t qp, WAVEFORMATEX* wave_format)
+                        uint32_t qp, WAVEFORMATEX* wave_format, uint32_t audio_bitrate)
     -> std::expected<void, std::string> {
   // 确保目录存在
   std::filesystem::create_directories(output_path.parent_path());
@@ -366,7 +367,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
 
   // 7. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
   if (wave_format) {
-    auto audio_result = add_audio_stream(ctx, wave_format);
+    auto audio_result = add_audio_stream(ctx, wave_format, audio_bitrate);
     if (!audio_result) {
       Logger().warn("Failed to add audio stream to CPU encoder: {}", audio_result.error());
     }
@@ -390,7 +391,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
                     Features::Recording::Types::EncoderMode mode,
                     Features::Recording::Types::VideoCodec codec,
                     Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
-                    uint32_t qp, WAVEFORMATEX* wave_format)
+                    uint32_t qp, WAVEFORMATEX* wave_format, uint32_t audio_bitrate)
     -> std::expected<Features::Recording::State::EncoderContext, std::string> {
   Features::Recording::State::EncoderContext ctx;
 
@@ -402,8 +403,9 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
       (codec == Features::Recording::Types::VideoCodec::H265) ? "H.265" : "H.264";
 
   if (try_gpu) {
-    auto gpu_result = try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device,
-                                             codec, rate_control, quality, qp, wave_format);
+    auto gpu_result =
+        try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device, codec,
+                               rate_control, quality, qp, wave_format, audio_bitrate);
     if (gpu_result) {
       Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
                     bitrate, codec_name);
@@ -425,7 +427,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
 
   // CPU 编码
   auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate, codec,
-                                       rate_control, quality, qp, wave_format);
+                                       rate_control, quality, qp, wave_format, audio_bitrate);
   if (!cpu_result) {
     return std::unexpected(cpu_result.error());
   }

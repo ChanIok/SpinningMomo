@@ -4,11 +4,13 @@ export module Features.Recording.AudioCapture;
 
 import std;
 import Features.Recording.State;
+import Features.Recording.Types;
 
 export namespace Features::Recording::AudioCapture {
 
-// 初始化 WASAPI Loopback 音频捕获
-auto initialize(Features::Recording::State::AudioCaptureContext& ctx)
+// 初始化音频捕获（根据音频源类型选择不同的初始化方式）
+auto initialize(Features::Recording::State::AudioCaptureContext& ctx,
+                Features::Recording::Types::AudioSource source, std::uint32_t process_id)
     -> std::expected<void, std::string>;
 
 // 启动音频捕获线程

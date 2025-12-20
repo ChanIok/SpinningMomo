@@ -137,6 +137,8 @@ export interface AppSettings {
       rateControl: 'cbr' | 'vbr' | 'manual_qp' // 码率控制模式
       encoderMode: 'auto' | 'gpu' | 'cpu' // 编码器模式
       codec: 'h264' | 'h265' // 视频编码格式
+      audioSource: 'none' | 'system' | 'game_only' // 音频源
+      audioBitrate: number // 音频码率 (bps)
     }
   }
 
@@ -224,6 +226,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       rateControl: 'cbr',
       encoderMode: 'auto',
       codec: 'h264',
+      audioSource: 'system',
+      audioBitrate: 320000,
     },
   },
 

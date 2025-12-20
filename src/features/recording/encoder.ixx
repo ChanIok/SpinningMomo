@@ -16,7 +16,7 @@ auto create_encoder(const std::filesystem::path& output_path, std::uint32_t widt
                     ID3D11Device* device, Features::Recording::Types::EncoderMode mode,
                     Features::Recording::Types::VideoCodec codec,
                     Features::Recording::Types::RateControlMode rate_control, std::uint32_t quality,
-                    std::uint32_t qp, WAVEFORMATEX* wave_format)
+                    std::uint32_t qp, WAVEFORMATEX* wave_format, std::uint32_t audio_bitrate)
     -> std::expected<Features::Recording::State::EncoderContext, std::string>;
 
 // 编码一帧

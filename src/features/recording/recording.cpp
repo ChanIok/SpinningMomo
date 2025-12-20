@@ -155,7 +155,13 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
 
   // 4. 初始化音频捕获
   WAVEFORMATEX* wave_format = nullptr;
-  auto audio_result = Features::Recording::AudioCapture::initialize(state.audio);
+
+  // 获取目标窗口的进程 ID
+  DWORD process_id = 0;
+  GetWindowThreadProcessId(target_window, &process_id);
+
+  auto audio_result =
+      Features::Recording::AudioCapture::initialize(state.audio, config.audio_source, process_id);
   if (!audio_result) {
     Logger().warn("Audio capture initialization failed: {}, continuing without audio",
                   audio_result.error());
@@ -168,7 +174,7 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   auto encoder_result = Features::Recording::Encoder::create_encoder(
       config.output_path, width, height, config.fps, config.bitrate, state.device.get(),
       config.encoder_mode, config.codec, config.rate_control, config.quality, config.qp,
-      wave_format);
+      wave_format, config.audio_bitrate);
   if (!encoder_result) {
     return std::unexpected("Failed to create encoder: " + encoder_result.error());
   }
