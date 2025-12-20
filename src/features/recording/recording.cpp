@@ -7,6 +7,7 @@ module Features.Recording;
 import std;
 import Features.Recording.State;
 import Features.Recording.Encoder;
+import Features.Recording.AudioCapture;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import Utils.Logger;
@@ -28,9 +29,9 @@ auto initialize(Features::Recording::State::RecordingState& state)
 
 auto on_frame_arrived(Features::Recording::State::RecordingState& state,
                       Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
-  std::lock_guard lock(state.mutex);
-
-  if (state.status != Features::Recording::Types::RecordingStatus::Recording) {
+  // 使用 atomic 读取状态，无需上锁
+  if (state.status.load(std::memory_order_acquire) !=
+      Features::Recording::Types::RecordingStatus::Recording) {
     return;
   }
 
@@ -52,6 +53,9 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   }
 
   // 填充缺失的帧（使用上一帧或当前帧重复）
+  // 使用 resource_mutex 保护帧填充逻辑和 frame_index
+  std::lock_guard resource_lock(state.resource_mutex);
+
   while (state.frame_index <= target_frame_index) {
     int64_t timestamp = state.frame_index * frame_duration_100ns;
 
@@ -61,9 +65,9 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
             ? state.last_encoded_texture.get()
             : texture.get();
 
-    // 编码帧
+    // 编码帧（encode_frame 内部会获取 encoder_write_mutex）
     auto result = Features::Recording::Encoder::encode_frame(
-        state.encoder, state.context.get(), encode_texture, timestamp, state.config.fps);
+        state, state.context.get(), encode_texture, timestamp, state.config.fps);
 
     if (!result) {
       Logger().error("Failed to encode frame {}: {}", state.frame_index, result.error());
@@ -99,9 +103,12 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
 auto start(Features::Recording::State::RecordingState& state, HWND target_window,
            const Features::Recording::Types::RecordingConfig& config)
     -> std::expected<void, std::string> {
-  std::lock_guard lock(state.mutex);
+  // 使用 resource_mutex 保护资源初始化
+  std::lock_guard resource_lock(state.resource_mutex);
 
-  if (state.status != Features::Recording::Types::RecordingStatus::Idle) {
+  // 原子检查状态
+  auto current_status = state.status.load(std::memory_order_acquire);
+  if (current_status != Features::Recording::Types::RecordingStatus::Idle) {
     return std::unexpected("Recording is not idle");
   }
 
@@ -146,16 +153,28 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
     return std::unexpected("Failed to create WinRT device: " + winrt_device_result.error());
   }
 
-  // 4. 创建编码器
+  // 4. 初始化音频捕获
+  WAVEFORMATEX* wave_format = nullptr;
+  auto audio_result = Features::Recording::AudioCapture::initialize(state.audio);
+  if (!audio_result) {
+    Logger().warn("Audio capture initialization failed: {}, continuing without audio",
+                  audio_result.error());
+  } else {
+    wave_format = state.audio.wave_format;
+    Logger().info("Audio capture initialized");
+  }
+
+  // 5. 创建编码器（音频流在内部添加）
   auto encoder_result = Features::Recording::Encoder::create_encoder(
       config.output_path, width, height, config.fps, config.bitrate, state.device.get(),
-      config.encoder_mode, config.codec, config.rate_control, config.quality, config.qp);
+      config.encoder_mode, config.codec, config.rate_control, config.quality, config.qp,
+      wave_format);
   if (!encoder_result) {
     return std::unexpected("Failed to create encoder: " + encoder_result.error());
   }
   state.encoder = std::move(*encoder_result);
 
-  // 5. 创建捕获会话（使用 2 帧缓冲以容忍编码延迟）
+  // 6. 创建捕获会话（使用 2 帧缓冲以容忍编码延迟）
   auto capture_result = Utils::Graphics::Capture::create_capture_session(
       target_window, *winrt_device_result, width, height,
       [&state](auto frame) { on_frame_arrived(state, frame); }, 2);
@@ -165,74 +184,98 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   }
   state.capture_session = std::move(*capture_result);
 
-  // 6. 启动捕获
+  // 7. 启动捕获
   auto start_result = Utils::Graphics::Capture::start_capture(state.capture_session);
   if (!start_result) {
     return std::unexpected("Failed to start capture: " + start_result.error());
   }
 
-  // 7. 更新状态
+  // 8. 更新状态
   state.start_time = std::chrono::steady_clock::now();
   state.frame_index = 0;
-  state.status = Features::Recording::Types::RecordingStatus::Recording;
+
+  // 9. 启动音频捕获线程（如果有音频）
+  if (state.encoder.has_audio) {
+    Features::Recording::AudioCapture::start_capture_thread(state);
+  }
+
+  // 10. 原子设置状态为 Recording（最后设置，确保所有资源就绪）
+  state.status.store(Features::Recording::Types::RecordingStatus::Recording,
+                     std::memory_order_release);
 
   Logger().info("Recording started: {}", config.output_path.string());
   return {};
 }
 
 auto stop(Features::Recording::State::RecordingState& state) -> void {
-  std::lock_guard lock(state.mutex);
-
-  if (state.status != Features::Recording::Types::RecordingStatus::Recording) {
+  // 阶段1: 原子检查并设置状态为 Stopping（无需锁）
+  auto expected = Features::Recording::Types::RecordingStatus::Recording;
+  if (!state.status.compare_exchange_strong(expected,
+                                            Features::Recording::Types::RecordingStatus::Stopping,
+                                            std::memory_order_acq_rel)) {
+    // 不是 Recording 状态，直接返回
     return;
   }
 
-  state.status = Features::Recording::Types::RecordingStatus::Stopping;
+  // 阶段2: 通知并等待线程退出（无需锁，避免死锁）
+  // 1. 停止音频捕获线程
+  if (state.encoder.has_audio) {
+    Features::Recording::AudioCapture::stop(state.audio);
+  }
 
-  // 1. 停止捕捉
+  // 2. 停止视频捕捉
   Utils::Graphics::Capture::stop_capture(state.capture_session);
 
-  // 2. 填充最后的帧（确保录制时长完整）
-  if (state.last_encoded_texture) {
-    auto now = std::chrono::steady_clock::now();
-    auto elapsed = now - state.start_time;
-    auto elapsed_100ns =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
+  // 阶段3: 清理资源（使用 resource_mutex 保护）
+  {
+    std::lock_guard resource_lock(state.resource_mutex);
 
-    int64_t frame_duration_100ns = 10'000'000 / state.config.fps;
-    int64_t final_frame_index = elapsed_100ns / frame_duration_100ns;
+    // 3. 填充最后的视频帧（确保录制时长完整）
+    if (state.last_encoded_texture) {
+      auto now = std::chrono::steady_clock::now();
+      auto elapsed = now - state.start_time;
+      auto elapsed_100ns =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
 
-    // 用最后一帧填充到结束
-    while (state.frame_index <= final_frame_index) {
-      int64_t timestamp = state.frame_index * frame_duration_100ns;
-      auto result = Features::Recording::Encoder::encode_frame(state.encoder, state.context.get(),
-                                                               state.last_encoded_texture.get(),
-                                                               timestamp, state.config.fps);
+      int64_t frame_duration_100ns = 10'000'000 / state.config.fps;
+      int64_t final_frame_index = elapsed_100ns / frame_duration_100ns;
 
-      if (!result) {
-        Logger().error("Failed to encode final frame {}: {}", state.frame_index, result.error());
-        break;
+      // 用最后一帧填充到结束
+      while (state.frame_index <= final_frame_index) {
+        int64_t timestamp = state.frame_index * frame_duration_100ns;
+        auto result = Features::Recording::Encoder::encode_frame(state, state.context.get(),
+                                                                 state.last_encoded_texture.get(),
+                                                                 timestamp, state.config.fps);
+
+        if (!result) {
+          Logger().error("Failed to encode final frame {}: {}", state.frame_index, result.error());
+          break;
+        }
+        state.frame_index++;
       }
-      state.frame_index++;
+
+      Logger().info("Filled {} total frames for recording duration", state.frame_index);
     }
 
-    Logger().info("Filled {} total frames for recording duration", state.frame_index);
+    // 4. 完成编码
+    auto finalize_result = Features::Recording::Encoder::finalize_encoder(state.encoder);
+    if (!finalize_result) {
+      Logger().error("Failed to finalize encoder: {}", finalize_result.error());
+    }
+
+    // 5. 清理资源
+    state.capture_session = {};
+    state.encoder = {};
+    state.last_encoded_texture = nullptr;
+    state.device = nullptr;
+    state.context = nullptr;
+
+    // 6. 清理音频资源
+    Features::Recording::AudioCapture::cleanup(state.audio);
   }
 
-  // 3. 完成编码
-  auto finalize_result = Features::Recording::Encoder::finalize_encoder(state.encoder);
-  if (!finalize_result) {
-    Logger().error("Failed to finalize encoder: {}", finalize_result.error());
-  }
-
-  // 4. 清理资源
-  state.capture_session = {};
-  state.encoder = {};
-  state.last_encoded_texture = nullptr;
-  state.device = nullptr;
-  state.context = nullptr;
-
-  state.status = Features::Recording::Types::RecordingStatus::Idle;
+  // 阶段4: 原子设置最终状态
+  state.status.store(Features::Recording::Types::RecordingStatus::Idle, std::memory_order_release);
   Logger().info("Recording stopped");
 }
 

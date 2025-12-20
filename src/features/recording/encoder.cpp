@@ -60,13 +60,84 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
   return media_type;
 }
 
+auto add_audio_stream(Features::Recording::State::EncoderContext& encoder,
+                      WAVEFORMATEX* wave_format) -> std::expected<void, std::string> {
+  if (!encoder.sink_writer) {
+    return std::unexpected("Sink writer not initialized");
+  }
+
+  if (!wave_format) {
+    return std::unexpected("Invalid wave format");
+  }
+
+  // 1. 创建 AAC 输出媒体类型
+  wil::com_ptr<IMFMediaType> audio_out;
+  if (FAILED(MFCreateMediaType(audio_out.put()))) {
+    return std::unexpected("Failed to create audio output media type");
+  }
+
+  if (FAILED(audio_out->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio))) {
+    return std::unexpected("Failed to set audio major type");
+  }
+
+  if (FAILED(audio_out->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC))) {
+    return std::unexpected("Failed to set AAC subtype");
+  }
+
+  if (FAILED(audio_out->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, wave_format->nSamplesPerSec))) {
+    return std::unexpected("Failed to set audio sample rate");
+  }
+
+  if (FAILED(audio_out->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, wave_format->nChannels))) {
+    return std::unexpected("Failed to set audio channel count");
+  }
+
+  if (FAILED(audio_out->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16))) {
+    return std::unexpected("Failed to set audio bits per sample");
+  }
+
+  // 设置 AAC 码率（192 kbps）
+  if (FAILED(audio_out->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 192000 / 8))) {
+    return std::unexpected("Failed to set audio bitrate");
+  }
+
+  // 添加音频流
+  if (FAILED(encoder.sink_writer->AddStream(audio_out.get(), &encoder.audio_stream_index))) {
+    return std::unexpected("Failed to add audio stream");
+  }
+
+  // 2. 创建 PCM 输入媒体类型（直接使用 WASAPI 返回的 16-bit PCM 格式）
+  wil::com_ptr<IMFMediaType> audio_in;
+  if (FAILED(MFCreateMediaType(audio_in.put()))) {
+    return std::unexpected("Failed to create audio input media type");
+  }
+
+  UINT32 wave_format_size = sizeof(WAVEFORMATEX) + wave_format->cbSize;
+  if (FAILED(MFInitMediaTypeFromWaveFormatEx(audio_in.get(), wave_format, wave_format_size))) {
+    return std::unexpected("Failed to initialize audio input from wave format");
+  }
+
+  // 设置输入媒体类型
+  if (FAILED(encoder.sink_writer->SetInputMediaType(encoder.audio_stream_index, audio_in.get(),
+                                                    nullptr))) {
+    return std::unexpected("Failed to set audio input media type");
+  }
+
+  encoder.has_audio = true;
+  Logger().info("Audio stream added: {} Hz, {} channels", wave_format->nSamplesPerSec,
+                wave_format->nChannels);
+
+  return {};
+}
+
 // 尝试创建 GPU 编码器
 auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
                             const std::filesystem::path& output_path, uint32_t width,
                             uint32_t height, uint32_t fps, uint32_t bitrate, ID3D11Device* device,
                             Features::Recording::Types::VideoCodec codec,
                             Features::Recording::Types::RateControlMode rate_control,
-                            uint32_t quality, uint32_t qp) -> std::expected<void, std::string> {
+                            uint32_t quality, uint32_t qp, WAVEFORMATEX* wave_format)
+    -> std::expected<void, std::string> {
   // 1. 创建 DXGI Device Manager
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
     return std::unexpected("Failed to create DXGI Device Manager");
@@ -181,7 +252,15 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to create shared texture for GPU encoding");
   }
 
-  // 11. 开始写入
+  // 11. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
+  if (wave_format) {
+    auto audio_result = add_audio_stream(ctx, wave_format);
+    if (!audio_result) {
+      Logger().warn("Failed to add audio stream to GPU encoder: {}", audio_result.error());
+    }
+  }
+
+  // 12. 开始写入
   if (FAILED(ctx.sink_writer->BeginWriting())) {
     return std::unexpected("Failed to begin writing with GPU encoder");
   }
@@ -200,7 +279,8 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
                         uint32_t fps, uint32_t bitrate,
                         Features::Recording::Types::VideoCodec codec,
                         Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
-                        uint32_t qp) -> std::expected<void, std::string> {
+                        uint32_t qp, WAVEFORMATEX* wave_format)
+    -> std::expected<void, std::string> {
   // 确保目录存在
   std::filesystem::create_directories(output_path.parent_path());
 
@@ -284,7 +364,15 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
     return std::unexpected("Failed to set input media type");
   }
 
-  // 7. 开始写入
+  // 7. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
+  if (wave_format) {
+    auto audio_result = add_audio_stream(ctx, wave_format);
+    if (!audio_result) {
+      Logger().warn("Failed to add audio stream to CPU encoder: {}", audio_result.error());
+    }
+  }
+
+  // 8. 开始写入
   if (FAILED(ctx.sink_writer->BeginWriting())) {
     return std::unexpected("Failed to begin writing");
   }
@@ -302,7 +390,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
                     Features::Recording::Types::EncoderMode mode,
                     Features::Recording::Types::VideoCodec codec,
                     Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
-                    uint32_t qp)
+                    uint32_t qp, WAVEFORMATEX* wave_format)
     -> std::expected<Features::Recording::State::EncoderContext, std::string> {
   Features::Recording::State::EncoderContext ctx;
 
@@ -315,7 +403,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
 
   if (try_gpu) {
     auto gpu_result = try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device,
-                                             codec, rate_control, quality, qp);
+                                             codec, rate_control, quality, qp, wave_format);
     if (gpu_result) {
       Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
                     bitrate, codec_name);
@@ -337,7 +425,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
 
   // CPU 编码
   auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate, codec,
-                                       rate_control, quality, qp);
+                                       rate_control, quality, qp, wave_format);
   if (!cpu_result) {
     return std::unexpected(cpu_result.error());
   }
@@ -346,6 +434,7 @@ auto create_encoder(const std::filesystem::path& output_path, uint32_t width, ui
                 bitrate, codec_name);
   return ctx;
 }
+// GPU 编码帧（内部函数，不加锁）
 auto encode_frame_gpu(Features::Recording::State::EncoderContext& encoder,
                       ID3D11DeviceContext* context, ID3D11Texture2D* frame_texture,
                       int64_t timestamp_100ns, uint32_t fps) -> std::expected<void, std::string> {
@@ -386,7 +475,7 @@ auto encode_frame_gpu(Features::Recording::State::EncoderContext& encoder,
   return {};
 }
 
-// CPU 编码帧
+// CPU 编码帧（内部函数，不加锁）
 auto encode_frame_cpu(Features::Recording::State::EncoderContext& encoder,
                       ID3D11DeviceContext* context, ID3D11Texture2D* frame_texture,
                       int64_t timestamp_100ns, uint32_t fps) -> std::expected<void, std::string> {
@@ -464,12 +553,17 @@ auto encode_frame_cpu(Features::Recording::State::EncoderContext& encoder,
   return {};
 }
 
-auto encode_frame(Features::Recording::State::EncoderContext& encoder, ID3D11DeviceContext* context,
+auto encode_frame(Features::Recording::State::RecordingState& state, ID3D11DeviceContext* context,
                   ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
     -> std::expected<void, std::string> {
+  auto& encoder = state.encoder;
+
   if (!encoder.sink_writer || !context || !frame_texture) {
     return std::unexpected("Invalid encoder state");
   }
+
+  // 使用 encoder_write_mutex 保护 sink_writer 的写入操作
+  std::lock_guard write_lock(state.encoder_write_mutex);
 
   if (encoder.gpu_encoding) {
     return encode_frame_gpu(encoder, context, frame_texture, timestamp_100ns, fps);

@@ -8,11 +8,26 @@ export module Features.Recording.State;
 import std;
 import Features.Recording.Types;
 import Utils.Graphics.Capture;
+import <audioclient.h>;
 import <d3d11.h>;
+import <mmdeviceapi.h>;
 import <wil/com.h>;
 import <windows.h>;
 
 export namespace Features::Recording::State {
+
+// 音频捕获上下文
+struct AudioCaptureContext {
+  wil::com_ptr<IMMDevice> device;                    // 音频设备
+  wil::com_ptr<IAudioClient> audio_client;           // 音频客户端
+  wil::com_ptr<IAudioCaptureClient> capture_client;  // 捕获客户端
+
+  WAVEFORMATEX* wave_format = nullptr;  // 音频格式
+  UINT32 buffer_frame_count = 0;        // 缓冲区帧数
+
+  std::jthread capture_thread;            // 捕获线程
+  std::atomic<bool> should_stop = false;  // 停止信号
+};
 
 // 编码器上下文
 struct EncoderContext {
@@ -34,13 +49,19 @@ struct EncoderContext {
   UINT reset_token = 0;
   wil::com_ptr<ID3D11Texture2D> shared_texture;  // 编码器专用纹理
   bool gpu_encoding = false;
+
+  // 音频流
+  DWORD audio_stream_index = 0;  // 音频流索引
+  bool has_audio = false;        // 是否有音频流
 };
 
 // 录制完整状态
 struct RecordingState {
   Features::Recording::Types::RecordingConfig config;
-  Features::Recording::Types::RecordingStatus status =
-      Features::Recording::Types::RecordingStatus::Idle;
+
+  // 状态标志 - 使用 atomic 避免锁竞争
+  std::atomic<Features::Recording::Types::RecordingStatus> status{
+      Features::Recording::Types::RecordingStatus::Idle};
 
   // D3D 资源 (Headless)
   wil::com_ptr<ID3D11Device> device;
@@ -62,8 +83,14 @@ struct RecordingState {
   // 目标窗口信息
   HWND target_window = nullptr;
 
-  // 线程同步
-  std::mutex mutex;
+  // 音频捕获
+  AudioCaptureContext audio;
+
+  // 线程同步 - 细粒度锁
+  // encoder_write_mutex: 保护 sink_writer 的写入操作（视频帧回调和音频线程共享）
+  std::mutex encoder_write_mutex;
+  // resource_mutex: 保护资源的初始化、清理和帧填充逻辑（主线程独占）
+  std::mutex resource_mutex;
 };
 
 }  // namespace Features::Recording::State

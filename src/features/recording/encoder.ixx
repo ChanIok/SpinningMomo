@@ -5,6 +5,7 @@ export module Features.Recording.Encoder;
 import std;
 import Features.Recording.State;
 import Features.Recording.Types;
+import <audioclient.h>;
 import <d3d11.h>;
 
 export namespace Features::Recording::Encoder {
@@ -15,11 +16,11 @@ auto create_encoder(const std::filesystem::path& output_path, std::uint32_t widt
                     ID3D11Device* device, Features::Recording::Types::EncoderMode mode,
                     Features::Recording::Types::VideoCodec codec,
                     Features::Recording::Types::RateControlMode rate_control, std::uint32_t quality,
-                    std::uint32_t qp)
+                    std::uint32_t qp, WAVEFORMATEX* wave_format)
     -> std::expected<Features::Recording::State::EncoderContext, std::string>;
 
 // 编码一帧
-auto encode_frame(Features::Recording::State::EncoderContext& encoder, ID3D11DeviceContext* context,
+auto encode_frame(Features::Recording::State::RecordingState& state, ID3D11DeviceContext* context,
                   ID3D11Texture2D* frame_texture, std::int64_t timestamp_100ns, std::uint32_t fps)
     -> std::expected<void, std::string>;
 
