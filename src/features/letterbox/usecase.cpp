@@ -56,8 +56,8 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
         // 回滚 UI状态
         UI::AppWindow::set_letterbox_enabled(state, is_enabled);
         std::string error_message =
-            state.i18n->texts.message.overlay_start_failed + start_result.error();
-        Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+            state.i18n->texts["message.overlay_start_failed"] + start_result.error();
+        Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                    error_message);
       }
     }
@@ -71,8 +71,8 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
           // 回滚 UI状态
           UI::AppWindow::set_letterbox_enabled(state, false);
           std::string error_message =
-              state.i18n->texts.message.overlay_start_failed + result.error();
-          Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+              state.i18n->texts["message.overlay_start_failed"] + result.error();
+          Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                      error_message);
         }
       }
@@ -80,8 +80,9 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
       // 禁用黑边模式
       if (auto result = Features::Letterbox::shutdown(state); !result) {
         Logger().error("Failed to shutdown letterbox: {}", result.error());
-        std::string error_message = state.i18n->texts.message.overlay_start_failed + result.error();
-        Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+        std::string error_message =
+            state.i18n->texts["message.overlay_start_failed"] + result.error();
+        Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                    error_message);
       }
     }

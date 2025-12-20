@@ -58,7 +58,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
       Logger().info("I18n system initialized successfully with default Chinese");
 
       // 直接访问texts字段测试默认中文
-      const auto& app_name = m_app_state->i18n->texts.label.app_name;
+      const auto& app_name = m_app_state->i18n->texts["label.app_name"];
       Logger().info("Default app name (Chinese): {}", app_name);
     }
 

@@ -35,8 +35,8 @@ auto build_window_submenu(Core::State::AppState& state)
     }
   }
   if (items.empty()) {
-    auto disabled_item =
-        UI::ContextMenu::Types::MenuItem(Utils::String::FromUtf8(texts.menu.window_no_available));
+    auto disabled_item = UI::ContextMenu::Types::MenuItem(
+        Utils::String::FromUtf8(texts.at("menu.window_no_available")));
     disabled_item.is_enabled = false;
     items.emplace_back(std::move(disabled_item));
   }
@@ -71,47 +71,47 @@ auto build_tray_menu_items(Core::State::AppState& state)
   const auto& texts = state.i18n->texts;
 
   auto window_menu =
-      UI::ContextMenu::Types::MenuItem(Utils::String::FromUtf8(texts.menu.window_select));
+      UI::ContextMenu::Types::MenuItem(Utils::String::FromUtf8(texts.at("menu.window_select")));
   window_menu.submenu_items = build_window_submenu(state);
   items.emplace_back(std::move(window_menu));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   auto ratio_menu =
-      UI::ContextMenu::Types::MenuItem(Utils::String::FromUtf8(texts.menu.window_ratio));
+      UI::ContextMenu::Types::MenuItem(Utils::String::FromUtf8(texts.at("menu.window_ratio")));
   ratio_menu.submenu_items = build_ratio_submenu(state);
   items.emplace_back(std::move(ratio_menu));
 
   auto resolution_menu =
-      UI::ContextMenu::Types::MenuItem(Utils::String::FromUtf8(texts.menu.window_resolution));
+      UI::ContextMenu::Types::MenuItem(Utils::String::FromUtf8(texts.at("menu.window_resolution")));
   resolution_menu.submenu_items = build_resolution_submenu(state);
   items.emplace_back(std::move(resolution_menu));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.menu.screenshot_capture), "screenshot.capture"));
+      Utils::String::FromUtf8(texts.at("menu.screenshot_capture")), "screenshot.capture"));
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.menu.preview_toggle), "preview.toggle",
+      Utils::String::FromUtf8(texts.at("menu.preview_toggle")), "preview.toggle",
       state.app_window->ui.preview_enabled));
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.menu.overlay_toggle), "overlay.toggle",
+      Utils::String::FromUtf8(texts.at("menu.overlay_toggle")), "overlay.toggle",
       state.app_window->ui.overlay_enabled));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
-      Utils::String::FromUtf8(texts.menu.app_main), "app.main"));
+      Utils::String::FromUtf8(texts.at("menu.app_main")), "app.main"));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      state.app_window->window.is_visible ? Utils::String::FromUtf8(texts.menu.float_hide)
-                                          : Utils::String::FromUtf8(texts.menu.float_show),
+      state.app_window->window.is_visible ? Utils::String::FromUtf8(texts.at("menu.float_hide"))
+                                          : Utils::String::FromUtf8(texts.at("menu.float_show")),
       "float.toggle"));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
-      Utils::String::FromUtf8(texts.menu.app_exit), "app.exit"));
+      Utils::String::FromUtf8(texts.at("menu.app_exit")), "app.exit"));
 
   return items;
 }

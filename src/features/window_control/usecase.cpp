@@ -80,8 +80,8 @@ auto handle_ratio_changed(Core::State::AppState& state,
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_not_found);
+    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               state.i18n->texts["message.window_not_found"]);
     return;
   }
 
@@ -106,8 +106,8 @@ auto handle_ratio_changed(Core::State::AppState& state,
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
     Features::Notifications::show_notification(
-        state, state.i18n->texts.label.app_name,
-        state.i18n->texts.message.window_adjust_failed + ": " + result.error());
+        state, state.i18n->texts["label.app_name"],
+        state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
     return;
   }
 
@@ -133,8 +133,8 @@ auto handle_resolution_changed(Core::State::AppState& state,
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_not_found);
+    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               state.i18n->texts["message.window_not_found"]);
     return;
   }
 
@@ -160,8 +160,8 @@ auto handle_resolution_changed(Core::State::AppState& state,
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
     Features::Notifications::show_notification(
-        state, state.i18n->texts.label.app_name,
-        state.i18n->texts.message.window_adjust_failed + ": " + result.error());
+        state, state.i18n->texts["label.app_name"],
+        state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
     return;
   }
 
@@ -200,16 +200,16 @@ auto handle_window_selected(Core::State::AppState& state,
 
   auto target_window = Features::WindowControl::find_target_window(event.window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_not_found);
+    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               state.i18n->texts["message.window_not_found"]);
     return;
   }
   post_transform_actions(state, target_window.value());
 
   // 发送通知给用户
   Features::Notifications::show_notification(
-      state, state.i18n->texts.label.app_name,
-      std::format("{}: {}", state.i18n->texts.message.window_selected,
+      state, state.i18n->texts["label.app_name"],
+      std::format("{}: {}", state.i18n->texts["message.window_selected"],
                   Utils::String::ToUtf8(event.window_title)));
 }
 

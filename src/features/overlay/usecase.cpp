@@ -42,15 +42,16 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
         // 回滚 UI状态
         UI::AppWindow::set_overlay_enabled(state, false);
         // 使用新的消息定义并附加错误详情
-        std::string error_message = state.i18n->texts.message.overlay_start_failed + result.error();
-        Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
+        std::string error_message =
+            state.i18n->texts["message.overlay_start_failed"] + result.error();
+        Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                    error_message);
       }
     } else {
       Logger().warn("No target window found for overlay");
       UI::AppWindow::set_overlay_enabled(state, false);
-      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                                 state.i18n->texts.message.window_not_found);
+      Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                                 state.i18n->texts["message.window_not_found"]);
     }
   } else {
     // 停止叠加层

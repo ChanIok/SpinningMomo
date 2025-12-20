@@ -21,8 +21,8 @@ auto capture(Core::State::AppState& state) -> void {
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                               state.i18n->texts.message.window_not_found);
+    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               state.i18n->texts["message.window_not_found"]);
     return;
   }
 
@@ -32,12 +32,12 @@ auto capture(Core::State::AppState& state) -> void {
       // 转换路径为字符串用于通知
       std::string path_str(path.begin(), path.end());
       Features::Notifications::show_notification(
-          state, state.i18n->texts.label.app_name,
-          state.i18n->texts.message.screenshot_success + path_str);
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.screenshot_success"] + path_str);
       Logger().debug("Screenshot saved successfully: {}", path_str);
     } else {
-      Features::Notifications::show_notification(state, state.i18n->texts.label.app_name,
-                                                 state.i18n->texts.message.window_adjust_failed);
+      Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                                 state.i18n->texts["message.window_adjust_failed"]);
       Logger().error("Screenshot capture failed");
     }
   };
@@ -46,8 +46,8 @@ auto capture(Core::State::AppState& state) -> void {
   auto result = Features::Screenshot::take_screenshot(state, *target_window, completion_callback);
   if (!result) {
     Features::Notifications::show_notification(
-        state, state.i18n->texts.label.app_name,
-        state.i18n->texts.message.window_adjust_failed + ": " + result.error());
+        state, state.i18n->texts["label.app_name"],
+        state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
     Logger().error("Failed to start screenshot: {}", result.error());
   } else {
     Logger().debug("Screenshot capture started successfully");

@@ -205,30 +205,12 @@ auto unregister_hotkey(Core::State::AppState& state) -> void {
 
 // 内部辅助函数实现
 
-// 根据 i18n_key 获取本地化文本
+// 根据 i18n_key 获取本地化文本（扁平化版本）
 auto get_text_by_i18n_key(const std::string& i18n_key, const Core::I18n::Types::TextData& texts)
     -> std::wstring {
-  // 直接映射 i18n_key 到 texts 中的字段
-  if (i18n_key == "menu.app_main") {
-    return Utils::String::FromUtf8(texts.menu.app_main);
-  } else if (i18n_key == "menu.app_exit") {
-    return Utils::String::FromUtf8(texts.menu.app_exit);
-  } else if (i18n_key == "menu.float_toggle") {
-    return Utils::String::FromUtf8(texts.menu.float_toggle);
-  } else if (i18n_key == "menu.screenshot_capture") {
-    return Utils::String::FromUtf8(texts.menu.screenshot_capture);
-  } else if (i18n_key == "menu.screenshot_open_folder") {
-    return Utils::String::FromUtf8(texts.menu.screenshot_open_folder);
-  } else if (i18n_key == "menu.preview_toggle") {
-    return Utils::String::FromUtf8(texts.menu.preview_toggle);
-  } else if (i18n_key == "menu.overlay_toggle") {
-    return Utils::String::FromUtf8(texts.menu.overlay_toggle);
-  } else if (i18n_key == "menu.letterbox_toggle") {
-    return Utils::String::FromUtf8(texts.menu.letterbox_toggle);
-  } else if (i18n_key == "menu.recording_toggle") {
-    return Utils::String::FromUtf8(texts.menu.recording_toggle);
-  } else if (i18n_key == "menu.window_reset") {
-    return Utils::String::FromUtf8(texts.menu.window_reset);
+  auto it = texts.find(i18n_key);
+  if (it != texts.end()) {
+    return Utils::String::FromUtf8(it->second);
   }
   // Fallback: 返回 key 本身
   return Utils::String::FromUtf8(i18n_key);
