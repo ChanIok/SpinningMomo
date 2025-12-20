@@ -59,6 +59,7 @@ const inputQp = ref(appSettings.value?.features?.recording?.qp || 23)
 const inputAudioBitrateKbps = ref(
   (appSettings.value?.features?.recording?.audioBitrate || 320000) / 1000
 )
+const inputFps = ref(appSettings.value?.features?.recording?.fps || 60)
 
 const handleTitleChange = async () => {
   const value = inputTitle.value.trim()
@@ -72,12 +73,6 @@ const handleTitleChange = async () => {
   } catch (error) {
     console.error('Failed to update window title:', error)
     // TODO: toast error
-  }
-}
-
-const handleKeyDown = (e: KeyboardEvent) => {
-  if (e.key === 'Enter') {
-    handleTitleChange()
   }
 }
 
@@ -150,6 +145,12 @@ const handleAudioBitrateChange = async () => {
   // TODO: toast success
 }
 
+const handleFpsChange = async () => {
+  if (!inputFps.value) return
+  await updateRecordingFps(inputFps.value)
+  // TODO: toast success
+}
+
 const handleResetSettings = async () => {
   await resetFunctionSettings()
   inputBitrateMbps.value = 80 // Reset to default
@@ -219,13 +220,11 @@ const handleResetSettings = async () => {
             <ItemActions>
               <Input
                 v-model="inputTitle"
-                @keydown="handleKeyDown"
+                @keydown.enter="handleTitleChange"
+                @blur="handleTitleChange"
                 :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
                 class="w-48"
               />
-              <Button @click="handleTitleChange" :disabled="!inputTitle.trim()" size="sm">
-                {{ t('settings.function.windowControl.windowTitle.update') }}
-              </Button>
             </ItemActions>
           </Item>
 
@@ -265,16 +264,15 @@ const handleResetSettings = async () => {
               {{ t('settings.function.screenshot.directory.label') }}
             </ItemTitle>
             <ItemDescription>
-              {{ t('settings.function.screenshot.directory.description') }}
+              <template v-if="appSettings?.features?.screenshot?.screenshotDirPath">
+                {{ appSettings.features.screenshot.screenshotDirPath }}
+              </template>
+              <template v-else>
+                {{ t('settings.function.screenshot.directory.description') }}
+              </template>
             </ItemDescription>
           </ItemContent>
           <ItemActions>
-            <Input
-              :model-value="appSettings?.features?.screenshot?.screenshotDirPath"
-              readonly
-              :placeholder="t('settings.function.screenshot.directory.placeholder')"
-              class="w-48"
-            />
             <Button @click="handleSelectDir" :disabled="isSelectingDir" size="sm">
               {{
                 isSelectingDir
@@ -333,16 +331,15 @@ const handleResetSettings = async () => {
                 {{ t('settings.function.recording.outputDir.label') }}
               </ItemTitle>
               <ItemDescription>
-                {{ t('settings.function.recording.outputDir.description') }}
+                <template v-if="appSettings?.features?.recording?.outputDirPath">
+                  {{ appSettings.features.recording.outputDirPath }}
+                </template>
+                <template v-else>
+                  {{ t('settings.function.recording.outputDir.description') }}
+                </template>
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Input
-                :model-value="appSettings?.features?.recording?.outputDirPath"
-                readonly
-                :placeholder="t('settings.function.recording.outputDir.placeholder')"
-                class="w-48"
-              />
               <Button
                 @click="handleSelectRecordingDir"
                 :disabled="isSelectingRecordingDir"
@@ -367,19 +364,15 @@ const handleResetSettings = async () => {
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Select
-                :model-value="String(appSettings?.features?.recording?.fps)"
-                @update:model-value="(value) => updateRecordingFps(Number(value))"
-              >
-                <SelectTrigger class="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 FPS</SelectItem>
-                  <SelectItem value="60">60 FPS</SelectItem>
-                  <SelectItem value="120">120 FPS</SelectItem>
-                </SelectContent>
-              </Select>
+              <Input
+                v-model.number="inputFps"
+                type="number"
+                :min="1"
+                class="w-24"
+                @blur="handleFpsChange"
+                @keydown.enter="handleFpsChange"
+              />
+              <span class="text-sm text-muted-foreground">FPS</span>
             </ItemActions>
           </Item>
 
@@ -437,11 +430,10 @@ const handleResetSettings = async () => {
                 :min="1"
                 :max="500"
                 class="w-24"
+                @blur="handleBitrateChange"
+                @keydown.enter="handleBitrateChange"
               />
               <span class="text-sm text-muted-foreground">Mbps</span>
-              <Button @click="handleBitrateChange" size="sm">
-                {{ t('settings.function.windowControl.windowTitle.update') }}
-              </Button>
             </ItemActions>
           </Item>
 
@@ -459,11 +451,16 @@ const handleResetSettings = async () => {
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Input v-model.number="inputQuality" type="number" :min="0" :max="100" class="w-24" />
+              <Input
+                v-model.number="inputQuality"
+                type="number"
+                :min="0"
+                :max="100"
+                class="w-24"
+                @blur="handleQualityChange"
+                @keydown.enter="handleQualityChange"
+              />
               <span class="text-sm text-muted-foreground">(0-100)</span>
-              <Button @click="handleQualityChange" size="sm">
-                {{ t('settings.function.windowControl.windowTitle.update') }}
-              </Button>
             </ItemActions>
           </Item>
 
@@ -481,11 +478,16 @@ const handleResetSettings = async () => {
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Input v-model.number="inputQp" type="number" :min="0" :max="51" class="w-24" />
+              <Input
+                v-model.number="inputQp"
+                type="number"
+                :min="0"
+                :max="51"
+                class="w-24"
+                @blur="handleQpChange"
+                @keydown.enter="handleQpChange"
+              />
               <span class="text-sm text-muted-foreground">(0-51)</span>
-              <Button @click="handleQpChange" size="sm">
-                {{ t('settings.function.windowControl.windowTitle.update') }}
-              </Button>
             </ItemActions>
           </Item>
 
@@ -598,11 +600,10 @@ const handleResetSettings = async () => {
                 :min="64"
                 :max="512"
                 class="w-24"
+                @blur="handleAudioBitrateChange"
+                @keydown.enter="handleAudioBitrateChange"
               />
               <span class="text-sm text-muted-foreground">kbps</span>
-              <Button @click="handleAudioBitrateChange" size="sm">
-                {{ t('settings.function.windowControl.windowTitle.update') }}
-              </Button>
             </ItemActions>
           </Item>
         </ItemGroup>
