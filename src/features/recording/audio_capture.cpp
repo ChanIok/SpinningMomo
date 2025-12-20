@@ -34,9 +34,11 @@ auto is_process_loopback_supported() -> bool {
 }
 
 // Process Loopback 激活回调类
-class ProcessLoopbackActivator : public Microsoft::WRL::RuntimeClass<
-                                     Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
-                                     IActivateAudioInterfaceCompletionHandler> {
+// 必须继承 FtmBase 以支持自由线程封装，否则 ActivateAudioInterfaceAsync 会失败
+class ProcessLoopbackActivator
+    : public Microsoft::WRL::RuntimeClass<
+          Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>, Microsoft::WRL::FtmBase,
+          IActivateAudioInterfaceCompletionHandler> {
  private:
   wil::com_ptr<IAudioClient> m_audio_client;
   HRESULT m_activation_result = E_PENDING;
@@ -139,7 +141,7 @@ auto initialize_process_loopback(Features::Recording::State::AudioCaptureContext
                 ctx.wave_format->wBitsPerSample);
 
   // 7. 初始化（带自动格式转换）
-  REFERENCE_TIME buffer_duration = 10'000'000;  // 1 秒缓冲
+  REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms 缓冲
   hr = ctx.audio_client->Initialize(
       AUDCLNT_SHAREMODE_SHARED,
       AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,  // 自动转换
@@ -375,7 +377,7 @@ auto initialize_system_loopback(Features::Recording::State::AudioCaptureContext&
                 ctx.wave_format->nChannels, ctx.wave_format->wBitsPerSample);
 
   // 7. 以 Loopback 模式初始化
-  REFERENCE_TIME buffer_duration = 10'000'000;  // 1 秒缓冲（100ns 单位）
+  REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms 缓冲（100ns 单位）
   hr = ctx.audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED,
                                     AUDCLNT_STREAMFLAGS_LOOPBACK,  // Loopback 模式
                                     buffer_duration, 0, format_to_use, nullptr);
