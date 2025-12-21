@@ -106,7 +106,7 @@ auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
   // 根据热键ID调用对应命令
   if (hotkey_id == state.app_window->window.toggle_visibility_hotkey_id) {
     if (state.commands) {
-      Core::Commands::invoke_command(state.commands->registry, "float.toggle");
+      Core::Commands::invoke_command(state.commands->registry, "app.float");
     }
   } else if (hotkey_id == state.app_window->window.screenshot_hotkey_id) {
     if (state.commands) {

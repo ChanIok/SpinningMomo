@@ -108,7 +108,7 @@ auto build_tray_menu_items(Core::State::AppState& state)
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
       state.app_window->window.is_visible ? Utils::String::FromUtf8(texts.at("menu.float_hide"))
                                           : Utils::String::FromUtf8(texts.at("menu.float_show")),
-      "float.toggle"));
+      "app.float"));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
       Utils::String::FromUtf8(texts.at("menu.app_exit")), "app.exit"));

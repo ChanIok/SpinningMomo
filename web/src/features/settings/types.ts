@@ -248,13 +248,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     appMenu: {
       features: [
         'screenshot.capture',
-        'screenshot.open_folder',
+        'recording.toggle',
         'preview.toggle',
         'overlay.toggle',
-        'letterbox.toggle',
-        'recording.toggle',
         'window.reset',
+        'app.main',
         'app.exit',
+        'screenshot.open_folder',
+        'letterbox.toggle',
       ],
       aspectRatios: ['21:9', '16:9', '3:2', '1:1', '3:4', '2:3', '9:16'],
       resolutions: ['Default', '1080P', '2K', '4K', '6K', '8K', '12K'],

@@ -22,19 +22,6 @@ export const BLUR_RANGE = {
 
 // === 菜单项 Registry ===
 
-// 所有可用的功能项
-export const ALL_FEATURES = [
-  'screenshot.capture',
-  'screenshot.open_folder',
-  'preview.toggle',
-  'overlay.toggle',
-  'letterbox.toggle',
-  'recording.toggle',
-  'window.reset',
-  'float.toggle',
-  'app.exit',
-] as const
-
 // 内置比例预设（用于快速查找，但用户可自定义任意 W:H 格式）
 export const ASPECT_RATIO_PRESETS: Record<string, number> = {
   '32:9': 32 / 9,

@@ -219,7 +219,7 @@ Events::post(*state.events, WindowResizeEvent{...});
 The command system (`src/core/commands/`) provides a unified way to invoke actions from different input sources (hotkeys, menus, RPC, etc.):
 
 - **Command Registry**: Central registry mapping command IDs to actions and metadata
-- **Builtin Commands**: Registered in `builtin.cpp` (e.g., `app.main`, `float.toggle`, `screenshot.capture`)
+- **Builtin Commands**: Registered in `builtin.cpp` (e.g., `app.main`, `app.float`, `screenshot.capture`)
 - **Command Invocation**: All inputs (hotkeys, context menus, RPC) invoke commands through the registry
 
 ```cpp
