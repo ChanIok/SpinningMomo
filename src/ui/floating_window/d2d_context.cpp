@@ -6,14 +6,14 @@ module;
 
 #include <string>
 
-module UI.AppWindow.D2DContext;
+module UI.FloatingWindow.D2DContext;
 
 import Core.State;
-import UI.AppWindow.State;
-import UI.AppWindow.Types;
+import UI.FloatingWindow.State;
+import UI.FloatingWindow.Types;
 import Features.Settings.State;
 
-namespace UI::AppWindow::D2DContext {
+namespace UI::FloatingWindow::D2DContext {
 
 // 辅助函数：从包含透明度的十六进制颜色字符串创建 D2D1_COLOR_F
 auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
@@ -47,7 +47,7 @@ auto create_brush_from_hex(ID2D1RenderTarget* target, const std::string& hex_col
 }
 
 // 辅助函数：批量创建所有画刷
-auto create_all_brushes_simple(Core::State::AppState& state, UI::AppWindow::RenderContext& d2d)
+auto create_all_brushes_simple(Core::State::AppState& state, UI::FloatingWindow::RenderContext& d2d)
     -> bool {
   const auto& colors = state.settings->raw.ui.app_window_colors;
 
@@ -95,7 +95,7 @@ auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format
 // 更新所有画刷颜色
 auto update_all_brush_colors(Core::State::AppState& state) -> void {
   const auto& colors = state.settings->raw.ui.app_window_colors;
-  auto& d2d = state.app_window->d2d_context;
+  auto& d2d = state.floating_window->d2d_context;
 
   // 更新画刷颜色
   if (d2d.background_brush) {
@@ -146,7 +146,7 @@ auto create_text_format_with_size(IDWriteFactory7* write_factory, float font_siz
 
 // 初始化Direct2D资源
 auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
-  auto& d2d = state.app_window->d2d_context;
+  auto& d2d = state.floating_window->d2d_context;
 
   // 获取窗口大小
   RECT rc;
@@ -255,7 +255,7 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
 
 // 清理Direct2D资源
 auto cleanup_d2d(Core::State::AppState& state) -> void {
-  auto& d2d = state.app_window->d2d_context;
+  auto& d2d = state.floating_window->d2d_context;
 
   // 释放画刷
   if (d2d.background_brush) {
@@ -337,7 +337,7 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
 
 // 调整渲染目标大小
 auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
-  auto& d2d = state.app_window->d2d_context;
+  auto& d2d = state.floating_window->d2d_context;
 
   if (!d2d.is_initialized || !d2d.render_target) {
     return false;
@@ -393,8 +393,8 @@ auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
 
 // 更新文本格式（DPI变化时）
 auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
-  auto& d2d = state.app_window->d2d_context;
-  auto& layout = state.app_window->layout;
+  auto& d2d = state.floating_window->d2d_context;
+  auto& layout = state.floating_window->layout;
 
   // 如果不需要更新或工厂不可用，直接返回成功
   if (!d2d.needs_font_update || !d2d.write_factory) {
@@ -436,4 +436,4 @@ auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
   return false;
 }
 
-}  // namespace UI::AppWindow::D2DContext
+}  // namespace UI::FloatingWindow::D2DContext

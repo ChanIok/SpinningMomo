@@ -7,7 +7,7 @@ import Core.Events;
 import Core.State;
 import Features.Settings.Events;
 import Features.Settings.Types;
-import UI.AppWindow;
+import UI.FloatingWindow;
 import Utils.Logger;
 
 namespace Core::Events::Handlers {
@@ -19,7 +19,7 @@ auto handle_settings_changed(Core::State::AppState& state,
     Logger().info("Settings changed: {}", event.data.change_description);
 
     // 通知app_window刷新UI以反映设置变更
-    UI::AppWindow::refresh_from_settings(state);
+    UI::FloatingWindow::refresh_from_settings(state);
 
     Logger().debug("Settings change processing completed");
 

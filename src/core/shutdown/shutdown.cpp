@@ -14,7 +14,7 @@ import Features.Preview;
 import Features.Screenshot;
 import Features.Update;
 import Features.Update.State;
-import UI.AppWindow;
+import UI.FloatingWindow;
 import UI.ContextMenu;
 import UI.TrayIcon;
 import UI.WebViewWindow;
@@ -30,7 +30,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   // 1. UI 清理
   UI::ContextMenu::cleanup(state);
   UI::TrayIcon::destroy(state);
-  UI::AppWindow::destroy_window(state);
+  UI::FloatingWindow::destroy_window(state);
   UI::WebViewWindow::cleanup(state);
 
   // 2. 功能模块清理

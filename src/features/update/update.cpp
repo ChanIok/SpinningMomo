@@ -6,7 +6,7 @@ module Features.Update;
 
 import std;
 import Core.Events;
-import UI.AppWindow.Events;
+import UI.FloatingWindow.Events;
 import Core.State;
 import Features.Update.State;
 import Features.Update.Types;
@@ -518,7 +518,7 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
     if (params.restart) {
       // 立即重启更新：发送退出事件
       Logger().info("Sending exit event for immediate update");
-      Core::Events::post(*app_state.events, UI::AppWindow::Events::ExitEvent{});
+      Core::Events::post(*app_state.events, UI::FloatingWindow::Events::ExitEvent{});
       result.message = "Update will start immediately after application exits";
     } else {
       // 延迟更新：程序继续运行，更新会在退出时执行

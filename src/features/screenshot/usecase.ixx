@@ -3,7 +3,7 @@ module;
 export module Features.Screenshot.UseCase;
 
 import Core.State;
-import UI.AppWindow.Events;
+import UI.FloatingWindow.Events;
 
 namespace Features::Screenshot::UseCase {
 
@@ -12,6 +12,6 @@ export auto capture(Core::State::AppState& state) -> void;
 
 // 处理截图事件（Event版本，用于热键系统）
 export auto handle_capture_event(Core::State::AppState& state,
-                                 const UI::AppWindow::Events::CaptureEvent& event) -> void;
+                                 const UI::FloatingWindow::Events::CaptureEvent& event) -> void;
 
 }  // namespace Features::Screenshot::UseCase

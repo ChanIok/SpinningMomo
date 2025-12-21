@@ -18,7 +18,7 @@ import Core.Commands.State;
 import Features.Settings.State;
 import Features.Recording;
 import Features.Update;
-import UI.AppWindow;
+import UI.FloatingWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
 import Vendor.Windows;
@@ -66,7 +66,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     Logger().info("Command registry initialized with {} commands",
                   state.commands->registry.descriptors.size());
 
-    if (auto result = UI::AppWindow::create_window(state); !result) {
+    if (auto result = UI::FloatingWindow::create_window(state); !result) {
       return std::unexpected("Failed to create app window: " + result.error());
     }
 
@@ -87,15 +87,15 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     }
 
     // 默认显示窗口
-    UI::AppWindow::show_window(state);
+    UI::FloatingWindow::show_window(state);
 
     // 注册热键（从settings中读取配置）
-    UI::AppWindow::register_toggle_visibility_hotkey(
+    UI::FloatingWindow::register_toggle_visibility_hotkey(
         state, state.settings->raw.app.hotkey.toggle_visibility.modifiers,
         state.settings->raw.app.hotkey.toggle_visibility.key);
-    UI::AppWindow::register_screenshot_hotkey(state,
-                                              state.settings->raw.app.hotkey.screenshot.modifiers,
-                                              state.settings->raw.app.hotkey.screenshot.key);
+    UI::FloatingWindow::register_screenshot_hotkey(
+        state, state.settings->raw.app.hotkey.screenshot.modifiers,
+        state.settings->raw.app.hotkey.screenshot.key);
 
     Logger().info("Application initialized successfully");
     return {};

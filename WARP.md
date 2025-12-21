@@ -104,8 +104,8 @@ src/
 │   └── shutdown/              # Graceful shutdown logic
 │
 ├── ui/                        # Native Win32 UI components
-│   ├── app_window/            # Main application window (native controls)
-│   ├── webview_window/        # WebView2 host window (browser container)
+│   ├── floating_window/       # Floating control panel (Direct2D overlay)
+│   ├── webview_window/        # Main application window (WebView2 host)
 │   ├── tray_icon/             # System tray icon
 │   └── context_menu/          # Right-click menu
 │

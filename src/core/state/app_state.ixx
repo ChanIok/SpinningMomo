@@ -36,8 +36,8 @@ namespace Features::Update::State {
 export struct UpdateState;
 }
 
-namespace UI::AppWindow::State {
-export struct AppWindowState;
+namespace UI::FloatingWindow::State {
+export struct FloatingWindowState;
 }
 
 namespace UI::TrayIcon::State {
@@ -117,7 +117,7 @@ export struct AppState {
   std::unique_ptr<Features::Update::State::UpdateState> updater;
 
   // UI状态
-  std::unique_ptr<UI::AppWindow::State::AppWindowState> app_window;
+  std::unique_ptr<UI::FloatingWindow::State::FloatingWindowState> floating_window;
   std::unique_ptr<UI::TrayIcon::State::TrayIconState> tray_icon;
   std::unique_ptr<UI::ContextMenu::State::ContextMenuState> context_menu;
 

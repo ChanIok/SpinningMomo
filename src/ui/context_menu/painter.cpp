@@ -10,8 +10,8 @@ module UI.ContextMenu.Painter;
 
 import std;
 import Core.State;
-import UI.AppWindow.Types;
-import UI.AppWindow.State;
+import UI.FloatingWindow.Types;
+import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
 import UI.ContextMenu.Layout;
@@ -26,13 +26,13 @@ auto paint_context_menu(Core::State::AppState& state, const RECT& client_rect) -
   if (!menu_state.main_menu_d2d_ready || !menu_state.render_target) {
     return;
   }
-  const auto& d2d = state.app_window->d2d_context;
+  const auto& d2d = state.floating_window->d2d_context;
   if (!d2d.is_initialized) {
     return;
   }
 
   menu_state.render_target->BeginDraw();
-  const auto rect_f = UI::AppWindow::rect_to_d2d(client_rect);
+  const auto rect_f = UI::FloatingWindow::rect_to_d2d(client_rect);
   draw_menu_background(state, rect_f);
   draw_menu_items(state, rect_f);
   HRESULT hr = menu_state.render_target->EndDraw();
@@ -80,7 +80,7 @@ auto draw_menu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> v
 auto draw_single_menu_item(Core::State::AppState& state, const Types::MenuItem& item,
                            const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& menu_state = *state.context_menu;
-  const auto& d2d = state.app_window->d2d_context;
+  const auto& d2d = state.floating_window->d2d_context;
   const auto& layout = menu_state.layout;
   if (is_hovered && item.is_enabled) {
     menu_state.render_target->FillRectangle(item_rect, menu_state.hover_brush);
@@ -128,12 +128,12 @@ auto paint_submenu(Core::State::AppState& state, const RECT& client_rect) -> voi
   if (!menu_state.submenu_d2d_ready || !menu_state.submenu_render_target) {
     return;
   }
-  const auto& d2d = state.app_window->d2d_context;
+  const auto& d2d = state.floating_window->d2d_context;
   if (!d2d.is_initialized) {
     return;
   }
   menu_state.submenu_render_target->BeginDraw();
-  const auto rect_f = UI::AppWindow::rect_to_d2d(client_rect);
+  const auto rect_f = UI::FloatingWindow::rect_to_d2d(client_rect);
   draw_submenu_background(state, rect_f);
   draw_submenu_items(state, rect_f);
   HRESULT hr = menu_state.submenu_render_target->EndDraw();
@@ -183,7 +183,7 @@ auto draw_submenu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -
 auto draw_submenu_single_item(Core::State::AppState& state, const Types::MenuItem& item,
                               const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& menu_state = *state.context_menu;
-  const auto& d2d = state.app_window->d2d_context;
+  const auto& d2d = state.floating_window->d2d_context;
   const auto& layout = menu_state.layout;
   if (is_hovered && item.is_enabled) {
     menu_state.submenu_render_target->FillRectangle(item_rect, menu_state.submenu_hover_brush);

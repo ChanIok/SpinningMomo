@@ -7,7 +7,7 @@ export module UI.ContextMenu.Painter;
 
 import std;
 import Core.State;
-import UI.AppWindow.Types;
+import UI.FloatingWindow.Types;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
 
@@ -24,15 +24,13 @@ auto paint_submenu(Core::State::AppState& app_state, const RECT& client_rect) ->
 // 内部绘制函数
 auto draw_menu_background(Core::State::AppState& app_state, const D2D1_RECT_F& rect) -> void;
 auto draw_menu_items(Core::State::AppState& app_state, const D2D1_RECT_F& rect) -> void;
-auto draw_single_menu_item(Core::State::AppState& app_state,
-                           const Types::MenuItem& item, const D2D1_RECT_F& item_rect,
-                           bool is_hovered) -> void;
+auto draw_single_menu_item(Core::State::AppState& app_state, const Types::MenuItem& item,
+                           const D2D1_RECT_F& item_rect, bool is_hovered) -> void;
 auto draw_separator(Core::State::AppState& app_state, const D2D1_RECT_F& separator_rect) -> void;
 
 auto draw_submenu_background(Core::State::AppState& app_state, const D2D1_RECT_F& rect) -> void;
 auto draw_submenu_items(Core::State::AppState& app_state, const D2D1_RECT_F& rect) -> void;
-auto draw_submenu_single_item(Core::State::AppState& app_state,
-                              const Types::MenuItem& item,
+auto draw_submenu_single_item(Core::State::AppState& app_state, const Types::MenuItem& item,
                               const D2D1_RECT_F& item_rect, bool is_hovered) -> void;
 auto draw_submenu_separator(Core::State::AppState& app_state, const D2D1_RECT_F& separator_rect)
     -> void;

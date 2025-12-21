@@ -3,7 +3,7 @@ module;
 export module Features.Overlay.UseCase;
 
 import Core.State;
-import UI.AppWindow.Events;
+import UI.FloatingWindow.Events;
 
 namespace Features::Overlay::UseCase {
 

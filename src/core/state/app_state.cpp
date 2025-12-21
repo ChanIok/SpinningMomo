@@ -22,7 +22,7 @@ import Features.Screenshot.State;
 import Features.Recording.State;
 import Features.Settings.State;
 import Features.Update.State;
-import UI.AppWindow.State;
+import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import UI.TrayIcon.State;
 
@@ -40,7 +40,7 @@ AppState::AppState()
       worker_pool(std::make_unique<Core::WorkerPool::State::WorkerPoolState>()),
       settings(std::make_unique<Features::Settings::State::SettingsState>()),
       updater(std::make_unique<Features::Update::State::UpdateState>()),
-      app_window(std::make_unique<UI::AppWindow::State::AppWindowState>()),
+      floating_window(std::make_unique<UI::FloatingWindow::State::FloatingWindowState>()),
       tray_icon(std::make_unique<UI::TrayIcon::State::TrayIconState>()),
       context_menu(std::make_unique<UI::ContextMenu::State::ContextMenuState>()),
       letterbox(std::make_unique<Features::Letterbox::State::LetterboxState>()),

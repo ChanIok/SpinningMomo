@@ -3,7 +3,7 @@ module;
 export module Features.Letterbox.UseCase;
 
 import Core.State;
-import UI.AppWindow.Events;
+import UI.FloatingWindow.Events;
 
 namespace Features::Letterbox::UseCase {
 

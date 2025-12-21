@@ -14,8 +14,8 @@ import Features.Preview;
 import Features.Screenshot;
 import Features.Settings;
 import Features.Update;
-import UI.AppWindow;
-import UI.AppWindow.State;
+import UI.FloatingWindow;
+import UI.FloatingWindow.State;
 import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
@@ -43,7 +43,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     // 创建 AppState, 其构造函数会自动初始化所有子状态
     m_app_state = std::make_unique<Core::State::AppState>();
 
-    m_app_state->app_window->window.instance = m_h_instance;
+    m_app_state->floating_window->window.instance = m_h_instance;
 
     LogSystemInfo();
 

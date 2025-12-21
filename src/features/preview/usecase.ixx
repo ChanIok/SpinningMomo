@@ -3,7 +3,7 @@ module;
 export module Features.Preview.UseCase;
 
 import Core.State;
-import UI.AppWindow.Events;
+import UI.FloatingWindow.Events;
 
 namespace Features::Preview::UseCase {
 

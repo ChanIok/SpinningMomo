@@ -12,7 +12,7 @@ import std;
 import Core.State;
 import Core.WebView;
 import Core.WebView.State;
-import UI.AppWindow.State;
+import UI.FloatingWindow.State;
 import Utils.Logger;
 import Vendor.Windows;
 
@@ -223,7 +223,7 @@ auto create_window_attributes(HWND hwnd) -> void {
 
 auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 注册窗口类
-  register_window_class(state.app_window->window.instance);
+  register_window_class(state.floating_window->window.instance);
 
   // 设置默认窗口大小和位置
   const int width = state.webview->window.width;
@@ -232,15 +232,15 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   const int y = 100;
 
   // 创建独立窗口
-  HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW,                    // 扩展样式
-                              L"SpinningMomoWebViewWindowClass",  // 窗口类名
-                              L"SpinningMomo WebView",            // 窗口标题
-                              WS_POPUP | WS_THICKFRAME,           // 窗口样式
-                              x, y, width, height,                // 位置和大小
-                              nullptr,                            // 父窗口
-                              nullptr,                            // 菜单
-                              state.app_window->window.instance,  // 实例句柄
-                              &state                              // 用户数据
+  HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW,                         // 扩展样式
+                              L"SpinningMomoWebViewWindowClass",       // 窗口类名
+                              L"SpinningMomo WebView",                 // 窗口标题
+                              WS_POPUP | WS_THICKFRAME,                // 窗口样式
+                              x, y, width, height,                     // 位置和大小
+                              nullptr,                                 // 父窗口
+                              nullptr,                                 // 菜单
+                              state.floating_window->window.instance,  // 实例句柄
+                              &state                                   // 用户数据
   );
 
   if (!hwnd) {

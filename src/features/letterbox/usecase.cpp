@@ -5,7 +5,7 @@ module Features.Letterbox.UseCase;
 import std;
 import Core.State;
 import Core.I18n.State;
-import UI.AppWindow;
+import UI.FloatingWindow;
 import Features.Letterbox;
 import Features.Overlay;
 import Features.Overlay.State;
@@ -23,7 +23,7 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
   bool is_enabled = state.settings->raw.features.letterbox.enabled;
 
   // 更新状态
-  UI::AppWindow::set_letterbox_enabled(state, !is_enabled);
+  UI::FloatingWindow::set_letterbox_enabled(state, !is_enabled);
   Features::Overlay::set_letterbox_mode(state, !is_enabled);
   state.settings->raw.features.letterbox.enabled = !is_enabled;
 
@@ -54,7 +54,7 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
         Logger().error("Failed to restart overlay after letterbox mode change: {}",
                        start_result.error());
         // 回滚 UI状态
-        UI::AppWindow::set_letterbox_enabled(state, is_enabled);
+        UI::FloatingWindow::set_letterbox_enabled(state, is_enabled);
         std::string error_message =
             state.i18n->texts["message.overlay_start_failed"] + start_result.error();
         Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
@@ -69,7 +69,7 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
         if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
           Logger().error("Failed to show letterbox: {}", result.error());
           // 回滚 UI状态
-          UI::AppWindow::set_letterbox_enabled(state, false);
+          UI::FloatingWindow::set_letterbox_enabled(state, false);
           std::string error_message =
               state.i18n->texts["message.overlay_start_failed"] + result.error();
           Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],

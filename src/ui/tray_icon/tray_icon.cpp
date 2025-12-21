@@ -14,7 +14,7 @@ import Features.Settings.Menu;
 import Features.WindowControl;
 import UI.ContextMenu;
 import UI.ContextMenu.Types;
-import UI.AppWindow.State;
+import UI.FloatingWindow.State;
 import UI.TrayIcon.State;
 import UI.TrayIcon.Types;
 import Utils.String;
@@ -49,7 +49,7 @@ auto build_ratio_submenu(Core::State::AppState& state)
   const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   for (size_t i = 0; i < ratios.size(); ++i) {
     items.emplace_back(UI::ContextMenu::Types::MenuItem::ratio_item(
-        ratios[i], i, i == state.app_window->ui.current_ratio_index));
+        ratios[i], i, i == state.floating_window->ui.current_ratio_index));
   }
   return items;
 }
@@ -60,7 +60,7 @@ auto build_resolution_submenu(Core::State::AppState& state)
   const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
   for (size_t i = 0; i < resolutions.size(); ++i) {
     items.emplace_back(UI::ContextMenu::Types::MenuItem::resolution_item(
-        resolutions[i], i, i == state.app_window->ui.current_resolution_index));
+        resolutions[i], i, i == state.floating_window->ui.current_resolution_index));
   }
   return items;
 }
@@ -93,10 +93,10 @@ auto build_tray_menu_items(Core::State::AppState& state)
       Utils::String::FromUtf8(texts.at("menu.screenshot_capture")), "screenshot.capture"));
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
       Utils::String::FromUtf8(texts.at("menu.preview_toggle")), "preview.toggle",
-      state.app_window->ui.preview_enabled));
+      state.floating_window->ui.preview_enabled));
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
       Utils::String::FromUtf8(texts.at("menu.overlay_toggle")), "overlay.toggle",
-      state.app_window->ui.overlay_enabled));
+      state.floating_window->ui.overlay_enabled));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
@@ -106,8 +106,9 @@ auto build_tray_menu_items(Core::State::AppState& state)
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      state.app_window->window.is_visible ? Utils::String::FromUtf8(texts.at("menu.float_hide"))
-                                          : Utils::String::FromUtf8(texts.at("menu.float_show")),
+      state.floating_window->window.is_visible
+          ? Utils::String::FromUtf8(texts.at("menu.float_hide"))
+          : Utils::String::FromUtf8(texts.at("menu.float_show")),
       "app.float"));
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
@@ -125,14 +126,14 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   }
   auto& nid = state.tray_icon->nid;
   nid.cbSize = sizeof(decltype(nid));
-  nid.hWnd = state.app_window->window.hwnd;
+  nid.hWnd = state.floating_window->window.hwnd;
   nid.uID = UI::TrayIcon::Types::HOTKEY_ID;
   nid.uFlags =
       Vendor::ShellApi::kNIF_ICON | Vendor::ShellApi::kNIF_MESSAGE | Vendor::ShellApi::kNIF_TIP;
   nid.uCallbackMessage = UI::TrayIcon::Types::WM_TRAYICON;
 
   nid.hIcon = static_cast<HICON>(LoadImageW(
-      state.app_window->window.instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1),
+      state.floating_window->window.instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1),
       IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
   if (!nid.hIcon) nid.hIcon = LoadIcon(nullptr, IDI_APPLICATION);
   if (!nid.hIcon) return std::unexpected("Failed to load tray icon.");

@@ -18,9 +18,9 @@ import Core.Events;
 import Features.Settings.Menu;
 import Core.Commands;
 import Core.Commands.State;
-import UI.AppWindow.Types;
-import UI.AppWindow.State;
-import UI.AppWindow.Events;
+import UI.FloatingWindow.Types;
+import UI.FloatingWindow.State;
+import UI.FloatingWindow.Events;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
 import UI.ContextMenu.Layout;
@@ -109,7 +109,7 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto window_info = std::any_cast<Features::WindowControl::WindowInfo>(action.data);
         // 使用新的事件系统发送窗口选择事件
-        Core::Events::send(*state.events, UI::AppWindow::Events::WindowSelectionEvent{
+        Core::Events::send(*state.events, UI::FloatingWindow::Events::WindowSelectionEvent{
                                               window_info.title, window_info.handle});
         Logger().info("Window selected: {}", Utils::String::ToUtf8(window_info.title));
       } catch (const std::bad_any_cast& e) {
@@ -122,7 +122,7 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto ratio_data = std::any_cast<UI::ContextMenu::Types::RatioData>(action.data);
         // 使用新的事件系统发送比例改变事件
-        Core::Events::send(*state.events, UI::AppWindow::Events::RatioChangeEvent{
+        Core::Events::send(*state.events, UI::FloatingWindow::Events::RatioChangeEvent{
                                               ratio_data.index, ratio_data.name, ratio_data.ratio});
         Logger().info("Ratio selected: {} ({})", Utils::String::ToUtf8(ratio_data.name),
                       ratio_data.ratio);
@@ -136,7 +136,7 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto resolution_data = std::any_cast<UI::ContextMenu::Types::ResolutionData>(action.data);
         // 使用新的事件系统发送分辨率改变事件
-        Core::Events::send(*state.events, UI::AppWindow::Events::ResolutionChangeEvent{
+        Core::Events::send(*state.events, UI::FloatingWindow::Events::ResolutionChangeEvent{
                                               resolution_data.index, resolution_data.name,
                                               resolution_data.total_pixels});
         Logger().info("Resolution selected: {} ({}M pixels)",
@@ -211,7 +211,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
   Layout::calculate_submenu_position(state, index);
 
   // 创建子菜单窗口
-  HINSTANCE instance = state.app_window->window.instance;
+  HINSTANCE instance = state.floating_window->window.instance;
   menu_state.submenu_hwnd = CreateWindowExW(
       WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, L"SpinningMomoContextMenuClass",
       L"ContextMenu",  // 窗口标题不重要
@@ -261,7 +261,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     }
 
     // 注册窗口类
-    if (!register_context_menu_class(app_state.app_window->window.instance,
+    if (!register_context_menu_class(app_state.floating_window->window.instance,
                                      MessageHandler::static_window_proc)) {
       return std::unexpected("Failed to register context menu window class");
     }
@@ -306,7 +306,7 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
   }
 
   // 2. 创建窗口
-  HINSTANCE instance = app_state.app_window->window.instance;
+  HINSTANCE instance = app_state.floating_window->window.instance;
   menu_state.hwnd =
       create_context_menu_window(instance, MessageHandler::static_window_proc, &app_state);
 

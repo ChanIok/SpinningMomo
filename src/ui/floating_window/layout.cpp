@@ -5,24 +5,24 @@ module;
 
 #include <string>
 
-module UI.AppWindow.Layout;
+module UI.FloatingWindow.Layout;
 
 import std;
 import Core.State;
-import UI.AppWindow.State;
+import UI.FloatingWindow.State;
 import Features.Settings.State;
 import Features.Settings.Types;
 import Utils.Logger;
 
-namespace UI::AppWindow::Layout {
+namespace UI::FloatingWindow::Layout {
 
 auto update_layout(Core::State::AppState& state) -> void {
   const auto& settings = state.settings->raw;
   const auto& layout_settings = settings.ui.app_window_layout;
-  const UINT dpi = state.app_window->window.dpi;
+  const UINT dpi = state.floating_window->window.dpi;
   const double scale = static_cast<double>(dpi) / 96.0;
 
-  auto& layout = state.app_window->layout;
+  auto& layout = state.floating_window->layout;
 
   // 直接从配置计算实际渲染尺寸
   layout.item_height = static_cast<int>(layout_settings.base_item_height * scale);
@@ -43,7 +43,7 @@ auto update_layout(Core::State::AppState& state) -> void {
 }
 
 auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
-  const auto& render = state.app_window->layout;
+  const auto& render = state.floating_window->layout;
   const int total_width =
       render.ratio_column_width + render.resolution_column_width + render.settings_column_width;
   const int window_height = calculate_window_height(state);
@@ -52,16 +52,16 @@ auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
 }
 
 auto calculate_window_height(const Core::State::AppState& state) -> int {
-  const auto& render = state.app_window->layout;
+  const auto& render = state.floating_window->layout;
 
   // 翻页模式：返回固定高度
-  if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+  if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
     return render.title_height + render.separator_height +
-           render.item_height * UI::AppWindow::LayoutConfig::MAX_VISIBLE_ROWS;
+           render.item_height * UI::FloatingWindow::LayoutConfig::MAX_VISIBLE_ROWS;
   }
 
   // 自适应高度模式：由最大列决定高度
-  const auto counts = count_items_per_column(state.app_window->data.menu_items);
+  const auto counts = count_items_per_column(state.floating_window->data.menu_items);
 
   // 计算每列的高度
   const int ratio_height = counts.ratio_count * render.item_height;
@@ -90,9 +90,9 @@ auto calculate_center_position(const SIZE& window_size) -> POINT {
 }
 
 auto get_item_index_from_point(const Core::State::AppState& state, int x, int y) -> int {
-  const auto& render = state.app_window->layout;
-  const auto& items = state.app_window->data.menu_items;
-  const auto& ui = state.app_window->ui;
+  const auto& render = state.floating_window->layout;
+  const auto& items = state.floating_window->data.menu_items;
+  const auto& ui = state.floating_window->ui;
 
   // 检查是否在标题栏或分隔线区域
   if (y < render.title_height + render.separator_height) {
@@ -102,17 +102,17 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
   const auto bounds = get_column_bounds(state);
 
   // 确定点击的是哪一列
-  UI::AppWindow::MenuItemCategory target_category;
+  UI::FloatingWindow::MenuItemCategory target_category;
   size_t scroll_offset = 0;
 
   if (x < bounds.ratio_column_right) {
-    target_category = UI::AppWindow::MenuItemCategory::AspectRatio;
-    if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+    target_category = UI::FloatingWindow::MenuItemCategory::AspectRatio;
+    if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
       scroll_offset = ui.ratio_scroll_offset;
     }
   } else if (x < bounds.resolution_column_right) {
-    target_category = UI::AppWindow::MenuItemCategory::Resolution;
-    if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+    target_category = UI::FloatingWindow::MenuItemCategory::Resolution;
+    if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
       scroll_offset = ui.resolution_scroll_offset;
     }
   } else {
@@ -144,18 +144,19 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
   return -1;
 }
 
-auto count_items_per_column(const std::vector<UI::AppWindow::MenuItem>& items) -> ColumnCounts {
+auto count_items_per_column(const std::vector<UI::FloatingWindow::MenuItem>& items)
+    -> ColumnCounts {
   ColumnCounts counts;
 
   for (const auto& item : items) {
     switch (item.category) {
-      case UI::AppWindow::MenuItemCategory::AspectRatio:
+      case UI::FloatingWindow::MenuItemCategory::AspectRatio:
         ++counts.ratio_count;
         break;
-      case UI::AppWindow::MenuItemCategory::Resolution:
+      case UI::FloatingWindow::MenuItemCategory::Resolution:
         ++counts.resolution_count;
         break;
-      case UI::AppWindow::MenuItemCategory::Feature:
+      case UI::FloatingWindow::MenuItemCategory::Feature:
         ++counts.settings_count;
         break;
     }
@@ -165,7 +166,7 @@ auto count_items_per_column(const std::vector<UI::AppWindow::MenuItem>& items) -
 }
 
 auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds {
-  const auto& render = state.app_window->layout;
+  const auto& render = state.floating_window->layout;
   const int ratio_column_right = render.ratio_column_width;
   const int resolution_column_right = ratio_column_right + render.resolution_column_width;
   const int settings_column_left = resolution_column_right + render.separator_height;
@@ -174,12 +175,12 @@ auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds {
 }
 
 auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
-  const auto& render = state.app_window->layout;
-  const auto& items = state.app_window->data.menu_items;
-  const auto& ui = state.app_window->ui;
+  const auto& render = state.floating_window->layout;
+  const auto& items = state.floating_window->data.menu_items;
+  const auto& ui = state.floating_window->ui;
 
   size_t scroll_offset = 0;
-  if (render.layout_mode == UI::AppWindow::MenuLayoutMode::Paged) {
+  if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
     scroll_offset = ui.feature_scroll_offset;
   }
 
@@ -190,7 +191,7 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
     const auto& item = items[i];
 
     // 判断是否为功能项
-    if (item.category == UI::AppWindow::MenuItemCategory::Feature) {
+    if (item.category == UI::FloatingWindow::MenuItemCategory::Feature) {
       // 翻页模式下跳过不可见项
       if (visible_index < scroll_offset) {
         visible_index++;
@@ -207,11 +208,11 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
   return -1;
 }
 
-auto get_indicator_width(const UI::AppWindow::MenuItem& item, const Core::State::AppState& state)
-    -> int {
-  return (item.category == UI::AppWindow::MenuItemCategory::AspectRatio)
-             ? state.app_window->layout.ratio_indicator_width
-             : state.app_window->layout.indicator_width;
+auto get_indicator_width(const UI::FloatingWindow::MenuItem& item,
+                         const Core::State::AppState& state) -> int {
+  return (item.category == UI::FloatingWindow::MenuItemCategory::AspectRatio)
+             ? state.floating_window->layout.ratio_indicator_width
+             : state.floating_window->layout.indicator_width;
 }
 
-}  // namespace UI::AppWindow::Layout
+}  // namespace UI::FloatingWindow::Layout

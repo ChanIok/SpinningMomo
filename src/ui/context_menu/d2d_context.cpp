@@ -9,8 +9,8 @@ module;
 module UI.ContextMenu.D2DContext;
 
 import Core.State;
-import UI.AppWindow.Types;
-import UI.AppWindow.State;
+import UI.FloatingWindow.Types;
+import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import Utils.Logger;
 import Features.Settings.State;
@@ -102,11 +102,11 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& menu_state = *state.context_menu;
   if (menu_state.main_menu_d2d_ready) return true;
 
-  if (!state.app_window || !state.app_window->d2d_context.is_initialized ||
-      !state.app_window->d2d_context.factory) {
+  if (!state.floating_window || !state.floating_window->d2d_context.is_initialized ||
+      !state.floating_window->d2d_context.factory) {
     return false;
   }
-  const auto& d2d_context = state.app_window->d2d_context;
+  const auto& d2d_context = state.floating_window->d2d_context;
 
   RECT rc;
   GetClientRect(hwnd, &rc);
@@ -146,12 +146,12 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& menu_state = *state.context_menu;
   if (menu_state.submenu_d2d_ready) return true;
 
-  if (!state.app_window || !state.app_window->d2d_context.is_initialized ||
-      !state.app_window->d2d_context.factory) {
+  if (!state.floating_window || !state.floating_window->d2d_context.is_initialized ||
+      !state.floating_window->d2d_context.factory) {
     Logger().error("AppWindow D2D not initialized or factory is null");
     return false;
   }
-  const auto& d2d_context = state.app_window->d2d_context;
+  const auto& d2d_context = state.floating_window->d2d_context;
 
   RECT rc;
   GetClientRect(hwnd, &rc);

@@ -6,13 +6,13 @@ module;
 
 #include <string>
 
-export module UI.AppWindow.Types;
+export module UI.FloatingWindow.Types;
 
 import std;
 import Features.WindowControl;
 import Features.Settings.Menu;
 
-export namespace UI::AppWindow {
+export namespace UI::FloatingWindow {
 
 // 菜单布局模式
 enum class MenuLayoutMode {
@@ -142,4 +142,4 @@ inline auto make_d2d_rect(float left, float top, float right, float bottom) -> D
   return D2D1::RectF(left, top, right, bottom);
 }
 
-}  // namespace UI::AppWindow
+}  // namespace UI::FloatingWindow

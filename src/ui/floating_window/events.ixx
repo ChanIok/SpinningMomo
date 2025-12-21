@@ -1,11 +1,11 @@
 module;
 
-export module UI.AppWindow.Events;
+export module UI.FloatingWindow.Events;
 
 import std;
 import Vendor.Windows;
 
-namespace UI::AppWindow::Events {
+namespace UI::FloatingWindow::Events {
 
 // DPI改变事件
 export struct DpiChangeEvent {
@@ -86,4 +86,4 @@ export struct WindowSelectionEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
-}  // namespace UI::AppWindow::Events
+}  // namespace UI::FloatingWindow::Events

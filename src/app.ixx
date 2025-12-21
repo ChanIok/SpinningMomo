@@ -6,7 +6,7 @@ import std;
 import Vendor.Windows;
 import Core.Events;
 import Core.State;
-import UI.AppWindow;
+import UI.FloatingWindow;
 
 // 主应用程序类
 export class Application {

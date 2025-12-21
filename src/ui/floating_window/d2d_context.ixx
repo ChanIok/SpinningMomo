@@ -4,12 +4,12 @@ module;
 #include <dwrite_3.h>
 #include <windows.h>
 
-export module UI.AppWindow.D2DContext;
+export module UI.FloatingWindow.D2DContext;
 
 import std;
 import Core.State;
 
-namespace UI::AppWindow::D2DContext {
+namespace UI::FloatingWindow::D2DContext {
 
 // 初始化Direct2D资源
 export auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool;
@@ -34,4 +34,4 @@ export auto create_text_format_with_size(IDWriteFactory7* write_factory, float f
 // 更新所有画刷颜色
 export auto update_all_brush_colors(Core::State::AppState& state) -> void;
 
-}  // namespace UI::AppWindow::D2DContext
+}  // namespace UI::FloatingWindow::D2DContext

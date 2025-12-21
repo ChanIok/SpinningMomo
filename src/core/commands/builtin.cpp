@@ -17,7 +17,7 @@ import Features.Recording.State;
 import Features.Overlay.State;
 import Features.Preview.State;
 import Features.WindowControl.UseCase;
-import UI.AppWindow;
+import UI.FloatingWindow;
 import UI.WebViewWindow;
 import Utils.Logger;
 import Vendor.Windows;
@@ -50,12 +50,13 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
   // === 悬浮窗控制 ===
 
   // 激活悬浮窗
-  register_command(registry, {
-                                 .id = "app.float",
-                                 .i18n_key = "menu.app_float",
-                                 .is_toggle = false,
-                                 .action = [&state]() { UI::AppWindow::toggle_visibility(state); },
-                             });
+  register_command(registry,
+                   {
+                       .id = "app.float",
+                       .i18n_key = "menu.app_float",
+                       .is_toggle = false,
+                       .action = [&state]() { UI::FloatingWindow::toggle_visibility(state); },
+                   });
 
   // === 截图功能 ===
 
@@ -93,7 +94,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                                  .action =
                                      [&state]() {
                                        Features::Preview::UseCase::toggle_preview(state);
-                                       UI::AppWindow::request_repaint(state);
+                                       UI::FloatingWindow::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
                                    return state.preview ? state.preview->running : false;
@@ -108,7 +109,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                                  .action =
                                      [&state]() {
                                        Features::Overlay::UseCase::toggle_overlay(state);
-                                       UI::AppWindow::request_repaint(state);
+                                       UI::FloatingWindow::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
                                    return state.overlay ? state.overlay->running : false;
@@ -123,7 +124,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                                  .action =
                                      [&state]() {
                                        Features::Letterbox::UseCase::toggle_letterbox(state);
-                                       UI::AppWindow::request_repaint(state);
+                                       UI::FloatingWindow::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
                                    return state.letterbox && state.letterbox->window_handle &&
@@ -143,7 +144,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                 if (auto result = Features::Recording::UseCase::toggle_recording(state); !result) {
                   Logger().error("Recording toggle failed: {}", result.error());
                 }
-                UI::AppWindow::request_repaint(state);
+                UI::FloatingWindow::request_repaint(state);
               },
           .get_state = [&state]() -> bool {
             return state.recording && state.recording->status ==

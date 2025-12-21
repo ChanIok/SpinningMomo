@@ -5,7 +5,7 @@ module Features.Overlay.UseCase;
 import std;
 import Core.State;
 import Core.I18n.State;
-import UI.AppWindow;
+import UI.FloatingWindow;
 import Features.Overlay;
 import Features.Letterbox;
 import Features.Settings.State;
@@ -22,7 +22,7 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
   bool is_running = state.overlay && state.overlay->running;
 
   // 更新叠加层状态
-  UI::AppWindow::set_overlay_enabled(state, !is_running);
+  UI::FloatingWindow::set_overlay_enabled(state, !is_running);
 
   if (!is_running) {
     // 启动叠加层
@@ -40,7 +40,7 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
       if (auto result = Features::Overlay::start_overlay(state, target_window.value()); !result) {
         Logger().error("Failed to start overlay: {}", result.error());
         // 回滚 UI状态
-        UI::AppWindow::set_overlay_enabled(state, false);
+        UI::FloatingWindow::set_overlay_enabled(state, false);
         // 使用新的消息定义并附加错误详情
         std::string error_message =
             state.i18n->texts["message.overlay_start_failed"] + result.error();
@@ -49,7 +49,7 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
       }
     } else {
       Logger().warn("No target window found for overlay");
-      UI::AppWindow::set_overlay_enabled(state, false);
+      UI::FloatingWindow::set_overlay_enabled(state, false);
       Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                  state.i18n->texts["message.window_not_found"]);
     }

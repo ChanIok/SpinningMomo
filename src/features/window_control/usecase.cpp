@@ -6,9 +6,9 @@ import std;
 import Features.Settings.Menu;
 import Core.State;
 import Core.I18n.State;
-import UI.AppWindow;
-import UI.AppWindow.Events;
-import UI.AppWindow.State;
+import UI.FloatingWindow;
+import UI.FloatingWindow.Events;
+import UI.FloatingWindow.State;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Letterbox;
@@ -25,8 +25,8 @@ namespace Features::WindowControl::UseCase {
 // 获取当前比例
 auto get_current_ratio(const Core::State::AppState& state) -> double {
   const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
-  if (state.app_window->ui.current_ratio_index < ratios.size()) {
-    return ratios[state.app_window->ui.current_ratio_index].ratio;
+  if (state.floating_window->ui.current_ratio_index < ratios.size()) {
+    return ratios[state.floating_window->ui.current_ratio_index].ratio;
   }
 
   // 默认使用屏幕比例
@@ -38,8 +38,8 @@ auto get_current_ratio(const Core::State::AppState& state) -> double {
 // 获取当前总像素数
 auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64_t {
   const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
-  if (state.app_window->ui.current_resolution_index < resolutions.size()) {
-    return resolutions[state.app_window->ui.current_resolution_index].total_pixels;
+  if (state.floating_window->ui.current_resolution_index < resolutions.size()) {
+    return resolutions[state.floating_window->ui.current_resolution_index].total_pixels;
   }
   return 0;  // 表示使用屏幕尺寸
 }
@@ -48,7 +48,7 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
 auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
   // 提取启动overlay
-  if (state.app_window->ui.overlay_enabled) {
+  if (state.floating_window->ui.overlay_enabled) {
     Logger().debug("Starting overlay before window transform");
     auto overlay_result = Features::Overlay::start_overlay(state, target_window, true);
     if (!overlay_result) {
@@ -61,7 +61,7 @@ auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HW
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
   // 重启letterbox
-  if (!state.overlay->running && state.app_window->ui.letterbox_enabled) {
+  if (!state.overlay->running && state.floating_window->ui.letterbox_enabled) {
     auto letterbox_result = Features::Letterbox::show(state, target_window);
     if (!letterbox_result) {
       Logger().error("Failed to restart letterbox after window transform: {}",
@@ -73,7 +73,7 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
 
 // 处理比例改变事件
 auto handle_ratio_changed(Core::State::AppState& state,
-                          const UI::AppWindow::Events::RatioChangeEvent& event) -> void {
+                          const UI::FloatingWindow::Events::RatioChangeEvent& event) -> void {
   Logger().debug("Handling ratio change to index {}, ratio: {}", event.index, event.ratio_value);
 
   // 查找目标窗口
@@ -119,13 +119,14 @@ auto handle_ratio_changed(Core::State::AppState& state,
   // 更新当前比例索引
   const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   if (event.index < ratios.size() || event.index == std::numeric_limits<size_t>::max()) {
-    state.app_window->ui.current_ratio_index = event.index;
+    state.floating_window->ui.current_ratio_index = event.index;
   }
 }
 
 // 处理分辨率改变事件
 auto handle_resolution_changed(Core::State::AppState& state,
-                               const UI::AppWindow::Events::ResolutionChangeEvent& event) -> void {
+                               const UI::FloatingWindow::Events::ResolutionChangeEvent& event)
+    -> void {
   Logger().debug("Handling resolution change to index {}, pixels: {}", event.index,
                  event.total_pixels);
 
@@ -173,13 +174,13 @@ auto handle_resolution_changed(Core::State::AppState& state,
   // 更新当前分辨率索引
   const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
   if (event.index < resolutions.size()) {
-    state.app_window->ui.current_resolution_index = event.index;
+    state.floating_window->ui.current_resolution_index = event.index;
   }
 }
 
 // 处理窗口选择事件
 auto handle_window_selected(Core::State::AppState& state,
-                            const UI::AppWindow::Events::WindowSelectionEvent& event) -> void {
+                            const UI::FloatingWindow::Events::WindowSelectionEvent& event) -> void {
   Logger().info("Window selected: {}", Utils::String::ToUtf8(event.window_title));
 
   // 更新设置状态中的目标窗口标题

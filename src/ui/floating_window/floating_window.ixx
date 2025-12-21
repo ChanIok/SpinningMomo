@@ -1,13 +1,13 @@
 module;
 
-export module UI.AppWindow;
+export module UI.FloatingWindow;
 
 import std;
 import Core.State;
-import UI.AppWindow.Layout;
+import UI.FloatingWindow.Layout;
 import Vendor.Windows;
 
-namespace UI::AppWindow {
+namespace UI::FloatingWindow {
 
 // 窗口创建和销毁
 export auto create_window(Core::State::AppState& state) -> std::expected<void, std::string>;
@@ -31,10 +31,12 @@ export auto set_menu_items_to_show(Core::State::AppState& state,
                                    std::span<const std::wstring> items) -> void;
 
 // 热键处理
-export auto register_toggle_visibility_hotkey(Core::State::AppState& state, Vendor::Windows::UINT modifiers,
-                            Vendor::Windows::UINT key) -> bool;
-export auto register_screenshot_hotkey(Core::State::AppState& state, Vendor::Windows::UINT modifiers,
-                            Vendor::Windows::UINT key) -> bool;
+export auto register_toggle_visibility_hotkey(Core::State::AppState& state,
+                                              Vendor::Windows::UINT modifiers,
+                                              Vendor::Windows::UINT key) -> bool;
+export auto register_screenshot_hotkey(Core::State::AppState& state,
+                                       Vendor::Windows::UINT modifiers, Vendor::Windows::UINT key)
+    -> bool;
 export auto unregister_hotkey(Core::State::AppState& state) -> void;
 
 // 渲染触发
@@ -52,4 +54,4 @@ auto initialize_menu_items(Core::State::AppState& state) -> void;
 // 创建窗口样式和属性
 auto create_window_attributes(Vendor::Windows::HWND hwnd) -> void;
 
-}  // namespace UI::AppWindow
+}  // namespace UI::FloatingWindow

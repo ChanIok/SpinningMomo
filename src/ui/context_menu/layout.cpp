@@ -13,18 +13,18 @@ import std;
 import Core.State;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
-import UI.AppWindow.State;
-import UI.AppWindow.Types;
+import UI.FloatingWindow.State;
+import UI.FloatingWindow.Types;
 import Vendor.Windows;
 
 namespace UI::ContextMenu::Layout {
 
 auto calculate_text_width(const Core::State::AppState& state, const std::wstring& text) -> int {
   const auto& menu_state = *state.context_menu;
-  if (!state.app_window) {
+  if (!state.floating_window) {
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
-  const auto& d2d = state.app_window->d2d_context;
+  const auto& d2d = state.floating_window->d2d_context;
   if (!d2d.is_initialized || !d2d.text_format) {
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
