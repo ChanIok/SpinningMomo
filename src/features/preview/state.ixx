@@ -1,12 +1,11 @@
 module;
 
-#include <windows.h>
-
 export module Features.Preview.State;
 
 import std;
 import Utils.Timer;
 import Features.Preview.Types;
+import <windows.h>;
 
 export namespace Features::Preview::State {
 

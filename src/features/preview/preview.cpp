@@ -1,12 +1,5 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
-
-#include <functional>
-#include <iostream>
-
 module Features.Preview;
 
 import std;
@@ -22,6 +15,9 @@ import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
 import Utils.Timer;
 import Utils.Logger;
+import <dwmapi.h>;
+import <windows.h>;
+import <windowsx.h>;
 
 namespace Features::Preview {
 
@@ -66,30 +62,29 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   int width = clientRect.right - clientRect.left;
   int height = clientRect.bottom - clientRect.top;
 
-  
   // 初始化渲染系统（如果需要）
   if (!preview_state.d3d_initialized) {
     auto rendering_result =
-    Rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
-      preview_state.size.window_height);
-      
-      if (!rendering_result) {
-        Logger().error("Failed to initialize rendering system");
-        return std::unexpected(rendering_result.error());
-      }
-    }
-    
-    // 初始化捕获系统
-    auto capture_result = Capture::initialize_capture(state, target_window, width, height);
-    
-    if (!capture_result) {
-      Logger().error("Failed to initialize capture system");
-      return std::unexpected(capture_result.error());
-    }
-    // 计算窗口尺寸和宽高比
-    Window::set_preview_window_size(preview_state, width, height);
+        Rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
+                                        preview_state.size.window_height);
 
-    Window::show_preview_window(state);
+    if (!rendering_result) {
+      Logger().error("Failed to initialize rendering system");
+      return std::unexpected(rendering_result.error());
+    }
+  }
+
+  // 初始化捕获系统
+  auto capture_result = Capture::initialize_capture(state, target_window, width, height);
+
+  if (!capture_result) {
+    Logger().error("Failed to initialize capture system");
+    return std::unexpected(capture_result.error());
+  }
+  // 计算窗口尺寸和宽高比
+  Window::set_preview_window_size(preview_state, width, height);
+
+  Window::show_preview_window(state);
 
   // 启动捕获
   auto start_result = Capture::start_capture(state);

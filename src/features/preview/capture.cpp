@@ -1,11 +1,6 @@
 module;
 
-#include <d3d11.h>
 #include <wil/com.h>
-#include <windows.h>
-
-#include <functional>
-#include <iostream>
 
 module Features.Preview.Capture;
 
@@ -17,6 +12,8 @@ import Features.Preview.Rendering;
 import Features.Preview.Window;
 import Utils.Graphics.Capture;
 import Utils.Logger;
+import <d3d11.h>;
+import <windows.h>;
 
 namespace Features::Preview::Capture {
 

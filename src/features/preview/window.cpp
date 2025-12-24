@@ -1,12 +1,5 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
-
-#include <functional>
-#include <iostream>
-
 module Features.Preview.Window;
 
 import std;
@@ -21,6 +14,9 @@ import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
 import Utils.Timer;
 import Utils.Logger;
+import <dwmapi.h>;
+import <windows.h>;
+import <windowsx.h>;
 
 namespace Features::Preview::Window {
 

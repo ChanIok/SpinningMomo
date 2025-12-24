@@ -1,9 +1,6 @@
 module;
 
 #include <windows.h>
-#include <windowsx.h>
-
-#include <iostream>
 
 module Features.Preview.Interaction;
 
@@ -12,6 +9,7 @@ import Core.State;
 import Features.Preview.State;
 import Features.Preview.Rendering;
 import Utils.Logger;
+import <windowsx.h>;
 
 namespace Features::Preview::Interaction {
 
@@ -54,7 +52,7 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
   if (!state.preview->target_window) return;
 
   Logger().debug("move_game_window_to_position: relative_x: {}, relative_y: {}", relative_x,
-                relative_y);
+                 relative_y);
 
   // 获取屏幕尺寸
   int screenWidth = GetSystemMetrics(SM_CXSCREEN);
@@ -133,10 +131,8 @@ auto update_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> 
   float previewHeight = static_cast<float>(clientRect.bottom - clientRect.top);
 
   // 计算新的相对位置
-  float relativeX =
-      static_cast<float>(pt.x) / previewWidth;
-  float relativeY =
-      static_cast<float>(pt.y) / previewHeight;
+  float relativeX = static_cast<float>(pt.x) / previewWidth;
+  float relativeY = static_cast<float>(pt.y) / previewHeight;
 
   move_game_window_to_position(state, relativeX, relativeY);
 }

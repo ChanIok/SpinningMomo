@@ -1,11 +1,10 @@
 module;
 
-#include <windows.h>
-
 export module Features.Preview.Capture;
 
 import std;
 import Core.State;
+import <windows.h>;
 
 export namespace Features::Preview::Capture {
 

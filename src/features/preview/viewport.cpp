@@ -1,10 +1,6 @@
 module;
 
-#include <d3d11.h>
 #include <wil/com.h>
-#include <windows.h>
-
-#include <iostream>
 
 module Features.Preview.Viewport;
 
@@ -15,6 +11,8 @@ import Features.Preview.State;
 import Features.Preview.Types;
 import Features.Preview.Rendering;
 import Utils.Logger;
+import <d3d11.h>;
+import <windows.h>;
 
 namespace Features::Preview::Viewport {
 

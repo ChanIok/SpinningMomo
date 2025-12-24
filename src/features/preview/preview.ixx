@@ -1,11 +1,10 @@
 module;
 
-#include <windows.h>
-
 export module Features.Preview;
 
 import std;
 import Core.State;
+import <windows.h>;
 
 namespace Features::Preview {
 
