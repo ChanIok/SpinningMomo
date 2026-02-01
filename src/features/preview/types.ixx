@@ -5,6 +5,7 @@ module;
 export module Features.Preview.Types;
 
 import std;
+import Utils.Throttle;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import <d3d11.h>;
@@ -43,6 +44,7 @@ struct InteractionState {
   bool is_dragging = false;
   bool viewport_dragging = false;
   POINT drag_start{};
+  std::unique_ptr<Utils::Throttle::ThrottleState<float, float>> move_throttle;
 };
 
 // DPI相关尺寸

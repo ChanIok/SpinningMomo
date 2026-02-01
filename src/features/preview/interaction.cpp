@@ -9,6 +9,7 @@ import Core.State;
 import Features.Preview.State;
 import Features.Preview.Rendering;
 import Utils.Logger;
+import Utils.Throttle;
 import <windowsx.h>;
 
 namespace Features::Preview::Interaction {
@@ -119,6 +120,14 @@ auto end_window_drag(Core::State::AppState& state, HWND hwnd) -> void {
 auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
   state.preview->interaction.viewport_dragging = true;
 
+  // 初始化/重置节流器 (约60fps)
+  if (!state.preview->interaction.move_throttle) {
+    state.preview->interaction.move_throttle =
+        Utils::Throttle::create<float, float>(std::chrono::milliseconds(16));
+  } else {
+    Utils::Throttle::reset(*state.preview->interaction.move_throttle);
+  }
+
   SetCapture(hwnd);
 }
 
@@ -134,10 +143,18 @@ auto update_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> 
   float relativeX = static_cast<float>(pt.x) / previewWidth;
   float relativeY = static_cast<float>(pt.y) / previewHeight;
 
-  move_game_window_to_position(state, relativeX, relativeY);
+  // 使用节流机制移动窗口
+  Utils::Throttle::call(
+      *state.preview->interaction.move_throttle,
+      [&state](float x, float y) { move_game_window_to_position(state, x, y); }, relativeX,
+      relativeY);
 }
 
 auto end_viewport_drag(Core::State::AppState& state, HWND hwnd) -> void {
+  // 确保最后一次移动被执行
+  Utils::Throttle::flush(*state.preview->interaction.move_throttle,
+                         [&state](float x, float y) { move_game_window_to_position(state, x, y); });
+
   state.preview->interaction.viewport_dragging = false;
   ReleaseCapture();
 }
