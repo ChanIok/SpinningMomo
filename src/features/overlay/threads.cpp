@@ -1,8 +1,4 @@
 module;
-#include <windows.h>
-
-#include <iostream>
-#include <thread>
 
 module Features.Overlay.Threads;
 
@@ -13,6 +9,7 @@ import Features.Overlay.Types;
 import Features.Overlay.Interaction;
 import Features.Overlay.Window;
 import Utils.Logger;
+import <windows.h>;
 
 namespace Features::Overlay::Threads {
 

@@ -1,11 +1,6 @@
 module;
 
-#include <d3d11.h>
 #include <wil/com.h>
-#include <windows.h>
-
-#include <functional>
-#include <iostream>
 
 module Features.Overlay.Capture;
 
@@ -15,15 +10,17 @@ import Core.State.AppInfo;
 import Features.Overlay;
 import Features.Overlay.State;
 import Features.Overlay.Rendering;
-import Features.Overlay.Utils;
+import Features.Overlay.Geometry;
 import Features.Overlay.Window;
 import Utils.Logger;
 import Utils.Graphics.Capture;
+import <d3d11.h>;
+import <windows.h>;
 
 namespace Features::Overlay::Capture {
 
 auto on_frame_arrived(Core::State::AppState& state,
-                      ::Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
+                      Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
   if (!state.overlay->running || !frame) {
     return;
   }
@@ -37,9 +34,9 @@ auto on_frame_arrived(Core::State::AppState& state,
 
   if (size_changed) {
     // 检查是否需要退出
-    auto [screen_width, screen_height] = Utils::get_screen_dimensions();
-    if (!Utils::should_use_overlay(content_size.Width, content_size.Height, screen_width,
-                                   screen_height)) {
+    auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
+    if (!Geometry::should_use_overlay(content_size.Width, content_size.Height, screen_width,
+                                      screen_height)) {
       stop_overlay(state);
       return;
     }
@@ -49,8 +46,8 @@ auto on_frame_arrived(Core::State::AppState& state,
     last_height = content_size.Height;
 
     // 重建帧池
-    ::Utils::Graphics::Capture::recreate_frame_pool(state.overlay->capture_state.session,
-                                                    content_size.Width, content_size.Height);
+    Utils::Graphics::Capture::recreate_frame_pool(state.overlay->capture_state.session,
+                                                  content_size.Width, content_size.Height);
 
     state.overlay->rendering.create_new_srv = true;
 
@@ -68,7 +65,7 @@ auto on_frame_arrived(Core::State::AppState& state,
   auto surface = frame.Surface();
   if (surface) {
     auto texture =
-        ::Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+        Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
     if (texture) {
       // 触发渲染
       Rendering::render_frame(state, texture);
@@ -101,7 +98,7 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
   }
 
   // 创建WinRT设备
-  auto winrt_device_result = ::Utils::Graphics::Capture::create_winrt_device(
+  auto winrt_device_result = Utils::Graphics::Capture::create_winrt_device(
       overlay_state.rendering.d3d_context.device.get());
   if (!winrt_device_result) {
     Logger().error("Failed to create WinRT device for capture");
@@ -109,12 +106,12 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
   }
 
   // 创建帧回调
-  auto frame_callback = [&state](::Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
+  auto frame_callback = [&state](Utils::Graphics::Capture::Direct3D11CaptureFrame frame) {
     on_frame_arrived(state, frame);
   };
 
   // 创建捕获会话
-  auto session_result = ::Utils::Graphics::Capture::create_capture_session(
+  auto session_result = Utils::Graphics::Capture::create_capture_session(
       target_window, winrt_device_result.value(), width, height, frame_callback);
 
   if (!session_result) {
@@ -123,9 +120,6 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
   }
 
   overlay_state.capture_state.session = std::move(session_result.value());
-  overlay_state.capture_state.active = false;
-  overlay_state.capture_state.last_frame_width = width;
-  overlay_state.capture_state.last_frame_height = height;
 
   Logger().info("Capture system initialized successfully");
   return {};
@@ -134,13 +128,12 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
 auto start_capture(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& session = state.overlay->capture_state.session;
 
-  auto start_result = ::Utils::Graphics::Capture::start_capture(session);
+  auto start_result = Utils::Graphics::Capture::start_capture(session);
   if (!start_result) {
     Logger().error("Failed to start capture");
     return std::unexpected("Failed to start capture");
   }
 
-  state.overlay->capture_state.active = true;
   Logger().debug("Capture started successfully");
   return {};
 }
@@ -148,24 +141,14 @@ auto start_capture(Core::State::AppState& state) -> std::expected<void, std::str
 auto stop_capture(Core::State::AppState& state) -> void {
   auto& session = state.overlay->capture_state.session;
 
-  if (state.overlay->capture_state.active) {
-    ::Utils::Graphics::Capture::stop_capture(session);
-    state.overlay->capture_state.active = false;
-    state.overlay->capture_state.last_frame_width = 0;
-    state.overlay->capture_state.last_frame_height = 0;
-    Logger().debug("Capture stopped");
-  }
+  Utils::Graphics::Capture::stop_capture(session);
+  Logger().debug("Capture stopped");
 }
 
 auto cleanup_capture(Core::State::AppState& state) -> void {
   auto& session = state.overlay->capture_state.session;
 
-  if (state.overlay->capture_state.active) {
-    ::Utils::Graphics::Capture::stop_capture(session);
-  }
-
-  ::Utils::Graphics::Capture::cleanup_capture_session(session);
-  state.overlay->capture_state.active = false;
+  Utils::Graphics::Capture::cleanup_capture_session(session);
   Logger().info("Capture resources cleaned up");
 }
 

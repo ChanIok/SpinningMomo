@@ -1,17 +1,15 @@
 module;
 
-#include <windows.h>
-
-#include <iostream>
-
-module Features.Overlay.Utils;
+module Features.Overlay.Geometry;
 
 import std;
 import Core.State;
 import Features.Overlay.State;
 import Features.Overlay.Types;
+import <dwmapi.h>;
+import <windows.h>;
 
-namespace Features::Overlay::Utils {
+namespace Features::Overlay::Geometry {
 
 auto get_screen_dimensions() -> std::pair<int, int> {
   return {GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)};
@@ -84,4 +82,4 @@ auto calculate_letterbox_area(int screen_width, int screen_height, int game_widt
   return std::make_tuple(content_left, content_top, content_width, content_height);
 }
 
-}  // namespace Features::Overlay::Utils
+}  // namespace Features::Overlay::Geometry

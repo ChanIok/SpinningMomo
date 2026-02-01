@@ -1,9 +1,5 @@
 module;
 
-#include <windows.h>
-
-#include <iostream>
-
 module Features.Overlay.Window;
 
 import std;
@@ -11,8 +7,10 @@ import Features.Overlay.State;
 import Utils.Logger;
 import Core.State;
 import Features.Overlay.Types;
-import Features.Overlay.Utils;
+import Features.Overlay.Geometry;
 import Features.Overlay.Interaction;
+import <dwmapi.h>;
+import <windows.h>;
 
 namespace Features::Overlay::Window {
 
@@ -66,7 +64,7 @@ auto unregister_overlay_window_class(HINSTANCE instance) -> void {
 auto create_overlay_window(HINSTANCE instance, Core::State::AppState& state)
     -> std::expected<HWND, std::string> {
   auto& overlay_state = *state.overlay;
-  auto [screen_width, screen_height] = Utils::get_screen_dimensions();
+  auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
 
   overlay_state.window.screen_width = screen_width;
   overlay_state.window.screen_height = screen_height;
@@ -135,7 +133,7 @@ auto set_overlay_window_size(Core::State::AppState& state, int game_width, int g
     overlay_state.window.window_width = overlay_state.window.screen_width;
     overlay_state.window.window_height = overlay_state.window.screen_height;
   } else {
-    auto [window_width, window_height] = Utils::calculate_overlay_dimensions(
+    auto [window_width, window_height] = Geometry::calculate_overlay_dimensions(
         game_width, game_height, overlay_state.window.screen_width,
         overlay_state.window.screen_height);
 
@@ -214,7 +212,7 @@ auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void 
   SetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE, ex_style & ~WS_EX_LAYERED);
 
   // 获取窗口尺寸
-  auto dimensions_result = Utils::get_window_dimensions(overlay_state.window.target_window);
+  auto dimensions_result = Geometry::get_window_dimensions(overlay_state.window.target_window);
   if (!dimensions_result) {
     return;
   }

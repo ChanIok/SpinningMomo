@@ -1,10 +1,5 @@
 module;
 
-#include <windows.h>
-
-#include <functional>
-#include <iostream>
-
 module Features.Overlay;
 
 import std;
@@ -16,9 +11,11 @@ import Features.Overlay.Rendering;
 import Features.Overlay.Capture;
 import Features.Overlay.Interaction;
 import Features.Overlay.Threads;
-import Features.Overlay.Utils;
+import Features.Overlay.Geometry;
 import Utils.Logger;
 import Utils.Timer;
+import <dwmapi.h>;
+import <windows.h>;
 
 namespace Features::Overlay {
 
@@ -55,15 +52,15 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool is_pre
   }
 
   // 获取窗口尺寸
-  auto dimensions_result = Utils::get_window_dimensions(target_window);
+  auto dimensions_result = Geometry::get_window_dimensions(target_window);
   if (!dimensions_result) {
     return std::unexpected(dimensions_result.error());
   }
 
   auto [width, height] = dimensions_result.value();
-  auto [screen_width, screen_height] = Utils::get_screen_dimensions();
+  auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
 
-  if (!Utils::should_use_overlay(width, height, screen_width, screen_height) && !is_pre_launch) {
+  if (!Geometry::should_use_overlay(width, height, screen_width, screen_height) && !is_pre_launch) {
     Window::restore_game_window(state);
     // 不返回错误，因为游戏窗口在屏幕内，不需要叠加层
     return {};

@@ -12,7 +12,7 @@ import std;
 import Core.State;
 import Features.Overlay.State;
 import Features.Overlay.Types;
-import Features.Overlay.Utils;
+import Features.Overlay.Geometry;
 import Features.Overlay.Shaders;
 import Utils.Graphics.D3D;
 import Utils.Logger;
@@ -22,7 +22,7 @@ namespace Features::Overlay::Rendering {
 auto create_shader_resources(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
-  auto result = ::Utils::Graphics::D3D::create_basic_shader_resources(
+  auto result = Utils::Graphics::D3D::create_basic_shader_resources(
       overlay_state.rendering.d3d_context.device.get(),
       Features::Overlay::Shaders::BASIC_VERTEX_SHADER,
       Features::Overlay::Shaders::BASIC_PIXEL_SHADER);
@@ -41,7 +41,7 @@ auto create_shader_resources(Core::State::AppState& state) -> std::expected<void
       {1.0f, 1.0f, 1.0f, 0.0f}     // 右上
   };
 
-  auto vertex_buffer_result = ::Utils::Graphics::D3D::create_vertex_buffer(
+  auto vertex_buffer_result = Utils::Graphics::D3D::create_vertex_buffer(
       overlay_state.rendering.d3d_context.device.get(), vertices, 4, sizeof(Types::Vertex));
 
   if (!vertex_buffer_result) {
@@ -57,9 +57,9 @@ auto initialize_rendering(Core::State::AppState& state) -> std::expected<void, s
   auto& overlay_state = *state.overlay;
 
   // 创建D3D上下文
-  auto d3d_result = ::Utils::Graphics::D3D::create_d3d_context(overlay_state.window.overlay_hwnd,
-                                                               overlay_state.window.window_width,
-                                                               overlay_state.window.window_height);
+  auto d3d_result = Utils::Graphics::D3D::create_d3d_context(overlay_state.window.overlay_hwnd,
+                                                             overlay_state.window.window_width,
+                                                             overlay_state.window.window_height);
 
   if (!d3d_result) {
     auto error_msg = std::format("Failed to initialize D3D rendering: {}", d3d_result.error());
@@ -76,7 +76,7 @@ auto initialize_rendering(Core::State::AppState& state) -> std::expected<void, s
     Logger().error(error_msg);
 
     // 清理已分配的D3D资源
-    ::Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
+    Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
     overlay_state.rendering.d3d_initialized = false;
 
     return std::unexpected(result.error());
@@ -99,9 +99,9 @@ auto resize_rendering(Core::State::AppState& state) -> std::expected<void, std::
   rendering_state.resources_busy.store(true, std::memory_order_release);
 
   // 调整交换链大小
-  auto result = ::Utils::Graphics::D3D::resize_swap_chain(rendering_state.d3d_context,
-                                                          overlay_state.window.window_width,
-                                                          overlay_state.window.window_height);
+  auto result = Utils::Graphics::D3D::resize_swap_chain(rendering_state.d3d_context,
+                                                        overlay_state.window.window_width,
+                                                        overlay_state.window.window_height);
 
   rendering_state.resources_busy.store(false, std::memory_order_release);
 
@@ -159,7 +159,7 @@ auto update_vertex_buffer_for_letterbox(Core::State::AppState& state) -> void {
   if (overlay_state.window.use_letterbox_mode) {
     // 使用工具函数计算黑边区域
     auto [content_left, content_top, content_width, content_height] =
-        Utils::calculate_letterbox_area(
+        Geometry::calculate_letterbox_area(
             overlay_state.window.screen_width, overlay_state.window.screen_height,
             overlay_state.window.cached_game_width, overlay_state.window.cached_game_height);
 
@@ -273,8 +273,8 @@ auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> fr
 auto cleanup_rendering(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
-  ::Utils::Graphics::D3D::cleanup_shader_resources(overlay_state.rendering.shader_resources);
-  ::Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
+  Utils::Graphics::D3D::cleanup_shader_resources(overlay_state.rendering.shader_resources);
+  Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
 
   overlay_state.rendering.frame_texture.reset();
   overlay_state.rendering.capture_srv.reset();

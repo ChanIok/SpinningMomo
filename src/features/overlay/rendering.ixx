@@ -1,13 +1,12 @@
 module;
 
-#include <d3d11.h>
-#include <wil/com.h>
-
 export module Features.Overlay.Rendering;
 
 import std;
 import Core.State;
 import Features.Overlay.State;
+import <d3d11.h>;
+import <wil/com.h>;
 
 namespace Features::Overlay::Rendering {
 

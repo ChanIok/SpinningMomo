@@ -1,12 +1,11 @@
 module;
 
-#include <windows.h>
-
-export module Features.Overlay.Utils;
+export module Features.Overlay.Geometry;
 
 import std;
+import <windows.h>;
 
-namespace Features::Overlay::Utils {
+namespace Features::Overlay::Geometry {
 
 // 获取屏幕尺寸
 export auto get_screen_dimensions() -> std::pair<int, int>;
@@ -23,7 +22,7 @@ export auto should_use_overlay(int game_width, int game_height, int screen_width
 export auto get_window_dimensions(HWND hwnd) -> std::expected<std::pair<int, int>, std::string>;
 
 // 计算黑边区域的位置和尺寸
-export auto calculate_letterbox_area(int screen_width, int screen_height, int game_width, int game_height)
-    -> std::tuple<int, int, int, int>;
+export auto calculate_letterbox_area(int screen_width, int screen_height, int game_width,
+                                     int game_height) -> std::tuple<int, int, int, int>;
 
-}  // namespace Features::Overlay::Utils
+}  // namespace Features::Overlay::Geometry

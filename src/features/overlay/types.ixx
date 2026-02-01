@@ -1,15 +1,14 @@
 module;
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
-
 export module Features.Overlay.Types;
 
 import std;
 import Utils.Timer;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
+import <d3d11.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 export namespace Features::Overlay::Types {
 
@@ -59,7 +58,6 @@ struct RenderingState {
 // 捕获状态
 struct CaptureState {
   Utils::Graphics::Capture::CaptureSession session;
-  bool active = false;
   int last_frame_width = 0;
   int last_frame_height = 0;
 };

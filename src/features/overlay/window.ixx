@@ -1,12 +1,11 @@
 module;
 
-#include <windows.h>
-
 export module Features.Overlay.Window;
 
 import std;
 import Features.Overlay.State;
 import Core.State;
+import <windows.h>;
 
 namespace Features::Overlay::Window {
 
