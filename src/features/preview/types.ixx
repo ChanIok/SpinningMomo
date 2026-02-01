@@ -52,11 +52,13 @@ struct DpiDependentSizes {
   static constexpr int BASE_TITLE_HEIGHT = 24;
   static constexpr int BASE_FONT_SIZE = 12;
   static constexpr int BASE_BORDER_WIDTH = 8;
+  static constexpr int BASE_VIEWPORT_LINE_WIDTH = 3;  // 视口框线宽基准值 (3dp)
 
   UINT dpi = 96;
   int title_height = BASE_TITLE_HEIGHT;
   int font_size = BASE_FONT_SIZE;
   int border_width = BASE_BORDER_WIDTH;
+  int viewport_line_width = BASE_VIEWPORT_LINE_WIDTH;
 
   auto update_dpi_scaling(UINT new_dpi) -> void {
     dpi = new_dpi;
@@ -64,6 +66,7 @@ struct DpiDependentSizes {
     title_height = static_cast<int>(BASE_TITLE_HEIGHT * scale);
     font_size = static_cast<int>(BASE_FONT_SIZE * scale);
     border_width = static_cast<int>(BASE_BORDER_WIDTH * scale);
+    viewport_line_width = static_cast<int>(BASE_VIEWPORT_LINE_WIDTH * scale);
   }
 };
 

@@ -166,28 +166,54 @@ auto create_viewport_vertices(const Core::State::AppState& state,
   viewportRight = std::clamp(viewportRight, 0.0f, 1.0f);
   viewportBottom = std::clamp(viewportBottom, 0.0f, 1.0f);
 
+  // 获取 DPI 缩放后的线宽，并转换为归一化坐标
+  float lineWidthPx = static_cast<float>(state.preview->dpi_sizes.viewport_line_width);
+  float halfThicknessX = (lineWidthPx / 2.0f) / previewWidth;
+  float halfThicknessY = (lineWidthPx / 2.0f) / previewHeight;
+
   // 视口框颜色 RGBA(255, 160, 80, 0.8)
   Features::Preview::Types::ViewportVertex::Color frameColor = {255.0f / 255.0f, 160.0f / 255.0f,
                                                                 80.0f / 255.0f, 0.8f};
 
-  // 创建矩形框线条顶点（4条边，8个顶点）
-  vertices.reserve(8);
+  // 创建矩形框顶点（4条边，每条边6个顶点 = 24个顶点）
+  vertices.reserve(24);
 
-  // 上边
-  vertices.push_back({{viewportLeft, viewportTop}, frameColor});
-  vertices.push_back({{viewportRight, viewportTop}, frameColor});
+  // 辅助 lambda：添加一个矩形（2个三角形，6个顶点）
+  auto add_rect = [&](float x1, float y1, float x2, float y2, float x3, float y3, float x4,
+                      float y4) {
+    // 三角形 1: (x1,y1), (x2,y2), (x3,y3)
+    vertices.push_back({{x1, y1}, frameColor});
+    vertices.push_back({{x2, y2}, frameColor});
+    vertices.push_back({{x3, y3}, frameColor});
+    // 三角形 2: (x3,y3), (x4,y4), (x1,y1)
+    vertices.push_back({{x3, y3}, frameColor});
+    vertices.push_back({{x4, y4}, frameColor});
+    vertices.push_back({{x1, y1}, frameColor});
+  };
 
-  // 右边
-  vertices.push_back({{viewportRight, viewportTop}, frameColor});
-  vertices.push_back({{viewportRight, viewportBottom}, frameColor});
+  // 上边（水平矩形）
+  add_rect(viewportLeft - halfThicknessX, viewportTop - halfThicknessY,   // 左上
+           viewportRight + halfThicknessX, viewportTop - halfThicknessY,  // 右上
+           viewportRight + halfThicknessX, viewportTop + halfThicknessY,  // 右下
+           viewportLeft - halfThicknessX, viewportTop + halfThicknessY);  // 左下
 
-  // 下边
-  vertices.push_back({{viewportRight, viewportBottom}, frameColor});
-  vertices.push_back({{viewportLeft, viewportBottom}, frameColor});
+  // 下边（水平矩形）
+  add_rect(viewportLeft - halfThicknessX, viewportBottom - halfThicknessY,   // 左上
+           viewportRight + halfThicknessX, viewportBottom - halfThicknessY,  // 右上
+           viewportRight + halfThicknessX, viewportBottom + halfThicknessY,  // 右下
+           viewportLeft - halfThicknessX, viewportBottom + halfThicknessY);  // 左下
 
-  // 左边
-  vertices.push_back({{viewportLeft, viewportBottom}, frameColor});
-  vertices.push_back({{viewportLeft, viewportTop}, frameColor});
+  // 左边（垂直矩形，避免与上下边重叠）
+  add_rect(viewportLeft - halfThicknessX, viewportTop + halfThicknessY,      // 左上
+           viewportLeft + halfThicknessX, viewportTop + halfThicknessY,      // 右上
+           viewportLeft + halfThicknessX, viewportBottom - halfThicknessY,   // 右下
+           viewportLeft - halfThicknessX, viewportBottom - halfThicknessY);  // 左下
+
+  // 右边（垂直矩形，避免与上下边重叠）
+  add_rect(viewportRight - halfThicknessX, viewportTop + halfThicknessY,      // 左上
+           viewportRight + halfThicknessX, viewportTop + halfThicknessY,      // 右上
+           viewportRight + halfThicknessX, viewportBottom - halfThicknessY,   // 右下
+           viewportRight - halfThicknessX, viewportBottom - halfThicknessY);  // 左下
 }
 
 auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* context,
@@ -228,7 +254,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
 
   // 设置渲染状态
   context->IASetInputLayout(input_layout.get());
-  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
   UINT stride = sizeof(Features::Preview::Types::ViewportVertex);
   UINT offset = 0;
@@ -238,7 +264,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
   context->VSSetShader(vertex_shader.get(), nullptr, 0);
   context->PSSetShader(pixel_shader.get(), nullptr, 0);
 
-  // 绘制视口框线条
+  // 绘制视口框矩形
   context->Draw(static_cast<UINT>(vertices.size()), 0);
 }
 
