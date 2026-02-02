@@ -40,7 +40,7 @@ const handleMenuSelect = (key: string) => {
 </script>
 
 <template>
-  <Sidebar collapsible="none" class="w-14 bg-transparent pt-2">
+  <Sidebar collapsible="none" class="w-14 border-r border-panel pt-2">
     <SidebarContent>
       <SidebarGroup>
         <SidebarGroupContent class="px-0">

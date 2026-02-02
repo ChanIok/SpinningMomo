@@ -31,7 +31,7 @@ const handleClose = () => {
 </script>
 
 <template>
-  <header class="flex h-12 items-center justify-between gap-2 bg-transparent px-4">
+  <header class="flex h-10 items-center justify-between gap-2 bg-transparent pr-1 pl-4">
     <!-- 可拖动区域 -->
     <div class="drag-region h-full flex-1" />
 
@@ -40,7 +40,7 @@ const handleClose = () => {
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-muted-foreground"
+        class="h-8 w-8 text-muted-foreground hover:bg-secondary"
         @click="handleMinimize"
         title="Minimize"
       >
@@ -50,7 +50,7 @@ const handleClose = () => {
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-muted-foreground"
+        class="h-8 w-8 text-muted-foreground hover:bg-secondary"
         @click="handleMaximizeToggle"
         :title="isMaximized ? 'Restore' : 'Maximize'"
       >

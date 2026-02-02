@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
 import { Settings, Wrench, Menu, Palette } from 'lucide-vue-next'
@@ -56,24 +55,28 @@ const handleMenuClick = (key: SettingsPageKey) => {
 </script>
 
 <template>
-  <div class="flex h-full w-48 flex-col lg:w-56 2xl:w-64 border-r bg-muted/20">
+  <div class="flex h-full w-48 flex-col border-r border-panel bg-muted/20 lg:w-56 2xl:w-64">
     <div class="h-full p-4">
       <nav class="flex-1">
         <div class="space-y-1">
           <div v-for="item in settingsMenus" :key="item.key" class="group">
             <button
               @click="handleMenuClick(item.key)"
-              :class="cn(
-                'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-all duration-200',
-                'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                'hover:bg-accent hover:text-accent-foreground',
-                activePage === item.key ? 'bg-accent text-accent-foreground font-medium' : 'text-muted-foreground'
-              )"
+              :class="
+                cn(
+                  'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-all duration-200',
+                  'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                  'hover:bg-accent hover:text-accent-foreground',
+                  activePage === item.key
+                    ? 'bg-accent font-medium text-accent-foreground'
+                    : 'text-muted-foreground'
+                )
+              "
               :title="t(item.description)"
             >
               <component :is="item.icon" class="h-5 w-5 flex-shrink-0" stroke-width="1.8" />
               <div class="min-w-0 flex-1">
-                <div class="font-medium text-sm">{{ t(item.label) }}</div>
+                <div class="text-sm font-medium">{{ t(item.label) }}</div>
               </div>
             </button>
           </div>
