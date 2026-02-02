@@ -123,36 +123,47 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
   switch (msg) {
     case WM_NCCALCSIZE: {
-      // 处理非客户区大小计算，仅调整顶部边框以抵消WS_THICKFRAME的影响
+      // 处理非客户区大小计算，实现无标题栏窗口
+      // wparam == TRUE: 窗口大小改变时，lparam 指向 NCCALCSIZE_PARAMS
+      // wparam == FALSE: 窗口创建时，lparam 指向 RECT
       if (wparam == TRUE) {
-        // 检查窗口是否已最大化
-        bool is_maximized = IsZoomed(hwnd);
+        NCCALCSIZE_PARAMS* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
 
-        // 只有在非最大化状态下才调整顶部边框
-        if (!is_maximized) {
-          NCCALCSIZE_PARAMS* nccsp = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
-
-          // 保存原始矩形
-          RECT original = nccsp->rgrc[0];
-
-          // 先调用默认处理，获取标准的客户区计算结果
-          LRESULT result = DefWindowProcW(hwnd, msg, wparam, lparam);
-
-          // 保持默认处理后的左侧、右侧和底部不变，只调整顶部
-          nccsp->rgrc[0].top = original.top;
-
-          return result;
+        if (IsZoomed(hwnd)) {
+          // 最大化：限制到工作区（不覆盖任务栏）
+          HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+          MONITORINFO mi = {sizeof(mi)};
+          if (GetMonitorInfoW(monitor, &mi)) {
+            params->rgrc[0] = mi.rcWork;
+          }
+        } else {
+          // 非最大化：获取系统计算的边框大小，但移除顶部标题栏
+          RECT original = params->rgrc[0];
+          DefWindowProcW(hwnd, msg, wparam, lparam);
+          // 保留左右底边框，只移除顶部标题栏
+          params->rgrc[0].top = original.top;
         }
       }
-      // 对于最大化窗口或其他情况，使用默认处理
-      return DefWindowProcW(hwnd, msg, wparam, lparam);
+      // 返回 0 表示我们已处理此消息
+      return 0;
     }
 
     case WM_GETMINMAXINFO: {
-      // 限制窗口的最小尺寸为320x240
       MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
+
+      // 设置最小尺寸
       mmi->ptMinTrackSize.x = 320;
       mmi->ptMinTrackSize.y = 240;
+
+      // 设置最大化时的位置和尺寸（工作区，不覆盖任务栏）
+      HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      MONITORINFO mi = {sizeof(mi)};
+      if (GetMonitorInfoW(monitor, &mi)) {
+        mmi->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+        mmi->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
+        mmi->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
+        mmi->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+      }
       return 0;
     }
 
@@ -216,9 +227,15 @@ auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
   RegisterClassExW(&wc);
 }
 
-auto create_window_attributes(HWND hwnd) -> void {
-  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
+auto apply_window_style(HWND hwnd) -> void {
+  // 设置 Win11 圆角样式
+  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUND;
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+
+  // 强制触发 WM_NCCALCSIZE 重新计算边框
+  // 这确保窗口创建后立即应用正确的非客户区计算
+  SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+               SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
@@ -232,10 +249,18 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   const int y = 100;
 
   // 创建独立窗口
+  // 窗口样式：
+  // - WS_POPUP: 无边框窗口
+  // - WS_THICKFRAME: 支持边缘拖拽调整大小
+  // - WS_CAPTION: 启用 DWM 动画效果（标题栏通过 WM_NCCALCSIZE 隐藏）
+  // - WS_SYSMENU: 启用系统菜单（Alt+Space）
+  // - WS_MAXIMIZEBOX/WS_MINIMIZEBOX: 支持最大化/最小化
+  constexpr DWORD style =
+      WS_POPUP | WS_THICKFRAME | WS_CAPTION | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
   HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW,                         // 扩展样式
                               L"SpinningMomoWebViewWindowClass",       // 窗口类名
                               L"SpinningMomo WebView",                 // 窗口标题
-                              WS_POPUP | WS_THICKFRAME,                // 窗口样式
+                              style,                                   // 窗口样式
                               x, y, width, height,                     // 位置和大小
                               nullptr,                                 // 父窗口
                               nullptr,                                 // 菜单
@@ -247,11 +272,7 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
     return std::unexpected("Failed to create WebView window");
   }
 
-  // 设置窗口圆角
-  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
-  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
-
-  // 保存窗口句柄到WebView状态中
+  // 保存窗口句柄到 WebView 状态中
   state.webview->window.webview_hwnd = hwnd;
   state.webview->window.width = width;
   state.webview->window.height = height;
@@ -259,8 +280,8 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   state.webview->window.y = y;
   state.webview->window.is_visible = false;
 
-  // 创建窗口属性（Win11样式）
-  create_window_attributes(hwnd);
+  // 应用窗口样式（圆角 + 触发边框重算）
+  apply_window_style(hwnd);
 
   Logger().info("WebView window created successfully");
   return {};
