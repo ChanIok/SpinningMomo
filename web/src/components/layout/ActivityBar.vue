@@ -18,13 +18,25 @@ interface MenuItem {
   icon: any
 }
 
-const menuItems: (MenuItem | { type: 'divider' })[] = [
+const baseMenuItems: (MenuItem | { type: 'divider' })[] = [
   { title: '主页', key: 'home', icon: Home },
   { title: '图库', key: 'gallery', icon: Images },
   { title: '设置', key: 'settings', icon: Settings },
   { type: 'divider' },
   { title: '关于', key: 'about', icon: Info },
 ]
+
+const menuItems = computed(() => {
+  if (import.meta.env.PROD) {
+    return baseMenuItems.filter((item) => {
+      if ('key' in item) {
+        return item.key !== 'gallery'
+      }
+      return true
+    })
+  }
+  return baseMenuItems
+})
 
 const router = useRouter()
 const route = useRoute()

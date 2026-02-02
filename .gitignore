@@ -3,6 +3,7 @@ out/
 [Bb]uild/
 [Dd]ebug/
 [Rr]elease/
+dist/
 
 # Visual Studio files
 .vs/
