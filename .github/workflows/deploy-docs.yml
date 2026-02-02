@@ -5,7 +5,7 @@ name: Deploy VitePress Documentation
 # 同时支持手动触发
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - 'docs/**'
   # 添加手动触发

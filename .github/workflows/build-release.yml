@@ -1,0 +1,123 @@
+# Build and Release workflow
+# Triggers on version tags (v*) or manual dispatch
+
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version override (e.g., 1.0.0). Leave empty to extract from version.hpp'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+
+      - name: Setup .NET (for WiX)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install WiX Toolset v6
+        run: |
+          dotnet tool install --global wix --version 6.*
+          wix extension add WixToolset.UI.wixext --global
+          wix extension add WixToolset.BootstrapperApplications.wixext --global
+
+      - name: Extract version from version.hpp
+        id: version
+        shell: pwsh
+        run: |
+          $versionFile = Get-Content "src/version.hpp" -Raw
+          if ($versionFile -match 'VERSION_STR\s+"([^"]+)"') {
+            $version = $matches[1]
+            # Convert 1.0.0.0 to 1.0.0 for MSI (max 3 parts)
+            $versionParts = $version.Split('.')
+            $msiVersion = "$($versionParts[0]).$($versionParts[1]).$($versionParts[2])"
+            Write-Host "Extracted version: $msiVersion"
+            echo "VERSION=$msiVersion" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Error "Could not extract version from version.hpp"
+            exit 1
+          }
+
+      - name: Override version if specified
+        id: final_version
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          if ([string]::IsNullOrEmpty($version)) {
+            $version = "${{ steps.version.outputs.VERSION }}"
+          }
+          Write-Host "Final version: $version"
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd web && npm ci
+
+      - name: Build all (C++ + Web + Dist)
+        run: npm run build
+
+      - name: Build MSI and Bundle Installer
+        shell: pwsh
+        run: |
+          $version = "${{ steps.final_version.outputs.VERSION }}"
+          .\scripts\build-msi.ps1 -Version $version
+
+      - name: Create Portable ZIP
+        shell: pwsh
+        run: |
+          $version = "${{ steps.final_version.outputs.VERSION }}"
+          $zipName = "SpinningMomo-$version-x64-Portable.zip"
+          $zipPath = Join-Path "dist" $zipName
+          
+          # Create ZIP from dist contents (excluding installers)
+          Compress-Archive -Path "dist\SpinningMomo.exe", "dist\resources" -DestinationPath $zipPath -Force
+          Write-Host "Created: $zipPath"
+
+      - name: Upload artifacts (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpinningMomo-All
+          path: |
+            dist/*.msi
+            dist/*-Setup.exe
+            dist/*-Portable.zip
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*-Setup.exe
+            dist/*-Portable.zip
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

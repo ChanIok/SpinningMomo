@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  SpinningMomo Bundle Installer
+  WiX v6 Burn Bundle - provides modern UI installer (.exe)
+-->
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+
+  <Bundle
+    Name="SpinningMomo"
+    Manufacturer="ChanIok"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="F9A8B7C6-5D4E-3F2A-1B0C-9D8E7F6A5B4C"
+    IconSourceFile="$(var.ProjectDir)\resources\icon.ico"
+    AboutUrl="https://github.com/ChanIok/SpinningMomo"
+    HelpUrl="https://github.com/ChanIok/SpinningMomo/issues">
+
+    <!-- Standard Bootstrapper Application with modern UI -->
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        Theme="hyperlinkLicense"
+        LicenseUrl="https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE"
+        LogoFile="$(var.ProjectDir)\docs\public\logo.png" />
+    </BootstrapperApplication>
+
+    <Chain>
+      <!-- Install the MSI package -->
+      <MsiPackage
+        Id="MainPackage"
+        SourceFile="$(var.MsiPath)"
+        Visible="no" />
+    </Chain>
+
+  </Bundle>
+
+</Wix>

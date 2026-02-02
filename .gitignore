@@ -34,6 +34,10 @@ compile_commands.json
 .xmake/
 vsxmake2022/
 
+# WiX generated files
+*.msi
+*.wixpdb
+
 # VitePress docs
 docs/.vitepress/dist/
 docs/.vitepress/cache/

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  SpinningMomo MSI Installer Configuration
+  WiX v5/v6 format - uses Files element for automatic file harvesting
+-->
+
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+    Name="SpinningMomo"
+    Manufacturer="ChanIok"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="AE1DB654-768A-488C-8DBE-1E213939C662"
+    Language="1033"
+    Codepage="1252"
+    InstallerVersion="500"
+    Scope="perMachine"
+    Compressed="yes">
+
+    <SummaryInformation
+      Description="SpinningMomo - Window adjustment tool for Infinity Nikki"
+      Manufacturer="ChanIok" />
+
+    <!-- Upgrade logic: remove older versions before installing -->
+    <MajorUpgrade
+      DowngradeErrorMessage="!(loc.DowngradeError)"
+      Schedule="afterInstallInitialize" />
+
+    <!-- Embed CAB into MSI -->
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <!-- Icon for Add/Remove Programs -->
+    <Icon Id="AppIcon" SourceFile="$(var.ProjectDir)\resources\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="AppIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/ChanIok/SpinningMomo" />
+
+    <!-- Features -->
+    <Feature Id="MainFeature" Title="SpinningMomo" Level="1">
+      <ComponentGroupRef Id="MainComponents" />
+      <ComponentGroupRef Id="WebResources" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="CleanupUserData" />
+    </Feature>
+
+    <!-- UI: Use WiX standard install directory UI -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)\installer\License.rtf" />
+    <ui:WixUI Id="WixUI_InstallDir" />
+
+  </Package>
+
+  <!-- Directory Structure -->
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="SpinningMomo">
+        <Directory Id="ResourcesFolder" Name="resources">
+          <Directory Id="WebFolder" Name="web" />
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppMenuFolder" Name="SpinningMomo" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder" />
+  </Fragment>
+
+  <!-- Main Components -->
+  <Fragment>
+    <ComponentGroup Id="MainComponents" Directory="INSTALLFOLDER">
+      <File Source="$(var.DistDir)\SpinningMomo.exe" />
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Web Resources: WiX v5+ Files element for automatic harvesting -->
+  <Fragment>
+    <ComponentGroup Id="WebResources" Directory="WebFolder">
+      <Files Include="$(var.DistDir)\resources\web\**" />
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Shortcuts -->
+  <Fragment>
+    <!-- Start Menu Shortcut -->
+    <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="C3D4E5F6-A7B8-4C5D-0E1F-2A3B4C5D6E7F">
+      <Shortcut Id="StartMenuShortcutFile"
+                Name="SpinningMomo"
+                Description="!(loc.ShortcutDescription)"
+                Target="[INSTALLFOLDER]SpinningMomo.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\ChanIok\SpinningMomo"
+                     Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Desktop Shortcut -->
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="D4E5F6A7-B8C9-4D5E-1F2A-3B4C5D6E7F8A">
+      <Shortcut Id="DesktopShortcutFile"
+                Name="SpinningMomo"
+                Description="!(loc.ShortcutDescription)"
+                Target="[INSTALLFOLDER]SpinningMomo.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="AppIcon" />
+      <RegistryValue Root="HKCU" Key="Software\ChanIok\SpinningMomo"
+                     Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+  <!-- Remove user data on uninstall -->
+  <Fragment>
+    <!-- Define runtime directories for cleanup -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Directory Id="LogsFolder" Name="logs" />
+      <Directory Id="DataFolder" Name="data" />
+      <Directory Id="ThumbnailsFolder" Name="thumbnails" />
+    </DirectoryRef>
+
+    <Component Id="CleanupUserData" Directory="INSTALLFOLDER" Guid="E5F6A7B8-C9D0-4E5F-2A3B-4C5D6E7F8A9B">
+      <!-- Remove user data files -->
+      <RemoveFile Id="RemoveDatabase" Name="database.db" On="uninstall" />
+      <RemoveFile Id="RemoveSettings" Name="settings.json" On="uninstall" />
+      <!-- Remove all files in logs folder -->
+      <RemoveFile Id="RemoveLogFiles" Directory="LogsFolder" Name="*" On="uninstall" />
+      <RemoveFolder Id="RemoveLogsFolder" Directory="LogsFolder" On="uninstall" />
+      <!-- Remove all files in data folder -->
+      <RemoveFile Id="RemoveDataFiles" Directory="DataFolder" Name="*" On="uninstall" />
+      <RemoveFolder Id="RemoveDataFolder" Directory="DataFolder" On="uninstall" />
+      <!-- Remove all files in thumbnails folder -->
+      <RemoveFile Id="RemoveThumbnailFiles" Directory="ThumbnailsFolder" Name="*" On="uninstall" />
+      <RemoveFolder Id="RemoveThumbnailsFolder" Directory="ThumbnailsFolder" On="uninstall" />
+      <!-- Remove install folder itself if empty -->
+      <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+      <!-- Registry key for component tracking -->
+      <RegistryValue Root="HKCU" Key="Software\ChanIok\SpinningMomo"
+                     Name="Cleanup" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+
+</Wix>
