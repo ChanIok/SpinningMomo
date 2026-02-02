@@ -1,11 +1,9 @@
 module;
 
-#include <windows.h>  // 必须放在最前面
 #include <comdef.h>
 #include <shellapi.h>
 #include <shobjidl.h>
-
-#include <filesystem>
+#include <windows.h>  // 必须放在最前面
 
 module Features.Screenshot.Folder;
 
@@ -90,8 +88,7 @@ auto discover_game_path(HWND game_window) -> std::expected<std::filesystem::path
 auto resolve_path(const Core::State::AppState& state)
     -> std::expected<std::filesystem::path, std::string> {
   // 1. 检查配置中的路径
-  std::string screenshot_path_config =
-      state.settings->raw.features.screenshot.screenshot_dir_path;
+  std::string screenshot_path_config = state.settings->raw.features.screenshot.screenshot_dir_path;
   if (!screenshot_path_config.empty()) {
     std::filesystem::path config_path = screenshot_path_config;
     if (std::filesystem::exists(config_path)) {

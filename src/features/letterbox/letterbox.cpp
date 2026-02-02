@@ -1,17 +1,13 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-
-#include <iostream>
-#include <thread>
-
 module Features.Letterbox;
 
 import std;
 import Core.State;
 import Features.Letterbox.State;
 import Utils.Logger;
+import <dwmapi.h>;
+import <windows.h>;
 
 namespace Features::Letterbox {
 

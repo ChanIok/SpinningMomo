@@ -1,10 +1,9 @@
 module;
 
-#include <windows.h>
-
 export module Features.Letterbox.State;
 
 import std;
+import <windows.h>;
 
 export namespace Features::Letterbox::State {
 

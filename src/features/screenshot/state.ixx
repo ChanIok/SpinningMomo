@@ -1,23 +1,19 @@
 module;
 
-#include <d3d11.h>
-#include <windows.h>
-
-#include <thread>
-
 export module Features.Screenshot.State;
 
 import std;
 import Utils.Timer;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
-import Vendor.Windows;
+import <d3d11.h>;
+import <windows.h>;
 
 export namespace Features::Screenshot::State {
 
 // 截图请求结构体
 struct ScreenshotRequest {
-  Vendor::Windows::HWND target_window = nullptr;
+  HWND target_window = nullptr;
   std::wstring file_path;
   std::function<void(bool success, const std::wstring& path)> completion_callback;
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();

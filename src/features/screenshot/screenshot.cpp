@@ -1,14 +1,6 @@
 module;
 
-#include <d3d11.h>
-#include <wil/com.h>
 #include <wil/result.h>
-#include <wincodec.h>
-#include <windows.h>
-
-#include <functional>
-#include <iostream>
-#include <thread>
 
 module Features.Screenshot;
 
@@ -22,7 +14,10 @@ import Utils.String;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import Utils.Image;
-import Vendor.Windows;
+import <d3d11.h>;
+import <wil/com.h>;
+import <wincodec.h>;
+import <windows.h>;
 
 namespace Features::Screenshot {
 
