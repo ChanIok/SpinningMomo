@@ -69,6 +69,8 @@ struct InteractionState {
   POINT current_mouse_pos{};
   POINT last_mouse_pos{};
   DWORD game_process_id = 0;
+  bool is_game_focused = false;            // 前台窗口是否是游戏/overlay
+  bool taskbar_redraw_suppressed = false;  // 任务栏重绘是否已禁用
 };
 
 // 线程状态

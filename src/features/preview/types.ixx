@@ -39,12 +39,24 @@ struct ViewportState {
   bool game_window_fully_visible = false;
 };
 
+// 定时器 ID 常量
+constexpr UINT_PTR TIMER_ID_TASKBAR_REDRAW = 1;
+
+// 任务栏重绘延迟时间（毫秒）
+constexpr UINT TASKBAR_REDRAW_DELAY_MS = 200;
+
 // 交互状态
 struct InteractionState {
   bool is_dragging = false;
   bool viewport_dragging = false;
   POINT drag_start{};
   std::unique_ptr<Utils::Throttle::ThrottleState<float, float>> move_throttle;
+
+  // 上次设置的游戏窗口位置（用于跳过重复的 SetWindowPos 调用）
+  std::optional<POINT> last_game_window_pos;
+
+  // 任务栏重绘状态
+  bool taskbar_redraw_suppressed = false;
 };
 
 // DPI相关尺寸

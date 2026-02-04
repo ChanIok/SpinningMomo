@@ -83,9 +83,10 @@ auto install_window_event_hook(Core::State::AppState& state) -> std::expected<vo
     return {};  // 已经安装
   }
 
+  // 使用 0 监听所有进程的前台窗口变化，以便检测用户切换到其他应用
   overlay_state.interaction.event_hook =
-      SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, win_event_proc,
-                      overlay_state.interaction.game_process_id, 0, WINEVENT_OUTOFCONTEXT);
+      SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, win_event_proc, 0,
+                      0, WINEVENT_OUTOFCONTEXT);
 
   if (!overlay_state.interaction.event_hook) {
     DWORD error = GetLastError();
@@ -115,6 +116,29 @@ auto uninstall_hooks(Core::State::AppState& state) -> void {
 auto handle_mouse_movement(Core::State::AppState& state, POINT mouse_pos) -> void {
   auto& overlay_state = *state.overlay;
   overlay_state.interaction.current_mouse_pos = mouse_pos;
+}
+
+auto suppress_taskbar_redraw(Core::State::AppState& state) -> void {
+  if (state.overlay->interaction.taskbar_redraw_suppressed) {
+    return;  // 已经禁止了，无需重复操作
+  }
+
+  HWND taskbar = FindWindow(L"Shell_TrayWnd", nullptr);
+  if (taskbar) {
+    SendMessage(taskbar, WM_SETREDRAW, FALSE, 0);
+    state.overlay->interaction.taskbar_redraw_suppressed = true;
+    Logger().debug("[Overlay] Taskbar redraw suppressed");
+  }
+}
+
+auto restore_taskbar_redraw(Core::State::AppState& state) -> void {
+  HWND taskbar = FindWindow(L"Shell_TrayWnd", nullptr);
+  if (taskbar) {
+    SendMessage(taskbar, WM_SETREDRAW, TRUE, 0);
+    RedrawWindow(taskbar, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+    state.overlay->interaction.taskbar_redraw_suppressed = false;
+    Logger().debug("[Overlay] Taskbar redraw restored");
+  }
 }
 
 auto update_game_window_position(Core::State::AppState& state) -> void {
@@ -160,6 +184,11 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
         int new_game_y =
             static_cast<int>(-relative_y * overlay_state.window.cached_game_height + current_pos.y);
 
+        // 根据焦点状态禁用任务栏重绘
+        if (overlay_state.interaction.is_game_focused) {
+          suppress_taskbar_redraw(state);
+        }
+
         // 更新游戏窗口位置
         SetWindowPos(
             overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
@@ -179,6 +208,11 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
       int new_game_y =
           static_cast<int>(-relative_y * overlay_state.window.cached_game_height + current_pos.y);
 
+      // 根据焦点状态禁用任务栏重绘
+      if (overlay_state.interaction.is_game_focused) {
+        suppress_taskbar_redraw(state);
+      }
+
       // 更新游戏窗口位置
       SetWindowPos(overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
                    SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
@@ -192,16 +226,28 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
 auto handle_window_event(Core::State::AppState& state, DWORD event, HWND hwnd) -> void {
   auto& overlay_state = *state.overlay;
 
-  if (event == EVENT_SYSTEM_FOREGROUND && hwnd == overlay_state.window.target_window) {
-    // 游戏窗口获得焦点，发送消息确保叠加层在上方
-    if (overlay_state.window.overlay_hwnd) {
-      PostMessage(overlay_state.window.overlay_hwnd, Types::WM_GAME_WINDOW_FOREGROUND, 0, 0);
+  if (event == EVENT_SYSTEM_FOREGROUND) {
+    bool is_game_or_overlay =
+        (hwnd == overlay_state.window.target_window || hwnd == overlay_state.window.overlay_hwnd);
+
+    // 更新焦点状态
+    overlay_state.interaction.is_game_focused = is_game_or_overlay;
+
+    if (is_game_or_overlay) {
+      // 游戏窗口获得焦点，发送消息确保叠加层在上方
+      if (hwnd == overlay_state.window.target_window && overlay_state.window.overlay_hwnd) {
+        PostMessage(overlay_state.window.overlay_hwnd, Types::WM_GAME_WINDOW_FOREGROUND, 0, 0);
+      }
+    } else {
+      // 用户切到其他应用，恢复任务栏重绘
+      restore_taskbar_redraw(state);
     }
   }
 }
 
 auto cleanup_interaction(Core::State::AppState& state) -> void {
   uninstall_hooks(state);
+  restore_taskbar_redraw(state);  // 确保任务栏重绘被恢复
   g_app_state = nullptr;
 }
 

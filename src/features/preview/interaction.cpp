@@ -14,7 +14,37 @@ import <windowsx.h>;
 
 namespace Features::Preview::Interaction {
 
-// 辅助函数实现
+// ==================== 任务栏重绘控制 ====================
+
+auto suppress_taskbar_redraw(Core::State::AppState& state) -> void {
+  if (state.preview->interaction.taskbar_redraw_suppressed) {
+    return;  // 已经禁止了，无需重复操作
+  }
+
+  HWND taskbar = FindWindow(L"Shell_TrayWnd", nullptr);
+  if (taskbar) {
+    SendMessage(taskbar, WM_SETREDRAW, FALSE, 0);
+    state.preview->interaction.taskbar_redraw_suppressed = true;
+    Logger().debug("Taskbar redraw suppressed");
+  }
+}
+
+auto restore_taskbar_redraw(Core::State::AppState& state) -> void {
+  if (!state.preview->interaction.taskbar_redraw_suppressed) {
+    return;  // 未禁止，无需恢复
+  }
+
+  HWND taskbar = FindWindow(L"Shell_TrayWnd", nullptr);
+  if (taskbar) {
+    SendMessage(taskbar, WM_SETREDRAW, TRUE, 0);
+    RedrawWindow(taskbar, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+    state.preview->interaction.taskbar_redraw_suppressed = false;
+    Logger().debug("Taskbar redraw restored");
+  }
+}
+
+// ==================== 辅助函数实现 ====================
+
 auto is_point_in_title_bar(const Core::State::AppState& state, POINT pt) -> bool {
   return pt.y < state.preview->dpi_sizes.title_height;
 }
@@ -86,9 +116,16 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
     targetY = std::min(targetY, 0.0f);
   }
 
+  // 跳过重复位置
+  POINT newPos = {static_cast<LONG>(targetX), static_cast<LONG>(targetY)};
+  if (auto& lastPos = state.preview->interaction.last_game_window_pos;
+      lastPos && lastPos->x == newPos.x && lastPos->y == newPos.y) {
+    return;
+  }
+
   // 移动游戏窗口
-  SetWindowPos(state.preview->target_window, nullptr, static_cast<int>(targetX),
-               static_cast<int>(targetY), 0, 0,
+  state.preview->interaction.last_game_window_pos = newPos;
+  SetWindowPos(state.preview->target_window, nullptr, newPos.x, newPos.y, 0, 0,
                SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
 }
 
@@ -120,6 +157,9 @@ auto end_window_drag(Core::State::AppState& state, HWND hwnd) -> void {
 auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> void {
   state.preview->interaction.viewport_dragging = true;
 
+  // 重置位置缓存，确保首次移动不会被跳过
+  state.preview->interaction.last_game_window_pos.reset();
+
   // 初始化/重置节流器 (约60fps)
   if (!state.preview->interaction.move_throttle) {
     state.preview->interaction.move_throttle =
@@ -127,6 +167,12 @@ auto start_viewport_drag(Core::State::AppState& state, HWND hwnd, POINT pt) -> v
   } else {
     Utils::Throttle::reset(*state.preview->interaction.move_throttle);
   }
+
+  // 取消之前的延迟重绘定时器（如果存在）
+  KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
+
+  // 禁止任务栏重绘
+  suppress_taskbar_redraw(state);
 
   SetCapture(hwnd);
 }
@@ -157,6 +203,12 @@ auto end_viewport_drag(Core::State::AppState& state, HWND hwnd) -> void {
 
   state.preview->interaction.viewport_dragging = false;
   ReleaseCapture();
+
+  // 启动延迟定时器恢复任务栏重绘
+  if (state.preview->interaction.taskbar_redraw_suppressed) {
+    SetTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW,
+             Features::Preview::Types::TASKBAR_REDRAW_DELAY_MS, nullptr);
+  }
 }
 
 auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
@@ -185,11 +237,11 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
     return 0;
   }
 
-  // 检查是否点击在视口上，或开始视口拖拽
-  bool isOnViewport = is_point_in_viewport(state, pt);
+  // 先开始视口拖拽（设置任务栏保护和位置缓存）
+  start_viewport_drag(state, hwnd, pt);
 
-  if (!isOnViewport) {
-    // 点击在视口外，先移动游戏窗口到点击位置
+  // 检查是否点击在视口外，如果是则立即移动游戏窗口到点击位置
+  if (!is_point_in_viewport(state, pt)) {
     RECT clientRect;
     GetClientRect(hwnd, &clientRect);
     float previewWidth = static_cast<float>(clientRect.right - clientRect.left);
@@ -201,8 +253,6 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
     move_game_window_to_position(state, relativeX, relativeY);
   }
 
-  // 开始视口拖拽
-  start_viewport_drag(state, hwnd, pt);
   return 0;
 }
 
@@ -427,6 +477,16 @@ auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   return 0;
 }
 
+auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM wParam) -> LRESULT {
+  if (wParam == Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW) {
+    // 停止定时器
+    KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
+    // 恢复任务栏重绘
+    restore_taskbar_redraw(state);
+  }
+  return 0;
+}
+
 auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
                             LPARAM lParam) -> std::pair<bool, LRESULT> {
   switch (message) {
@@ -457,8 +517,14 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
     case WM_NCHITTEST:
       return {true, handle_nc_hit_test(state, hwnd, wParam, lParam)};
 
+    case WM_TIMER:
+      return {true, handle_timer(state, hwnd, wParam)};
+
     case WM_DESTROY:
       // 清理资源但不调用PostQuitMessage
+      // 确保任务栏重绘被恢复
+      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
+      restore_taskbar_redraw(state);
       return {true, 0};
 
     default:
