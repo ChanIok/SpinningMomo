@@ -38,4 +38,10 @@ export auto handle_window_event(Core::State::AppState& state, DWORD event, HWND 
 // 清理交互资源
 export auto cleanup_interaction(Core::State::AppState& state) -> void;
 
+// 禁止任务栏重绘
+export auto suppress_taskbar_redraw(Core::State::AppState& state) -> void;
+
+// 恢复任务栏重绘
+export auto restore_taskbar_redraw(Core::State::AppState& state) -> void;
+
 }  // namespace Features::Overlay::Interaction

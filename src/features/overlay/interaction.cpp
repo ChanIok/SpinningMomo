@@ -137,7 +137,6 @@ auto restore_taskbar_redraw(Core::State::AppState& state) -> void {
     SendMessage(taskbar, WM_SETREDRAW, TRUE, 0);
     RedrawWindow(taskbar, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
     state.overlay->interaction.taskbar_redraw_suppressed = false;
-    Logger().debug("[Overlay] Taskbar redraw restored");
   }
 }
 

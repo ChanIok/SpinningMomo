@@ -19,7 +19,7 @@ import <windows.h>;
 
 namespace Features::Overlay {
 
-auto start_overlay(Core::State::AppState& state, HWND target_window, bool is_pre_launch)
+auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze_after_first_frame)
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
@@ -28,7 +28,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool is_pre
     return {};
   }
 
-  // 检查是否支持捕获
+  // 检查是否支持捕捉
   if (!state.app_info->is_capture_supported) {
     return std::unexpected("Capture not supported on this system");
   }
@@ -60,11 +60,16 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool is_pre
   auto [width, height] = dimensions_result.value();
   auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
 
-  if (!Geometry::should_use_overlay(width, height, screen_width, screen_height) && !is_pre_launch) {
+  // 在非变换场景下，检查是否需要 overlay
+  if (!freeze_after_first_frame &&
+      !Geometry::should_use_overlay(width, height, screen_width, screen_height)) {
     Window::restore_game_window(state);
     // 不返回错误，因为游戏窗口在屏幕内，不需要叠加层
     return {};
   }
+
+  // 设置首帧后自动冻结标志
+  overlay_state.freeze_after_first_frame = freeze_after_first_frame;
 
   // 取消清理定时器
   if (overlay_state.cleanup_timer && overlay_state.cleanup_timer->IsRunning()) {
@@ -104,11 +109,6 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool is_pre
     return std::unexpected(result.error());
   }
 
-  // 如果叠加层窗口未显示，则等待100ms，保证画面渲染完成
-  if (!overlay_state.window.overlay_window_shown) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-
   return {};
 }
 
@@ -118,6 +118,8 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 
   // 设置运行状态为false
   overlay_state.running = false;
+  overlay_state.freeze_rendering = false;
+  overlay_state.freeze_after_first_frame = false;
   overlay_state.rendering.create_new_srv = true;
 
   // 停止线程
@@ -152,6 +154,17 @@ auto stop_overlay(Core::State::AppState& state) -> void {
   }
 
   Logger().debug("Overlay stopped");
+}
+
+auto freeze_overlay(Core::State::AppState& state) -> void {
+  state.overlay->freeze_rendering = true;
+  Logger().debug("Overlay frozen");
+}
+
+auto unfreeze_overlay(Core::State::AppState& state) -> void {
+  state.overlay->freeze_rendering = false;
+  state.overlay->freeze_after_first_frame = false;
+  Logger().debug("Overlay unfrozen");
 }
 
 auto set_letterbox_mode(Core::State::AppState& state, bool enabled) -> void {

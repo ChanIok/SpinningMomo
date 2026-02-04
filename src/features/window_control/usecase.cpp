@@ -17,6 +17,8 @@ import Features.WindowControl;
 import Features.Notifications;
 import Features.Overlay;
 import Features.Overlay.State;
+import Features.Overlay.Geometry;
+import Features.Overlay.Interaction;
 import Utils.Logger;
 import Utils.String;
 import Vendor.Windows;
@@ -46,21 +48,63 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
 }
 
 // 变换前的准备
-auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
-    -> void {
-  // 如果用户启用了overlay，尝试启动
-  if (state.overlay->enabled) {
-    Logger().debug("Starting overlay before window transform");
+auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window,
+                               int target_width, int target_height) -> void {
+  if (!state.overlay->enabled) {
+    return;
+  }
+
+  auto [screen_w, screen_h] = Features::Overlay::Geometry::get_screen_dimensions();
+  bool will_need_overlay = Features::Overlay::Geometry::should_use_overlay(
+      target_width, target_height, screen_w, screen_h);
+
+  if (state.overlay->running) {
+    // overlay 已运行，冻结当前帧
+    state.overlay->is_transforming = true;
+    Features::Overlay::freeze_overlay(state);
+  } else if (will_need_overlay) {
+    // overlay 未运行，但目标尺寸需要 overlay，启动并在首帧后自动冻结
+    state.overlay->is_transforming = true;
     auto overlay_result = Features::Overlay::start_overlay(state, target_window, true);
-    if (!overlay_result) {
+    if (overlay_result) {
+      // 等待首帧渲染完成并冻结（最多等待 500ms）
+      for (int i = 0; i < 50 && !state.overlay->freeze_rendering; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      }
+    } else {
       Logger().error("Failed to start overlay before window transform: {}", overlay_result.error());
+      state.overlay->is_transforming = false;
     }
   }
+  // 否则：overlay 未运行，目标也不需要，什么都不做
 }
 
 // 变换后的后续处理
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
+  // 处理 overlay 变换后的状态
+  if (state.overlay->is_transforming) {
+    // 等待窗口调整稳定
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+    // 获取新窗口尺寸，决定是否继续 overlay
+    auto dimensions = Features::Overlay::Geometry::get_window_dimensions(target_window);
+    auto [screen_w, screen_h] = Features::Overlay::Geometry::get_screen_dimensions();
+
+    if (dimensions && Features::Overlay::Geometry::should_use_overlay(
+                          dimensions->first, dimensions->second, screen_w, screen_h)) {
+      // 仍需 overlay：解冻继续
+      Features::Overlay::unfreeze_overlay(state);
+      // 主动禁止任务栏重绘，防止闪烁
+      Features::Overlay::Interaction::suppress_taskbar_redraw(state);
+    } else {
+      // 不需要 overlay：停止
+      Features::Overlay::stop_overlay(state);
+    }
+
+    state.overlay->is_transforming = false;
+  }
+
   // 重启letterbox
   if (!state.overlay->running && state.letterbox->enabled) {
     auto letterbox_result = Features::Letterbox::show(state, target_window);
@@ -69,7 +113,6 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
                      letterbox_result.error());
     }
   }
-  Logger().debug("Post-transform actions completed");
 }
 
 // 处理比例改变事件
@@ -86,9 +129,7 @@ auto handle_ratio_changed(Core::State::AppState& state,
     return;
   }
 
-  prepare_transform_actions(state, target_window.value());
-
-  // 计算新分辨率
+  // 先计算目标分辨率
   auto total_pixels = get_current_total_pixels(state);
   Features::WindowControl::Resolution new_resolution;
 
@@ -99,6 +140,10 @@ auto handle_ratio_changed(Core::State::AppState& state,
     new_resolution = Features::WindowControl::calculate_resolution(event.ratio_value, total_pixels);
   }
 
+  // 准备变换（根据目标尺寸决定是否启动 overlay）
+  prepare_transform_actions(state, target_window.value(), new_resolution.width,
+                            new_resolution.height);
+
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
@@ -106,14 +151,12 @@ auto handle_ratio_changed(Core::State::AppState& state,
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
+    state.overlay->is_transforming = false;
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
     return;
   }
-
-  Logger().debug("Window transform applied successfully: {}x{}", new_resolution.width,
-                 new_resolution.height);
 
   post_transform_actions(state, target_window.value());
 
@@ -140,9 +183,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
     return;
   }
 
-  prepare_transform_actions(state, target_window.value());
-
-  // 计算新分辨率
+  // 先计算目标分辨率
   double current_ratio = get_current_ratio(state);
   Features::WindowControl::Resolution new_resolution;
 
@@ -154,6 +195,10 @@ auto handle_resolution_changed(Core::State::AppState& state,
         Features::WindowControl::calculate_resolution(current_ratio, event.total_pixels);
   }
 
+  // 准备变换（根据目标尺寸决定是否启动 overlay）
+  prepare_transform_actions(state, target_window.value(), new_resolution.width,
+                            new_resolution.height);
+
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
       .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
@@ -161,14 +206,12 @@ auto handle_resolution_changed(Core::State::AppState& state,
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
   if (!result) {
+    state.overlay->is_transforming = false;
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
     return;
   }
-
-  Logger().debug("Window transform applied successfully: {}x{}", new_resolution.width,
-                 new_resolution.height);
 
   post_transform_actions(state, target_window.value());
 

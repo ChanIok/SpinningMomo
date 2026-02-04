@@ -25,6 +25,11 @@ auto on_frame_arrived(Core::State::AppState& state,
     return;
   }
 
+  // 冻结状态下不处理任何帧
+  if (state.overlay->freeze_rendering) {
+    return;
+  }
+
   // 检查帧大小是否发生变化
   auto content_size = frame.ContentSize();
   auto& last_width = state.overlay->capture_state.last_frame_width;
@@ -33,7 +38,14 @@ auto on_frame_arrived(Core::State::AppState& state,
   bool size_changed = (content_size.Width != last_width) || (content_size.Height != last_height);
 
   if (size_changed) {
-    // 检查是否需要退出
+    // 变换流程中，只更新尺寸记录，不做其他处理
+    if (state.overlay->is_transforming) {
+      last_width = content_size.Width;
+      last_height = content_size.Height;
+      return;
+    }
+
+    // 检查是否需要退出（非变换场景，如用户手动调整窗口）
     auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
     if (!Geometry::should_use_overlay(content_size.Width, content_size.Height, screen_width,
                                       screen_height)) {
@@ -63,19 +75,31 @@ auto on_frame_arrived(Core::State::AppState& state,
   }
 
   auto surface = frame.Surface();
-  if (surface) {
-    auto texture =
-        Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
-    if (texture) {
-      // 触发渲染
-      Rendering::render_frame(state, texture);
+  if (!surface) {
+    return;
+  }
 
-      // 首次渲染时显示叠加层窗口
-      if (!state.overlay->window.overlay_window_shown) {
-        if (auto result = Window::show_overlay_window_first_time(state); result) {
-          state.overlay->window.overlay_window_shown = true;
-        }
-      }
+  auto texture = Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
+  if (!texture) {
+    return;
+  }
+
+  // 触发渲染
+  Rendering::render_frame(state, texture);
+
+  // 首次渲染时显示叠加层窗口
+  if (!state.overlay->window.overlay_window_shown) {
+    auto result = Window::show_overlay_window_first_time(state);
+    if (!result) {
+      return;
+    }
+
+    state.overlay->window.overlay_window_shown = true;
+
+    // 首帧后自动冻结（用于窗口变换场景）
+    if (state.overlay->freeze_after_first_frame) {
+      state.overlay->freeze_rendering = true;
+      Logger().debug("First frame rendered, overlay frozen for transform");
     }
   }
 }
