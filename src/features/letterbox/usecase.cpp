@@ -5,8 +5,8 @@ module Features.Letterbox.UseCase;
 import std;
 import Core.State;
 import Core.I18n.State;
-import UI.FloatingWindow;
 import Features.Letterbox;
+import Features.Letterbox.State;
 import Features.Overlay;
 import Features.Overlay.State;
 import Features.Settings;
@@ -20,11 +20,13 @@ namespace Features::Letterbox::UseCase {
 
 // 切换黑边模式
 auto toggle_letterbox(Core::State::AppState& state) -> void {
-  bool is_enabled = state.settings->raw.features.letterbox.enabled;
+  bool is_enabled = state.letterbox->enabled;
 
-  // 更新状态
-  UI::FloatingWindow::set_letterbox_enabled(state, !is_enabled);
+  // 切换启用状态
+  state.letterbox->enabled = !is_enabled;
   Features::Overlay::set_letterbox_mode(state, !is_enabled);
+
+  // 同步到 settings 并持久化
   state.settings->raw.features.letterbox.enabled = !is_enabled;
 
   // 保存设置到文件
@@ -53,8 +55,9 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
       if (!start_result) {
         Logger().error("Failed to restart overlay after letterbox mode change: {}",
                        start_result.error());
-        // 回滚 UI状态
-        UI::FloatingWindow::set_letterbox_enabled(state, is_enabled);
+        // 回滚启用状态
+        state.letterbox->enabled = is_enabled;
+        state.settings->raw.features.letterbox.enabled = is_enabled;
         std::string error_message =
             state.i18n->texts["message.overlay_start_failed"] + start_result.error();
         Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
@@ -68,8 +71,9 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
       if (target_window) {
         if (auto result = Features::Letterbox::show(state, target_window.value()); !result) {
           Logger().error("Failed to show letterbox: {}", result.error());
-          // 回滚 UI状态
-          UI::FloatingWindow::set_letterbox_enabled(state, false);
+          // 回滚启用状态
+          state.letterbox->enabled = false;
+          state.settings->raw.features.letterbox.enabled = false;
           std::string error_message =
               state.i18n->texts["message.overlay_start_failed"] + result.error();
           Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],

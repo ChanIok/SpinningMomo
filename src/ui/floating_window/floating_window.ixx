@@ -21,9 +21,6 @@ export auto toggle_visibility(Core::State::AppState& state) -> void;
 // 更新UI状态
 export auto set_current_ratio(Core::State::AppState& state, size_t index) -> void;
 export auto set_current_resolution(Core::State::AppState& state, size_t index) -> void;
-export auto set_preview_enabled(Core::State::AppState& state, bool enabled) -> void;
-export auto set_overlay_enabled(Core::State::AppState& state, bool enabled) -> void;
-export auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void;
 
 // 更新菜单项
 export auto update_menu_items(Core::State::AppState& state) -> void;

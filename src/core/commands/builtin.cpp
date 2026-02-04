@@ -112,7 +112,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                                        UI::FloatingWindow::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
-                                   return state.overlay ? state.overlay->running : false;
+                                   return state.overlay && state.overlay->enabled;
                                  },
                              });
 
@@ -127,8 +127,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                                        UI::FloatingWindow::request_repaint(state);
                                      },
                                  .get_state = [&state]() -> bool {
-                                   return state.letterbox && state.letterbox->window_handle &&
-                                          IsWindowVisible(state.letterbox->window_handle);
+                                   return state.letterbox && state.letterbox->enabled;
                                  },
                              });
 

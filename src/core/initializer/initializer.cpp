@@ -18,6 +18,7 @@ import Core.Commands.State;
 import Features.Settings.State;
 import Features.Recording;
 import Features.Update;
+import Features.Letterbox.State;
 import UI.FloatingWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
@@ -56,6 +57,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
       return std::unexpected("Failed to initialize settings: " + settings_result.error());
     }
+
+    // 从 settings 同步 letterbox 启用状态
+    state.letterbox->enabled = state.settings->raw.features.letterbox.enabled;
 
     if (auto updater_result = Features::Update::initialize(state); !updater_result) {
       return std::unexpected("Failed to initialize updater: " + updater_result.error());

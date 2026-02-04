@@ -8,6 +8,9 @@ import <windows.h>;
 export namespace Features::Letterbox::State {
 
 struct LetterboxState {
+  // 状态标志
+  bool enabled{false};  // 用户是否启用黑边模式
+
   HWND window_handle{nullptr};
   HWND target_window{nullptr};
   HWND message_window{nullptr};

@@ -12,6 +12,7 @@ import UI.FloatingWindow.State;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Letterbox;
+import Features.Letterbox.State;
 import Features.WindowControl;
 import Features.Notifications;
 import Features.Overlay;
@@ -47,8 +48,8 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
 // 变换前的准备
 auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
-  // 提取启动overlay
-  if (state.floating_window->ui.overlay_enabled) {
+  // 如果用户启用了overlay，尝试启动
+  if (state.overlay->enabled) {
     Logger().debug("Starting overlay before window transform");
     auto overlay_result = Features::Overlay::start_overlay(state, target_window, true);
     if (!overlay_result) {
@@ -61,7 +62,7 @@ auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HW
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
   // 重启letterbox
-  if (!state.overlay->running && state.floating_window->ui.letterbox_enabled) {
+  if (!state.overlay->running && state.letterbox->enabled) {
     auto letterbox_result = Features::Letterbox::show(state, target_window);
     if (!letterbox_result) {
       Logger().error("Failed to restart letterbox after window transform: {}",

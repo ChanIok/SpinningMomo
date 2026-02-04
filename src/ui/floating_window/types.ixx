@@ -53,10 +53,6 @@ struct InteractionState {
   int hover_index = -1;
   size_t current_ratio_index = std::numeric_limits<size_t>::max();
   size_t current_resolution_index = 0;
-  bool preview_enabled = false;
-  bool overlay_enabled = false;
-  bool letterbox_enabled = false;
-  bool recording_enabled = false;
   bool close_button_hovered = false;
 
   // 翻页模式状态（仅 Paged 模式使用）

@@ -21,9 +21,10 @@ struct OverlayState {
   std::mutex render_target_mutex;
   std::mutex capture_state_mutex;
   std::condition_variable frame_available;
-  
-  // 运行状态标志
-  bool running = false;
+
+  // 状态标志
+  bool enabled = false;  // 用户是否启用叠加层模式
+  bool running = false;  // 叠加层是否实际在运行
 };
 
 }  // namespace Features::Overlay::State

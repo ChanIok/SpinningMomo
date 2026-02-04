@@ -143,27 +143,6 @@ auto set_current_resolution(Core::State::AppState& state, size_t index) -> void 
   }
 }
 
-auto set_preview_enabled(Core::State::AppState& state, bool enabled) -> void {
-  state.floating_window->ui.preview_enabled = enabled;
-  if (state.floating_window->window.hwnd) {
-    request_repaint(state);
-  }
-}
-
-auto set_overlay_enabled(Core::State::AppState& state, bool enabled) -> void {
-  state.floating_window->ui.overlay_enabled = enabled;
-  if (state.floating_window->window.hwnd) {
-    request_repaint(state);
-  }
-}
-
-auto set_letterbox_enabled(Core::State::AppState& state, bool enabled) -> void {
-  state.floating_window->ui.letterbox_enabled = enabled;
-  if (state.floating_window->window.hwnd) {
-    request_repaint(state);
-  }
-}
-
 auto update_menu_items(Core::State::AppState& state) -> void {
   state.floating_window->data.menu_items.clear();
   initialize_menu_items(state);

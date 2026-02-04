@@ -10,7 +10,6 @@ import Features.Recording.State;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.WindowControl;
-import UI.FloatingWindow.State;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
@@ -58,11 +57,6 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   if (state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
     // 停止录制
     Features::Recording::stop(*state.recording);
-
-    // 更新UI状态
-    if (state.floating_window) {
-      state.floating_window->ui.recording_enabled = false;
-    }
   } else if (state.recording->status == Features::Recording::Types::RecordingStatus::Idle) {
     // 开始录制
 
@@ -102,11 +96,6 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     if (!result) {
       return result;
     }
-
-    // 更新UI状态
-    if (state.floating_window) {
-      state.floating_window->ui.recording_enabled = true;
-    }
   } else {
     return std::unexpected("Recording is in a transitional state");
   }
@@ -118,9 +107,6 @@ auto stop_recording_if_running(Core::State::AppState& state) -> void {
   if (state.recording &&
       state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
     Features::Recording::stop(*state.recording);
-    if (state.floating_window) {
-      state.floating_window->ui.recording_enabled = false;
-    }
   }
 }
 
