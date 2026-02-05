@@ -24,7 +24,7 @@ struct GitHubRelease {
 };
 
 // === 响应类型定义 ===
-// Updater模块的公共API响应类型
+// Update模块的公共API响应类型
 
 // 检查更新响应结果
 struct CheckUpdateResult {

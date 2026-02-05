@@ -8,7 +8,7 @@ import Core.RPC.Endpoints.Dialog;
 import Core.RPC.Endpoints.File;
 import Core.RPC.Endpoints.Settings;
 import Core.RPC.Endpoints.Registry;
-import Core.RPC.Endpoints.Updater;
+import Core.RPC.Endpoints.Update;
 import Core.RPC.Endpoints.WebView;
 import Core.RPC.Endpoints.Gallery;
 import Core.RPC.Endpoints.PluginEndpoints;
@@ -33,7 +33,7 @@ auto register_all_endpoints(Core::State::AppState& state) -> void {
   Endpoints::Dialog::register_all(state);
 
   // 注册更新端点
-  Endpoints::Updater::register_all(state);
+  Endpoints::Update::register_all(state);
 
   // 注册Webview端点
   Endpoints::WebView::register_all(state);

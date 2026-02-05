@@ -64,8 +64,8 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 从 settings 同步 letterbox 启用状态
     state.letterbox->enabled = state.settings->raw.features.letterbox.enabled;
 
-    if (auto updater_result = Features::Update::initialize(state); !updater_result) {
-      return std::unexpected("Failed to initialize updater: " + updater_result.error());
+    if (auto update_result = Features::Update::initialize(state); !update_result) {
+      return std::unexpected("Failed to initialize update: " + update_result.error());
     }
 
     // 初始化命令注册表

@@ -95,8 +95,8 @@ export struct AppSettings {
     } recording;
   } features;
 
-  // updater 分组 - 更新设置
-  struct Updater {
+  // update 分组 - 更新设置
+  struct Update {
     bool auto_check = true;         // 是否自动检查更新
     int check_interval_hours = 24;  // 检查间隔（小时）
 
@@ -108,7 +108,7 @@ export struct AppSettings {
 
     std::vector<Server> servers = {  // 服务器列表（按优先级排序）
         {"GitHub官方", "https://api.github.com/repos/ChanIok/SpinningMomo/releases/latest"}};
-  } updater;
+  } update;
 
   // ui 分组 - UI界面设置
   struct UI {

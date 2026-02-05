@@ -142,8 +142,8 @@ export interface AppSettings {
     }
   }
 
-  // updater 分组 - 更新设置
-  updater: {
+  // update 分组 - 更新设置
+  update: {
     autoCheck: boolean // 是否自动检查更新
     checkIntervalHours: number // 检查间隔（小时）
     servers: Array<{
@@ -231,8 +231,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
   },
 
-  // updater 设置
-  updater: {
+  // update 设置
+  update: {
     autoCheck: true,
     checkIntervalHours: 24,
     servers: [

@@ -4,7 +4,7 @@ module;
 #include <rfl.hpp>
 #include <rfl/json.hpp>
 
-module Core.RPC.Endpoints.Updater;
+module Core.RPC.Endpoints.Update;
 
 import std;
 import Core.State;
@@ -14,7 +14,7 @@ import Core.RPC.Types;
 import Features.Update;
 import Features.Update.Types;
 
-namespace Core::RPC::Endpoints::Updater {
+namespace Core::RPC::Endpoints::Update {
 
 auto handle_check_for_update(Core::State::AppState& app_state,
                              [[maybe_unused]] const rfl::Generic& params)
@@ -60,17 +60,17 @@ auto handle_install_update(Core::State::AppState& app_state,
 
 auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<rfl::Generic, Features::Update::Types::CheckUpdateResult>(
-      app_state, app_state.rpc->registry, "updater.check_for_update", handle_check_for_update,
+      app_state, app_state.rpc->registry, "update.check_for_update", handle_check_for_update,
       "Check for available updates");
 
   Core::RPC::register_method<rfl::Generic, Features::Update::Types::DownloadUpdateResult>(
-      app_state, app_state.rpc->registry, "updater.download_update", handle_download_update,
+      app_state, app_state.rpc->registry, "update.download_update", handle_download_update,
       "Download update package");
 
   Core::RPC::register_method<Features::Update::Types::InstallUpdateParams,
                              Features::Update::Types::InstallUpdateResult>(
-      app_state, app_state.rpc->registry, "updater.install_update", handle_install_update,
+      app_state, app_state.rpc->registry, "update.install_update", handle_install_update,
       "Install downloaded update");
 }
 
-}  // namespace Core::RPC::Endpoints::Updater
+}  // namespace Core::RPC::Endpoints::Update

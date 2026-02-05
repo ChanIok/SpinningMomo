@@ -98,7 +98,7 @@ Endpoints live under `src/core/rpc/endpoints/<domain>/`, each domain exposes a `
 
 ### Initialization Order
 `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()` which runs:
-events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings → updater → commands → floating window → tray icon → context menu → recording → gallery → hotkeys.
+events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings → update → commands → floating window → tray icon → context menu → recording → gallery → hotkeys.
 
 ## Build Output
 - Release: `build\windows\x64\release\`

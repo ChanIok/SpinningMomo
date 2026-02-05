@@ -35,7 +35,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
 
   // 2. 功能模块清理
   // 检查是否有待处理的更新
-  if (state.updater && state.updater->pending_update) {
+  if (state.update && state.update->pending_update) {
     Logger().info("Executing pending update on program exit");
     Features::Update::execute_pending_update(state);
   }

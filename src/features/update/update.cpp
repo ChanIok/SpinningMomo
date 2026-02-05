@@ -1,4 +1,4 @@
-module;
+﻿module;
 
 #include <rfl/json.hpp>
 
@@ -224,18 +224,18 @@ auto get_release_info(Core::State::AppState& app_state)
     -> std::expected<Types::CheckUpdateResult, std::string> {
   try {
     // 从settings获取配置
-    if (!app_state.settings || !app_state.updater) {
-      return std::unexpected("Settings or updater not initialized");
+    if (!app_state.settings || !app_state.update) {
+      return std::unexpected("Settings or update not initialized");
     }
 
-    const auto& updater_config = app_state.settings->raw.updater;
-    if (updater_config.servers.empty()) {
+    const auto& update_config = app_state.settings->raw.update;
+    if (update_config.servers.empty()) {
       return std::unexpected("No update servers configured");
     }
 
     // 循环尝试所有服务器
-    for (size_t i = 0; i < updater_config.servers.size(); ++i) {
-      const auto& server = updater_config.servers[i];
+    for (size_t i = 0; i < update_config.servers.size(); ++i) {
+      const auto& server = update_config.servers[i];
       Logger().info("Attempting to use update server: {} (index: {})", server.name, i);
 
       // 使用配置的服务器URL
@@ -244,7 +244,7 @@ auto get_release_info(Core::State::AppState& app_state)
       auto response = http_get(url);
       if (response) {
         // 成功获取响应，更新当前服务器索引并返回结果
-        app_state.updater->current_server_index = i;
+        app_state.update->current_server_index = i;
         Logger().info("Successfully connected to update server: {}", server.name);
         Logger().debug("Response: {}", response.value());
         return parse_github_release_info(response.value(), Vendor::Version::get_app_version());
@@ -343,47 +343,47 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   try {
     // 初始化已存在的更新状态
-    if (!app_state.updater) {
-      return std::unexpected("Updater state not created");
+    if (!app_state.update) {
+      return std::unexpected("Update state not created");
     }
 
     // 设置默认状态
     auto default_state = State::create_default_update_state();
-    *app_state.updater = std::move(default_state);
-    app_state.updater->is_initialized = true;
+    *app_state.update = std::move(default_state);
+    app_state.update->is_initialized = true;
 
-    Logger().info("Updater initialized successfully");
+    Logger().info("Update initialized successfully");
     return {};
   } catch (const std::exception& e) {
-    return std::unexpected("Failed to initialize updater: " + std::string(e.what()));
+    return std::unexpected("Failed to initialize update: " + std::string(e.what()));
   }
 }
 
 auto check_for_update(Core::State::AppState& app_state)
     -> std::expected<Types::CheckUpdateResult, std::string> {
   try {
-    if (!app_state.updater) {
-      return std::unexpected("Updater not initialized");
+    if (!app_state.update) {
+      return std::unexpected("Update not initialized");
     }
 
     // 更新状态为检查中
-    app_state.updater->is_checking = true;
-    app_state.updater->error_message.clear();
+    app_state.update->is_checking = true;
+    app_state.update->error_message.clear();
 
     // 调用内部函数获取发布信息（从settings获取配置）
     auto result = get_release_info(app_state);
     if (!result) {
-      app_state.updater->is_checking = false;
-      app_state.updater->error_message = result.error();
+      app_state.update->is_checking = false;
+      app_state.update->error_message = result.error();
       return std::unexpected(result.error());
     }
 
     // 更新状态
-    app_state.updater->is_checking = false;
-    app_state.updater->update_available = result->has_update;
-    app_state.updater->latest_version = result->latest_version;
-    app_state.updater->changelog = result->changelog;
-    app_state.updater->download_url = result->download_url;
+    app_state.update->is_checking = false;
+    app_state.update->update_available = result->has_update;
+    app_state.update->latest_version = result->latest_version;
+    app_state.update->changelog = result->changelog;
+    app_state.update->download_url = result->download_url;
 
     Logger().info("Check for update result: {}, {}, {}", result->latest_version, result->has_update,
                   result->download_url);
@@ -391,28 +391,28 @@ auto check_for_update(Core::State::AppState& app_state)
     return result;
 
   } catch (const std::exception& e) {
-    if (app_state.updater) {
-      app_state.updater->is_checking = false;
-      app_state.updater->error_message = e.what();
+    if (app_state.update) {
+      app_state.update->is_checking = false;
+      app_state.update->error_message = e.what();
     }
     return std::unexpected(std::string(e.what()));
   }
 }
 
 auto execute_pending_update(Core::State::AppState& app_state) -> void {
-  if (!app_state.updater || !app_state.updater->pending_update) {
+  if (!app_state.update || !app_state.update->pending_update) {
     return;
   }
 
   Logger().info("Executing pending update script: {}",
-                app_state.updater->update_script_path.string());
+                app_state.update->update_script_path.string());
 
   // 启动更新脚本
   Vendor::ShellApi::SHELLEXECUTEINFOW sei = {sizeof(sei)};
   sei.fMask = Vendor::ShellApi::kSEE_MASK_NOCLOSEPROCESS;
   sei.hwnd = nullptr;
   sei.lpVerb = L"open";
-  sei.lpFile = app_state.updater->update_script_path.c_str();
+  sei.lpFile = app_state.update->update_script_path.c_str();
   sei.lpParameters = nullptr;
   sei.lpDirectory = nullptr;
   sei.nShow = Vendor::ShellApi::kSW_HIDE;
@@ -427,18 +427,18 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   }
 
   // 清除待处理更新标志
-  app_state.updater->pending_update = false;
+  app_state.update->pending_update = false;
 }
 
 auto download_update(Core::State::AppState& app_state)
     -> std::expected<Types::DownloadUpdateResult, std::string> {
   try {
-    if (!app_state.updater) {
-      return std::unexpected("Updater not initialized");
+    if (!app_state.update) {
+      return std::unexpected("Update not initialized");
     }
 
     // 检查是否有可用的下载URL
-    if (app_state.updater->download_url.empty()) {
+    if (app_state.update->download_url.empty()) {
       return std::unexpected("No download URL available. Please check for updates first.");
     }
 
@@ -450,21 +450,21 @@ auto download_update(Core::State::AppState& app_state)
     std::filesystem::path save_path = *temp_dir / "SpinningMomo_update.zip";
 
     // 更新状态
-    app_state.updater->download_in_progress = true;
-    app_state.updater->download_progress = 0.0;
-    app_state.updater->error_message.clear();
+    app_state.update->download_in_progress = true;
+    app_state.update->download_progress = 0.0;
+    app_state.update->error_message.clear();
 
     // 下载文件 - 使用状态中的download_url
-    auto download_result = download_file(app_state.updater->download_url, save_path);
+    auto download_result = download_file(app_state.update->download_url, save_path);
     if (!download_result) {
-      app_state.updater->download_in_progress = false;
-      app_state.updater->error_message = download_result.error();
+      app_state.update->download_in_progress = false;
+      app_state.update->error_message = download_result.error();
       return std::unexpected(download_result.error());
     }
 
     // 更新状态
-    app_state.updater->download_in_progress = false;
-    app_state.updater->download_progress = 1.0;
+    app_state.update->download_in_progress = false;
+    app_state.update->download_progress = 1.0;
 
     Types::DownloadUpdateResult result;
     result.message = "Download completed successfully";
@@ -474,9 +474,9 @@ auto download_update(Core::State::AppState& app_state)
     return result;
 
   } catch (const std::exception& e) {
-    if (app_state.updater) {
-      app_state.updater->download_in_progress = false;
-      app_state.updater->error_message = e.what();
+    if (app_state.update) {
+      app_state.update->download_in_progress = false;
+      app_state.update->error_message = e.what();
     }
     return std::unexpected(std::string(e.what()));
   }
@@ -485,11 +485,11 @@ auto download_update(Core::State::AppState& app_state)
 auto install_update(Core::State::AppState& app_state, const Types::InstallUpdateParams& params)
     -> std::expected<Types::InstallUpdateResult, std::string> {
   try {
-    if (!app_state.updater) {
-      return std::unexpected("Updater not initialized");
+    if (!app_state.update) {
+      return std::unexpected("Update not initialized");
     }
 
-    // 使用默认的更新包路径 - temp目录下的SpinningMomo_update.zip
+    // 使用默认的更新包路径
     auto temp_dir = get_temp_directory();
     if (!temp_dir) {
       return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
@@ -510,8 +510,8 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
     }
 
     // 保存脚本路径到状态中
-    app_state.updater->update_script_path = script_result.value();
-    app_state.updater->pending_update = true;
+    app_state.update->update_script_path = script_result.value();
+    app_state.update->pending_update = true;
 
     Types::InstallUpdateResult result;
 
