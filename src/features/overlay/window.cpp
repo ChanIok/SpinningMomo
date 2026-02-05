@@ -199,13 +199,9 @@ auto show_overlay_window_first_time(Core::State::AppState& state)
   return {};
 }
 
-auto restore_game_window(Core::State::AppState& state, bool with_delay) -> void {
+auto restore_game_window(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
   if (!overlay_state.window.target_window) return;
-
-  if (with_delay) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(400));
-  }
 
   // 移除分层窗口样式
   LONG ex_style = GetWindowLong(overlay_state.window.target_window, GWL_EXSTYLE);

@@ -27,17 +27,16 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
 
   // === 窗口控制功能 ===
   // 通过UI菜单选择触发的窗口调整事件
+  // 注：handle_xxx 会启动协程在 UI 线程执行，协程内部会在完成后请求重绘
   subscribe<UI::FloatingWindow::Events::RatioChangeEvent>(
       *app_state.events, [&app_state](const UI::FloatingWindow::Events::RatioChangeEvent& event) {
         Features::WindowControl::UseCase::handle_ratio_changed(app_state, event);
-        UI::FloatingWindow::request_repaint(app_state);
       });
 
   subscribe<UI::FloatingWindow::Events::ResolutionChangeEvent>(
       *app_state.events,
       [&app_state](const UI::FloatingWindow::Events::ResolutionChangeEvent& event) {
         Features::WindowControl::UseCase::handle_resolution_changed(app_state, event);
-        UI::FloatingWindow::request_repaint(app_state);
       });
 
   subscribe<UI::FloatingWindow::Events::WindowSelectionEvent>(

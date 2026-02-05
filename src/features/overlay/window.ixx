@@ -35,6 +35,6 @@ export auto destroy_overlay_window(Core::State::AppState& state) -> void;
 export auto unregister_overlay_window_class(HINSTANCE instance) -> void;
 
 // 恢复游戏窗口
-export auto restore_game_window(Core::State::AppState& state, bool with_delay = false) -> void;
+export auto restore_game_window(Core::State::AppState& state) -> void;
 
 }  // namespace Features::Overlay::Window

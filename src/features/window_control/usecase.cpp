@@ -5,6 +5,7 @@ module Features.WindowControl.UseCase;
 import std;
 import Features.Settings.Menu;
 import Core.State;
+import Core.Async.UiAwaitable;
 import Core.I18n.State;
 import UI.FloatingWindow;
 import UI.FloatingWindow.Events;
@@ -48,10 +49,11 @@ auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64
 }
 
 // 变换前的准备
+// 返回值：是否需要等待 overlay 首帧
 auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window,
-                               int target_width, int target_height) -> void {
+                               int target_width, int target_height) -> bool {
   if (!state.overlay->enabled) {
-    return;
+    return false;
   }
 
   auto [screen_w, screen_h] = Features::Overlay::Geometry::get_screen_dimensions();
@@ -62,32 +64,28 @@ auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HW
     // overlay 已运行，冻结当前帧
     state.overlay->is_transforming = true;
     Features::Overlay::freeze_overlay(state);
+    return false;  // 不需要等待首帧
   } else if (will_need_overlay) {
     // overlay 未运行，但目标尺寸需要 overlay，启动并在首帧后自动冻结
     state.overlay->is_transforming = true;
     auto overlay_result = Features::Overlay::start_overlay(state, target_window, true);
     if (overlay_result) {
-      // 等待首帧渲染完成并冻结（最多等待 500ms）
-      for (int i = 0; i < 50 && !state.overlay->freeze_rendering; ++i) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      }
+      return true;  // 需要等待首帧
     } else {
       Logger().error("Failed to start overlay before window transform: {}", overlay_result.error());
       state.overlay->is_transforming = false;
+      return false;
     }
   }
-  // 否则：overlay 未运行，目标也不需要，什么都不做
+
+  // overlay 未运行，目标也不需要，什么都不做
+  return false;
 }
 
 // 变换后的后续处理
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
-  // 处理 overlay 变换后的状态
   if (state.overlay->is_transforming) {
-    // 等待窗口调整稳定
-    std::this_thread::sleep_for(std::chrono::milliseconds(400));
-
-    // 获取新窗口尺寸，决定是否继续 overlay
     auto dimensions = Features::Overlay::Geometry::get_window_dimensions(target_window);
     auto [screen_w, screen_h] = Features::Overlay::Geometry::get_screen_dimensions();
 
@@ -95,7 +93,6 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
                           dimensions->first, dimensions->second, screen_w, screen_h)) {
       // 仍需 overlay：解冻继续
       Features::Overlay::unfreeze_overlay(state);
-      // 主动禁止任务栏重绘，防止闪烁
       Features::Overlay::Interaction::suppress_taskbar_redraw(state);
     } else {
       // 不需要 overlay：停止
@@ -105,7 +102,7 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
     state.overlay->is_transforming = false;
   }
 
-  // 重启letterbox
+  // 重启 letterbox
   if (!state.overlay->running && state.letterbox->enabled) {
     auto letterbox_result = Features::Letterbox::show(state, target_window);
     if (!letterbox_result) {
@@ -115,10 +112,10 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
   }
 }
 
-// 处理比例改变事件
-auto handle_ratio_changed(Core::State::AppState& state,
-                          const UI::FloatingWindow::Events::RatioChangeEvent& event) -> void {
-  Logger().debug("Handling ratio change to index {}, ratio: {}", event.index, event.ratio_value);
+// 比例变换的完整协程流程
+auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, double ratio_value)
+    -> Core::Async::ui_task {
+  Logger().debug("[Coroutine] Transforming ratio to index {}, ratio: {}", ratio_index, ratio_value);
 
   // 查找目标窗口
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
@@ -126,23 +123,29 @@ auto handle_ratio_changed(Core::State::AppState& state,
   if (!target_window) {
     Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                state.i18n->texts["message.window_not_found"]);
-    return;
+    co_return;
   }
 
-  // 先计算目标分辨率
+  // 计算目标分辨率
   auto total_pixels = get_current_total_pixels(state);
   Features::WindowControl::Resolution new_resolution;
 
   if (total_pixels == 0) {
-    // 使用屏幕尺寸计算
-    new_resolution = Features::WindowControl::calculate_resolution_by_screen(event.ratio_value);
+    new_resolution = Features::WindowControl::calculate_resolution_by_screen(ratio_value);
   } else {
-    new_resolution = Features::WindowControl::calculate_resolution(event.ratio_value, total_pixels);
+    new_resolution = Features::WindowControl::calculate_resolution(ratio_value, total_pixels);
   }
 
-  // 准备变换（根据目标尺寸决定是否启动 overlay）
-  prepare_transform_actions(state, target_window.value(), new_resolution.width,
-                            new_resolution.height);
+  // 准备变换
+  bool needs_wait_first_frame =
+      prepare_transform_actions(state, *target_window, new_resolution.width, new_resolution.height);
+
+  // 如果需要等待 overlay 首帧（最多 500ms）
+  if (needs_wait_first_frame) {
+    for (int i = 0; i < 50 && !state.overlay->freeze_rendering; ++i) {
+      co_await Core::Async::ui_delay{std::chrono::milliseconds(10)};
+    }
+  }
 
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
@@ -155,24 +158,37 @@ auto handle_ratio_changed(Core::State::AppState& state,
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
-    return;
+    co_return;
   }
 
-  post_transform_actions(state, target_window.value());
+  // 后续处理：等待窗口稳定后决定 overlay 状态
+  if (state.overlay->is_transforming) {
+    co_await Core::Async::ui_delay{std::chrono::milliseconds(400)};
+    post_transform_actions(state, *target_window);
+  }
 
   // 更新当前比例索引
   const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
-  if (event.index < ratios.size() || event.index == std::numeric_limits<size_t>::max()) {
-    state.floating_window->ui.current_ratio_index = event.index;
+  if (ratio_index < ratios.size() || ratio_index == std::numeric_limits<size_t>::max()) {
+    state.floating_window->ui.current_ratio_index = ratio_index;
   }
+
+  // 请求重绘悬浮窗
+  UI::FloatingWindow::request_repaint(state);
 }
 
-// 处理分辨率改变事件
-auto handle_resolution_changed(Core::State::AppState& state,
-                               const UI::FloatingWindow::Events::ResolutionChangeEvent& event)
-    -> void {
-  Logger().debug("Handling resolution change to index {}, pixels: {}", event.index,
-                 event.total_pixels);
+// 处理比例改变事件（启动协程）
+auto handle_ratio_changed(Core::State::AppState& state,
+                          const UI::FloatingWindow::Events::RatioChangeEvent& event) -> void {
+  // 直接调用协程函数（ui_task 使用 suspend_never，立即开始执行）
+  transform_ratio_async(state, event.index, event.ratio_value);
+}
+
+// 分辨率变换的完整协程流程
+auto transform_resolution_async(Core::State::AppState& state, size_t resolution_index,
+                                std::uint64_t total_pixels) -> Core::Async::ui_task {
+  Logger().debug("[Coroutine] Transforming resolution to index {}, pixels: {}", resolution_index,
+                 total_pixels);
 
   // 查找目标窗口
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
@@ -180,24 +196,29 @@ auto handle_resolution_changed(Core::State::AppState& state,
   if (!target_window) {
     Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                                state.i18n->texts["message.window_not_found"]);
-    return;
+    co_return;
   }
 
-  // 先计算目标分辨率
+  // 计算目标分辨率
   double current_ratio = get_current_ratio(state);
   Features::WindowControl::Resolution new_resolution;
 
-  if (event.total_pixels == 0) {
-    // 使用屏幕尺寸计算
+  if (total_pixels == 0) {
     new_resolution = Features::WindowControl::calculate_resolution_by_screen(current_ratio);
   } else {
-    new_resolution =
-        Features::WindowControl::calculate_resolution(current_ratio, event.total_pixels);
+    new_resolution = Features::WindowControl::calculate_resolution(current_ratio, total_pixels);
   }
 
-  // 准备变换（根据目标尺寸决定是否启动 overlay）
-  prepare_transform_actions(state, target_window.value(), new_resolution.width,
-                            new_resolution.height);
+  // 准备变换
+  bool needs_wait_first_frame =
+      prepare_transform_actions(state, *target_window, new_resolution.width, new_resolution.height);
+
+  // 如果需要等待 overlay 首帧（最多 500ms）
+  if (needs_wait_first_frame) {
+    for (int i = 0; i < 50 && !state.overlay->freeze_rendering; ++i) {
+      co_await Core::Async::ui_delay{std::chrono::milliseconds(10)};
+    }
+  }
 
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{
@@ -210,16 +231,31 @@ auto handle_resolution_changed(Core::State::AppState& state,
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
-    return;
+    co_return;
   }
 
-  post_transform_actions(state, target_window.value());
+  // 后续处理：等待窗口稳定后决定 overlay 状态
+  if (state.overlay->is_transforming) {
+    co_await Core::Async::ui_delay{std::chrono::milliseconds(400)};
+    post_transform_actions(state, *target_window);
+  }
 
   // 更新当前分辨率索引
   const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
-  if (event.index < resolutions.size()) {
-    state.floating_window->ui.current_resolution_index = event.index;
+  if (resolution_index < resolutions.size()) {
+    state.floating_window->ui.current_resolution_index = resolution_index;
   }
+
+  // 请求重绘悬浮窗
+  UI::FloatingWindow::request_repaint(state);
+}
+
+// 处理分辨率改变事件（启动协程）
+auto handle_resolution_changed(Core::State::AppState& state,
+                               const UI::FloatingWindow::Events::ResolutionChangeEvent& event)
+    -> void {
+  // 直接调用协程函数（ui_task 使用 suspend_never，立即开始执行）
+  transform_resolution_async(state, event.index, event.total_pixels);
 }
 
 // 处理窗口选择事件

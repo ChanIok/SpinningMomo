@@ -129,7 +129,7 @@ auto stop_overlay(Core::State::AppState& state) -> void {
   Capture::stop_capture(state);
 
   // 恢复游戏窗口
-  Window::restore_game_window(state, true);
+  Window::restore_game_window(state);
 
   // 隐藏窗口
   Window::hide_overlay_window(state);
