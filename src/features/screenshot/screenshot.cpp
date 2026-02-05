@@ -433,7 +433,7 @@ auto take_screenshot(
     return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
   }
 
-  auto screenshots_dir = exe_dir_result.value() / "Screenshots";
+  auto screenshots_dir = exe_dir_result.value() / "screenshots";
   auto ensure_result = Utils::Path::EnsureDirectoryExists(screenshots_dir);
   if (!ensure_result) {
     return std::unexpected("Failed to create screenshots directory: " + ensure_result.error());

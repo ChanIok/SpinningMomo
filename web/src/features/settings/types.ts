@@ -83,13 +83,13 @@ export interface AppSettings {
   app: {
     // 快捷键设置
     hotkey: {
-      toggleVisibility: {
-        modifiers: number // Ctrl + Alt = 3
-        key: number // R键 = 82
+      floatingWindow: {
+        modifiers: number // MOD_CONTROL = 2
+        key: number // VK_OEM_3 (`) = 192
       }
       screenshot: {
         modifiers: number // 无修饰键 = 0
-        key: number // 印屏键 = 44
+        key: number // VK_F11 = 122
       }
     }
 
@@ -183,13 +183,13 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // app 设置
   app: {
     hotkey: {
-      toggleVisibility: {
-        modifiers: 3, // Ctrl + Alt
-        key: 82, // R键
+      floatingWindow: {
+        modifiers: 2, // MOD_CONTROL
+        key: 192, // VK_OEM_3 (`)
       },
       screenshot: {
         modifiers: 0, // 无修饰键
-        key: 44, // 印屏键
+        key: 122, // VK_F11
       },
     },
     language: {

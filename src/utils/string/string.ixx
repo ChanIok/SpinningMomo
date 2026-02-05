@@ -51,10 +51,10 @@ export [[nodiscard]] auto FormatTimestamp(const std::chrono::system_clock::time_
   using namespace std::chrono;
 
   auto now = time_point;
-  auto local_time = zoned_time{current_zone(), now};
+  auto local_time = zoned_time{current_zone(), floor<seconds>(now)};
   auto ms = duration_cast<milliseconds>(now.time_since_epoch()) % 1000;
 
-  return std::format("Screenshot_{:%Y%m%d_%H%M%S}_{:03d}.png", local_time, ms.count());
+  return std::format("{:%Y%m%d_%H%M%S}_{:03d}.png", local_time, ms.count());
 }
 
 // Base64编码表

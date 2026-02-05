@@ -56,6 +56,12 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                        .i18n_key = "menu.app_float",
                        .is_toggle = false,
                        .action = [&state]() { UI::FloatingWindow::toggle_visibility(state); },
+                       .hotkey =
+                           HotkeyBinding{
+                               .modifiers = 1,  // MOD_CONTROL
+                               .key = 192,      // VK_OEM_3 (`)
+                               .settings_path = "app.hotkey.floating_window",
+                           },
                    });
 
   // === 截图功能 ===
@@ -67,6 +73,12 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                        .i18n_key = "menu.screenshot_capture",
                        .is_toggle = false,
                        .action = [&state]() { Features::Screenshot::UseCase::capture(state); },
+                       .hotkey =
+                           HotkeyBinding{
+                               .modifiers = 0,  // 无修饰键
+                               .key = 44,       // VK_SNAPSHOT (PrintScreen)
+                               .settings_path = "app.hotkey.screenshot",
+                           },
                    });
 
   // 打开截图文件夹

@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { useSettingsStore } from '../store'
 import { useGeneralActions } from '../composables/useGeneralActions'
@@ -11,7 +10,14 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions, ItemGroup } from '@/components/ui/item'
+import {
+  Item,
+  ItemContent,
+  ItemTitle,
+  ItemDescription,
+  ItemActions,
+  ItemGroup,
+} from '@/components/ui/item'
 import HotkeyRecorder from './HotkeyRecorder.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
@@ -21,7 +27,7 @@ const { appSettings, error, isInitialized } = storeToRefs(store)
 const {
   updateLanguage,
   updateLoggerLevel,
-  updateToggleVisibilityHotkey,
+  updateFloatingWindowHotkey,
   updateScreenshotHotkey,
   resetGeneralSettings,
 } = useGeneralActions()
@@ -29,11 +35,11 @@ const { clearError } = store
 const { t } = useI18n()
 
 // Ensure settings are passed safely to HotkeyRecorder
-const getHotkey = (type: 'toggleVisibility' | 'screenshot') => {
+const getHotkey = (type: 'floatingWindow' | 'screenshot') => {
   const hotkey = appSettings.value.app.hotkey[type]
   return {
     modifiers: hotkey.modifiers,
-    key: hotkey.key
+    key: hotkey.key,
   }
 }
 
@@ -88,7 +94,7 @@ const handleReset = async () => {
             {{ t('settings.general.language.description') }}
           </p>
         </div>
-        
+
         <Item variant="outline" size="sm">
           <ItemContent>
             <ItemTitle>
@@ -125,7 +131,7 @@ const handleReset = async () => {
             {{ t('settings.general.logger.description') }}
           </p>
         </div>
-        
+
         <Item variant="outline" size="sm">
           <ItemContent>
             <ItemTitle>
@@ -163,21 +169,21 @@ const handleReset = async () => {
             {{ t('settings.general.hotkey.description') }}
           </p>
         </div>
-        
+
         <ItemGroup>
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
-                {{ t('settings.general.hotkey.toggleVisibility') }}
+                {{ t('settings.general.hotkey.floatingWindow') }}
               </ItemTitle>
               <ItemDescription>
-                {{ t('settings.general.hotkey.toggleVisibilityDescription') }}
+                {{ t('settings.general.hotkey.floatingWindowDescription') }}
               </ItemDescription>
             </ItemContent>
             <ItemActions>
               <HotkeyRecorder
-                :value="getHotkey('toggleVisibility')"
-                @change="(v) => updateToggleVisibilityHotkey(v.modifiers, v.key)"
+                :value="getHotkey('floatingWindow')"
+                @change="(v) => updateFloatingWindowHotkey(v.modifiers, v.key)"
                 class="w-48"
               />
             </ItemActions>

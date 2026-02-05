@@ -100,18 +100,10 @@ auto dispatch_item_click_event(Core::State::AppState& state,
   }
 }
 
-// 处理热键，通过命令注册表调用
-auto handle_hotkey(Core::State::AppState& state, WPARAM hotkey_id) -> void {
-  // 根据热键ID调用对应命令
-  if (hotkey_id == state.floating_window->window.toggle_visibility_hotkey_id) {
-    if (state.commands) {
-      Core::Commands::invoke_command(state.commands->registry, "app.float");
-    }
-  } else if (hotkey_id == state.floating_window->window.screenshot_hotkey_id) {
-    if (state.commands) {
-      Core::Commands::invoke_command(state.commands->registry, "screenshot.capture");
-    }
-  }
+// 处理热键，通过命令系统统一分发
+auto handle_hotkey_message(Core::State::AppState& state, WPARAM hotkey_id) -> void {
+  Logger().debug("WM_HOTKEY received, wParam={}", hotkey_id);
+  Core::Commands::handle_hotkey(state, static_cast<int>(hotkey_id));
 }
 
 // 处理鼠标移出窗口，重置悬停状态并重绘
@@ -197,7 +189,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       return 0;
 
     case WM_HOTKEY:
-      handle_hotkey(state, wParam);
+      handle_hotkey_message(state, wParam);
       return 0;
 
     case WM_DPICHANGED: {

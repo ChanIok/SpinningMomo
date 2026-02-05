@@ -99,13 +99,8 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 默认显示窗口
     UI::FloatingWindow::show_window(state);
 
-    // 注册热键（从settings中读取配置）
-    UI::FloatingWindow::register_toggle_visibility_hotkey(
-        state, state.settings->raw.app.hotkey.toggle_visibility.modifiers,
-        state.settings->raw.app.hotkey.toggle_visibility.key);
-    UI::FloatingWindow::register_screenshot_hotkey(
-        state, state.settings->raw.app.hotkey.screenshot.modifiers,
-        state.settings->raw.app.hotkey.screenshot.key);
+    // 注册所有命令的热键
+    Core::Commands::register_all_hotkeys(state, state.floating_window->window.hwnd);
 
     Logger().info("Application initialized successfully");
     return {};

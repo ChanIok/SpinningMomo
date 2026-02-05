@@ -1,4 +1,3 @@
-
 import { useSettingsStore } from '../store'
 import { DEFAULT_APP_SETTINGS } from '../types'
 import { storeToRefs } from 'pinia'
@@ -12,8 +11,8 @@ export const useGeneralActions = () => {
       ...appSettings.value,
       app: {
         ...appSettings.value.app,
-        language: { current: language }
-      }
+        language: { current: language },
+      },
     })
   }
 
@@ -22,21 +21,21 @@ export const useGeneralActions = () => {
       ...appSettings.value,
       app: {
         ...appSettings.value.app,
-        logger: { level }
-      }
+        logger: { level },
+      },
     })
   }
 
-  const updateToggleVisibilityHotkey = async (modifiers: number, key: number) => {
+  const updateFloatingWindowHotkey = async (modifiers: number, key: number) => {
     await store.updateSettings({
       ...appSettings.value,
       app: {
         ...appSettings.value.app,
         hotkey: {
           ...appSettings.value.app.hotkey,
-          toggleVisibility: { modifiers, key }
-        }
-      }
+          floatingWindow: { modifiers, key },
+        },
+      },
     })
   }
 
@@ -47,9 +46,9 @@ export const useGeneralActions = () => {
         ...appSettings.value.app,
         hotkey: {
           ...appSettings.value.app.hotkey,
-          screenshot: { modifiers, key }
-        }
-      }
+          screenshot: { modifiers, key },
+        },
+      },
     })
   }
 
@@ -65,9 +64,9 @@ export const useGeneralActions = () => {
           level: DEFAULT_APP_SETTINGS.app.logger.level,
         },
         hotkey: {
-          toggleVisibility: {
-            modifiers: DEFAULT_APP_SETTINGS.app.hotkey.toggleVisibility.modifiers,
-            key: DEFAULT_APP_SETTINGS.app.hotkey.toggleVisibility.key,
+          floatingWindow: {
+            modifiers: DEFAULT_APP_SETTINGS.app.hotkey.floatingWindow.modifiers,
+            key: DEFAULT_APP_SETTINGS.app.hotkey.floatingWindow.key,
           },
           screenshot: {
             modifiers: DEFAULT_APP_SETTINGS.app.hotkey.screenshot.modifiers,
@@ -81,8 +80,8 @@ export const useGeneralActions = () => {
   return {
     updateLanguage,
     updateLoggerLevel,
-    updateToggleVisibilityHotkey,
+    updateFloatingWindowHotkey,
     updateScreenshotHotkey,
-    resetGeneralSettings
+    resetGeneralSettings,
   }
 }

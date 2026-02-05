@@ -44,8 +44,6 @@ struct WindowInfo {
   UINT dpi = 96;
   bool is_visible = false;
   bool is_tracking_mouse = false;
-  int toggle_visibility_hotkey_id = 1;
-  int screenshot_hotkey_id = 2;
 };
 
 // UI交互状态

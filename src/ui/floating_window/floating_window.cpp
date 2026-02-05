@@ -118,8 +118,6 @@ auto toggle_visibility(Core::State::AppState& state) -> void {
 }
 
 auto destroy_window(Core::State::AppState& state) -> void {
-  unregister_hotkey(state);
-
   // 清理Direct2D资源
   UI::FloatingWindow::D2DContext::cleanup_d2d(state);
 
@@ -158,33 +156,6 @@ auto update_menu_items(Core::State::AppState& state) -> void {
 auto set_menu_items_to_show(Core::State::AppState& state, std::span<const std::wstring> items)
     -> void {
   state.floating_window->data.menu_items_to_show.assign(items.begin(), items.end());
-}
-
-auto register_toggle_visibility_hotkey(Core::State::AppState& state, UINT modifiers, UINT key)
-    -> bool {
-  if (state.floating_window->window.hwnd) {
-    return ::RegisterHotKey(state.floating_window->window.hwnd,
-                            state.floating_window->window.toggle_visibility_hotkey_id, modifiers,
-                            key);
-  }
-  return false;
-}
-
-auto register_screenshot_hotkey(Core::State::AppState& state, UINT modifiers, UINT key) -> bool {
-  if (state.floating_window->window.hwnd) {
-    return ::RegisterHotKey(state.floating_window->window.hwnd,
-                            state.floating_window->window.screenshot_hotkey_id, modifiers, key);
-  }
-  return false;
-}
-
-auto unregister_hotkey(Core::State::AppState& state) -> void {
-  if (state.floating_window->window.hwnd) {
-    ::UnregisterHotKey(state.floating_window->window.hwnd,
-                       state.floating_window->window.toggle_visibility_hotkey_id);
-    ::UnregisterHotKey(state.floating_window->window.hwnd,
-                       state.floating_window->window.screenshot_hotkey_id);
-  }
 }
 
 // 内部辅助函数实现

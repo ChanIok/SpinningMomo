@@ -31,15 +31,16 @@ export struct AppSettings {
     bool always_run_as_admin = true;  // 始终以管理员权限运行
 
     // 快捷键设置
+    // 修饰键值: MOD_ALT=1, MOD_CONTROL=2, MOD_SHIFT=4, MOD_WIN=8
     struct Hotkey {
-      struct ToggleVisibility {
-        int modifiers = 3;  // Ctrl + Alt
-        int key = 82;       // R键
-      } toggle_visibility;
+      struct FloatingWindow {
+        int modifiers = 2;  // MOD_CONTROL (Ctrl)
+        int key = 192;      // VK_OEM_3 (`)
+      } floating_window;
 
       struct Screenshot {
         int modifiers = 0;  // 无修饰键
-        int key = 44;       // 印屏键
+        int key = 0x7A;     // VK_F11 (F11) - PrintScreen(0x2C) 可能被系统截图功能拦截
       } screenshot;
     } hotkey;
 
