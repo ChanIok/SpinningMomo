@@ -40,9 +40,9 @@ auto should_use_overlay(int game_width, int game_height, int screen_width, int s
 
 auto get_window_dimensions(HWND hwnd) -> std::expected<std::pair<int, int>, std::string> {
   RECT rect;
-  if (!GetWindowRect(hwnd, &rect)) {
+  if (!GetClientRect(hwnd, &rect)) {
     DWORD error = GetLastError();
-    return std::unexpected(std::format("Failed to get window rect. Error: {}", error));
+    return std::unexpected(std::format("Failed to get client rect. Error: {}", error));
   }
 
   return std::make_pair(rect.right - rect.left, rect.bottom - rect.top);
