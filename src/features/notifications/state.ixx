@@ -47,6 +47,9 @@ struct NotificationSystemState {
   // 这对于将指针传递给 WNDPROC 非常重要。
   std::list<Notification> active_notifications;
   size_t next_id = 0;
+
+  // 动画定时器状态
+  bool animation_timer_active = false;
 };
 
 }  // namespace Features::Notifications::State

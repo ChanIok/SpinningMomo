@@ -4,8 +4,12 @@ export module Core.Events;
 
 import std;
 import Core.Events.State;
+import <windows.h>;
 
 namespace Core::Events {
+
+// Custom message for UI thread wake-up to process async events
+export constexpr UINT kWM_APP_PROCESS_EVENTS = WM_APP + 1;
 
 // 同步发送事件
 export template <typename T>
@@ -25,9 +29,15 @@ auto send(State::EventsState& bus, const T& event) -> void {
 // 异步投递事件
 export template <typename T>
 auto post(State::EventsState& bus, T event) -> void {
-  std::lock_guard<std::mutex> lock(bus.queue_mutex);
-  auto key = std::type_index(typeid(T));
-  bus.event_queue.emplace(key, std::any(std::move(event)));
+  {
+    std::lock_guard<std::mutex> lock(bus.queue_mutex);
+    auto key = std::type_index(typeid(T));
+    bus.event_queue.emplace(key, std::any(std::move(event)));
+  }
+  // Wake up UI thread to process events
+  if (bus.notify_hwnd) {
+    ::PostMessageW(bus.notify_hwnd, kWM_APP_PROCESS_EVENTS, 0, 0);
+  }
 }
 
 // 订阅事件

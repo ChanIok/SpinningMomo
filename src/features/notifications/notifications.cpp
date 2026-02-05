@@ -350,6 +350,15 @@ auto show_notification(Core::State::AppState& state, const std::wstring& title,
 
   // 3. 更新所有通知的位置
   update_window_positions(state);
+
+  // 4. 启动动画定时器（如果尚未运行）
+  if (!state.notifications->animation_timer_active) {
+    if (state.floating_window && state.floating_window->window.hwnd) {
+      ::SetTimer(state.floating_window->window.hwnd, Constants::ANIMATION_TIMER_ID,
+                 Constants::ANIMATION_FRAME_INTERVAL, nullptr);
+      state.notifications->animation_timer_active = true;
+    }
+  }
 }
 
 // std::string 重载版本
@@ -470,6 +479,16 @@ auto update_notifications(Core::State::AppState& state) -> void {
       it = state.notifications->active_notifications.erase(it);
     } else {
       ++it;
+    }
+  }
+
+  // 如果没有活动的通知，停止动画定时器
+  if (state.notifications->active_notifications.empty()) {
+    if (state.notifications->animation_timer_active) {
+      if (state.floating_window && state.floating_window->window.hwnd) {
+        ::KillTimer(state.floating_window->window.hwnd, Constants::ANIMATION_TIMER_ID);
+      }
+      state.notifications->animation_timer_active = false;
     }
   }
 }

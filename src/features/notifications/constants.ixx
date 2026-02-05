@@ -28,6 +28,10 @@ constexpr auto SLIDE_DURATION = std::chrono::milliseconds(200);
 constexpr auto FADE_DURATION = std::chrono::milliseconds(200);
 constexpr auto DISPLAY_DURATION = std::chrono::milliseconds(3000);
 
+// 动画定时器
+constexpr UINT_PTR ANIMATION_TIMER_ID = 1001;
+constexpr UINT ANIMATION_FRAME_INTERVAL = 16;  // ~60fps
+
 // 颜色
 const COLORREF BG_COLOR = RGB(255, 255, 255);
 const COLORREF TEXT_COLOR = RGB(96, 96, 96);
@@ -38,4 +42,4 @@ const COLORREF CLOSE_HOVER_COLOR = RGB(51, 51, 51);
 // 窗口类名
 const std::wstring NOTIFICATION_WINDOW_CLASS = L"SpinningMomoNotificationClass";
 
-} // namespace Features::Notifications::Constants 
+}  // namespace Features::Notifications::Constants

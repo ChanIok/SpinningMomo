@@ -1,10 +1,5 @@
 module;
 
-#include <windows.h>
-#include <windowsx.h>
-
-#include <string>
-
 module UI.FloatingWindow.MessageHandler;
 
 import std;
@@ -24,7 +19,11 @@ import UI.TrayIcon.Types;
 import UI.ContextMenu;
 import UI.ContextMenu.Types;
 import UI.FloatingWindow.D2DContext;
+import Features.Notifications;
+import Features.Notifications.Constants;
 import Utils.Logger;
+import <windows.h>;
+import <windowsx.h>;
 
 namespace UI::FloatingWindow::MessageHandler {
 
@@ -338,6 +337,18 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case 0x8000 + 100:  // WM_SPINNINGMOMO_SHOW
       UI::FloatingWindow::show_window(state);
       SetForegroundWindow(hwnd);
+      return 0;
+
+    // 处理异步事件队列 (WM_APP + 1)
+    case Core::Events::kWM_APP_PROCESS_EVENTS:
+      Core::Events::process_events(*state.events);
+      return 0;
+
+    // 处理通知动画定时器
+    case WM_TIMER:
+      if (wParam == Features::Notifications::Constants::ANIMATION_TIMER_ID) {
+        Features::Notifications::update_notifications(state);
+      }
       return 0;
   }
   return DefWindowProc(hwnd, msg, wParam, lParam);

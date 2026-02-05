@@ -5,10 +5,8 @@ module App;
 import std;
 import Core.Initializer;
 import Core.State;
-import Core.Events;
 import Core.State.AppInfo;
 import Features.Letterbox;
-import Features.Notifications;
 import Features.Overlay;
 import Features.Preview;
 import Features.Screenshot;
@@ -81,30 +79,20 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
 auto Application::Run() -> int {
   Vendor::Windows::MSG msg{};
-  const auto timeout = 10;
 
-  while (true) {
-    // 等待消息或超时
-    Vendor::Windows::MsgWaitForMultipleObjectsEx(0, nullptr, timeout, Vendor::Windows::kQS_ALLINPUT,
-                                                 Vendor::Windows::kMWMO_INPUTAVAILABLE);
-
-    // 处理所有挂起的消息
-    while (Vendor::Windows::PeekMessageW(&msg, nullptr, 0, 0, Vendor::Windows::kPM_REMOVE)) {
-      if (msg.message == Vendor::Windows::kWM_QUIT) {
-        return static_cast<int>(msg.wParam);
-      }
-      Vendor::Windows::TranslateWindowMessage(&msg);
-      Vendor::Windows::DispatchWindowMessageW(&msg);
+  // 消息驱动的事件循环：
+  // - WM_APP_PROCESS_EVENTS: 处理异步事件队列
+  // - WM_TIMER: 处理通知动画更新（固定 60fps 帧率）
+  // 没有任务时 GetMessage 会阻塞，零 CPU 占用
+  while (Vendor::Windows::GetWindowMessage(&msg, nullptr, 0, 0)) {
+    if (msg.message == Vendor::Windows::kWM_QUIT) {
+      return static_cast<int>(msg.wParam);
     }
-
-    // 在处理完消息或超时后，运行我们的更新逻辑
-    if (m_app_state) {
-      Core::Events::process_events(*m_app_state->events);
-
-      // 更新通知系统
-      Features::Notifications::update_notifications(*m_app_state);
-    }
+    Vendor::Windows::TranslateWindowMessage(&msg);
+    Vendor::Windows::DispatchWindowMessageW(&msg);
   }
+
+  return static_cast<int>(msg.wParam);
 }
 
 auto Application::LogSystemInfo() -> void {

@@ -7,6 +7,8 @@ import Core.Async;
 import Core.WorkerPool;
 import Core.State;
 import Core.HttpServer;
+import Core.Events;
+import Core.Events.State;
 import Core.Events.Registrar;
 import Core.RPC.Registry;
 import Core.Initializer.Database;
@@ -20,6 +22,7 @@ import Features.Recording;
 import Features.Update;
 import Features.Letterbox.State;
 import UI.FloatingWindow;
+import UI.FloatingWindow.State;
 import UI.TrayIcon;
 import UI.ContextMenu;
 import Vendor.Windows;
@@ -73,6 +76,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     if (auto result = UI::FloatingWindow::create_window(state); !result) {
       return std::unexpected("Failed to create app window: " + result.error());
     }
+
+    // Set up notify_hwnd for event system wake-up
+    state.events->notify_hwnd = state.floating_window->window.hwnd;
 
     if (auto result = UI::TrayIcon::create(state); !result) {
       return std::unexpected("Failed to create tray icon: " + result.error());
