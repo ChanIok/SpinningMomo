@@ -333,6 +333,12 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_DESTROY:
       PostQuitMessage(0);
       return 0;
+
+    // 自定义消息：另一个实例请求显示窗口
+    case 0x8000 + 100:  // WM_SPINNINGMOMO_SHOW
+      UI::FloatingWindow::show_window(state);
+      SetForegroundWindow(hwnd);
+      return 0;
   }
   return DefWindowProc(hwnd, msg, wParam, lParam);
 }

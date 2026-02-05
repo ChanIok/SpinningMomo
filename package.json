@@ -4,7 +4,7 @@
   "scripts": {
     "prepare": "husky",
     "build": "npm run build:cpp && npm run build:web && npm run build:dist",
-    "build:cpp": "xmake config -m release && xmake build",
+    "build:cpp": "xmake config -m release && xmake build && xmake config -m debug",
     "build:web": "cd web && npm run build",
     "build:dist": "node scripts/prepare-dist.js",
     "format:cpp": "node scripts/format-cpp.js",

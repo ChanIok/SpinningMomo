@@ -92,4 +92,43 @@ namespace Utils::System {
   return Vendor::ShellApi::ShellExecuteExW(&exec_info) != FALSE;
 }
 
+// 单实例互斥锁名称
+constexpr auto kMutexName = L"Global\\SpinningMomo_SingleInstance_Mutex";
+// 窗口类名
+constexpr auto kWindowClassName = L"SpinningMomoAppWindowClass";
+
+// 全局互斥锁句柄
+static HANDLE g_instance_mutex = nullptr;
+
+// 单实例检测：尝试获取单实例锁
+[[nodiscard]] auto acquire_single_instance_lock() noexcept -> bool {
+  g_instance_mutex = CreateMutexW(nullptr, FALSE, kMutexName);
+
+  if (g_instance_mutex == nullptr) {
+    // 创建失败，假定已有实例
+    return false;
+  }
+
+  if (GetLastError() == ERROR_ALREADY_EXISTS) {
+    // 互斥锁已存在，说明已有实例在运行
+    CloseHandle(g_instance_mutex);
+    g_instance_mutex = nullptr;
+    return false;
+  }
+
+  // 成功获取锁，当前是第一个实例
+  return true;
+}
+
+// 激活已运行的实例窗口
+auto activate_existing_instance() noexcept -> void {
+  // 查找已运行实例的窗口
+  HWND hwnd = FindWindowW(kWindowClassName, nullptr);
+  if (hwnd) {
+    // 发送自定义消息，让已有实例自己显示窗口
+    // 这样可以绕过 UIPI 限制（高权限窗口已允许接收此消息）
+    PostMessageW(hwnd, WM_SPINNINGMOMO_SHOW, 0, 0);
+  }
+}
+
 }  // namespace Utils::System

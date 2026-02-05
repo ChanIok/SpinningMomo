@@ -10,6 +10,13 @@ auto __stdcall wWinMain([[maybe_unused]] Vendor::Windows::HINSTANCE hInstance,
                         [[maybe_unused]] Vendor::Windows::HINSTANCE hPrevInstance,
                         [[maybe_unused]] Vendor::Windows::LPWSTR lpCmdLine,
                         [[maybe_unused]] int nCmdShow) -> int {
+  // 单实例检测：防止应用多开（必须在提权检查之前）
+  if (!Utils::System::acquire_single_instance_lock()) {
+    // 已有实例在运行，激活它的窗口后退出
+    Utils::System::activate_existing_instance();
+    return 0;
+  }
+
   // 权限检查：如果需要管理员权限且当前没有，则重启并请求提权
   if (Features::Settings::should_run_as_admin() && !Utils::System::is_process_elevated()) {
     if (Utils::System::restart_as_elevated(lpCmdLine)) {

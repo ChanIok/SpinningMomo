@@ -65,6 +65,10 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
     return std::unexpected("Failed to create window");
   }
 
+  // 允许低权限进程发送显示窗口的消息（绕过 UIPI 限制）
+  ChangeWindowMessageFilterEx(state.floating_window->window.hwnd, 0x8000 + 100, MSGFLT_ALLOW,
+                              nullptr);
+
   // 保存窗口尺寸和位置
   state.floating_window->window.size = window_size;
   state.floating_window->window.position = window_pos;
