@@ -1,6 +1,7 @@
 module;
 
 #include <windows.h>  // 必须放在最前面
+
 #include <shellapi.h>
 #include <shlobj_core.h>
 
@@ -30,7 +31,9 @@ export constexpr auto kNIF_TIP = NIF_TIP;
 // ShellExecute 相关类型和常量
 export using SHELLEXECUTEINFOW = ::SHELLEXECUTEINFOW;
 export constexpr auto kSEE_MASK_NOCLOSEPROCESS = SEE_MASK_NOCLOSEPROCESS;
+export constexpr auto kSEE_MASK_NOASYNC = SEE_MASK_NOASYNC;
 export constexpr auto kSW_HIDE = SW_HIDE;
+export constexpr auto kSW_SHOWNORMAL = SW_SHOWNORMAL;
 
 // ShellExecute 函数
 export auto ShellExecuteExW(SHELLEXECUTEINFOW* lpExecInfo) -> BOOL {

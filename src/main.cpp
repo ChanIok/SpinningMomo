@@ -1,6 +1,8 @@
 import std;
 import App;
 import Utils.Logger;
+import Utils.System;
+import Features.Settings;
 import Vendor.Windows;
 
 // 现代C++入口点
@@ -8,6 +10,15 @@ auto __stdcall wWinMain([[maybe_unused]] Vendor::Windows::HINSTANCE hInstance,
                         [[maybe_unused]] Vendor::Windows::HINSTANCE hPrevInstance,
                         [[maybe_unused]] Vendor::Windows::LPWSTR lpCmdLine,
                         [[maybe_unused]] int nCmdShow) -> int {
+  // 权限检查：如果需要管理员权限且当前没有，则重启并请求提权
+  if (Features::Settings::should_run_as_admin() && !Utils::System::is_process_elevated()) {
+    if (Utils::System::restart_as_elevated(lpCmdLine)) {
+      // 成功启动了新的提权进程，当前进程退出
+      return 0;
+    }
+    // 用户取消了 UAC 对话框或启动失败，继续以普通权限运行
+  }
+
   // 在所有操作之前初始化日志系统
   if (auto result = Utils::Logging::initialize(); !result) {
     // 如果日志初始化失败，使用系统API显示错误，因为我们的日志系统不可用

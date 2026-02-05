@@ -27,4 +27,8 @@ export auto save_settings_to_file(const std::filesystem::path& settings_path,
 export auto migrate_settings_file(const std::filesystem::path& file_path, int target_version)
     -> std::expected<void, std::string>;
 
+// 轻量级预读取：检查是否需要以管理员权限运行
+// 此函数不依赖 AppState，可在应用初始化之前调用
+export auto should_run_as_admin() noexcept -> bool;
+
 }  // namespace Features::Settings

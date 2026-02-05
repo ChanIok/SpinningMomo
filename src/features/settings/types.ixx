@@ -28,6 +28,8 @@ export struct AppSettings {
 
   // app 分组 - 应用核心设置
   struct App {
+    bool always_run_as_admin = true;  // 始终以管理员权限运行
+
     // 快捷键设置
     struct Hotkey {
       struct ToggleVisibility {

@@ -252,4 +252,59 @@ auto save_settings_to_file(const std::filesystem::path& settings_path,
   }
 }
 
+// 轻量级预读取：检查是否需要以管理员权限运行
+auto should_run_as_admin() noexcept -> bool {
+  try {
+    auto settings_path = get_settings_path();
+    if (!settings_path) {
+      return true;  // 默认需要管理员权限
+    }
+
+    if (!std::filesystem::exists(settings_path.value())) {
+      return true;  // 文件不存在，使用默认值
+    }
+
+    std::ifstream file(settings_path.value());
+    if (!file) {
+      return true;
+    }
+
+    std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+    // 使用 rfl::Generic 解析，只读取需要的字段
+    auto generic_result = rfl::json::read<rfl::Generic::Object>(json_str);
+    if (!generic_result) {
+      return true;
+    }
+
+    auto& root = generic_result.value();
+
+    // 读取 app.always_run_as_admin
+    auto app_result = root.get("app");
+    if (!app_result) {
+      return true;
+    }
+
+    auto app_obj = app_result.value().to_object();
+    if (!app_obj) {
+      return true;
+    }
+
+    auto admin_result = app_obj->get("always_run_as_admin");
+    if (!admin_result) {
+      return true;  // 字段不存在，使用默认值
+    }
+
+    auto admin_bool = admin_result.value().to_bool();
+    if (!admin_bool) {
+      return true;
+    }
+
+    return admin_bool.value();
+
+  } catch (...) {
+    return true;  // 任何异常都返回默认值
+  }
+}
+
 }  // namespace Features::Settings
