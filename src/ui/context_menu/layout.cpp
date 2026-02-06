@@ -25,13 +25,13 @@ auto calculate_text_width(const Core::State::AppState& state, const std::wstring
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
   const auto& d2d = state.floating_window->d2d_context;
-  if (!d2d.is_initialized || !d2d.text_format) {
+  if (!d2d.is_initialized || !menu_state.text_format) {
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
 
   Microsoft::WRL::ComPtr<IDWriteTextLayout> text_layout;
   HRESULT hr = d2d.write_factory->CreateTextLayout(
-      text.c_str(), static_cast<UINT32>(text.length()), d2d.text_format, 1000.0f,
+      text.c_str(), static_cast<UINT32>(text.length()), menu_state.text_format, 1000.0f,
       static_cast<float>(menu_state.layout.item_height), &text_layout);
 
   if (SUCCEEDED(hr)) {
@@ -150,8 +150,9 @@ auto calculate_submenu_position(Core::State::AppState& state, int parent_index) 
     }
   }
 
-  // 子菜单显示在主菜单右侧
-  menu_state.submenu_position.x = menu_state.position.x + menu_state.menu_size.cx;
+  // 子菜单显示在主菜单右侧（略微重叠以补偿 DWM 圆角/阴影的视觉间距）
+  constexpr int kSubmenuOverlap = 4;
+  menu_state.submenu_position.x = menu_state.position.x + menu_state.menu_size.cx - kSubmenuOverlap;
   menu_state.submenu_position.y = menu_state.position.y + parent_y;
 
   // 确保子菜单不会超出屏幕边界，使用与主菜单一致的监视器检测方式
@@ -163,8 +164,9 @@ auto calculate_submenu_position(Core::State::AppState& state, int parent_index) 
 
   // 检查右边界
   if (menu_state.submenu_position.x + menu_state.submenu_size.cx > work_area.right) {
-    // 显示在主菜单左侧
-    menu_state.submenu_position.x = menu_state.position.x - menu_state.submenu_size.cx;
+    // 显示在主菜单左侧（同样应用 overlap）
+    menu_state.submenu_position.x =
+        menu_state.position.x - menu_state.submenu_size.cx + kSubmenuOverlap;
   }
 
   // 检查下边界

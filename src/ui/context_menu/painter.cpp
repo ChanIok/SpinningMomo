@@ -80,7 +80,6 @@ auto draw_menu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> v
 auto draw_single_menu_item(Core::State::AppState& state, const Types::MenuItem& item,
                            const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& menu_state = *state.context_menu;
-  const auto& d2d = state.floating_window->d2d_context;
   const auto& layout = menu_state.layout;
   if (is_hovered && item.is_enabled) {
     menu_state.render_target->FillRectangle(item_rect, menu_state.hover_brush);
@@ -91,11 +90,11 @@ auto draw_single_menu_item(Core::State::AppState& state, const Types::MenuItem& 
   ID2D1SolidColorBrush* text_brush =
       item.is_enabled ? menu_state.text_brush : menu_state.separator_brush;
   menu_state.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
-                                     d2d.text_format, text_rect, text_brush);
+                                     menu_state.text_format, text_rect, text_brush);
 
   if (item.has_submenu()) {
     float arrow_height = static_cast<float>(layout.font_size) * 0.6f;
-    float arrow_width = arrow_height * 0.8f;
+    float arrow_width = arrow_height * 0.6f;
 
     float arrow_x = item_rect.right - static_cast<float>(layout.text_padding) - arrow_width;
     float arrow_y = item_rect.top + (item_rect.bottom - item_rect.top - arrow_height) / 2;
@@ -106,8 +105,9 @@ auto draw_single_menu_item(Core::State::AppState& state, const Types::MenuItem& 
         D2D1::Point2F(arrow_x, arrow_y + arrow_height)                     // 左下点
     };
 
-    menu_state.render_target->DrawLine(points[0], points[1], text_brush, 1.2f);
-    menu_state.render_target->DrawLine(points[1], points[2], text_brush, 1.2f);
+    float stroke_width = static_cast<float>(layout.font_size) * 0.1f;
+    menu_state.render_target->DrawLine(points[0], points[1], text_brush, stroke_width);
+    menu_state.render_target->DrawLine(points[1], points[2], text_brush, stroke_width);
   } else if (item.is_checked) {
     float check_size = static_cast<float>(layout.font_size) * 0.6f;
     float check_x = item_rect.right - static_cast<float>(layout.text_padding) - check_size;
@@ -183,7 +183,6 @@ auto draw_submenu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -
 auto draw_submenu_single_item(Core::State::AppState& state, const Types::MenuItem& item,
                               const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& menu_state = *state.context_menu;
-  const auto& d2d = state.floating_window->d2d_context;
   const auto& layout = menu_state.layout;
   if (is_hovered && item.is_enabled) {
     menu_state.submenu_render_target->FillRectangle(item_rect, menu_state.submenu_hover_brush);
@@ -195,7 +194,7 @@ auto draw_submenu_single_item(Core::State::AppState& state, const Types::MenuIte
       item.is_enabled ? menu_state.submenu_text_brush : menu_state.submenu_separator_brush;
   menu_state.submenu_render_target->DrawText(item.text.c_str(),
                                              static_cast<UINT32>(item.text.length()),
-                                             d2d.text_format, text_rect, text_brush);
+                                             menu_state.text_format, text_rect, text_brush);
   if (item.is_checked) {
     float check_size = static_cast<float>(layout.font_size) * 0.8f;
     float check_x = item_rect.right - static_cast<float>(layout.text_padding) - check_size;

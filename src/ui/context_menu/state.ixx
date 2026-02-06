@@ -1,6 +1,7 @@
 module;
 
 #include <d2d1.h>
+#include <dwrite.h>
 #include <windows.h>
 
 #include <string>
@@ -31,6 +32,9 @@ struct ContextMenuState {
   ID2D1SolidColorBrush* submenu_separator_brush = nullptr;
   ID2D1SolidColorBrush* submenu_hover_brush = nullptr;
   ID2D1SolidColorBrush* submenu_indicator_brush = nullptr;
+
+  // 独立的文本格式（DPI 缩放后的字号，不依赖浮窗）
+  IDWriteTextFormat* text_format = nullptr;
 
   bool main_menu_d2d_ready = false;
   bool submenu_d2d_ready = false;

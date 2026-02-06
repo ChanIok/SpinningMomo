@@ -91,30 +91,6 @@ auto build_tray_menu_items(Core::State::AppState& state)
 
   items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
 
-  items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.at("menu.screenshot_capture")), "screenshot.capture"));
-
-  // 从命令注册表获取状态
-  auto get_command_state = [&state](const std::string& command_id) -> bool {
-    if (state.commands) {
-      if (auto cmd = Core::Commands::get_command(state.commands->registry, command_id)) {
-        if (cmd->is_toggle && cmd->get_state) {
-          return cmd->get_state();
-        }
-      }
-    }
-    return false;
-  };
-
-  items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.at("menu.preview_toggle")), "preview.toggle",
-      get_command_state("preview.toggle")));
-  items.emplace_back(UI::ContextMenu::Types::MenuItem::feature_item(
-      Utils::String::FromUtf8(texts.at("menu.overlay_toggle")), "overlay.toggle",
-      get_command_state("overlay.toggle")));
-
-  items.emplace_back(UI::ContextMenu::Types::MenuItem::separator());
-
   items.emplace_back(UI::ContextMenu::Types::MenuItem::system_item(
       Utils::String::FromUtf8(texts.at("menu.app_main")), "app.main"));
 

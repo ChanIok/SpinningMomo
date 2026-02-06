@@ -124,7 +124,8 @@ struct MenuItem {
     }
     return MenuItem(
         display_text,
-        MenuAction::resolution_selection(index, resolution.name, resolution.total_pixels), selected);
+        MenuAction::resolution_selection(index, resolution.name, resolution.total_pixels),
+        selected);
   }
 
   static auto feature_item(const std::wstring& text, const std::string& action_id,
@@ -148,7 +149,7 @@ struct LayoutConfig {
   static constexpr int BASE_SEPARATOR_HEIGHT = 1;
   static constexpr int BASE_PADDING = 8;
   static constexpr int BASE_TEXT_PADDING = 12;
-  static constexpr int BASE_MIN_WIDTH = 180;
+  static constexpr int BASE_MIN_WIDTH = 140;
   static constexpr int BASE_FONT_SIZE = 12;
   static constexpr int BASE_BORDER_RADIUS = 6;
 

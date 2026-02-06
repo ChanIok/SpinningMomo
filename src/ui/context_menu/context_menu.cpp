@@ -315,14 +315,18 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
     return;
   }
 
-  // 3. 初始化D2D资源
+  // 3. 应用 DPI 缩放（必须在 D2D 初始化之前，因为 text_format 创建依赖 layout.font_size）
+  UINT dpi = app_state.floating_window->window.dpi;
+  menu_state.layout.update_dpi_scaling(dpi);
+
+  // 4. 初始化D2D资源
   if (!D2DContext::initialize_context_menu(app_state, menu_state.hwnd)) {
     Logger().error("Failed to initialize D2D for context menu.");
     DestroyWindow(menu_state.hwnd);
     return;
   }
 
-  // 4. 计算布局和最终位置
+  // 5. 计算布局和最终位置
   Layout::calculate_menu_size(app_state);
   menu_state.position = Layout::calculate_menu_position(app_state, position);
 

@@ -111,9 +111,12 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
   RECT rc;
   GetClientRect(hwnd, &rc);
   D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+
+  // 强制 96 DPI，避免 HwndRenderTarget 自动按系统 DPI 缩放
   HRESULT hr = d2d_context.factory->CreateHwndRenderTarget(
-      D2D1::RenderTargetProperties(), D2D1::HwndRenderTargetProperties(hwnd, size),
-      &menu_state.render_target);
+      D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(), 96.0f,
+                                   96.0f),
+      D2D1::HwndRenderTargetProperties(hwnd, size), &menu_state.render_target);
 
   if (FAILED(hr)) {
     cleanup_context_menu(state);
@@ -127,6 +130,22 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
     return false;
   }
 
+  // 创建独立的文本格式（使用 DPI 缩放后的字号）
+  if (menu_state.text_format) {
+    menu_state.text_format->Release();
+    menu_state.text_format = nullptr;
+  }
+  hr = d2d_context.write_factory->CreateTextFormat(
+      L"Microsoft YaHei", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+      DWRITE_FONT_STRETCH_NORMAL, static_cast<float>(menu_state.layout.font_size), L"zh-CN",
+      &menu_state.text_format);
+  if (FAILED(hr) || !menu_state.text_format) {
+    cleanup_context_menu(state);
+    return false;
+  }
+  menu_state.text_format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
+  menu_state.text_format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+
   menu_state.main_menu_d2d_ready = true;
   return true;
 }
@@ -135,6 +154,10 @@ auto cleanup_context_menu(Core::State::AppState& state) -> void {
   auto& menu_state = *state.context_menu;
   release_brushes(&menu_state.background_brush, &menu_state.text_brush, &menu_state.separator_brush,
                   &menu_state.hover_brush, &menu_state.indicator_brush);
+  if (menu_state.text_format) {
+    menu_state.text_format->Release();
+    menu_state.text_format = nullptr;
+  }
   if (menu_state.render_target) {
     menu_state.render_target->Release();
     menu_state.render_target = nullptr;
@@ -156,9 +179,12 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
   RECT rc;
   GetClientRect(hwnd, &rc);
   D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+
+  // 强制 96 DPI，与主菜单保持一致
   HRESULT hr = d2d_context.factory->CreateHwndRenderTarget(
-      D2D1::RenderTargetProperties(), D2D1::HwndRenderTargetProperties(hwnd, size),
-      &menu_state.submenu_render_target);
+      D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(), 96.0f,
+                                   96.0f),
+      D2D1::HwndRenderTargetProperties(hwnd, size), &menu_state.submenu_render_target);
 
   if (FAILED(hr)) {
     Logger().error("Failed to create submenu render target, HRESULT: 0x{:X}", hr);
