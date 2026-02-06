@@ -15,17 +15,18 @@
     Language="1033"
     Codepage="1252"
     InstallerVersion="500"
-    Scope="perMachine"
+    Scope="perUser"
     Compressed="yes">
 
     <SummaryInformation
       Description="SpinningMomo - Window adjustment tool for Infinity Nikki"
       Manufacturer="ChanIok" />
 
-    <!-- Upgrade logic: remove older versions before installing -->
+    <!-- Upgrade logic: install new version first, then remove old components -->
+    <!-- Using afterInstallExecute to preserve desktop shortcut positions -->
     <MajorUpgrade
       DowngradeErrorMessage="!(loc.DowngradeError)"
-      Schedule="afterInstallInitialize" />
+      Schedule="afterInstallExecute" />
 
     <!-- Embed CAB into MSI -->
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
@@ -53,10 +54,12 @@
 
   <!-- Directory Structure -->
   <Fragment>
-    <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="SpinningMomo">
-        <Directory Id="ResourcesFolder" Name="resources">
-          <Directory Id="WebFolder" Name="web" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="SpinningMomo">
+          <Directory Id="ResourcesFolder" Name="resources">
+            <Directory Id="WebFolder" Name="web" />
+          </Directory>
         </Directory>
       </Directory>
     </StandardDirectory>

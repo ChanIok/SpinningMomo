@@ -24,8 +24,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Required for git-cliff to access full history
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -84,37 +82,15 @@ jobs:
       - name: Build all (C++ + Web + Dist)
         run: npm run build
 
+      - name: Create Portable ZIP
+        run: npm run build:portable
+
       - name: Build MSI and Bundle Installer
         shell: pwsh
-        run: |
-          $version = "${{ steps.final_version.outputs.VERSION }}"
-          .\scripts\build-msi.ps1 -Version $version
-
-      - name: Create Portable ZIP
-        shell: pwsh
-        run: |
-          $version = "${{ steps.final_version.outputs.VERSION }}"
-          $zipName = "SpinningMomo-$version-x64-Portable.zip"
-          $zipPath = Join-Path "dist" $zipName
-          
-          # Create portable marker file (to distinguish from installer version)
-          New-Item -Path "dist\portable" -ItemType File -Force | Out-Null
-          
-          # Create ZIP from dist contents (excluding installers)
-          Compress-Archive -Path "dist\SpinningMomo.exe", "dist\resources", "dist\portable" -DestinationPath $zipPath -Force
-          Write-Host "Created: $zipPath"
+        run: .\scripts\build-msi.ps1 -Version "${{ steps.final_version.outputs.VERSION }}"
 
       - name: Generate checksums
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem "dist/*-Setup.exe", "dist/*-Portable.zip"
-          $checksums = $files | ForEach-Object {
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)"
-          }
-          $checksums | Set-Content "dist/SHA256SUMS.txt" -Encoding UTF8
-          Write-Host "Generated checksums:"
-          Get-Content "dist/SHA256SUMS.txt"
+        run: npm run build:checksums
 
       - name: Upload artifacts (for debugging)
         uses: actions/upload-artifact@v4
@@ -126,26 +102,17 @@ jobs:
             dist/SHA256SUMS.txt
           if-no-files-found: error
 
-      - name: Generate changelog
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: orhun/git-cliff-action@v4
-        id: changelog
-        with:
-          args: --latest --strip header
-        env:
-          OUTPUT: CHANGELOG.md
-
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          body: ${{ steps.changelog.outputs.content }}
           files: |
             dist/*-Setup.exe
             dist/*-Portable.zip
             dist/SHA256SUMS.txt
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

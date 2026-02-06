@@ -7,6 +7,10 @@
     "build:cpp": "xmake config -m release && xmake build && xmake config -m debug",
     "build:web": "cd web && npm run build",
     "build:dist": "node scripts/prepare-dist.js",
+    "build:portable": "node scripts/build-portable.js",
+"build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-msi.ps1",
+    "build:checksums": "node scripts/generate-checksums.js",
+    "release": "npm run build && npm run build:portable && npm run build:installer && npm run build:checksums",
     "format:cpp": "node scripts/format-cpp.js",
     "format:web": "cd web && prettier --write ."
   },
