@@ -117,9 +117,11 @@ export interface AppSettings {
 
   // features 分组 - 功能特性设置
   features: {
+    outputDirPath: string // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
+
     // 截图功能设置
     screenshot: {
-      screenshotDirPath: string // 截图目录路径
+      gameAlbumPath: string // 游戏相册目录路径
     }
 
     // 黑边模式设置
@@ -129,12 +131,11 @@ export interface AppSettings {
 
     // 录制功能设置
     recording: {
-      outputDirPath: string // 输出目录（空=默认使用 exe/recordings/）
       fps: number // 帧率: 30, 60, 120
       bitrate: number // 比特率 (bps)，CBR 模式使用
       quality: number // 质量值 (0-100)，VBR 模式使用
       qp: number // 量化参数 (0-51)，ManualQP 模式使用
-      rateControl: 'cbr' | 'vbr' | 'manual_qp' // 码率控制模式
+      rateControl: 'cbr' | 'vbr' | 'manual_qp' // 码率控制模式（默认 VBR）
       encoderMode: 'auto' | 'gpu' | 'cpu' // 编码器模式
       codec: 'h264' | 'h265' // 视频编码格式
       audioSource: 'none' | 'system' | 'game_only' // 音频源
@@ -212,19 +213,19 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
   // features 设置
   features: {
+    outputDirPath: '',
     screenshot: {
-      screenshotDirPath: '',
+      gameAlbumPath: '',
     },
     letterbox: {
       enabled: false,
     },
     recording: {
-      outputDirPath: '',
       fps: 60,
       bitrate: 80000000,
-      quality: 70,
+      quality: 100,
       qp: 23,
-      rateControl: 'cbr',
+      rateControl: 'vbr',
       encoderMode: 'auto',
       codec: 'h264',
       audioSource: 'system',

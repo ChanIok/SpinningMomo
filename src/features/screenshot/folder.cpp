@@ -87,32 +87,31 @@ auto discover_game_path(HWND game_window) -> std::expected<std::filesystem::path
 // 解析截图目录路径（核心逻辑）
 auto resolve_path(const Core::State::AppState& state)
     -> std::expected<std::filesystem::path, std::string> {
-  // 1. 检查配置中的路径
-  std::string screenshot_path_config = state.settings->raw.features.screenshot.screenshot_dir_path;
-  if (!screenshot_path_config.empty()) {
-    std::filesystem::path config_path = screenshot_path_config;
-    if (std::filesystem::exists(config_path)) {
-      Logger().debug("Using configured screenshot path: {}", config_path.string());
+  // 1. 检查统一输出目录配置
+  const auto& output_dir_path = state.settings->raw.features.output_dir_path;
+  if (!output_dir_path.empty()) {
+    std::filesystem::path config_path = output_dir_path;
+    auto ensure_result = Utils::Path::EnsureDirectoryExists(config_path);
+    if (ensure_result) {
+      Logger().debug("Using configured output path: {}", config_path.string());
       return config_path;
     } else {
-      Logger().warn("Configured screenshot path does not exist: {}", config_path.string());
+      Logger().warn("Failed to access configured output path: {}", config_path.string());
     }
   }
 
-  // 2. 尝试通过配置的窗口标题查找游戏窗口
-  std::wstring window_title_config =
-      Utils::String::FromUtf8(state.settings->raw.window.target_title);
-  if (!window_title_config.empty()) {
-    auto target_window = Features::WindowControl::find_target_window(window_title_config);
-    if (target_window) {
-      if (auto game_path = discover_game_path(target_window.value())) {
-        Logger().debug("Discovered game screenshot path from configured window");
-        return game_path.value();
-      }
+  // 2. 默认使用用户视频文件夹
+  auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
+  if (videos_dir_result) {
+    auto output_dir = *videos_dir_result / "SpinningMomo";
+    auto ensure_result = Utils::Path::EnsureDirectoryExists(output_dir);
+    if (ensure_result) {
+      Logger().debug("Using default output path: {}", output_dir.string());
+      return output_dir;
     }
   }
 
-  // 3. 回退到程序截图目录
+  // 3. 回退到程序目录
   auto exe_dir_result = Utils::Path::GetExecutableDirectory();
   if (!exe_dir_result) {
     return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
@@ -124,7 +123,7 @@ auto resolve_path(const Core::State::AppState& state)
     return std::unexpected("Failed to create screenshots directory: " + ensure_result.error());
   }
 
-  Logger().debug("Using default screenshot path: {}", screenshots_dir.string());
+  Logger().debug("Using fallback screenshot path: {}", screenshots_dir.string());
   return screenshots_dir;
 }
 

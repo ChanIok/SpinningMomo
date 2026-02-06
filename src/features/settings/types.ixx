@@ -68,9 +68,11 @@ export struct AppSettings {
 
   // features 分组 - 功能特性设置
   struct Features {
+    std::string output_dir_path = "";  // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
+
     // 截图功能设置
     struct Screenshot {
-      std::string screenshot_dir_path = "";  // 游戏相册目录路径
+      std::string game_album_path = "";  // 游戏相册目录路径
     } screenshot;
 
     // 黑边模式设置
@@ -80,12 +82,11 @@ export struct AppSettings {
 
     // 录制功能设置
     struct Recording {
-      std::string output_dir_path = "";    // 输出目录
       std::uint32_t fps = 60;              // 帧率
       std::uint32_t bitrate = 80'000'000;  // 比特率 (bps)，默认 80Mbps，CBR 模式使用
-      std::uint32_t quality = 70;          // 质量值 (0-100)，VBR 模式使用
+      std::uint32_t quality = 100;         // 质量值 (0-100)，VBR 模式使用
       std::uint32_t qp = 23;               // 量化参数 (0-51)，ManualQP 模式使用
-      std::string rate_control = "cbr";    // 码率控制模式: "cbr" | "vbr" | "manual_qp"
+      std::string rate_control = "vbr";    // 码率控制模式: "cbr" | "vbr" | "manual_qp"
       std::string encoder_mode = "auto";   // 编码器模式: "auto" | "gpu" | "cpu"
       std::string codec = "h264";          // 视频编码格式: "h264" | "h265"
 

@@ -16,14 +16,24 @@ export const useFunctionActions = () => {
     })
   }
 
-  const updateScreenshotDir = async (dirPath: string) => {
+  const updateOutputDir = async (dirPath: string) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        outputDirPath: dirPath,
+      },
+    })
+  }
+
+  const updateGameAlbumPath = async (dirPath: string) => {
     await store.updateSettings({
       ...appSettings.value,
       features: {
         ...appSettings.value.features,
         screenshot: {
           ...appSettings.value.features.screenshot,
-          screenshotDirPath: dirPath,
+          gameAlbumPath: dirPath,
         },
       },
     })
@@ -50,19 +60,6 @@ export const useFunctionActions = () => {
         letterbox: {
           ...appSettings.value.features.letterbox,
           enabled,
-        },
-      },
-    })
-  }
-
-  const updateRecordingOutputDir = async (dirPath: string) => {
-    await store.updateSettings({
-      ...appSettings.value,
-      features: {
-        ...appSettings.value.features,
-        recording: {
-          ...appSettings.value.features.recording,
-          outputDirPath: dirPath,
         },
       },
     })
@@ -198,9 +195,10 @@ export const useFunctionActions = () => {
       },
       features: {
         ...appSettings.value.features,
+        outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
         screenshot: {
           ...appSettings.value.features.screenshot,
-          screenshotDirPath: DEFAULT_APP_SETTINGS.features.screenshot.screenshotDirPath,
+          gameAlbumPath: DEFAULT_APP_SETTINGS.features.screenshot.gameAlbumPath,
         },
         letterbox: {
           ...appSettings.value.features.letterbox,
@@ -208,7 +206,6 @@ export const useFunctionActions = () => {
         },
         recording: {
           ...appSettings.value.features.recording,
-          outputDirPath: DEFAULT_APP_SETTINGS.features.recording.outputDirPath,
           fps: DEFAULT_APP_SETTINGS.features.recording.fps,
           bitrate: DEFAULT_APP_SETTINGS.features.recording.bitrate,
           quality: DEFAULT_APP_SETTINGS.features.recording.quality,
@@ -225,10 +222,10 @@ export const useFunctionActions = () => {
 
   return {
     updateWindowTitle,
-    updateScreenshotDir,
+    updateOutputDir,
+    updateGameAlbumPath,
     updateTaskbarLowerOnResize,
     updateLetterboxEnabled,
-    updateRecordingOutputDir,
     updateRecordingFps,
     updateRecordingBitrate,
     updateRecordingQuality,

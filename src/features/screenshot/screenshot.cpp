@@ -8,6 +8,7 @@ import std;
 import Core.State;
 import Core.State.AppInfo;
 import Features.Screenshot.State;
+import Features.Settings.State;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
@@ -428,15 +429,28 @@ auto take_screenshot(
   }
 
   // 生成截图文件路径
-  auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-  if (!exe_dir_result) {
-    return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+  const auto& output_dir_path = app_state.settings->raw.features.output_dir_path;
+  std::filesystem::path screenshots_dir;
+
+  if (!output_dir_path.empty()) {
+    screenshots_dir = std::filesystem::path(output_dir_path);
+  } else {
+    auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
+    if (videos_dir_result) {
+      screenshots_dir = *videos_dir_result / "SpinningMomo";
+    } else {
+      // 回退到程序目录
+      auto exe_dir_result = Utils::Path::GetExecutableDirectory();
+      if (!exe_dir_result) {
+        return std::unexpected("Failed to get output directory: " + exe_dir_result.error());
+      }
+      screenshots_dir = exe_dir_result.value() / "screenshots";
+    }
   }
 
-  auto screenshots_dir = exe_dir_result.value() / "screenshots";
   auto ensure_result = Utils::Path::EnsureDirectoryExists(screenshots_dir);
   if (!ensure_result) {
-    return std::unexpected("Failed to create screenshots directory: " + ensure_result.error());
+    return std::unexpected("Failed to create output directory: " + ensure_result.error());
   }
 
   auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());

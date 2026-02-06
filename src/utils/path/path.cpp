@@ -3,6 +3,7 @@ module;
 module Utils.Path;
 
 import std;
+import Vendor.ShellApi;
 import <windows.h>;
 
 // 获取当前程序的完整路径
@@ -117,4 +118,19 @@ auto Utils::Path::NormalizePath(const std::filesystem::path& path,
   } catch (const std::filesystem::filesystem_error& e) {
     return std::unexpected(std::string(e.what()));
   }
+}
+
+// 获取用户视频文件夹路径 (FOLDERID_Videos)
+auto Utils::Path::GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string> {
+  PWSTR path = nullptr;
+  HRESULT hr =
+      Vendor::ShellApi::SHGetKnownFolderPath(Vendor::ShellApi::kFOLDERID_Videos, 0, nullptr, &path);
+  if (FAILED(hr) || !path) {
+    if (path) Vendor::ShellApi::CoTaskMemFree(path);
+    return std::unexpected("Failed to get user Videos directory, HRESULT: " + std::to_string(hr));
+  }
+
+  std::filesystem::path result(path);
+  Vendor::ShellApi::CoTaskMemFree(path);
+  return result;
 }

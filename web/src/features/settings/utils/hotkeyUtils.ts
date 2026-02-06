@@ -1,4 +1,3 @@
-
 // 修饰键映射
 export const MODIFIER_MAP = {
   alt: 1,
@@ -101,6 +100,7 @@ export const KEY_CODE_MAP: Record<number, string> = {
   221: ']',
   189: '-',
   187: '=',
+  192: '`',
   220: '\\',
 
   // 系统特殊键

@@ -42,11 +42,15 @@ export auto ShellExecuteExW(SHELLEXECUTEINFOW* lpExecInfo) -> BOOL {
 
 // 常用文件夹 ID
 export const auto& kFOLDERID_LocalAppData = FOLDERID_LocalAppData;
+export const auto& kFOLDERID_Videos = FOLDERID_Videos;
 
 // SHGetKnownFolderPath 函数
 export auto SHGetKnownFolderPath(REFKNOWNFOLDERID rfid, DWORD dwFlags, HANDLE hToken,
                                  PWSTR* ppszPath) -> HRESULT {
   return ::SHGetKnownFolderPath(rfid, dwFlags, hToken, ppszPath);
 }
+
+// CoTaskMemFree 函数
+export auto CoTaskMemFree(LPVOID pv) -> void { ::CoTaskMemFree(pv); }
 
 }  // namespace Vendor::ShellApi

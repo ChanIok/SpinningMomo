@@ -29,10 +29,10 @@ const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
 const {
   updateWindowTitle,
-  updateScreenshotDir,
+  updateOutputDir,
+  updateGameAlbumPath,
   updateTaskbarLowerOnResize,
   updateLetterboxEnabled,
-  updateRecordingOutputDir,
   updateRecordingFps,
   updateRecordingBitrate,
   updateRecordingQuality,
@@ -47,8 +47,8 @@ const {
 const { clearError } = store
 const { t } = useI18n()
 
-const isSelectingDir = ref(false)
-const isSelectingRecordingDir = ref(false)
+const isSelectingOutputDir = ref(false)
+const isSelectingGameAlbumDir = ref(false)
 // Local state for input to avoid jitter
 const inputTitle = ref(appSettings.value?.window?.targetTitle || '')
 const inputBitrateMbps = ref(
@@ -76,50 +76,49 @@ const handleTitleChange = async () => {
   }
 }
 
-const handleSelectDir = async () => {
-  isSelectingDir.value = true
+const handleSelectOutputDir = async () => {
+  isSelectingOutputDir.value = true
   try {
-    // TODO: check env for parentWindowMode
     const parentWindowMode = 2 // web: 2
 
     const result = await call<{ path: string }>(
       'dialog.openDirectory',
       {
-        title: t('settings.function.screenshot.directory.dialogTitle'),
+        title: t('settings.function.outputDir.dialogTitle'),
         parentWindowMode,
       },
       0
     )
-    await updateScreenshotDir(result.path)
+    await updateOutputDir(result.path)
     // TODO: toast success
   } catch (error) {
-    console.error('Failed to select screenshot directory:', error)
+    console.error('Failed to select output directory:', error)
     // TODO: toast error
   } finally {
-    isSelectingDir.value = false
+    isSelectingOutputDir.value = false
   }
 }
 
-const handleSelectRecordingDir = async () => {
-  isSelectingRecordingDir.value = true
+const handleSelectGameAlbumDir = async () => {
+  isSelectingGameAlbumDir.value = true
   try {
     const parentWindowMode = 2 // web: 2
 
     const result = await call<{ path: string }>(
       'dialog.openDirectory',
       {
-        title: t('settings.function.recording.outputDir.dialogTitle'),
+        title: t('settings.function.screenshot.gameAlbum.dialogTitle'),
         parentWindowMode,
       },
       0
     )
-    await updateRecordingOutputDir(result.path)
+    await updateGameAlbumPath(result.path)
     // TODO: toast success
   } catch (error) {
-    console.error('Failed to select recording directory:', error)
+    console.error('Failed to select game album directory:', error)
     // TODO: toast error
   } finally {
-    isSelectingRecordingDir.value = false
+    isSelectingGameAlbumDir.value = false
   }
 }
 
@@ -154,7 +153,7 @@ const handleFpsChange = async () => {
 const handleResetSettings = async () => {
   await resetFunctionSettings()
   inputBitrateMbps.value = 80 // Reset to default
-  inputQuality.value = 70 // Reset to default
+  inputQuality.value = 100 // Reset to default
   inputQp.value = 23 // Reset to default
   inputAudioBitrateKbps.value = 320 // Reset to default
   // TODO: toast success
@@ -196,6 +195,43 @@ const handleResetSettings = async () => {
     </div>
 
     <div class="space-y-8">
+      <!-- Output Directory -->
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.function.outputDir.title') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.function.outputDir.description') }}
+          </p>
+        </div>
+
+        <Item variant="outline" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.outputDir.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              <template v-if="appSettings?.features?.outputDirPath">
+                {{ appSettings.features.outputDirPath }}
+              </template>
+              <template v-else>
+                {{ t('settings.function.outputDir.default') }}
+              </template>
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button @click="handleSelectOutputDir" :disabled="isSelectingOutputDir" size="sm">
+              {{
+                isSelectingOutputDir
+                  ? t('settings.function.outputDir.selecting')
+                  : t('settings.function.outputDir.selectButton')
+              }}
+            </Button>
+          </ItemActions>
+        </Item>
+      </div>
+
       <!-- Window Control -->
       <div class="space-y-4">
         <div>
@@ -261,23 +297,23 @@ const handleResetSettings = async () => {
         <Item variant="outline" size="sm">
           <ItemContent>
             <ItemTitle>
-              {{ t('settings.function.screenshot.directory.label') }}
+              {{ t('settings.function.screenshot.gameAlbum.label') }}
             </ItemTitle>
             <ItemDescription>
-              <template v-if="appSettings?.features?.screenshot?.screenshotDirPath">
-                {{ appSettings.features.screenshot.screenshotDirPath }}
+              <template v-if="appSettings?.features?.screenshot?.gameAlbumPath">
+                {{ appSettings.features.screenshot.gameAlbumPath }}
               </template>
               <template v-else>
-                {{ t('settings.function.screenshot.directory.description') }}
+                {{ t('settings.function.screenshot.gameAlbum.description') }}
               </template>
             </ItemDescription>
           </ItemContent>
           <ItemActions>
-            <Button @click="handleSelectDir" :disabled="isSelectingDir" size="sm">
+            <Button @click="handleSelectGameAlbumDir" :disabled="isSelectingGameAlbumDir" size="sm">
               {{
-                isSelectingDir
-                  ? t('settings.function.screenshot.directory.selecting')
-                  : t('settings.function.screenshot.directory.selectButton')
+                isSelectingGameAlbumDir
+                  ? t('settings.function.screenshot.gameAlbum.selecting')
+                  : t('settings.function.screenshot.gameAlbum.selectButton')
               }}
             </Button>
           </ItemActions>
@@ -325,35 +361,6 @@ const handleResetSettings = async () => {
         </div>
 
         <ItemGroup>
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.outputDir.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                <template v-if="appSettings?.features?.recording?.outputDirPath">
-                  {{ appSettings.features.recording.outputDirPath }}
-                </template>
-                <template v-else>
-                  {{ t('settings.function.recording.outputDir.description') }}
-                </template>
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Button
-                @click="handleSelectRecordingDir"
-                :disabled="isSelectingRecordingDir"
-                size="sm"
-              >
-                {{
-                  isSelectingRecordingDir
-                    ? t('settings.function.recording.outputDir.selecting')
-                    : t('settings.function.recording.outputDir.selectButton')
-                }}
-              </Button>
-            </ItemActions>
-          </Item>
-
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>

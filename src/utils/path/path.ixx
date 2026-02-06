@@ -26,4 +26,7 @@ export auto NormalizePath(const std::filesystem::path& path,
                           std::optional<std::filesystem::path> base = std::nullopt)
     -> std::expected<std::filesystem::path, std::string>;
 
+// 获取用户视频文件夹路径 (FOLDERID_Videos)
+export auto GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string>;
+
 }  // namespace Utils::Path
