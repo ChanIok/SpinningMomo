@@ -1,6 +1,7 @@
 module;
 
 #include <wil/com.h>
+
 #include <WebView2.h>  // 必须放最后面
 
 module Core.WebView;
@@ -280,7 +281,14 @@ class ControllerCompletedHandler
 
     // 5. 设置虚拟主机映射
     hr = setup_virtual_host_mapping(webview, webview_state.config);
-    if (FAILED(hr)) return hr;
+    if (FAILED(hr)) {
+      if (Vendor::BuildConfig::is_debug_build()) {
+        // Debug 模式下使用 dev server，虚拟主机映射失败不是致命错误
+        Logger().warn("Virtual host mapping failed in debug mode, continuing with dev server");
+      } else {
+        return hr;
+      }
+    }
 
     // 6. 设置资源拦截（缩略图）
     hr = Core::WebView::Static::setup_resource_interception(

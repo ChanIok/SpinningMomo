@@ -91,7 +91,7 @@ struct LayoutConfig {
   static constexpr int MAX_VISIBLE_ROWS = 7;  // 翻页模式下每页最大可见行数
 };
 
-// AppWindow专用的Direct2D渲染状态
+// 浮窗专用的Direct2D渲染状态
 struct RenderContext {
   // Direct2D 1.3资源句柄
   ID2D1Factory7* factory = nullptr;               // Direct2D 1.3 工厂

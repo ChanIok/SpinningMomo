@@ -208,7 +208,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       if (HDC hdc = BeginPaint(hwnd, &ps); hdc) {
         RECT rect{};
         GetClientRect(hwnd, &rect);
-        UI::FloatingWindow::Painter::paint_app_window(state, hwnd, rect);
+        UI::FloatingWindow::Painter::paint(state, hwnd, rect);
         EndPaint(hwnd, &ps);
       }
       return 0;

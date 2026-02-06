@@ -51,7 +51,7 @@ auto create_brushes_for_target(Core::State::AppState& state, ID2D1HwndRenderTarg
                                ID2D1SolidColorBrush** separator_brush,
                                ID2D1SolidColorBrush** hover_brush,
                                ID2D1SolidColorBrush** indicator_brush) -> bool {
-  const auto& colors = state.settings->raw.ui.app_window_colors;
+  const auto& colors = state.settings->raw.ui.floating_window_colors;
 
   if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.background),
                                            background_brush)))
@@ -171,7 +171,7 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
 
   if (!state.floating_window || !state.floating_window->d2d_context.is_initialized ||
       !state.floating_window->d2d_context.factory) {
-    Logger().error("AppWindow D2D not initialized or factory is null");
+    Logger().error("FloatingWindow D2D not initialized or factory is null");
     return false;
   }
   const auto& d2d_context = state.floating_window->d2d_context;

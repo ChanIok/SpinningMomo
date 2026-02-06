@@ -78,7 +78,7 @@ auto draw_single_column(const Core::State::AppState& state, const D2D1_RECT_F& r
 
     const bool is_hovered =
         (static_cast<int>(original_index) == state.floating_window->ui.hover_index);
-    draw_app_single_item(state, item, item_rect, is_hovered);
+    draw_single_item(state, item, item_rect, is_hovered);
 
     y += static_cast<float>(render.item_height);
   }
@@ -130,7 +130,7 @@ auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F
 }
 
 // 主绘制函数实现
-auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
+auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
   auto& d2d = state.floating_window->d2d_context;
 
   if (!d2d.is_initialized || !d2d.render_target) {
@@ -171,10 +171,10 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
   const auto rect_f = UI::FloatingWindow::rect_to_d2d(client_rect);
 
   // 4. 绘制各个部分
-  draw_app_background(state, rect_f);
-  draw_app_title_bar(state, rect_f);
-  draw_app_separators(state, rect_f);
-  draw_app_items(state, rect_f);
+  draw_background(state, rect_f);
+  draw_title_bar(state, rect_f);
+  draw_separators(state, rect_f);
+  draw_items(state, rect_f);
 
   HRESULT hr = d2d.render_target->EndDraw();
 
@@ -193,7 +193,7 @@ auto paint_app_window(Core::State::AppState& state, HWND hwnd, const RECT& clien
 }
 
 // 绘制背景
-auto draw_app_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.floating_window->d2d_context;
   // 使用半透明白色背景
   d2d.render_target->FillRectangle(rect, d2d.background_brush);
@@ -241,7 +241,7 @@ auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& ti
 }
 
 // 绘制标题栏
-auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.floating_window->d2d_context;
   const auto& render = state.floating_window->layout;
 
@@ -264,7 +264,7 @@ auto draw_app_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& r
 }
 
 // 绘制分隔线
-auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.floating_window->d2d_context;
   const auto& render = state.floating_window->layout;
 
@@ -293,7 +293,7 @@ auto draw_app_separators(const Core::State::AppState& state, const D2D1_RECT_F& 
 }
 
 // 绘制所有菜单项
-auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& render = state.floating_window->layout;
   const auto& ui = state.floating_window->ui;
   const auto& items = state.floating_window->data.menu_items;
@@ -356,9 +356,8 @@ auto draw_app_items(const Core::State::AppState& state, const D2D1_RECT_F& rect)
 }
 
 // 绘制单个菜单项
-auto draw_app_single_item(const Core::State::AppState& state,
-                          const UI::FloatingWindow::MenuItem& item, const D2D1_RECT_F& item_rect,
-                          bool is_hovered) -> void {
+auto draw_single_item(const Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
+                      const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   const auto& d2d = state.floating_window->d2d_context;
   const auto& render = state.floating_window->layout;
 

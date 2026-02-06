@@ -95,7 +95,7 @@ namespace Utils::System {
 // 单实例互斥锁名称
 constexpr auto kMutexName = L"Global\\SpinningMomo_SingleInstance_Mutex";
 // 窗口类名
-constexpr auto kWindowClassName = L"SpinningMomoAppWindowClass";
+constexpr auto kWindowClassName = L"SpinningMomoFloatingWindowClass";
 
 // 全局互斥锁句柄
 static HANDLE g_instance_mutex = nullptr;

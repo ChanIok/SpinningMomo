@@ -49,7 +49,7 @@ auto create_brush_from_hex(ID2D1RenderTarget* target, const std::string& hex_col
 // 辅助函数：批量创建所有画刷
 auto create_all_brushes_simple(Core::State::AppState& state, UI::FloatingWindow::RenderContext& d2d)
     -> bool {
-  const auto& colors = state.settings->raw.ui.app_window_colors;
+  const auto& colors = state.settings->raw.ui.floating_window_colors;
 
   return create_brush_from_hex(d2d.render_target, colors.background, &d2d.background_brush) &&
          create_brush_from_hex(d2d.render_target, colors.separator, &d2d.separator_brush) &&
@@ -94,7 +94,7 @@ auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format
 
 // 更新所有画刷颜色
 auto update_all_brush_colors(Core::State::AppState& state) -> void {
-  const auto& colors = state.settings->raw.ui.app_window_colors;
+  const auto& colors = state.settings->raw.ui.floating_window_colors;
   auto& d2d = state.floating_window->d2d_context;
 
   // 更新画刷颜色

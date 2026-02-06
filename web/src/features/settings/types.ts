@@ -15,17 +15,18 @@ export interface MenuItem {
 // Web 主题模式（页面主题）
 export type WebThemeMode = 'light' | 'dark' | 'system'
 
-// AppWindow主题模式（原生窗口主题）
-export type AppWindowThemeMode = 'dark' | 'light'
+// 浮窗主题模式
+export type FloatingWindowThemeMode = 'dark' | 'light'
 
-// AppWindow颜色配置
-export interface AppWindowColors {
+// 浮窗颜色配置
+export interface FloatingWindowColors {
   background: string // 主背景色 (包含透明度)
   separator: string // 分隔线颜色 (包含透明度)
   text: string // 文字颜色 (包含透明度)
   indicator: string // 指示器颜色 (包含透明度)
   hover: string // 悬停背景色 (包含透明度)
   titleBar: string // 标题栏颜色 (包含透明度)
+  scrollIndicator: string // 滚动条颜色 (包含透明度)
 }
 
 // Web 背景设置
@@ -42,27 +43,29 @@ export interface WebThemeSettings {
 }
 
 // 深色主题颜色配置
-export const DARK_APP_WINDOW_COLORS: AppWindowColors = {
+export const DARK_FLOATING_WINDOW_COLORS: FloatingWindowColors = {
   background: '#1f1f1fB3',
   separator: '#333333B3',
   text: '#D8D8D8FF',
   indicator: '#FBBF24FF',
   hover: '#505050CC',
   titleBar: '#1f1f1fB3',
+  scrollIndicator: '#808080CC',
 }
 
 // 浅色主题颜色配置
-export const LIGHT_APP_WINDOW_COLORS: AppWindowColors = {
+export const LIGHT_FLOATING_WINDOW_COLORS: FloatingWindowColors = {
   background: '#F5F5F5CC',
   separator: '#E5E5E5CC',
   text: '#2E2E2EFF',
   indicator: '#F59E0BFF',
   hover: '#E5E5E5CC',
   titleBar: '#F5F5F5CC',
+  scrollIndicator: '#BDBDBDCC',
 }
 
-// AppWindow布局配置
-export interface AppWindowLayout {
+// 浮窗布局配置
+export interface FloatingWindowLayout {
   baseItemHeight: number
   baseTitleHeight: number
   baseSeparatorHeight: number
@@ -73,6 +76,7 @@ export interface AppWindowLayout {
   baseRatioColumnWidth: number
   baseResolutionColumnWidth: number
   baseSettingsColumnWidth: number
+  baseScrollIndicatorWidth: number
 }
 
 // 完整的应用设置类型
@@ -81,6 +85,9 @@ export interface AppSettings {
 
   // app 分组 - 应用核心设置
   app: {
+    // 始终以管理员权限运行
+    alwaysRunAsAdmin: boolean
+
     // 快捷键设置
     hotkey: {
       floatingWindow: {
@@ -163,14 +170,14 @@ export interface AppSettings {
       resolutions: string[] // 启用的分辨率列表
     }
 
-    // AppWindow布局配置
-    appWindowLayout: AppWindowLayout
+    // 浮窗布局配置
+    floatingWindowLayout: FloatingWindowLayout
 
-    // AppWindow颜色配置
-    appWindowColors: AppWindowColors
+    // 浮窗颜色配置
+    floatingWindowColors: FloatingWindowColors
 
-    // AppWindow主题模式
-    appWindowThemeMode: AppWindowThemeMode
+    // 浮窗主题模式
+    floatingWindowThemeMode: FloatingWindowThemeMode
 
     // Web UI 设置
     webTheme: WebThemeSettings
@@ -184,6 +191,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
   // app 设置
   app: {
+    alwaysRunAsAdmin: true,
     hotkey: {
       floatingWindow: {
         modifiers: 2, // MOD_CONTROL
@@ -267,7 +275,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       aspectRatios: ['21:9', '16:9', '3:2', '1:1', '3:4', '2:3', '9:16'],
       resolutions: ['Default', '1080P', '2K', '4K', '6K', '8K', '12K'],
     },
-    appWindowLayout: {
+    floatingWindowLayout: {
       baseItemHeight: 24,
       baseTitleHeight: 26,
       baseSeparatorHeight: 1,
@@ -278,9 +286,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       baseRatioColumnWidth: 60,
       baseResolutionColumnWidth: 70,
       baseSettingsColumnWidth: 80,
+      baseScrollIndicatorWidth: 3,
     },
-    appWindowColors: DARK_APP_WINDOW_COLORS,
-    appWindowThemeMode: 'dark',
+    floatingWindowColors: DARK_FLOATING_WINDOW_COLORS,
+    floatingWindowThemeMode: 'dark',
     webTheme: {
       mode: 'system',
     },

@@ -57,7 +57,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   register_window_class(state.floating_window->window.instance);
 
   state.floating_window->window.hwnd = CreateWindowExW(
-      WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, L"SpinningMomoAppWindowClass",
+      WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, L"SpinningMomoFloatingWindowClass",
       L"SpinningMomo", WS_POPUP | WS_CLIPCHILDREN, window_pos.x, window_pos.y, window_size.cx,
       window_size.cy, nullptr, nullptr, state.floating_window->window.instance, &state);
 
@@ -176,7 +176,7 @@ auto register_window_class(HINSTANCE instance) -> void {
   wc.cbSize = sizeof(WNDCLASSEXW);
   wc.lpfnWndProc = MessageHandler::static_window_proc;
   wc.hInstance = instance;
-  wc.lpszClassName = L"SpinningMomoAppWindowClass";
+  wc.lpszClassName = L"SpinningMomoFloatingWindowClass";
   wc.hbrBackground = nullptr;
   wc.style = CS_HREDRAW | CS_VREDRAW;
   wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
