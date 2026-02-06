@@ -1,6 +1,4 @@
-﻿module;
-
-#include <rfl/json.hpp>
+module;
 
 module Features.Update;
 
@@ -178,88 +176,47 @@ auto get_temp_directory() -> std::expected<std::filesystem::path, std::string> {
   return temp_dir;
 }
 
-auto parse_github_release_info(const std::string& json_response, const std::string& current_version)
-    -> std::expected<Types::CheckUpdateResult, std::string> {
-  try {
-    auto release_result = rfl::json::read<Types::GitHubRelease>(json_response);
-    if (!release_result) {
-      return std::unexpected("Failed to parse GitHub release: " +
-                             std::string(release_result.error().what()));
-    }
+// 去除字符串首尾空白字符
+auto trim(const std::string& str) -> std::string {
+  auto start = str.find_first_not_of(" \t\n\r");
+  if (start == std::string::npos) return "";
+  auto end = str.find_last_not_of(" \t\n\r");
+  return str.substr(start, end - start + 1);
+}
 
-    auto release = release_result.value();
-
-    Types::CheckUpdateResult result;
-
-    // 处理版本号
-    result.latest_version = release.tag_name;
-    if (!result.latest_version.empty() && result.latest_version[0] == 'v') {
-      result.latest_version = result.latest_version.substr(1);
-    }
-
-    result.has_update = is_update_needed(current_version, result.latest_version);
-    result.changelog = release.body;
-
-    result.download_url.clear();
-    for (const auto& asset : release.assets) {
-      if (asset.name.starts_with("SpinningMomo-v") && asset.name.ends_with(".zip")) {
-        result.download_url = asset.browser_download_url;
-        break;
-      }
-    }
-
-    // 如果没有找到匹配的文件，记录警告但仍然返回结果
-    if (result.download_url.empty()) {
-      Logger().warn("No matching SpinningMomo-v*.zip asset found in release");
-    }
-
-    return result;
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Failed to parse GitHub response: " + std::string(e.what()));
+// 根据安装类型获取更新文件名
+auto get_update_filename(const std::string& version, bool is_portable) -> std::string {
+  if (is_portable) {
+    return "SpinningMomo-" + version + "-x64-Portable.zip";
+  } else {
+    return "SpinningMomo-" + version + "-x64-Setup.exe";
   }
 }
 
-auto get_release_info(Core::State::AppState& app_state)
-    -> std::expected<Types::CheckUpdateResult, std::string> {
-  try {
-    // 从settings获取配置
-    if (!app_state.settings || !app_state.update) {
-      return std::unexpected("Settings or update not initialized");
-    }
-
-    const auto& update_config = app_state.settings->raw.update;
-    if (update_config.servers.empty()) {
-      return std::unexpected("No update servers configured");
-    }
-
-    // 循环尝试所有服务器
-    for (size_t i = 0; i < update_config.servers.size(); ++i) {
-      const auto& server = update_config.servers[i];
-      Logger().info("Attempting to use update server: {} (index: {})", server.name, i);
-
-      // 使用配置的服务器URL
-      std::wstring url(server.url.begin(), server.url.end());
-
-      auto response = http_get(url);
-      if (response) {
-        // 成功获取响应，更新当前服务器索引并返回结果
-        app_state.update->current_server_index = i;
-        Logger().info("Successfully connected to update server: {}", server.name);
-        Logger().debug("Response: {}", response.value());
-        return parse_github_release_info(response.value(), Vendor::Version::get_app_version());
-      } else {
-        // 记录失败，继续尝试下一个服务器
-        Logger().warn("Failed to connect to update server {}: {}", server.name, response.error());
-      }
-    }
-
-    // 所有服务器都尝试失败
-    return std::unexpected("All update servers failed");
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Failed to get release info: " + std::string(e.what()));
+// 检测是否为便携版安装（exe同目录下存在portable标记文件）
+auto detect_portable() -> bool {
+  auto exec_dir = Utils::Path::GetExecutableDirectory();
+  if (!exec_dir) {
+    return true;  // 默认为便携版
   }
+  return std::filesystem::exists(*exec_dir / "portable");
+}
+
+// 从版本检查URL获取最新版本号
+auto fetch_latest_version(const std::string& version_url)
+    -> std::expected<std::string, std::string> {
+  std::wstring wide_url(version_url.begin(), version_url.end());
+  auto response = http_get(wide_url);
+  if (!response) {
+    return std::unexpected("Failed to fetch version info: " + response.error());
+  }
+
+  auto version = trim(response.value());
+  if (version.empty()) {
+    return std::unexpected("Empty version response");
+  }
+
+  return version;
 }
 
 auto download_file(const std::string& url, const std::filesystem::path& save_path)
@@ -287,7 +244,8 @@ auto download_file(const std::string& url, const std::filesystem::path& save_pat
   }
 }
 
-auto create_update_script(const std::filesystem::path& update_package_path, bool restart = true)
+auto create_update_script(const std::filesystem::path& update_package_path, bool is_portable,
+                          bool restart = true)
     -> std::expected<std::filesystem::path, std::string> {
   try {
     auto temp_dir = get_temp_directory();
@@ -314,9 +272,17 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
     script << "echo Starting update process...\n";
     script << "timeout /t 1 /nobreak >nul\n";                  // 等待主程序退出
     script << "taskkill /f /im SpinningMomo.exe >nul 2>&1\n";  // 确保主程序退出
-    script << "echo Extracting update package...\n";
-    script << "powershell -Command \"Expand-Archive -Path '" << update_package_path.string()
-           << "' -DestinationPath '" << current_dir.string() << "' -Force\"\n";
+
+    if (is_portable) {
+      // 便携版：解压zip覆盖当前目录
+      script << "echo Extracting update package...\n";
+      script << "powershell -Command \"Expand-Archive -Path '" << update_package_path.string()
+             << "' -DestinationPath '" << current_dir.string() << "' -Force\"\n";
+    } else {
+      // 安装版：运行安装程序静默升级
+      script << "echo Running installer...\n";
+      script << "\"" << update_package_path.string() << "\" /quiet\n";
+    }
 
     if (restart) {
       script << "echo Update completed, restarting application...\n";
@@ -342,17 +308,18 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
 
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   try {
-    // 初始化已存在的更新状态
     if (!app_state.update) {
       return std::unexpected("Update state not created");
     }
 
-    // 设置默认状态
     auto default_state = State::create_default_update_state();
     *app_state.update = std::move(default_state);
+
+    // 检测安装类型
+    app_state.update->is_portable = detect_portable();
     app_state.update->is_initialized = true;
 
-    Logger().info("Update initialized successfully");
+    Logger().info("Update initialized successfully (portable: {})", app_state.update->is_portable);
     return {};
   } catch (const std::exception& e) {
     return std::unexpected("Failed to initialize update: " + std::string(e.what()));
@@ -366,27 +333,37 @@ auto check_for_update(Core::State::AppState& app_state)
       return std::unexpected("Update not initialized");
     }
 
-    // 更新状态为检查中
     app_state.update->is_checking = true;
     app_state.update->error_message.clear();
 
-    // 调用内部函数获取发布信息（从settings获取配置）
-    auto result = get_release_info(app_state);
-    if (!result) {
+    if (!app_state.settings) {
       app_state.update->is_checking = false;
-      app_state.update->error_message = result.error();
-      return std::unexpected(result.error());
+      return std::unexpected("Settings not initialized");
     }
+
+    // 从Cloudflare Pages获取最新版本号
+    const auto& version_url = app_state.settings->raw.update.version_url;
+    auto latest = fetch_latest_version(version_url);
+    if (!latest) {
+      app_state.update->is_checking = false;
+      app_state.update->error_message = latest.error();
+      return std::unexpected(latest.error());
+    }
+
+    auto current_version = Vendor::Version::get_app_version();
+
+    Types::CheckUpdateResult result;
+    result.latest_version = latest.value();
+    result.current_version = current_version;
+    result.has_update = is_update_needed(current_version, result.latest_version);
 
     // 更新状态
     app_state.update->is_checking = false;
-    app_state.update->update_available = result->has_update;
-    app_state.update->latest_version = result->latest_version;
-    app_state.update->changelog = result->changelog;
-    app_state.update->download_url = result->download_url;
+    app_state.update->update_available = result.has_update;
+    app_state.update->latest_version = result.latest_version;
 
-    Logger().info("Check for update result: {}, {}, {}", result->latest_version, result->has_update,
-                  result->download_url);
+    Logger().info("Check for update: current={}, latest={}, has_update={}", current_version,
+                  result.latest_version, result.has_update);
 
     return result;
 
@@ -437,41 +414,60 @@ auto download_update(Core::State::AppState& app_state)
       return std::unexpected("Update not initialized");
     }
 
-    // 检查是否有可用的下载URL
-    if (app_state.update->download_url.empty()) {
-      return std::unexpected("No download URL available. Please check for updates first.");
+    if (app_state.update->latest_version.empty()) {
+      return std::unexpected("No version info available. Please check for updates first.");
     }
 
-    // 确定保存路径 - 使用临时目录
+    if (!app_state.settings) {
+      return std::unexpected("Settings not initialized");
+    }
+
+    const auto& download_sources = app_state.settings->raw.update.download_sources;
+    if (download_sources.empty()) {
+      return std::unexpected("No download sources configured");
+    }
+
+    // 根据安装类型确定文件名和保存路径
+    auto filename =
+        get_update_filename(app_state.update->latest_version, app_state.update->is_portable);
+
     auto temp_dir = get_temp_directory();
     if (!temp_dir) {
       return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
     }
-    std::filesystem::path save_path = *temp_dir / "SpinningMomo_update.zip";
+    std::filesystem::path save_path = *temp_dir / filename;
 
-    // 更新状态
     app_state.update->download_in_progress = true;
     app_state.update->download_progress = 0.0;
     app_state.update->error_message.clear();
 
-    // 下载文件 - 使用状态中的download_url
-    auto download_result = download_file(app_state.update->download_url, save_path);
-    if (!download_result) {
-      app_state.update->download_in_progress = false;
-      app_state.update->error_message = download_result.error();
-      return std::unexpected(download_result.error());
+    // 按优先级尝试各下载源
+    for (size_t i = 0; i < download_sources.size(); ++i) {
+      const auto& source = download_sources[i];
+      auto url = std::vformat(source.url_template,
+                              std::make_format_args(app_state.update->latest_version, filename));
+      Logger().info("Trying download source: {} ({})", source.name, url);
+
+      auto download_result = download_file(url, save_path);
+      if (download_result) {
+        app_state.update->download_in_progress = false;
+        app_state.update->download_progress = 1.0;
+
+        Types::DownloadUpdateResult result;
+        result.message = "Download completed from " + source.name;
+        result.file_path = save_path;
+
+        Logger().info("Download completed from {}: {}", source.name, save_path.string());
+        return result;
+      }
+
+      Logger().warn("Download failed from {}: {}", source.name, download_result.error());
     }
 
-    // 更新状态
+    // 所有源都失败
     app_state.update->download_in_progress = false;
-    app_state.update->download_progress = 1.0;
-
-    Types::DownloadUpdateResult result;
-    result.message = "Download completed successfully";
-    result.file_path = save_path;
-
-    Logger().info("Download completed successfully: {}", save_path.string());
-    return result;
+    app_state.update->error_message = "All download sources failed";
+    return std::unexpected("All download sources failed");
 
   } catch (const std::exception& e) {
     if (app_state.update) {
@@ -489,39 +485,42 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
       return std::unexpected("Update not initialized");
     }
 
-    // 使用默认的更新包路径
+    if (app_state.update->latest_version.empty()) {
+      return std::unexpected("No version info available");
+    }
+
+    // 根据安装类型确定更新包路径
+    auto filename =
+        get_update_filename(app_state.update->latest_version, app_state.update->is_portable);
     auto temp_dir = get_temp_directory();
     if (!temp_dir) {
       return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
     }
-    std::filesystem::path update_package_path = *temp_dir / "SpinningMomo_update.zip";
+    std::filesystem::path update_package_path = *temp_dir / filename;
 
-    // 验证更新包是否存在
     if (!std::filesystem::exists(update_package_path)) {
       return std::unexpected("Update package does not exist: " + update_package_path.string());
     }
 
-    Logger().info("Preparing update process with package: {}", update_package_path.string());
+    Logger().info("Preparing update with package: {} (portable: {})", update_package_path.string(),
+                  app_state.update->is_portable);
 
-    // 创建更新脚本，根据params.restart决定是否重启程序
-    auto script_result = create_update_script(update_package_path, params.restart);
+    auto script_result =
+        create_update_script(update_package_path, app_state.update->is_portable, params.restart);
     if (!script_result) {
       return std::unexpected("Failed to create update script: " + script_result.error());
     }
 
-    // 保存脚本路径到状态中
     app_state.update->update_script_path = script_result.value();
     app_state.update->pending_update = true;
 
     Types::InstallUpdateResult result;
 
     if (params.restart) {
-      // 立即重启更新：发送退出事件
       Logger().info("Sending exit event for immediate update");
       Core::Events::post(*app_state.events, UI::FloatingWindow::Events::ExitEvent{});
       result.message = "Update will start immediately after application exits";
     } else {
-      // 延迟更新：程序继续运行，更新会在退出时执行
       Logger().info("Update scheduled for program exit");
       result.message = "Update will be applied when the program exits";
     }

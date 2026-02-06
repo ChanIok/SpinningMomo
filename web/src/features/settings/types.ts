@@ -146,9 +146,10 @@ export interface AppSettings {
   update: {
     autoCheck: boolean // 是否自动检查更新
     checkIntervalHours: number // 检查间隔（小时）
-    servers: Array<{
-      name: string // 服务器名称
-      url: string // 服务器API地址
+    versionUrl: string // 版本检查URL（Cloudflare Pages）
+    downloadSources: Array<{
+      name: string // 源名称
+      urlTemplate: string // URL模板，支持 {version} 和 {filename} 占位符
     }>
   }
 
@@ -235,10 +236,15 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   update: {
     autoCheck: true,
     checkIntervalHours: 24,
-    servers: [
+    versionUrl: 'https://spinning-momo.pages.dev/version.txt',
+    downloadSources: [
       {
-        name: 'GitHub官方',
-        url: 'https://api.github.com/repos/ChanIok/SpinningMomo/releases/latest',
+        name: 'GitHub',
+        urlTemplate: 'https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}',
+      },
+      {
+        name: 'Mirror',
+        urlTemplate: 'https://r2.spinning-momo.pages.dev/releases/v{0}/{1}',
       },
     ],
   },

@@ -100,14 +100,18 @@ export struct AppSettings {
     bool auto_check = true;         // 是否自动检查更新
     int check_interval_hours = 24;  // 检查间隔（小时）
 
-    // 服务器配置
-    struct Server {
-      std::string name;  // 服务器名称
-      std::string url;   // 服务器API地址
+    // 版本检查URL（Cloudflare Pages）
+    std::string version_url = "https://spinning.infinitymomo.com/version.txt";
+
+    // 下载源配置（按优先级排序）
+    struct DownloadSource {
+      std::string name;          // 源名称
+      std::string url_template;  // URL模板，支持 {version} 和 {filename} 占位符
     };
 
-    std::vector<Server> servers = {  // 服务器列表（按优先级排序）
-        {"GitHub官方", "https://api.github.com/repos/ChanIok/SpinningMomo/releases/latest"}};
+    std::vector<DownloadSource> download_sources = {
+        {"GitHub", "https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}"},
+        {"Mirror", "https://r2.infinitymomo.com/releases/v{0}/{1}"}};
   } update;
 
   // ui 分组 - UI界面设置

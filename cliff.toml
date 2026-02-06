@@ -1,0 +1,33 @@
+# git-cliff configuration
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | upper_first }}\
+{% endfor %}
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+  { message = "^feat", group = "新功能 | Features" },
+  { message = "^fix", group = "修复 | Fixes" },
+  { message = "^perf", group = "优化 | Performance" },
+  { message = "^refactor", group = "重构 | Refactor" },
+  { message = "^docs", group = "文档 | Documentation" },
+  { message = "^test", group = "测试 | Tests" },
+  { message = "^ci", group = "CI" },
+  { message = "^chore|^build|^style", group = "其他 | Chores" },
+]
+filter_commits = false
+tag_pattern = "v[0-9].*"
+sort_commits = "oldest"
