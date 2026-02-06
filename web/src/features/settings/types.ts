@@ -43,22 +43,22 @@ export interface WebThemeSettings {
 
 // 深色主题颜色配置
 export const DARK_APP_WINDOW_COLORS: AppWindowColors = {
-  background: '#282C34A6',
-  separator: '#333842A6',
-  text: '#DEE8FCFF',
-  indicator: '#61AFEFFF',
-  hover: '#383D4AA6',
-  titleBar: '#282C34A6',
+  background: '#1f1f1fB3',
+  separator: '#333333B3',
+  text: '#D8D8D8FF',
+  indicator: '#FBBF24FF',
+  hover: '#505050CC',
+  titleBar: '#1f1f1fB3',
 }
 
 // 浅色主题颜色配置
 export const LIGHT_APP_WINDOW_COLORS: AppWindowColors = {
-  background: '#F9FAFBCC',
-  separator: '#E4E5E7CC',
-  text: '#1F2937FF',
-  indicator: '#FFAF50FF',
-  hover: '#F2F2F2CC',
-  titleBar: '#F9FAFBCC',
+  background: '#F5F5F5CC',
+  separator: '#E5E5E5CC',
+  text: '#2E2E2EFF',
+  indicator: '#F59E0BFF',
+  hover: '#E5E5E5CC',
+  titleBar: '#F5F5F5CC',
 }
 
 // AppWindow布局配置
