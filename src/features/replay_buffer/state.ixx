@@ -23,8 +23,10 @@ struct ReplayBufferState {
       Features::ReplayBuffer::Types::ReplayBufferStatus::Idle};
 
   // 即时回放运行时开关（不持久化）
-  // Motion Photo 的 enabled 从 settings 读取
   std::atomic<bool> replay_enabled{false};
+
+  // 动态照片运行时开关（不持久化）
+  std::atomic<bool> motion_photo_enabled{false};
 
   // D3D 资源 (Headless)
   wil::com_ptr<ID3D11Device> device;

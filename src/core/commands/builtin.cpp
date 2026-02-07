@@ -168,7 +168,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
 
   // === 动态照片和即时回放 ===
 
-  // 切换动态照片模式（持久化）
+  // 切换动态照片模式（仅运行时）
   register_command(
       registry,
       {
@@ -184,7 +184,8 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                 UI::FloatingWindow::request_repaint(state);
               },
           .get_state = [&state]() -> bool {
-            return state.settings && state.settings->raw.features.motion_photo.enabled;
+            return state.replay_buffer &&
+                   state.replay_buffer->motion_photo_enabled.load(std::memory_order_acquire);
           },
       });
 

@@ -99,17 +99,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize replay buffer: " + result.error());
     }
 
-    // 如果 Motion Photo 开启，自动启动后台录制
-    if (state.settings->raw.features.motion_photo.enabled) {
-      if (auto result = Features::ReplayBuffer::UseCase::ensure_buffering_started(state); !result) {
-        Logger().warn("Auto-start Motion Photo failed: {}, disabling", result.error());
-        // 启动失败时禁用 Motion Photo
-        state.settings->raw.features.motion_photo.enabled = false;
-      } else {
-        Logger().info("Motion Photo auto-started from saved settings");
-      }
-    }
-
     if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {
       return std::unexpected("Failed to initialize gallery: " + gallery_result.error());
     }

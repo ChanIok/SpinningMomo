@@ -66,19 +66,6 @@ export const useFunctionActions = () => {
   }
 
   // Motion Photo 设置
-  const updateMotionPhotoEnabled = async (enabled: boolean) => {
-    await store.updateSettings({
-      ...appSettings.value,
-      features: {
-        ...appSettings.value.features,
-        motionPhoto: {
-          ...appSettings.value.features.motionPhoto,
-          enabled,
-        },
-      },
-    })
-  }
-
   const updateMotionPhotoDuration = async (duration: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -325,7 +312,6 @@ export const useFunctionActions = () => {
         },
         motionPhoto: {
           ...appSettings.value.features.motionPhoto,
-          enabled: DEFAULT_APP_SETTINGS.features.motionPhoto.enabled,
           duration: DEFAULT_APP_SETTINGS.features.motionPhoto.duration,
           resolution: DEFAULT_APP_SETTINGS.features.motionPhoto.resolution,
           fps: DEFAULT_APP_SETTINGS.features.motionPhoto.fps,
@@ -361,7 +347,6 @@ export const useFunctionActions = () => {
     updateTaskbarLowerOnResize,
     updateLetterboxEnabled,
     // Motion Photo
-    updateMotionPhotoEnabled,
     updateMotionPhotoDuration,
     updateMotionPhotoResolution,
     updateMotionPhotoFps,

@@ -138,7 +138,6 @@ export interface AppSettings {
 
     // 动态照片设置
     motionPhoto: {
-      enabled: boolean // 持久化开关
       duration: number // 视频时长（秒）
       resolution: number // 短边分辨率: 720/1080/1440/2160
       fps: number // 帧率
@@ -246,7 +245,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       enabled: false,
     },
     motionPhoto: {
-      enabled: false,
       duration: 3,
       resolution: 1080,
       fps: 30,

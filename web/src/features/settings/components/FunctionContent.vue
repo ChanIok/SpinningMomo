@@ -34,7 +34,6 @@ const {
   updateTaskbarLowerOnResize,
   updateLetterboxEnabled,
   // Motion Photo
-  updateMotionPhotoEnabled,
   updateMotionPhotoDuration,
   updateMotionPhotoResolution,
   updateMotionPhotoFps,
@@ -423,23 +422,6 @@ const handleResetSettings = async () => {
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
-                {{ t('settings.function.motionPhoto.enabled.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.motionPhoto.enabled.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                :model-value="appSettings?.features?.motionPhoto?.enabled"
-                @update:model-value="updateMotionPhotoEnabled"
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
                 {{ t('settings.function.motionPhoto.duration.label') }}
               </ItemTitle>
               <ItemDescription>
@@ -471,16 +453,19 @@ const handleResetSettings = async () => {
             </ItemContent>
             <ItemActions>
               <Select
-                :model-value="String(appSettings?.features?.motionPhoto?.resolution || 1080)"
+                :model-value="String(appSettings?.features?.motionPhoto?.resolution ?? 1080)"
                 @update:model-value="(value) => updateMotionPhotoResolution(Number(value))"
               >
                 <SelectTrigger class="w-32">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="0">{{
+                    t('settings.function.motionPhoto.resolution.original')
+                  }}</SelectItem>
                   <SelectItem value="720">720P</SelectItem>
                   <SelectItem value="1080">1080P</SelectItem>
-                  <SelectItem value="1440">2K</SelectItem>
+                  <SelectItem value="1440">1440P</SelectItem>
                   <SelectItem value="2160">4K</SelectItem>
                 </SelectContent>
               </Select>

@@ -33,10 +33,11 @@ auto capture(Core::State::AppState& state) -> void {
   }
 
   // 检查是否需要生成 Motion Photo
-  bool motion_photo_enabled = state.settings->raw.features.motion_photo.enabled &&
-                              state.replay_buffer &&
-                              state.replay_buffer->status.load(std::memory_order_acquire) ==
-                                  Features::ReplayBuffer::Types::ReplayBufferStatus::Buffering;
+  bool motion_photo_enabled =
+      state.replay_buffer &&
+      state.replay_buffer->motion_photo_enabled.load(std::memory_order_acquire) &&
+      state.replay_buffer->status.load(std::memory_order_acquire) ==
+          Features::ReplayBuffer::Types::ReplayBufferStatus::Buffering;
 
   // 创建截图完成回调
   // 注意：这个回调在截图工作线程的帧回调中执行，必须快速返回

@@ -21,7 +21,8 @@ namespace Features::ReplayBuffer::UseCase {
 
 // 内部辅助：检查是否需要后台录制
 auto is_buffering_needed(Core::State::AppState& state) -> bool {
-  bool motion_photo_enabled = state.settings->raw.features.motion_photo.enabled;
+  bool motion_photo_enabled = state.replay_buffer && state.replay_buffer->motion_photo_enabled.load(
+                                                         std::memory_order_acquire);
   bool replay_enabled =
       state.replay_buffer && state.replay_buffer->replay_enabled.load(std::memory_order_acquire);
   return motion_photo_enabled || replay_enabled;
@@ -39,6 +40,8 @@ auto build_config(Core::State::AppState& state)
 
   bool replay_enabled =
       state.replay_buffer && state.replay_buffer->replay_enabled.load(std::memory_order_acquire);
+  bool motion_photo_enabled = state.replay_buffer && state.replay_buffer->motion_photo_enabled.load(
+                                                         std::memory_order_acquire);
 
   Features::ReplayBuffer::Types::ReplayBufferConfig config;
 
@@ -52,7 +55,7 @@ auto build_config(Core::State::AppState& state)
     config.encoder_mode = rec_settings.encoder_mode;
     config.audio_source = rec_settings.audio_source;
     config.audio_bitrate = rec_settings.audio_bitrate;
-  } else {
+  } else if (motion_photo_enabled) {
     // 仅 Motion Photo：使用 motion_photo 参数
     config.fps = mp_settings.fps;
     config.bitrate = mp_settings.bitrate;
@@ -121,32 +124,21 @@ auto ensure_buffering_stopped(Core::State::AppState& state) -> void {
 }
 
 auto toggle_motion_photo(Core::State::AppState& state) -> std::expected<void, std::string> {
-  if (!state.settings) {
-    return std::unexpected("Settings not initialized");
+  if (!state.replay_buffer) {
+    return std::unexpected("ReplayBuffer state is not initialized");
   }
 
-  // 1. 切换 enabled 状态
-  bool new_enabled = !state.settings->raw.features.motion_photo.enabled;
-  state.settings->raw.features.motion_photo.enabled = new_enabled;
+  // 1. 切换运行时状态（不持久化）
+  bool current = state.replay_buffer->motion_photo_enabled.load(std::memory_order_acquire);
+  bool new_enabled = !current;
+  state.replay_buffer->motion_photo_enabled.store(new_enabled, std::memory_order_release);
 
-  // 2. 保存设置到文件
-  auto path_result = Features::Settings::get_settings_path();
-  if (path_result) {
-    auto save_result = Features::Settings::save_settings_to_file(*path_result, state.settings->raw);
-    if (!save_result) {
-      Logger().warn("Failed to save settings: {}", save_result.error());
-    }
-  }
-
-  // 3. 根据新状态启动或停止后台录制
+  // 2. 根据新状态启动或停止后台录制
   if (new_enabled) {
     auto result = ensure_buffering_started(state);
     if (!result) {
-      // 启动失败，回滚设置
-      state.settings->raw.features.motion_photo.enabled = false;
-      if (path_result) {
-        (void)Features::Settings::save_settings_to_file(*path_result, state.settings->raw);
-      }
+      // 启动失败，回滚状态
+      state.replay_buffer->motion_photo_enabled.store(false, std::memory_order_release);
       return result;
     }
     Logger().info("Motion Photo enabled");

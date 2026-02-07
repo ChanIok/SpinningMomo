@@ -9,7 +9,7 @@ namespace Features::ReplayBuffer::UseCase {
 
 // === 功能开关 ===
 
-// 切换动态照片模式（持久化到设置）
+// 切换动态照片模式（仅运行时状态）
 export auto toggle_motion_photo(Core::State::AppState& state) -> std::expected<void, std::string>;
 
 // 切换即时回放模式（仅运行时状态）

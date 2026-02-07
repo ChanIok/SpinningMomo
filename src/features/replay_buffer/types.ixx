@@ -34,7 +34,7 @@ export struct ReplayBufferConfig {
 
   // Motion Photo 参数
   std::uint32_t motion_photo_duration = 3;       // Motion Photo 视频时长（秒）
-  std::uint32_t motion_photo_resolution = 1080;  // Motion Photo 目标短边分辨率
+  std::uint32_t motion_photo_resolution = 1080;  // Motion Photo 目标短边分辨率，0 表示不缩放
 };
 
 }  // namespace Features::ReplayBuffer::Types
