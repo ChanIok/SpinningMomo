@@ -9,26 +9,17 @@ namespace Features::ReplayBuffer::MotionPhoto {
 
 // 构造 XMP 元数据 XML
 auto build_xmp_xml(std::int64_t mp4_size, std::int64_t presentation_timestamp_us) -> std::string {
-  return std::format(
-      R"(<?xpacket begin='' id='W5M0MpCehiHzreSzNTczkc9d'?>)"
-      R"(<x:xmpmeta xmlns:x="adobe:ns:meta/">)"
-      R"(<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">)"
-      R"(<rdf:Description )"
-      R"(xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" )"
-      R"(xmlns:Container="http://ns.google.com/photos/1.0/container/" )"
-      R"(xmlns:Item="http://ns.google.com/photos/1.0/container/item/" )"
-      R"(GCamera:MotionPhoto="1" )"
-      R"(GCamera:MotionPhotoVersion="1" )"
-      R"(GCamera:MotionPhotoPresentationTimestampUs="{}">)"
-      R"(<Container:Directory><rdf:Seq>)"
-      R"(<rdf:li Item:Mime="image/jpeg" Item:Semantic="Primary"/>)"
-      R"(<rdf:li Item:Mime="video/mp4" Item:Semantic="MotionPhoto" Item:Length="{}"/>)"
-      R"(</rdf:Seq></Container:Directory>)"
-      R"(</rdf:Description>)"
-      R"(</rdf:RDF>)"
-      R"(</x:xmpmeta>)"
-      R"(<?xpacket end='w'?>)",
-      presentation_timestamp_us, mp4_size);
+  return std::format(R"(<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.1.0-jc003">)"
+                     R"(<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">)"
+                     R"(<rdf:Description rdf:about="" )"
+                     R"(xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" )"
+                     R"(GCamera:MicroVideoVersion="1" )"
+                     R"(GCamera:MicroVideo="1" )"
+                     R"(GCamera:MicroVideoOffset="{}" )"
+                     R"(GCamera:MicroVideoPresentationTimestampUs="{}"/>)"
+                     R"(</rdf:RDF>)"
+                     R"(</x:xmpmeta>)",
+                     mp4_size, presentation_timestamp_us);
 }
 
 // 将 XMP 注入 JPEG（作为 APP1 段）

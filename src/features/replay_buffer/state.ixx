@@ -4,24 +4,17 @@ export module Features.ReplayBuffer.State;
 
 import std;
 import Features.ReplayBuffer.Types;
+import Features.ReplayBuffer.DiskRingBuffer;
 import Utils.Graphics.Capture;
 import Utils.Media.AudioCapture;
-import Utils.Media.Encoder.State;
-import Utils.Timer;
+import Utils.Media.RawEncoder;
 import <d3d11.h>;
 import <wil/com.h>;
 import <windows.h>;
 
 export namespace Features::ReplayBuffer::State {
 
-// 已完成的视频段落信息
-struct SegmentInfo {
-  std::filesystem::path path;                        // 段落文件路径
-  std::chrono::steady_clock::time_point start_time;  // 段落开始时间
-  std::int64_t duration_100ns = 0;                   // 段落实际时长（100ns 单位）
-};
-
-// 回放缓冲完整状态
+// 回放缓冲完整状态（新架构：单编码器 + 硬盘环形缓冲）
 struct ReplayBufferState {
   Features::ReplayBuffer::Types::ReplayBufferConfig config;
 
@@ -40,15 +33,14 @@ struct ReplayBufferState {
   // WGC 捕获会话
   Utils::Graphics::Capture::CaptureSession capture_session;
 
-  // 编码器（使用共享编码器模块）
-  Utils::Media::Encoder::State::EncoderContext encoder;
+  // RawEncoder（单一实例，全程运行）
+  Utils::Media::RawEncoder::RawEncoderContext raw_encoder;
 
-  // 段落管理
-  SegmentInfo current_segment;
-  std::deque<SegmentInfo> completed_segments;
+  // 硬盘环形缓冲
+  DiskRingBuffer::DiskRingBufferContext ring_buffer;
 
   // 帧率控制
-  std::chrono::steady_clock::time_point segment_start_time;
+  std::chrono::steady_clock::time_point start_time;
   std::uint64_t frame_index = 0;
 
   // 最后编码的帧纹理（用于帧重复填充）
@@ -64,11 +56,8 @@ struct ReplayBufferState {
   std::mutex encoder_write_mutex;
   std::mutex resource_mutex;
 
-  // 临时文件目录
-  std::filesystem::path temp_dir;
-
-  // 轮转定时器
-  std::optional<Utils::Timer::Timer> rotation_timer;
+  // 缓存目录
+  std::filesystem::path cache_dir;
 };
 
 }  // namespace Features::ReplayBuffer::State

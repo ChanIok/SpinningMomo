@@ -7,11 +7,12 @@ module Features.ReplayBuffer;
 import std;
 import Features.ReplayBuffer.State;
 import Features.ReplayBuffer.Types;
+import Features.ReplayBuffer.DiskRingBuffer;
+import Features.ReplayBuffer.Muxer;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import Utils.Media.AudioCapture;
-import Utils.Media.Encoder;
-import Utils.Media.Encoder.Types;
+import Utils.Media.RawEncoder;
 import Utils.Logger;
 import Utils.Path;
 import <d3d11_4.h>;
@@ -21,135 +22,8 @@ import <windows.h>;
 
 namespace Features::ReplayBuffer {
 
-// 生成临时段落文件路径
-auto generate_segment_path(const Features::ReplayBuffer::State::ReplayBufferState& state)
-    -> std::filesystem::path {
-  auto now = std::chrono::system_clock::now();
-  auto filename = std::format(
-      "segment_{:%Y%m%d_%H%M%S}_{}.mp4", now,
-      std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
-  return state.temp_dir / filename;
-}
-
-// 创建新的编码器段落
-auto create_new_segment(Features::ReplayBuffer::State::ReplayBufferState& state)
-    -> std::expected<void, std::string> {
-  auto segment_path = generate_segment_path(state);
-
-  // 获取窗口尺寸
-  RECT rect;
-  GetClientRect(state.target_window, &rect);
-  int width = (rect.right - rect.left) / 2 * 2;  // 确保偶数
-  int height = (rect.bottom - rect.top) / 2 * 2;
-
-  if (width <= 0 || height <= 0) {
-    return std::unexpected("Invalid window size");
-  }
-
-  // 构造编码器配置
-  Utils::Media::Encoder::Types::EncoderConfig encoder_config;
-  encoder_config.output_path = segment_path;
-  encoder_config.width = width;
-  encoder_config.height = height;
-  encoder_config.fps = state.config.fps;
-  encoder_config.bitrate = state.config.bitrate;
-  encoder_config.quality = state.config.quality;
-  encoder_config.keyframe_interval = state.config.keyframe_interval;
-  encoder_config.rate_control =
-      Utils::Media::Encoder::Types::rate_control_mode_from_string(state.config.rate_control);
-  encoder_config.encoder_mode =
-      Utils::Media::Encoder::Types::encoder_mode_from_string(state.config.encoder_mode);
-  encoder_config.codec = Utils::Media::Encoder::Types::video_codec_from_string(state.config.codec);
-  encoder_config.audio_bitrate = state.config.audio_bitrate;
-
-  // 创建编码器
-  WAVEFORMATEX* wave_format = state.audio.wave_format;
-  auto encoder_result =
-      Utils::Media::Encoder::create_encoder(encoder_config, state.device.get(), wave_format);
-  if (!encoder_result) {
-    return std::unexpected("Failed to create encoder: " + encoder_result.error());
-  }
-  state.encoder = std::move(*encoder_result);
-
-  // 更新段落信息
-  state.current_segment.path = segment_path;
-  state.current_segment.start_time = std::chrono::steady_clock::now();
-  state.current_segment.duration_100ns = 0;
-
-  // 重置帧索引和段落开始时间
-  state.segment_start_time = std::chrono::steady_clock::now();
-  state.frame_index = 0;
-
-  Logger().debug("New segment created: {}", segment_path.string());
-  return {};
-}
-
-// 删除超出最大缓冲时长的旧段落
-auto cleanup_old_segments(Features::ReplayBuffer::State::ReplayBufferState& state) -> void {
-  // 计算最大保留时长（100ns 单位）
-  std::int64_t max_duration_100ns =
-      static_cast<std::int64_t>(state.config.max_duration) * 10'000'000;
-  std::int64_t total_duration = 0;
-
-  // 从新到旧累加时长，超出部分删除
-  auto it = state.completed_segments.rbegin();
-  while (it != state.completed_segments.rend()) {
-    total_duration += it->duration_100ns;
-    ++it;
-  }
-
-  while (!state.completed_segments.empty() && total_duration > max_duration_100ns) {
-    auto& oldest = state.completed_segments.front();
-    total_duration -= oldest.duration_100ns;
-
-    // 删除文件
-    std::error_code ec;
-    std::filesystem::remove(oldest.path, ec);
-    if (ec) {
-      Logger().warn("Failed to remove old segment: {}", oldest.path.string());
-    } else {
-      Logger().debug("Removed old segment: {}", oldest.path.string());
-    }
-
-    state.completed_segments.pop_front();
-  }
-}
-
-// 执行段落轮转（内部实现，调用方需持有 resource_mutex）
-auto rotate_segment_internal(Features::ReplayBuffer::State::ReplayBufferState& state)
-    -> std::expected<void, std::string> {
-  // 1. 记录当前段落的实际时长
-  auto now = std::chrono::steady_clock::now();
-  auto elapsed = now - state.current_segment.start_time;
-  state.current_segment.duration_100ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
-
-  // 2. Finalize 当前编码器（需要持有 encoder_write_mutex）
-  {
-    std::lock_guard write_lock(state.encoder_write_mutex);
-    auto finalize_result = Utils::Media::Encoder::finalize_encoder(state.encoder);
-    if (!finalize_result) {
-      Logger().error("Failed to finalize segment: {}", finalize_result.error());
-      // 继续执行，不要因为 finalize 失败阻断轮转
-    }
-  }
-
-  // 3. 保存已完成段落信息
-  state.completed_segments.push_back(state.current_segment);
-
-  // 4. 创建新编码器
-  auto result = create_new_segment(state);
-  if (!result) {
-    return std::unexpected("Failed to create new segment during rotation: " + result.error());
-  }
-
-  // 5. 清理过期段落
-  cleanup_old_segments(state);
-
-  Logger().debug("Segment rotated, {} completed segments in queue",
-                 state.completed_segments.size());
-  return {};
-}
+// 默认缓冲文件大小限制（2GB）
+constexpr std::int64_t kDefaultBufferSizeLimit = 2LL * 1024 * 1024 * 1024;
 
 // 帧到达回调
 auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
@@ -160,7 +34,7 @@ auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
   }
 
   auto now = std::chrono::steady_clock::now();
-  auto elapsed = now - state.segment_start_time;
+  auto elapsed = now - state.start_time;
   auto elapsed_100ns = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
 
   std::int64_t frame_duration_100ns = 10'000'000 / state.config.fps;
@@ -183,16 +57,25 @@ auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
             ? state.last_encoded_texture.get()
             : texture.get();
 
-    std::expected<void, std::string> result;
+    // 使用 RawEncoder 编码
+    std::expected<std::vector<Utils::Media::RawEncoder::EncodedFrame>, std::string> result;
     {
       std::lock_guard write_lock(state.encoder_write_mutex);
-      result = Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(),
-                                                   encode_texture, timestamp, state.config.fps);
+      result = Utils::Media::RawEncoder::encode_video_frame(state.raw_encoder, state.context.get(),
+                                                            encode_texture, timestamp);
     }
 
     if (!result) {
       Logger().error("Failed to encode frame {}: {}", state.frame_index, result.error());
       break;
+    }
+
+    // 将编码输出写入环形缓冲
+    for (auto& encoded_frame : *result) {
+      auto append_result = DiskRingBuffer::append_encoded_frame(state.ring_buffer, encoded_frame);
+      if (!append_result) {
+        Logger().warn("Failed to append frame to ring buffer: {}", append_result.error());
+      }
     }
 
     state.frame_index++;
@@ -237,13 +120,17 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
   state.config = config;
   state.target_window = target_window;
 
-  // 1. 创建临时目录
-  auto temp_base = std::filesystem::temp_directory_path() / "SpinningMomo" / "replay_buffer";
-  auto ensure_result = Utils::Path::EnsureDirectoryExists(temp_base);
-  if (!ensure_result) {
-    return std::unexpected("Failed to create temp directory: " + ensure_result.error());
+  // 1. 创建缓存目录
+  auto exe_dir = Utils::Path::GetExecutableDirectory();
+  if (!exe_dir) {
+    return std::unexpected("Failed to get executable directory");
   }
-  state.temp_dir = temp_base;
+  state.cache_dir = *exe_dir / "cache" / "replay_buffer";
+
+  auto ensure_result = Utils::Path::EnsureDirectoryExists(state.cache_dir);
+  if (!ensure_result) {
+    return std::unexpected("Failed to create cache directory: " + ensure_result.error());
+  }
 
   // 2. 创建 Headless D3D 设备
   auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
@@ -278,19 +165,46 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
     Logger().info("ReplayBuffer audio capture initialized");
   }
 
-  // 5. 创建首个编码器段落
-  auto segment_result = create_new_segment(state);
-  if (!segment_result) {
-    return std::unexpected(segment_result.error());
-  }
-
-  // 6. 获取窗口尺寸
+  // 5. 获取窗口尺寸
   RECT rect;
   GetClientRect(target_window, &rect);
-  int width = (rect.right - rect.left) / 2 * 2;
+  int width = (rect.right - rect.left) / 2 * 2;  // 确保偶数
   int height = (rect.bottom - rect.top) / 2 * 2;
 
-  // 7. 创建捕获会话（2 帧缓冲）
+  if (width <= 0 || height <= 0) {
+    return std::unexpected("Invalid window size");
+  }
+
+  // 6. 创建 RawEncoder
+  Utils::Media::RawEncoder::RawEncoderConfig encoder_config;
+  encoder_config.width = width;
+  encoder_config.height = height;
+  encoder_config.fps = config.fps;
+  encoder_config.bitrate = config.bitrate;
+  encoder_config.keyframe_interval = config.keyframe_interval;
+  encoder_config.use_hardware = true;
+
+  WAVEFORMATEX* wave_format = state.audio.wave_format;
+  auto encoder_result =
+      Utils::Media::RawEncoder::create_encoder(encoder_config, state.device.get(), wave_format);
+  if (!encoder_result) {
+    return std::unexpected("Failed to create RawEncoder: " + encoder_result.error());
+  }
+  state.raw_encoder = std::move(*encoder_result);
+
+  // 7. 初始化硬盘环形缓冲
+  auto video_type = Utils::Media::RawEncoder::get_video_output_type(state.raw_encoder);
+  auto audio_type = Utils::Media::RawEncoder::get_audio_output_type(state.raw_encoder);
+  auto codec_data = Utils::Media::RawEncoder::get_video_codec_private_data(state.raw_encoder);
+
+  auto ring_result =
+      DiskRingBuffer::initialize(state.ring_buffer, state.cache_dir, kDefaultBufferSizeLimit,
+                                 video_type, audio_type, codec_data);
+  if (!ring_result) {
+    return std::unexpected("Failed to initialize ring buffer: " + ring_result.error());
+  }
+
+  // 8. 创建捕获会话（2 帧缓冲）
   auto capture_result = Utils::Graphics::Capture::create_capture_session(
       target_window, *winrt_device_result, width, height,
       [&state](auto frame) { on_frame_arrived(state, frame); }, 2);
@@ -300,90 +214,54 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
   }
   state.capture_session = std::move(*capture_result);
 
-  // 8. 启动捕获
+  // 9. 启动捕获
   auto start_result = Utils::Graphics::Capture::start_capture(state.capture_session);
   if (!start_result) {
     return std::unexpected("Failed to start capture: " + start_result.error());
   }
 
-  // 9. 启动音频捕获线程
-  if (state.encoder.has_audio) {
+  // 10. 启动音频捕获线程
+  if (state.raw_encoder.has_audio) {
     Utils::Media::AudioCapture::start_capture_thread(
         state.audio,
-        // get_elapsed_100ns: 相对于当前段落开始时间
+        // get_elapsed_100ns: 相对于开始时间
         [&state]() -> std::int64_t {
           auto now = std::chrono::steady_clock::now();
-          auto elapsed = now - state.segment_start_time;
+          auto elapsed = now - state.start_time;
           return std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
         },
         // is_active
         [&state]() -> bool {
           return state.status.load(std::memory_order_acquire) ==
                      Features::ReplayBuffer::Types::ReplayBufferStatus::Buffering &&
-                 state.encoder.has_audio;
+                 state.raw_encoder.has_audio;
         },
         // on_packet
         [&state](const BYTE* data, UINT32 num_frames, UINT32 bytes_per_frame,
                  std::int64_t timestamp_100ns) {
-          auto& encoder = state.encoder;
           DWORD buffer_size = num_frames * bytes_per_frame;
-          wil::com_ptr<IMFSample> sample;
-          wil::com_ptr<IMFMediaBuffer> buffer;
 
-          if (SUCCEEDED(MFCreateSample(sample.put())) &&
-              SUCCEEDED(MFCreateMemoryBuffer(buffer_size, buffer.put()))) {
-            BYTE* buffer_data = nullptr;
-            if (SUCCEEDED(buffer->Lock(&buffer_data, nullptr, nullptr))) {
-              std::memcpy(buffer_data, data, buffer_size);
-              buffer->Unlock();
-              buffer->SetCurrentLength(buffer_size);
+          std::lock_guard write_lock(state.encoder_write_mutex);
+          auto result = Utils::Media::RawEncoder::encode_audio_frame(state.raw_encoder, data,
+                                                                     buffer_size, timestamp_100ns);
 
-              sample->AddBuffer(buffer.get());
-              sample->SetSampleTime(timestamp_100ns);
-
-              std::lock_guard write_lock(state.encoder_write_mutex);
-              encoder.sink_writer->WriteSample(encoder.audio_stream_index, sample.get());
+          if (result && result->has_value()) {
+            {
+              auto append_result =
+                  DiskRingBuffer::append_encoded_frame(state.ring_buffer, result->value());
+              Logger().warn("Failed to append audio frame: {}", append_result.error());
             }
           }
         });
   }
 
-  // 10. 启动轮转定时器
-  if (!state.rotation_timer) {
-    state.rotation_timer.emplace();
-  }
-  auto timer_interval = std::chrono::milliseconds(state.config.rotation_interval * 1000);
-  auto timer_result = state.rotation_timer->SetTimer(timer_interval, [&state]() {
-    std::lock_guard resource_lock(state.resource_mutex);
-    if (state.status.load(std::memory_order_acquire) ==
-        Features::ReplayBuffer::Types::ReplayBufferStatus::Buffering) {
-      auto result = rotate_segment_internal(state);
-      if (!result) {
-        Logger().error("Segment rotation failed: {}", result.error());
-      }
-
-      // 重新设置定时器（Timer 是一次性的）
-      auto interval = std::chrono::milliseconds(state.config.rotation_interval * 1000);
-      (void)state.rotation_timer->SetTimer(interval, [&state]() {
-        std::lock_guard rl(state.resource_mutex);
-        if (state.status.load(std::memory_order_acquire) ==
-            Features::ReplayBuffer::Types::ReplayBufferStatus::Buffering) {
-          (void)rotate_segment_internal(state);
-          // 继续轮转 — 递归设置（简化实现）
-        }
-      });
-    }
-  });
-
-  if (!timer_result) {
-    Logger().warn("Failed to set rotation timer, segments won't auto-rotate");
-  }
-
-  // 11. 设置状态为 Buffering
+  // 11. 设置状态
+  state.start_time = std::chrono::steady_clock::now();
+  state.frame_index = 0;
   state.status.store(Features::ReplayBuffer::Types::ReplayBufferStatus::Buffering,
                      std::memory_order_release);
 
-  Logger().info("ReplayBuffer started buffering");
+  Logger().info("ReplayBuffer started buffering (new architecture)");
   return {};
 }
 
@@ -395,81 +273,65 @@ auto stop_buffering(Features::ReplayBuffer::State::ReplayBufferState& state) -> 
     return;
   }
 
-  // 1. 停止轮转定时器
-  if (state.rotation_timer && state.rotation_timer->IsRunning()) {
-    state.rotation_timer->Cancel();
-  }
-
-  // 2. 停止音频
-  if (state.encoder.has_audio) {
+  // 1. 停止音频
+  if (state.raw_encoder.has_audio) {
     Utils::Media::AudioCapture::stop(state.audio);
   }
 
-  // 3. 停止视频捕获
+  // 2. 停止视频捕获
   Utils::Graphics::Capture::stop_capture(state.capture_session);
 
-  // 4. 清理资源
+  // 3. 清理资源
   {
     std::lock_guard resource_lock(state.resource_mutex);
 
-    auto finalize_result = Utils::Media::Encoder::finalize_encoder(state.encoder);
-    if (!finalize_result) {
-      Logger().error("Failed to finalize encoder: {}", finalize_result.error());
-    }
+    // Flush 并清理 RawEncoder
+    Utils::Media::RawEncoder::finalize(state.raw_encoder);
 
     state.capture_session = {};
-    state.encoder = {};
+    state.raw_encoder = {};
     state.last_encoded_texture = nullptr;
     state.device = nullptr;
     state.context = nullptr;
 
     Utils::Media::AudioCapture::cleanup(state.audio);
-  }
 
-  // 5. 清理所有临时段落文件
-  for (auto& segment : state.completed_segments) {
-    std::error_code ec;
-    std::filesystem::remove(segment.path, ec);
-  }
-  state.completed_segments.clear();
-
-  // 清理当前段落文件
-  if (!state.current_segment.path.empty()) {
-    std::error_code ec;
-    std::filesystem::remove(state.current_segment.path, ec);
-    state.current_segment = {};
+    // 清理环形缓冲
+    DiskRingBuffer::cleanup(state.ring_buffer);
   }
 
   Logger().info("ReplayBuffer stopped");
 }
 
-auto force_rotate(Features::ReplayBuffer::State::ReplayBufferState& state)
-    -> std::expected<void, std::string> {
+auto get_recent_frames(const Features::ReplayBuffer::State::ReplayBufferState& state,
+                       double duration_seconds)
+    -> std::expected<std::vector<DiskRingBuffer::FrameMetadata>, std::string> {
+  return DiskRingBuffer::get_recent_frames(state.ring_buffer, duration_seconds);
+}
+
+auto save_replay(Features::ReplayBuffer::State::ReplayBufferState& state, double duration_seconds,
+                 const std::filesystem::path& output_path) -> std::expected<void, std::string> {
   if (state.status.load(std::memory_order_acquire) !=
       Features::ReplayBuffer::Types::ReplayBufferStatus::Buffering) {
     return std::unexpected("ReplayBuffer is not buffering");
   }
 
-  std::lock_guard resource_lock(state.resource_mutex);
-  return rotate_segment_internal(state);
-}
-
-auto get_recent_segments(const Features::ReplayBuffer::State::ReplayBufferState& state,
-                         double duration_seconds) -> std::vector<std::filesystem::path> {
-  std::vector<std::filesystem::path> result;
-  std::int64_t target_duration_100ns = static_cast<std::int64_t>(duration_seconds * 10'000'000);
-  std::int64_t accumulated = 0;
-
-  // 从最新的段落开始往回取
-  for (auto it = state.completed_segments.rbegin(); it != state.completed_segments.rend(); ++it) {
-    result.insert(result.begin(), it->path);
-    accumulated += it->duration_100ns;
-    if (accumulated >= target_duration_100ns) {
-      break;
-    }
+  // 获取最近的帧
+  auto frames_result = DiskRingBuffer::get_recent_frames(state.ring_buffer, duration_seconds);
+  if (!frames_result) {
+    return std::unexpected("Failed to get recent frames: " + frames_result.error());
   }
 
-  return result;
+  if (frames_result->empty()) {
+    return std::unexpected("No frames available for replay");
+  }
+
+  // 使用 Muxer 保存为 MP4
+  auto video_type = state.ring_buffer.video_media_type.get();
+  auto audio_type = state.ring_buffer.audio_media_type.get();
+
+  return Muxer::mux_frames_to_mp4(*frames_result, state.ring_buffer, video_type, audio_type,
+                                  output_path);
 }
 
 auto cleanup(Features::ReplayBuffer::State::ReplayBufferState& state) -> void {

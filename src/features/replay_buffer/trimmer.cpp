@@ -143,13 +143,10 @@ auto process_input_file(const std::filesystem::path& input_path, IMFSinkWriter* 
 
     hr = sink_writer->WriteSample(out_index, sample.get());
     if (FAILED(hr)) {
-      Logger().warn("WriteSample failed: {:08X}", static_cast<uint32_t>(hr));
+      Logger().error("WriteSample failed: {:08X}, aborting file", static_cast<uint32_t>(hr));
+      return std::unexpected(std::format("WriteSample failed: {:08X}", static_cast<uint32_t>(hr)));
     }
   }
-
-  // 更新时间偏移（当前文件从 seek 位置到末尾的时长）
-  // 用最后一个样本的时间戳近似
-  // 实际偏移由下个文件的第一帧自动校正
 
   return {};
 }
@@ -191,6 +188,10 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
                                   std::int64_t seek_position_100ns, std::int64_t& time_offset_100ns,
                                   std::uint32_t target_width, std::uint32_t target_height)
     -> std::expected<void, std::string> {
+  Logger().debug("[Transcode] Processing file: {}", input_path.string());
+  Logger().debug("[Transcode] Target size: {}x{}, seek: {}", target_width, target_height,
+                 seek_position_100ns);
+
   // 创建 SourceReader，启用解码
   wil::com_ptr<IMFAttributes> reader_attrs;
   MFCreateAttributes(reader_attrs.put(), 2);
@@ -204,16 +205,18 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
         std::format("Failed to open {}: {:08X}", input_path.string(), static_cast<uint32_t>(hr)));
   }
 
-  // 设置视频输出为 RGB32（解码后）
+  // 设置视频输出为 NV12（解码后）—— NV12 是视频编解码的原生格式，
+  // 避免 RGB32 的 bottom-up stride 翻转问题，且性能更好
   wil::com_ptr<IMFMediaType> video_decode_type;
   MFCreateMediaType(video_decode_type.put());
   video_decode_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-  video_decode_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
-  MFSetAttributeSize(video_decode_type.get(), MF_MT_FRAME_SIZE, target_width, target_height);
+  video_decode_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
   hr = reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr,
                                    video_decode_type.get());
   if (FAILED(hr)) {
-    // 如果不支持缩放，尝试不指定尺寸
+    Logger().debug("[Transcode] SetCurrentMediaType NV12 failed: {:08X}, trying RGB32",
+                   static_cast<uint32_t>(hr));
+    // Fallback 到 RGB32
     video_decode_type = nullptr;
     MFCreateMediaType(video_decode_type.put());
     video_decode_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
@@ -224,6 +227,19 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
       return std::unexpected(
           std::format("Failed to set video decode type: {:08X}", static_cast<uint32_t>(hr)));
     }
+  }
+
+  // 获取实际的解码输出格式
+  wil::com_ptr<IMFMediaType> actual_video_type;
+  hr = reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, actual_video_type.put());
+  GUID actual_subtype = GUID_NULL;
+  UINT32 actual_w = 0, actual_h = 0;
+  if (SUCCEEDED(hr)) {
+    MFGetAttributeSize(actual_video_type.get(), MF_MT_FRAME_SIZE, &actual_w, &actual_h);
+    actual_video_type->GetGUID(MF_MT_SUBTYPE, &actual_subtype);
+    const char* format_name = (actual_subtype == MFVideoFormat_NV12) ? "NV12" : "RGB32";
+    Logger().debug("[Transcode] Actual decoder output: {}x{}, format={}", actual_w, actual_h,
+                   format_name);
   }
 
   // 音频输出为 PCM
@@ -280,6 +296,19 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
       if (first_video_sample) {
         first_video_timestamp = timestamp;
         first_video_sample = false;
+
+        // 调试：输出第一个视频样本的详细信息
+        wil::com_ptr<IMFMediaBuffer> dbg_buffer;
+        if (SUCCEEDED(sample->GetBufferByIndex(0, dbg_buffer.put()))) {
+          DWORD buf_len = 0, max_len = 0;
+          dbg_buffer->GetCurrentLength(&buf_len);
+          dbg_buffer->GetMaxLength(&max_len);
+          // NV12: width * height * 1.5
+          Logger().debug(
+              "[Transcode] First video sample: buffer_len={}, max_len={}, expected_nv12={} "
+              "({}x{}x1.5)",
+              buf_len, max_len, target_width * target_height * 3 / 2, target_width, target_height);
+        }
       }
       std::int64_t adjusted_ts = (timestamp - first_video_timestamp) + time_offset_100ns;
       sample->SetSampleTime(adjusted_ts);
@@ -295,7 +324,24 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
       out_index = audio_out_index;
     }
 
-    sink_writer->WriteSample(out_index, sample.get());
+    hr = sink_writer->WriteSample(out_index, sample.get());
+    if (FAILED(hr)) {
+      // 获取更多调试信息
+      if (is_video) {
+        wil::com_ptr<IMFMediaBuffer> err_buffer;
+        if (SUCCEEDED(sample->GetBufferByIndex(0, err_buffer.put()))) {
+          DWORD buf_len = 0;
+          err_buffer->GetCurrentLength(&buf_len);
+          Logger().error(
+              "[Transcode] WriteSample failed: {:08X}, is_video={}, buffer_len={}, "
+              "expected_nv12={}",
+              static_cast<uint32_t>(hr), is_video, buf_len, target_width * target_height * 3 / 2);
+        }
+      } else {
+        Logger().error("[Transcode] WriteSample (audio) failed: {:08X}", static_cast<uint32_t>(hr));
+      }
+      return std::unexpected(std::format("WriteSample failed: {:08X}", static_cast<uint32_t>(hr)));
+    }
   }
 
   return {};
@@ -380,6 +426,33 @@ auto trim_and_concat(const std::vector<std::filesystem::path>& input_paths,
     }
   }
 
+  // 多段落拼接时强制转码：不同编码器实例生成的 H.264 段落具有不同的 SPS/PPS，
+  // stream copy 模式下 SinkWriter 只识别第一个段落的 codec private data，
+  // 后续段落的压缩样本会被拒绝 (E_UNEXPECTED)。转码模式先解码再编码，避免此问题。
+  size_t files_to_process = input_paths.size() - start_file_index;
+  if (!need_transcode && files_to_process > 1) {
+    need_transcode = true;
+    // 不缩放，使用源分辨率转码
+    Logger().info("Multi-segment concat: forcing transcode mode for {} files", files_to_process);
+    if (!scale_config) {
+      // 从源文件获取帧率和码率
+      UINT32 fps_num = 0, fps_den = 1;
+      MFGetAttributeRatio(video_type.get(), MF_MT_FRAME_RATE, &fps_num, &fps_den);
+      UINT32 bitrate = 0;
+      video_type->GetUINT32(MF_MT_AVG_BITRATE, &bitrate);
+      ScaleConfig auto_config;
+      auto_config.target_short_edge = 0;
+      auto_config.fps = (fps_num > 0) ? fps_num : 30;
+      auto_config.bitrate = (bitrate > 0) ? bitrate : 20'000'000;
+      scale_config = auto_config;
+      Logger().debug("[Transcode] Auto config: fps={}, bitrate={}", auto_config.fps,
+                     auto_config.bitrate);
+    }
+  }
+
+  Logger().debug("[Transcode] Source video: {}x{}, need_transcode={}, target={}x{}", src_width,
+                 src_height, need_transcode, target_width, target_height);
+
   // 检查是否有音频
   bool has_audio = false;
   wil::com_ptr<IMFMediaType> audio_type;
@@ -402,6 +475,8 @@ auto trim_and_concat(const std::vector<std::filesystem::path>& input_paths,
   DWORD audio_out_index = 0;
 
   if (need_transcode) {
+    Logger().debug("[Transcode] Setting up SinkWriter for transcode mode");
+
     // 转码模式：设置输出为 H.264
     wil::com_ptr<IMFMediaType> output_video_type;
     MFCreateMediaType(output_video_type.put());
@@ -413,20 +488,27 @@ auto trim_and_concat(const std::vector<std::filesystem::path>& input_paths,
     MFSetAttributeRatio(output_video_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
     output_video_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
 
+    Logger().debug("[Transcode] SinkWriter output: H.264 {}x{} @ {}fps, {} bps", target_width,
+                   target_height, scale_config->fps, scale_config->bitrate);
+
     hr = sink_writer->AddStream(output_video_type.get(), &video_out_index);
     if (FAILED(hr)) {
       return std::unexpected("Failed to add video stream for transcoding");
     }
 
-    // 输入类型为 RGB32
+    // 输入类型为 NV12（与解码器输出匹配）
     wil::com_ptr<IMFMediaType> input_video_type;
     MFCreateMediaType(input_video_type.put());
     input_video_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-    input_video_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
+    input_video_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
     MFSetAttributeSize(input_video_type.get(), MF_MT_FRAME_SIZE, target_width, target_height);
     MFSetAttributeRatio(input_video_type.get(), MF_MT_FRAME_RATE, scale_config->fps, 1);
     MFSetAttributeRatio(input_video_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
     input_video_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+
+    // NV12 buffer size = width * height * 1.5
+    Logger().debug("[Transcode] SinkWriter input: NV12 {}x{}, expected buffer={} bytes",
+                   target_width, target_height, target_width * target_height * 3 / 2);
 
     hr = sink_writer->SetInputMediaType(video_out_index, input_video_type.get(), nullptr);
     if (FAILED(hr)) {

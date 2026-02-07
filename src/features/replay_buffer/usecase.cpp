@@ -71,9 +71,6 @@ auto build_config(Core::State::AppState& state)
   // Instant Replay 参数
   config.max_duration = rb_settings.duration;
 
-  // rotation_interval 取 max(motion_photo_duration, 10) 以适应即时回放
-  config.rotation_interval = std::max(mp_settings.duration, 10u);
-
   return config;
 }
 
@@ -206,49 +203,49 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
     return std::unexpected("ReplayBuffer is not buffering");
   }
 
-  // 1. 强制轮转以获取最新视频数据
-  auto rotate_result = Features::ReplayBuffer::force_rotate(*state.replay_buffer);
-  if (!rotate_result) {
-    return std::unexpected("Failed to rotate segment: " + rotate_result.error());
-  }
-
-  // 2. 获取最近的段落
+  // 1. 先保存原始 MP4（从环形缓冲导出）
   double duration = static_cast<double>(state.replay_buffer->config.motion_photo_duration);
-  auto segments = Features::ReplayBuffer::get_recent_segments(*state.replay_buffer, duration);
-  if (segments.empty()) {
-    return std::unexpected("No video segments available");
+  auto raw_mp4_path = state.replay_buffer->cache_dir / "motion_photo_raw.mp4";
+
+  auto save_result =
+      Features::ReplayBuffer::save_replay(*state.replay_buffer, duration, raw_mp4_path);
+  if (!save_result) {
+    return std::unexpected("Failed to save raw video: " + save_result.error());
   }
 
-  // 3. 裁剪/拼接视频（带缩放）
-  auto temp_mp4_path = state.replay_buffer->temp_dir / "motion_photo_temp.mp4";
+  // 2. 缩放/转码为 Motion Photo 格式
+  auto temp_mp4_path = state.replay_buffer->cache_dir / "motion_photo_temp.mp4";
 
-  // 构建缩放配置
   const auto& mp_settings = state.settings->raw.features.motion_photo;
   Features::ReplayBuffer::Trimmer::ScaleConfig scale_config;
   scale_config.target_short_edge = mp_settings.resolution;
   scale_config.bitrate = mp_settings.bitrate;
   scale_config.fps = mp_settings.fps;
 
-  auto trim_result = Features::ReplayBuffer::Trimmer::trim_and_concat(segments, temp_mp4_path,
+  // 使用 Trimmer 转码（单文件输入）
+  std::vector<std::filesystem::path> input_files = {raw_mp4_path};
+  auto trim_result = Features::ReplayBuffer::Trimmer::trim_and_concat(input_files, temp_mp4_path,
                                                                       duration, scale_config);
+
+  // 清理原始文件
+  std::error_code ec;
+  std::filesystem::remove(raw_mp4_path, ec);
+
   if (!trim_result) {
-    return std::unexpected("Failed to trim video: " + trim_result.error());
+    return std::unexpected("Failed to transcode video: " + trim_result.error());
   }
 
-  // 4. 生成输出路径：将 .jpg 替换为 MP.jpg
+  // 3. 生成输出路径：将 .jpg 替换为 MP.jpg
   auto output_path =
       jpeg_path.parent_path() / (jpeg_path.stem().string() + "MP" + jpeg_path.extension().string());
 
-  // 5. 合成 Motion Photo
-  // presentation_timestamp 为视频末尾（即截图时刻）
+  // 4. 合成 Motion Photo
   std::int64_t presentation_timestamp_us = static_cast<std::int64_t>(duration * 1'000'000);
   auto mp_result = Features::ReplayBuffer::MotionPhoto::create_motion_photo(
       jpeg_path, temp_mp4_path, output_path, presentation_timestamp_us);
 
-  // 6. 清理临时文件
-  std::error_code ec;
+  // 5. 清理临时文件
   std::filesystem::remove(temp_mp4_path, ec);
-  // 删除原始 JPEG（Motion Photo 包含了图片数据）
   std::filesystem::remove(jpeg_path, ec);
 
   if (!mp_result) {
@@ -270,20 +267,7 @@ auto save_replay(Core::State::AppState& state)
     return std::unexpected("ReplayBuffer is not buffering");
   }
 
-  // 1. 强制轮转
-  auto rotate_result = Features::ReplayBuffer::force_rotate(*state.replay_buffer);
-  if (!rotate_result) {
-    return std::unexpected("Failed to rotate segment: " + rotate_result.error());
-  }
-
-  // 2. 获取段落
-  double duration = static_cast<double>(state.replay_buffer->config.max_duration);
-  auto segments = Features::ReplayBuffer::get_recent_segments(*state.replay_buffer, duration);
-  if (segments.empty()) {
-    return std::unexpected("No video segments available");
-  }
-
-  // 3. 生成输出路径
+  // 1. 生成输出路径
   std::filesystem::path output_dir;
   const auto& output_dir_path = state.settings->raw.features.output_dir_path;
 
@@ -311,11 +295,12 @@ auto save_replay(Core::State::AppState& state)
   auto filename = std::format("replay_{:%Y%m%d_%H%M%S}.mp4", now);
   auto output_path = output_dir / filename;
 
-  // 4. 裁剪/拼接
-  auto trim_result =
-      Features::ReplayBuffer::Trimmer::trim_and_concat(segments, output_path, duration);
-  if (!trim_result) {
-    return std::unexpected("Failed to save replay: " + trim_result.error());
+  // 2. 直接从环形缓冲导出（stream copy，无转码）
+  double duration = static_cast<double>(state.replay_buffer->config.max_duration);
+  auto save_result =
+      Features::ReplayBuffer::save_replay(*state.replay_buffer, duration, output_path);
+  if (!save_result) {
+    return std::unexpected("Failed to save replay: " + save_result.error());
   }
 
   Logger().info("Replay saved: {}", output_path.string());

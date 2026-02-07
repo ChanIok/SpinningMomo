@@ -30,8 +30,7 @@ export struct ReplayBufferConfig {
   std::uint32_t audio_bitrate = 256'000;  // 音频码率
 
   // 即时回放参数
-  std::uint32_t max_duration = 30;       // 即时回放最大时长（秒）
-  std::uint32_t rotation_interval = 10;  // 文件轮转间隔（秒）
+  std::uint32_t max_duration = 30;  // 即时回放最大时长（秒）
 
   // Motion Photo 参数
   std::uint32_t motion_photo_duration = 3;       // Motion Photo 视频时长（秒）

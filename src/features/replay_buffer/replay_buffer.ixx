@@ -5,6 +5,8 @@ export module Features.ReplayBuffer;
 import std;
 import Features.ReplayBuffer.Types;
 import Features.ReplayBuffer.State;
+import Features.ReplayBuffer.DiskRingBuffer;
+import Features.ReplayBuffer.Muxer;
 import <windows.h>;
 
 export namespace Features::ReplayBuffer {
@@ -21,13 +23,14 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
 // 停止缓冲
 auto stop_buffering(Features::ReplayBuffer::State::ReplayBufferState& state) -> void;
 
-// 强制轮转当前段落（截图时调用，获取最新视频数据）
-auto force_rotate(Features::ReplayBuffer::State::ReplayBufferState& state)
-    -> std::expected<void, std::string>;
+// 获取最近 N 秒的帧元数据（从关键帧开始）
+auto get_recent_frames(const Features::ReplayBuffer::State::ReplayBufferState& state,
+                       double duration_seconds)
+    -> std::expected<std::vector<DiskRingBuffer::FrameMetadata>, std::string>;
 
-// 获取最近的已完成段落路径（用于 Motion Photo / Replay）
-auto get_recent_segments(const Features::ReplayBuffer::State::ReplayBufferState& state,
-                         double duration_seconds) -> std::vector<std::filesystem::path>;
+// 保存最近 N 秒到 MP4 文件
+auto save_replay(Features::ReplayBuffer::State::ReplayBufferState& state, double duration_seconds,
+                 const std::filesystem::path& output_path) -> std::expected<void, std::string>;
 
 // 清理资源
 auto cleanup(Features::ReplayBuffer::State::ReplayBufferState& state) -> void;
