@@ -8,6 +8,7 @@ import Features.ReplayBuffer;
 import Features.ReplayBuffer.Types;
 import Features.ReplayBuffer.State;
 import Features.ReplayBuffer.MotionPhoto;
+import Features.ReplayBuffer.Trimmer;
 import Features.Recording.State;
 import Features.Recording.Types;
 import Features.Settings;
@@ -207,9 +208,30 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
     return std::unexpected("Failed to save raw video: " + save_result.error());
   }
 
-  // 2. 直接使用 raw MP4（已经是压缩的 H.264 stream copy）
-  // 如果未来需要缩放，可在此处添加 Trimmer 调用
+  // 2. 根据 motion_photo_resolution 决定是否缩放
+  const auto& mp_settings = state.settings->raw.features.motion_photo;
   auto mp4_for_merge = raw_mp4_path;
+  std::filesystem::path scaled_mp4_path;
+
+  if (mp_settings.resolution > 0) {
+    scaled_mp4_path =
+        state.replay_buffer->cache_dir / std::format("motion_photo_scaled_{}.mp4", unique_suffix);
+
+    Features::ReplayBuffer::Trimmer::ScaleConfig scale_cfg{
+        .target_short_edge = mp_settings.resolution,
+        .bitrate = mp_settings.bitrate,
+        .fps = mp_settings.fps,
+    };
+
+    auto scale_result =
+        Features::ReplayBuffer::Trimmer::scale_video(raw_mp4_path, scaled_mp4_path, scale_cfg);
+    if (scale_result) {
+      mp4_for_merge = scaled_mp4_path;
+    } else {
+      // 缩放失败，回退到原始 MP4
+      Logger().warn("Failed to scale video, using raw: {}", scale_result.error());
+    }
+  }
 
   // 3. 生成输出路径：将 .jpg 替换为 MP.jpg
   auto output_path =
@@ -223,6 +245,9 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
   // 5. 清理临时文件
   std::error_code ec;
   std::filesystem::remove(raw_mp4_path, ec);
+  if (!scaled_mp4_path.empty()) {
+    std::filesystem::remove(scaled_mp4_path, ec);
+  }
   std::filesystem::remove(jpeg_path, ec);
 
   if (!mp_result) {
