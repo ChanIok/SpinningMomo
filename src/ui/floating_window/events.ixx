@@ -86,4 +86,12 @@ export struct WindowSelectionEvent {
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
 
+// 通知事件（用于跨线程安全地显示通知）
+export struct NotificationEvent {
+  std::string title;
+  std::string message;
+
+  std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
+};
+
 }  // namespace UI::FloatingWindow::Events

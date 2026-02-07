@@ -130,8 +130,6 @@ auto append_frame(DiskRingBufferContext& ctx, const BYTE* data, std::uint32_t si
   if (!ctx.data_file.good()) {
     return std::unexpected("Failed to write frame data to disk");
   }
-  ctx.data_file.flush();
-
   // 4. 记录元数据
   FrameMetadata meta;
   meta.file_offset = ctx.write_position;
@@ -223,6 +221,65 @@ auto read_frame(const DiskRingBufferContext& ctx, const FrameMetadata& meta)
   }
 
   return out_buffer;
+}
+
+auto read_frames_bulk(const DiskRingBufferContext& ctx, const std::vector<FrameMetadata>& frames)
+    -> std::expected<std::vector<std::vector<std::uint8_t>>, std::string> {
+  std::lock_guard lock(ctx.mutex);
+
+  if (!ctx.data_file.is_open()) {
+    return std::unexpected("Data file not open");
+  }
+
+  std::vector<std::vector<std::uint8_t>> result;
+  result.reserve(frames.size());
+
+  for (const auto& meta : frames) {
+    std::vector<std::uint8_t> buffer(meta.size);
+    ctx.data_file.seekg(meta.file_offset);
+    ctx.data_file.read(reinterpret_cast<char*>(buffer.data()), meta.size);
+
+    if (!ctx.data_file.good()) {
+      // 清除错误状态并继续
+      ctx.data_file.clear();
+      Logger().warn("Failed to read frame at offset {}", meta.file_offset);
+      result.emplace_back();  // 空数据占位
+    } else {
+      result.push_back(std::move(buffer));
+    }
+  }
+
+  return result;
+}
+
+auto read_frames_unlocked(const std::filesystem::path& data_file_path,
+                          const std::vector<FrameMetadata>& frames)
+    -> std::expected<std::vector<std::vector<std::uint8_t>>, std::string> {
+  // 使用独立文件句柄读取，完全不需要获取 mutex
+  // Windows 允许多个线程同时以只读模式打开同一个文件
+  std::ifstream reader(data_file_path, std::ios::binary);
+  if (!reader.is_open()) {
+    return std::unexpected("Failed to open data file for reading: " + data_file_path.string());
+  }
+
+  std::vector<std::vector<std::uint8_t>> result;
+  result.reserve(frames.size());
+
+  for (const auto& meta : frames) {
+    std::vector<std::uint8_t> buffer(meta.size);
+    reader.seekg(meta.file_offset);
+    reader.read(reinterpret_cast<char*>(buffer.data()), meta.size);
+
+    if (!reader.good()) {
+      reader.clear();
+      Logger().warn("Failed to read frame at offset {} (unlocked)", meta.file_offset);
+      result.emplace_back();  // 空数据占位
+    } else {
+      result.push_back(std::move(buffer));
+    }
+  }
+
+  return result;
 }
 
 auto cleanup(DiskRingBufferContext& ctx) -> void {

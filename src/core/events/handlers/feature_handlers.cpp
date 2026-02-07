@@ -9,6 +9,7 @@ import UI.FloatingWindow;
 import UI.FloatingWindow.Events;
 import Features.Screenshot.UseCase;
 import Features.WindowControl.UseCase;
+import Features.Notifications;
 
 namespace Core::Events::Handlers {
 
@@ -43,6 +44,13 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
       *app_state.events,
       [&app_state](const UI::FloatingWindow::Events::WindowSelectionEvent& event) {
         Features::WindowControl::UseCase::handle_window_selected(app_state, event);
+      });
+
+  // === 通知功能 ===
+  // 跨线程安全的通知显示（由 WorkerPool 等工作线程 post 事件，UI 线程处理）
+  subscribe<UI::FloatingWindow::Events::NotificationEvent>(
+      *app_state.events, [&app_state](const UI::FloatingWindow::Events::NotificationEvent& event) {
+        Features::Notifications::show_notification(app_state, event.title, event.message);
       });
 }
 

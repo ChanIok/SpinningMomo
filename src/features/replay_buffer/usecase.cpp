@@ -7,7 +7,6 @@ import Core.State;
 import Features.ReplayBuffer;
 import Features.ReplayBuffer.Types;
 import Features.ReplayBuffer.State;
-import Features.ReplayBuffer.Trimmer;
 import Features.ReplayBuffer.MotionPhoto;
 import Features.Recording.State;
 import Features.Recording.Types;
@@ -204,8 +203,11 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
   }
 
   // 1. 先保存原始 MP4（从环形缓冲导出）
+  // 使用时间戳生成唯一文件名，避免多个并发任务冲突
   double duration = static_cast<double>(state.replay_buffer->config.motion_photo_duration);
-  auto raw_mp4_path = state.replay_buffer->cache_dir / "motion_photo_raw.mp4";
+  auto unique_suffix = std::chrono::steady_clock::now().time_since_epoch().count();
+  auto raw_mp4_path =
+      state.replay_buffer->cache_dir / std::format("motion_photo_raw_{}.mp4", unique_suffix);
 
   auto save_result =
       Features::ReplayBuffer::save_replay(*state.replay_buffer, duration, raw_mp4_path);
@@ -213,27 +215,9 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
     return std::unexpected("Failed to save raw video: " + save_result.error());
   }
 
-  // 2. 缩放/转码为 Motion Photo 格式
-  auto temp_mp4_path = state.replay_buffer->cache_dir / "motion_photo_temp.mp4";
-
-  const auto& mp_settings = state.settings->raw.features.motion_photo;
-  Features::ReplayBuffer::Trimmer::ScaleConfig scale_config;
-  scale_config.target_short_edge = mp_settings.resolution;
-  scale_config.bitrate = mp_settings.bitrate;
-  scale_config.fps = mp_settings.fps;
-
-  // 使用 Trimmer 转码（单文件输入）
-  std::vector<std::filesystem::path> input_files = {raw_mp4_path};
-  auto trim_result = Features::ReplayBuffer::Trimmer::trim_and_concat(input_files, temp_mp4_path,
-                                                                      duration, scale_config);
-
-  // 清理原始文件
-  std::error_code ec;
-  std::filesystem::remove(raw_mp4_path, ec);
-
-  if (!trim_result) {
-    return std::unexpected("Failed to transcode video: " + trim_result.error());
-  }
+  // 2. 直接使用 raw MP4（已经是压缩的 H.264 stream copy）
+  // 如果未来需要缩放，可在此处添加 Trimmer 调用
+  auto mp4_for_merge = raw_mp4_path;
 
   // 3. 生成输出路径：将 .jpg 替换为 MP.jpg
   auto output_path =
@@ -242,10 +226,11 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
   // 4. 合成 Motion Photo
   std::int64_t presentation_timestamp_us = static_cast<std::int64_t>(duration * 1'000'000);
   auto mp_result = Features::ReplayBuffer::MotionPhoto::create_motion_photo(
-      jpeg_path, temp_mp4_path, output_path, presentation_timestamp_us);
+      jpeg_path, mp4_for_merge, output_path, presentation_timestamp_us);
 
   // 5. 清理临时文件
-  std::filesystem::remove(temp_mp4_path, ec);
+  std::error_code ec;
+  std::filesystem::remove(raw_mp4_path, ec);
   std::filesystem::remove(jpeg_path, ec);
 
   if (!mp_result) {

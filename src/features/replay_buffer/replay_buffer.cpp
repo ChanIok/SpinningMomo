@@ -246,9 +246,9 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
                                                                      buffer_size, timestamp_100ns);
 
           if (result && result->has_value()) {
-            {
-              auto append_result =
-                  DiskRingBuffer::append_encoded_frame(state.ring_buffer, result->value());
+            auto append_result =
+                DiskRingBuffer::append_encoded_frame(state.ring_buffer, result->value());
+            if (!append_result) {
               Logger().warn("Failed to append audio frame: {}", append_result.error());
             }
           }
@@ -326,12 +326,12 @@ auto save_replay(Features::ReplayBuffer::State::ReplayBufferState& state, double
     return std::unexpected("No frames available for replay");
   }
 
-  // 使用 Muxer 保存为 MP4
+  // 使用 Muxer 保存为 MP4（传入文件路径以使用无锁读取）
   auto video_type = state.ring_buffer.video_media_type.get();
   auto audio_type = state.ring_buffer.audio_media_type.get();
 
-  return Muxer::mux_frames_to_mp4(*frames_result, state.ring_buffer, video_type, audio_type,
-                                  output_path);
+  return Muxer::mux_frames_to_mp4(*frames_result, state.ring_buffer.data_file_path, video_type,
+                                  audio_type, output_path);
 }
 
 auto cleanup(Features::ReplayBuffer::State::ReplayBufferState& state) -> void {

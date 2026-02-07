@@ -196,7 +196,8 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
   wil::com_ptr<IMFAttributes> reader_attrs;
   MFCreateAttributes(reader_attrs.put(), 2);
   reader_attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
-  reader_attrs->SetUINT32(MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING, TRUE);
+  // ADVANCED 版本支持解码 + 缩放 + 格式转换（普通版本只支持格式转换）
+  reader_attrs->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE);
 
   wil::com_ptr<IMFSourceReader> reader;
   HRESULT hr = MFCreateSourceReaderFromURL(input_path.c_str(), reader_attrs.get(), reader.put());
@@ -211,6 +212,7 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
   MFCreateMediaType(video_decode_type.put());
   video_decode_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
   video_decode_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
+  MFSetAttributeSize(video_decode_type.get(), MF_MT_FRAME_SIZE, target_width, target_height);
   hr = reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr,
                                    video_decode_type.get());
   if (FAILED(hr)) {
@@ -221,6 +223,7 @@ auto process_input_file_transcode(const std::filesystem::path& input_path,
     MFCreateMediaType(video_decode_type.put());
     video_decode_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
     video_decode_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
+    MFSetAttributeSize(video_decode_type.get(), MF_MT_FRAME_SIZE, target_width, target_height);
     hr = reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr,
                                      video_decode_type.get());
     if (FAILED(hr)) {
@@ -463,9 +466,13 @@ auto trim_and_concat(const std::vector<std::filesystem::path>& input_paths,
 
   probe_reader = nullptr;  // 释放
 
-  // 创建 SinkWriter
+  // 创建 SinkWriter（启用硬件变换以支持自动缩放）
+  wil::com_ptr<IMFAttributes> sink_attrs;
+  MFCreateAttributes(sink_attrs.put(), 1);
+  sink_attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
+
   wil::com_ptr<IMFSinkWriter> sink_writer;
-  hr = MFCreateSinkWriterFromURL(output_path.c_str(), nullptr, nullptr, sink_writer.put());
+  hr = MFCreateSinkWriterFromURL(output_path.c_str(), nullptr, sink_attrs.get(), sink_writer.put());
   if (FAILED(hr)) {
     return std::unexpected(
         std::format("Failed to create sink writer: {:08X}", static_cast<uint32_t>(hr)));
@@ -496,7 +503,7 @@ auto trim_and_concat(const std::vector<std::filesystem::path>& input_paths,
       return std::unexpected("Failed to add video stream for transcoding");
     }
 
-    // 输入类型为 NV12（与解码器输出匹配）
+    // 输入类型为 NV12（目标分辨率，SourceReader 已通过 ADVANCED_VIDEO_PROCESSING 完成缩放）
     wil::com_ptr<IMFMediaType> input_video_type;
     MFCreateMediaType(input_video_type.put());
     input_video_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);

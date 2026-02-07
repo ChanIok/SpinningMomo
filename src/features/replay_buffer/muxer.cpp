@@ -17,9 +17,8 @@ namespace Features::ReplayBuffer::Muxer {
 
 auto mux_frames_to_mp4(
     const std::vector<Features::ReplayBuffer::DiskRingBuffer::FrameMetadata>& frames,
-    Features::ReplayBuffer::DiskRingBuffer::DiskRingBufferContext& ring_buffer,
-    IMFMediaType* video_type, IMFMediaType* audio_type, const std::filesystem::path& output_path)
-    -> std::expected<void, std::string> {
+    const std::filesystem::path& data_file_path, IMFMediaType* video_type, IMFMediaType* audio_type,
+    const std::filesystem::path& output_path) -> std::expected<void, std::string> {
   if (frames.empty()) {
     return std::unexpected("No frames to mux");
   }
@@ -102,15 +101,23 @@ auto mux_frames_to_mp4(
     }
   }
 
-  // 7. 写入所有帧
+  // 7. 无锁批量读取所有帧数据（使用独立文件句柄，避免与编码线程竞争锁）
+  auto bulk_result = DiskRingBuffer::read_frames_unlocked(data_file_path, frames);
+  if (!bulk_result) {
+    return std::unexpected("Failed to bulk read frame data: " + bulk_result.error());
+  }
+  auto& all_frame_data = *bulk_result;
+
+  // 8. 写入所有帧（此时不再访问 ring_buffer）
   std::uint32_t video_count = 0;
   std::uint32_t audio_count = 0;
 
-  for (const auto& frame : frames) {
-    // 从磁盘读取帧数据
-    auto frame_data = DiskRingBuffer::read_frame(ring_buffer, frame);
-    if (!frame_data) {
-      Logger().warn("Failed to read frame data: {}", frame_data.error());
+  for (size_t i = 0; i < frames.size(); ++i) {
+    const auto& frame = frames[i];
+    const auto& frame_data = all_frame_data[i];
+
+    // 跳过读取失败的帧
+    if (frame_data.empty()) {
       continue;
     }
 
@@ -124,7 +131,7 @@ auto mux_frames_to_mp4(
 
     // 创建 buffer
     wil::com_ptr<IMFMediaBuffer> buffer;
-    hr = MFCreateMemoryBuffer(static_cast<DWORD>(frame_data->size()), buffer.put());
+    hr = MFCreateMemoryBuffer(static_cast<DWORD>(frame_data.size()), buffer.put());
     if (FAILED(hr)) {
       Logger().warn("Failed to create buffer");
       continue;
@@ -134,9 +141,9 @@ auto mux_frames_to_mp4(
     BYTE* dest = nullptr;
     hr = buffer->Lock(&dest, nullptr, nullptr);
     if (SUCCEEDED(hr)) {
-      std::memcpy(dest, frame_data->data(), frame_data->size());
+      std::memcpy(dest, frame_data.data(), frame_data.size());
       buffer->Unlock();
-      buffer->SetCurrentLength(static_cast<DWORD>(frame_data->size()));
+      buffer->SetCurrentLength(static_cast<DWORD>(frame_data.size()));
     } else {
       Logger().warn("Failed to lock buffer");
       continue;
@@ -181,7 +188,7 @@ auto mux_frames_to_mp4(
     }
   }
 
-  // 8. 完成写入
+  // 9. 完成写入
   hr = sink_writer->Finalize();
   if (FAILED(hr)) {
     return std::unexpected("Failed to finalize: " + std::to_string(hr));

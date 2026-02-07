@@ -69,6 +69,16 @@ auto get_recent_frames(const DiskRingBufferContext& ctx, double duration_seconds
 auto read_frame(const DiskRingBufferContext& ctx, const FrameMetadata& meta)
     -> std::expected<std::vector<std::uint8_t>, std::string>;
 
+// 批量读取多帧数据（一次加锁，减少锁竞争）
+auto read_frames_bulk(const DiskRingBufferContext& ctx, const std::vector<FrameMetadata>& frames)
+    -> std::expected<std::vector<std::vector<std::uint8_t>>, std::string>;
+
+// 无锁批量读取多帧数据（使用独立文件句柄，避免与编码线程竞争锁）
+// 注意：调用者应确保帧数据在读取期间不会被覆盖（2GB缓冲区足够大，正常使用不会出问题）
+auto read_frames_unlocked(const std::filesystem::path& data_file_path,
+                          const std::vector<FrameMetadata>& frames)
+    -> std::expected<std::vector<std::vector<std::uint8_t>>, std::string>;
+
 // 清理资源并删除缓存文件
 auto cleanup(DiskRingBufferContext& ctx) -> void;
 

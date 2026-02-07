@@ -412,13 +412,18 @@ auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_d
     // 设置帧尺寸
     THROW_IF_FAILED(frame->SetSize(width, height));
 
-    // 设置像素格式
+    // 用原始像素数据创建 WIC 位图（声明为 32bppBGRA）
+    wil::com_ptr<IWICBitmap> bitmap;
+    THROW_IF_FAILED(factory->CreateBitmapFromMemory(width, height, GUID_WICPixelFormat32bppBGRA,
+                                                    row_pitch, row_pitch * height,
+                                                    const_cast<BYTE*>(pixel_data), bitmap.put()));
+
+    // 设置像素格式（让编码器协商：JPEG→24bppBGR, PNG→32bppBGRA）
     WICPixelFormatGUID pixel_format = GUID_WICPixelFormat32bppBGRA;
     THROW_IF_FAILED(frame->SetPixelFormat(&pixel_format));
 
-    // 写入像素数据
-    THROW_IF_FAILED(
-        frame->WritePixels(height, row_pitch, row_pitch * height, const_cast<BYTE*>(pixel_data)));
+    // WriteSource 自动将 32bppBGRA 转换为编码器协商的格式
+    THROW_IF_FAILED(frame->WriteSource(bitmap.get(), nullptr));
 
     // 提交帧
     THROW_IF_FAILED(frame->Commit());
