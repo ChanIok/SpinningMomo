@@ -18,6 +18,8 @@ import Features.WindowControl;
 import Features.Notifications;
 import Features.Overlay;
 import Features.Overlay.State;
+import Features.Preview;
+import Features.Preview.State;
 import Features.Overlay.Geometry;
 import Features.Overlay.Interaction;
 import Utils.Logger;

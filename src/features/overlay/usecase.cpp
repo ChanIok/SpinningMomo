@@ -6,6 +6,8 @@ import std;
 import Core.State;
 import Core.I18n.State;
 import Features.Overlay;
+import Features.Preview;
+import Features.Preview.State;
 import Features.Letterbox;
 import Features.Letterbox.State;
 import Features.Settings.State;
@@ -26,6 +28,13 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
 
   if (!is_enabled) {
     // 用户想启用叠加层
+    // 预览窗与叠加层互斥，若预览窗运行则先关闭
+    if (state.preview && state.preview->running) {
+      Features::Preview::stop_preview(state);
+      Features::Notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.preview_overlay_conflict"]);
+    }
     // 如果启用了黑边模式，关闭黑边窗口
     if (state.letterbox->enabled) {
       if (auto result = Features::Letterbox::shutdown(state); !result) {
