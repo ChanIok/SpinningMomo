@@ -85,6 +85,12 @@ auto initialize_process_loopback(Features::Recording::State::AudioCaptureContext
                                  std::uint32_t process_id) -> std::expected<void, std::string> {
   HRESULT hr;
 
+  // 0. 创建 WASAPI 缓冲就绪事件
+  ctx.audio_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!ctx.audio_event) {
+    return std::unexpected("Failed to create audio event for process loopback");
+  }
+
   // 1. 构造激活参数
   AUDIOCLIENT_ACTIVATION_PARAMS activation_params = {};
   activation_params.ActivationType = AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;
@@ -140,15 +146,23 @@ auto initialize_process_loopback(Features::Recording::State::AudioCaptureContext
                 ctx.wave_format->nSamplesPerSec, ctx.wave_format->nChannels,
                 ctx.wave_format->wBitsPerSample);
 
-  // 7. 初始化（带自动格式转换）
+  // 7. 初始化（带自动格式转换 + 事件回调）
   REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms 缓冲
-  hr = ctx.audio_client->Initialize(
-      AUDCLNT_SHAREMODE_SHARED,
-      AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM,  // 自动转换
-      buffer_duration, 0, ctx.wave_format, nullptr);
+  hr = ctx.audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED,
+                                    AUDCLNT_STREAMFLAGS_LOOPBACK |
+                                        AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
+                                        AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                                    buffer_duration, 0, ctx.wave_format, nullptr);
   if (FAILED(hr)) {
     return std::unexpected(
         std::format("Failed to initialize audio client: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  // 7.5. 绑定事件句柄
+  hr = ctx.audio_client->SetEventHandle(ctx.audio_event);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to set audio event handle: {:08X}", static_cast<uint32_t>(hr)));
   }
 
   // 8. 获取捕获客户端
@@ -190,8 +204,12 @@ auto audio_capture_loop(Features::Recording::State::RecordingState& state) -> vo
   Logger().info("Audio capture thread started");
 
   while (!audio.should_stop.load()) {
-    // 等待数据可用
-    Sleep(10);
+    // 等待 WASAPI 缓冲就绪事件（100ms 超时兜底，避免停止信号丢失时死等）
+    if (audio.audio_event) {
+      WaitForSingleObject(audio.audio_event, 100);
+    } else {
+      Sleep(10);  // 回退：事件未创建时保持原行为
+    }
 
     // 获取可用帧数
     UINT32 packet_length = 0;
@@ -285,10 +303,16 @@ auto audio_capture_loop(Features::Recording::State::RecordingState& state) -> vo
   Logger().info("Audio capture thread stopped");
 }
 
-// System Loopback 初始化（原 initialize 函数）
+// System Loopback 初始化
 auto initialize_system_loopback(Features::Recording::State::AudioCaptureContext& ctx)
     -> std::expected<void, std::string> {
   HRESULT hr;
+
+  // 0. 创建 WASAPI 缓冲就绪事件
+  ctx.audio_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!ctx.audio_event) {
+    return std::unexpected("Failed to create audio event for system loopback");
+  }
 
   // 1. 创建设备枚举器
   wil::com_ptr<IMMDeviceEnumerator> enumerator;
@@ -376,14 +400,21 @@ auto initialize_system_loopback(Features::Recording::State::AudioCaptureContext&
   Logger().info("Final audio format: {} Hz, {} channels, {} bits", ctx.wave_format->nSamplesPerSec,
                 ctx.wave_format->nChannels, ctx.wave_format->wBitsPerSample);
 
-  // 7. 以 Loopback 模式初始化
+  // 7. 以 Loopback + 事件回调模式初始化
   REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms 缓冲（100ns 单位）
-  hr = ctx.audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED,
-                                    AUDCLNT_STREAMFLAGS_LOOPBACK,  // Loopback 模式
-                                    buffer_duration, 0, format_to_use, nullptr);
+  hr = ctx.audio_client->Initialize(
+      AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+      buffer_duration, 0, format_to_use, nullptr);
   if (FAILED(hr)) {
     return std::unexpected(
         std::format("Failed to initialize audio client: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  // 7.5. 绑定事件句柄
+  hr = ctx.audio_client->SetEventHandle(ctx.audio_event);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to set audio event handle: {:08X}", static_cast<uint32_t>(hr)));
   }
 
   // 8. 获取捕获客户端
@@ -461,6 +492,12 @@ auto cleanup(Features::Recording::State::AudioCaptureContext& ctx) -> void {
   if (ctx.wave_format) {
     CoTaskMemFree(ctx.wave_format);
     ctx.wave_format = nullptr;
+  }
+
+  // 释放音频事件
+  if (ctx.audio_event) {
+    CloseHandle(ctx.audio_event);
+    ctx.audio_event = nullptr;
   }
 
   ctx.buffer_frame_count = 0;

@@ -79,25 +79,23 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   }
 
   // 缓存当前帧作为下一次填充的参考
-  // 只有当纹理不同时才更新（避免不必要的复制）
-  if (!state.last_encoded_texture || state.last_encoded_texture.get() != texture.get()) {
-    // 创建一个新的纹理副本用于缓存
-    if (!state.last_encoded_texture) {
-      D3D11_TEXTURE2D_DESC desc;
-      texture->GetDesc(&desc);
-      desc.BindFlags = 0;
-      desc.MiscFlags = 0;
-      desc.Usage = D3D11_USAGE_DEFAULT;
-      desc.CPUAccessFlags = 0;
+  // 首次调用时创建缓存纹理
+  if (!state.last_encoded_texture) {
+    D3D11_TEXTURE2D_DESC desc;
+    texture->GetDesc(&desc);
+    desc.BindFlags = 0;
+    desc.MiscFlags = 0;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.CPUAccessFlags = 0;
 
-      if (FAILED(state.device->CreateTexture2D(&desc, nullptr, state.last_encoded_texture.put()))) {
-        Logger().error("Failed to create texture for frame caching");
-        return;
-      }
+    if (FAILED(state.device->CreateTexture2D(&desc, nullptr, state.last_encoded_texture.put()))) {
+      Logger().error("Failed to create texture for frame caching");
+      return;
     }
-
-    state.context->CopyResource(state.last_encoded_texture.get(), texture.get());
   }
+
+  // 每帧都更新缓存（WGC 帧池会复用纹理，指针比较不可靠）
+  state.context->CopyResource(state.last_encoded_texture.get(), texture.get());
 }
 
 auto start(Features::Recording::State::RecordingState& state, HWND target_window,

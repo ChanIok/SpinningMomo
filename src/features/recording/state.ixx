@@ -25,6 +25,7 @@ struct AudioCaptureContext {
   WAVEFORMATEX* wave_format = nullptr;  // 音频格式
   UINT32 buffer_frame_count = 0;        // 缓冲区帧数
 
+  HANDLE audio_event = nullptr;           // WASAPI 缓冲就绪事件
   std::jthread capture_thread;            // 捕获线程
   std::atomic<bool> should_stop = false;  // 停止信号
 };

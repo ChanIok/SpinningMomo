@@ -35,6 +35,23 @@ auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uin
   if (FAILED(MFSetAttributeSize(media_type.get(), MF_MT_FRAME_SIZE, width, height))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_FRAME_RATE, fps, 1))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1))) return nullptr;
+
+  // 颜色元数据 (BT.709 标准，与 NVIDIA APP / OBS 一致)
+  media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709);
+  media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709);
+  media_type->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT709);
+  media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235);  // TV / Limited Range
+
+  // 编码 Profile (H.264 High / H.265 Main，与 NVIDIA APP / OBS 一致)
+  if (codec == Features::Recording::Types::VideoCodec::H265) {
+    media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH265VProfile_Main_420_8);
+  } else {
+    media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High);
+  }
+
+  // 关键帧间隔 (每 2 秒一个关键帧，便于拖动进度条定位)
+  media_type->SetUINT32(MF_MT_MAX_KEYFRAME_SPACING, fps * 2);
+
   return media_type;
 }
 
@@ -57,6 +74,12 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
 
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_FRAME_RATE, fps, 1))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1))) return nullptr;
+
+  // 输入颜色信息：屏幕捕获是 Full Range RGB，告知编码器以正确执行 RGB→YUV 转换
+  media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709);
+  media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709);
+  media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_0_255);  // Full Range (屏幕捕获)
+
   return media_type;
 }
 
