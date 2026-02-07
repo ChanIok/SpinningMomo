@@ -5,28 +5,13 @@ export module Features.Recording.State;
 import std;
 import Features.Recording.Types;
 import Utils.Graphics.Capture;
+import Utils.Media.AudioCapture;
 import Utils.Media.Encoder.State;
-import <audioclient.h>;
 import <d3d11.h>;
-import <mmdeviceapi.h>;
 import <wil/com.h>;
 import <windows.h>;
 
 export namespace Features::Recording::State {
-
-// 音频捕获上下文
-struct AudioCaptureContext {
-  wil::com_ptr<IMMDevice> device;                    // 音频设备
-  wil::com_ptr<IAudioClient> audio_client;           // 音频客户端
-  wil::com_ptr<IAudioCaptureClient> capture_client;  // 捕获客户端
-
-  WAVEFORMATEX* wave_format = nullptr;  // 音频格式
-  UINT32 buffer_frame_count = 0;        // 缓冲区帧数
-
-  HANDLE audio_event = nullptr;           // WASAPI 缓冲就绪事件
-  std::jthread capture_thread;            // 捕获线程
-  std::atomic<bool> should_stop = false;  // 停止信号
-};
 
 // 录制完整状态
 struct RecordingState {
@@ -56,8 +41,8 @@ struct RecordingState {
   // 目标窗口信息
   HWND target_window = nullptr;
 
-  // 音频捕获
-  AudioCaptureContext audio;
+  // 音频捕获（使用共享音频捕获模块）
+  Utils::Media::AudioCapture::AudioCaptureContext audio;
 
   // 线程同步
   // encoder_write_mutex: 保护 sink_writer 的写入操作（视频帧回调和音频线程共享）

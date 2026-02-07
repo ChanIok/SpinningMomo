@@ -65,6 +65,125 @@ export const useFunctionActions = () => {
     })
   }
 
+  // Motion Photo 设置
+  const updateMotionPhotoEnabled = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          enabled,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoDuration = async (duration: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          duration,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoResolution = async (resolution: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          resolution,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoFps = async (fps: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          fps,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoBitrate = async (bitrate: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          bitrate,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoCodec = async (codec: 'h264' | 'h265') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          codec,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoAudioSource = async (audioSource: 'none' | 'system' | 'game_only') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          audioSource,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoAudioBitrate = async (audioBitrate: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          audioBitrate,
+        },
+      },
+    })
+  }
+
+  // Instant Replay 设置
+  const updateReplayBufferDuration = async (duration: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        replayBuffer: {
+          ...appSettings.value.features.replayBuffer,
+          duration,
+        },
+      },
+    })
+  }
+
   const updateRecordingFps = async (fps: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -204,6 +323,21 @@ export const useFunctionActions = () => {
           ...appSettings.value.features.letterbox,
           enabled: DEFAULT_APP_SETTINGS.features.letterbox.enabled,
         },
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          enabled: DEFAULT_APP_SETTINGS.features.motionPhoto.enabled,
+          duration: DEFAULT_APP_SETTINGS.features.motionPhoto.duration,
+          resolution: DEFAULT_APP_SETTINGS.features.motionPhoto.resolution,
+          fps: DEFAULT_APP_SETTINGS.features.motionPhoto.fps,
+          bitrate: DEFAULT_APP_SETTINGS.features.motionPhoto.bitrate,
+          codec: DEFAULT_APP_SETTINGS.features.motionPhoto.codec,
+          audioSource: DEFAULT_APP_SETTINGS.features.motionPhoto.audioSource,
+          audioBitrate: DEFAULT_APP_SETTINGS.features.motionPhoto.audioBitrate,
+        },
+        replayBuffer: {
+          ...appSettings.value.features.replayBuffer,
+          duration: DEFAULT_APP_SETTINGS.features.replayBuffer.duration,
+        },
         recording: {
           ...appSettings.value.features.recording,
           fps: DEFAULT_APP_SETTINGS.features.recording.fps,
@@ -226,6 +360,18 @@ export const useFunctionActions = () => {
     updateGameAlbumPath,
     updateTaskbarLowerOnResize,
     updateLetterboxEnabled,
+    // Motion Photo
+    updateMotionPhotoEnabled,
+    updateMotionPhotoDuration,
+    updateMotionPhotoResolution,
+    updateMotionPhotoFps,
+    updateMotionPhotoBitrate,
+    updateMotionPhotoCodec,
+    updateMotionPhotoAudioSource,
+    updateMotionPhotoAudioBitrate,
+    // Instant Replay
+    updateReplayBufferDuration,
+    // Recording
     updateRecordingFps,
     updateRecordingBitrate,
     updateRecordingQuality,

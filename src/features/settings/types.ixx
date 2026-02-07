@@ -80,6 +80,25 @@ export struct AppSettings {
       bool enabled = false;  // 是否启用黑边模式
     } letterbox;
 
+    // 动态照片设置
+    struct MotionPhoto {
+      bool enabled = false;                   // 持久化开关
+      std::uint32_t duration = 3;             // 视频时长（秒）
+      std::uint32_t resolution = 1080;        // 短边分辨率: 720/1080/1440/2160
+      std::uint32_t fps = 30;                 // 帧率
+      std::uint32_t bitrate = 10'000'000;     // 比特率 (10Mbps)
+      std::string codec = "h264";             // 编码格式: "h264" | "h265"
+      std::string audio_source = "system";    // 音频源: "none" | "system" | "game_only"
+      std::uint32_t audio_bitrate = 128'000;  // 音频码率 (128kbps)
+    } motion_photo;
+
+    // 即时回放设置（录制参数继承自 recording）
+    struct ReplayBuffer {
+      std::uint32_t duration = 30;  // 回放时长（秒）
+      // enabled 不持久化，仅运行时状态
+      // 其他参数从 recording 继承
+    } replay_buffer;
+
     // 录制功能设置
     struct Recording {
       std::uint32_t fps = 60;              // 帧率
@@ -121,7 +140,8 @@ export struct AppSettings {
     struct AppMenu {
       // 启用的功能项（有则启用，顺序即菜单显示顺序）
       std::vector<std::string> features = {
-          "screenshot.capture", "recording.toggle",       "preview.toggle",
+          "screenshot.capture", "motion_photo.toggle",    "replay_buffer.toggle",
+          "replay_buffer.save", "recording.toggle",       "preview.toggle",
           "overlay.toggle",     "window.reset",           "app.main",
           "app.exit",           "screenshot.open_folder", "letterbox.toggle"};
       // 启用的比例列表（顺序即为菜单显示顺序）

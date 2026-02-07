@@ -4,6 +4,7 @@ export module Features.Screenshot.State;
 
 import std;
 import Utils.Timer;
+import Utils.Image;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
 import <d3d11.h>;
@@ -15,6 +16,8 @@ export namespace Features::Screenshot::State {
 struct ScreenshotRequest {
   HWND target_window = nullptr;
   std::wstring file_path;
+  Utils::Image::ImageFormat format = Utils::Image::ImageFormat::PNG;
+  float jpeg_quality = 1.0f;
   std::function<void(bool success, const std::wstring& path)> completion_callback;
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };

@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded Chinese JSON content as string_view
-// Size: 3273 bytes
+// Size: 3658 bytes
 constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -39,6 +39,9 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "menu.overlay_toggle": "叠加层",
   "menu.preview_toggle": "预览窗",
   "menu.recording_toggle": "录制",
+  "menu.motion_photo_toggle": "动态照片",
+  "menu.replay_buffer_toggle": "即时回放",
+  "menu.replay_buffer_save": "保存回放",
   "menu.letterbox_toggle": "黑边模式",
 
   "menu.settings_hotkey": "修改热键",
@@ -63,6 +66,10 @@ constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.overlay_start_failed": "叠加层启动失败: ",
   "message.recording_start_failed": "录制启动失败: ",
   "message.recording_stop_failed": "录制停止失败: ",
+  "message.motion_photo_success": "动态照片已保存: ",
+  "message.replay_saved": "回放已保存: ",
+  "message.motion_photo_start_failed": "动态照片启动失败: ",
+  "message.replay_buffer_start_failed": "即时回放启动失败: ",
 
   "message.settings_hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
   "message.settings_hotkey_success": "热键已设置为：",

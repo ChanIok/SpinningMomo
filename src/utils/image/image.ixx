@@ -50,9 +50,13 @@ export auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::
                                     uint32_t short_edge_size, const WebPEncodeOptions& options = {})
     -> std::expected<WebPEncodedResult, std::string>;
 
+// 图像输出格式
+export enum class ImageFormat { PNG, JPEG };
+
 // 保存像素数据到文件
 export auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_data,
                                     uint32_t width, uint32_t height, uint32_t row_pitch,
-                                    const std::wstring& file_path)
-    -> std::expected<void, std::string>;
+                                    const std::wstring& file_path,
+                                    ImageFormat format = ImageFormat::PNG,
+                                    float jpeg_quality = 1.0f) -> std::expected<void, std::string>;
 }  // namespace Utils::Image

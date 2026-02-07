@@ -9,6 +9,9 @@ import Features.Settings.State;
 import Features.Screenshot.UseCase;
 import Features.Screenshot.Folder;
 import Features.Recording.UseCase;
+import Features.ReplayBuffer.UseCase;
+import Features.ReplayBuffer.Types;
+import Features.ReplayBuffer.State;
 import Features.Letterbox.UseCase;
 import Features.Overlay.UseCase;
 import Features.Preview.UseCase;
@@ -162,6 +165,64 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                                           Features::Recording::Types::RecordingStatus::Recording;
           },
       });
+
+  // === 动态照片和即时回放 ===
+
+  // 切换动态照片模式（持久化）
+  register_command(
+      registry,
+      {
+          .id = "motion_photo.toggle",
+          .i18n_key = "menu.motion_photo_toggle",
+          .is_toggle = true,
+          .action =
+              [&state]() {
+                if (auto result = Features::ReplayBuffer::UseCase::toggle_motion_photo(state);
+                    !result) {
+                  Logger().error("Motion Photo toggle failed: {}", result.error());
+                }
+                UI::FloatingWindow::request_repaint(state);
+              },
+          .get_state = [&state]() -> bool {
+            return state.settings && state.settings->raw.features.motion_photo.enabled;
+          },
+      });
+
+  // 切换即时回放模式（仅运行时）
+  register_command(
+      registry,
+      {
+          .id = "replay_buffer.toggle",
+          .i18n_key = "menu.replay_buffer_toggle",
+          .is_toggle = true,
+          .action =
+              [&state]() {
+                if (auto result = Features::ReplayBuffer::UseCase::toggle_replay_buffer(state);
+                    !result) {
+                  Logger().error("Instant Replay toggle failed: {}", result.error());
+                }
+                UI::FloatingWindow::request_repaint(state);
+              },
+          .get_state = [&state]() -> bool {
+            return state.replay_buffer &&
+                   state.replay_buffer->replay_enabled.load(std::memory_order_acquire);
+          },
+      });
+
+  // 保存即时回放
+  register_command(registry,
+                   {
+                       .id = "replay_buffer.save",
+                       .i18n_key = "menu.replay_buffer_save",
+                       .is_toggle = false,
+                       .action =
+                           [&state]() {
+                             if (auto result = Features::ReplayBuffer::UseCase::save_replay(state);
+                                 !result) {
+                               Logger().error("Save replay failed: {}", result.error());
+                             }
+                           },
+                   });
 
   // === 窗口操作 ===
 

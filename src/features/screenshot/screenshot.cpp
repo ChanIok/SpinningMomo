@@ -23,8 +23,9 @@ import <windows.h>;
 namespace Features::Screenshot {
 
 // WIC 编码保存纹理
-auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_path)
-    -> std::expected<void, std::string> {
+auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_path,
+                           Utils::Image::ImageFormat format = Utils::Image::ImageFormat::PNG,
+                           float jpeg_quality = 1.0f) -> std::expected<void, std::string> {
   try {
     if (!texture) {
       return std::unexpected("Texture cannot be null");
@@ -74,7 +75,7 @@ auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_pa
 
     auto save_result = Utils::Image::save_pixel_data_to_file(
         wic_factory.get(), static_cast<const uint8_t*>(mapped.pData), desc.Width, desc.Height,
-        mapped.RowPitch, file_path);
+        mapped.RowPitch, file_path, format, jpeg_quality);
 
     if (!save_result) {
       return std::unexpected(save_result.error());
@@ -144,7 +145,9 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
               Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
           if (texture) {
             // 直接在回调中保存纹理
-            auto save_result = save_texture_with_wic(texture.get(), session_info.request.file_path);
+            auto save_result = save_texture_with_wic(texture.get(), session_info.request.file_path,
+                                                     session_info.request.format,
+                                                     session_info.request.jpeg_quality);
             if (save_result) {
               success = true;
               Logger().debug("Screenshot saved successfully for session {}", session_id);
@@ -421,8 +424,8 @@ auto cleanup_system(Core::State::AppState& app_state) -> void {
 
 auto take_screenshot(
     Core::State::AppState& app_state, HWND target_window,
-    std::function<void(bool success, const std::wstring& path)> completion_callback)
-    -> std::expected<void, std::string> {
+    std::function<void(bool success, const std::wstring& path)> completion_callback,
+    Utils::Image::ImageFormat format, float jpeg_quality) -> std::expected<void, std::string> {
   auto& state = *app_state.screenshot;
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window handle");
@@ -454,6 +457,13 @@ auto take_screenshot(
   }
 
   auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
+  // Motion Photo 使用 JPEG 格式时替换扩展名
+  if (format == Utils::Image::ImageFormat::JPEG) {
+    auto dot_pos = filename.rfind('.');
+    if (dot_pos != std::string::npos) {
+      filename = filename.substr(0, dot_pos) + ".jpg";
+    }
+  }
   auto file_path = Utils::Path::Combine(screenshots_dir, filename);
 
   // 自动初始化系统（如果尚未初始化）
@@ -492,6 +502,8 @@ auto take_screenshot(
   Features::Screenshot::State::ScreenshotRequest request;
   request.target_window = target_window;
   request.file_path = file_path.wstring();
+  request.format = format;
+  request.jpeg_quality = jpeg_quality;
   request.completion_callback = completion_callback;
   request.timestamp = std::chrono::steady_clock::now();
 

@@ -33,6 +33,18 @@ const {
   updateGameAlbumPath,
   updateTaskbarLowerOnResize,
   updateLetterboxEnabled,
+  // Motion Photo
+  updateMotionPhotoEnabled,
+  updateMotionPhotoDuration,
+  updateMotionPhotoResolution,
+  updateMotionPhotoFps,
+  updateMotionPhotoBitrate,
+  updateMotionPhotoCodec,
+  updateMotionPhotoAudioSource,
+  updateMotionPhotoAudioBitrate,
+  // Instant Replay
+  updateReplayBufferDuration,
+  // Recording
   updateRecordingFps,
   updateRecordingBitrate,
   updateRecordingQuality,
@@ -60,6 +72,19 @@ const inputAudioBitrateKbps = ref(
   (appSettings.value?.features?.recording?.audioBitrate || 320000) / 1000
 )
 const inputFps = ref(appSettings.value?.features?.recording?.fps || 60)
+
+// Motion Photo local state
+const inputMotionPhotoDuration = ref(appSettings.value?.features?.motionPhoto?.duration || 3)
+const inputMotionPhotoFps = ref(appSettings.value?.features?.motionPhoto?.fps || 30)
+const inputMotionPhotoBitrateMbps = ref(
+  (appSettings.value?.features?.motionPhoto?.bitrate || 10000000) / 1000000
+)
+const inputMotionPhotoAudioBitrateKbps = ref(
+  (appSettings.value?.features?.motionPhoto?.audioBitrate || 128000) / 1000
+)
+
+// Instant Replay local state
+const inputReplayBufferDuration = ref(appSettings.value?.features?.replayBuffer?.duration || 30)
 
 const handleTitleChange = async () => {
   const value = inputTitle.value.trim()
@@ -147,16 +172,50 @@ const handleAudioBitrateChange = async () => {
 const handleFpsChange = async () => {
   if (!inputFps.value) return
   await updateRecordingFps(inputFps.value)
-  // TODO: toast success
+}
+
+// Motion Photo handlers
+const handleMotionPhotoDurationChange = async () => {
+  if (!inputMotionPhotoDuration.value) return
+  await updateMotionPhotoDuration(inputMotionPhotoDuration.value)
+}
+
+const handleMotionPhotoFpsChange = async () => {
+  if (!inputMotionPhotoFps.value) return
+  await updateMotionPhotoFps(inputMotionPhotoFps.value)
+}
+
+const handleMotionPhotoBitrateChange = async () => {
+  const bitrateBps = inputMotionPhotoBitrateMbps.value * 1000000
+  await updateMotionPhotoBitrate(bitrateBps)
+}
+
+const handleMotionPhotoAudioBitrateChange = async () => {
+  const audioBitrateBps = inputMotionPhotoAudioBitrateKbps.value * 1000
+  await updateMotionPhotoAudioBitrate(audioBitrateBps)
+}
+
+// Instant Replay handlers
+const handleReplayBufferDurationChange = async () => {
+  if (!inputReplayBufferDuration.value) return
+  await updateReplayBufferDuration(inputReplayBufferDuration.value)
 }
 
 const handleResetSettings = async () => {
   await resetFunctionSettings()
-  inputBitrateMbps.value = 80 // Reset to default
-  inputQuality.value = 100 // Reset to default
-  inputQp.value = 23 // Reset to default
-  inputAudioBitrateKbps.value = 320 // Reset to default
-  // TODO: toast success
+  // Recording defaults
+  inputBitrateMbps.value = 80
+  inputQuality.value = 100
+  inputQp.value = 23
+  inputAudioBitrateKbps.value = 320
+  inputFps.value = 60
+  // Motion Photo defaults
+  inputMotionPhotoDuration.value = 3
+  inputMotionPhotoFps.value = 30
+  inputMotionPhotoBitrateMbps.value = 10
+  inputMotionPhotoAudioBitrateKbps.value = 128
+  // Instant Replay defaults
+  inputReplayBufferDuration.value = 30
 }
 </script>
 
@@ -345,6 +404,250 @@ const handleResetSettings = async () => {
               :model-value="appSettings?.features?.letterbox?.enabled"
               @update:model-value="updateLetterboxEnabled"
             />
+          </ItemActions>
+        </Item>
+      </div>
+
+      <!-- Motion Photo -->
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.function.motionPhoto.title') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.function.motionPhoto.description') }}
+          </p>
+        </div>
+
+        <ItemGroup>
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.enabled.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.enabled.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.motionPhoto?.enabled"
+                @update:model-value="updateMotionPhotoEnabled"
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.duration.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.duration.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputMotionPhotoDuration"
+                type="number"
+                :min="1"
+                :max="10"
+                class="w-24"
+                @blur="handleMotionPhotoDurationChange"
+                @keydown.enter="handleMotionPhotoDurationChange"
+              />
+              <span class="text-sm text-muted-foreground">s</span>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.resolution.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.resolution.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="String(appSettings?.features?.motionPhoto?.resolution || 1080)"
+                @update:model-value="(value) => updateMotionPhotoResolution(Number(value))"
+              >
+                <SelectTrigger class="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="720">720P</SelectItem>
+                  <SelectItem value="1080">1080P</SelectItem>
+                  <SelectItem value="1440">2K</SelectItem>
+                  <SelectItem value="2160">4K</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.fps.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.fps.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputMotionPhotoFps"
+                type="number"
+                :min="15"
+                :max="60"
+                class="w-24"
+                @blur="handleMotionPhotoFpsChange"
+                @keydown.enter="handleMotionPhotoFpsChange"
+              />
+              <span class="text-sm text-muted-foreground">FPS</span>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.bitrate.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.bitrate.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputMotionPhotoBitrateMbps"
+                type="number"
+                :min="1"
+                :max="50"
+                class="w-24"
+                @blur="handleMotionPhotoBitrateChange"
+                @keydown.enter="handleMotionPhotoBitrateChange"
+              />
+              <span class="text-sm text-muted-foreground">Mbps</span>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.codec.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.codec.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.motionPhoto?.codec"
+                @update:model-value="(value) => updateMotionPhotoCodec(value as 'h264' | 'h265')"
+              >
+                <SelectTrigger class="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="h264">H.264 / AVC</SelectItem>
+                  <SelectItem value="h265">H.265 / HEVC</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.audioSource.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.audioSource.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.motionPhoto?.audioSource"
+                @update:model-value="
+                  (value) => updateMotionPhotoAudioSource(value as 'none' | 'system' | 'game_only')
+                "
+              >
+                <SelectTrigger class="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{{
+                    t('settings.function.recording.audioSource.none')
+                  }}</SelectItem>
+                  <SelectItem value="system">{{
+                    t('settings.function.recording.audioSource.system')
+                  }}</SelectItem>
+                  <SelectItem value="game_only">{{
+                    t('settings.function.recording.audioSource.gameOnly')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.audioBitrate.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.audioBitrate.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputMotionPhotoAudioBitrateKbps"
+                type="number"
+                :min="64"
+                :max="320"
+                class="w-24"
+                @blur="handleMotionPhotoAudioBitrateChange"
+                @keydown.enter="handleMotionPhotoAudioBitrateChange"
+              />
+              <span class="text-sm text-muted-foreground">kbps</span>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
+      </div>
+
+      <!-- Instant Replay -->
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.function.replayBuffer.title') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.function.replayBuffer.description') }}
+          </p>
+        </div>
+
+        <Item variant="outline" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.replayBuffer.duration.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.replayBuffer.duration.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Input
+              v-model.number="inputReplayBufferDuration"
+              type="number"
+              :min="5"
+              :max="300"
+              class="w-24"
+              @blur="handleReplayBufferDurationChange"
+              @keydown.enter="handleReplayBufferDurationChange"
+            />
+            <span class="text-sm text-muted-foreground">s</span>
           </ItemActions>
         </Item>
       </div>

@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3484 bytes
+// Size: 3874 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -39,6 +39,9 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "menu.overlay_toggle": "Overlay",
   "menu.preview_toggle": "Preview",
   "menu.recording_toggle": "Record",
+  "menu.motion_photo_toggle": "Motion Photo",
+  "menu.replay_buffer_toggle": "Instant Replay",
+  "menu.replay_buffer_save": "Save Replay",
   "menu.letterbox_toggle": "Letterbox",
 
   "menu.settings_hotkey": "Modify Hotkey",
@@ -63,6 +66,10 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.overlay_start_failed": "Failed to start overlay window: ",
   "message.recording_start_failed": "Failed to start recording: ",
   "message.recording_stop_failed": "Failed to stop recording: ",
+  "message.motion_photo_success": "Motion Photo saved: ",
+  "message.replay_saved": "Replay saved: ",
+  "message.motion_photo_start_failed": "Failed to start Motion Photo: ",
+  "message.replay_buffer_start_failed": "Failed to start Instant Replay: ",
 
   "message.settings_hotkey_prompt": "Please press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys",
   "message.settings_hotkey_success": "Hotkey set to: ",

@@ -19,6 +19,9 @@ import Core.Commands;
 import Core.Commands.State;
 import Features.Settings.State;
 import Features.Recording;
+import Features.ReplayBuffer;
+import Features.ReplayBuffer.State;
+import Features.ReplayBuffer.UseCase;
 import Features.Update;
 import Features.Letterbox.State;
 import UI.FloatingWindow;
@@ -90,6 +93,21 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto result = Features::Recording::initialize(*state.recording); !result) {
       return std::unexpected(result.error());
+    }
+
+    if (auto result = Features::ReplayBuffer::initialize(*state.replay_buffer); !result) {
+      return std::unexpected("Failed to initialize replay buffer: " + result.error());
+    }
+
+    // 如果 Motion Photo 开启，自动启动后台录制
+    if (state.settings->raw.features.motion_photo.enabled) {
+      if (auto result = Features::ReplayBuffer::UseCase::ensure_buffering_started(state); !result) {
+        Logger().warn("Auto-start Motion Photo failed: {}, disabling", result.error());
+        // 启动失败时禁用 Motion Photo
+        state.settings->raw.features.motion_photo.enabled = false;
+      } else {
+        Logger().info("Motion Photo auto-started from saved settings");
+      }
     }
 
     if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {

@@ -363,7 +363,8 @@ auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& p
 
 // 保存像素数据到文件
 auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_data, uint32_t width,
-                             uint32_t height, uint32_t row_pitch, const std::wstring& file_path)
+                             uint32_t height, uint32_t row_pitch, const std::wstring& file_path,
+                             ImageFormat format, float jpeg_quality)
     -> std::expected<void, std::string> {
   if (!factory) {
     return std::unexpected("WIC factory is null");
@@ -374,26 +375,39 @@ auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_d
   }
 
   try {
-    // 创建PNG编码器
+    // 根据格式选择编码器 GUID
+    GUID container_format =
+        (format == ImageFormat::JPEG) ? GUID_ContainerFormatJpeg : GUID_ContainerFormatPng;
+
     wil::com_ptr<IWICBitmapEncoder> encoder;
-    THROW_IF_FAILED(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.put()));
+    THROW_IF_FAILED(factory->CreateEncoder(container_format, nullptr, encoder.put()));
 
     // 创建流
     wil::com_ptr<IWICStream> stream;
     THROW_IF_FAILED(factory->CreateStream(stream.put()));
-
-    // 初始化流到文件
     THROW_IF_FAILED(stream->InitializeFromFilename(file_path.c_str(), GENERIC_WRITE));
 
     // 初始化编码器
     THROW_IF_FAILED(encoder->Initialize(stream.get(), WICBitmapEncoderNoCache));
 
-    // 创建新帧
+    // 创建新帧（带属性包用于 JPEG 质量设置）
     wil::com_ptr<IWICBitmapFrameEncode> frame;
-    THROW_IF_FAILED(encoder->CreateNewFrame(frame.put(), nullptr));
+    wil::com_ptr<IPropertyBag2> property_bag;
+    THROW_IF_FAILED(encoder->CreateNewFrame(frame.put(), property_bag.put()));
+
+    // JPEG 格式时设置质量参数
+    if (format == ImageFormat::JPEG && property_bag) {
+      PROPBAG2 quality_option = {};
+      quality_option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
+      VARIANT quality_value;
+      VariantInit(&quality_value);
+      quality_value.vt = VT_R4;
+      quality_value.fltVal = jpeg_quality;
+      property_bag->Write(1, &quality_option, &quality_value);
+    }
 
     // 初始化帧
-    THROW_IF_FAILED(frame->Initialize(nullptr));
+    THROW_IF_FAILED(frame->Initialize(property_bag.get()));
 
     // 设置帧尺寸
     THROW_IF_FAILED(frame->SetSize(width, height));

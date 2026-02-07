@@ -4,7 +4,7 @@ This file provides guidance to WARP (warp.dev) when working with code in this re
 
 ## Project Overview
 
-SpinningMomo (旋转吧大喵) is a Windows-only desktop tool for the game "Infinity Nikki" (无限暖暖) that adjusts game window aspect ratios/resolutions for photography. It supports portrait orientation, ultra-high-resolution screenshots (up to 12K), overlay rendering, and a gallery viewer. The codebase is bilingual — code comments and UI strings are predominantly in Chinese.
+SpinningMomo (旋转吧大喵) is a Windows-only desktop tool for the game "Infinity Nikki" (无限暖暖) that adjusts game window aspect ratios/resolutions for photography. It supports portrait orientation, ultra-high-resolution screenshots (up to 12K), video recording, instant replay, Motion Photo, overlay rendering, and a gallery viewer. The codebase is bilingual — code comments and UI strings are predominantly in Chinese.
 
 ## Build & Development
 
@@ -62,9 +62,9 @@ The frontend auto-detects its environment (`window.chrome.webview` presence) and
 The backend uses **C++23 modules** (`.ixx` interface files, `.cpp` implementation files). Module names follow a dotted hierarchy that mirrors the directory structure:
 
 - `Core.*` — framework infrastructure (async runtime, database, events, HTTP server, RPC, WebView, i18n, commands, migrations, worker pool)
-- `Features.*` — business logic (gallery, letterbox, overlay, preview, recording, screenshot, settings, update, window_control, notifications)
+- `Features.*` — business logic (gallery, letterbox, overlay, preview, recording, replay_buffer, screenshot, settings, update, window_control, notifications)
 - `UI.*` — native Win32 UI (floating_window, tray_icon, context_menu, webview_window)
-- `Utils.*` — shared utilities (logger, file, graphics, image, path, string, system, throttle, timer, dialog, lru_cache, time)
+- `Utils.*` — shared utilities (logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, lru_cache, time)
 - `Vendor.*` — thin wrappers re-exporting Win32 API and third-party types through the module system (e.g. `Vendor.Windows` wraps `<windows.h>`)
 
 ### Design Philosophy
@@ -98,7 +98,7 @@ Endpoints live under `src/core/rpc/endpoints/<domain>/`, each domain exposes a `
 
 ### Initialization Order
 `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()` which runs:
-events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings → update → commands → floating window → tray icon → context menu → recording → gallery → hotkeys.
+events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings → update → commands → floating window → tray icon → context menu → recording → replay_buffer → gallery → hotkeys.
 
 ## Build Output
 - Release: `build\windows\x64\release\`
