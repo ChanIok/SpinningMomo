@@ -3,7 +3,7 @@ module;
 #include <mfidl.h>
 #include <mfreadwrite.h>
 
-module Features.Recording.Encoder;
+module Utils.Media.Encoder;
 
 import std;
 import Utils.Logger;
@@ -15,19 +15,18 @@ import <windows.h>;
 import <codecapi.h>;
 import <strmif.h>;
 
-namespace Features::Recording::Encoder {
+namespace Utils::Media::Encoder {
 
 // 辅助函数：创建输出媒体类型
 auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uint32_t bitrate,
-                              Features::Recording::Types::VideoCodec codec)
+                              uint32_t keyframe_interval, Types::VideoCodec codec)
     -> wil::com_ptr<IMFMediaType> {
   wil::com_ptr<IMFMediaType> media_type;
   if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
 
   // 根据 codec 选择编码格式
-  GUID subtype = (codec == Features::Recording::Types::VideoCodec::H265) ? MFVideoFormat_HEVC
-                                                                         : MFVideoFormat_H264;
+  GUID subtype = (codec == Types::VideoCodec::H265) ? MFVideoFormat_HEVC : MFVideoFormat_H264;
   if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, subtype))) return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_AVG_BITRATE, bitrate))) return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive)))
@@ -43,14 +42,14 @@ auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uin
   media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235);  // TV / Limited Range
 
   // 编码 Profile (H.264 High / H.265 Main，与 NVIDIA APP / OBS 一致)
-  if (codec == Features::Recording::Types::VideoCodec::H265) {
+  if (codec == Types::VideoCodec::H265) {
     media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH265VProfile_Main_420_8);
   } else {
     media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High);
   }
 
-  // 关键帧间隔 (每 2 秒一个关键帧，便于拖动进度条定位)
-  media_type->SetUINT32(MF_MT_MAX_KEYFRAME_SPACING, fps * 2);
+  // 关键帧间隔
+  media_type->SetUINT32(MF_MT_MAX_KEYFRAME_SPACING, fps * keyframe_interval);
 
   return media_type;
 }
@@ -83,9 +82,9 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
   return media_type;
 }
 
-auto add_audio_stream(Features::Recording::State::EncoderContext& encoder,
-                      WAVEFORMATEX* wave_format, uint32_t audio_bitrate)
-    -> std::expected<void, std::string> {
+// 辅助函数：添加音频流
+auto add_audio_stream(State::EncoderContext& encoder, WAVEFORMATEX* wave_format,
+                      uint32_t audio_bitrate) -> std::expected<void, std::string> {
   if (!encoder.sink_writer) {
     return std::unexpected("Sink writer not initialized");
   }
@@ -155,13 +154,9 @@ auto add_audio_stream(Features::Recording::State::EncoderContext& encoder,
 }
 
 // 尝试创建 GPU 编码器
-auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
-                            const std::filesystem::path& output_path, uint32_t width,
-                            uint32_t height, uint32_t fps, uint32_t bitrate, ID3D11Device* device,
-                            Features::Recording::Types::VideoCodec codec,
-                            Features::Recording::Types::RateControlMode rate_control,
-                            uint32_t quality, uint32_t qp, WAVEFORMATEX* wave_format,
-                            uint32_t audio_bitrate) -> std::expected<void, std::string> {
+auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& config,
+                            ID3D11Device* device, WAVEFORMATEX* wave_format)
+    -> std::expected<void, std::string> {
   // 1. 创建 DXGI Device Manager
   if (FAILED(MFCreateDXGIDeviceManager(&ctx.reset_token, ctx.dxgi_manager.put()))) {
     return std::unexpected("Failed to create DXGI Device Manager");
@@ -173,12 +168,12 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 3. 确保目录存在
-  std::filesystem::create_directories(output_path.parent_path());
+  std::filesystem::create_directories(config.output_path.parent_path());
 
   // 4. 创建 Byte Stream
   wil::com_ptr<IMFByteStream> byte_stream;
   if (FAILED(MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE,
-                          output_path.c_str(), byte_stream.put()))) {
+                          config.output_path.c_str(), byte_stream.put()))) {
     return std::unexpected("Failed to create byte stream");
   }
 
@@ -207,9 +202,9 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   // 在创建 Sink Writer 前预设 Rate Control Mode
   UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
 
-  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
+  if (config.rate_control == Types::RateControlMode::VBR) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;
-  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
   }
 
@@ -218,17 +213,17 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
-  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, quality))) {
+  if (config.rate_control == Types::RateControlMode::VBR) {
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, config.quality))) {
       Logger().warn("Failed to set quality attribute");
     }
-    Logger().info("GPU encoder configured for VBR mode with quality: {}", quality);
-  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+    Logger().info("GPU encoder configured for VBR mode with quality: {}", config.quality);
+  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
     // 尝试设置 QP 参数（可能不被所有编码器支持）
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, qp))) {
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, config.qp))) {
       Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
     }
-    Logger().info("GPU encoder configured for Manual QP mode with QP: {}", qp);
+    Logger().info("GPU encoder configured for Manual QP mode with QP: {}", config.qp);
   } else {
     Logger().info("GPU encoder configured for CBR mode");
   }
@@ -240,7 +235,9 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 8. 创建输出媒体类型
-  auto media_type_out = create_output_media_type(width, height, fps, bitrate, codec);
+  auto media_type_out =
+      create_output_media_type(config.width, config.height, config.fps, config.bitrate,
+                               config.keyframe_interval, config.codec);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -250,7 +247,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 9. 创建 GPU 输入媒体类型
-  auto media_type_in = create_input_media_type(width, height, fps, false);
+  auto media_type_in = create_input_media_type(config.width, config.height, config.fps, false);
   if (!media_type_in) {
     return std::unexpected("Failed to create GPU input media type");
   }
@@ -262,8 +259,8 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
 
   // 10. 创建共享纹理 (编码器专用)
   D3D11_TEXTURE2D_DESC tex_desc = {};
-  tex_desc.Width = width;
-  tex_desc.Height = height;
+  tex_desc.Width = config.width;
+  tex_desc.Height = config.height;
   tex_desc.MipLevels = 1;
   tex_desc.ArraySize = 1;
   tex_desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -278,7 +275,7 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
 
   // 11. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
   if (wave_format) {
-    auto audio_result = add_audio_stream(ctx, wave_format, audio_bitrate);
+    auto audio_result = add_audio_stream(ctx, wave_format, config.audio_bitrate);
     if (!audio_result) {
       Logger().warn("Failed to add audio stream to GPU encoder: {}", audio_result.error());
     }
@@ -290,28 +287,23 @@ auto try_create_gpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 缓存尺寸信息
-  ctx.frame_width = width;
-  ctx.frame_height = height;
-  ctx.buffer_size = width * height * 4;
+  ctx.frame_width = config.width;
+  ctx.frame_height = config.height;
+  ctx.buffer_size = config.width * config.height * 4;
   ctx.gpu_encoding = true;
   return {};
 }
 
 // 创建 CPU 编码器 (fallback)
-auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
-                        const std::filesystem::path& output_path, uint32_t width, uint32_t height,
-                        uint32_t fps, uint32_t bitrate,
-                        Features::Recording::Types::VideoCodec codec,
-                        Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
-                        uint32_t qp, WAVEFORMATEX* wave_format, uint32_t audio_bitrate)
-    -> std::expected<void, std::string> {
+auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& config,
+                        WAVEFORMATEX* wave_format) -> std::expected<void, std::string> {
   // 确保目录存在
-  std::filesystem::create_directories(output_path.parent_path());
+  std::filesystem::create_directories(config.output_path.parent_path());
 
   // 1. 创建 Byte Stream
   wil::com_ptr<IMFByteStream> byte_stream;
   if (FAILED(MFCreateFile(MF_ACCESSMODE_WRITE, MF_OPENMODE_DELETE_IF_EXIST, MF_FILEFLAGS_NONE,
-                          output_path.c_str(), byte_stream.put()))) {
+                          config.output_path.c_str(), byte_stream.put()))) {
     return std::unexpected("Failed to create byte stream");
   }
 
@@ -335,9 +327,9 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
   // 在创建 Sink Writer 前预设 Rate Control Mode
   UINT32 rate_control_mode = eAVEncCommonRateControlMode_CBR;  // 默认 CBR
 
-  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
+  if (config.rate_control == Types::RateControlMode::VBR) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;
-  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
     rate_control_mode = eAVEncCommonRateControlMode_Quality;  // QP 模式也使用 Quality
   }
 
@@ -346,17 +338,17 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 预设 Quality (VBR 模式) 或 QP (ManualQP 模式)
-  if (rate_control == Features::Recording::Types::RateControlMode::VBR) {
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, quality))) {
+  if (config.rate_control == Types::RateControlMode::VBR) {
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncCommonQuality, config.quality))) {
       Logger().warn("Failed to set quality attribute");
     }
-    Logger().info("CPU encoder configured for VBR mode with quality: {}", quality);
-  } else if (rate_control == Features::Recording::Types::RateControlMode::ManualQP) {
+    Logger().info("CPU encoder configured for VBR mode with quality: {}", config.quality);
+  } else if (config.rate_control == Types::RateControlMode::ManualQP) {
     // 尝试设置 QP 参数（可能不被所有编码器支持）
-    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, qp))) {
+    if (FAILED(attributes->SetUINT32(CODECAPI_AVEncVideoEncodeQP, config.qp))) {
       Logger().warn("Failed to set QP attribute - encoder may not support Manual QP mode");
     }
-    Logger().info("CPU encoder configured for Manual QP mode with QP: {}", qp);
+    Logger().info("CPU encoder configured for Manual QP mode with QP: {}", config.qp);
   } else {
     Logger().info("CPU encoder configured for CBR mode");
   }
@@ -368,7 +360,9 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 5. 创建输出媒体类型
-  auto media_type_out = create_output_media_type(width, height, fps, bitrate, codec);
+  auto media_type_out =
+      create_output_media_type(config.width, config.height, config.fps, config.bitrate,
+                               config.keyframe_interval, config.codec);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -378,7 +372,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 6. 创建输入媒体类型
-  auto media_type_in = create_input_media_type(width, height, fps, true);
+  auto media_type_in = create_input_media_type(config.width, config.height, config.fps, true);
   if (!media_type_in) {
     return std::unexpected("Failed to create input media type");
   }
@@ -390,7 +384,7 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
 
   // 7. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
   if (wave_format) {
-    auto audio_result = add_audio_stream(ctx, wave_format, audio_bitrate);
+    auto audio_result = add_audio_stream(ctx, wave_format, config.audio_bitrate);
     if (!audio_result) {
       Logger().warn("Failed to add audio stream to CPU encoder: {}", audio_result.error());
     }
@@ -402,67 +396,60 @@ auto create_cpu_encoder(Features::Recording::State::EncoderContext& ctx,
   }
 
   // 缓存尺寸信息
-  ctx.frame_width = width;
-  ctx.frame_height = height;
-  ctx.buffer_size = width * height * 4;
+  ctx.frame_width = config.width;
+  ctx.frame_height = config.height;
+  ctx.buffer_size = config.width * config.height * 4;
   ctx.gpu_encoding = false;
   return {};
 }
 
-auto create_encoder(const std::filesystem::path& output_path, uint32_t width, uint32_t height,
-                    uint32_t fps, uint32_t bitrate, ID3D11Device* device,
-                    Features::Recording::Types::EncoderMode mode,
-                    Features::Recording::Types::VideoCodec codec,
-                    Features::Recording::Types::RateControlMode rate_control, uint32_t quality,
-                    uint32_t qp, WAVEFORMATEX* wave_format, uint32_t audio_bitrate)
-    -> std::expected<Features::Recording::State::EncoderContext, std::string> {
-  Features::Recording::State::EncoderContext ctx;
+auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
+                    WAVEFORMATEX* wave_format)
+    -> std::expected<State::EncoderContext, std::string> {
+  auto ctx = std::make_unique<State::EncoderContext>();
 
-  bool try_gpu = (mode == Features::Recording::Types::EncoderMode::Auto ||
-                  mode == Features::Recording::Types::EncoderMode::GPU) &&
+  bool try_gpu = (config.encoder_mode == Types::EncoderMode::Auto ||
+                  config.encoder_mode == Types::EncoderMode::GPU) &&
                  device != nullptr;
 
-  const char* codec_name =
-      (codec == Features::Recording::Types::VideoCodec::H265) ? "H.265" : "H.264";
+  const char* codec_name = (config.codec == Types::VideoCodec::H265) ? "H.265" : "H.264";
 
   if (try_gpu) {
-    auto gpu_result =
-        try_create_gpu_encoder(ctx, output_path, width, height, fps, bitrate, device, codec,
-                               rate_control, quality, qp, wave_format, audio_bitrate);
+    auto gpu_result = try_create_gpu_encoder(*ctx, config, device, wave_format);
     if (gpu_result) {
-      Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
-                    bitrate, codec_name);
-      return ctx;
+      Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", config.width,
+                    config.height, config.fps, config.bitrate, codec_name);
+      return std::move(*ctx);
     }
 
     // GPU 失败
     Logger().warn("Failed to create GPU encoder: {}", gpu_result.error());
 
-    if (mode == Features::Recording::Types::EncoderMode::GPU) {
+    if (config.encoder_mode == Types::EncoderMode::GPU) {
       // 强制 GPU 模式，不降级
       return std::unexpected(gpu_result.error());
     }
 
     // Auto 模式，降级到 CPU
     Logger().info("Falling back to CPU encoder");
-    ctx = {};  // 重置 context
+    ctx = std::make_unique<State::EncoderContext>();  // 重置 context
   }
 
   // CPU 编码
-  auto cpu_result = create_cpu_encoder(ctx, output_path, width, height, fps, bitrate, codec,
-                                       rate_control, quality, qp, wave_format, audio_bitrate);
+  auto cpu_result = create_cpu_encoder(*ctx, config, wave_format);
   if (!cpu_result) {
     return std::unexpected(cpu_result.error());
   }
 
-  Logger().info("CPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", width, height, fps,
-                bitrate, codec_name);
-  return ctx;
+  Logger().info("CPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", config.width,
+                config.height, config.fps, config.bitrate, codec_name);
+  return std::move(*ctx);
 }
-// GPU 编码帧（内部函数，不加锁）
-auto encode_frame_gpu(Features::Recording::State::EncoderContext& encoder,
-                      ID3D11DeviceContext* context, ID3D11Texture2D* frame_texture,
-                      int64_t timestamp_100ns, uint32_t fps) -> std::expected<void, std::string> {
+
+// GPU 编码帧（内部函数）
+auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* context,
+                      ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
+    -> std::expected<void, std::string> {
   // 1. 复制到共享纹理
   context->CopyResource(encoder.shared_texture.get(), frame_texture);
 
@@ -500,10 +487,10 @@ auto encode_frame_gpu(Features::Recording::State::EncoderContext& encoder,
   return {};
 }
 
-// CPU 编码帧（内部函数，不加锁）
-auto encode_frame_cpu(Features::Recording::State::EncoderContext& encoder,
-                      ID3D11DeviceContext* context, ID3D11Texture2D* frame_texture,
-                      int64_t timestamp_100ns, uint32_t fps) -> std::expected<void, std::string> {
+// CPU 编码帧（内部函数）
+auto encode_frame_cpu(State::EncoderContext& encoder, ID3D11DeviceContext* context,
+                      ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
+    -> std::expected<void, std::string> {
   // 1. 获取纹理描述
   D3D11_TEXTURE2D_DESC desc;
   frame_texture->GetDesc(&desc);
@@ -578,18 +565,14 @@ auto encode_frame_cpu(Features::Recording::State::EncoderContext& encoder,
   return {};
 }
 
-auto encode_frame(Features::Recording::State::RecordingState& state, ID3D11DeviceContext* context,
+auto encode_frame(State::EncoderContext& encoder, ID3D11DeviceContext* context,
                   ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
     -> std::expected<void, std::string> {
-  auto& encoder = state.encoder;
-
   if (!encoder.sink_writer || !context || !frame_texture) {
     return std::unexpected("Invalid encoder state");
   }
 
-  // 使用 encoder_write_mutex 保护 sink_writer 的写入操作
-  std::lock_guard write_lock(state.encoder_write_mutex);
-
+  // 注：线程同步由调用方管理
   if (encoder.gpu_encoding) {
     return encode_frame_gpu(encoder, context, frame_texture, timestamp_100ns, fps);
   } else {
@@ -597,8 +580,53 @@ auto encode_frame(Features::Recording::State::RecordingState& state, ID3D11Devic
   }
 }
 
-auto finalize_encoder(Features::Recording::State::EncoderContext& encoder)
+auto encode_audio(State::EncoderContext& encoder, const BYTE* audio_data, UINT32 num_frames,
+                  UINT32 bytes_per_frame, int64_t timestamp_100ns)
     -> std::expected<void, std::string> {
+  if (!encoder.sink_writer || !encoder.has_audio) {
+    return std::unexpected("Audio stream not available");
+  }
+
+  if (!audio_data || num_frames == 0) {
+    return {};  // 空数据，跳过
+  }
+
+  UINT32 data_size = num_frames * bytes_per_frame;
+
+  // 创建音频 buffer
+  wil::com_ptr<IMFMediaBuffer> buffer;
+  if (FAILED(MFCreateMemoryBuffer(data_size, buffer.put()))) {
+    return std::unexpected("Failed to create audio buffer");
+  }
+
+  // 复制音频数据
+  BYTE* buffer_data = nullptr;
+  if (FAILED(buffer->Lock(&buffer_data, nullptr, nullptr))) {
+    return std::unexpected("Failed to lock audio buffer");
+  }
+
+  std::memcpy(buffer_data, audio_data, data_size);
+  buffer->Unlock();
+  buffer->SetCurrentLength(data_size);
+
+  // 创建音频 sample
+  wil::com_ptr<IMFSample> sample;
+  if (FAILED(MFCreateSample(sample.put()))) {
+    return std::unexpected("Failed to create audio sample");
+  }
+
+  sample->AddBuffer(buffer.get());
+  sample->SetSampleTime(timestamp_100ns);
+
+  // 注：线程同步由调用方管理
+  if (FAILED(encoder.sink_writer->WriteSample(encoder.audio_stream_index, sample.get()))) {
+    return std::unexpected("Failed to write audio sample");
+  }
+
+  return {};
+}
+
+auto finalize_encoder(State::EncoderContext& encoder) -> std::expected<void, std::string> {
   if (encoder.sink_writer) {
     if (FAILED(encoder.sink_writer->Finalize())) {
       return std::unexpected("Failed to finalize sink writer");
@@ -616,4 +644,4 @@ auto finalize_encoder(Features::Recording::State::EncoderContext& encoder)
   return {};
 }
 
-}  // namespace Features::Recording::Encoder
+}  // namespace Utils::Media::Encoder

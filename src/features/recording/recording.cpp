@@ -6,10 +6,11 @@ module Features.Recording;
 
 import std;
 import Features.Recording.State;
-import Features.Recording.Encoder;
 import Features.Recording.AudioCapture;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
+import Utils.Media.Encoder;
+import Utils.Media.Encoder.Types;
 import Utils.Logger;
 import <d3d11_4.h>;
 import <mfapi.h>;
@@ -65,9 +66,13 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
             ? state.last_encoded_texture.get()
             : texture.get();
 
-    // 编码帧（encode_frame 内部会获取 encoder_write_mutex）
-    auto result = Features::Recording::Encoder::encode_frame(
-        state, state.context.get(), encode_texture, timestamp, state.config.fps);
+    // 编码帧
+    std::expected<void, std::string> result;
+    {
+      std::lock_guard write_lock(state.encoder_write_mutex);
+      result = Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(),
+                                                   encode_texture, timestamp, state.config.fps);
+    }
 
     if (!result) {
       Logger().error("Failed to encode frame {}: {}", state.frame_index, result.error());
@@ -169,10 +174,25 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   }
 
   // 5. 创建编码器（音频流在内部添加）
-  auto encoder_result = Features::Recording::Encoder::create_encoder(
-      config.output_path, width, height, config.fps, config.bitrate, state.device.get(),
-      config.encoder_mode, config.codec, config.rate_control, config.quality, config.qp,
-      wave_format, config.audio_bitrate);
+  Utils::Media::Encoder::Types::EncoderConfig encoder_config;
+  encoder_config.output_path = config.output_path;
+  encoder_config.width = width;
+  encoder_config.height = height;
+  encoder_config.fps = config.fps;
+  encoder_config.bitrate = config.bitrate;
+  encoder_config.quality = config.quality;
+  encoder_config.qp = config.qp;
+  encoder_config.keyframe_interval = 2;  // 录制默认 2s 关键帧间隔
+  encoder_config.rate_control = Utils::Media::Encoder::Types::rate_control_mode_from_string(
+      Features::Recording::Types::rate_control_mode_to_string(config.rate_control));
+  encoder_config.encoder_mode = Utils::Media::Encoder::Types::encoder_mode_from_string(
+      Features::Recording::Types::encoder_mode_to_string(config.encoder_mode));
+  encoder_config.codec = Utils::Media::Encoder::Types::video_codec_from_string(
+      Features::Recording::Types::video_codec_to_string(config.codec));
+  encoder_config.audio_bitrate = config.audio_bitrate;
+
+  auto encoder_result =
+      Utils::Media::Encoder::create_encoder(encoder_config, state.device.get(), wave_format);
   if (!encoder_result) {
     return std::unexpected("Failed to create encoder: " + encoder_result.error());
   }
@@ -247,9 +267,13 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
       // 用最后一帧填充到结束
       while (state.frame_index <= final_frame_index) {
         int64_t timestamp = state.frame_index * frame_duration_100ns;
-        auto result = Features::Recording::Encoder::encode_frame(state, state.context.get(),
-                                                                 state.last_encoded_texture.get(),
-                                                                 timestamp, state.config.fps);
+        std::expected<void, std::string> result;
+        {
+          std::lock_guard write_lock(state.encoder_write_mutex);
+          result = Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(),
+                                                       state.last_encoded_texture.get(), timestamp,
+                                                       state.config.fps);
+        }
 
         if (!result) {
           Logger().error("Failed to encode final frame {}: {}", state.frame_index, result.error());
@@ -262,7 +286,7 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
     }
 
     // 4. 完成编码
-    auto finalize_result = Features::Recording::Encoder::finalize_encoder(state.encoder);
+    auto finalize_result = Utils::Media::Encoder::finalize_encoder(state.encoder);
     if (!finalize_result) {
       Logger().error("Failed to finalize encoder: {}", finalize_result.error());
     }

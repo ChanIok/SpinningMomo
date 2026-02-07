@@ -1,10 +1,10 @@
 module;
 
-export module Features.Recording.Types;
+export module Utils.Media.Encoder.Types;
 
 import std;
 
-namespace Features::Recording::Types {
+namespace Utils::Media::Encoder::Types {
 
 // 码率控制模式
 export enum class RateControlMode {
@@ -18,18 +18,6 @@ export constexpr RateControlMode rate_control_mode_from_string(std::string_view 
   if (str == "vbr") return RateControlMode::VBR;
   if (str == "manual_qp") return RateControlMode::ManualQP;
   return RateControlMode::CBR;  // 默认
-}
-
-// RateControlMode 转换为字符串
-export constexpr std::string_view rate_control_mode_to_string(RateControlMode mode) {
-  switch (mode) {
-    case RateControlMode::VBR:
-      return "vbr";
-    case RateControlMode::ManualQP:
-      return "manual_qp";
-    default:
-      return "cbr";
-  }
 }
 
 // 编码器模式
@@ -46,23 +34,17 @@ export constexpr EncoderMode encoder_mode_from_string(std::string_view str) {
   return EncoderMode::Auto;  // 默认或 "auto"
 }
 
-// EncoderMode 转换为字符串
-export constexpr std::string_view encoder_mode_to_string(EncoderMode mode) {
-  switch (mode) {
-    case EncoderMode::GPU:
-      return "gpu";
-    case EncoderMode::CPU:
-      return "cpu";
-    default:
-      return "auto";
-  }
-}
-
 // 视频编码格式
 export enum class VideoCodec {
   H264,  // H.264/AVC
   H265   // H.265/HEVC
 };
+
+// 从字符串转换为 VideoCodec
+export constexpr VideoCodec video_codec_from_string(std::string_view str) {
+  if (str == "h265" || str == "hevc") return VideoCodec::H265;
+  return VideoCodec::H264;  // 默认
+}
 
 // 音频源类型
 export enum class AudioSource {
@@ -78,24 +60,8 @@ export constexpr AudioSource audio_source_from_string(std::string_view str) {
   return AudioSource::System;  // 默认
 }
 
-// 从字符串转换为 VideoCodec
-export constexpr VideoCodec video_codec_from_string(std::string_view str) {
-  if (str == "h265" || str == "hevc") return VideoCodec::H265;
-  return VideoCodec::H264;  // 默认
-}
-
-// VideoCodec 转换为字符串
-export constexpr std::string_view video_codec_to_string(VideoCodec codec) {
-  switch (codec) {
-    case VideoCodec::H265:
-      return "h265";
-    default:
-      return "h264";
-  }
-}
-
-// 录制配置
-export struct RecordingConfig {
+// 编码器配置
+export struct EncoderConfig {
   std::filesystem::path output_path;                    // 输出文件路径
   std::uint32_t width = 0;                              // 视频宽度
   std::uint32_t height = 0;                             // 视频高度
@@ -103,21 +69,13 @@ export struct RecordingConfig {
   std::uint32_t bitrate = 80'000'000;                   // 视频比特率 (默认 80Mbps, CBR 模式使用)
   std::uint32_t quality = 70;                           // 质量值 (0-100, VBR 模式使用)
   std::uint32_t qp = 23;                                // 量化参数 (0-51, ManualQP 模式使用)
+  std::uint32_t keyframe_interval = 2;                  // 关键帧间隔（秒），默认 2s
   RateControlMode rate_control = RateControlMode::CBR;  // 码率控制模式
   EncoderMode encoder_mode = EncoderMode::Auto;         // 编码器模式
   VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
 
   // 音频配置
-  AudioSource audio_source = AudioSource::System;  // 音频源类型 (默认系统音频)
-  std::uint32_t audio_bitrate = 256'000;           // 音频码率 (默认 256kbps)
+  std::uint32_t audio_bitrate = 256'000;  // 音频码率 (默认 256kbps)
 };
 
-// 录制状态枚举
-export enum class RecordingStatus {
-  Idle,       // 空闲
-  Recording,  // 正在录制
-  Stopping,   // 正在停止
-  Error       // 发生错误
-};
-
-}  // namespace Features::Recording::Types
+}  // namespace Utils::Media::Encoder::Types

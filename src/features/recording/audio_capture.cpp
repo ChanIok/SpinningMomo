@@ -8,6 +8,7 @@ module Features.Recording.AudioCapture;
 import std;
 import Features.Recording.State;
 import Features.Recording.Types;
+import Utils.Media.Encoder;
 import Utils.Logger;
 import <audioclient.h>;
 import <mfapi.h>;
@@ -243,38 +244,31 @@ auto audio_capture_loop(Features::Recording::State::RecordingState& state) -> vo
         auto timestamp_100ns =
             std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
 
-        // 计算数据大小
-        DWORD buffer_size = frames_available * audio.wave_format->nBlockAlign;
+        // 写入编码器
+        // 检查状态使用 atomic 读取，无需锁
+        if (state.status.load(std::memory_order_acquire) ==
+                Features::Recording::Types::RecordingStatus::Recording &&
+            encoder.has_audio) {
+          // 在锁外创建 sample（与原实现一致，减少持锁时间）
+          DWORD buffer_size = frames_available * audio.wave_format->nBlockAlign;
+          wil::com_ptr<IMFSample> sample;
+          wil::com_ptr<IMFMediaBuffer> buffer;
 
-        // 创建 MF Sample
-        wil::com_ptr<IMFSample> sample;
-        wil::com_ptr<IMFMediaBuffer> buffer;
+          if (SUCCEEDED(MFCreateSample(sample.put())) &&
+              SUCCEEDED(MFCreateMemoryBuffer(buffer_size, buffer.put()))) {
+            BYTE* buffer_data = nullptr;
+            if (SUCCEEDED(buffer->Lock(&buffer_data, nullptr, nullptr))) {
+              std::memcpy(buffer_data, data, buffer_size);
+              buffer->Unlock();
+              buffer->SetCurrentLength(buffer_size);
 
-        if (SUCCEEDED(MFCreateSample(sample.put())) &&
-            SUCCEEDED(MFCreateMemoryBuffer(buffer_size, buffer.put()))) {
-          // 复制数据到 buffer
-          BYTE* buffer_data = nullptr;
-          if (SUCCEEDED(buffer->Lock(&buffer_data, nullptr, nullptr))) {
-            std::memcpy(buffer_data, data, buffer_size);
-            buffer->Unlock();
-            buffer->SetCurrentLength(buffer_size);
+              sample->AddBuffer(buffer.get());
+              sample->SetSampleTime(timestamp_100ns);
 
-            // 设置 sample 属性
-            sample->AddBuffer(buffer.get());
-            sample->SetSampleTime(timestamp_100ns);
-
-            // 计算持续时间（100ns 单位）
-            int64_t duration_100ns = static_cast<int64_t>(frames_available) * 10'000'000 /
-                                     audio.wave_format->nSamplesPerSec;
-            sample->SetSampleDuration(duration_100ns);
-
-            // 写入 Sink Writer（只需加 encoder_write_mutex）
-            // 检查状态使用 atomic 读取，无需锁
-            if (state.status.load(std::memory_order_acquire) ==
-                    Features::Recording::Types::RecordingStatus::Recording &&
-                encoder.has_audio) {
+              // 只在写入时加锁
               std::lock_guard write_lock(state.encoder_write_mutex);
-              hr = encoder.sink_writer->WriteSample(encoder.audio_stream_index, sample.get());
+              HRESULT hr =
+                  encoder.sink_writer->WriteSample(encoder.audio_stream_index, sample.get());
               if (FAILED(hr)) {
                 Logger().error("Failed to write audio sample: {:08X}", static_cast<uint32_t>(hr));
               }
