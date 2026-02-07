@@ -1,8 +1,8 @@
 module;
 
 #include <wil/com.h>
-#include <WebView2.h>  // 必须放最后面
 
+#include <WebView2.h>  // 必须放最后面
 export module Core.WebView.State;
 
 import std;
@@ -14,8 +14,8 @@ export namespace Core::WebView::State {
 // WebView窗口状态
 struct WindowState {
   HWND webview_hwnd = nullptr;
-  int width = 1366;
-  int height = 768;
+  int width = 1200;
+  int height = 800;
   int x = 0;
   int y = 0;
   bool is_visible = false;
@@ -26,13 +26,13 @@ struct CoreResources {
   wil::com_ptr<ICoreWebView2Environment> environment;
   wil::com_ptr<ICoreWebView2Controller> controller;
   wil::com_ptr<ICoreWebView2> webview;
-  
+
   // 事件注册令牌，用于清理时取消注册
   EventRegistrationToken navigation_starting_token{};
   EventRegistrationToken navigation_completed_token{};
   EventRegistrationToken web_message_received_token{};
   std::vector<EventRegistrationToken> webresource_requested_tokens;
-  
+
   std::wstring user_data_folder;
   std::wstring current_url;
 

@@ -178,6 +178,15 @@ export struct AppSettings {
     // 浮窗主题模式
     std::string floating_window_theme_mode = "dark";
 
+    // WebView 主窗口尺寸和位置（持久化）
+    // x/y 为 -1 表示未保存过，首次启动时居中
+    struct WebViewWindow {
+      int width = 1200;
+      int height = 800;
+      int x = -1;
+      int y = -1;
+    } webview_window;
+
     // Web UI 设置
     WebThemeSettings web_theme;
     WebBackgroundSettings background;

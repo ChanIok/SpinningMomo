@@ -1,20 +1,20 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
-
-#include <iostream>
-
 module UI.WebViewWindow;
 
 import std;
 import Core.State;
 import Core.WebView;
 import Core.WebView.State;
+import Features.Settings;
+import Features.Settings.State;
+import Features.Settings.Types;
 import UI.FloatingWindow.State;
 import Utils.Logger;
 import Vendor.Windows;
+import <dwmapi.h>;
+import <windows.h>;
+import <windowsx.h>;
 
 namespace UI::WebViewWindow {
 
@@ -242,11 +242,45 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 注册窗口类
   register_window_class(state.floating_window->window.instance);
 
-  // 设置默认窗口大小和位置
-  const int width = state.webview->window.width;
-  const int height = state.webview->window.height;
-  const int x = 200;
-  const int y = 100;
+  // 从设置读取持久化的尺寸和位置，默认 1200×800，位置居中
+  int width = state.settings->raw.ui.webview_window.width;
+  int height = state.settings->raw.ui.webview_window.height;
+  int x = state.settings->raw.ui.webview_window.x;
+  int y = state.settings->raw.ui.webview_window.y;
+
+  // 限制在合理范围内（最小 320×240，最大为工作区）
+  constexpr int kMinWidth = 320;
+  constexpr int kMinHeight = 240;
+  width = std::max(kMinWidth, width);
+  height = std::max(kMinHeight, height);
+
+  HMONITOR monitor = MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+  MONITORINFO mi = {sizeof(mi)};
+  if (GetMonitorInfoW(monitor, &mi)) {
+    int work_width = mi.rcWork.right - mi.rcWork.left;
+    int work_height = mi.rcWork.bottom - mi.rcWork.top;
+    width = std::min(width, work_width);
+    height = std::min(height, work_height);
+  }
+
+  // 位置：x/y < 0 表示未保存过，居中；否则使用保存的位置
+  // 若保存的位置完全不在当前显示器上，则回退到居中
+  bool use_center = (x < 0 || y < 0);
+  if (!use_center && GetMonitorInfoW(monitor, &mi)) {
+    RECT work = mi.rcWork;
+    // 窗口至少有一部分在工作区内
+    bool visible =
+        (x + width > work.left && x < work.right && y + height > work.top && y < work.bottom);
+    if (!visible) {
+      use_center = true;
+    }
+  }
+  if (use_center && GetMonitorInfoW(monitor, &mi)) {
+    int work_width = mi.rcWork.right - mi.rcWork.left;
+    int work_height = mi.rcWork.bottom - mi.rcWork.top;
+    x = mi.rcWork.left + (work_width - width) / 2;
+    y = mi.rcWork.top + (work_height - height) / 2;
+  }
 
   // 创建独立窗口
   // 窗口样式：
@@ -292,7 +326,43 @@ auto cleanup(Core::State::AppState& state) -> void {
   Core::WebView::shutdown(state);
 
   if (state.webview->window.webview_hwnd) {
-    DestroyWindow(state.webview->window.webview_hwnd);
+    HWND hwnd = state.webview->window.webview_hwnd;
+
+    // 持久化窗口尺寸和位置（若最大化则保存恢复后尺寸和位置）
+    int width_to_save = state.webview->window.width;
+    int height_to_save = state.webview->window.height;
+    int x_to_save = state.webview->window.x;
+    int y_to_save = state.webview->window.y;
+    if (IsZoomed(hwnd)) {
+      WINDOWPLACEMENT wp = {sizeof(wp)};
+      if (GetWindowPlacement(hwnd, &wp)) {
+        width_to_save = wp.rcNormalPosition.right - wp.rcNormalPosition.left;
+        height_to_save = wp.rcNormalPosition.bottom - wp.rcNormalPosition.top;
+        x_to_save = wp.rcNormalPosition.left;
+        y_to_save = wp.rcNormalPosition.top;
+      }
+    }
+
+    constexpr int kMinWidth = 320;
+    constexpr int kMinHeight = 240;
+    width_to_save = std::max(kMinWidth, width_to_save);
+    height_to_save = std::max(kMinHeight, height_to_save);
+
+    state.settings->raw.ui.webview_window.width = width_to_save;
+    state.settings->raw.ui.webview_window.height = height_to_save;
+    state.settings->raw.ui.webview_window.x = x_to_save;
+    state.settings->raw.ui.webview_window.y = y_to_save;
+
+    auto settings_path = Features::Settings::get_settings_path();
+    if (settings_path) {
+      if (auto save_result =
+              Features::Settings::save_settings_to_file(settings_path.value(), state.settings->raw);
+          !save_result) {
+        Logger().warn("Failed to persist WebView window bounds: {}", save_result.error());
+      }
+    }
+
+    DestroyWindow(hwnd);
     state.webview->window.webview_hwnd = nullptr;
     state.webview->window.is_visible = false;
     Logger().info("WebView window destroyed");
