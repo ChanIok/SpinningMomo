@@ -8,8 +8,8 @@ import Features.ReplayBuffer;
 import Features.ReplayBuffer.Types;
 import Features.ReplayBuffer.State;
 import Features.ReplayBuffer.MotionPhoto;
-import Features.ReplayBuffer.Trimmer;
 import Features.Recording.State;
+import Utils.Media.VideoScaler;
 import Features.Recording.Types;
 import Features.Settings;
 import Features.Settings.State;
@@ -217,20 +217,22 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
     scaled_mp4_path =
         state.replay_buffer->cache_dir / std::format("motion_photo_scaled_{}.mp4", unique_suffix);
 
-    Features::ReplayBuffer::Trimmer::ScaleConfig scale_cfg{
+    Utils::Media::VideoScaler::ScaleConfig scale_cfg{
         .target_short_edge = mp_settings.resolution,
         .bitrate = mp_settings.bitrate,
         .fps = mp_settings.fps,
     };
 
     auto scale_result =
-        Features::ReplayBuffer::Trimmer::scale_video(raw_mp4_path, scaled_mp4_path, scale_cfg);
-    if (scale_result) {
+        Utils::Media::VideoScaler::scale_video_file(raw_mp4_path, scaled_mp4_path, scale_cfg);
+    if (scale_result && scale_result->scaled) {
+      // 缩放成功，使用缩放后的文件
       mp4_for_merge = scaled_mp4_path;
-    } else {
+    } else if (!scale_result) {
       // 缩放失败，回退到原始 MP4
       Logger().warn("Failed to scale video, using raw: {}", scale_result.error());
     }
+    // scale_result && !scale_result->scaled: 源分辨率已符合目标，使用原始 MP4
   }
 
   // 3. 生成输出路径：将 .jpg 替换为 MP.jpg
