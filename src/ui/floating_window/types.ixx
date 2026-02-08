@@ -1,18 +1,18 @@
 module;
 
-#include <d2d1_3.h>
-#include <dwrite_3.h>
-#include <windows.h>
-
-#include <string>
-
 export module UI.FloatingWindow.Types;
 
 import std;
 import Features.WindowControl;
 import Features.Settings.Menu;
+import <d2d1_3.h>;
+import <dwrite_3.h>;
+import <windows.h>;
 
 export namespace UI::FloatingWindow {
+
+// 用于 Windows 11 TopMost Z 序失效 workaround 的自定义消息
+constexpr UINT WM_REFRESH_TOPMOST = WM_USER + 10;
 
 // 菜单布局模式
 enum class MenuLayoutMode {
@@ -44,6 +44,7 @@ struct WindowInfo {
   UINT dpi = 96;
   bool is_visible = false;
   bool is_tracking_mouse = false;
+  HWINEVENTHOOK topmost_refresh_hook = nullptr;  // 用于 Windows 11 TopMost workaround
 };
 
 // UI交互状态

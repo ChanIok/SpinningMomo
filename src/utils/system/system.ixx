@@ -38,6 +38,6 @@ export [[nodiscard]] auto acquire_single_instance_lock() noexcept -> bool;
 export auto activate_existing_instance() noexcept -> void;
 
 // 自定义消息：通知已运行实例显示窗口
-export constexpr unsigned int WM_SPINNINGMOMO_SHOW = 0x8000 + 100;  // WM_APP + 100
+export constexpr unsigned int WM_SPINNINGMOMO_SHOW = 0x8000 + 100;  // 跨进程消息范围
 
 }  // namespace Utils::System

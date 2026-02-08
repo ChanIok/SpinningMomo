@@ -1,11 +1,5 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
-
-#include <string>
-
 module UI.FloatingWindow;
 
 import std;
@@ -27,8 +21,39 @@ import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
 import Utils.Logger;
 import Utils.String;
+import <dwmapi.h>;
+import <windows.h>;
+import <windowsx.h>;
 
 namespace UI::FloatingWindow {
+
+// 用于前台窗口变化回调，用于 Windows 11 TopMost Z 序失效 workaround
+static Core::State::AppState* g_floating_window_for_topmost_hook = nullptr;
+
+static void CALLBACK topmost_refresh_win_event_proc(HWINEVENTHOOK /*hook*/, DWORD event, HWND hwnd,
+                                                    LONG /*idObject*/, LONG /*idChild*/,
+                                                    DWORD /*idEventThread*/,
+                                                    DWORD /*dwmsEventTime*/) {
+  if (event != EVENT_SYSTEM_FOREGROUND || !g_floating_window_for_topmost_hook) {
+    return;
+  }
+  auto& state = *g_floating_window_for_topmost_hook;
+  if (!state.floating_window->window.is_visible || !state.floating_window->window.hwnd) {
+    return;
+  }
+  // 当前台变为本窗口时，无需刷新
+  if (hwnd == state.floating_window->window.hwnd) {
+    return;
+  }
+  // 当前台为本进程的其他窗口（如上下文菜单、WebView）时，不刷新，避免覆盖自己的 UI
+  DWORD fg_pid = 0;
+  GetWindowThreadProcessId(hwnd, &fg_pid);
+  if (fg_pid != 0 && fg_pid == GetCurrentProcessId()) {
+    return;
+  }
+  // 当前台变为外部应用时，请求刷新置顶状态以恢复 Z 序
+  PostMessageW(state.floating_window->window.hwnd, UI::FloatingWindow::WM_REFRESH_TOPMOST, 0, 0);
+}
 
 auto create_window(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 获取系统DPI
@@ -91,11 +116,40 @@ auto request_repaint(Core::State::AppState& state) -> void {
   }
 }
 
+auto install_topmost_refresh_hook(Core::State::AppState& state) -> void {
+  auto& win = state.floating_window->window;
+  if (win.topmost_refresh_hook) {
+    return;  // 已安装
+  }
+  g_floating_window_for_topmost_hook = &state;
+  win.topmost_refresh_hook =
+      SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr,
+                      topmost_refresh_win_event_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
+  if (!win.topmost_refresh_hook) {
+    Logger().warn("Failed to install topmost refresh hook for Windows 11 workaround");
+    g_floating_window_for_topmost_hook = nullptr;
+  }
+}
+
+auto uninstall_topmost_refresh_hook(Core::State::AppState& state) -> void {
+  auto& win = state.floating_window->window;
+  if (win.topmost_refresh_hook) {
+    UnhookWinEvent(win.topmost_refresh_hook);
+    win.topmost_refresh_hook = nullptr;
+  }
+  if (g_floating_window_for_topmost_hook == &state) {
+    g_floating_window_for_topmost_hook = nullptr;
+  }
+}
+
 auto show_window(Core::State::AppState& state) -> void {
   if (state.floating_window->window.hwnd) {
     ShowWindow(state.floating_window->window.hwnd, SW_SHOWNA);
     UpdateWindow(state.floating_window->window.hwnd);
     state.floating_window->window.is_visible = true;
+
+    // Windows 11 TopMost Z 序失效 workaround：显示时安装前台变化监听
+    install_topmost_refresh_hook(state);
 
     // 触发初始绘制（使用标准InvalidateRect机制）
     request_repaint(state);
@@ -104,6 +158,7 @@ auto show_window(Core::State::AppState& state) -> void {
 
 auto hide_window(Core::State::AppState& state) -> void {
   if (state.floating_window->window.hwnd) {
+    uninstall_topmost_refresh_hook(state);
     ShowWindow(state.floating_window->window.hwnd, SW_HIDE);
     state.floating_window->window.is_visible = false;
   }
@@ -122,6 +177,7 @@ auto destroy_window(Core::State::AppState& state) -> void {
   UI::FloatingWindow::D2DContext::cleanup_d2d(state);
 
   if (state.floating_window->window.hwnd) {
+    uninstall_topmost_refresh_hook(state);
     DestroyWindow(state.floating_window->window.hwnd);
     state.floating_window->window.hwnd = nullptr;
     state.floating_window->window.is_visible = false;

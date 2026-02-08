@@ -342,6 +342,11 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
         Features::Notifications::update_notifications(state);
       }
       return 0;
+
+    // Windows 11 TopMost Z 序失效 workaround：重新应用置顶以恢复视觉层级
+    case UI::FloatingWindow::WM_REFRESH_TOPMOST:
+      SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+      return 0;
   }
   return DefWindowProc(hwnd, msg, wParam, lParam);
 }
