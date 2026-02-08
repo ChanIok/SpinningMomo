@@ -2,15 +2,13 @@ module;
 
 #include <codecapi.h>
 #include <d3d11.h>
-#include <d3d11_4.h>
 #include <mferror.h>
 #include <mfidl.h>
-#include <mfreadwrite.h>
+#include <propvarutil.h>
 
 module Utils.Media.VideoScaler;
 
 import std;
-import Utils.Graphics.D3D;
 import Utils.Logger;
 import <mfapi.h>;
 import <wil/com.h>;
@@ -51,131 +49,44 @@ auto calculate_scaled_dimensions(std::uint32_t src_width, std::uint32_t src_heig
   return {src_width, src_height};
 }
 
-// D3D11 Video Processor 缩放上下文
-struct VideoProcessorContext {
-  wil::com_ptr<ID3D11VideoDevice> video_device;
-  wil::com_ptr<ID3D11VideoContext> video_context;
-  wil::com_ptr<ID3D11VideoProcessorEnumerator> vp_enum;
-  wil::com_ptr<ID3D11VideoProcessor> video_processor;
-  wil::com_ptr<ID3D11Texture2D> output_texture;  // 缩放后的 NV12 纹理
-  std::uint32_t src_width = 0;
-  std::uint32_t src_height = 0;
-  std::uint32_t dst_width = 0;
-  std::uint32_t dst_height = 0;
-};
-
-// 创建 D3D11 Video Processor（支持缩放）
-auto create_video_processor_for_scaling(ID3D11Device* device, std::uint32_t src_width,
-                                        std::uint32_t src_height, std::uint32_t dst_width,
-                                        std::uint32_t dst_height)
-    -> std::expected<VideoProcessorContext, std::string> {
-  VideoProcessorContext ctx;
-  ctx.src_width = src_width;
-  ctx.src_height = src_height;
-  ctx.dst_width = dst_width;
-  ctx.dst_height = dst_height;
-
-  // 获取 Video Device 接口
-  HRESULT hr = device->QueryInterface(IID_PPV_ARGS(ctx.video_device.put()));
+// 从 MediaSource 获取视频分辨率
+auto get_source_video_dimensions(IMFMediaSource* source)
+    -> std::expected<std::pair<std::uint32_t, std::uint32_t>, std::string> {
+  wil::com_ptr<IMFPresentationDescriptor> pd;
+  HRESULT hr = source->CreatePresentationDescriptor(pd.put());
   if (FAILED(hr)) {
-    return std::unexpected("Failed to get ID3D11VideoDevice");
+    return std::unexpected("Failed to create presentation descriptor");
   }
 
-  // 获取 Video Context 接口
-  wil::com_ptr<ID3D11DeviceContext> d3d_context;
-  device->GetImmediateContext(d3d_context.put());
-  hr = d3d_context->QueryInterface(IID_PPV_ARGS(ctx.video_context.put()));
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to get ID3D11VideoContext");
+  DWORD stream_count = 0;
+  pd->GetStreamDescriptorCount(&stream_count);
+
+  for (DWORD i = 0; i < stream_count; ++i) {
+    BOOL selected = FALSE;
+    wil::com_ptr<IMFStreamDescriptor> sd;
+    hr = pd->GetStreamDescriptorByIndex(i, &selected, sd.put());
+    if (FAILED(hr)) continue;
+
+    wil::com_ptr<IMFMediaTypeHandler> handler;
+    hr = sd->GetMediaTypeHandler(handler.put());
+    if (FAILED(hr)) continue;
+
+    GUID major_type;
+    hr = handler->GetMajorType(&major_type);
+    if (FAILED(hr) || major_type != MFMediaType_Video) continue;
+
+    wil::com_ptr<IMFMediaType> media_type;
+    hr = handler->GetCurrentMediaType(media_type.put());
+    if (FAILED(hr)) continue;
+
+    UINT32 width = 0, height = 0;
+    hr = MFGetAttributeSize(media_type.get(), MF_MT_FRAME_SIZE, &width, &height);
+    if (SUCCEEDED(hr) && width > 0 && height > 0) {
+      return std::make_pair(width, height);
+    }
   }
 
-  // 创建 Video Processor Enumerator（关键：输入输出尺寸不同）
-  D3D11_VIDEO_PROCESSOR_CONTENT_DESC content_desc = {};
-  content_desc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
-  content_desc.InputWidth = src_width;
-  content_desc.InputHeight = src_height;
-  content_desc.OutputWidth = dst_width;
-  content_desc.OutputHeight = dst_height;
-  content_desc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
-
-  hr = ctx.video_device->CreateVideoProcessorEnumerator(&content_desc, ctx.vp_enum.put());
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create video processor enumerator: " +
-                           std::to_string(static_cast<std::uint32_t>(hr)));
-  }
-
-  // 创建 Video Processor
-  hr = ctx.video_device->CreateVideoProcessor(ctx.vp_enum.get(), 0, ctx.video_processor.put());
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create video processor");
-  }
-
-  // 设置源矩形（输入完整帧）
-  RECT src_rect = {0, 0, static_cast<LONG>(src_width), static_cast<LONG>(src_height)};
-  ctx.video_context->VideoProcessorSetStreamSourceRect(ctx.video_processor.get(), 0, TRUE,
-                                                       &src_rect);
-
-  // 设置目标矩形（输出完整帧）
-  RECT dst_rect = {0, 0, static_cast<LONG>(dst_width), static_cast<LONG>(dst_height)};
-  ctx.video_context->VideoProcessorSetStreamDestRect(ctx.video_processor.get(), 0, TRUE, &dst_rect);
-  ctx.video_context->VideoProcessorSetOutputTargetRect(ctx.video_processor.get(), TRUE, &dst_rect);
-
-  // 禁用自动处理（保持质量）
-  ctx.video_context->VideoProcessorSetStreamAutoProcessingMode(ctx.video_processor.get(), 0, FALSE);
-
-  // 创建输出纹理（NV12 格式，用于编码器输入）
-  D3D11_TEXTURE2D_DESC output_desc = {};
-  output_desc.Width = dst_width;
-  output_desc.Height = dst_height;
-  output_desc.MipLevels = 1;
-  output_desc.ArraySize = 1;
-  output_desc.Format = DXGI_FORMAT_NV12;
-  output_desc.SampleDesc.Count = 1;
-  output_desc.Usage = D3D11_USAGE_DEFAULT;
-  output_desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_VIDEO_ENCODER;
-
-  hr = device->CreateTexture2D(&output_desc, nullptr, ctx.output_texture.put());
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create output NV12 texture");
-  }
-
-  Logger().debug("Video Processor created for scaling: {}x{} -> {}x{}", src_width, src_height,
-                 dst_width, dst_height);
-  return ctx;
-}
-
-// 执行缩放操作
-auto scale_frame(VideoProcessorContext& ctx, ID3D11Texture2D* input_texture) -> HRESULT {
-  // 创建输入视图
-  D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC input_view_desc = {};
-  input_view_desc.FourCC = 0;
-  input_view_desc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
-  input_view_desc.Texture2D.MipSlice = 0;
-
-  wil::com_ptr<ID3D11VideoProcessorInputView> input_view;
-  HRESULT hr = ctx.video_device->CreateVideoProcessorInputView(input_texture, ctx.vp_enum.get(),
-                                                               &input_view_desc, input_view.put());
-  if (FAILED(hr)) return hr;
-
-  // 创建输出视图
-  D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC output_view_desc = {};
-  output_view_desc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
-  output_view_desc.Texture2D.MipSlice = 0;
-
-  wil::com_ptr<ID3D11VideoProcessorOutputView> output_view;
-  hr = ctx.video_device->CreateVideoProcessorOutputView(ctx.output_texture.get(), ctx.vp_enum.get(),
-                                                        &output_view_desc, output_view.put());
-  if (FAILED(hr)) return hr;
-
-  // 执行缩放
-  D3D11_VIDEO_PROCESSOR_STREAM stream = {};
-  stream.Enable = TRUE;
-  stream.OutputIndex = 0;
-  stream.InputFrameOrField = 0;
-  stream.pInputSurface = input_view.get();
-
-  return ctx.video_context->VideoProcessorBlt(ctx.video_processor.get(), output_view.get(), 0, 1,
-                                              &stream);
+  return std::unexpected("No video stream found in source");
 }
 
 auto scale_video_file(const std::filesystem::path& input_path,
@@ -183,60 +94,39 @@ auto scale_video_file(const std::filesystem::path& input_path,
     -> std::expected<ScaleResult, std::string> {
   ScaleResult result = {};
 
-  // 1. 创建 D3D11 设备
-  auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
-  if (!d3d_result) {
-    return std::unexpected("Failed to create D3D11 device: " + d3d_result.error());
-  }
-  auto [device, context] = std::move(*d3d_result);
-
-  // 启用多线程保护
-  wil::com_ptr<ID3D11Multithread> multithread;
-  if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(multithread.put())))) {
-    multithread->SetMultithreadProtected(TRUE);
-  }
-
-  // 2. 创建 DXGI Device Manager
-  wil::com_ptr<IMFDXGIDeviceManager> dxgi_manager;
-  UINT reset_token = 0;
-  HRESULT hr = MFCreateDXGIDeviceManager(&reset_token, dxgi_manager.put());
+  // 1. 创建 MediaSource
+  wil::com_ptr<IMFSourceResolver> resolver;
+  HRESULT hr = MFCreateSourceResolver(resolver.put());
   if (FAILED(hr)) {
-    return std::unexpected("Failed to create DXGI Device Manager");
+    return std::unexpected("Failed to create source resolver");
   }
 
-  hr = dxgi_manager->ResetDevice(device.get(), reset_token);
+  MF_OBJECT_TYPE object_type = MF_OBJECT_INVALID;
+  wil::com_ptr<IUnknown> source_unk;
+  hr = resolver->CreateObjectFromURL(input_path.c_str(), MF_RESOLUTION_MEDIASOURCE, nullptr,
+                                     &object_type, source_unk.put());
   if (FAILED(hr)) {
-    return std::unexpected("Failed to reset DXGI device");
-  }
-
-  // 3. 创建 SourceReader（配置 D3D11 加速）
-  wil::com_ptr<IMFAttributes> reader_attrs;
-  MFCreateAttributes(reader_attrs.put(), 3);
-  reader_attrs->SetUnknown(MF_SOURCE_READER_D3D_MANAGER, dxgi_manager.get());
-  reader_attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
-  reader_attrs->SetUINT32(MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING, TRUE);
-
-  wil::com_ptr<IMFSourceReader> reader;
-  hr = MFCreateSourceReaderFromURL(input_path.c_str(), reader_attrs.get(), reader.put());
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create source reader: " +
+    return std::unexpected("Failed to create media source: " +
                            std::to_string(static_cast<std::uint32_t>(hr)));
   }
 
-  // 获取源视频格式
-  wil::com_ptr<IMFMediaType> native_type;
-  hr = reader->GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, native_type.put());
+  wil::com_ptr<IMFMediaSource> media_source;
+  hr = source_unk->QueryInterface(IID_PPV_ARGS(media_source.put()));
   if (FAILED(hr)) {
-    return std::unexpected("Failed to get native video type");
+    return std::unexpected("Failed to get IMFMediaSource interface");
   }
 
-  UINT32 src_width = 0, src_height = 0;
-  MFGetAttributeSize(native_type.get(), MF_MT_FRAME_SIZE, &src_width, &src_height);
+  // 2. 获取源视频分辨率
+  auto dims_result = get_source_video_dimensions(media_source.get());
+  if (!dims_result) {
+    return std::unexpected(dims_result.error());
+  }
+  auto [src_width, src_height] = *dims_result;
 
   result.src_width = src_width;
   result.src_height = src_height;
 
-  // 计算目标分辨率
+  // 3. 计算目标分辨率
   auto [target_width, target_height] = calculate_scaled_dimensions(src_width, src_height, config);
   result.target_width = target_width;
   result.target_height = target_height;
@@ -246,275 +136,198 @@ auto scale_video_file(const std::filesystem::path& input_path,
     Logger().info("Video already at target resolution {}x{}, skipping scale", src_width,
                   src_height);
     result.scaled = false;
+    media_source->Shutdown();
     return result;
   }
 
-  Logger().info("Scaling video from {}x{} to {}x{}", src_width, src_height, target_width,
-                target_height);
+  Logger().info("Scaling video from {}x{} to {}x{} using Transcode API", src_width, src_height,
+                target_width, target_height);
 
-  // 配置 SourceReader 输出 NV12（D3D11 Video Processor 优化格式）
-  wil::com_ptr<IMFMediaType> decoder_output_type;
-  MFCreateMediaType(decoder_output_type.put());
-  decoder_output_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-  decoder_output_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
-  MFSetAttributeSize(decoder_output_type.get(), MF_MT_FRAME_SIZE, src_width, src_height);
-
-  hr = reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr,
-                                   decoder_output_type.get());
+  // 4. 创建 TranscodeProfile
+  wil::com_ptr<IMFTranscodeProfile> profile;
+  hr = MFCreateTranscodeProfile(profile.put());
   if (FAILED(hr)) {
-    return std::unexpected("Failed to set decoder output type: " +
+    media_source->Shutdown();
+    return std::unexpected("Failed to create transcode profile");
+  }
+
+  // 视频属性
+  wil::com_ptr<IMFAttributes> video_attrs;
+  MFCreateAttributes(video_attrs.put(), 10);
+
+  // 根据 codec 配置选择编码器
+  if (config.codec == VideoCodec::H265) {
+    video_attrs->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_HEVC);
+    video_attrs->SetUINT32(MF_MT_VIDEO_PROFILE, eAVEncH265VProfile_Main_420_8);
+    Logger().debug("Using H.265/HEVC codec");
+  } else {
+    video_attrs->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
+    video_attrs->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Main);
+    Logger().debug("Using H.264/AVC codec");
+  }
+
+  MFSetAttributeSize(video_attrs.get(), MF_MT_FRAME_SIZE, target_width, target_height);
+  MFSetAttributeRatio(video_attrs.get(), MF_MT_FRAME_RATE, config.fps, 1);
+  video_attrs->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+
+  // 根据 rate_control 配置码率控制
+  if (config.rate_control == RateControl::CBR) {
+    // CBR: 使用指定码率
+    video_attrs->SetUINT32(MF_MT_AVG_BITRATE, config.bitrate);
+    Logger().debug("Using CBR with bitrate: {} bps", config.bitrate);
+  } else {
+    // VBR: 使用质量参数，码率作为上限
+    video_attrs->SetUINT32(MF_MT_AVG_BITRATE, config.bitrate);
+    Logger().debug("Using VBR with quality: {}, max bitrate: {} bps", config.quality,
+                   config.bitrate);
+  }
+
+  // 质量 vs 速度：0=最快，100=最高质量
+  video_attrs->SetUINT32(MF_TRANSCODE_QUALITYVSSPEED, config.quality);
+
+  hr = profile->SetVideoAttributes(video_attrs.get());
+  if (FAILED(hr)) {
+    media_source->Shutdown();
+    return std::unexpected("Failed to set video attributes");
+  }
+
+  // 音频属性（MF_MT_AUDIO_AVG_BYTES_PER_SECOND 为字节/秒 = bitrate/8）
+  std::uint32_t audio_bytes_per_sec = config.audio_bitrate / 8;
+  wil::com_ptr<IMFAttributes> audio_attrs;
+  MFCreateAttributes(audio_attrs.put(), 6);
+  audio_attrs->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC);
+  audio_attrs->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
+  audio_attrs->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, 48000);
+  audio_attrs->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, 2);
+  audio_attrs->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 1);
+  audio_attrs->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, audio_bytes_per_sec);
+
+  hr = profile->SetAudioAttributes(audio_attrs.get());
+  if (FAILED(hr)) {
+    Logger().warn("Failed to set audio attributes, continuing without audio");
+  }
+
+  // 容器属性
+  wil::com_ptr<IMFAttributes> container_attrs;
+  MFCreateAttributes(container_attrs.put(), 2);
+  container_attrs->SetGUID(MF_TRANSCODE_CONTAINERTYPE, MFTranscodeContainerType_MPEG4);
+  // 允许硬件加速
+  container_attrs->SetUINT32(MF_TRANSCODE_TOPOLOGYMODE, MF_TRANSCODE_TOPOLOGYMODE_HARDWARE_ALLOWED);
+
+  hr = profile->SetContainerAttributes(container_attrs.get());
+  if (FAILED(hr)) {
+    media_source->Shutdown();
+    return std::unexpected("Failed to set container attributes");
+  }
+
+  // 5. 创建 Transcode Topology
+  wil::com_ptr<IMFTopology> topology;
+  hr = MFCreateTranscodeTopology(media_source.get(), output_path.c_str(), profile.get(),
+                                 topology.put());
+  if (FAILED(hr)) {
+    media_source->Shutdown();
+    return std::unexpected("Failed to create transcode topology: " +
                            std::to_string(static_cast<std::uint32_t>(hr)));
   }
 
-  // 检查是否有音频
-  bool has_audio = false;
-  wil::com_ptr<IMFMediaType> native_audio_type;
-  if (SUCCEEDED(reader->GetNativeMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0,
-                                           native_audio_type.put()))) {
-    has_audio = true;
+  Logger().debug("Transcode topology created");
 
-    // 配置音频解码为 PCM
-    wil::com_ptr<IMFMediaType> audio_decode_type;
-    MFCreateMediaType(audio_decode_type.put());
-    audio_decode_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-    audio_decode_type->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
-    reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr,
-                                audio_decode_type.get());
-  }
-
-  // 4. 创建 Video Processor
-  auto vp_result = create_video_processor_for_scaling(device.get(), src_width, src_height,
-                                                      target_width, target_height);
-  if (!vp_result) {
-    return std::unexpected("Failed to create video processor: " + vp_result.error());
-  }
-  auto& vp_ctx = *vp_result;
-
-  // 5. 创建 SinkWriter（配置 D3D11 硬件编码）
-  wil::com_ptr<IMFAttributes> writer_attrs;
-  MFCreateAttributes(writer_attrs.put(), 2);
-  writer_attrs->SetUnknown(MF_SINK_WRITER_D3D_MANAGER, dxgi_manager.get());
-  writer_attrs->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
-
-  wil::com_ptr<IMFSinkWriter> writer;
-  hr = MFCreateSinkWriterFromURL(output_path.c_str(), nullptr, writer_attrs.get(), writer.put());
+  // 6. 创建 MediaSession
+  wil::com_ptr<IMFMediaSession> session;
+  hr = MFCreateMediaSession(nullptr, session.put());
   if (FAILED(hr)) {
-    return std::unexpected("Failed to create sink writer: " +
+    media_source->Shutdown();
+    return std::unexpected("Failed to create media session");
+  }
+
+  // 设置 topology
+  hr = session->SetTopology(0, topology.get());
+  if (FAILED(hr)) {
+    session->Shutdown();
+    media_source->Shutdown();
+    return std::unexpected("Failed to set topology: " +
                            std::to_string(static_cast<std::uint32_t>(hr)));
   }
 
-  // 配置视频输出流（H.264）
-  wil::com_ptr<IMFMediaType> output_video_type;
-  MFCreateMediaType(output_video_type.put());
-  output_video_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-  output_video_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_H264);
-  output_video_type->SetUINT32(MF_MT_AVG_BITRATE, config.bitrate);
-  MFSetAttributeSize(output_video_type.get(), MF_MT_FRAME_SIZE, target_width, target_height);
-  MFSetAttributeRatio(output_video_type.get(), MF_MT_FRAME_RATE, config.fps, 1);
-  MFSetAttributeRatio(output_video_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
-  output_video_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
-  output_video_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_Main);
-
-  DWORD video_stream_index = 0;
-  hr = writer->AddStream(output_video_type.get(), &video_stream_index);
+  // 7. 启动 session
+  PROPVARIANT var_start;
+  PropVariantInit(&var_start);
+  hr = session->Start(&GUID_NULL, &var_start);
+  PropVariantClear(&var_start);
   if (FAILED(hr)) {
-    return std::unexpected("Failed to add video stream: " +
+    session->Shutdown();
+    media_source->Shutdown();
+    return std::unexpected("Failed to start session: " +
                            std::to_string(static_cast<std::uint32_t>(hr)));
   }
 
-  // 配置视频输入类型（NV12）
-  wil::com_ptr<IMFMediaType> input_video_type;
-  MFCreateMediaType(input_video_type.put());
-  input_video_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
-  input_video_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
-  MFSetAttributeSize(input_video_type.get(), MF_MT_FRAME_SIZE, target_width, target_height);
-  MFSetAttributeRatio(input_video_type.get(), MF_MT_FRAME_RATE, config.fps, 1);
-  MFSetAttributeRatio(input_video_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1);
-  input_video_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+  Logger().debug("Transcode session started");
 
-  hr = writer->SetInputMediaType(video_stream_index, input_video_type.get(), nullptr);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to set video input type: " +
-                           std::to_string(static_cast<std::uint32_t>(hr)));
-  }
-
-  // 配置音频流（如果有）
-  DWORD audio_stream_index = 0;
-  wil::com_ptr<IMFMediaType> actual_audio_type;
-  if (has_audio) {
-    reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, actual_audio_type.put());
-
-    wil::com_ptr<IMFMediaType> output_audio_type;
-    MFCreateMediaType(output_audio_type.put());
-    output_audio_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-    output_audio_type->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_AAC);
-    output_audio_type->SetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
-    output_audio_type->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, 48000);
-    output_audio_type->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, 2);
-    output_audio_type->SetUINT32(MF_MT_AUDIO_AVG_BYTES_PER_SECOND, 16000);
-
-    hr = writer->AddStream(output_audio_type.get(), &audio_stream_index);
+  // 8. 等待完成（同步轮询）
+  bool transcoding = true;
+  while (transcoding) {
+    wil::com_ptr<IMFMediaEvent> event;
+    hr = session->GetEvent(0, event.put());  // 阻塞等待
     if (FAILED(hr)) {
-      Logger().warn("Failed to add audio stream, continuing without audio");
-      has_audio = false;
-    } else {
-      hr = writer->SetInputMediaType(audio_stream_index, actual_audio_type.get(), nullptr);
-      if (FAILED(hr)) {
-        Logger().warn("Failed to set audio input type, continuing without audio");
-        has_audio = false;
-      }
-    }
-  }
-
-  // 6. 开始写入
-  hr = writer->BeginWriting();
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to begin writing: " +
-                           std::to_string(static_cast<std::uint32_t>(hr)));
-  }
-
-  // 7. 读取、缩放、写入循环
-  bool first_video_sample = true;
-  std::int64_t first_video_timestamp = 0;
-  bool first_audio_sample = true;
-  std::int64_t first_audio_timestamp = 0;
-  std::int64_t frame_duration = 10'000'000 / config.fps;
-  std::uint32_t frame_count = 0;
-  std::uint32_t skipped_non_dxgi = 0;
-
-  Logger().debug("Starting frame processing loop");
-
-  while (true) {
-    DWORD stream_index = 0;
-    DWORD flags = 0;
-    LONGLONG timestamp = 0;
-    wil::com_ptr<IMFSample> sample;
-
-    hr = reader->ReadSample(MF_SOURCE_READER_ANY_STREAM, 0, &stream_index, &flags, &timestamp,
-                            sample.put());
-
-    if (FAILED(hr)) {
-      Logger().warn("ReadSample failed: {:08X}", static_cast<std::uint32_t>(hr));
+      Logger().warn("GetEvent failed: {:08X}", static_cast<std::uint32_t>(hr));
       break;
     }
 
-    if (flags & MF_SOURCE_READERF_ENDOFSTREAM) {
-      Logger().debug("End of stream reached");
-      break;
+    MediaEventType event_type = MEUnknown;
+    event->GetType(&event_type);
+
+    HRESULT event_status = S_OK;
+    event->GetStatus(&event_status);
+
+    switch (event_type) {
+      case MESessionTopologySet:
+        Logger().debug("Topology set");
+        break;
+
+      case MESessionStarted:
+        Logger().debug("Session started");
+        break;
+
+      case MESessionEnded:
+        Logger().debug("Session ended, closing...");
+        session->Close();
+        break;
+
+      case MESessionClosed:
+        Logger().debug("Session closed");
+        transcoding = false;
+        break;
+
+      case MEError:
+        Logger().error("Session error: {:08X}", static_cast<std::uint32_t>(event_status));
+        transcoding = false;
+        break;
+
+      default:
+        // 其他事件忽略
+        break;
     }
 
-    if ((flags & MF_SOURCE_READERF_STREAMTICK) || !sample) {
-      continue;
-    }
-
-    bool is_video = (stream_index == MF_SOURCE_READER_FIRST_VIDEO_STREAM);
-
-    if (is_video) {
-      // 调整时间戳
-      if (first_video_sample) {
-        first_video_timestamp = timestamp;
-        first_video_sample = false;
-      }
-      std::int64_t adjusted_ts = timestamp - first_video_timestamp;
-
-      // 从 sample 获取纹理
-      wil::com_ptr<IMFMediaBuffer> buffer;
-      hr = sample->ConvertToContiguousBuffer(buffer.put());
-      if (FAILED(hr)) {
-        Logger().warn("Failed to get buffer from sample");
-        continue;
-      }
-
-      wil::com_ptr<IMFDXGIBuffer> dxgi_buffer;
-      hr = buffer->QueryInterface(IID_PPV_ARGS(dxgi_buffer.put()));
-      if (FAILED(hr)) {
-        skipped_non_dxgi++;
-        if (skipped_non_dxgi <= 3) {
-          Logger().warn("Sample is not a DXGI buffer (hr={:08X}), skipping frame",
-                        static_cast<std::uint32_t>(hr));
-        }
-        continue;
-      }
-
-      wil::com_ptr<ID3D11Texture2D> input_texture;
-      hr = dxgi_buffer->GetResource(IID_PPV_ARGS(input_texture.put()));
-      if (FAILED(hr)) {
-        Logger().warn("Failed to get texture from DXGI buffer");
-        continue;
-      }
-
-      // 执行缩放
-      hr = scale_frame(vp_ctx, input_texture.get());
-      if (FAILED(hr)) {
-        Logger().warn("Video Processor scaling failed: {:08X}", static_cast<std::uint32_t>(hr));
-        continue;
-      }
-
-      // 创建输出 sample
-      wil::com_ptr<IMFSample> output_sample;
-      MFCreateSample(output_sample.put());
-
-      wil::com_ptr<IMFMediaBuffer> output_buffer;
-      wil::com_ptr<IDXGISurface> surface;
-      hr = vp_ctx.output_texture->QueryInterface(IID_PPV_ARGS(surface.put()));
-      if (FAILED(hr)) {
-        Logger().warn("Failed to get DXGI surface from output texture");
-        continue;
-      }
-
-      hr = MFCreateDXGISurfaceBuffer(__uuidof(ID3D11Texture2D), surface.get(), 0, FALSE,
-                                     output_buffer.put());
-      if (FAILED(hr)) {
-        Logger().warn("Failed to create DXGI buffer for output");
-        continue;
-      }
-
-      // 设置 buffer 长度（NV12）
-      DWORD buffer_length = target_width * target_height * 3 / 2;
-      output_buffer->SetCurrentLength(buffer_length);
-
-      output_sample->AddBuffer(output_buffer.get());
-      output_sample->SetSampleTime(adjusted_ts);
-      output_sample->SetSampleDuration(frame_duration);
-
-      // 写入
-      hr = writer->WriteSample(video_stream_index, output_sample.get());
-      if (FAILED(hr)) {
-        Logger().warn("Failed to write video sample: {:08X}", static_cast<std::uint32_t>(hr));
-        continue;
-      }
-
-      frame_count++;
-    } else if (has_audio) {
-      // 音频直接写入
-      if (first_audio_sample) {
-        first_audio_timestamp = timestamp;
-        first_audio_sample = false;
-      }
-      std::int64_t adjusted_ts = timestamp - first_audio_timestamp;
-      sample->SetSampleTime(adjusted_ts);
-
-      hr = writer->WriteSample(audio_stream_index, sample.get());
-      if (FAILED(hr)) {
-        Logger().warn("Failed to write audio sample");
-      }
+    if (FAILED(event_status)) {
+      Logger().error("Event status failed: {:08X}", static_cast<std::uint32_t>(event_status));
+      session->Close();
+      // 继续循环等待 MESessionClosed
     }
   }
 
-  // 8. Finalize
-  hr = writer->Finalize();
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to finalize output: " +
-                           std::to_string(static_cast<std::uint32_t>(hr)));
-  }
+  // 9. 清理
+  session->Shutdown();
+  media_source->Shutdown();
 
-  if (skipped_non_dxgi > 0) {
-    Logger().warn("Skipped {} frames due to non-DXGI buffers", skipped_non_dxgi);
+  // 检查输出文件
+  std::error_code ec;
+  auto file_size = std::filesystem::file_size(output_path, ec);
+  if (ec || file_size == 0) {
+    return std::unexpected("Output file is empty or not created");
   }
 
   result.scaled = true;
-  Logger().info("Video scaling completed: {} frames, saved to {}", frame_count,
-                output_path.string());
+  Logger().info("Video scaling completed using Transcode API, saved to {}", output_path.string());
   return result;
 }
 

@@ -157,6 +157,32 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateMotionPhotoRateControl = async (rateControl: 'cbr' | 'vbr') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          rateControl,
+        },
+      },
+    })
+  }
+
+  const updateMotionPhotoQuality = async (quality: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          quality,
+        },
+      },
+    })
+  }
+
   // Instant Replay 设置
   const updateReplayBufferDuration = async (duration: number) => {
     await store.updateSettings({
@@ -316,6 +342,8 @@ export const useFunctionActions = () => {
           resolution: DEFAULT_APP_SETTINGS.features.motionPhoto.resolution,
           fps: DEFAULT_APP_SETTINGS.features.motionPhoto.fps,
           bitrate: DEFAULT_APP_SETTINGS.features.motionPhoto.bitrate,
+          quality: DEFAULT_APP_SETTINGS.features.motionPhoto.quality,
+          rateControl: DEFAULT_APP_SETTINGS.features.motionPhoto.rateControl,
           codec: DEFAULT_APP_SETTINGS.features.motionPhoto.codec,
           audioSource: DEFAULT_APP_SETTINGS.features.motionPhoto.audioSource,
           audioBitrate: DEFAULT_APP_SETTINGS.features.motionPhoto.audioBitrate,
@@ -351,6 +379,8 @@ export const useFunctionActions = () => {
     updateMotionPhotoResolution,
     updateMotionPhotoFps,
     updateMotionPhotoBitrate,
+    updateMotionPhotoQuality,
+    updateMotionPhotoRateControl,
     updateMotionPhotoCodec,
     updateMotionPhotoAudioSource,
     updateMotionPhotoAudioBitrate,

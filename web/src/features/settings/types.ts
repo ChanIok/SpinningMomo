@@ -141,7 +141,9 @@ export interface AppSettings {
       duration: number // 视频时长（秒）
       resolution: number // 短边分辨率: 720/1080/1440/2160
       fps: number // 帧率
-      bitrate: number // 比特率
+      bitrate: number // 比特率 (bps)，CBR 模式使用
+      quality: number // 质量值 (0-100)，VBR 模式使用
+      rateControl: 'cbr' | 'vbr' // 码率控制模式
       codec: 'h264' | 'h265' // 编码格式
       audioSource: 'none' | 'system' | 'game_only' // 音频源
       audioBitrate: number // 音频码率
@@ -246,12 +248,14 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     motionPhoto: {
       duration: 3,
-      resolution: 1080,
+      resolution: 0,
       fps: 30,
       bitrate: 10000000,
+      quality: 100,
+      rateControl: 'vbr',
       codec: 'h264',
       audioSource: 'system',
-      audioBitrate: 128000,
+      audioBitrate: 192000,
     },
     replayBuffer: {
       duration: 30,

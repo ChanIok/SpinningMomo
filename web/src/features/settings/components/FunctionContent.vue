@@ -38,6 +38,8 @@ const {
   updateMotionPhotoResolution,
   updateMotionPhotoFps,
   updateMotionPhotoBitrate,
+  updateMotionPhotoQuality,
+  updateMotionPhotoRateControl,
   updateMotionPhotoCodec,
   updateMotionPhotoAudioSource,
   updateMotionPhotoAudioBitrate,
@@ -79,8 +81,9 @@ const inputMotionPhotoBitrateMbps = ref(
   (appSettings.value?.features?.motionPhoto?.bitrate || 10000000) / 1000000
 )
 const inputMotionPhotoAudioBitrateKbps = ref(
-  (appSettings.value?.features?.motionPhoto?.audioBitrate || 128000) / 1000
+  (appSettings.value?.features?.motionPhoto?.audioBitrate || 192000) / 1000
 )
+const inputMotionPhotoQuality = ref(appSettings.value?.features?.motionPhoto?.quality || 100)
 
 // Instant Replay local state
 const inputReplayBufferDuration = ref(appSettings.value?.features?.replayBuffer?.duration || 30)
@@ -194,6 +197,10 @@ const handleMotionPhotoAudioBitrateChange = async () => {
   await updateMotionPhotoAudioBitrate(audioBitrateBps)
 }
 
+const handleMotionPhotoQualityChange = async () => {
+  await updateMotionPhotoQuality(inputMotionPhotoQuality.value)
+}
+
 // Instant Replay handlers
 const handleReplayBufferDurationChange = async () => {
   if (!inputReplayBufferDuration.value) return
@@ -212,7 +219,8 @@ const handleResetSettings = async () => {
   inputMotionPhotoDuration.value = 3
   inputMotionPhotoFps.value = 30
   inputMotionPhotoBitrateMbps.value = 10
-  inputMotionPhotoAudioBitrateKbps.value = 128
+  inputMotionPhotoQuality.value = 100
+  inputMotionPhotoAudioBitrateKbps.value = 192
   // Instant Replay defaults
   inputReplayBufferDuration.value = 30
 }
@@ -453,7 +461,7 @@ const handleResetSettings = async () => {
             </ItemContent>
             <ItemActions>
               <Select
-                :model-value="String(appSettings?.features?.motionPhoto?.resolution ?? 1080)"
+                :model-value="String(appSettings?.features?.motionPhoto?.resolution ?? 0)"
                 @update:model-value="(value) => updateMotionPhotoResolution(Number(value))"
               >
                 <SelectTrigger class="w-32">
@@ -498,6 +506,41 @@ const handleResetSettings = async () => {
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
+                {{ t('settings.function.motionPhoto.rateControl.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.rateControl.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.motionPhoto?.rateControl"
+                @update:model-value="
+                  (value) => updateMotionPhotoRateControl(value as 'cbr' | 'vbr')
+                "
+              >
+                <SelectTrigger class="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cbr">{{
+                    t('settings.function.recording.rateControl.cbr')
+                  }}</SelectItem>
+                  <SelectItem value="vbr">{{
+                    t('settings.function.recording.rateControl.vbr')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.motionPhoto?.rateControl === 'cbr'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
                 {{ t('settings.function.motionPhoto.bitrate.label') }}
               </ItemTitle>
               <ItemDescription>
@@ -515,6 +558,33 @@ const handleResetSettings = async () => {
                 @keydown.enter="handleMotionPhotoBitrateChange"
               />
               <span class="text-sm text-muted-foreground">Mbps</span>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.motionPhoto?.rateControl === 'vbr'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.motionPhoto.quality.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.motionPhoto.quality.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputMotionPhotoQuality"
+                type="number"
+                :min="0"
+                :max="100"
+                class="w-24"
+                @blur="handleMotionPhotoQualityChange"
+                @keydown.enter="handleMotionPhotoQualityChange"
+              />
+              <span class="text-sm text-muted-foreground">(0-100)</span>
             </ItemActions>
           </Item>
 

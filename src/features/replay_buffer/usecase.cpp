@@ -217,10 +217,23 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
     scaled_mp4_path =
         state.replay_buffer->cache_dir / std::format("motion_photo_scaled_{}.mp4", unique_suffix);
 
+    // 根据设置选择码率控制模式
+    auto rate_control = mp_settings.rate_control == "vbr"
+                            ? Utils::Media::VideoScaler::RateControl::VBR
+                            : Utils::Media::VideoScaler::RateControl::CBR;
+
+    // 根据设置选择视频编码格式
+    auto video_codec = mp_settings.codec == "h265" ? Utils::Media::VideoScaler::VideoCodec::H265
+                                                   : Utils::Media::VideoScaler::VideoCodec::H264;
+
     Utils::Media::VideoScaler::ScaleConfig scale_cfg{
         .target_short_edge = mp_settings.resolution,
         .bitrate = mp_settings.bitrate,
         .fps = mp_settings.fps,
+        .rate_control = rate_control,
+        .quality = mp_settings.quality,
+        .codec = video_codec,
+        .audio_bitrate = mp_settings.audio_bitrate,
     };
 
     auto scale_result =
