@@ -23,6 +23,7 @@ import Features.Recording.State;
 import Features.ReplayBuffer.State;
 import Features.Settings.State;
 import Features.Update.State;
+import Features.VirtualGamepad.State;
 import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import UI.TrayIcon.State;
@@ -52,6 +53,7 @@ AppState::AppState()
       screenshot(std::make_unique<Features::Screenshot::State::ScreenshotState>()),
       recording(std::make_unique<Features::Recording::State::RecordingState>()),
       replay_buffer(std::make_unique<Features::ReplayBuffer::State::ReplayBufferState>()),
+      virtual_gamepad(std::make_unique<Features::VirtualGamepad::State::VirtualGamepadState>()),
       commands(std::make_unique<Core::Commands::State::CommandState>()) {}
 
 AppState::~AppState() = default;

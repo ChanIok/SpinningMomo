@@ -19,6 +19,8 @@ import Features.Letterbox.State;
 import Features.Recording.State;
 import Features.Overlay.State;
 import Features.Preview.State;
+import Features.VirtualGamepad;
+import Features.VirtualGamepad.State;
 import Features.WindowControl.UseCase;
 import UI.FloatingWindow;
 import UI.WebViewWindow;
@@ -235,6 +237,25 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
           .i18n_key = "menu.window_reset",
           .is_toggle = false,
           .action = [&state]() { Features::WindowControl::UseCase::reset_window_transform(state); },
+      });
+
+  // === 虚拟手柄 ===
+
+  // 切换虚拟手柄
+  register_command(
+      registry,
+      {
+          .id = "virtual_gamepad.toggle",
+          .i18n_key = "menu.virtual_gamepad_toggle",
+          .is_toggle = true,
+          .action =
+              [&state]() {
+                if (auto result = Features::VirtualGamepad::toggle(state); !result) {
+                  Logger().error("Virtual gamepad toggle failed: {}", result.error());
+                }
+                UI::FloatingWindow::request_repaint(state);
+              },
+          .get_state = [&state]() -> bool { return Features::VirtualGamepad::is_enabled(state); },
       });
 
   Logger().info("Registered {} builtin commands", registry.descriptors.size());

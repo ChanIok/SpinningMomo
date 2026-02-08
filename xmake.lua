@@ -17,6 +17,15 @@ set_policy("package.requires_lock", true)
 add_requires("vcpkg::uwebsockets", "vcpkg::spdlog", "vcpkg::asio", "vcpkg::reflectcpp", 
              "vcpkg::webview2", "vcpkg::wil", "vcpkg::xxhash", "vcpkg::sqlitecpp", "vcpkg::libwebp", "vcpkg::zlib")
 
+-- ViGEmClient 静态库（虚拟手柄）
+target("ViGEmClient")
+    set_kind("static")
+    set_languages("c11")
+    add_files("third_party/ViGEmClient/src/ViGEmClient.cpp")
+    add_includedirs("third_party/ViGEmClient/include", {public = true})
+    add_defines("NOMINMAX", "UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN")
+    add_links("setupapi", "hid")
+
 target("SpinningMomo")
     -- 设置为Windows可执行文件
     set_kind("binary")
@@ -49,3 +58,7 @@ target("SpinningMomo")
 
     -- vcpkg的传递依赖
     add_links("fmt", "yyjson", "sqlite3", "uSockets", "libuv")
+
+    -- ViGEmClient（虚拟手柄）
+    add_deps("ViGEmClient")
+    add_links("setupapi", "hid")

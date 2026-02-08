@@ -12,6 +12,7 @@ import Core.RPC.Endpoints.Update;
 import Core.RPC.Endpoints.WebView;
 import Core.RPC.Endpoints.Gallery;
 import Core.RPC.Endpoints.PluginEndpoints;
+import Core.RPC.Endpoints.VirtualGamepad;
 import Utils.Logger;
 
 namespace Core::RPC::Registry {
@@ -43,6 +44,9 @@ auto register_all_endpoints(Core::State::AppState& state) -> void {
 
   // 注册插件端点
   Endpoints::PluginEndpoints::register_all(state);
+
+  // 注册虚拟手柄端点
+  Endpoints::VirtualGamepad::register_all(state);
 
   Logger().info("RPC endpoints registration completed");
 }

@@ -23,6 +23,7 @@ import Features.ReplayBuffer;
 import Features.ReplayBuffer.State;
 import Features.ReplayBuffer.UseCase;
 import Features.Update;
+import Features.VirtualGamepad;
 import Features.Letterbox.State;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
@@ -101,6 +102,12 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {
       return std::unexpected("Failed to initialize gallery: " + gallery_result.error());
+    }
+
+    // 初始化虚拟手柄（检测 ViGEm 可用性，不自动启用）
+    if (auto vg_result = Features::VirtualGamepad::initialize(state); !vg_result) {
+      Logger().warn("Virtual gamepad initialization failed: {}", vg_result.error());
+      // 不返回错误，许应用继续运行
     }
 
     // 默认显示窗口
