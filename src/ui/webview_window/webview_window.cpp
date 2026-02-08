@@ -10,6 +10,7 @@ import Features.Settings;
 import Features.Settings.State;
 import Features.Settings.Types;
 import UI.FloatingWindow.State;
+import UI.TrayIcon.Types;
 import Utils.Logger;
 import Vendor.Windows;
 import <dwmapi.h>;
@@ -221,8 +222,17 @@ auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
   wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
   wc.style = CS_HREDRAW | CS_VREDRAW;
   wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-  wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-  wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
+  // 大图标：Alt+Tab、窗口标题栏等
+  wc.hIcon = static_cast<HICON>(
+      LoadImageW(instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1), IMAGE_ICON,
+                 GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR));
+  if (!wc.hIcon) wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+
+  // 小图标：任务栏
+  wc.hIconSm = static_cast<HICON>(
+      LoadImageW(instance, MAKEINTRESOURCEW(UI::TrayIcon::Types::IDI_ICON1), IMAGE_ICON,
+                 GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
+  if (!wc.hIconSm) wc.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
 
   RegisterClassExW(&wc);
 }
