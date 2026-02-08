@@ -235,9 +235,32 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
     // scale_result && !scale_result->scaled: 源分辨率已符合目标，使用原始 MP4
   }
 
-  // 3. 生成输出路径：将 .jpg 替换为 MP.jpg
+  // 3. 生成输出路径：使用 output_dir（Videos/SpinningMomo 或用户配置），文件名 stem+MP+ext
+  std::filesystem::path output_dir;
+  const auto& output_dir_path = state.settings->raw.features.output_dir_path;
+
+  if (!output_dir_path.empty()) {
+    output_dir = std::filesystem::path(output_dir_path);
+  } else {
+    auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
+    if (videos_dir_result) {
+      output_dir = *videos_dir_result / "SpinningMomo";
+    } else {
+      auto exe_dir_result = Utils::Path::GetExecutableDirectory();
+      if (!exe_dir_result) {
+        return std::unexpected("Failed to get output directory");
+      }
+      output_dir = *exe_dir_result / "replays";
+    }
+  }
+
+  auto ensure_result = Utils::Path::EnsureDirectoryExists(output_dir);
+  if (!ensure_result) {
+    return std::unexpected("Failed to create output directory");
+  }
+
   auto output_path =
-      jpeg_path.parent_path() / (jpeg_path.stem().string() + "MP" + jpeg_path.extension().string());
+      output_dir / (jpeg_path.stem().string() + "MP" + jpeg_path.extension().string());
 
   // 4. 合成 Motion Photo
   std::int64_t presentation_timestamp_us = static_cast<std::int64_t>(duration * 1'000'000);

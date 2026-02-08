@@ -425,29 +425,34 @@ auto cleanup_system(Core::State::AppState& app_state) -> void {
 auto take_screenshot(
     Core::State::AppState& app_state, HWND target_window,
     std::function<void(bool success, const std::wstring& path)> completion_callback,
-    Utils::Image::ImageFormat format, float jpeg_quality) -> std::expected<void, std::string> {
+    Utils::Image::ImageFormat format, float jpeg_quality,
+    std::optional<std::filesystem::path> output_dir_override) -> std::expected<void, std::string> {
   auto& state = *app_state.screenshot;
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window handle");
   }
 
   // 生成截图文件路径
-  const auto& output_dir_path = app_state.settings->raw.features.output_dir_path;
   std::filesystem::path screenshots_dir;
 
-  if (!output_dir_path.empty()) {
-    screenshots_dir = std::filesystem::path(output_dir_path);
+  if (output_dir_override.has_value()) {
+    screenshots_dir = *output_dir_override;
   } else {
-    auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
-    if (videos_dir_result) {
-      screenshots_dir = *videos_dir_result / "SpinningMomo";
+    const auto& output_dir_path = app_state.settings->raw.features.output_dir_path;
+    if (!output_dir_path.empty()) {
+      screenshots_dir = std::filesystem::path(output_dir_path);
     } else {
-      // 回退到程序目录
-      auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-      if (!exe_dir_result) {
-        return std::unexpected("Failed to get output directory: " + exe_dir_result.error());
+      auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
+      if (videos_dir_result) {
+        screenshots_dir = *videos_dir_result / "SpinningMomo";
+      } else {
+        // 回退到程序目录
+        auto exe_dir_result = Utils::Path::GetExecutableDirectory();
+        if (!exe_dir_result) {
+          return std::unexpected("Failed to get output directory: " + exe_dir_result.error());
+        }
+        screenshots_dir = exe_dir_result.value() / "screenshots";
       }
-      screenshots_dir = exe_dir_result.value() / "screenshots";
     }
   }
 

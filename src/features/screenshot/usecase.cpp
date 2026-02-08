@@ -18,6 +18,7 @@ import Features.WindowControl;
 import Features.Notifications;
 import Utils.Image;
 import Utils.Logger;
+import Utils.Path;
 import Utils.String;
 
 namespace Features::Screenshot::UseCase {
@@ -110,8 +111,21 @@ auto capture(Core::State::AppState& state) -> void {
   auto image_format =
       motion_photo_enabled ? Utils::Image::ImageFormat::JPEG : Utils::Image::ImageFormat::PNG;
   float jpeg_quality = 1.0f;  // 视觉无损
-  auto result = Features::Screenshot::take_screenshot(state, *target_window, completion_callback,
-                                                      image_format, jpeg_quality);
+
+  std::optional<std::filesystem::path> output_dir_override;
+  if (motion_photo_enabled) {
+    auto exe_dir_result = Utils::Path::GetExecutableDirectory();
+    if (exe_dir_result) {
+      auto temp_dir = *exe_dir_result / "cache" / "motion_photo_temp";
+      auto ensure_result = Utils::Path::EnsureDirectoryExists(temp_dir);
+      if (ensure_result) {
+        output_dir_override = temp_dir;
+      }
+    }
+  }
+
+  auto result = Features::Screenshot::take_screenshot(
+      state, *target_window, completion_callback, image_format, jpeg_quality, output_dir_override);
   if (!result) {
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
