@@ -99,7 +99,7 @@ jobs:
           cd web && npm ci
 
       - name: Build all (C++ + Web + Dist)
-        run: npm run build
+        run: npm run build:ci
 
       - name: Create Portable ZIP
         run: npm run build:portable
