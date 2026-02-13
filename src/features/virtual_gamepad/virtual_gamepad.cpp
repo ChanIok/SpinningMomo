@@ -9,7 +9,10 @@ module Features.VirtualGamepad;
 import std;
 import Core.State;
 import Features.VirtualGamepad.State;
+import Features.Settings.State;
+import Features.WindowControl;
 import Utils.Logger;
+import Utils.String;
 
 namespace Features::VirtualGamepad {
 
@@ -168,70 +171,100 @@ LRESULT CALLBACK keyboard_hook_proc(int code, WPARAM wParam, LPARAM lParam) {
     bool key_down = (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN);
     bool key_up = (wParam == WM_KEYUP || wParam == WM_SYSKEYUP);
     DWORD vk = kb->vkCode;
+    bool matched = false;
 
     // === 左摇杆: W / A / S / D ===
     if (vk == mapping.left_stick.up) {
       update_key_state(input.left_stick.up, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.left_stick.down) {
       update_key_state(input.left_stick.down, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.left_stick.left) {
       update_key_state(input.left_stick.left, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.left_stick.right) {
       update_key_state(input.left_stick.right, key_down, key_up);
+      matched = true;
     }
     // === 右摇杆: I / J / K / L ===
     else if (vk == mapping.right_stick.up) {
       update_key_state(input.right_stick.up, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.right_stick.down) {
       update_key_state(input.right_stick.down, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.right_stick.left) {
       update_key_state(input.right_stick.left, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.right_stick.right) {
       update_key_state(input.right_stick.right, key_down, key_up);
+      matched = true;
     }
     // === 扳机: Q / E ===
     else if (vk == mapping.left_trigger) {
       update_key_state(input.left_trigger.pressed, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.right_trigger) {
       update_key_state(input.right_trigger.pressed, key_down, key_up);
+      matched = true;
     }
     // === 肩键: Z / X ===
     else if (vk == mapping.left_bumper) {
       update_key_state(input.left_bumper, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.right_bumper) {
       update_key_state(input.right_bumper, key_down, key_up);
+      matched = true;
     }
     // === 面键: 1 / 2 / 3 / 4 ===
     else if (vk == mapping.button_a) {
       update_key_state(input.button_a, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.button_b) {
       update_key_state(input.button_b, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.button_x) {
       update_key_state(input.button_x, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.button_y) {
       update_key_state(input.button_y, key_down, key_up);
+      matched = true;
     }
     // === D-pad: 方向键 ===
     else if (vk == mapping.dpad_up) {
       update_key_state(input.dpad_up, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.dpad_down) {
       update_key_state(input.dpad_down, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.dpad_left) {
       update_key_state(input.dpad_left, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.dpad_right) {
       update_key_state(input.dpad_right, key_down, key_up);
+      matched = true;
     }
     // === 功能键: Enter / Backspace ===
     else if (vk == mapping.start) {
       update_key_state(input.start, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.back) {
       update_key_state(input.back, key_down, key_up);
+      matched = true;
     }
     // === 摇杆按下: C / V ===
     else if (vk == mapping.left_thumb) {
       update_key_state(input.left_thumb, key_down, key_up);
+      matched = true;
     } else if (vk == mapping.right_thumb) {
       update_key_state(input.right_thumb, key_down, key_up);
+      matched = true;
+    }
+
+    // 如果按键被映射且游戏窗口在前台，吃掉按键，不让游戏收到键盘输入
+    if (matched && state.game_hwnd && GetForegroundWindow() == state.game_hwnd) {
+      return 1;
     }
   }
   return CallNextHookEx(nullptr, code, wParam, lParam);
@@ -397,6 +430,17 @@ auto enable(Core::State::AppState& state) -> std::expected<void, std::string> {
     return std::unexpected("ViGEm driver not available. Please install ViGEmBus v1.22.0 or later.");
   }
 
+  // 查找并缓存游戏窗口句柄
+  std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
+  auto target_window = Features::WindowControl::find_target_window(window_title);
+  if (target_window) {
+    vg_state.game_hwnd = target_window.value();
+    Logger().info("Game window found for virtual gamepad key suppression");
+  } else {
+    vg_state.game_hwnd = nullptr;
+    Logger().warn("Game window not found, keyboard keys will not be suppressed");
+  }
+
   // 创建虚拟手柄
   if (auto result = create_gamepad(vg_state); !result) {
     return result;
@@ -438,6 +482,9 @@ auto disable(Core::State::AppState& state) -> void {
 
   // 重置输入状态
   vg_state.input = State::InputState{};
+
+  // 清除游戏窗口句柄
+  vg_state.game_hwnd = nullptr;
 
   vg_state.enabled = false;
   Logger().info("Virtual gamepad disabled");

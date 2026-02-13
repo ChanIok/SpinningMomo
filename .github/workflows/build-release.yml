@@ -42,9 +42,9 @@ jobs:
 
       - name: Install WiX Toolset v6
         run: |
-          dotnet tool install --global wix --version 6.*
-          wix extension add WixToolset.UI.wixext --global
-          wix extension add WixToolset.BootstrapperApplications.wixext --global
+          dotnet tool install --global wix --version 6.0.2
+          wix extension add WixToolset.UI.wixext/6.0.2 --global
+          wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 
       - name: Extract version from version.hpp
         id: version

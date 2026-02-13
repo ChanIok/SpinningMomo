@@ -62,7 +62,7 @@ struct SpeedConfig {
 
   // 幅度缩放（0.0 - 1.0）
   float trigger_scale{0.5f};   // 扳机幅度：20% 默认
-  float joystick_scale{1.0f};  // 摇杆幅度：50% 默认
+  float joystick_scale{0.5f};  // 摇杆幅度：50% 默认
 };
 
 // ViGEm 相关句柄
@@ -146,6 +146,9 @@ struct VirtualGamepadState {
 
   // 键盘钩子
   HHOOK keyboard_hook{nullptr};
+
+  // 游戏窗口句柄（用于判断前台窗口，吃掉映射按键）
+  HWND game_hwnd{nullptr};
 
   // 更新循环相关
   bool update_running{false};
