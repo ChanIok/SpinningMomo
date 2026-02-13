@@ -25,15 +25,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Fetch third-party dependencies
+        shell: pwsh
+        run: .\scripts\fetch-third-party.ps1
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            web/package-lock.json
 
       - name: Setup xmake
         uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: latest
+
+      - name: Cache xmake/vcpkg dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            .xmake
+            ~/.xmake
+            ~/AppData/Local/.xmake
+            ~/AppData/Local/vcpkg/archives
+          key: ${{ runner.os }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-xmake-vcpkg-
 
       - name: Setup .NET (for WiX)
         uses: actions/setup-dotnet@v4
