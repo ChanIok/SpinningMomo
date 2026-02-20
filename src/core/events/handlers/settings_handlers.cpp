@@ -4,6 +4,7 @@ module Core.Events.Handlers.Settings;
 
 import std;
 import Core.Events;
+import Core.RPC.NotificationHub;
 import Core.State;
 import Features.Settings.Events;
 import Features.Settings.Types;
@@ -20,6 +21,8 @@ auto handle_settings_changed(Core::State::AppState& state,
 
     // 通知浮窗刷新UI以反映设置变更
     UI::FloatingWindow::refresh_from_settings(state);
+
+    Core::RPC::NotificationHub::send_notification(state, "settings.changed");
 
     Logger().debug("Settings change processing completed");
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useSettingsStore } from '../store'
 import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
@@ -29,6 +29,17 @@ const { clearError } = store
 const { t } = useI18n()
 
 const inputTitle = ref(appSettings.value?.window?.targetTitle || '')
+const isEditingTitle = ref(false)
+
+watch(
+  () => appSettings.value?.window?.targetTitle,
+  (newTitle) => {
+    if (!isEditingTitle.value) {
+      inputTitle.value = newTitle || ''
+    }
+  },
+  { immediate: true }
+)
 
 const handleTitleChange = async () => {
   const value = inputTitle.value.trim()
@@ -105,8 +116,14 @@ const handleResetSettings = async () => {
             <ItemActions>
               <Input
                 v-model="inputTitle"
+                @focus="isEditingTitle = true"
                 @keydown.enter="handleTitleChange"
-                @blur="handleTitleChange"
+                @blur="
+                  () => {
+                    isEditingTitle = false
+                    handleTitleChange()
+                  }
+                "
                 :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
                 class="w-48"
               />

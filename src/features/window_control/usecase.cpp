@@ -264,11 +264,13 @@ auto handle_resolution_changed(Core::State::AppState& state,
 auto handle_window_selected(Core::State::AppState& state,
                             const UI::FloatingWindow::Events::WindowSelectionEvent& event) -> void {
   Logger().info("Window selected: {}", Utils::String::ToUtf8(event.window_title));
+  auto old_settings = state.settings->raw;
 
   // 更新设置状态中的目标窗口标题
   state.settings->raw.window.target_title = Utils::String::ToUtf8(event.window_title);
 
   // 保存设置到文件
+  bool did_persist_settings = false;
   auto settings_path = Features::Settings::get_settings_path();
   if (settings_path) {
     auto save_result =
@@ -276,9 +278,16 @@ auto handle_window_selected(Core::State::AppState& state,
     if (!save_result) {
       Logger().error("Failed to save settings: {}", save_result.error());
       // 可能需要通知用户保存失败
+    } else {
+      did_persist_settings = true;
     }
   } else {
     Logger().error("Failed to get settings path: {}", settings_path.error());
+  }
+
+  if (did_persist_settings) {
+    Features::Settings::notify_settings_changed(state, old_settings,
+                                                "Settings updated via window selection");
   }
 
   auto target_window = Features::WindowControl::find_target_window(event.window_title);

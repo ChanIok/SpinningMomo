@@ -21,6 +21,7 @@ namespace Features::Letterbox::UseCase {
 // 切换黑边模式
 auto toggle_letterbox(Core::State::AppState& state) -> void {
   bool is_enabled = state.letterbox->enabled;
+  auto old_settings = state.settings->raw;
 
   // 切换启用状态
   state.letterbox->enabled = !is_enabled;
@@ -30,15 +31,23 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
   state.settings->raw.features.letterbox.enabled = !is_enabled;
 
   // 保存设置到文件
+  bool did_persist_settings = false;
   auto settings_path = Features::Settings::get_settings_path();
   if (settings_path) {
     auto save_result =
         Features::Settings::save_settings_to_file(settings_path.value(), state.settings->raw);
     if (!save_result) {
       Logger().error("Failed to save settings: {}", save_result.error());
+    } else {
+      did_persist_settings = true;
     }
   } else {
     Logger().error("Failed to get settings path: {}", settings_path.error());
+  }
+
+  if (did_persist_settings) {
+    Features::Settings::notify_settings_changed(state, old_settings,
+                                                "Settings updated via letterbox toggle");
   }
 
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);

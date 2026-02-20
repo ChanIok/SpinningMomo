@@ -184,6 +184,22 @@ auto get_settings(const Types::GetSettingsParams& params)
   }
 }
 
+auto notify_settings_changed(Core::State::AppState& app_state,
+                             const Types::AppSettings& old_settings,
+                             std::string_view change_description) -> void {
+  if (!app_state.events || !app_state.settings) {
+    return;
+  }
+
+  Types::SettingsChangeData change_data{
+      .old_settings = old_settings,
+      .new_settings = app_state.settings->raw,
+      .change_description = std::string(change_description),
+  };
+  Core::Events::post(*app_state.events,
+                     Features::Settings::Events::SettingsChangeEvent{change_data});
+}
+
 namespace {
 
 auto merge_patch_object(rfl::Generic::Object& target, const rfl::Generic::Object& patch) -> void {
@@ -231,13 +247,7 @@ auto apply_settings_and_persist(Core::State::AppState& app_state,
     return std::unexpected(save_result.error());
   }
 
-  Types::SettingsChangeData change_data{
-      .old_settings = old_settings,
-      .new_settings = app_state.settings->raw,
-      .change_description = std::string(change_description),
-  };
-  Core::Events::post(*app_state.events,
-                     Features::Settings::Events::SettingsChangeEvent{change_data});
+  notify_settings_changed(app_state, old_settings, change_description);
 
   return Types::UpdateSettingsResult{
       .success = true,

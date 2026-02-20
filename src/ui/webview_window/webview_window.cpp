@@ -358,6 +358,7 @@ auto cleanup(Core::State::AppState& state) -> void {
     width_to_save = std::max(kMinWidth, width_to_save);
     height_to_save = std::max(kMinHeight, height_to_save);
 
+    auto old_settings = state.settings->raw;
     state.settings->raw.ui.webview_window.width = width_to_save;
     state.settings->raw.ui.webview_window.height = height_to_save;
     state.settings->raw.ui.webview_window.x = x_to_save;
@@ -369,6 +370,9 @@ auto cleanup(Core::State::AppState& state) -> void {
               Features::Settings::save_settings_to_file(settings_path.value(), state.settings->raw);
           !save_result) {
         Logger().warn("Failed to persist WebView window bounds: {}", save_result.error());
+      } else {
+        Features::Settings::notify_settings_changed(state, old_settings,
+                                                    "Settings updated via WebView window bounds");
       }
     }
 

@@ -5,6 +5,7 @@ import type { AppSettings } from './types'
 import { DEFAULT_APP_SETTINGS } from './types'
 import { useI18n } from '@/composables/useI18n'
 import type { Locale } from '@/core/i18n/types'
+import { on, off } from '@/core/rpc'
 
 type JsonObject = Record<string, unknown>
 const NO_CHANGE = Symbol('no_change')
@@ -66,6 +67,63 @@ export const useSettingsStore = defineStore('settings', () => {
   const error = ref<string | null>(null)
   const isInitialized = ref(false)
   const { setLocale } = useI18n()
+  let settingsChangedHandler: ((params: unknown) => void) | null = null
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null
+  let refreshInFlight: Promise<void> | null = null
+
+  const refreshFromBackend = async () => {
+    if (refreshInFlight) {
+      await refreshInFlight
+      return
+    }
+
+    refreshInFlight = (async () => {
+      try {
+        const settings = await settingsApi.get()
+        appSettings.value = settings
+        error.value = null
+      } catch (e) {
+        error.value = (e as Error).message
+      } finally {
+        refreshInFlight = null
+      }
+    })()
+
+    await refreshInFlight
+  }
+
+  const scheduleRefreshFromBackend = () => {
+    if (refreshTimer) {
+      return
+    }
+
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null
+      void refreshFromBackend()
+    }, 120)
+  }
+
+  const subscribeSettingsChanged = () => {
+    if (settingsChangedHandler) {
+      return
+    }
+
+    settingsChangedHandler = () => {
+      scheduleRefreshFromBackend()
+    }
+    on('settings.changed', settingsChangedHandler)
+  }
+
+  const unsubscribeSettingsChanged = () => {
+    if (settingsChangedHandler) {
+      off('settings.changed', settingsChangedHandler)
+      settingsChangedHandler = null
+    }
+    if (refreshTimer) {
+      clearTimeout(refreshTimer)
+      refreshTimer = null
+    }
+  }
 
   const init = async () => {
     if (isInitialized.value) return
@@ -81,6 +139,7 @@ export const useSettingsStore = defineStore('settings', () => {
       await setLocale(language)
 
       isInitialized.value = true
+      subscribeSettingsChanged()
     } catch (e) {
       error.value = (e as Error).message
     } finally {
@@ -124,6 +183,10 @@ export const useSettingsStore = defineStore('settings', () => {
     error.value = null
   }
 
+  const dispose = () => {
+    unsubscribeSettingsChanged()
+  }
+
   return {
     appSettings,
     isLoading,
@@ -132,5 +195,6 @@ export const useSettingsStore = defineStore('settings', () => {
     init,
     updateSettings,
     clearError,
+    dispose,
   }
 })

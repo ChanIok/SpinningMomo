@@ -21,6 +21,11 @@ export auto patch_settings(Core::State::AppState& app_state,
                            const Types::PatchSettingsParams& params)
     -> std::expected<Types::PatchSettingsResult, std::string>;
 
+// 发布 settings 变更事件（new_settings 使用 app_state.settings->raw）
+export auto notify_settings_changed(Core::State::AppState& app_state,
+                                    const Types::AppSettings& old_settings,
+                                    std::string_view change_description) -> void;
+
 export auto get_settings_path() -> std::expected<std::filesystem::path, std::string>;
 
 export auto save_settings_to_file(const std::filesystem::path& settings_path,
