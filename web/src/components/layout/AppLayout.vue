@@ -27,8 +27,6 @@ const showHeader = isWebView()
                 background-size: cover;
                 background-position: center;
                 background-repeat: no-repeat;
-                opacity: var(--app-background-opacity, 0);
-                filter: blur(var(--app-background-blur, 0px));
                 transform: scale(1.04);
               "
             />

@@ -13,19 +13,19 @@ export const BACKGROUND_WEB_DIR = '/assets/backgrounds'
 // 背景图片文件名
 export const BACKGROUND_IMAGE_NAME = 'background'
 
-// 模糊范围
-export const BLUR_RANGE = {
+// 页面面板模糊范围
+export const SURFACE_BLUR_RANGE = {
   MIN: 0,
   MAX: 200,
-  DEFAULT: 0,
+  DEFAULT: 20,
   STEP: 1,
 } as const
 
 // 界面面板不透明度范围
 export const SURFACE_OPACITY_RANGE = {
-  MIN: 0.4,
+  MIN: 0,
   MAX: 1,
-  DEFAULT: 1,
+  DEFAULT: 0.8,
   STEP: 0.05,
 } as const
 

@@ -35,17 +35,14 @@ const applyBackground = (settings: AppSettings): void => {
   const background = settings.ui.background
   const imageUrl = resolveBackgroundImageUrl(background)
   root.style.setProperty('--app-surface-opacity', String(clamp(background.surfaceOpacity, 0, 1)))
+  root.style.setProperty('--app-surface-blur', `${Math.max(background.surfaceBlurAmount, 0)}px`)
 
   if (!imageUrl) {
     root.style.setProperty('--app-background-image', 'none')
-    root.style.setProperty('--app-background-opacity', '0')
-    root.style.setProperty('--app-background-blur', '0px')
     return
   }
 
   root.style.setProperty('--app-background-image', `url("${imageUrl}")`)
-  root.style.setProperty('--app-background-opacity', '1')
-  root.style.setProperty('--app-background-blur', `${Math.max(background.blurAmount, 0)}px`)
 }
 
 export const applyAppearanceToDocument = (settings: AppSettings): void => {

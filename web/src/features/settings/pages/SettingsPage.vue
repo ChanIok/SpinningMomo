@@ -29,7 +29,7 @@ watch(activePage, () => {
 </script>
 
 <template>
-  <div class="flex h-full bg-background text-foreground">
+  <div class="app-surface flex h-full text-foreground">
     <SettingsSidebar v-model:activePage="activePage" />
     <div class="flex h-full flex-1 flex-col overflow-hidden">
       <ScrollArea ref="scrollAreaRef" class="h-full w-full flex-1">

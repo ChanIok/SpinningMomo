@@ -52,7 +52,11 @@ const handleMenuSelect = (key: string) => {
 </script>
 
 <template>
-  <Sidebar collapsible="none" class="w-14 border-r border-panel pt-2">
+  <Sidebar
+    collapsible="none"
+    class="app-surface w-14 border-r border-panel pt-2"
+    style="--surface-base: var(--sidebar)"
+  >
     <SidebarContent>
       <SidebarGroup>
         <SidebarGroupContent class="px-0">

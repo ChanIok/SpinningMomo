@@ -44,7 +44,7 @@ initializeRPC()
       settingsStore.appSettings.ui.webTheme.mode,
       settingsStore.appSettings.ui.background.type,
       settingsStore.appSettings.ui.background.imagePath,
-      settingsStore.appSettings.ui.background.blurAmount,
+      settingsStore.appSettings.ui.background.surfaceBlurAmount,
       settingsStore.appSettings.ui.background.surfaceOpacity,
     ],
     () => {

@@ -125,6 +125,17 @@
   --panel-foreground: #cccccc;
 }
 
+.app-surface {
+  background-color: color-mix(
+    in srgb,
+    var(--surface-base, var(--background))
+      calc(var(--app-surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
+    transparent
+  ) !important;
+  -webkit-backdrop-filter: blur(var(--app-surface-blur, 0px));
+  backdrop-filter: blur(var(--app-surface-blur, 0px));
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

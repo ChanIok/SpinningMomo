@@ -90,7 +90,7 @@ function handleImageClick() {
 <template>
   <div
     ref="containerRef"
-    class="relative flex h-full w-full items-center justify-center bg-background"
+    class="app-surface relative flex h-full w-full items-center justify-center"
   >
     <!-- 左侧导航按钮 -->
     <button

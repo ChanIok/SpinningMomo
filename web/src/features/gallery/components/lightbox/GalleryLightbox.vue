@@ -78,7 +78,8 @@ watch(
     leave-to-class="opacity-0"
   >
     <div
-      class="lightbox-container flex h-full w-full overflow-hidden bg-background/95"
+      class="app-surface lightbox-container flex h-full w-full overflow-hidden"
+      style="--surface-opacity-scale: 0.95"
       @click.self="handleBackdropClick"
     >
       <!-- Lightbox内容 -->

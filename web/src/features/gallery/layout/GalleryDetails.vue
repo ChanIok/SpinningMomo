@@ -116,7 +116,7 @@ async function handleAddTag(tagId: number) {
 </script>
 
 <template>
-  <div class="h-full overflow-auto border-l bg-background p-4">
+  <div class="app-surface h-full overflow-auto border-l p-4">
     <!-- 文件夹详情 -->
     <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
       <div class="flex items-center justify-between">
@@ -272,7 +272,7 @@ async function handleAddTag(tagId: number) {
           >
             <span>{{ tag.name }}</span>
             <button
-              class="flex h-3 w-3 items-center justify-center rounded-full opacity-60 transition-opacity hover:opacity-100 hover:bg-primary/30"
+              class="flex h-3 w-3 items-center justify-center rounded-full opacity-60 transition-opacity hover:bg-primary/30 hover:opacity-100"
               @click="handleRemoveTag(tag.id)"
             >
               <svg

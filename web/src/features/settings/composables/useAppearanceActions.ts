@@ -120,8 +120,8 @@ export const useAppearanceActions = () => {
     await updateBackgroundSettings({ surfaceOpacity })
   }
 
-  const updateBackgroundBlur = async (blurAmount: number) => {
-    await updateBackgroundSettings({ blurAmount })
+  const updateSurfaceBlur = async (surfaceBlurAmount: number) => {
+    await updateBackgroundSettings({ surfaceBlurAmount })
   }
 
   const handleBackgroundImageSelect = async () => {
@@ -167,7 +167,7 @@ export const useAppearanceActions = () => {
     resetFloatingWindowSettings,
     updateFloatingWindowColors,
     updateSurfaceOpacity,
-    updateBackgroundBlur,
+    updateSurfaceBlur,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,
     getFloatingWindowColorsByTheme,
