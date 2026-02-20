@@ -73,7 +73,7 @@ const handleMenuClick = (key: SettingsPageKey) => {
 </script>
 
 <template>
-  <div class="flex h-full w-48 flex-col border-r border-panel bg-muted/20 lg:w-56 2xl:w-64">
+  <div class="flex h-full w-48 flex-col bg-muted/20 lg:w-56 2xl:w-64">
     <div class="h-full p-4">
       <nav class="flex-1">
         <div class="space-y-1">

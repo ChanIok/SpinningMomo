@@ -80,7 +80,7 @@ const handleReset = async () => {
         </div>
 
         <ItemGroup>
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.general.hotkey.floatingWindow') }}
@@ -98,7 +98,7 @@ const handleReset = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.general.hotkey.screenshot') }}

@@ -84,13 +84,7 @@ const createGhost = (source: HTMLElement, rect: DOMRect, initialTop: number): HT
   ghost.classList.add('draggable-ghost')
 
   // Remove Tailwind classes that would override our styles
-  ghost.classList.remove(
-    'bg-card',
-    'border',
-    'border-transparent',
-    'hover:bg-accent/50',
-    'hover:border-primary/20'
-  )
+  ghost.classList.remove('bg-background/80', 'hover:bg-accent/50')
 
   ghost.style.cssText = `
         position: fixed;
@@ -283,13 +277,13 @@ onUnmounted(() => {
       <p class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
     </div>
 
-    <div class="rounded-md border bg-card p-3 text-card-foreground">
+    <div class="rounded-md bg-background/80 p-3">
       <div ref="itemsContainer" class="relative flex flex-col gap-1">
         <TransitionGroup name="list">
           <div
             v-for="item in items"
             :key="item.id"
-            class="draggable-item group flex cursor-grab items-center justify-between rounded-md border border-transparent bg-card p-2.5 transition-colors hover:border-primary/20 hover:bg-accent/50 active:cursor-grabbing"
+            class="draggable-item group flex cursor-grab items-center justify-between rounded-md bg-background/80 p-2.5 transition-colors hover:bg-accent/50 active:cursor-grabbing"
             :class="{
               'is-dragging-source': draggingId === item.id,
             }"
@@ -329,7 +323,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Add Item Section (only if allowAdd is true) -->
-      <div v-if="allowAdd" class="mt-3 border-t pt-3">
+      <div v-if="allowAdd" class="mt-3 pt-3">
         <div
           v-if="isAdding"
           class="flex items-center gap-2 rounded-md border border-primary bg-primary/5 p-3"

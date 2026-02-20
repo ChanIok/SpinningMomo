@@ -207,37 +207,35 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <ItemGroup>
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.appearance.floatingWindowTheme.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.appearance.floatingWindowTheme.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select
-                :model-value="appSettings?.ui?.floatingWindowThemeMode || 'dark'"
-                @update:model-value="(v) => updateFloatingWindowTheme(v as FloatingWindowThemeMode)"
-              >
-                <SelectTrigger class="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in floatingWindowThemeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </ItemActions>
-          </Item>
-        </ItemGroup>
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.floatingWindowTheme.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.floatingWindowTheme.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="appSettings?.ui?.floatingWindowThemeMode || 'dark'"
+              @update:model-value="(v) => updateFloatingWindowTheme(v as FloatingWindowThemeMode)"
+            >
+              <SelectTrigger class="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="option in floatingWindowThemeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </ItemActions>
+        </Item>
       </div>
 
       <div class="space-y-4">
@@ -265,7 +263,7 @@ const handleResetSettings = async () => {
               'baseSettingsColumnWidth',
             ] as const"
             :key="key"
-            variant="outline"
+            variant="surface"
             size="sm"
           >
             <ItemContent>

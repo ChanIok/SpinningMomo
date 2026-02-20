@@ -124,7 +124,7 @@ const handleClearError = () => {
         </div>
 
         <ItemGroup>
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.appearance.background.surfaceOpacity.label') }}
@@ -150,7 +150,7 @@ const handleClearError = () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.appearance.background.surfaceBlurAmount.label') }}
@@ -176,7 +176,7 @@ const handleClearError = () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.appearance.background.image.label') }}
@@ -209,37 +209,35 @@ const handleClearError = () => {
           </p>
         </div>
 
-        <ItemGroup>
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.appearance.theme.mode.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.appearance.theme.mode.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select
-                :model-value="appSettings.ui.webTheme.mode"
-                @update:model-value="(v) => handleThemeChange(v as string)"
-              >
-                <SelectTrigger class="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in themeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </ItemActions>
-          </Item>
-        </ItemGroup>
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.theme.mode.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.theme.mode.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="appSettings.ui.webTheme.mode"
+              @update:model-value="(v) => handleThemeChange(v as string)"
+            >
+              <SelectTrigger class="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="option in themeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </ItemActions>
+        </Item>
       </div>
     </div>
   </div>

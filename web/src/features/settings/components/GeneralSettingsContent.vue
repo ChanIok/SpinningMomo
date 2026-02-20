@@ -72,7 +72,7 @@ const handleReset = async () => {
           </p>
         </div>
 
-        <Item variant="outline" size="sm">
+        <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
               {{ t('settings.general.language.displayLanguage') }}
@@ -109,7 +109,7 @@ const handleReset = async () => {
           </p>
         </div>
 
-        <Item variant="outline" size="sm">
+        <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
               {{ t('settings.general.logger.level') }}

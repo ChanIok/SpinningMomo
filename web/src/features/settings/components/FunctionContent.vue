@@ -229,7 +229,7 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <Item variant="outline" size="sm">
+        <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
               {{ t('settings.function.outputDir.label') }}
@@ -265,7 +265,7 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <Item variant="outline" size="sm">
+        <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
               {{ t('settings.function.screenshot.gameAlbum.label') }}
@@ -302,7 +302,7 @@ const handleResetSettings = async () => {
         </div>
 
         <ItemGroup>
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.recording.fps.label') }}
@@ -324,7 +324,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.recording.rateControl.label') }}
@@ -360,7 +360,7 @@ const handleResetSettings = async () => {
 
           <Item
             v-if="appSettings?.features?.recording?.rateControl === 'cbr'"
-            variant="outline"
+            variant="surface"
             size="sm"
           >
             <ItemContent>
@@ -387,7 +387,7 @@ const handleResetSettings = async () => {
 
           <Item
             v-if="appSettings?.features?.recording?.rateControl === 'vbr'"
-            variant="outline"
+            variant="surface"
             size="sm"
           >
             <ItemContent>
@@ -414,7 +414,7 @@ const handleResetSettings = async () => {
 
           <Item
             v-if="appSettings?.features?.recording?.rateControl === 'manual_qp'"
-            variant="outline"
+            variant="surface"
             size="sm"
           >
             <ItemContent>
@@ -439,7 +439,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.recording.codec.label') }}
@@ -464,7 +464,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.recording.encoderMode.label') }}
@@ -498,7 +498,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.recording.audioSource.label') }}
@@ -532,7 +532,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.recording.audioBitrate.label') }}
@@ -568,7 +568,7 @@ const handleResetSettings = async () => {
         </div>
 
         <ItemGroup>
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.motionPhoto.duration.label') }}
@@ -591,7 +591,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.motionPhoto.resolution.label') }}
@@ -621,7 +621,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.motionPhoto.fps.label') }}
@@ -644,7 +644,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.motionPhoto.rateControl.label') }}
@@ -677,7 +677,7 @@ const handleResetSettings = async () => {
 
           <Item
             v-if="appSettings?.features?.motionPhoto?.rateControl === 'cbr'"
-            variant="outline"
+            variant="surface"
             size="sm"
           >
             <ItemContent>
@@ -704,7 +704,7 @@ const handleResetSettings = async () => {
 
           <Item
             v-if="appSettings?.features?.motionPhoto?.rateControl === 'vbr'"
-            variant="outline"
+            variant="surface"
             size="sm"
           >
             <ItemContent>
@@ -729,7 +729,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.motionPhoto.codec.label') }}
@@ -754,7 +754,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.motionPhoto.audioSource.label') }}
@@ -788,7 +788,7 @@ const handleResetSettings = async () => {
             </ItemActions>
           </Item>
 
-          <Item variant="outline" size="sm">
+          <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t('settings.function.motionPhoto.audioBitrate.label') }}
@@ -823,7 +823,7 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <Item variant="outline" size="sm">
+        <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
               {{ t('settings.function.replayBuffer.duration.label') }}

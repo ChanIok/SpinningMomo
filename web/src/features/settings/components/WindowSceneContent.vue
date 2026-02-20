@@ -98,33 +98,31 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <ItemGroup>
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.windowControl.windowTitle.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.windowControl.windowTitle.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Input
-                v-model="inputTitle"
-                @focus="isEditingTitle = true"
-                @keydown.enter="handleTitleChange"
-                @blur="
-                  () => {
-                    isEditingTitle = false
-                    handleTitleChange()
-                  }
-                "
-                :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
-                class="w-48"
-              />
-            </ItemActions>
-          </Item>
-        </ItemGroup>
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.windowTitle.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.windowTitle.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Input
+              v-model="inputTitle"
+              @focus="isEditingTitle = true"
+              @keydown.enter="handleTitleChange"
+              @blur="
+                () => {
+                  isEditingTitle = false
+                  handleTitleChange()
+                }
+              "
+              :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
+              class="w-48"
+            />
+          </ItemActions>
+        </Item>
       </div>
 
       <div class="space-y-4">
@@ -137,7 +135,7 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <Item variant="outline" size="sm">
+        <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
               {{ t('settings.function.letterbox.enabled.label') }}
