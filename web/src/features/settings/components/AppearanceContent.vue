@@ -23,13 +23,14 @@ import {
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { WebThemeMode } from '../types'
+import { SURFACE_OPACITY_RANGE } from '../constants'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
 const { setTheme } = useTheme()
 const {
   resetWebAppearanceSettings,
-  updateBackgroundOpacity,
+  updateSurfaceOpacity,
   updateBackgroundBlur,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
@@ -43,12 +44,12 @@ const themeOptions = [
   { value: 'system', label: t('settings.appearance.theme.system') },
 ]
 
-const handleOpacityChange = async (val: number[] | undefined) => {
+const handleSurfaceOpacityChange = async (val: number[] | undefined) => {
   if (!val || val.length === 0) return
   try {
-    await updateBackgroundOpacity(val[0]!)
+    await updateSurfaceOpacity(val[0]!)
   } catch (error) {
-    console.error('Failed to update opacity:', error)
+    console.error('Failed to update surface opacity:', error)
   }
 }
 
@@ -126,24 +127,24 @@ const handleClearError = () => {
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
-                {{ t('settings.appearance.background.opacity.label') }}
+                {{ t('settings.appearance.background.surfaceOpacity.label') }}
               </ItemTitle>
               <ItemDescription>
-                {{ t('settings.appearance.background.opacity.description') }}
+                {{ t('settings.appearance.background.surfaceOpacity.description') }}
               </ItemDescription>
             </ItemContent>
             <ItemActions>
               <div class="flex items-center gap-2">
                 <Slider
-                  :model-value="[appSettings.ui.background.opacity]"
-                  @update:model-value="handleOpacityChange"
-                  :min="0"
-                  :max="1"
-                  :step="0.1"
+                  :model-value="[appSettings.ui.background.surfaceOpacity]"
+                  @update:model-value="handleSurfaceOpacityChange"
+                  :min="SURFACE_OPACITY_RANGE.MIN"
+                  :max="SURFACE_OPACITY_RANGE.MAX"
+                  :step="SURFACE_OPACITY_RANGE.STEP"
                   class="w-36"
                 />
                 <span class="w-12 text-sm text-muted-foreground">
-                  {{ (appSettings.ui.background.opacity * 100).toFixed(0) }}%
+                  {{ (appSettings.ui.background.surfaceOpacity * 100).toFixed(0) }}%
                 </span>
               </div>
             </ItemActions>

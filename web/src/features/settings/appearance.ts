@@ -1,0 +1,67 @@
+import type { AppSettings, WebThemeMode } from './types'
+import { resolveBackgroundImageUrl } from './backgroundPath'
+
+type ResolvedTheme = 'light' | 'dark'
+
+const clamp = (value: number, min: number, max: number): number => {
+  return Math.min(max, Math.max(min, value))
+}
+
+const detectSystemTheme = (): ResolvedTheme => {
+  if (typeof window === 'undefined') return 'dark'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+const resolveTheme = (mode: WebThemeMode): ResolvedTheme => {
+  if (mode === 'system') {
+    return detectSystemTheme()
+  }
+  return mode
+}
+
+const applyTheme = (mode: WebThemeMode): void => {
+  const root = document.documentElement
+  const resolvedTheme = resolveTheme(mode)
+
+  if (resolvedTheme === 'dark') {
+    root.classList.add('dark')
+  } else {
+    root.classList.remove('dark')
+  }
+}
+
+const applyBackground = (settings: AppSettings): void => {
+  const root = document.documentElement
+  const background = settings.ui.background
+  const imageUrl = resolveBackgroundImageUrl(background)
+  root.style.setProperty('--app-surface-opacity', String(clamp(background.surfaceOpacity, 0, 1)))
+
+  if (!imageUrl) {
+    root.style.setProperty('--app-background-image', 'none')
+    root.style.setProperty('--app-background-opacity', '0')
+    root.style.setProperty('--app-background-blur', '0px')
+    return
+  }
+
+  root.style.setProperty('--app-background-image', `url("${imageUrl}")`)
+  root.style.setProperty('--app-background-opacity', '1')
+  root.style.setProperty('--app-background-blur', `${Math.max(background.blurAmount, 0)}px`)
+}
+
+export const applyAppearanceToDocument = (settings: AppSettings): void => {
+  if (typeof document === 'undefined') return
+
+  applyTheme(settings.ui.webTheme.mode)
+  applyBackground(settings)
+}
+
+export const preloadBackgroundImage = (settings: AppSettings): void => {
+  if (typeof window === 'undefined') return
+
+  const imageUrl = resolveBackgroundImageUrl(settings.ui.background)
+  if (!imageUrl) return
+
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = imageUrl
+}

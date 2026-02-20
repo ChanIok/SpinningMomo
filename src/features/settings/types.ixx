@@ -19,8 +19,8 @@ export struct WebThemeSettings {
 export struct WebBackgroundSettings {
   std::string type = "none";  // "none" | "image"
   std::string image_path = "";
-  double opacity = 0.8;  // 0.0 - 1.0
-  int blur_amount = 0;   // 0 - 200
+  int blur_amount = 0;           // 0 - 200
+  double surface_opacity = 1.0;  // 0.0 - 1.0
 };
 
 // 完整的应用设置（重构后的结构）

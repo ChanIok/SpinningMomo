@@ -289,9 +289,12 @@ auto patch_settings(Core::State::AppState& app_state, const Types::PatchSettings
     auto merged_object = current_object.value();
     merge_patch_object(merged_object, params.patch);
 
+    // 经 JSON 再反序列化，与「从文件读设置」同路径，避免 from_generic 对 double 字段
+    // 不接受整数（如 100% → 1）导致的解析失败
+    auto merged_json = rfl::json::write(merged_object);
     auto merged_settings_result =
-        rfl::from_generic<Types::AppSettings, rfl::SnakeCaseToCamelCase, rfl::DefaultIfMissing>(
-            merged_object);
+        rfl::json::read<Types::AppSettings, rfl::DefaultIfMissing, rfl::SnakeCaseToCamelCase>(
+            merged_json);
     if (!merged_settings_result) {
       return std::unexpected("Invalid settings patch: " + merged_settings_result.error().what());
     }

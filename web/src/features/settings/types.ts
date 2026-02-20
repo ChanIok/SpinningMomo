@@ -33,8 +33,8 @@ export interface FloatingWindowColors {
 export interface WebBackgroundSettings {
   type: 'none' | 'image'
   imagePath: string
-  opacity: number
   blurAmount: number
+  surfaceOpacity: number
 }
 
 // Web 主题设置
@@ -333,8 +333,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     background: {
       type: 'none',
       imagePath: '',
-      opacity: 0.8,
       blurAmount: 0,
+      surfaceOpacity: 1,
     },
   },
 } as const

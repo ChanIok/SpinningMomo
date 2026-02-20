@@ -1,16 +1,17 @@
-// 资源目录路径
-export const RESOURCES_DIR = './resources/web/assets'
+// 前端资源根目录（文件系统路径）
+export const RESOURCES_WEB_ROOT = './resources/web'
+
+// 资源目录路径（文件系统路径）
+export const RESOURCES_DIR = `${RESOURCES_WEB_ROOT}/assets`
+
+// 背景图片目录（文件系统路径）
+export const BACKGROUND_RESOURCES_DIR = `${RESOURCES_DIR}/backgrounds`
+
+// 背景图片目录（Web 路径）
+export const BACKGROUND_WEB_DIR = '/assets/backgrounds'
 
 // 背景图片文件名
 export const BACKGROUND_IMAGE_NAME = 'background'
-
-// 透明度范围
-export const OPACITY_RANGE = {
-  MIN: 0,
-  MAX: 1,
-  DEFAULT: 0.8,
-  STEP: 0.1,
-} as const
 
 // 模糊范围
 export const BLUR_RANGE = {
@@ -18,6 +19,14 @@ export const BLUR_RANGE = {
   MAX: 200,
   DEFAULT: 0,
   STEP: 1,
+} as const
+
+// 界面面板不透明度范围
+export const SURFACE_OPACITY_RANGE = {
+  MIN: 0.4,
+  MAX: 1,
+  DEFAULT: 1,
+  STEP: 0.05,
 } as const
 
 // === 菜单项 Registry ===

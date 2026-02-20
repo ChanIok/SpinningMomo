@@ -10,7 +10,11 @@ import type {
   FloatingWindowThemeMode,
   WebBackgroundSettings,
 } from '../types'
-import { selectBackgroundImage, copyBackgroundImageToResources } from '../api'
+import {
+  selectBackgroundImage,
+  copyBackgroundImageToResources,
+  removeBackgroundImageResource,
+} from '../api'
 import { storeToRefs } from 'pinia'
 
 export const useAppearanceActions = () => {
@@ -112,8 +116,8 @@ export const useAppearanceActions = () => {
     })
   }
 
-  const updateBackgroundOpacity = async (opacity: number) => {
-    await updateBackgroundSettings({ opacity })
+  const updateSurfaceOpacity = async (surfaceOpacity: number) => {
+    await updateBackgroundSettings({ surfaceOpacity })
   }
 
   const updateBackgroundBlur = async (blurAmount: number) => {
@@ -122,6 +126,7 @@ export const useAppearanceActions = () => {
 
   const handleBackgroundImageSelect = async () => {
     try {
+      const previousImagePath = appSettings.value.ui.background.imagePath
       const imagePath = await selectBackgroundImage()
       if (imagePath) {
         const copiedImagePath = await copyBackgroundImageToResources(imagePath)
@@ -129,6 +134,9 @@ export const useAppearanceActions = () => {
           type: 'image',
           imagePath: copiedImagePath,
         })
+        if (previousImagePath && previousImagePath !== copiedImagePath) {
+          void removeBackgroundImageResource(previousImagePath)
+        }
       }
     } catch (error) {
       console.error('设置背景图片失败:', error)
@@ -138,10 +146,14 @@ export const useAppearanceActions = () => {
 
   const handleBackgroundImageRemove = async () => {
     try {
+      const previousImagePath = appSettings.value.ui.background.imagePath
       await updateBackgroundSettings({
         type: 'none',
         imagePath: '',
       })
+      if (previousImagePath) {
+        void removeBackgroundImageResource(previousImagePath)
+      }
     } catch (error) {
       console.error('移除背景图片失败:', error)
       throw error
@@ -154,7 +166,7 @@ export const useAppearanceActions = () => {
     resetWebAppearanceSettings,
     resetFloatingWindowSettings,
     updateFloatingWindowColors,
-    updateBackgroundOpacity,
+    updateSurfaceOpacity,
     updateBackgroundBlur,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,
