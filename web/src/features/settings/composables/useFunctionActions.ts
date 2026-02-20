@@ -39,19 +39,6 @@ export const useFunctionActions = () => {
     })
   }
 
-  const updateTaskbarLowerOnResize = async (enabled: boolean) => {
-    await store.updateSettings({
-      ...appSettings.value,
-      window: {
-        ...appSettings.value.window,
-        taskbar: {
-          ...appSettings.value.window.taskbar,
-          lowerOnResize: enabled,
-        },
-      },
-    })
-  }
-
   const updateLetterboxEnabled = async (enabled: boolean) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -320,10 +307,6 @@ export const useFunctionActions = () => {
       window: {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
-        taskbar: {
-          ...appSettings.value.window.taskbar,
-          lowerOnResize: DEFAULT_APP_SETTINGS.window.taskbar.lowerOnResize,
-        },
       },
       features: {
         ...appSettings.value.features,
@@ -416,10 +399,6 @@ export const useFunctionActions = () => {
       window: {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
-        taskbar: {
-          ...appSettings.value.window.taskbar,
-          lowerOnResize: DEFAULT_APP_SETTINGS.window.taskbar.lowerOnResize,
-        },
       },
       features: {
         ...appSettings.value.features,
@@ -435,7 +414,6 @@ export const useFunctionActions = () => {
     updateWindowTitle,
     updateOutputDir,
     updateGameAlbumPath,
-    updateTaskbarLowerOnResize,
     updateLetterboxEnabled,
     // Motion Photo
     updateMotionPhotoDuration,

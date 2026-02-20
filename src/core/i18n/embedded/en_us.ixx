@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3736 bytes
+// Size: 3629 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -31,8 +31,6 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "menu.window_resolution": "Resolution",
   "menu.window_reset": "Reset",
   "menu.window_toggle_borderless": "Toggle Window Border",
-  "menu.window_auto_hide": "Hide Taskbar",
-  "menu.window_lower_on_resize": "Lower Taskbar When Resizing",
 
   "menu.screenshot_capture": "Capture",
   "menu.screenshot_open_folder": "Screenshots",

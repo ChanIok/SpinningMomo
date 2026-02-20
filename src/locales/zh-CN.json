@@ -15,8 +15,6 @@
   "menu.window_resolution": "分辨率",
   "menu.window_reset": "重置窗口",
   "menu.window_toggle_borderless": "切换窗口边框",
-  "menu.window_auto_hide": "隐藏任务栏",
-  "menu.window_lower_on_resize": "调整时置底任务栏",
 
   "menu.screenshot_capture": "截图",
   "menu.screenshot_open_folder": "打开相册",

@@ -19,12 +19,7 @@ import ResetSettingsDialog from './ResetSettingsDialog.vue'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const {
-  updateWindowTitle,
-  updateTaskbarLowerOnResize,
-  updateLetterboxEnabled,
-  resetWindowSceneSettings,
-} = useFunctionActions()
+const { updateWindowTitle, updateLetterboxEnabled, resetWindowSceneSettings } = useFunctionActions()
 const { clearError } = store
 const { t } = useI18n()
 
@@ -126,23 +121,6 @@ const handleResetSettings = async () => {
                 "
                 :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
                 class="w-48"
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.windowControl.taskbarLowerOnResize.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.windowControl.taskbarLowerOnResize.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                :model-value="appSettings?.window?.taskbar?.lowerOnResize"
-                @update:model-value="updateTaskbarLowerOnResize"
               />
             </ItemActions>
           </Item>

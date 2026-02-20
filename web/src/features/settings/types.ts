@@ -114,12 +114,6 @@ export interface AppSettings {
   // window 分组 - 窗口相关设置
   window: {
     targetTitle: string // 目标窗口标题
-
-    // 任务栏设置
-    taskbar: {
-      autoHide: boolean // 隐藏任务栏
-      lowerOnResize: boolean // 调整时置底任务栏
-    }
   }
 
   // features 分组 - 功能特性设置
@@ -139,7 +133,7 @@ export interface AppSettings {
     // 动态照片设置
     motionPhoto: {
       duration: number // 视频时长（秒）
-      resolution: number // 短边分辨率: 720/1080/1440/2160
+      resolution: number // 短边分辨率: 0=原始不缩放, 720/1080/1440/2160
       fps: number // 帧率
       bitrate: number // 比特率 (bps)，CBR 模式使用
       quality: number // 质量值 (0-100)，VBR 模式使用
@@ -197,6 +191,15 @@ export interface AppSettings {
     // 浮窗主题模式
     floatingWindowThemeMode: FloatingWindowThemeMode
 
+    // WebView 主窗口尺寸和位置（持久化）
+    // x/y 为 -1 表示未保存过，首次启动时居中
+    webviewWindow: {
+      width: number
+      height: number
+      x: number
+      y: number
+    }
+
     // Web UI 设置
     webTheme: WebThemeSettings
     background: WebBackgroundSettings
@@ -231,10 +234,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // window 设置
   window: {
     targetTitle: '无限暖暖  ',
-    taskbar: {
-      autoHide: false,
-      lowerOnResize: true,
-    },
   },
 
   // features 设置
@@ -277,7 +276,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   update: {
     autoCheck: true,
     checkIntervalHours: 24,
-    versionUrl: 'https://spinning-momo.pages.dev/version.txt',
+    versionUrl: 'https://spinning.infinitymomo.com/version.txt',
     downloadSources: [
       {
         name: 'GitHub',
@@ -285,7 +284,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       },
       {
         name: 'Mirror',
-        urlTemplate: 'https://r2.spinning-momo.pages.dev/releases/v{0}/{1}',
+        urlTemplate: 'https://r2.infinitymomo.com/releases/v{0}/{1}',
       },
     ],
   },
@@ -295,9 +294,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     appMenu: {
       features: [
         'screenshot.capture',
-        'motionPhoto.toggle',
-        'replay_buffer.toggle',
-        'replay_buffer.save',
         'recording.toggle',
         'preview.toggle',
         'overlay.toggle',
@@ -325,6 +321,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     floatingWindowColors: DARK_FLOATING_WINDOW_COLORS,
     floatingWindowThemeMode: 'dark',
+    webviewWindow: {
+      width: 1200,
+      height: 800,
+      x: -1,
+      y: -1,
+    },
     webTheme: {
       mode: 'system',
     },

@@ -15,8 +15,6 @@
   "menu.window_resolution": "Resolution",
   "menu.window_reset": "Reset",
   "menu.window_toggle_borderless": "Toggle Window Border",
-  "menu.window_auto_hide": "Hide Taskbar",
-  "menu.window_lower_on_resize": "Lower Taskbar When Resizing",
 
   "menu.screenshot_capture": "Capture",
   "menu.screenshot_open_folder": "Screenshots",

@@ -59,12 +59,6 @@ export struct AppSettings {
   // window 分组 - 窗口相关设置
   struct Window {
     std::string target_title = "无限暖暖  ";  // 目标窗口标题
-
-    // 任务栏设置
-    struct Taskbar {
-      bool auto_hide = false;       // 隐藏任务栏
-      bool lower_on_resize = true;  // 调整时置底任务栏
-    } taskbar;
   } window;
 
   // features 分组 - 功能特性设置
@@ -142,8 +136,7 @@ export struct AppSettings {
     struct AppMenu {
       // 启用的功能项（有则启用，顺序即菜单显示顺序）
       std::vector<std::string> features = {
-          "screenshot.capture", "motion_photo.toggle",    "replay_buffer.toggle",
-          "replay_buffer.save", "recording.toggle",       "preview.toggle",
+          "screenshot.capture", "recording.toggle",       "preview.toggle",
           "overlay.toggle",     "window.reset",           "app.main",
           "app.exit",           "screenshot.open_folder", "letterbox.toggle"};
       // 启用的比例列表（顺序即为菜单显示顺序）

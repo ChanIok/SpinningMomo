@@ -37,7 +37,7 @@ auto find_target_window(const std::wstring& configured_title) -> std::expected<H
 }
 
 // 调整窗口大小并居中
-auto resize_and_center_window(HWND hwnd, int width, int height, bool taskbar_lower, bool activate)
+auto resize_and_center_window(HWND hwnd, int width, int height, bool activate)
     -> std::expected<void, std::string> {
   if (!hwnd || !IsWindow(hwnd)) {
     return std::unexpected{"Failed to resize window: Invalid window handle provided."};
@@ -95,11 +95,9 @@ auto resize_and_center_window(HWND hwnd, int width, int height, bool taskbar_low
     return std::unexpected{"Failed to set window position and size (SetWindowPos)."};
   }
 
-  // 如果窗口调整成功且需要置底任务栏，则执行置底操作
-  if (taskbar_lower) {
-    if (HWND taskbar = FindWindow(L"Shell_TrayWnd", nullptr)) {
-      SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
-    }
+  // 窗口调整成功后，始终将任务栏置底
+  if (HWND taskbar = FindWindow(L"Shell_TrayWnd", nullptr)) {
+    SetWindowPos(taskbar, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
   }
 
   return {};
@@ -215,7 +213,7 @@ auto apply_window_transform(HWND target_window, const Resolution& resolution,
 
   // 调用现有的调整窗口大小函数
   auto result = resize_and_center_window(target_window, resolution.width, resolution.height,
-                                         options.taskbar_lower, options.activate_window);
+                                         options.activate_window);
 
   if (!result) {
     return std::unexpected{result.error()};

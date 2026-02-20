@@ -150,8 +150,7 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   }
 
   // 应用窗口变换
-  Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
+  Features::WindowControl::TransformOptions options{.activate_window = true};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -223,8 +222,7 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
   }
 
   // 应用窗口变换
-  Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
+  Features::WindowControl::TransformOptions options{.activate_window = true};
 
   auto result =
       Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
@@ -314,8 +312,7 @@ auto reset_window_transform(Core::State::AppState& state) -> void {
     return;
   }
 
-  Features::WindowControl::TransformOptions options{
-      .taskbar_lower = state.settings->raw.window.taskbar.lower_on_resize, .activate_window = true};
+  Features::WindowControl::TransformOptions options{.activate_window = true};
 
   auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
   if (!result) {

@@ -294,6 +294,272 @@ const handleResetSettings = async () => {
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.function.recording.title') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.function.recording.description') }}
+          </p>
+        </div>
+
+        <ItemGroup>
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.fps.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.fps.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputFps"
+                type="number"
+                :min="1"
+                class="w-24"
+                @blur="handleFpsChange"
+                @keydown.enter="handleFpsChange"
+              />
+              <span class="text-sm text-muted-foreground">FPS</span>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.rateControl.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.rateControl.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.recording?.rateControl"
+                @update:model-value="
+                  (value) => updateRecordingRateControl(value as 'cbr' | 'vbr' | 'manual_qp')
+                "
+              >
+                <SelectTrigger class="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cbr">{{
+                    t('settings.function.recording.rateControl.cbr')
+                  }}</SelectItem>
+                  <SelectItem value="vbr">{{
+                    t('settings.function.recording.rateControl.vbr')
+                  }}</SelectItem>
+                  <SelectItem value="manual_qp">{{
+                    t('settings.function.recording.rateControl.manualQp')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.recording?.rateControl === 'cbr'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.bitrate.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.bitrate.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputBitrateMbps"
+                type="number"
+                :min="1"
+                :max="500"
+                class="w-24"
+                @blur="handleBitrateChange"
+                @keydown.enter="handleBitrateChange"
+              />
+              <span class="text-sm text-muted-foreground">Mbps</span>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.recording?.rateControl === 'vbr'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.quality.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.quality.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputQuality"
+                type="number"
+                :min="0"
+                :max="100"
+                class="w-24"
+                @blur="handleQualityChange"
+                @keydown.enter="handleQualityChange"
+              />
+              <span class="text-sm text-muted-foreground">(0-100)</span>
+            </ItemActions>
+          </Item>
+
+          <Item
+            v-if="appSettings?.features?.recording?.rateControl === 'manual_qp'"
+            variant="outline"
+            size="sm"
+          >
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.qp.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.qp.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputQp"
+                type="number"
+                :min="0"
+                :max="51"
+                class="w-24"
+                @blur="handleQpChange"
+                @keydown.enter="handleQpChange"
+              />
+              <span class="text-sm text-muted-foreground">(0-51)</span>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.codec.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.codec.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.recording?.codec"
+                @update:model-value="(value) => updateRecordingCodec(value as 'h264' | 'h265')"
+              >
+                <SelectTrigger class="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="h264">H.264 / AVC</SelectItem>
+                  <SelectItem value="h265">H.265 / HEVC</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.encoderMode.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.encoderMode.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.recording?.encoderMode"
+                @update:model-value="
+                  (value) => updateRecordingEncoderMode(value as 'auto' | 'gpu' | 'cpu')
+                "
+              >
+                <SelectTrigger class="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{{
+                    t('settings.function.recording.encoderMode.auto')
+                  }}</SelectItem>
+                  <SelectItem value="gpu">{{
+                    t('settings.function.recording.encoderMode.gpu')
+                  }}</SelectItem>
+                  <SelectItem value="cpu">{{
+                    t('settings.function.recording.encoderMode.cpu')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.audioSource.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.audioSource.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.recording?.audioSource"
+                @update:model-value="
+                  (value) => updateRecordingAudioSource(value as 'none' | 'system' | 'game_only')
+                "
+              >
+                <SelectTrigger class="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{{
+                    t('settings.function.recording.audioSource.none')
+                  }}</SelectItem>
+                  <SelectItem value="system">{{
+                    t('settings.function.recording.audioSource.system')
+                  }}</SelectItem>
+                  <SelectItem value="game_only">{{
+                    t('settings.function.recording.audioSource.gameOnly')
+                  }}</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="outline" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.audioBitrate.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.audioBitrate.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Input
+                v-model.number="inputAudioBitrateKbps"
+                type="number"
+                :min="64"
+                :max="512"
+                class="w-24"
+                @blur="handleAudioBitrateChange"
+                @keydown.enter="handleAudioBitrateChange"
+              />
+              <span class="text-sm text-muted-foreground">kbps</span>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
             {{ t('settings.function.motionPhoto.title') }}
           </h3>
           <p class="mt-1 text-sm text-muted-foreground">
@@ -579,272 +845,6 @@ const handleResetSettings = async () => {
             <span class="text-sm text-muted-foreground">s</span>
           </ItemActions>
         </Item>
-      </div>
-
-      <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-semibold text-foreground">
-            {{ t('settings.function.recording.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.function.recording.description') }}
-          </p>
-        </div>
-
-        <ItemGroup>
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.fps.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.fps.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Input
-                v-model.number="inputFps"
-                type="number"
-                :min="1"
-                class="w-24"
-                @blur="handleFpsChange"
-                @keydown.enter="handleFpsChange"
-              />
-              <span class="text-sm text-muted-foreground">FPS</span>
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.rateControl.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.rateControl.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select
-                :model-value="appSettings?.features?.recording?.rateControl"
-                @update:model-value="
-                  (value) => updateRecordingRateControl(value as 'cbr' | 'vbr' | 'manual_qp')
-                "
-              >
-                <SelectTrigger class="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cbr">{{
-                    t('settings.function.recording.rateControl.cbr')
-                  }}</SelectItem>
-                  <SelectItem value="vbr">{{
-                    t('settings.function.recording.rateControl.vbr')
-                  }}</SelectItem>
-                  <SelectItem value="manual_qp">{{
-                    t('settings.function.recording.rateControl.manualQp')
-                  }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </ItemActions>
-          </Item>
-
-          <Item
-            v-if="appSettings?.features?.recording?.rateControl === 'cbr'"
-            variant="outline"
-            size="sm"
-          >
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.bitrate.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.bitrate.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Input
-                v-model.number="inputBitrateMbps"
-                type="number"
-                :min="1"
-                :max="500"
-                class="w-24"
-                @blur="handleBitrateChange"
-                @keydown.enter="handleBitrateChange"
-              />
-              <span class="text-sm text-muted-foreground">Mbps</span>
-            </ItemActions>
-          </Item>
-
-          <Item
-            v-if="appSettings?.features?.recording?.rateControl === 'vbr'"
-            variant="outline"
-            size="sm"
-          >
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.quality.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.quality.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Input
-                v-model.number="inputQuality"
-                type="number"
-                :min="0"
-                :max="100"
-                class="w-24"
-                @blur="handleQualityChange"
-                @keydown.enter="handleQualityChange"
-              />
-              <span class="text-sm text-muted-foreground">(0-100)</span>
-            </ItemActions>
-          </Item>
-
-          <Item
-            v-if="appSettings?.features?.recording?.rateControl === 'manual_qp'"
-            variant="outline"
-            size="sm"
-          >
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.qp.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.qp.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Input
-                v-model.number="inputQp"
-                type="number"
-                :min="0"
-                :max="51"
-                class="w-24"
-                @blur="handleQpChange"
-                @keydown.enter="handleQpChange"
-              />
-              <span class="text-sm text-muted-foreground">(0-51)</span>
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.codec.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.codec.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select
-                :model-value="appSettings?.features?.recording?.codec"
-                @update:model-value="(value) => updateRecordingCodec(value as 'h264' | 'h265')"
-              >
-                <SelectTrigger class="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="h264">H.264 / AVC</SelectItem>
-                  <SelectItem value="h265">H.265 / HEVC</SelectItem>
-                </SelectContent>
-              </Select>
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.encoderMode.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.encoderMode.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select
-                :model-value="appSettings?.features?.recording?.encoderMode"
-                @update:model-value="
-                  (value) => updateRecordingEncoderMode(value as 'auto' | 'gpu' | 'cpu')
-                "
-              >
-                <SelectTrigger class="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">{{
-                    t('settings.function.recording.encoderMode.auto')
-                  }}</SelectItem>
-                  <SelectItem value="gpu">{{
-                    t('settings.function.recording.encoderMode.gpu')
-                  }}</SelectItem>
-                  <SelectItem value="cpu">{{
-                    t('settings.function.recording.encoderMode.cpu')
-                  }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.audioSource.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.audioSource.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select
-                :model-value="appSettings?.features?.recording?.audioSource"
-                @update:model-value="
-                  (value) => updateRecordingAudioSource(value as 'none' | 'system' | 'game_only')
-                "
-              >
-                <SelectTrigger class="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{{
-                    t('settings.function.recording.audioSource.none')
-                  }}</SelectItem>
-                  <SelectItem value="system">{{
-                    t('settings.function.recording.audioSource.system')
-                  }}</SelectItem>
-                  <SelectItem value="game_only">{{
-                    t('settings.function.recording.audioSource.gameOnly')
-                  }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.recording.audioBitrate.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.audioBitrate.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Input
-                v-model.number="inputAudioBitrateKbps"
-                type="number"
-                :min="64"
-                :max="512"
-                class="w-24"
-                @blur="handleAudioBitrateChange"
-                @keydown.enter="handleAudioBitrateChange"
-              />
-              <span class="text-sm text-muted-foreground">kbps</span>
-            </ItemActions>
-          </Item>
-        </ItemGroup>
       </div>
     </div>
   </div>
