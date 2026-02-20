@@ -10,41 +10,18 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import {
-  Item,
-  ItemContent,
-  ItemTitle,
-  ItemDescription,
-  ItemActions,
-  ItemGroup,
-} from '@/components/ui/item'
-import HotkeyRecorder from './HotkeyRecorder.vue'
+import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from '@/components/ui/item'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const {
-  updateLanguage,
-  updateLoggerLevel,
-  updateFloatingWindowHotkey,
-  updateScreenshotHotkey,
-  resetGeneralSettings,
-} = useGeneralActions()
+const { updateLanguage, updateLoggerLevel, resetGeneralCoreSettings } = useGeneralActions()
 const { clearError } = store
 const { t } = useI18n()
 
-// Ensure settings are passed safely to HotkeyRecorder
-const getHotkey = (type: 'floatingWindow' | 'screenshot') => {
-  const hotkey = appSettings.value.app.hotkey[type]
-  return {
-    modifiers: hotkey.modifiers,
-    key: hotkey.key,
-  }
-}
-
 const handleReset = async () => {
-  await resetGeneralSettings()
+  await resetGeneralCoreSettings()
   // simple visual feedback handled by dialog
 }
 </script>
@@ -157,56 +134,6 @@ const handleReset = async () => {
             </Select>
           </ItemActions>
         </Item>
-      </div>
-
-      <!-- Hotkeys -->
-      <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-semibold text-foreground">
-            {{ t('settings.general.hotkey.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.general.hotkey.description') }}
-          </p>
-        </div>
-
-        <ItemGroup>
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.general.hotkey.floatingWindow') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.general.hotkey.floatingWindowDescription') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <HotkeyRecorder
-                :value="getHotkey('floatingWindow')"
-                @change="(v) => updateFloatingWindowHotkey(v.modifiers, v.key)"
-                class="w-48"
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.general.hotkey.screenshot') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.general.hotkey.screenshotDescription') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <HotkeyRecorder
-                :value="getHotkey('screenshot')"
-                @change="(v) => updateScreenshotHotkey(v.modifiers, v.key)"
-                class="w-48"
-              />
-            </ItemActions>
-          </Item>
-        </ItemGroup>
       </div>
     </div>
   </div>

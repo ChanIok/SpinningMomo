@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
-import { Settings, Wrench, Menu, Palette } from 'lucide-vue-next'
+import { Settings, Keyboard, Camera, Monitor, Menu, Palette } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 
-export type SettingsPageKey = 'function' | 'menu' | 'appearance' | 'general'
+export type SettingsPageKey =
+  | 'general'
+  | 'hotkeys'
+  | 'capture'
+  | 'windowScene'
+  | 'floatingWindow'
+  | 'webAppearance'
 
 interface SettingsMenuItem {
   key: SettingsPageKey
@@ -24,28 +30,40 @@ const { t } = useI18n()
 
 const settingsMenus: SettingsMenuItem[] = [
   {
-    key: 'function',
-    label: 'settings.layout.function.title',
-    icon: Wrench,
-    description: 'settings.layout.function.description',
-  },
-  {
-    key: 'menu',
-    label: 'settings.layout.menu.title',
-    icon: Menu,
-    description: 'settings.layout.menu.description',
-  },
-  {
-    key: 'appearance',
-    label: 'settings.layout.appearance.title',
-    icon: Palette,
-    description: 'settings.layout.appearance.description',
-  },
-  {
     key: 'general',
     label: 'settings.layout.general.title',
     icon: Settings,
     description: 'settings.layout.general.description',
+  },
+  {
+    key: 'hotkeys',
+    label: 'settings.layout.hotkeys.title',
+    icon: Keyboard,
+    description: 'settings.layout.hotkeys.description',
+  },
+  {
+    key: 'capture',
+    label: 'settings.layout.capture.title',
+    icon: Camera,
+    description: 'settings.layout.capture.description',
+  },
+  {
+    key: 'windowScene',
+    label: 'settings.layout.windowScene.title',
+    icon: Monitor,
+    description: 'settings.layout.windowScene.description',
+  },
+  {
+    key: 'floatingWindow',
+    label: 'settings.layout.floatingWindow.title',
+    icon: Menu,
+    description: 'settings.layout.floatingWindow.description',
+  },
+  {
+    key: 'webAppearance',
+    label: 'settings.layout.webAppearance.title',
+    icon: Palette,
+    description: 'settings.layout.webAppearance.description',
   },
 ]
 

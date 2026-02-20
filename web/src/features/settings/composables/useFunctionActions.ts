@@ -368,6 +368,69 @@ export const useFunctionActions = () => {
     })
   }
 
+  const resetCaptureExportSettings = async () => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
+        screenshot: {
+          ...appSettings.value.features.screenshot,
+          gameAlbumPath: DEFAULT_APP_SETTINGS.features.screenshot.gameAlbumPath,
+        },
+        motionPhoto: {
+          ...appSettings.value.features.motionPhoto,
+          duration: DEFAULT_APP_SETTINGS.features.motionPhoto.duration,
+          resolution: DEFAULT_APP_SETTINGS.features.motionPhoto.resolution,
+          fps: DEFAULT_APP_SETTINGS.features.motionPhoto.fps,
+          bitrate: DEFAULT_APP_SETTINGS.features.motionPhoto.bitrate,
+          quality: DEFAULT_APP_SETTINGS.features.motionPhoto.quality,
+          rateControl: DEFAULT_APP_SETTINGS.features.motionPhoto.rateControl,
+          codec: DEFAULT_APP_SETTINGS.features.motionPhoto.codec,
+          audioSource: DEFAULT_APP_SETTINGS.features.motionPhoto.audioSource,
+          audioBitrate: DEFAULT_APP_SETTINGS.features.motionPhoto.audioBitrate,
+        },
+        replayBuffer: {
+          ...appSettings.value.features.replayBuffer,
+          duration: DEFAULT_APP_SETTINGS.features.replayBuffer.duration,
+        },
+        recording: {
+          ...appSettings.value.features.recording,
+          fps: DEFAULT_APP_SETTINGS.features.recording.fps,
+          bitrate: DEFAULT_APP_SETTINGS.features.recording.bitrate,
+          quality: DEFAULT_APP_SETTINGS.features.recording.quality,
+          qp: DEFAULT_APP_SETTINGS.features.recording.qp,
+          rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
+          encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
+          codec: DEFAULT_APP_SETTINGS.features.recording.codec,
+          audioSource: DEFAULT_APP_SETTINGS.features.recording.audioSource,
+          audioBitrate: DEFAULT_APP_SETTINGS.features.recording.audioBitrate,
+        },
+      },
+    })
+  }
+
+  const resetWindowSceneSettings = async () => {
+    await store.updateSettings({
+      ...appSettings.value,
+      window: {
+        ...appSettings.value.window,
+        targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
+        taskbar: {
+          ...appSettings.value.window.taskbar,
+          lowerOnResize: DEFAULT_APP_SETTINGS.window.taskbar.lowerOnResize,
+        },
+      },
+      features: {
+        ...appSettings.value.features,
+        letterbox: {
+          ...appSettings.value.features.letterbox,
+          enabled: DEFAULT_APP_SETTINGS.features.letterbox.enabled,
+        },
+      },
+    })
+  }
+
   return {
     updateWindowTitle,
     updateOutputDir,
@@ -397,5 +460,7 @@ export const useFunctionActions = () => {
     updateRecordingAudioSource,
     updateRecordingAudioBitrate,
     resetFunctionSettings,
+    resetCaptureExportSettings,
+    resetWindowSceneSettings,
   }
 }

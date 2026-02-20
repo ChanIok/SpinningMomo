@@ -5,7 +5,6 @@ import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
 import {
   Item,
   ItemContent,
@@ -28,12 +27,8 @@ import { call } from '@/core/rpc'
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
 const {
-  updateWindowTitle,
   updateOutputDir,
   updateGameAlbumPath,
-  updateTaskbarLowerOnResize,
-  updateLetterboxEnabled,
-  // Motion Photo
   updateMotionPhotoDuration,
   updateMotionPhotoResolution,
   updateMotionPhotoFps,
@@ -43,9 +38,7 @@ const {
   updateMotionPhotoCodec,
   updateMotionPhotoAudioSource,
   updateMotionPhotoAudioBitrate,
-  // Instant Replay
   updateReplayBufferDuration,
-  // Recording
   updateRecordingFps,
   updateRecordingBitrate,
   updateRecordingQuality,
@@ -55,15 +48,13 @@ const {
   updateRecordingCodec,
   updateRecordingAudioSource,
   updateRecordingAudioBitrate,
-  resetFunctionSettings,
+  resetCaptureExportSettings,
 } = useFunctionActions()
 const { clearError } = store
 const { t } = useI18n()
 
 const isSelectingOutputDir = ref(false)
 const isSelectingGameAlbumDir = ref(false)
-// Local state for input to avoid jitter
-const inputTitle = ref(appSettings.value?.window?.targetTitle || '')
 const inputBitrateMbps = ref(
   (appSettings.value?.features?.recording?.bitrate || 80000000) / 1000000
 )
@@ -74,7 +65,6 @@ const inputAudioBitrateKbps = ref(
 )
 const inputFps = ref(appSettings.value?.features?.recording?.fps || 60)
 
-// Motion Photo local state
 const inputMotionPhotoDuration = ref(appSettings.value?.features?.motionPhoto?.duration || 3)
 const inputMotionPhotoFps = ref(appSettings.value?.features?.motionPhoto?.fps || 30)
 const inputMotionPhotoBitrateMbps = ref(
@@ -85,29 +75,12 @@ const inputMotionPhotoAudioBitrateKbps = ref(
 )
 const inputMotionPhotoQuality = ref(appSettings.value?.features?.motionPhoto?.quality || 100)
 
-// Instant Replay local state
 const inputReplayBufferDuration = ref(appSettings.value?.features?.replayBuffer?.duration || 30)
-
-const handleTitleChange = async () => {
-  const value = inputTitle.value.trim()
-  if (value === '') {
-    // TODO: toast error
-    return
-  }
-  try {
-    await updateWindowTitle(value)
-    // TODO: toast success
-  } catch (error) {
-    console.error('Failed to update window title:', error)
-    // TODO: toast error
-  }
-}
 
 const handleSelectOutputDir = async () => {
   isSelectingOutputDir.value = true
   try {
-    const parentWindowMode = 2 // web: 2
-
+    const parentWindowMode = 2
     const result = await call<{ path: string }>(
       'dialog.openDirectory',
       {
@@ -117,10 +90,8 @@ const handleSelectOutputDir = async () => {
       0
     )
     await updateOutputDir(result.path)
-    // TODO: toast success
   } catch (error) {
     console.error('Failed to select output directory:', error)
-    // TODO: toast error
   } finally {
     isSelectingOutputDir.value = false
   }
@@ -129,8 +100,7 @@ const handleSelectOutputDir = async () => {
 const handleSelectGameAlbumDir = async () => {
   isSelectingGameAlbumDir.value = true
   try {
-    const parentWindowMode = 2 // web: 2
-
+    const parentWindowMode = 2
     const result = await call<{ path: string }>(
       'dialog.openDirectory',
       {
@@ -140,10 +110,8 @@ const handleSelectGameAlbumDir = async () => {
       0
     )
     await updateGameAlbumPath(result.path)
-    // TODO: toast success
   } catch (error) {
     console.error('Failed to select game album directory:', error)
-    // TODO: toast error
   } finally {
     isSelectingGameAlbumDir.value = false
   }
@@ -152,23 +120,19 @@ const handleSelectGameAlbumDir = async () => {
 const handleBitrateChange = async () => {
   const bitrateBps = inputBitrateMbps.value * 1000000
   await updateRecordingBitrate(bitrateBps)
-  // TODO: toast success
 }
 
 const handleQualityChange = async () => {
   await updateRecordingQuality(inputQuality.value)
-  // TODO: toast success
 }
 
 const handleQpChange = async () => {
   await updateRecordingQp(inputQp.value)
-  // TODO: toast success
 }
 
 const handleAudioBitrateChange = async () => {
   const audioBitrateBps = inputAudioBitrateKbps.value * 1000
   await updateRecordingAudioBitrate(audioBitrateBps)
-  // TODO: toast success
 }
 
 const handleFpsChange = async () => {
@@ -176,7 +140,6 @@ const handleFpsChange = async () => {
   await updateRecordingFps(inputFps.value)
 }
 
-// Motion Photo handlers
 const handleMotionPhotoDurationChange = async () => {
   if (!inputMotionPhotoDuration.value) return
   await updateMotionPhotoDuration(inputMotionPhotoDuration.value)
@@ -201,27 +164,23 @@ const handleMotionPhotoQualityChange = async () => {
   await updateMotionPhotoQuality(inputMotionPhotoQuality.value)
 }
 
-// Instant Replay handlers
 const handleReplayBufferDurationChange = async () => {
   if (!inputReplayBufferDuration.value) return
   await updateReplayBufferDuration(inputReplayBufferDuration.value)
 }
 
 const handleResetSettings = async () => {
-  await resetFunctionSettings()
-  // Recording defaults
+  await resetCaptureExportSettings()
   inputBitrateMbps.value = 80
   inputQuality.value = 100
   inputQp.value = 23
   inputAudioBitrateKbps.value = 320
   inputFps.value = 60
-  // Motion Photo defaults
   inputMotionPhotoDuration.value = 3
   inputMotionPhotoFps.value = 30
   inputMotionPhotoBitrateMbps.value = 10
   inputMotionPhotoQuality.value = 100
   inputMotionPhotoAudioBitrateKbps.value = 192
-  // Instant Replay defaults
   inputReplayBufferDuration.value = 30
 }
 </script>
@@ -232,36 +191,34 @@ const handleResetSettings = async () => {
       <div
         class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"
       ></div>
-      <p class="mt-2 text-sm text-muted-foreground">{{ t('settings.function.loading') }}</p>
+      <p class="mt-2 text-sm text-muted-foreground">{{ t('settings.capture.loading') }}</p>
     </div>
   </div>
 
   <div v-else-if="error" class="flex items-center justify-center p-6">
     <div class="text-center">
-      <p class="text-sm text-muted-foreground">{{ t('settings.function.error.title') }}</p>
+      <p class="text-sm text-muted-foreground">{{ t('settings.capture.error.title') }}</p>
       <p class="mt-1 text-sm text-red-500">{{ error }}</p>
       <Button variant="outline" size="sm" @click="clearError" class="mt-2">
-        {{ t('settings.function.error.retry') }}
+        {{ t('settings.capture.error.retry') }}
       </Button>
     </div>
   </div>
 
   <div v-else class="w-full">
-    <!-- Header -->
     <div class="mb-6 flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.function.title') }}</h1>
-        <p class="mt-1 text-muted-foreground">{{ t('settings.function.description') }}</p>
+        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.capture.title') }}</h1>
+        <p class="mt-1 text-muted-foreground">{{ t('settings.capture.description') }}</p>
       </div>
       <ResetSettingsDialog
-        :title="t('settings.function.reset.title')"
-        :description="t('settings.function.reset.description')"
+        :title="t('settings.capture.reset.title')"
+        :description="t('settings.capture.reset.description')"
         @reset="handleResetSettings"
       />
     </div>
 
     <div class="space-y-8">
-      <!-- Output Directory -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
@@ -298,58 +255,6 @@ const handleResetSettings = async () => {
         </Item>
       </div>
 
-      <!-- Window Control -->
-      <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-semibold text-foreground">
-            {{ t('settings.function.windowControl.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.function.windowControl.description') }}
-          </p>
-        </div>
-
-        <ItemGroup>
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.windowControl.windowTitle.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.windowControl.windowTitle.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Input
-                v-model="inputTitle"
-                @keydown.enter="handleTitleChange"
-                @blur="handleTitleChange"
-                :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
-                class="w-48"
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.function.windowControl.taskbarLowerOnResize.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.windowControl.taskbarLowerOnResize.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                :model-value="appSettings?.window?.taskbar?.lowerOnResize"
-                @update:model-value="updateTaskbarLowerOnResize"
-              />
-            </ItemActions>
-          </Item>
-        </ItemGroup>
-      </div>
-
-      <!-- Screenshot -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
@@ -386,36 +291,6 @@ const handleResetSettings = async () => {
         </Item>
       </div>
 
-      <!-- Letterbox -->
-      <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-semibold text-foreground">
-            {{ t('settings.function.letterbox.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.function.letterbox.description') }}
-          </p>
-        </div>
-
-        <Item variant="outline" size="sm">
-          <ItemContent>
-            <ItemTitle>
-              {{ t('settings.function.letterbox.enabled.label') }}
-            </ItemTitle>
-            <ItemDescription>
-              {{ t('settings.function.letterbox.enabled.description') }}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Switch
-              :model-value="appSettings?.features?.letterbox?.enabled"
-              @update:model-value="updateLetterboxEnabled"
-            />
-          </ItemActions>
-        </Item>
-      </div>
-
-      <!-- Motion Photo -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
@@ -672,7 +547,6 @@ const handleResetSettings = async () => {
         </ItemGroup>
       </div>
 
-      <!-- Instant Replay -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
@@ -707,7 +581,6 @@ const handleResetSettings = async () => {
         </Item>
       </div>
 
-      <!-- Recording -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">

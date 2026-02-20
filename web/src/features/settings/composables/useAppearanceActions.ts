@@ -41,6 +41,29 @@ export const useAppearanceActions = () => {
     })
   }
 
+  const resetWebAppearanceSettings = async () => {
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        webTheme: DEFAULT_APP_SETTINGS.ui.webTheme,
+        background: DEFAULT_APP_SETTINGS.ui.background,
+      },
+    })
+  }
+
+  const resetFloatingWindowSettings = async () => {
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        floatingWindowLayout: DEFAULT_APP_SETTINGS.ui.floatingWindowLayout,
+        floatingWindowColors: DEFAULT_APP_SETTINGS.ui.floatingWindowColors,
+        floatingWindowThemeMode: DEFAULT_APP_SETTINGS.ui.floatingWindowThemeMode,
+      },
+    })
+  }
+
   const getFloatingWindowColorsByTheme = (
     themeMode: FloatingWindowThemeMode
   ): FloatingWindowColors => {
@@ -128,6 +151,8 @@ export const useAppearanceActions = () => {
   return {
     updateFloatingWindowLayout,
     resetAppearanceSettings,
+    resetWebAppearanceSettings,
+    resetFloatingWindowSettings,
     updateFloatingWindowColors,
     updateBackgroundOpacity,
     updateBackgroundBlur,

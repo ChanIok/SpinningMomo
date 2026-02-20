@@ -77,11 +77,47 @@ export const useGeneralActions = () => {
     })
   }
 
+  const resetGeneralCoreSettings = async () => {
+    await store.updateSettings({
+      ...appSettings.value,
+      app: {
+        ...appSettings.value.app,
+        language: {
+          current: DEFAULT_APP_SETTINGS.app.language.current,
+        },
+        logger: {
+          level: DEFAULT_APP_SETTINGS.app.logger.level,
+        },
+      },
+    })
+  }
+
+  const resetHotkeySettings = async () => {
+    await store.updateSettings({
+      ...appSettings.value,
+      app: {
+        ...appSettings.value.app,
+        hotkey: {
+          floatingWindow: {
+            modifiers: DEFAULT_APP_SETTINGS.app.hotkey.floatingWindow.modifiers,
+            key: DEFAULT_APP_SETTINGS.app.hotkey.floatingWindow.key,
+          },
+          screenshot: {
+            modifiers: DEFAULT_APP_SETTINGS.app.hotkey.screenshot.modifiers,
+            key: DEFAULT_APP_SETTINGS.app.hotkey.screenshot.key,
+          },
+        },
+      },
+    })
+  }
+
   return {
     updateLanguage,
     updateLoggerLevel,
     updateFloatingWindowHotkey,
     updateScreenshotHotkey,
     resetGeneralSettings,
+    resetGeneralCoreSettings,
+    resetHotkeySettings,
   }
 }

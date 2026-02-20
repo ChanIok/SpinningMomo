@@ -4,7 +4,6 @@ import { useAppearanceActions } from '../composables/useAppearanceActions'
 import { useTheme } from '../composables/useTheme'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import {
   Item,
@@ -23,22 +22,18 @@ import {
 } from '@/components/ui/select'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
-import type { FloatingWindowLayout, FloatingWindowThemeMode, WebThemeMode } from '../types'
+import type { WebThemeMode } from '../types'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
 const { setTheme } = useTheme()
-
 const {
-  updateFloatingWindowLayout,
-  resetAppearanceSettings,
+  resetWebAppearanceSettings,
   updateBackgroundOpacity,
   updateBackgroundBlur,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
-  updateFloatingWindowTheme,
 } = useAppearanceActions()
-
 const { clearError } = store
 const { t } = useI18n()
 
@@ -48,39 +43,12 @@ const themeOptions = [
   { value: 'system', label: t('settings.appearance.theme.system') },
 ]
 
-const floatingWindowThemeOptions = [
-  { value: 'light', label: t('settings.appearance.floatingWindowTheme.light') },
-  { value: 'dark', label: t('settings.appearance.floatingWindowTheme.dark') },
-]
-
-const handleLayoutChange = async (field: keyof FloatingWindowLayout, value: string) => {
-  const numValue = parseInt(value, 10)
-  if (!isNaN(numValue) && numValue >= 0 && appSettings.value.ui.floatingWindowLayout) {
-    try {
-      await updateFloatingWindowLayout({
-        ...appSettings.value.ui.floatingWindowLayout,
-        [field]: numValue,
-      })
-    } catch (error) {
-      console.error('Failed to update layout settings:', error)
-      // TODO: toast error
-    }
-  }
-}
-
-const handleKeyDown = (e: KeyboardEvent) => {
-  if (e.key === 'Enter') {
-    ;(e.target as HTMLInputElement).blur()
-  }
-}
-
 const handleOpacityChange = async (val: number[] | undefined) => {
   if (!val || val.length === 0) return
   try {
     await updateBackgroundOpacity(val[0]!)
   } catch (error) {
     console.error('Failed to update opacity:', error)
-    // TODO: toast error
   }
 }
 
@@ -90,7 +58,6 @@ const handleBlurAmountChange = async (val: number[] | undefined) => {
     await updateBackgroundBlur(val[0]!)
   } catch (error) {
     console.error('Failed to update blur amount:', error)
-    // TODO: toast error
   }
 }
 
@@ -99,13 +66,11 @@ const handleThemeChange = async (themeMode: string) => {
     await setTheme(themeMode as WebThemeMode)
   } catch (error) {
     console.error('Failed to update theme:', error)
-    // TODO: toast error
   }
 }
 
 const handleResetSettings = async () => {
-  await resetAppearanceSettings()
-  // TODO: toast success
+  await resetWebAppearanceSettings()
 }
 
 const handleClearError = () => {
@@ -119,36 +84,34 @@ const handleClearError = () => {
       <div
         class="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"
       ></div>
-      <p class="mt-2 text-sm text-muted-foreground">{{ t('settings.appearance.loading') }}</p>
+      <p class="mt-2 text-sm text-muted-foreground">{{ t('settings.webAppearance.loading') }}</p>
     </div>
   </div>
 
   <div v-else-if="error" class="flex items-center justify-center p-6">
     <div class="text-center">
-      <p class="text-sm text-muted-foreground">{{ t('settings.appearance.error.title') }}</p>
+      <p class="text-sm text-muted-foreground">{{ t('settings.webAppearance.error.title') }}</p>
       <p class="mt-1 text-sm text-red-500">{{ error }}</p>
       <Button variant="outline" size="sm" @click="handleClearError" class="mt-2">
-        {{ t('settings.appearance.error.retry') }}
+        {{ t('settings.webAppearance.error.retry') }}
       </Button>
     </div>
   </div>
 
   <div v-else class="w-full">
-    <!-- Header -->
     <div class="mb-6 flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.appearance.title') }}</h1>
-        <p class="mt-1 text-muted-foreground">{{ t('settings.appearance.description') }}</p>
+        <h1 class="text-2xl font-bold text-foreground">{{ t('settings.webAppearance.title') }}</h1>
+        <p class="mt-1 text-muted-foreground">{{ t('settings.webAppearance.description') }}</p>
       </div>
       <ResetSettingsDialog
-        :title="t('settings.appearance.reset.title')"
-        :description="t('settings.appearance.reset.description')"
+        :title="t('settings.webAppearance.reset.title')"
+        :description="t('settings.webAppearance.reset.description')"
         @reset="handleResetSettings"
       />
     </div>
 
     <div class="space-y-8">
-      <!-- Background Settings -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
@@ -160,7 +123,6 @@ const handleClearError = () => {
         </div>
 
         <ItemGroup>
-          <!-- Opacity -->
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
@@ -187,7 +149,6 @@ const handleClearError = () => {
             </ItemActions>
           </Item>
 
-          <!-- Blur -->
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
@@ -214,7 +175,6 @@ const handleClearError = () => {
             </ItemActions>
           </Item>
 
-          <!-- Background Image -->
           <Item variant="outline" size="sm">
             <ItemContent>
               <ItemTitle>
@@ -238,7 +198,6 @@ const handleClearError = () => {
         </ItemGroup>
       </div>
 
-      <!-- Theme Settings -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
@@ -277,98 +236,6 @@ const handleClearError = () => {
                   </SelectItem>
                 </SelectContent>
               </Select>
-            </ItemActions>
-          </Item>
-
-          <Item variant="outline" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.appearance.floatingWindowTheme.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.appearance.floatingWindowTheme.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Select
-                :model-value="appSettings?.ui?.floatingWindowThemeMode || 'dark'"
-                @update:model-value="(v) => updateFloatingWindowTheme(v as FloatingWindowThemeMode)"
-              >
-                <SelectTrigger class="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in floatingWindowThemeOptions"
-                    :key="option.value"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </ItemActions>
-          </Item>
-        </ItemGroup>
-      </div>
-
-      <!-- Layout Settings -->
-      <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-semibold text-foreground">
-            {{ t('settings.appearance.layout.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.appearance.layout.description') }}
-          </p>
-        </div>
-
-        <ItemGroup>
-          <Item
-            v-for="key in [
-              'baseItemHeight',
-              'baseTitleHeight',
-              'baseSeparatorHeight',
-              'baseFontSize',
-              'baseTextPadding',
-              'baseIndicatorWidth',
-              'baseRatioIndicatorWidth',
-              'baseRatioColumnWidth',
-              'baseResolutionColumnWidth',
-              'baseSettingsColumnWidth',
-            ] as const"
-            :key="key"
-            variant="outline"
-            size="sm"
-          >
-            <ItemContent>
-              <ItemTitle>
-                {{ t(`settings.appearance.layout.${key}.label`) }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t(`settings.appearance.layout.${key}.description`) }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <div class="flex items-center gap-2">
-                <Input
-                  type="number"
-                  :model-value="appSettings?.ui?.floatingWindowLayout?.[key]"
-                  @input="
-                    (e: Event) =>
-                      handleLayoutChange(
-                        key as keyof FloatingWindowLayout,
-                        (e.target as HTMLInputElement).value
-                      )
-                  "
-                  @keydown="handleKeyDown"
-                  class="w-24"
-                  min="0"
-                />
-                <span class="text-sm text-muted-foreground">
-                  {{ t('settings.appearance.layout.unit') }}
-                </span>
-              </div>
             </ItemActions>
           </Item>
         </ItemGroup>
