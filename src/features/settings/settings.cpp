@@ -184,52 +184,112 @@ auto get_settings(const Types::GetSettingsParams& params)
   }
 }
 
+namespace {
+
+auto merge_patch_object(rfl::Generic::Object& target, const rfl::Generic::Object& patch) -> void {
+  for (const auto& [key, patch_value] : patch) {
+    auto patch_object = patch_value.to_object();
+    if (!patch_object) {
+      target[key] = patch_value;
+      continue;
+    }
+
+    auto target_object =
+        target.get(key).and_then([](const rfl::Generic& value) { return value.to_object(); });
+    if (target_object) {
+      auto merged_child = target_object.value();
+      merge_patch_object(merged_child, patch_object.value());
+      target[key] = merged_child;
+      continue;
+    }
+
+    target[key] = patch_value;
+  }
+}
+
+auto apply_settings_and_persist(Core::State::AppState& app_state,
+                                const Types::AppSettings& next_settings,
+                                std::string_view change_description)
+    -> std::expected<Types::UpdateSettingsResult, std::string> {
+  auto settings_path = get_settings_path();
+  if (!settings_path) {
+    return std::unexpected(settings_path.error());
+  }
+
+  if (!app_state.settings) {
+    return std::unexpected("Settings not initialized");
+  }
+
+  Types::AppSettings old_settings = app_state.settings->raw;
+  app_state.settings->raw = next_settings;
+  Compute::trigger_compute(app_state);
+
+  auto save_result = save_settings_to_file(settings_path.value(), app_state.settings->raw);
+  if (!save_result) {
+    app_state.settings->raw = old_settings;
+    Compute::trigger_compute(app_state);
+    return std::unexpected(save_result.error());
+  }
+
+  Types::SettingsChangeData change_data{
+      .old_settings = old_settings,
+      .new_settings = app_state.settings->raw,
+      .change_description = std::string(change_description),
+  };
+  Core::Events::post(*app_state.events,
+                     Features::Settings::Events::SettingsChangeEvent{change_data});
+
+  return Types::UpdateSettingsResult{
+      .success = true,
+      .message = "Settings updated successfully",
+  };
+}
+
+}  // namespace
+
 auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string> {
   try {
-    auto settings_path = get_settings_path();
-    if (!settings_path) {
-      return std::unexpected(settings_path.error());
+    return apply_settings_and_persist(app_state, params, "Settings updated via RPC");
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to save settings: " + std::string(e.what()));
+  }
+}
+
+auto patch_settings(Core::State::AppState& app_state, const Types::PatchSettingsParams& params)
+    -> std::expected<Types::PatchSettingsResult, std::string> {
+  try {
+    if (params.patch.empty()) {
+      return Types::PatchSettingsResult{
+          .success = true,
+          .message = "No settings changes",
+      };
     }
 
-    // 确保 settings 已初始化
     if (!app_state.settings) {
       return std::unexpected("Settings not initialized");
     }
 
-    // 保存旧设置用于事件通知
-    Types::AppSettings old_settings = app_state.settings->raw;
-
-    // 更新配置
-    app_state.settings->raw = params;
-
-    // 重新计算预设状态
-    Compute::trigger_compute(app_state);
-
-    // 保存到文件
-    auto save_result = save_settings_to_file(settings_path.value(), params);
-    if (!save_result) {
-      // 回滚状态
-      app_state.settings->raw = old_settings;
-      Compute::trigger_compute(app_state);
-      return std::unexpected(save_result.error());
+    auto current_generic = rfl::to_generic<rfl::SnakeCaseToCamelCase>(app_state.settings->raw);
+    auto current_object = current_generic.to_object();
+    if (!current_object) {
+      return std::unexpected("Current settings is not an object");
     }
 
-    // 发送设置变更事件
-    Types::SettingsChangeData change_data{.old_settings = old_settings,
-                                          .new_settings = app_state.settings->raw,
-                                          .change_description = "Settings updated via RPC"};
+    auto merged_object = current_object.value();
+    merge_patch_object(merged_object, params.patch);
 
-    Core::Events::post(*app_state.events,
-                       Features::Settings::Events::SettingsChangeEvent{change_data});
+    auto merged_settings_result =
+        rfl::from_generic<Types::AppSettings, rfl::SnakeCaseToCamelCase, rfl::DefaultIfMissing>(
+            merged_object);
+    if (!merged_settings_result) {
+      return std::unexpected("Invalid settings patch: " + merged_settings_result.error().what());
+    }
 
-    Types::UpdateSettingsResult result;
-    result.success = true;
-    result.message = "Settings updated successfully";
-
-    return result;
+    return apply_settings_and_persist(app_state, merged_settings_result.value(),
+                                      "Settings patched via RPC");
   } catch (const std::exception& e) {
-    return std::unexpected("Failed to save settings: " + std::string(e.what()));
+    return std::unexpected("Failed to patch settings: " + std::string(e.what()));
   }
 }
 

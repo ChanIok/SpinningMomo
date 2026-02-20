@@ -3,6 +3,7 @@ module;
 export module Features.Settings.Types;
 
 import std;
+import <rfl.hpp>;
 
 namespace Features::Settings::Types {
 
@@ -215,5 +216,12 @@ export struct UpdateSettingsResult {
   bool success;
   std::string message;
 };
+
+// 局部更新设置（JSON Merge Patch 风格，不支持字段删除）
+export struct PatchSettingsParams {
+  rfl::Generic::Object patch;
+};
+
+export using PatchSettingsResult = UpdateSettingsResult;
 
 }  // namespace Features::Settings::Types

@@ -17,6 +17,10 @@ export auto update_settings(Core::State::AppState& app_state,
                             const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string>;
 
+export auto patch_settings(Core::State::AppState& app_state,
+                           const Types::PatchSettingsParams& params)
+    -> std::expected<Types::PatchSettingsResult, std::string>;
+
 export auto get_settings_path() -> std::expected<std::filesystem::path, std::string>;
 
 export auto save_settings_to_file(const std::filesystem::path& settings_path,

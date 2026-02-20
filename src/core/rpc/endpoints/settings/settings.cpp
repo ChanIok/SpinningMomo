@@ -41,6 +41,20 @@ auto handle_update_settings(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_patch_settings(Core::State::AppState& app_state,
+                           const Features::Settings::Types::PatchSettingsParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::PatchSettingsResult>> {
+  auto result = Features::Settings::patch_settings(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<Features::Settings::Types::GetSettingsParams,
                              Features::Settings::Types::GetSettingsResult>(
@@ -51,6 +65,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
                              Features::Settings::Types::UpdateSettingsResult>(
       app_state, app_state.rpc->registry, "settings.update", handle_update_settings,
       "Update settings configuration");
+
+  Core::RPC::register_method<Features::Settings::Types::PatchSettingsParams,
+                             Features::Settings::Types::PatchSettingsResult>(
+      app_state, app_state.rpc->registry, "settings.patch", handle_patch_settings,
+      "Patch settings configuration");
 }
 
 }  // namespace Core::RPC::Endpoints::Settings

@@ -7,8 +7,8 @@ export const settingsApi = {
     return call<AppSettings>('settings.get')
   },
 
-  update: async (settings: AppSettings): Promise<void> => {
-    await call('settings.update', settings)
+  patch: async (patch: Partial<AppSettings>): Promise<void> => {
+    await call('settings.patch', { patch })
   },
 }
 

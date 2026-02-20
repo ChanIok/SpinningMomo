@@ -6,6 +6,60 @@ import { DEFAULT_APP_SETTINGS } from './types'
 import { useI18n } from '@/composables/useI18n'
 import type { Locale } from '@/core/i18n/types'
 
+type JsonObject = Record<string, unknown>
+const NO_CHANGE = Symbol('no_change')
+
+const isPlainObject = (value: unknown): value is JsonObject => {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const cloneDeep = <T>(value: T): T => {
+  return JSON.parse(JSON.stringify(value)) as T
+}
+
+const deepMerge = <T>(base: T, patch: unknown): T => {
+  if (!isPlainObject(base) || !isPlainObject(patch)) {
+    return patch as T
+  }
+
+  const merged: JsonObject = { ...(base as JsonObject) }
+  for (const [key, patchValue] of Object.entries(patch)) {
+    const baseValue = (base as JsonObject)[key]
+    if (isPlainObject(baseValue) && isPlainObject(patchValue)) {
+      merged[key] = deepMerge(baseValue, patchValue)
+      continue
+    }
+    merged[key] = patchValue
+  }
+
+  return merged as T
+}
+
+const buildPatch = (before: unknown, after: unknown): unknown | typeof NO_CHANGE => {
+  if (Object.is(before, after)) {
+    return NO_CHANGE
+  }
+
+  if (Array.isArray(before) || Array.isArray(after)) {
+    return JSON.stringify(before) === JSON.stringify(after) ? NO_CHANGE : after
+  }
+
+  if (isPlainObject(before) && isPlainObject(after)) {
+    const patch: JsonObject = {}
+
+    for (const [key, afterValue] of Object.entries(after)) {
+      const diff = buildPatch((before as JsonObject)[key], afterValue)
+      if (diff !== NO_CHANGE) {
+        patch[key] = diff
+      }
+    }
+
+    return Object.keys(patch).length > 0 ? patch : NO_CHANGE
+  }
+
+  return after
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const appSettings = ref<AppSettings>(DEFAULT_APP_SETTINGS)
   const isLoading = ref(false)
@@ -46,13 +100,18 @@ export const useSettingsStore = defineStore('settings', () => {
 
   const updateSettings = async (newSettings: Partial<AppSettings>) => {
     // 乐观更新
-    const oldSettings = JSON.parse(JSON.stringify(appSettings.value))
+    const oldSettings = cloneDeep(appSettings.value)
+    const nextSettings = deepMerge(oldSettings, newSettings) as AppSettings
+    const patch = buildPatch(oldSettings, nextSettings)
 
-    const nextSettings = { ...appSettings.value, ...newSettings }
-    appSettings.value = nextSettings as AppSettings
+    if (patch === NO_CHANGE) {
+      return
+    }
+
+    appSettings.value = nextSettings
 
     try {
-      await settingsApi.update(nextSettings as AppSettings)
+      await settingsApi.patch(patch as Partial<AppSettings>)
     } catch (e) {
       // 回滚
       appSettings.value = oldSettings
