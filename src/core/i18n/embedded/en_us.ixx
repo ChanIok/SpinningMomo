@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3629 bytes
+// Size: 3749 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -62,6 +62,8 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.preview_overlay_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
   "message.preview_start_failed": "Failed to start preview window: ",
   "message.overlay_start_failed": "Failed to start overlay window: ",
+  "message.recording_started": "Recording started, output file: ",
+  "message.recording_stopped": "Recording stopped.",
   "message.recording_start_failed": "Failed to start recording: ",
   "message.recording_stop_failed": "Failed to stop recording: ",
   "message.motion_photo_success": "Motion Photo saved: ",

@@ -4,18 +4,33 @@ module Features.Recording.UseCase;
 
 import std;
 import Core.State;
+import Core.I18n.State;
 import Features.Recording;
 import Features.Recording.Types;
 import Features.Recording.State;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.WindowControl;
+import Features.Notifications;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
 import <windows.h>;
 
 namespace Features::Recording::UseCase {
+
+namespace {
+
+auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
+  if (!state.i18n) {
+    Logger().warn("Skip recording notification because i18n state is not initialized");
+    return;
+  }
+
+  Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"], message);
+}
+
+}  // namespace
 
 // 生成输出文件路径
 auto generate_output_path(const Core::State::AppState& state)
@@ -62,6 +77,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   if (state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
     // 停止录制
     Features::Recording::stop(*state.recording);
+    show_recording_notification(state, state.i18n->texts["message.recording_stopped"]);
   } else if (state.recording->status == Features::Recording::Types::RecordingStatus::Idle) {
     // 开始录制
 
@@ -69,12 +85,15 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
     auto target = Features::WindowControl::find_target_window(window_title);
     if (!target) {
+      show_recording_notification(state, state.i18n->texts["message.window_not_found"]);
       return std::unexpected("Target window not found");
     }
 
     // 2. 准备配置
     auto path_result = generate_output_path(state);
     if (!path_result) {
+      show_recording_notification(
+          state, state.i18n->texts["message.recording_start_failed"] + path_result.error());
       return std::unexpected(path_result.error());
     }
 
@@ -99,8 +118,13 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     // 3. 启动
     auto result = Features::Recording::start(*state.recording, target.value(), config);
     if (!result) {
+      show_recording_notification(
+          state, state.i18n->texts["message.recording_start_failed"] + result.error());
       return result;
     }
+
+    show_recording_notification(state, state.i18n->texts["message.recording_started"] +
+                                           Utils::String::ToUtf8(path_result->wstring()));
   } else {
     return std::unexpected("Recording is in a transitional state");
   }

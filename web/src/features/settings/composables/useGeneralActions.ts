@@ -52,6 +52,19 @@ export const useGeneralActions = () => {
     })
   }
 
+  const updateRecordingHotkey = async (modifiers: number, key: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      app: {
+        ...appSettings.value.app,
+        hotkey: {
+          ...appSettings.value.app.hotkey,
+          recording: { modifiers, key },
+        },
+      },
+    })
+  }
+
   const resetGeneralSettings = async () => {
     await store.updateSettings({
       ...appSettings.value,
@@ -71,6 +84,10 @@ export const useGeneralActions = () => {
           screenshot: {
             modifiers: DEFAULT_APP_SETTINGS.app.hotkey.screenshot.modifiers,
             key: DEFAULT_APP_SETTINGS.app.hotkey.screenshot.key,
+          },
+          recording: {
+            modifiers: DEFAULT_APP_SETTINGS.app.hotkey.recording.modifiers,
+            key: DEFAULT_APP_SETTINGS.app.hotkey.recording.key,
           },
         },
       },
@@ -106,6 +123,10 @@ export const useGeneralActions = () => {
             modifiers: DEFAULT_APP_SETTINGS.app.hotkey.screenshot.modifiers,
             key: DEFAULT_APP_SETTINGS.app.hotkey.screenshot.key,
           },
+          recording: {
+            modifiers: DEFAULT_APP_SETTINGS.app.hotkey.recording.modifiers,
+            key: DEFAULT_APP_SETTINGS.app.hotkey.recording.key,
+          },
         },
       },
     })
@@ -116,6 +137,7 @@ export const useGeneralActions = () => {
     updateLoggerLevel,
     updateFloatingWindowHotkey,
     updateScreenshotHotkey,
+    updateRecordingHotkey,
     resetGeneralSettings,
     resetGeneralCoreSettings,
     resetHotkeySettings,

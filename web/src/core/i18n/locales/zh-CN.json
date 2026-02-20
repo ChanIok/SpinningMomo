@@ -29,6 +29,8 @@
   "settings.general.hotkey.floatingWindowDescription": "切换悬浮窗的显示和隐藏。",
   "settings.general.hotkey.screenshot": "截图",
   "settings.general.hotkey.screenshotDescription": "触发截图功能的快捷键。",
+  "settings.general.hotkey.recording": "录制",
+  "settings.general.hotkey.recordingDescription": "触发开始/停止录制的快捷键。",
   "settings.layout.general.title": "通用",
   "settings.layout.general.description": "通用设置",
   "settings.layout.hotkeys.title": "快捷键",

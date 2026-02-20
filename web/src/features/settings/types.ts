@@ -98,6 +98,10 @@ export interface AppSettings {
         modifiers: number // 无修饰键 = 0
         key: number // VK_F11 = 122
       }
+      recording: {
+        modifiers: number // 无修饰键 = 0
+        key: number // VK_F8 = 119
+      }
     }
 
     // 语言设置
@@ -222,6 +226,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         modifiers: 0, // 无修饰键
         key: 122, // VK_F11
       },
+      recording: {
+        modifiers: 0, // 无修饰键
+        key: 119, // VK_F8
+      },
     },
     language: {
       current: 'zh-CN',
@@ -250,7 +258,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       resolution: 0,
       fps: 30,
       bitrate: 10000000,
-      quality: 100,
+      quality: 80,
       rateControl: 'vbr',
       codec: 'h264',
       audioSource: 'system',
@@ -262,7 +270,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     recording: {
       fps: 60,
       bitrate: 80000000,
-      quality: 100,
+      quality: 80,
       qp: 23,
       rateControl: 'vbr',
       encoderMode: 'auto',

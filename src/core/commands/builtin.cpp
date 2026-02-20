@@ -166,6 +166,12 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
             return state.recording && state.recording->status ==
                                           Features::Recording::Types::RecordingStatus::Recording;
           },
+          .hotkey =
+              HotkeyBinding{
+                  .modifiers = 0,  // 无修饰键
+                  .key = 0x77,     // VK_F8 (F8)
+                  .settings_path = "app.hotkey.recording",
+              },
       });
 
   // === 动态照片和即时回放 ===

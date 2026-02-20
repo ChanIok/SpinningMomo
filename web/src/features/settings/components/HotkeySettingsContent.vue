@@ -17,12 +17,16 @@ import { useI18n } from '@/composables/useI18n'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const { updateFloatingWindowHotkey, updateScreenshotHotkey, resetHotkeySettings } =
-  useGeneralActions()
+const {
+  updateFloatingWindowHotkey,
+  updateScreenshotHotkey,
+  updateRecordingHotkey,
+  resetHotkeySettings,
+} = useGeneralActions()
 const { clearError } = store
 const { t } = useI18n()
 
-const getHotkey = (type: 'floatingWindow' | 'screenshot') => {
+const getHotkey = (type: 'floatingWindow' | 'screenshot' | 'recording') => {
   const hotkey = appSettings.value.app.hotkey[type]
   return {
     modifiers: hotkey.modifiers,
@@ -111,6 +115,24 @@ const handleReset = async () => {
               <HotkeyRecorder
                 :value="getHotkey('screenshot')"
                 @change="(v) => updateScreenshotHotkey(v.modifiers, v.key)"
+                class="w-48"
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.general.hotkey.recording') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.general.hotkey.recordingDescription') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <HotkeyRecorder
+                :value="getHotkey('recording')"
+                @change="(v) => updateRecordingHotkey(v.modifiers, v.key)"
                 class="w-48"
               />
             </ItemActions>

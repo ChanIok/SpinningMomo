@@ -29,6 +29,8 @@
   "settings.general.hotkey.floatingWindowDescription": "Toggle floating window visibility.",
   "settings.general.hotkey.screenshot": "Screenshot",
   "settings.general.hotkey.screenshotDescription": "Hotkey to trigger screenshot.",
+  "settings.general.hotkey.recording": "Recording",
+  "settings.general.hotkey.recordingDescription": "Hotkey to start/stop recording.",
   "settings.layout.general.title": "General",
   "settings.layout.general.description": "General Settings",
   "settings.layout.hotkeys.title": "Hotkeys",

@@ -87,6 +87,12 @@ auto get_hotkey_from_settings(const Core::State::AppState& state, const HotkeyBi
     Logger().debug("Hotkey config for '{}': modifiers={}, key={}", binding.settings_path,
                    result.first, result.second);
     return result;
+  } else if (binding.settings_path == "app.hotkey.recording") {
+    auto result =
+        std::pair{settings.app.hotkey.recording.modifiers, settings.app.hotkey.recording.key};
+    Logger().debug("Hotkey config for '{}': modifiers={}, key={}", binding.settings_path,
+                   result.first, result.second);
+    return result;
   }
 
   // 如果没有配置，使用默认值

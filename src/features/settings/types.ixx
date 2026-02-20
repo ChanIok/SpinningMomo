@@ -43,6 +43,11 @@ export struct AppSettings {
         int modifiers = 0;  // 无修饰键
         int key = 0x7A;     // VK_F11 (F11) - PrintScreen(0x2C) 可能被系统截图功能拦截
       } screenshot;
+
+      struct Recording {
+        int modifiers = 0;  // 无修饰键
+        int key = 0x77;     // VK_F8 (F8)
+      } recording;
     } hotkey;
 
     // 语言设置
@@ -81,7 +86,7 @@ export struct AppSettings {
       std::uint32_t resolution = 0;           // 短边分辨率: 0=原始不缩放, 720/1080/1440/2160
       std::uint32_t fps = 30;                 // 帧率
       std::uint32_t bitrate = 10'000'000;     // 比特率 (10Mbps)，CBR 模式使用
-      std::uint32_t quality = 100;            // 质量值 (0-100)，VBR 模式使用
+      std::uint32_t quality = 80;             // 质量值 (0-100)，VBR 模式使用
       std::string rate_control = "vbr";       // 码率控制模式: "cbr" | "vbr"
       std::string codec = "h264";             // 编码格式: "h264" | "h265"
       std::string audio_source = "system";    // 音频源: "none" | "system" | "game_only"
@@ -99,7 +104,7 @@ export struct AppSettings {
     struct Recording {
       std::uint32_t fps = 60;              // 帧率
       std::uint32_t bitrate = 80'000'000;  // 比特率 (bps)，默认 80Mbps，CBR 模式使用
-      std::uint32_t quality = 100;         // 质量值 (0-100)，VBR 模式使用
+      std::uint32_t quality = 80;          // 质量值 (0-100)，VBR 模式使用
       std::uint32_t qp = 23;               // 量化参数 (0-51)，ManualQP 模式使用
       std::string rate_control = "vbr";    // 码率控制模式: "cbr" | "vbr" | "manual_qp"
       std::string encoder_mode = "auto";   // 编码器模式: "auto" | "gpu" | "cpu"
