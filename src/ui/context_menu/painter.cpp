@@ -14,6 +14,7 @@ import UI.FloatingWindow.Types;
 import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
+import UI.ContextMenu.Interaction;
 import UI.ContextMenu.Layout;
 import Utils.Logger;
 
@@ -56,10 +57,11 @@ auto draw_menu_background(Core::State::AppState& state, const D2D1_RECT_F& rect)
 auto draw_menu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& menu_state = *state.context_menu;
   const auto& layout = menu_state.layout;
+  const int highlight_index = UI::ContextMenu::Interaction::get_main_highlight_index(state);
   float current_y = rect.top + static_cast<float>(layout.padding);
   for (size_t i = 0; i < menu_state.items.size(); ++i) {
     const auto& item = menu_state.items[i];
-    bool is_hovered = (static_cast<int>(i) == menu_state.interaction.hover_index);
+    bool is_hovered = (static_cast<int>(i) == highlight_index);
     if (item.type == Types::MenuItemType::Separator) {
       float separator_height = static_cast<float>(layout.separator_height);
       D2D1_RECT_F separator_rect = D2D1::RectF(

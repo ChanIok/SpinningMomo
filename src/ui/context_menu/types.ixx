@@ -13,6 +13,10 @@ import Features.Settings.Menu;
 
 export namespace UI::ContextMenu::Types {
 
+enum class CursorZone { MainMenu, Submenu, Outside };
+
+enum class PendingIntentType { None, OpenSubmenu, SwitchSubmenu, HideSubmenu };
+
 // 菜单项类型枚举
 enum class MenuItemType {
   Normal,     // 普通菜单项
@@ -176,22 +180,23 @@ struct LayoutConfig {
   }
 };
 
-// 交互状态（添加子菜单延迟隐藏）
+// 交互状态（状态机驱动，统一意图定时器）
 struct InteractionState {
   int hover_index = -1;
   int submenu_hover_index = -1;
   bool is_mouse_tracking = false;
+  CursorZone cursor_zone = CursorZone::Outside;
+  PendingIntentType pending_intent = PendingIntentType::None;
+  int pending_parent_index = -1;
+  UINT_PTR intent_timer_id = 0;
 
-  // 子菜单显示延迟
-  UINT_PTR show_timer_id = 0;
-  int pending_submenu_index = -1;
-  static constexpr UINT SHOW_TIMER_DELAY = 200;  // 200ms延迟显示
-  static constexpr UINT_PTR SHOW_TIMER_ID = 1;
+  // 单一意图定时器
+  static constexpr UINT_PTR INTENT_TIMER_ID = 1;
 
-  // 子菜单隐藏延迟（解决对角线移动问题）
-  UINT_PTR hide_timer_id = 0;
-  static constexpr UINT HIDE_TIMER_DELAY = 300;  // 300ms延迟隐藏
-  static constexpr UINT_PTR HIDE_TIMER_ID = 2;
+  // 延迟参数（毫秒）
+  static constexpr UINT OPEN_SUBMENU_DELAY = 200;
+  static constexpr UINT SWITCH_SUBMENU_DELAY = 200;
+  static constexpr UINT HIDE_SUBMENU_DELAY = 200;
 };
 
 }  // namespace UI::ContextMenu::Types

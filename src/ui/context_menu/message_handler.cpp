@@ -3,21 +3,18 @@ module;
 #include <windows.h>
 #include <windowsx.h>
 
-#include <string>
-
 module UI.ContextMenu.MessageHandler;
 
 import std;
 import Core.State;
-import Core.Events;
 import UI.ContextMenu;
 import UI.ContextMenu.Layout;
 import UI.ContextMenu.Painter;
 import UI.ContextMenu.D2DContext;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
+import UI.ContextMenu.Interaction;
 import Utils.Logger;
-import Utils.String;
 
 namespace {
 
@@ -28,12 +25,18 @@ auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT;
 auto handle_size(Core::State::AppState& state, HWND hwnd) -> LRESULT;
 auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT;
+auto handle_mouse_leave(Core::State::AppState& state, HWND hwnd) -> LRESULT;
 auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT;
 auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT;
 auto handle_kill_focus(Core::State::AppState& state, HWND hwnd) -> LRESULT;
 auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM timer_id) -> LRESULT;
+auto handle_destroy(Core::State::AppState& state, HWND hwnd) -> LRESULT;
+
+auto get_timer_owner_hwnd(const ContextMenuState& menu_state, HWND fallback) -> HWND {
+  return menu_state.hwnd ? menu_state.hwnd : fallback;
+}
 
 auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
                       LPARAM lParam) -> LRESULT {
@@ -44,6 +47,8 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       return handle_size(state, hwnd);
     case WM_MOUSEMOVE:
       return handle_mouse_move(state, hwnd, wParam, lParam);
+    case WM_MOUSELEAVE:
+      return handle_mouse_leave(state, hwnd);
     case WM_LBUTTONDOWN:
       return handle_left_button_down(state, hwnd, wParam, lParam);
     case WM_KEYDOWN:
@@ -53,7 +58,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_TIMER:
       return handle_timer(state, hwnd, wParam);
     case WM_DESTROY:
-      return 0;
+      return handle_destroy(state, hwnd);
   }
   return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
@@ -135,91 +140,42 @@ auto handle_size(Core::State::AppState& state, HWND hwnd) -> LRESULT {
 
 auto handle_mouse_move(Core::State::AppState& state, HWND hwnd, WPARAM, LPARAM lParam) -> LRESULT {
   auto& menu_state = *state.context_menu;
-  auto& interaction = menu_state.interaction;
+  const HWND timer_owner = get_timer_owner_hwnd(menu_state, hwnd);
   POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
   if (hwnd == menu_state.submenu_hwnd) {
     int submenu_hover_index = get_submenu_item_at_point(state, pt);
-    if (submenu_hover_index != interaction.submenu_hover_index) {
-      interaction.submenu_hover_index = submenu_hover_index;
-      Logger().debug("Submenu hover index changed to: {}", submenu_hover_index);
+    if (UI::ContextMenu::Interaction::on_submenu_mouse_move(state, submenu_hover_index,
+                                                            timer_owner)) {
       InvalidateRect(hwnd, nullptr, FALSE);
     }
-
-    // 取消任何待处理的隐藏定时器
-    if (interaction.hide_timer_id != 0) {
-      Logger().debug("Killing hide timer");
-      KillTimer(hwnd, interaction.HIDE_TIMER_ID);
-      interaction.hide_timer_id = 0;
-    }
   } else {
-    // 处理主菜单鼠标移动
     int hover_index = UI::ContextMenu::Layout::get_menu_item_at_point(state, pt);
-
-    if (hover_index != interaction.hover_index) {
-      interaction.hover_index = hover_index;
-
-      // 取消任何待处理的显示定时器
-      if (interaction.show_timer_id != 0) {
-        Logger().debug("Killing show timer");
-        KillTimer(hwnd, interaction.SHOW_TIMER_ID);
-        interaction.show_timer_id = 0;
-        interaction.pending_submenu_index = -1;
-      }
-
-      // 检查是否需要延迟显示子菜单
-      if (hover_index >= 0 && hover_index < static_cast<int>(menu_state.items.size())) {
-        const auto& item = menu_state.items[hover_index];
-        Logger().debug("Mouse moved over menu item: {} (has_submenu: {})",
-                       Utils::String::ToUtf8(item.text), item.has_submenu());
-        if (item.has_submenu()) {
-          // 如果已经显示的是同一个子菜单，不需要重新显示
-          if (menu_state.submenu_hwnd == nullptr ||
-              menu_state.submenu_parent_index != hover_index) {
-            Logger().debug("Setting timer to show submenu for item: {}",
-                           Utils::String::ToUtf8(item.text));
-            // 先隐藏当前子菜单
-            UI::ContextMenu::hide_submenu(state);
-
-            // 设置延迟显示定时器
-            interaction.pending_submenu_index = hover_index;
-            interaction.show_timer_id =
-                SetTimer(hwnd, interaction.SHOW_TIMER_ID, interaction.SHOW_TIMER_DELAY, nullptr);
-            Logger().debug("Show timer set with ID: {}", interaction.show_timer_id);
-          } else {
-            Logger().debug("Same submenu already shown, not setting timer");
-          }
-        } else {
-          // 没有子菜单，启动延迟隐藏而不是立即隐藏
-          // 这样可以处理对角线移动，但也能在用户明确移动到其他项时隐藏
-          if (menu_state.submenu_hwnd != nullptr) {
-            Logger().debug("Setting timer to hide submenu");
-            if (interaction.hide_timer_id != 0) {
-              KillTimer(hwnd, interaction.HIDE_TIMER_ID);
-            }
-            interaction.hide_timer_id =
-                SetTimer(hwnd, UI::ContextMenu::Types::InteractionState::HIDE_TIMER_ID,
-                         UI::ContextMenu::Types::InteractionState::HIDE_TIMER_DELAY, nullptr);
-            Logger().debug("Hide timer set with ID: {}", interaction.hide_timer_id);
-          }
-        }
-      } else {
-        Logger().debug("Hover index out of bounds or invalid");
-      }
-
+    if (UI::ContextMenu::Interaction::on_main_mouse_move(state, hover_index, timer_owner)) {
       InvalidateRect(hwnd, nullptr, FALSE);
     }
   }
 
-  // 开始鼠标跟踪
   TRACKMOUSEEVENT tme{sizeof(TRACKMOUSEEVENT), TME_LEAVE, hwnd, 0};
   TrackMouseEvent(&tme);
+  return 0;
+}
+
+auto handle_mouse_leave(Core::State::AppState& state, HWND hwnd) -> LRESULT {
+  auto& menu_state = *state.context_menu;
+  const HWND timer_owner = get_timer_owner_hwnd(menu_state, hwnd);
+
+  if (UI::ContextMenu::Interaction::on_mouse_leave(state, hwnd, timer_owner)) {
+    InvalidateRect(hwnd, nullptr, FALSE);
+  }
   return 0;
 }
 
 auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM, LPARAM lParam)
     -> LRESULT {
   auto& menu_state = *state.context_menu;
+  const HWND timer_owner = get_timer_owner_hwnd(menu_state, hwnd);
+
   if (hwnd == menu_state.submenu_hwnd) {
     POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
     int clicked_index = get_submenu_item_at_point(state, pt);
@@ -232,12 +188,15 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM, LP
       }
     }
   } else {
-    int hover_index = menu_state.interaction.hover_index;
-    if (hover_index >= 0 && hover_index < static_cast<int>(menu_state.items.size())) {
-      const auto& item = menu_state.items[hover_index];
+    POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+    int clicked_index = UI::ContextMenu::Layout::get_menu_item_at_point(state, pt);
+    if (clicked_index >= 0 && clicked_index < static_cast<int>(menu_state.items.size())) {
+      const auto& item = menu_state.items[clicked_index];
       if (item.type == UI::ContextMenu::Types::MenuItemType::Normal && item.is_enabled) {
         if (item.has_submenu()) {
-          UI::ContextMenu::show_submenu(state, hover_index);
+          UI::ContextMenu::Interaction::cancel_pending_intent(state, timer_owner);
+          UI::ContextMenu::show_submenu(state, clicked_index);
+          InvalidateRect(menu_state.hwnd, nullptr, FALSE);
         } else {
           UI::ContextMenu::handle_menu_action(state, item);
           DestroyWindow(menu_state.hwnd);  // Close on selection
@@ -253,15 +212,14 @@ auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPA
     case VK_ESCAPE:
       DestroyWindow(hwnd);
       break;
-      // Other key handling (VK_UP, VK_DOWN, etc.) would go here
   }
   return 0;
 }
 
 auto handle_kill_focus(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   auto& menu_state = *state.context_menu;
+  const HWND timer_owner = get_timer_owner_hwnd(menu_state, hwnd);
 
-  // 检查焦点是否转移到了菜单系统内的其他窗口
   HWND new_focus = GetFocus();
   if (new_focus != nullptr &&
       (new_focus == menu_state.hwnd || new_focus == menu_state.submenu_hwnd)) {
@@ -269,48 +227,39 @@ auto handle_kill_focus(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   }
 
   Logger().debug("Menu lost focus to external window, hiding entire menu system");
+  UI::ContextMenu::Interaction::cancel_pending_intent(state, timer_owner);
   UI::ContextMenu::hide_and_destroy_menu(state);
   return 0;
 }
 
 auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM timer_id) -> LRESULT {
   auto& menu_state = *state.context_menu;
-  auto& interaction = menu_state.interaction;
+  const HWND timer_owner = get_timer_owner_hwnd(menu_state, hwnd);
 
-  if (timer_id == interaction.SHOW_TIMER_ID) {
-    Logger().debug("Show timer expired, showing submenu for index: {}",
-                   interaction.pending_submenu_index);
-    // 清理显示定时器
-    KillTimer(hwnd, interaction.SHOW_TIMER_ID);
-    interaction.show_timer_id = 0;
+  const auto action = UI::ContextMenu::Interaction::on_timer(state, timer_owner, timer_id);
+  switch (action.type) {
+    case UI::ContextMenu::Interaction::TimerActionType::ShowSubmenu:
+      UI::ContextMenu::show_submenu(state, action.parent_index);
+      break;
+    case UI::ContextMenu::Interaction::TimerActionType::HideSubmenu:
+      UI::ContextMenu::hide_submenu(state);
+      break;
+    case UI::ContextMenu::Interaction::TimerActionType::None:
+    default:
+      break;
+  }
 
-    // 验证待显示的索引仍然有效且鼠标仍在该菜单项上
-    if (interaction.pending_submenu_index >= 0 &&
-        interaction.pending_submenu_index < static_cast<int>(menu_state.items.size())) {
-      Logger().debug("Index is valid, checking if mouse is still over the item");
-      if (interaction.pending_submenu_index == interaction.hover_index) {
-        const auto& item = menu_state.items[interaction.pending_submenu_index];
-        Logger().debug("Mouse is still over the item: {} (has_submenu: {})",
-                       Utils::String::ToUtf8(item.text), item.has_submenu());
-        if (item.has_submenu()) {
-          UI::ContextMenu::show_submenu(state, interaction.pending_submenu_index);
-        }
-      }
-    } else {
-      Logger().debug("Index is invalid: {} (items size: {})", interaction.pending_submenu_index,
-                     menu_state.items.size());
-    }
+  if (action.invalidate_main && menu_state.hwnd) {
+    InvalidateRect(menu_state.hwnd, nullptr, FALSE);
+  }
 
-    // 重置待显示索引
-    interaction.pending_submenu_index = -1;
-  } else if (timer_id == UI::ContextMenu::Types::InteractionState::HIDE_TIMER_ID) {
-    Logger().debug("Hide timer expired, hiding submenu");
-    // 清理隐藏定时器
-    KillTimer(hwnd, interaction.HIDE_TIMER_ID);
-    interaction.hide_timer_id = 0;
+  return 0;
+}
 
-    // 隐藏子菜单
-    UI::ContextMenu::hide_submenu(state);
+auto handle_destroy(Core::State::AppState& state, HWND hwnd) -> LRESULT {
+  auto& menu_state = *state.context_menu;
+  if (hwnd == menu_state.hwnd) {
+    UI::ContextMenu::Interaction::cancel_pending_intent(state, hwnd);
   }
   return 0;
 }

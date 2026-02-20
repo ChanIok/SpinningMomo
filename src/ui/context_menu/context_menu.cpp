@@ -25,6 +25,7 @@ import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
 import UI.ContextMenu.Layout;
 import UI.ContextMenu.MessageHandler;
+import UI.ContextMenu.Interaction;
 import UI.ContextMenu.Painter;
 import UI.ContextMenu.D2DContext;
 import Utils.Logger;
@@ -92,6 +93,10 @@ void hide_and_destroy_menu(Core::State::AppState& state) {
     // 确保清理主菜单D2D资源
     D2DContext::cleanup_context_menu(state);
   }
+
+  // 重置交互状态，避免旧菜单残留的hover/定时意图影响下一次显示。
+  UI::ContextMenu::Interaction::reset(state);
+  state.context_menu->submenu_parent_index = -1;
 }
 
 // 处理菜单命令
@@ -289,13 +294,22 @@ auto cleanup(Core::State::AppState& app_state) -> void {
 
     // 清理D2D资源
     D2DContext::cleanup_context_menu(app_state);
+    UI::ContextMenu::Interaction::reset(app_state);
+    app_state.context_menu->submenu_parent_index = -1;
   }
 }
 
 auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
           const Vendor::Windows::POINT& position) -> void {
+  // 若已有菜单实例，先回收，确保状态机从干净状态重新开始。
+  if (app_state.context_menu->hwnd || app_state.context_menu->submenu_hwnd) {
+    hide_and_destroy_menu(app_state);
+  }
+
   // 1. 更新菜单状态
   auto& menu_state = *app_state.context_menu;
+  UI::ContextMenu::Interaction::reset(app_state);
+  menu_state.submenu_parent_index = -1;
   menu_state.items = std::move(items);
   menu_state.position = position;
 
