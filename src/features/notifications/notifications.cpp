@@ -1,11 +1,5 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-#include <windowsx.h>
-
-#include <iostream>
-
 module Features.Notifications;
 
 import std;
@@ -13,14 +7,77 @@ import Core.State;
 import UI.FloatingWindow.State;
 import Features.Notifications.State;
 import Features.Notifications.Constants;
+import Features.Settings.State;
 import Utils.Logger;
 import Utils.String;
+import <dwmapi.h>;
+import <windows.h>;
+import <windowsx.h>;
 
 namespace Features::Notifications {
 
 auto ease_out_cubic(float t) -> float {
   float ft = 1.0f - t;
   return 1.0f - ft * ft * ft;
+}
+
+struct NotificationThemeColors {
+  COLORREF background = Constants::BG_COLOR;
+  COLORREF text = Constants::TEXT_COLOR;
+  COLORREF title = Constants::TITLE_COLOR;
+  COLORREF close_normal = Constants::CLOSE_NORMAL_COLOR;
+  COLORREF close_hover = Constants::CLOSE_HOVER_COLOR;
+};
+
+auto hex_char_to_int(char c) -> int {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+
+auto parse_hex_color_to_colorref(std::string_view hex_color, COLORREF fallback) -> COLORREF {
+  if (hex_color.empty()) return fallback;
+
+  if (hex_color.starts_with('#')) {
+    hex_color.remove_prefix(1);
+  }
+
+  // 只使用前 6 位 RRGGBB，忽略可选 AA。
+  if (hex_color.size() < 6) return fallback;
+
+  const int r_hi = hex_char_to_int(hex_color[0]);
+  const int r_lo = hex_char_to_int(hex_color[1]);
+  const int g_hi = hex_char_to_int(hex_color[2]);
+  const int g_lo = hex_char_to_int(hex_color[3]);
+  const int b_hi = hex_char_to_int(hex_color[4]);
+  const int b_lo = hex_char_to_int(hex_color[5]);
+
+  if (r_hi < 0 || r_lo < 0 || g_hi < 0 || g_lo < 0 || b_hi < 0 || b_lo < 0) {
+    return fallback;
+  }
+
+  const int r = (r_hi << 4) | r_lo;
+  const int g = (g_hi << 4) | g_lo;
+  const int b = (b_hi << 4) | b_lo;
+
+  return RGB(r, g, b);
+}
+
+auto resolve_notification_theme_colors(const Core::State::AppState& state)
+    -> NotificationThemeColors {
+  NotificationThemeColors colors;
+  if (!state.settings) {
+    return colors;
+  }
+
+  const auto& settings_colors = state.settings->raw.ui.floating_window_colors;
+  colors.background = parse_hex_color_to_colorref(settings_colors.background, colors.background);
+  colors.text = parse_hex_color_to_colorref(settings_colors.text, colors.text);
+  colors.title = parse_hex_color_to_colorref(settings_colors.text, colors.title);
+  colors.close_normal = parse_hex_color_to_colorref(settings_colors.text, colors.close_normal);
+  colors.close_hover = parse_hex_color_to_colorref(settings_colors.text, colors.close_hover);
+  return colors;
 }
 
 auto calculate_window_height(const std::wstring& message, int dpi) -> int {
@@ -59,7 +116,8 @@ auto calculate_window_height(const std::wstring& message, int dpi) -> int {
   return std::clamp(totalHeight, minHeight, maxHeight);
 }
 
-void draw_close_button(HDC hdc, const RECT& rect, bool is_hovered, int dpi) {
+void draw_close_button(HDC hdc, const RECT& rect, bool is_hovered, int dpi, COLORREF normal_color,
+                       COLORREF hover_color) {
   int close_size = MulDiv(Constants::BASE_CLOSE_SIZE, dpi, 96);
   int close_padding = MulDiv(Constants::BASE_CLOSE_PADDING, dpi, 96);
   int padding = MulDiv(Constants::BASE_PADDING, dpi, 96);
@@ -69,7 +127,7 @@ void draw_close_button(HDC hdc, const RECT& rect, bool is_hovered, int dpi) {
 
   int penWidth = std::max(2, dpi / 48);
 
-  COLORREF closeColor = is_hovered ? Constants::CLOSE_HOVER_COLOR : Constants::CLOSE_NORMAL_COLOR;
+  COLORREF closeColor = is_hovered ? hover_color : normal_color;
   LOGBRUSH lb = {BS_SOLID, closeColor, 0};
   HPEN hClosePen = ExtCreatePen(PS_GEOMETRIC | PS_SOLID | PS_ENDCAP_ROUND | PS_JOIN_ROUND, penWidth,
                                 &lb, 0, nullptr);
@@ -112,7 +170,7 @@ void on_paint(HDC hdc, Features::Notifications::State::Notification& n, int dpi)
                                  DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
                                  CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"微软雅黑");
 
-  HBRUSH hBackBrush = CreateSolidBrush(Constants::BG_COLOR);
+  HBRUSH hBackBrush = CreateSolidBrush(static_cast<COLORREF>(n.bg_color));
   FillRect(memDC, &rect, hBackBrush);
   DeleteObject(hBackBrush);
 
@@ -120,18 +178,20 @@ void on_paint(HDC hdc, Features::Notifications::State::Notification& n, int dpi)
   int textRight = rect.right - close_padding_h;
 
   SelectObject(memDC, titleFont);
-  SetTextColor(memDC, Constants::TITLE_COLOR);
+  SetTextColor(memDC, static_cast<COLORREF>(n.title_color));
   RECT titleRect = {textLeft, padding, textRight, padding + title_height};
   DrawText(memDC, n.title.c_str(), -1, &titleRect,
            DT_SINGLELINE | DT_LEFT | DT_VCENTER | DT_END_ELLIPSIS);
 
   SelectObject(memDC, messageFont);
-  SetTextColor(memDC, Constants::TEXT_COLOR);
+  SetTextColor(memDC, static_cast<COLORREF>(n.text_color));
   RECT messageRect = {textLeft, padding + title_height, textRight, rect.bottom - padding};
   DrawText(memDC, n.message.c_str(), -1, &messageRect,
            DT_WORDBREAK | DT_EDITCONTROL | DT_EXPANDTABS);
 
-  draw_close_button(memDC, rect, n.is_close_hovered, dpi);
+  draw_close_button(memDC, rect, n.is_close_hovered, dpi,
+                    static_cast<COLORREF>(n.close_normal_color),
+                    static_cast<COLORREF>(n.close_hover_color));
 
   BLENDFUNCTION blend = {AC_SRC_OVER, 0, static_cast<BYTE>(n.opacity * 255), 0};
   POINT ptSrc = {0, 0};
@@ -335,11 +395,17 @@ auto show_notification(Core::State::AppState& state, const std::wstring& title,
   }
 
   // 2. 创建新的通知对象
+  const auto colors = resolve_notification_theme_colors(state);
   state.notifications->active_notifications.emplace_back(
       Features::Notifications::State::Notification{
           .id = state.notifications->next_id++,
           .title = title,
           .message = message,
+          .bg_color = static_cast<std::uint32_t>(colors.background),
+          .text_color = static_cast<std::uint32_t>(colors.text),
+          .title_color = static_cast<std::uint32_t>(colors.title),
+          .close_normal_color = static_cast<std::uint32_t>(colors.close_normal),
+          .close_hover_color = static_cast<std::uint32_t>(colors.close_hover),
           .state = Features::Notifications::State::NotificationAnimState::Spawning,
           .last_state_change_time = std::chrono::steady_clock::now()});
 

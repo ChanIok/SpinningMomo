@@ -5,10 +5,10 @@ export module Features.Notifications.State;
 import std;
 import Vendor.Windows;
 
-export namespace Features::Notifications::State {
+namespace Features::Notifications::State {
 
 // 通知当前的动画/生命周期阶段
-enum class NotificationAnimState {
+export enum class NotificationAnimState {
   Spawning,    // 正在生成，尚未创建窗口
   SlidingIn,   // 滑入动画
   Displaying,  // 正常显示
@@ -18,11 +18,18 @@ enum class NotificationAnimState {
 };
 
 // 单个通知的所有数据
-struct Notification {
+export struct Notification {
   size_t id;  // 唯一ID
   std::wstring title;
   std::wstring message;
   // 未来可以扩展: NotificationType type;
+
+  // 主题颜色快照（创建通知时读取设置，确保通知生命周期内外观稳定）
+  std::uint32_t bg_color = 0;
+  std::uint32_t text_color = 0;
+  std::uint32_t title_color = 0;
+  std::uint32_t close_normal_color = 0;
+  std::uint32_t close_hover_color = 0;
 
   NotificationAnimState state = NotificationAnimState::Spawning;
   Vendor::Windows::HWND hwnd = nullptr;
@@ -42,7 +49,7 @@ struct Notification {
 };
 
 // 整个通知系统的状态
-struct NotificationSystemState {
+export struct NotificationSystemState {
   // 使用 std::list 能保证元素指针和引用的稳定性，
   // 这对于将指针传递给 WNDPROC 非常重要。
   std::list<Notification> active_notifications;
