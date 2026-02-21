@@ -12,12 +12,12 @@ const showHeader = isWebView()
 
 <template>
   <SidebarProvider>
-    <div class="flex h-screen w-screen flex-col bg-panel">
+    <div class="flex h-screen w-screen flex-col bg-transparent">
       <!-- 窗口控制栏（仅 WebView 环境下显示） -->
       <AppHeader v-if="showHeader" />
       <div class="flex min-h-0 flex-1 p-1" :class="{ 'pt-0': showHeader }">
         <div
-          class="relative flex flex-1 flex-col overflow-hidden rounded-md bg-background text-foreground"
+          class="relative flex flex-1 flex-col overflow-hidden rounded-md bg-transparent text-foreground"
         >
           <div class="pointer-events-none absolute inset-0">
             <div

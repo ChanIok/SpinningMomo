@@ -31,5 +31,13 @@ export auto send_message(Core::State::AppState& state, const std::string& messag
 export auto post_message(Core::State::AppState& state, const std::string& message) -> void;
 export auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
                                      std::function<void(const std::string&)> handler) -> void;
-                                     
+
+// Composition hosting 输入转发
+export auto forward_mouse_message(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wparam,
+                                  LPARAM lparam) -> bool;
+export auto forward_non_client_right_button_message(Core::State::AppState& state, HWND hwnd,
+                                                    UINT msg, WPARAM wparam, LPARAM lparam) -> bool;
+export auto hit_test_non_client_region(Core::State::AppState& state, HWND hwnd, LPARAM lparam)
+    -> std::optional<LRESULT>;
+
 }  // namespace Core::WebView

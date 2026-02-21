@@ -25,6 +25,8 @@ struct WindowState {
 struct CoreResources {
   wil::com_ptr<ICoreWebView2Environment> environment;
   wil::com_ptr<ICoreWebView2Controller> controller;
+  wil::com_ptr<ICoreWebView2CompositionController> composition_controller;
+  wil::com_ptr<ICoreWebView2CompositionController4> composition_controller4;
   wil::com_ptr<ICoreWebView2> webview;
 
   // 事件注册令牌，用于清理时取消注册

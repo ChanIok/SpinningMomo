@@ -168,6 +168,21 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
       return 0;
     }
 
+    case WM_NCHITTEST: {
+      // 先让系统处理边框缩放命中，再用 WebView 非客户区命中覆盖标题栏/按钮区域
+      LRESULT default_hit = DefWindowProcW(hwnd, msg, wparam, lparam);
+      if (default_hit != HTCLIENT) {
+        return default_hit;
+      }
+
+      if (state) {
+        if (auto non_client_hit = Core::WebView::hit_test_non_client_region(*state, hwnd, lparam)) {
+          return *non_client_hit;
+        }
+      }
+      return HTCLIENT;
+    }
+
     case WM_SIZE: {
       if (state) {
         int width = LOWORD(lparam);
@@ -184,12 +199,55 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
       break;
     }
 
+    case WM_NCRBUTTONDOWN:
+    case WM_NCRBUTTONUP: {
+      if (state && Core::WebView::forward_non_client_right_button_message(*state, hwnd, msg, wparam,
+                                                                          lparam)) {
+        return 0;
+      }
+      break;
+    }
+
     case WM_MOVE: {
       if (state) {
         int x = static_cast<int>(static_cast<short>(LOWORD(lparam)));
         int y = static_cast<int>(static_cast<short>(HIWORD(lparam)));
         state->webview->window.x = x;
         state->webview->window.y = y;
+      }
+      break;
+    }
+
+    case WM_ERASEBKGND: {
+      // Composition hosting 下避免宿主窗口刷白底，保留透明背景
+      return 1;
+    }
+
+    case WM_SETFOCUS: {
+      if (state && state->webview->resources.controller) {
+        state->webview->resources.controller->MoveFocus(
+            COREWEBVIEW2_MOVE_FOCUS_REASON_PROGRAMMATIC);
+      }
+      break;
+    }
+
+    case WM_MOUSEMOVE:
+    case WM_MOUSEWHEEL:
+    case WM_MOUSEHWHEEL:
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_LBUTTONDBLCLK:
+    case WM_RBUTTONDOWN:
+    case WM_RBUTTONUP:
+    case WM_RBUTTONDBLCLK:
+    case WM_MBUTTONDOWN:
+    case WM_MBUTTONUP:
+    case WM_MBUTTONDBLCLK:
+    case WM_XBUTTONDOWN:
+    case WM_XBUTTONUP:
+    case WM_XBUTTONDBLCLK: {
+      if (state) {
+        Core::WebView::forward_mouse_message(*state, hwnd, msg, wparam, lparam);
       }
       break;
     }
@@ -219,7 +277,7 @@ auto register_window_class(Vendor::Windows::HINSTANCE instance) -> void {
   wc.lpfnWndProc = window_proc;
   wc.hInstance = instance;
   wc.lpszClassName = L"SpinningMomoWebViewWindowClass";
-  wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+  wc.hbrBackground = nullptr;
   wc.style = CS_HREDRAW | CS_VREDRAW;
   wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
   // 大图标：Alt+Tab、窗口标题栏等
@@ -296,20 +354,18 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 窗口样式：
   // - WS_POPUP: 无边框窗口
   // - WS_THICKFRAME: 支持边缘拖拽调整大小
-  // - WS_CAPTION: 启用 DWM 动画效果（标题栏通过 WM_NCCALCSIZE 隐藏）
-  // - WS_SYSMENU: 启用系统菜单（Alt+Space）
+  // - WS_SYSMENU: 保留系统菜单（Alt+Space）
   // - WS_MAXIMIZEBOX/WS_MINIMIZEBOX: 支持最大化/最小化
-  constexpr DWORD style =
-      WS_POPUP | WS_THICKFRAME | WS_CAPTION | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
-  HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW,                         // 扩展样式
-                              L"SpinningMomoWebViewWindowClass",       // 窗口类名
-                              L"SpinningMomo WebView",                 // 窗口标题
-                              style,                                   // 窗口样式
-                              x, y, width, height,                     // 位置和大小
-                              nullptr,                                 // 父窗口
-                              nullptr,                                 // 菜单
-                              state.floating_window->window.instance,  // 实例句柄
-                              &state                                   // 用户数据
+  constexpr DWORD style = WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
+  HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_NOREDIRECTIONBITMAP,  // 扩展样式
+                              L"SpinningMomoWebViewWindowClass",            // 窗口类名
+                              L"SpinningMomo WebView",                      // 窗口标题
+                              style,                                        // 窗口样式
+                              x, y, width, height,                          // 位置和大小
+                              nullptr,                                      // 父窗口
+                              nullptr,                                      // 菜单
+                              state.floating_window->window.instance,       // 实例句柄
+                              &state                                        // 用户数据
   );
 
   if (!hwnd) {
