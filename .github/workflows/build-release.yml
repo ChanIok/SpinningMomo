@@ -98,6 +98,14 @@ jobs:
           npm install
           cd web && npm ci
 
+      - name: Install fonttools (for HarmonyOS subset generation)
+        shell: pwsh
+        run: |
+          py -m pip install --disable-pip-version-check fonttools brotli zopfli
+
+      - name: Generate HarmonyOS subset fonts
+        run: npm run font:build:harmonyos
+
       - name: Build all (C++ + Web + Dist)
         run: npm run build:ci
 

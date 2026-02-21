@@ -82,3 +82,9 @@ web/.vite/
 web/stats*
 
 web_react/
+
+# Generated HarmonyOS subset font artifacts
+web/src/assets/fonts/harmonyos-sans-sc/*.woff2
+web/src/assets/fonts/harmonyos-sans-sc/charset-generated.txt
+web/src/assets/fonts/harmonyos-sans-sc/manifest.json
+web/src/assets/fonts/harmonyos-sans-sc/LICENSE.txt
