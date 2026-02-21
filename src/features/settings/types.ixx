@@ -19,6 +19,11 @@ export struct WebThemeSettings {
 export struct WebBackgroundSettings {
   std::string type = "none";  // "none" | "image"
   std::string image_path = "";
+  int background_blur_amount = 0;   // 0 - 100
+  double background_opacity = 1.0;  // 0.0 - 1.0
+  std::string overlay_start_color = "#000000";
+  std::string overlay_end_color = "#000000";
+  double overlay_opacity = 0.0;  // 0.0 - 1.0
   int surface_blur_amount = 20;  // 0 - 200
   double surface_opacity = 0.8;  // 0.0 - 1.0
 };

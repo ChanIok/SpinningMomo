@@ -34,6 +34,21 @@ const applyBackground = (settings: AppSettings): void => {
   const root = document.documentElement
   const background = settings.ui.background
   const imageUrl = resolveBackgroundImageUrl(background)
+
+  const backgroundOpacity = clamp(background.backgroundOpacity, 0, 1)
+  const backgroundBlur = clamp(background.backgroundBlurAmount, 0, 100)
+  const overlayOpacity = clamp(background.overlayOpacity, 0, 1)
+
+  root.style.setProperty('--app-background-opacity', String(backgroundOpacity))
+  root.style.setProperty('--app-background-blur', `${backgroundBlur}px`)
+  root.style.setProperty('--app-background-scale', '1')
+  root.style.setProperty(
+    '--app-background-overlay-start',
+    background.overlayStartColor || '#000000'
+  )
+  root.style.setProperty('--app-background-overlay-end', background.overlayEndColor || '#000000')
+  root.style.setProperty('--app-background-overlay-opacity', String(overlayOpacity))
+
   root.style.setProperty('--app-surface-opacity', String(clamp(background.surfaceOpacity, 0, 1)))
   root.style.setProperty('--app-surface-blur', `${Math.max(background.surfaceBlurAmount, 0)}px`)
 

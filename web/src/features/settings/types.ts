@@ -33,6 +33,11 @@ export interface FloatingWindowColors {
 export interface WebBackgroundSettings {
   type: 'none' | 'image'
   imagePath: string
+  backgroundBlurAmount: number
+  backgroundOpacity: number
+  overlayStartColor: string
+  overlayEndColor: string
+  overlayOpacity: number
   surfaceBlurAmount: number
   surfaceOpacity: number
 }
@@ -341,6 +346,11 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     background: {
       type: 'none',
       imagePath: '',
+      backgroundBlurAmount: 0,
+      backgroundOpacity: 1,
+      overlayStartColor: '#000000',
+      overlayEndColor: '#000000',
+      overlayOpacity: 0,
       surfaceBlurAmount: 20,
       surfaceOpacity: 0.8,
     },

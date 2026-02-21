@@ -48,6 +48,13 @@
 
 :root {
   --radius: 0.625rem;
+  --app-background-image: none;
+  --app-background-opacity: 1;
+  --app-background-blur: 0px;
+  --app-background-scale: 1;
+  --app-background-overlay-start: #000000;
+  --app-background-overlay-end: #000000;
+  --app-background-overlay-opacity: 0;
   /* Light Modern */
   --background: #ffffff;
   --foreground: #1f1f1f;
@@ -134,6 +141,30 @@
   ) !important;
   -webkit-backdrop-filter: blur(var(--app-surface-blur, 0px));
   backdrop-filter: blur(var(--app-surface-blur, 0px));
+}
+
+.app-background-image {
+  background-image: var(--app-background-image, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--app-background-opacity, 1);
+  filter: blur(var(--app-background-blur, 0px));
+  transform: scale(var(--app-background-scale, 1));
+  transition:
+    opacity 220ms ease,
+    filter 220ms ease;
+  will-change: transform, filter, opacity;
+}
+
+.app-background-overlay {
+  background-image: linear-gradient(
+    to bottom right,
+    var(--app-background-overlay-start, #000000),
+    var(--app-background-overlay-end, #000000)
+  );
+  opacity: var(--app-background-overlay-opacity, 0);
+  transition: opacity 220ms ease;
 }
 
 @layer base {

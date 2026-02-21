@@ -124,6 +124,26 @@ export const useAppearanceActions = () => {
     await updateBackgroundSettings({ surfaceBlurAmount })
   }
 
+  const updateBackgroundOpacity = async (backgroundOpacity: number) => {
+    await updateBackgroundSettings({ backgroundOpacity })
+  }
+
+  const updateBackgroundBlur = async (backgroundBlurAmount: number) => {
+    await updateBackgroundSettings({ backgroundBlurAmount })
+  }
+
+  const updateOverlayOpacity = async (overlayOpacity: number) => {
+    await updateBackgroundSettings({ overlayOpacity })
+  }
+
+  const updateOverlayStartColor = async (overlayStartColor: string) => {
+    await updateBackgroundSettings({ overlayStartColor })
+  }
+
+  const updateOverlayEndColor = async (overlayEndColor: string) => {
+    await updateBackgroundSettings({ overlayEndColor })
+  }
+
   const handleBackgroundImageSelect = async () => {
     try {
       const previousImagePath = appSettings.value.ui.background.imagePath
@@ -166,6 +186,11 @@ export const useAppearanceActions = () => {
     resetWebAppearanceSettings,
     resetFloatingWindowSettings,
     updateFloatingWindowColors,
+    updateBackgroundOpacity,
+    updateBackgroundBlur,
+    updateOverlayOpacity,
+    updateOverlayStartColor,
+    updateOverlayEndColor,
     updateSurfaceOpacity,
     updateSurfaceBlur,
     handleBackgroundImageSelect,

@@ -29,6 +29,30 @@ export const SURFACE_OPACITY_RANGE = {
   STEP: 0.05,
 } as const
 
+// 背景图层模糊范围
+export const BACKGROUND_BLUR_RANGE = {
+  MIN: 0,
+  MAX: 100,
+  DEFAULT: 0,
+  STEP: 1,
+} as const
+
+// 背景图层不透明度范围
+export const BACKGROUND_OPACITY_RANGE = {
+  MIN: 0,
+  MAX: 1,
+  DEFAULT: 1,
+  STEP: 0.05,
+} as const
+
+// 叠加层不透明度范围
+export const OVERLAY_OPACITY_RANGE = {
+  MIN: 0,
+  MAX: 1,
+  DEFAULT: 0,
+  STEP: 0.05,
+} as const
+
 // === 菜单项 Registry ===
 
 // 内置比例预设（用于快速查找，但用户可自定义任意 W:H 格式）

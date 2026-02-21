@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { ref, watch } from 'vue'
 import { useSettingsStore } from '../store'
 import { useAppearanceActions } from '../composables/useAppearanceActions'
 import { useTheme } from '../composables/useTheme'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
 import {
   Item,
   ItemContent,
@@ -23,13 +25,24 @@ import {
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { WebThemeMode } from '../types'
-import { SURFACE_BLUR_RANGE, SURFACE_OPACITY_RANGE } from '../constants'
+import {
+  SURFACE_BLUR_RANGE,
+  SURFACE_OPACITY_RANGE,
+  BACKGROUND_BLUR_RANGE,
+  BACKGROUND_OPACITY_RANGE,
+  OVERLAY_OPACITY_RANGE,
+} from '../constants'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
 const { setTheme } = useTheme()
 const {
   resetWebAppearanceSettings,
+  updateBackgroundOpacity,
+  updateBackgroundBlur,
+  updateOverlayOpacity,
+  updateOverlayStartColor,
+  updateOverlayEndColor,
   updateSurfaceOpacity,
   updateSurfaceBlur,
   handleBackgroundImageSelect,
@@ -43,6 +56,27 @@ const themeOptions = [
   { value: 'dark', label: t('settings.appearance.theme.dark') },
   { value: 'system', label: t('settings.appearance.theme.system') },
 ]
+
+const overlayStartHexInput = ref('#000000')
+const overlayEndHexInput = ref('#000000')
+
+watch(
+  () => appSettings.value.ui.background.overlayStartColor,
+  (value) => {
+    overlayStartHexInput.value = value
+  },
+  { immediate: true }
+)
+
+watch(
+  () => appSettings.value.ui.background.overlayEndColor,
+  (value) => {
+    overlayEndHexInput.value = value
+  },
+  { immediate: true }
+)
+
+const isValidHexColor = (value: string): boolean => /^#[0-9a-fA-F]{6}$/.test(value.trim())
 
 const handleSurfaceOpacityChange = async (val: number[] | undefined) => {
   if (!val || val.length === 0) return
@@ -59,6 +93,79 @@ const handleSurfaceBlurAmountChange = async (val: number[] | undefined) => {
     await updateSurfaceBlur(val[0]!)
   } catch (error) {
     console.error('Failed to update surface blur amount:', error)
+  }
+}
+
+const handleBackgroundOpacityChange = async (val: number[] | undefined) => {
+  if (!val || val.length === 0) return
+  try {
+    await updateBackgroundOpacity(val[0]!)
+  } catch (error) {
+    console.error('Failed to update background opacity:', error)
+  }
+}
+
+const handleBackgroundBlurAmountChange = async (val: number[] | undefined) => {
+  if (!val || val.length === 0) return
+  try {
+    await updateBackgroundBlur(val[0]!)
+  } catch (error) {
+    console.error('Failed to update background blur amount:', error)
+  }
+}
+
+const handleOverlayOpacityChange = async (val: number[] | undefined) => {
+  if (!val || val.length === 0) return
+  try {
+    await updateOverlayOpacity(val[0]!)
+  } catch (error) {
+    console.error('Failed to update overlay opacity:', error)
+  }
+}
+
+const handleOverlayStartColorPickerChange = async (value: string) => {
+  if (!isValidHexColor(value)) return
+  try {
+    await updateOverlayStartColor(value.toUpperCase())
+  } catch (error) {
+    console.error('Failed to update overlay start color:', error)
+  }
+}
+
+const handleOverlayEndColorPickerChange = async (value: string) => {
+  if (!isValidHexColor(value)) return
+  try {
+    await updateOverlayEndColor(value.toUpperCase())
+  } catch (error) {
+    console.error('Failed to update overlay end color:', error)
+  }
+}
+
+const commitOverlayStartHexInput = async () => {
+  const normalized = overlayStartHexInput.value.trim().toUpperCase()
+  if (!isValidHexColor(normalized)) {
+    overlayStartHexInput.value = appSettings.value.ui.background.overlayStartColor
+    return
+  }
+  try {
+    await updateOverlayStartColor(normalized)
+  } catch (error) {
+    console.error('Failed to update overlay start color from hex:', error)
+    overlayStartHexInput.value = appSettings.value.ui.background.overlayStartColor
+  }
+}
+
+const commitOverlayEndHexInput = async () => {
+  const normalized = overlayEndHexInput.value.trim().toUpperCase()
+  if (!isValidHexColor(normalized)) {
+    overlayEndHexInput.value = appSettings.value.ui.background.overlayEndColor
+    return
+  }
+  try {
+    await updateOverlayEndColor(normalized)
+  } catch (error) {
+    console.error('Failed to update overlay end color from hex:', error)
+    overlayEndHexInput.value = appSettings.value.ui.background.overlayEndColor
   }
 }
 
@@ -124,6 +231,140 @@ const handleClearError = () => {
         </div>
 
         <ItemGroup>
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.backgroundOpacity.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.backgroundOpacity.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <div class="flex items-center gap-2">
+                <Slider
+                  :model-value="[appSettings.ui.background.backgroundOpacity]"
+                  @update:model-value="handleBackgroundOpacityChange"
+                  :min="BACKGROUND_OPACITY_RANGE.MIN"
+                  :max="BACKGROUND_OPACITY_RANGE.MAX"
+                  :step="BACKGROUND_OPACITY_RANGE.STEP"
+                  class="w-36"
+                />
+                <span class="w-12 text-sm text-muted-foreground">
+                  {{ (appSettings.ui.background.backgroundOpacity * 100).toFixed(0) }}%
+                </span>
+              </div>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.backgroundBlurAmount.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.backgroundBlurAmount.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <div class="flex items-center gap-2">
+                <Slider
+                  :model-value="[appSettings.ui.background.backgroundBlurAmount]"
+                  @update:model-value="handleBackgroundBlurAmountChange"
+                  :min="BACKGROUND_BLUR_RANGE.MIN"
+                  :max="BACKGROUND_BLUR_RANGE.MAX"
+                  :step="BACKGROUND_BLUR_RANGE.STEP"
+                  class="w-36"
+                />
+                <span class="w-12 text-sm text-muted-foreground">
+                  {{ appSettings.ui.background.backgroundBlurAmount }}px
+                </span>
+              </div>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.overlayOpacity.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.overlayOpacity.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <div class="flex items-center gap-2">
+                <Slider
+                  :model-value="[appSettings.ui.background.overlayOpacity]"
+                  @update:model-value="handleOverlayOpacityChange"
+                  :min="OVERLAY_OPACITY_RANGE.MIN"
+                  :max="OVERLAY_OPACITY_RANGE.MAX"
+                  :step="OVERLAY_OPACITY_RANGE.STEP"
+                  class="w-36"
+                />
+                <span class="w-12 text-sm text-muted-foreground">
+                  {{ (appSettings.ui.background.overlayOpacity * 100).toFixed(0) }}%
+                </span>
+              </div>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.overlayStartColor.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.overlayStartColor.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <div class="flex items-center gap-2">
+                <Input
+                  type="color"
+                  :model-value="appSettings.ui.background.overlayStartColor"
+                  @update:model-value="(v) => handleOverlayStartColorPickerChange(v as string)"
+                  class="h-9 w-12 p-1"
+                />
+                <Input
+                  v-model="overlayStartHexInput"
+                  class="w-28 font-mono uppercase"
+                  placeholder="#000000"
+                  @keydown.enter.prevent="commitOverlayStartHexInput"
+                  @blur="commitOverlayStartHexInput"
+                />
+              </div>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.overlayEndColor.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.overlayEndColor.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <div class="flex items-center gap-2">
+                <Input
+                  type="color"
+                  :model-value="appSettings.ui.background.overlayEndColor"
+                  @update:model-value="(v) => handleOverlayEndColorPickerChange(v as string)"
+                  class="h-9 w-12 p-1"
+                />
+                <Input
+                  v-model="overlayEndHexInput"
+                  class="w-28 font-mono uppercase"
+                  placeholder="#000000"
+                  @keydown.enter.prevent="commitOverlayEndHexInput"
+                  @blur="commitOverlayEndHexInput"
+                />
+              </div>
+            </ItemActions>
+          </Item>
+
           <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
