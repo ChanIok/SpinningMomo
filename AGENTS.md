@@ -116,6 +116,7 @@ These must be re-run when their source files change:
 ## Naming Conventions
 - **C++ module names**: PascalCase with dots — `Features.Gallery`, `Core.RPC.Types`
 - **C++ files/functions**: snake_case — `gallery.ixx`, `initialize()`
+- **No anonymous namespaces**: Do not use `namespace { ... }` in C++; put helpers in the module's named namespace.
 - **Frontend components**: PascalCase — `GalleryPage.vue`
 - **Frontend modules**: camelCase — `galleryApi.ts`
 - **Module import order** in `.ixx`: `std` → `Vendor.*` → `Core.*` → `Features.*` / `UI.*` / `Utils.*`

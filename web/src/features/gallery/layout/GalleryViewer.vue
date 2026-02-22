@@ -31,7 +31,7 @@ watch(
     <GalleryLightbox v-if="store.lightbox.isOpen" />
 
     <!-- 当lightbox关闭时，显示正常的工具栏和内容区域 -->
-    <div v-else class="app-surface flex h-full flex-col">
+    <div v-else class="flex h-full flex-col">
       <GalleryToolbar />
       <div class="flex-1 overflow-hidden">
         <GalleryContent />

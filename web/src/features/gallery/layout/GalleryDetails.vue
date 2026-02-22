@@ -116,7 +116,7 @@ async function handleAddTag(tagId: number) {
 </script>
 
 <template>
-  <div class="app-surface h-full overflow-auto border-l p-4">
+  <div class="h-full overflow-auto border-l p-4">
     <!-- 文件夹详情 -->
     <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
       <div class="flex items-center justify-between">

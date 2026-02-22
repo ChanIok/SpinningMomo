@@ -1,5 +1,5 @@
 <template>
-  <div class="app-surface flex items-center gap-3 p-4">
+  <div class="flex items-center gap-3 p-4">
     <!-- 左侧：快速操作 -->
     <div class="flex items-center gap-2">
       <TooltipProvider>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import { isWebView } from '@/core/env'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
@@ -7,7 +8,9 @@ import AppHeader from './AppHeader.vue'
 import ContentArea from './ContentArea.vue'
 import 'vue-sonner/style.css'
 
+const route = useRoute()
 const showHeader = isWebView()
+const isHome = () => route.name === 'home'
 </script>
 
 <template>
@@ -15,26 +18,29 @@ const showHeader = isWebView()
     <div class="relative h-screen w-screen overflow-hidden bg-transparent">
       <div class="pointer-events-none absolute inset-0 z-0">
         <div class="app-background-image absolute inset-0" />
-        <div class="app-background-overlay absolute inset-0" />
+        <div
+          class="app-background-overlay absolute inset-0"
+          :style="isHome() ? { opacity: 0 } : undefined"
+        />
       </div>
 
-      <div class="relative z-10 flex h-full w-full flex-col">
-        <!-- 窗口控制栏（仅 WebView 环境下显示） -->
-        <AppHeader v-if="showHeader" />
-        <div class="flex min-h-0 flex-1" :class="{ 'pt-0': showHeader }">
-          <div
-            class="relative flex flex-1 flex-col overflow-hidden rounded-md bg-transparent text-foreground"
-          >
-            <!-- 主布局区域 -->
-            <div class="relative z-10 flex min-h-0 flex-1">
-              <!-- 左侧导航栏 -->
-              <ActivityBar />
+      <div class="relative z-10 flex h-full w-full flex-row">
+        <!-- 左侧 ActivityBar -->
+        <ActivityBar />
 
-              <!-- 主内容区域 -->
-              <div class="flex flex-1 overflow-auto">
-                <ContentArea />
-              </div>
-            </div>
+        <!-- 右侧：Header + 主内容区 -->
+        <div
+          class="relative flex min-h-0 flex-1 flex-col overflow-hidden text-foreground"
+          :class="[
+            !isHome() && 'app-surface',
+            showHeader ? 'rounded-lg' : 'rounded-tr-lg rounded-br-lg rounded-bl-lg',
+          ]"
+        >
+          <!-- 窗口控制栏（仅 WebView 环境下显示，位于主内容区上方） -->
+          <AppHeader v-if="showHeader" />
+          <!-- 主内容区域 -->
+          <div class="relative z-10 min-h-0 flex-1 overflow-auto">
+            <ContentArea />
           </div>
         </div>
       </div>
