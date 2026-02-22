@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 
 // 懒加载页面组件
@@ -9,12 +9,7 @@ const AboutPage = () => import('@/features/about/pages/AboutPage.vue')
 
 // 导入playground路由
 import { routes as playgroundRoutes } from '@/features/playground'
-
-// 临时的 404 页面
-const NotFoundPage = {
-  template:
-    '<div class="flex h-full items-center justify-center"><h1 class="text-2xl font-bold">页面未找到 404</h1></div>',
-}
+import NotFoundPage from '@/features/common/pages/NotFoundPage.vue'
 
 // 基础路由配置
 const routes: RouteRecordRaw[] = [
@@ -68,7 +63,7 @@ const routes: RouteRecordRaw[] = [
 
 // 创建路由实例
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes,
 })
 

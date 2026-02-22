@@ -1,4 +1,3 @@
-import { getStaticUrl } from '@/core/env'
 import type { WebBackgroundSettings } from './types'
 import { BACKGROUND_WEB_DIR, RESOURCES_WEB_ROOT } from './constants'
 
@@ -51,17 +50,10 @@ export const normalizeBackgroundPath = (rawPath: string): string => {
 }
 
 export const resolveBackgroundImageUrl = (background: WebBackgroundSettings): string | null => {
-  if (background.type !== 'image') return null
-  if (!background.imagePath) return null
+  if (background.type !== 'image' || !background.imagePath) return null
 
   const normalizedPath = normalizeBackgroundPath(background.imagePath)
-  if (!normalizedPath) return null
-
-  if (HTTP_PREFIX.test(normalizedPath)) {
-    return normalizedPath
-  }
-
-  return getStaticUrl(normalizedPath)
+  return normalizedPath || null
 }
 
 export const toResourceFilePath = (path: string): string | null => {
