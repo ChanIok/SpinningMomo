@@ -275,6 +275,32 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateRecordingCaptureClientArea = async (captureClientArea: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          captureClientArea,
+        },
+      },
+    })
+  }
+
+  const updateRecordingCaptureCursor = async (captureCursor: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          captureCursor,
+        },
+      },
+    })
+  }
+
   const updateRecordingAudioSource = async (audioSource: 'none' | 'system' | 'game_only') => {
     await store.updateSettings({
       ...appSettings.value,
@@ -344,6 +370,8 @@ export const useFunctionActions = () => {
           rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
           encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
+          captureClientArea: DEFAULT_APP_SETTINGS.features.recording.captureClientArea,
+          captureCursor: DEFAULT_APP_SETTINGS.features.recording.captureCursor,
           audioSource: DEFAULT_APP_SETTINGS.features.recording.audioSource,
           audioBitrate: DEFAULT_APP_SETTINGS.features.recording.audioBitrate,
         },
@@ -386,6 +414,8 @@ export const useFunctionActions = () => {
           rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
           encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
+          captureClientArea: DEFAULT_APP_SETTINGS.features.recording.captureClientArea,
+          captureCursor: DEFAULT_APP_SETTINGS.features.recording.captureCursor,
           audioSource: DEFAULT_APP_SETTINGS.features.recording.audioSource,
           audioBitrate: DEFAULT_APP_SETTINGS.features.recording.audioBitrate,
         },
@@ -435,6 +465,8 @@ export const useFunctionActions = () => {
     updateRecordingRateControl,
     updateRecordingEncoderMode,
     updateRecordingCodec,
+    updateRecordingCaptureClientArea,
+    updateRecordingCaptureCursor,
     updateRecordingAudioSource,
     updateRecordingAudioBitrate,
     resetFunctionSettings,

@@ -10,6 +10,7 @@ import Features.ReplayBuffer.Types;
 import Features.ReplayBuffer.DiskRingBuffer;
 import Features.ReplayBuffer.Muxer;
 import Utils.Graphics.Capture;
+import Utils.Graphics.CaptureRegion;
 import Utils.Graphics.D3D;
 import Utils.Media.AudioCapture;
 import Utils.Media.RawEncoder;
@@ -24,6 +25,7 @@ namespace Features::ReplayBuffer {
 
 // 默认缓冲文件大小限制（2GB）
 constexpr std::int64_t kDefaultBufferSizeLimit = 2LL * 1024 * 1024 * 1024;
+auto floor_to_even(int value) -> int { return (value / 2) * 2; }
 
 // 帧到达回调
 auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
@@ -48,6 +50,17 @@ auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
   }
 
   std::lock_guard resource_lock(state.resource_mutex);
+  ID3D11Texture2D* current_texture = texture.get();
+  if (state.crop_to_client_area) {
+    auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
+        state.device.get(), state.context.get(), texture.get(), state.crop_region,
+        state.cropped_texture);
+    if (!crop_result) {
+      Logger().error("Failed to crop replay frame to client area: {}", crop_result.error());
+      return;
+    }
+    current_texture = *crop_result;
+  }
 
   while (state.frame_index <= target_frame_index) {
     std::int64_t timestamp = state.frame_index * frame_duration_100ns;
@@ -55,7 +68,7 @@ auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
     ID3D11Texture2D* encode_texture =
         (state.frame_index < target_frame_index && state.last_encoded_texture)
             ? state.last_encoded_texture.get()
-            : texture.get();
+            : current_texture;
 
     // 使用 RawEncoder 编码
     std::expected<std::vector<Utils::Media::RawEncoder::EncodedFrame>, std::string> result;
@@ -84,7 +97,7 @@ auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
   // 缓存当前帧
   if (!state.last_encoded_texture) {
     D3D11_TEXTURE2D_DESC desc;
-    texture->GetDesc(&desc);
+    current_texture->GetDesc(&desc);
     desc.BindFlags = 0;
     desc.MiscFlags = 0;
     desc.Usage = D3D11_USAGE_DEFAULT;
@@ -96,7 +109,7 @@ auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
     }
   }
 
-  state.context->CopyResource(state.last_encoded_texture.get(), texture.get());
+  state.context->CopyResource(state.last_encoded_texture.get(), current_texture);
 }
 
 auto initialize(Features::ReplayBuffer::State::ReplayBufferState& state)
@@ -165,14 +178,65 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
     Logger().info("ReplayBuffer audio capture initialized");
   }
 
-  // 5. 获取窗口尺寸
-  RECT rect;
-  GetClientRect(target_window, &rect);
-  int width = (rect.right - rect.left) / 2 * 2;  // 确保偶数
-  int height = (rect.bottom - rect.top) / 2 * 2;
+  // 5. 计算捕获尺寸与输出尺寸
+  int width = 0;
+  int height = 0;
+  int capture_width = 0;
+  int capture_height = 0;
+  state.crop_to_client_area = false;
+  state.crop_region = {};
+  state.cropped_texture = nullptr;
 
-  if (width <= 0 || height <= 0) {
-    return std::unexpected("Invalid window size");
+  if (config.use_recording_capture_options) {
+    RECT window_rect{};
+    RECT client_rect{};
+    GetWindowRect(target_window, &window_rect);
+    GetClientRect(target_window, &client_rect);
+
+    int window_width = window_rect.right - window_rect.left;
+    int window_height = window_rect.bottom - window_rect.top;
+    int client_width = client_rect.right - client_rect.left;
+    int client_height = client_rect.bottom - client_rect.top;
+
+    if (window_width <= 0 || window_height <= 0 || client_width <= 0 || client_height <= 0) {
+      return std::unexpected("Invalid window size");
+    }
+
+    capture_width = window_width;
+    capture_height = window_height;
+    width = config.capture_client_area ? client_width : window_width;
+    height = config.capture_client_area ? client_height : window_height;
+    width = floor_to_even(width);
+    height = floor_to_even(height);
+
+    if (width <= 0 || height <= 0) {
+      return std::unexpected("Invalid output size");
+    }
+
+    if (config.capture_client_area) {
+      auto crop_region_result =
+          Utils::Graphics::CaptureRegion::calculate_client_crop_region(target_window);
+      if (!crop_region_result) {
+        return std::unexpected("Failed to calculate client crop region: " +
+                               crop_region_result.error());
+      }
+      state.crop_region = *crop_region_result;
+      state.crop_region.width = static_cast<UINT>(width);
+      state.crop_region.height = static_cast<UINT>(height);
+      state.crop_to_client_area = true;
+    }
+  } else {
+    // 兼容旧行为：按客户区尺寸创建帧池，不启用客户区裁剪逻辑
+    RECT rect{};
+    GetClientRect(target_window, &rect);
+    width = floor_to_even(rect.right - rect.left);
+    height = floor_to_even(rect.bottom - rect.top);
+    capture_width = width;
+    capture_height = height;
+
+    if (width <= 0 || height <= 0) {
+      return std::unexpected("Invalid window size");
+    }
   }
 
   // 6. 创建 RawEncoder
@@ -204,10 +268,15 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
     return std::unexpected("Failed to initialize ring buffer: " + ring_result.error());
   }
 
+  Utils::Graphics::Capture::CaptureSessionOptions capture_options;
+  capture_options.capture_cursor =
+      config.use_recording_capture_options ? config.capture_cursor : false;
+  capture_options.border_required = false;
+
   // 8. 创建捕获会话（2 帧缓冲）
   auto capture_result = Utils::Graphics::Capture::create_capture_session(
-      target_window, *winrt_device_result, width, height,
-      [&state](auto frame) { on_frame_arrived(state, frame); }, 2);
+      target_window, *winrt_device_result, capture_width, capture_height,
+      [&state](auto frame) { on_frame_arrived(state, frame); }, 2, capture_options);
 
   if (!capture_result) {
     return std::unexpected("Failed to create capture session: " + capture_result.error());
@@ -291,6 +360,9 @@ auto stop_buffering(Features::ReplayBuffer::State::ReplayBufferState& state) -> 
     state.capture_session = {};
     state.raw_encoder = {};
     state.last_encoded_texture = nullptr;
+    state.cropped_texture = nullptr;
+    state.crop_to_client_area = false;
+    state.crop_region = {};
     state.device = nullptr;
     state.context = nullptr;
 

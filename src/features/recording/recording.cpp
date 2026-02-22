@@ -8,6 +8,7 @@ import std;
 import Features.Recording.State;
 import Features.Recording.AudioCapture;
 import Utils.Graphics.Capture;
+import Utils.Graphics.CaptureRegion;
 import Utils.Graphics.D3D;
 import Utils.Media.Encoder;
 import Utils.Media.Encoder.Types;
@@ -18,6 +19,8 @@ import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording {
+
+auto floor_to_even(int value) -> int { return (value / 2) * 2; }
 
 auto initialize(Features::Recording::State::RecordingState& state)
     -> std::expected<void, std::string> {
@@ -57,6 +60,18 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   // 使用 resource_mutex 保护帧填充逻辑和 frame_index
   std::lock_guard resource_lock(state.resource_mutex);
 
+  ID3D11Texture2D* current_texture = texture.get();
+  if (state.crop_to_client_area) {
+    auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
+        state.device.get(), state.context.get(), texture.get(), state.crop_region,
+        state.cropped_texture);
+    if (!crop_result) {
+      Logger().error("Failed to crop frame to client area: {}", crop_result.error());
+      return;
+    }
+    current_texture = *crop_result;
+  }
+
   while (state.frame_index <= target_frame_index) {
     int64_t timestamp = state.frame_index * frame_duration_100ns;
 
@@ -64,7 +79,7 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
     ID3D11Texture2D* encode_texture =
         (state.frame_index < target_frame_index && state.last_encoded_texture)
             ? state.last_encoded_texture.get()
-            : texture.get();
+            : current_texture;
 
     // 编码帧
     std::expected<void, std::string> result;
@@ -87,7 +102,7 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   // 首次调用时创建缓存纹理
   if (!state.last_encoded_texture) {
     D3D11_TEXTURE2D_DESC desc;
-    texture->GetDesc(&desc);
+    current_texture->GetDesc(&desc);
     desc.BindFlags = 0;
     desc.MiscFlags = 0;
     desc.Usage = D3D11_USAGE_DEFAULT;
@@ -100,7 +115,7 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   }
 
   // 每帧都更新缓存（WGC 帧池会复用纹理，指针比较不可靠）
-  state.context->CopyResource(state.last_encoded_texture.get(), texture.get());
+  state.context->CopyResource(state.last_encoded_texture.get(), current_texture);
 }
 
 auto start(Features::Recording::State::RecordingState& state, HWND target_window,
@@ -118,23 +133,49 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   state.config = config;
   state.target_window = target_window;
 
-  // 1. 获取窗口尺寸
-  RECT rect;
-  GetClientRect(target_window, &rect);
-  int width = rect.right - rect.left;
-  int height = rect.bottom - rect.top;
+  // 1. 计算捕获尺寸与输出尺寸
+  RECT window_rect{};
+  RECT client_rect{};
+  GetWindowRect(target_window, &window_rect);
+  GetClientRect(target_window, &client_rect);
 
-  // 确保尺寸有效 (偶数)
-  width = (width / 2) * 2;
-  height = (height / 2) * 2;
+  int window_width = window_rect.right - window_rect.left;
+  int window_height = window_rect.bottom - window_rect.top;
+  int client_width = client_rect.right - client_rect.left;
+  int client_height = client_rect.bottom - client_rect.top;
 
-  if (width <= 0 || height <= 0) {
+  if (window_width <= 0 || window_height <= 0 || client_width <= 0 || client_height <= 0) {
     return std::unexpected("Invalid window size");
   }
 
-  // 更新配置中的尺寸
-  state.config.width = width;
-  state.config.height = height;
+  int output_width = config.capture_client_area ? client_width : window_width;
+  int output_height = config.capture_client_area ? client_height : window_height;
+  output_width = floor_to_even(output_width);
+  output_height = floor_to_even(output_height);
+
+  if (output_width <= 0 || output_height <= 0) {
+    return std::unexpected("Invalid output size");
+  }
+
+  state.config.width = output_width;
+  state.config.height = output_height;
+  state.crop_to_client_area = false;
+  state.crop_region = {};
+  state.cropped_texture = nullptr;
+
+  if (config.capture_client_area) {
+    auto crop_region_result =
+        Utils::Graphics::CaptureRegion::calculate_client_crop_region(target_window);
+    if (!crop_region_result) {
+      return std::unexpected("Failed to calculate client crop region: " +
+                             crop_region_result.error());
+    }
+
+    state.crop_region = *crop_region_result;
+    state.crop_region.width = static_cast<UINT>(output_width);
+    state.crop_region.height = static_cast<UINT>(output_height);
+    state.crop_to_client_area = true;
+  }
 
   // 2. 创建 Headless D3D 设备
   auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
@@ -176,8 +217,8 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   // 5. 创建编码器（音频流在内部添加）
   Utils::Media::Encoder::Types::EncoderConfig encoder_config;
   encoder_config.output_path = config.output_path;
-  encoder_config.width = width;
-  encoder_config.height = height;
+  encoder_config.width = output_width;
+  encoder_config.height = output_height;
   encoder_config.fps = config.fps;
   encoder_config.bitrate = config.bitrate;
   encoder_config.quality = config.quality;
@@ -198,10 +239,14 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   }
   state.encoder = std::move(*encoder_result);
 
+  Utils::Graphics::Capture::CaptureSessionOptions capture_options;
+  capture_options.capture_cursor = config.capture_cursor;
+  capture_options.border_required = false;
+
   // 6. 创建捕获会话（使用 2 帧缓冲以容忍编码延迟）
   auto capture_result = Utils::Graphics::Capture::create_capture_session(
-      target_window, *winrt_device_result, width, height,
-      [&state](auto frame) { on_frame_arrived(state, frame); }, 2);
+      target_window, *winrt_device_result, window_width, window_height,
+      [&state](auto frame) { on_frame_arrived(state, frame); }, 2, capture_options);
 
   if (!capture_result) {
     return std::unexpected("Failed to create capture session: " + capture_result.error());
@@ -295,6 +340,9 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
     state.capture_session = {};
     state.encoder = {};
     state.last_encoded_texture = nullptr;
+    state.cropped_texture = nullptr;
+    state.crop_to_client_area = false;
+    state.crop_region = {};
     state.device = nullptr;
     state.context = nullptr;
 

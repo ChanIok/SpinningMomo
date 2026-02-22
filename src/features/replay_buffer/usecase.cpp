@@ -54,6 +54,9 @@ auto build_config(Core::State::AppState& state)
     config.codec = rec_settings.codec;
     config.rate_control = rec_settings.rate_control;
     config.encoder_mode = rec_settings.encoder_mode;
+    config.use_recording_capture_options = true;
+    config.capture_client_area = rec_settings.capture_client_area;
+    config.capture_cursor = rec_settings.capture_cursor;
     config.audio_source = rec_settings.audio_source;
     config.audio_bitrate = rec_settings.audio_bitrate;
   } else if (motion_photo_enabled) {

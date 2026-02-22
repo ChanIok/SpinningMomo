@@ -19,8 +19,6 @@ import <windows.h>;
 
 namespace Features::Recording::UseCase {
 
-namespace {
-
 auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
   if (!state.i18n) {
     Logger().warn("Skip recording notification because i18n state is not initialized");
@@ -29,8 +27,6 @@ auto show_recording_notification(Core::State::AppState& state, const std::string
 
   Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"], message);
 }
-
-}  // namespace
 
 // 生成输出文件路径
 auto generate_output_path(const Core::State::AppState& state)
@@ -62,8 +58,14 @@ auto generate_output_path(const Core::State::AppState& state)
     return std::unexpected("Failed to create recordings directory");
   }
 
-  auto now = std::chrono::system_clock::now();
-  auto filename = std::format("recording_{:%Y%m%d_%H%M%S}.mp4", now);
+  auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
+  // 与截图模块一致：FormatTimestamp 返回 .png，录制使用 .mp4
+  auto dot_pos = filename.rfind('.');
+  if (dot_pos != std::string::npos) {
+    filename = filename.substr(0, dot_pos) + ".mp4";
+  } else {
+    filename += ".mp4";
+  }
 
   return recordings_dir / filename;
 }
@@ -75,9 +77,11 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   }
 
   if (state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
-    // 停止录制
+    // 停止录制（保存路径在 stop 前读取，stop 不清理 config）
+    std::filesystem::path saved_path = state.recording->config.output_path;
     Features::Recording::stop(*state.recording);
-    show_recording_notification(state, state.i18n->texts["message.recording_stopped"]);
+    show_recording_notification(state, state.i18n->texts["message.recording_saved"] +
+                                           Utils::String::ToUtf8(saved_path.wstring()));
   } else if (state.recording->status == Features::Recording::Types::RecordingStatus::Idle) {
     // 开始录制
 
@@ -111,6 +115,8 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     config.encoder_mode =
         Features::Recording::Types::encoder_mode_from_string(recording_settings.encoder_mode);
     config.codec = Features::Recording::Types::video_codec_from_string(recording_settings.codec);
+    config.capture_client_area = recording_settings.capture_client_area;
+    config.capture_cursor = recording_settings.capture_cursor;
     config.audio_source =
         Features::Recording::Types::audio_source_from_string(recording_settings.audio_source);
     config.audio_bitrate = recording_settings.audio_bitrate;
@@ -123,8 +129,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
       return result;
     }
 
-    show_recording_notification(state, state.i18n->texts["message.recording_started"] +
-                                           Utils::String::ToUtf8(path_result->wstring()));
+    show_recording_notification(state, state.i18n->texts["message.recording_started"]);
   } else {
     return std::unexpected("Recording is in a transitional state");
   }

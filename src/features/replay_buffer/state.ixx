@@ -6,6 +6,7 @@ import std;
 import Features.ReplayBuffer.Types;
 import Features.ReplayBuffer.DiskRingBuffer;
 import Utils.Graphics.Capture;
+import Utils.Graphics.CaptureRegion;
 import Utils.Media.AudioCapture;
 import Utils.Media.RawEncoder;
 import <d3d11.h>;
@@ -34,6 +35,9 @@ struct ReplayBufferState {
 
   // WGC 捕获会话
   Utils::Graphics::Capture::CaptureSession capture_session;
+  bool crop_to_client_area = false;
+  Utils::Graphics::CaptureRegion::CropRegion crop_region;
+  wil::com_ptr<ID3D11Texture2D> cropped_texture;
 
   // RawEncoder（单一实例，全程运行）
   Utils::Media::RawEncoder::RawEncoderContext raw_encoder;

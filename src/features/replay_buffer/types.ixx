@@ -25,6 +25,11 @@ export struct ReplayBufferConfig {
   std::string encoder_mode = "auto";    // 编码器模式
   std::uint32_t keyframe_interval = 1;  // 关键帧间隔（秒），裁剪精度
 
+  // 捕获配置
+  bool use_recording_capture_options = false;  // 是否启用录制继承的捕获参数
+  bool capture_client_area = false;            // 是否只捕获客户区
+  bool capture_cursor = false;                 // 是否捕获鼠标指针
+
   // 音频配置
   std::string audio_source = "system";    // 音频源: "none" | "system" | "game_only"
   std::uint32_t audio_bitrate = 256'000;  // 音频码率

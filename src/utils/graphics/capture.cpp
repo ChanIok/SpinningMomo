@@ -1,10 +1,7 @@
 module;
 
-#include <d3d11.h>
-#include <wil/com.h>
 #include <windows.graphics.capture.interop.h>
 #include <windows.graphics.directx.direct3d11.interop.h>
-#include <windows.h>
 #include <winrt/Windows.Foundation.Metadata.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
@@ -14,6 +11,9 @@ module Utils.Graphics.Capture;
 
 import std;
 import Utils.Logger;
+import <d3d11.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 namespace Utils::Graphics::Capture {
 
@@ -57,8 +57,8 @@ auto create_winrt_device(ID3D11Device* d3d_device)
 auto create_capture_session(
     HWND target_window,
     const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
-    int height, FrameCallback frame_callback, int frame_pool_size)
-    -> std::expected<CaptureSession, std::string> {
+    int height, FrameCallback frame_callback, int frame_pool_size,
+    const CaptureSessionOptions& options) -> std::expected<CaptureSession, std::string> {
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Target window is invalid");
   }
@@ -116,17 +116,20 @@ auto create_capture_session(
   if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
           winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
           L"IsCursorCaptureEnabled")) {
-    session.session.IsCursorCaptureEnabled(false);
-  } else {
-    // 如果不支持IsCursorCaptureEnabled，则标记需要手动隐藏光标
+    session.session.IsCursorCaptureEnabled(options.capture_cursor);
+  } else if (!options.capture_cursor) {
+    // 如果不支持 IsCursorCaptureEnabled，且要求隐藏光标，则标记需要手动隐藏光标
     session.need_hide_cursor = true;
+    Logger().warn(
+        "IsCursorCaptureEnabled is not available, cursor visibility cannot be controlled "
+        "without manual fallback");
   }
 
   // 尝试禁用边框（如果支持）
   if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
           winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
           L"IsBorderRequired")) {
-    session.session.IsBorderRequired(false);
+    session.session.IsBorderRequired(options.border_required);
   }
 
   return session;

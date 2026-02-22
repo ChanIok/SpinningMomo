@@ -1,8 +1,8 @@
 module;
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
+// #include <d3d11.h>
+// #include <wil/com.h>
+// #include <windows.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
@@ -10,6 +10,9 @@ module;
 export module Utils.Graphics.Capture;
 
 import std;
+import <d3d11.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 namespace Utils::Graphics::Capture {
 
@@ -21,6 +24,12 @@ export struct CaptureSession {
   winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
   winrt::event_token frame_token;
   bool need_hide_cursor = false;
+};
+
+// 捕获会话配置
+export struct CaptureSessionOptions {
+  bool capture_cursor = false;
+  bool border_required = false;
 };
 
 export using Direct3D11CaptureFrame = winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame;
@@ -36,8 +45,8 @@ export auto create_winrt_device(ID3D11Device* d3d_device)
 export auto create_capture_session(
     HWND target_window,
     const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
-    int height, FrameCallback frame_callback, int frame_pool_size = 1)
-    -> std::expected<CaptureSession, std::string>;
+    int height, FrameCallback frame_callback, int frame_pool_size = 1,
+    const CaptureSessionOptions& options = {}) -> std::expected<CaptureSession, std::string>;
 
 // 开始捕获
 export auto start_capture(CaptureSession& session) -> std::expected<void, std::string>;

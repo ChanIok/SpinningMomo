@@ -5,6 +5,7 @@ import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import {
   Item,
   ItemContent,
@@ -46,6 +47,8 @@ const {
   updateRecordingRateControl,
   updateRecordingEncoderMode,
   updateRecordingCodec,
+  updateRecordingCaptureClientArea,
+  updateRecordingCaptureCursor,
   updateRecordingAudioSource,
   updateRecordingAudioBitrate,
   resetCaptureExportSettings,
@@ -495,6 +498,40 @@ const handleResetSettings = async () => {
                   }}</SelectItem>
                 </SelectContent>
               </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.captureClientArea.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.captureClientArea.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.recording?.captureClientArea"
+                @update:model-value="(value) => updateRecordingCaptureClientArea(Boolean(value))"
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.captureCursor.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.captureCursor.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.recording?.captureCursor"
+                @update:model-value="(value) => updateRecordingCaptureCursor(Boolean(value))"
+              />
             </ItemActions>
           </Item>
 

@@ -106,6 +106,8 @@ export struct RecordingConfig {
   RateControlMode rate_control = RateControlMode::CBR;  // 码率控制模式
   EncoderMode encoder_mode = EncoderMode::Auto;         // 编码器模式
   VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
+  bool capture_client_area = true;                      // 是否只捕获客户区（无边框）
+  bool capture_cursor = false;                          // 是否捕获鼠标指针
 
   // 音频配置
   AudioSource audio_source = AudioSource::System;  // 音频源类型 (默认系统音频)
