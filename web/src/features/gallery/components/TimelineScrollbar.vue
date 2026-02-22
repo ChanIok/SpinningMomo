@@ -277,7 +277,7 @@ function formatMonthFull(monthStr: string): string {
 <template>
   <div
     ref="timelineRef"
-    class="timeline-scrollbar w-10 bg-background/80 backdrop-blur transition-all select-none"
+    class="timeline-scrollbar surface-top w-10 transition-all select-none"
     @mousedown="handleMouseDown"
     @mousemove="handleMouseMove"
     @mouseleave="handleMouseLeave"

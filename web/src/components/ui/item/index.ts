@@ -20,7 +20,7 @@ export const itemVariants = cva(
         default: 'bg-transparent',
         outline: 'border-border',
         muted: 'bg-muted/50',
-        surface: 'bg-background/80',
+        surface: 'surface-top',
       },
       size: {
         default: 'p-4 gap-4 ',

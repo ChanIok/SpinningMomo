@@ -26,9 +26,7 @@ function handleToggleFilmstrip() {
 </script>
 
 <template>
-  <div
-    class="flex items-center justify-between border-b border-border bg-card/80 px-4 py-3 backdrop-blur-sm"
-  >
+  <div class="surface-top flex items-center justify-between border-b border-border px-4 py-3">
     <!-- 左侧：图片计数 -->
     <div class="flex items-center gap-3 text-foreground">
       <span class="text-sm font-medium"> {{ currentIndex + 1 }} / {{ totalCount }} </span>

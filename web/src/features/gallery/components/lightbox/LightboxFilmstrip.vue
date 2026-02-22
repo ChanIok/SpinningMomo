@@ -182,7 +182,7 @@ function handleWheel(event: WheelEvent) {
 </script>
 
 <template>
-  <div class="flex flex-col border-t border-border bg-card/80 backdrop-blur-md">
+  <div class="surface-top flex flex-col border-t border-border">
     <!-- 缩略图滚动容器 -->
     <ScrollArea ref="scrollAreaRef" class="filmstrip-scroller" @wheel.prevent="handleWheel">
       <div class="px-4 py-3">

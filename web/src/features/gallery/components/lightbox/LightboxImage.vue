@@ -92,7 +92,7 @@ function handleImageClick() {
     <!-- 左侧导航按钮 -->
     <button
       v-if="canGoToPrevious"
-      class="absolute left-4 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full bg-card/80 text-foreground backdrop-blur-sm transition-all hover:bg-card"
+      class="surface-top absolute left-4 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full text-foreground transition-all"
       @click="handlePrevious"
       title="上一张 (←)"
     >
@@ -156,7 +156,7 @@ function handleImageClick() {
     <!-- 右侧导航按钮 -->
     <button
       v-if="canGoToNext"
-      class="absolute right-4 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full bg-card/80 text-foreground backdrop-blur-sm transition-all hover:bg-card"
+      class="surface-top absolute right-4 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full text-foreground transition-all"
       @click="handleNext"
       title="下一张 (→)"
     >

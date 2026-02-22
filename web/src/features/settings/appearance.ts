@@ -49,8 +49,8 @@ const applyBackground = (settings: AppSettings): void => {
   root.style.setProperty('--app-background-overlay-end', background.overlayEndColor || '#000000')
   root.style.setProperty('--app-background-overlay-opacity', String(overlayOpacity))
 
-  root.style.setProperty('--app-surface-opacity', String(clamp(background.surfaceOpacity, 0, 1)))
-  root.style.setProperty('--app-surface-blur', `${Math.max(background.surfaceBlurAmount, 0)}px`)
+  root.style.setProperty('--surface-opacity', String(clamp(background.surfaceOpacity, 0, 1)))
+  root.style.setProperty('--surface-blur', `${Math.max(background.surfaceBlurAmount, 0)}px`)
 
   if (!imageUrl) {
     root.style.setProperty('--app-background-image', 'none')

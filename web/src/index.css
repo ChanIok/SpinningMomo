@@ -82,6 +82,9 @@
   --color-statusbar-foreground: var(--statusbar-foreground);
   --color-panel: var(--panel);
   --color-panel-foreground: var(--panel-foreground);
+  --color-surface-bottom: var(--surface-bottom);
+  --color-surface-middle: var(--surface-middle);
+  --color-surface-top: var(--surface-top);
 }
 
 :root {
@@ -93,12 +96,17 @@
   --app-background-overlay-start: #000000;
   --app-background-overlay-end: #000000;
   --app-background-overlay-opacity: 0;
+  --surface-opacity: 1;
+  --surface-blur: 0px;
+  --surface-bottom: #eceef2;
+  --surface-middle: rgb(255 255 255 / 0.56);
+  --surface-top: #fbfcfd;
   /* Light Modern */
-  --background: #ffffff;
+  --background: var(--surface-bottom);
   --foreground: #1f1f1f;
-  --card: #ffffff;
+  --card: var(--surface-top);
   --card-foreground: #3b3b3b;
-  --popover: #ffffff;
+  --popover: var(--surface-top);
   --popover-foreground: #3b3b3b;
   --primary: #f59e0b;
   --primary-foreground: #ffffff;
@@ -113,7 +121,7 @@
   --border: #e5e5e5;
   --input: #e5e5e5;
   --ring: #f59e0b;
-  --sidebar: #ffffff;
+  --sidebar: var(--surface-middle);
   --sidebar-foreground: #1f1f1f;
   --sidebar-primary: #f59e0b;
   --sidebar-primary-foreground: #ffffff;
@@ -133,11 +141,14 @@
 
 .dark {
   /* Dark Modern */
-  --background: #1f1f1f;
+  --surface-bottom: #17181a;
+  --surface-middle: rgb(255 255 255 / 0.06);
+  --surface-top: rgb(255 255 255 / 0.1);
+  --background: var(--surface-bottom);
   --foreground: #cccccc;
-  --card: #1f1f1f;
+  --card: var(--surface-middle);
   --card-foreground: #cccccc;
-  --popover: #1f1f1f;
+  --popover: var(--surface-top);
   --popover-foreground: #cccccc;
   --primary: #fbbf24;
   --primary-foreground: #18181b;
@@ -152,7 +163,7 @@
   --border: #3a3a3a;
   --input: #3a3a3a;
   --ring: #fbbf24;
-  --sidebar: #1f1f1f;
+  --sidebar: var(--surface-middle);
   --sidebar-foreground: #cccccc;
   --sidebar-primary: #fbbf24;
   --sidebar-primary-foreground: #18181b;
@@ -170,15 +181,29 @@
   --panel-foreground: #cccccc;
 }
 
-.app-surface {
+.surface-bottom,
+.surface-middle,
+.surface-top {
   background-color: color-mix(
     in srgb,
-    var(--surface-base, var(--background))
-      calc(var(--app-surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
+    var(--surface-layer-color, var(--surface-middle))
+      calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
     transparent
-  ) !important;
-  -webkit-backdrop-filter: blur(var(--app-surface-blur, 0px));
-  backdrop-filter: blur(var(--app-surface-blur, 0px));
+  );
+  -webkit-backdrop-filter: blur(var(--surface-blur, 0px));
+  backdrop-filter: blur(var(--surface-blur, 0px));
+}
+
+.surface-bottom {
+  --surface-layer-color: var(--surface-bottom);
+}
+
+.surface-middle {
+  --surface-layer-color: var(--surface-middle);
+}
+
+.surface-top {
+  --surface-layer-color: var(--surface-top);
 }
 
 .app-background-image {

@@ -1,4 +1,3 @@
-
 <script setup lang="ts">
 import { ref } from 'vue'
 import {
@@ -49,11 +48,7 @@ const handleReset = async (e: Event) => {
   <AlertDialog :open="open" @update:open="open = $event">
     <AlertDialogTrigger as-child>
       <slot name="trigger">
-        <Button
-          variant="outline"
-          size="sm"
-          class="shrink-0 bg-background/80 dark:bg-secondary/80 dark:hover:bg-secondary"
-        >
+        <Button variant="outline" size="sm" class="surface-top shrink-0 hover:bg-accent">
           <RotateCcw class="mr-2 h-4 w-4" />
           {{ triggerText || t('settings.reset.dialog.triggerText') }}
         </Button>
@@ -70,7 +65,11 @@ const handleReset = async (e: Event) => {
         </AlertDialogCancel>
         <!-- 使用 .prevent 防止自动关闭 -->
         <AlertDialogAction @click.prevent="handleReset" :disabled="isResetting">
-          {{ isResetting ? t('settings.reset.dialog.resetting') : (confirmText || t('settings.reset.dialog.confirmText')) }}
+          {{
+            isResetting
+              ? t('settings.reset.dialog.resetting')
+              : confirmText || t('settings.reset.dialog.confirmText')
+          }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

@@ -2,6 +2,7 @@ import { ref, computed, watch } from 'vue'
 import { useSettingsStore } from '../store'
 import { storeToRefs } from 'pinia'
 import type { WebThemeMode } from '../types'
+import { applyAppearanceToDocument } from '../appearance'
 
 /**
  * 主题管理 Composable
@@ -38,19 +39,9 @@ export const useTheme = () => {
     return mode
   }
 
-  /**
-   * 应用主题到 DOM
-   */
-  const applyTheme = (theme: 'light' | 'dark') => {
-    const root = document.documentElement
-
-    if (theme === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
-
-    resolvedTheme.value = theme
+  const syncAppearance = () => {
+    applyAppearanceToDocument(appSettings.value)
+    resolvedTheme.value = resolveTheme(themeMode.value)
   }
 
   /**
@@ -68,11 +59,9 @@ export const useTheme = () => {
         },
       })
 
-      // 立即应用新主题
-      const resolved = resolveTheme(mode)
-      applyTheme(resolved)
+      syncAppearance()
 
-      console.log('✅ 主题已更新:', mode, '→', resolved)
+      console.log('✅ 主题已更新:', mode, '→', resolvedTheme.value)
     } catch (error) {
       console.error('❌ 更新主题失败:', error)
       throw error
@@ -92,7 +81,7 @@ export const useTheme = () => {
 
       // 如果当前是 system 模式，重新应用主题
       if (themeMode.value === 'system') {
-        applyTheme(systemTheme.value)
+        syncAppearance()
       }
     }
 
@@ -120,9 +109,7 @@ export const useTheme = () => {
     // 检测系统主题
     systemTheme.value = detectSystemTheme()
 
-    // 解析并应用主题
-    const resolved = resolveTheme(themeMode.value)
-    applyTheme(resolved)
+    syncAppearance()
 
     // 监听系统主题变化
     watchSystemTheme()
@@ -130,16 +117,15 @@ export const useTheme = () => {
     console.log('🎨 主题初始化完成:', {
       mode: themeMode.value,
       system: systemTheme.value,
-      resolved: resolved,
+      resolved: resolvedTheme.value,
     })
   }
 
   // 监听主题模式变化
   watch(
     () => themeMode.value,
-    (newMode) => {
-      const resolved = resolveTheme(newMode)
-      applyTheme(resolved)
+    () => {
+      syncAppearance()
     }
   )
 

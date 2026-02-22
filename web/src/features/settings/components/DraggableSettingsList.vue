@@ -84,7 +84,7 @@ const createGhost = (source: HTMLElement, rect: DOMRect, initialTop: number): HT
   ghost.classList.add('draggable-ghost')
 
   // Remove Tailwind classes that would override our styles
-  ghost.classList.remove('bg-background/80', 'hover:bg-accent/50')
+  ghost.classList.remove('surface-top', 'hover:bg-accent/50')
 
   ghost.style.cssText = `
         position: fixed;
@@ -277,13 +277,13 @@ onUnmounted(() => {
       <p class="mt-1 text-sm text-muted-foreground">{{ description }}</p>
     </div>
 
-    <div class="rounded-md bg-background/80 p-3">
+    <div class="surface-top rounded-md p-3">
       <div ref="itemsContainer" class="relative flex flex-col gap-1">
         <TransitionGroup name="list">
           <div
             v-for="item in items"
             :key="item.id"
-            class="draggable-item group flex cursor-grab items-center justify-between rounded-md bg-background/80 p-2.5 transition-colors hover:bg-accent/50 active:cursor-grabbing"
+            class="draggable-item surface-top group flex cursor-grab items-center justify-between rounded-md p-2.5 transition-colors hover:bg-accent/50 active:cursor-grabbing"
             :class="{
               'is-dragging-source': draggingId === item.id,
             }"

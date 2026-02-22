@@ -32,7 +32,7 @@ const isHome = () => route.name === 'home'
         <div
           class="relative flex min-h-0 flex-1 flex-col overflow-hidden text-foreground"
           :class="[
-            !isHome() && 'app-surface',
+            !isHome() && 'surface-middle',
             showHeader ? 'rounded-lg' : 'rounded-tr-lg rounded-br-lg rounded-bl-lg',
           ]"
         >
