@@ -16,7 +16,8 @@ auto format_sse_message(const std::string& event_data) -> std::string {
   return std::format("data: {}\n\n", event_data);
 }
 
-auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* response) -> void {
+auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* response,
+                    std::string allowed_origin) -> void {
   if (!state.http_server || !response) {
     Logger().error("Cannot add SSE connection: invalid state or response");
     return;
@@ -38,7 +39,10 @@ auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* resp
   response->writeHeader("Content-Type", "text/event-stream");
   response->writeHeader("Cache-Control", "no-cache");
   response->writeHeader("Connection", "keep-alive");
-  response->writeHeader("Access-Control-Allow-Origin", "*");
+  if (!allowed_origin.empty()) {
+    response->writeHeader("Access-Control-Allow-Origin", allowed_origin);
+    response->writeHeader("Vary", "Origin");
+  }
   response->write(": connected\n\n");
 
   size_t current_count = 0;
@@ -65,13 +69,51 @@ auto remove_connection(Core::State::AppState& state, const std::string& client_i
   auto old_size = connections.size();
   auto it = std::remove_if(connections.begin(), connections.end(),
                            [&client_id](const std::shared_ptr<Types::SseConnection>& conn) {
-                             return conn && conn->client_id == client_id;
+                             if (conn && conn->client_id == client_id) {
+                               conn->is_closed = true;
+                               return true;
+                             }
+                             return false;
                            });
   connections.erase(it, connections.end());
 
   if (connections.size() < old_size) {
     Logger().info("SSE connection removed. client_id={}, total={}", client_id, connections.size());
   }
+}
+
+auto close_all_connections(Core::State::AppState& state) -> void {
+  if (!state.http_server) {
+    return;
+  }
+
+  auto& connections = state.http_server->sse_connections;
+  auto& mtx = state.http_server->sse_connections_mutex;
+
+  std::vector<std::shared_ptr<Types::SseConnection>> snapshot;
+  {
+    std::lock_guard<std::mutex> lock(mtx);
+    snapshot.reserve(connections.size());
+    for (const auto& conn : connections) {
+      if (!conn) {
+        continue;
+      }
+      conn->is_closed = true;
+      snapshot.push_back(conn);
+    }
+    connections.clear();
+  }
+
+  size_t closed_count = 0;
+  for (const auto& conn : snapshot) {
+    if (!conn || !conn->response) {
+      continue;
+    }
+    conn->response->end();
+    ++closed_count;
+  }
+
+  Logger().info("Closed {} SSE connections during shutdown", closed_count);
 }
 
 auto broadcast_event(Core::State::AppState& state, const std::string& event_data) -> void {

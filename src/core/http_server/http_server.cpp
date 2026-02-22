@@ -25,14 +25,14 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
 
       Core::HttpServer::Routes::register_routes(state, app);
 
-      // 启动监听
-      app.listen(state.http_server->port, [&state](auto* socket) {
+      // 仅监听本机回环地址，避免暴露到局域网
+      app.listen("127.0.0.1", state.http_server->port, [&state](auto* socket) {
         if (socket) {
           state.http_server->listen_socket = socket;
           state.http_server->is_running = true;
-          Logger().info("HTTP server listening on port {}", state.http_server->port);
+          Logger().info("HTTP server listening on 127.0.0.1:{}", state.http_server->port);
         } else {
-          Logger().error("Failed to start HTTP server on port {}", state.http_server->port);
+          Logger().error("Failed to start HTTP server on 127.0.0.1:{}", state.http_server->port);
           state.http_server->is_running = false;
         }
       });
@@ -58,24 +58,39 @@ auto shutdown(Core::State::AppState& state) -> void {
 
   Logger().info("Shutting down HTTP server");
 
+  auto active_sse = Core::HttpServer::SseManager::get_connection_count(state);
+  Logger().info("Active SSE connections before shutdown: {}", active_sse);
+
+  // 提前标记停止，避免 shutdown 过程中继续广播 SSE 事件
+  state.http_server->is_running = false;
+
+  auto* loop = state.http_server->loop;
+  auto* listen_socket = state.http_server->listen_socket;
+
   // 使用 defer 将关闭操作调度到事件循环线程
-  if (state.http_server->listen_socket) {
-    Logger().info("Scheduling socket close");
-    state.http_server->loop->defer([listen_socket = state.http_server->listen_socket]() {
+  if (loop) {
+    Logger().info("Scheduling SSE close and socket close");
+    loop->defer([&state, listen_socket]() {
+      Core::HttpServer::SseManager::close_all_connections(state);
+
       if (listen_socket) {
         us_listen_socket_close(0, listen_socket);
         Logger().info("Listen socket closed");
       }
     });
-    state.http_server->listen_socket = nullptr;
-    state.http_server->loop = nullptr;
+  } else {
+    Logger().warn("HTTP loop is null during shutdown; listen socket close was not scheduled");
   }
 
   if (state.http_server->server_thread.joinable()) {
     state.http_server->server_thread.join();
   }
 
-  state.http_server->is_running = false;
+  state.http_server->listen_socket = nullptr;
+  state.http_server->loop = nullptr;
+
+  auto remaining_sse = Core::HttpServer::SseManager::get_connection_count(state);
+  Logger().info("Remaining SSE connections after shutdown: {}", remaining_sse);
   Logger().info("HTTP server shut down");
 }
 
