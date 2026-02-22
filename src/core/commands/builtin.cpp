@@ -41,7 +41,7 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                        .id = "app.main",
                        .i18n_key = "menu.app_main",
                        .is_toggle = false,
-                       .action = [&state]() { UI::WebViewWindow::toggle_visibility(state); },
+                       .action = [&state]() { UI::WebViewWindow::activate_window(state); },
                    });
 
   // 退出应用

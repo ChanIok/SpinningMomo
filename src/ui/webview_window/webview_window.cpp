@@ -47,14 +47,27 @@ auto hide(Core::State::AppState& state) -> void {
   }
 }
 
-auto toggle_visibility(Core::State::AppState& state) -> void {
-  if (state.webview->window.is_visible) {
-    hide(state);
-  } else {
-    if (auto result = show(state); !result) {
-      Logger().error("Failed to show WebView window: {}", result.error());
-    }
+auto activate_window(Core::State::AppState& state) -> void {
+  if (auto result = show(state); !result) {
+    Logger().error("Failed to activate WebView window: {}", result.error());
+    return;
   }
+
+  auto hwnd = state.webview->window.webview_hwnd;
+  if (!hwnd) {
+    Logger().error("Failed to activate WebView window: WebView window not created");
+    return;
+  }
+
+  if (IsIconic(hwnd)) {
+    ShowWindow(hwnd, SW_RESTORE);
+  } else {
+    ShowWindow(hwnd, SW_SHOW);
+  }
+
+  SetForegroundWindow(hwnd);
+  state.webview->window.is_visible = true;
+  Logger().info("WebView window activated");
 }
 
 // 窗口控制功能实现

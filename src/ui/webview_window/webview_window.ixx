@@ -13,7 +13,7 @@ export auto initialize(Core::State::AppState& state) -> std::expected<void, std:
 export auto cleanup(Core::State::AppState& state) -> void;
 
 // 窗口显示控制
-export auto toggle_visibility(Core::State::AppState& state) -> void;
+export auto activate_window(Core::State::AppState& state) -> void;
 
 // 窗口控制功能
 export auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::string>;
