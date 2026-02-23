@@ -38,6 +38,12 @@ target("SpinningMomo")
     -- 启用C++模块支持
     set_policy("build.c++.modules", true)
     -- set_policy("build.c++.modules.non_cascading_changes", true)
+
+    -- Release 也保留调试符号，便于分析生产崩溃 dump
+    if is_mode("release") then
+        set_symbols("debug")
+        add_ldflags("/DEBUG:FULL", {force = true})
+    end
     
     -- Windows特定宏定义
     add_defines("NOMINMAX", "UNICODE", "_UNICODE", "WIN32_LEAN_AND_MEAN", "_WIN32_WINNT=0x0A00", "SPDLOG_COMPILED_LIB", "yyjson_api_inline=yyjson_inline")

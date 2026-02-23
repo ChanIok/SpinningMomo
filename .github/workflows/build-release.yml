@@ -127,6 +127,7 @@ jobs:
             dist/*-Setup.exe
             dist/*-Portable.zip
             dist/SHA256SUMS.txt
+            build/windows/x64/release/SpinningMomo.pdb
           if-no-files-found: error
 
       - name: Create GitHub Release
