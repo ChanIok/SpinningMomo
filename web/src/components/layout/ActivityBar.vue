@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar'
+import { pushWithViewTransition } from '@/router/viewTransition'
 
 interface MenuItem {
   key: string
@@ -38,8 +39,8 @@ const menuItems = computed(() => {
   return baseMenuItems
 })
 
-const router = useRouter()
 const route = useRoute()
+const router = useRouter()
 
 const activeKey = computed(() => {
   const firstSegment = route.path.split('/')[1]
@@ -47,7 +48,7 @@ const activeKey = computed(() => {
 })
 
 const handleMenuSelect = (key: string) => {
-  router.push(`/${key}`)
+  void pushWithViewTransition(router, `/${key}`)
 }
 </script>
 
@@ -70,7 +71,7 @@ const handleMenuSelect = (key: string) => {
                   :tooltip="item.title"
                   :is-active="activeKey === item.key"
                   @click="handleMenuSelect(item.key)"
-                  class="h-10 w-10 [&>svg]:mx-auto [&>svg]:h-5 [&>svg]:w-5"
+                  class="h-10 w-10 [&>svg]:mx-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:transition-colors [&[data-active=true]>svg]:text-primary"
                 >
                   <component :is="item.icon" :stroke-width="1.8" />
                 </SidebarMenuButton>

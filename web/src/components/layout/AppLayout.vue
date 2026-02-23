@@ -18,10 +18,8 @@ const isHome = () => route.name === 'home'
     <div class="relative h-screen w-screen overflow-hidden bg-transparent">
       <div class="pointer-events-none absolute inset-0 z-0">
         <div class="app-background-image absolute inset-0" />
-        <div
-          class="app-background-overlay absolute inset-0"
-          :style="isHome() ? { opacity: 0 } : undefined"
-        />
+        <div v-if="isHome()" class="app-background-overlay absolute inset-y-0 left-0 w-14" />
+        <div v-else class="app-background-overlay absolute inset-0" />
       </div>
 
       <div class="relative z-10 flex h-full w-full flex-row">

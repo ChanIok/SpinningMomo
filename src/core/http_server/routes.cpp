@@ -20,17 +20,6 @@ namespace Core::HttpServer::Routes {
 
 auto get_origin_header(auto* req) -> std::string { return std::string(req->getHeader("origin")); }
 
-auto is_dev_origin_allowed(std::string_view origin) -> bool {
-  static constexpr std::array<std::string_view, 4> kAllowedOrigins = {
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:4173",
-      "http://127.0.0.1:4173",
-  };
-
-  return std::ranges::find(kAllowedOrigins, origin) != kAllowedOrigins.end();
-}
-
 auto is_local_origin_allowed(std::string_view origin, int port) -> bool {
   const auto localhost = std::format("http://localhost:{}", port);
   const auto loopback_v4 = std::format("http://127.0.0.1:{}", port);
@@ -45,17 +34,13 @@ auto is_origin_allowed(std::string_view origin, int port) -> bool {
     return true;
   }
 
-  // 发布/开发模式都允许同端口本机来源（支持浏览器直接访问本地服务）。
-  if (is_local_origin_allowed(origin, port)) {
+  // 开发模式放行所有 Origin，便于局域网/多设备联调。
+  if (Vendor::BuildConfig::is_debug_build()) {
     return true;
   }
 
-  // 开发模式额外允许 Vite 常见来源。
-  if (Vendor::BuildConfig::is_debug_build()) {
-    return is_dev_origin_allowed(origin);
-  }
-
-  return false;
+  // 发布模式仅允许本机同端口来源。
+  return is_local_origin_allowed(origin, port);
 }
 
 auto write_cors_headers(auto* res, std::string_view origin) -> void {

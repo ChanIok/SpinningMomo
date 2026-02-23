@@ -82,17 +82,20 @@ const handleMenuClick = (key: SettingsPageKey) => {
               @click="handleMenuClick(item.key)"
               :class="
                 cn(
-                  'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-all duration-200',
+                  'flex w-full items-center space-x-3 rounded-md px-4 py-3 transition-colors duration-200 ease-out',
                   'text-left focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                  'hover:bg-accent hover:text-accent-foreground',
                   activePage === item.key
-                    ? 'bg-accent font-medium text-accent-foreground'
-                    : 'text-muted-foreground'
+                    ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&>svg]:text-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 )
               "
               :title="t(item.description)"
             >
-              <component :is="item.icon" class="h-5 w-5 flex-shrink-0" stroke-width="1.8" />
+              <component
+                :is="item.icon"
+                class="h-5 w-5 flex-shrink-0 transition-colors duration-200 ease-out"
+                stroke-width="1.8"
+              />
               <div class="min-w-0 flex-1">
                 <div class="text-sm font-medium">{{ t(item.label) }}</div>
               </div>

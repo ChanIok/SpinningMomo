@@ -96,6 +96,8 @@
   --app-background-overlay-start: #000000;
   --app-background-overlay-end: #000000;
   --app-background-overlay-opacity: 0;
+  --route-transition-duration: 180ms;
+  --route-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
   --surface-opacity: 1;
   --surface-blur: 0px;
   --surface-bottom: #eceef2;
@@ -125,7 +127,7 @@
   --sidebar-foreground: #1f1f1f;
   --sidebar-primary: #f59e0b;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f4f4f5;
+  --sidebar-accent: var(--surface-top);
   --sidebar-accent-foreground: #000000;
   --sidebar-border: #e5e5e5;
   --sidebar-ring: #f59e0b;
@@ -167,7 +169,7 @@
   --sidebar-foreground: #cccccc;
   --sidebar-primary: #fbbf24;
   --sidebar-primary-foreground: #18181b;
-  --sidebar-accent: #2a2d2e;
+  --sidebar-accent: var(--surface-top);
   --sidebar-accent-foreground: #cccccc;
   --sidebar-border: #3a3a3a;
   --sidebar-ring: #fbbf24;
@@ -228,6 +230,41 @@
   );
   opacity: var(--app-background-overlay-opacity, 0);
   transition: opacity 220ms ease;
+}
+
+.route-scene {
+  view-transition-name: route-scene;
+}
+
+::view-transition-group(route-scene) {
+  animation-duration: var(--route-transition-duration);
+  animation-timing-function: var(--route-transition-easing);
+}
+
+::view-transition-old(route-scene) {
+  animation-name: route-scene-fade-out;
+}
+
+::view-transition-new(route-scene) {
+  animation-name: route-scene-fade-in;
+}
+
+@keyframes route-scene-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes route-scene-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @layer base {

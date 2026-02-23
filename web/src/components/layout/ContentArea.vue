@@ -4,7 +4,7 @@
 
 <template>
   <div class="flex h-full w-full flex-1 flex-col">
-    <main class="h-full flex-1 overflow-auto">
+    <main class="route-scene h-full flex-1 overflow-auto">
       <router-view />
     </main>
   </div>
