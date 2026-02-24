@@ -2,16 +2,18 @@ import { useSettingsStore } from '../store'
 import { DEFAULT_APP_SETTINGS } from '../types'
 import type { MenuItem } from '../types'
 import { storeToRefs } from 'pinia'
-import { featuresApi } from '../featuresApi'
 import { ref, computed } from 'vue'
 
 export const useMenuActions = () => {
   const store = useSettingsStore()
-  const { appSettings, isInitialized } = storeToRefs(store)
+  const { appSettings, isInitialized, commandDescriptors } = storeToRefs(store)
 
   // 功能项状态
   const featureItems = ref<MenuItem[]>([])
   const isLoadingFeatures = ref(false)
+  const featureDescriptorMap = computed(() => {
+    return new Map(commandDescriptors.value.map((descriptor) => [descriptor.id, descriptor]))
+  })
 
   // 加载功能项列表
   const loadFeatureItems = async () => {
@@ -19,8 +21,9 @@ export const useMenuActions = () => {
 
     isLoadingFeatures.value = true
     try {
-      // 获取所有可用功能
-      const allFeatures = await featuresApi.getAll()
+      // 命令列表在应用生命周期内只拉取一次，后续直接复用 store 缓存
+      await store.loadCommandsOnce()
+      const allFeatures = commandDescriptors.value
       const enabledFeatures = appSettings.value?.ui?.appMenu?.features || []
 
       // 构建启用功能的索引映射
@@ -170,6 +173,7 @@ export const useMenuActions = () => {
     // 状态
     featureItems,
     isLoadingFeatures,
+    featureDescriptorMap,
     aspectRatios,
     resolutions,
 

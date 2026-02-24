@@ -84,7 +84,7 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     id: 'spring',
     themeMode: 'light',
     mode: 2,
-    colors: ['#F1E1C5', '#DAE8CA', '#DAE8CA', '#DAE8CA'],
+    colors: ['#DAE8CA', '#F1E1C5', '#F1E1C5', '#F1E1C5'],
   },
   {
     id: 'daydream',
@@ -108,7 +108,7 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     id: 'teal',
     themeMode: 'dark',
     mode: 2,
-    colors: ['#062727', '#0F4D4D', '#0F4D4D', '#0F4D4D'],
+    colors: ['#0F4D4D', '#062727', '#062727', '#062727'],
   },
   {
     id: 'galaxy',

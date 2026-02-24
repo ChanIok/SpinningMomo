@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { settingsApi } from './api'
-import type { AppSettings } from './types'
+import { featuresApi } from './featuresApi'
+import type { AppSettings, FeatureDescriptor } from './types'
 import { DEFAULT_APP_SETTINGS } from './types'
 import { useI18n } from '@/composables/useI18n'
 import type { Locale } from '@/core/i18n/types'
@@ -63,13 +64,46 @@ const buildPatch = (before: unknown, after: unknown): unknown | typeof NO_CHANGE
 
 export const useSettingsStore = defineStore('settings', () => {
   const appSettings = ref<AppSettings>(DEFAULT_APP_SETTINGS)
+  const commandDescriptors = ref<FeatureDescriptor[]>([])
   const isLoading = ref(false)
+  const isLoadingCommands = ref(false)
   const error = ref<string | null>(null)
+  const commandsError = ref<string | null>(null)
   const isInitialized = ref(false)
+  const commandsLoaded = ref(false)
   const { setLocale } = useI18n()
   let settingsChangedHandler: ((params: unknown) => void) | null = null
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
   let refreshInFlight: Promise<void> | null = null
+  let commandsInFlight: Promise<void> | null = null
+
+  const loadCommandsOnce = async () => {
+    if (commandsLoaded.value) {
+      return
+    }
+
+    if (commandsInFlight) {
+      await commandsInFlight
+      return
+    }
+
+    commandsInFlight = (async () => {
+      isLoadingCommands.value = true
+      try {
+        const commands = await featuresApi.getAll()
+        commandDescriptors.value = commands
+        commandsLoaded.value = true
+        commandsError.value = null
+      } catch (e) {
+        commandsError.value = (e as Error).message
+      } finally {
+        isLoadingCommands.value = false
+        commandsInFlight = null
+      }
+    })()
+
+    await commandsInFlight
+  }
 
   const refreshFromBackend = async () => {
     if (refreshInFlight) {
@@ -140,6 +174,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
       isInitialized.value = true
       subscribeSettingsChanged()
+      void loadCommandsOnce()
     } catch (e) {
       error.value = (e as Error).message
     } finally {
@@ -189,10 +224,15 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     appSettings,
+    commandDescriptors,
     isLoading,
+    isLoadingCommands,
     error,
+    commandsError,
     isInitialized,
+    commandsLoaded,
     init,
+    loadCommandsOnce,
     updateSettings,
     clearError,
     dispose,

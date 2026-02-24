@@ -33,6 +33,7 @@ const { t } = useI18n()
 
 const {
   featureItems,
+  featureDescriptorMap,
   aspectRatios,
   resolutions,
   loadFeatureItems,
@@ -66,22 +67,14 @@ const floatingWindowThemeOptions = [
 ]
 
 const getFeatureItemLabel = (id: string): string => {
-  const labelMap: Record<string, string> = {
-    'screenshot.capture': t('menu.screenshot_capture'),
-    'screenshot.open_folder': t('menu.screenshot_open_folder'),
-    'preview.toggle': t('menu.preview_toggle'),
-    'overlay.toggle': t('menu.overlay_toggle'),
-    'letterbox.toggle': t('menu.letterbox_toggle'),
-    'recording.toggle': t('menu.recording_toggle'),
-    'motion_photo.toggle': t('menu.motion_photo_toggle'),
-    'replay_buffer.toggle': t('menu.replay_buffer_toggle'),
-    'replay_buffer.save': t('menu.replay_buffer_save'),
-    'window.reset': t('menu.window_reset'),
-    'app.float': t('menu.app_float'),
-    'app.main': t('menu.app_main'),
-    'app.exit': t('menu.app_exit'),
+  const descriptor = featureDescriptorMap.value.get(id)
+  if (descriptor?.i18nKey) {
+    const translated = t(descriptor.i18nKey)
+    if (translated && translated !== descriptor.i18nKey) {
+      return translated
+    }
   }
-  return labelMap[id] || id
+  return id
 }
 
 const validateAspectRatio = (value: string): boolean => {
