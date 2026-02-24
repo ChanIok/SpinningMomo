@@ -236,6 +236,8 @@
   "settings.appearance.theme.light": "Light",
   "settings.appearance.theme.dark": "Dark",
   "settings.appearance.theme.system": "Follow System",
+  "settings.appearance.webview.transparentBackground.label": "WebView Transparent Background",
+  "settings.appearance.webview.transparentBackground.description": "Enable transparent background effects. Disable to use an opaque theme-based background for better performance.",
   "settings.appearance.floatingWindowTheme.label": "Floating Window Theme",
   "settings.appearance.floatingWindowTheme.description": "Floating window (UI border) theme mode.",
   "settings.appearance.floatingWindowTheme.light": "Light",

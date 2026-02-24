@@ -1,5 +1,7 @@
 module;
 
+#include <d3d11.h>
+#include <dcomp.h>
 #include <wil/com.h>
 
 #include <WebView2.h>  // 必须放最后面
@@ -9,10 +11,18 @@ import std;
 import Core.WebView.Types;
 import <windows.h>;
 
-export namespace Core::WebView::State {
+namespace Core::WebView::State {
+
+// Composition Hosting 运行时资源
+export struct HostRuntime {
+  wil::com_ptr<ID3D11Device> d3d_device;
+  wil::com_ptr<IDCompositionDevice> dcomp_device;
+  wil::com_ptr<IDCompositionTarget> dcomp_target;
+  wil::com_ptr<IDCompositionVisual> dcomp_root_visual;
+};
 
 // WebView窗口状态
-struct WindowState {
+export struct WindowState {
   HWND webview_hwnd = nullptr;
   int width = 1200;
   int height = 800;
@@ -22,7 +32,7 @@ struct WindowState {
 };
 
 // WebView核心资源
-struct CoreResources {
+export struct CoreResources {
   wil::com_ptr<ICoreWebView2Environment> environment;
   wil::com_ptr<ICoreWebView2Controller> controller;
   wil::com_ptr<ICoreWebView2CompositionController> composition_controller;
@@ -40,13 +50,14 @@ struct CoreResources {
 
   // WebView 资源解析器注册表
   std::unique_ptr<Types::WebResolverRegistry> web_resolvers;
+  HostRuntime host_runtime;
 
   // 构造函数：初始化解析器注册表
   CoreResources() : web_resolvers(std::make_unique<Types::WebResolverRegistry>()) {}
 };
 
 // 消息通信状态
-struct MessageState {
+export struct MessageState {
   std::queue<std::string> pending_messages;
   std::unordered_map<std::string, std::string> message_responses;
   std::unordered_map<std::string, std::function<void(const std::string&)>> handlers;
@@ -55,7 +66,7 @@ struct MessageState {
 };
 
 // WebView配置
-struct WebViewConfig {
+export struct WebViewConfig {
   std::wstring user_data_folder = L"./webview_data";
   std::wstring initial_url = L"";  // 运行时根据编译模式自动设置
   std::vector<std::wstring> allowed_origins;
@@ -70,7 +81,7 @@ struct WebViewConfig {
 };
 
 // WebView完整状态
-struct WebViewState {
+export struct WebViewState {
   WindowState window;
   CoreResources resources;
   MessageState messaging;

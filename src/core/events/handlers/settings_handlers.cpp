@@ -7,6 +7,7 @@ import Core.Events;
 import Core.RPC.NotificationHub;
 import Core.State;
 import Core.Commands;
+import Core.WebView;
 import Features.Settings.Events;
 import Features.Settings.Types;
 import UI.FloatingWindow;
@@ -40,6 +41,14 @@ auto refresh_global_hotkeys(Core::State::AppState& state) -> void {
   Logger().info("Global hotkeys refreshed from latest settings");
 }
 
+auto has_webview_background_mode_changes(const Features::Settings::Types::AppSettings& old_settings,
+                                         const Features::Settings::Types::AppSettings& new_settings)
+    -> bool {
+  return old_settings.ui.webview_window.enable_transparent_background !=
+             new_settings.ui.webview_window.enable_transparent_background ||
+         old_settings.ui.web_theme.mode != new_settings.ui.web_theme.mode;
+}
+
 // 处理设置变更事件
 auto handle_settings_changed(Core::State::AppState& state,
                              const Features::Settings::Events::SettingsChangeEvent& event) -> void {
@@ -51,6 +60,10 @@ auto handle_settings_changed(Core::State::AppState& state,
 
     if (has_hotkey_changes(event.data.old_settings, event.data.new_settings)) {
       refresh_global_hotkeys(state);
+    }
+
+    if (has_webview_background_mode_changes(event.data.old_settings, event.data.new_settings)) {
+      Core::WebView::apply_background_mode_from_settings(state);
     }
 
     Core::RPC::NotificationHub::send_notification(state, "settings.changed");

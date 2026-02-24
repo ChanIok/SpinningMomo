@@ -7,6 +7,7 @@ import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import {
   Item,
   ItemContent,
@@ -42,6 +43,7 @@ const {
   updateOverlayOpacity,
   updateOverlayStartColor,
   updateOverlayEndColor,
+  updateWebViewTransparentBackground,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
@@ -163,6 +165,14 @@ const handleThemeChange = async (themeMode: string) => {
     await setTheme(themeMode as WebThemeMode)
   } catch (error) {
     console.error('Failed to update theme:', error)
+  }
+}
+
+const handleWebViewTransparentBackgroundChange = async (enabled: boolean) => {
+  try {
+    await updateWebViewTransparentBackground(enabled)
+  } catch (error) {
+    console.error('Failed to update WebView transparent background setting:', error)
   }
 }
 
@@ -440,6 +450,25 @@ const handleClearError = () => {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.webview.transparentBackground.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.webview.transparentBackground.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.ui.webviewWindow.enableTransparentBackground"
+              @update:model-value="
+                (value) => handleWebViewTransparentBackgroundChange(Boolean(value))
+              "
+            />
           </ItemActions>
         </Item>
       </div>

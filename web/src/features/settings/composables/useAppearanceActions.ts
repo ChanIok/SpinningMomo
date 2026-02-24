@@ -40,6 +40,11 @@ export const useAppearanceActions = () => {
         floatingWindowColors: DEFAULT_APP_SETTINGS.ui.floatingWindowColors,
         floatingWindowThemeMode: DEFAULT_APP_SETTINGS.ui.floatingWindowThemeMode,
         webTheme: DEFAULT_APP_SETTINGS.ui.webTheme,
+        webviewWindow: {
+          ...appSettings.value.ui.webviewWindow,
+          enableTransparentBackground:
+            DEFAULT_APP_SETTINGS.ui.webviewWindow.enableTransparentBackground,
+        },
         background: DEFAULT_APP_SETTINGS.ui.background,
       },
     })
@@ -51,6 +56,11 @@ export const useAppearanceActions = () => {
       ui: {
         ...appSettings.value.ui,
         webTheme: DEFAULT_APP_SETTINGS.ui.webTheme,
+        webviewWindow: {
+          ...appSettings.value.ui.webviewWindow,
+          enableTransparentBackground:
+            DEFAULT_APP_SETTINGS.ui.webviewWindow.enableTransparentBackground,
+        },
         background: DEFAULT_APP_SETTINGS.ui.background,
       },
     })
@@ -140,6 +150,19 @@ export const useAppearanceActions = () => {
     await updateBackgroundSettings({ overlayEndColor })
   }
 
+  const updateWebViewTransparentBackground = async (enableTransparentBackground: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        webviewWindow: {
+          ...appSettings.value.ui.webviewWindow,
+          enableTransparentBackground,
+        },
+      },
+    })
+  }
+
   const handleBackgroundImageSelect = async () => {
     try {
       const previousImagePath = appSettings.value.ui.background.imagePath
@@ -187,6 +210,7 @@ export const useAppearanceActions = () => {
     updateOverlayOpacity,
     updateOverlayStartColor,
     updateOverlayEndColor,
+    updateWebViewTransparentBackground,
     updateSurfaceOpacity,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,

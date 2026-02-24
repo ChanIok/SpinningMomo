@@ -31,6 +31,7 @@ export auto send_message(Core::State::AppState& state, const std::string& messag
 export auto post_message(Core::State::AppState& state, const std::string& message) -> void;
 export auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
                                      std::function<void(const std::string&)> handler) -> void;
+export auto apply_background_mode_from_settings(Core::State::AppState& state) -> void;
 
 // Composition hosting 输入转发
 export auto forward_mouse_message(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wparam,

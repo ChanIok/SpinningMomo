@@ -236,6 +236,8 @@
   "settings.appearance.theme.light": "浅色",
   "settings.appearance.theme.dark": "深色",
   "settings.appearance.theme.system": "跟随系统",
+  "settings.appearance.webview.transparentBackground.label": "WebView 透明背景",
+  "settings.appearance.webview.transparentBackground.description": "启用后可显示透明背景效果；关闭后将使用随主题切换的不透明底色以提升性能。",
   "settings.appearance.floatingWindowTheme.label": "浮窗主题",
   "settings.appearance.floatingWindowTheme.description": "浮窗（UI 边框）的主题模式。",
   "settings.appearance.floatingWindowTheme.light": "浅色",

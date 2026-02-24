@@ -192,6 +192,7 @@ export struct AppSettings {
       int height = 800;
       int x = -1;
       int y = -1;
+      bool enable_transparent_background = false;
     } webview_window;
 
     // Web UI 设置

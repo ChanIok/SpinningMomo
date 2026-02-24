@@ -208,6 +208,7 @@ export interface AppSettings {
       height: number
       x: number
       y: number
+      enableTransparentBackground: boolean
     }
 
     // Web UI 设置
@@ -342,6 +343,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       height: 800,
       x: -1,
       y: -1,
+      enableTransparentBackground: false,
     },
     webTheme: {
       mode: 'system',
