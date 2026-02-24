@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { isWebView } from '@/core/env'
 import { SidebarProvider } from '@/components/ui/sidebar'
@@ -10,27 +11,30 @@ import 'vue-sonner/style.css'
 
 const route = useRoute()
 const showHeader = isWebView()
-const isHome = () => route.name === 'home'
+const isHome = computed(() => route.name === 'home')
 </script>
 
 <template>
   <SidebarProvider>
     <div class="relative h-screen w-screen overflow-hidden bg-transparent">
       <div class="pointer-events-none absolute inset-0 z-0">
-        <div class="app-background-image absolute inset-0" />
-        <div v-if="isHome()" class="app-background-overlay absolute inset-y-0 left-0 w-14" />
+        <div
+          class="app-background-image absolute inset-0"
+          :class="[isHome && 'app-background-image-no-blur']"
+        />
+        <div v-if="isHome" class="app-background-overlay absolute inset-y-0 left-0 w-14" />
         <div v-else class="app-background-overlay absolute inset-0" />
       </div>
 
       <div class="relative z-10 flex h-full w-full flex-row">
         <!-- 左侧 ActivityBar -->
-        <ActivityBar />
+        <ActivityBar :is-home="isHome" />
 
         <!-- 右侧：Header + 主内容区 -->
         <div
           class="relative flex min-h-0 flex-1 flex-col overflow-hidden text-foreground"
           :class="[
-            !isHome() && 'surface-middle',
+            !isHome && 'surface-middle',
             showHeader ? 'rounded-lg' : 'rounded-tr-lg rounded-br-lg rounded-bl-lg',
           ]"
         >

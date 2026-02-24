@@ -24,7 +24,6 @@ export struct WebBackgroundSettings {
   std::string overlay_start_color = "#000000";
   std::string overlay_end_color = "#000000";
   double overlay_opacity = 0.0;  // 0.0 - 1.0
-  int surface_blur_amount = 20;  // 0 - 200
   double surface_opacity = 0.8;  // 0.0 - 1.0
 };
 
@@ -161,7 +160,7 @@ export struct AppSettings {
     struct FloatingWindowLayout {
       int base_item_height = 24;
       int base_title_height = 26;
-      int base_separator_height = 1;
+      int base_separator_height = 0;
       int base_font_size = 12;
       int base_text_padding = 12;
       int base_indicator_width = 3;

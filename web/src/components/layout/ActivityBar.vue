@@ -19,6 +19,15 @@ interface MenuItem {
   icon: any
 }
 
+withDefaults(
+  defineProps<{
+    isHome?: boolean
+  }>(),
+  {
+    isHome: false,
+  }
+)
+
 const baseMenuItems: (MenuItem | { type: 'divider' })[] = [
   { title: '主页', key: 'home', icon: Home },
   { title: '图库', key: 'gallery', icon: Images },
@@ -53,7 +62,10 @@ const handleMenuSelect = (key: string) => {
 </script>
 
 <template>
-  <Sidebar collapsible="none" class="w-14 bg-transparent pt-8">
+  <Sidebar
+    collapsible="none"
+    :class="['w-14 bg-transparent pt-8', isHome && 'activity-bar-background-blur']"
+  >
     <SidebarContent>
       <SidebarGroup>
         <SidebarGroupContent class="px-0">

@@ -120,10 +120,6 @@ export const useAppearanceActions = () => {
     await updateBackgroundSettings({ surfaceOpacity })
   }
 
-  const updateSurfaceBlur = async (surfaceBlurAmount: number) => {
-    await updateBackgroundSettings({ surfaceBlurAmount })
-  }
-
   const updateBackgroundOpacity = async (backgroundOpacity: number) => {
     await updateBackgroundSettings({ backgroundOpacity })
   }
@@ -192,7 +188,6 @@ export const useAppearanceActions = () => {
     updateOverlayStartColor,
     updateOverlayEndColor,
     updateSurfaceOpacity,
-    updateSurfaceBlur,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,
     getFloatingWindowColorsByTheme,

@@ -99,7 +99,6 @@
   --route-transition-duration: 180ms;
   --route-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
   --surface-opacity: 1;
-  --surface-blur: 0px;
   --surface-bottom: #eceef2;
   --surface-middle: rgb(255 255 255 / 0.56);
   --surface-top: #fbfcfd;
@@ -192,8 +191,6 @@
       calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
     transparent
   );
-  -webkit-backdrop-filter: blur(var(--surface-blur, 0px));
-  backdrop-filter: blur(var(--surface-blur, 0px));
 }
 
 .surface-bottom {
@@ -222,6 +219,10 @@
   will-change: transform, filter, opacity;
 }
 
+.app-background-image-no-blur {
+  filter: none;
+}
+
 .app-background-overlay {
   background-image: linear-gradient(
     to bottom right,
@@ -230,6 +231,12 @@
   );
   opacity: var(--app-background-overlay-opacity, 0);
   transition: opacity 220ms ease;
+}
+
+.activity-bar-background-blur {
+  -webkit-backdrop-filter: blur(var(--app-background-blur, 0px));
+  backdrop-filter: blur(var(--app-background-blur, 0px));
+  background-color: rgb(0 0 0 / 0.01);
 }
 
 .route-scene {

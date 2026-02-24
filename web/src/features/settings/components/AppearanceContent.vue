@@ -26,7 +26,6 @@ import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { WebThemeMode } from '../types'
 import {
-  SURFACE_BLUR_RANGE,
   SURFACE_OPACITY_RANGE,
   BACKGROUND_BLUR_RANGE,
   BACKGROUND_OPACITY_RANGE,
@@ -44,7 +43,6 @@ const {
   updateOverlayStartColor,
   updateOverlayEndColor,
   updateSurfaceOpacity,
-  updateSurfaceBlur,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
 } = useAppearanceActions()
@@ -84,15 +82,6 @@ const handleSurfaceOpacityChange = async (val: number[] | undefined) => {
     await updateSurfaceOpacity(val[0]!)
   } catch (error) {
     console.error('Failed to update surface opacity:', error)
-  }
-}
-
-const handleSurfaceBlurAmountChange = async (val: number[] | undefined) => {
-  if (!val || val.length === 0) return
-  try {
-    await updateSurfaceBlur(val[0]!)
-  } catch (error) {
-    console.error('Failed to update surface blur amount:', error)
   }
 }
 
@@ -386,32 +375,6 @@ const handleClearError = () => {
                 />
                 <span class="w-12 text-sm text-muted-foreground">
                   {{ (appSettings.ui.background.surfaceOpacity * 100).toFixed(0) }}%
-                </span>
-              </div>
-            </ItemActions>
-          </Item>
-
-          <Item variant="surface" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.appearance.background.surfaceBlurAmount.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.appearance.background.surfaceBlurAmount.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <div class="flex items-center gap-2">
-                <Slider
-                  :model-value="[appSettings.ui.background.surfaceBlurAmount]"
-                  @update:model-value="handleSurfaceBlurAmountChange"
-                  :min="SURFACE_BLUR_RANGE.MIN"
-                  :max="SURFACE_BLUR_RANGE.MAX"
-                  :step="SURFACE_BLUR_RANGE.STEP"
-                  class="w-36"
-                />
-                <span class="w-12 text-sm text-muted-foreground">
-                  {{ appSettings.ui.background.surfaceBlurAmount }}px
                 </span>
               </div>
             </ItemActions>

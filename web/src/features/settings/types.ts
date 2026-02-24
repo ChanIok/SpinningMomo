@@ -38,7 +38,6 @@ export interface WebBackgroundSettings {
   overlayStartColor: string
   overlayEndColor: string
   overlayOpacity: number
-  surfaceBlurAmount: number
   surfaceOpacity: number
 }
 
@@ -326,7 +325,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     floatingWindowLayout: {
       baseItemHeight: 24,
       baseTitleHeight: 26,
-      baseSeparatorHeight: 1,
+      baseSeparatorHeight: 0,
       baseFontSize: 12,
       baseTextPadding: 12,
       baseIndicatorWidth: 3,
@@ -355,7 +354,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       overlayStartColor: '#000000',
       overlayEndColor: '#000000',
       overlayOpacity: 0,
-      surfaceBlurAmount: 20,
       surfaceOpacity: 0.8,
     },
   },

@@ -2,78 +2,138 @@
 
 ## 环境要求
 
-### 必需软件
-- **Visual Studio 2022** - 包含"使用C++的桌面开发"工作负载，确保包含C++模块支持
-- **Node.js** - 前端构建
-- **Xmake** - 构建系统
+| 工具 | 要求 | 说明 |
+|------|------|------|
+| **Visual Studio 2022+** | 含「使用 C++ 的桌面开发」工作负载 | 需在工作负载中额外勾选「**C++ 模块（针对标准库的 MSVC v143）**」|
+| **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
+| **xmake** | 最新版 | C++ 构建系统，管理 vcpkg 依赖 |
+| **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
+| **Python 3** | 含 `pip` | 用于生成 HarmonyOS 字体子集 |
 
-### 安装 Xmake
-```bash
-# Windows (使用 PowerShell)
+### 安装 xmake
+
+```powershell
+# PowerShell（推荐）
 iwr -useb https://xmake.io/psget.txt | iex
 
-# 或者下载安装包
-# 访问 https://xmake.io/#/getting_started?id=installation
+# 或前往官网下载安装包
+# https://xmake.io/#/getting_started?id=installation
 ```
 
-## vcpkg 配置
+> xmake 会通过 `xmake-requires.lock` 自动调用 vcpkg 下载和编译 C++ 依赖，**无需手动安装 vcpkg**。
 
-### 安装 vcpkg
-```bash
-git clone https://github.com/microsoft/vcpkg.git
-cd vcpkg
-./bootstrap-vcpkg.bat
+---
+
+## 依赖准备
+
+### 1. 获取第三方依赖
+
+```powershell
+.\scripts\fetch-third-party.ps1
 ```
 
-### 启用 vcpkg 集成
+### 2. 安装 npm 依赖
+
 ```bash
-./vcpkg integrate install
-```
-
-## 构建流程
-
-### 快速构建
-```bash
-xmake build-all
-```
-
-此命令会自动完成以下步骤：
-1. 配置并构建release版本
-2. 构建Web应用
-3. 复制Web资源到输出目录
-
-### 分步构建
-
-#### 1. 安装前端依赖
-```bash
-cd web
+# 根目录（构建脚本依赖）
 npm install
+
+# Web 前端依赖
+cd web && npm ci
 ```
 
-#### 2. 构建项目
-```bash
-# 构建release版本
-xmake config -m release
-xmake build
+### 3. 生成字体子集（可选，用于内嵌 HarmonyOS 字体）
 
-# 构建web应用
-cd web
-npm run build
-
-# 复制web资源
-mkdir -p build/release/resources/web
-cp -r web/dist/* build/release/resources/web/
-```
-
-### 构建选项说明
-- **release**: 发布版本，优化性能
-- **debug**: 调试版本，包含调试信息
-
-构建完成后，可执行文件位于：
-```
-build/release/SpinningMomo.exe
+```powershell
+pip install fonttools brotli zopfli
+npm run font:build:harmonyos
 ```
 
 ---
 
-此构建指南基于项目当前的xmake配置，如需调整构建选项请参考 `xmake.lua` 和 `tasks/build-all.lua`。
+## 构建
+
+### 完整构建（推荐）
+
+```bash
+# 一键完成：C++ Release + Web 前端 + 打包 dist/
+npm run build:ci
+```
+
+产物位于 `dist/` 目录。
+
+### 分步构建
+
+```bash
+# C++ 后端 - Debug（日常开发）
+xmake config -m debug
+xmake build
+
+# C++ 后端 - Release
+xmake release    # 构建 release 后自动恢复 debug 配置
+
+# Web 前端
+cd web && npm run build
+
+# 打包 dist/（汇总 exe + web 资源）
+npm run build:prepare
+```
+
+### 构建输出路径
+
+| 构建类型 | 路径 |
+|----------|------|
+| Debug | `build\windows\x64\debug\` |
+| Release | `build\windows\x64\release\` |
+| 打包产物 | `dist\` |
+
+---
+
+## 打包发布产物
+
+### 便携版（ZIP）
+
+```bash
+npm run build:portable
+```
+
+### MSI 安装包
+
+需要额外安装 WiX Toolset v6：
+
+```bash
+dotnet tool install --global wix --version 6.0.2
+wix extension add WixToolset.UI.wixext/6.0.2 --global
+wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
+```
+
+然后运行：
+
+```powershell
+.\scripts\build-msi.ps1 -Version "x.y.z"
+```
+
+---
+
+## Web 前端开发
+
+启动开发服务器（需 C++ 后端同时运行）：
+
+```bash
+cd web && npm run dev
+```
+
+Vite 开发服务器会将 `/rpc` 和 `/static` 代理到 C++ 后端（`localhost:51206`）。
+
+---
+
+## 代码生成脚本
+
+修改以下源文件后需重新运行对应脚本：
+
+| 修改内容 | 需运行的脚本 |
+|----------|-------------|
+| `src/migrations/*.sql` | `node scripts/generate-migrations.js` |
+| `src/locales/*.json` | `node scripts/generate-embedded-locales.js` |
+
+---
