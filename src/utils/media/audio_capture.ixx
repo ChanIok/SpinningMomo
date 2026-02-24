@@ -41,6 +41,9 @@ export struct AudioCaptureContext {
 // 音频数据包回调: (audio_data, num_frames, bytes_per_frame, timestamp_100ns)
 export using AudioPacketCallback = std::function<void(const BYTE*, UINT32, UINT32, std::int64_t)>;
 
+// 是否支持 Process Loopback API（Windows 10 2004+）
+export auto is_process_loopback_supported() -> bool;
+
 // 初始化音频捕获（根据音频源类型选择不同的初始化方式）
 export auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32_t process_id)
     -> std::expected<void, std::string>;

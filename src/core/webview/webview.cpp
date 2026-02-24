@@ -101,6 +101,24 @@ auto to_non_client_hit_test(COREWEBVIEW2_NON_CLIENT_REGION_KIND kind) -> LRESULT
 
 namespace Core::WebView {
 
+auto get_runtime_version() -> std::expected<std::string, std::string> {
+  LPWSTR version_raw = nullptr;
+  auto hr = GetAvailableCoreWebView2BrowserVersionString(nullptr, &version_raw);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("GetAvailableCoreWebView2BrowserVersionString failed: 0x{:08X}",
+                    static_cast<unsigned>(hr)));
+  }
+
+  if (!version_raw) {
+    return std::unexpected("WebView2 runtime version string is empty");
+  }
+
+  std::string version = Utils::String::ToUtf8(version_raw);
+  CoTaskMemFree(version_raw);
+  return version;
+}
+
 auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;

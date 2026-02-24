@@ -16,21 +16,6 @@ import <wrl/implements.h>;
 
 namespace {
 
-// 版本检测：是否支持 Process Loopback API (Windows 10 2004+)
-auto is_process_loopback_supported() -> bool {
-  OSVERSIONINFOEXW osvi = {sizeof(osvi)};
-  osvi.dwMajorVersion = 10;
-  osvi.dwMinorVersion = 0;
-  osvi.dwBuildNumber = 19041;  // Windows 10 2004
-
-  DWORDLONG mask = 0;
-  VER_SET_CONDITION(mask, VER_MAJORVERSION, VER_GREATER_EQUAL);
-  VER_SET_CONDITION(mask, VER_MINORVERSION, VER_GREATER_EQUAL);
-  VER_SET_CONDITION(mask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
-
-  return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, mask);
-}
-
 // Process Loopback 激活回调类
 class ProcessLoopbackActivator
     : public Microsoft::WRL::RuntimeClass<
@@ -355,6 +340,20 @@ auto audio_capture_loop(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
 }  // namespace
 
 namespace Utils::Media::AudioCapture {
+
+auto is_process_loopback_supported() -> bool {
+  OSVERSIONINFOEXW osvi = {sizeof(osvi)};
+  osvi.dwMajorVersion = 10;
+  osvi.dwMinorVersion = 0;
+  osvi.dwBuildNumber = 19041;  // Windows 10 2004
+
+  DWORDLONG mask = 0;
+  VER_SET_CONDITION(mask, VER_MAJORVERSION, VER_GREATER_EQUAL);
+  VER_SET_CONDITION(mask, VER_MINORVERSION, VER_GREATER_EQUAL);
+  VER_SET_CONDITION(mask, VER_BUILDNUMBER, VER_GREATER_EQUAL);
+
+  return VerifyVersionInfoW(&osvi, VER_MAJORVERSION | VER_MINORVERSION | VER_BUILDNUMBER, mask);
+}
 
 auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32_t process_id)
     -> std::expected<void, std::string> {

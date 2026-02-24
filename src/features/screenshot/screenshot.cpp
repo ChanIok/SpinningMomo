@@ -6,7 +6,7 @@ module Features.Screenshot;
 
 import std;
 import Core.State;
-import Core.State.AppInfo;
+import Core.State.RuntimeInfo;
 import Features.Screenshot.State;
 import Features.Settings.State;
 import Utils.Logger;
@@ -328,7 +328,7 @@ auto initialize_d3d_resources_only(Core::State::AppState& app_state)
     Logger().debug("Initializing D3D resources only");
 
     // 检查系统支持
-    if (!app_state.app_info->is_capture_supported) {
+    if (!app_state.runtime_info->is_capture_supported) {
       return std::unexpected("Windows Graphics Capture is not supported");
     }
 

@@ -24,8 +24,8 @@ namespace Core::WebView::State {
 export struct WebViewState;
 }
 
-namespace Core::State::AppInfo {
-export struct AppInfoState;
+namespace Core::State::RuntimeInfo {
+export struct RuntimeInfoState;
 }
 
 namespace Features::Settings::State {
@@ -112,7 +112,7 @@ export struct AppState {
   std::unique_ptr<Core::Events::State::EventsState> events;
   std::unique_ptr<Core::I18n::State::I18nState> i18n;
   std::unique_ptr<Core::WebView::State::WebViewState> webview;
-  std::unique_ptr<Core::State::AppInfo::AppInfoState> app_info;
+  std::unique_ptr<Core::State::RuntimeInfo::RuntimeInfoState> runtime_info;
   std::unique_ptr<Core::Database::State::DatabaseState> database;
   std::unique_ptr<Core::HttpServer::State::HttpServerState> http_server;
   std::unique_ptr<Core::WorkerPool::State::WorkerPoolState> worker_pool;

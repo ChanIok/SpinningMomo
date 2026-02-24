@@ -6,7 +6,7 @@ module Features.Overlay.Capture;
 
 import std;
 import Core.State;
-import Core.State.AppInfo;
+import Core.State.RuntimeInfo;
 import Features.Overlay;
 import Features.Overlay.State;
 import Features.Overlay.Rendering;
@@ -111,7 +111,7 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
   }
 
   // 检查是否支持捕获
-  if (!state.app_info->is_capture_supported) {
+  if (!state.runtime_info->is_capture_supported) {
     return std::unexpected("Capture not supported on this system");
   }
 

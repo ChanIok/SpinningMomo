@@ -41,6 +41,10 @@ using FrameCallback = std::function<void(Direct3D11CaptureFrame)>;
 export auto create_winrt_device(ID3D11Device* d3d_device)
     -> std::expected<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice, std::string>;
 
+// 检测 WGC 会话属性支持能力
+export auto is_cursor_capture_control_supported() -> bool;
+export auto is_border_control_supported() -> bool;
+
 // 创建捕获会话
 export auto create_capture_session(
     HWND target_window,

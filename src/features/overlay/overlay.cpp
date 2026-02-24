@@ -4,7 +4,7 @@ module Features.Overlay;
 
 import std;
 import Core.State;
-import Core.State.AppInfo;
+import Core.State.RuntimeInfo;
 import Features.Overlay.State;
 import Features.Overlay.Window;
 import Features.Overlay.Rendering;
@@ -29,7 +29,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
   }
 
   // 检查是否支持捕捉
-  if (!state.app_info->is_capture_supported) {
+  if (!state.runtime_info->is_capture_supported) {
     return std::unexpected("Capture not supported on this system");
   }
 

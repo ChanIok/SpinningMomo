@@ -6,6 +6,7 @@ import std;
 import Core.State;
 import Core.RPC.Endpoints.Dialog;
 import Core.RPC.Endpoints.File;
+import Core.RPC.Endpoints.RuntimeInfo;
 import Core.RPC.Endpoints.Settings;
 import Core.RPC.Endpoints.Registry;
 import Core.RPC.Endpoints.Update;
@@ -23,6 +24,9 @@ auto register_all_endpoints(Core::State::AppState& state) -> void {
 
   // 注册文件操作端点
   Endpoints::File::register_all(state);
+
+  // 注册应用运行时信息端点
+  Endpoints::RuntimeInfo::register_all(state);
 
   // 注册设置端点
   Endpoints::Settings::register_all(state);

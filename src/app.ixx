@@ -31,7 +31,4 @@ export class Application {
   std::unique_ptr<Core::State::AppState> m_app_state;
 
   Vendor::Windows::HINSTANCE m_h_instance = nullptr;
-
-  // 内部辅助函数
-  auto LogSystemInfo() -> void;
 };

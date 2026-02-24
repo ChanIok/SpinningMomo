@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { settingsApi } from './api'
 import { featuresApi } from './featuresApi'
-import type { AppSettings, FeatureDescriptor } from './types'
+import type { AppSettings, FeatureDescriptor, RuntimeCapabilities } from './types'
 import { DEFAULT_APP_SETTINGS } from './types'
 import { useI18n } from '@/composables/useI18n'
 import type { Locale } from '@/core/i18n/types'
@@ -64,6 +64,7 @@ const buildPatch = (before: unknown, after: unknown): unknown | typeof NO_CHANGE
 
 export const useSettingsStore = defineStore('settings', () => {
   const appSettings = ref<AppSettings>(DEFAULT_APP_SETTINGS)
+  const runtimeCapabilities = ref<RuntimeCapabilities | null>(null)
   const commandDescriptors = ref<FeatureDescriptor[]>([])
   const isLoading = ref(false)
   const isLoadingCommands = ref(false)
@@ -165,8 +166,12 @@ export const useSettingsStore = defineStore('settings', () => {
     isLoading.value = true
     error.value = null
     try {
-      const settings = await settingsApi.get()
+      const [settings, capabilities] = await Promise.all([
+        settingsApi.get(),
+        settingsApi.getRuntimeCapabilities().catch(() => null),
+      ])
       appSettings.value = settings
+      runtimeCapabilities.value = capabilities
 
       // 同步语言设置到 i18n
       const language = settings.app.language.current as Locale
@@ -224,6 +229,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     appSettings,
+    runtimeCapabilities,
     commandDescriptors,
     isLoading,
     isLoadingCommands,

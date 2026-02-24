@@ -4,7 +4,7 @@ module Features.Preview.Window;
 
 import std;
 import Core.State;
-import Core.State.AppInfo;
+import Core.State.RuntimeInfo;
 import Features.Preview.State;
 import Features.Preview.Types;
 import Features.Preview.Interaction;

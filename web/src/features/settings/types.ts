@@ -12,6 +12,25 @@ export interface MenuItem {
   order?: number // 显示顺序（-1 表示未启用/无顺序）
 }
 
+// 运行时能力信息（来自后端 runtime_info.get）
+export interface RuntimeCapabilities {
+  version: string
+  majorVersion: number
+  minorVersion: number
+  patchVersion: number
+  buildNumber: number
+  osName: string
+  osMajorVersion: number
+  osMinorVersion: number
+  osBuildNumber: number
+  isWebview2Available: boolean
+  webview2Version: string
+  isCaptureSupported: boolean
+  isCursorCaptureControlSupported: boolean
+  isBorderControlSupported: boolean
+  isProcessLoopbackAudioSupported: boolean
+}
+
 // Web 主题模式（页面主题）
 export type WebThemeMode = 'light' | 'dark' | 'system'
 

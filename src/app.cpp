@@ -4,28 +4,14 @@ module App;
 
 import std;
 import Core.Initializer;
-import Core.State;
-import Core.State.AppInfo;
-import Features.Letterbox;
-import Features.Overlay;
-import Features.Preview;
-import Features.Screenshot;
-import Features.Settings;
-import Features.Update;
-import UI.FloatingWindow;
-import UI.FloatingWindow.State;
-import UI.WebViewWindow;
-import UI.TrayIcon;
-import UI.ContextMenu;
-import Core.WebView;
-import Core.HttpServer;
+import Core.RuntimeInfo;
 import Core.Shutdown;
-import Utils.Logger;
-import Utils.String;
-import Utils.System;
-import Vendor.Windows;
+import Core.State;
 import Core.I18n;
 import Core.I18n.Types;
+import UI.FloatingWindow.State;
+import Utils.Logger;
+import Vendor.Windows;
 
 Application::Application() = default;
 Application::~Application() {
@@ -43,7 +29,7 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
 
     m_app_state->floating_window->window.instance = m_h_instance;
 
-    LogSystemInfo();
+    Core::RuntimeInfo::collect(*m_app_state);
 
     // 测试嵌入式多语言系统
     Logger().info("=== Testing Embedded I18n System ===");
@@ -93,29 +79,4 @@ auto Application::Run() -> int {
   }
 
   return static_cast<int>(msg.wParam);
-}
-
-auto Application::LogSystemInfo() -> void {
-  // 使用 Utils::System 模块获取系统版本信息
-  if (auto version_result = Utils::System::get_windows_version()) {
-    const auto& version = version_result.value();
-    Logger().info("OS Version: {}.{}.{}", version.major_version, version.minor_version,
-                  version.build_number);
-
-    // 填充系统信息到 AppInfoState
-    if (m_app_state && m_app_state->app_info) {
-      m_app_state->app_info->os_major_version = version.major_version;
-      m_app_state->app_info->os_minor_version = version.minor_version;
-      m_app_state->app_info->os_build_number = version.build_number;
-      m_app_state->app_info->os_name = Utils::System::get_windows_name(version);
-
-      // 设置捕获支持状态 (Windows 10 1903 build 18362 or later)
-      m_app_state->app_info->is_capture_supported =
-          (version.major_version > 10) ||
-          (version.major_version == 10 && version.build_number >= 18362);
-      Logger().info("Is capture supported: {}", m_app_state->app_info->is_capture_supported);
-    }
-  } else {
-    Logger().error("Failed to get OS version: {}", version_result.error());
-  }
 }

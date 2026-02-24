@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useSettingsStore } from '../store'
 import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
@@ -21,12 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
+import { TriangleAlert } from 'lucide-vue-next'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { call } from '@/core/rpc'
 
 const store = useSettingsStore()
-const { appSettings, error, isInitialized } = storeToRefs(store)
+const { appSettings, runtimeCapabilities, error, isInitialized } = storeToRefs(store)
 const {
   updateOutputDir,
   updateGameAlbumPath,
@@ -79,6 +81,18 @@ const inputMotionPhotoAudioBitrateKbps = ref(
 const inputMotionPhotoQuality = ref(appSettings.value?.features?.motionPhoto?.quality || 100)
 
 const inputReplayBufferDuration = ref(appSettings.value?.features?.replayBuffer?.duration || 30)
+
+const showCursorCaptureHint = computed(() => {
+  return runtimeCapabilities.value
+    ? !runtimeCapabilities.value.isCursorCaptureControlSupported
+    : false
+})
+
+const showGameOnlyAudioHint = computed(() => {
+  return runtimeCapabilities.value
+    ? !runtimeCapabilities.value.isProcessLoopbackAudioSupported
+    : false
+})
 
 const handleSelectOutputDir = async () => {
   isSelectingOutputDir.value = true
@@ -520,8 +534,20 @@ const handleResetSettings = async () => {
 
           <Item variant="surface" size="sm">
             <ItemContent>
-              <ItemTitle>
+              <ItemTitle class="flex items-center gap-1">
                 {{ t('settings.function.recording.captureCursor.label') }}
+                <TooltipProvider v-if="showCursorCaptureHint" :delay-duration="300">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span class="inline-flex cursor-help text-amber-500">
+                        <TriangleAlert class="size-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent class="max-w-xs">
+                      {{ t('settings.function.recording.captureCursor.unsupportedHint') }}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </ItemTitle>
               <ItemDescription>
                 {{ t('settings.function.recording.captureCursor.description') }}
@@ -537,8 +563,20 @@ const handleResetSettings = async () => {
 
           <Item variant="surface" size="sm">
             <ItemContent>
-              <ItemTitle>
+              <ItemTitle class="flex items-center gap-1">
                 {{ t('settings.function.recording.audioSource.label') }}
+                <TooltipProvider v-if="showGameOnlyAudioHint" :delay-duration="300">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span class="inline-flex cursor-help text-amber-500">
+                        <TriangleAlert class="size-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent class="max-w-xs">
+                      {{ t('settings.function.recording.audioSource.gameOnlyFallbackHint') }}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </ItemTitle>
               <ItemDescription>
                 {{ t('settings.function.recording.audioSource.description') }}
@@ -793,8 +831,20 @@ const handleResetSettings = async () => {
 
           <Item variant="surface" size="sm">
             <ItemContent>
-              <ItemTitle>
+              <ItemTitle class="flex items-center gap-1">
                 {{ t('settings.function.motionPhoto.audioSource.label') }}
+                <TooltipProvider v-if="showGameOnlyAudioHint" :delay-duration="300">
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <span class="inline-flex cursor-help text-amber-500">
+                        <TriangleAlert class="size-4" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent class="max-w-xs">
+                      {{ t('settings.function.recording.audioSource.gameOnlyFallbackHint') }}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </ItemTitle>
               <ItemDescription>
                 {{ t('settings.function.motionPhoto.audioSource.description') }}

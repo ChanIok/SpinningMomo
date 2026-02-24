@@ -17,6 +17,26 @@ import <windows.h>;
 
 namespace Utils::Graphics::Capture {
 
+auto is_cursor_capture_control_supported() -> bool {
+  try {
+    return winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsCursorCaptureEnabled");
+  } catch (...) {
+    return false;
+  }
+}
+
+auto is_border_control_supported() -> bool {
+  try {
+    return winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"IsBorderRequired");
+  } catch (...) {
+    return false;
+  }
+}
+
 auto create_winrt_device(ID3D11Device* d3d_device)
     -> std::expected<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice, std::string> {
   if (!d3d_device) {
@@ -113,9 +133,7 @@ auto create_capture_session(
   }
 
   // 尝试禁用光标捕获（如果支持）
-  if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
-          winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
-          L"IsCursorCaptureEnabled")) {
+  if (is_cursor_capture_control_supported()) {
     session.session.IsCursorCaptureEnabled(options.capture_cursor);
   } else if (!options.capture_cursor) {
     // 如果不支持 IsCursorCaptureEnabled，且要求隐藏光标，则标记需要手动隐藏光标
@@ -126,9 +144,7 @@ auto create_capture_session(
   }
 
   // 尝试禁用边框（如果支持）
-  if (winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
-          winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
-          L"IsBorderRequired")) {
+  if (is_border_control_supported()) {
     session.session.IsBorderRequired(options.border_required);
   }
 

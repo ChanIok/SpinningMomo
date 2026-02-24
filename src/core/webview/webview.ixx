@@ -15,6 +15,9 @@ namespace Core::WebView {
 export auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string>;
 
+// 检测本机 WebView2 Runtime 版本
+export auto get_runtime_version() -> std::expected<std::string, std::string>;
+
 // 销毁函数
 export auto shutdown(Core::State::AppState& state) -> void;
 

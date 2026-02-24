@@ -1,12 +1,16 @@
 import { call } from '@/core/rpc'
 import { isWebView } from '@/core/env'
-import type { AppSettings } from './types'
+import type { AppSettings, RuntimeCapabilities } from './types'
 import { BACKGROUND_IMAGE_NAME, BACKGROUND_RESOURCES_DIR, BACKGROUND_WEB_DIR } from './constants'
 import { isManagedBackgroundPath, toResourceFilePath } from './backgroundPath'
 
 export const settingsApi = {
   get: async (): Promise<AppSettings> => {
     return call<AppSettings>('settings.get')
+  },
+
+  getRuntimeCapabilities: async (): Promise<RuntimeCapabilities> => {
+    return call<RuntimeCapabilities>('runtime_info.get')
   },
 
   patch: async (patch: Partial<AppSettings>): Promise<void> => {

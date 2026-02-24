@@ -10,7 +10,7 @@ import Core.Events.State;
 import Core.HttpServer.State;
 import Core.I18n.State;
 import Core.RPC.State;
-import Core.State.AppInfo;
+import Core.State.RuntimeInfo;
 import Core.WebView.State;
 import Core.WorkerPool.State;
 import Features.Letterbox.State;
@@ -36,7 +36,7 @@ AppState::AppState()
       events(std::make_unique<Core::Events::State::EventsState>()),
       i18n(std::make_unique<Core::I18n::State::I18nState>()),
       webview(std::make_unique<Core::WebView::State::WebViewState>()),
-      app_info(std::make_unique<Core::State::AppInfo::AppInfoState>()),
+      runtime_info(std::make_unique<Core::State::RuntimeInfo::RuntimeInfoState>()),
       database(std::make_unique<Core::Database::State::DatabaseState>()),
       http_server(std::make_unique<Core::HttpServer::State::HttpServerState>()),
       worker_pool(std::make_unique<Core::WorkerPool::State::WorkerPoolState>()),
