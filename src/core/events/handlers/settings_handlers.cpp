@@ -64,6 +64,13 @@ auto handle_settings_changed(Core::State::AppState& state,
     // 通知浮窗刷新UI以反映设置变更
     UI::FloatingWindow::refresh_from_settings(state);
 
+    if (!event.data.old_settings.app.onboarding.completed &&
+        event.data.new_settings.app.onboarding.completed) {
+      Logger().info("Onboarding completed, showing floating window and closing webview");
+      UI::FloatingWindow::show_window(state);
+      auto _ = UI::WebViewWindow::close_window(state);
+    }
+
     if (has_hotkey_changes(event.data.old_settings, event.data.new_settings)) {
       refresh_global_hotkeys(state);
     }

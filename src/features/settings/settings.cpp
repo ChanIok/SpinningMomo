@@ -26,6 +26,14 @@ auto get_settings_path() -> std::expected<std::filesystem::path, std::string> {
   return dir_result.value() / "settings.json";
 }
 
+auto should_show_onboarding(const Types::AppSettings& settings) -> bool {
+  if (!settings.app.onboarding.completed) {
+    return true;
+  }
+
+  return settings.app.onboarding.flow_version < Types::CURRENT_ONBOARDING_FLOW_VERSION;
+}
+
 // Migration专用：迁移settings文件到指定版本
 auto migrate_settings_file(const std::filesystem::path& file_path, int target_version)
     -> std::expected<void, std::string> {
@@ -106,6 +114,10 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       Logger().info("Settings file not found, creating default configuration");
 
       auto default_state = State::create_default_settings_state();
+      // 新安装用户首次启动应进入欢迎流程
+      default_state.raw.app.onboarding.completed = false;
+      default_state.raw.app.onboarding.flow_version = Types::CURRENT_ONBOARDING_FLOW_VERSION;
+      default_state.raw.plugins.infinity_nikki.enable = false;
 
       auto json_str = rfl::json::write(default_state.raw, rfl::json::pretty);
       std::ofstream file(settings_path.value());
@@ -200,8 +212,6 @@ auto notify_settings_changed(Core::State::AppState& app_state,
                      Features::Settings::Events::SettingsChangeEvent{change_data});
 }
 
-namespace {
-
 auto merge_patch_object(rfl::Generic::Object& target, const rfl::Generic::Object& patch) -> void {
   for (const auto& [key, patch_value] : patch) {
     auto patch_object = patch_value.to_object();
@@ -254,8 +264,6 @@ auto apply_settings_and_persist(Core::State::AppState& app_state,
       .message = "Settings updated successfully",
   };
 }
-
-}  // namespace
 
 auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string> {

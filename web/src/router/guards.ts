@@ -1,4 +1,6 @@
 import type { Router } from 'vue-router'
+import { useSettingsStore } from '@/features/settings/store'
+import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
 
 /**
  * 路由守卫配置
@@ -7,6 +9,23 @@ import type { Router } from 'vue-router'
 // 全局前置守卫
 export function setupRouterGuards(router: Router) {
   router.beforeEach((to, _from, next) => {
+    const settingsStore = useSettingsStore()
+    if (settingsStore.isInitialized) {
+      const onboarding = settingsStore.appSettings.app.onboarding
+      const needsOnboarding =
+        !onboarding.completed || onboarding.flowVersion < CURRENT_ONBOARDING_FLOW_VERSION
+
+      if (needsOnboarding && to.name !== 'welcome') {
+        next({ name: 'welcome', replace: true })
+        return
+      }
+
+      if (!needsOnboarding && to.name === 'welcome') {
+        next({ name: 'home', replace: true })
+        return
+      }
+    }
+
     // 设置页面标题
     if (to.meta?.title) {
       document.title = `${to.meta.title} - SpinningMomo`

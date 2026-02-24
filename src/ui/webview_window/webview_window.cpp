@@ -13,6 +13,9 @@ import UI.FloatingWindow.State;
 import UI.TrayIcon.Types;
 import Utils.Logger;
 import Vendor.Windows;
+import Vendor.ShellApi;
+import Core.State.RuntimeInfo;
+import Core.HttpServer.State;
 import <dwmapi.h>;
 import <windows.h>;
 import <windowsx.h>;
@@ -86,6 +89,20 @@ auto hide(Core::State::AppState& state) -> void {
 }
 
 auto activate_window(Core::State::AppState& state) -> void {
+  if (state.runtime_info && !state.runtime_info->is_webview2_available) {
+    Logger().warn("WebView2 runtime is unavailable. Opening in browser.");
+    std::string url = std::format("http://localhost:{}/", state.http_server->port);
+    std::wstring wurl(url.begin(), url.end());  // URL is ASCII
+
+    Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{.cbSize = sizeof(exec_info),
+                                                  .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+                                                  .lpVerb = L"open",
+                                                  .lpFile = wurl.c_str(),
+                                                  .nShow = Vendor::ShellApi::kSW_SHOWNORMAL};
+    Vendor::ShellApi::ShellExecuteExW(&exec_info);
+    return;
+  }
+
   if (auto result = show(state); !result) {
     Logger().error("Failed to activate WebView window: {}", result.error());
     return;
@@ -367,7 +384,7 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 注册窗口类
   register_window_class(state.floating_window->window.instance);
 
-  // 从设置读取持久化的尺寸和位置，默认 1200×800，位置居中
+  // 从设置读取持久化的尺寸和位置，位置居中
   int width = state.settings->raw.ui.webview_window.width;
   int height = state.settings->raw.ui.webview_window.height;
   int x = state.settings->raw.ui.webview_window.x;

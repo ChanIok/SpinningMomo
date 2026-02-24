@@ -9,7 +9,7 @@ includes("tasks/vs.lua")
 set_languages("c++23")
 
 -- 统一源文件编码
-add_cxflags("/utf-8")
+add_cxflags("/utf-8", "/bigobj")
 
 -- 设置运行时库
 set_runtimes(is_mode("debug") and "MD" or "MT")

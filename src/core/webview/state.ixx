@@ -24,8 +24,8 @@ export struct HostRuntime {
 // WebView窗口状态
 export struct WindowState {
   HWND webview_hwnd = nullptr;
-  int width = 1200;
-  int height = 800;
+  int width = 900;
+  int height = 600;
   int x = 0;
   int y = 0;
   bool is_visible = false;

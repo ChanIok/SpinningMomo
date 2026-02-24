@@ -6,6 +6,7 @@ import std;
 import Core.Async;
 import Core.WorkerPool;
 import Core.State;
+import Core.State.RuntimeInfo;
 import Core.HttpServer;
 import Core.Events;
 import Core.Events.State;
@@ -27,6 +28,7 @@ import Features.VirtualGamepad;
 import Features.Letterbox.State;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
+import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
 import Vendor.Windows;
@@ -110,8 +112,15 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       // 不返回错误，许应用继续运行
     }
 
-    // 默认显示窗口
-    UI::FloatingWindow::show_window(state);
+    const bool should_open_onboarding =
+        Features::Settings::should_show_onboarding(state.settings->raw);
+    if (should_open_onboarding) {
+      Logger().info("Onboarding required, attempting to open main UI window");
+      UI::WebViewWindow::activate_window(state);
+    } else {
+      // 默认显示悬浮窗
+      UI::FloatingWindow::show_window(state);
+    }
 
     // 注册所有命令的热键
     Core::Commands::register_all_hotkeys(state, state.floating_window->window.hwnd);

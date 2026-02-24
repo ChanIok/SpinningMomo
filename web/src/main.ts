@@ -6,6 +6,7 @@ import { setupRouterGuards } from './router/guards'
 import { initializeRPC } from '@/core/rpc'
 import { initI18n } from '@/core/i18n'
 import { useSettingsStore } from '@/features/settings/store'
+import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
 import { applyAppearanceToDocument, preloadBackgroundImage } from '@/features/settings/appearance'
 import './index.css'
 import App from './App.vue'
@@ -33,6 +34,13 @@ initializeRPC()
   // 然后初始化 settings store，它会自动同步后端的语言设置
   const settingsStore = useSettingsStore()
   await settingsStore.init()
+
+  const onboarding = settingsStore.appSettings.app.onboarding
+  const needsOnboarding =
+    !onboarding.completed || onboarding.flowVersion < CURRENT_ONBOARDING_FLOW_VERSION
+  if (needsOnboarding && router.currentRoute.value.name !== 'welcome') {
+    await router.replace('/welcome')
+  }
 
   // 在挂载前应用主题和背景，避免首屏闪烁
   applyAppearanceToDocument(settingsStore.appSettings)

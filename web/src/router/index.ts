@@ -3,6 +3,7 @@ import type { RouteRecordRaw } from 'vue-router'
 
 // 懒加载页面组件
 const HomePage = () => import('@/features/home/pages/HomePage.vue')
+const OnboardingPage = () => import('@/features/onboarding/pages/OnboardingPage.vue')
 const GalleryPage = () => import('@/features/gallery/pages/GalleryPage.vue')
 const SettingsPage = () => import('@/features/settings/pages/SettingsPage.vue')
 const AboutPage = () => import('@/features/about/pages/AboutPage.vue')
@@ -23,6 +24,14 @@ const routes: RouteRecordRaw[] = [
     component: HomePage,
     meta: {
       title: '首页',
+    },
+  },
+  {
+    path: '/welcome',
+    name: 'welcome',
+    component: OnboardingPage,
+    meta: {
+      title: '欢迎',
     },
   },
   {

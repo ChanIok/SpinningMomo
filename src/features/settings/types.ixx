@@ -9,6 +9,8 @@ namespace Features::Settings::Types {
 
 // 当前设置版本
 export constexpr int CURRENT_SETTINGS_VERSION = 1;
+// 当前欢迎流程版本（用于控制是否需要重新引导）
+export constexpr int CURRENT_ONBOARDING_FLOW_VERSION = 1;
 
 // Web 主题设置
 export struct WebThemeSettings {
@@ -22,8 +24,8 @@ export struct WebBackgroundSettings {
   int background_blur_amount = 0;                                    // 0 - 100
   double background_opacity = 1.0;                                   // 0.0 - 1.0
   std::vector<std::string> overlay_colors = {"#000000", "#000000"};  // 1 - 4
-  double overlay_opacity = 0.0;                                      // 0.0 - 1.0
-  double surface_opacity = 0.8;                                      // 0.0 - 1.0
+  double overlay_opacity = 0.8;                                      // 0.0 - 1.0
+  double surface_opacity = 1.0;                                      // 0.0 - 1.0
 };
 
 // 完整的应用设置（重构后的结构）
@@ -33,6 +35,13 @@ export struct AppSettings {
   // app 分组 - 应用核心设置
   struct App {
     bool always_run_as_admin = true;  // 始终以管理员权限运行
+
+    // 首次引导设置
+    struct Onboarding {
+      // 默认为 true，避免老用户升级时被强制进入引导；首次创建配置时会改写为 false
+      bool completed = true;
+      int flow_version = CURRENT_ONBOARDING_FLOW_VERSION;
+    } onboarding;
 
     // 快捷键设置
     // 修饰键值: MOD_ALT=1, MOD_CONTROL=2, MOD_SHIFT=4, MOD_WIN=8
@@ -187,8 +196,8 @@ export struct AppSettings {
     // WebView 主窗口尺寸和位置（持久化）
     // x/y 为 -1 表示未保存过，首次启动时居中
     struct WebViewWindow {
-      int width = 1200;
-      int height = 800;
+      int width = 900;
+      int height = 600;
       int x = -1;
       int y = -1;
       bool enable_transparent_background = false;
@@ -198,6 +207,14 @@ export struct AppSettings {
     WebThemeSettings web_theme;
     WebBackgroundSettings background;
   } ui;
+
+  // 插件配置
+  struct Plugins {
+    struct InfinityNikki {
+      bool enable = true;
+      std::string game_dir = "";
+    } infinity_nikki;
+  } plugins;
 };
 
 // 设置变更事件数据

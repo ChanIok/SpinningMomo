@@ -31,6 +31,9 @@ export interface RuntimeCapabilities {
   isProcessLoopbackAudioSupported: boolean
 }
 
+// 当前欢迎流程版本
+export const CURRENT_ONBOARDING_FLOW_VERSION = 1
+
 // Web 主题模式（页面主题）
 export type WebThemeMode = 'light' | 'dark' | 'system'
 
@@ -109,6 +112,12 @@ export interface AppSettings {
   app: {
     // 始终以管理员权限运行
     alwaysRunAsAdmin: boolean
+
+    // 首次引导
+    onboarding: {
+      completed: boolean
+      flowVersion: number
+    }
 
     // 快捷键设置
     hotkey: {
@@ -233,6 +242,14 @@ export interface AppSettings {
     webTheme: WebThemeSettings
     background: WebBackgroundSettings
   }
+
+  // 插件配置
+  plugins: {
+    infinityNikki: {
+      enable: boolean
+      gameDir: string
+    }
+  }
 }
 
 // 默认设置值
@@ -242,6 +259,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // app 设置
   app: {
     alwaysRunAsAdmin: true,
+    onboarding: {
+      completed: true,
+      flowVersion: CURRENT_ONBOARDING_FLOW_VERSION,
+    },
     hotkey: {
       floatingWindow: {
         modifiers: 2, // MOD_CONTROL
@@ -357,8 +378,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     floatingWindowColors: DARK_FLOATING_WINDOW_COLORS,
     floatingWindowThemeMode: 'dark',
     webviewWindow: {
-      width: 1200,
-      height: 800,
+      width: 900,
+      height: 600,
       x: -1,
       y: -1,
       enableTransparentBackground: false,
@@ -372,8 +393,15 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       backgroundBlurAmount: 0,
       backgroundOpacity: 1,
       overlayColors: ['#000000', '#000000'],
-      overlayOpacity: 0,
-      surfaceOpacity: 0.8,
+      overlayOpacity: 0.8,
+      surfaceOpacity: 1,
+    },
+  },
+
+  plugins: {
+    infinityNikki: {
+      enable: true,
+      gameDir: '',
     },
   },
 } as const
