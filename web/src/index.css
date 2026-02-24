@@ -103,26 +103,26 @@
   --surface-top: #fdfdfd;
   /* Light Modern */
   --background: var(--surface-bottom);
-  --foreground: #1f1f1f;
+  --foreground: #2e2e2e;
   --card: var(--surface-middle);
-  --card-foreground: #1f1f1f80;
+  --card-foreground: #2e2e2e80;
   --popover: var(--surface-top);
-  --popover-foreground: #1f1f1f80;
+  --popover-foreground: #2e2e2e80;
   --primary: #f59e0b;
   --primary-foreground: #ffffff;
   --secondary: #e5e5e5;
-  --secondary-foreground: #1f1f1f80;
+  --secondary-foreground: #2e2e2e80;
   --muted: #f8f8f8;
-  --muted-foreground: #1f1f1f80;
+  --muted-foreground: #2e2e2e80;
   --accent: #f2f2f2;
-  --accent-foreground: #1f1f1f80;
+  --accent-foreground: #2e2e2e80;
   --destructive: #c72e0f;
   --destructive-foreground: #ffffff;
   --border: #e5e5e5;
   --input: #e5e5e5;
   --ring: #f59e0b;
   --sidebar: var(--surface-middle);
-  --sidebar-foreground: #1f1f1f;
+  --sidebar-foreground: #2e2e2e;
   --sidebar-primary: #f59e0b;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--surface-top);
@@ -134,9 +134,9 @@
   --header-accent: #e4e4e4;
   --header-accent-foreground: #1e1e1e;
   --statusbar: #f8f8f8;
-  --statusbar-foreground: #1f1f1f80;
+  --statusbar-foreground: #2e2e2e80;
   --panel: #f8f8f8;
-  --panel-foreground: #1f1f1f80;
+  --panel-foreground: #2e2e2e80;
 }
 
 .dark {

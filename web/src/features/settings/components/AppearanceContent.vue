@@ -26,8 +26,10 @@ import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import OverlayPaletteEditor from './OverlayPaletteEditor.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { WebThemeMode } from '../types'
-import type { OverlayPalette } from '../overlayPalette'
+import type { OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
 import { getOverlayPaletteFromBackground } from '../overlayPalette'
+import { resolveBackgroundImageUrl } from '../backgroundPath'
+import { sampleOverlayPaletteFromWallpaper } from '../overlayPaletteSampler'
 import {
   SURFACE_OPACITY_RANGE,
   BACKGROUND_BLUR_RANGE,
@@ -44,6 +46,7 @@ const {
   updateBackgroundBlur,
   updateOverlayOpacity,
   updateOverlayPalette,
+  applyOverlayPalettePreset,
   updateWebViewTransparentBackground,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
@@ -60,6 +63,9 @@ const themeOptions = [
 const overlayPalette = computed<OverlayPalette>(() =>
   getOverlayPaletteFromBackground(appSettings.value.ui.background)
 )
+const canSampleOverlayPaletteFromWallpaper = computed(() => {
+  return Boolean(resolveBackgroundImageUrl(appSettings.value.ui.background))
+})
 
 const handleSurfaceOpacityChange = async (val: number[] | undefined) => {
   if (!val || val.length === 0) return
@@ -102,6 +108,31 @@ const handleOverlayPaletteChange = async (palette: OverlayPalette) => {
     await updateOverlayPalette(palette)
   } catch (error) {
     console.error('Failed to update overlay palette:', error)
+  }
+}
+
+const handleOverlayPresetApply = async (preset: OverlayPalettePreset) => {
+  try {
+    await applyOverlayPalettePreset(preset)
+  } catch (error) {
+    console.error('Failed to apply overlay palette preset:', error)
+  }
+}
+
+const handleOverlaySampleFromWallpaper = async () => {
+  const imageUrl = resolveBackgroundImageUrl(appSettings.value.ui.background)
+  if (!imageUrl) return
+
+  try {
+    const nextPalette = await sampleOverlayPaletteFromWallpaper({
+      imageUrl,
+      mode: overlayPalette.value.mode,
+      themeMode: appSettings.value.ui.webTheme.mode,
+    })
+
+    await updateOverlayPalette(nextPalette)
+  } catch (error) {
+    console.error('Failed to sample overlay palette from wallpaper:', error)
   }
 }
 
@@ -265,7 +296,10 @@ const handleClearError = () => {
             <ItemActions>
               <OverlayPaletteEditor
                 :model-value="overlayPalette"
+                :show-wallpaper-sampler="canSampleOverlayPaletteFromWallpaper"
                 @update:model-value="handleOverlayPaletteChange"
+                @apply-preset="handleOverlayPresetApply"
+                @sample-from-wallpaper="handleOverlaySampleFromWallpaper"
               />
             </ItemActions>
           </Item>

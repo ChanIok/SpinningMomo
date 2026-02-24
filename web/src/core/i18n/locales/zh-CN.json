@@ -227,6 +227,7 @@
   "settings.appearance.background.overlayPalette.mode.double": "双色",
   "settings.appearance.background.overlayPalette.mode.triple": "三色",
   "settings.appearance.background.overlayPalette.mode.quad": "四色",
+  "settings.appearance.background.overlayPalette.sampleFromWallpaper": "从壁纸取色",
   "settings.appearance.background.overlayPalette.presets.title": "预设方案",
   "settings.appearance.background.surfaceOpacity.label": "面板不透明度",
   "settings.appearance.background.surfaceOpacity.description": "仅调整页面面板层的不透明度，不影响背景图层。",

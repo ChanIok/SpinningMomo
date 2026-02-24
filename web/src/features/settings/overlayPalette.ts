@@ -1,4 +1,4 @@
-import type { WebBackgroundSettings } from './types'
+import type { WebBackgroundSettings, WebThemeMode } from './types'
 
 export type OverlayColorMode = 1 | 2 | 3 | 4
 
@@ -9,6 +9,7 @@ export interface OverlayPalette {
 
 export interface OverlayPalettePreset extends OverlayPalette {
   id: string
+  themeMode: Exclude<WebThemeMode, 'system'>
 }
 
 const DEFAULT_HEX_COLOR = '#000000'
@@ -67,18 +68,54 @@ const normalizeOverlayColors = (colors: Array<string | undefined>): string[] => 
 }
 
 export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
-  { id: 'graphite', mode: 1, colors: ['#0F1115', '#0F1115', '#0F1115', '#0F1115'] },
-  { id: 'fog', mode: 2, colors: ['#6D7388', '#2B2E38', '#2B2E38', '#2B2E38'] },
-  { id: 'amber', mode: 2, colors: ['#A77A2A', '#3A2A16', '#3A2A16', '#3A2A16'] },
-  { id: 'teal', mode: 2, colors: ['#3A8D93', '#172D3B', '#172D3B', '#172D3B'] },
-  { id: 'plum', mode: 2, colors: ['#6F5A8A', '#2B2238', '#2B2238', '#2B2238'] },
-  { id: 'forest', mode: 3, colors: ['#3A6F55', '#2A3B32', '#161A20', '#161A20'] },
-  { id: 'sunset', mode: 3, colors: ['#A86A3C', '#6C4D66', '#273347', '#273347'] },
-  { id: 'ocean', mode: 3, colors: ['#4A76B8', '#2F5A7C', '#1E2E4A', '#1E2E4A'] },
-  { id: 'dawn', mode: 4, colors: ['#A06F7E', '#7A84B0', '#2E4966', '#556C5B'] },
-  { id: 'aurora', mode: 4, colors: ['#5F8A84', '#6079A8', '#393E64', '#6A4C70'] },
-  { id: 'steel', mode: 4, colors: ['#76808E', '#6B7D94', '#3F4B5C', '#4E5762'] },
-  { id: 'night', mode: 4, colors: ['#4E5874', '#43536B', '#242B3A', '#313544'] },
+  {
+    id: 'mist',
+    themeMode: 'light',
+    mode: 1,
+    colors: ['#E9EEF7', '#E9EEF7', '#E9EEF7', '#E9EEF7'],
+  },
+  {
+    id: 'nikki',
+    themeMode: 'light',
+    mode: 2,
+    colors: ['#FDF0F4', '#F9E1E6', '#F9E1E6', '#F9E1E6'],
+  },
+  {
+    id: 'spring',
+    themeMode: 'light',
+    mode: 2,
+    colors: ['#F1E1C5', '#DAE8CA', '#DAE8CA', '#DAE8CA'],
+  },
+  {
+    id: 'daydream',
+    themeMode: 'light',
+    mode: 3,
+    colors: ['#E3F0FF', '#F0E6FA', '#FBE4F0', '#FBE4F0'],
+  },
+  {
+    id: 'graphite',
+    themeMode: 'dark',
+    mode: 1,
+    colors: ['#171B22', '#171B22', '#171B22', '#171B22'],
+  },
+  {
+    id: 'slate',
+    themeMode: 'dark',
+    mode: 1,
+    colors: ['#0F172A', '#0F172A', '#0F172A', '#0F172A'],
+  },
+  {
+    id: 'teal',
+    themeMode: 'dark',
+    mode: 2,
+    colors: ['#062727', '#0F4D4D', '#0F4D4D', '#0F4D4D'],
+  },
+  {
+    id: 'galaxy',
+    themeMode: 'dark',
+    mode: 3,
+    colors: ['#0B1021', '#112240', '#1A1423', '#1A1423'],
+  },
 ]
 
 export const getOverlayPaletteFromBackground = (

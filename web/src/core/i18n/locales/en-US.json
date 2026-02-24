@@ -227,6 +227,7 @@
   "settings.appearance.background.overlayPalette.mode.double": "Double",
   "settings.appearance.background.overlayPalette.mode.triple": "Triple",
   "settings.appearance.background.overlayPalette.mode.quad": "Quad",
+  "settings.appearance.background.overlayPalette.sampleFromWallpaper": "Sample from Wallpaper",
   "settings.appearance.background.overlayPalette.presets.title": "Presets",
   "settings.appearance.background.surfaceOpacity.label": "Panel Opacity",
   "settings.appearance.background.surfaceOpacity.description": "Only affects panel layer opacity, not the background image layer.",

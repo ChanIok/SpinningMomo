@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { computed, ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { Check, Palette } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,21 +8,25 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/composables/useI18n'
-import type { OverlayColorMode, OverlayPalette } from '../overlayPalette'
+import type { OverlayColorMode, OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
 import {
   buildOverlayGradient,
   getActiveOverlayColors,
   normalizeHexColor,
   OVERLAY_PALETTE_PRESETS,
 } from '../overlayPalette'
+import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
 
 const props = defineProps<{
   modelValue: OverlayPalette
+  showWallpaperSampler?: boolean
   class?: HTMLAttributes['class']
 }>()
 
 const emits = defineEmits<{
   (e: 'update:modelValue', value: OverlayPalette): void
+  (e: 'apply-preset', preset: OverlayPalettePreset): void
+  (e: 'sample-from-wallpaper'): void
 }>()
 
 const { t } = useI18n()
@@ -80,12 +84,14 @@ const triggerPreviewStyle = computed(() => ({
   backgroundImage: buildOverlayGradient(localPalette.value),
 }))
 
-const setPalette = (nextPalette: OverlayPalette) => {
+const setPalette = (nextPalette: OverlayPalette, emitUpdate = true) => {
   localPalette.value = {
     mode: nextPalette.mode,
     colors: [...nextPalette.colors] as OverlayPalette['colors'],
   }
-  emits('update:modelValue', localPalette.value)
+  if (emitUpdate) {
+    emits('update:modelValue', localPalette.value)
+  }
 }
 
 const updateMode = (mode: OverlayColorMode) => {
@@ -120,12 +126,16 @@ const handleHexCommit = () => {
   updateColor(activeColorIndex.value, normalized)
 }
 
-const applyPreset = (preset: OverlayPalette) => {
+const applyPreset = (preset: OverlayPalettePreset) => {
   activeColorIndex.value = 0
-  setPalette({
-    mode: preset.mode,
-    colors: [...preset.colors] as OverlayPalette['colors'],
-  })
+  setPalette(
+    {
+      mode: preset.mode,
+      colors: [...preset.colors] as OverlayPalette['colors'],
+    },
+    false
+  )
+  emits('apply-preset', preset)
 }
 
 const isPresetActive = (preset: OverlayPalette): boolean => {
@@ -136,6 +146,10 @@ const isPresetActive = (preset: OverlayPalette): boolean => {
 const getPreviewStyle = (palette: OverlayPalette) => ({
   backgroundImage: buildOverlayGradient(palette),
 })
+
+const handleSampleFromWallpaper = () => {
+  emits('sample-from-wallpaper')
+}
 </script>
 
 <template>
@@ -163,9 +177,21 @@ const getPreviewStyle = (palette: OverlayPalette) => ({
 
     <PopoverContent align="end" class="w-[21rem] space-y-4">
       <div class="space-y-2">
-        <p class="text-xs font-medium text-foreground">
-          {{ t('settings.appearance.background.overlayPalette.mode.title') }}
-        </p>
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs font-medium text-foreground">
+            {{ t('settings.appearance.background.overlayPalette.mode.title') }}
+          </p>
+          <Button
+            v-if="props.showWallpaperSampler"
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-7 px-2 text-xs"
+            @click="handleSampleFromWallpaper"
+          >
+            {{ t('settings.appearance.background.overlayPalette.sampleFromWallpaper') }}
+          </Button>
+        </div>
         <ToggleGroup
           type="single"
           variant="outline"
@@ -205,19 +231,24 @@ const getPreviewStyle = (palette: OverlayPalette) => ({
             @click="activeColorIndex = index"
           />
 
-          <label
-            class="relative h-9 w-11 shrink-0 cursor-pointer overflow-hidden rounded-md border border-input"
-          >
-            <div class="h-full w-full" :style="{ backgroundColor: currentColor }" />
-            <input
-              class="absolute inset-0 cursor-pointer opacity-0"
-              type="color"
-              :value="currentColor"
-              @input="
-                (event) => updateColor(activeColorIndex, (event.target as HTMLInputElement).value)
-              "
-            />
-          </label>
+          <!-- Custom Color Picker Popover Triggered by the main color block -->
+          <Popover>
+            <PopoverTrigger as-child>
+              <button
+                type="button"
+                class="relative h-9 w-11 shrink-0 cursor-pointer overflow-hidden rounded-md border border-input focus:ring-2 focus:ring-primary/50 focus:outline-none"
+              >
+                <div class="h-full w-full" :style="{ backgroundColor: currentColor }" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="center" :sideOffset="8" class="w-auto p-3">
+              <ColorPicker
+                :model-value="currentColor"
+                :show-hex-input="false"
+                @update:model-value="(color) => updateColor(activeColorIndex, color)"
+              />
+            </PopoverContent>
+          </Popover>
 
           <Input
             v-model="activeHexInput"
@@ -233,7 +264,7 @@ const getPreviewStyle = (palette: OverlayPalette) => ({
         <p class="text-xs font-medium text-foreground">
           {{ t('settings.appearance.background.overlayPalette.presets.title') }}
         </p>
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-4 gap-2">
           <button
             v-for="preset in OVERLAY_PALETTE_PRESETS"
             :key="preset.id"
