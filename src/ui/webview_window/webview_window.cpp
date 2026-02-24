@@ -19,6 +19,44 @@ import <windowsx.h>;
 
 namespace UI::WebViewWindow {
 
+auto is_transparent_background_enabled(Core::State::AppState& state) -> bool {
+  if (!state.settings) {
+    return false;
+  }
+  return state.settings->raw.ui.webview_window.enable_transparent_background;
+}
+
+auto desired_window_ex_style(Core::State::AppState& state) -> DWORD {
+  DWORD ex_style = WS_EX_APPWINDOW;
+  if (is_transparent_background_enabled(state)) {
+    ex_style |= WS_EX_NOREDIRECTIONBITMAP;
+  }
+  return ex_style;
+}
+
+auto apply_window_ex_style_from_settings(Core::State::AppState& state) -> void {
+  auto hwnd = state.webview->window.webview_hwnd;
+  if (!hwnd) {
+    return;
+  }
+
+  auto current_style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_EXSTYLE));
+  auto updated_style = current_style;
+  if (is_transparent_background_enabled(state)) {
+    updated_style |= WS_EX_NOREDIRECTIONBITMAP;
+  } else {
+    updated_style &= ~WS_EX_NOREDIRECTIONBITMAP;
+  }
+
+  if (updated_style == current_style) {
+    return;
+  }
+
+  SetWindowLongPtrW(hwnd, GWL_EXSTYLE, static_cast<LONG_PTR>(updated_style));
+  SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+               SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
 auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 如果 WebView 还未初始化，则进行初始化
   if (!state.webview->is_initialized) {
@@ -188,10 +226,12 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
         return default_hit;
       }
 
-      if (state) {
-        if (auto non_client_hit = Core::WebView::hit_test_non_client_region(*state, hwnd, lparam)) {
-          return *non_client_hit;
-        }
+      if (!state || !Core::WebView::is_composition_active(*state)) {
+        return default_hit;
+      }
+
+      if (auto non_client_hit = Core::WebView::hit_test_non_client_region(*state, hwnd, lparam)) {
+        return *non_client_hit;
       }
       return HTCLIENT;
     }
@@ -214,8 +254,9 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
     case WM_NCRBUTTONDOWN:
     case WM_NCRBUTTONUP: {
-      if (state && Core::WebView::forward_non_client_right_button_message(*state, hwnd, msg, wparam,
-                                                                          lparam)) {
+      if (state && Core::WebView::is_composition_active(*state) &&
+          Core::WebView::forward_non_client_right_button_message(*state, hwnd, msg, wparam,
+                                                                 lparam)) {
         return 0;
       }
       break;
@@ -232,8 +273,11 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
     }
 
     case WM_ERASEBKGND: {
-      // Composition hosting 下避免宿主窗口刷白底，保留透明背景
-      return 1;
+      // Composition hosting 下避免宿主窗口刷白底，HWND 控制器走默认擦除逻辑。
+      if (state && Core::WebView::is_composition_active(*state)) {
+        return 1;
+      }
+      break;
     }
 
     case WM_SETFOCUS: {
@@ -259,7 +303,7 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
     case WM_XBUTTONDOWN:
     case WM_XBUTTONUP:
     case WM_XBUTTONDBLCLK: {
-      if (state) {
+      if (state && Core::WebView::is_composition_active(*state)) {
         Core::WebView::forward_mouse_message(*state, hwnd, msg, wparam, lparam);
       }
       break;
@@ -370,15 +414,16 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // - WS_SYSMENU: 保留系统菜单（Alt+Space）
   // - WS_MAXIMIZEBOX/WS_MINIMIZEBOX: 支持最大化/最小化
   constexpr DWORD style = WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
-  HWND hwnd = CreateWindowExW(WS_EX_APPWINDOW | WS_EX_NOREDIRECTIONBITMAP,  // 扩展样式
-                              L"SpinningMomoWebViewWindowClass",            // 窗口类名
-                              L"SpinningMomo WebView",                      // 窗口标题
-                              style,                                        // 窗口样式
-                              x, y, width, height,                          // 位置和大小
-                              nullptr,                                      // 父窗口
-                              nullptr,                                      // 菜单
-                              state.floating_window->window.instance,       // 实例句柄
-                              &state                                        // 用户数据
+  auto ex_style = desired_window_ex_style(state);
+  HWND hwnd = CreateWindowExW(ex_style,                                // 扩展样式
+                              L"SpinningMomoWebViewWindowClass",       // 窗口类名
+                              L"SpinningMomo WebView",                 // 窗口标题
+                              style,                                   // 窗口样式
+                              x, y, width, height,                     // 位置和大小
+                              nullptr,                                 // 父窗口
+                              nullptr,                                 // 菜单
+                              state.floating_window->window.instance,  // 实例句柄
+                              &state                                   // 用户数据
   );
 
   if (!hwnd) {
@@ -397,6 +442,31 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   apply_window_style(hwnd);
 
   Logger().info("WebView window created successfully");
+  return {};
+}
+
+auto recreate_webview_host(Core::State::AppState& state) -> std::expected<void, std::string> {
+  auto hwnd = state.webview->window.webview_hwnd;
+  if (!hwnd) {
+    return {};
+  }
+
+  apply_window_ex_style_from_settings(state);
+
+  if (!state.webview->is_initialized) {
+    Logger().info("Skipped WebView host recreation: WebView is not initialized");
+    return {};
+  }
+
+  bool was_visible = IsWindowVisible(hwnd) == TRUE;
+
+  Core::WebView::shutdown(state);
+  if (auto result = Core::WebView::initialize(state, hwnd); !result) {
+    return std::unexpected("Failed to recreate WebView host: " + result.error());
+  }
+
+  state.webview->window.is_visible = was_visible;
+  Logger().info("WebView host recreated successfully");
   return {};
 }
 

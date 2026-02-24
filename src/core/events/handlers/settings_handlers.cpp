@@ -12,6 +12,7 @@ import Features.Settings.Events;
 import Features.Settings.Types;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
+import UI.WebViewWindow;
 import Utils.Logger;
 
 namespace Core::Events::Handlers {
@@ -41,12 +42,17 @@ auto refresh_global_hotkeys(Core::State::AppState& state) -> void {
   Logger().info("Global hotkeys refreshed from latest settings");
 }
 
-auto has_webview_background_mode_changes(const Features::Settings::Types::AppSettings& old_settings,
-                                         const Features::Settings::Types::AppSettings& new_settings)
+auto has_webview_host_mode_changes(const Features::Settings::Types::AppSettings& old_settings,
+                                   const Features::Settings::Types::AppSettings& new_settings)
     -> bool {
   return old_settings.ui.webview_window.enable_transparent_background !=
-             new_settings.ui.webview_window.enable_transparent_background ||
-         old_settings.ui.web_theme.mode != new_settings.ui.web_theme.mode;
+         new_settings.ui.webview_window.enable_transparent_background;
+}
+
+auto has_webview_theme_mode_changes(const Features::Settings::Types::AppSettings& old_settings,
+                                    const Features::Settings::Types::AppSettings& new_settings)
+    -> bool {
+  return old_settings.ui.web_theme.mode != new_settings.ui.web_theme.mode;
 }
 
 // 处理设置变更事件
@@ -62,7 +68,18 @@ auto handle_settings_changed(Core::State::AppState& state,
       refresh_global_hotkeys(state);
     }
 
-    if (has_webview_background_mode_changes(event.data.old_settings, event.data.new_settings)) {
+    auto webview_host_mode_changed =
+        has_webview_host_mode_changes(event.data.old_settings, event.data.new_settings);
+    auto webview_theme_mode_changed =
+        has_webview_theme_mode_changes(event.data.old_settings, event.data.new_settings);
+
+    if (webview_host_mode_changed) {
+      if (auto recreate_result = UI::WebViewWindow::recreate_webview_host(state);
+          !recreate_result) {
+        Logger().warn("Failed to recreate WebView host after settings change: {}",
+                      recreate_result.error());
+      }
+    } else if (webview_theme_mode_changed) {
       Core::WebView::apply_background_mode_from_settings(state);
     }
 

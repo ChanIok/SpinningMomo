@@ -209,6 +209,10 @@ auto apply_background_mode_from_settings(Core::State::AppState& state) -> void {
   Core::WebView::Host::apply_background_mode_from_settings(state);
 }
 
+auto is_composition_active(Core::State::AppState& state) -> bool {
+  return state.webview->resources.composition_controller != nullptr;
+}
+
 auto forward_mouse_message(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wparam,
                            LPARAM lparam) -> bool {
   auto& webview_state = *state.webview;
