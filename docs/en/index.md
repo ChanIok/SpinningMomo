@@ -214,7 +214,7 @@ This program only sends requests through Windows standard window management APIs
 
 ## License
 
-This project is licensed under the [MIT License](https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE). The project icon is from the game "Infinity Nikki" and copyrighted by the game developer.
+This project is open source under the [MIT License](https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE). The project icon is from the game "Infinity Nikki" and copyright belongs to the game developer. Please read the [Legal & Privacy Notice](https://chaniok.github.io/SpinningMomo/en/legal/notice) before use.
 
 <style>
 /* 添加命名空间，限制样式只在文档内容区域生效 */

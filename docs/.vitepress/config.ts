@@ -28,10 +28,23 @@ export default defineConfig({
       label: "English",
       lang: "en-US",
       link: "/en/",
-      // 添加重定向配置
       themeConfig: {
-        nav: [],
-        sidebar: [],
+        nav: [
+          { text: "Guide", link: "/en/" },
+          { text: "Legal", link: "/en/legal/notice" },
+        ],
+        sidebar: {
+          "/en/": [
+            {
+              text: "Guide",
+              items: [{ text: "Overview", link: "/en/" }],
+            },
+            {
+              text: "Legal",
+              items: [{ text: "Legal & Privacy Notice", link: "/en/legal/notice" }],
+            },
+          ],
+        },
       },
     },
   },
@@ -49,6 +62,7 @@ export default defineConfig({
     nav: [
       { text: "指南", link: "/zh/guide/getting-started" },
       { text: "进阶", link: "/zh/advanced/custom-settings" },
+      { text: "法律与隐私", link: "/zh/legal/notice" },
       {
         text: "下载",
         link: "https://github.com/ChanIok/SpinningMomo/releases",
@@ -72,6 +86,7 @@ export default defineConfig({
             { text: "常见问题", link: "/zh/advanced/troubleshooting" },
           ],
         },
+        { text: "法律与隐私", items: [{ text: "法律与隐私说明", link: "/zh/legal/notice" }] },
       ],
     },
   },
