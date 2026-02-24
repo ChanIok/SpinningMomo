@@ -35,8 +35,7 @@ export interface WebBackgroundSettings {
   imagePath: string
   backgroundBlurAmount: number
   backgroundOpacity: number
-  overlayStartColor: string
-  overlayEndColor: string
+  overlayColors: string[]
   overlayOpacity: number
   surfaceOpacity: number
 }
@@ -353,8 +352,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       imagePath: '',
       backgroundBlurAmount: 0,
       backgroundOpacity: 1,
-      overlayStartColor: '#000000',
-      overlayEndColor: '#000000',
+      overlayColors: ['#000000', '#000000'],
       overlayOpacity: 0,
       surfaceOpacity: 0.8,
     },

@@ -1,5 +1,6 @@
 import type { AppSettings, WebThemeMode } from './types'
 import { resolveBackgroundImageUrl } from './backgroundPath'
+import { buildOverlayGradient, getOverlayPaletteFromBackground } from './overlayPalette'
 
 type ResolvedTheme = 'light' | 'dark'
 
@@ -43,10 +44,9 @@ const applyBackground = (settings: AppSettings): void => {
   root.style.setProperty('--app-background-blur', `${backgroundBlur}px`)
   root.style.setProperty('--app-background-scale', '1')
   root.style.setProperty(
-    '--app-background-overlay-start',
-    background.overlayStartColor || '#000000'
+    '--app-background-overlay-image',
+    buildOverlayGradient(getOverlayPaletteFromBackground(background))
   )
-  root.style.setProperty('--app-background-overlay-end', background.overlayEndColor || '#000000')
   root.style.setProperty('--app-background-overlay-opacity', String(overlayOpacity))
 
   root.style.setProperty('--surface-opacity', String(clamp(background.surfaceOpacity, 0, 1)))

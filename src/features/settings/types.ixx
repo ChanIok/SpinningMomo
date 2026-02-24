@@ -19,12 +19,11 @@ export struct WebThemeSettings {
 export struct WebBackgroundSettings {
   std::string type = "none";  // "none" | "image"
   std::string image_path = "";
-  int background_blur_amount = 0;   // 0 - 100
-  double background_opacity = 1.0;  // 0.0 - 1.0
-  std::string overlay_start_color = "#000000";
-  std::string overlay_end_color = "#000000";
-  double overlay_opacity = 0.0;  // 0.0 - 1.0
-  double surface_opacity = 0.8;  // 0.0 - 1.0
+  int background_blur_amount = 0;                                    // 0 - 100
+  double background_opacity = 1.0;                                   // 0.0 - 1.0
+  std::vector<std::string> overlay_colors = {"#000000", "#000000"};  // 1 - 4
+  double overlay_opacity = 0.0;                                      // 0.0 - 1.0
+  double surface_opacity = 0.8;                                      // 0.0 - 1.0
 };
 
 // 完整的应用设置（重构后的结构）

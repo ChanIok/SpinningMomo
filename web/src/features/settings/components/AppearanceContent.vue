@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed } from 'vue'
 import { useSettingsStore } from '../store'
 import { useAppearanceActions } from '../composables/useAppearanceActions'
 import { useTheme } from '../composables/useTheme'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
   Item,
@@ -24,8 +23,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
+import OverlayPaletteEditor from './OverlayPaletteEditor.vue'
 import { useI18n } from '@/composables/useI18n'
 import type { WebThemeMode } from '../types'
+import type { OverlayPalette } from '../overlayPalette'
+import { getOverlayPaletteFromBackground } from '../overlayPalette'
 import {
   SURFACE_OPACITY_RANGE,
   BACKGROUND_BLUR_RANGE,
@@ -41,8 +43,7 @@ const {
   updateBackgroundOpacity,
   updateBackgroundBlur,
   updateOverlayOpacity,
-  updateOverlayStartColor,
-  updateOverlayEndColor,
+  updateOverlayPalette,
   updateWebViewTransparentBackground,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
@@ -56,27 +57,9 @@ const themeOptions = [
   { value: 'dark', label: t('settings.appearance.theme.dark') },
   { value: 'system', label: t('settings.appearance.theme.system') },
 ]
-
-const overlayStartHexInput = ref('#000000')
-const overlayEndHexInput = ref('#000000')
-
-watch(
-  () => appSettings.value.ui.background.overlayStartColor,
-  (value) => {
-    overlayStartHexInput.value = value
-  },
-  { immediate: true }
+const overlayPalette = computed<OverlayPalette>(() =>
+  getOverlayPaletteFromBackground(appSettings.value.ui.background)
 )
-
-watch(
-  () => appSettings.value.ui.background.overlayEndColor,
-  (value) => {
-    overlayEndHexInput.value = value
-  },
-  { immediate: true }
-)
-
-const isValidHexColor = (value: string): boolean => /^#[0-9a-fA-F]{6}$/.test(value.trim())
 
 const handleSurfaceOpacityChange = async (val: number[] | undefined) => {
   if (!val || val.length === 0) return
@@ -114,49 +97,11 @@ const handleOverlayOpacityChange = async (val: number[] | undefined) => {
   }
 }
 
-const handleOverlayStartColorPickerChange = async (value: string) => {
-  if (!isValidHexColor(value)) return
+const handleOverlayPaletteChange = async (palette: OverlayPalette) => {
   try {
-    await updateOverlayStartColor(value.toUpperCase())
+    await updateOverlayPalette(palette)
   } catch (error) {
-    console.error('Failed to update overlay start color:', error)
-  }
-}
-
-const handleOverlayEndColorPickerChange = async (value: string) => {
-  if (!isValidHexColor(value)) return
-  try {
-    await updateOverlayEndColor(value.toUpperCase())
-  } catch (error) {
-    console.error('Failed to update overlay end color:', error)
-  }
-}
-
-const commitOverlayStartHexInput = async () => {
-  const normalized = overlayStartHexInput.value.trim().toUpperCase()
-  if (!isValidHexColor(normalized)) {
-    overlayStartHexInput.value = appSettings.value.ui.background.overlayStartColor
-    return
-  }
-  try {
-    await updateOverlayStartColor(normalized)
-  } catch (error) {
-    console.error('Failed to update overlay start color from hex:', error)
-    overlayStartHexInput.value = appSettings.value.ui.background.overlayStartColor
-  }
-}
-
-const commitOverlayEndHexInput = async () => {
-  const normalized = overlayEndHexInput.value.trim().toUpperCase()
-  if (!isValidHexColor(normalized)) {
-    overlayEndHexInput.value = appSettings.value.ui.background.overlayEndColor
-    return
-  }
-  try {
-    await updateOverlayEndColor(normalized)
-  } catch (error) {
-    console.error('Failed to update overlay end color from hex:', error)
-    overlayEndHexInput.value = appSettings.value.ui.background.overlayEndColor
+    console.error('Failed to update overlay palette:', error)
   }
 }
 
@@ -311,56 +256,17 @@ const handleClearError = () => {
           <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
-                {{ t('settings.appearance.background.overlayStartColor.label') }}
+                {{ t('settings.appearance.background.overlayPalette.label') }}
               </ItemTitle>
               <ItemDescription>
-                {{ t('settings.appearance.background.overlayStartColor.description') }}
+                {{ t('settings.appearance.background.overlayPalette.description') }}
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <div class="flex items-center gap-2">
-                <Input
-                  type="color"
-                  :model-value="appSettings.ui.background.overlayStartColor"
-                  @update:model-value="(v) => handleOverlayStartColorPickerChange(v as string)"
-                  class="h-9 w-12 p-1"
-                />
-                <Input
-                  v-model="overlayStartHexInput"
-                  class="w-28 font-mono uppercase"
-                  placeholder="#000000"
-                  @keydown.enter.prevent="commitOverlayStartHexInput"
-                  @blur="commitOverlayStartHexInput"
-                />
-              </div>
-            </ItemActions>
-          </Item>
-
-          <Item variant="surface" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.appearance.background.overlayEndColor.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.appearance.background.overlayEndColor.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <div class="flex items-center gap-2">
-                <Input
-                  type="color"
-                  :model-value="appSettings.ui.background.overlayEndColor"
-                  @update:model-value="(v) => handleOverlayEndColorPickerChange(v as string)"
-                  class="h-9 w-12 p-1"
-                />
-                <Input
-                  v-model="overlayEndHexInput"
-                  class="w-28 font-mono uppercase"
-                  placeholder="#000000"
-                  @keydown.enter.prevent="commitOverlayEndHexInput"
-                  @blur="commitOverlayEndHexInput"
-                />
-              </div>
+              <OverlayPaletteEditor
+                :model-value="overlayPalette"
+                @update:model-value="handleOverlayPaletteChange"
+              />
             </ItemActions>
           </Item>
 

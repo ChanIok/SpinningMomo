@@ -22,8 +22,10 @@ const isHome = computed(() => route.name === 'home')
           class="app-background-image absolute inset-0"
           :class="[isHome && 'app-background-image-no-blur']"
         />
-        <div v-if="isHome" class="app-background-overlay absolute inset-y-0 left-0 w-14" />
-        <div v-else class="app-background-overlay absolute inset-0" />
+        <div
+          class="app-background-overlay absolute inset-0"
+          :class="[isHome && 'app-background-overlay-home-clip']"
+        />
       </div>
 
       <div class="relative z-10 flex h-full w-full flex-row">

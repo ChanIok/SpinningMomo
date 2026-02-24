@@ -110,8 +110,8 @@ auto is_system_light_theme() -> bool {
 auto resolve_opaque_background_color(std::string_view theme_mode) -> COREWEBVIEW2_COLOR {
   // Match web/src/index.css surface-bottom colors for light/dark themes.
   // COREWEBVIEW2_COLOR field order is A, R, G, B.
-  constexpr COREWEBVIEW2_COLOR light_color{255, 236, 238, 242};  // #ECEEF2
-  constexpr COREWEBVIEW2_COLOR dark_color{255, 23, 24, 26};      // #17181A
+  constexpr COREWEBVIEW2_COLOR light_color{255, 239, 239, 239};  // #efefef
+  constexpr COREWEBVIEW2_COLOR dark_color{255, 25, 25, 25};      // #191919
 
   if (theme_mode == "light") return light_color;
   if (theme_mode == "dark") return dark_color;

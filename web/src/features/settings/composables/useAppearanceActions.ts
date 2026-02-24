@@ -15,6 +15,8 @@ import {
   copyBackgroundImageToResources,
   removeBackgroundImageResource,
 } from '../api'
+import type { OverlayPalette } from '../overlayPalette'
+import { toBackgroundOverlayPatch } from '../overlayPalette'
 import { storeToRefs } from 'pinia'
 
 export const useAppearanceActions = () => {
@@ -142,12 +144,8 @@ export const useAppearanceActions = () => {
     await updateBackgroundSettings({ overlayOpacity })
   }
 
-  const updateOverlayStartColor = async (overlayStartColor: string) => {
-    await updateBackgroundSettings({ overlayStartColor })
-  }
-
-  const updateOverlayEndColor = async (overlayEndColor: string) => {
-    await updateBackgroundSettings({ overlayEndColor })
+  const updateOverlayPalette = async (palette: OverlayPalette) => {
+    await updateBackgroundSettings(toBackgroundOverlayPatch(palette))
   }
 
   const updateWebViewTransparentBackground = async (enableTransparentBackground: boolean) => {
@@ -208,8 +206,7 @@ export const useAppearanceActions = () => {
     updateBackgroundOpacity,
     updateBackgroundBlur,
     updateOverlayOpacity,
-    updateOverlayStartColor,
-    updateOverlayEndColor,
+    updateOverlayPalette,
     updateWebViewTransparentBackground,
     updateSurfaceOpacity,
     handleBackgroundImageSelect,
