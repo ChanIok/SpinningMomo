@@ -119,7 +119,6 @@ auto register_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
 
   for (const auto& [id, descriptor] : cmd_state.registry.descriptors) {
     if (!descriptor.hotkey) {
-      Logger().debug("Command '{}' has no hotkey binding, skipping", id);
       continue;
     }
 

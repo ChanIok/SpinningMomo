@@ -323,7 +323,7 @@
   "onboarding.step2.skipLink": "I don't play Infinity Nikki, skip!",
   "onboarding.step2.undoSkipLink": "I play Infinity Nikki, reconfigure",
   "onboarding.step2.gameDirRequired": "Please enter InfinityNikki game directory, or click \"I don't play Infinity Nikki, skip\".",
-  "onboarding.step2.gameDirInvalid": "Invalid directory. Please make sure it exists and is a folder.",
+  "onboarding.step2.gameDirInvalid": "Invalid directory. Please make sure it exists and contains InfinityNikki.exe.",
   "onboarding.step3.title": "Step 3: Target Window Title",
   "onboarding.step3.description": "Set the target game window title you want to control.",
   "onboarding.step3.targetTitleLabel": "Target Window Title",

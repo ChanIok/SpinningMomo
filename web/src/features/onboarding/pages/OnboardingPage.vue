@@ -135,6 +135,24 @@ const detectionMessageClass = computed(() => {
   return 'text-muted-foreground'
 })
 
+const buildInfinityNikkiExePath = (dir: string) => {
+  if (/[\\/]$/.test(dir)) {
+    return `${dir}InfinityNikki.exe`
+  }
+
+  return `${dir}\\InfinityNikki.exe`
+}
+
+const isValidInfinityNikkiGameDir = async (dir: string): Promise<boolean> => {
+  const dirInfo = await onboardingApi.getFileInfo(dir)
+  if (!dirInfo.exists || !dirInfo.isDirectory) {
+    return false
+  }
+
+  const exeInfo = await onboardingApi.getFileInfo(buildInfinityNikkiExePath(dir))
+  return exeInfo.exists && exeInfo.isRegularFile
+}
+
 const detectInfinityNikkiDirectory = async () => {
   detectionStatus.value = 'loading'
   detectionMessageKey.value = 'onboarding.step2.detecting'
@@ -237,8 +255,8 @@ const completeOnboarding = async () => {
         return
       }
 
-      const dirInfo = await onboardingApi.getFileInfo(trimmedGameDir)
-      if (!dirInfo.exists || !dirInfo.isDirectory) {
+      const isValidGameDir = await isValidInfinityNikkiGameDir(trimmedGameDir)
+      if (!isValidGameDir) {
         step.value = 2
         stepError.value = t('onboarding.step2.gameDirInvalid')
         return

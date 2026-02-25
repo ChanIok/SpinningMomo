@@ -323,7 +323,7 @@
   "onboarding.step2.skipLink": "我不玩《无限暖暖》，跳过！",
   "onboarding.step2.undoSkipLink": "我玩《无限暖暖》，重新配置",
   "onboarding.step2.gameDirRequired": "请填写 InfinityNikki 游戏目录，或点击“我不玩《无限暖暖》，跳过”。",
-  "onboarding.step2.gameDirInvalid": "目录无效，请确认路径存在且为文件夹。",
+  "onboarding.step2.gameDirInvalid": "目录无效，请确认路径存在且包含 InfinityNikki.exe。",
   "onboarding.step3.title": "步骤 3：目标窗口标题",
   "onboarding.step3.description": "设置你要操作的目标游戏窗口标题。",
   "onboarding.step3.targetTitleLabel": "目标窗口标题",
