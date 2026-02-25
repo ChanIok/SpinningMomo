@@ -47,11 +47,48 @@ auto handle_get_all_commands(Core::State::AppState& app_state,
   }
 }
 
+auto handle_invoke_command(Core::State::AppState& app_state,
+                           const Core::Commands::InvokeCommandParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Core::Commands::InvokeCommandResult>> {
+  try {
+    if (!app_state.commands) {
+      co_return std::unexpected(
+          Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                              .message = "Command registry not initialized"});
+    }
+
+    if (params.id.empty()) {
+      co_return std::unexpected(
+          Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::InvalidParams),
+                              .message = "Command id cannot be empty"});
+    }
+
+    const auto success = Core::Commands::invoke_command(app_state.commands->registry, params.id);
+
+    Core::Commands::InvokeCommandResult result{
+        .success = success,
+        .message =
+            success ? "Command invoked successfully" : "Command not found or failed: " + params.id,
+    };
+
+    co_return result;
+  } catch (const std::exception& e) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Failed to invoke command: " + std::string(e.what())});
+  }
+}
+
 auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<Core::Commands::GetAllCommandsParams,
                              Core::Commands::GetAllCommandsResult>(
       app_state, app_state.rpc->registry, "commands.getAll", handle_get_all_commands,
       "Get all available command descriptors");
+
+  Core::RPC::register_method<Core::Commands::InvokeCommandParams,
+                             Core::Commands::InvokeCommandResult>(
+      app_state, app_state.rpc->registry, "commands.invoke", handle_invoke_command,
+      "Invoke a command by id");
 }
 
 }  // namespace Core::RPC::Endpoints::Registry

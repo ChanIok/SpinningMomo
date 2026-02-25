@@ -2,6 +2,8 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { isWebView } from '@/core/env'
+import { useSettingsStore } from '@/features/settings/store'
+import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import ActivityBar from './ActivityBar.vue'
@@ -10,9 +12,13 @@ import ContentArea from './ContentArea.vue'
 import 'vue-sonner/style.css'
 
 const route = useRoute()
+const settingsStore = useSettingsStore()
 const isWelcome = computed(() => route.name === 'welcome')
 const showHeader = computed(() => isWebView())
 const isHome = computed(() => route.name === 'home')
+const hasBackgroundImage = computed(() =>
+  Boolean(resolveBackgroundImageUrl(settingsStore.appSettings.ui.background))
+)
 </script>
 
 <template>
@@ -25,7 +31,7 @@ const isHome = computed(() => route.name === 'home')
         />
         <div
           class="app-background-overlay absolute inset-0"
-          :class="[isHome && 'app-background-overlay-home-clip']"
+          :class="[isHome && hasBackgroundImage && 'app-background-overlay-home-clip']"
         />
       </div>
 

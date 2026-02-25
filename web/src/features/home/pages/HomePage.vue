@@ -1,12 +1,60 @@
 <script setup lang="ts">
-// 临时的首页组件，用于测试布局
+import { ref } from 'vue'
+import { FolderOpen } from 'lucide-vue-next'
+import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
+import { featuresApi } from '@/features/settings/featuresApi'
+
+const { t } = useI18n()
+const { toast } = useToast()
+
+const isOpening = ref(false)
+
+const handleOpenOutputDirectory = async () => {
+  if (isOpening.value) return
+
+  isOpening.value = true
+  try {
+    await featuresApi.invoke('screenshot.open_folder')
+  } catch (error) {
+    console.error('Failed to open output directory:', error)
+    toast.error(t('home.outputDir.openFailed'))
+  } finally {
+    isOpening.value = false
+  }
+}
 </script>
 
 <template>
-  <div class="flex h-full items-center justify-center">
-    <div class="text-center">
-      <h1 class="mb-4 text-4xl font-bold">欢迎使用 SpinningMomo</h1>
-      <p class="text-muted-foreground">这是首页 - Home Page</p>
-    </div>
+  <div class="relative h-full w-full">
+    <button
+      class="group surface-middle absolute right-8 bottom-8 z-20 flex h-14 cursor-pointer flex-nowrap items-center overflow-hidden rounded-full border border-border/40 shadow-sm transition-all duration-500 hover:shadow-md focus:outline-none active:scale-95"
+      style="transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1)"
+      :class="isOpening ? 'max-w-[240px]' : 'max-w-[56px] hover:max-w-[240px]'"
+      :disabled="isOpening"
+      @click="handleOpenOutputDirectory"
+    >
+      <!-- Hover Overlay -->
+      <div
+        class="pointer-events-none absolute inset-0 z-0 bg-foreground opacity-0 transition-opacity duration-300 group-hover:opacity-[0.04] dark:group-hover:opacity-[0.08]"
+      ></div>
+
+      <div class="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center">
+        <FolderOpen
+          class="h-5 w-5 text-foreground/80 transition-colors group-hover:text-foreground"
+          :class="isOpening ? 'animate-pulse' : ''"
+        />
+      </div>
+      <span
+        class="relative z-10 pr-6 text-sm font-medium whitespace-nowrap text-foreground/90 transition-opacity duration-300"
+        :class="
+          isOpening
+            ? 'opacity-100 delay-100'
+            : 'opacity-0 group-hover:opacity-100 group-hover:delay-100'
+        "
+      >
+        {{ t('home.outputDir.openButton') }}
+      </span>
+    </button>
   </div>
 </template>

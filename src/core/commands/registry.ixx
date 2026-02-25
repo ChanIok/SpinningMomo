@@ -66,6 +66,15 @@ export struct GetAllCommandsResult {
   std::vector<CommandDescriptorData> commands;
 };
 
+export struct InvokeCommandParams {
+  std::string id;
+};
+
+export struct InvokeCommandResult {
+  bool success = false;
+  std::string message;
+};
+
 // 注册所有内置命令（需要在应用初始化时调用）
 export auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& registry)
     -> void;
