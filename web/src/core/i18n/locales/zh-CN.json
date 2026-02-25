@@ -209,6 +209,7 @@
   "menu.window_reset": "重置窗口",
   "home.outputDir.openButton": "打开输出目录",
   "home.outputDir.openFailed": "打开输出目录失败",
+  "home.emptyState.poetry": "等待捕捉奇迹大陆的风景。",
   "about.title": "关于",
   "about.description": "旋转吧大喵是一个面向《无限暖暖》的轻量窗口调整工具。",
   "about.links.title": "相关链接",

@@ -209,6 +209,7 @@
   "menu.window_reset": "Reset",
   "home.outputDir.openButton": "Open Output Folder",
   "home.outputDir.openFailed": "Failed to open output folder",
+  "home.emptyState.poetry": "Waiting to capture the scenery of the Miraland.",
   "about.title": "About",
   "about.description": "SpinningMomo is a lightweight window adjustment tool built for Infinity Nikki.",
   "about.links.title": "Links",

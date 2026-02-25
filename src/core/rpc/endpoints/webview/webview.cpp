@@ -1,7 +1,5 @@
 module;
 
-#include <windows.h>
-
 #include <asio.hpp>
 #include <rfl.hpp>
 #include <rfl/json.hpp>
@@ -18,10 +16,6 @@ import UI.WebViewWindow;
 namespace Core::RPC::Endpoints::WebView {
 
 // RPC参数和结果类型定义
-struct WindowStateResult {
-  bool is_maximized;
-};
-
 struct WindowControlResult {
   bool success;
 };
@@ -41,27 +35,14 @@ auto handle_minimize_window(Core::State::AppState& app_state,
   co_return WindowControlResult{.success = true};
 }
 
-auto handle_maximize_window(Core::State::AppState& app_state,
-                            [[maybe_unused]] const rfl::Generic& params)
+auto handle_toggle_maximize_window(Core::State::AppState& app_state,
+                                   [[maybe_unused]] const rfl::Generic& params)
     -> asio::awaitable<Core::RPC::RpcResult<WindowControlResult>> {
-  auto result = UI::WebViewWindow::maximize_window(app_state);
+  auto result = UI::WebViewWindow::toggle_maximize_window(app_state);
   if (!result) {
     co_return std::unexpected(
         Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to maximize window: " + result.error()});
-  }
-
-  co_return WindowControlResult{.success = true};
-}
-
-auto handle_restore_window(Core::State::AppState& app_state,
-                           [[maybe_unused]] const rfl::Generic& params)
-    -> asio::awaitable<Core::RPC::RpcResult<WindowControlResult>> {
-  auto result = UI::WebViewWindow::restore_window(app_state);
-  if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Failed to restore window: " + result.error()});
+                            .message = "Failed to toggle maximize window: " + result.error()});
   }
 
   co_return WindowControlResult{.success = true};
@@ -87,12 +68,8 @@ auto register_all(Core::State::AppState& app_state) -> void {
       "Minimize the webview window");
 
   Core::RPC::register_method<rfl::Generic, WindowControlResult>(
-      app_state, app_state.rpc->registry, "webview.maximize", handle_maximize_window,
-      "Maximize the webview window");
-
-  Core::RPC::register_method<rfl::Generic, WindowControlResult>(
-      app_state, app_state.rpc->registry, "webview.restore", handle_restore_window,
-      "Restore the webview window");
+      app_state, app_state.rpc->registry, "webview.toggleMaximize", handle_toggle_maximize_window,
+      "Toggle maximize state of the webview window");
 
   Core::RPC::register_method<rfl::Generic, WindowControlResult>(
       app_state, app_state.rpc->registry, "webview.close", handle_close_window,

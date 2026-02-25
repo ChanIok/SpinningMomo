@@ -18,8 +18,8 @@ export auto activate_window(Core::State::AppState& state) -> void;
 
 // 窗口控制功能
 export auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::string>;
-export auto maximize_window(Core::State::AppState& state) -> std::expected<void, std::string>;
-export auto restore_window(Core::State::AppState& state) -> std::expected<void, std::string>;
+export auto toggle_maximize_window(Core::State::AppState& state)
+    -> std::expected<void, std::string>;
 export auto close_window(Core::State::AppState& state) -> std::expected<void, std::string>;
 
 }  // namespace UI::WebViewWindow

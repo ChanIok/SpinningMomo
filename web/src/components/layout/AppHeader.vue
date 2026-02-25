@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { call } from '@/core/rpc'
 import { Button } from '@/components/ui/button'
-import { Minus, Square, X, Minimize2 } from 'lucide-vue-next'
-
-const isMaximized = ref(false)
+import { Minus, Square, X } from 'lucide-vue-next'
 
 const handleMinimize = () => {
   call('webview.minimize').catch((err) => {
@@ -13,14 +10,9 @@ const handleMinimize = () => {
 }
 
 const handleMaximizeToggle = () => {
-  const method = isMaximized.value ? 'webview.restore' : 'webview.maximize'
-  call(method)
-    .then(() => {
-      isMaximized.value = !isMaximized.value
-    })
-    .catch((err) => {
-      console.error(`Failed to ${method} window:`, err)
-    })
+  call('webview.toggleMaximize').catch((err) => {
+    console.error('Failed to toggle maximize window:', err)
+  })
 }
 
 const handleClose = () => {
@@ -40,7 +32,7 @@ const handleClose = () => {
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-muted-foreground hover:bg-secondary"
+        class="h-8 w-8 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
         @click="handleMinimize"
         title="Minimize"
       >
@@ -50,18 +42,17 @@ const handleClose = () => {
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-muted-foreground hover:bg-secondary"
+        class="h-8 w-8 text-foreground hover:bg-black/10 dark:hover:bg-white/10"
         @click="handleMaximizeToggle"
-        :title="isMaximized ? 'Restore' : 'Maximize'"
+        title="Maximize / Restore"
       >
-        <Minimize2 v-if="isMaximized" class="h-4 w-4" />
-        <Square v-else class="h-4 w-4" />
+        <Square class="h-4 w-4" />
       </Button>
 
       <Button
         variant="ghost"
         size="icon"
-        class="h-8 w-8 text-muted-foreground hover:bg-destructive hover:text-destructive-foreground"
+        class="h-8 w-8 text-foreground hover:bg-destructive hover:text-destructive-foreground"
         @click="handleClose"
         title="Close"
       >

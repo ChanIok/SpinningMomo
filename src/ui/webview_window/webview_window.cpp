@@ -138,27 +138,18 @@ auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::s
   return {};
 }
 
-auto maximize_window(Core::State::AppState& state) -> std::expected<void, std::string> {
+auto toggle_maximize_window(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
   if (!webview_state.window.webview_hwnd) {
     return std::unexpected("WebView window not created");
   }
 
-  ShowWindow(webview_state.window.webview_hwnd, SW_MAXIMIZE);
-  Logger().debug("WebView window maximized");
-  return {};
-}
+  auto hwnd = webview_state.window.webview_hwnd;
+  auto was_maximized = IsZoomed(hwnd) == TRUE;
+  ShowWindow(hwnd, was_maximized ? SW_RESTORE : SW_MAXIMIZE);
 
-auto restore_window(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& webview_state = *state.webview;
-
-  if (!webview_state.window.webview_hwnd) {
-    return std::unexpected("WebView window not created");
-  }
-
-  ShowWindow(webview_state.window.webview_hwnd, SW_RESTORE);
-  Logger().debug("WebView window restored");
+  Logger().debug("WebView window toggled maximize state");
   return {};
 }
 
