@@ -94,6 +94,10 @@ const showGameOnlyAudioHint = computed(() => {
     : false
 })
 
+const showExperimentalCaptureSettings = computed(() => {
+  return Boolean(runtimeCapabilities.value?.isDebugBuild)
+})
+
 const handleSelectOutputDir = async () => {
   isSelectingOutputDir.value = true
   try {
@@ -632,7 +636,7 @@ const handleResetSettings = async () => {
         </ItemGroup>
       </div>
 
-      <div class="space-y-4">
+      <div v-if="showExperimentalCaptureSettings" class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
             {{ t('settings.function.motionPhoto.title') }}
@@ -900,7 +904,7 @@ const handleResetSettings = async () => {
         </ItemGroup>
       </div>
 
-      <div class="space-y-4">
+      <div v-if="showExperimentalCaptureSettings" class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
             {{ t('settings.function.replayBuffer.title') }}

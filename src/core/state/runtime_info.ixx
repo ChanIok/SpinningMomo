@@ -24,6 +24,7 @@ export struct RuntimeInfoState {
   // WebView2 运行时信息
   bool is_webview2_available = false;
   std::string webview2_version;
+  bool is_debug_build = false;
 
   // Windows Graphics Capture 支持状态 (Windows 10 1903 build 18362 or later)
   bool is_capture_supported = false;

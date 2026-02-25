@@ -10,6 +10,7 @@ import Utils.Graphics.Capture;
 import Utils.Logger;
 import Utils.Media.AudioCapture;
 import Utils.System;
+import Vendor.BuildConfig;
 import Vendor.Version;
 
 namespace Core::RuntimeInfo::Detail {
@@ -92,6 +93,7 @@ auto collect(Core::State::AppState& app_state) -> void {
   }
 
   auto& runtime_info = *app_state.runtime_info;
+  runtime_info.is_debug_build = Vendor::BuildConfig::is_debug_build();
   Detail::collect_app_version(runtime_info);
   Detail::collect_os_and_capabilities(runtime_info);
   Detail::collect_webview_info(runtime_info);

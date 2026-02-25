@@ -14,6 +14,7 @@ export interface MenuItem {
 
 // 运行时能力信息（来自后端 runtime_info.get）
 export interface RuntimeCapabilities {
+  isDebugBuild: boolean
   version: string
   majorVersion: number
   minorVersion: number
