@@ -7,6 +7,7 @@ import Core.Async;
 import Core.WorkerPool;
 import Core.State;
 import Core.State.RuntimeInfo;
+import Core.I18n;
 import Core.HttpServer;
 import Core.Events;
 import Core.Events.State;
@@ -35,6 +36,22 @@ import Vendor.Windows;
 import Utils.Logger;
 
 namespace Core::Initializer {
+
+auto apply_language_from_settings(Core::State::AppState& state) -> void {
+  if (!state.settings || !state.i18n) {
+    Logger().warn("Skip language sync from settings: state is not ready");
+    return;
+  }
+
+  const auto& locale = state.settings->raw.app.language.current;
+  if (auto result = Core::I18n::load_language_by_locale(*state.i18n, locale); !result) {
+    Logger().warn("Failed to load runtime language from settings ('{}'): {}", locale,
+                  result.error());
+    return;
+  }
+
+  Logger().info("Runtime language loaded from settings: {}", locale);
+}
 
 auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINSTANCE instance)
     -> std::expected<void, std::string> {
@@ -66,6 +83,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
       return std::unexpected("Failed to initialize settings: " + settings_result.error());
     }
+
+    // 将后端 i18n 语言与 settings 对齐，确保原生浮窗/通知文案一致
+    apply_language_from_settings(state);
 
     // 从 settings 同步 letterbox 启用状态
     state.letterbox->enabled = state.settings->raw.features.letterbox.enabled;

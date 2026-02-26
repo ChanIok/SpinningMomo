@@ -7,6 +7,7 @@ import Core.Events;
 import Core.RPC.NotificationHub;
 import Core.State;
 import Core.Commands;
+import Core.I18n;
 import Core.WebView;
 import Features.Settings.Events;
 import Features.Settings.Types;
@@ -55,11 +56,37 @@ auto has_webview_theme_mode_changes(const Features::Settings::Types::AppSettings
   return old_settings.ui.web_theme.mode != new_settings.ui.web_theme.mode;
 }
 
+auto has_language_changes(const Features::Settings::Types::AppSettings& old_settings,
+                          const Features::Settings::Types::AppSettings& new_settings) -> bool {
+  return old_settings.app.language.current != new_settings.app.language.current;
+}
+
+auto apply_runtime_language_from_settings(Core::State::AppState& state,
+                                          const Features::Settings::Types::AppSettings& settings)
+    -> void {
+  if (!state.i18n) {
+    Logger().warn("Skip runtime language sync: i18n state is not ready");
+    return;
+  }
+
+  const auto& locale = settings.app.language.current;
+  if (auto result = Core::I18n::load_language_by_locale(*state.i18n, locale); !result) {
+    Logger().warn("Failed to apply runtime language ('{}'): {}", locale, result.error());
+    return;
+  }
+
+  Logger().info("Runtime language switched to {}", locale);
+}
+
 // 处理设置变更事件
 auto handle_settings_changed(Core::State::AppState& state,
                              const Features::Settings::Events::SettingsChangeEvent& event) -> void {
   try {
     Logger().info("Settings changed: {}", event.data.change_description);
+
+    if (has_language_changes(event.data.old_settings, event.data.new_settings)) {
+      apply_runtime_language_from_settings(state, event.data.new_settings);
+    }
 
     // 通知浮窗刷新UI以反映设置变更
     UI::FloatingWindow::refresh_from_settings(state);

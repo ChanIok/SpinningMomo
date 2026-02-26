@@ -77,6 +77,17 @@ auto load_language(State::I18nState& i18n_state, Types::Language lang)
   }
 }
 
+auto load_language_by_locale(State::I18nState& i18n_state, std::string_view locale)
+    -> std::expected<void, std::string> {
+  if (locale == "zh-CN") {
+    return load_language(i18n_state, Types::Language::ZhCN);
+  }
+  if (locale == "en-US") {
+    return load_language(i18n_state, Types::Language::EnUS);
+  }
+  return std::unexpected("Unsupported locale: " + std::string(locale));
+}
+
 auto get_current_language(const State::I18nState& i18n_state) -> Types::Language {
   return i18n_state.current_language;
 }
