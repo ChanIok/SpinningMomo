@@ -31,10 +31,7 @@ export const useFunctionActions = () => {
       ...appSettings.value,
       features: {
         ...appSettings.value.features,
-        screenshot: {
-          ...appSettings.value.features.screenshot,
-          gameAlbumPath: dirPath,
-        },
+        externalAlbumPath: dirPath,
       },
     })
   }
@@ -337,10 +334,7 @@ export const useFunctionActions = () => {
       features: {
         ...appSettings.value.features,
         outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
-        screenshot: {
-          ...appSettings.value.features.screenshot,
-          gameAlbumPath: DEFAULT_APP_SETTINGS.features.screenshot.gameAlbumPath,
-        },
+        externalAlbumPath: DEFAULT_APP_SETTINGS.features.externalAlbumPath,
         letterbox: {
           ...appSettings.value.features.letterbox,
           enabled: DEFAULT_APP_SETTINGS.features.letterbox.enabled,
@@ -385,10 +379,7 @@ export const useFunctionActions = () => {
       features: {
         ...appSettings.value.features,
         outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
-        screenshot: {
-          ...appSettings.value.features.screenshot,
-          gameAlbumPath: DEFAULT_APP_SETTINGS.features.screenshot.gameAlbumPath,
-        },
+        externalAlbumPath: DEFAULT_APP_SETTINGS.features.externalAlbumPath,
         motionPhoto: {
           ...appSettings.value.features.motionPhoto,
           duration: DEFAULT_APP_SETTINGS.features.motionPhoto.duration,

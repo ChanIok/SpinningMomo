@@ -9,7 +9,6 @@ import Core.I18n.State;
 import Core.WorkerPool;
 import UI.FloatingWindow.Events;
 import Features.Screenshot;
-import Features.Screenshot.Folder;
 import Features.Settings.State;
 import Features.ReplayBuffer.UseCase;
 import Features.ReplayBuffer.Types;

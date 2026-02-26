@@ -22,7 +22,7 @@ const handleOpenOutputDirectory = async () => {
 
   isOpening.value = true
   try {
-    await featuresApi.invoke('screenshot.open_folder')
+    await featuresApi.invoke('output.open_folder')
   } catch (error) {
     console.error('Failed to open output directory:', error)
     toast.error(t('home.outputDir.openFailed'))

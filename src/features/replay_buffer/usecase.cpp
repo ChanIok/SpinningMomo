@@ -252,28 +252,12 @@ auto save_motion_photo(Core::State::AppState& state, const std::filesystem::path
   }
 
   // 3. 生成输出路径：使用 output_dir（Videos/SpinningMomo 或用户配置），文件名 stem+MP+ext
-  std::filesystem::path output_dir;
-  const auto& output_dir_path = state.settings->raw.features.output_dir_path;
-
-  if (!output_dir_path.empty()) {
-    output_dir = std::filesystem::path(output_dir_path);
-  } else {
-    auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
-    if (videos_dir_result) {
-      output_dir = *videos_dir_result / "SpinningMomo";
-    } else {
-      auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-      if (!exe_dir_result) {
-        return std::unexpected("Failed to get output directory");
-      }
-      output_dir = *exe_dir_result / "replays";
-    }
+  auto output_dir_result =
+      Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+  if (!output_dir_result) {
+    return std::unexpected("Failed to get output directory: " + output_dir_result.error());
   }
-
-  auto ensure_result = Utils::Path::EnsureDirectoryExists(output_dir);
-  if (!ensure_result) {
-    return std::unexpected("Failed to create output directory");
-  }
+  const auto& output_dir = output_dir_result.value();
 
   auto output_path =
       output_dir / (jpeg_path.stem().string() + "MP" + jpeg_path.extension().string());
@@ -311,28 +295,12 @@ auto save_replay(Core::State::AppState& state)
   }
 
   // 1. 生成输出路径
-  std::filesystem::path output_dir;
-  const auto& output_dir_path = state.settings->raw.features.output_dir_path;
-
-  if (!output_dir_path.empty()) {
-    output_dir = std::filesystem::path(output_dir_path);
-  } else {
-    auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
-    if (videos_dir_result) {
-      output_dir = *videos_dir_result / "SpinningMomo";
-    } else {
-      auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-      if (!exe_dir_result) {
-        return std::unexpected("Failed to get output directory");
-      }
-      output_dir = *exe_dir_result / "replays";
-    }
+  auto output_dir_result =
+      Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+  if (!output_dir_result) {
+    return std::unexpected("Failed to get output directory: " + output_dir_result.error());
   }
-
-  auto ensure_result = Utils::Path::EnsureDirectoryExists(output_dir);
-  if (!ensure_result) {
-    return std::unexpected("Failed to create output directory");
-  }
+  const auto& output_dir = output_dir_result.value();
 
   auto now = std::chrono::system_clock::now();
   auto filename = std::format("replay_{:%Y%m%d_%H%M%S}.mp4", now);

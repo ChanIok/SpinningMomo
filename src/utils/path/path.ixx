@@ -29,4 +29,11 @@ export auto NormalizePath(const std::filesystem::path& path,
 // 获取用户视频文件夹路径 (FOLDERID_Videos)
 export auto GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string>;
 
+// 获取应用输出目录：
+// 1. 使用配置目录（非空时）
+// 2. 回退到 Videos/SpinningMomo
+// 3. 最终回退到 exe 目录下的 SpinningMomo
+export auto GetOutputDirectory(const std::string& configured_output_dir_path)
+    -> std::expected<std::filesystem::path, std::string>;
+
 }  // namespace Utils::Path

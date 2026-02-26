@@ -136,11 +136,13 @@ const detectionMessageClass = computed(() => {
 })
 
 const buildInfinityNikkiExePath = (dir: string) => {
-  if (/[\\/]$/.test(dir)) {
-    return `${dir}InfinityNikki.exe`
-  }
+  const base = dir.replace(/\\/g, '/').replace(/\/+$/, '')
+  return `${base}/InfinityNikki.exe`
+}
 
-  return `${dir}\\InfinityNikki.exe`
+const resolveInfinityNikkiAlbumPath = (dir: string): string => {
+  const base = dir.replace(/\\/g, '/').replace(/\/+$/, '')
+  return `${base}/X6Game/ScreenShot`
 }
 
 const isValidInfinityNikkiGameDir = async (dir: string): Promise<boolean> => {
@@ -245,6 +247,7 @@ const completeOnboarding = async () => {
   }
 
   const trimmedGameDir = gameDir.value.trim()
+  let externalAlbumPath = ''
 
   isSubmitting.value = true
   try {
@@ -261,6 +264,8 @@ const completeOnboarding = async () => {
         stepError.value = t('onboarding.step2.gameDirInvalid')
         return
       }
+
+      externalAlbumPath = resolveInfinityNikkiAlbumPath(trimmedGameDir)
     }
 
     await store.updateSettings({
@@ -289,9 +294,14 @@ const completeOnboarding = async () => {
         ...store.appSettings.window,
         targetTitle: targetTitle.value,
       },
+      features: {
+        ...store.appSettings.features,
+        externalAlbumPath: skipInfinityNikki.value ? '' : externalAlbumPath,
+      },
       plugins: {
         ...store.appSettings.plugins,
         infinityNikki: {
+          ...store.appSettings.plugins.infinityNikki,
           enable: !skipInfinityNikki.value,
           gameDir: skipInfinityNikki.value ? '' : trimmedGameDir,
         },

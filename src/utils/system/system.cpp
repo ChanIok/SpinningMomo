@@ -5,6 +5,7 @@ module Utils.System;
 import std;
 import <windows.h>;
 import Vendor.ShellApi;
+import Vendor.Windows;
 
 namespace Utils::System {
 
@@ -90,6 +91,40 @@ namespace Utils::System {
   };
 
   return Vendor::ShellApi::ShellExecuteExW(&exec_info) != FALSE;
+}
+
+auto open_directory(const std::filesystem::path& path) -> std::expected<void, std::string> {
+  if (path.empty()) {
+    return std::unexpected("Directory path is empty");
+  }
+
+  try {
+    if (!std::filesystem::exists(path)) {
+      return std::unexpected("Directory does not exist: " + path.string());
+    }
+
+    if (!std::filesystem::is_directory(path)) {
+      return std::unexpected("Path is not a directory: " + path.string());
+    }
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to validate directory path: " + std::string(e.what()));
+  }
+
+  std::wstring wpath = path.wstring();
+  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+      .cbSize = sizeof(exec_info),
+      .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+      .lpVerb = L"open",
+      .lpFile = wpath.c_str(),
+      .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+  };
+
+  if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+    return std::unexpected("Failed to open directory, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  return {};
 }
 
 // 单实例互斥锁名称

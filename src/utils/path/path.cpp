@@ -134,3 +134,38 @@ auto Utils::Path::GetUserVideosDirectory() -> std::expected<std::filesystem::pat
   Vendor::ShellApi::CoTaskMemFree(path);
   return result;
 }
+
+auto Utils::Path::GetOutputDirectory(const std::string& configured_output_dir_path)
+    -> std::expected<std::filesystem::path, std::string> {
+  if (!configured_output_dir_path.empty()) {
+    std::filesystem::path configured_path = configured_output_dir_path;
+    auto ensure_result = EnsureDirectoryExists(configured_path);
+    if (!ensure_result) {
+      return std::unexpected("Failed to create configured output directory: " +
+                             ensure_result.error());
+    }
+    return configured_path;
+  }
+
+  auto videos_dir_result = GetUserVideosDirectory();
+  if (videos_dir_result) {
+    auto output_dir = *videos_dir_result / "SpinningMomo";
+    auto ensure_result = EnsureDirectoryExists(output_dir);
+    if (ensure_result) {
+      return output_dir;
+    }
+  }
+
+  auto exe_dir_result = GetExecutableDirectory();
+  if (!exe_dir_result) {
+    return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+  }
+
+  auto fallback_output_dir = *exe_dir_result / "SpinningMomo";
+  auto ensure_result = EnsureDirectoryExists(fallback_output_dir);
+  if (!ensure_result) {
+    return std::unexpected("Failed to create fallback output directory: " + ensure_result.error());
+  }
+
+  return fallback_output_dir;
+}

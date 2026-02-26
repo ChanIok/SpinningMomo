@@ -29,6 +29,10 @@ export [[nodiscard]] auto is_process_elevated() noexcept -> bool;
 // 返回 true 表示成功启动新进程（当前进程应退出）
 // 返回 false 表示用户取消或启动失败
 export [[nodiscard]] auto restart_as_elevated(const wchar_t* arguments = nullptr) noexcept -> bool;
+
+// 在资源管理器中打开目录
+export auto open_directory(const std::filesystem::path& path) -> std::expected<void, std::string>;
+
 // 单实例检测：尝试获取单实例锁
 // 返回 true 表示成功获取锁（当前是第一个实例）
 // 返回 false 表示已有实例在运行

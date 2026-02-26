@@ -80,12 +80,8 @@ export struct AppSettings {
 
   // features 分组 - 功能特性设置
   struct Features {
-    std::string output_dir_path = "";  // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
-
-    // 截图功能设置
-    struct Screenshot {
-      std::string game_album_path = "";  // 游戏相册目录路径
-    } screenshot;
+    std::string output_dir_path = "";      // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
+    std::string external_album_path = "";  // 外部游戏相册目录路径（为空时回退到输出目录）
 
     // 黑边模式设置
     struct Letterbox {
@@ -155,9 +151,10 @@ export struct AppSettings {
     struct AppMenu {
       // 启用的功能项（有则启用，顺序即菜单显示顺序）
       std::vector<std::string> features = {
-          "screenshot.capture", "recording.toggle",       "preview.toggle",
-          "overlay.toggle",     "window.reset",           "app.main",
-          "app.exit",           "screenshot.open_folder", "letterbox.toggle"};
+          "screenshot.capture", "recording.toggle",   "preview.toggle",
+          "overlay.toggle",     "window.reset",       "app.main",
+          "app.exit",           "output.open_folder", "external_album.open_folder",
+          "letterbox.toggle"};
       // 启用的比例列表（顺序即为菜单显示顺序）
       std::vector<std::string> aspect_ratios = {"21:9", "16:9", "3:2", "1:1", "3:4", "2:3", "9:16"};
       // 启用的分辨率列表（顺序即为菜单显示顺序）

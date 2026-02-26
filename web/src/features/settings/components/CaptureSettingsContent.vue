@@ -292,8 +292,8 @@ const handleResetSettings = async () => {
               {{ t('settings.function.screenshot.gameAlbum.label') }}
             </ItemTitle>
             <ItemDescription>
-              <template v-if="appSettings?.features?.screenshot?.gameAlbumPath">
-                {{ appSettings.features.screenshot.gameAlbumPath }}
+              <template v-if="appSettings?.features?.externalAlbumPath">
+                {{ appSettings.features.externalAlbumPath }}
               </template>
               <template v-else>
                 {{ t('settings.function.screenshot.gameAlbum.description') }}

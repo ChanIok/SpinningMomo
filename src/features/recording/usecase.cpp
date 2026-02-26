@@ -31,32 +31,12 @@ auto show_recording_notification(Core::State::AppState& state, const std::string
 // 生成输出文件路径
 auto generate_output_path(const Core::State::AppState& state)
     -> std::expected<std::filesystem::path, std::string> {
-  std::filesystem::path recordings_dir;
-
-  // 从设置中读取统一输出目录
-  const auto& output_dir_path = state.settings->raw.features.output_dir_path;
-
-  if (!output_dir_path.empty()) {
-    recordings_dir = std::filesystem::path(output_dir_path);
-  } else {
-    // 默认使用用户视频文件夹
-    auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
-    if (videos_dir_result) {
-      recordings_dir = *videos_dir_result / "SpinningMomo";
-    } else {
-      // 回退到程序目录
-      auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-      if (!exe_dir_result) {
-        return std::unexpected("Failed to get output directory");
-      }
-      recordings_dir = *exe_dir_result / "recordings";
-    }
+  auto output_dir_result =
+      Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+  if (!output_dir_result) {
+    return std::unexpected("Failed to get output directory: " + output_dir_result.error());
   }
-
-  auto ensure_result = Utils::Path::EnsureDirectoryExists(recordings_dir);
-  if (!ensure_result) {
-    return std::unexpected("Failed to create recordings directory");
-  }
+  const auto& recordings_dir = output_dir_result.value();
 
   auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
   // 与截图模块一致：FormatTimestamp 返回 .png，录制使用 .mp4

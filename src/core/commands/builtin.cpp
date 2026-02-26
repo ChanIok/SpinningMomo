@@ -7,7 +7,6 @@ import Core.State;
 import Core.Commands;
 import Features.Settings.State;
 import Features.Screenshot.UseCase;
-import Features.Screenshot.Folder;
 import Features.Recording.UseCase;
 import Features.ReplayBuffer.UseCase;
 import Features.ReplayBuffer.Types;
@@ -25,6 +24,8 @@ import Features.WindowControl.UseCase;
 import UI.FloatingWindow;
 import UI.WebViewWindow;
 import Utils.Logger;
+import Utils.Path;
+import Utils.System;
 import Vendor.BuildConfig;
 import Vendor.Windows;
 
@@ -87,20 +88,62 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
                            },
                    });
 
-  // 打开截图文件夹
+  // 打开输出目录
   register_command(
-      registry, {
-                    .id = "screenshot.open_folder",
-                    .i18n_key = "menu.screenshot_open_folder",
-                    .is_toggle = false,
-                    .action =
-                        [&state]() {
-                          auto result = Features::Screenshot::Folder::open_folder(state);
-                          if (!result) {
-                            Logger().error("Failed to open screenshot folder: {}", result.error());
-                          }
-                        },
-                });
+      registry,
+      {
+          .id = "output.open_folder",
+          .i18n_key = "menu.output_open_folder",
+          .is_toggle = false,
+          .action =
+              [&state]() {
+                auto output_dir_result =
+                    Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+                if (!output_dir_result) {
+                  Logger().error("Failed to resolve output directory: {}",
+                                 output_dir_result.error());
+                  return;
+                }
+
+                auto open_result = Utils::System::open_directory(output_dir_result.value());
+                if (!open_result) {
+                  Logger().error("Failed to open output directory: {}", open_result.error());
+                }
+              },
+      });
+
+  // 打开游戏相册目录
+  register_command(
+      registry,
+      {
+          .id = "external_album.open_folder",
+          .i18n_key = "menu.external_album_open_folder",
+          .is_toggle = false,
+          .action =
+              [&state]() {
+                std::filesystem::path folder_to_open;
+
+                const auto& external_album_path = state.settings->raw.features.external_album_path;
+                if (!external_album_path.empty()) {
+                  folder_to_open = external_album_path;
+                } else {
+                  auto output_dir_result =
+                      Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+                  if (!output_dir_result) {
+                    Logger().error("Failed to resolve fallback output directory: {}",
+                                   output_dir_result.error());
+                    return;
+                  }
+                  folder_to_open = output_dir_result.value();
+                }
+
+                auto open_result = Utils::System::open_directory(folder_to_open);
+                if (!open_result) {
+                  Logger().error("Failed to open external album directory: {}",
+                                 open_result.error());
+                }
+              },
+      });
 
   // === 独立功能 ===
 

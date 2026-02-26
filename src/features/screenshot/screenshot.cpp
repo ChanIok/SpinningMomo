@@ -437,28 +437,17 @@ auto take_screenshot(
 
   if (output_dir_override.has_value()) {
     screenshots_dir = *output_dir_override;
-  } else {
-    const auto& output_dir_path = app_state.settings->raw.features.output_dir_path;
-    if (!output_dir_path.empty()) {
-      screenshots_dir = std::filesystem::path(output_dir_path);
-    } else {
-      auto videos_dir_result = Utils::Path::GetUserVideosDirectory();
-      if (videos_dir_result) {
-        screenshots_dir = *videos_dir_result / "SpinningMomo";
-      } else {
-        // 回退到程序目录
-        auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-        if (!exe_dir_result) {
-          return std::unexpected("Failed to get output directory: " + exe_dir_result.error());
-        }
-        screenshots_dir = exe_dir_result.value() / "screenshots";
-      }
+    auto ensure_result = Utils::Path::EnsureDirectoryExists(screenshots_dir);
+    if (!ensure_result) {
+      return std::unexpected("Failed to create output directory: " + ensure_result.error());
     }
-  }
-
-  auto ensure_result = Utils::Path::EnsureDirectoryExists(screenshots_dir);
-  if (!ensure_result) {
-    return std::unexpected("Failed to create output directory: " + ensure_result.error());
+  } else {
+    auto output_dir_result =
+        Utils::Path::GetOutputDirectory(app_state.settings->raw.features.output_dir_path);
+    if (!output_dir_result) {
+      return std::unexpected("Failed to get output directory: " + output_dir_result.error());
+    }
+    screenshots_dir = output_dir_result.value();
   }
 
   auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());

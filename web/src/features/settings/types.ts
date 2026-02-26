@@ -155,11 +155,7 @@ export interface AppSettings {
   // features 分组 - 功能特性设置
   features: {
     outputDirPath: string // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
-
-    // 截图功能设置
-    screenshot: {
-      gameAlbumPath: string // 游戏相册目录路径
-    }
+    externalAlbumPath: string // 外部游戏相册目录路径（为空时回退到输出目录）
 
     // 黑边模式设置
     letterbox: {
@@ -294,9 +290,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // features 设置
   features: {
     outputDirPath: '',
-    screenshot: {
-      gameAlbumPath: '',
-    },
+    externalAlbumPath: '',
     letterbox: {
       enabled: false,
     },
@@ -357,7 +351,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         'window.reset',
         'app.main',
         'app.exit',
-        'screenshot.open_folder',
+        'output.open_folder',
+        'external_album.open_folder',
         'letterbox.toggle',
       ],
       aspectRatios: ['21:9', '16:9', '3:2', '1:1', '3:4', '2:3', '9:16'],
