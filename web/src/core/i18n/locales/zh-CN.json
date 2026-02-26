@@ -341,5 +341,9 @@
   "onboarding.actions.completing": "保存中...",
   "onboarding.common.saveFailed": "保存欢迎配置失败，请重试。",
   "onboarding.completed.title": "配置完成！",
-  "onboarding.completed.description": "你可以关闭此页面了。"
+  "onboarding.completed.description": "你可以关闭此页面了。",
+  "app.header.gallery.toggleSidebar.hide": "隐藏左侧面板",
+  "app.header.gallery.toggleSidebar.show": "显示左侧面板",
+  "app.header.gallery.toggleDetails.hide": "隐藏右侧面板",
+  "app.header.gallery.toggleDetails.show": "显示右侧面板"
 }

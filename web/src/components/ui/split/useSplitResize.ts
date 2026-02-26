@@ -8,12 +8,14 @@ interface UseSplitResizeOptions {
   max: Ref<number | string>
   reverse: Ref<boolean>
   onUpdate: (size: number | string) => void
+  onDrag?: (e: MouseEvent) => void
   onDragStart?: (e: MouseEvent) => void
   onDragEnd?: (e: MouseEvent) => void
 }
 
 export function useSplitResize(options: UseSplitResizeOptions) {
-  const { direction, dividerSize, min, max, reverse, onUpdate, onDragStart, onDragEnd } = options
+  const { direction, dividerSize, min, max, reverse, onUpdate, onDrag, onDragStart, onDragEnd } =
+    options
 
   const containerRef = ref<HTMLElement>()
   const dividerRef = ref<HTMLElement>()
@@ -123,6 +125,7 @@ export function useSplitResize(options: UseSplitResizeOptions) {
     const handleMouseMove = (e: MouseEvent) => {
       const newSize = calculateNewSize(e, currentSize)
       onUpdate(newSize)
+      onDrag?.(e)
     }
 
     // 鼠标释放处理

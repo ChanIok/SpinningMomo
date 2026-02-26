@@ -341,5 +341,9 @@
   "onboarding.actions.completing": "Saving...",
   "onboarding.common.saveFailed": "Failed to save onboarding settings. Please try again.",
   "onboarding.completed.title": "Setup Complete!",
-  "onboarding.completed.description": "You can now close this page."
+  "onboarding.completed.description": "You can now close this page.",
+  "app.header.gallery.toggleSidebar.hide": "Hide left panel",
+  "app.header.gallery.toggleSidebar.show": "Show left panel",
+  "app.header.gallery.toggleDetails.hide": "Hide right panel",
+  "app.header.gallery.toggleDetails.show": "Show right panel"
 }

@@ -104,6 +104,7 @@ const props = withDefaults(defineProps<SplitProps>(), {
 
 const emit = defineEmits<{
   'update:size': [size: number | string]
+  drag: [e: MouseEvent]
   'drag-start': [e: MouseEvent]
   'drag-end': [e: MouseEvent]
 }>()
@@ -152,6 +153,7 @@ const {
   onUpdate: (size) => {
     internalSize.value = size
   },
+  onDrag: (e) => emit('drag', e),
   onDragStart: (e) => emit('drag-start', e),
   onDragEnd: (e) => emit('drag-end', e),
 })
