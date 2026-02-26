@@ -1,12 +1,5 @@
 module;
 
-#include <d2d1.h>
-#include <dwrite.h>
-#include <windows.h>
-#include <wrl/client.h>
-
-#include <string>
-
 module UI.ContextMenu.Layout;
 
 import std;
@@ -16,6 +9,10 @@ import UI.ContextMenu.Types;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
 import Vendor.Windows;
+import <d2d1.h>;
+import <dwrite.h>;
+import <windows.h>;
+import <wrl/client.h>;
 
 namespace UI::ContextMenu::Layout {
 
@@ -25,7 +22,7 @@ auto calculate_text_width(const Core::State::AppState& state, const std::wstring
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
   const auto& d2d = state.floating_window->d2d_context;
-  if (!d2d.is_initialized || !menu_state.text_format) {
+  if (!d2d.is_initialized || !d2d.write_factory || !menu_state.text_format) {
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
 

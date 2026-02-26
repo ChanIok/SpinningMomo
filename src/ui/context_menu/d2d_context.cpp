@@ -1,11 +1,5 @@
 module;
 
-#include <d2d1_3.h>
-#include <dwrite_3.h>
-#include <windows.h>
-
-#include <string>
-
 module UI.ContextMenu.D2DContext;
 
 import Core.State;
@@ -14,10 +8,11 @@ import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import Utils.Logger;
 import Features.Settings.State;
+import <d2d1_3.h>;
+import <dwrite_3.h>;
+import <windows.h>;
 
 namespace {
-
-using UI::ContextMenu::State::ContextMenuState;
 
 // 辅助函数：从包含透明度的十六进制颜色字符串创建 D2D1_COLOR_F
 auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
@@ -53,20 +48,30 @@ auto create_brushes_for_target(Core::State::AppState& state, ID2D1HwndRenderTarg
                                ID2D1SolidColorBrush** indicator_brush) -> bool {
   const auto& colors = state.settings->raw.ui.floating_window_colors;
 
-  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.background),
-                                           background_brush)))
-    return false;
-  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.text), text_brush)))
-    return false;
-  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.separator),
-                                           separator_brush)))
-    return false;
-  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.hover), hover_brush)))
-    return false;
-  if (FAILED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(colors.indicator),
-                                           indicator_brush)))
-    return false;
+  if (!create_brush_from_hex(target, colors.background, background_brush)) return false;
+  if (!create_brush_from_hex(target, colors.text, text_brush)) return false;
+  if (!create_brush_from_hex(target, colors.separator, separator_brush)) return false;
+  if (!create_brush_from_hex(target, colors.hover, hover_brush)) return false;
+  if (!create_brush_from_hex(target, colors.indicator, indicator_brush)) return false;
   return true;
+}
+
+auto has_floating_d2d_context(const Core::State::AppState& state) -> bool {
+  return state.floating_window && state.floating_window->d2d_context.is_initialized &&
+         state.floating_window->d2d_context.factory;
+}
+
+auto create_hwnd_render_target(ID2D1Factory7* factory, HWND hwnd,
+                               ID2D1HwndRenderTarget** render_target) -> HRESULT {
+  RECT rc;
+  GetClientRect(hwnd, &rc);
+  D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
+
+  // 强制 96 DPI，避免 HwndRenderTarget 自动按系统 DPI 缩放
+  return factory->CreateHwndRenderTarget(
+      D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(), 96.0f,
+                                   96.0f),
+      D2D1::HwndRenderTargetProperties(hwnd, size), render_target);
 }
 
 auto release_brushes(ID2D1SolidColorBrush** background_brush, ID2D1SolidColorBrush** text_brush,
@@ -102,21 +107,12 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& menu_state = *state.context_menu;
   if (menu_state.main_menu_d2d_ready) return true;
 
-  if (!state.floating_window || !state.floating_window->d2d_context.is_initialized ||
-      !state.floating_window->d2d_context.factory) {
+  if (!has_floating_d2d_context(state)) {
     return false;
   }
   const auto& d2d_context = state.floating_window->d2d_context;
 
-  RECT rc;
-  GetClientRect(hwnd, &rc);
-  D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
-
-  // 强制 96 DPI，避免 HwndRenderTarget 自动按系统 DPI 缩放
-  HRESULT hr = d2d_context.factory->CreateHwndRenderTarget(
-      D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(), 96.0f,
-                                   96.0f),
-      D2D1::HwndRenderTargetProperties(hwnd, size), &menu_state.render_target);
+  HRESULT hr = create_hwnd_render_target(d2d_context.factory, hwnd, &menu_state.render_target);
 
   if (FAILED(hr)) {
     cleanup_context_menu(state);
@@ -169,22 +165,14 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& menu_state = *state.context_menu;
   if (menu_state.submenu_d2d_ready) return true;
 
-  if (!state.floating_window || !state.floating_window->d2d_context.is_initialized ||
-      !state.floating_window->d2d_context.factory) {
+  if (!has_floating_d2d_context(state)) {
     Logger().error("FloatingWindow D2D not initialized or factory is null");
     return false;
   }
   const auto& d2d_context = state.floating_window->d2d_context;
 
-  RECT rc;
-  GetClientRect(hwnd, &rc);
-  D2D1_SIZE_U size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
-
-  // 强制 96 DPI，与主菜单保持一致
-  HRESULT hr = d2d_context.factory->CreateHwndRenderTarget(
-      D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1::PixelFormat(), 96.0f,
-                                   96.0f),
-      D2D1::HwndRenderTargetProperties(hwnd, size), &menu_state.submenu_render_target);
+  HRESULT hr =
+      create_hwnd_render_target(d2d_context.factory, hwnd, &menu_state.submenu_render_target);
 
   if (FAILED(hr)) {
     Logger().error("Failed to create submenu render target, HRESULT: 0x{:X}", hr);

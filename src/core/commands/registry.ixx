@@ -42,12 +42,12 @@ export auto register_command(CommandRegistry& registry, CommandDescriptor descri
 // 调用命令
 export auto invoke_command(CommandRegistry& registry, const std::string& id) -> bool;
 
+// 获取单个命令描述符（零拷贝，只读）
+export auto get_command(const CommandRegistry& registry, const std::string& id)
+    -> const CommandDescriptor*;
+
 // 获取所有命令描述符（按注册顺序）
 export auto get_all_commands(const CommandRegistry& registry) -> std::vector<CommandDescriptor>;
-
-// 获取单个命令描述符
-export auto get_command(const CommandRegistry& registry, const std::string& id)
-    -> std::optional<CommandDescriptor>;
 
 // === RPC Types ===
 

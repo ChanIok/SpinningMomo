@@ -1,17 +1,14 @@
 module;
 
-#include <d2d1_3.h>
-#include <dwrite_3.h>
-#include <windows.h>
-
-#include <string>
-
 module UI.FloatingWindow.D2DContext;
 
 import Core.State;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
 import Features.Settings.State;
+import <d2d1_3.h>;
+import <dwrite_3.h>;
+import <windows.h>;
 
 namespace UI::FloatingWindow::D2DContext {
 
@@ -59,6 +56,16 @@ auto create_all_brushes_simple(Core::State::AppState& state, UI::FloatingWindow:
          create_brush_from_hex(d2d.render_target, colors.hover, &d2d.hover_brush) &&
          create_brush_from_hex(d2d.render_target, colors.scroll_indicator,
                                &d2d.scroll_indicator_brush);
+}
+
+auto clear_text_caches(UI::FloatingWindow::RenderContext& d2d) -> void {
+  for (auto& [_, text_format] : d2d.adjusted_text_formats) {
+    if (text_format) {
+      text_format->Release();
+    }
+  }
+  d2d.adjusted_text_formats.clear();
+  d2d.text_measure_cache.clear();
 }
 
 // 辅助函数：测量文本宽度
@@ -256,6 +263,7 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
 // 清理Direct2D资源
 auto cleanup_d2d(Core::State::AppState& state) -> void {
   auto& d2d = state.floating_window->d2d_context;
+  clear_text_caches(d2d);
 
   // 释放画刷
   if (d2d.background_brush) {
@@ -299,18 +307,17 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
     d2d.write_factory = nullptr;
   }
 
-  // 释放内存DC和位图
-  if (d2d.memory_dc) {
-    DeleteDC(d2d.memory_dc);
-    d2d.memory_dc = nullptr;
+  if (d2d.old_bitmap && d2d.memory_dc) {
+    SelectObject(d2d.memory_dc, d2d.old_bitmap);
+    d2d.old_bitmap = nullptr;
   }
   if (d2d.dib_bitmap) {
     DeleteObject(d2d.dib_bitmap);
     d2d.dib_bitmap = nullptr;
   }
-  if (d2d.old_bitmap) {
-    SelectObject(d2d.memory_dc, d2d.old_bitmap);
-    d2d.old_bitmap = nullptr;
+  if (d2d.memory_dc) {
+    DeleteDC(d2d.memory_dc);
+    d2d.memory_dc = nullptr;
   }
 
   // 释放设备上下文
@@ -422,6 +429,7 @@ auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
     }
 
     if (SUCCEEDED(hr)) {
+      clear_text_caches(d2d);
       d2d.needs_font_update = false;
       return true;
     }

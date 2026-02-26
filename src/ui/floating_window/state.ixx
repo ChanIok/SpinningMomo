@@ -31,10 +31,10 @@ auto is_item_selected(const FloatingWindow::MenuItem& item, const Core::State::A
     case FloatingWindow::MenuItemCategory::Feature: {
       // 从命令注册表查询状态
       if (app_state.commands) {
-        if (auto command_opt =
+        if (const auto* command =
                 Core::Commands::get_command(app_state.commands->registry, item.action_id)) {
-          if (command_opt->is_toggle && command_opt->get_state) {
-            return command_opt->get_state();
+          if (command->is_toggle && command->get_state) {
+            return command->get_state();
           }
         }
       }

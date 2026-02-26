@@ -47,6 +47,15 @@ auto invoke_command(CommandRegistry& registry, const std::string& id) -> bool {
   }
 }
 
+auto get_command(const CommandRegistry& registry, const std::string& id)
+    -> const CommandDescriptor* {
+  auto it = registry.descriptors.find(id);
+  if (it == registry.descriptors.end()) {
+    return nullptr;
+  }
+  return &it->second;
+}
+
 auto get_all_commands(const CommandRegistry& registry) -> std::vector<CommandDescriptor> {
   std::vector<CommandDescriptor> result;
   result.reserve(registry.registration_order.size());
@@ -59,15 +68,6 @@ auto get_all_commands(const CommandRegistry& registry) -> std::vector<CommandDes
   }
 
   return result;
-}
-
-auto get_command(const CommandRegistry& registry, const std::string& id)
-    -> std::optional<CommandDescriptor> {
-  auto it = registry.descriptors.find(id);
-  if (it != registry.descriptors.end()) {
-    return it->second;
-  }
-  return std::nullopt;
 }
 
 // 从 settings 获取热键配置（根据 settings_path）

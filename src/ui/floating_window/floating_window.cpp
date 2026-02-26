@@ -268,9 +268,9 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
     for (size_t i = 0; i < feature_config.size(); ++i) {
       const auto& command_id = feature_config[i];
       // 从注册表获取命令描述
-      if (auto command_opt = Core::Commands::get_command(state.commands->registry, command_id)) {
+      if (const auto* command = Core::Commands::get_command(state.commands->registry, command_id)) {
         // 使用 i18n_key 获取文本
-        std::wstring text = get_text_by_i18n_key(command_opt->i18n_key, texts);
+        std::wstring text = get_text_by_i18n_key(command->i18n_key, texts);
         state.floating_window->data.menu_items.emplace_back(
             text, UI::FloatingWindow::MenuItemCategory::Feature, static_cast<int>(i), command_id);
       } else {

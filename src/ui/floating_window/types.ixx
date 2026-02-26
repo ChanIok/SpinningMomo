@@ -93,6 +93,13 @@ struct LayoutConfig {
 };
 
 // 浮窗专用的Direct2D渲染状态
+struct TextMeasureCacheEntry {
+  std::wstring text;
+  int width_key = 0;
+  int base_font_key = 0;
+  int resolved_font_key = 0;
+};
+
 struct RenderContext {
   // Direct2D 1.3资源句柄
   ID2D1Factory7* factory = nullptr;               // Direct2D 1.3 工厂
@@ -118,6 +125,8 @@ struct RenderContext {
 
   // 文本格式
   IDWriteTextFormat* text_format = nullptr;
+  std::unordered_map<int, IDWriteTextFormat*> adjusted_text_formats;  // 按字号缓存文本格式
+  std::vector<TextMeasureCacheEntry> text_measure_cache;              // 文本测量结果缓存
 
   // 状态标志
   bool is_initialized = false;

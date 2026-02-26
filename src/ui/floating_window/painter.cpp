@@ -1,9 +1,5 @@
 module;
 
-#include <d2d1_3.h>
-#include <dwrite_3.h>
-#include <windows.h>
-
 module UI.FloatingWindow.Painter;
 
 import std;
@@ -13,6 +9,9 @@ import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
 import UI.FloatingWindow.D2DContext;
 import Features.Settings.Menu;
+import <d2d1_3.h>;
+import <dwrite_3.h>;
+import <windows.h>;
 
 namespace UI::FloatingWindow::Painter {
 
@@ -30,6 +29,66 @@ struct ColumnDrawParams {
   size_t max_visible;
   bool is_paged;
 };
+
+constexpr float kWidthCacheScale = 10.0f;
+constexpr float kFontCacheScale = 100.0f;
+constexpr size_t kMaxTextMeasureCacheEntries = 256;
+constexpr size_t kMaxAdjustedFormatEntries = 32;
+
+auto to_cache_key(float value, float scale) -> int {
+  return static_cast<int>(std::lround(value * scale));
+}
+
+auto find_cached_font_key(const UI::FloatingWindow::RenderContext& d2d, std::wstring_view text,
+                          int width_key, int base_font_key) -> std::optional<int> {
+  for (const auto& entry : d2d.text_measure_cache) {
+    if (entry.width_key == width_key && entry.base_font_key == base_font_key &&
+        entry.text == text) {
+      return entry.resolved_font_key;
+    }
+  }
+  return std::nullopt;
+}
+
+auto store_text_measure_cache(UI::FloatingWindow::RenderContext& d2d, std::wstring_view text,
+                              int width_key, int base_font_key, int resolved_font_key) -> void {
+  if (d2d.text_measure_cache.size() >= kMaxTextMeasureCacheEntries) {
+    d2d.text_measure_cache.clear();
+  }
+
+  d2d.text_measure_cache.push_back(UI::FloatingWindow::TextMeasureCacheEntry{
+      .text = std::wstring(text),
+      .width_key = width_key,
+      .base_font_key = base_font_key,
+      .resolved_font_key = resolved_font_key,
+  });
+}
+
+auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderContext& d2d, int font_key)
+    -> IDWriteTextFormat* {
+  if (auto it = d2d.adjusted_text_formats.find(font_key); it != d2d.adjusted_text_formats.end()) {
+    return it->second;
+  }
+
+  if (d2d.adjusted_text_formats.size() >= kMaxAdjustedFormatEntries) {
+    for (auto& [_, text_format] : d2d.adjusted_text_formats) {
+      if (text_format) {
+        text_format->Release();
+      }
+    }
+    d2d.adjusted_text_formats.clear();
+  }
+
+  const float font_size = static_cast<float>(font_key) / kFontCacheScale;
+  auto* text_format =
+      UI::FloatingWindow::D2DContext::create_text_format_with_size(d2d.write_factory, font_size);
+  if (!text_format) {
+    return nullptr;
+  }
+
+  d2d.adjusted_text_formats.emplace(font_key, text_format);
+  return text_format;
+}
 
 // 按类别分组菜单项
 auto group_items_by_column(const std::vector<UI::FloatingWindow::MenuItem>& items)
@@ -57,7 +116,7 @@ auto group_items_by_column(const std::vector<UI::FloatingWindow::MenuItem>& item
 }
 
 // 绘制单个列
-auto draw_single_column(const Core::State::AppState& state, const D2D1_RECT_F& rect,
+auto draw_single_column(Core::State::AppState& state, const D2D1_RECT_F& rect,
                         const ColumnItems& column, const ColumnDrawParams& params) -> void {
   const auto& render = state.floating_window->layout;
   float y = rect.top + static_cast<float>(render.title_height + render.separator_height);
@@ -206,7 +265,6 @@ auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& ti
 
   // 计算按钮尺寸（正方形，与标题栏高度一致）
   const float button_size = static_cast<float>(render.title_height);
-  const float button_padding = static_cast<float>(render.text_padding) / 2.0f;
 
   // 计算按钮位置（右上角）
   const float x = title_rect.right - button_size;
@@ -293,7 +351,7 @@ auto draw_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect
 }
 
 // 绘制所有菜单项
-auto draw_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
+auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& render = state.floating_window->layout;
   const auto& ui = state.floating_window->ui;
   const auto& items = state.floating_window->data.menu_items;
@@ -356,10 +414,11 @@ auto draw_items(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> 
 }
 
 // 绘制单个菜单项
-auto draw_single_item(const Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
+auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
                       const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
-  const auto& d2d = state.floating_window->d2d_context;
+  auto& d2d = state.floating_window->d2d_context;
   const auto& render = state.floating_window->layout;
+  const int indicator_width = UI::FloatingWindow::Layout::get_indicator_width(item, state);
 
   // 绘制悬停背景
   if (is_hovered) {
@@ -369,7 +428,6 @@ auto draw_single_item(const Core::State::AppState& state, const UI::FloatingWind
   // 绘制选中指示器（保持完全不透明）
   const bool is_selected = UI::FloatingWindow::State::is_item_selected(item, state);
   if (is_selected) {
-    const int indicator_width = UI::FloatingWindow::Layout::get_indicator_width(item, state);
     D2D1_RECT_F indicator_rect = UI::FloatingWindow::make_d2d_rect(
         item_rect.left, item_rect.top, item_rect.left + static_cast<float>(indicator_width),
         item_rect.bottom);
@@ -377,79 +435,73 @@ auto draw_single_item(const Core::State::AppState& state, const UI::FloatingWind
   }
 
   // 绘制文本（保持完全不透明）
-  const int indicator_width = UI::FloatingWindow::Layout::get_indicator_width(item, state);
-
   D2D1_RECT_F text_rect = UI::FloatingWindow::make_d2d_rect(
       item_rect.left + static_cast<float>(render.text_padding + indicator_width), item_rect.top,
       item_rect.right - static_cast<float>(render.text_padding / 2), item_rect.bottom);
+  const auto draw_default_text = [&]() -> void {
+    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
+                                d2d.text_format, text_rect, d2d.text_brush);
+  };
 
   // 计算可用于文本的宽度
   const float available_width = text_rect.right - text_rect.left;
 
   // 如果文本为空或宽度无效，则直接使用默认字体绘制
-  if (item.text.empty() || available_width <= 0.0f) {
-    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
-                                d2d.text_format, text_rect, d2d.text_brush);
+  if (item.text.empty() || available_width <= 0.0f || !d2d.text_format || !d2d.write_factory) {
+    draw_default_text();
     return;
   }
 
-  // 测量当前字体大小下的文本宽度
-  float text_width = UI::FloatingWindow::D2DContext::measure_text_width(item.text, d2d.text_format,
-                                                                        d2d.write_factory);
+  const int width_key = to_cache_key(available_width, kWidthCacheScale);
+  const int base_font_key = to_cache_key(render.font_size, kFontCacheScale);
 
-  // 如果文本宽度小于可用宽度，则直接使用默认字体绘制
-  if (text_width <= available_width) {
-    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
-                                d2d.text_format, text_rect, d2d.text_brush);
+  int resolved_font_key = base_font_key;
+  if (const auto cached_font_key = find_cached_font_key(d2d, item.text, width_key, base_font_key)) {
+    resolved_font_key = *cached_font_key;
+  } else {
+    float text_width = UI::FloatingWindow::D2DContext::measure_text_width(
+        item.text, d2d.text_format, d2d.write_factory);
+
+    if (text_width > available_width) {
+      float adjusted_font_size = render.font_size;
+
+      for (adjusted_font_size -= UI::FloatingWindow::LayoutConfig::FONT_SIZE_STEP;
+           adjusted_font_size >= UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE;
+           adjusted_font_size -= UI::FloatingWindow::LayoutConfig::FONT_SIZE_STEP) {
+        const float clamped_font_size =
+            std::max(adjusted_font_size, UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE);
+
+        const int adjusted_font_key = to_cache_key(clamped_font_size, kFontCacheScale);
+        auto* adjusted_text_format = get_or_create_adjusted_text_format(d2d, adjusted_font_key);
+        if (!adjusted_text_format) {
+          break;
+        }
+
+        text_width = UI::FloatingWindow::D2DContext::measure_text_width(
+            item.text, adjusted_text_format, d2d.write_factory);
+        if (text_width <= available_width) {
+          resolved_font_key = adjusted_font_key;
+          break;
+        }
+      }
+    }
+
+    store_text_measure_cache(d2d, item.text, width_key, base_font_key, resolved_font_key);
+  }
+
+  if (resolved_font_key == base_font_key) {
+    draw_default_text();
     return;
   }
 
-  // 文本太宽，需要调整字体大小
-  IDWriteTextFormat* adjusted_text_format = nullptr;
-  float adjusted_font_size = render.font_size;
-
-  // 逐步减小字体大小，直到文本适合或达到最小字体大小
-  while (adjusted_font_size > UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE) {
-    adjusted_font_size -= UI::FloatingWindow::LayoutConfig::FONT_SIZE_STEP;
-
-    // 如果已达到最小字体大小，则使用最小字体大小
-    if (adjusted_font_size <= UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE) {
-      adjusted_font_size = UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE;
-    }
-
-    // 创建调整后的文本格式
-    adjusted_text_format = UI::FloatingWindow::D2DContext::create_text_format_with_size(
-        d2d.write_factory, adjusted_font_size);
-    if (!adjusted_text_format) {
-      // 如果创建失败，则回退到默认字体
-      break;
-    }
-
-    // 测量调整后字体大小的文本宽度
-    text_width = UI::FloatingWindow::D2DContext::measure_text_width(item.text, adjusted_text_format,
-                                                                    d2d.write_factory);
-
-    // 如果文本宽度满足要求，则使用调整后的字体绘制
-    if (text_width <= available_width) {
-      d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
-                                  adjusted_text_format, text_rect, d2d.text_brush);
-      adjusted_text_format->Release();
-      return;
-    }
-
-    // 释放临时文本格式对象
-    adjusted_text_format->Release();
-    adjusted_text_format = nullptr;
-
-    // 如果已达到最小字体大小，则跳出循环
-    if (adjusted_font_size <= UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE) {
-      break;
-    }
+  if (auto* adjusted_text_format = get_or_create_adjusted_text_format(d2d, resolved_font_key)) {
+    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
+                                adjusted_text_format, text_rect, d2d.text_brush);
+    return;
   }
 
-  // 如果无法调整到合适的字体大小，仍然使用默认字体绘制（可能会被截断）
-  d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
-                              d2d.text_format, text_rect, d2d.text_brush);
+  // 缓存命中但创建失败时，回退默认字体绘制
+  draw_default_text();
 }
 
 // UpdateLayeredWindow函数 - 将内存DC更新到分层窗口

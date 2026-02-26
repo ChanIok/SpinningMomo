@@ -1,13 +1,5 @@
 module;
 
-#include <d2d1.h>
-#include <dwmapi.h>
-#include <dwrite.h>
-#include <windows.h>
-#include <wrl/client.h>
-
-#include <format>
-
 module UI.ContextMenu;
 
 import std;
@@ -32,6 +24,11 @@ import Utils.Logger;
 import Utils.String;
 import Vendor.Windows;
 import Features.WindowControl;
+import <d2d1.h>;
+import <dwmapi.h>;
+import <dwrite.h>;
+import <windows.h>;
+import <wrl/client.h>;
 
 namespace UI::ContextMenu {
 
@@ -293,6 +290,7 @@ auto cleanup(Core::State::AppState& app_state) -> void {
     }
 
     // 清理D2D资源
+    D2DContext::cleanup_submenu(app_state);
     D2DContext::cleanup_context_menu(app_state);
     UI::ContextMenu::Interaction::reset(app_state);
     app_state.context_menu->submenu_parent_index = -1;
