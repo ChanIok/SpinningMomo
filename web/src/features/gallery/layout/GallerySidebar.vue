@@ -83,7 +83,7 @@ const totalCount = computed(() => store.foldersAssetTotalCount)
 </script>
 
 <template>
-  <div class="flex h-full flex-col border-r">
+  <div class="flex h-full flex-col">
     <!-- 标题栏 -->
     <div class="flex h-12 items-center justify-between border-b px-4">
       <h2 class="text-sm font-medium">资源库</h2>

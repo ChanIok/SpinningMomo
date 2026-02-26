@@ -85,6 +85,7 @@ const syncPreviewAppearance = () => {
     ui: {
       ...store.appSettings.ui,
       webTheme: {
+        ...store.appSettings.ui.webTheme,
         mode: themeMode.value,
       },
       background: {
@@ -283,6 +284,7 @@ const completeOnboarding = async () => {
       ui: {
         ...store.appSettings.ui,
         webTheme: {
+          ...store.appSettings.ui.webTheme,
           mode: themeMode.value,
         },
         background: {

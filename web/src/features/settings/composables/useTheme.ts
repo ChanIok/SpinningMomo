@@ -54,6 +54,7 @@ export const useTheme = () => {
         ui: {
           ...appSettings.value.ui,
           webTheme: {
+            ...appSettings.value.ui.webTheme,
             mode,
           },
         },

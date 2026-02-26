@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, toRef, watch } from 'vue'
+import { computed, ref, toRef, useSlots, watch } from 'vue'
 import { useSplitResize } from './useSplitResize'
 
 export interface SplitProps {
@@ -46,14 +46,27 @@ export interface SplitProps {
 
   /**
    * 分隔条宽度（像素）
+   * - 仅影响布局占位与拖拽命中区域
    * @default 4
    */
   dividerSize?: number
 
   /**
-   * 分隔条自定义类名
+   * 分隔条视觉线宽度（像素）
+   * - 仅影响可见线条粗细，不影响命中区域
+   * @default 1
+   */
+  dividerVisualSize?: number
+
+  /**
+   * 分隔条拖拽区域自定义类名
    */
   dividerClass?: string
+
+  /**
+   * 分隔条视觉线自定义类名
+   */
+  dividerLineClass?: string
 
   /**
    * 面板 1 自定义类名
@@ -81,7 +94,9 @@ const props = withDefaults(defineProps<SplitProps>(), {
   max: 1,
   disabled: false,
   dividerSize: 4,
+  dividerVisualSize: 1,
   dividerClass: '',
+  dividerLineClass: '',
   pane1Class: '',
   pane2Class: '',
   reverse: false,
@@ -149,14 +164,32 @@ const containerClass = computed(() => [
 
 const firstPaneStyle = computed(() => getFirstPaneStyle(internalSize.value))
 const secondPaneStyle = computed(() => getSecondPaneStyle(internalSize.value))
+const slots = useSlots()
 
 const dividerClasses = computed(() => [
-  'group flex-shrink-0 transition-colors duration-200',
+  'group relative flex-shrink-0',
   dividerCursor.value,
-  props.dividerClass || 'bg-border hover:bg-primary/50',
-  isDragging.value && 'bg-primary/70',
+  props.dividerClass || 'bg-transparent',
   props.disabled && 'cursor-default opacity-50',
 ])
+
+const dividerLineClasses = computed(() => [
+  'pointer-events-none absolute transition-colors duration-200',
+  props.direction === 'horizontal'
+    ? 'top-0 left-1/2 h-full -translate-x-1/2'
+    : 'top-1/2 left-0 w-full -translate-y-1/2',
+  props.dividerLineClass ||
+    (isDragging.value ? 'bg-primary/70' : 'bg-border group-hover:bg-primary/50'),
+])
+
+const dividerLineStyle = computed(() => {
+  const isHorizontal = props.direction === 'horizontal'
+  return isHorizontal
+    ? { width: `${props.dividerVisualSize}px` }
+    : { height: `${props.dividerVisualSize}px` }
+})
+
+const hasDividerSlot = computed(() => Boolean(slots.divider))
 
 // 拖拽处理器
 const onMouseDown = (e: MouseEvent) => {
@@ -182,6 +215,7 @@ const onMouseDown = (e: MouseEvent) => {
       :style="dividerStyle"
       @mousedown="onMouseDown"
     >
+      <div v-if="!hasDividerSlot" :class="dividerLineClasses" :style="dividerLineStyle" />
       <slot name="divider" />
     </div>
 

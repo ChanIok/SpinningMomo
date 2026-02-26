@@ -72,7 +72,7 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     id: 'mist',
     themeMode: 'light',
     mode: 1,
-    colors: ['#E9EEF7', '#E9EEF7', '#E9EEF7', '#E9EEF7'],
+    colors: ['#F1F5FB', '#F1F5FB', '#F1F5FB', '#F1F5FB'],
   },
   {
     id: 'nikki',
@@ -84,7 +84,7 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     id: 'spring',
     themeMode: 'light',
     mode: 2,
-    colors: ['#DAE8CA', '#F1E1C5', '#F1E1C5', '#F1E1C5'],
+    colors: ['#DAE8CA', '#F6EAD3', '#F6EAD3', '#F6EAD3'],
   },
   {
     id: 'daydream',

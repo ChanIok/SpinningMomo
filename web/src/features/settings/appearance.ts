@@ -1,8 +1,15 @@
-import type { AppSettings, WebThemeMode } from './types'
+import type { AppSettings, CjkFontPreset, WebThemeMode } from './types'
 import { resolveBackgroundImageUrl } from './backgroundPath'
 import { buildOverlayGradient, getOverlayPaletteFromBackground } from './overlayPalette'
 
 type ResolvedTheme = 'light' | 'dark'
+
+const CJK_FONT_STACKS: Record<CjkFontPreset, string> = {
+  harmony:
+    "'HarmonyOS Sans SC Web', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC'",
+  microsoft:
+    "'Microsoft YaHei UI', 'Microsoft YaHei', 'HarmonyOS Sans SC Web', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC'",
+}
 
 const clamp = (value: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, value))
@@ -29,6 +36,13 @@ const applyTheme = (mode: WebThemeMode): void => {
   } else {
     root.classList.remove('dark')
   }
+}
+
+const applyFont = (settings: AppSettings): void => {
+  const root = document.documentElement
+  const preset = settings.ui.webTheme.cjkFontPreset
+  const stack = CJK_FONT_STACKS[preset] ?? CJK_FONT_STACKS.harmony
+  root.style.setProperty('--app-font-cjk', stack)
 }
 
 const applyBackground = (settings: AppSettings): void => {
@@ -63,6 +77,7 @@ export const applyAppearanceToDocument = (settings: AppSettings): void => {
   if (typeof document === 'undefined') return
 
   applyTheme(settings.ui.webTheme.mode)
+  applyFont(settings)
   applyBackground(settings)
 }
 

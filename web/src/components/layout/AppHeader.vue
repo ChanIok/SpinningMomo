@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { call } from '@/core/rpc'
+import { isWebView } from '@/core/env'
 import { Button } from '@/components/ui/button'
 import { Minus, Square, X } from 'lucide-vue-next'
+
+const showWindowControls = isWebView()
 
 const handleMinimize = () => {
   call('webview.minimize').catch((err) => {
@@ -28,7 +31,7 @@ const handleClose = () => {
     <div class="drag-region h-full flex-1" />
 
     <!-- 窗口控制按钮 -->
-    <div class="flex gap-2">
+    <div v-if="showWindowControls" class="flex gap-2">
       <Button
         variant="ghost"
         size="icon"

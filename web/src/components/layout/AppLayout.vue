@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { isWebView } from '@/core/env'
 import { useSettingsStore } from '@/features/settings/store'
 import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
 import { SidebarProvider } from '@/components/ui/sidebar'
@@ -14,7 +13,6 @@ import 'vue-sonner/style.css'
 const route = useRoute()
 const settingsStore = useSettingsStore()
 const isWelcome = computed(() => route.name === 'welcome')
-const showHeader = computed(() => isWebView())
 const isHome = computed(() => route.name === 'home')
 const hasBackgroundImage = computed(() =>
   Boolean(resolveBackgroundImageUrl(settingsStore.appSettings.ui.background))
@@ -41,18 +39,11 @@ const hasBackgroundImage = computed(() =>
 
         <!-- 右侧：Header + 主内容区 -->
         <div
-          class="relative flex min-h-0 flex-1 flex-col overflow-hidden text-foreground"
-          :class="[
-            !isHome && !isWelcome && 'surface-middle',
-            isWelcome
-              ? 'rounded-lg'
-              : showHeader
-                ? 'rounded-lg'
-                : 'rounded-tr-lg rounded-br-lg rounded-bl-lg',
-          ]"
+          class="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg text-foreground"
+          :class="[!isHome && !isWelcome && 'surface-middle']"
         >
-          <!-- 窗口控制栏（仅 WebView 环境下显示，位于主内容区上方） -->
-          <AppHeader v-if="showHeader" />
+          <!-- 窗口控制栏 -->
+          <AppHeader />
           <!-- 主内容区域 -->
           <div class="relative z-10 min-h-0 flex-1 overflow-auto">
             <ContentArea />

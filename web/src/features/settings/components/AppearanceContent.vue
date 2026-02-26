@@ -25,7 +25,7 @@ import {
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import OverlayPaletteEditor from './OverlayPaletteEditor.vue'
 import { useI18n } from '@/composables/useI18n'
-import type { WebThemeMode } from '../types'
+import type { CjkFontPreset, WebThemeMode } from '../types'
 import type { OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
 import { getOverlayPaletteFromBackground } from '../overlayPalette'
 import { resolveBackgroundImageUrl } from '../backgroundPath'
@@ -48,6 +48,7 @@ const {
   updateOverlayPalette,
   applyOverlayPalettePreset,
   updateWebViewTransparentBackground,
+  updateCjkFontPreset,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
@@ -59,6 +60,10 @@ const themeOptions = [
   { value: 'light', label: t('settings.appearance.theme.light') },
   { value: 'dark', label: t('settings.appearance.theme.dark') },
   { value: 'system', label: t('settings.appearance.theme.system') },
+]
+const cjkFontOptions = [
+  { value: 'harmony', label: t('settings.appearance.theme.font.harmony') },
+  { value: 'microsoft', label: t('settings.appearance.theme.font.microsoft') },
 ]
 const overlayPalette = computed<OverlayPalette>(() =>
   getOverlayPaletteFromBackground(appSettings.value.ui.background)
@@ -141,6 +146,14 @@ const handleThemeChange = async (themeMode: string) => {
     await setTheme(themeMode as WebThemeMode)
   } catch (error) {
     console.error('Failed to update theme:', error)
+  }
+}
+
+const handleCjkFontPresetChange = async (preset: string) => {
+  try {
+    await updateCjkFontPreset(preset as CjkFontPreset)
+  } catch (error) {
+    console.error('Failed to update CJK font preset:', error)
   }
 }
 
@@ -383,6 +396,36 @@ const handleClearError = () => {
               <SelectContent>
                 <SelectItem
                   v-for="option in themeOptions"
+                  :key="option.value"
+                  :value="option.value"
+                >
+                  {{ option.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.theme.font.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.theme.font.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="appSettings.ui.webTheme.cjkFontPreset"
+              @update:model-value="(v) => handleCjkFontPresetChange(v as string)"
+            >
+              <SelectTrigger class="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="option in cjkFontOptions"
                   :key="option.value"
                   :value="option.value"
                 >

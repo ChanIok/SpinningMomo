@@ -89,6 +89,13 @@
 
 :root {
   --radius: 0.625rem;
+  --app-font-latin: 'Inter Variable', 'Inter';
+  --app-font-cjk:
+    'HarmonyOS Sans SC Web', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC',
+    'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC';
+  --app-font-fallback:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
   --app-background-image: none;
   --app-background-opacity: 1;
   --app-background-blur: 0px;
@@ -283,29 +290,8 @@
   body {
     @apply bg-transparent text-foreground;
     font-family:
-      'Inter Variable',
-      'Inter',
-      'HarmonyOS Sans SC Web',
-      'Microsoft YaHei UI',
-      'Microsoft YaHei',
-      'PingFang SC',
-      'Hiragino Sans GB',
-      'Noto Sans CJK SC',
-      'Source Han Sans SC',
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      BlinkMacSystemFont,
-      'Segoe UI',
-      Roboto,
-      'Helvetica Neue',
-      Arial,
-      'Noto Sans',
-      sans-serif,
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji';
+      var(--app-font-latin), var(--app-font-cjk), var(--app-font-fallback), 'Apple Color Emoji',
+      'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

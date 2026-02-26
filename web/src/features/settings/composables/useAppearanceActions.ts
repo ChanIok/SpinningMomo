@@ -5,6 +5,7 @@ import {
   LIGHT_FLOATING_WINDOW_COLORS,
 } from '../types'
 import type {
+  CjkFontPreset,
   FloatingWindowLayout,
   FloatingWindowColors,
   FloatingWindowThemeMode,
@@ -154,6 +155,7 @@ export const useAppearanceActions = () => {
       ui: {
         ...appSettings.value.ui,
         webTheme: {
+          ...appSettings.value.ui.webTheme,
           mode: preset.themeMode,
         },
         background: {
@@ -172,6 +174,19 @@ export const useAppearanceActions = () => {
         webviewWindow: {
           ...appSettings.value.ui.webviewWindow,
           enableTransparentBackground,
+        },
+      },
+    })
+  }
+
+  const updateCjkFontPreset = async (cjkFontPreset: CjkFontPreset) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        webTheme: {
+          ...appSettings.value.ui.webTheme,
+          cjkFontPreset,
         },
       },
     })
@@ -225,6 +240,7 @@ export const useAppearanceActions = () => {
     updateOverlayPalette,
     applyOverlayPalettePreset,
     updateWebViewTransparentBackground,
+    updateCjkFontPreset,
     updateSurfaceOpacity,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,

@@ -16,7 +16,7 @@ const rightDetailsSize = useLocalStorage('gallery-right-details-size', '256px')
 
 <template>
   <!-- 左中右三区域布局 -->
-  <div class="h-full w-full">
+  <div class="h-full w-full border-t">
     <!-- 第一层分割：左侧 + (中右) -->
     <Split v-model:size="leftSidebarSize" direction="horizontal" min="180px" :max="0.3">
       <!-- 左侧区域 - 侧边栏 -->
