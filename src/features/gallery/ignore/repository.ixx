@@ -30,9 +30,9 @@ export auto get_rules_by_directory_path(Core::State::AppState& app_state,
 export auto get_global_rules(Core::State::AppState& app_state)
     -> std::expected<std::vector<Types::IgnoreRule>, std::string>;
 
-export auto batch_create_ignore_rules(Core::State::AppState& app_state, std::int64_t folder_id,
-                                      const std::vector<Types::ScanIgnoreRule>& scan_rules)
-    -> std::expected<std::vector<std::int64_t>, std::string>;
+export auto replace_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t folder_id,
+                                       const std::vector<Types::ScanIgnoreRule>& scan_rules)
+    -> std::expected<void, std::string>;
 
 export auto batch_update_ignore_rules(Core::State::AppState& app_state,
                                       const std::vector<Types::IgnoreRule>& rules)

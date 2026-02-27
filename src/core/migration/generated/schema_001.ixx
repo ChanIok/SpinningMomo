@@ -10,8 +10,8 @@ import std;
 export namespace Core::Migration::Schema {
 
 struct V001 {
-  static constexpr std::array<std::string_view, 25> statements = {
-        R"SQL(
+  static constexpr std::array<std::string_view, 26> statements = {
+      R"SQL(
 CREATE TABLE assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -35,34 +35,34 @@ CREATE TABLE assets (
         updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000)
 )
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_path ON assets(path)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_type ON assets(type)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_extension ON assets(extension)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_created_at ON assets(created_at)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_hash ON assets(hash)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_folder_id ON assets(folder_id)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_file_created_at ON assets(file_created_at)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_file_modified_at ON assets(file_modified_at)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_assets_folder_time ON assets(folder_id, file_created_at)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE TRIGGER update_assets_updated_at
 AFTER
 UPDATE
@@ -75,7 +75,7 @@ WHERE
     id = NEW.id;
 END
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE TABLE folders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT NOT NULL UNIQUE,
@@ -92,13 +92,13 @@ CREATE TABLE folders (
         NULL
 )
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_folders_parent_sort ON folders(parent_id, sort_order)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_folders_path ON folders(path)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE TRIGGER update_folders_updated_at
 AFTER
 UPDATE
@@ -111,7 +111,7 @@ WHERE
     id = NEW.id;
 END
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE TABLE tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE tags (
     FOREIGN KEY (parent_id) REFERENCES tags(id) ON DELETE CASCADE
 )
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE TABLE asset_tags (
     asset_id INTEGER NOT NULL,
     tag_id INTEGER NOT NULL,
@@ -132,10 +132,10 @@ CREATE TABLE asset_tags (
     FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
 )
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_tags_parent_sort ON tags(parent_id, sort_order)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE TRIGGER update_tags_updated_at
 AFTER
 UPDATE
@@ -148,10 +148,10 @@ WHERE
     id = NEW.id;
 END
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_asset_tags_tag ON asset_tags(tag_id)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE TABLE ignore_rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     folder_id INTEGER REFERENCES folders(id) ON DELETE CASCADE,
@@ -165,16 +165,20 @@ CREATE TABLE ignore_rules (
     UNIQUE(folder_id, rule_pattern)
 )
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_ignore_rules_folder_id ON ignore_rules(folder_id)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_ignore_rules_enabled ON ignore_rules(is_enabled)
         )SQL",
-        R"SQL(
+      R"SQL(
 CREATE INDEX idx_ignore_rules_pattern_type ON ignore_rules(pattern_type)
         )SQL",
-        R"SQL(
+      R"SQL(
+CREATE UNIQUE INDEX idx_ignore_rules_global_pattern_unique ON ignore_rules(rule_pattern)
+WHERE folder_id IS NULL
+        )SQL",
+      R"SQL(
 CREATE TRIGGER update_ignore_rules_updated_at
 AFTER
 UPDATE
@@ -186,8 +190,7 @@ SET
 WHERE
     id = NEW.id;
 END
-        )SQL"
-  };
+        )SQL"};
 };
 
 }  // namespace Core::Migration::Schema

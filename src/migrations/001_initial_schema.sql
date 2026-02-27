@@ -186,6 +186,9 @@ CREATE INDEX idx_ignore_rules_enabled ON ignore_rules(is_enabled);
 
 CREATE INDEX idx_ignore_rules_pattern_type ON ignore_rules(pattern_type);
 
+CREATE UNIQUE INDEX idx_ignore_rules_global_pattern_unique ON ignore_rules(rule_pattern)
+WHERE folder_id IS NULL;
+
 -- ============================================================================
 -- Ignore Rules Triggers
 -- ============================================================================

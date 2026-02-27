@@ -8,7 +8,6 @@ import Core.Database;
 import Core.Database.State;
 import Core.Database.Types;
 import Features.Gallery.Types;
-import Features.Gallery.Folder.Repository;
 import Utils.Logger;
 import <rfl.hpp>;
 
@@ -175,42 +174,23 @@ auto get_global_rules(Core::State::AppState& app_state)
 
 // ============= 批量操作 =============
 
-auto batch_create_ignore_rules(Core::State::AppState& app_state, std::int64_t folder_id,
-                               const std::vector<Types::ScanIgnoreRule>& scan_rules)
-    -> std::expected<std::vector<std::int64_t>, std::string> {
-  if (scan_rules.empty()) {
-    return std::vector<std::int64_t>{};
-  }
-
-  std::vector<std::int64_t> created_ids;
-  created_ids.reserve(scan_rules.size());
-
-  // 在事务中执行批量创建
+auto replace_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t folder_id,
+                                const std::vector<Types::ScanIgnoreRule>& scan_rules)
+    -> std::expected<void, std::string> {
   auto transaction_result = Core::Database::execute_transaction(
       *app_state.database,
-      [&](Core::Database::State::DatabaseState& db_state)
-          -> std::expected<std::vector<std::int64_t>, std::string> {
+      [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+        // 先删除该文件夹已有规则，再插入新的完整规则集
+        auto delete_result = Core::Database::execute(
+            db_state, "DELETE FROM ignore_rules WHERE folder_id = ?", {folder_id});
+        if (!delete_result) {
+          return std::unexpected("Failed to delete existing rules: " + delete_result.error());
+        }
+
         for (const auto& scan_rule : scan_rules) {
-          // 检查是否已存在相同规则（避免重复）
-          std::string check_sql =
-              "SELECT id FROM ignore_rules WHERE folder_id = ? AND rule_pattern = ?";
-          auto existing = Core::Database::query_scalar<int64_t>(db_state, check_sql,
-                                                                {folder_id, scan_rule.pattern});
-
-          if (existing && existing->has_value()) {
-            Logger().debug("Ignore rule already exists: {}", scan_rule.pattern);
-            continue;  // 跳过已存在的规则
+          if (scan_rule.pattern.empty()) {
+            continue;
           }
-
-          // 创建新规则
-          Types::IgnoreRule db_rule{
-              .folder_id = folder_id,
-              .rule_pattern = scan_rule.pattern,
-              .pattern_type = scan_rule.pattern_type,
-              .rule_type = scan_rule.rule_type,
-              .is_enabled = 1,
-              .description = scan_rule.description,
-          };
 
           std::string insert_sql = R"(
             INSERT INTO ignore_rules (
@@ -224,37 +204,30 @@ auto batch_create_ignore_rules(Core::State::AppState& app_state, std::int64_t fo
 
           std::vector<Core::Database::Types::DbParam> params = {
               folder_id,
-              db_rule.rule_pattern,
-              db_rule.pattern_type,
-              db_rule.rule_type,
-              db_rule.is_enabled,
-              db_rule.description.has_value()
-                  ? Core::Database::Types::DbParam{db_rule.description.value()}
+              scan_rule.pattern,
+              scan_rule.pattern_type,
+              scan_rule.rule_type,
+              1,
+              scan_rule.description.has_value()
+                  ? Core::Database::Types::DbParam{scan_rule.description.value()}
                   : Core::Database::Types::DbParam{std::monostate{}}};
 
           auto insert_result = Core::Database::execute(db_state, insert_sql, params);
           if (!insert_result) {
             return std::unexpected("Failed to insert ignore rule: " + insert_result.error());
           }
-
-          auto id_result =
-              Core::Database::query_scalar<int64_t>(db_state, "SELECT last_insert_rowid()");
-          if (!id_result || !id_result->has_value()) {
-            return std::unexpected("Failed to get inserted rule ID");
-          }
-
-          created_ids.push_back(id_result->value());
         }
 
-        return created_ids;
+        return {};
       });
 
   if (!transaction_result) {
     return std::unexpected("Transaction failed: " + transaction_result.error());
   }
 
-  Logger().info("Created {} ignore rules for folder_id {}", created_ids.size(), folder_id);
-  return created_ids;
+  Logger().info("Replaced ignore rules for folder_id {} with {} rule(s)", folder_id,
+                scan_rules.size());
+  return {};
 }
 
 auto batch_update_ignore_rules(Core::State::AppState& app_state,

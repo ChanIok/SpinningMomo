@@ -525,18 +525,14 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto root_folder_map = std::move(root_folder_mapping_result.value());
   std::int64_t folder_id = root_folder_map.at(normalized_scan_root.string());
 
-  // 2. 持久化前端提供的ignore规则
+  // 2. 使用前端提交的完整规则集替换该目录规则
   auto ignore_rules = options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{});
-  if (!ignore_rules.empty()) {
-    auto persist_result =
-        Ignore::Repository::batch_create_ignore_rules(app_state, folder_id, ignore_rules);
-    if (!persist_result) {
-      Logger().warn("Failed to persist ignore rules: {}", persist_result.error());
-    } else {
-      Logger().info("Persisted {} new ignore rules for folder_id {}", persist_result.value().size(),
-                    folder_id);
-    }
+  auto persist_result =
+      Ignore::Repository::replace_rules_by_folder_id(app_state, folder_id, ignore_rules);
+  if (!persist_result) {
+    return std::unexpected("Failed to persist ignore rules: " + persist_result.error());
   }
+  Logger().info("Persisted {} ignore rules for folder_id {}", ignore_rules.size(), folder_id);
 
   // 3. 加载资产缓存
   auto asset_cache_result = Asset::Service::load_asset_cache(app_state);
