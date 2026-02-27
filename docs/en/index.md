@@ -14,7 +14,7 @@ layout: doc
   <div class="badges">
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" />
     <img alt="Release" src="https://img.shields.io/github/v/release/ChanIok/SpinningMomo?style=flat-square&color=brightgreen" />
-    <img alt="License" src="https://img.shields.io/badge/license-MIT-orange?style=flat-square" />
+    <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square" />
   </div>
   
   <div class="download-btn">
@@ -214,7 +214,7 @@ This program only sends requests through Windows standard window management APIs
 
 ## License
 
-This project is open source under the [MIT License](https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE). The project icon is from the game "Infinity Nikki" and copyright belongs to the game developer. Please read the [Legal & Privacy Notice](https://chaniok.github.io/SpinningMomo/en/legal/notice) before use.
+This project is open source under the [GPL 3.0 License](https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE). The project icon is from the game "Infinity Nikki" and copyright belongs to the game developer. Please read the [Legal & Privacy Notice](https://chaniok.github.io/SpinningMomo/en/legal/notice) before use.
 
 <style>
 /* 添加命名空间，限制样式只在文档内容区域生效 */

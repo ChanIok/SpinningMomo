@@ -12,7 +12,7 @@
   <p>
     <img alt="Platform" src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" />
     <img alt="Release" src="https://img.shields.io/github/v/release/ChanIok/SpinningMomo?style=flat-square&color=brightgreen" />
-    <img alt="License" src="https://img.shields.io/badge/license-MIT-orange?style=flat-square" />
+    <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square" />
   </p>
 
   <p>
@@ -61,4 +61,4 @@
 
 ## 📄 声明
 
-本项目采用 [MIT 协议](LICENSE) 开源。项目图标来自游戏《无限暖暖》，版权归属游戏开发商。使用前请阅读 [法律与隐私说明](https://chaniok.github.io/SpinningMomo/zh/legal/notice)。
+本项目采用 [GPL 3.0 协议](LICENSE) 开源。项目图标来自游戏《无限暖暖》，版权归属游戏开发商。使用前请阅读 [法律与隐私说明](https://chaniok.github.io/SpinningMomo/zh/legal/notice)。

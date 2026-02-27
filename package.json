@@ -1,6 +1,7 @@
 {
   "name": "spinning-momo",
   "private": true,
+  "license": "GPL-3.0",
   "scripts": {
     "prepare": "husky",
     "build": "npm run build:cpp && npm run build:web && npm run build:dist",

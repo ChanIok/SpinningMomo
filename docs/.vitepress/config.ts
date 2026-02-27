@@ -41,7 +41,10 @@ export default defineConfig({
             },
             {
               text: "Legal",
-              items: [{ text: "Legal & Privacy Notice", link: "/en/legal/notice" }],
+              items: [
+                { text: "Legal & Privacy Notice", link: "/en/legal/notice" },
+                { text: "Third-Party Licenses", link: "/en/credits" }
+              ],
             },
           ],
         },
@@ -86,7 +89,13 @@ export default defineConfig({
             { text: "常见问题", link: "/zh/advanced/troubleshooting" },
           ],
         },
-        { text: "法律与隐私", items: [{ text: "法律与隐私说明", link: "/zh/legal/notice" }] },
+        { 
+          text: "法律与隐私", 
+          items: [
+            { text: "法律与隐私说明", link: "/zh/legal/notice" },
+            { text: "开源鸣谢", link: "/zh/credits" }
+          ] 
+        },
       ],
     },
   },

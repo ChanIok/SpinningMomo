@@ -219,6 +219,7 @@
   "about.links.issues": "Report Issue",
   "about.links.license": "License",
   "about.links.legalNotice": "Legal & Privacy Notice",
+  "about.links.credits": "Third-Party Licenses",
   "about.actions.refresh": "Refresh",
   "about.actions.retry": "Retry",
   "about.actions.showAdvanced": "Show Runtime Info (Advanced)",

@@ -8,7 +8,7 @@ By downloading, installing, or using the software, you acknowledge and accept th
 
 ## 1. Project Nature
 
-- SpinningMomo is an open-source third-party desktop tool, with source code licensed under MIT.
+- SpinningMomo is an open-source third-party desktop tool, with source code licensed under GPLv3.
 - It is not affiliated with, endorsed by, or guaranteed by Infinity Nikki or its developers/publishers.
 
 ## 2. Data Scope (Primarily Local)
