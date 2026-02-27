@@ -1,5 +1,6 @@
 import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
+import type { ScanAssetsParams } from '../types'
 
 /**
  * Gallery数据管理 Composable
@@ -154,13 +155,9 @@ export function useGalleryData() {
   /**
    * 扫描资产目录
    */
-  async function scanAssets(directories: string[]) {
+  async function scanAssets(options: ScanAssetsParams) {
     try {
-      const result = await galleryApi.scanAssets({
-        directories,
-        recursive: true,
-        generateThumbnails: true,
-      })
+      const result = await galleryApi.scanAssets(options)
 
       return result
     } catch (error) {

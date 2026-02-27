@@ -70,9 +70,9 @@ export async function listAssets(params: ListAssetsParams = {}): Promise<ListAss
  */
 export async function scanAssets(params: ScanAssetsParams): Promise<ScanAssetsResult> {
   try {
-    console.log('🔍 开始扫描资产目录:', params.directories)
+    console.log('🔍 开始扫描资产目录:', params.directory)
 
-    const result = await call<ScanAssetsResult>('gallery.scanDirectory', params)
+    const result = await call<ScanAssetsResult>('gallery.scanDirectory', params, 0)
 
     console.log('✅ 资产扫描完成:', {
       total: result.totalFiles,

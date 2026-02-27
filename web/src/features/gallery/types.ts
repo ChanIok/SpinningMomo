@@ -140,6 +140,14 @@ export interface IgnoreRule {
   updatedAt: number
 }
 
+// 扫描时提交的忽略规则（对应后端 ScanIgnoreRule）
+export interface ScanIgnoreRule {
+  pattern: string
+  patternType?: 'glob' | 'regex'
+  ruleType?: 'exclude' | 'include'
+  description?: string
+}
+
 // ============= 视图配置类型 =============
 
 // 视图模式
@@ -195,10 +203,11 @@ export interface OperationResult {
 
 // 扫描参数
 export interface ScanAssetsParams {
-  directories: string[]
-  recursive?: boolean
+  directory: string
   generateThumbnails?: boolean
   thumbnailShortEdge?: number
+  supportedExtensions?: string[]
+  ignoreRules?: ScanIgnoreRule[]
 }
 
 // 扫描结果
