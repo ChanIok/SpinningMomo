@@ -59,7 +59,7 @@ function toggleExpand() {
 // 处理 item 点击
 function handleItemClick() {
   if (isEditing.value) return
-  
+
   // 移除了选中状态下点击展开子标签的逻辑
   // 现在只会选中标签，不会自动展开
   emit('select', props.tag.id, props.tag.name)
@@ -142,11 +142,7 @@ function confirmDelete() {
     </AlertDialog>
 
     <!-- 标签 item -->
-    <div
-      v-if="isEditing"
-      class="px-2"
-      :style="{ paddingLeft: `${depth * 12}px` }"
-    >
+    <div v-if="isEditing" class="px-2" :style="{ paddingLeft: `${depth * 12}px` }">
       <TagInlineEditor
         :initial-value="tag.name"
         placeholder="输入标签名..."
@@ -161,69 +157,70 @@ function confirmDelete() {
           type="button"
           variant="ghost"
           :class="[
-            'group relative h-8 w-full justify-between rounded px-2 transition-colors',
+            'group relative h-8 w-full justify-between rounded px-0 transition-colors',
             selectedTag === tag.id ? 'bg-accent text-accent-foreground' : '',
           ]"
           :style="{ paddingLeft: `${depth * 12 + 8}px` }"
           @click="handleItemClick"
           @dblclick="handleDoubleClick"
         >
-      <!-- 左侧：图标 + 名称 -->
-      <div class="flex min-w-0 items-center gap-2">
-        <!-- 标签图标 -->
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="flex-shrink-0"
-        >
-          <path
-            d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"
-          />
-          <path d="M7 7h.01" />
-        </svg>
+          <!-- 左侧：图标 + 名称 -->
+          <div class="flex min-w-0 items-center gap-2">
+            <!-- 标签图标 -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="flex-shrink-0"
+            >
+              <path
+                d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"
+              />
+              <path d="M7 7h.01" />
+            </svg>
 
-        <!-- 标签名称 -->
-        <span class="truncate text-sm">
-          {{ tag.name }}
-        </span>
-      </div>
+            <!-- 标签名称 -->
+            <span class="truncate text-sm">
+              {{ tag.name }}
+            </span>
+          </div>
 
-      <!-- 右侧：资产数量 + 箭头 -->
-      <div class="flex flex-shrink-0 items-center gap-2">
-        <!-- 资产数量 -->
-        <span class="rounded border px-1.5 py-0.5 text-xs">{{ tag.assetCount }}</span>
-
-        <!-- 展开/收起箭头 -->
-        <span
-          v-if="tag.children && tag.children.length > 0"
-          class="-mr-1.5 flex-shrink-0 rounded p-1.5 hover:bg-accent/80"
-          @click.stop="toggleExpand"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="transition-transform"
-            :class="{ 'rotate-90': isExpanded }"
+          <!-- 右侧：资产数量 + 箭头 -->
+          <div
+            class="flex flex-shrink-0 items-center gap-2"
+            v-if="tag.children && tag.children.length > 0"
           >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </span>
-        <div v-else class="w-3 flex-shrink-0" />
-      </div>
+            <!-- 资产数量 -->
+            <span class="rounded border px-1.5 py-0.5 text-xs">{{ tag.assetCount }}</span>
+
+            <!-- 展开/收起箭头 -->
+            <span
+              class="-mr-1.5 flex-shrink-0 rounded p-1.5 hover:bg-accent/80"
+              @click.stop="toggleExpand"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="transition-transform"
+                :class="{ 'rotate-90': isExpanded }"
+              >
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </span>
+          </div>
         </Button>
       </ContextMenuTrigger>
 

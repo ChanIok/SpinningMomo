@@ -386,5 +386,11 @@
   "gallery.sidebar.scan.ruleDescriptionPlaceholder": "可选说明",
   "gallery.sidebar.scan.cancel": "取消",
   "gallery.sidebar.scan.scanning": "扫描中...",
-  "gallery.sidebar.scan.submit": "添加并扫描"
+  "gallery.sidebar.scan.submit": "添加并扫描",
+  "gallery.details.rootFolderSummary.title": "根文件夹概览",
+  "gallery.details.rootFolderSummary.folderCount": "根文件夹总数",
+  "gallery.details.rootFolderSummary.assetCount": "资产总数",
+  "gallery.details.rootTagSummary.title": "根标签概览",
+  "gallery.details.rootTagSummary.tagCount": "根标签总数",
+  "gallery.details.rootTagSummary.assetCount": "资产总数"
 }

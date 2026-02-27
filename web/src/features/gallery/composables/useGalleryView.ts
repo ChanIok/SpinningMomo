@@ -7,7 +7,7 @@ import type { ViewMode, SortBy, SortOrder, AssetFilter } from '../types'
  * 使用平方函数，让小尺寸调整更细腻，大尺寸跳跃更大
  */
 function sliderToSize(position: number): number {
-  const min = 120
+  const min = 100
   const max = 768
   const normalized = position / 100
 
@@ -22,7 +22,7 @@ function sliderToSize(position: number): number {
  * 反向映射
  */
 function sizeToSlider(size: number): number {
-  const min = 120
+  const min = 100
   const max = 768
   const normalized = (size - min) / (max - min)
 
@@ -64,17 +64,17 @@ export function useGalleryView() {
    */
   function setViewSizeFromSlider(sliderPosition: number) {
     const size = sliderToSize(sliderPosition)
-    const validSize = Math.max(120, Math.min(768, size))
+    const validSize = Math.max(100, Math.min(768, size))
     store.setViewConfig({ size: validSize })
     console.log('📏 视图大小调整:', validSize, 'px (slider:', sliderPosition, '%)')
   }
 
   /**
    * 直接设置视图大小（从实际px值设置）
-   * @param size - 实际尼寸 (120-768px)
+   * @param size - 实际尼寸 (100-768px)
    */
   function setViewSize(size: number) {
-    const validSize = Math.max(120, Math.min(768, size))
+    const validSize = Math.max(100, Math.min(768, size))
     store.setViewConfig({ size: validSize })
     console.log('📏 视图大小调整:', validSize, 'px')
   }

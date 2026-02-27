@@ -47,7 +47,7 @@ function handleItemClick() {
       type="button"
       variant="ghost"
       :class="[
-        'group relative h-8 w-full justify-between rounded px-2 transition-colors',
+        'group relative h-8 w-full justify-between rounded px-0 transition-colors',
         selectedFolder === folder.id ? 'bg-accent text-accent-foreground' : '',
       ]"
       :style="{ paddingLeft: `${depth * 12 + 8}px` }"
@@ -80,9 +80,11 @@ function handleItemClick() {
       </div>
 
       <!-- 右侧：箭头 -->
-      <div class="flex flex-shrink-0 items-center gap-2">
+      <div
+        class="flex flex-shrink-0 items-center gap-2"
+        v-if="folder.children && folder.children.length > 0"
+      >
         <span
-          v-if="folder.children && folder.children.length > 0"
           class="-mr-1.5 flex-shrink-0 rounded p-1.5 hover:bg-accent/80"
           @click.stop="toggleExpand"
         >
@@ -102,7 +104,6 @@ function handleItemClick() {
             <path d="m9 18 6-6-6-6" />
           </svg>
         </span>
-        <div v-else class="w-3 flex-shrink-0" />
       </div>
     </Button>
 

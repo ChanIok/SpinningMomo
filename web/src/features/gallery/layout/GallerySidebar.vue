@@ -42,6 +42,8 @@ const {
   selectedFolder,
   selectedTag,
   selectFolder,
+  clearFolderFilter,
+  clearTagFilter,
   selectTag,
   loadTagTree,
   createTag,
@@ -76,6 +78,14 @@ const nextIgnoreRuleId = ref(1)
 
 const canSubmitAddFolder = computed(() => {
   return scanDirectory.value.trim().length > 0 && !isScanningDirectory.value
+})
+
+const isFolderTitleSelected = computed(() => {
+  return galleryStore.sidebar.activeSection === 'folders' && selectedFolder.value === null
+})
+
+const isTagTitleSelected = computed(() => {
+  return galleryStore.sidebar.activeSection === 'tags' && selectedTag.value === null
 })
 
 function resetAddFolderForm() {
@@ -297,11 +307,20 @@ onMounted(() => {
     <!-- 导航菜单 -->
     <div class="flex-1 overflow-auto p-4">
       <!-- 文件夹区域 -->
-      <div class="mt-4 space-y-2">
-        <div class="flex items-center justify-between px-2">
-          <h3 class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <button
+            type="button"
+            :class="[
+              'cursor-pointer rounded px-2 py-1 text-xs font-medium tracking-wider uppercase transition-colors',
+              isFolderTitleSelected
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            ]"
+            @click="clearFolderFilter"
+          >
             {{ t('gallery.sidebar.folders.title') }}
-          </h3>
+          </button>
           <Button variant="ghost" size="icon" class="h-6 w-6" @click="startAddFolder">
             <Plus class="h-3 w-3" />
           </Button>
@@ -331,10 +350,19 @@ onMounted(() => {
 
       <!-- 标签区域 -->
       <div class="space-y-2">
-        <div class="flex items-center justify-between px-2">
-          <h3 class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+        <div class="flex items-center justify-between">
+          <button
+            type="button"
+            :class="[
+              'cursor-pointer rounded px-2 py-1 text-xs font-medium tracking-wider uppercase transition-colors',
+              isTagTitleSelected
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:text-foreground',
+            ]"
+            @click="clearTagFilter"
+          >
             {{ t('gallery.sidebar.tags.title') }}
-          </h3>
+          </button>
           <Button variant="ghost" size="icon" class="h-6 w-6" @click="startCreateTag">
             <Plus class="h-3 w-3" />
           </Button>

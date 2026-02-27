@@ -10,6 +10,8 @@ import type { FolderTreeNode, TagTreeNode } from '../types'
  */
 export function useGallerySidebar() {
   const store = useGalleryStore()
+  const ROOT_FOLDER_ID = -1
+  const ROOT_TAG_ID = -1
 
   // ============= 本地 UI 状态 =============
 
@@ -117,6 +119,54 @@ export function useGallerySidebar() {
   }
 
   /**
+   * 清空文件夹筛选（保留其他筛选）
+   */
+  function clearFolderFilter() {
+    store.setSidebarActiveSection('folders')
+    store.setFilter({ folderId: undefined })
+    store.setDetailsFocus({
+      type: 'folder',
+      folder: {
+        id: ROOT_FOLDER_ID,
+        path: '',
+        parentId: undefined,
+        name: '__root__',
+        displayName: '__root__',
+        coverAssetId: undefined,
+        sortOrder: 0,
+        isHidden: false,
+        createdAt: 0,
+        updatedAt: 0,
+        assetCount: store.foldersAssetTotalCount,
+        children: [],
+      },
+    })
+    console.log('📁 清空文件夹筛选')
+  }
+
+  /**
+   * 清空标签筛选（保留其他筛选）
+   */
+  function clearTagFilter() {
+    store.setSidebarActiveSection('tags')
+    store.setFilter({ tagIds: [], tagMatchMode: 'any' })
+    store.setDetailsFocus({
+      type: 'tag',
+      tag: {
+        id: ROOT_TAG_ID,
+        name: '__root__',
+        parentId: undefined,
+        sortOrder: 0,
+        createdAt: 0,
+        updatedAt: 0,
+        assetCount: store.tagsAssetTotalCount,
+        children: [],
+      },
+    })
+    console.log('🏷️ 清空标签筛选')
+  }
+
+  /**
    * 切换标签展开/收起
    */
   function toggleTagExpanded(tagId: number) {
@@ -195,7 +245,7 @@ export function useGallerySidebar() {
   async function createTag(name: string, parentId?: number) {
     try {
       console.log('➕ 创建标签:', name, parentId ? `(父标签ID: ${parentId})` : '')
-      
+
       const result = await galleryApi.createTag({
         name,
         parentId,
@@ -277,6 +327,8 @@ export function useGallerySidebar() {
     toggleTagExpanded,
     isTagExpanded,
     selectFolder,
+    clearFolderFilter,
+    clearTagFilter,
     selectTag,
     selectAllMedia,
     loadTagTree,

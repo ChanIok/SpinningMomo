@@ -386,5 +386,11 @@
   "gallery.sidebar.scan.ruleDescriptionPlaceholder": "Optional note",
   "gallery.sidebar.scan.cancel": "Cancel",
   "gallery.sidebar.scan.scanning": "Scanning...",
-  "gallery.sidebar.scan.submit": "Add and Scan"
+  "gallery.sidebar.scan.submit": "Add and Scan",
+  "gallery.details.rootFolderSummary.title": "Root Folder Overview",
+  "gallery.details.rootFolderSummary.folderCount": "Root Folder Count",
+  "gallery.details.rootFolderSummary.assetCount": "Total Assets",
+  "gallery.details.rootTagSummary.title": "Root Tag Overview",
+  "gallery.details.rootTagSummary.tagCount": "Root Tag Count",
+  "gallery.details.rootTagSummary.assetCount": "Total Assets"
 }

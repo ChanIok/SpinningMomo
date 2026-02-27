@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
 import { getAssetTags, removeTagsFromAsset, addTagsToAsset } from '../api'
@@ -10,6 +11,7 @@ import TagSelectorPopover from '../components/TagSelectorPopover.vue'
 import type { Tag } from '../types'
 
 const store = useGalleryStore()
+const { t } = useI18n()
 
 // 获取详情面板焦点
 const detailsFocus = computed(() => store.detailsPanel)
@@ -18,6 +20,9 @@ const detailsFocus = computed(() => store.detailsPanel)
 const currentFolder = computed(() => {
   return detailsFocus.value.type === 'folder' ? detailsFocus.value.folder : null
 })
+const isRootFolderSummary = computed(() => currentFolder.value?.id === -1)
+const rootFolderCount = computed(() => store.folders.length)
+const rootFolderAssetTotalCount = computed(() => store.foldersAssetTotalCount)
 
 const activeAsset = computed(() => {
   return detailsFocus.value.type === 'asset' ? detailsFocus.value.asset : null
@@ -41,6 +46,9 @@ const assetTags = ref<Tag[]>([])
 const currentTag = computed(() => {
   return detailsFocus.value.type === 'tag' ? detailsFocus.value.tag : null
 })
+const isRootTagSummary = computed(() => currentTag.value?.id === -1)
+const rootTagCount = computed(() => store.tags.length)
+const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
 
 // 监听 activeAsset 变化，加载标签
 watch(
@@ -123,8 +131,28 @@ async function handleAddTag(tagId: number) {
         <h3 class="font-medium">详情</h3>
       </div>
 
+      <div v-if="isRootFolderSummary">
+        <h4 class="mb-2 text-sm font-medium">
+          {{ t('gallery.details.rootFolderSummary.title') }}
+        </h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between gap-2">
+            <span class="text-muted-foreground">{{
+              t('gallery.details.rootFolderSummary.folderCount')
+            }}</span>
+            <span>{{ rootFolderCount }}</span>
+          </div>
+          <div class="flex justify-between gap-2">
+            <span class="text-muted-foreground">{{
+              t('gallery.details.rootFolderSummary.assetCount')
+            }}</span>
+            <span>{{ rootFolderAssetTotalCount }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 文件夹信息 -->
-      <div>
+      <div v-else>
         <h4 class="mb-2 text-sm font-medium">文件夹信息</h4>
         <div class="space-y-2 text-xs">
           <div class="flex justify-between gap-2">
@@ -154,33 +182,11 @@ async function handleAddTag(tagId: number) {
           </div>
         </div>
       </div>
-
-      <Separator />
-
-      <div class="py-4 text-center text-xs text-muted-foreground">更多功能敬请期待...</div>
     </div>
 
     <!-- 资产详情 -->
     <div v-else-if="detailsFocus.type === 'asset' && activeAsset" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="font-medium">详情</h3>
-        <Button variant="ghost" size="icon" @click="store.clearDetailsFocus()">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </Button>
-      </div>
+      <h3 class="font-medium">详情</h3>
 
       <!-- 资产缩略图 -->
       <div>
@@ -304,36 +310,32 @@ async function handleAddTag(tagId: number) {
           <p class="rounded bg-muted/50 p-2 font-mono break-all">{{ activeAsset.path }}</p>
         </div>
       </div>
-
-      <Separator />
-
-      <div class="py-4 text-center text-xs text-muted-foreground">更多功能敬请期待...</div>
     </div>
 
     <!-- 标签详情 -->
     <div v-else-if="detailsFocus.type === 'tag' && currentTag" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="font-medium">详情</h3>
-        <Button variant="ghost" size="icon" @click="store.clearDetailsFocus()">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </Button>
+      <h3 class="font-medium">详情</h3>
+
+      <div v-if="isRootTagSummary">
+        <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.rootTagSummary.title') }}</h4>
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between gap-2">
+            <span class="text-muted-foreground">{{
+              t('gallery.details.rootTagSummary.tagCount')
+            }}</span>
+            <span>{{ rootTagCount }}</span>
+          </div>
+          <div class="flex justify-between gap-2">
+            <span class="text-muted-foreground">{{
+              t('gallery.details.rootTagSummary.assetCount')
+            }}</span>
+            <span>{{ rootTagAssetTotalCount }}</span>
+          </div>
+        </div>
       </div>
 
       <!-- 标签信息 -->
-      <div>
+      <div v-else>
         <h4 class="mb-2 text-sm font-medium">标签信息</h4>
         <div class="space-y-2 text-xs">
           <div class="flex justify-between gap-2">
@@ -356,33 +358,11 @@ async function handleAddTag(tagId: number) {
           </div>
         </div>
       </div>
-
-      <Separator />
-
-      <div class="py-4 text-center text-xs text-muted-foreground">更多功能敬请期待...</div>
     </div>
 
     <!-- 批量操作 -->
     <div v-else-if="detailsFocus.type === 'batch'" class="space-y-4">
-      <div class="flex items-center justify-between">
-        <h3 class="font-medium">批量操作</h3>
-        <Button variant="ghost" size="icon" @click="store.clearDetailsFocus()">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </Button>
-      </div>
+      <h3 class="font-medium">批量操作</h3>
 
       <div class="text-sm text-muted-foreground">已选中 {{ selectedCount }} 项</div>
 

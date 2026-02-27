@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, reactive, computed } from 'vue'
+import { useStorage } from '@vueuse/core'
 import type {
   Asset,
   ViewConfig,
@@ -15,6 +16,13 @@ import type {
   DetailsPanelFocus,
 } from './types'
 
+const GALLERY_VIEW_SIZE_STORAGE_KEY = 'spinningmomo.gallery.view.size'
+
+function normalizeGalleryViewSize(size: number): number {
+  const numericSize = Number(size)
+  return Number.isNaN(numericSize) ? 128 : numericSize
+}
+
 /**
  * Gallery Pinia Store
  *
@@ -23,6 +31,9 @@ import type {
  * - Composable 只负责协调 API 调用和调用 Store Actions
  */
 export const useGalleryStore = defineStore('gallery', () => {
+  const persistedViewSize = useStorage<number>(GALLERY_VIEW_SIZE_STORAGE_KEY, 128)
+  persistedViewSize.value = normalizeGalleryViewSize(persistedViewSize.value)
+
   // ============= 数据状态 =============
   const isLoading = ref(false)
   const isInitialLoading = ref(false)
@@ -52,7 +63,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= 视图配置 =============
   const viewConfig = ref<ViewConfig>({
     mode: 'grid',
-    size: 200, // 默认缩略图尺寸 200px（中等大小，对应slider约41%位置）
+    size: persistedViewSize.value,
   })
 
   const filter = ref<AssetFilter>({})
@@ -215,7 +226,10 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= 视图操作 Actions =============
 
   function setViewConfig(config: Partial<ViewConfig>) {
-    viewConfig.value = { ...viewConfig.value, ...config }
+    const merged = { ...viewConfig.value, ...config }
+    merged.size = normalizeGalleryViewSize(merged.size)
+    viewConfig.value = merged
+    persistedViewSize.value = viewConfig.value.size
   }
 
   function setFilter(newFilter: Partial<AssetFilter>) {
@@ -360,7 +374,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     tagsLoading.value = false
     tagsError.value = null
 
-    viewConfig.value = { mode: 'adaptive', size: 200 }
+    viewConfig.value = { mode: 'adaptive', size: 128 }
+    persistedViewSize.value = viewConfig.value.size
     filter.value = {}
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'
