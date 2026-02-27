@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useLocalStorage, useMediaQuery } from '@vueuse/core'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { useDebounceFn, useLocalStorage, useMediaQuery } from '@vueuse/core'
+import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { Split } from '@/components/ui/split'
 import { useGalleryLayout } from '../composables'
+import { useGalleryData } from '../composables/useGalleryData'
+import { useGalleryStore } from '../store'
 import GallerySidebar from './GallerySidebar.vue'
 import GalleryViewer from './GalleryViewer.vue'
 import GalleryDetails from './GalleryDetails.vue'
@@ -15,10 +18,17 @@ const DEFAULT_LEFT_SIZE = '200px'
 const DEFAULT_RIGHT_SIZE = '256px'
 const COLLAPSED_SIZE = '0px'
 const COLLAPSE_TRIGGER_PX = 40
+const GALLERY_REFRESH_DEBOUNCE_MS = 400
 
 // 使用布局管理
 const { isSidebarOpen, isDetailsOpen, setSidebarOpen, setDetailsOpen } = useGalleryLayout()
+const galleryData = useGalleryData()
+const galleryStore = useGalleryStore()
 const isBelowLg = useMediaQuery('(max-width: 1023px)')
+
+let isUnmounted = false
+let refreshInFlight = false
+let refreshQueued = false
 
 // Split 拖动状态持久化
 const leftSidebarSize = useLocalStorage('gallery-left-sidebar-size', DEFAULT_LEFT_SIZE)
@@ -238,6 +248,50 @@ function handleRightDragEnd() {
   rightDragStartSizePx.value = null
   rightCollapsedByDrag.value = false
 }
+
+async function refreshGalleryFromNotification() {
+  if (refreshInFlight) {
+    refreshQueued = true
+    return
+  }
+
+  refreshInFlight = true
+  do {
+    refreshQueued = false
+    try {
+      await galleryData.loadFolderTree()
+      if (galleryStore.isTimelineMode) {
+        await galleryData.loadTimelineData()
+      } else {
+        await galleryData.loadAllAssets()
+      }
+    } catch (error) {
+      console.error('Failed to refresh gallery after notification:', error)
+    }
+  } while (refreshQueued)
+
+  refreshInFlight = false
+}
+
+const scheduleGalleryRefresh = useDebounceFn(() => {
+  if (isUnmounted) {
+    return
+  }
+  void refreshGalleryFromNotification()
+}, GALLERY_REFRESH_DEBOUNCE_MS)
+
+const galleryChangedHandler = () => {
+  void scheduleGalleryRefresh()
+}
+
+onMounted(() => {
+  onRpc('gallery.changed', galleryChangedHandler)
+})
+
+onUnmounted(() => {
+  isUnmounted = true
+  offRpc('gallery.changed', galleryChangedHandler)
+})
 </script>
 
 <template>

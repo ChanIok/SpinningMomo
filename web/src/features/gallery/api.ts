@@ -123,24 +123,6 @@ export async function getThumbnailStats(): Promise<string> {
 }
 
 /**
- * 清理已删除资产
- */
-export async function cleanupDeletedAssets(daysOld = 30): Promise<OperationResult> {
-  try {
-    console.log('🧹 清理已删除资产:', { daysOld })
-
-    const result = await call<OperationResult>('gallery.cleanupDeleted', { daysOld: daysOld })
-
-    console.log('✅ 已删除资产清理完成:', result.message)
-
-    return result
-  } catch (error) {
-    console.error('Failed to cleanup deleted assets:', error)
-    throw new Error('清理已删除资产失败')
-  }
-}
-
-/**
  * 获取资产缩略图URL - 从 asset对象直接构建
  * 路径格式: thumbnails/[hash前2位]/[hash第3-4位]/{hash}.webp
  */
@@ -403,7 +385,6 @@ export const galleryApi = {
   // 维护操作
   cleanupThumbnails,
   getThumbnailStats,
-  cleanupDeletedAssets,
 
   // 标签管理
   getTagTree,

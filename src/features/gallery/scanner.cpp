@@ -149,6 +149,133 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   return "unknown";
 }
 
+auto is_path_under_root(const std::string& candidate_path, const std::string& root_path) -> bool {
+  if (candidate_path.size() < root_path.size()) {
+    return false;
+  }
+
+  if (!candidate_path.starts_with(root_path)) {
+    return false;
+  }
+
+  if (candidate_path.size() == root_path.size()) {
+    return true;
+  }
+
+  return candidate_path[root_path.size()] == '/';
+}
+
+auto cleanup_removed_assets(Core::State::AppState& app_state,
+                            const std::filesystem::path& normalized_scan_root,
+                            const std::vector<Types::FileSystemInfo>& file_infos,
+                            const std::unordered_map<std::string, Types::Metadata>& asset_cache)
+    -> int {
+  auto root_str = normalized_scan_root.string();
+
+  // 本次磁盘上实际存在的文件。
+  std::unordered_set<std::string> existing_paths;
+  existing_paths.reserve(file_infos.size());
+  for (const auto& file_info : file_infos) {
+    existing_paths.insert(file_info.path.string());
+  }
+
+  std::vector<Types::Metadata> removed_assets;
+  for (const auto& [cached_path, metadata] : asset_cache) {
+    if (!is_path_under_root(cached_path, root_str)) {
+      continue;
+    }
+
+    if (!existing_paths.contains(cached_path)) {
+      // DB 有但磁盘没有，后面要删掉。
+      removed_assets.push_back(metadata);
+    }
+  }
+
+  int deleted_count = 0;
+  for (const auto& metadata : removed_assets) {
+    auto asset_result = Asset::Repository::get_asset_by_id(app_state, metadata.id);
+    if (asset_result && asset_result->has_value()) {
+      auto thumbnail_result = Asset::Thumbnail::delete_thumbnail(app_state, asset_result->value());
+      if (!thumbnail_result) {
+        Logger().debug("Thumbnail cleanup skipped for removed asset {}: {}", metadata.id,
+                       thumbnail_result.error());
+      }
+    }
+
+    auto delete_result = Asset::Repository::delete_asset(app_state, metadata.id);
+    if (!delete_result) {
+      Logger().warn("Failed to delete removed asset {}: {}", metadata.id, delete_result.error());
+      continue;
+    }
+
+    deleted_count++;
+  }
+
+  if (deleted_count > 0) {
+    Logger().info("Deleted {} removed assets under '{}'", deleted_count, root_str);
+  }
+
+  return deleted_count;
+}
+
+auto cleanup_missing_folders(Core::State::AppState& app_state,
+                             const std::filesystem::path& normalized_scan_root) -> int {
+  auto all_folders_result = Folder::Repository::list_all_folders(app_state);
+  if (!all_folders_result) {
+    Logger().warn("Failed to list folders for cleanup: {}", all_folders_result.error());
+    return 0;
+  }
+
+  auto root_str = normalized_scan_root.string();
+
+  struct MissingFolder {
+    std::int64_t id;
+    std::string path;
+  };
+
+  std::vector<MissingFolder> missing_folders;
+  for (const auto& folder : all_folders_result.value()) {
+    if (folder.path == root_str) {
+      continue;
+    }
+
+    if (!is_path_under_root(folder.path, root_str)) {
+      continue;
+    }
+
+    std::error_code ec;
+    auto folder_path = std::filesystem::path(folder.path);
+    bool exists = std::filesystem::exists(folder_path, ec);
+    bool is_directory = exists && std::filesystem::is_directory(folder_path, ec);
+    if (ec || !exists || !is_directory) {
+      // DB 有目录记录，但磁盘目录没了。
+      missing_folders.push_back(MissingFolder{.id = folder.id, .path = folder.path});
+    }
+  }
+
+  // 先删更深的目录，减少父子删除冲突。
+  std::ranges::sort(missing_folders, [](const MissingFolder& a, const MissingFolder& b) {
+    return a.path.size() > b.path.size();
+  });
+
+  int deleted_folders = 0;
+  for (const auto& folder : missing_folders) {
+    auto delete_result = Folder::Repository::delete_folder(app_state, folder.id);
+    if (!delete_result) {
+      Logger().debug("Skip folder cleanup for '{}' (id={}): {}", folder.path, folder.id,
+                     delete_result.error());
+      continue;
+    }
+    deleted_folders++;
+  }
+
+  if (deleted_folders > 0) {
+    Logger().info("Deleted {} missing folders under '{}'", deleted_folders, root_str);
+  }
+
+  return deleted_folders;
+}
+
 // 扫描目录并获取文件信息
 auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::path& directory,
                     const Types::ScanOptions& options, std::optional<std::int64_t> folder_id)
@@ -525,14 +652,20 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto root_folder_map = std::move(root_folder_mapping_result.value());
   std::int64_t folder_id = root_folder_map.at(normalized_scan_root.string());
 
-  // 2. 使用前端提交的完整规则集替换该目录规则
-  auto ignore_rules = options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{});
-  auto persist_result =
-      Ignore::Repository::replace_rules_by_folder_id(app_state, folder_id, ignore_rules);
-  if (!persist_result) {
-    return std::unexpected("Failed to persist ignore rules: " + persist_result.error());
+  // 2. 只有前端明确传了规则，才覆盖 DB 里的规则。
+  // watcher 触发的重扫一般不传规则，这样就能沿用旧规则。
+  if (options.ignore_rules.has_value()) {
+    auto persist_result = Ignore::Repository::replace_rules_by_folder_id(
+        app_state, folder_id, options.ignore_rules.value());
+    if (!persist_result) {
+      return std::unexpected("Failed to persist ignore rules: " + persist_result.error());
+    }
+    Logger().info("Persisted {} ignore rules for folder_id {}", options.ignore_rules->size(),
+                  folder_id);
+  } else {
+    Logger().debug("No ignore rules provided for '{}', keeping existing rules",
+                   normalized_scan_root.string());
   }
-  Logger().info("Persisted {} ignore rules for folder_id {}", ignore_rules.size(), folder_id);
 
   // 3. 加载资产缓存
   auto asset_cache_result = Asset::Service::load_asset_cache(app_state);
@@ -573,77 +706,78 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
   Logger().info("Found {} files that need processing", files_to_process.size());
 
-  if (files_to_process.empty()) {
-    // 无需处理文件
-    Types::ScanResult result{.total_files = static_cast<int>(file_infos.size())};
-
-    auto end_time = std::chrono::steady_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-    result.scan_duration = std::format("{}ms", duration.count());
-
-    Logger().info("Folder-aware asset scan completed - no changes detected");
-    return result;
-  }
-
   // 6. 提前准备文件夹映射，批量创建文件夹记录
   std::unordered_map<std::string, std::int64_t> path_to_folder_id;
-  std::vector<std::filesystem::path> file_paths;
-  file_paths.reserve(files_to_process.size());
-
-  for (const auto& analysis : files_to_process) {
-    file_paths.push_back(analysis.file_info.path);
-  }
-
-  // 提取所有需要的文件夹路径（包含祖先目录直到扫描根目录）
-  auto folder_paths = Folder::Service::extract_unique_folder_paths(file_paths, directory);
-
-  auto folder_mapping_result =
-      Folder::Service::batch_create_folders_for_paths(app_state, folder_paths);
-  if (folder_mapping_result) {
-    path_to_folder_id = std::move(folder_mapping_result.value());
-    Logger().info("Pre-created {} folder records with complete hierarchy",
-                  path_to_folder_id.size());
-  } else {
-    Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
-  }
-
-  // 7. 并行处理文件
-  auto processing_result =
-      process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id);
-  if (!processing_result) {
-    return std::unexpected("File processing failed: " + processing_result.error());
-  }
-
-  auto batch_result = processing_result.value();
-
-  // 8. 批量更新资产记录
+  Types::ProcessingBatchResult batch_result{};
   bool all_db_success = true;
 
-  if (!batch_result.new_assets.empty()) {
-    auto create_result = Asset::Repository::batch_create_asset(app_state, batch_result.new_assets);
-    if (create_result) {
-      Logger().info("Successfully created {} new asset items", batch_result.new_assets.size());
-    } else {
-      Logger().error("Failed to batch create asset items: {}", create_result.error());
-      all_db_success = false;
+  if (!files_to_process.empty()) {
+    std::vector<std::filesystem::path> file_paths;
+    file_paths.reserve(files_to_process.size());
+
+    for (const auto& analysis : files_to_process) {
+      file_paths.push_back(analysis.file_info.path);
     }
+
+    // 提取所有需要的文件夹路径（包含祖先目录直到扫描根目录）
+    auto folder_paths = Folder::Service::extract_unique_folder_paths(file_paths, directory);
+
+    auto folder_mapping_result =
+        Folder::Service::batch_create_folders_for_paths(app_state, folder_paths);
+    if (folder_mapping_result) {
+      path_to_folder_id = std::move(folder_mapping_result.value());
+      Logger().info("Pre-created {} folder records with complete hierarchy",
+                    path_to_folder_id.size());
+    } else {
+      Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
+    }
+
+    // 7. 并行处理文件
+    auto processing_result =
+        process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id);
+    if (!processing_result) {
+      return std::unexpected("File processing failed: " + processing_result.error());
+    }
+
+    batch_result = std::move(processing_result.value());
+
+    // 8. 批量更新资产记录
+    if (!batch_result.new_assets.empty()) {
+      auto create_result =
+          Asset::Repository::batch_create_asset(app_state, batch_result.new_assets);
+      if (create_result) {
+        Logger().info("Successfully created {} new asset items", batch_result.new_assets.size());
+      } else {
+        Logger().error("Failed to batch create asset items: {}", create_result.error());
+        all_db_success = false;
+      }
+    }
+
+    if (!batch_result.updated_assets.empty()) {
+      auto update_result =
+          Asset::Repository::batch_update_asset(app_state, batch_result.updated_assets);
+      if (update_result) {
+        Logger().info("Successfully updated {} asset items", batch_result.updated_assets.size());
+      } else {
+        Logger().error("Failed to batch update asset items: {}", update_result.error());
+        all_db_success = false;
+      }
+    }
+  } else {
+    Logger().info("Folder-aware asset scan found no new or modified files");
   }
 
-  if (!batch_result.updated_assets.empty()) {
-    auto update_result =
-        Asset::Repository::batch_update_asset(app_state, batch_result.updated_assets);
-    if (update_result) {
-      Logger().info("Successfully updated {} asset items", batch_result.updated_assets.size());
-    } else {
-      Logger().error("Failed to batch update asset items: {}", update_result.error());
-      all_db_success = false;
-    }
-  }
+  // 9. 做一次删除对账和空目录清理。
+  // 就算没有新增/修改，也要做这步，不然“已删除文件”会残留在 DB。
+  int deleted_items =
+      cleanup_removed_assets(app_state, normalized_scan_root, file_infos, asset_cache);
+  [[maybe_unused]] int deleted_folders = cleanup_missing_folders(app_state, normalized_scan_root);
 
-  // 9. 构建扫描结果
+  // 10. 构建扫描结果
   Types::ScanResult result{.total_files = static_cast<int>(file_infos.size()),
                            .new_items = static_cast<int>(batch_result.new_assets.size()),
                            .updated_items = static_cast<int>(batch_result.updated_assets.size()),
+                           .deleted_items = deleted_items,
                            .errors = std::move(batch_result.errors)};
 
   auto end_time = std::chrono::steady_clock::now();
@@ -655,10 +789,10 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
 
   Logger().info(
-      "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}, Duration: "
-      "{}",
-      result.total_files, result.new_items, result.updated_items, result.errors.size(),
-      result.scan_duration);
+      "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Deleted: {}, Errors: "
+      "{}, Duration: {}",
+      result.total_files, result.new_items, result.updated_items, result.deleted_items,
+      result.errors.size(), result.scan_duration);
 
   return result;
 }
