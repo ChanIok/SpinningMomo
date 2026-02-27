@@ -22,7 +22,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ChevronDown, ChevronUp, Loader2, Plus, Trash2 } from 'lucide-vue-next'
 import { useGallerySidebar, useGalleryData } from '../composables'
 import { useGalleryStore } from '../store'
-import type { ScanAssetsParams, ScanIgnoreRule } from '../types'
+import type { FolderTreeNode, ScanAssetsParams, ScanIgnoreRule } from '../types'
 import FolderTreeItem from '../components/FolderTreeItem.vue'
 import TagTreeItem from '../components/TagTreeItem.vue'
 import TagInlineEditor from '../components/TagInlineEditor.vue'
@@ -43,6 +43,9 @@ const {
   selectedTag,
   selectFolder,
   clearFolderFilter,
+  updateFolderDisplayName,
+  openFolderInExplorer,
+  removeFolderWatch,
   clearTagFilter,
   selectTag,
   loadTagTree,
@@ -296,6 +299,71 @@ async function handleDeleteTag(tagId: number) {
   }
 }
 
+function folderExistsById(nodes: FolderTreeNode[], folderId: number): boolean {
+  for (const node of nodes) {
+    if (node.id === folderId) {
+      return true
+    }
+    if (node.children && folderExistsById(node.children, folderId)) {
+      return true
+    }
+  }
+  return false
+}
+
+async function handleRenameFolderDisplayName(folderId: number, displayName: string) {
+  try {
+    await updateFolderDisplayName(folderId, displayName)
+    await galleryData.loadFolderTree()
+
+    if (selectedFolder.value === folderId) {
+      const folderName = displayName.trim()
+      selectFolder(folderId, folderName)
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.sidebar.folders.rename.failedTitle'), { description: message })
+  }
+}
+
+async function handleOpenFolderInExplorer(folderId: number) {
+  try {
+    await openFolderInExplorer(folderId)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.sidebar.folders.openInExplorer.failedTitle'), { description: message })
+  }
+}
+
+async function handleRemoveFolderWatch(folderId: number) {
+  try {
+    await removeFolderWatch(folderId)
+
+    await galleryData.loadFolderTree()
+
+    const currentSelectedFolderId = selectedFolder.value
+    if (
+      currentSelectedFolderId !== null &&
+      !folderExistsById(galleryStore.folders, currentSelectedFolderId)
+    ) {
+      clearFolderFilter()
+    }
+
+    if (galleryStore.isTimelineMode) {
+      await galleryData.loadTimelineData()
+    } else {
+      await galleryData.loadAllAssets()
+    }
+
+    toast.success(t('gallery.sidebar.folders.removeWatch.successTitle'), {
+      description: t('gallery.sidebar.folders.removeWatch.successDescription'),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.sidebar.folders.removeWatch.failedTitle'), { description: message })
+  }
+}
+
 onMounted(() => {
   galleryData.loadFolderTree()
   loadTagTree()
@@ -342,6 +410,9 @@ onMounted(() => {
             :selected-folder="selectedFolder"
             :depth="0"
             @select="selectFolder"
+            @rename-display-name="handleRenameFolderDisplayName"
+            @open-in-explorer="handleOpenFolderInExplorer"
+            @remove-watch="handleRemoveFolderWatch"
           />
         </div>
       </div>

@@ -18,6 +18,11 @@ export auto ensure_watcher_for_directory(
     const std::optional<Types::ScanOptions>& scan_options = std::nullopt,
     bool bootstrap_full_scan = true) -> std::expected<void, std::string>;
 
+// 停止并移除某个目录 watcher。返回 true 表示实际移除了 watcher。
+export auto remove_watcher_for_directory(Core::State::AppState& app_state,
+                                         const std::filesystem::path& root_directory)
+    -> std::expected<bool, std::string>;
+
 // 退出时停掉所有 watcher 线程。
 export auto shutdown_watchers(Core::State::AppState& app_state) -> void;
 

@@ -7,6 +7,7 @@ import type {
   ScanAssetsParams,
   ScanAssetsResult,
   FolderTreeNode,
+  UpdateFolderDisplayNameParams,
   GetTimelineBucketsParams,
   TimelineBucketsResponse,
   GetAssetsByMonthParams,
@@ -40,6 +41,47 @@ export async function getFolderTree(): Promise<FolderTreeNode[]> {
   } catch (error) {
     console.error('Failed to get folder tree:', error)
     throw new Error('获取文件夹树失败')
+  }
+}
+
+/**
+ * 更新文件夹显示名称（仅应用内）
+ */
+export async function updateFolderDisplayName(
+  params: UpdateFolderDisplayNameParams
+): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.updateFolderDisplayName', params)
+    return result
+  } catch (error) {
+    console.error('Failed to update folder display name:', error)
+    throw new Error('更新文件夹显示名称失败')
+  }
+}
+
+/**
+ * 在资源管理器中打开文件夹
+ */
+export async function openFolderInExplorer(folderId: number): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.openFolderInExplorer', { id: folderId })
+    return result
+  } catch (error) {
+    console.error('Failed to open folder in explorer:', error)
+    throw new Error('打开文件夹失败')
+  }
+}
+
+/**
+ * 移出根文件夹监听并清理索引
+ */
+export async function removeFolderWatch(folderId: number): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.removeFolderWatch', { id: folderId })
+    return result
+  } catch (error) {
+    console.error('Failed to remove folder watch:', error)
+    throw new Error('移出监听失败')
   }
 }
 
@@ -373,6 +415,9 @@ export const galleryApi = {
   // 数据查询
   listAssets,
   getFolderTree,
+  updateFolderDisplayName,
+  openFolderInExplorer,
+  removeFolderWatch,
   queryAssets, // 统一查询接口
 
   // 时间线查询

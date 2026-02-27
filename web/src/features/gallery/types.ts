@@ -59,6 +59,12 @@ export interface FolderTreeNode {
   children: FolderTreeNode[]
 }
 
+// 更新文件夹显示名称参数
+export interface UpdateFolderDisplayNameParams {
+  id: number
+  displayName: string
+}
+
 // 标签类型
 export interface Tag {
   id: number

@@ -763,6 +763,34 @@ auto ensure_watcher_for_directory(Core::State::AppState& app_state,
   return {};
 }
 
+auto remove_watcher_for_directory(Core::State::AppState& app_state,
+                                  const std::filesystem::path& root_directory)
+    -> std::expected<bool, std::string> {
+  auto normalized_result = Utils::Path::NormalizePath(root_directory);
+  if (!normalized_result) {
+    return std::unexpected("Failed to normalize root directory: " + normalized_result.error());
+  }
+
+  auto key = normalized_result->string();
+  std::shared_ptr<State::FolderWatcherState> watcher;
+  {
+    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
+    if (auto it = app_state.gallery->folder_watchers.find(key);
+        it != app_state.gallery->folder_watchers.end()) {
+      watcher = it->second;
+      app_state.gallery->folder_watchers.erase(it);
+    }
+  }
+
+  if (!watcher) {
+    return false;
+  }
+
+  stop_watcher(watcher);
+  Logger().info("Gallery watcher removed: {}", key);
+  return true;
+}
+
 auto initialize_watchers(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   auto folders_result = Features::Gallery::Folder::Repository::list_all_folders(app_state);
   if (!folders_result) {

@@ -145,6 +145,49 @@ export function useGallerySidebar() {
   }
 
   /**
+   * 更新文件夹显示名称（仅应用内）
+   */
+  async function updateFolderDisplayName(id: number, displayName: string) {
+    try {
+      await galleryApi.updateFolderDisplayName({
+        id,
+        displayName,
+      })
+      console.log('✏️ 更新文件夹显示名称:', id)
+    } catch (error) {
+      console.error('Failed to update folder display name:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 在资源管理器中打开文件夹
+   */
+  async function openFolderInExplorer(id: number) {
+    try {
+      await galleryApi.openFolderInExplorer(id)
+      console.log('📂 在资源管理器中打开文件夹:', id)
+    } catch (error) {
+      console.error('Failed to open folder in explorer:', error)
+      throw error
+    }
+  }
+
+  /**
+   * 移出根文件夹监听并清理索引
+   */
+  async function removeFolderWatch(id: number) {
+    try {
+      const result = await galleryApi.removeFolderWatch(id)
+      console.log('🗑️ 移出文件夹监听:', id)
+      return result
+    } catch (error) {
+      console.error('Failed to remove folder watch:', error)
+      throw error
+    }
+  }
+
+  /**
    * 清空标签筛选（保留其他筛选）
    */
   function clearTagFilter() {
@@ -328,6 +371,9 @@ export function useGallerySidebar() {
     isTagExpanded,
     selectFolder,
     clearFolderFilter,
+    updateFolderDisplayName,
+    openFolderInExplorer,
+    removeFolderWatch,
     clearTagFilter,
     selectTag,
     selectAllMedia,

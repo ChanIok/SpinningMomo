@@ -4,10 +4,13 @@ module Features.Gallery.Folder.Service;
 
 import std;
 import Core.State;
+import Core.Database;
 import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
+import Features.Gallery.Watcher;
 import Utils.Logger;
 import Utils.Path;
+import Utils.System;
 
 namespace Features::Gallery::Folder::Service {
 
@@ -177,6 +180,169 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   }
 
   return path_to_id_map;
+}
+
+auto trim_copy(std::string value) -> std::string {
+  auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
+
+  auto begin = std::find_if(value.begin(), value.end(), not_space);
+  auto end = std::find_if(value.rbegin(), value.rend(), not_space).base();
+
+  if (begin >= end) {
+    return "";
+  }
+
+  return std::string(begin, end);
+}
+
+auto normalize_display_name(const std::optional<std::string>& display_name)
+    -> std::optional<std::string> {
+  if (!display_name.has_value()) {
+    return std::nullopt;
+  }
+
+  auto trimmed = trim_copy(display_name.value());
+  if (trimmed.empty()) {
+    return std::nullopt;
+  }
+
+  return trimmed;
+}
+
+auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t root_folder_id,
+                               const std::string& root_path)
+    -> std::expected<std::int64_t, std::string> {
+  return Core::Database::execute_transaction(
+      *app_state.database, [&](auto& db_state) -> std::expected<std::int64_t, std::string> {
+        auto delete_assets_result =
+            Core::Database::execute(db_state, "DELETE FROM assets WHERE path = ? OR path LIKE ?",
+                                    {root_path, root_path + "/%"});
+        if (!delete_assets_result) {
+          return std::unexpected("Failed to delete assets under root path: " +
+                                 delete_assets_result.error());
+        }
+
+        auto deleted_assets_result =
+            Core::Database::query_scalar<std::int64_t>(db_state, "SELECT changes()");
+        if (!deleted_assets_result) {
+          return std::unexpected("Failed to query deleted assets count: " +
+                                 deleted_assets_result.error());
+        }
+        auto deleted_assets = deleted_assets_result->value_or(0);
+
+        std::string delete_folders_sql = R"(
+          DELETE FROM folders
+          WHERE id IN (
+            WITH RECURSIVE folder_tree(id) AS (
+              SELECT id FROM folders WHERE id = ?
+              UNION ALL
+              SELECT f.id FROM folders f
+              INNER JOIN folder_tree t ON f.parent_id = t.id
+            )
+            SELECT id FROM folder_tree
+          )
+        )";
+
+        auto delete_folders_result =
+            Core::Database::execute(db_state, delete_folders_sql, {root_folder_id});
+        if (!delete_folders_result) {
+          return std::unexpected("Failed to delete folders under root: " +
+                                 delete_folders_result.error());
+        }
+
+        auto deleted_folders_result =
+            Core::Database::query_scalar<std::int64_t>(db_state, "SELECT changes()");
+        if (!deleted_folders_result) {
+          return std::unexpected("Failed to query deleted folders count: " +
+                                 deleted_folders_result.error());
+        }
+        auto deleted_folders = deleted_folders_result->value_or(0);
+
+        return deleted_assets + deleted_folders;
+      });
+}
+
+auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t folder_id,
+                                const std::optional<std::string>& display_name)
+    -> std::expected<Types::OperationResult, std::string> {
+  auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
+  if (!folder_result) {
+    return std::unexpected("Failed to query folder: " + folder_result.error());
+  }
+  if (!folder_result->has_value()) {
+    return std::unexpected("Folder not found: " + std::to_string(folder_id));
+  }
+
+  auto folder = folder_result->value();
+  folder.display_name = normalize_display_name(display_name);
+
+  auto update_result = Repository::update_folder(app_state, folder);
+  if (!update_result) {
+    return std::unexpected("Failed to update folder: " + update_result.error());
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = folder.display_name.has_value() ? "Folder display name updated"
+                                                 : "Folder display name reset",
+      .affected_count = 1,
+  };
+}
+
+auto open_folder_in_explorer(Core::State::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<Types::OperationResult, std::string> {
+  auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
+  if (!folder_result) {
+    return std::unexpected("Failed to query folder: " + folder_result.error());
+  }
+  if (!folder_result->has_value()) {
+    return std::unexpected("Folder not found: " + std::to_string(folder_id));
+  }
+
+  auto open_result =
+      Utils::System::open_directory(std::filesystem::path(folder_result->value().path));
+  if (!open_result) {
+    return std::unexpected("Failed to open folder in explorer: " + open_result.error());
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Folder opened in explorer",
+      .affected_count = 0,
+  };
+}
+
+auto remove_root_folder_watch(Core::State::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<Types::OperationResult, std::string> {
+  auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
+  if (!folder_result) {
+    return std::unexpected("Failed to query folder: " + folder_result.error());
+  }
+  if (!folder_result->has_value()) {
+    return std::unexpected("Folder not found: " + std::to_string(folder_id));
+  }
+
+  const auto& folder = folder_result->value();
+  if (folder.parent_id.has_value()) {
+    return std::unexpected("Only root folders can be removed from watch list");
+  }
+
+  auto remove_watcher_result = Features::Gallery::Watcher::remove_watcher_for_directory(
+      app_state, std::filesystem::path(folder.path));
+  if (!remove_watcher_result) {
+    return std::unexpected("Failed to remove watcher: " + remove_watcher_result.error());
+  }
+
+  auto cleanup_result = cleanup_root_folder_index(app_state, folder.id, folder.path);
+  if (!cleanup_result) {
+    return std::unexpected("Failed to cleanup folder index: " + cleanup_result.error());
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Folder removed from watch list and index cleaned",
+      .affected_count = cleanup_result.value(),
+  };
 }
 
 }  // namespace Features::Gallery::Folder::Service
