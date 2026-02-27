@@ -21,6 +21,10 @@ struct RecordingState {
   // 状态标志 - 使用 atomic 避免锁竞争
   std::atomic<Features::Recording::Types::RecordingStatus> status{
       Features::Recording::Types::RecordingStatus::Idle};
+  // 防止重复触发录制切换任务
+  std::atomic<bool> op_in_progress{false};
+  // 录制开关专用线程（仅执行开始/停止控制逻辑）
+  std::jthread toggle_thread;
 
   // D3D 资源 (Headless)
   wil::com_ptr<ID3D11Device> device;
@@ -37,7 +41,7 @@ struct RecordingState {
 
   // 帧率控制
   std::chrono::steady_clock::time_point start_time;
-  uint64_t frame_index = 0;
+  std::uint64_t frame_index = 0;
 
   // 最后编码的帧纹理（用于帧重复填充）
   wil::com_ptr<ID3D11Texture2D> last_encoded_texture;

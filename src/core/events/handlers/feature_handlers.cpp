@@ -46,6 +46,12 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
         Features::WindowControl::UseCase::handle_window_selected(app_state, event);
       });
 
+  // 录制状态由后台线程切换完成后，触发悬浮窗重绘以更新 toggle 显示
+  subscribe<UI::FloatingWindow::Events::RecordingToggleEvent>(
+      *app_state.events, [&app_state](const UI::FloatingWindow::Events::RecordingToggleEvent&) {
+        UI::FloatingWindow::request_repaint(app_state);
+      });
+
   // === 通知功能 ===
   // 跨线程安全的通知显示（由 WorkerPool 等工作线程 post 事件，UI 线程处理）
   subscribe<UI::FloatingWindow::Events::NotificationEvent>(

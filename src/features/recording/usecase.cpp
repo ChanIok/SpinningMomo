@@ -3,6 +3,7 @@ module;
 module Features.Recording.UseCase;
 
 import std;
+import Core.Events;
 import Core.State;
 import Core.I18n.State;
 import Features.Recording;
@@ -11,7 +12,7 @@ import Features.Recording.State;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.WindowControl;
-import Features.Notifications;
+import UI.FloatingWindow.Events;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
@@ -20,12 +21,23 @@ import <windows.h>;
 namespace Features::Recording::UseCase {
 
 auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
-  if (!state.i18n) {
-    Logger().warn("Skip recording notification because i18n state is not initialized");
+  if (!state.events || !state.i18n) {
+    Logger().warn("Skip recording notification because events/i18n state is not initialized");
     return;
   }
 
-  Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"], message);
+  Core::Events::post(*state.events,
+                     UI::FloatingWindow::Events::NotificationEvent{
+                         .title = state.i18n->texts["label.app_name"], .message = message});
+}
+
+auto notify_recording_toggled(Core::State::AppState& state, bool enabled) -> void {
+  if (!state.events) {
+    return;
+  }
+
+  Core::Events::post(*state.events,
+                     UI::FloatingWindow::Events::RecordingToggleEvent{.enabled = enabled});
 }
 
 // 生成输出文件路径
@@ -50,19 +62,17 @@ auto generate_output_path(const Core::State::AppState& state)
   return recordings_dir / filename;
 }
 
-auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::string> {
-  // 如果尚未初始化，应该先初始化（如果 RecordingState 是 unique_ptr）
-  if (!state.recording) {
-    return std::unexpected("Recording state is not initialized");
-  }
+auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, std::string> {
+  auto status = state.recording->status.load(std::memory_order_acquire);
 
-  if (state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
+  if (status == Features::Recording::Types::RecordingStatus::Recording) {
     // 停止录制（保存路径在 stop 前读取，stop 不清理 config）
     std::filesystem::path saved_path = state.recording->config.output_path;
     Features::Recording::stop(*state.recording);
     show_recording_notification(state, state.i18n->texts["message.recording_saved"] +
                                            Utils::String::ToUtf8(saved_path.wstring()));
-  } else if (state.recording->status == Features::Recording::Types::RecordingStatus::Idle) {
+    notify_recording_toggled(state, false);
+  } else if (status == Features::Recording::Types::RecordingStatus::Idle) {
     // 开始录制
 
     // 1. 查找窗口
@@ -110,6 +120,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     }
 
     show_recording_notification(state, state.i18n->texts["message.recording_started"]);
+    notify_recording_toggled(state, true);
   } else {
     return std::unexpected("Recording is in a transitional state");
   }
@@ -117,10 +128,64 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   return {};
 }
 
+auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::string> {
+  if (!state.recording) {
+    return std::unexpected("Recording state is not initialized");
+  }
+
+  bool expected = false;
+  if (!state.recording->op_in_progress.compare_exchange_strong(expected, true,
+                                                               std::memory_order_acq_rel)) {
+    return {};
+  }
+
+  if (state.recording->toggle_thread.joinable()) {
+    state.recording->toggle_thread.join();
+  }
+
+  state.recording->toggle_thread = std::jthread([&state](std::stop_token) {
+    try {
+      HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+      const bool need_uninitialize = SUCCEEDED(hr);
+      if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+        Logger().warn("CoInitializeEx failed in recording task: {:08X}", static_cast<uint32_t>(hr));
+      }
+
+      auto result = toggle_recording_impl(state);
+      if (!result) {
+        Logger().error("Recording toggle failed: {}", result.error());
+      }
+
+      state.recording->op_in_progress.store(false, std::memory_order_release);
+
+      if (need_uninitialize) {
+        CoUninitialize();
+      }
+    } catch (const std::exception& e) {
+      Logger().error("Recording toggle thread exception: {}", e.what());
+      state.recording->op_in_progress.store(false, std::memory_order_release);
+    } catch (...) {
+      Logger().error("Recording toggle thread exception: unknown");
+      state.recording->op_in_progress.store(false, std::memory_order_release);
+    }
+  });
+
+  return {};
+}
+
 auto stop_recording_if_running(Core::State::AppState& state) -> void {
-  if (state.recording &&
-      state.recording->status == Features::Recording::Types::RecordingStatus::Recording) {
+  if (!state.recording) {
+    return;
+  }
+
+  if (state.recording->toggle_thread.joinable()) {
+    state.recording->toggle_thread.join();
+  }
+
+  if (state.recording->status.load(std::memory_order_acquire) ==
+      Features::Recording::Types::RecordingStatus::Recording) {
     Features::Recording::stop(*state.recording);
+    notify_recording_toggled(state, false);
   }
 }
 

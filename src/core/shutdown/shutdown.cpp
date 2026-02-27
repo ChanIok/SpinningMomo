@@ -12,6 +12,7 @@ import Features.Letterbox;
 import Features.Overlay;
 import Features.Preview;
 import Features.Screenshot;
+import Features.Recording.UseCase;
 import Features.Update;
 import Features.Update.State;
 import Features.Gallery;
@@ -28,6 +29,9 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   Logger().info("Starting application shutdown sequence...");
 
   // 清理顺序应该与 Core::Initializer::initialize_application 中的初始化顺序相反
+
+  // 先停止录制并等待录制切换线程结束，避免与后续 UI/核心清理并发
+  Features::Recording::UseCase::stop_recording_if_running(state);
 
   // 1. UI 清理
   UI::ContextMenu::cleanup(state);
