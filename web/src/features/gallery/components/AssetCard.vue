@@ -7,27 +7,21 @@ import type { Asset } from '../types'
 interface AssetCardProps {
   asset: Asset
   isSelected?: boolean
-  isActive?: boolean
   showName?: boolean
   showSize?: boolean
-  showQuickActions?: boolean
 }
 
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
-  isActive: false,
   showName: true,
   showSize: false,
-  showQuickActions: true,
 })
 
 // Emits 定义
 const emit = defineEmits<{
   click: [asset: Asset, event: MouseEvent]
   doubleClick: [asset: Asset, event: MouseEvent]
-  select: [assetId: number, selected: boolean, event: MouseEvent]
   contextMenu: [asset: Asset, event: MouseEvent]
-  preview: [asset: Asset]
 }>()
 
 // 响应式状态
@@ -45,11 +39,6 @@ const thumbnailUrl = computed(() => {
 // 事件处理
 function handleClick(event: MouseEvent) {
   emit('click', props.asset, event)
-
-  // 如果是 Ctrl/Cmd + 点击，切换选择状态
-  if (event.ctrlKey || event.metaKey) {
-    emit('select', props.asset.id, !props.isSelected, event)
-  }
 }
 
 function handleDoubleClick(event: MouseEvent) {
@@ -170,34 +159,6 @@ function formatFileSize(bytes: number): string {
             {{ asset.name }}
           </div>
         </div>
-      </div>
-
-      <!-- 快速操作按钮（悬停时显示） -->
-      <div
-        class="absolute top-2 left-2 flex space-x-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-        @click.stop
-      >
-        <button
-          v-if="showQuickActions"
-          class="flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
-          title="预览"
-          @click="$emit('preview', asset)"
-        >
-          <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-            />
-          </svg>
-        </button>
       </div>
     </div>
   </div>

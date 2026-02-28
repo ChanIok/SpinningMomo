@@ -81,10 +81,6 @@ function handleAssetDoubleClick(asset: any, event: MouseEvent, index: number) {
 function handleAssetContextMenu(asset: any, event: MouseEvent) {
   gallerySelection.handleAssetContextMenu(asset, event)
 }
-
-function handleAssetPreview(_asset: any, index: number) {
-  galleryLightbox.openLightbox(index)
-}
 </script>
 
 <template>
@@ -132,9 +128,10 @@ function handleAssetPreview(_asset: any, index: number) {
                 :show-name="galleryView.viewSize.value >= 256"
                 :show-size="galleryView.viewSize.value >= 256"
                 @click="handleAssetClick"
-                @double-click="(a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)"
+                @double-click="
+                  (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
+                "
                 @context-menu="handleAssetContextMenu"
-                @preview="(a) => handleAssetPreview(a, virtualRow.index * columns + idx)"
               />
 
               <!-- 骨架屏占位 -->
@@ -205,9 +202,10 @@ function handleAssetPreview(_asset: any, index: number) {
                 :show-name="galleryView.viewSize.value >= 256"
                 :show-size="galleryView.viewSize.value >= 256"
                 @click="handleAssetClick"
-                @double-click="(a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)"
+                @double-click="
+                  (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
+                "
                 @context-menu="handleAssetContextMenu"
-                @preview="(a) => handleAssetPreview(a, virtualRow.index * columns + idx)"
               />
 
               <!-- 骨架屏占位 -->

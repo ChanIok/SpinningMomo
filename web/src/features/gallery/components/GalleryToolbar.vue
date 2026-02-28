@@ -7,22 +7,15 @@
           <TooltipTrigger as-child>
             <Button variant="ghost" size="sm" @click="$emit('deleteSelected')">
               <Trash2 class="h-4 w-4" />
-              <span class="ml-1.5 hidden sm:inline">删除 ({{ selectedCount }})</span>
+              <span class="ml-1.5 hidden sm:inline">
+                {{ t('gallery.toolbar.deleteSelected.button', { count: selectedCount }) }}
+              </span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>删除选中的 {{ selectedCount }} 项资产</p>
-          </TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button variant="ghost" size="sm" @click="$emit('refresh')" :disabled="isLoading">
-              <RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isLoading }" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>重新加载图库资产</p>
+            <p>
+              {{ t('gallery.toolbar.deleteSelected.tooltip', { count: selectedCount }) }}
+            </p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -35,7 +28,7 @@
         <Input
           :model-value="searchQuery"
           @update:model-value="updateSearchQuery"
-          placeholder="搜索资产名称..."
+          :placeholder="t('gallery.toolbar.search.placeholder')"
           class="pl-10"
         />
         <button
@@ -58,33 +51,55 @@
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
                   <Button variant="ghost" size="sm">
-                    <SlidersHorizontal class="h-4 w-4" />
+                    <ListFilter class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" class="w-56">
                   <!-- 类型筛选 -->
-                  <DropdownMenuLabel>资产类型</DropdownMenuLabel>
+                  <DropdownMenuLabel>{{
+                    t('gallery.toolbar.filter.type.label')
+                  }}</DropdownMenuLabel>
                   <DropdownMenuRadioGroup
                     :model-value="filter.type || 'all'"
                     @update:model-value="onTypeFilterChange"
                   >
-                    <DropdownMenuRadioItem value="all">全部类型</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="photo">📷 照片</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="video">🎥 视频</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="live_photo">📸 实况</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="all">
+                      {{ t('gallery.toolbar.filter.type.all') }}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="photo">
+                      <Image class="mr-2 h-4 w-4" />
+                      {{ t('gallery.toolbar.filter.type.photo') }}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="video">
+                      <Video class="mr-2 h-4 w-4" />
+                      {{ t('gallery.toolbar.filter.type.video') }}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="live_photo">
+                      <Camera class="mr-2 h-4 w-4" />
+                      {{ t('gallery.toolbar.filter.type.livePhoto') }}
+                    </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
 
                   <DropdownMenuSeparator />
 
                   <!-- 排序方式 -->
-                  <DropdownMenuLabel>排序方式</DropdownMenuLabel>
+                  <DropdownMenuLabel>{{ t('gallery.toolbar.sort.label') }}</DropdownMenuLabel>
                   <DropdownMenuRadioGroup
                     :model-value="sortBy"
                     @update:model-value="onSortByChange"
                   >
-                    <DropdownMenuRadioItem value="createdAt">📅 创建日期</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="name">📝 名称</DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="size">📏 大小</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="createdAt">
+                      <CalendarClock class="mr-2 h-4 w-4" />
+                      {{ t('gallery.toolbar.sort.createdAt') }}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="name">
+                      <Type class="mr-2 h-4 w-4" />
+                      {{ t('gallery.toolbar.sort.name') }}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="size">
+                      <Ruler class="mr-2 h-4 w-4" />
+                      {{ t('gallery.toolbar.sort.size') }}
+                    </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
 
                   <DropdownMenuSeparator />
@@ -92,25 +107,33 @@
                   <!-- 排序顺序 -->
                   <DropdownMenuItem @click="toggleSortOrder">
                     <ArrowUpDown class="mr-2 h-4 w-4" />
-                    <span>{{ sortOrder === 'asc' ? '升序排列' : '降序排列' }}</span>
+                    <span>
+                      {{
+                        sortOrder === 'asc'
+                          ? t('gallery.toolbar.sortOrder.asc')
+                          : t('gallery.toolbar.sortOrder.desc')
+                      }}
+                    </span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
 
                   <!-- 文件夹选项 -->
-                  <DropdownMenuLabel>文件夹选项</DropdownMenuLabel>
+                  <DropdownMenuLabel>{{
+                    t('gallery.toolbar.folderOptions.label')
+                  }}</DropdownMenuLabel>
                   <DropdownMenuCheckboxItem
                     :model-value="includeSubfolders"
                     @update:model-value="toggleIncludeSubfolders"
                   >
-                    📂 包含子文件夹
+                    {{ t('gallery.toolbar.folderOptions.includeSubfolders') }}
                   </DropdownMenuCheckboxItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            <p>筛选与排序</p>
+            <p>{{ t('gallery.toolbar.filterAndSort.tooltip') }}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -130,7 +153,9 @@
                   <div class="space-y-6">
                     <!-- 视图模式选择 -->
                     <div class="space-y-3">
-                      <p class="text-sm font-medium">视图模式</p>
+                      <p class="text-sm font-medium">
+                        {{ t('gallery.toolbar.viewMode.label') }}
+                      </p>
                       <div class="grid grid-cols-4 gap-2">
                         <Button
                           v-for="mode in viewModes"
@@ -141,7 +166,7 @@
                           @click="setViewMode(mode.value)"
                         >
                           <component :is="mode.icon" class="h-5 w-5" />
-                          <span class="text-xs">{{ mode.label }}</span>
+                          <span class="text-xs">{{ t(mode.i18nKey) }}</span>
                         </Button>
                       </div>
                     </div>
@@ -152,7 +177,9 @@
                     <!-- 缩略图大小调整 -->
                     <div class="space-y-3">
                       <div class="flex items-center justify-between">
-                        <p class="text-sm font-medium">缩略图大小</p>
+                        <p class="text-sm font-medium">
+                          {{ t('gallery.toolbar.thumbnailSize.label') }}
+                        </p>
                         <span class="text-sm text-muted-foreground">{{ viewSize }}px</span>
                       </div>
                       <Slider
@@ -164,8 +191,8 @@
                         class="w-full"
                       />
                       <div class="flex justify-between text-xs text-muted-foreground">
-                        <span>精致</span>
-                        <span>展示</span>
+                        <span>{{ t('gallery.toolbar.thumbnailSize.fine') }}</span>
+                        <span>{{ t('gallery.toolbar.thumbnailSize.showcase') }}</span>
                       </div>
                     </div>
                   </div>
@@ -174,7 +201,7 @@
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            <p>视图设置</p>
+            <p>{{ t('gallery.toolbar.viewSettings.tooltip') }}</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -202,7 +229,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   Trash2,
-  RefreshCw,
   Search,
   X,
   ArrowUpDown,
@@ -210,27 +236,34 @@ import {
   LayoutGrid,
   List,
   Rows3,
-  SlidersHorizontal,
+  ListFilter,
+  Image,
+  Video,
+  Camera,
+  CalendarClock,
+  Type,
+  Ruler,
 } from 'lucide-vue-next'
+import { useI18n } from '@/composables/useI18n'
 import { useGalleryView } from '../composables'
 import type { ViewMode, SortBy, AssetType } from '../types'
 
 // Props 定义
 interface GalleryToolbarProps {
-  isLoading?: boolean
   selectedCount?: number
 }
 
 const props = withDefaults(defineProps<GalleryToolbarProps>(), {
-  isLoading: false,
   selectedCount: 0,
 })
 
 // Emits 定义
 const emit = defineEmits<{
-  refresh: []
   deleteSelected: []
 }>()
+
+// i18n
+const { t } = useI18n()
 
 // 使用视图管理逻辑
 const galleryView = useGalleryView()
@@ -251,10 +284,10 @@ const hasSelection = computed(() => props.selectedCount > 0)
 
 // 视图模式选项
 const viewModes = [
-  { value: 'grid' as ViewMode, icon: Grid3x3, label: '网格' },
-  { value: 'masonry' as ViewMode, icon: LayoutGrid, label: '瀑布流' },
-  { value: 'list' as ViewMode, icon: List, label: '列表' },
-  { value: 'adaptive' as ViewMode, icon: Rows3, label: '自适应' },
+  { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
+  { value: 'masonry' as ViewMode, icon: LayoutGrid, i18nKey: 'gallery.toolbar.viewMode.masonry' },
+  { value: 'list' as ViewMode, icon: List, i18nKey: 'gallery.toolbar.viewMode.list' },
+  { value: 'adaptive' as ViewMode, icon: Rows3, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
 ]
 
 // 当前视图模式的图标
