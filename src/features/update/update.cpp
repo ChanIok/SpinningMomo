@@ -12,6 +12,7 @@ import Features.Settings.State;
 import Utils.Crypto;
 import Utils.Logger;
 import Utils.Path;
+import Utils.String;
 import Vendor.ShellApi;
 import Vendor.Version;
 import Vendor.Windows;
@@ -177,20 +178,6 @@ auto get_temp_directory() -> std::expected<std::filesystem::path, std::string> {
   return temp_dir;
 }
 
-// 去除字符串首尾空白字符
-auto trim(const std::string& str) -> std::string {
-  auto start = str.find_first_not_of(" \t\n\r");
-  if (start == std::string::npos) return "";
-  auto end = str.find_last_not_of(" \t\n\r");
-  return str.substr(start, end - start + 1);
-}
-
-auto to_lower_ascii(std::string value) -> std::string {
-  std::ranges::transform(value, value.begin(),
-                         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
-  return value;
-}
-
 auto format_download_url(const std::string& url_template, const std::string& version,
                          const std::string& filename) -> std::expected<std::string, std::string> {
   try {
@@ -205,7 +192,7 @@ auto parse_sha256sum_for_filename(const std::string& checksums_content, const st
   std::istringstream stream(checksums_content);
   std::string line;
   while (std::getline(stream, line)) {
-    auto trimmed_line = trim(line);
+    auto trimmed_line = Utils::String::TrimAscii(line);
     if (trimmed_line.empty()) {
       continue;
     }
@@ -235,9 +222,9 @@ auto parse_sha256sum_for_filename(const std::string& checksums_content, const st
       hash_end++;
     }
 
-    auto file_part = trim(trimmed_line.substr(hash_end));
+    auto file_part = Utils::String::TrimAscii(trimmed_line.substr(hash_end));
     if (file_part == filename) {
-      return to_lower_ascii(hash);
+      return Utils::String::ToLowerAscii(hash);
     }
   }
 
@@ -252,7 +239,7 @@ auto verify_downloaded_file_sha256(const std::filesystem::path& file_path,
     return std::unexpected("Failed to calculate downloaded file hash: " + actual_sha256.error());
   }
 
-  auto expected = to_lower_ascii(trim(expected_sha256));
+  auto expected = Utils::String::ToLowerAscii(Utils::String::TrimAscii(expected_sha256));
   if (actual_sha256.value() != expected) {
     return std::unexpected("SHA256 mismatch");
   }
@@ -287,7 +274,7 @@ auto fetch_latest_version(const std::string& version_url)
     return std::unexpected("Failed to fetch version info: " + response.error());
   }
 
-  auto version = trim(response.value());
+  auto version = Utils::String::TrimAscii(response.value());
   if (version.empty()) {
     return std::unexpected("Empty version response");
   }

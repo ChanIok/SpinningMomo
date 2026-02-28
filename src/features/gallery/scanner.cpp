@@ -16,6 +16,7 @@ import Features.Gallery.Ignore.Service;
 import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
+import Utils.String;
 import Utils.Time;
 import Vendor.BuildConfig;
 import Vendor.XXHash;
@@ -56,11 +57,7 @@ auto is_supported_file(const std::filesystem::path& file_path,
     return false;
   }
 
-  std::string extension = file_path.extension().string();
-
-  // 转换为小写进行比较
-  std::ranges::transform(extension, extension.begin(),
-                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
 
   return std::ranges::find(supported_extensions, extension) != supported_extensions.end();
 }
@@ -130,9 +127,7 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
     return "unknown";
   }
 
-  std::string extension = file_path.extension().string();
-  std::ranges::transform(extension, extension.begin(),
-                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
 
   // 图片格式
   if (extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".bmp" ||
@@ -474,9 +469,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
 
   // 设置文件扩展名（小写格式，包含点号）
   if (file_path.has_extension()) {
-    std::string extension = file_path.extension().string();
-    std::ranges::transform(extension, extension.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
     asset.extension = extension;
   } else {
     asset.extension = std::nullopt;

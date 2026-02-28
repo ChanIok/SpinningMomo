@@ -45,6 +45,32 @@ export [[nodiscard]] auto FromUtf8(const std::string& utf8_str) noexcept -> std:
   return result;
 }
 
+// 将ASCII字符串转换为小写副本
+export [[nodiscard]] auto ToLowerAscii(std::string value) -> std::string {
+  std::ranges::transform(value, value.begin(),
+                         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return value;
+}
+
+// 去除ASCII字符串首尾空白字符
+export [[nodiscard]] auto TrimAscii(std::string_view value) -> std::string {
+  auto is_space = [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; };
+
+  auto begin = std::find_if_not(value.begin(), value.end(), is_space);
+  if (begin == value.end()) {
+    return {};
+  }
+
+  auto end = std::find_if_not(value.rbegin(), value.rend(), is_space).base();
+  return std::string(begin, end);
+}
+
+// 检查ASCII字符串是否只包含空白字符
+export [[nodiscard]] auto IsBlankAscii(std::string_view value) -> bool {
+  return std::ranges::all_of(
+      value, [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; });
+}
+
 // 格式化时间戳为文件名安全的字符串
 export [[nodiscard]] auto FormatTimestamp(const std::chrono::system_clock::time_point& time_point)
     -> std::string {

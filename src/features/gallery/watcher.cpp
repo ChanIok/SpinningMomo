@@ -17,6 +17,7 @@ import Features.Gallery.Asset.Thumbnail;
 import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
+import Utils.String;
 import Utils.Time;
 import Vendor.BuildConfig;
 import Vendor.XXHash;
@@ -41,19 +42,13 @@ struct ParsedNotification {
   bool is_directory = false;
 };
 
-auto to_lowercase(std::string value) -> std::string {
-  std::ranges::transform(value, value.begin(),
-                         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-  return value;
-}
-
 auto is_supported_file(const std::filesystem::path& file_path,
                        const std::vector<std::string>& supported_extensions) -> bool {
   if (!file_path.has_extension()) {
     return false;
   }
 
-  auto extension = to_lowercase(file_path.extension().string());
+  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
   return std::ranges::find(supported_extensions, extension) != supported_extensions.end();
 }
 
@@ -62,7 +57,7 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
     return "unknown";
   }
 
-  auto extension = to_lowercase(file_path.extension().string());
+  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
   if (extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".bmp" ||
       extension == ".webp" || extension == ".tiff" || extension == ".tif") {
     return "photo";
@@ -320,7 +315,7 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
   };
 
   if (normalized.has_extension()) {
-    asset.extension = to_lowercase(normalized.extension().string());
+    asset.extension = Utils::String::ToLowerAscii(normalized.extension().string());
   }
 
   auto parent_path = normalized.parent_path().string();

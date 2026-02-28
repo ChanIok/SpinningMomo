@@ -10,6 +10,7 @@ import Features.Gallery.Folder.Repository;
 import Features.Gallery.Watcher;
 import Utils.Logger;
 import Utils.Path;
+import Utils.String;
 import Utils.System;
 
 namespace Features::Gallery::Folder::Service {
@@ -182,26 +183,13 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   return path_to_id_map;
 }
 
-auto trim_copy(std::string value) -> std::string {
-  auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
-
-  auto begin = std::find_if(value.begin(), value.end(), not_space);
-  auto end = std::find_if(value.rbegin(), value.rend(), not_space).base();
-
-  if (begin >= end) {
-    return "";
-  }
-
-  return std::string(begin, end);
-}
-
 auto normalize_display_name(const std::optional<std::string>& display_name)
     -> std::optional<std::string> {
   if (!display_name.has_value()) {
     return std::nullopt;
   }
 
-  auto trimmed = trim_copy(display_name.value());
+  auto trimmed = Utils::String::TrimAscii(display_name.value());
   if (trimmed.empty()) {
     return std::nullopt;
   }

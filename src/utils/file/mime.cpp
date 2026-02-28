@@ -3,6 +3,7 @@ module;
 module Utils.File.Mime;
 
 import std;
+import Utils.String;
 
 namespace Utils::File::Mime {
 
@@ -76,11 +77,8 @@ const std::unordered_map<std::string, std::string> mime_map = {
     {".bin", "application/octet-stream"},
     {".iso", "application/octet-stream"}};
 
-auto get_mime_type_by_extension(const std::string &extension) -> std::string {
-  // 转换为小写进行匹配
-  std::string lowercase_ext = extension;
-  std::transform(lowercase_ext.begin(), lowercase_ext.end(), lowercase_ext.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
+auto get_mime_type_by_extension(const std::string& extension) -> std::string {
+  auto lowercase_ext = Utils::String::ToLowerAscii(extension);
 
   auto it = mime_map.find(lowercase_ext);
   if (it != mime_map.end()) {
@@ -91,12 +89,12 @@ auto get_mime_type_by_extension(const std::string &extension) -> std::string {
   return "application/octet-stream";
 }
 
-auto get_mime_type(const std::filesystem::path &file_path) -> std::string {
+auto get_mime_type(const std::filesystem::path& file_path) -> std::string {
   std::string extension = file_path.extension().string();
   return get_mime_type_by_extension(extension);
 }
 
-auto get_mime_type(const std::string &file_path) -> std::string {
+auto get_mime_type(const std::string& file_path) -> std::string {
   std::filesystem::path fs_path(file_path);
   return get_mime_type(fs_path);
 }
