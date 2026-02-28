@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useGalleryStore } from '../store'
+import type { Asset } from '../types'
 import {
   useGalleryView,
   useGallerySelection,
@@ -69,16 +70,16 @@ function handleScroll(event: Event) {
   viewportHeight.value = target.clientHeight
 }
 
-function handleAssetClick(asset: any, event: MouseEvent) {
-  gallerySelection.handleAssetClick(asset, event, [])
+function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
+  void gallerySelection.handleAssetClick(asset, event, index)
 }
 
-function handleAssetDoubleClick(asset: any, event: MouseEvent, index: number) {
+function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
   gallerySelection.handleAssetDoubleClick(asset, event)
   galleryLightbox.openLightbox(index)
 }
 
-function handleAssetContextMenu(asset: any, event: MouseEvent) {
+function handleAssetContextMenu(asset: Asset, event: MouseEvent) {
   gallerySelection.handleAssetContextMenu(asset, event)
 }
 </script>
@@ -127,7 +128,7 @@ function handleAssetContextMenu(asset: any, event: MouseEvent) {
                 :is-selected="gallerySelection.isAssetSelected(asset.id)"
                 :show-name="galleryView.viewSize.value >= 256"
                 :show-size="galleryView.viewSize.value >= 256"
-                @click="handleAssetClick"
+                @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
                 @double-click="
                   (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
                 "
@@ -201,7 +202,7 @@ function handleAssetContextMenu(asset: any, event: MouseEvent) {
                 :is-selected="gallerySelection.isAssetSelected(asset.id)"
                 :show-name="galleryView.viewSize.value >= 256"
                 :show-size="galleryView.viewSize.value >= 256"
-                @click="handleAssetClick"
+                @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
                 @double-click="
                   (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
                 "

@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import { useGalleryData } from './useGalleryData'
 import { useGalleryStore } from '../store'
 import type { Asset } from '../types'
 
@@ -8,12 +9,17 @@ import type { Asset } from '../types'
  */
 export function useGallerySelection() {
   const store = useGalleryStore()
+  const galleryData = useGalleryData()
 
   // ============= 选择状态 =============
   const selectedIds = computed(() => store.selection.selectedIds)
   const selectedCount = computed(() => store.selectedCount)
   const hasSelection = computed(() => store.hasSelection)
   const lastSelectedId = computed(() => store.selection.lastSelectedId)
+  const totalCount = computed(() =>
+    store.isTimelineMode ? store.timelineTotalCount : store.totalCount
+  )
+  const perPage = computed(() => store.perPage)
 
   // ============= 选择操作 =============
 
@@ -46,6 +52,84 @@ export function useGallerySelection() {
     store.clearDetailsFocus()
   }
 
+  function normalizeIndex(index: number): number | undefined {
+    if (totalCount.value <= 0) {
+      return undefined
+    }
+    return Math.max(0, Math.min(index, totalCount.value - 1))
+  }
+
+  function getAssetByIndex(index: number): Asset | undefined {
+    const [asset] = store.getAssetsInRange(index, index)
+    return asset ?? undefined
+  }
+
+  function getLastSelectedIdFromSet(): number | undefined {
+    let lastId: number | undefined
+    selectedIds.value.forEach((id) => {
+      lastId = id
+    })
+    return lastId
+  }
+
+  async function ensureRangeLoaded(startIndex: number, endIndex: number) {
+    const startPage = Math.floor(startIndex / perPage.value) + 1
+    const endPage = Math.floor(endIndex / perPage.value) + 1
+    const loadPromises: Promise<void>[] = []
+
+    for (let page = startPage; page <= endPage; page++) {
+      if (!store.isPageLoaded(page)) {
+        loadPromises.push(galleryData.loadPage(page))
+      }
+    }
+
+    if (loadPromises.length > 0) {
+      await Promise.all(loadPromises)
+    }
+  }
+
+  async function selectRangeByIndex(targetIndex: number) {
+    const normalizedTargetIndex = normalizeIndex(targetIndex)
+    if (normalizedTargetIndex === undefined) {
+      return
+    }
+
+    const anchorIndex = store.selection.anchorIndex
+    if (anchorIndex === undefined || anchorIndex < 0 || anchorIndex >= totalCount.value) {
+      await ensureRangeLoaded(normalizedTargetIndex, normalizedTargetIndex)
+      const targetAsset = getAssetByIndex(normalizedTargetIndex)
+      if (!targetAsset) {
+        return
+      }
+
+      store.replaceSelection([targetAsset.id], targetAsset.id)
+      store.setSelectionAnchor(normalizedTargetIndex)
+      store.setSelectionFocus(normalizedTargetIndex)
+      return
+    }
+
+    const startIndex = Math.min(anchorIndex, normalizedTargetIndex)
+    const endIndex = Math.max(anchorIndex, normalizedTargetIndex)
+
+    await ensureRangeLoaded(startIndex, endIndex)
+
+    const rangeIds: number[] = []
+    for (let i = startIndex; i <= endIndex; i++) {
+      const asset = getAssetByIndex(i)
+      if (asset) {
+        rangeIds.push(asset.id)
+      }
+    }
+
+    if (rangeIds.length === 0) {
+      return
+    }
+
+    const targetAsset = getAssetByIndex(normalizedTargetIndex)
+    store.replaceSelection(rangeIds, targetAsset?.id ?? rangeIds[rangeIds.length - 1])
+    store.setSelectionFocus(normalizedTargetIndex)
+  }
+
   /**
    * 范围选择：从 lastSelectedId 到 targetId 之间的所有资产
    * @param targetId 目标资产ID
@@ -55,7 +139,7 @@ export function useGallerySelection() {
     const lastId = lastSelectedId.value
     if (!lastId) {
       // 如果没有上次选择的资产，只选择当前资产
-      selectAsset(targetId, true, true)
+      store.replaceSelection([targetId], targetId)
       return
     }
 
@@ -65,7 +149,7 @@ export function useGallerySelection() {
 
     if (lastIndex === -1 || targetIndex === -1) {
       // 如果找不到索引，只选择当前资产
-      selectAsset(targetId, true, true)
+      store.replaceSelection([targetId], targetId)
       return
     }
 
@@ -73,13 +157,8 @@ export function useGallerySelection() {
     const startIndex = Math.min(lastIndex, targetIndex)
     const endIndex = Math.max(lastIndex, targetIndex)
 
-    // 选择范围内的所有资产
-    for (let i = startIndex; i <= endIndex; i++) {
-      const asset = assets[i]
-      if (asset) {
-        selectAsset(asset.id, true, true)
-      }
-    }
+    const rangeIds = assets.slice(startIndex, endIndex + 1).map((asset) => asset.id)
+    store.replaceSelection(rangeIds, targetId)
   }
 
   /**
@@ -111,28 +190,46 @@ export function useGallerySelection() {
    * 处理资产点击事件
    * @param asset 被点击的资产
    * @param event 鼠标事件
-   * @param assets 当前显示的资产列表
+   * @param index 被点击资产在当前排序结果中的全局索引
    */
-  function handleAssetClick(asset: Asset, event: MouseEvent, assets: Asset[]) {
+  async function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
     if (event.shiftKey) {
       // Shift + 点击：范围选择
-      selectRange(asset.id, assets)
+      await selectRangeByIndex(index)
       // Shift 多选后，显示批量操作面板
       if (store.selectedCount > 1) {
         store.setDetailsFocus({ type: 'batch' })
+      } else if (store.selectedCount === 1) {
+        store.setDetailsFocus({ type: 'asset', asset })
+      } else {
+        store.clearDetailsFocus()
       }
     } else if (event.ctrlKey || event.metaKey) {
       // Ctrl/Cmd + 点击：切换选择状态
+      const wasSelected = selectedIds.value.has(asset.id)
       toggleAsset(asset.id, true)
+      if (wasSelected) {
+        // 取消选中时保持当前活动项；若活动项被移除则回退到剩余选中项
+        if (store.selection.lastSelectedId === asset.id) {
+          store.setSelectionLastSelected(getLastSelectedIdFromSet())
+        }
+      } else {
+        store.setSelectionAnchor(index)
+        store.setSelectionFocus(index)
+      }
       // Ctrl 多选后，判断选中数量
       if (store.selectedCount > 1) {
         store.setDetailsFocus({ type: 'batch' })
       } else if (store.selectedCount === 1) {
         store.setDetailsFocus({ type: 'asset', asset })
+      } else {
+        store.clearDetailsFocus()
       }
     } else {
       // 普通点击：单选
       selectAsset(asset.id, true, false)
+      store.setSelectionAnchor(index)
+      store.setSelectionFocus(index)
       // 单选时显示资产详情
       store.setDetailsFocus({ type: 'asset', asset })
     }
@@ -270,6 +367,7 @@ export function useGallerySelection() {
 
     // 高级操作
     selectRange,
+    selectRangeByIndex,
     invertSelection,
     selectByType,
 

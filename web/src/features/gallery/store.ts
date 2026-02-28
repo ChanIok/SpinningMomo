@@ -75,6 +75,8 @@ export const useGalleryStore = defineStore('gallery', () => {
   const selection = reactive<SelectionState>({
     selectedIds: new Set<number>(),
     lastSelectedId: undefined,
+    anchorIndex: undefined,
+    focusIndex: undefined,
   })
 
   // ============= Lightbox状态 =============
@@ -263,6 +265,26 @@ export const useGalleryStore = defineStore('gallery', () => {
   function clearSelection() {
     selection.selectedIds.clear()
     selection.lastSelectedId = undefined
+    selection.anchorIndex = undefined
+    selection.focusIndex = undefined
+  }
+
+  function replaceSelection(ids: number[], lastSelectedId?: number) {
+    selection.selectedIds.clear()
+    ids.forEach((id) => selection.selectedIds.add(id))
+    selection.lastSelectedId = lastSelectedId
+  }
+
+  function setSelectionAnchor(index?: number) {
+    selection.anchorIndex = index
+  }
+
+  function setSelectionFocus(index?: number) {
+    selection.focusIndex = index
+  }
+
+  function setSelectionLastSelected(id?: number) {
+    selection.lastSelectedId = id
   }
 
   // ============= Lightbox操作 Actions =============
@@ -383,6 +405,8 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     selection.selectedIds.clear()
     selection.lastSelectedId = undefined
+    selection.anchorIndex = undefined
+    selection.focusIndex = undefined
 
     lightbox.isOpen = false
     lightbox.currentIndex = 0
@@ -472,6 +496,10 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     selectAsset,
     clearSelection,
+    replaceSelection,
+    setSelectionAnchor,
+    setSelectionFocus,
+    setSelectionLastSelected,
 
     openLightbox,
     closeLightbox,

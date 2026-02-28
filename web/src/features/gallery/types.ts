@@ -298,6 +298,8 @@ export interface GetAssetsByMonthResponse {
 export interface SelectionState {
   selectedIds: Set<number>
   lastSelectedId?: number
+  anchorIndex?: number
+  focusIndex?: number
 }
 
 // Lightbox状态
