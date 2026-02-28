@@ -145,6 +145,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 注册所有命令的热键
     Core::Commands::register_all_hotkeys(state, state.floating_window->window.hwnd);
 
+    // 按设置自动检查更新（异步，不阻塞启动）
+    Features::Update::schedule_startup_auto_update_check(state);
+
     Logger().info("Application initialized successfully");
     return {};
 

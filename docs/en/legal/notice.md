@@ -1,7 +1,7 @@
 # Legal & Privacy Notice
 
-Last Updated: 2026-02-24  
-Effective Date: 2026-02-24
+Last Updated: 2026-02-28  
+Effective Date: 2026-02-28
 
 Please read this notice before using SpinningMomo.  
 By downloading, installing, or using the software, you acknowledge and accept this notice.
@@ -23,6 +23,7 @@ By default, the project has no account system, no ad SDK, and does not actively 
 ## 3. Network Behavior
 
 - When you trigger update-related actions (for example check/download updates), the app connects to update sources.
+- If you enable auto update checks, the app also connects to update sources on startup.
 - Those providers may log standard access metadata (for example IP, timestamp, and User-Agent).
 
 ## 4. Data Sharing and User Submissions
@@ -45,4 +46,3 @@ You may use this software only for lawful and compliant purposes, and must not u
 - This notice may be updated as the project evolves. New versions are published in the repository/docs site.
 - Continued use means you accept the updated notice.
 - No one-to-one support or response-time commitment is provided. If Issues are enabled, you may submit feedback there.
-

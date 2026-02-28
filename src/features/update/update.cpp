@@ -4,6 +4,7 @@ module Features.Update;
 
 import std;
 import Core.Events;
+import Core.WorkerPool;
 import UI.FloatingWindow.Events;
 import Core.State;
 import Features.Update.State;
@@ -386,6 +387,73 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     return {};
   } catch (const std::exception& e) {
     return std::unexpected("Failed to initialize update: " + std::string(e.what()));
+  }
+}
+
+auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> void {
+  if (!app_state.settings || !app_state.update || !app_state.worker_pool) {
+    Logger().warn("Skip startup auto update check: state is not ready");
+    return;
+  }
+
+  if (!app_state.settings->raw.update.auto_check) {
+    Logger().info("Skip startup auto update check: auto_check is disabled");
+    return;
+  }
+
+  bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
+    Logger().info("Startup auto update check started");
+
+    auto check_result = check_for_update(app_state);
+    if (!check_result) {
+      Logger().warn("Startup auto update check failed: {}", check_result.error());
+      return;
+    }
+
+    if (check_result->has_update) {
+      Logger().info("Startup auto update check found update: current={}, latest={}",
+                    check_result->current_version, check_result->latest_version);
+
+      if (!app_state.settings || !app_state.update) {
+        Logger().warn("Skip startup auto update prepare: state is not ready");
+        return;
+      }
+
+      if (!app_state.settings->raw.update.auto_update_on_exit) {
+        Logger().info("Skip startup auto update prepare: auto_update_on_exit is disabled");
+        return;
+      }
+
+      if (app_state.update->pending_update) {
+        Logger().info("Skip startup auto update prepare: pending update already exists");
+        return;
+      }
+
+      auto download_result = download_update(app_state);
+      if (!download_result) {
+        Logger().warn("Startup auto update download failed: {}", download_result.error());
+        return;
+      }
+
+      Types::InstallUpdateParams install_params;
+      install_params.restart = false;
+
+      auto install_result = install_update(app_state, install_params);
+      if (!install_result) {
+        Logger().warn("Startup auto update prepare failed: {}", install_result.error());
+        return;
+      }
+
+      Logger().info("Startup auto update prepared successfully");
+      return;
+    }
+
+    Logger().info("Startup auto update check completed: current version is up-to-date ({})",
+                  check_result->current_version);
+  });
+
+  if (!submitted) {
+    Logger().warn("Failed to schedule startup auto update check");
   }
 }
 
