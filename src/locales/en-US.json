@@ -44,6 +44,7 @@
   "message.window_reset_failed": "Failed to reset window size.",
 
   "message.screenshot_success": "Screenshot saved to: ",
+  "message.screenshot_failed": "Screenshot failed",
   "message.preview_overlay_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
   "message.preview_start_failed": "Failed to start preview window: ",
   "message.overlay_start_failed": "Failed to start overlay window: ",

@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3784 bytes
+// Size: 3836 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -60,6 +60,7 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.window_reset_failed": "Failed to reset window size.",
 
   "message.screenshot_success": "Screenshot saved to: ",
+  "message.screenshot_failed": "Screenshot failed",
   "message.preview_overlay_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
   "message.preview_start_failed": "Failed to start preview window: ",
   "message.overlay_start_failed": "Failed to start overlay window: ",

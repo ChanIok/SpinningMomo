@@ -101,7 +101,7 @@ auto capture(Core::State::AppState& state) -> void {
       Core::Events::post(*state.events,
                          UI::FloatingWindow::Events::NotificationEvent{
                              .title = state.i18n->texts["label.app_name"],
-                             .message = state.i18n->texts["message.window_adjust_failed"]});
+                             .message = state.i18n->texts["message.screenshot_failed"]});
       Logger().error("Screenshot capture failed");
     }
   };
@@ -128,7 +128,7 @@ auto capture(Core::State::AppState& state) -> void {
   if (!result) {
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
-        state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
+        state.i18n->texts["message.screenshot_failed"] + ": " + result.error());
     Logger().error("Failed to start screenshot: {}", result.error());
   } else {
     Logger().debug("Screenshot capture started successfully");

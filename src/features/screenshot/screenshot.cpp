@@ -106,6 +106,11 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
                            Features::Screenshot::State::ScreenshotState& state)
     -> std::expected<void, std::string> {
   try {
+    // 最小化窗口不执行截图，避免创建无法完成的捕获会话
+    if (IsIconic(request.target_window)) {
+      return std::unexpected("Target window is minimized");
+    }
+
     // 获取窗口大小
     RECT rect;
     THROW_IF_WIN32_BOOL_FALSE(GetWindowRect(request.target_window, &rect));
@@ -430,6 +435,9 @@ auto take_screenshot(
   auto& state = *app_state.screenshot;
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window handle");
+  }
+  if (IsIconic(target_window)) {
+    return std::unexpected("Target window is minimized");
   }
 
   // 生成截图文件路径
