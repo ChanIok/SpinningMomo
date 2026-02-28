@@ -3,9 +3,26 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { call } from '@/core/rpc'
 import { getCurrentEnvironment } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Info, Monitor, Settings, Camera, TriangleAlert } from 'lucide-vue-next'
+import {
+  Info,
+  Monitor,
+  Settings,
+  Camera,
+  TriangleAlert,
+  RefreshCw,
+  Download,
+  Check,
+  Loader2,
+  Book,
+  Package,
+  Bug,
+  Scale,
+  ShieldAlert,
+  Heart,
+} from 'lucide-vue-next'
 
 interface RuntimeInfo {
   version: string
@@ -19,16 +36,31 @@ interface RuntimeInfo {
   isProcessLoopbackAudioSupported: boolean
 }
 
+interface CheckUpdateResult {
+  hasUpdate: boolean
+  latestVersion: string
+  currentVersion: string
+}
+
 const { t, locale } = useI18n()
+const { toast } = useToast()
 
 const runtimeInfo = ref<RuntimeInfo | null>(null)
+const currentVersionFromUpdate = ref<string | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
+const isCheckingUpdate = ref(false)
+const isInstallingUpdate = ref(false)
+const hasUpdate = ref<boolean | null>(null)
+const latestVersion = ref<string | null>(null)
+const updateError = ref<string | null>(null)
+const updateChecked = ref(false)
 const showAdvanced = ref(false)
 const copied = ref(false)
 const environment = getCurrentEnvironment()
 
 let copiedTimer: ReturnType<typeof setTimeout> | null = null
+let updateCheckedTimer: ReturnType<typeof setTimeout> | null = null
 
 const docsUrl = 'https://chaniok.github.io/SpinningMomo'
 const releaseUrl = 'https://github.com/ChanIok/SpinningMomo/releases/latest'
@@ -45,7 +77,25 @@ const legalNoticeUrl = computed(() =>
 
 const creditsUrl = computed(() => (locale.value === 'en-US' ? creditsEnUrl : creditsZhUrl))
 
-const appVersionText = computed(() => runtimeInfo.value?.version || '-')
+const appVersionText = computed(
+  () => runtimeInfo.value?.version || currentVersionFromUpdate.value || '-'
+)
+
+const actionButtonText = computed(() => {
+  if (isInstallingUpdate.value) {
+    return t('about.actions.installingUpdate')
+  }
+  if (isCheckingUpdate.value) {
+    return t('about.actions.checkingUpdate')
+  }
+  if (hasUpdate.value) {
+    return t('about.actions.updateAvailable').replace('{version}', latestVersion.value || '')
+  }
+  if (updateChecked.value && !hasUpdate.value) {
+    return t('about.status.upToDateShort')
+  }
+  return t('about.actions.checkUpdate')
+})
 
 const environmentText = computed(() => {
   const key =
@@ -146,6 +196,69 @@ const loadRuntimeInfo = async () => {
   }
 }
 
+const checkForUpdate = async () => {
+  if (isCheckingUpdate.value || isInstallingUpdate.value) {
+    return
+  }
+
+  isCheckingUpdate.value = true
+  updateError.value = null
+  updateChecked.value = false
+
+  if (updateCheckedTimer) {
+    clearTimeout(updateCheckedTimer)
+  }
+
+  try {
+    const result = await call<CheckUpdateResult>('update.check_for_update')
+
+    hasUpdate.value = result.hasUpdate
+    latestVersion.value = result.latestVersion
+    currentVersionFromUpdate.value = result.currentVersion
+
+    if (result.hasUpdate) {
+      toast.success(t('about.toast.updateAvailable'))
+    } else {
+      toast.info(t('about.toast.upToDate'))
+      updateChecked.value = true
+      updateCheckedTimer = setTimeout(() => {
+        updateChecked.value = false
+      }, 3000)
+    }
+  } catch (e) {
+    updateError.value = toErrorMessage(e)
+    toast.error(t('about.toast.updateCheckFailed'))
+  } finally {
+    isCheckingUpdate.value = false
+  }
+}
+
+const downloadAndInstallUpdate = async () => {
+  if (isCheckingUpdate.value || isInstallingUpdate.value || !hasUpdate.value) {
+    return
+  }
+
+  isInstallingUpdate.value = true
+  updateError.value = null
+
+  try {
+    await call('update.download_update')
+    await call('update.install_update', { restart: true })
+  } catch (e) {
+    updateError.value = toErrorMessage(e)
+    toast.error(t('about.toast.updateInstallFailed'))
+    isInstallingUpdate.value = false
+  }
+}
+
+const handleUpdateAction = async () => {
+  if (hasUpdate.value) {
+    await downloadAndInstallUpdate()
+    return
+  }
+  await checkForUpdate()
+}
+
 const copyDiagnostics = async () => {
   const text = diagnosticsText.value
   let success = false
@@ -176,114 +289,195 @@ onBeforeUnmount(() => {
   if (copiedTimer) {
     clearTimeout(copiedTimer)
   }
+  if (updateCheckedTimer) {
+    clearTimeout(updateCheckedTimer)
+  }
 })
 </script>
 
 <template>
   <ScrollArea class="h-full text-foreground">
     <div class="mx-auto w-full max-w-3xl p-8 pb-12">
-      <div class="space-y-2 pr-4">
-        <h1 class="text-2xl font-semibold">{{ t('about.title') }}</h1>
-        <p class="text-sm text-muted-foreground">{{ t('about.description') }}</p>
-      </div>
-
-      <div class="mt-6 rounded-lg border bg-card/60 p-4 pr-5">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="text-xs text-muted-foreground">{{ t('about.runtime.version') }}</p>
-            <p class="text-sm font-medium">{{ appVersionText }}</p>
+      <!-- Hero Section -->
+      <div class="mb-8 flex flex-col items-start space-y-3">
+        <div class="flex items-center gap-3">
+          <h1 class="text-3xl font-bold tracking-tight">{{ t('app.name') }}</h1>
+          <div
+            v-if="appVersionText !== '-'"
+            class="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary shadow-sm"
+          >
+            v{{ appVersionText }}
           </div>
-          <Button variant="outline" size="sm" :disabled="isLoading" @click="loadRuntimeInfo">
-            {{ isLoading ? t('about.status.loading') : t('about.actions.refresh') }}
-          </Button>
         </div>
+        <p class="text-[15px] text-muted-foreground">{{ t('about.description') }}</p>
       </div>
 
-      <div class="mt-6 pr-4">
-        <p class="text-xs font-medium tracking-wide text-muted-foreground">
-          {{ t('about.links.title') }}
+      <!-- Action Button -->
+      <div class="mb-10">
+        <Button
+          :variant="hasUpdate ? 'default' : 'secondary'"
+          :class="[
+            'transition-all duration-300',
+            hasUpdate
+              ? 'bg-primary shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background hover:bg-primary/90'
+              : '',
+          ]"
+          :disabled="isCheckingUpdate || isInstallingUpdate"
+          @click="handleUpdateAction"
+        >
+          <div class="flex items-center gap-2">
+            <Loader2 v-if="isCheckingUpdate || isInstallingUpdate" class="h-4 w-4 animate-spin" />
+            <Download v-else-if="hasUpdate" class="h-4 w-4" />
+            <Check v-else-if="updateChecked && !hasUpdate" class="h-4 w-4 text-green-500" />
+            <RefreshCw v-else class="h-4 w-4 text-muted-foreground" />
+            <span>{{ actionButtonText }}</span>
+          </div>
+        </Button>
+        <p v-if="updateError" class="mt-3 flex items-center gap-1.5 text-sm text-destructive">
+          <TriangleAlert class="h-4 w-4" />
+          {{ updateError }}
         </p>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <Button as-child variant="secondary" size="sm">
+      </div>
+
+      <!-- Links Grid -->
+      <div class="mb-10 pr-4">
+        <h2 class="mb-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+          {{ t('about.links.title') }}
+        </h2>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Button
+            as-child
+            variant="ghost"
+            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
+          >
             <a :href="docsUrl" target="_blank" rel="noopener noreferrer">
+              <Book class="mr-2 h-4 w-4 opacity-70" />
               {{ t('about.links.docs') }}
             </a>
           </Button>
-          <Button as-child variant="secondary" size="sm">
+          <Button
+            as-child
+            variant="ghost"
+            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
+          >
             <a :href="releaseUrl" target="_blank" rel="noopener noreferrer">
+              <Package class="mr-2 h-4 w-4 opacity-70" />
               {{ t('about.links.release') }}
             </a>
           </Button>
-          <Button as-child variant="secondary" size="sm">
+          <Button
+            as-child
+            variant="ghost"
+            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
+          >
             <a :href="issuesUrl" target="_blank" rel="noopener noreferrer">
+              <Bug class="mr-2 h-4 w-4 opacity-70" />
               {{ t('about.links.issues') }}
             </a>
           </Button>
-          <Button as-child variant="secondary" size="sm">
+          <Button
+            as-child
+            variant="ghost"
+            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
+          >
             <a :href="licenseUrl" target="_blank" rel="noopener noreferrer">
+              <Scale class="mr-2 h-4 w-4 opacity-70" />
               {{ t('about.links.license') }}
             </a>
           </Button>
-          <Button as-child variant="secondary" size="sm">
+          <Button
+            as-child
+            variant="ghost"
+            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
+          >
             <a :href="legalNoticeUrl" target="_blank" rel="noopener noreferrer">
+              <ShieldAlert class="mr-2 h-4 w-4 opacity-70" />
               {{ t('about.links.legalNotice') }}
             </a>
           </Button>
-          <Button as-child variant="secondary" size="sm">
+          <Button
+            as-child
+            variant="ghost"
+            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
+          >
             <a :href="creditsUrl" target="_blank" rel="noopener noreferrer">
+              <Heart class="mr-2 h-4 w-4 opacity-70" />
               {{ t('about.links.credits') }}
             </a>
           </Button>
         </div>
       </div>
 
-      <div class="mt-8 pr-4">
-        <Button variant="ghost" size="sm" class="px-0" @click="showAdvanced = !showAdvanced">
+      <!-- Advanced Info -->
+      <div class="pr-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          class="px-2 text-muted-foreground hover:text-foreground"
+          @click="showAdvanced = !showAdvanced"
+        >
+          <Settings class="mr-2 h-4 w-4" />
           {{ showAdvanced ? t('about.actions.hideAdvanced') : t('about.actions.showAdvanced') }}
         </Button>
 
-        <div v-if="showAdvanced" class="mt-3 rounded-lg border bg-card/40 p-4">
-          <div v-if="isLoading" class="text-sm text-muted-foreground">
+        <div
+          v-if="showAdvanced"
+          class="mt-4 rounded-xl border bg-card/40 p-5 shadow-sm transition-all duration-300"
+        >
+          <div v-if="isLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 class="h-4 w-4 animate-spin" />
             {{ t('about.status.loading') }}
           </div>
 
           <div v-else-if="error" class="space-y-3">
-            <p class="text-sm text-muted-foreground">{{ t('about.status.loadFailed') }}</p>
-            <p class="text-sm text-red-500">{{ error }}</p>
+            <div class="flex items-center gap-2 text-sm text-destructive">
+              <TriangleAlert class="h-4 w-4" />
+              <p>{{ t('about.status.loadFailed') }}</p>
+            </div>
+            <p class="text-xs text-destructive/80">{{ error }}</p>
             <Button variant="outline" size="sm" @click="loadRuntimeInfo">
+              <RefreshCw class="mr-2 h-3.5 w-3.5" />
               {{ t('about.actions.retry') }}
             </Button>
           </div>
 
           <template v-else>
-            <div class="space-y-3 text-sm">
-              <div class="flex items-center justify-between gap-4">
+            <div class="space-y-4 text-sm">
+              <div
+                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
+              >
                 <span class="flex items-center gap-2 text-muted-foreground">
-                  <Info class="h-4 w-4" />
+                  <Info class="h-4 w-4 opacity-70" />
                   {{ t('about.runtime.environment') }}
                 </span>
                 <span class="text-right font-medium">{{ environmentText }}</span>
               </div>
 
-              <div class="flex items-center justify-between gap-4">
+              <div
+                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
+              >
                 <span class="flex items-center gap-2 text-muted-foreground">
-                  <Monitor class="h-4 w-4" />
+                  <Monitor class="h-4 w-4 opacity-70" />
                   {{ t('about.runtime.os') }}
                 </span>
                 <span class="text-right font-medium">{{ osText }}</span>
               </div>
 
-              <div class="flex items-center justify-between gap-4">
+              <div
+                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
+              >
                 <span class="flex items-center gap-2 text-muted-foreground">
-                  <Settings class="h-4 w-4" />
+                  <Settings class="h-4 w-4 opacity-70" />
                   {{ t('about.runtime.webview2') }}
                 </span>
                 <span class="text-right font-medium">{{ webview2Text }}</span>
               </div>
 
-              <div class="flex items-center justify-between gap-4">
+              <div
+                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
+              >
                 <span class="flex items-center gap-2 text-muted-foreground">
-                  <Camera class="h-4 w-4" />
+                  <Camera class="h-4 w-4 opacity-70" />
                   {{ t('about.runtime.capture') }}
                 </span>
                 <span class="text-right font-medium">
@@ -291,9 +485,11 @@ onBeforeUnmount(() => {
                 </span>
               </div>
 
-              <div class="flex items-center justify-between gap-4">
+              <div
+                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
+              >
                 <span class="flex items-center gap-2 text-muted-foreground">
-                  <TriangleAlert class="h-4 w-4" />
+                  <TriangleAlert class="h-4 w-4 opacity-70" />
                   {{ t('about.runtime.loopback') }}
                 </span>
                 <span class="text-right font-medium">
@@ -302,8 +498,9 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <div class="mt-4">
-              <Button variant="outline" size="sm" @click="copyDiagnostics">
+            <div class="mt-5 flex justify-end">
+              <Button variant="secondary" size="sm" class="h-8" @click="copyDiagnostics">
+                <Check v-if="copied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />
                 {{ copied ? t('about.status.copied') : t('about.actions.copyDiagnostics') }}
               </Button>
             </div>
