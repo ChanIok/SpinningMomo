@@ -9,6 +9,7 @@ import Core.State;
 import Features.Update.State;
 import Features.Update.Types;
 import Features.Settings.State;
+import Utils.Crypto;
 import Utils.Logger;
 import Utils.Path;
 import Vendor.ShellApi;
@@ -182,6 +183,81 @@ auto trim(const std::string& str) -> std::string {
   if (start == std::string::npos) return "";
   auto end = str.find_last_not_of(" \t\n\r");
   return str.substr(start, end - start + 1);
+}
+
+auto to_lower_ascii(std::string value) -> std::string {
+  std::ranges::transform(value, value.begin(),
+                         [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return value;
+}
+
+auto format_download_url(const std::string& url_template, const std::string& version,
+                         const std::string& filename) -> std::expected<std::string, std::string> {
+  try {
+    return std::vformat(url_template, std::make_format_args(version, filename));
+  } catch (const std::exception& e) {
+    return std::unexpected("Invalid download URL template: " + std::string(e.what()));
+  }
+}
+
+auto parse_sha256sum_for_filename(const std::string& checksums_content, const std::string& filename)
+    -> std::expected<std::string, std::string> {
+  std::istringstream stream(checksums_content);
+  std::string line;
+  while (std::getline(stream, line)) {
+    auto trimmed_line = trim(line);
+    if (trimmed_line.empty()) {
+      continue;
+    }
+
+    size_t hash_end = 0;
+    while (hash_end < trimmed_line.size() &&
+           !std::isspace(static_cast<unsigned char>(trimmed_line[hash_end]))) {
+      hash_end++;
+    }
+    if (hash_end == 0 || hash_end >= trimmed_line.size()) {
+      continue;
+    }
+
+    auto hash = trimmed_line.substr(0, hash_end);
+    if (hash.size() != 64 || !std::all_of(hash.begin(), hash.end(), [](unsigned char ch) {
+          return std::isxdigit(ch) != 0;
+        })) {
+      continue;
+    }
+
+    while (hash_end < trimmed_line.size() &&
+           std::isspace(static_cast<unsigned char>(trimmed_line[hash_end]))) {
+      hash_end++;
+    }
+
+    if (hash_end < trimmed_line.size() && trimmed_line[hash_end] == '*') {
+      hash_end++;
+    }
+
+    auto file_part = trim(trimmed_line.substr(hash_end));
+    if (file_part == filename) {
+      return to_lower_ascii(hash);
+    }
+  }
+
+  return std::unexpected("SHA256SUMS does not contain checksum for " + filename);
+}
+
+auto verify_downloaded_file_sha256(const std::filesystem::path& file_path,
+                                   const std::string& expected_sha256)
+    -> std::expected<void, std::string> {
+  auto actual_sha256 = Utils::Crypto::sha256_file(file_path);
+  if (!actual_sha256) {
+    return std::unexpected("Failed to calculate downloaded file hash: " + actual_sha256.error());
+  }
+
+  auto expected = to_lower_ascii(trim(expected_sha256));
+  if (actual_sha256.value() != expected) {
+    return std::unexpected("SHA256 mismatch");
+  }
+
+  return {};
 }
 
 // 根据安装类型获取更新文件名
@@ -444,12 +520,53 @@ auto download_update(Core::State::AppState& app_state)
     // 按优先级尝试各下载源
     for (size_t i = 0; i < download_sources.size(); ++i) {
       const auto& source = download_sources[i];
-      auto url = std::vformat(source.url_template,
-                              std::make_format_args(app_state.update->latest_version, filename));
-      Logger().info("Trying download source: {} ({})", source.name, url);
+      auto package_url_result =
+          format_download_url(source.url_template, app_state.update->latest_version, filename);
+      if (!package_url_result) {
+        Logger().warn("Skipped source {} due to invalid package URL template: {}", source.name,
+                      package_url_result.error());
+        continue;
+      }
 
-      auto download_result = download_file(url, save_path);
+      auto checksums_url_result = format_download_url(
+          source.url_template, app_state.update->latest_version, "SHA256SUMS.txt");
+      if (!checksums_url_result) {
+        Logger().warn("Skipped source {} due to invalid checksum URL template: {}", source.name,
+                      checksums_url_result.error());
+        continue;
+      }
+
+      std::wstring wide_checksums_url(checksums_url_result.value().begin(),
+                                      checksums_url_result.value().end());
+      auto checksums_content_result = http_get(wide_checksums_url);
+      if (!checksums_content_result) {
+        Logger().warn("Failed to fetch SHA256SUMS from {}: {}", source.name,
+                      checksums_content_result.error());
+        continue;
+      }
+
+      auto expected_sha256_result =
+          parse_sha256sum_for_filename(checksums_content_result.value(), filename);
+      if (!expected_sha256_result) {
+        Logger().warn("Failed to parse SHA256SUMS from {}: {}", source.name,
+                      expected_sha256_result.error());
+        continue;
+      }
+
+      Logger().info("Trying download source: {} ({})", source.name, package_url_result.value());
+
+      auto download_result = download_file(package_url_result.value(), save_path);
       if (download_result) {
+        auto verify_result =
+            verify_downloaded_file_sha256(save_path, expected_sha256_result.value());
+        if (!verify_result) {
+          std::error_code remove_error;
+          std::filesystem::remove(save_path, remove_error);
+          Logger().warn("SHA256 verification failed from {}: {}", source.name,
+                        verify_result.error());
+          continue;
+        }
+
         app_state.update->download_in_progress = false;
         app_state.update->download_progress = 1.0;
 

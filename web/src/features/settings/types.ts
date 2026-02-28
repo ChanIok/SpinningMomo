@@ -201,7 +201,7 @@ export interface AppSettings {
   // update 分组 - 更新设置
   update: {
     autoCheck: boolean // 是否自动检查更新
-    checkIntervalHours: number // 检查间隔（小时）
+    autoUpdateOnExit: boolean // 是否在退出时自动更新
     versionUrl: string // 版本检查URL（Cloudflare Pages）
     downloadSources: Array<{
       name: string // 源名称
@@ -328,7 +328,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // update 设置
   update: {
     autoCheck: true,
-    checkIntervalHours: 24,
+    autoUpdateOnExit: true,
     versionUrl: 'https://spinning.infinitymomo.com/version.txt',
     downloadSources: [
       {
