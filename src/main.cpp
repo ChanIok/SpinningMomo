@@ -22,11 +22,19 @@ auto __stdcall wWinMain(Vendor::Windows::HINSTANCE hInstance,
 
   // 需要管理员权限时尝试提权重启
   if (Features::Settings::should_run_as_admin() && !Utils::System::is_process_elevated()) {
+    // 提权前先释放单实例锁，避免提权后的新进程误判为“已有实例”
+    Utils::System::release_single_instance_lock();
+
     if (Utils::System::restart_as_elevated(lpCmdLine)) {
       // 提权进程已启动，当前进程退出
       return 0;
     }
-    // 取消 UAC 或启动失败则继续普通权限
+
+    // 取消 UAC 或启动失败：重新获取单实例锁后继续普通权限
+    if (!Utils::System::acquire_single_instance_lock()) {
+      Utils::System::activate_existing_instance();
+      return 0;
+    }
   }
 
   // 初始化日志系统

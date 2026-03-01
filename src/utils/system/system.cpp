@@ -155,6 +155,13 @@ static HANDLE g_instance_mutex = nullptr;
   return true;
 }
 
+auto release_single_instance_lock() noexcept -> void {
+  if (g_instance_mutex != nullptr) {
+    CloseHandle(g_instance_mutex);
+    g_instance_mutex = nullptr;
+  }
+}
+
 // 激活已运行的实例窗口
 auto activate_existing_instance() noexcept -> void {
   // 查找已运行实例的窗口

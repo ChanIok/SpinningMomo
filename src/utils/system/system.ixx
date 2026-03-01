@@ -38,6 +38,9 @@ export auto open_directory(const std::filesystem::path& path) -> std::expected<v
 // 返回 false 表示已有实例在运行
 export [[nodiscard]] auto acquire_single_instance_lock() noexcept -> bool;
 
+// 释放单实例锁（若当前进程持有）
+export auto release_single_instance_lock() noexcept -> void;
+
 // 激活已运行的实例窗口
 export auto activate_existing_instance() noexcept -> void;
 
