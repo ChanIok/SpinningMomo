@@ -21,7 +21,7 @@
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication
         Theme="hyperlinkLicense"
-        LicenseUrl="https://chaniok.github.io/SpinningMomo/en/legal/notice"
+        LicenseUrl="https://chaniok.github.io/SpinningMomo/en/about/legal"
         LogoFile="$(var.ProjectDir)\docs\public\logo.png" />
     </BootstrapperApplication>
 

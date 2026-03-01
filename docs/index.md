@@ -2,8 +2,8 @@
 layout: home
 hero:
   name: SpinningMomo
-  text: 旋转吧大喵
-  tagline: 一个为《无限暖暖》提升摄影体验的窗口调整工具
+  text: 
+  tagline: 《无限暖暖》游戏摄影与录像工具
   image:
     src: /logo.png
     alt: SpinningMomo
@@ -12,23 +12,21 @@ hero:
       text: 快速开始
       link: /zh/guide/getting-started
     - theme: alt
-      text: 在 GitHub 上查看
+      text: GitHub
       link: https://github.com/ChanIok/SpinningMomo
-    - theme: alt
-      text: 搬砖吧大喵
-      link: https://infinitymomo.com/
-
 features:
-  - icon: 🎮
-    title: 竖拍支持
-    details: 完美支持游戏竖拍UI，留影沙漏和大喵相册
-  - icon: 📸
-    title: 超高分辨率
-    details: 支持突破游戏和设备分辨率的照片输出
   - icon: 📐
-    title: 灵活调整
-    details: 多种预设，自定义比例和分辨率
-  - icon: ⌨️
-    title: 快捷键支持
-    details: 可自定义热键，便捷操作
---- 
+    title: 自定义窗口比例
+    details: 支持任意比例的窗口尺寸调整，一键切换竖屏显示。
+  - icon: 📸
+    title: 超高清像素截图
+    details: 绕过游戏原生限制，支持生成 8K 至 12K 分辨率的游戏截图。
+  - icon: 🎬
+    title: 适配录像功能
+    details: 内置录制功能，无缝适配各种自定义窗口比例，无需繁琐设置。
+---
+
+<div align="center" style="margin-top: 4rem; color: var(--vp-c-text-2);">
+  当前为 <strong>v2.0 (重构中)</strong> 版本文档。<br>
+  如需查阅旧版说明，请访问 <a href="/v0/">v0.7.7 历史文档</a>。
+</div>

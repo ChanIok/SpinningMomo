@@ -66,10 +66,10 @@ const docsUrl = 'https://chaniok.github.io/SpinningMomo'
 const releaseUrl = 'https://github.com/ChanIok/SpinningMomo/releases/latest'
 const issuesUrl = 'https://github.com/ChanIok/SpinningMomo/issues'
 const licenseUrl = 'https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE'
-const legalNoticeZhUrl = 'https://chaniok.github.io/SpinningMomo/zh/legal/notice'
-const legalNoticeEnUrl = 'https://chaniok.github.io/SpinningMomo/en/legal/notice'
-const creditsZhUrl = 'https://chaniok.github.io/SpinningMomo/zh/credits'
-const creditsEnUrl = 'https://chaniok.github.io/SpinningMomo/en/credits'
+const legalNoticeZhUrl = 'https://chaniok.github.io/SpinningMomo/zh/about/legal'
+const legalNoticeEnUrl = 'https://chaniok.github.io/SpinningMomo/en/about/legal'
+const creditsZhUrl = 'https://chaniok.github.io/SpinningMomo/zh/about/credits'
+const creditsEnUrl = 'https://chaniok.github.io/SpinningMomo/en/about/credits'
 
 const legalNoticeUrl = computed(() =>
   locale.value === 'en-US' ? legalNoticeEnUrl : legalNoticeZhUrl

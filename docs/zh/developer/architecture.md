@@ -1,4 +1,9 @@
-# 构建指南
+# 架构与构建
+
+## 架构与代码规范说明
+
+本项目核心采用 C++23 Modules 与 Vue 3 混合双端架构。
+关于详细的设计哲学、C++ 组件系统划分以及所有的模块依赖关系，已在此仓库根目录维护了最新的 **[`AGENTS.md`](https://github.com/ChanIok/SpinningMomo/blob/main/AGENTS.md)**。
 
 ## 环境要求
 
@@ -135,5 +140,3 @@ Vite 开发服务器会将 `/rpc` 和 `/static` 代理到 C++ 后端（`localhos
 |----------|-------------|
 | `src/migrations/*.sql` | `node scripts/generate-migrations.js` |
 | `src/locales/*.json` | `node scripts/generate-embedded-locales.js` |
-
----

@@ -1,11 +1,11 @@
-# Third-Party Licenses
+# Open Source Credits
 
-SpinningMomo is built upon the following excellent open-source projects. We express our sincere gratitude to their authors.
+SpinningMomo is built upon the following excellent open-source projects. We extend our sincere gratitude to their authors and contributors.
 
-## C++ Backend
+### C++ Backend
 
-| Project | License | Url |
-|---------|---------|-----|
+| Project | License | Link |
+|---------|---------|------|
 | [xmake](https://github.com/xmake-io/xmake) | Apache-2.0 | https://github.com/xmake-io/xmake |
 | [uWebSockets](https://github.com/uNetworking/uWebSockets) | Apache-2.0 | https://github.com/uNetworking/uWebSockets |
 | [uSockets](https://github.com/uNetworking/uSockets) | Apache-2.0 | https://github.com/uNetworking/uSockets |
@@ -24,11 +24,10 @@ SpinningMomo is built upon the following excellent open-source projects. We expr
 | [libuv](https://libuv.org/) | MIT | https://github.com/libuv/libuv |
 | [ViGEmClient](https://github.com/nefarius/ViGEmClient) | MIT | https://github.com/nefarius/ViGEmClient |
 
+### Web Frontend
 
-## Web Frontend
-
-| Project | License | Url |
-|---------|---------|-----|
+| Project | License | Link |
+|---------|---------|------|
 | [Vue.js](https://vuejs.org/) | MIT | https://github.com/vuejs/core |
 | [Vite](https://vitejs.dev/) | MIT | https://github.com/vitejs/vite |
 | [Tailwind CSS](https://tailwindcss.com/) | MIT | https://github.com/tailwindlabs/tailwindcss |
@@ -37,12 +36,10 @@ SpinningMomo is built upon the following excellent open-source projects. We expr
 | [VueUse](https://vueuse.org/) | MIT | https://github.com/vueuse/vueuse |
 | [TanStack Virtual](https://tanstack.com/virtual) | MIT | https://github.com/TanStack/virtual |
 | [Lucide](https://lucide.dev/) | ISC | https://github.com/lucide-icons/lucide |
-| [Inter Font](https://rsms.me/inter/) | OFL-1.1 (Open Font License) | https://github.com/rsms/inter |
+| [Inter Font](https://rsms.me/inter/) | OFL-1.1 | https://github.com/rsms/inter |
 | [HarmonyOS Sans](https://developer.huawei.com/consumer/en/doc/design-guides/font-0000001828772001) | HarmonyOS Sans Fonts License | https://developer.huawei.com/consumer/en/doc/design-guides/font-0000001828772001 |
 | [Reka UI](https://reka-ui.com/) | MIT | https://github.com/unovue/reka-ui |
 | [shadcn-vue](https://www.shadcn-vue.com/) | MIT | https://github.com/radix-vue/shadcn-vue |
 | [vue-sonner](https://github.com/xiaoluoboding/vue-sonner) | MIT | https://github.com/xiaoluoboding/vue-sonner |
 
---
-
-*Full license texts for the above projects can be found in their respective repositories or distribution packages.*
+*The full license texts for all projects listed above can be found in their respective repositories or distribution packages.*
