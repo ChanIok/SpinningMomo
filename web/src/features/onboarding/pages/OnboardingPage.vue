@@ -13,7 +13,10 @@ import { isWebView } from '@/core/env'
 import { useSettingsStore } from '@/features/settings/store'
 import {
   CURRENT_ONBOARDING_FLOW_VERSION,
+  DARK_FLOATING_WINDOW_COLORS,
+  LIGHT_FLOATING_WINDOW_COLORS,
   type AppSettings,
+  type FloatingWindowThemeMode,
   type WebThemeMode,
 } from '@/features/settings/types'
 import { applyAppearanceToDocument } from '@/features/settings/appearance'
@@ -77,6 +80,17 @@ const getDefaultOverlayColorsByTheme = (mode: WebThemeMode): string[] => {
   }
 
   return firstPreset.colors.slice(0, firstPreset.mode)
+}
+
+const getFloatingWindowThemeByWebTheme = (mode: WebThemeMode): FloatingWindowThemeMode => {
+  return resolveThemePresetMode(mode)
+}
+
+const getFloatingWindowColorsByWebTheme = (mode: WebThemeMode) => {
+  const floatingWindowTheme = getFloatingWindowThemeByWebTheme(mode)
+  return floatingWindowTheme === 'light'
+    ? LIGHT_FLOATING_WINDOW_COLORS
+    : DARK_FLOATING_WINDOW_COLORS
 }
 
 const syncPreviewAppearance = () => {
@@ -283,6 +297,8 @@ const completeOnboarding = async () => {
       },
       ui: {
         ...store.appSettings.ui,
+        floatingWindowThemeMode: getFloatingWindowThemeByWebTheme(themeMode.value),
+        floatingWindowColors: getFloatingWindowColorsByWebTheme(themeMode.value),
         webTheme: {
           ...store.appSettings.ui.webTheme,
           mode: themeMode.value,
