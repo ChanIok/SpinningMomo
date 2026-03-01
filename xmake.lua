@@ -43,6 +43,8 @@ target("SpinningMomo")
     if is_mode("release") then
         set_symbols("debug")
         add_ldflags("/DEBUG:FULL", {force = true})
+        add_ldflags("/NODEFAULTLIB:libucrt.lib", {force = true})
+        add_ldflags("/DEFAULTLIB:ucrt.lib", {force = true})
     end
     
     -- Windows特定宏定义
