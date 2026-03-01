@@ -22,7 +22,6 @@ BEGIN
     BEGIN
         BLOCK "040904E4" // English (United States)
         BEGIN
-            VALUE "CompanyName",      COMPANY_NAME
             VALUE "FileDescription",  FILE_DESCRIPTION
             VALUE "FileVersion",      VERSION_STR
             VALUE "InternalName",     INTERNAL_NAME
@@ -34,7 +33,6 @@ BEGIN
         END
         BLOCK "080404B0" // Chinese (Simplified, PRC)
         BEGIN
-            VALUE "CompanyName",      COMPANY_NAME
             VALUE "FileDescription",  FILE_DESCRIPTION
             VALUE "FileVersion",      VERSION_STR
             VALUE "InternalName",     INTERNAL_NAME
