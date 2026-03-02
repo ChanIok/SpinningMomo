@@ -227,6 +227,48 @@ auto get_text_by_i18n_key(const std::string& i18n_key, const Core::I18n::Types::
   return Utils::String::FromUtf8(i18n_key);
 }
 
+auto normalize_scroll_offsets(Core::State::AppState& state) -> void {
+  const size_t page_size = static_cast<size_t>(state.floating_window->layout.max_visible_rows);
+  if (page_size == 0) {
+    state.floating_window->ui.ratio_scroll_offset = 0;
+    state.floating_window->ui.resolution_scroll_offset = 0;
+    state.floating_window->ui.feature_scroll_offset = 0;
+    return;
+  }
+
+  size_t ratio_count = 0;
+  size_t resolution_count = 0;
+  size_t feature_count = 0;
+  for (const auto& item : state.floating_window->data.menu_items) {
+    switch (item.category) {
+      case UI::FloatingWindow::MenuItemCategory::AspectRatio:
+        ++ratio_count;
+        break;
+      case UI::FloatingWindow::MenuItemCategory::Resolution:
+        ++resolution_count;
+        break;
+      case UI::FloatingWindow::MenuItemCategory::Feature:
+        ++feature_count;
+        break;
+    }
+  }
+
+  const auto clamp_offset = [page_size](size_t& offset, size_t item_count) -> void {
+    if (item_count == 0) {
+      offset = 0;
+      return;
+    }
+    const size_t max_page = (item_count - 1) / page_size;
+    const size_t current_page = offset / page_size;
+    offset = std::min(current_page, max_page) * page_size;
+  };
+
+  auto& ui = state.floating_window->ui;
+  clamp_offset(ui.ratio_scroll_offset, ratio_count);
+  clamp_offset(ui.resolution_scroll_offset, resolution_count);
+  clamp_offset(ui.feature_scroll_offset, feature_count);
+}
+
 auto register_window_class(HINSTANCE instance) -> void {
   WNDCLASSEXW wc{};
   wc.cbSize = sizeof(WNDCLASSEXW);
@@ -292,6 +334,9 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
 
   // 更新布局配置（基于应用状态）
   UI::FloatingWindow::Layout::update_layout(state);
+
+  // 行数配置变化后，确保翻页偏移仍落在有效页
+  normalize_scroll_offsets(state);
 
   // 更新颜色配置
   UI::FloatingWindow::D2DContext::update_all_brush_colors(state);

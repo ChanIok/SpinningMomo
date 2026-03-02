@@ -40,6 +40,7 @@ auto update_layout(Core::State::AppState& state) -> void {
       static_cast<int>(layout_settings.base_settings_column_width * scale);
   layout.scroll_indicator_width =
       static_cast<int>(layout_settings.base_scroll_indicator_width * scale);
+  layout.max_visible_rows = std::max(layout_settings.max_visible_rows, 1);
 }
 
 auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
@@ -57,7 +58,7 @@ auto calculate_window_height(const Core::State::AppState& state) -> int {
   // 翻页模式：返回固定高度
   if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
     return render.title_height + render.separator_height +
-           render.item_height * UI::FloatingWindow::LayoutConfig::MAX_VISIBLE_ROWS;
+           render.item_height * render.max_visible_rows;
   }
 
   // 自适应高度模式：由最大列决定高度

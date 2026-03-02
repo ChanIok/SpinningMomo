@@ -88,9 +88,32 @@ const validateResolution = (value: string): boolean => {
   return resolutionRegex.test(value) || presetRegex.test(value)
 }
 
+const layoutKeys = [
+  'baseItemHeight',
+  'baseTitleHeight',
+  'baseSeparatorHeight',
+  'baseFontSize',
+  'baseTextPadding',
+  'baseIndicatorWidth',
+  'baseRatioIndicatorWidth',
+  'baseRatioColumnWidth',
+  'baseResolutionColumnWidth',
+  'baseSettingsColumnWidth',
+  'maxVisibleRows',
+] as const
+
+const getLayoutMinValue = (field: keyof FloatingWindowLayout): number =>
+  field === 'maxVisibleRows' ? 1 : 0
+
+const getLayoutUnitKey = (field: keyof FloatingWindowLayout): string =>
+  field === 'maxVisibleRows'
+    ? 'settings.appearance.layout.rowsUnit'
+    : 'settings.appearance.layout.unit'
+
 const handleLayoutChange = async (field: keyof FloatingWindowLayout, value: string) => {
   const numValue = parseInt(value, 10)
-  if (!isNaN(numValue) && numValue >= 0 && appSettings.value.ui.floatingWindowLayout) {
+  const minValue = getLayoutMinValue(field)
+  if (!isNaN(numValue) && numValue >= minValue && appSettings.value.ui.floatingWindowLayout) {
     try {
       await updateFloatingWindowLayout({
         ...appSettings.value.ui.floatingWindowLayout,
@@ -242,23 +265,7 @@ const handleResetSettings = async () => {
         </div>
 
         <ItemGroup>
-          <Item
-            v-for="key in [
-              'baseItemHeight',
-              'baseTitleHeight',
-              'baseSeparatorHeight',
-              'baseFontSize',
-              'baseTextPadding',
-              'baseIndicatorWidth',
-              'baseRatioIndicatorWidth',
-              'baseRatioColumnWidth',
-              'baseResolutionColumnWidth',
-              'baseSettingsColumnWidth',
-            ] as const"
-            :key="key"
-            variant="surface"
-            size="sm"
-          >
+          <Item v-for="key in layoutKeys" :key="key" variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
                 {{ t(`settings.appearance.layout.${key}.label`) }}
@@ -281,10 +288,10 @@ const handleResetSettings = async () => {
                   "
                   @keydown="handleKeyDown"
                   class="w-24"
-                  min="0"
+                  :min="getLayoutMinValue(key as keyof FloatingWindowLayout)"
                 />
                 <span class="text-sm text-muted-foreground">
-                  {{ t('settings.appearance.layout.unit') }}
+                  {{ t(getLayoutUnitKey(key as keyof FloatingWindowLayout)) }}
                 </span>
               </div>
             </ItemActions>

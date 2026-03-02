@@ -105,6 +105,7 @@ export interface FloatingWindowLayout {
   baseResolutionColumnWidth: number
   baseSettingsColumnWidth: number
   baseScrollIndicatorWidth: number
+  maxVisibleRows: number
 }
 
 // 完整的应用设置类型
@@ -380,6 +381,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       baseResolutionColumnWidth: 70,
       baseSettingsColumnWidth: 80,
       baseScrollIndicatorWidth: 3,
+      maxVisibleRows: 7,
     },
     floatingWindowColors: DARK_FLOATING_WINDOW_COLORS,
     floatingWindowThemeMode: 'dark',

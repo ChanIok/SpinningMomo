@@ -270,7 +270,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       }
 
       // 计算当前页号
-      const int page_size = static_cast<int>(UI::FloatingWindow::LayoutConfig::MAX_VISIBLE_ROWS);
+      const int page_size = render.max_visible_rows;
       const int current_page = static_cast<int>(*target_offset) / page_size;
 
       // 滚轮方向：向上滚-1页，向下滚+1页

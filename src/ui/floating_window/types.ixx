@@ -82,6 +82,7 @@ struct LayoutConfig {
   int resolution_column_width = 120;
   int settings_column_width = 120;
   int scroll_indicator_width = 2;  // 滚动条宽度
+  int max_visible_rows = 7;        // 翻页模式下每列最大可见行数，下限 1
 
   // 字体大小调整相关常量
   static constexpr float MIN_FONT_SIZE = 8.0f;   // 最小字体大小
@@ -89,7 +90,6 @@ struct LayoutConfig {
 
   // 翻页模式配置
   MenuLayoutMode layout_mode = MenuLayoutMode::Paged;
-  static constexpr int MAX_VISIBLE_ROWS = 7;  // 翻页模式下每页最大可见行数
 };
 
 // 浮窗专用的Direct2D渲染状态

@@ -147,21 +147,20 @@ auto draw_single_column(Core::State::AppState& state, const D2D1_RECT_F& rect,
 auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F& column_rect,
                            size_t total_items, size_t scroll_offset, bool is_hovered,
                            bool is_last_column) -> void {
-  if (!is_hovered || total_items <= UI::FloatingWindow::LayoutConfig::MAX_VISIBLE_ROWS) {
+  const auto& render = state.floating_window->layout;
+  if (!is_hovered || total_items <= static_cast<size_t>(render.max_visible_rows)) {
     return;  // 不需要显示滚动条
   }
 
-  const auto& render = state.floating_window->layout;
   const auto& d2d = state.floating_window->d2d_context;
 
   // 计算轨道高度
-  const float track_height =
-      static_cast<float>(render.item_height * UI::FloatingWindow::LayoutConfig::MAX_VISIBLE_ROWS);
+  const float track_height = static_cast<float>(render.item_height * render.max_visible_rows);
   const float track_top =
       column_rect.top + static_cast<float>(render.title_height + render.separator_height);
 
   // 分页模式：计算总页数和当前页号
-  const int page_size = static_cast<int>(UI::FloatingWindow::LayoutConfig::MAX_VISIBLE_ROWS);
+  const int page_size = render.max_visible_rows;
   const int total_pages = (static_cast<int>(total_items) + page_size - 1) / page_size;
   const int current_page = static_cast<int>(scroll_offset) / page_size;
 
@@ -361,7 +360,7 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   auto [ratio_col, resolution_col, feature_col] = group_items_by_column(items);
 
   const bool is_paged = (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged);
-  const size_t max_visible = UI::FloatingWindow::LayoutConfig::MAX_VISIBLE_ROWS;
+  const size_t max_visible = static_cast<size_t>(render.max_visible_rows);
 
   // 绘制比例列
   draw_single_column(state, rect, ratio_col,

@@ -181,6 +181,7 @@ export struct AppSettings {
       int base_resolution_column_width = 70;
       int base_settings_column_width = 80;
       int base_scroll_indicator_width = 3;  // 滚动条宽度
+      int max_visible_rows = 7;             // 每列可见行数，下限 1
     } floating_window_layout;
 
     // 浮窗颜色配置
