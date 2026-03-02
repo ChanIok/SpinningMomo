@@ -152,6 +152,10 @@ export interface AppSettings {
   // window 分组 - 窗口相关设置
   window: {
     targetTitle: string // 目标窗口标题
+    resetResolution: {
+      width: number // 重置窗口宽度，0=跟随屏幕
+      height: number // 重置窗口高度，0=跟随屏幕
+    }
   }
 
   // features 分组 - 功能特性设置
@@ -287,6 +291,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // window 设置
   window: {
     targetTitle: '无限暖暖  ',
+    resetResolution: {
+      width: 0,
+      height: 0,
+    },
   },
 
   // features 设置

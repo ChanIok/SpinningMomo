@@ -77,6 +77,12 @@ export struct AppSettings {
   // window 分组 - 窗口相关设置
   struct Window {
     std::string target_title = "无限暖暖  ";  // 目标窗口标题
+
+    // 重置窗口尺寸偏好（0 表示跟随屏幕）
+    struct ResetResolution {
+      int width = 0;
+      int height = 0;
+    } reset_resolution;
   } window;
 
   // features 分组 - 功能特性设置

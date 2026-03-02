@@ -314,10 +314,28 @@ auto reset_window_transform(Core::State::AppState& state) -> void {
 
   Features::WindowControl::TransformOptions options{.activate_window = true};
 
-  auto result = Features::WindowControl::reset_window_to_screen(*target_window, options);
+  const auto& reset_resolution = state.settings->raw.window.reset_resolution;
+
+  std::expected<void, std::string> result = std::unexpected("Unknown reset mode");
+  if (reset_resolution.width > 0 && reset_resolution.height > 0) {
+    Features::WindowControl::Resolution resolution{
+        .width = reset_resolution.width,
+        .height = reset_resolution.height,
+    };
+    result = Features::WindowControl::apply_window_transform(*target_window, resolution, options);
+  } else {
+    result = Features::WindowControl::reset_window_to_screen(*target_window, options);
+  }
+
   if (!result) {
     Logger().error("Failed to reset window: {}", result.error());
+    return;
   }
+
+  // 重置后恢复浮窗选中状态：比例清空，分辨率回到 Default
+  state.floating_window->ui.current_ratio_index = std::numeric_limits<size_t>::max();
+  state.floating_window->ui.current_resolution_index = 0;
+  UI::FloatingWindow::request_repaint(state);
 }
 
 }  // namespace Features::WindowControl::UseCase

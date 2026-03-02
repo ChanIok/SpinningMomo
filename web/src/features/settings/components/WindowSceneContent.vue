@@ -7,17 +7,34 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from '@/components/ui/item'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useI18n } from '@/composables/useI18n'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const { updateWindowTitle, updateLetterboxEnabled, resetWindowSceneSettings } = useFunctionActions()
+const {
+  updateWindowTitle,
+  updateWindowResetResolution,
+  updateLetterboxEnabled,
+  resetWindowSceneSettings,
+} = useFunctionActions()
 const { clearError } = store
 const { t } = useI18n()
 
+type ResetResolutionMode = 'screen' | 'custom'
+
 const inputTitle = ref(appSettings.value?.window?.targetTitle || '')
 const isEditingTitle = ref(false)
+const resetResolutionMode = ref<ResetResolutionMode>('screen')
+const inputResetWidth = ref(appSettings.value?.window?.resetResolution?.width || 0)
+const inputResetHeight = ref(appSettings.value?.window?.resetResolution?.height || 0)
 
 watch(
   () => appSettings.value?.window?.targetTitle,
@@ -29,6 +46,18 @@ watch(
   { immediate: true }
 )
 
+watch(
+  () => appSettings.value?.window?.resetResolution,
+  (newResetResolution) => {
+    const width = newResetResolution?.width ?? 0
+    const height = newResetResolution?.height ?? 0
+    inputResetWidth.value = width
+    inputResetHeight.value = height
+    resetResolutionMode.value = width > 0 && height > 0 ? 'custom' : 'screen'
+  },
+  { immediate: true, deep: true }
+)
+
 const handleTitleChange = async () => {
   const value = inputTitle.value.trim()
   if (value === '') {
@@ -38,6 +67,42 @@ const handleTitleChange = async () => {
     await updateWindowTitle(value)
   } catch (error) {
     console.error('Failed to update window title:', error)
+  }
+}
+
+const handleResetResolutionModeChange = async (value: string) => {
+  const mode = value as ResetResolutionMode
+  resetResolutionMode.value = mode
+
+  try {
+    if (mode === 'screen') {
+      inputResetWidth.value = 0
+      inputResetHeight.value = 0
+      await updateWindowResetResolution(0, 0)
+      return
+    }
+
+    const width = inputResetWidth.value > 0 ? inputResetWidth.value : 1920
+    const height = inputResetHeight.value > 0 ? inputResetHeight.value : 1080
+    inputResetWidth.value = width
+    inputResetHeight.value = height
+    await updateWindowResetResolution(width, height)
+  } catch (error) {
+    console.error('Failed to update reset resolution mode:', error)
+  }
+}
+
+const handleResetResolutionChange = async () => {
+  const width = Number(inputResetWidth.value)
+  const height = Number(inputResetHeight.value)
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return
+  }
+
+  try {
+    await updateWindowResetResolution(Math.trunc(width), Math.trunc(height))
+  } catch (error) {
+    console.error('Failed to update reset resolution:', error)
   }
 }
 
@@ -114,6 +179,79 @@ const handleResetSettings = async () => {
               :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
               class="w-48"
             />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.resetResolution.mode.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.resetResolution.mode.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="resetResolutionMode"
+              @update:model-value="(value) => handleResetResolutionModeChange(String(value))"
+            >
+              <SelectTrigger class="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="screen">
+                  {{ t('settings.function.windowControl.resetResolution.mode.screen') }}
+                </SelectItem>
+                <SelectItem value="custom">
+                  {{ t('settings.function.windowControl.resetResolution.mode.custom') }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </ItemActions>
+        </Item>
+
+        <Item v-if="resetResolutionMode === 'custom'" variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.resetResolution.width.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.resetResolution.width.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Input
+              v-model.number="inputResetWidth"
+              type="number"
+              :min="1"
+              class="w-24"
+              @blur="handleResetResolutionChange"
+              @keydown.enter="handleResetResolutionChange"
+            />
+            <span class="text-sm text-muted-foreground">px</span>
+          </ItemActions>
+        </Item>
+
+        <Item v-if="resetResolutionMode === 'custom'" variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.resetResolution.height.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.resetResolution.height.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Input
+              v-model.number="inputResetHeight"
+              type="number"
+              :min="1"
+              class="w-24"
+              @blur="handleResetResolutionChange"
+              @keydown.enter="handleResetResolutionChange"
+            />
+            <span class="text-sm text-muted-foreground">px</span>
           </ItemActions>
         </Item>
       </div>

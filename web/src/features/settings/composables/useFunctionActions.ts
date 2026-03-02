@@ -16,6 +16,20 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateWindowResetResolution = async (width: number, height: number) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      window: {
+        ...appSettings.value.window,
+        resetResolution: {
+          ...appSettings.value.window.resetResolution,
+          width,
+          height,
+        },
+      },
+    })
+  }
+
   const updateOutputDir = async (dirPath: string) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -330,6 +344,11 @@ export const useFunctionActions = () => {
       window: {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
+        resetResolution: {
+          ...appSettings.value.window.resetResolution,
+          width: DEFAULT_APP_SETTINGS.window.resetResolution.width,
+          height: DEFAULT_APP_SETTINGS.window.resetResolution.height,
+        },
       },
       features: {
         ...appSettings.value.features,
@@ -420,6 +439,11 @@ export const useFunctionActions = () => {
       window: {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
+        resetResolution: {
+          ...appSettings.value.window.resetResolution,
+          width: DEFAULT_APP_SETTINGS.window.resetResolution.width,
+          height: DEFAULT_APP_SETTINGS.window.resetResolution.height,
+        },
       },
       features: {
         ...appSettings.value.features,
@@ -433,6 +457,7 @@ export const useFunctionActions = () => {
 
   return {
     updateWindowTitle,
+    updateWindowResetResolution,
     updateOutputDir,
     updateGameAlbumPath,
     updateLetterboxEnabled,
