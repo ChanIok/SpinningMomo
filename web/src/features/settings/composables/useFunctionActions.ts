@@ -50,19 +50,6 @@ export const useFunctionActions = () => {
     })
   }
 
-  const updateLetterboxEnabled = async (enabled: boolean) => {
-    await store.updateSettings({
-      ...appSettings.value,
-      features: {
-        ...appSettings.value.features,
-        letterbox: {
-          ...appSettings.value.features.letterbox,
-          enabled,
-        },
-      },
-    })
-  }
-
   // Motion Photo 设置
   const updateMotionPhotoDuration = async (duration: number) => {
     await store.updateSettings({
@@ -445,13 +432,6 @@ export const useFunctionActions = () => {
           height: DEFAULT_APP_SETTINGS.window.resetResolution.height,
         },
       },
-      features: {
-        ...appSettings.value.features,
-        letterbox: {
-          ...appSettings.value.features.letterbox,
-          enabled: DEFAULT_APP_SETTINGS.features.letterbox.enabled,
-        },
-      },
     })
   }
 
@@ -460,7 +440,6 @@ export const useFunctionActions = () => {
     updateWindowResetResolution,
     updateOutputDir,
     updateGameAlbumPath,
-    updateLetterboxEnabled,
     // Motion Photo
     updateMotionPhotoDuration,
     updateMotionPhotoResolution,

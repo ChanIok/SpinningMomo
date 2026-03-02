@@ -5,7 +5,6 @@ import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from '@/components/ui/item'
 import {
   Select,
@@ -19,12 +18,8 @@ import ResetSettingsDialog from './ResetSettingsDialog.vue'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const {
-  updateWindowTitle,
-  updateWindowResetResolution,
-  updateLetterboxEnabled,
-  resetWindowSceneSettings,
-} = useFunctionActions()
+const { updateWindowTitle, updateWindowResetResolution, resetWindowSceneSettings } =
+  useFunctionActions()
 const { clearError } = store
 const { t } = useI18n()
 
@@ -252,34 +247,6 @@ const handleResetSettings = async () => {
               @keydown.enter="handleResetResolutionChange"
             />
             <span class="text-sm text-muted-foreground">px</span>
-          </ItemActions>
-        </Item>
-      </div>
-
-      <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-semibold text-foreground">
-            {{ t('settings.function.letterbox.title') }}
-          </h3>
-          <p class="mt-1 text-sm text-muted-foreground">
-            {{ t('settings.function.letterbox.description') }}
-          </p>
-        </div>
-
-        <Item variant="surface" size="sm">
-          <ItemContent>
-            <ItemTitle>
-              {{ t('settings.function.letterbox.enabled.label') }}
-            </ItemTitle>
-            <ItemDescription>
-              {{ t('settings.function.letterbox.enabled.description') }}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Switch
-              :model-value="appSettings?.features?.letterbox?.enabled"
-              @update:model-value="updateLetterboxEnabled"
-            />
           </ItemActions>
         </Item>
       </div>
