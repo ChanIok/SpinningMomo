@@ -7,6 +7,7 @@ import std;
 import Core.Async;
 import Core.WorkerPool;
 import Core.HttpServer;
+import Core.Commands;
 import Core.State;
 import Features.Letterbox;
 import Features.Overlay;
@@ -18,6 +19,7 @@ import Features.Update.State;
 import Features.Gallery;
 import Features.VirtualGamepad;
 import UI.FloatingWindow;
+import UI.FloatingWindow.State;
 import UI.ContextMenu;
 import UI.TrayIcon;
 import UI.WebViewWindow;
@@ -32,6 +34,10 @@ auto shutdown_application(Core::State::AppState& state) -> void {
 
   // 先停止录制并等待录制切换线程结束，避免与后续 UI/核心清理并发
   Features::Recording::UseCase::stop_recording_if_running(state);
+
+  if (state.floating_window) {
+    Core::Commands::unregister_all_hotkeys(state, state.floating_window->window.hwnd);
+  }
 
   // 1. UI 清理
   UI::ContextMenu::cleanup(state);

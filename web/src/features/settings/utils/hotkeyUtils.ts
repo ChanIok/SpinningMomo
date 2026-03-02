@@ -107,6 +107,8 @@ export const KEY_CODE_MAP: Record<number, string> = {
   44: 'PrintScreen',
   145: 'ScrollLock',
   19: 'Pause',
+  5: 'Mouse4',
+  6: 'Mouse5',
   45: 'Insert',
   46: 'Delete',
   36: 'Home',

@@ -14,6 +14,7 @@ export using WPARAM = ::WPARAM;
 export using LPARAM = ::LPARAM;
 export using LRESULT = ::LRESULT;
 export using HWND = ::HWND;
+export using HHOOK = ::HHOOK;
 export using HINSTANCE = ::HINSTANCE;
 export using LPWSTR = ::LPWSTR;
 export using LPCWSTR = ::LPCWSTR;
