@@ -12,6 +12,8 @@ import <windows.h>;
 
 namespace UI::FloatingWindow::D2DContext {
 
+constexpr const char* kRecordingIndicatorColor = "#ED4C4CFF";
+
 // 辅助函数：从包含透明度的十六进制颜色字符串创建 D2D1_COLOR_F
 auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
   // 支持 #RRGGBBAA 格式，如果只有6位则默认透明度为FF
@@ -52,6 +54,8 @@ auto create_all_brushes_simple(Core::State::AppState& state, UI::FloatingWindow:
          create_brush_from_hex(d2d.render_target, colors.separator, &d2d.separator_brush) &&
          create_brush_from_hex(d2d.render_target, colors.text, &d2d.text_brush) &&
          create_brush_from_hex(d2d.render_target, colors.indicator, &d2d.indicator_brush) &&
+         create_brush_from_hex(d2d.render_target, kRecordingIndicatorColor,
+                               &d2d.recording_indicator_brush) &&
          create_brush_from_hex(d2d.render_target, colors.title_bar, &d2d.title_brush) &&
          create_brush_from_hex(d2d.render_target, colors.hover, &d2d.hover_brush) &&
          create_brush_from_hex(d2d.render_target, colors.scroll_indicator,
@@ -119,6 +123,9 @@ auto update_all_brush_colors(Core::State::AppState& state) -> void {
   }
   if (d2d.indicator_brush) {
     d2d.indicator_brush->SetColor(hex_with_alpha_to_color_f(colors.indicator));
+  }
+  if (d2d.recording_indicator_brush) {
+    d2d.recording_indicator_brush->SetColor(hex_with_alpha_to_color_f(kRecordingIndicatorColor));
   }
   if (d2d.hover_brush) {
     d2d.hover_brush->SetColor(hex_with_alpha_to_color_f(colors.hover));
@@ -285,6 +292,10 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
   if (d2d.indicator_brush) {
     d2d.indicator_brush->Release();
     d2d.indicator_brush = nullptr;
+  }
+  if (d2d.recording_indicator_brush) {
+    d2d.recording_indicator_brush->Release();
+    d2d.recording_indicator_brush = nullptr;
   }
   if (d2d.hover_brush) {
     d2d.hover_brush->Release();

@@ -431,7 +431,14 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
     D2D1_RECT_F indicator_rect = UI::FloatingWindow::make_d2d_rect(
         item_rect.left, item_rect.top, item_rect.left + static_cast<float>(indicator_width),
         item_rect.bottom);
-    d2d.render_target->FillRectangle(indicator_rect, d2d.indicator_brush);
+    ID2D1SolidColorBrush* indicator_brush = d2d.indicator_brush;
+    if (item.category == UI::FloatingWindow::MenuItemCategory::Feature &&
+        item.action_id == "recording.toggle" && d2d.recording_indicator_brush) {
+      indicator_brush = d2d.recording_indicator_brush;
+    }
+    if (indicator_brush) {
+      d2d.render_target->FillRectangle(indicator_rect, indicator_brush);
+    }
   }
 
   // 绘制文本（保持完全不透明）

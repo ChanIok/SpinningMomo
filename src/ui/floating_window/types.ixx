@@ -120,6 +120,7 @@ struct RenderContext {
   ID2D1SolidColorBrush* separator_brush = nullptr;
   ID2D1SolidColorBrush* text_brush = nullptr;
   ID2D1SolidColorBrush* indicator_brush = nullptr;
+  ID2D1SolidColorBrush* recording_indicator_brush = nullptr;
   ID2D1SolidColorBrush* hover_brush = nullptr;
   ID2D1SolidColorBrush* scroll_indicator_brush = nullptr;  // 滚动条画刷
 
