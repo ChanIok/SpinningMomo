@@ -33,6 +33,18 @@ export [[nodiscard]] auto restart_as_elevated(const wchar_t* arguments = nullptr
 // 在资源管理器中打开目录
 export auto open_directory(const std::filesystem::path& path) -> std::expected<void, std::string>;
 
+// 使用系统默认应用打开文件
+export auto open_file_with_default_app(const std::filesystem::path& path)
+    -> std::expected<void, std::string>;
+
+// 在资源管理器中显示并选中文件
+export auto reveal_file_in_explorer(const std::filesystem::path& path)
+    -> std::expected<void, std::string>;
+
+// 将文件移动到系统回收站
+export auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
+    -> std::expected<void, std::string>;
+
 // 单实例检测：尝试获取单实例锁
 // 返回 true 表示成功获取锁（当前是第一个实例）
 // 返回 false 表示已有实例在运行

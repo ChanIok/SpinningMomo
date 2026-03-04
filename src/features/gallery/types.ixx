@@ -214,6 +214,10 @@ struct GetParams {
   std::int64_t id;
 };
 
+struct AssetIdsParams {
+  std::vector<std::int64_t> ids;
+};
+
 struct DeleteParams {
   std::int64_t id;
   std::optional<bool> delete_file = false;

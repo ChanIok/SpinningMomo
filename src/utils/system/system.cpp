@@ -110,7 +110,7 @@ auto open_directory(const std::filesystem::path& path) -> std::expected<void, st
     return std::unexpected("Failed to validate directory path: " + std::string(e.what()));
   }
 
-  std::wstring wpath = path.wstring();
+  std::wstring wpath = std::filesystem::path(path).make_preferred().wstring();
   Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
       .cbSize = sizeof(exec_info),
       .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
@@ -122,6 +122,116 @@ auto open_directory(const std::filesystem::path& path) -> std::expected<void, st
   if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
     return std::unexpected("Failed to open directory, Win32 error: " +
                            std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  return {};
+}
+
+auto open_file_with_default_app(const std::filesystem::path& path)
+    -> std::expected<void, std::string> {
+  if (path.empty()) {
+    return std::unexpected("File path is empty");
+  }
+
+  try {
+    if (!std::filesystem::exists(path)) {
+      return std::unexpected("File does not exist: " + path.string());
+    }
+
+    if (!std::filesystem::is_regular_file(path)) {
+      return std::unexpected("Path is not a file: " + path.string());
+    }
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to validate file path: " + std::string(e.what()));
+  }
+
+  std::wstring wpath = std::filesystem::path(path).make_preferred().wstring();
+  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+      .cbSize = sizeof(exec_info),
+      .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+      .lpVerb = L"open",
+      .lpFile = wpath.c_str(),
+      .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+  };
+
+  if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+    return std::unexpected("Failed to open file with default app, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  return {};
+}
+
+auto reveal_file_in_explorer(const std::filesystem::path& path)
+    -> std::expected<void, std::string> {
+  if (path.empty()) {
+    return std::unexpected("File path is empty");
+  }
+
+  try {
+    if (!std::filesystem::exists(path)) {
+      return std::unexpected("File does not exist: " + path.string());
+    }
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to validate file path: " + std::string(e.what()));
+  }
+
+  std::wstring wpath = std::filesystem::path(path).make_preferred().wstring();
+  std::wstring params = std::format(LR"(/select,"{}")", wpath);
+  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+      .cbSize = sizeof(exec_info),
+      .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+      .lpVerb = L"open",
+      .lpFile = L"explorer.exe",
+      .lpParameters = params.c_str(),
+      .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+  };
+
+  if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+    return std::unexpected("Failed to reveal file in explorer, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  return {};
+}
+
+auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
+    -> std::expected<void, std::string> {
+  if (paths.empty()) {
+    return {};
+  }
+
+  std::wstring from_buffer;
+  for (const auto& path : paths) {
+    if (path.empty()) {
+      continue;
+    }
+
+    from_buffer.append(path.wstring());
+    from_buffer.push_back(L'\0');
+  }
+
+  if (from_buffer.empty()) {
+    return {};
+  }
+
+  // SHFileOperation 要求双 \0 结尾的路径列表
+  from_buffer.push_back(L'\0');
+
+  Vendor::ShellApi::SHFILEOPSTRUCTW file_op{};
+  file_op.wFunc = Vendor::ShellApi::kFO_DELETE;
+  file_op.pFrom = from_buffer.c_str();
+  file_op.fFlags = Vendor::ShellApi::kFOF_ALLOWUNDO | Vendor::ShellApi::kFOF_NOCONFIRMATION |
+                   Vendor::ShellApi::kFOF_NOERRORUI | Vendor::ShellApi::kFOF_SILENT;
+
+  auto result = Vendor::ShellApi::SHFileOperationW(&file_op);
+  if (result != 0) {
+    return std::unexpected("Failed to move files to recycle bin, shell error: " +
+                           std::to_string(result));
+  }
+
+  if (file_op.fAnyOperationsAborted != FALSE) {
+    return std::unexpected("Move to recycle bin was aborted");
   }
 
   return {};

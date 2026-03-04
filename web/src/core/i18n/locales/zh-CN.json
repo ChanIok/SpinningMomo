@@ -477,5 +477,14 @@
   "gallery.toolbar.viewMode.adaptive": "自适应",
   "gallery.toolbar.thumbnailSize.label": "缩略图大小",
   "gallery.toolbar.thumbnailSize.fine": "精致",
-  "gallery.toolbar.thumbnailSize.showcase": "展示"
+  "gallery.toolbar.thumbnailSize.showcase": "展示",
+  "gallery.contextMenu.openDefaultApp.label": "默认应用打开",
+  "gallery.contextMenu.openDefaultApp.failedTitle": "打开文件失败",
+  "gallery.contextMenu.revealInExplorer.label": "在资源管理器中打开",
+  "gallery.contextMenu.revealInExplorer.failedTitle": "在资源管理器中定位失败",
+  "gallery.contextMenu.moveToTrash.label": "移到回收站",
+  "gallery.contextMenu.moveToTrash.successTitle": "已移到回收站",
+  "gallery.contextMenu.moveToTrash.successDescription": "共处理 {count} 项资产",
+  "gallery.contextMenu.moveToTrash.partialTitle": "部分移到回收站",
+  "gallery.contextMenu.moveToTrash.failedTitle": "移到回收站失败"
 }

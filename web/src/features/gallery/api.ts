@@ -207,6 +207,45 @@ export function getAssetUrl(assetId: number): string {
 }
 
 /**
+ * 使用系统默认应用打开资产文件
+ */
+export async function openAssetDefault(assetId: number): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.openAssetDefault', { id: assetId })
+    return result
+  } catch (error) {
+    console.error('Failed to open asset with default app:', error)
+    throw new Error('打开文件失败')
+  }
+}
+
+/**
+ * 在资源管理器中显示并选中资产文件
+ */
+export async function revealAssetInExplorer(assetId: number): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.revealAssetInExplorer', { id: assetId })
+    return result
+  } catch (error) {
+    console.error('Failed to reveal asset in explorer:', error)
+    throw new Error('在资源管理器中定位文件失败')
+  }
+}
+
+/**
+ * 将资产移动到系统回收站
+ */
+export async function moveAssetsToTrash(assetIds: number[]): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.moveAssetsToTrash', { ids: assetIds })
+    return result
+  } catch (error) {
+    console.error('Failed to move assets to trash:', error)
+    throw new Error('移到回收站失败')
+  }
+}
+
+/**
  * 获取时间线桶（月份元数据）
  */
 export async function getTimelineBuckets(
@@ -468,4 +507,9 @@ export const galleryApi = {
   // URL 工具
   getAssetThumbnailUrl,
   getAssetUrl,
+
+  // 资产动作
+  openAssetDefault,
+  revealAssetInExplorer,
+  moveAssetsToTrash,
 }

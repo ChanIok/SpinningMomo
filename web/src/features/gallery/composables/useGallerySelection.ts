@@ -255,9 +255,6 @@ export function useGallerySelection() {
     if (!selectedIds.value.has(asset.id)) {
       selectAsset(asset.id, true, false)
     }
-
-    // TODO: 显示上下文菜单
-    console.log('右键菜单:', asset.name, '选中数量:', selectedCount.value)
   }
 
   // ============= 键盘快捷键 =============

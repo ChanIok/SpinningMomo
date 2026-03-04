@@ -18,6 +18,7 @@ import Features.Gallery.Watcher;
 import Utils.Image;
 import Utils.Logger;
 import Utils.LRUCache;
+import Utils.System;
 
 namespace Features::Gallery {
 
@@ -137,6 +138,150 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
   } catch (const std::exception& e) {
     return std::unexpected("Exception in delete_asset: " + std::string(e.what()));
   }
+}
+
+auto open_asset_with_default_app(Core::State::AppState& app_state, std::int64_t id)
+    -> std::expected<Types::OperationResult, std::string> {
+  auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+  if (!asset_result) {
+    return std::unexpected("Failed to get asset item: " + asset_result.error());
+  }
+
+  if (!asset_result->has_value()) {
+    return Types::OperationResult{
+        .success = false,
+        .message = "Asset item not found",
+        .affected_count = 0,
+    };
+  }
+
+  auto open_result =
+      Utils::System::open_file_with_default_app(std::filesystem::path(asset_result->value().path));
+  if (!open_result) {
+    return std::unexpected("Failed to open asset with default app: " + open_result.error());
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Asset opened with default app",
+      .affected_count = 0,
+  };
+}
+
+auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
+    -> std::expected<Types::OperationResult, std::string> {
+  auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+  if (!asset_result) {
+    return std::unexpected("Failed to get asset item: " + asset_result.error());
+  }
+
+  if (!asset_result->has_value()) {
+    return Types::OperationResult{
+        .success = false,
+        .message = "Asset item not found",
+        .affected_count = 0,
+    };
+  }
+
+  auto reveal_result =
+      Utils::System::reveal_file_in_explorer(std::filesystem::path(asset_result->value().path));
+  if (!reveal_result) {
+    return std::unexpected("Failed to reveal asset in explorer: " + reveal_result.error());
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Asset revealed in explorer",
+      .affected_count = 0,
+  };
+}
+
+auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<std::int64_t>& ids)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (ids.empty()) {
+    return Types::OperationResult{
+        .success = false,
+        .message = "No assets selected",
+        .affected_count = 0,
+    };
+  }
+
+  std::unordered_set<std::int64_t> unique_ids(ids.begin(), ids.end());
+  std::int64_t moved_count = 0;
+  std::int64_t skipped_not_found = 0;
+  std::vector<std::string> errors;
+  errors.reserve(unique_ids.size());
+
+  for (auto id : unique_ids) {
+    auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+    if (!asset_result) {
+      errors.push_back("Failed to query asset " + std::to_string(id) + ": " + asset_result.error());
+      continue;
+    }
+
+    if (!asset_result->has_value()) {
+      skipped_not_found++;
+      continue;
+    }
+
+    const auto& asset = asset_result->value();
+    std::filesystem::path file_path(asset.path);
+    std::error_code ec;
+    bool file_exists = std::filesystem::exists(file_path, ec);
+    if (ec) {
+      errors.push_back("Failed to access file " + asset.path + ": " + ec.message());
+      continue;
+    }
+
+    if (file_exists) {
+      auto recycle_result = Utils::System::move_files_to_recycle_bin({file_path});
+      if (!recycle_result) {
+        errors.push_back("Failed to move file to recycle bin " + asset.path + ": " +
+                         recycle_result.error());
+        continue;
+      }
+    }
+
+    if (auto delete_thumbnail_result = Asset::Thumbnail::delete_thumbnail(app_state, asset);
+        !delete_thumbnail_result) {
+      Logger().warn("Failed to delete thumbnail for asset {}: {}", asset.id,
+                    delete_thumbnail_result.error());
+    }
+
+    auto delete_result = Asset::Repository::delete_asset(app_state, asset.id);
+    if (!delete_result) {
+      errors.push_back("Failed to delete asset index " + std::to_string(asset.id) + ": " +
+                       delete_result.error());
+      continue;
+    }
+
+    moved_count++;
+  }
+
+  Types::OperationResult result{
+      .success = errors.empty(),
+      .message = "",
+      .affected_count = moved_count,
+  };
+
+  if (errors.empty()) {
+    result.message = std::format("Moved {} asset(s) to recycle bin", moved_count);
+    return result;
+  }
+
+  if (moved_count > 0) {
+    result.message = std::format("Moved {} asset(s) to recycle bin, {} failed, {} not found",
+                                 moved_count, errors.size(), skipped_not_found);
+  } else {
+    result.message = std::format("Failed to move assets to recycle bin: {} failed, {} not found",
+                                 errors.size(), skipped_not_found);
+  }
+
+  for (const auto& error : errors) {
+    Logger().warn("move_assets_to_trash: {}", error);
+  }
+
+  return result;
 }
 
 // ============= 扫描和索引 =============

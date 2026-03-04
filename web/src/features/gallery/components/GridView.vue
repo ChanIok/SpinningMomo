@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
 import { useGalleryStore } from '../store'
 import type { Asset } from '../types'
+import { galleryApi } from '../api'
 import {
   useGalleryView,
   useGallerySelection,
@@ -12,12 +15,21 @@ import { useElementSize } from '@vueuse/core'
 import AssetCard from './AssetCard.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 
 // Store 和 Composables
 const store = useGalleryStore()
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
+const { t } = useI18n()
+const { toast } = useToast()
 
 // 响应式变量和引用
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
@@ -82,6 +94,80 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
 function handleAssetContextMenu(asset: Asset, event: MouseEvent) {
   gallerySelection.handleAssetContextMenu(asset, event)
 }
+
+const selectedAssetIds = computed(() => Array.from(store.selection.selectedIds))
+const isSingleSelection = computed(() => selectedAssetIds.value.length === 1)
+const selectedAssetId = computed(() => {
+  if (!isSingleSelection.value) return undefined
+  return selectedAssetIds.value[0]
+})
+
+async function handleOpenAssetDefault() {
+  const assetId = selectedAssetId.value
+  if (assetId === undefined) return
+
+  try {
+    const result = await galleryApi.openAssetDefault(assetId)
+    if (!result.success) {
+      throw new Error(result.message)
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.contextMenu.openDefaultApp.failedTitle'), {
+      description: message,
+    })
+  }
+}
+
+async function handleRevealAssetInExplorer() {
+  const assetId = selectedAssetId.value
+  if (assetId === undefined) return
+
+  try {
+    const result = await galleryApi.revealAssetInExplorer(assetId)
+    if (!result.success) {
+      throw new Error(result.message)
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.contextMenu.revealInExplorer.failedTitle'), {
+      description: message,
+    })
+  }
+}
+
+async function handleMoveAssetsToTrash() {
+  if (selectedAssetIds.value.length === 0) {
+    return
+  }
+
+  const ids = [...selectedAssetIds.value]
+  try {
+    const result = await galleryApi.moveAssetsToTrash(ids)
+    const affectedCount = result.affectedCount ?? 0
+    if (!result.success && affectedCount === 0) {
+      throw new Error(result.message)
+    }
+
+    gallerySelection.clearSelection()
+    if (result.success) {
+      toast.success(t('gallery.contextMenu.moveToTrash.successTitle'), {
+        description: t('gallery.contextMenu.moveToTrash.successDescription', {
+          count: affectedCount || ids.length,
+        }),
+      })
+    } else {
+      toast.warning(t('gallery.contextMenu.moveToTrash.partialTitle'), {
+        description: result.message,
+      })
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.contextMenu.moveToTrash.failedTitle'), {
+      description: message,
+    })
+  }
+}
 </script>
 
 <template>
@@ -122,18 +208,39 @@ function handleAssetContextMenu(asset: Asset, event: MouseEvent) {
               :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
             >
               <!-- 已加载的资产 -->
-              <AssetCard
-                v-if="asset !== null"
-                :asset="asset"
-                :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                :show-name="galleryView.viewSize.value >= 256"
-                :show-size="galleryView.viewSize.value >= 256"
-                @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
-                @double-click="
-                  (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
-                "
-                @context-menu="handleAssetContextMenu"
-              />
+              <ContextMenu v-if="asset !== null">
+                <ContextMenuTrigger as-child>
+                  <AssetCard
+                    :asset="asset"
+                    :is-selected="gallerySelection.isAssetSelected(asset.id)"
+                    :show-name="galleryView.viewSize.value >= 256"
+                    :show-size="galleryView.viewSize.value >= 256"
+                    @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
+                    @double-click="
+                      (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
+                    "
+                    @context-menu="handleAssetContextMenu"
+                  />
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem :disabled="!isSingleSelection" @click="handleOpenAssetDefault">
+                    {{ t('gallery.contextMenu.openDefaultApp.label') }}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    :disabled="!isSingleSelection"
+                    @click="handleRevealAssetInExplorer"
+                  >
+                    {{ t('gallery.contextMenu.revealInExplorer.label') }}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    class="text-destructive focus:text-destructive"
+                    @click="handleMoveAssetsToTrash"
+                  >
+                    {{ t('gallery.contextMenu.moveToTrash.label') }}
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
 
               <!-- 骨架屏占位 -->
               <div
@@ -196,18 +303,39 @@ function handleAssetContextMenu(asset: Asset, event: MouseEvent) {
               :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
             >
               <!-- 已加载的资产 -->
-              <AssetCard
-                v-if="asset !== null"
-                :asset="asset"
-                :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                :show-name="galleryView.viewSize.value >= 256"
-                :show-size="galleryView.viewSize.value >= 256"
-                @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
-                @double-click="
-                  (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
-                "
-                @context-menu="handleAssetContextMenu"
-              />
+              <ContextMenu v-if="asset !== null">
+                <ContextMenuTrigger as-child>
+                  <AssetCard
+                    :asset="asset"
+                    :is-selected="gallerySelection.isAssetSelected(asset.id)"
+                    :show-name="galleryView.viewSize.value >= 256"
+                    :show-size="galleryView.viewSize.value >= 256"
+                    @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
+                    @double-click="
+                      (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
+                    "
+                    @context-menu="handleAssetContextMenu"
+                  />
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem :disabled="!isSingleSelection" @click="handleOpenAssetDefault">
+                    {{ t('gallery.contextMenu.openDefaultApp.label') }}
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    :disabled="!isSingleSelection"
+                    @click="handleRevealAssetInExplorer"
+                  >
+                    {{ t('gallery.contextMenu.revealInExplorer.label') }}
+                  </ContextMenuItem>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    class="text-destructive focus:text-destructive"
+                    @click="handleMoveAssetsToTrash"
+                  >
+                    {{ t('gallery.contextMenu.moveToTrash.label') }}
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
 
               <!-- 骨架屏占位 -->
               <div

@@ -477,5 +477,14 @@
   "gallery.toolbar.viewMode.adaptive": "Adaptive",
   "gallery.toolbar.thumbnailSize.label": "Thumbnail Size",
   "gallery.toolbar.thumbnailSize.fine": "Compact",
-  "gallery.toolbar.thumbnailSize.showcase": "Showcase"
+  "gallery.toolbar.thumbnailSize.showcase": "Showcase",
+  "gallery.contextMenu.openDefaultApp.label": "Open With Default App",
+  "gallery.contextMenu.openDefaultApp.failedTitle": "Failed to open file",
+  "gallery.contextMenu.revealInExplorer.label": "Show in Explorer",
+  "gallery.contextMenu.revealInExplorer.failedTitle": "Failed to reveal file",
+  "gallery.contextMenu.moveToTrash.label": "Move to Recycle Bin",
+  "gallery.contextMenu.moveToTrash.successTitle": "Moved to Recycle Bin",
+  "gallery.contextMenu.moveToTrash.successDescription": "{count} item(s) processed",
+  "gallery.contextMenu.moveToTrash.partialTitle": "Partially moved to recycle bin",
+  "gallery.contextMenu.moveToTrash.failedTitle": "Failed to move to recycle bin"
 }

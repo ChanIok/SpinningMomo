@@ -20,8 +20,8 @@ const props = withDefaults(defineProps<AssetCardProps>(), {
 // Emits 定义
 const emit = defineEmits<{
   click: [asset: Asset, event: MouseEvent]
-  doubleClick: [asset: Asset, event: MouseEvent]
-  contextMenu: [asset: Asset, event: MouseEvent]
+  'double-click': [asset: Asset, event: MouseEvent]
+  'context-menu': [asset: Asset, event: MouseEvent]
 }>()
 
 // 响应式状态
@@ -42,12 +42,11 @@ function handleClick(event: MouseEvent) {
 }
 
 function handleDoubleClick(event: MouseEvent) {
-  emit('doubleClick', props.asset, event)
+  emit('double-click', props.asset, event)
 }
 
 function handleContextMenu(event: MouseEvent) {
-  event.preventDefault()
-  emit('contextMenu', props.asset, event)
+  emit('context-menu', props.asset, event)
 }
 
 // 图片加载处理

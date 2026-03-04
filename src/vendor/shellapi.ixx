@@ -40,6 +40,19 @@ export auto ShellExecuteExW(SHELLEXECUTEINFOW* lpExecInfo) -> BOOL {
   return ::ShellExecuteExW(lpExecInfo);
 }
 
+// SHFileOperation 相关类型和常量
+export using SHFILEOPSTRUCTW = ::SHFILEOPSTRUCTW;
+export using LPSHFILEOPSTRUCTW = ::LPSHFILEOPSTRUCTW;
+export constexpr auto kFO_DELETE = FO_DELETE;
+export constexpr auto kFOF_ALLOWUNDO = FOF_ALLOWUNDO;
+export constexpr auto kFOF_NOCONFIRMATION = FOF_NOCONFIRMATION;
+export constexpr auto kFOF_NOERRORUI = FOF_NOERRORUI;
+export constexpr auto kFOF_SILENT = FOF_SILENT;
+
+export auto SHFileOperationW(LPSHFILEOPSTRUCTW lpFileOp) -> int {
+  return ::SHFileOperationW(lpFileOp);
+}
+
 // 常用文件夹 ID
 export const auto& kFOLDERID_LocalAppData = FOLDERID_LocalAppData;
 export const auto& kFOLDERID_Videos = FOLDERID_Videos;
