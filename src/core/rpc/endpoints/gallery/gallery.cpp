@@ -38,6 +38,10 @@ auto launch_scan_directory_task(Core::State::AppState& app_state,
   asio::co_spawn(
       *io_context,
       [&app_state, options, task_id]() -> asio::awaitable<void> {
+        // 确保此协程先立即让出执行权，这样 RPC 可以先返回 task_id，
+        // 而不会被后续同步的扫描流水线阻塞。
+        co_await asio::post(asio::use_awaitable);
+
         Core::Tasks::mark_task_running(app_state, task_id);
 
         auto progress_callback =
