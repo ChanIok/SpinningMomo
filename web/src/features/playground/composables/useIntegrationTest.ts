@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { call } from '@/core/rpc'
+import { createInfinityNikkiAlbumScanParams } from '@/plugins/infinity_nikki'
 
 // 测试场景分类
 export type ScenarioCategory = 'gallery' | 'database' | 'system'
@@ -92,32 +93,8 @@ export function useIntegrationTest() {
       let params = step.params
 
       // 如果是扫描目录步骤，使用之前获取的 gameDir
-      if (step.method === 'gallery.scanDirectory' && context.gameDir) {
-        params = {
-          directory: context.gameDir,
-          generateThumbnails: true,
-          thumbnailShortEdge: 480,
-          ignoreRules: [
-            {
-              pattern: '**',
-              patternType: 'glob',
-              ruleType: 'exclude',
-              description: '默认排除所有文件',
-            },
-            {
-              pattern: 'X6Game/ScreenShot/**',
-              patternType: 'glob',
-              ruleType: 'include',
-              description: '包含游戏截图目录',
-            },
-            {
-              pattern: 'X6Game/Saved/GamePlayPhotos/*/NikkiPhotos_HighQuality/**',
-              patternType: 'glob',
-              ruleType: 'include',
-              description: '包含高质量照片目录',
-            },
-          ],
-        }
+      if (step.method === 'gallery.scanDirectory' && typeof context.gameDir === 'string') {
+        params = createInfinityNikkiAlbumScanParams(context.gameDir)
       }
 
       const result = await call(step.method, params, 60000) // 60秒超时

@@ -1,4 +1,50 @@
-import type { FolderTreeNode } from '@/features/gallery/types'
+import type { FolderTreeNode, ScanAssetsParams, ScanIgnoreRule } from '@/features/gallery/types'
+import { useI18n } from '@/core/i18n'
+
+interface InfinityNikkiAlbumIgnoreRuleTemplate extends Omit<ScanIgnoreRule, 'description'> {
+  descriptionKey: string
+}
+
+const INFINITY_NIKKI_ALBUM_IGNORE_RULES: InfinityNikkiAlbumIgnoreRuleTemplate[] = [
+  {
+    pattern: '**',
+    patternType: 'glob',
+    ruleType: 'exclude',
+    descriptionKey: 'plugins.infinityNikki.scanRules.excludeAll',
+  },
+  {
+    pattern: 'X6Game/ScreenShot/**',
+    patternType: 'glob',
+    ruleType: 'include',
+    descriptionKey: 'plugins.infinityNikki.scanRules.includeScreenshot',
+  },
+  {
+    pattern: 'X6Game/Saved/GamePlayPhotos/*/NikkiPhotos_HighQuality/**',
+    patternType: 'glob',
+    ruleType: 'include',
+    descriptionKey: 'plugins.infinityNikki.scanRules.includeHighQualityPhotos',
+  },
+]
+
+/**
+ * 生成 InfinityNikki 游戏相册扫描参数
+ * @param gameDir InfinityNikki 游戏根目录
+ */
+export function createInfinityNikkiAlbumScanParams(gameDir: string): ScanAssetsParams {
+  const { t } = useI18n()
+
+  return {
+    directory: gameDir.trim(),
+    generateThumbnails: true,
+    thumbnailShortEdge: 480,
+    ignoreRules: INFINITY_NIKKI_ALBUM_IGNORE_RULES.map((rule) => ({
+      pattern: rule.pattern,
+      patternType: rule.patternType,
+      ruleType: rule.ruleType,
+      description: t(rule.descriptionKey),
+    })),
+  }
+}
 
 /**
  * InfinityNikki 游戏照片管理插件
