@@ -198,6 +198,7 @@ export interface AppSettings {
       codec: 'h264' | 'h265' // 视频编码格式
       captureClientArea: boolean // 是否只捕获客户区（无边框）
       captureCursor: boolean // 是否捕获鼠标指针
+      autoRestartOnResize: boolean // 尺寸变化时是否自动切段重启录制
       audioSource: 'none' | 'system' | 'game_only' // 音频源
       audioBitrate: number // 音频码率 (bps)
     }
@@ -329,6 +330,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       codec: 'h264',
       captureClientArea: true,
       captureCursor: false,
+      autoRestartOnResize: true,
       audioSource: 'system',
       audioBitrate: 320000,
     },

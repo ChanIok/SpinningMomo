@@ -126,6 +126,7 @@ export struct AppSettings {
       std::string codec = "h264";          // 视频编码格式: "h264" | "h265"
       bool capture_client_area = true;     // 是否只捕获客户区（无边框）
       bool capture_cursor = false;         // 是否捕获鼠标指针
+      bool auto_restart_on_resize = true;  // 尺寸变化时是否自动切段重启录制
 
       // 音频配置
       std::string audio_source = "system";    // 音频源: "none" | "system" | "game_only"

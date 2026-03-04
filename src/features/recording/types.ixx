@@ -108,6 +108,7 @@ export struct RecordingConfig {
   VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
   bool capture_client_area = true;                      // 是否只捕获客户区（无边框）
   bool capture_cursor = false;                          // 是否捕获鼠标指针
+  bool auto_restart_on_resize = true;                   // 尺寸变化时是否自动切段重启录制
 
   // 音频配置
   AudioSource audio_source = AudioSource::System;  // 音频源类型 (默认系统音频)

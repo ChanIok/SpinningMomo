@@ -25,6 +25,10 @@ struct RecordingState {
   std::atomic<bool> op_in_progress{false};
   // 录制开关专用线程（仅执行开始/停止控制逻辑）
   std::jthread toggle_thread;
+  // 窗口尺寸变化时的自动切段重启线程
+  std::jthread resize_restart_thread;
+  // 自动切段重启任务是否正在执行
+  std::atomic<bool> resize_restart_in_progress{false};
 
   // D3D 资源 (Headless)
   wil::com_ptr<ID3D11Device> device;
@@ -42,6 +46,8 @@ struct RecordingState {
   // 帧率控制
   std::chrono::steady_clock::time_point start_time;
   std::uint64_t frame_index = 0;
+  int last_frame_width = 0;
+  int last_frame_height = 0;
 
   // 最后编码的帧纹理（用于帧重复填充）
   wil::com_ptr<ID3D11Texture2D> last_encoded_texture;

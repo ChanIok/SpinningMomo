@@ -299,6 +299,19 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateRecordingAutoRestartOnResize = async (autoRestartOnResize: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...appSettings.value.features.recording,
+          autoRestartOnResize,
+        },
+      },
+    })
+  }
+
   const updateRecordingAudioSource = async (audioSource: 'none' | 'system' | 'game_only') => {
     await store.updateSettings({
       ...appSettings.value,
@@ -372,6 +385,7 @@ export const useFunctionActions = () => {
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
           captureClientArea: DEFAULT_APP_SETTINGS.features.recording.captureClientArea,
           captureCursor: DEFAULT_APP_SETTINGS.features.recording.captureCursor,
+          autoRestartOnResize: DEFAULT_APP_SETTINGS.features.recording.autoRestartOnResize,
           audioSource: DEFAULT_APP_SETTINGS.features.recording.audioSource,
           audioBitrate: DEFAULT_APP_SETTINGS.features.recording.audioBitrate,
         },
@@ -413,6 +427,7 @@ export const useFunctionActions = () => {
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
           captureClientArea: DEFAULT_APP_SETTINGS.features.recording.captureClientArea,
           captureCursor: DEFAULT_APP_SETTINGS.features.recording.captureCursor,
+          autoRestartOnResize: DEFAULT_APP_SETTINGS.features.recording.autoRestartOnResize,
           audioSource: DEFAULT_APP_SETTINGS.features.recording.audioSource,
           audioBitrate: DEFAULT_APP_SETTINGS.features.recording.audioBitrate,
         },
@@ -462,6 +477,7 @@ export const useFunctionActions = () => {
     updateRecordingCodec,
     updateRecordingCaptureClientArea,
     updateRecordingCaptureCursor,
+    updateRecordingAutoRestartOnResize,
     updateRecordingAudioSource,
     updateRecordingAudioBitrate,
     resetFunctionSettings,

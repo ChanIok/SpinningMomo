@@ -13,6 +13,7 @@ import Utils.Graphics.D3D;
 import Utils.Media.Encoder;
 import Utils.Media.Encoder.Types;
 import Utils.Logger;
+import Utils.String;
 import <d3d11_4.h>;
 import <mfapi.h>;
 import <wil/com.h>;
@@ -21,6 +22,142 @@ import <windows.h>;
 namespace Features::Recording {
 
 auto floor_to_even(int value) -> int { return (value / 2) * 2; }
+auto start(Features::Recording::State::RecordingState& state, HWND target_window,
+           const Features::Recording::Types::RecordingConfig& config)
+    -> std::expected<void, std::string>;
+auto stop(Features::Recording::State::RecordingState& state) -> void;
+
+struct CaptureDimensions {
+  int window_width = 0;
+  int window_height = 0;
+  int client_width = 0;
+  int client_height = 0;
+  int output_width = 0;
+  int output_height = 0;
+};
+
+auto calculate_capture_dimensions(HWND target_window, bool capture_client_area)
+    -> std::expected<CaptureDimensions, std::string> {
+  RECT window_rect{};
+  RECT client_rect{};
+  GetWindowRect(target_window, &window_rect);
+  GetClientRect(target_window, &client_rect);
+
+  CaptureDimensions dims;
+  dims.window_width = window_rect.right - window_rect.left;
+  dims.window_height = window_rect.bottom - window_rect.top;
+  dims.client_width = client_rect.right - client_rect.left;
+  dims.client_height = client_rect.bottom - client_rect.top;
+
+  if (dims.window_width <= 0 || dims.window_height <= 0 || dims.client_width <= 0 ||
+      dims.client_height <= 0) {
+    return std::unexpected("Invalid window size");
+  }
+
+  dims.output_width = capture_client_area ? dims.client_width : dims.window_width;
+  dims.output_height = capture_client_area ? dims.client_height : dims.window_height;
+  dims.output_width = floor_to_even(dims.output_width);
+  dims.output_height = floor_to_even(dims.output_height);
+
+  if (dims.output_width <= 0 || dims.output_height <= 0) {
+    return std::unexpected("Invalid output size");
+  }
+
+  return dims;
+}
+
+auto build_timestamp_output_path(const std::filesystem::path& reference_output_path)
+    -> std::filesystem::path {
+  auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
+  auto dot_pos = filename.rfind('.');
+  if (dot_pos != std::string::npos) {
+    filename = filename.substr(0, dot_pos) + ".mp4";
+  } else {
+    filename += ".mp4";
+  }
+  return reference_output_path.parent_path() / filename;
+}
+
+auto start_resize_restart_task(Features::Recording::State::RecordingState& state) -> void {
+  bool expected = false;
+  if (!state.resize_restart_in_progress.compare_exchange_strong(expected, true,
+                                                                std::memory_order_acq_rel)) {
+    return;
+  }
+
+  if (state.resize_restart_thread.joinable() &&
+      state.resize_restart_thread.get_id() != std::this_thread::get_id()) {
+    state.resize_restart_thread.join();
+  }
+
+  state.resize_restart_thread = std::jthread([&state](std::stop_token) {
+    auto finish_task = [&state]() {
+      state.resize_restart_in_progress.store(false, std::memory_order_release);
+    };
+
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const bool need_uninitialize = SUCCEEDED(hr);
+    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+      Logger().warn("CoInitializeEx failed in resize restart task: {:08X}",
+                    static_cast<uint32_t>(hr));
+    }
+
+    try {
+      if (state.status.load(std::memory_order_acquire) !=
+          Features::Recording::Types::RecordingStatus::Recording) {
+        finish_task();
+        if (need_uninitialize) {
+          CoUninitialize();
+        }
+        return;
+      }
+
+      Features::Recording::Types::RecordingConfig restart_config;
+      HWND target_window = nullptr;
+      {
+        std::lock_guard resource_lock(state.resource_mutex);
+        restart_config = state.config;
+        target_window = state.target_window;
+      }
+
+      if (!target_window || !IsWindow(target_window)) {
+        Logger().error("Skip recording auto restart after resize: target window is invalid");
+        finish_task();
+        if (need_uninitialize) {
+          CoUninitialize();
+        }
+        return;
+      }
+
+      restart_config.output_path = build_timestamp_output_path(restart_config.output_path);
+      Logger().info("Recording restarted with timestamp output after resize: {}",
+                    restart_config.output_path.string());
+
+      stop(state);
+      auto restart_result = start(state, target_window, restart_config);
+      if (!restart_result) {
+        Logger().error("Failed to restart recording after resize: {}", restart_result.error());
+      }
+
+      finish_task();
+      if (need_uninitialize) {
+        CoUninitialize();
+      }
+    } catch (const std::exception& e) {
+      Logger().error("Resize restart task exception: {}", e.what());
+      finish_task();
+      if (need_uninitialize) {
+        CoUninitialize();
+      }
+    } catch (...) {
+      Logger().error("Resize restart task exception: unknown");
+      finish_task();
+      if (need_uninitialize) {
+        CoUninitialize();
+      }
+    }
+  });
+}
 
 auto initialize(Features::Recording::State::RecordingState& state)
     -> std::expected<void, std::string> {
@@ -37,6 +174,33 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   if (state.status.load(std::memory_order_acquire) !=
       Features::Recording::Types::RecordingStatus::Recording) {
     return;
+  }
+
+  auto content_size = frame.ContentSize();
+  if (content_size.Width > 0 && content_size.Height > 0) {
+    bool frame_size_changed = content_size.Width != state.last_frame_width ||
+                              content_size.Height != state.last_frame_height;
+
+    if (frame_size_changed) {
+      state.last_frame_width = content_size.Width;
+      state.last_frame_height = content_size.Height;
+      Utils::Graphics::Capture::recreate_frame_pool(state.capture_session, content_size.Width,
+                                                    content_size.Height);
+
+      if (state.config.auto_restart_on_resize) {
+        auto dims_result =
+            calculate_capture_dimensions(state.target_window, state.config.capture_client_area);
+        if (dims_result) {
+          if (dims_result->output_width != static_cast<int>(state.config.width) ||
+              dims_result->output_height != static_cast<int>(state.config.height)) {
+            start_resize_restart_task(state);
+            return;
+          }
+        } else {
+          Logger().warn("Skip recording auto restart after resize: {}", dims_result.error());
+        }
+      }
+    }
   }
 
   // 获取当前时间和帧的系统时间戳
@@ -134,31 +298,20 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   state.target_window = target_window;
 
   // 1. 计算捕获尺寸与输出尺寸
-  RECT window_rect{};
-  RECT client_rect{};
-  GetWindowRect(target_window, &window_rect);
-  GetClientRect(target_window, &client_rect);
-
-  int window_width = window_rect.right - window_rect.left;
-  int window_height = window_rect.bottom - window_rect.top;
-  int client_width = client_rect.right - client_rect.left;
-  int client_height = client_rect.bottom - client_rect.top;
-
-  if (window_width <= 0 || window_height <= 0 || client_width <= 0 || client_height <= 0) {
-    return std::unexpected("Invalid window size");
+  auto dims_result = calculate_capture_dimensions(target_window, config.capture_client_area);
+  if (!dims_result) {
+    return std::unexpected(dims_result.error());
   }
-
-  int output_width = config.capture_client_area ? client_width : window_width;
-  int output_height = config.capture_client_area ? client_height : window_height;
-  output_width = floor_to_even(output_width);
-  output_height = floor_to_even(output_height);
-
-  if (output_width <= 0 || output_height <= 0) {
-    return std::unexpected("Invalid output size");
-  }
+  const auto& dims = *dims_result;
+  int window_width = dims.window_width;
+  int window_height = dims.window_height;
+  int output_width = dims.output_width;
+  int output_height = dims.output_height;
 
   state.config.width = output_width;
   state.config.height = output_height;
+  state.last_frame_width = window_width;
+  state.last_frame_height = window_height;
   state.crop_to_client_area = false;
   state.crop_region = {};
   state.cropped_texture = nullptr;
@@ -340,6 +493,8 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
     state.capture_session = {};
     state.encoder = {};
     state.last_encoded_texture = nullptr;
+    state.last_frame_width = 0;
+    state.last_frame_height = 0;
     state.cropped_texture = nullptr;
     state.crop_to_client_area = false;
     state.crop_region = {};

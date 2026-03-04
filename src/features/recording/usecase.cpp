@@ -20,6 +20,14 @@ import <windows.h>;
 
 namespace Features::Recording::UseCase {
 
+auto join_resize_restart_thread(Features::Recording::State::RecordingState& recording_state)
+    -> void {
+  if (recording_state.resize_restart_thread.joinable() &&
+      recording_state.resize_restart_thread.get_id() != std::this_thread::get_id()) {
+    recording_state.resize_restart_thread.join();
+  }
+}
+
 auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
   if (!state.events || !state.i18n) {
     Logger().warn("Skip recording notification because events/i18n state is not initialized");
@@ -63,6 +71,8 @@ auto generate_output_path(const Core::State::AppState& state)
 }
 
 auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, std::string> {
+  join_resize_restart_thread(*state.recording);
+
   auto status = state.recording->status.load(std::memory_order_acquire);
 
   if (status == Features::Recording::Types::RecordingStatus::Recording) {
@@ -107,6 +117,7 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
     config.codec = Features::Recording::Types::video_codec_from_string(recording_settings.codec);
     config.capture_client_area = recording_settings.capture_client_area;
     config.capture_cursor = recording_settings.capture_cursor;
+    config.auto_restart_on_resize = recording_settings.auto_restart_on_resize;
     config.audio_source =
         Features::Recording::Types::audio_source_from_string(recording_settings.audio_source);
     config.audio_bitrate = recording_settings.audio_bitrate;
@@ -177,6 +188,8 @@ auto stop_recording_if_running(Core::State::AppState& state) -> void {
   if (!state.recording) {
     return;
   }
+
+  join_resize_restart_thread(*state.recording);
 
   if (state.recording->toggle_thread.joinable()) {
     state.recording->toggle_thread.join();

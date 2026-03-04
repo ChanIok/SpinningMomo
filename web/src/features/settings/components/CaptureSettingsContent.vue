@@ -51,6 +51,7 @@ const {
   updateRecordingCodec,
   updateRecordingCaptureClientArea,
   updateRecordingCaptureCursor,
+  updateRecordingAutoRestartOnResize,
   updateRecordingAudioSource,
   updateRecordingAudioBitrate,
   resetCaptureExportSettings,
@@ -561,6 +562,23 @@ const handleResetSettings = async () => {
               <Switch
                 :model-value="appSettings?.features?.recording?.captureCursor"
                 @update:model-value="(value) => updateRecordingCaptureCursor(Boolean(value))"
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.autoRestartOnResize.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.autoRestartOnResize.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.recording?.autoRestartOnResize"
+                @update:model-value="(value) => updateRecordingAutoRestartOnResize(Boolean(value))"
               />
             </ItemActions>
           </Item>
