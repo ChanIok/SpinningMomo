@@ -9,6 +9,7 @@ import Core.RPC.NotificationHub;
 import Features.Gallery.State;
 import Features.Gallery.Types;
 import Features.Gallery.Scanner;
+import Features.Gallery.ScanCommon;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Service;
@@ -19,8 +20,6 @@ import Utils.Logger;
 import Utils.Path;
 import Utils.String;
 import Utils.Time;
-import Vendor.BuildConfig;
-import Vendor.XXHash;
 import <windows.h>;
 
 namespace Features::Gallery::Watcher {
@@ -41,57 +40,6 @@ struct ParsedNotification {
   DWORD action = 0;
   bool is_directory = false;
 };
-
-auto is_supported_file(const std::filesystem::path& file_path,
-                       const std::vector<std::string>& supported_extensions) -> bool {
-  if (!file_path.has_extension()) {
-    return false;
-  }
-
-  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
-  return std::ranges::find(supported_extensions, extension) != supported_extensions.end();
-}
-
-auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
-  if (!file_path.has_extension()) {
-    return "unknown";
-  }
-
-  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
-  if (extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".bmp" ||
-      extension == ".webp" || extension == ".tiff" || extension == ".tif") {
-    return "photo";
-  }
-
-  if (extension == ".mp4" || extension == ".avi" || extension == ".mov" || extension == ".mkv" ||
-      extension == ".wmv" || extension == ".webm") {
-    return "video";
-  }
-
-  return "unknown";
-}
-
-auto calculate_file_hash(const std::filesystem::path& file_path)
-    -> std::expected<std::string, std::string> {
-  if (Vendor::BuildConfig::is_debug_build()) {
-    auto path_str = file_path.string();
-    auto hash = std::hash<std::string>{}(path_str);
-    return std::format("{:016x}", hash);
-  }
-
-  std::ifstream file(file_path, std::ios::binary);
-  if (!file) {
-    return std::unexpected("Cannot open file for hashing: " + file_path.string());
-  }
-
-  std::vector<char> buffer((std::istreambuf_iterator<char>(file)),
-                           std::istreambuf_iterator<char>());
-  if (buffer.empty()) {
-    return std::unexpected("File is empty: " + file_path.string());
-  }
-
-  return Vendor::XXHash::HashCharVectorToHex(buffer);
-}
 
 auto make_default_scan_options(const std::filesystem::path& root_path) -> Types::ScanOptions {
   Types::ScanOptions options;
@@ -243,9 +191,9 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     return 0;
   }
 
-  const auto supported_extensions = options.supported_extensions.value_or(
-      std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"});
-  if (!is_supported_file(normalized, supported_extensions)) {
+  const auto supported_extensions =
+      options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
+  if (!ScanCommon::is_supported_file(normalized, supported_extensions)) {
     return 0;
   }
 
@@ -282,7 +230,7 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     return 0;
   }
 
-  auto hash_result = calculate_file_hash(normalized);
+  auto hash_result = ScanCommon::calculate_file_hash(normalized);
   if (!hash_result) {
     return std::unexpected(hash_result.error());
   }
@@ -293,7 +241,7 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     return 0;
   }
 
-  auto asset_type = detect_asset_type(normalized);
+  auto asset_type = ScanCommon::detect_asset_type(normalized);
 
   Types::Asset asset{
       .id = existing_asset ? existing_asset->id : 0,

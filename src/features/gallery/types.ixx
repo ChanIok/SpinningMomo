@@ -197,7 +197,6 @@ struct FileAnalysisResult {
 struct ProcessingBatchResult {
   std::vector<Asset> new_assets;
   std::vector<Asset> updated_assets;
-  std::vector<std::string> generated_thumbnails;
   std::vector<std::string> errors;
 };
 

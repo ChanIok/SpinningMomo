@@ -6,6 +6,7 @@ import std;
 import Core.State;
 import Core.WorkerPool;
 import Features.Gallery.Types;
+import Features.Gallery.ScanCommon;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Thumbnail;
@@ -18,50 +19,10 @@ import Utils.Logger;
 import Utils.Path;
 import Utils.String;
 import Utils.Time;
-import Vendor.BuildConfig;
-import Vendor.XXHash;
 
 namespace Features::Gallery::Scanner {
 
-auto calculate_file_hash(const std::filesystem::path& file_path)
-    -> std::expected<std::string, std::string> {
-  if (Vendor::BuildConfig::is_debug_build()) {
-    // Debug模式：直接hash文件路径，避免XXH3性能问题
-    auto path_str = file_path.string();
-    auto hash = std::hash<std::string>{}(path_str);
-    return std::format("{:016x}", hash);
-  }
-
-  std::ifstream file(file_path, std::ios::binary);
-  if (!file) {
-    return std::unexpected("Cannot open file for hashing: " + file_path.string());
-  }
-
-  // 读取文件内容
-  std::vector<char> buffer((std::istreambuf_iterator<char>(file)),
-                           std::istreambuf_iterator<char>());
-
-  if (buffer.empty()) {
-    return std::unexpected("File is empty: " + file_path.string());
-  }
-
-  // 计算XXH3哈希
-  auto hash = Vendor::XXHash::HashCharVectorToHex(buffer);
-
-  return hash;
-}
-
-auto is_supported_file(const std::filesystem::path& file_path,
-                       const std::vector<std::string>& supported_extensions) -> bool {
-  if (!file_path.has_extension()) {
-    return false;
-  }
-
-  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
-
-  return std::ranges::find(supported_extensions, extension) != supported_extensions.end();
-}
-
+// 核心逻辑：扫描路径并应用过滤规则
 auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& directory,
                 const Types::ScanOptions& options, std::optional<std::int64_t> folder_id)
     -> std::expected<std::vector<std::filesystem::path>, std::string> {
@@ -80,11 +41,15 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
       Logger().warn("Failed to load ignore rules: {}", rules_result.error());
     }
     auto combined_rules = rules_result.value_or(std::vector<Types::IgnoreRule>{});
+    auto supported_extensions =
+        options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
 
-    // 使用递归目录迭代器和ranges管道进行函数式过滤和转换
+    // 使用递归目录迭代器和 ranges 管道进行函数式过滤和转换
+    // 整个流程惰性求值，直到最后的 to<std::vector> 才实际收集结果
     auto found_files =
         std::ranges::subrange(std::filesystem::recursive_directory_iterator(directory),
                               std::filesystem::recursive_directory_iterator{}) |
+        // 步骤 1: 过滤掉不可访问的文件或跳过目录本身，只保留常规文件。捕获文件系统错误。
         std::views::filter([](const std::filesystem::directory_entry& entry) {
           try {
             return entry.is_regular_file();
@@ -93,11 +58,11 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
             return false;
           }
         }) |
-        std::views::filter([&options](const std::filesystem::directory_entry& entry) {
-          const auto& extensions = options.supported_extensions.value_or(
-              std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"});
-          return is_supported_file(entry.path(), extensions);
+        // 步骤 2: 过滤扩展名。基于 options.supported_extensions 确定的列表（如 .jpg, .png）。
+        std::views::filter([&supported_extensions](const std::filesystem::directory_entry& entry) {
+          return ScanCommon::is_supported_file(entry.path(), supported_extensions);
         }) |
+        // 步骤 3: 结合 .ignore 规则（类似 .gitignore）进行深层次忽略检查。
         std::views::filter(
             [&directory, &combined_rules](const std::filesystem::directory_entry& entry) {
               bool should_ignore =
@@ -109,6 +74,7 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
 
               return !should_ignore;
             }) |
+        // 步骤 4: 提取符合条件的 std::filesystem::path 用于后续处理。
         std::views::transform(
             [](const std::filesystem::directory_entry& entry) { return entry.path(); }) |
         std::ranges::to<std::vector>();
@@ -120,28 +86,6 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
   } catch (const std::exception& e) {
     return std::unexpected("Exception in scan_paths: " + std::string(e.what()));
   }
-}
-
-auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
-  if (!file_path.has_extension()) {
-    return "unknown";
-  }
-
-  auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
-
-  // 图片格式
-  if (extension == ".jpg" || extension == ".jpeg" || extension == ".png" || extension == ".bmp" ||
-      extension == ".webp" || extension == ".tiff" || extension == ".tif") {
-    return "photo";
-  }
-
-  // 视频格式（预留）
-  if (extension == ".mp4" || extension == ".avi" || extension == ".mov" || extension == ".mkv" ||
-      extension == ".wmv" || extension == ".webm") {
-    return "video";
-  }
-
-  return "unknown";
 }
 
 auto report_scan_progress(const std::function<void(const Types::ScanProgress&)>& progress_callback,
@@ -169,6 +113,7 @@ auto steady_clock_millis() -> std::int64_t {
       .count();
 }
 
+// 进度追踪器：支持加权计算和频率限制，防止 UI 阻塞
 struct ProcessingProgressTracker {
   static constexpr std::int64_t kMinReportIntervalMillis = 200;
 
@@ -292,6 +237,7 @@ auto is_path_under_root(const std::string& candidate_path, const std::string& ro
   return candidate_path[root_path.size()] == '/';
 }
 
+// 清理磁盘已删除但数据库仍存在的资产
 auto cleanup_removed_assets(Core::State::AppState& app_state,
                             const std::filesystem::path& normalized_scan_root,
                             const std::vector<Types::FileSystemInfo>& file_infos,
@@ -454,7 +400,7 @@ auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::pat
   return result;
 }
 
-// 分析文件变化
+// 状态分析：通过大小和修改时间初步判断文件状态
 auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
                           const std::unordered_map<std::string, Types::Metadata>& asset_cache)
     -> std::vector<Types::FileAnalysisResult> {
@@ -467,19 +413,20 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
 
     auto it = asset_cache.find(file_info.path.string());
     if (it == asset_cache.end()) {
-      // 新文件
+      // 数据库中没有此路径记录，说明是全新文件，将在后续提取完整元数据。
       analysis.status = Types::FileStatus::NEW;
     } else {
-      // 检查是否需要更新
+      // 文件在数据库中有记录，但需进一步评估是否被修改过。
       const auto& cached_metadata = it->second;
       analysis.existing_metadata = cached_metadata;
 
-      // 检查文件大小和修改时间，任一不同都需要重新计算哈希
+      // 快速比较法：检查文件大小和系统修改时间。
+      // 因为计算文件 Hash 代价昂贵，所以仅当尺寸或修改时间改变时才触发 NEEDS_HASH_CHECK。
       if (cached_metadata.size != file_info.size ||
           cached_metadata.file_modified_at != file_info.file_modified_millis) {
         analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
       } else {
-        // 大小和修改时间都相同，很可能未发生变化
+        // 大小和修改时间均一致，极大可能未发生内容改变，跳过 Hash 计算直接标记为完毕。
         analysis.status = Types::FileStatus::UNCHANGED;
       }
     }
@@ -490,11 +437,12 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
   return results;
 }
 
-// 计算目标文件哈希
+// 并行校检：对变动文件计算哈希，精准识别内容变化
 auto calculate_hash_for_targets(Core::State::AppState& app_state,
                                 std::vector<Types::FileAnalysisResult>& analysis_results)
     -> std::expected<void, std::string> {
-  // 1. 使用ranges找到需要处理的文件，保持原始索引
+  // 1. 使用 C++20 ranges 枚举并过滤出所有状态为 NEW 或 NEEDS_HASH_CHECK 的待处理文件。
+  // 保留了原始索引(idx)，这是为了在并发算完哈希后能无缝写回原数组。
   auto targets_with_index = analysis_results | std::views::enumerate |
                             std::views::filter([](const auto& pair) {
                               const auto& [idx, analysis] = pair;
@@ -507,10 +455,12 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
     return {};
   }
 
+  // 使用 batches 把超大文件列表切分成每个容量32的小块，以供线程池粗粒度分发。
   constexpr size_t HASH_BATCH_SIZE = 32;
   auto batches =
       targets_with_index | std::views::chunk(HASH_BATCH_SIZE) | std::ranges::to<std::vector>();
 
+  // std::latch 用于同步协调：等待所有子批次执行完毕后再释放控制流。
   std::latch completion_latch(batches.size());
   std::vector<std::pair<size_t, std::string>> all_hashes;
   std::mutex results_mutex;
@@ -526,7 +476,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
                   [](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
                     const auto& [idx, analysis] = pair;
 
-                    auto hash_result = calculate_file_hash(analysis.file_info.path);
+                    auto hash_result = ScanCommon::calculate_file_hash(analysis.file_info.path);
                     if (hash_result) {
                       return std::make_pair(idx, std::move(hash_result.value()));
                     } else {
@@ -586,7 +536,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   const auto& file_info = analysis.file_info;
   const auto& file_path = file_info.path;
 
-  auto asset_type = detect_asset_type(file_path);
+  auto asset_type = ScanCommon::detect_asset_type(file_path);
 
   Types::Asset asset;
 
@@ -616,7 +566,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
 
   // 数据库记录管理时间戳由数据库自动设置
 
-  // 根据文件路径查找对应的 folder_id
+  // 根据文件路径查找最匹配的父级 folder_id
   if (!folder_mapping.empty()) {
     auto parent_path = file_path.parent_path().string();
     if (auto it = folder_mapping.find(parent_path); it != folder_mapping.end()) {
@@ -624,7 +574,9 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
     }
   }
 
+  // 针对图片资产(Photo)获取 WIC 特征
   if (asset_type == "photo") {
+    // 解析具体的宽高、Mimetype，比如 1920x1080 image/png
     auto image_info_result = Utils::Image::get_image_info(wic_factory.get(), file_path);
     if (image_info_result) {
       auto image_info = std::move(*image_info_result);
@@ -636,10 +588,10 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
                     image_info_result.error());
       asset.width = 0;
       asset.height = 0;
-      asset.mime_type = "application/octet-stream";
+      asset.mime_type = "application/octet-stream";  // 兜底处理
     }
 
-    // 生成缩略图（如果需要）
+    // 生成或更新这幅图的缩略图到缓存目录（用于无感滚动列表展示）
     if (options.generate_thumbnails.value_or(true)) {
       auto thumbnail_result =
           Asset::Thumbnail::generate_thumbnail(app_state, wic_factory, file_path, file_info.hash,
@@ -651,10 +603,12 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
       }
 
       if (progress_tracker) {
+        // 利用权重推进总体缩略图进度，保证进度条平滑增长
         progress_tracker->mark_thumbnail_processed();
       }
     }
   } else {
+    // 非图片类型
     asset.width = 0;
     asset.height = 0;
     asset.mime_type = "application/octet-stream";
@@ -663,7 +617,7 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   return asset;
 }
 
-// 并行处理文件
+// 并行处理：提取元数据并生成缩略图
 auto process_files_in_parallel(Core::State::AppState& app_state,
                                const std::vector<Types::FileAnalysisResult>& files_to_process,
                                const Types::ScanOptions& options,
@@ -759,14 +713,31 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
   return final_result;
 }
 
-// 主扫描函数
-auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
-                          std::function<void(const Types::ScanProgress&)> progress_callback)
-    -> std::expected<Types::ScanResult, std::string> {
-  auto start_time = std::chrono::steady_clock::now();
+constexpr double kPreparingPercent = 2.0;
+constexpr double kDiscoveringStartPercent = 10.0;
+constexpr double kDiscoveringEndPercent = 25.0;
+constexpr double kHashingStartPercent = 35.0;
+constexpr double kHashingEndPercent = 60.0;
+constexpr std::int64_t kThumbnailProgressWeight = 3;
+constexpr double kProcessingStartPercent = 60.0;
+constexpr double kProcessingEndPercent = 92.0;
+constexpr double kCleanupPercent = 96.0;
 
-  report_scan_progress(progress_callback, "preparing", 0, 1, 2.0, "Preparing gallery scan context");
+struct ScanPreparationContext {
+  std::filesystem::path normalized_scan_root;
+  std::filesystem::path directory;
+  std::int64_t folder_id = 0;
+  std::unordered_map<std::string, Types::Metadata> asset_cache;
+};
 
+struct ProcessingPhaseResult {
+  Types::ProcessingBatchResult batch_result;
+  bool all_db_success = true;
+};
+
+// 准备阶段：规范化路径并加载缓存
+auto prepare_scan_context(Core::State::AppState& app_state, const Types::ScanOptions& options)
+    -> std::expected<ScanPreparationContext, std::string> {
   auto normalized_scan_root_result = Utils::Path::NormalizePath(options.directory);
   if (!normalized_scan_root_result) {
     return std::unexpected("Failed to normalize scan root path: " +
@@ -778,9 +749,7 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
                 normalized_scan_root.string(),
                 options.ignore_rules.value_or(std::vector<Types::ScanIgnoreRule>{}).size());
 
-  // 1. 为扫描根目录预创建文件夹记录
   std::vector<std::filesystem::path> root_folder_paths = {normalized_scan_root};
-
   auto root_folder_mapping_result =
       Folder::Service::batch_create_folders_for_paths(app_state, root_folder_paths);
   if (!root_folder_mapping_result) {
@@ -791,8 +760,6 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto root_folder_map = std::move(root_folder_mapping_result.value());
   std::int64_t folder_id = root_folder_map.at(normalized_scan_root.string());
 
-  // 2. 只有前端明确传了规则，才覆盖 DB 里的规则。
-  // watcher 触发的重扫一般不传规则，这样就能沿用旧规则。
   if (options.ignore_rules.has_value()) {
     auto persist_result = Ignore::Repository::replace_rules_by_folder_id(
         app_state, folder_id, options.ignore_rules.value());
@@ -806,51 +773,64 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
                    normalized_scan_root.string());
   }
 
-  // 3. 加载资产缓存
   auto asset_cache_result = Asset::Service::load_asset_cache(app_state);
   if (!asset_cache_result) {
     return std::unexpected("Failed to load asset cache: " + asset_cache_result.error());
   }
-  auto asset_cache = std::move(asset_cache_result.value());
 
-  std::filesystem::path directory(normalized_scan_root);
+  return ScanPreparationContext{
+      .normalized_scan_root = normalized_scan_root,
+      .directory = normalized_scan_root,
+      .folder_id = folder_id,
+      .asset_cache = std::move(asset_cache_result.value()),
+  };
+}
 
-  report_scan_progress(progress_callback, "discovering", 0, 1, 10.0, "Scanning files from disk");
+auto run_discovery_phase(Core::State::AppState& app_state, const ScanPreparationContext& context,
+                         const Types::ScanOptions& options,
+                         const std::function<void(const Types::ScanProgress&)>& progress_callback)
+    -> std::expected<std::vector<Types::FileSystemInfo>, std::string> {
+  report_scan_progress(progress_callback, "discovering", 0, 1, kDiscoveringStartPercent,
+                       "Scanning files from disk");
 
-  // 4. 使用支持忽略规则的文件信息扫描（传递folder_id）
-  auto file_info_result = scan_file_info(app_state, directory, options, folder_id);
+  auto file_info_result = scan_file_info(app_state, context.directory, options, context.folder_id);
   if (!file_info_result) {
     return std::unexpected("File info scanning failed: " + file_info_result.error());
   }
-  auto file_infos = file_info_result.value();
 
+  auto file_infos = std::move(file_info_result.value());
   report_scan_progress(progress_callback, "discovering",
                        static_cast<std::int64_t>(file_infos.size()),
-                       static_cast<std::int64_t>(file_infos.size()), 25.0,
+                       static_cast<std::int64_t>(file_infos.size()), kDiscoveringEndPercent,
                        std::format("Discovered {} candidate files", file_infos.size()));
 
   Logger().info("Scanned {} files in directory '{}' (after ignore rules)", file_infos.size(),
-                normalized_scan_root.string());
+                context.normalized_scan_root.string());
+  return file_infos;
+}
 
-  // 分析文件变化
+auto run_hash_analysis_phase(
+    Core::State::AppState& app_state, const std::vector<Types::FileSystemInfo>& file_infos,
+    const std::unordered_map<std::string, Types::Metadata>& asset_cache,
+    const std::function<void(const Types::ScanProgress&)>& progress_callback)
+    -> std::expected<std::vector<Types::FileAnalysisResult>, std::string> {
   auto analysis_results = analyze_file_changes(file_infos, asset_cache);
 
   report_scan_progress(progress_callback, "hashing", 0,
-                       static_cast<std::int64_t>(analysis_results.size()), 35.0,
+                       static_cast<std::int64_t>(analysis_results.size()), kHashingStartPercent,
                        "Calculating file hashes");
 
-  // 计算文件哈希
   if (auto hash_phase = calculate_hash_for_targets(app_state, analysis_results); !hash_phase) {
     return std::unexpected("Hash calculation failed: " + hash_phase.error());
   }
 
-  report_scan_progress(
-      progress_callback, "hashing", static_cast<std::int64_t>(analysis_results.size()),
-      static_cast<std::int64_t>(analysis_results.size()), 60.0, "Hash calculation completed");
+  report_scan_progress(progress_callback, "hashing",
+                       static_cast<std::int64_t>(analysis_results.size()),
+                       static_cast<std::int64_t>(analysis_results.size()), kHashingEndPercent,
+                       "Hash calculation completed");
 
   Logger().info("Calculated hashes for {} files", analysis_results.size());
 
-  // 5. 筛选需要处理的文件
   std::vector<Types::FileAnalysisResult> files_to_process;
   std::ranges::copy_if(analysis_results, std::back_inserter(files_to_process),
                        [](const Types::FileAnalysisResult& result) {
@@ -859,17 +839,19 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
                        });
 
   Logger().info("Found {} files that need processing", files_to_process.size());
+  return files_to_process;
+}
 
-  constexpr std::int64_t kThumbnailProgressWeight = 3;
-  constexpr double kProcessingStartPercent = 60.0;
-  constexpr double kProcessingEndPercent = 92.0;
-  constexpr double kCleanupPercent = 96.0;
-
+auto run_processing_phase(Core::State::AppState& app_state, const std::filesystem::path& directory,
+                          const std::vector<Types::FileAnalysisResult>& files_to_process,
+                          const Types::ScanOptions& options,
+                          const std::function<void(const Types::ScanProgress&)>& progress_callback)
+    -> std::expected<ProcessingPhaseResult, std::string> {
   std::int64_t thumbnail_targets = 0;
   if (options.generate_thumbnails.value_or(true)) {
     thumbnail_targets = static_cast<std::int64_t>(
         std::ranges::count_if(files_to_process, [](const Types::FileAnalysisResult& result) {
-          return detect_asset_type(result.file_info.path) == "photo";
+          return ScanCommon::is_photo_file(result.file_info.path);
         }));
   }
 
@@ -884,12 +866,33 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   report_scan_progress(progress_callback, "processing", 0, processing_total_units,
                        kProcessingStartPercent, std::move(processing_start_message));
 
-  // 6. 提前准备文件夹映射，批量创建文件夹记录
-  std::unordered_map<std::string, std::int64_t> path_to_folder_id;
-  Types::ProcessingBatchResult batch_result{};
-  bool all_db_success = true;
-  std::optional<ProcessingProgressTracker> processing_tracker;
+  ProcessingPhaseResult result{};
+  if (files_to_process.empty()) {
+    Logger().info("Folder-aware asset scan found no new or modified files");
+    report_scan_progress(progress_callback, "processing", 0, 0, kProcessingEndPercent,
+                         "No changed files found");
+    return result;
+  }
 
+  std::vector<std::filesystem::path> file_paths;
+  file_paths.reserve(files_to_process.size());
+  for (const auto& analysis : files_to_process) {
+    file_paths.push_back(analysis.file_info.path);
+  }
+
+  std::unordered_map<std::string, std::int64_t> path_to_folder_id;
+  auto folder_paths = Folder::Service::extract_unique_folder_paths(file_paths, directory);
+  auto folder_mapping_result =
+      Folder::Service::batch_create_folders_for_paths(app_state, folder_paths);
+  if (folder_mapping_result) {
+    path_to_folder_id = std::move(folder_mapping_result.value());
+    Logger().info("Pre-created {} folder records with complete hierarchy",
+                  path_to_folder_id.size());
+  } else {
+    Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
+  }
+
+  std::optional<ProcessingProgressTracker> processing_tracker;
   if (processing_total_units > 0) {
     processing_tracker.emplace(progress_callback,
                                static_cast<std::int64_t>(files_to_process.size()),
@@ -897,94 +900,122 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
                                kProcessingStartPercent, kProcessingEndPercent);
   }
 
-  if (!files_to_process.empty()) {
-    std::vector<std::filesystem::path> file_paths;
-    file_paths.reserve(files_to_process.size());
-
-    for (const auto& analysis : files_to_process) {
-      file_paths.push_back(analysis.file_info.path);
-    }
-
-    // 提取所有需要的文件夹路径（包含祖先目录直到扫描根目录）
-    auto folder_paths = Folder::Service::extract_unique_folder_paths(file_paths, directory);
-
-    auto folder_mapping_result =
-        Folder::Service::batch_create_folders_for_paths(app_state, folder_paths);
-    if (folder_mapping_result) {
-      path_to_folder_id = std::move(folder_mapping_result.value());
-      Logger().info("Pre-created {} folder records with complete hierarchy",
-                    path_to_folder_id.size());
-    } else {
-      Logger().warn("Failed to pre-create folders: {}", folder_mapping_result.error());
-    }
-
-    // 7. 并行处理文件
-    auto processing_result =
-        process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id,
-                                  processing_tracker ? &(*processing_tracker) : nullptr);
-    if (!processing_result) {
-      return std::unexpected("File processing failed: " + processing_result.error());
-    }
-
-    batch_result = std::move(processing_result.value());
-
-    // 8. 批量更新资产记录
-    if (!batch_result.new_assets.empty()) {
-      auto create_result =
-          Asset::Repository::batch_create_asset(app_state, batch_result.new_assets);
-      if (create_result) {
-        Logger().info("Successfully created {} new asset items", batch_result.new_assets.size());
-      } else {
-        Logger().error("Failed to batch create asset items: {}", create_result.error());
-        all_db_success = false;
-      }
-    }
-
-    if (!batch_result.updated_assets.empty()) {
-      auto update_result =
-          Asset::Repository::batch_update_asset(app_state, batch_result.updated_assets);
-      if (update_result) {
-        Logger().info("Successfully updated {} asset items", batch_result.updated_assets.size());
-      } else {
-        Logger().error("Failed to batch update asset items: {}", update_result.error());
-        all_db_success = false;
-      }
-    }
-
-    if (processing_tracker) {
-      processing_tracker->report(true, "File processing completed");
-    } else {
-      report_scan_progress(progress_callback, "processing", processing_total_units,
-                           processing_total_units, kProcessingEndPercent,
-                           "File processing completed");
-    }
-  } else {
-    Logger().info("Folder-aware asset scan found no new or modified files");
-    report_scan_progress(progress_callback, "processing", 0, 0, kProcessingEndPercent,
-                         "No changed files found");
+  auto processing_result =
+      process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id,
+                                processing_tracker ? &(*processing_tracker) : nullptr);
+  if (!processing_result) {
+    return std::unexpected("File processing failed: " + processing_result.error());
   }
 
+  result.batch_result = std::move(processing_result.value());
+
+  if (!result.batch_result.new_assets.empty()) {
+    auto create_result =
+        Asset::Repository::batch_create_asset(app_state, result.batch_result.new_assets);
+    if (create_result) {
+      Logger().info("Successfully created {} new asset items",
+                    result.batch_result.new_assets.size());
+    } else {
+      Logger().error("Failed to batch create asset items: {}", create_result.error());
+      result.all_db_success = false;
+    }
+  }
+
+  if (!result.batch_result.updated_assets.empty()) {
+    auto update_result =
+        Asset::Repository::batch_update_asset(app_state, result.batch_result.updated_assets);
+    if (update_result) {
+      Logger().info("Successfully updated {} asset items",
+                    result.batch_result.updated_assets.size());
+    } else {
+      Logger().error("Failed to batch update asset items: {}", update_result.error());
+      result.all_db_success = false;
+    }
+  }
+
+  if (processing_tracker) {
+    processing_tracker->report(true, "File processing completed");
+  } else {
+    report_scan_progress(progress_callback, "processing", processing_total_units,
+                         processing_total_units, kProcessingEndPercent,
+                         "File processing completed");
+  }
+
+  return result;
+}
+
+auto run_cleanup_phase(Core::State::AppState& app_state,
+                       const std::filesystem::path& normalized_scan_root,
+                       const std::vector<Types::FileSystemInfo>& file_infos,
+                       const std::unordered_map<std::string, Types::Metadata>& asset_cache,
+                       const std::function<void(const Types::ScanProgress&)>& progress_callback)
+    -> int {
   report_scan_progress(progress_callback, "cleanup", 0, 1, kCleanupPercent,
                        "Reconciling deleted files");
 
-  // 9. 做一次删除对账和空目录清理。
-  // 就算没有新增/修改，也要做这步，不然“已删除文件”会残留在 DB。
   int deleted_items =
       cleanup_removed_assets(app_state, normalized_scan_root, file_infos, asset_cache);
   [[maybe_unused]] int deleted_folders = cleanup_missing_folders(app_state, normalized_scan_root);
+  return deleted_items;
+}
 
-  // 10. 构建扫描结果
-  Types::ScanResult result{.total_files = static_cast<int>(file_infos.size()),
-                           .new_items = static_cast<int>(batch_result.new_assets.size()),
-                           .updated_items = static_cast<int>(batch_result.updated_assets.size()),
-                           .deleted_items = deleted_items,
-                           .errors = std::move(batch_result.errors)};
+// =============================================================================
+// 主扫描入口：协调五个阶段完成资产同步
+// =============================================================================
+auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
+                          std::function<void(const Types::ScanProgress&)> progress_callback)
+    -> std::expected<Types::ScanResult, std::string> {
+  auto start_time = std::chrono::steady_clock::now();
+  report_scan_progress(progress_callback, "preparing", 0, 1, kPreparingPercent,
+                       "Preparing gallery scan context");
+
+  // 步骤 1: 准备阶段 (获取规范化路径，预先载入数据库中的资产缓存)
+  auto context_result = prepare_scan_context(app_state, options);
+  if (!context_result) {
+    return std::unexpected(context_result.error());
+  }
+  auto context = std::move(context_result.value());
+
+  // 步骤 2: 发现阶段 (遍历磁盘系统，按照扩展名和忽略规则筛选文件)
+  auto file_infos_result = run_discovery_phase(app_state, context, options, progress_callback);
+  if (!file_infos_result) {
+    return std::unexpected(file_infos_result.error());
+  }
+  auto file_infos = std::move(file_infos_result.value());
+
+  // 步骤 3: 哈希分析阶段 (对比缓存，对于变动的文件进行哈希校检来确定状态)
+  auto files_to_process_result =
+      run_hash_analysis_phase(app_state, file_infos, context.asset_cache, progress_callback);
+  if (!files_to_process_result) {
+    return std::unexpected(files_to_process_result.error());
+  }
+  auto files_to_process = std::move(files_to_process_result.value());
+
+  // 步骤 4: 处理阶段 (提取全新或发生修改的文件的元信息，并生成缩略图)
+  auto processing_result = run_processing_phase(app_state, context.directory, files_to_process,
+                                                options, progress_callback);
+  if (!processing_result) {
+    return std::unexpected(processing_result.error());
+  }
+  auto processing_phase = std::move(processing_result.value());
+
+  // 步骤 5: 清理阶段 (从数据库中移除那些在本次磁盘扫描中已经不存在的资产)
+  int deleted_items = run_cleanup_phase(app_state, context.normalized_scan_root, file_infos,
+                                        context.asset_cache, progress_callback);
+
+  Types::ScanResult result{
+      .total_files = static_cast<int>(file_infos.size()),
+      .new_items = static_cast<int>(processing_phase.batch_result.new_assets.size()),
+      .updated_items = static_cast<int>(processing_phase.batch_result.updated_assets.size()),
+      .deleted_items = deleted_items,
+      .errors = std::move(processing_phase.batch_result.errors),
+  };
 
   auto end_time = std::chrono::steady_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
   result.scan_duration = std::format("{}ms", duration.count());
 
-  if (!all_db_success) {
+  if (!processing_phase.all_db_success) {
     result.errors.push_back("Some database operations failed");
   }
 
