@@ -20,6 +20,8 @@ auto get_connection(const std::filesystem::path& db_path) -> SQLite::Database& {
     // 设置 WAL 模式以提高并发性能
     thread_connection->exec("PRAGMA journal_mode=WAL;");
     thread_connection->exec("PRAGMA synchronous=NORMAL;");
+    // SQLite 外键约束默认可能关闭，需要按连接显式启用。
+    thread_connection->exec("PRAGMA foreign_keys=ON;");
   }
   return *thread_connection;
 }

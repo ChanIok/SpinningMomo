@@ -67,11 +67,6 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
             [&directory, &combined_rules](const std::filesystem::directory_entry& entry) {
               bool should_ignore =
                   Ignore::Service::apply_ignore_rules(entry.path(), directory, combined_rules);
-
-              if (should_ignore) {
-                Logger().debug("File ignored by rules: {}", entry.path().string());
-              }
-
               return !should_ignore;
             }) |
         // 步骤 4: 提取符合条件的 std::filesystem::path 用于后续处理。

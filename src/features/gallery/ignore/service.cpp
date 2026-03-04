@@ -85,9 +85,6 @@ auto apply_ignore_rules(const std::filesystem::path& file_path,
     if (matches) {
       // 根据规则类型设置忽略状态
       should_ignore = (rule.rule_type == "exclude");
-
-      Logger().debug("File '{}' {} by rule '{}' ({})", normalized_path,
-                     should_ignore ? "excluded" : "included", rule.rule_pattern, rule.pattern_type);
     }
   }
 

@@ -109,8 +109,6 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
   }
 
   args->put_Response(response.get());
-  Logger().debug("Served custom WebView resource: {}",
-                 Utils::String::ToUtf8(resolution.file_path.wstring()));
   return S_OK;
 }
 

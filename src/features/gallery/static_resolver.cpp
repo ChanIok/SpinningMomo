@@ -295,7 +295,6 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
               .success = false, .file_path = {}, .error_message = "Unsafe path or file not found"};
         }
 
-        Logger().debug("Resolved WebView thumbnail: {}", full_path.string());
         return {.success = true,
                 .file_path = full_path,
                 .error_message = {},
@@ -308,7 +307,8 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
   if (Vendor::BuildConfig::is_debug_build()) {
     image_prefix = state.webview->config.dev_server_url + L"/static/assets/originals";
   } else {
-    image_prefix = L"https://" + state.webview->config.static_host_name + L"/static/assets/originals";
+    image_prefix =
+        L"https://" + state.webview->config.static_host_name + L"/static/assets/originals";
   }
 
   Core::WebView::Static::register_web_resource_resolver(

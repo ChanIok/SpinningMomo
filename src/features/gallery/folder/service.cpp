@@ -8,6 +8,7 @@ import Core.Database;
 import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Watcher;
+import Features.Gallery.Asset.Thumbnail;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
@@ -183,6 +184,7 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
   return path_to_id_map;
 }
 
+// 规范化文件夹显示名称（去除首尾空白字符，若为空则返回 nullopt）
 auto normalize_display_name(const std::optional<std::string>& display_name)
     -> std::optional<std::string> {
   if (!display_name.has_value()) {
@@ -197,11 +199,13 @@ auto normalize_display_name(const std::optional<std::string>& display_name)
   return trimmed;
 }
 
+// 清除指定根目录对应的数据索引（在数据库事务中级联删除其涵盖的所有资产与子文件夹记录）
 auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t root_folder_id,
                                const std::string& root_path)
     -> std::expected<std::int64_t, std::string> {
   return Core::Database::execute_transaction(
       *app_state.database, [&](auto& db_state) -> std::expected<std::int64_t, std::string> {
+        // 1. 基于路径匹配，删除该目录下及所有子目录内的资产记录
         auto delete_assets_result =
             Core::Database::execute(db_state, "DELETE FROM assets WHERE path = ? OR path LIKE ?",
                                     {root_path, root_path + "/%"});
@@ -218,6 +222,7 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
         }
         auto deleted_assets = deleted_assets_result->value_or(0);
 
+        // 2. 使用递归 CTE 查找并删除该文件夹及其所有嵌套级别的子文件夹记录
         std::string delete_folders_sql = R"(
           DELETE FROM folders
           WHERE id IN (
@@ -250,6 +255,7 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
       });
 }
 
+// 更新文件夹的自定义显示名称（允许清空为 nullopt）
 auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t folder_id,
                                 const std::optional<std::string>& display_name)
     -> std::expected<Types::OperationResult, std::string> {
@@ -277,6 +283,7 @@ auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t f
   };
 }
 
+// 在系统资源管理器中打开指定 ID 的文件夹路径
 auto open_folder_in_explorer(Core::State::AppState& app_state, std::int64_t folder_id)
     -> std::expected<Types::OperationResult, std::string> {
   auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
@@ -300,6 +307,7 @@ auto open_folder_in_explorer(Core::State::AppState& app_state, std::int64_t fold
   };
 }
 
+// 取消对指定根文件夹的监控跟踪，清理相关的索引与孤立缩略图缓存
 auto remove_root_folder_watch(Core::State::AppState& app_state, std::int64_t folder_id)
     -> std::expected<Types::OperationResult, std::string> {
   auto folder_result = Repository::get_folder_by_id(app_state, folder_id);
@@ -311,19 +319,30 @@ auto remove_root_folder_watch(Core::State::AppState& app_state, std::int64_t fol
   }
 
   const auto& folder = folder_result->value();
+  // 仅允许直接取消对根监控文件夹的监听
   if (folder.parent_id.has_value()) {
     return std::unexpected("Only root folders can be removed from watch list");
   }
 
+  // 1. 从系统的文件变动监控器中注销该目录
   auto remove_watcher_result = Features::Gallery::Watcher::remove_watcher_for_directory(
       app_state, std::filesystem::path(folder.path));
   if (!remove_watcher_result) {
     return std::unexpected("Failed to remove watcher: " + remove_watcher_result.error());
   }
 
+  // 2. 清空该根目录在数据库内的所有文件及子文件夹索引数据
   auto cleanup_result = cleanup_root_folder_index(app_state, folder.id, folder.path);
   if (!cleanup_result) {
     return std::unexpected("Failed to cleanup folder index: " + cleanup_result.error());
+  }
+
+  // 3. 触发清理因本次操作而处于孤立状态的缩略图缓存
+  auto thumbnail_cleanup_result =
+      Features::Gallery::Asset::Thumbnail::cleanup_orphaned_thumbnails(app_state);
+  if (!thumbnail_cleanup_result) {
+    Logger().warn("Failed to cleanup orphaned thumbnails after removing watch: {}",
+                  thumbnail_cleanup_result.error());
   }
 
   return Types::OperationResult{

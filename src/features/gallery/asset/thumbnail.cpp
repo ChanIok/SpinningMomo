@@ -17,6 +17,22 @@ namespace Features::Gallery::Asset::Thumbnail {
 
 // ============= 缩略图路径管理 =============
 
+auto build_thumbnail_path(const std::filesystem::path& thumbnails_dir, const std::string& file_hash)
+    -> std::filesystem::path {
+  auto level1 = file_hash.substr(0, 2);
+  auto level2 = file_hash.substr(2, 2);
+  return thumbnails_dir / level1 / level2 / std::format("{}.webp", file_hash);
+}
+
+auto extract_hash_from_thumbnail(const std::filesystem::path& thumbnail_path)
+    -> std::optional<std::string> {
+  auto stem = thumbnail_path.stem().string();
+  if (stem.empty()) {
+    return std::nullopt;
+  }
+  return stem;
+}
+
 auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
     -> std::expected<void, std::string> {
   // 如果状态中已经有缩略图目录路径，确保目录存在
@@ -60,13 +76,7 @@ auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& 
     }
   }
 
-  // 使用xxh3 64位哈希的前4位作为两级子目录
-  std::string level1 = file_hash.substr(0, 2);
-  std::string level2 = file_hash.substr(2, 2);
-  std::string filename = std::format("{}.webp", file_hash);
-
-  // 构建完整路径
-  auto thumbnail_path = app_state.gallery->thumbnails_directory / level1 / level2 / filename;
+  auto thumbnail_path = build_thumbnail_path(app_state.gallery->thumbnails_directory, file_hash);
 
   // 确保子目录存在
   std::error_code ec;
@@ -92,45 +102,23 @@ auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asse
     return std::unexpected("Asset has no file hash, cannot determine thumbnail files");
   }
 
-  int deleted_count = 0;
-  std::error_code ec;
   const std::string& file_hash = asset.hash.value();
+  auto thumbnail_path = build_thumbnail_path(app_state.gallery->thumbnails_directory, file_hash);
+  std::error_code ec;
 
-  std::string level1 = file_hash.substr(0, 2);
-  std::string level2 = file_hash.substr(2, 2);
-  auto target_subdir = app_state.gallery->thumbnails_directory / level1 / level2;
-
-  if (std::filesystem::exists(target_subdir, ec) && !ec) {
-    // 遍历特定子目录，删除对应的缩略图
-    for (const auto& entry : std::filesystem::directory_iterator(target_subdir, ec)) {
-      if (ec) break;
-
-      if (entry.is_regular_file(ec) && entry.path().extension() == ".webp") {
-        std::string filename = entry.path().filename().string();
-
-        // 检查文件名是否以文件哈希开头
-        if (filename.starts_with(file_hash + "_")) {
-          std::error_code remove_ec;
-          if (std::filesystem::remove(entry.path(), remove_ec)) {
-            deleted_count++;
-            Logger().debug("Deleted thumbnail: {}", entry.path().string());
-          } else {
-            Logger().warn("Failed to delete thumbnail {}: {}", entry.path().string(),
-                          remove_ec.message());
-          }
-        }
-      }
-    }
-  }
-
+  bool exists = std::filesystem::exists(thumbnail_path, ec);
   if (ec) {
-    return std::unexpected("Error during thumbnail deletion: " + ec.message());
+    return std::unexpected("Failed to check thumbnail existence: " + ec.message());
+  }
+  if (!exists) {
+    return {};
   }
 
-  if (deleted_count > 0) {
-    Logger().info("Deleted {} thumbnail(s) for asset ID {}", deleted_count, asset.id);
+  if (!std::filesystem::remove(thumbnail_path, ec)) {
+    return std::unexpected("Failed to delete thumbnail: " + ec.message());
   }
 
+  Logger().debug("Deleted thumbnail: {}", thumbnail_path.string());
   return {};
 }
 
@@ -167,24 +155,20 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
     }
 
     if (entry.is_regular_file(ec) && entry.path().extension() == ".webp") {
-      std::string filename = entry.path().filename().string();
+      auto hash_result = extract_hash_from_thumbnail(entry.path());
+      if (!hash_result) {
+        continue;
+      }
 
-      // 从文件名提取文件哈希（格式：{file_hash}_{width}x{height}.webp）
-      auto underscore_pos = filename.find('_');
-      if (underscore_pos != std::string::npos) {
-        std::string file_hash = filename.substr(0, underscore_pos);
-
-        // 检查文件哈希是否存在于任何资产中
-        if (all_file_hashes.find(file_hash) == all_file_hashes.end()) {
-          // 文件哈希不存在于任何资产中，删除缩略图
-          std::error_code remove_ec;
-          if (std::filesystem::remove(entry.path(), remove_ec)) {
-            deleted_count++;
-            Logger().debug("Deleted orphaned thumbnail: {}", entry.path().string());
-          } else {
-            Logger().warn("Failed to delete orphaned thumbnail {}: {}", entry.path().string(),
-                          remove_ec.message());
-          }
+      // 文件哈希不存在于任何资产中，删除缩略图
+      if (all_file_hashes.find(*hash_result) == all_file_hashes.end()) {
+        std::error_code remove_ec;
+        if (std::filesystem::remove(entry.path(), remove_ec)) {
+          deleted_count++;
+          Logger().debug("Deleted orphaned thumbnail: {}", entry.path().string());
+        } else {
+          Logger().warn("Failed to delete orphaned thumbnail {}: {}", entry.path().string(),
+                        remove_ec.message());
         }
       }
     }
@@ -303,15 +287,9 @@ auto get_thumbnail_stats(Core::State::AppState& app_state)
       }
 
       // 检查是否为孤立缩略图
-      std::string filename = entry.path().filename().string();
-      auto underscore_pos = filename.find('_');
-      if (underscore_pos != std::string::npos) {
-        std::string file_hash = filename.substr(0, underscore_pos);
-
-        // 检查文件哈希是否存在于任何资产中
-        if (all_file_hashes.find(file_hash) == all_file_hashes.end()) {
-          orphaned_thumbnails++;  // 文件哈希不存在于任何资产中，当作孤立处理
-        }
+      auto hash_result = extract_hash_from_thumbnail(entry.path());
+      if (hash_result && all_file_hashes.find(*hash_result) == all_file_hashes.end()) {
+        orphaned_thumbnails++;
       }
     }
   }
