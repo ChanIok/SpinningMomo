@@ -141,9 +141,11 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
 
 // ============= 扫描和索引 =============
 
-auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options)
+auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
+                    std::function<void(const Types::ScanProgress&)> progress_callback)
     -> std::expected<Types::ScanResult, std::string> {
-  auto scan_result = Scanner::scan_asset_directory(app_state, options);
+  auto scan_result =
+      Scanner::scan_asset_directory(app_state, options, std::move(progress_callback));
   if (!scan_result) {
     Logger().error("Asset scan failed: {}", scan_result.error());
     return std::unexpected("Asset scan failed: " + scan_result.error());

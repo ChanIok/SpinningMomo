@@ -100,6 +100,10 @@ namespace Core::Commands::State {
 export struct CommandState;
 }
 
+namespace Core::Tasks::State {
+export struct TaskState;
+}
+
 namespace Core::State {
 
 export struct AppState {
@@ -117,6 +121,7 @@ export struct AppState {
   std::unique_ptr<Core::HttpServer::State::HttpServerState> http_server;
   std::unique_ptr<Core::WorkerPool::State::WorkerPoolState> worker_pool;
   std::unique_ptr<Core::Commands::State::CommandState> commands;
+  std::unique_ptr<Core::Tasks::State::TaskState> tasks;
 
   // 应用设置状态（包含配置和计算状态）
   std::unique_ptr<Features::Settings::State::SettingsState> settings;

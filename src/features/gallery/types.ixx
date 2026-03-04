@@ -153,6 +153,14 @@ struct ScanOptions {
   std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };
 
+struct ScanProgress {
+  std::string stage;
+  std::int64_t current = 0;
+  std::int64_t total = 0;
+  std::optional<double> percent;
+  std::optional<std::string> message;
+};
+
 struct ScanResult {
   int total_files = 0;
   int new_items = 0;

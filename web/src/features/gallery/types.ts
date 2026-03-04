@@ -226,6 +226,10 @@ export interface ScanAssetsResult {
   scanDuration: string
 }
 
+export interface StartScanAssetsResult {
+  taskId: string
+}
+
 // ============= 统一查询相关类型 =============
 
 // 查询过滤器

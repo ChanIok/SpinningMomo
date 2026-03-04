@@ -17,8 +17,9 @@ export auto delete_asset(Core::State::AppState& app_state, const Types::DeletePa
     -> std::expected<Types::OperationResult, std::string>;
 
 // 扫描与索引
-export auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options)
-    -> std::expected<Types::ScanResult, std::string>;
+export auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
+                           std::function<void(const Types::ScanProgress&)> progress_callback =
+                               nullptr) -> std::expected<Types::ScanResult, std::string>;
 
 // 缩略图
 export auto cleanup_thumbnails(Core::State::AppState& app_state)

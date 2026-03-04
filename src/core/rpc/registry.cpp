@@ -8,6 +8,7 @@ import Core.RPC.Endpoints.Dialog;
 import Core.RPC.Endpoints.File;
 import Core.RPC.Endpoints.RuntimeInfo;
 import Core.RPC.Endpoints.Settings;
+import Core.RPC.Endpoints.Tasks;
 import Core.RPC.Endpoints.Registry;
 import Core.RPC.Endpoints.Update;
 import Core.RPC.Endpoints.WebView;
@@ -30,6 +31,9 @@ auto register_all_endpoints(Core::State::AppState& state) -> void {
 
   // 注册设置端点
   Endpoints::Settings::register_all(state);
+
+  // 注册后台任务端点
+  Endpoints::Tasks::register_all(state);
 
   // 注册功能注册表端点
   Endpoints::Registry::register_all(state);

@@ -8,6 +8,7 @@ import { initI18n } from '@/core/i18n'
 import { useSettingsStore } from '@/features/settings/store'
 import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
 import { applyAppearanceToDocument, preloadBackgroundImage } from '@/features/settings/appearance'
+import { useTaskStore } from '@/core/tasks/store'
 import './index.css'
 import App from './App.vue'
 
@@ -34,6 +35,10 @@ initializeRPC()
   // 然后初始化 settings store，它会自动同步后端的语言设置
   const settingsStore = useSettingsStore()
   await settingsStore.init()
+
+  // 初始化后台任务订阅
+  const taskStore = useTaskStore()
+  await taskStore.initialize()
 
   const onboarding = settingsStore.appSettings.app.onboarding
   const needsOnboarding =

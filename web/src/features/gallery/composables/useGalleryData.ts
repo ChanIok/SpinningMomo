@@ -167,6 +167,20 @@ export function useGalleryData() {
   }
 
   /**
+   * 提交后台扫描任务
+   */
+  async function startScanAssets(options: ScanAssetsParams) {
+    try {
+      const result = await galleryApi.startScanAssets(options)
+
+      return result
+    } catch (error) {
+      console.error('Failed to start scan task:', error)
+      throw error
+    }
+  }
+
+  /**
    * 获取资产缩略图URL
    */
   function getAssetThumbnailUrl(asset: any) {
@@ -184,6 +198,7 @@ export function useGalleryData() {
     loadPage, // 加载指定页（虚拟列表用）
     loadFolderTree, // 文件夹树
     scanAssets,
+    startScanAssets,
 
     // 工具函数
     getAssetThumbnailUrl,

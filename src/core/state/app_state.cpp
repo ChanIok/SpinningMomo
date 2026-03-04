@@ -13,6 +13,7 @@ import Core.RPC.State;
 import Core.State.RuntimeInfo;
 import Core.WebView.State;
 import Core.WorkerPool.State;
+import Core.Tasks.State;
 import Features.Letterbox.State;
 import Features.Notifications.State;
 import Features.Gallery.State;
@@ -40,6 +41,8 @@ AppState::AppState()
       database(std::make_unique<Core::Database::State::DatabaseState>()),
       http_server(std::make_unique<Core::HttpServer::State::HttpServerState>()),
       worker_pool(std::make_unique<Core::WorkerPool::State::WorkerPoolState>()),
+      commands(std::make_unique<Core::Commands::State::CommandState>()),
+      tasks(std::make_unique<Core::Tasks::State::TaskState>()),
       settings(std::make_unique<Features::Settings::State::SettingsState>()),
       update(std::make_unique<Features::Update::State::UpdateState>()),
       floating_window(std::make_unique<UI::FloatingWindow::State::FloatingWindowState>()),
@@ -53,8 +56,7 @@ AppState::AppState()
       screenshot(std::make_unique<Features::Screenshot::State::ScreenshotState>()),
       recording(std::make_unique<Features::Recording::State::RecordingState>()),
       replay_buffer(std::make_unique<Features::ReplayBuffer::State::ReplayBufferState>()),
-      virtual_gamepad(std::make_unique<Features::VirtualGamepad::State::VirtualGamepadState>()),
-      commands(std::make_unique<Core::Commands::State::CommandState>()) {}
+      virtual_gamepad(std::make_unique<Features::VirtualGamepad::State::VirtualGamepadState>()) {}
 
 AppState::~AppState() = default;
 

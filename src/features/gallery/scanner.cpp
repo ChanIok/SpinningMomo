@@ -144,6 +144,138 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   return "unknown";
 }
 
+auto report_scan_progress(const std::function<void(const Types::ScanProgress&)>& progress_callback,
+                          std::string stage, std::int64_t current, std::int64_t total,
+                          std::optional<double> percent = std::nullopt,
+                          std::optional<std::string> message = std::nullopt) -> void {
+  if (!progress_callback) {
+    return;
+  }
+
+  try {
+    progress_callback(Types::ScanProgress{.stage = std::move(stage),
+                                          .current = current,
+                                          .total = total,
+                                          .percent = percent,
+                                          .message = std::move(message)});
+  } catch (const std::exception& e) {
+    Logger().warn("Scan progress callback failed: {}", e.what());
+  }
+}
+
+auto steady_clock_millis() -> std::int64_t {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
+struct ProcessingProgressTracker {
+  static constexpr std::int64_t kMinReportIntervalMillis = 200;
+
+  const std::function<void(const Types::ScanProgress&)>& progress_callback;
+  const std::int64_t total_files;
+  const std::int64_t total_thumbnails;
+  const std::int64_t total_units;
+  const std::int64_t thumbnail_weight;
+  const double percent_start;
+  const double percent_end;
+
+  std::atomic<std::int64_t> completed_files = 0;
+  std::atomic<std::int64_t> completed_thumbnails = 0;
+  std::atomic<std::int64_t> completed_units = 0;
+
+  std::mutex report_mutex;
+  int last_reported_percent = -1;
+  std::int64_t last_report_millis = 0;
+
+  ProcessingProgressTracker(const std::function<void(const Types::ScanProgress&)>& callback,
+                            std::int64_t files, std::int64_t thumbnails, std::int64_t units,
+                            std::int64_t thumbnail_weight_value, double start_percent,
+                            double end_percent)
+      : progress_callback(callback),
+        total_files(files),
+        total_thumbnails(thumbnails),
+        total_units(units),
+        thumbnail_weight(thumbnail_weight_value),
+        percent_start(start_percent),
+        percent_end(end_percent) {}
+
+  auto report(bool force = false, std::optional<std::string> message = std::nullopt) -> void {
+    if (!progress_callback || total_units <= 0) {
+      return;
+    }
+
+    auto units_done = std::min(completed_units.load(std::memory_order_relaxed), total_units);
+    if (force) {
+      units_done = total_units;
+    }
+
+    const auto ratio = static_cast<double>(units_done) / static_cast<double>(total_units);
+    auto percent = percent_start + (percent_end - percent_start) * ratio;
+    percent = std::clamp(percent, percent_start, percent_end);
+
+    const auto files_done = std::min(completed_files.load(std::memory_order_relaxed), total_files);
+    const auto thumbnails_done =
+        std::min(completed_thumbnails.load(std::memory_order_relaxed), total_thumbnails);
+
+    auto now = steady_clock_millis();
+
+    {
+      std::lock_guard<std::mutex> lock(report_mutex);
+      auto rounded_percent = static_cast<int>(std::floor(percent));
+
+      if (!force) {
+        if (rounded_percent <= last_reported_percent) {
+          return;
+        }
+
+        if (now - last_report_millis < kMinReportIntervalMillis) {
+          return;
+        }
+      }
+
+      if (rounded_percent > last_reported_percent) {
+        last_reported_percent = rounded_percent;
+      }
+
+      if (force && last_reported_percent >= 0 &&
+          percent < static_cast<double>(last_reported_percent)) {
+        percent = static_cast<double>(last_reported_percent);
+      }
+
+      last_report_millis = now;
+    }
+
+    if (!message.has_value()) {
+      if (total_thumbnails > 0) {
+        message = std::format("Processed {} / {} files, thumbnails {} / {}", files_done,
+                              total_files, thumbnails_done, total_thumbnails);
+      } else {
+        message = std::format("Processed {} / {} files", files_done, total_files);
+      }
+    }
+
+    report_scan_progress(progress_callback, "processing", units_done, total_units, percent,
+                         std::move(message));
+  }
+
+  auto mark_file_processed() -> void {
+    completed_files.fetch_add(1, std::memory_order_relaxed);
+    completed_units.fetch_add(1, std::memory_order_relaxed);
+    report();
+  }
+
+  auto mark_thumbnail_processed() -> void {
+    if (total_thumbnails <= 0) {
+      return;
+    }
+
+    completed_thumbnails.fetch_add(1, std::memory_order_relaxed);
+    completed_units.fetch_add(thumbnail_weight, std::memory_order_relaxed);
+    report();
+  }
+};
+
 auto is_path_under_root(const std::string& candidate_path, const std::string& root_path) -> bool {
   if (candidate_path.size() < root_path.size()) {
     return false;
@@ -448,7 +580,8 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
 auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
                          const Types::FileAnalysisResult& analysis,
                          const Types::ScanOptions& options,
-                         const std::unordered_map<std::string, std::int64_t>& folder_mapping)
+                         const std::unordered_map<std::string, std::int64_t>& folder_mapping,
+                         ProcessingProgressTracker* progress_tracker)
     -> std::expected<Types::Asset, std::string> {
   const auto& file_info = analysis.file_info;
   const auto& file_path = file_info.path;
@@ -516,6 +649,10 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
         Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
                       thumbnail_result.error());
       }
+
+      if (progress_tracker) {
+        progress_tracker->mark_thumbnail_processed();
+      }
     }
   } else {
     asset.width = 0;
@@ -530,7 +667,8 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
 auto process_files_in_parallel(Core::State::AppState& app_state,
                                const std::vector<Types::FileAnalysisResult>& files_to_process,
                                const Types::ScanOptions& options,
-                               const std::unordered_map<std::string, std::int64_t>& folder_mapping)
+                               const std::unordered_map<std::string, std::int64_t>& folder_mapping,
+                               ProcessingProgressTracker* progress_tracker)
     -> std::expected<Types::ProcessingBatchResult, std::string> {
   if (files_to_process.empty()) {
     return Types::ProcessingBatchResult{};
@@ -550,8 +688,9 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
     size_t end = std::min(start + PROCESS_BATCH_SIZE, files_to_process.size());
 
     bool submitted = Core::WorkerPool::submit_task(
-        *app_state.worker_pool, [&final_result, &results_mutex, &completion_latch, &app_state,
-                                 &files_to_process, start, end, &options, &folder_mapping]() {
+        *app_state.worker_pool,
+        [&final_result, &results_mutex, &completion_latch, &app_state, &files_to_process, start,
+         end, &options, &folder_mapping, progress_tracker]() {
           auto thread_wic_factory_result = Utils::Image::get_thread_wic_factory();
           if (!thread_wic_factory_result) {
             {
@@ -571,7 +710,7 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
             const auto& analysis = files_to_process[idx];
 
             auto asset_result = process_single_file(app_state, thread_wic_factory, analysis,
-                                                    options, folder_mapping);
+                                                    options, folder_mapping, progress_tracker);
             if (asset_result) {
               if (analysis.status == Types::FileStatus::NEW) {
                 batch_result.new_assets.push_back(std::move(asset_result.value()));
@@ -581,6 +720,10 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
             } else {
               batch_result.errors.push_back(
                   std::format("{}: {}", analysis.file_info.path.string(), asset_result.error()));
+            }
+
+            if (progress_tracker) {
+              progress_tracker->mark_file_processed();
             }
           }
 
@@ -617,9 +760,12 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
 }
 
 // 主扫描函数
-auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOptions& options)
+auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
+                          std::function<void(const Types::ScanProgress&)> progress_callback)
     -> std::expected<Types::ScanResult, std::string> {
   auto start_time = std::chrono::steady_clock::now();
+
+  report_scan_progress(progress_callback, "preparing", 0, 1, 2.0, "Preparing gallery scan context");
 
   auto normalized_scan_root_result = Utils::Path::NormalizePath(options.directory);
   if (!normalized_scan_root_result) {
@@ -669,6 +815,8 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
   std::filesystem::path directory(normalized_scan_root);
 
+  report_scan_progress(progress_callback, "discovering", 0, 1, 10.0, "Scanning files from disk");
+
   // 4. 使用支持忽略规则的文件信息扫描（传递folder_id）
   auto file_info_result = scan_file_info(app_state, directory, options, folder_id);
   if (!file_info_result) {
@@ -676,16 +824,29 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
   auto file_infos = file_info_result.value();
 
+  report_scan_progress(progress_callback, "discovering",
+                       static_cast<std::int64_t>(file_infos.size()),
+                       static_cast<std::int64_t>(file_infos.size()), 25.0,
+                       std::format("Discovered {} candidate files", file_infos.size()));
+
   Logger().info("Scanned {} files in directory '{}' (after ignore rules)", file_infos.size(),
                 normalized_scan_root.string());
 
   // 分析文件变化
   auto analysis_results = analyze_file_changes(file_infos, asset_cache);
 
+  report_scan_progress(progress_callback, "hashing", 0,
+                       static_cast<std::int64_t>(analysis_results.size()), 35.0,
+                       "Calculating file hashes");
+
   // 计算文件哈希
   if (auto hash_phase = calculate_hash_for_targets(app_state, analysis_results); !hash_phase) {
     return std::unexpected("Hash calculation failed: " + hash_phase.error());
   }
+
+  report_scan_progress(
+      progress_callback, "hashing", static_cast<std::int64_t>(analysis_results.size()),
+      static_cast<std::int64_t>(analysis_results.size()), 60.0, "Hash calculation completed");
 
   Logger().info("Calculated hashes for {} files", analysis_results.size());
 
@@ -699,10 +860,42 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
   Logger().info("Found {} files that need processing", files_to_process.size());
 
+  constexpr std::int64_t kThumbnailProgressWeight = 3;
+  constexpr double kProcessingStartPercent = 60.0;
+  constexpr double kProcessingEndPercent = 92.0;
+  constexpr double kCleanupPercent = 96.0;
+
+  std::int64_t thumbnail_targets = 0;
+  if (options.generate_thumbnails.value_or(true)) {
+    thumbnail_targets = static_cast<std::int64_t>(
+        std::ranges::count_if(files_to_process, [](const Types::FileAnalysisResult& result) {
+          return detect_asset_type(result.file_info.path) == "photo";
+        }));
+  }
+
+  std::int64_t processing_total_units = static_cast<std::int64_t>(files_to_process.size()) +
+                                        thumbnail_targets * kThumbnailProgressWeight;
+
+  auto processing_start_message =
+      thumbnail_targets > 0 ? std::format("Processing {} changed files ({} thumbnails)",
+                                          files_to_process.size(), thumbnail_targets)
+                            : std::format("Processing {} changed files", files_to_process.size());
+
+  report_scan_progress(progress_callback, "processing", 0, processing_total_units,
+                       kProcessingStartPercent, std::move(processing_start_message));
+
   // 6. 提前准备文件夹映射，批量创建文件夹记录
   std::unordered_map<std::string, std::int64_t> path_to_folder_id;
   Types::ProcessingBatchResult batch_result{};
   bool all_db_success = true;
+  std::optional<ProcessingProgressTracker> processing_tracker;
+
+  if (processing_total_units > 0) {
+    processing_tracker.emplace(progress_callback,
+                               static_cast<std::int64_t>(files_to_process.size()),
+                               thumbnail_targets, processing_total_units, kThumbnailProgressWeight,
+                               kProcessingStartPercent, kProcessingEndPercent);
+  }
 
   if (!files_to_process.empty()) {
     std::vector<std::filesystem::path> file_paths;
@@ -727,7 +920,8 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
     // 7. 并行处理文件
     auto processing_result =
-        process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id);
+        process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id,
+                                  processing_tracker ? &(*processing_tracker) : nullptr);
     if (!processing_result) {
       return std::unexpected("File processing failed: " + processing_result.error());
     }
@@ -756,9 +950,22 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
         all_db_success = false;
       }
     }
+
+    if (processing_tracker) {
+      processing_tracker->report(true, "File processing completed");
+    } else {
+      report_scan_progress(progress_callback, "processing", processing_total_units,
+                           processing_total_units, kProcessingEndPercent,
+                           "File processing completed");
+    }
   } else {
     Logger().info("Folder-aware asset scan found no new or modified files");
+    report_scan_progress(progress_callback, "processing", 0, 0, kProcessingEndPercent,
+                         "No changed files found");
   }
+
+  report_scan_progress(progress_callback, "cleanup", 0, 1, kCleanupPercent,
+                       "Reconciling deleted files");
 
   // 9. 做一次删除对账和空目录清理。
   // 就算没有新增/修改，也要做这步，不然“已删除文件”会残留在 DB。
@@ -786,6 +993,10 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
       "{}, Duration: {}",
       result.total_files, result.new_items, result.updated_items, result.deleted_items,
       result.errors.size(), result.scan_duration);
+
+  report_scan_progress(
+      progress_callback, "completed", static_cast<std::int64_t>(result.total_files),
+      static_cast<std::int64_t>(result.total_files), 100.0, "Gallery scan completed");
 
   return result;
 }

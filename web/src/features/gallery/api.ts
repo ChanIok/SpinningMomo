@@ -6,6 +6,7 @@ import type {
   OperationResult,
   ScanAssetsParams,
   ScanAssetsResult,
+  StartScanAssetsResult,
   FolderTreeNode,
   UpdateFolderDisplayNameParams,
   GetTimelineBucketsParams,
@@ -127,6 +128,24 @@ export async function scanAssets(params: ScanAssetsParams): Promise<ScanAssetsRe
   } catch (error) {
     console.error('Failed to scan assets:', error)
     throw new Error('扫描资产目录失败')
+  }
+}
+
+/**
+ * 在后台启动资产扫描任务
+ */
+export async function startScanAssets(params: ScanAssetsParams): Promise<StartScanAssetsResult> {
+  try {
+    console.log('🧵 提交后台扫描任务:', params.directory)
+
+    const result = await call<StartScanAssetsResult>('gallery.startScanDirectory', params)
+
+    console.log('✅ 后台扫描任务已创建:', result.taskId)
+
+    return result
+  } catch (error) {
+    console.error('Failed to start scan task:', error)
+    throw new Error('提交扫描任务失败')
   }
 }
 
@@ -426,6 +445,7 @@ export const galleryApi = {
 
   // 数据操作
   scanAssets,
+  startScanAssets,
 
   // 维护操作
   cleanupThumbnails,

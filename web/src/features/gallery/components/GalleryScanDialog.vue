@@ -5,7 +5,6 @@ import { isWebView } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useGalleryData } from '../composables/useGalleryData'
-import { useGalleryStore } from '../store'
 import type { ScanAssetsParams, ScanIgnoreRule } from '../types'
 import {
   Dialog,
@@ -44,12 +43,11 @@ const emit = defineEmits<{
 const defaultSupportedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.tif']
 
 const galleryData = useGalleryData()
-const galleryStore = useGalleryStore()
 const { toast } = useToast()
 const { t } = useI18n()
 
 const isSelectingScanDirectory = ref(false)
-const isScanningDirectory = ref(false)
+const isSubmittingScanTask = ref(false)
 const showAdvancedOptions = ref(false)
 const scanDirectory = ref('')
 const generateThumbnails = ref(true)
@@ -59,7 +57,7 @@ const ignoreRules = ref<FormIgnoreRule[]>([])
 const nextIgnoreRuleId = ref(1)
 
 const canSubmitAddFolder = computed(() => {
-  return scanDirectory.value.trim().length > 0 && !isScanningDirectory.value
+  return scanDirectory.value.trim().length > 0 && !isSubmittingScanTask.value
 })
 
 function toFormIgnoreRules(rules: ScanIgnoreRule[] | undefined): FormIgnoreRule[] {
@@ -114,14 +112,14 @@ watch(
       initializeFormFromPreset()
       return
     }
-    if (!isScanningDirectory.value) {
+    if (!isSubmittingScanTask.value) {
       resetForm()
     }
   }
 )
 
 function handleDialogOpenChange(open: boolean) {
-  if (!open && isScanningDirectory.value) {
+  if (!open && isSubmittingScanTask.value) {
     return
   }
   emit('update:open', open)
@@ -220,8 +218,8 @@ async function handleImportAlbum() {
     return
   }
 
-  isScanningDirectory.value = true
-  const loadingToastId = toast.loading(t('gallery.sidebar.scan.loading'))
+  isSubmittingScanTask.value = true
+  const loadingToastId = toast.loading(t('gallery.sidebar.scan.submitting'))
 
   try {
     const scanParams: ScanAssetsParams = {
@@ -232,29 +230,14 @@ async function handleImportAlbum() {
       ignoreRules: buildScanIgnoreRules(),
     }
 
-    const result = await galleryData.scanAssets(scanParams)
-
-    await galleryData.loadFolderTree()
-    if (galleryStore.isTimelineMode) {
-      await galleryData.loadTimelineData()
-    } else {
-      await galleryData.loadAllAssets()
-    }
+    const result = await galleryData.startScanAssets(scanParams)
 
     toast.dismiss(loadingToastId)
-    toast.success(t('gallery.sidebar.scan.successTitle'), {
-      description: t('gallery.sidebar.scan.successDescription', {
-        totalFiles: result.totalFiles,
-        newItems: result.newItems,
-        updatedItems: result.updatedItems,
+    toast.success(t('gallery.sidebar.scan.queuedTitle'), {
+      description: t('gallery.sidebar.scan.queuedDescription', {
+        taskId: result.taskId,
       }),
     })
-
-    if (result.errors.length > 0) {
-      toast.warning(t('gallery.sidebar.scan.partialErrorsTitle'), {
-        description: result.errors.slice(0, 3).join('; '),
-      })
-    }
 
     emit('update:open', false)
     resetForm()
@@ -263,7 +246,7 @@ async function handleImportAlbum() {
     const message = error instanceof Error ? error.message : String(error)
     toast.error(t('gallery.sidebar.scan.failedTitle'), { description: message })
   } finally {
-    isScanningDirectory.value = false
+    isSubmittingScanTask.value = false
   }
 }
 </script>
@@ -292,7 +275,7 @@ async function handleImportAlbum() {
                 />
                 <Button
                   variant="outline"
-                  :disabled="isSelectingScanDirectory || isScanningDirectory"
+                  :disabled="isSelectingScanDirectory || isSubmittingScanTask"
                   @click="handleSelectScanDirectory"
                 >
                   <Loader2 v-if="isSelectingScanDirectory" class="mr-2 h-4 w-4 animate-spin" />
@@ -447,16 +430,16 @@ async function handleImportAlbum() {
         <DialogFooter class="shrink-0 border-t px-6 py-4">
           <Button
             variant="outline"
-            :disabled="isScanningDirectory"
+            :disabled="isSubmittingScanTask"
             @click="handleDialogOpenChange(false)"
           >
             {{ t('gallery.sidebar.scan.cancel') }}
           </Button>
           <Button :disabled="!canSubmitAddFolder" @click="handleImportAlbum">
-            <Loader2 v-if="isScanningDirectory" class="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 v-if="isSubmittingScanTask" class="mr-2 h-4 w-4 animate-spin" />
             {{
-              isScanningDirectory
-                ? t('gallery.sidebar.scan.scanning')
+              isSubmittingScanTask
+                ? t('gallery.sidebar.scan.submitting')
                 : t('gallery.sidebar.scan.submit')
             }}
           </Button>
