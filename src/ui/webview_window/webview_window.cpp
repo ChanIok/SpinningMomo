@@ -246,6 +246,10 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
     case WM_SIZE: {
       if (state) {
+        if (wparam == SIZE_MINIMIZED) {
+          break;
+        }
+
         int width = LOWORD(lparam);
         int height = HIWORD(lparam);
         state->webview->window.width = width;
@@ -485,12 +489,12 @@ auto cleanup(Core::State::AppState& state) -> void {
   if (state.webview->window.webview_hwnd) {
     HWND hwnd = state.webview->window.webview_hwnd;
 
-    // 持久化窗口尺寸和位置（若最大化则保存恢复后尺寸和位置）
+    // 持久化窗口尺寸和位置（若最大化/最小化则保存恢复后尺寸和位置）
     int width_to_save = state.webview->window.width;
     int height_to_save = state.webview->window.height;
     int x_to_save = state.webview->window.x;
     int y_to_save = state.webview->window.y;
-    if (IsZoomed(hwnd)) {
+    if (IsZoomed(hwnd) || IsIconic(hwnd)) {
       WINDOWPLACEMENT wp = {sizeof(wp)};
       if (GetWindowPlacement(hwnd, &wp)) {
         width_to_save = wp.rcNormalPosition.right - wp.rcNormalPosition.left;
