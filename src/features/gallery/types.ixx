@@ -249,6 +249,8 @@ struct TimelineBucketsParams {
   std::optional<std::string> search;
   std::optional<std::vector<std::int64_t>> tag_ids;
   std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<std::vector<std::int64_t>> cloth_ids;
+  std::optional<std::string> cloth_match_mode = "any";  // "any" (OR) | "all" (AND)
 };
 
 struct TimelineBucketsResponse {
@@ -280,6 +282,8 @@ struct QueryAssetsFilters {
   std::optional<std::string> search;  // 搜索关键词
   std::optional<std::vector<std::int64_t>> tag_ids;
   std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<std::vector<std::int64_t>> cloth_ids;
+  std::optional<std::string> cloth_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<std::vector<std::string>> color_hexes;
   std::optional<std::string> color_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<double> color_distance = 18.0;

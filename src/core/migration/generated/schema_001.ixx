@@ -10,7 +10,7 @@ import std;
 export namespace Core::Migration::Schema {
 
 struct V001 {
-  static constexpr std::array<std::string_view, 30> statements = {
+  static constexpr std::array<std::string_view, 35> statements = {
       R"SQL(
 CREATE TABLE assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -187,6 +187,46 @@ CREATE INDEX idx_asset_colors_asset_weight ON asset_colors(asset_id, weight DESC
         )SQL",
       R"SQL(
 CREATE INDEX idx_asset_colors_lab_bin ON asset_colors(l_bin, a_bin, b_bin)
+        )SQL",
+      R"SQL(
+CREATE TABLE asset_infinity_nikki_params (
+    asset_id INTEGER PRIMARY KEY REFERENCES assets(id) ON DELETE CASCADE,
+    uid TEXT NOT NULL,
+    camera_params TEXT,
+    time_day INTEGER,
+    time_hour INTEGER,
+    time_min INTEGER,
+    time_sec REAL,
+    camera_focal_length REAL,
+    aperture_section INTEGER,
+    filter_id TEXT,
+    filter_strength REAL,
+    vignette_intensity REAL,
+    light_id TEXT,
+    light_strength REAL,
+    nikki_loc_x REAL,
+    nikki_loc_y REAL,
+    nikki_loc_z REAL,
+    nikki_hidden INTEGER,
+    pose_id INTEGER,
+    nikki_diy_json TEXT
+)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_infinity_nikki_params_uid ON asset_infinity_nikki_params(uid)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_infinity_nikki_params_pose_id ON asset_infinity_nikki_params(pose_id)
+        )SQL",
+      R"SQL(
+CREATE TABLE asset_infinity_nikki_clothes (
+    asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    cloth_id INTEGER NOT NULL,
+    PRIMARY KEY (asset_id, cloth_id)
+)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_infinity_nikki_clothes_cloth_id ON asset_infinity_nikki_clothes(cloth_id)
         )SQL",
       R"SQL(
 CREATE TABLE ignore_rules (

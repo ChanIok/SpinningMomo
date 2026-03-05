@@ -170,6 +170,8 @@ export interface AssetFilter {
   folderId?: string
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
+  clothIds?: number[]
+  clothMatchMode?: 'any' | 'all'
 }
 
 // 视图配置
@@ -242,6 +244,8 @@ export interface QueryAssetsFilters {
   search?: string // 搜索关键词
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
+  clothIds?: number[]
+  clothMatchMode?: 'any' | 'all'
 }
 
 // 查询参数
@@ -273,6 +277,8 @@ export interface GetTimelineBucketsParams {
   search?: string
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
+  clothIds?: number[]
+  clothMatchMode?: 'any' | 'all'
 }
 
 // 获取时间线桶响应

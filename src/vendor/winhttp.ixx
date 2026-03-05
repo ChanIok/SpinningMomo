@@ -5,6 +5,8 @@ module;
 
 export module Vendor.WinHttp;
 
+import std;
+
 namespace Vendor::WinHttp {
 
 // 导出 WinHTTP 相关类型
@@ -69,6 +71,28 @@ export auto WinHttpReadData(HINTERNET hRequest, void* lpBuffer, DWORD dwNumberOf
 export auto WinHttpCloseHandle(HINTERNET hInternet) -> BOOL {
   return ::WinHttpCloseHandle(hInternet);
 }
+
+export struct UniqueHInternet {
+  HINTERNET handle = nullptr;
+
+  UniqueHInternet() = default;
+  explicit UniqueHInternet(HINTERNET h) : handle(h) {}
+  ~UniqueHInternet() {
+    if (handle) ::WinHttpCloseHandle(handle);
+  }
+  UniqueHInternet(const UniqueHInternet&) = delete;
+  UniqueHInternet& operator=(const UniqueHInternet&) = delete;
+  UniqueHInternet(UniqueHInternet&& o) noexcept : handle(std::exchange(o.handle, nullptr)) {}
+  UniqueHInternet& operator=(UniqueHInternet&& o) noexcept {
+    if (this != &o) {
+      if (handle) ::WinHttpCloseHandle(handle);
+      handle = std::exchange(o.handle, nullptr);
+    }
+    return *this;
+  }
+  explicit operator bool() const { return handle != nullptr; }
+  auto get() const -> HINTERNET { return handle; }
+};
 
 // 导出常量 (使用 k 前缀风格)
 // Access types

@@ -1,5 +1,7 @@
 module;
 
+#include <asio.hpp>
+
 module Core.RPC.Endpoints.PluginEndpoints;
 
 import std;
@@ -7,17 +9,83 @@ import Core.State;
 import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
+import Core.RPC.NotificationHub;
+import Core.Async;
+import Core.Tasks;
 import Plugins.InfinityNikki;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
-import <asio.hpp>;
 import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::PluginEndpoints {
 
-auto handle_infinity_nikki_get_game_directory(
-    [[maybe_unused]] Core::State::AppState& app_state,
-    const Plugins::InfinityNikki::InfinityNikkiGameDirRequest& params)
+struct StartExtractPhotoParamsResult {
+  std::string task_id;
+};
+
+auto launch_extract_photo_params_task(
+    Core::State::AppState& app_state,
+    const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request,
+    const std::string& task_id) -> void {
+  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  if (!io_context) {
+    Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
+    return;
+  }
+
+  asio::co_spawn(
+      *io_context,
+      [&app_state, request, task_id]() -> asio::awaitable<void> {
+        co_await asio::post(asio::use_awaitable);
+        Core::Tasks::mark_task_running(app_state, task_id);
+
+        auto progress_callback =
+            [&app_state, &task_id](
+                const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsProgress& progress) {
+              Core::Tasks::TaskProgress task_progress{
+                  .stage = progress.stage,
+                  .current = progress.current,
+                  .total = progress.total,
+                  .percent = progress.percent,
+                  .message = progress.message,
+              };
+              Core::Tasks::update_task_progress(app_state, task_id, task_progress);
+            };
+
+        auto extract_result =
+            Plugins::InfinityNikki::extract_photo_params(app_state, request, progress_callback);
+        if (!extract_result) {
+          auto error_message =
+              "Infinity Nikki photo params extract failed: " + extract_result.error();
+          Logger().error("{}", error_message);
+          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          co_return;
+        }
+
+        const auto& summary = extract_result.value();
+        Core::Tasks::update_task_progress(
+            app_state, task_id,
+            Core::Tasks::TaskProgress{
+                .stage = "completed",
+                .current = summary.processed_count,
+                .total = summary.candidate_count,
+                .percent = 100.0,
+                .message =
+                    std::format("Candidates {}, processed {}, saved {}, skipped {}, failed {}",
+                                summary.candidate_count, summary.processed_count,
+                                summary.saved_count, summary.skipped_count, summary.failed_count),
+            });
+        Core::Tasks::complete_task_success(app_state, task_id);
+
+        if (summary.saved_count > 0) {
+          Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+        }
+      },
+      asio::detached);
+}
+
+auto handle_infinity_nikki_get_game_directory([[maybe_unused]] Core::State::AppState& app_state,
+                                              [[maybe_unused]] const rfl::Generic& params)
     -> Core::RPC::RpcAwaitable<Plugins::InfinityNikki::InfinityNikkiGameDirResult> {
   auto result = Plugins::InfinityNikki::get_game_directory();
   if (!result) {
@@ -30,12 +98,41 @@ auto handle_infinity_nikki_get_game_directory(
   co_return result.value();
 }
 
+auto handle_infinity_nikki_start_extract_photo_params(
+    Core::State::AppState& app_state,
+    const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& params)
+    -> Core::RPC::RpcAwaitable<StartExtractPhotoParamsResult> {
+  constexpr auto kTaskType = "plugins.infinityNikki.extractPhotoParams";
+  if (Core::Tasks::has_active_task_of_type(app_state, kTaskType)) {
+    co_return std::unexpected(Core::RPC::RpcError{
+        .code = static_cast<int>(Core::RPC::ErrorCode::InvalidRequest),
+        .message = "Another Infinity Nikki extract task is already running",
+    });
+  }
+
+  auto task_id = Core::Tasks::create_task(app_state, kTaskType, "Infinity Nikki photo params");
+  if (task_id.empty()) {
+    co_return std::unexpected(Core::RPC::RpcError{
+        .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        .message = "Failed to create Infinity Nikki extract task",
+    });
+  }
+
+  launch_extract_photo_params_task(app_state, params, task_id);
+  co_return StartExtractPhotoParamsResult{.task_id = task_id};
+}
+
 auto register_all(Core::State::AppState& app_state) -> void {
-  Core::RPC::register_method<Plugins::InfinityNikki::InfinityNikkiGameDirRequest,
-                             Plugins::InfinityNikki::InfinityNikkiGameDirResult>(
+  Core::RPC::register_method<rfl::Generic, Plugins::InfinityNikki::InfinityNikkiGameDirResult>(
       app_state, app_state.rpc->registry, "plugins.infinityNikki.getGameDirectory",
       handle_infinity_nikki_get_game_directory,
       "Get Infinity Nikki game installation directory from launcher config");
+
+  Core::RPC::register_method<Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest,
+                             StartExtractPhotoParamsResult>(
+      app_state, app_state.rpc->registry, "plugins.infinityNikki.startExtractPhotoParams",
+      handle_infinity_nikki_start_extract_photo_params,
+      "Create a background task to extract and index Infinity Nikki photo params");
 
   Logger().info("Plugins RPC endpoints registered");
 }

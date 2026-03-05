@@ -31,6 +31,8 @@ export function useGalleryData() {
         search: store.filter.searchQuery,
         tagIds: store.filter.tagIds,
         tagMatchMode: store.filter.tagMatchMode,
+        clothIds: store.filter.clothIds,
+        clothMatchMode: store.filter.clothMatchMode,
       })
 
       store.setTimelineBuckets(response.buckets)
@@ -74,6 +76,8 @@ export function useGalleryData() {
           search: store.filter.searchQuery,
           tagIds: store.filter.tagIds,
           tagMatchMode: store.filter.tagMatchMode,
+          clothIds: store.filter.clothIds,
+          clothMatchMode: store.filter.clothMatchMode,
         },
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,
@@ -117,6 +121,8 @@ export function useGalleryData() {
           search: store.filter.searchQuery,
           tagIds: store.filter.tagIds,
           tagMatchMode: store.filter.tagMatchMode,
+          clothIds: store.filter.clothIds,
+          clothMatchMode: store.filter.clothMatchMode,
         },
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,

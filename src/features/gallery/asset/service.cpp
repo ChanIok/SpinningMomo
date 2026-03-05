@@ -48,6 +48,23 @@ auto timestamp_to_month(std::int64_t timestamp_ms) -> std::string {
   return std::format("{:%Y-%m}", ymd);
 }
 
+auto build_in_clause_placeholders(std::size_t count) -> std::string {
+  if (count == 0) {
+    return "";
+  }
+
+  std::string placeholders;
+  placeholders.reserve(count * 2 - 1);
+  for (std::size_t i = 0; i < count; ++i) {
+    if (i > 0) {
+      placeholders += ",";
+    }
+    placeholders += "?";
+  }
+
+  return placeholders;
+}
+
 // 构建统一的WHERE条件
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
     -> std::expected<std::pair<std::string, std::vector<Core::Database::Types::DbParam>>,
@@ -120,14 +137,42 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
       }
     } else {
       // 匹配任一标签（OR）：资产拥有任意一个标签即可
-      std::string placeholders = std::string(filters.tag_ids->size() * 2 - 1, '?');
-      for (size_t i = 1; i < filters.tag_ids->size(); ++i) {
-        placeholders[i * 2 - 1] = ',';
-      }
+      auto placeholders = build_in_clause_placeholders(filters.tag_ids->size());
       conditions.push_back(std::format(
           "id IN (SELECT asset_id FROM asset_tags WHERE tag_id IN ({}))", placeholders));
       for (const auto& tag_id : filters.tag_ids.value()) {
         params.push_back(tag_id);
+      }
+    }
+  }
+
+  // 无限暖暖服装筛选
+  if (filters.cloth_ids.has_value() && !filters.cloth_ids->empty()) {
+    std::string match_mode = filters.cloth_match_mode.value_or("any");
+    auto placeholders = build_in_clause_placeholders(filters.cloth_ids->size());
+
+    if (match_mode == "all") {
+      conditions.push_back(std::format(
+          R"(id IN (
+            SELECT asset_id
+            FROM asset_infinity_nikki_clothes
+            WHERE cloth_id IN ({})
+            GROUP BY asset_id
+            HAVING COUNT(DISTINCT cloth_id) = ?
+          ))",
+          placeholders));
+
+      for (const auto cloth_id : filters.cloth_ids.value()) {
+        params.push_back(cloth_id);
+      }
+      params.push_back(static_cast<std::int64_t>(filters.cloth_ids->size()));
+    } else {
+      conditions.push_back(std::format(
+          "id IN (SELECT DISTINCT asset_id FROM asset_infinity_nikki_clothes WHERE cloth_id IN "
+          "({}))",
+          placeholders));
+      for (const auto cloth_id : filters.cloth_ids.value()) {
+        params.push_back(cloth_id);
       }
     }
   }
@@ -270,6 +315,8 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   filters.search = params.search;
   filters.tag_ids = params.tag_ids;
   filters.tag_match_mode = params.tag_match_mode;
+  filters.cloth_ids = params.cloth_ids;
+  filters.cloth_match_mode = params.cloth_match_mode;
 
   // 复用统一的 WHERE 条件构建器
   auto where_result = build_unified_where_clause(filters);
