@@ -35,6 +35,13 @@ export struct WebPEncodedResult {
   uint32_t height;
 };
 
+export struct BGRABitmapData {
+  uint32_t width = 0;
+  uint32_t height = 0;
+  uint32_t stride = 0;
+  std::vector<uint8_t> pixels;
+};
+
 // 创建WIC工厂
 export auto create_factory() -> std::expected<WICFactory, std::string>;
 
@@ -44,6 +51,18 @@ export auto get_thread_wic_factory() -> std::expected<WICFactory, std::string>;
 // 获取图像信息（需要传递工厂）
 export auto get_image_info(IWICImagingFactory* factory, const std::filesystem::path& path)
     -> std::expected<ImageInfo, std::string>;
+
+export auto load_bitmap_frame(IWICImagingFactory* factory, const std::filesystem::path& path)
+    -> std::expected<wil::com_ptr<IWICBitmapFrameDecode>, std::string>;
+
+export auto scale_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source,
+                         uint32_t short_edge_size)
+    -> std::expected<wil::com_ptr<IWICBitmap>, std::string>;
+
+export auto convert_to_bgra_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source)
+    -> std::expected<wil::com_ptr<IWICBitmap>, std::string>;
+
+export auto copy_bgra_bitmap_data(IWICBitmap* bitmap) -> std::expected<BGRABitmapData, std::string>;
 
 // 直接从文件生成WebP缩略图（按短边等比例缩放）
 export auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& path,

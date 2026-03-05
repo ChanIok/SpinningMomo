@@ -12,6 +12,14 @@ if (Test-Path $vigemHeader) {
     git clone --depth 1 https://github.com/nefarius/ViGEmClient.git third_party/ViGEmClient
 }
 
+$dkmHeader = "third_party/dkm/include/dkm.hpp"
+if (Test-Path $dkmHeader) {
+    Write-Host "DKM already exists, skip."
+} else {
+    Write-Host "Cloning DKM..."
+    git clone --depth 1 https://github.com/genbattle/dkm.git third_party/dkm
+}
+
 $harmonyFont = "third_party/HarmonyOS Sans/HarmonyOS_Sans_SC/HarmonyOS_Sans_SC_Regular.ttf"
 if (Test-Path $harmonyFont) {
     Write-Host "HarmonyOS Sans already exists, skip."

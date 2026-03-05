@@ -9,6 +9,7 @@ import Core.Database.Types;
 import Features.Gallery.Types;
 import Features.Gallery.State;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Color.Filter;
 import Utils.Logger;
 import Utils.LRUCache;
 
@@ -49,7 +50,8 @@ auto timestamp_to_month(std::int64_t timestamp_ms) -> std::string {
 
 // 构建统一的WHERE条件
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
-    -> std::pair<std::string, std::vector<Core::Database::Types::DbParam>> {
+    -> std::expected<std::pair<std::string, std::vector<Core::Database::Types::DbParam>>,
+                     std::string> {
   std::vector<std::string> conditions;
   std::vector<Core::Database::Types::DbParam> params;
 
@@ -130,6 +132,12 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
     }
   }
 
+  auto color_filter_result =
+      Features::Gallery::Color::Filter::append_color_filter_conditions(filters, conditions, params);
+  if (!color_filter_result) {
+    return std::unexpected(color_filter_result.error());
+  }
+
   // 构建 WHERE 子句
   std::string where_clause;
   if (!conditions.empty()) {
@@ -140,7 +148,7 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
                                           });
   }
 
-  return {where_clause, params};
+  return std::make_pair(where_clause, params);
 }
 
 // ============= 查询服务实现 =============
@@ -149,7 +157,11 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
 auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsParams& params)
     -> std::expected<Types::ListResponse, std::string> {
   // 1. 构建通用WHERE条件
-  auto [where_clause, where_params] = build_unified_where_clause(params.filters);
+  auto where_result = build_unified_where_clause(params.filters);
+  if (!where_result) {
+    return std::unexpected(where_result.error());
+  }
+  auto [where_clause, where_params] = std::move(where_result.value());
 
   // 2. 验证和构建 ORDER BY
   std::string sort_by = params.sort_by.value_or("created_at");
@@ -260,7 +272,11 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   filters.tag_match_mode = params.tag_match_mode;
 
   // 复用统一的 WHERE 条件构建器
-  auto [where_clause, query_params] = build_unified_where_clause(filters);
+  auto where_result = build_unified_where_clause(filters);
+  if (!where_result) {
+    return std::unexpected(where_result.error());
+  }
+  auto [where_clause, query_params] = std::move(where_result.value());
 
   // 构建查询
   std::string sql = std::format(R"(

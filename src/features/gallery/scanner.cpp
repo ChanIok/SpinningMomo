@@ -10,6 +10,9 @@ import Features.Gallery.ScanCommon;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.Color.Types;
+import Features.Gallery.Color.Extractor;
+import Features.Gallery.Color.Repository;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
@@ -521,19 +524,31 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
   return {};
 }
 
+struct ProcessedAssetEntry {
+  Types::Asset asset;
+  std::vector<Features::Gallery::Color::Types::ExtractedColor> colors;
+};
+
+struct FileProcessingBatchResult {
+  std::vector<ProcessedAssetEntry> new_assets;
+  std::vector<ProcessedAssetEntry> updated_assets;
+  std::vector<std::string> errors;
+};
+
 // 处理单个文件
 auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
                          const Types::FileAnalysisResult& analysis,
                          const Types::ScanOptions& options,
                          const std::unordered_map<std::string, std::int64_t>& folder_mapping,
                          ProcessingProgressTracker* progress_tracker)
-    -> std::expected<Types::Asset, std::string> {
+    -> std::expected<ProcessedAssetEntry, std::string> {
   const auto& file_info = analysis.file_info;
   const auto& file_path = file_info.path;
 
   auto asset_type = ScanCommon::detect_asset_type(file_path);
 
-  Types::Asset asset;
+  ProcessedAssetEntry processed;
+  auto& asset = processed.asset;
 
   // 如果是更新，保留原有ID
   if (analysis.status == Types::FileStatus::MODIFIED && analysis.existing_metadata) {
@@ -586,6 +601,16 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
       asset.mime_type = "application/octet-stream";  // 兜底处理
     }
 
+    auto color_result =
+        Features::Gallery::Color::Extractor::extract_main_colors(wic_factory, file_path);
+    if (color_result) {
+      processed.colors = std::move(color_result.value());
+    } else {
+      Logger().warn("Failed to extract main colors for {}: {}", file_path.string(),
+                    color_result.error());
+      processed.colors.clear();
+    }
+
     // 生成或更新这幅图的缩略图到缓存目录（用于无感滚动列表展示）
     if (options.generate_thumbnails.value_or(true)) {
       auto thumbnail_result =
@@ -607,9 +632,10 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
     asset.width = 0;
     asset.height = 0;
     asset.mime_type = "application/octet-stream";
+    processed.colors.clear();
   }
 
-  return asset;
+  return processed;
 }
 
 // 并行处理：提取元数据并生成缩略图
@@ -618,9 +644,9 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
                                const Types::ScanOptions& options,
                                const std::unordered_map<std::string, std::int64_t>& folder_mapping,
                                ProcessingProgressTracker* progress_tracker)
-    -> std::expected<Types::ProcessingBatchResult, std::string> {
+    -> std::expected<FileProcessingBatchResult, std::string> {
   if (files_to_process.empty()) {
-    return Types::ProcessingBatchResult{};
+    return FileProcessingBatchResult{};
   }
 
   constexpr size_t PROCESS_BATCH_SIZE = 16;  // 每批处理16个文件，可根据实际情况调整
@@ -628,7 +654,7 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
 
   std::latch completion_latch(total_batches);
 
-  Types::ProcessingBatchResult final_result;
+  FileProcessingBatchResult final_result;
   std::mutex results_mutex;
 
   // 提交所有批次任务
@@ -653,7 +679,7 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
           auto thread_wic_factory = std::move(thread_wic_factory_result.value());
 
           // 本批次的结果
-          Types::ProcessingBatchResult batch_result;
+          FileProcessingBatchResult batch_result;
 
           for (size_t idx = start; idx < end; ++idx) {
             const auto& analysis = files_to_process[idx];
@@ -726,7 +752,7 @@ struct ScanPreparationContext {
 };
 
 struct ProcessingPhaseResult {
-  Types::ProcessingBatchResult batch_result;
+  FileProcessingBatchResult batch_result;
   bool all_db_success = true;
 };
 
@@ -905,11 +931,40 @@ auto run_processing_phase(Core::State::AppState& app_state, const std::filesyste
   result.batch_result = std::move(processing_result.value());
 
   if (!result.batch_result.new_assets.empty()) {
-    auto create_result =
-        Asset::Repository::batch_create_asset(app_state, result.batch_result.new_assets);
+    std::vector<Types::Asset> new_assets_to_create;
+    new_assets_to_create.reserve(result.batch_result.new_assets.size());
+    for (const auto& entry : result.batch_result.new_assets) {
+      new_assets_to_create.push_back(entry.asset);
+    }
+
+    auto create_result = Asset::Repository::batch_create_asset(app_state, new_assets_to_create);
     if (create_result) {
       Logger().info("Successfully created {} new asset items",
                     result.batch_result.new_assets.size());
+
+      const auto& inserted_ids = create_result.value();
+      if (inserted_ids.size() != result.batch_result.new_assets.size()) {
+        Logger().error("Inserted asset count mismatch when replacing colors. assets={}, ids={}",
+                       result.batch_result.new_assets.size(), inserted_ids.size());
+        result.all_db_success = false;
+      } else {
+        std::vector<Features::Gallery::Color::Repository::ColorReplaceBatchItem> color_items;
+        color_items.reserve(result.batch_result.new_assets.size());
+
+        for (size_t i = 0; i < inserted_ids.size(); ++i) {
+          color_items.push_back(Features::Gallery::Color::Repository::ColorReplaceBatchItem{
+              .asset_id = inserted_ids[i],
+              .colors = result.batch_result.new_assets[i].colors,
+          });
+        }
+
+        auto color_result = Features::Gallery::Color::Repository::batch_replace_asset_colors(
+            app_state, color_items);
+        if (!color_result) {
+          Logger().error("Failed to batch replace colors for new assets: {}", color_result.error());
+          result.all_db_success = false;
+        }
+      }
     } else {
       Logger().error("Failed to batch create asset items: {}", create_result.error());
       result.all_db_success = false;
@@ -917,11 +972,38 @@ auto run_processing_phase(Core::State::AppState& app_state, const std::filesyste
   }
 
   if (!result.batch_result.updated_assets.empty()) {
-    auto update_result =
-        Asset::Repository::batch_update_asset(app_state, result.batch_result.updated_assets);
+    std::vector<Types::Asset> updated_assets_to_save;
+    updated_assets_to_save.reserve(result.batch_result.updated_assets.size());
+    for (const auto& entry : result.batch_result.updated_assets) {
+      updated_assets_to_save.push_back(entry.asset);
+    }
+
+    auto update_result = Asset::Repository::batch_update_asset(app_state, updated_assets_to_save);
     if (update_result) {
       Logger().info("Successfully updated {} asset items",
                     result.batch_result.updated_assets.size());
+
+      std::vector<Features::Gallery::Color::Repository::ColorReplaceBatchItem> color_items;
+      color_items.reserve(result.batch_result.updated_assets.size());
+      for (const auto& entry : result.batch_result.updated_assets) {
+        if (entry.asset.id <= 0) {
+          Logger().warn("Skip replacing colors for updated asset with invalid id: {}",
+                        entry.asset.path);
+          continue;
+        }
+        color_items.push_back(Features::Gallery::Color::Repository::ColorReplaceBatchItem{
+            .asset_id = entry.asset.id,
+            .colors = entry.colors,
+        });
+      }
+
+      auto color_result =
+          Features::Gallery::Color::Repository::batch_replace_asset_colors(app_state, color_items);
+      if (!color_result) {
+        Logger().error("Failed to batch replace colors for updated assets: {}",
+                       color_result.error());
+        result.all_db_success = false;
+      }
     } else {
       Logger().error("Failed to batch update asset items: {}", update_result.error());
       result.all_db_success = false;

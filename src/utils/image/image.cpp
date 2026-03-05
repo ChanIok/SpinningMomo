@@ -268,6 +268,68 @@ auto scale_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source, uint32_
   }
 }
 
+auto convert_to_bgra_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source)
+    -> std::expected<wil::com_ptr<IWICBitmap>, std::string> {
+  if (!factory) {
+    return std::unexpected("WIC factory is null");
+  }
+
+  if (!source) {
+    return std::unexpected("Source bitmap is null");
+  }
+
+  try {
+    wil::com_ptr<IWICFormatConverter> converter;
+    THROW_IF_FAILED(factory->CreateFormatConverter(converter.put()));
+    THROW_IF_FAILED(converter->Initialize(source, GUID_WICPixelFormat32bppBGRA,
+                                          WICBitmapDitherTypeNone, nullptr, 0.0,
+                                          WICBitmapPaletteTypeCustom));
+
+    return convert_to_bitmap(factory, converter.get());
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
+auto copy_bgra_bitmap_data(IWICBitmap* bitmap) -> std::expected<BGRABitmapData, std::string> {
+  if (!bitmap) {
+    return std::unexpected("Bitmap is null");
+  }
+
+  try {
+    UINT width = 0;
+    UINT height = 0;
+    THROW_IF_FAILED(bitmap->GetSize(&width, &height));
+
+    WICRect rect = {0, 0, static_cast<INT>(width), static_cast<INT>(height)};
+    wil::com_ptr<IWICBitmapLock> bitmap_lock;
+    THROW_IF_FAILED(bitmap->Lock(&rect, WICBitmapLockRead, bitmap_lock.put()));
+
+    UINT stride = 0;
+    UINT data_size = 0;
+    BYTE* data = nullptr;
+    THROW_IF_FAILED(bitmap_lock->GetStride(&stride));
+    THROW_IF_FAILED(bitmap_lock->GetDataPointer(&data_size, &data));
+
+    if (!data || data_size == 0) {
+      return std::unexpected("Bitmap data pointer is empty");
+    }
+
+    BGRABitmapData result;
+    result.width = static_cast<uint32_t>(width);
+    result.height = static_cast<uint32_t>(height);
+    result.stride = static_cast<uint32_t>(stride);
+    result.pixels.assign(data, data + data_size);
+    return result;
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
 // 将WIC位图编码为WebP
 auto encode_bitmap_to_webp(IWICBitmap* bitmap, const WebPEncodeOptions& options)
     -> std::expected<WebPEncodedResult, std::string> {

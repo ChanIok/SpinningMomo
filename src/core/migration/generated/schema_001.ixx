@@ -10,7 +10,7 @@ import std;
 export namespace Core::Migration::Schema {
 
 struct V001 {
-  static constexpr std::array<std::string_view, 26> statements = {
+  static constexpr std::array<std::string_view, 30> statements = {
       R"SQL(
 CREATE TABLE assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -150,6 +150,43 @@ END
         )SQL",
       R"SQL(
 CREATE INDEX idx_asset_tags_tag ON asset_tags(tag_id)
+        )SQL",
+      R"SQL(
+CREATE TABLE asset_colors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_id INTEGER NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+    r INTEGER NOT NULL CHECK (
+        r BETWEEN 0
+        AND 255
+    ),
+    g INTEGER NOT NULL CHECK (
+        g BETWEEN 0
+        AND 255
+    ),
+    b INTEGER NOT NULL CHECK (
+        b BETWEEN 0
+        AND 255
+    ),
+    lab_l REAL NOT NULL,
+    lab_a REAL NOT NULL,
+    lab_b REAL NOT NULL,
+    weight REAL NOT NULL CHECK (
+        weight > 0
+        AND weight <= 1
+    ),
+    l_bin INTEGER NOT NULL,
+    a_bin INTEGER NOT NULL,
+    b_bin INTEGER NOT NULL
+)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_asset_colors_asset_id ON asset_colors(asset_id)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_asset_colors_asset_weight ON asset_colors(asset_id, weight DESC)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_asset_colors_lab_bin ON asset_colors(l_bin, a_bin, b_bin)
         )SQL",
       R"SQL(
 CREATE TABLE ignore_rules (

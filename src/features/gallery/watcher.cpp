@@ -15,6 +15,9 @@ import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Service;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.Color.Types;
+import Features.Gallery.Color.Extractor;
+import Features.Gallery.Color.Repository;
 import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
@@ -261,6 +264,7 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
       .created_at = existing_asset ? existing_asset->created_at : 0,
       .updated_at = existing_asset ? existing_asset->updated_at : 0,
   };
+  std::vector<Features::Gallery::Color::Types::ExtractedColor> extracted_colors;
 
   if (normalized.has_extension()) {
     asset.extension = Utils::String::ToLowerAscii(normalized.extension().string());
@@ -303,13 +307,24 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
                         thumbnail_result.error());
         }
       }
+
+      auto color_result =
+          Features::Gallery::Color::Extractor::extract_main_colors(*wic_factory, normalized);
+      if (color_result) {
+        extracted_colors = std::move(color_result.value());
+      } else {
+        Logger().warn("Failed to extract main colors for '{}': {}", normalized.string(),
+                      color_result.error());
+      }
     } else {
       asset.width = 0;
       asset.height = 0;
+      extracted_colors.clear();
     }
   } else {
     asset.width = 0;
     asset.height = 0;
+    extracted_colors.clear();
   }
 
   if (existing_asset) {
@@ -317,12 +332,24 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     if (!update_result) {
       return std::unexpected("Failed to update asset: " + update_result.error());
     }
+
+    auto color_replace_result = Features::Gallery::Color::Repository::replace_asset_colors(
+        app_state, asset.id, extracted_colors);
+    if (!color_replace_result) {
+      return std::unexpected("Failed to update asset colors: " + color_replace_result.error());
+    }
     return 2;
   }
 
   auto create_result = Features::Gallery::Asset::Repository::create_asset(app_state, asset);
   if (!create_result) {
     return std::unexpected("Failed to create asset: " + create_result.error());
+  }
+
+  auto color_replace_result = Features::Gallery::Color::Repository::replace_asset_colors(
+      app_state, create_result.value(), extracted_colors);
+  if (!color_replace_result) {
+    return std::unexpected("Failed to create asset colors: " + color_replace_result.error());
   }
   return 1;
 }

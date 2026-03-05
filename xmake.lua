@@ -52,6 +52,7 @@ target("SpinningMomo")
     
     -- 添加包含目录
     add_includedirs("src")
+    add_includedirs("third_party/dkm/include")
     
     -- 添加源文件
     add_files("src/main.cpp")

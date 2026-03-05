@@ -194,12 +194,6 @@ struct FileAnalysisResult {
   std::optional<Metadata> existing_metadata;
 };
 
-struct ProcessingBatchResult {
-  std::vector<Asset> new_assets;
-  std::vector<Asset> updated_assets;
-  std::vector<std::string> errors;
-};
-
 // ============= RPC参数类型 =============
 
 struct ListResponse {
@@ -286,6 +280,9 @@ struct QueryAssetsFilters {
   std::optional<std::string> search;  // 搜索关键词
   std::optional<std::vector<std::int64_t>> tag_ids;
   std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<std::vector<std::string>> color_hexes;
+  std::optional<std::string> color_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<double> color_distance = 18.0;
 };
 
 struct QueryAssetsParams {
