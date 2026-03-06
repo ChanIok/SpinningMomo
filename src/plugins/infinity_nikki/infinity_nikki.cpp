@@ -1,6 +1,7 @@
 module;
 
 #include <wil/com.h>
+#include <rfl/json.hpp>
 
 module Plugins.InfinityNikki;
 
@@ -15,7 +16,7 @@ import Vendor.WIL;
 import Vendor.Windows;
 import Vendor.ShellApi;
 import Vendor.WinHttp;
-import <rfl/json.hpp>;
+// import <rfl/json.hpp>;
 
 namespace Plugins::InfinityNikki {
 
@@ -106,20 +107,75 @@ auto get_game_directory() -> std::expected<InfinityNikkiGameDirResult, std::stri
   return result;
 }
 
+// 查询阶段：从数据库取出的候选资产行
 struct CandidateAssetRow {
   std::int64_t id;
   std::string path;
 };
 
-struct PendingPhotoExtractEntry {
+// 扫描阶段：从照片文件提取出的待发送条目
+struct PreparedPhotoExtractEntry {
   std::int64_t asset_id;
-  std::string uid;
+  std::string uid;  // 用户 UID，取自路径中 GamePlayPhotos/<uid>/
   std::string params_base64;
 };
 
+// 解析 API 请求体：同一批次的所有照片必须属于同一个 UID
 struct ExtractApiRequestBody {
   std::string uid;
   std::vector<std::string> params_base64_list;
+};
+
+// 以下三个结构体镜像 API 响应中 SocialPhoto 的 JSON schema，供 rfl 直接反序列化。
+// SocialPhoto 级别字段为 PascalCase，PhotoInfo 级别字段为 camelCase（由 SnakeCaseToCamelCase
+// 处理）， Time 级别字段为纯小写单词（单词无需转换）。
+struct PhotoTime {
+  std::optional<std::int64_t> day;
+  std::optional<std::int64_t> hour;
+  std::optional<std::int64_t> min;
+  std::optional<double> sec;
+};
+
+struct PhotoInfo {
+  std::optional<double> camera_focal_length;
+  std::optional<std::int64_t> aperture_section;
+  std::optional<std::string> filter_id;
+  std::optional<double> filter_strength;
+  std::optional<double> vignette_intensity;
+  std::optional<std::string> light_id;
+  std::optional<double> light_strength;
+  std::optional<double> nikki_loc_x;
+  std::optional<double> nikki_loc_y;
+  std::optional<double> nikki_loc_z;
+  std::optional<bool> nikki_hidden;
+  std::optional<std::int64_t> pose_id;
+  // DIY 大写缩写和 Clothes 需显式 Rename；Clothes 元素统一用 double 接收，写入 DB 时再截断为整数
+  rfl::Rename<"nikkiDIY", std::optional<rfl::Generic>> nikki_diy;
+  rfl::Rename<"nikkiClothes", std::optional<std::vector<double>>> nikki_clothes;
+};
+
+struct SocialPhotoData {
+  rfl::Rename<"CameraParams", std::optional<std::string>> camera_params;
+  rfl::Rename<"Time", std::optional<PhotoTime>> time;
+  rfl::Rename<"PhotoInfo", std::optional<PhotoInfo>> photo_info;
+};
+
+// 镜像 API 响应的顶层结构：
+//   { "success": bool, "data": [ { "SocialPhoto": {...} } | null, ... ], "error": {...} }
+// data 数组的每一项是 { "SocialPhoto": SocialPhotoData } 包装对象，或 null。
+struct ApiError {
+  std::optional<std::string> code;
+  std::optional<std::string> message;
+};
+
+struct SocialPhotoWrapper {
+  rfl::Rename<"SocialPhoto", std::optional<SocialPhotoData>> social_photo;
+};
+
+struct ApiResponse {
+  bool success = false;
+  std::optional<std::vector<std::optional<SocialPhotoWrapper>>> data;
+  std::optional<ApiError> error;
 };
 
 struct ParsedPhotoParamsRecord {
@@ -144,9 +200,54 @@ struct ParsedPhotoParamsRecord {
   std::vector<std::int64_t> nikki_clothes;
 };
 
-constexpr std::string_view kExtractApiUrl = "http://api.infinitymomo.com/api/v1/extract";
+// 从 SocialPhotoData 映射到扁平的 DB 写入结构（展开嵌套层次，转换特殊字段）
+// rfl::Rename<"Key", T> 字段需通过 .value() 解包出底层类型 T
+auto to_parsed_record(const SocialPhotoData& sp) -> ParsedPhotoParamsRecord {
+  ParsedPhotoParamsRecord record;
+  record.camera_params = sp.camera_params.value();
+
+  if (const auto& time = sp.time.value()) {
+    record.time_day = time->day;
+    record.time_hour = time->hour;
+    record.time_min = time->min;
+    record.time_sec = time->sec;
+  }
+
+  if (const auto& photo_info = sp.photo_info.value()) {
+    const auto& pi = *photo_info;
+    record.camera_focal_length = pi.camera_focal_length;
+    record.aperture_section = pi.aperture_section;
+    record.filter_id = pi.filter_id;
+    record.filter_strength = pi.filter_strength;
+    record.vignette_intensity = pi.vignette_intensity;
+    record.light_id = pi.light_id;
+    record.light_strength = pi.light_strength;
+    record.nikki_loc_x = pi.nikki_loc_x;
+    record.nikki_loc_y = pi.nikki_loc_y;
+    record.nikki_loc_z = pi.nikki_loc_z;
+    record.nikki_hidden = pi.nikki_hidden;
+    record.pose_id = pi.pose_id;
+
+    if (const auto& nikki_diy = pi.nikki_diy.value()) {
+      record.nikki_diy_json = rfl::json::write(*nikki_diy);
+    }
+    if (const auto& nikki_clothes = pi.nikki_clothes.value()) {
+      for (double v : *nikki_clothes) {
+        record.nikki_clothes.push_back(static_cast<std::int64_t>(std::llround(v)));
+      }
+    }
+  }
+
+  return record;
+}
+
+constexpr std::string_view kExtractApiUrl = "https://api.infinitymomo.com/api/v1/extract";
 constexpr std::size_t kMaxErrorMessages = 50;
 constexpr std::size_t kExtractBatchSize = 32;
+constexpr std::int64_t kMinProgressReportIntervalMillis = 200;
+constexpr double kPreparingPercent = 2.0;
+constexpr double kProcessingStartPercent = 5.0;
+constexpr double kProcessingEndPercent = 99.0;
 
 auto add_error(std::vector<std::string>& errors, std::string message) -> void {
   if (errors.size() >= kMaxErrorMessages) {
@@ -163,7 +264,6 @@ auto normalize_path_for_matching(std::string path) -> std::string {
 auto extract_uid_from_asset_path(const std::string& asset_path) -> std::optional<std::string> {
   auto normalized = normalize_path_for_matching(asset_path);
   constexpr std::string_view kPrefix = "/X6Game/Saved/GamePlayPhotos/";
-  constexpr std::string_view kSuffix = "/NikkiPhotos_HighQuality/";
 
   auto prefix_pos = normalized.find(kPrefix);
   if (prefix_pos == std::string::npos) {
@@ -173,11 +273,6 @@ auto extract_uid_from_asset_path(const std::string& asset_path) -> std::optional
   auto uid_start = prefix_pos + kPrefix.size();
   auto uid_end = normalized.find('/', uid_start);
   if (uid_end == std::string::npos || uid_end <= uid_start) {
-    return std::nullopt;
-  }
-
-  auto suffix_pos = normalized.find(kSuffix, uid_end);
-  if (suffix_pos == std::string::npos) {
     return std::nullopt;
   }
 
@@ -198,6 +293,9 @@ auto is_base64_text(std::string_view text) -> bool {
   return true;
 }
 
+// 从游戏照片文件中提取 Base64 编码的拍摄参数。
+// 游戏的照片格式：在 JPEG 主图像的 EOI (0xFF 0xD9) 之后，紧接着追加了一段
+// Base64 文本，再以第二个 EOI 结尾。本函数定位最后两个 EOI，取其间的内容。
 auto extract_params_base64_from_file(const std::filesystem::path& file_path)
     -> std::expected<std::string, std::string> {
   std::ifstream file(file_path, std::ios::binary);
@@ -223,6 +321,7 @@ auto extract_params_base64_from_file(const std::filesystem::path& file_path)
     return std::unexpected("Not a dual-EOI photo");
   }
 
+  // 取倒数第二和最后一个 EOI，兼容 JPEG 内部可能出现的多余 EOI
   auto p1 = eoi_positions[eoi_positions.size() - 2];
   auto p2 = eoi_positions[eoi_positions.size() - 1];
   if (p2 <= p1 + 2) {
@@ -335,166 +434,37 @@ auto http_post_json(const std::string& url_utf8, const std::string& request_body
   return response;
 }
 
-auto get_optional_object(const rfl::Generic::Object& object, const std::string& key)
-    -> std::optional<rfl::Generic::Object> {
-  auto value_result = object.get(key);
-  if (!value_result) {
-    return std::nullopt;
-  }
-
-  auto object_result = value_result.value().to_object();
-  if (!object_result) {
-    return std::nullopt;
-  }
-
-  return object_result.value();
-}
-
-auto get_optional_string(const rfl::Generic::Object& object, const std::string& key)
-    -> std::optional<std::string> {
-  auto result = object.get(key).and_then(rfl::to_string);
-  if (result) return result.value();
-  return std::nullopt;
-}
-
-auto get_optional_bool(const rfl::Generic::Object& object, const std::string& key)
-    -> std::optional<bool> {
-  auto result = object.get(key).and_then(rfl::to_bool);
-  if (result) return result.value();
-  return std::nullopt;
-}
-
-auto get_optional_int64(const rfl::Generic::Object& object, const std::string& key)
-    -> std::optional<std::int64_t> {
-  auto val = object.get(key);
-  if (!val) return std::nullopt;
-  if (auto r = rfl::to_int(val.value())) return static_cast<std::int64_t>(r.value());
-  if (auto r = rfl::to_double(val.value()))
-    return static_cast<std::int64_t>(std::llround(r.value()));
-  return std::nullopt;
-}
-
-auto get_optional_double(const rfl::Generic::Object& object, const std::string& key)
-    -> std::optional<double> {
-  auto val = object.get(key);
-  if (!val) return std::nullopt;
-  if (auto r = rfl::to_double(val.value())) return r.value();
-  if (auto r = rfl::to_int(val.value())) return static_cast<double>(r.value());
-  return std::nullopt;
-}
-
-auto collect_payload_objects_with_social_photo(const rfl::Generic& node,
-                                               std::vector<rfl::Generic::Object>& out,
-                                               int depth = 0) -> void {
-  if (depth > 6) {
-    return;
-  }
-
-  if (auto object_result = node.to_object(); object_result) {
-    const auto& object = object_result.value();
-    if (auto social_photo = object.get("SocialPhoto").and_then(rfl::to_object); social_photo) {
-      out.push_back(object);
-    }
-
-    for (const auto& key : {"data", "result", "results", "items", "payload"}) {
-      auto child_result = object.get(key);
-      if (!child_result) {
-        continue;
-      }
-      collect_payload_objects_with_social_photo(child_result.value(), out, depth + 1);
-    }
-  }
-
-  if (auto array_result = node.to_array(); array_result) {
-    for (const auto& item : array_result.value()) {
-      collect_payload_objects_with_social_photo(item, out, depth + 1);
-    }
-  }
-}
-
-auto parse_photo_params_record_from_payload(const rfl::Generic::Object& payload_object)
-    -> std::expected<ParsedPhotoParamsRecord, std::string> {
-  auto social_photo_result = payload_object.get("SocialPhoto").and_then(rfl::to_object);
-  if (!social_photo_result) {
-    return std::unexpected("Payload SocialPhoto is missing");
-  }
-
-  const auto& social_photo = social_photo_result.value();
-  ParsedPhotoParamsRecord record;
-  record.camera_params = get_optional_string(social_photo, "CameraParams");
-
-  if (auto time_object = get_optional_object(social_photo, "Time"); time_object.has_value()) {
-    record.time_day = get_optional_int64(*time_object, "day");
-    record.time_hour = get_optional_int64(*time_object, "hour");
-    record.time_min = get_optional_int64(*time_object, "min");
-    record.time_sec = get_optional_double(*time_object, "sec");
-  }
-
-  if (auto photo_info = get_optional_object(social_photo, "PhotoInfo"); photo_info.has_value()) {
-    record.camera_focal_length = get_optional_double(*photo_info, "cameraFocalLength");
-    record.aperture_section = get_optional_int64(*photo_info, "apertureSection");
-    record.filter_id = get_optional_string(*photo_info, "filterId");
-    record.filter_strength = get_optional_double(*photo_info, "filterStrength");
-    record.vignette_intensity = get_optional_double(*photo_info, "vignetteIntensity");
-    record.light_id = get_optional_string(*photo_info, "lightId");
-    record.light_strength = get_optional_double(*photo_info, "lightStrength");
-    record.nikki_loc_x = get_optional_double(*photo_info, "nikkiLocX");
-    record.nikki_loc_y = get_optional_double(*photo_info, "nikkiLocY");
-    record.nikki_loc_z = get_optional_double(*photo_info, "nikkiLocZ");
-    record.nikki_hidden = get_optional_bool(*photo_info, "nikkiHidden");
-    record.pose_id = get_optional_int64(*photo_info, "poseId");
-
-    auto nikki_diy_value = photo_info->get("nikkiDIY");
-    if (nikki_diy_value) {
-      record.nikki_diy_json = rfl::json::write(nikki_diy_value.value());
-    }
-
-    auto clothes_result = photo_info->get("nikkiClothes").and_then(rfl::to_array);
-    if (clothes_result) {
-      for (const auto& cloth_value : clothes_result.value()) {
-        if (auto int_value = cloth_value.to_int(); int_value) {
-          record.nikki_clothes.push_back(static_cast<std::int64_t>(int_value.value()));
-          continue;
-        }
-        if (auto double_value = cloth_value.to_double(); double_value) {
-          record.nikki_clothes.push_back(
-              static_cast<std::int64_t>(std::llround(double_value.value())));
-        }
-      }
-      std::ranges::sort(record.nikki_clothes);
-      record.nikki_clothes.erase(
-          std::unique(record.nikki_clothes.begin(), record.nikki_clothes.end()),
-          record.nikki_clothes.end());
-    }
-  }
-
-  return record;
-}
-
+// 解析 API 响应：{ "success": bool, "data": [ item | null, ... ] }
+// data 数组与请求的 paramsBase64List 一一对应；null 表示该项无法解析，返回 nullopt。
+// rfl 在单次反序列化中完成所有工作：字段名映射、null 处理、嵌套类型转换。
 auto parse_photo_params_records_from_response(const std::string& response_body)
-    -> std::expected<std::vector<ParsedPhotoParamsRecord>, std::string> {
-  auto parsed_result = rfl::json::read<rfl::Generic>(response_body);
-  if (!parsed_result) {
-    return std::unexpected("Invalid JSON response: " + parsed_result.error().what());
+    -> std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string> {
+  auto resp_result =
+      rfl::json::read<ApiResponse, rfl::SnakeCaseToCamelCase, rfl::DefaultIfMissing>(response_body);
+  if (!resp_result) {
+    return std::unexpected("Invalid JSON response: " + resp_result.error().what());
   }
+  const auto& resp = resp_result.value();
 
-  std::vector<rfl::Generic::Object> payload_objects;
-  collect_payload_objects_with_social_photo(parsed_result.value(), payload_objects);
-  if (payload_objects.empty()) {
-    return std::unexpected("Response payload does not contain SocialPhoto");
-  }
-
-  std::vector<ParsedPhotoParamsRecord> records;
-  records.reserve(payload_objects.size());
-  for (std::size_t i = 0; i < payload_objects.size(); ++i) {
-    auto record_result = parse_photo_params_record_from_payload(payload_objects[i]);
-    if (!record_result) {
-      return std::unexpected("Failed to parse payload item " + std::to_string(i) + ": " +
-                             record_result.error());
+  if (!resp.success) {
+    std::string err = "API returned success=false";
+    if (resp.error && resp.error->message) {
+      err += ": " + *resp.error->message;
     }
-    records.push_back(std::move(record_result.value()));
+    return std::unexpected(err);
   }
 
+  if (!resp.data) {
+    return std::unexpected("Response missing 'data' field");
+  }
+
+  std::vector<std::optional<ParsedPhotoParamsRecord>> records;
+  records.reserve(resp.data->size());
+  for (const auto& item : *resp.data) {
+    // item 是 optional<SocialPhotoWrapper>；其内部 social_photo 也是 optional
+    auto sp = item ? item->social_photo.value() : std::nullopt;
+    records.push_back(sp ? std::optional{to_parsed_record(*sp)} : std::nullopt);
+  }
   return records;
 }
 
@@ -629,18 +599,35 @@ auto load_candidate_assets(Core::State::AppState& app_state, bool only_missing)
   return query_result.value();
 }
 
+struct ExtractProgressState {
+  std::int64_t total_candidates = 0;
+  std::int64_t scanned_count = 0;
+  std::int64_t finalized_count = 0;
+  int last_reported_percent = -1;
+  std::int64_t last_report_millis = 0;
+};
+
+auto steady_clock_millis() -> std::int64_t {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(
+             std::chrono::steady_clock::now().time_since_epoch())
+      .count();
+}
+
 auto report_extract_progress(
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback,
     std::string stage, std::int64_t current, std::int64_t total,
-    std::optional<std::string> message = std::nullopt) -> void {
+    std::optional<double> percent = std::nullopt, std::optional<std::string> message = std::nullopt)
+    -> void {
   if (!progress_callback) {
     return;
   }
 
-  std::optional<double> percent;
-  if (total > 0) {
-    percent =
-        std::clamp((static_cast<double>(current) * 100.0) / static_cast<double>(total), 0.0, 100.0);
+  if (!percent.has_value() && total > 0) {
+    percent = (static_cast<double>(current) * 100.0) / static_cast<double>(total);
+  }
+
+  if (percent.has_value()) {
+    percent = std::clamp(*percent, 0.0, 100.0);
   }
 
   progress_callback(InfinityNikkiExtractPhotoParamsProgress{
@@ -650,6 +637,183 @@ auto report_extract_progress(
       .percent = percent,
       .message = std::move(message),
   });
+}
+
+// 进度百分比综合了"扫描"和"已落库"两个子阶段，各占一半权重，
+// 使进度条在文件扫描期和 API 等待期都能持续推进，避免长时间停滞。
+auto calculate_processing_percent(const ExtractProgressState& progress) -> double {
+  if (progress.total_candidates <= 0) {
+    return 100.0;
+  }
+
+  auto total = static_cast<double>(progress.total_candidates);
+  auto scanned_ratio = std::clamp(static_cast<double>(progress.scanned_count) / total, 0.0, 1.0);
+  auto finalized_ratio =
+      std::clamp(static_cast<double>(progress.finalized_count) / total, 0.0, 1.0);
+  auto overall_ratio = (scanned_ratio + finalized_ratio) / 2.0;
+
+  return kProcessingStartPercent +
+         overall_ratio * (kProcessingEndPercent - kProcessingStartPercent);
+}
+
+auto build_processing_message(const ExtractProgressState& progress,
+                              const InfinityNikkiExtractPhotoParamsResult& result) -> std::string {
+  return std::format("Scanned {} / {}, finalized {} / {}, saved {}, skipped {}, failed {}",
+                     progress.scanned_count, progress.total_candidates, progress.finalized_count,
+                     progress.total_candidates, result.saved_count, result.skipped_count,
+                     result.failed_count);
+}
+
+auto report_processing_progress(
+    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback,
+    ExtractProgressState& progress, const InfinityNikkiExtractPhotoParamsResult& result,
+    bool force = false, std::optional<std::string> message = std::nullopt) -> void {
+  if (!progress_callback || progress.total_candidates <= 0) {
+    return;
+  }
+
+  auto percent = calculate_processing_percent(progress);
+  auto rounded_percent = static_cast<int>(std::floor(percent));
+  auto now = steady_clock_millis();
+
+  if (!force) {
+    if (rounded_percent <= progress.last_reported_percent) {
+      return;
+    }
+
+    if (now - progress.last_report_millis < kMinProgressReportIntervalMillis) {
+      return;
+    }
+  }
+
+  progress.last_reported_percent = std::max(progress.last_reported_percent, rounded_percent);
+  progress.last_report_millis = now;
+
+  if (!message.has_value()) {
+    message = build_processing_message(progress, result);
+  }
+
+  report_extract_progress(progress_callback, "processing", progress.finalized_count,
+                          progress.total_candidates, percent, std::move(message));
+}
+
+auto prepare_photo_extract_entry(const CandidateAssetRow& candidate)
+    -> std::expected<PreparedPhotoExtractEntry, std::string> {
+  auto uid_result = extract_uid_from_asset_path(candidate.path);
+  if (!uid_result.has_value()) {
+    return std::unexpected("cannot parse UID from path");
+  }
+
+  auto params_base64_result = extract_params_base64_from_file(to_filesystem_path(candidate.path));
+  if (!params_base64_result) {
+    return std::unexpected(params_base64_result.error());
+  }
+
+  return PreparedPhotoExtractEntry{
+      .asset_id = candidate.id,
+      .uid = std::move(uid_result.value()),
+      .params_base64 = std::move(params_base64_result.value()),
+  };
+}
+
+auto mark_candidate_skipped(InfinityNikkiExtractPhotoParamsResult& result,
+                            ExtractProgressState& progress, std::int64_t asset_id,
+                            const std::string& reason) -> void {
+  result.skipped_count++;
+  result.processed_count++;
+  progress.finalized_count++;
+  add_error(result.errors, std::format("asset_id {} skipped: {}", asset_id, reason));
+}
+
+auto mark_candidate_failed(InfinityNikkiExtractPhotoParamsResult& result,
+                           ExtractProgressState& progress, std::int64_t asset_id,
+                           const std::string& reason) -> void {
+  result.failed_count++;
+  result.processed_count++;
+  progress.finalized_count++;
+  add_error(result.errors, std::format("asset_id {} failed: {}", asset_id, reason));
+}
+
+auto mark_candidate_saved(InfinityNikkiExtractPhotoParamsResult& result,
+                          ExtractProgressState& progress, std::int32_t clothes_rows_written)
+    -> void {
+  result.saved_count++;
+  result.processed_count++;
+  result.clothes_rows_written += clothes_rows_written;
+  progress.finalized_count++;
+}
+
+auto flush_extract_batch(
+    Core::State::AppState& app_state, const std::vector<PreparedPhotoExtractEntry>& entries,
+    InfinityNikkiExtractPhotoParamsResult& result, ExtractProgressState& progress,
+    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
+    -> void {
+  if (entries.empty()) {
+    return;
+  }
+
+  auto fail_all = [&](const std::string& reason) {
+    Logger().warn("flush_extract_batch: batch failed (uid={}, count={}): {}", entries.front().uid,
+                  entries.size(), reason);
+    for (const auto& entry : entries) {
+      mark_candidate_failed(result, progress, entry.asset_id, reason);
+    }
+    report_processing_progress(progress_callback, progress, result, true);
+  };
+
+  const auto& uid = entries.front().uid;
+
+  Logger().debug("flush_extract_batch: sending batch (uid={}, count={})", uid, entries.size());
+
+  ExtractApiRequestBody request_body;
+  request_body.uid = uid;
+  request_body.params_base64_list.reserve(entries.size());
+  for (const auto& entry : entries) {
+    request_body.params_base64_list.push_back(entry.params_base64);
+  }
+
+  auto request_json = rfl::json::write<rfl::SnakeCaseToCamelCase>(request_body);
+  auto response_result = http_post_json(std::string(kExtractApiUrl), request_json);
+  if (!response_result) {
+    Logger().error("flush_extract_batch: HTTP request failed: {}", response_result.error());
+    fail_all("HTTP error: " + response_result.error());
+    return;
+  }
+
+  auto parsed_result = parse_photo_params_records_from_response(response_result.value());
+  if (!parsed_result) {
+    Logger().error("flush_extract_batch: parse response failed: {}", parsed_result.error());
+    fail_all(parsed_result.error());
+    return;
+  }
+
+  auto records = std::move(parsed_result.value());
+  if (records.size() != entries.size()) {
+    Logger().error("flush_extract_batch: response count mismatch: got {} records for {} entries",
+                   records.size(), entries.size());
+    fail_all(std::format("response count mismatch: got {} for {}", records.size(), entries.size()));
+    return;
+  }
+
+  for (std::size_t i = 0; i < entries.size(); ++i) {
+    const auto& entry = entries[i];
+    if (!records[i].has_value()) {
+      mark_candidate_failed(result, progress, entry.asset_id,
+                            "API returned null (photo params unrecognized)");
+      continue;
+    }
+    auto save_result = upsert_photo_params_record(app_state, entry.asset_id, uid, *records[i]);
+    if (!save_result) {
+      Logger().error("flush_extract_batch: DB upsert failed for asset_id={}: {}", entry.asset_id,
+                     save_result.error());
+      mark_candidate_failed(result, progress, entry.asset_id, save_result.error());
+      continue;
+    }
+
+    mark_candidate_saved(result, progress, save_result.value());
+  }
+
+  report_processing_progress(progress_callback, progress, result, true);
 }
 
 auto extract_photo_params(
@@ -664,6 +828,9 @@ auto extract_photo_params(
 
   auto only_missing = request.only_missing.value_or(true);
 
+  report_extract_progress(progress_callback, "preparing", 0, 0, kPreparingPercent,
+                          "Loading candidate assets");
+
   auto candidates_result = load_candidate_assets(app_state, only_missing);
   if (!candidates_result) {
     return std::unexpected(candidates_result.error());
@@ -672,127 +839,60 @@ auto extract_photo_params(
   auto candidates = std::move(candidates_result.value());
   result.candidate_count = static_cast<std::int32_t>(candidates.size());
 
+  Logger().info("extract_photo_params: found {} candidate assets (only_missing={})",
+                result.candidate_count, only_missing);
+
   if (candidates.empty()) {
-    report_extract_progress(progress_callback, "completed", 0, 0, "No candidate assets");
+    report_extract_progress(progress_callback, "completed", 0, 0, 100.0, "No candidate assets");
     return result;
   }
 
-  report_extract_progress(progress_callback, "processing", 0, result.candidate_count,
-                          std::format("Processing {} candidate photos", result.candidate_count));
-
-  std::vector<PendingPhotoExtractEntry> pending_entries;
-  pending_entries.reserve(candidates.size());
-
-  auto mark_progress = [&](std::optional<std::string> message = std::nullopt) {
-    report_extract_progress(progress_callback, "processing", result.processed_count,
-                            result.candidate_count, std::move(message));
+  ExtractProgressState progress{
+      .total_candidates = result.candidate_count,
   };
+  report_processing_progress(progress_callback, progress, result, true,
+                             std::format("Loaded {} candidate photos", result.candidate_count));
+
+  // 按 UID 分组批次：API 要求同一请求中所有照片属于同一用户
+  std::unordered_map<std::string, std::vector<PreparedPhotoExtractEntry>> active_batches;
+  active_batches.reserve(std::min<std::size_t>(candidates.size(), 256));
 
   for (const auto& candidate : candidates) {
-    auto uid_result = extract_uid_from_asset_path(candidate.path);
-    if (!uid_result.has_value()) {
-      result.skipped_count++;
-      add_error(result.errors,
-                std::format("asset_id {} skipped: cannot parse UID from path", candidate.id));
-      result.processed_count++;
-      mark_progress();
+    progress.scanned_count++;
+
+    auto prepared_result = prepare_photo_extract_entry(candidate);
+    if (!prepared_result) {
+      mark_candidate_skipped(result, progress, candidate.id, prepared_result.error());
+      report_processing_progress(progress_callback, progress, result);
       continue;
     }
 
-    auto photo_path = to_filesystem_path(candidate.path);
-    if (!std::filesystem::exists(photo_path)) {
-      result.skipped_count++;
-      add_error(result.errors,
-                std::format("asset_id {} skipped: photo file does not exist", candidate.id));
-      result.processed_count++;
-      mark_progress();
-      continue;
-    }
+    auto prepared_entry = std::move(prepared_result.value());
+    auto& batch = active_batches[prepared_entry.uid];
+    batch.push_back(std::move(prepared_entry));
 
-    auto params_base64_result = extract_params_base64_from_file(photo_path);
-    if (!params_base64_result) {
-      result.skipped_count++;
-      add_error(result.errors,
-                std::format("asset_id {} skipped: {}", candidate.id, params_base64_result.error()));
-      result.processed_count++;
-      mark_progress();
-      continue;
-    }
+    report_processing_progress(progress_callback, progress, result);
 
-    pending_entries.push_back(PendingPhotoExtractEntry{
-        .asset_id = candidate.id,
-        .uid = uid_result.value(),
-        .params_base64 = params_base64_result.value(),
-    });
-  }
-
-  std::unordered_map<std::string, std::vector<PendingPhotoExtractEntry>> groups_by_uid;
-  groups_by_uid.reserve(pending_entries.size());
-  for (auto& entry : pending_entries) {
-    groups_by_uid[entry.uid].push_back(std::move(entry));
-  }
-
-  auto fail_batch = [&](const std::vector<PendingPhotoExtractEntry>& entries, std::size_t start,
-                        std::size_t end, const std::string& reason) {
-    for (std::size_t i = start; i < end; ++i) {
-      result.failed_count++;
-      result.processed_count++;
-      add_error(result.errors, std::format("asset_id {} failed: {}", entries[i].asset_id, reason));
-      mark_progress();
-    }
-  };
-
-  for (auto& [uid, entries] : groups_by_uid) {
-    for (std::size_t start = 0; start < entries.size(); start += kExtractBatchSize) {
-      auto end = std::min(start + kExtractBatchSize, entries.size());
-      auto batch_size = end - start;
-
-      ExtractApiRequestBody request_body;
-      request_body.uid = uid;
-      request_body.params_base64_list.reserve(batch_size);
-      for (std::size_t i = start; i < end; ++i) {
-        request_body.params_base64_list.push_back(entries[i].params_base64);
-      }
-
-      auto request_json = rfl::json::write<rfl::SnakeCaseToCamelCase>(request_body);
-      auto response_result = http_post_json(std::string(kExtractApiUrl), request_json);
-      if (!response_result) {
-        fail_batch(entries, start, end, response_result.error());
-        continue;
-      }
-
-      auto parsed_result = parse_photo_params_records_from_response(response_result.value());
-      if (!parsed_result) {
-        fail_batch(entries, start, end, parsed_result.error());
-        continue;
-      }
-
-      auto records = std::move(parsed_result.value());
-      if (records.size() != batch_size) {
-        fail_batch(entries, start, end, "response count mismatch");
-        continue;
-      }
-
-      for (std::size_t i = 0; i < batch_size; ++i) {
-        const auto& entry = entries[start + i];
-        auto save_result = upsert_photo_params_record(app_state, entry.asset_id, uid, records[i]);
-        if (!save_result) {
-          result.failed_count++;
-          add_error(result.errors,
-                    std::format("asset_id {} failed: {}", entry.asset_id, save_result.error()));
-        } else {
-          result.saved_count++;
-          result.clothes_rows_written += save_result.value();
-        }
-
-        result.processed_count++;
-        mark_progress();
-      }
+    if (batch.size() >= kExtractBatchSize) {
+      flush_extract_batch(app_state, batch, result, progress, progress_callback);
+      batch.clear();
     }
   }
+
+  // 扫描结束后冲刷各 UID 剩余的不足一批的条目
+  for (auto& [uid, batch] : active_batches) {
+    (void)uid;
+    flush_extract_batch(app_state, batch, result, progress, progress_callback);
+  }
+
+  Logger().info(
+      "extract_photo_params: completed. candidates={}, processed={}, saved={}, skipped={}, "
+      "failed={}, clothes_rows={}",
+      result.candidate_count, result.processed_count, result.saved_count, result.skipped_count,
+      result.failed_count, result.clothes_rows_written);
 
   report_extract_progress(progress_callback, "completed", result.processed_count,
-                          result.candidate_count,
+                          result.candidate_count, 100.0,
                           std::format("Done: saved={}, skipped={}, failed={}", result.saved_count,
                                       result.skipped_count, result.failed_count));
 
