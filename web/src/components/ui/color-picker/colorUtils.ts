@@ -9,6 +9,15 @@ export interface HSV {
   v: number // 0-100
 }
 
+export const rgbToHex = (r: number, g: number, b: number): string => {
+  const toHex = (value: number) => {
+    const normalized = Math.max(0, Math.min(255, Math.round(value)))
+    return normalized.toString(16).padStart(2, '0')
+  }
+
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase()
+}
+
 /**
  * Converts a HEX color string to HSV object.
  * @param hex A HEX color string (e.g., '#FF0000' or 'FF0000')

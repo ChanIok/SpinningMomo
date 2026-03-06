@@ -16,6 +16,7 @@ import type {
   QueryAssetsParams,
   QueryAssetsResponse,
   InfinityNikkiPhotoParams,
+  AssetMainColor,
   Tag,
   TagTreeNode,
   TagStats,
@@ -321,6 +322,22 @@ export async function getInfinityNikkiPhotoParams(
 }
 
 /**
+ * 获取资产主色调板
+ */
+export async function getAssetMainColors(assetId: number): Promise<AssetMainColor[]> {
+  try {
+    const result = await call<AssetMainColor[]>('gallery.getAssetMainColors', {
+      assetId,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to get asset main colors:', error)
+    throw new Error('获取主色失败')
+  }
+}
+
+/**
  * 获取标签树结构
  */
 export async function getTagTree(): Promise<TagTreeNode[]> {
@@ -500,6 +517,7 @@ export const galleryApi = {
   removeFolderWatch,
   queryAssets, // 统一查询接口
   getInfinityNikkiPhotoParams,
+  getAssetMainColors,
 
   // 时间线查询
   getTimelineBuckets,

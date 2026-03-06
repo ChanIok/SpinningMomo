@@ -74,6 +74,19 @@ auto handle_get_infinity_nikki_photo_params(
   co_return result.value();
 }
 
+auto handle_get_asset_main_colors(Core::State::AppState& app_state,
+                                  const Features::Gallery::Types::GetAssetMainColorsParams& params)
+    -> RpcAwaitable<std::vector<Features::Gallery::Types::AssetMainColor>> {
+  auto result = Features::Gallery::Asset::Service::get_asset_main_colors(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 // ============= 资产动作 RPC 处理函数 =============
 
 auto handle_open_asset_default(Core::State::AppState& app_state,
@@ -145,6 +158,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.getInfinityNikkiPhotoParams",
       handle_get_infinity_nikki_photo_params,
       "Get extracted Infinity Nikki photo parameters for the specified asset");
+
+  register_method<Features::Gallery::Types::GetAssetMainColorsParams,
+                  std::vector<Features::Gallery::Types::AssetMainColor>>(
+      app_state, app_state.rpc->registry, "gallery.getAssetMainColors",
+      handle_get_asset_main_colors, "Get extracted main colors for the specified asset");
 
   register_method<Features::Gallery::Types::GetParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.openAssetDefault", handle_open_asset_default,

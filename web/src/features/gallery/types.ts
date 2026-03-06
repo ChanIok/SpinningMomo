@@ -133,6 +133,13 @@ export interface AssetTag {
   createdAt: number
 }
 
+export interface AssetMainColor {
+  r: number
+  g: number
+  b: number
+  weight: number
+}
+
 // 忽略规则类型
 export interface IgnoreRule {
   id: number
@@ -172,6 +179,7 @@ export interface AssetFilter {
   tagMatchMode?: 'any' | 'all'
   clothIds?: number[]
   clothMatchMode?: 'any' | 'all'
+  colorHex?: string
 }
 
 // 视图配置
@@ -246,6 +254,9 @@ export interface QueryAssetsFilters {
   tagMatchMode?: 'any' | 'all'
   clothIds?: number[]
   clothMatchMode?: 'any' | 'all'
+  colorHexes?: string[]
+  colorMatchMode?: 'any' | 'all'
+  colorDistance?: number
 }
 
 // 查询参数
@@ -297,6 +308,9 @@ export interface GetTimelineBucketsParams {
   tagMatchMode?: 'any' | 'all'
   clothIds?: number[]
   clothMatchMode?: 'any' | 'all'
+  colorHexes?: string[]
+  colorMatchMode?: 'any' | 'all'
+  colorDistance?: number
 }
 
 // 获取时间线桶响应
@@ -311,6 +325,15 @@ export interface GetAssetsByMonthParams {
   folderId?: number
   includeSubfolders?: boolean
   sortOrder?: 'asc' | 'desc'
+  type?: AssetType
+  search?: string
+  tagIds?: number[]
+  tagMatchMode?: 'any' | 'all'
+  clothIds?: number[]
+  clothMatchMode?: 'any' | 'all'
+  colorHexes?: string[]
+  colorMatchMode?: 'any' | 'all'
+  colorDistance?: number
 }
 
 // 获取指定月份资产响应

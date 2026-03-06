@@ -4,11 +4,14 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { rgbToHex } from '@/components/ui/color-picker/colorUtils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
 import {
+  getAssetMainColors,
   getAssetTags,
   removeTagsFromAsset,
   addTagsToAsset,
@@ -16,7 +19,7 @@ import {
 } from '../api'
 import AssetDetailsContent from '../components/AssetDetailsContent.vue'
 import TagSelectorPopover from '../components/TagSelectorPopover.vue'
-import type { Asset, InfinityNikkiPhotoParams, Tag } from '../types'
+import type { Asset, AssetMainColor, InfinityNikkiPhotoParams, Tag } from '../types'
 
 const store = useGalleryStore()
 const { t } = useI18n()
@@ -95,7 +98,9 @@ const batchThumbnailUrl = computed(() => {
 
 // 资产标签状态
 const assetTags = ref<Tag[]>([])
+const assetMainColors = ref<AssetMainColor[]>([])
 const infinityNikkiPhotoParams = ref<InfinityNikkiPhotoParams | null>(null)
+const hasMainColors = computed(() => assetMainColors.value.length > 0)
 const hasInfinityNikkiDetails = computed(() => {
   const params = infinityNikkiPhotoParams.value
   if (!params) return false
@@ -113,26 +118,32 @@ const isRootTagSummary = computed(() => currentTag.value?.id === -1)
 const rootTagCount = computed(() => store.tags.length)
 const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
 
-// 监听 activeAsset 变化，加载标签
+// 监听 activeAsset 变化，加载详情数据
 watch(
   activeAsset,
   async (asset) => {
     if (asset) {
       try {
-        const [tags, photoParams] = await Promise.all([
+        const [tags, mainColors, photoParams] = await Promise.all([
           getAssetTags(asset.id),
-          asset.type === 'photo' ? getInfinityNikkiPhotoParams(asset.id) : Promise.resolve(null),
+          getAssetMainColors(asset.id),
+          asset.type === 'photo' || asset.type === 'live_photo'
+            ? getInfinityNikkiPhotoParams(asset.id)
+            : Promise.resolve(null),
         ])
 
         assetTags.value = tags
+        assetMainColors.value = mainColors
         infinityNikkiPhotoParams.value = photoParams
       } catch (error) {
         console.error('Failed to load asset details:', error)
         assetTags.value = []
+        assetMainColors.value = []
         infinityNikkiPhotoParams.value = null
       }
     } else {
       assetTags.value = []
+      assetMainColors.value = []
       infinityNikkiPhotoParams.value = null
     }
   },
@@ -264,6 +275,39 @@ async function handleCopyCameraParams(text: string) {
 
   toast.error(t('gallery.details.infinityNikki.copyCameraParamsFailed'))
 }
+
+function formatPercentage(weight: number): string {
+  return `${formatNumber(weight * 100, 1) ?? '0'}%`
+}
+
+function getColorHex(color: AssetMainColor): string {
+  return rgbToHex(color.r, color.g, color.b)
+}
+
+async function handleCopyColorHex(color: AssetMainColor) {
+  const hex = getColorHex(color)
+
+  let success = false
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(hex)
+      success = true
+    } catch {
+      success = false
+    }
+  }
+
+  if (!success) {
+    success = copyWithExecCommand(hex)
+  }
+
+  if (success) {
+    toast.success(t('gallery.details.colors.copySuccess', { hex }))
+    return
+  }
+
+  toast.error(t('gallery.details.colors.copyFailed'))
+}
 </script>
 
 <template>
@@ -336,6 +380,32 @@ async function handleCopyCameraParams(text: string) {
         <AssetDetailsContent :asset="activeAsset" :thumbnail-url="thumbnailUrl">
           <template #after-size>
             <Separator />
+
+            <div v-if="hasMainColors" class="space-y-3">
+              <h4 class="text-sm font-medium">{{ t('gallery.details.colors.title') }}</h4>
+              <TooltipProvider>
+                <div class="flex gap-2 overflow-x-auto pb-1">
+                  <Tooltip v-for="(color, index) in assetMainColors" :key="`${index}-${color.r}`">
+                    <TooltipTrigger as-child>
+                      <button
+                        type="button"
+                        class="h-7 w-7 shrink-0 rounded-md border border-border/80 shadow-sm transition-transform hover:scale-[1.04]"
+                        :style="{ backgroundColor: getColorHex(color) }"
+                        @click="handleCopyColorHex(color)"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p class="font-mono text-xs">{{ getColorHex(color) }}</p>
+                      <p class="text-xs text-muted-foreground">
+                        {{ formatPercentage(color.weight) }}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
+            </div>
+
+            <Separator v-if="hasMainColors && hasInfinityNikkiDetails" />
 
             <template v-if="infinityNikkiPhotoParams">
               <div v-if="hasInfinityNikkiDetails" class="space-y-3">
@@ -475,7 +545,7 @@ async function handleCopyCameraParams(text: string) {
               </div>
             </template>
 
-            <Separator v-if="hasInfinityNikkiDetails" />
+            <Separator v-if="hasMainColors || hasInfinityNikkiDetails" />
 
             <!-- 标签信息 -->
             <div>

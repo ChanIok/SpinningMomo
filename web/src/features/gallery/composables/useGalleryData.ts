@@ -33,6 +33,7 @@ export function useGalleryData() {
         tagMatchMode: store.filter.tagMatchMode,
         clothIds: store.filter.clothIds,
         clothMatchMode: store.filter.clothMatchMode,
+        colorHexes: store.filter.colorHex ? [store.filter.colorHex] : undefined,
       })
 
       store.setTimelineBuckets(response.buckets)
@@ -78,6 +79,7 @@ export function useGalleryData() {
           tagMatchMode: store.filter.tagMatchMode,
           clothIds: store.filter.clothIds,
           clothMatchMode: store.filter.clothMatchMode,
+          colorHexes: store.filter.colorHex ? [store.filter.colorHex] : undefined,
         },
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,
@@ -123,6 +125,7 @@ export function useGalleryData() {
           tagMatchMode: store.filter.tagMatchMode,
           clothIds: store.filter.clothIds,
           clothMatchMode: store.filter.clothMatchMode,
+          colorHexes: store.filter.colorHex ? [store.filter.colorHex] : undefined,
         },
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,

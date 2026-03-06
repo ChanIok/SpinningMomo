@@ -155,6 +155,13 @@ export function useGalleryView() {
   }
 
   /**
+   * 设置颜色筛选
+   */
+  function setColorFilter(colorHex?: string) {
+    setFilter({ colorHex: colorHex || undefined })
+  }
+
+  /**
    * 设置是否包含子文件夹
    */
   function setIncludeSubfolders(include: boolean) {
@@ -219,6 +226,7 @@ export function useGalleryView() {
     clearFilter,
     setSearchQuery,
     setTypeFilter,
+    setColorFilter,
     setIncludeSubfolders,
 
     // 视图模式预设

@@ -10,6 +10,7 @@ import Features.Gallery.Types;
 import Features.Gallery.State;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Color.Filter;
+import Features.Gallery.Color.Repository;
 import Utils.Logger;
 import Utils.LRUCache;
 
@@ -317,6 +318,9 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   filters.tag_match_mode = params.tag_match_mode;
   filters.cloth_ids = params.cloth_ids;
   filters.cloth_match_mode = params.cloth_match_mode;
+  filters.color_hexes = params.color_hexes;
+  filters.color_match_mode = params.color_match_mode;
+  filters.color_distance = params.color_distance;
 
   // 复用统一的 WHERE 条件构建器
   auto where_result = build_unified_where_clause(filters);
@@ -370,6 +374,15 @@ auto get_assets_by_month(Core::State::AppState& app_state,
   query_params.filters.folder_id = params.folder_id;
   query_params.filters.include_subfolders = params.include_subfolders;
   query_params.filters.month = params.month;  // 关键：月份变成筛选条件
+  query_params.filters.type = params.type;
+  query_params.filters.search = params.search;
+  query_params.filters.tag_ids = params.tag_ids;
+  query_params.filters.tag_match_mode = params.tag_match_mode;
+  query_params.filters.cloth_ids = params.cloth_ids;
+  query_params.filters.cloth_match_mode = params.cloth_match_mode;
+  query_params.filters.color_hexes = params.color_hexes;
+  query_params.filters.color_match_mode = params.color_match_mode;
+  query_params.filters.color_distance = params.color_distance;
   query_params.sort_by = "created_at";
   query_params.sort_order = params.sort_order;
   // 注意：不传 page，所以返回该月全部数据
@@ -416,6 +429,18 @@ auto get_infinity_nikki_photo_params(Core::State::AppState& app_state,
       *app_state.database, sql, {params.asset_id});
   if (!result) {
     return std::unexpected("Failed to query Infinity Nikki photo params: " + result.error());
+  }
+
+  return result.value();
+}
+
+auto get_asset_main_colors(Core::State::AppState& app_state,
+                           const Types::GetAssetMainColorsParams& params)
+    -> std::expected<std::vector<Types::AssetMainColor>, std::string> {
+  auto result =
+      Features::Gallery::Color::Repository::get_asset_main_colors(app_state, params.asset_id);
+  if (!result) {
+    return std::unexpected(result.error());
   }
 
   return result.value();

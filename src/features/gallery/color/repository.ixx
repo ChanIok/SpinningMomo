@@ -5,6 +5,7 @@ export module Features.Gallery.Color.Repository;
 import std;
 import Core.State;
 import Features.Gallery.Color.Types;
+import Features.Gallery.Types;
 
 namespace Features::Gallery::Color::Repository {
 
@@ -20,5 +21,8 @@ export auto replace_asset_colors(Core::State::AppState& app_state, std::int64_t 
 export auto batch_replace_asset_colors(Core::State::AppState& app_state,
                                        const std::vector<ColorReplaceBatchItem>& items)
     -> std::expected<void, std::string>;
+
+export auto get_asset_main_colors(Core::State::AppState& app_state, std::int64_t asset_id)
+    -> std::expected<std::vector<Features::Gallery::Types::AssetMainColor>, std::string>;
 
 }  // namespace Features::Gallery::Color::Repository

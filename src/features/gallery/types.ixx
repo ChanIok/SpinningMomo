@@ -96,6 +96,13 @@ struct AssetTag {
   std::int64_t created_at;
 };
 
+struct AssetMainColor {
+  std::int64_t r = 0;
+  std::int64_t g = 0;
+  std::int64_t b = 0;
+  double weight = 0.0;
+};
+
 // ============= 辅助数据类型 =============
 
 struct Info {
@@ -212,6 +219,10 @@ struct GetInfinityNikkiPhotoParamsParams {
   std::int64_t asset_id;
 };
 
+struct GetAssetMainColorsParams {
+  std::int64_t asset_id;
+};
+
 struct AssetIdsParams {
   std::vector<std::int64_t> ids;
 };
@@ -255,6 +266,9 @@ struct TimelineBucketsParams {
   std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<std::vector<std::int64_t>> cloth_ids;
   std::optional<std::string> cloth_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<std::vector<std::string>> color_hexes;
+  std::optional<std::string> color_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<double> color_distance = 18.0;
 };
 
 struct TimelineBucketsResponse {
@@ -267,6 +281,15 @@ struct GetAssetsByMonthParams {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
   std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
+  std::optional<std::string> type;
+  std::optional<std::string> search;
+  std::optional<std::vector<std::int64_t>> tag_ids;
+  std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<std::vector<std::int64_t>> cloth_ids;
+  std::optional<std::string> cloth_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<std::vector<std::string>> color_hexes;
+  std::optional<std::string> color_match_mode = "any";  // "any" (OR) | "all" (AND)
+  std::optional<double> color_distance = 18.0;
 };
 
 struct GetAssetsByMonthResponse {

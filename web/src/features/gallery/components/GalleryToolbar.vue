@@ -138,6 +138,70 @@
         </Tooltip>
       </TooltipProvider>
 
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <div>
+              <Popover v-model:open="colorPopoverOpen">
+                <PopoverTrigger as-child>
+                  <Button variant="ghost" size="sm" class="relative">
+                    <Palette class="h-4 w-4" />
+                    <span
+                      v-if="activeColorHex"
+                      class="absolute right-1 bottom-1 h-2.5 w-2.5 rounded-full border border-background"
+                      :style="{ backgroundColor: activeColorHex }"
+                    />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" class="w-auto p-3">
+                  <div class="w-[220px] space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <div
+                          class="h-5 w-5 shrink-0 rounded border border-border/80"
+                          :style="{ backgroundColor: activeColorHex || draftColorHex }"
+                        />
+                        <div class="min-w-0">
+                          <p class="text-xs font-medium">
+                            {{ t('gallery.toolbar.colorFilter.title') }}
+                          </p>
+                          <p class="truncate font-mono text-[11px] text-muted-foreground">
+                            {{ activeColorHex || t('gallery.toolbar.colorFilter.none') }}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        v-if="activeColorHex"
+                        variant="ghost"
+                        size="sm"
+                        class="h-7 px-2 text-xs"
+                        @click="clearColorFilter"
+                      >
+                        {{ t('gallery.toolbar.colorFilter.clear') }}
+                      </Button>
+                    </div>
+
+                    <ColorPicker
+                      :model-value="draftColorHex"
+                      @update:model-value="(color) => (draftColorHex = color)"
+                    />
+
+                    <div class="flex justify-end">
+                      <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
+                        {{ t('gallery.toolbar.colorFilter.apply') }}
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{{ t('gallery.toolbar.colorFilter.tooltip') }}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
       <!-- 视图设置（模式 + 大小调整） -->
       <TooltipProvider>
         <Tooltip>
@@ -210,12 +274,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -241,6 +306,7 @@ import {
   Video,
   Camera,
   CalendarClock,
+  Palette,
   Type,
   Ruler,
 } from 'lucide-vue-next'
@@ -276,11 +342,14 @@ const sortOrder = computed(() => galleryView.sortOrder.value)
 const filter = computed(() => galleryView.filter.value)
 const searchQuery = computed(() => filter.value.searchQuery || '')
 const includeSubfolders = computed(() => galleryView.includeSubfolders.value)
+const activeColorHex = computed(() => filter.value.colorHex)
 
 // 当前slider位置（从实际尺寸反向计算）
 const currentSliderPosition = computed(() => galleryView.getSliderPosition())
 
 const hasSelection = computed(() => props.selectedCount > 0)
+const colorPopoverOpen = ref(false)
+const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
 
 // 视图模式选项
 const viewModes = [
@@ -294,6 +363,12 @@ const viewModes = [
 const currentViewModeIcon = computed(() => {
   const mode = viewModes.find((m) => m.value === viewMode.value)
   return mode?.icon || Grid3x3
+})
+
+watch(colorPopoverOpen, (open) => {
+  if (open) {
+    draftColorHex.value = activeColorHex.value || '#FFFFFF'
+  }
 })
 
 // 方法
@@ -324,6 +399,17 @@ function toggleSortOrder() {
 
 function toggleIncludeSubfolders() {
   galleryView.setIncludeSubfolders(!includeSubfolders.value)
+}
+
+function applyColorFilter() {
+  galleryView.setColorFilter(draftColorHex.value)
+  colorPopoverOpen.value = false
+}
+
+function clearColorFilter() {
+  galleryView.setColorFilter(undefined)
+  draftColorHex.value = '#FFFFFF'
+  colorPopoverOpen.value = false
 }
 
 function setViewMode(

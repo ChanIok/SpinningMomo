@@ -8,6 +8,7 @@ import Core.Database;
 import Core.Database.State;
 import Core.Database.Types;
 import Features.Gallery.Color.Types;
+import Features.Gallery.Types;
 
 namespace Features::Gallery::Color::Repository {
 
@@ -77,6 +78,28 @@ auto batch_replace_asset_colors(Core::State::AppState& app_state,
 
         return {};
       });
+}
+
+auto get_asset_main_colors(Core::State::AppState& app_state, std::int64_t asset_id)
+    -> std::expected<std::vector<Features::Gallery::Types::AssetMainColor>, std::string> {
+  if (asset_id <= 0) {
+    return std::unexpected("Invalid asset_id");
+  }
+
+  static const std::string kQuerySql = R"(
+    SELECT r, g, b, weight
+    FROM asset_colors
+    WHERE asset_id = ?
+    ORDER BY weight DESC, id ASC
+  )";
+
+  auto result = Core::Database::query<Features::Gallery::Types::AssetMainColor>(
+      *app_state.database, kQuerySql, std::vector<Core::Database::Types::DbParam>{asset_id});
+  if (!result) {
+    return std::unexpected("Failed to query asset main colors: " + result.error());
+  }
+
+  return result.value();
 }
 
 }  // namespace Features::Gallery::Color::Repository

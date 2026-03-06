@@ -24,6 +24,10 @@ export auto get_infinity_nikki_photo_params(Core::State::AppState& app_state,
                                             const Types::GetInfinityNikkiPhotoParamsParams& params)
     -> std::expected<std::optional<Types::InfinityNikkiPhotoParams>, std::string>;
 
+export auto get_asset_main_colors(Core::State::AppState& app_state,
+                                  const Types::GetAssetMainColorsParams& params)
+    -> std::expected<std::vector<Types::AssetMainColor>, std::string>;
+
 // 维护服务
 export auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;
