@@ -5,15 +5,22 @@ import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
-import { getAssetTags, removeTagsFromAsset, addTagsToAsset } from '../api'
+import {
+  getAssetTags,
+  removeTagsFromAsset,
+  addTagsToAsset,
+  getInfinityNikkiPhotoParams,
+} from '../api'
 import AssetDetailsContent from '../components/AssetDetailsContent.vue'
 import TagSelectorPopover from '../components/TagSelectorPopover.vue'
-import type { Asset, Tag } from '../types'
+import type { Asset, InfinityNikkiPhotoParams, Tag } from '../types'
 
 const store = useGalleryStore()
 const { t } = useI18n()
+const { toast } = useToast()
 
 // 获取详情面板焦点
 const detailsFocus = computed(() => store.detailsPanel)
@@ -88,6 +95,15 @@ const batchThumbnailUrl = computed(() => {
 
 // 资产标签状态
 const assetTags = ref<Tag[]>([])
+const infinityNikkiPhotoParams = ref<InfinityNikkiPhotoParams | null>(null)
+const hasInfinityNikkiDetails = computed(() => {
+  const params = infinityNikkiPhotoParams.value
+  if (!params) return false
+
+  return Object.values(params).some(
+    (value) => value !== undefined && value !== null && value !== ''
+  )
+})
 
 // 当前标签（详情面板焦点为 tag 时）
 const currentTag = computed(() => {
@@ -103,13 +119,21 @@ watch(
   async (asset) => {
     if (asset) {
       try {
-        assetTags.value = await getAssetTags(asset.id)
+        const [tags, photoParams] = await Promise.all([
+          getAssetTags(asset.id),
+          asset.type === 'photo' ? getInfinityNikkiPhotoParams(asset.id) : Promise.resolve(null),
+        ])
+
+        assetTags.value = tags
+        infinityNikkiPhotoParams.value = photoParams
       } catch (error) {
-        console.error('Failed to load asset tags:', error)
+        console.error('Failed to load asset details:', error)
         assetTags.value = []
+        infinityNikkiPhotoParams.value = null
       }
     } else {
       assetTags.value = []
+      infinityNikkiPhotoParams.value = null
     }
   },
   { immediate: true }
@@ -157,6 +181,89 @@ async function handleAddTag(tagId: number) {
     console.error('Failed to add tag:', error)
   }
 }
+
+function padTwoDigits(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+function formatGameTime(params: InfinityNikkiPhotoParams | null): string | null {
+  if (!params) return null
+  if (params.timeHour === undefined || params.timeMin === undefined) return null
+
+  return `${padTwoDigits(params.timeHour)}:${padTwoDigits(params.timeMin)}`
+}
+
+function formatNumber(value: number | undefined, digits = 2): string | null {
+  if (value === undefined) return null
+  return Number(value)
+    .toFixed(digits)
+    .replace(/\.?0+$/, '')
+}
+
+function formatNikkiLocation(params: InfinityNikkiPhotoParams | null): string | null {
+  if (!params) return null
+  if (
+    params.nikkiLocX === undefined ||
+    params.nikkiLocY === undefined ||
+    params.nikkiLocZ === undefined
+  ) {
+    return null
+  }
+
+  const x = formatNumber(params.nikkiLocX, 3)
+  const y = formatNumber(params.nikkiLocY, 3)
+  const z = formatNumber(params.nikkiLocZ, 3)
+  return x && y && z ? `(${x}, ${y}, ${z})` : null
+}
+
+function copyWithExecCommand(text: string): boolean {
+  if (typeof document === 'undefined') {
+    return false
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  textarea.style.pointerEvents = 'none'
+  document.body.appendChild(textarea)
+  textarea.focus()
+  textarea.select()
+
+  let success = false
+  try {
+    success = document.execCommand('copy')
+  } catch {
+    success = false
+  }
+
+  document.body.removeChild(textarea)
+  return success
+}
+
+async function handleCopyCameraParams(text: string) {
+  let success = false
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      success = true
+    } catch {
+      success = false
+    }
+  }
+
+  if (!success) {
+    success = copyWithExecCommand(text)
+  }
+
+  if (success) {
+    toast.success(t('gallery.details.infinityNikki.copyCameraParamsSuccess'))
+    return
+  }
+
+  toast.error(t('gallery.details.infinityNikki.copyCameraParamsFailed'))
+}
 </script>
 
 <template>
@@ -165,7 +272,7 @@ async function handleAddTag(tagId: number) {
       <!-- 文件夹详情 -->
       <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
         <div class="flex items-center justify-between">
-          <h3 class="font-medium">详情</h3>
+          <h3 class="font-medium">{{ t('gallery.details.title') }}</h3>
         </div>
 
         <div v-if="isRootFolderSummary">
@@ -190,10 +297,12 @@ async function handleAddTag(tagId: number) {
 
         <!-- 文件夹信息 -->
         <div v-else>
-          <h4 class="mb-2 text-sm font-medium">文件夹信息</h4>
+          <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.folderInfo') }}</h4>
           <div class="space-y-2 text-xs">
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">显示名称</span>
+              <span class="text-muted-foreground">{{
+                t('gallery.details.folderDisplayName')
+              }}</span>
               <span
                 class="truncate font-medium"
                 :title="currentFolder.displayName || currentFolder.name"
@@ -202,20 +311,20 @@ async function handleAddTag(tagId: number) {
               </span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">文件夹名</span>
+              <span class="text-muted-foreground">{{ t('gallery.details.folderName') }}</span>
               <span class="truncate font-mono" :title="currentFolder.name">{{
                 currentFolder.name
               }}</span>
             </div>
             <div class="flex flex-col gap-1">
-              <span class="text-muted-foreground">完整路径</span>
+              <span class="text-muted-foreground">{{ t('gallery.details.fullPath') }}</span>
               <p class="rounded bg-muted/50 p-2 font-mono text-xs break-all">
                 {{ currentFolder.path }}
               </p>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">资产数量</span>
-              <span>{{ currentFolder.assetCount }} 项</span>
+              <span class="text-muted-foreground">{{ t('gallery.details.assetCount') }}</span>
+              <span>{{ t('gallery.details.itemCount', { count: currentFolder.assetCount }) }}</span>
             </div>
           </div>
         </div>
@@ -223,15 +332,155 @@ async function handleAddTag(tagId: number) {
 
       <!-- 资产详情 -->
       <div v-else-if="detailsFocus.type === 'asset' && activeAsset" class="space-y-4">
-        <h3 class="font-medium">详情</h3>
+        <h3 class="font-medium">{{ t('gallery.details.title') }}</h3>
         <AssetDetailsContent :asset="activeAsset" :thumbnail-url="thumbnailUrl">
           <template #after-size>
             <Separator />
 
+            <template v-if="infinityNikkiPhotoParams">
+              <div v-if="hasInfinityNikkiDetails" class="space-y-3">
+                <h4 class="text-sm font-medium">{{ t('gallery.details.infinityNikki.title') }}</h4>
+                <div class="space-y-2 text-xs">
+                  <div
+                    v-if="formatGameTime(infinityNikkiPhotoParams)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.gameTime')
+                    }}</span>
+                    <span>{{ formatGameTime(infinityNikkiPhotoParams) }}</span>
+                  </div>
+
+                  <div v-if="infinityNikkiPhotoParams.cameraParams" class="space-y-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-muted-foreground">{{
+                        t('gallery.details.infinityNikki.cameraParams')
+                      }}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        class="h-6 px-2 text-xs"
+                        @click="handleCopyCameraParams(infinityNikkiPhotoParams.cameraParams)"
+                      >
+                        {{ t('gallery.details.infinityNikki.copyCameraParams') }}
+                      </Button>
+                    </div>
+                    <p
+                      class="truncate rounded bg-muted/50 p-2 font-mono text-[11px]"
+                      :title="infinityNikkiPhotoParams.cameraParams"
+                    >
+                      {{ infinityNikkiPhotoParams.cameraParams }}
+                    </p>
+                  </div>
+
+                  <div
+                    v-if="formatNumber(infinityNikkiPhotoParams.cameraFocalLength)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.cameraFocalLength')
+                    }}</span>
+                    <span>{{ formatNumber(infinityNikkiPhotoParams.cameraFocalLength) }}</span>
+                  </div>
+                  <div
+                    v-if="infinityNikkiPhotoParams.apertureSection !== undefined"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.apertureSection')
+                    }}</span>
+                    <span>{{ infinityNikkiPhotoParams.apertureSection }}</span>
+                  </div>
+                  <div v-if="infinityNikkiPhotoParams.filterId" class="flex justify-between gap-2">
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.filterId')
+                    }}</span>
+                    <span
+                      class="max-w-32 truncate font-mono"
+                      :title="infinityNikkiPhotoParams.filterId"
+                    >
+                      {{ infinityNikkiPhotoParams.filterId }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="formatNumber(infinityNikkiPhotoParams.filterStrength)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.filterStrength')
+                    }}</span>
+                    <span>{{ formatNumber(infinityNikkiPhotoParams.filterStrength) }}</span>
+                  </div>
+                  <div
+                    v-if="formatNumber(infinityNikkiPhotoParams.vignetteIntensity)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.vignetteIntensity')
+                    }}</span>
+                    <span>{{ formatNumber(infinityNikkiPhotoParams.vignetteIntensity) }}</span>
+                  </div>
+                  <div v-if="infinityNikkiPhotoParams.lightId" class="flex justify-between gap-2">
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.lightId')
+                    }}</span>
+                    <span
+                      class="max-w-32 truncate font-mono"
+                      :title="infinityNikkiPhotoParams.lightId"
+                    >
+                      {{ infinityNikkiPhotoParams.lightId }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="formatNumber(infinityNikkiPhotoParams.lightStrength)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.lightStrength')
+                    }}</span>
+                    <span>{{ formatNumber(infinityNikkiPhotoParams.lightStrength) }}</span>
+                  </div>
+                  <div
+                    v-if="formatNikkiLocation(infinityNikkiPhotoParams)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.nikkiLocation')
+                    }}</span>
+                    <span class="text-right">{{
+                      formatNikkiLocation(infinityNikkiPhotoParams)
+                    }}</span>
+                  </div>
+                  <div
+                    v-if="infinityNikkiPhotoParams.nikkiHidden !== undefined"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.nikkiHidden')
+                    }}</span>
+                    <span>{{
+                      infinityNikkiPhotoParams.nikkiHidden ? t('common.yes') : t('common.no')
+                    }}</span>
+                  </div>
+                  <div
+                    v-if="infinityNikkiPhotoParams.poseId !== undefined"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.poseId')
+                    }}</span>
+                    <span>{{ infinityNikkiPhotoParams.poseId }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <Separator v-if="hasInfinityNikkiDetails" />
+
             <!-- 标签信息 -->
             <div>
               <div class="mb-2 flex items-center justify-between">
-                <h4 class="text-sm font-medium">标签</h4>
+                <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
                 <!-- 添加标签按钮 -->
                 <Popover v-model:open="showTagSelector">
                   <PopoverTrigger as-child>
@@ -250,7 +499,7 @@ async function handleAddTag(tagId: number) {
                         <path d="M5 12h14" />
                         <path d="M12 5v14" />
                       </svg>
-                      添加标签
+                      {{ t('gallery.details.tags.add') }}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" class="p-0">
@@ -292,7 +541,9 @@ async function handleAddTag(tagId: number) {
                   </button>
                 </span>
               </div>
-              <div v-else class="text-xs text-muted-foreground">暂无标签</div>
+              <div v-else class="text-xs text-muted-foreground">
+                {{ t('gallery.details.tags.empty') }}
+              </div>
             </div>
           </template>
         </AssetDetailsContent>
@@ -300,7 +551,7 @@ async function handleAddTag(tagId: number) {
 
       <!-- 标签详情 -->
       <div v-else-if="detailsFocus.type === 'tag' && currentTag" class="space-y-4">
-        <h3 class="font-medium">详情</h3>
+        <h3 class="font-medium">{{ t('gallery.details.title') }}</h3>
 
         <div v-if="isRootTagSummary">
           <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.rootTagSummary.title') }}</h4>
@@ -322,24 +573,24 @@ async function handleAddTag(tagId: number) {
 
         <!-- 标签信息 -->
         <div v-else>
-          <h4 class="mb-2 text-sm font-medium">标签信息</h4>
+          <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.tagInfo') }}</h4>
           <div class="space-y-2 text-xs">
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">标签名</span>
+              <span class="text-muted-foreground">{{ t('gallery.details.tagName') }}</span>
               <span class="truncate font-medium" :title="currentTag.name">
                 {{ currentTag.name }}
               </span>
             </div>
             <div v-if="currentTag.parentId" class="flex justify-between gap-2">
-              <span class="text-muted-foreground">父标签ID</span>
+              <span class="text-muted-foreground">{{ t('gallery.details.parentTagId') }}</span>
               <span>{{ currentTag.parentId }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">资产数量</span>
-              <span>{{ currentTag.assetCount }} 项</span>
+              <span class="text-muted-foreground">{{ t('gallery.details.assetCount') }}</span>
+              <span>{{ t('gallery.details.itemCount', { count: currentTag.assetCount }) }}</span>
             </div>
             <div class="flex justify-between gap-2">
-              <span class="text-muted-foreground">排序顺序</span>
+              <span class="text-muted-foreground">{{ t('gallery.details.sortOrder') }}</span>
               <span>{{ currentTag.sortOrder }}</span>
             </div>
           </div>
@@ -348,25 +599,29 @@ async function handleAddTag(tagId: number) {
 
       <!-- 批量操作 -->
       <div v-else-if="detailsFocus.type === 'batch'" class="space-y-4">
-        <h3 class="font-medium">批量操作</h3>
+        <h3 class="font-medium">{{ t('gallery.details.batch.title') }}</h3>
 
-        <div class="text-sm text-muted-foreground">已选中 {{ selectedCount }} 项</div>
+        <div class="text-sm text-muted-foreground">
+          {{ t('gallery.details.batch.selectedCount', { count: selectedCount }) }}
+        </div>
 
         <template v-if="batchActiveAsset">
           <Separator />
 
-          <h4 class="text-sm font-medium">当前焦点项</h4>
+          <h4 class="text-sm font-medium">{{ t('gallery.details.batch.currentFocus') }}</h4>
           <AssetDetailsContent :asset="batchActiveAsset" :thumbnail-url="batchThumbnailUrl" />
         </template>
         <div v-else class="text-xs text-muted-foreground">
-          当前焦点项不可用（可能尚未加载或已被筛选条件过滤）
+          {{ t('gallery.details.batch.focusUnavailable') }}
         </div>
 
         <Separator />
 
         <div class="space-y-2">
-          <p class="text-sm font-medium">批量操作</p>
-          <div class="text-xs text-muted-foreground">敬请期待...</div>
+          <p class="text-sm font-medium">{{ t('gallery.details.batch.title') }}</p>
+          <div class="text-xs text-muted-foreground">
+            {{ t('gallery.details.batch.placeholder') }}
+          </div>
         </div>
       </div>
 
@@ -389,7 +644,7 @@ async function handleAddTag(tagId: number) {
             <circle cx="9" cy="9" r="2" />
             <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
           </svg>
-          <p class="text-sm">选择资产或文件夹查看详情</p>
+          <p class="text-sm">{{ t('gallery.details.empty') }}</p>
         </div>
       </div>
     </div>

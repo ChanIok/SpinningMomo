@@ -208,6 +208,10 @@ struct GetParams {
   std::int64_t id;
 };
 
+struct GetInfinityNikkiPhotoParamsParams {
+  std::int64_t asset_id;
+};
+
 struct AssetIdsParams {
   std::vector<std::int64_t> ids;
 };
@@ -296,6 +300,24 @@ struct QueryAssetsParams {
   // 分页是可选的：传page就分页，不传就返回所有结果
   std::optional<std::int32_t> page;
   std::optional<std::int32_t> per_page;
+};
+
+struct InfinityNikkiPhotoParams {
+  std::optional<std::string> camera_params;
+  std::optional<std::int64_t> time_hour;
+  std::optional<std::int64_t> time_min;
+  std::optional<double> camera_focal_length;
+  std::optional<std::int64_t> aperture_section;
+  std::optional<std::string> filter_id;
+  std::optional<double> filter_strength;
+  std::optional<double> vignette_intensity;
+  std::optional<std::string> light_id;
+  std::optional<double> light_strength;
+  std::optional<double> nikki_loc_x;
+  std::optional<double> nikki_loc_y;
+  std::optional<double> nikki_loc_z;
+  std::optional<std::int64_t> nikki_hidden;
+  std::optional<std::int64_t> pose_id;
 };
 
 // ============= 标签相关参数 =============

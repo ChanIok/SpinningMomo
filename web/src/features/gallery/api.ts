@@ -15,6 +15,7 @@ import type {
   GetAssetsByMonthResponse,
   QueryAssetsParams,
   QueryAssetsResponse,
+  InfinityNikkiPhotoParams,
   Tag,
   TagTreeNode,
   TagStats,
@@ -299,6 +300,27 @@ export async function queryAssets(params: QueryAssetsParams): Promise<QueryAsset
 }
 
 /**
+ * 获取 Infinity Nikki 照片详情参数
+ */
+export async function getInfinityNikkiPhotoParams(
+  assetId: number
+): Promise<InfinityNikkiPhotoParams | null> {
+  try {
+    const result = await call<InfinityNikkiPhotoParams | null>(
+      'gallery.getInfinityNikkiPhotoParams',
+      {
+        assetId,
+      }
+    )
+
+    return result
+  } catch (error) {
+    console.error('Failed to get Infinity Nikki photo params:', error)
+    throw new Error('获取无限暖暖照片参数失败')
+  }
+}
+
+/**
  * 获取标签树结构
  */
 export async function getTagTree(): Promise<TagTreeNode[]> {
@@ -477,6 +499,7 @@ export const galleryApi = {
   openFolderInExplorer,
   removeFolderWatch,
   queryAssets, // 统一查询接口
+  getInfinityNikkiPhotoParams,
 
   // 时间线查询
   getTimelineBuckets,

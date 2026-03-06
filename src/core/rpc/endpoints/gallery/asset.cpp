@@ -59,6 +59,21 @@ auto handle_query_assets(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_get_infinity_nikki_photo_params(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::GetInfinityNikkiPhotoParamsParams& params)
+    -> RpcAwaitable<std::optional<Features::Gallery::Types::InfinityNikkiPhotoParams>> {
+  auto result =
+      Features::Gallery::Asset::Service::get_infinity_nikki_photo_params(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 // ============= 资产动作 RPC 处理函数 =============
 
 auto handle_open_asset_default(Core::State::AppState& app_state,
@@ -124,6 +139,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.queryAssets", handle_query_assets,
       "Unified asset query interface with flexible filters (folder, month, year, type, search) "
       "and optional pagination");
+
+  register_method<Features::Gallery::Types::GetInfinityNikkiPhotoParamsParams,
+                  std::optional<Features::Gallery::Types::InfinityNikkiPhotoParams>>(
+      app_state, app_state.rpc->registry, "gallery.getInfinityNikkiPhotoParams",
+      handle_get_infinity_nikki_photo_params,
+      "Get extracted Infinity Nikki photo parameters for the specified asset");
 
   register_method<Features::Gallery::Types::GetParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.openAssetDefault", handle_open_asset_default,

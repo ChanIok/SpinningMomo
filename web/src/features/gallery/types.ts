@@ -261,6 +261,24 @@ export interface QueryAssetsParams {
 // 查询响应（复用 ListAssetsResponse）
 export type QueryAssetsResponse = ListAssetsResponse
 
+export interface InfinityNikkiPhotoParams {
+  cameraParams?: string
+  timeHour?: number
+  timeMin?: number
+  cameraFocalLength?: number
+  apertureSection?: number
+  filterId?: string
+  filterStrength?: number
+  vignetteIntensity?: number
+  lightId?: string
+  lightStrength?: number
+  nikkiLocX?: number
+  nikkiLocY?: number
+  nikkiLocZ?: number
+  nikkiHidden?: number
+  poseId?: number
+}
+
 // ============= 时间线相关类型 =============
 
 // 时间线桶（月份元数据）

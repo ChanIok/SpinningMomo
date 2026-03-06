@@ -389,6 +389,38 @@ auto get_assets_by_month(Core::State::AppState& app_state,
   return response;
 }
 
+auto get_infinity_nikki_photo_params(Core::State::AppState& app_state,
+                                     const Types::GetInfinityNikkiPhotoParamsParams& params)
+    -> std::expected<std::optional<Types::InfinityNikkiPhotoParams>, std::string> {
+  std::string sql = R"(
+    SELECT camera_params,
+           time_hour,
+           time_min,
+           camera_focal_length,
+           aperture_section,
+           filter_id,
+           filter_strength,
+           vignette_intensity,
+           light_id,
+           light_strength,
+           nikki_loc_x,
+           nikki_loc_y,
+           nikki_loc_z,
+           nikki_hidden,
+           pose_id
+    FROM asset_infinity_nikki_params
+    WHERE asset_id = ?
+  )";
+
+  auto result = Core::Database::query_single<Types::InfinityNikkiPhotoParams>(
+      *app_state.database, sql, {params.asset_id});
+  if (!result) {
+    return std::unexpected("Failed to query Infinity Nikki photo params: " + result.error());
+  }
+
+  return result.value();
+}
+
 // ============= 维护服务实现 =============
 
 auto load_asset_cache(Core::State::AppState& app_state)
