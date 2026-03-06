@@ -447,6 +447,51 @@ auto finalize_controller_initialization(Core::State::AppState* state,
     Logger().warn("Resource interception setup failed, continuing without thumbnail support");
   }
 
+  // 注入官方地图劫持脚本
+  const wchar_t* injection_script =
+      LR"SCRIPT(
+if (window.location.hostname === 'myl.nuanpaper.com') {
+    let innerL = undefined;
+    Object.defineProperty(window, 'L', {
+        get: function() { return innerL; },
+        set: function(val) {
+            innerL = val;
+            if (innerL && innerL.Map) {
+                // 劫持 L.Map 构造函数
+                const OriginalMapClass = innerL.Map;
+                innerL.Map = function(...args) {
+                    const mapInstance = new OriginalMapClass(...args);
+                    window.__SPINNING_MOMO_MAP__ = mapInstance;
+                    return mapInstance;
+                };
+                innerL.Map.prototype = OriginalMapClass.prototype;
+                Object.assign(innerL.Map, OriginalMapClass);
+            }
+        },
+        configurable: true,
+        enumerable: true
+    });
+
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.action === 'ADD_MARKER') {
+            const map = window.__SPINNING_MOMO_MAP__;
+            const L = window.innerL || window.L;
+            if (map && L) {
+                const { lat, lng, popupHtml } = event.data.payload || {};
+                if (lat === undefined || lng === undefined) return;
+                
+                const marker = L.marker([lat, lng]).addTo(map);
+                if (popupHtml) {
+                    marker.bindPopup(popupHtml).openPopup();
+                }
+                map.flyTo([lat, lng], 6);
+            }
+        }
+    });
+}
+)SCRIPT";
+  webview->AddScriptToExecuteOnDocumentCreated(injection_script, nullptr);
+
   select_initial_url(webview_state.config);
 
   auto non_client_enabled = enable_non_client_region_support(webview);

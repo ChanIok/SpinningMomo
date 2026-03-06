@@ -7,6 +7,7 @@ const OnboardingPage = () => import('@/features/onboarding/pages/OnboardingPage.
 const GalleryPage = () => import('@/features/gallery/pages/GalleryPage.vue')
 const SettingsPage = () => import('@/features/settings/pages/SettingsPage.vue')
 const AboutPage = () => import('@/features/about/pages/AboutPage.vue')
+const MapPage = () => import('@/features/map/pages/MapPage.vue')
 
 // 导入playground路由
 import { routes as playgroundRoutes } from '@/features/playground'
@@ -40,6 +41,14 @@ const routes: RouteRecordRaw[] = [
     component: GalleryPage,
     meta: {
       title: '图库',
+    },
+  },
+  {
+    path: '/map',
+    name: 'map',
+    component: MapPage,
+    meta: {
+      title: '地图',
     },
   },
   {

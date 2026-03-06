@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Home, Images, Settings, Info } from 'lucide-vue-next'
+import { Home, Images, Map, Settings, Info } from 'lucide-vue-next'
 import {
   Sidebar,
   SidebarContent,
@@ -31,6 +31,7 @@ withDefaults(
 const baseMenuItems: (MenuItem | { type: 'divider' })[] = [
   { title: '主页', key: 'home', icon: Home },
   { title: '图库', key: 'gallery', icon: Images },
+  { title: '地图', key: 'map', icon: Map },
   { title: '设置', key: 'settings', icon: Settings },
   { type: 'divider' },
   { title: '关于', key: 'about', icon: Info },
