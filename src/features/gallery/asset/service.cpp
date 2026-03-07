@@ -242,6 +242,13 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
   // 4. 构建主查询
   std::string sql = std::format(R"(
     SELECT id, name, path, type,
+           (
+             SELECT printf('#%02X%02X%02X', ac.r, ac.g, ac.b)
+             FROM asset_colors ac
+             WHERE ac.asset_id = assets.id
+             ORDER BY ac.weight DESC, ac.id ASC
+             LIMIT 1
+           ) AS dominant_color_hex,
            description, width, height, size, extension, mime_type, hash, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at
@@ -452,6 +459,7 @@ auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string> {
   std::string sql = R"(
     SELECT id, name, path, type,
+           NULL AS dominant_color_hex,
            description, width, height, size, extension, mime_type, hash, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at

@@ -8,6 +8,7 @@ export interface Asset {
   name: string
   path: string
   type: AssetType // photo, video, live_photo, unknown
+  dominantColorHex?: string
 
   // 基本信息
   width?: number

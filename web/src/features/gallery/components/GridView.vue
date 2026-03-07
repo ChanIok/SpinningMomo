@@ -213,8 +213,6 @@ async function handleMoveAssetsToTrash() {
                   <AssetCard
                     :asset="asset"
                     :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                    :show-name="galleryView.viewSize.value >= 256"
-                    :show-size="galleryView.viewSize.value >= 256"
                     @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
                     @double-click="
                       (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
@@ -308,8 +306,6 @@ async function handleMoveAssetsToTrash() {
                   <AssetCard
                     :asset="asset"
                     :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                    :show-name="galleryView.viewSize.value >= 256"
-                    :show-size="galleryView.viewSize.value >= 256"
                     @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
                     @double-click="
                       (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)

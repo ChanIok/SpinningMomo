@@ -83,6 +83,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
+                   NULL AS dominant_color_hex,
                    description, width, height, size, extension, mime_type, hash, folder_id,
                    file_created_at, file_modified_at,
                    created_at, updated_at
@@ -105,6 +106,7 @@ auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path
     -> std::expected<std::optional<Types::Asset>, std::string> {
   std::string sql = R"(
             SELECT id, name, path, type,
+                   NULL AS dominant_color_hex,
                    description, width, height, size, extension, mime_type, hash, folder_id,
                    file_created_at, file_modified_at,
                    created_at, updated_at

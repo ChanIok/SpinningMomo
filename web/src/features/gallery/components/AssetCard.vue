@@ -1,20 +1,19 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { hexToHsv, hsvToHex, normalizeToHex } from '@/components/ui/color-picker/colorUtils'
 import { useGalleryData } from '../composables/useGalleryData'
 import type { Asset } from '../types'
+
+const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
 
 // Props 定义
 interface AssetCardProps {
   asset: Asset
   isSelected?: boolean
-  showName?: boolean
-  showSize?: boolean
 }
 
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
-  showName: true,
-  showSize: false,
 })
 
 // Emits 定义
@@ -35,6 +34,25 @@ const { getAssetThumbnailUrl } = useGalleryData()
 const thumbnailUrl = computed(() => {
   return getAssetThumbnailUrl(props.asset)
 })
+
+const hasThumbnail = computed(() => thumbnailUrl.value.length > 0)
+
+const showPlaceholder = computed(
+  () => isImageLoading.value || imageError.value || !hasThumbnail.value
+)
+
+const placeholderColor = computed(() => {
+  return getAdjustedPlaceholderColor(props.asset.dominantColorHex)
+})
+
+watch(
+  thumbnailUrl,
+  (url) => {
+    imageError.value = false
+    isImageLoading.value = url.length > 0
+  },
+  { immediate: true }
+)
 
 // 事件处理
 function handleClick(event: MouseEvent) {
@@ -60,17 +78,35 @@ function onImageError() {
   imageError.value = true
 }
 
-function formatFileSize(bytes: number): string {
-  const units = ['B', 'KB', 'MB', 'GB']
-  let size = bytes
-  let unitIndex = 0
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
 
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024
-    unitIndex++
-  }
+function mixHexColors(baseHex: string, overlayHex: string, ratio: number): string {
+  const base = normalizeToHex(baseHex, FALLBACK_PLACEHOLDER_COLOR)
+  const overlay = normalizeToHex(overlayHex, '#FFFFFF')
+  const weight = clamp(ratio, 0, 1)
 
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)}${units[unitIndex]}`
+  const channels = [0, 2, 4].map((offset) => {
+    const baseValue = parseInt(base.slice(offset + 1, offset + 3), 16)
+    const overlayValue = parseInt(overlay.slice(offset + 1, offset + 3), 16)
+    return Math.round(baseValue * (1 - weight) + overlayValue * weight)
+  })
+
+  return `#${channels.map((value) => value.toString(16).padStart(2, '0')).join('')}`.toUpperCase()
+}
+
+function getAdjustedPlaceholderColor(hex?: string): string {
+  const normalized = normalizeToHex(hex ?? '', FALLBACK_PLACEHOLDER_COLOR)
+  const hsv = hexToHsv(normalized)
+
+  const adjustedHex = hsvToHex({
+    h: hsv.h,
+    s: clamp(hsv.s, 18, 52),
+    v: clamp(hsv.v, 38, 74),
+  })
+
+  return mixHexColors(adjustedHex, '#FFFFFF', 0.14)
 }
 </script>
 
@@ -93,7 +129,7 @@ function formatFileSize(bytes: number): string {
     <div class="relative h-full w-full overflow-hidden">
       <!-- 缩略图 -->
       <img
-        v-if="!imageError"
+        v-if="hasThumbnail && !imageError"
         :src="thumbnailUrl"
         :alt="asset.name"
         class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
@@ -101,21 +137,41 @@ function formatFileSize(bytes: number): string {
         @error="onImageError"
       />
 
-      <!-- 加载占位符 -->
+      <!-- 主色占位符 -->
       <div
-        v-if="isImageLoading"
-        class="absolute inset-0 flex animate-pulse items-center justify-center bg-muted"
+        v-if="showPlaceholder"
+        class="absolute inset-0"
+        :style="{ backgroundColor: placeholderColor }"
       >
-        <div class="text-2xl text-muted-foreground">📷</div>
+        <div class="absolute inset-0 bg-white/24 dark:bg-black/32" />
+        <div
+          v-if="isImageLoading"
+          class="absolute inset-0 animate-pulse bg-gradient-to-br from-white/18 via-transparent to-black/10 dark:from-white/10 dark:to-black/18"
+        />
       </div>
 
       <!-- 错误占位符 -->
       <div
         v-if="imageError"
-        class="absolute inset-0 flex flex-col items-center justify-center bg-muted text-muted-foreground"
+        class="absolute inset-0 flex flex-col items-center justify-center text-white/88"
       >
-        <div class="mb-1 text-2xl">❌</div>
-        <div class="px-2 text-center text-xs">加载失败</div>
+        <div class="rounded-full border border-white/25 bg-black/15 p-2 backdrop-blur-[1px]">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </div>
+        <div class="mt-2 px-2 text-center text-xs font-medium">加载失败</div>
       </div>
 
       <!-- 遮罩层 -->
@@ -139,25 +195,6 @@ function formatFileSize(bytes: number): string {
             clip-rule="evenodd"
           />
         </svg>
-      </div>
-
-      <!-- 资产类型标识 -->
-      <div
-        class="absolute right-0 bottom-0 left-0 bg-gradient-to-t from-black/60 to-transparent p-2"
-      >
-        <div class="flex items-center justify-between text-white">
-          <!-- 文件大小（可选） -->
-          <span v-if="showSize && asset.size" class="text-xs opacity-80">
-            {{ formatFileSize(asset.size) }}
-          </span>
-        </div>
-
-        <!-- 文件名（在较大尺寸时显示） -->
-        <div v-if="showName" class="mt-1">
-          <div class="truncate text-xs text-white/90" :title="asset.name">
-            {{ asset.name }}
-          </div>
-        </div>
       </div>
     </div>
   </div>

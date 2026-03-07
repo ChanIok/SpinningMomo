@@ -13,6 +13,7 @@ struct Asset {
   std::string name;
   std::string path;
   std::string type;  // photo, video, live_photo, unknown
+  std::optional<std::string> dominant_color_hex;
 
   std::optional<std::string> description;
   std::optional<std::int32_t> width;
