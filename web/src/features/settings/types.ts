@@ -60,6 +60,7 @@ export interface WebBackgroundSettings {
   backgroundBlurAmount: number
   backgroundOpacity: number
   overlayColors: string[]
+  primaryColor: string
   overlayOpacity: number
   surfaceOpacity: number
 }
@@ -404,6 +405,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       backgroundBlurAmount: 0,
       backgroundOpacity: 1,
       overlayColors: ['#000000', '#000000'],
+      primaryColor: '#F59E0B',
       overlayOpacity: 0.8,
       surfaceOpacity: 1,
     },

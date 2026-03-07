@@ -25,8 +25,21 @@ export struct WebBackgroundSettings {
   int background_blur_amount = 0;                                    // 0 - 100
   double background_opacity = 1.0;                                   // 0.0 - 1.0
   std::vector<std::string> overlay_colors = {"#000000", "#000000"};  // 1 - 4
-  double overlay_opacity = 0.8;                                      // 0.0 - 1.0
-  double surface_opacity = 1.0;                                      // 0.0 - 1.0
+  std::string primary_color = "#F59E0B";
+  double overlay_opacity = 0.8;  // 0.0 - 1.0
+  double surface_opacity = 1.0;  // 0.0 - 1.0
+};
+
+export struct AnalyzeBackgroundParams {
+  std::string image_path;
+  std::int32_t overlay_mode = 2;  // 1 - 4
+};
+
+export struct AnalyzeBackgroundResult {
+  std::string theme_mode = "dark";  // "light" | "dark"
+  std::string primary_color = "#FBBF24";
+  std::vector<std::string> overlay_colors;
+  double brightness = 0.0;  // 0 - 1
 };
 
 // 完整的应用设置（重构后的结构）

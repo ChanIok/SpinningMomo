@@ -9,6 +9,7 @@ import Core.RPC.State;
 import Core.RPC.Types;
 import Features.Settings;
 import Features.Settings.Types;
+import Features.Settings.BackgroundAnalyzer;
 import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Settings {
@@ -55,6 +56,20 @@ auto handle_patch_settings(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_analyze_background([[maybe_unused]] Core::State::AppState& app_state,
+                               const Features::Settings::Types::AnalyzeBackgroundParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::AnalyzeBackgroundResult>> {
+  auto result = Features::Settings::BackgroundAnalyzer::analyze_background(params);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 auto register_all(Core::State::AppState& app_state) -> void {
   Core::RPC::register_method<Features::Settings::Types::GetSettingsParams,
                              Features::Settings::Types::GetSettingsResult>(
@@ -70,6 +85,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
                              Features::Settings::Types::PatchSettingsResult>(
       app_state, app_state.rpc->registry, "settings.patch", handle_patch_settings,
       "Patch settings configuration");
+
+  Core::RPC::register_method<Features::Settings::Types::AnalyzeBackgroundParams,
+                             Features::Settings::Types::AnalyzeBackgroundResult>(
+      app_state, app_state.rpc->registry, "settings.analyzeBackground", handle_analyze_background,
+      "Analyze background image and return recommended theme and overlay colors");
 }
 
 }  // namespace Core::RPC::Endpoints::Settings

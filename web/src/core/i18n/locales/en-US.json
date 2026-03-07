@@ -301,6 +301,8 @@
   "settings.appearance.theme.light": "Light",
   "settings.appearance.theme.dark": "Dark",
   "settings.appearance.theme.system": "Follow System",
+  "settings.appearance.theme.primaryColor.label": "Primary Color",
+  "settings.appearance.theme.primaryColor.description": "Used for buttons, selected states, and focus highlights.",
   "settings.appearance.theme.font.label": "CJK Font",
   "settings.appearance.theme.font.description": "Inter stays first. Choose CJK font priority.",
   "settings.appearance.theme.font.harmony": "HarmonyOS Sans SC",

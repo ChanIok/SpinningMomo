@@ -18,6 +18,27 @@ export const settingsApi = {
   },
 }
 
+export interface WallpaperAnalysisResult {
+  themeMode: 'light' | 'dark'
+  primaryColor: string
+  overlayColors: string[]
+  brightness: number
+}
+
+export async function analyzeBackground(
+  imagePath: string,
+  overlayMode: number
+): Promise<WallpaperAnalysisResult> {
+  return call<WallpaperAnalysisResult>(
+    'settings.analyzeBackground',
+    {
+      imagePath,
+      overlayMode,
+    },
+    0
+  )
+}
+
 /**
  * 选择背景图片文件
  */

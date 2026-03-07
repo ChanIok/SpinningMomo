@@ -15,9 +15,10 @@ import {
   selectBackgroundImage,
   copyBackgroundImageToResources,
   removeBackgroundImageResource,
+  analyzeBackground,
 } from '../api'
 import type { OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
-import { toBackgroundOverlayPatch } from '../overlayPalette'
+import { getOverlayPaletteFromBackground, toBackgroundOverlayPatch } from '../overlayPalette'
 import { storeToRefs } from 'pinia'
 
 export const useAppearanceActions = () => {
@@ -145,6 +146,10 @@ export const useAppearanceActions = () => {
     await updateBackgroundSettings({ overlayOpacity })
   }
 
+  const updatePrimaryColor = async (primaryColor: string) => {
+    await updateBackgroundSettings({ primaryColor })
+  }
+
   const updateOverlayPalette = async (palette: OverlayPalette) => {
     await updateBackgroundSettings(toBackgroundOverlayPatch(palette))
   }
@@ -192,16 +197,46 @@ export const useAppearanceActions = () => {
     })
   }
 
+  const applyWallpaperAnalysis = async (imagePath: string, persistImage = false) => {
+    const currentBackground = appSettings.value.ui.background
+    const overlayMode = getOverlayPaletteFromBackground(currentBackground).mode
+    const analysis = await analyzeBackground(imagePath, overlayMode)
+
+    const nextBackground = {
+      ...currentBackground,
+      ...(persistImage ? { type: 'image' as const, imagePath } : {}),
+      overlayColors: analysis.overlayColors.slice(0, overlayMode),
+      primaryColor: analysis.primaryColor,
+    }
+
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        webTheme: {
+          ...appSettings.value.ui.webTheme,
+          mode: analysis.themeMode,
+        },
+        background: nextBackground,
+      },
+    })
+  }
+
   const handleBackgroundImageSelect = async () => {
     try {
       const previousImagePath = appSettings.value.ui.background.imagePath
       const imagePath = await selectBackgroundImage()
       if (imagePath) {
         const copiedImagePath = await copyBackgroundImageToResources(imagePath)
-        await updateBackgroundSettings({
-          type: 'image',
-          imagePath: copiedImagePath,
-        })
+        try {
+          await applyWallpaperAnalysis(copiedImagePath, true)
+        } catch (error) {
+          console.warn('分析背景图片失败，使用基础背景设置:', error)
+          await updateBackgroundSettings({
+            type: 'image',
+            imagePath: copiedImagePath,
+          })
+        }
         if (previousImagePath && previousImagePath !== copiedImagePath) {
           void removeBackgroundImageResource(previousImagePath)
         }
@@ -237,6 +272,7 @@ export const useAppearanceActions = () => {
     updateBackgroundOpacity,
     updateBackgroundBlur,
     updateOverlayOpacity,
+    updatePrimaryColor,
     updateOverlayPalette,
     applyOverlayPalettePreset,
     updateWebViewTransparentBackground,
@@ -244,6 +280,7 @@ export const useAppearanceActions = () => {
     updateSurfaceOpacity,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,
+    applyWallpaperAnalysis,
     getFloatingWindowColorsByTheme,
     updateFloatingWindowTheme,
   }

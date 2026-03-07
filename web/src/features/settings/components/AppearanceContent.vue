@@ -22,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import OverlayPaletteEditor from './OverlayPaletteEditor.vue'
 import { useI18n } from '@/composables/useI18n'
@@ -29,7 +31,6 @@ import type { CjkFontPreset, WebThemeMode } from '../types'
 import type { OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
 import { getOverlayPaletteFromBackground } from '../overlayPalette'
 import { resolveBackgroundImageUrl } from '../backgroundPath'
-import { sampleOverlayPaletteFromWallpaper } from '../overlayPaletteSampler'
 import {
   SURFACE_OPACITY_RANGE,
   BACKGROUND_BLUR_RANGE,
@@ -45,6 +46,7 @@ const {
   updateBackgroundOpacity,
   updateBackgroundBlur,
   updateOverlayOpacity,
+  updatePrimaryColor,
   updateOverlayPalette,
   applyOverlayPalettePreset,
   updateWebViewTransparentBackground,
@@ -52,6 +54,7 @@ const {
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
+  applyWallpaperAnalysis,
 } = useAppearanceActions()
 const { clearError } = store
 const { t } = useI18n()
@@ -129,13 +132,7 @@ const handleOverlaySampleFromWallpaper = async () => {
   if (!imageUrl) return
 
   try {
-    const nextPalette = await sampleOverlayPaletteFromWallpaper({
-      imageUrl,
-      mode: overlayPalette.value.mode,
-      themeMode: appSettings.value.ui.webTheme.mode,
-    })
-
-    await updateOverlayPalette(nextPalette)
+    await applyWallpaperAnalysis(imageUrl)
   } catch (error) {
     console.error('Failed to sample overlay palette from wallpaper:', error)
   }
@@ -154,6 +151,14 @@ const handleCjkFontPresetChange = async (preset: string) => {
     await updateCjkFontPreset(preset as CjkFontPreset)
   } catch (error) {
     console.error('Failed to update CJK font preset:', error)
+  }
+}
+
+const handlePrimaryColorChange = async (primaryColor: string) => {
+  try {
+    await updatePrimaryColor(primaryColor)
+  } catch (error) {
+    console.error('Failed to update primary color:', error)
   }
 }
 
@@ -433,6 +438,42 @@ const handleClearError = () => {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.theme.primaryColor.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.theme.primaryColor.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Popover>
+              <PopoverTrigger as-child>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="h-9 w-[13rem] justify-start gap-2 px-2 font-mono text-xs"
+                >
+                  <div
+                    class="h-5 w-8 shrink-0 rounded-sm border border-border/70"
+                    :style="{ backgroundColor: appSettings.ui.background.primaryColor }"
+                  />
+                  <span class="text-muted-foreground">
+                    {{ appSettings.ui.background.primaryColor }}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" class="w-auto p-3">
+                <ColorPicker
+                  :model-value="appSettings.ui.background.primaryColor"
+                  @update:model-value="handlePrimaryColorChange"
+                />
+              </PopoverContent>
+            </Popover>
           </ItemActions>
         </Item>
 

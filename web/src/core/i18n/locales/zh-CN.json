@@ -301,6 +301,8 @@
   "settings.appearance.theme.light": "浅色",
   "settings.appearance.theme.dark": "深色",
   "settings.appearance.theme.system": "跟随系统",
+  "settings.appearance.theme.primaryColor.label": "主题色",
+  "settings.appearance.theme.primaryColor.description": "用于按钮、选中态和焦点高亮颜色。",
   "settings.appearance.theme.font.label": "中文字体",
   "settings.appearance.theme.font.description": "Inter 固定首位，选择中文字体优先级。",
   "settings.appearance.theme.font.harmony": "HarmonyOS Sans SC",

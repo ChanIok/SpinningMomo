@@ -61,6 +61,7 @@ initializeRPC()
       settingsStore.appSettings.ui.background.backgroundBlurAmount,
       settingsStore.appSettings.ui.background.backgroundOpacity,
       settingsStore.appSettings.ui.background.overlayColors.join('|'),
+      settingsStore.appSettings.ui.background.primaryColor,
       settingsStore.appSettings.ui.background.overlayOpacity,
       settingsStore.appSettings.ui.background.surfaceOpacity,
     ],
