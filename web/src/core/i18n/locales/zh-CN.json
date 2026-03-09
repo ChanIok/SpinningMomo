@@ -383,6 +383,7 @@
   "onboarding.completed.description": "你可以关闭此页面了。",
   "plugins.infinityNikki.scanRules.excludeAll": "默认排除所有文件",
   "plugins.infinityNikki.scanRules.includeHighQualityPhotos": "包含高质量照片目录",
+  "plugins.infinityNikki.album.rootDisplayName": "大喵相册",
   "app.header.gallery.toggleSidebar.hide": "隐藏左侧面板",
   "app.header.gallery.toggleSidebar.show": "显示左侧面板",
   "app.header.gallery.toggleDetails.hide": "隐藏右侧面板",

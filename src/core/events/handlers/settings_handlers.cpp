@@ -12,7 +12,7 @@ import Core.WebView;
 import Features.Gallery;
 import Features.Settings.Events;
 import Features.Settings.Types;
-import Plugins.InfinityNikki.ScreenshotShortcuts;
+import Plugins.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.WebViewWindow;
@@ -118,7 +118,7 @@ auto handle_settings_changed(Core::State::AppState& state,
 
     if (has_infinity_nikki_shortcut_setting_changes(event.data.old_settings,
                                                     event.data.new_settings)) {
-      Plugins::InfinityNikki::ScreenshotShortcuts::refresh_from_settings(state);
+      Plugins::InfinityNikki::PhotoService::refresh_from_settings(state);
     }
 
     auto webview_host_mode_changed =

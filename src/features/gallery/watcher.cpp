@@ -31,6 +31,7 @@ constexpr std::chrono::milliseconds kDebounceDelay{500};
 // 监听缓冲区；太小更容易溢出。
 constexpr size_t kWatchBufferSize = 64 * 1024;
 
+// 待处理变更快照，用于描述需要增量或全量同步的状态
 struct PendingSnapshot {
   // true 走全量，false 按 file_changes 走增量。
   bool require_full_rescan = false;
@@ -38,18 +39,21 @@ struct PendingSnapshot {
   std::unordered_map<std::string, State::PendingFileChangeAction> file_changes;
 };
 
+// 解析后的目录监听事件
 struct ParsedNotification {
   std::filesystem::path path;
   DWORD action = 0;
   bool is_directory = false;
 };
 
+// 生成默认的目录扫描配置
 auto make_default_scan_options(const std::filesystem::path& root_path) -> Types::ScanOptions {
   Types::ScanOptions options;
   options.directory = root_path.string();
   return options;
 }
 
+// 更新监听器的扫描配置
 auto update_watcher_scan_options(const std::shared_ptr<State::FolderWatcherState>& watcher,
                                  const std::optional<Types::ScanOptions>& scan_options) -> void {
   std::lock_guard<std::mutex> lock(watcher->pending_mutex);
@@ -59,6 +63,26 @@ auto update_watcher_scan_options(const std::shared_ptr<State::FolderWatcherState
   watcher->scan_options.ignore_rules.reset();
 }
 
+// 更新扫描完成后的回调函数
+auto update_post_scan_callback(const std::shared_ptr<State::FolderWatcherState>& watcher,
+                               std::function<void(const Types::ScanResult&)> post_scan_callback)
+    -> void {
+  if (!post_scan_callback) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(watcher->pending_mutex);
+  watcher->post_scan_callback = std::move(post_scan_callback);
+}
+
+// 获取监听器配置的扫描完成后回调函数
+auto get_post_scan_callback(const std::shared_ptr<State::FolderWatcherState>& watcher)
+    -> std::function<void(const Types::ScanResult&)> {
+  std::lock_guard<std::mutex> lock(watcher->pending_mutex);
+  return watcher->post_scan_callback;
+}
+
+// 获取监听器当前的扫描配置
 auto get_watcher_scan_options(const std::shared_ptr<State::FolderWatcherState>& watcher)
     -> Types::ScanOptions {
   std::lock_guard<std::mutex> lock(watcher->pending_mutex);
@@ -68,11 +92,13 @@ auto get_watcher_scan_options(const std::shared_ptr<State::FolderWatcherState>& 
   return options;
 }
 
+// 检查是否有待处理的变更（包含全量重扫标记或文件变更）
 auto has_pending_changes(const std::shared_ptr<State::FolderWatcherState>& watcher) -> bool {
   std::lock_guard<std::mutex> lock(watcher->pending_mutex);
   return watcher->require_full_rescan || !watcher->pending_file_changes.empty();
 }
 
+// 获取并清空当前的待处理变更快照
 auto take_pending_snapshot(const std::shared_ptr<State::FolderWatcherState>& watcher)
     -> PendingSnapshot {
   std::lock_guard<std::mutex> lock(watcher->pending_mutex);
@@ -86,6 +112,7 @@ auto take_pending_snapshot(const std::shared_ptr<State::FolderWatcherState>& wat
   return snapshot;
 }
 
+// 标记当前监听器需要执行全量重扫，同时清空原本的增量变更队列
 auto mark_full_rescan(const std::shared_ptr<State::FolderWatcherState>& watcher) -> void {
   std::lock_guard<std::mutex> lock(watcher->pending_mutex);
   // 文件夹有变化时，直接全量扫，逻辑最稳。
@@ -94,6 +121,7 @@ auto mark_full_rescan(const std::shared_ptr<State::FolderWatcherState>& watcher)
   watcher->pending_rescan.store(true, std::memory_order_release);
 }
 
+// 将具体的文件变更动作加入到待处理队列，相同路径的新动作会覆盖之前的
 auto queue_file_change(const std::shared_ptr<State::FolderWatcherState>& watcher,
                        const std::string& normalized_path, State::PendingFileChangeAction action)
     -> void {
@@ -105,6 +133,7 @@ auto queue_file_change(const std::shared_ptr<State::FolderWatcherState>& watcher
   watcher->pending_rescan.store(true, std::memory_order_release);
 }
 
+// 解析 Windows ReadDirectoryChangesExW 系统调用返回的变更通知缓冲区
 auto parse_notification_buffer(const std::filesystem::path& root_path, const std::byte* buffer,
                                DWORD bytes_returned) -> std::vector<ParsedNotification> {
   std::vector<ParsedNotification> parsed_notifications;
@@ -138,6 +167,7 @@ auto parse_notification_buffer(const std::filesystem::path& root_path, const std
   return parsed_notifications;
 }
 
+// 根据文件路径在数据库中删除对应的资产数据和缩略图
 auto remove_asset_by_path(Core::State::AppState& app_state, const std::filesystem::path& path)
     -> std::expected<bool, std::string> {
   auto normalized_result = Utils::Path::NormalizePath(path);
@@ -172,6 +202,8 @@ auto remove_asset_by_path(Core::State::AppState& app_state, const std::filesyste
   return true;
 }
 
+// 根据文件路径执行插入或更新，包含读取属性、生成缩略图及提取颜色等全套处理逻辑
+// 成功时返回 1（插入）， 2（更新），或 0（由于文件不支持等原因被跳过）
 auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesystem::path& root_path,
                           const Types::ScanOptions& options,
                           const std::vector<Types::IgnoreRule>& ignore_rules,
@@ -354,6 +386,7 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
   return 1;
 }
 
+// 将接收到的待处理快照应用到数据库的最终逻辑（增量模式）
 auto apply_incremental_sync(Core::State::AppState& app_state,
                             const std::shared_ptr<State::FolderWatcherState>& watcher,
                             const PendingSnapshot& snapshot)
@@ -446,6 +479,7 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
   return result;
 }
 
+// 执行全量重扫逻辑（直接代理到 Scanner 模块）
 auto apply_full_rescan(Core::State::AppState& app_state,
                        const std::shared_ptr<State::FolderWatcherState>& watcher)
     -> std::expected<Types::ScanResult, std::string> {
@@ -456,12 +490,14 @@ auto apply_full_rescan(Core::State::AppState& app_state,
 auto schedule_sync_task(Core::State::AppState& app_state,
                         const std::shared_ptr<State::FolderWatcherState>& watcher) -> void;
 
+// 标记监听器为全量重扫状态并触发下次同步任务
 auto request_full_rescan(Core::State::AppState& app_state,
                          const std::shared_ptr<State::FolderWatcherState>& watcher) -> void {
   mark_full_rescan(watcher);
   schedule_sync_task(app_state, watcher);
 }
 
+// 核心后台处理循环，具有防抖动合并（Debounce）功能，负责将积攒的变更应用到数据库
 auto process_pending_sync(Core::State::AppState& app_state,
                           const std::shared_ptr<State::FolderWatcherState>& watcher) -> void {
   // 每 500ms 合并一次改动，再做一次同步。
@@ -499,6 +535,12 @@ auto process_pending_sync(Core::State::AppState& app_state,
           result.deleted_items > 0) {
         Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
       }
+
+      auto post_scan_callback = get_post_scan_callback(watcher);
+      if (post_scan_callback &&
+          (result.new_items > 0 || result.updated_items > 0 || result.deleted_items > 0)) {
+        post_scan_callback(result);
+      }
     }
 
     if (watcher->pending_rescan.load(std::memory_order_acquire) || has_pending_changes(watcher)) {
@@ -515,6 +557,7 @@ auto process_pending_sync(Core::State::AppState& app_state,
   }
 }
 
+// 提交异步同步任务到线程池（使用 CAS 保证同一目录同时仅有一个任务在执行）
 auto schedule_sync_task(Core::State::AppState& app_state,
                         const std::shared_ptr<State::FolderWatcherState>& watcher) -> void {
   watcher->pending_rescan.store(true, std::memory_order_release);
@@ -535,6 +578,7 @@ auto schedule_sync_task(Core::State::AppState& app_state,
   }
 }
 
+// 将 Windows 系统回调的原始变更通知分类转换为内部的 INSERT/UPDATE/DELETE 动作
 auto process_watch_notifications(Core::State::AppState& app_state,
                                  const std::shared_ptr<State::FolderWatcherState>& watcher,
                                  const std::vector<ParsedNotification>& notifications) -> void {
@@ -574,6 +618,7 @@ auto process_watch_notifications(Core::State::AppState& app_state,
   schedule_sync_task(app_state, watcher);
 }
 
+// 目录监听主循环（运行在独立线程中），阻塞调用系统 API 读取文件变更
 auto run_watch_loop(Core::State::AppState& app_state,
                     const std::shared_ptr<State::FolderWatcherState>& watcher,
                     std::stop_token stop_token) -> void {
@@ -637,6 +682,7 @@ auto run_watch_loop(Core::State::AppState& app_state,
   Logger().info("Gallery watcher stopped: {}", watcher->root_path.string());
 }
 
+// 停止并清理指定的目录监听器，取消阻塞的系统调用并等待线程退出
 auto stop_watcher(const std::shared_ptr<State::FolderWatcherState>& watcher) -> void {
   if (!watcher) {
     return;
@@ -657,6 +703,36 @@ auto stop_watcher(const std::shared_ptr<State::FolderWatcherState>& watcher) -> 
   }
 }
 
+// 启动指定目录的监听器线程，并处理初始化时的全量重扫请求
+auto start_watcher_if_needed(Core::State::AppState& app_state,
+                             const std::shared_ptr<State::FolderWatcherState>& watcher,
+                             bool bootstrap_full_scan) -> std::expected<bool, std::string> {
+  if (!watcher) {
+    return false;
+  }
+
+  if (watcher->watch_thread.joinable()) {
+    return false;
+  }
+
+  watcher->stop_requested.store(false, std::memory_order_release);
+
+  try {
+    watcher->watch_thread = std::jthread([&app_state, watcher](std::stop_token stop_token) {
+      run_watch_loop(app_state, watcher, stop_token);
+    });
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to start watcher thread: " + std::string(e.what()));
+  }
+
+  if (bootstrap_full_scan) {
+    request_full_rescan(app_state, watcher);
+  }
+
+  return true;
+}
+
+// 规范化需要监听的根目录路径，检查是否存在且是目录
 auto normalize_root_directory(const std::filesystem::path& root_directory)
     -> std::expected<std::filesystem::path, std::string> {
   auto normalized_result = Utils::Path::NormalizePath(root_directory);
@@ -675,10 +751,11 @@ auto normalize_root_directory(const std::filesystem::path& root_directory)
   return normalized;
 }
 
-auto ensure_watcher_for_directory(Core::State::AppState& app_state,
-                                  const std::filesystem::path& root_directory,
-                                  const std::optional<Types::ScanOptions>& scan_options,
-                                  bool bootstrap_full_scan) -> std::expected<void, std::string> {
+// 注册一个根目录 watcher；若已存在则更新扫描参数。
+auto register_watcher_for_directory(Core::State::AppState& app_state,
+                                    const std::filesystem::path& root_directory,
+                                    const std::optional<Types::ScanOptions>& scan_options)
+    -> std::expected<void, std::string> {
   auto normalized_result = normalize_root_directory(root_directory);
   if (!normalized_result) {
     return std::unexpected(normalized_result.error());
@@ -686,53 +763,82 @@ auto ensure_watcher_for_directory(Core::State::AppState& app_state,
   auto normalized_root = normalized_result.value();
   auto key = normalized_root.string();
 
+  std::shared_ptr<State::FolderWatcherState> watcher;
+  bool watcher_created = false;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
     if (auto it = app_state.gallery->folder_watchers.find(key);
         it != app_state.gallery->folder_watchers.end()) {
-      if (scan_options.has_value()) {
-        update_watcher_scan_options(it->second, scan_options);
-      }
-      // 已经在监听就直接返回。
-      return {};
+      watcher = it->second;
+    } else {
+      watcher = std::make_shared<State::FolderWatcherState>();
+      watcher->root_path = normalized_root;
+      app_state.gallery->folder_watchers.emplace(key, watcher);
+      watcher_created = true;
     }
   }
 
-  auto watcher = std::make_shared<State::FolderWatcherState>();
-  watcher->root_path = normalized_root;
-  update_watcher_scan_options(watcher, scan_options);
-
-  {
-    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
-    auto [it, inserted] = app_state.gallery->folder_watchers.try_emplace(key, watcher);
-    if (!inserted) {
-      if (scan_options.has_value()) {
-        update_watcher_scan_options(it->second, scan_options);
-      }
-      return {};
-    }
+  if (watcher_created || scan_options.has_value()) {
+    update_watcher_scan_options(watcher, scan_options);
   }
 
-  try {
-    watcher->watch_thread = std::jthread([&app_state, watcher](std::stop_token stop_token) {
-      run_watch_loop(app_state, watcher, stop_token);
-    });
-  } catch (const std::exception& e) {
-    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
-    if (auto it = app_state.gallery->folder_watchers.find(key);
-        it != app_state.gallery->folder_watchers.end() && it->second == watcher) {
-      app_state.gallery->folder_watchers.erase(it);
-    }
-    return std::unexpected("Failed to start watcher thread: " + std::string(e.what()));
-  }
-
-  if (bootstrap_full_scan) {
-    // 新建 watcher 后先全量扫一遍，先把数据对齐。
-    request_full_rescan(app_state, watcher);
-  }
   return {};
 }
 
+// 为已注册的根目录 watcher 设置扫描完成回调。
+auto set_post_scan_callback_for_directory(
+    Core::State::AppState& app_state, const std::filesystem::path& root_directory,
+    std::function<void(const Types::ScanResult&)> post_scan_callback)
+    -> std::expected<void, std::string> {
+  auto normalized_result = normalize_root_directory(root_directory);
+  if (!normalized_result) {
+    return std::unexpected(normalized_result.error());
+  }
+
+  std::shared_ptr<State::FolderWatcherState> watcher;
+  {
+    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
+    auto it = app_state.gallery->folder_watchers.find(normalized_result->string());
+    if (it == app_state.gallery->folder_watchers.end()) {
+      return std::unexpected("Watcher is not registered for root directory: " +
+                             normalized_result->string());
+    }
+    watcher = it->second;
+  }
+
+  update_post_scan_callback(watcher, std::move(post_scan_callback));
+  return {};
+}
+
+// 启动一个已注册的根目录 watcher。
+auto start_watcher_for_directory(Core::State::AppState& app_state,
+                                 const std::filesystem::path& root_directory,
+                                 bool bootstrap_full_scan) -> std::expected<void, std::string> {
+  auto normalized_result = normalize_root_directory(root_directory);
+  if (!normalized_result) {
+    return std::unexpected(normalized_result.error());
+  }
+
+  std::shared_ptr<State::FolderWatcherState> watcher;
+  {
+    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
+    auto it = app_state.gallery->folder_watchers.find(normalized_result->string());
+    if (it == app_state.gallery->folder_watchers.end()) {
+      return std::unexpected("Watcher is not registered for root directory: " +
+                             normalized_result->string());
+    }
+    watcher = it->second;
+  }
+
+  auto start_result = start_watcher_if_needed(app_state, watcher, bootstrap_full_scan);
+  if (!start_result) {
+    return std::unexpected(start_result.error());
+  }
+
+  return {};
+}
+
+// 从程序缓存中移除对应目录的监听器并停止后台线程
 auto remove_watcher_for_directory(Core::State::AppState& app_state,
                                   const std::filesystem::path& root_directory)
     -> std::expected<bool, std::string> {
@@ -761,7 +867,9 @@ auto remove_watcher_for_directory(Core::State::AppState& app_state,
   return true;
 }
 
-auto initialize_watchers(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+// 在应用启动时，从数据库的文件夹列表中恢复所有的监听器配置
+auto restore_watchers_from_db(Core::State::AppState& app_state)
+    -> std::expected<void, std::string> {
   auto folders_result = Features::Gallery::Folder::Repository::list_all_folders(app_state);
   if (!folders_result) {
     return std::unexpected("Failed to query folders for watcher restore: " +
@@ -775,19 +883,57 @@ auto initialize_watchers(Core::State::AppState& app_state) -> std::expected<void
       continue;
     }
 
-    auto start_result = ensure_watcher_for_directory(app_state, std::filesystem::path(folder.path));
-    if (!start_result) {
-      Logger().warn("Skip watcher restore for '{}': {}", folder.path, start_result.error());
+    auto register_result =
+        register_watcher_for_directory(app_state, std::filesystem::path(folder.path));
+    if (!register_result) {
+      Logger().warn("Skip watcher restore for '{}': {}", folder.path, register_result.error());
       continue;
     }
 
     restored_count++;
   }
 
-  Logger().info("Gallery watchers restored: {}", restored_count);
+  Logger().info("Gallery watcher registrations restored: {}", restored_count);
   return {};
 }
 
+// 启动所有已经纳入管理的（注册过的）监听器任务
+auto start_registered_watchers(Core::State::AppState& app_state)
+    -> std::expected<void, std::string> {
+  std::vector<std::shared_ptr<State::FolderWatcherState>> watchers;
+  {
+    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
+    for (auto& [_, watcher] : app_state.gallery->folder_watchers) {
+      watchers.push_back(watcher);
+    }
+  }
+
+  size_t started_count = 0;
+  std::optional<std::string> first_error;
+  for (const auto& watcher : watchers) {
+    auto start_result = start_watcher_if_needed(app_state, watcher, true);
+    if (!start_result) {
+      Logger().warn("Skip watcher start for '{}': {}", watcher->root_path.string(),
+                    start_result.error());
+      if (!first_error.has_value()) {
+        first_error = start_result.error();
+      }
+      continue;
+    }
+
+    if (start_result.value()) {
+      started_count++;
+    }
+  }
+
+  Logger().info("Gallery watchers started: {} / {}", started_count, watchers.size());
+  if (first_error.has_value()) {
+    return std::unexpected(first_error.value());
+  }
+  return {};
+}
+
+// 在应用关闭时，优雅关闭所有的监听器线程和句柄资源
 auto shutdown_watchers(Core::State::AppState& app_state) -> void {
   std::vector<std::shared_ptr<State::FolderWatcherState>> watchers;
   {

@@ -17,8 +17,8 @@ export auto initialize(
 export auto sync(Core::State::AppState& app_state)
     -> std::expected<InfinityNikkiInitializeScreenshotShortcutsResult, std::string>;
 
-export auto refresh_from_settings(Core::State::AppState& app_state) -> void;
-
-export auto shutdown() -> void;
+// 返回 PhotoService 应监听的目录（GamePlayPhotos 目录），供 Gallery.Watcher 注册使用
+export auto resolve_watch_directory(Core::State::AppState& app_state)
+    -> std::expected<std::filesystem::path, std::string>;
 
 }  // namespace Plugins::InfinityNikki::ScreenshotShortcuts

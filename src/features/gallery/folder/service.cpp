@@ -112,8 +112,27 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
     -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string> {
   std::unordered_map<std::string, std::int64_t> path_to_id_map;
 
+  std::vector<std::filesystem::path> normalized_paths;
+  normalized_paths.reserve(folder_paths.size());
+  std::unordered_set<std::string> normalized_path_keys;
+
+  for (const auto& folder_path : folder_paths) {
+    auto normalized_result = Utils::Path::NormalizePath(folder_path);
+    if (!normalized_result) {
+      Logger().warn("Failed to normalize folder path '{}': {}", folder_path.string(),
+                    normalized_result.error());
+      continue;
+    }
+
+    auto normalized_path = normalized_result.value();
+    auto path_key = normalized_path.string();
+    if (normalized_path_keys.insert(path_key).second) {
+      normalized_paths.push_back(std::move(normalized_path));
+    }
+  }
+
   // 按路径深度排序，确保父目录先创建
-  auto sorted_paths = folder_paths;
+  auto sorted_paths = normalized_paths;
   std::ranges::sort(sorted_paths, [](const auto& a, const auto& b) {
     // 按路径字符串长度排序（通常深度较浅的路径更短）
     auto a_str = a.string();

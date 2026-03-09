@@ -94,11 +94,6 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     StaticResolver::register_http_resolvers(app_state);
     StaticResolver::register_webview_resolvers(app_state);
 
-    // 启动时恢复 watcher，并先全量扫一次，补上停机期间的变化。
-    if (auto watcher_result = Watcher::initialize_watchers(app_state); !watcher_result) {
-      Logger().warn("Gallery watcher initialization failed: {}", watcher_result.error());
-    }
-
     Logger().info("Gallery module initialized successfully");
     Logger().info("Thumbnail directory set to: {}",
                   app_state.gallery->thumbnails_directory.string());
@@ -354,12 +349,19 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
   Logger().info("Asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}",
                 result.total_files, result.new_items, result.updated_items, result.errors.size());
 
-  if (auto watcher_result = Watcher::ensure_watcher_for_directory(
-          app_state, std::filesystem::path(options.directory), options, false);
-      !watcher_result) {
+  auto watcher_result = Watcher::register_watcher_for_directory(
+      app_state, std::filesystem::path(options.directory), options);
+  if (!watcher_result) {
     // 扫描已经成功，监听失败这里只记日志，不中断流程。
     Logger().warn("Failed to ensure watcher for '{}': {}", options.directory,
                   watcher_result.error());
+    return result;
+  }
+
+  auto start_result = Watcher::start_watcher_for_directory(
+      app_state, std::filesystem::path(options.directory), false);
+  if (!start_result) {
+    Logger().warn("Failed to start watcher for '{}': {}", options.directory, start_result.error());
   }
 
   return result;

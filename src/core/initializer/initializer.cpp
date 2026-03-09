@@ -18,6 +18,7 @@ import Core.RPC.Registry;
 import Core.Initializer.Database;
 import Core.Migration;
 import Features.Gallery;
+import Features.Gallery.Watcher;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Recording;
@@ -27,7 +28,7 @@ import Features.ReplayBuffer.UseCase;
 import Features.Update;
 import Features.VirtualGamepad;
 import Features.Letterbox.State;
-import Plugins.InfinityNikki.ScreenshotShortcuts;
+import Plugins.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.WebViewWindow;
@@ -85,8 +86,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize settings: " + settings_result.error());
     }
 
-    Plugins::InfinityNikki::ScreenshotShortcuts::refresh_from_settings(state);
-
     // 将后端 i18n 语言与 settings 对齐，确保原生浮窗/通知文案一致
     apply_language_from_settings(state);
 
@@ -129,6 +128,15 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize gallery: " + gallery_result.error());
     }
 
+    if (auto watcher_restore_result = Features::Gallery::Watcher::restore_watchers_from_db(state);
+        !watcher_restore_result) {
+      Logger().warn("Gallery watcher registration restore failed: {}",
+                    watcher_restore_result.error());
+    }
+
+    // Gallery 初始化完成后，先注册无限暖暖目录监听，统一在末尾启动
+    Plugins::InfinityNikki::PhotoService::register_from_settings(state);
+
     // 初始化虚拟手柄（检测 ViGEm 可用性，不自动启用）
     if (auto vg_result = Features::VirtualGamepad::initialize(state); !vg_result) {
       Logger().warn("Virtual gamepad initialization failed: {}", vg_result.error());
@@ -147,6 +155,11 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 注册所有命令的热键
     Core::Commands::register_all_hotkeys(state, state.floating_window->window.hwnd);
+
+    if (auto watcher_start_result = Features::Gallery::Watcher::start_registered_watchers(state);
+        !watcher_start_result) {
+      Logger().warn("Gallery watcher startup failed: {}", watcher_start_result.error());
+    }
 
     // 按设置自动检查更新（异步，不阻塞启动）
     Features::Update::schedule_startup_auto_update_check(state);

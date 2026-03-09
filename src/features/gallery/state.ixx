@@ -27,6 +27,9 @@ export struct FolderWatcherState {
 
   // 待处理的文件改动（同一路径只保留最后一次）
   std::unordered_map<std::string, PendingFileChangeAction> pending_file_changes;
+
+  // 扫描完成后的回调（可选），由注册方注入，扫描有变化时触发
+  std::function<void(const Types::ScanResult&)> post_scan_callback;
 };
 
 export struct GalleryState {

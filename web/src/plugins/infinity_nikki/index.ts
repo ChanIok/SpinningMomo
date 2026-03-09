@@ -8,18 +8,23 @@ interface InfinityNikkiAlbumIgnoreRuleTemplate extends Omit<ScanIgnoreRule, 'des
 
 const INFINITY_NIKKI_ALBUM_IGNORE_RULES: InfinityNikkiAlbumIgnoreRuleTemplate[] = [
   {
-    pattern: '**',
-    patternType: 'glob',
+    pattern: '^.*$',
+    patternType: 'regex',
     ruleType: 'exclude',
     descriptionKey: 'plugins.infinityNikki.scanRules.excludeAll',
   },
   {
-    pattern: 'X6Game/Saved/GamePlayPhotos/*/NikkiPhotos_HighQuality/**',
-    patternType: 'glob',
+    pattern: '^[0-9]+/NikkiPhotos_HighQuality(/.*)?$',
+    patternType: 'regex',
     ruleType: 'include',
     descriptionKey: 'plugins.infinityNikki.scanRules.includeHighQualityPhotos',
   },
 ]
+
+function resolveInfinityNikkiAlbumDirectory(gameDir: string): string {
+  const normalizedGameDir = gameDir.trim().replace(/[\\/]+$/, '')
+  return `${normalizedGameDir}/X6Game/Saved/GamePlayPhotos`
+}
 
 interface StartTaskResult {
   taskId: string
@@ -33,7 +38,7 @@ export function createInfinityNikkiAlbumScanParams(gameDir: string): ScanAssetsP
   const { t } = useI18n()
 
   return {
-    directory: gameDir.trim(),
+    directory: resolveInfinityNikkiAlbumDirectory(gameDir),
     generateThumbnails: true,
     thumbnailShortEdge: 480,
     ignoreRules: INFINITY_NIKKI_ALBUM_IGNORE_RULES.map((rule) => ({
@@ -64,7 +69,7 @@ export async function startInitializeInfinityNikkiScreenshotShortcuts(): Promise
  * InfinityNikki 游戏照片管理插件
  *
  * 将深层文件夹结构简化为两层：
- * - 第一层：InfinityNikki 文件夹
+ * - 第一层：GamePlayPhotos（显示为大喵相册 / Momo's Album）
  * - 第二层：各账号的 NikkiPhotos_HighQuality 文件夹（显示为 UID）
  */
 
@@ -74,58 +79,48 @@ export async function startInitializeInfinityNikkiScreenshotShortcuts(): Promise
  * @returns 转换后的文件夹树
  */
 export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNode[] {
-  // 在顶层查找 InfinityNikki 节点
-  const infinityNikkiIndex = tree.findIndex((node) => node.name === 'InfinityNikki')
+  const { t } = useI18n()
 
-  // 如果没有找到 InfinityNikki 节点，返回原始树
-  if (infinityNikkiIndex === -1) {
+  // 在顶层查找 GamePlayPhotos 节点
+  const gamePlayPhotosIndex = tree.findIndex((node) => node.name === 'GamePlayPhotos')
+
+  // 如果没有找到 GamePlayPhotos 节点，返回原始树
+  if (gamePlayPhotosIndex === -1) {
     return tree
   }
 
-  const infinityNikkiNode = tree[infinityNikkiIndex]!
-
-  // 固定路径遍历：InfinityNikki -> X6Game -> Saved -> GamePlayPhotos
-  // 期望结构：InfinityNikki/X6Game/Saved/GamePlayPhotos/[UID]/NikkiPhotos_HighQuality
-
-  const x6GameNode = infinityNikkiNode.children?.find((node) => node.name === 'X6Game')
-  if (!x6GameNode) {
-    return tree
-  }
+  const gamePlayPhotosNode = tree[gamePlayPhotosIndex]!
 
   const secondLevelNodes: FolderTreeNode[] = []
 
-  // 处理 Saved/GamePlayPhotos 路径下的照片文件夹
-  const savedNode = x6GameNode.children?.find((node) => node.name === 'Saved')
-  if (savedNode) {
-    const gamePlayPhotosNode = savedNode.children?.find((node) => node.name === 'GamePlayPhotos')
-    if (gamePlayPhotosNode?.children) {
-      // 遍历每个 UID 文件夹
-      for (const uidNode of gamePlayPhotosNode.children) {
-        const nikkiPhotosNode = uidNode.children?.find(
-          (node) => node.name === 'NikkiPhotos_HighQuality'
-        )
+  if (gamePlayPhotosNode.children) {
+    for (const uidNode of gamePlayPhotosNode.children) {
+      if (!/^\d+$/.test(uidNode.name)) {
+        continue
+      }
 
-        if (nikkiPhotosNode) {
-          // 创建新节点，使用 UID 作为显示名称
-          secondLevelNodes.push({
-            ...nikkiPhotosNode,
-            displayName: uidNode.name, // 使用父目录的 UID 作为显示名
-            children: [], // 清空子节点
-          })
-        }
+      const nikkiPhotosNode = uidNode.children?.find(
+        (node) => node.name === 'NikkiPhotos_HighQuality'
+      )
+
+      if (nikkiPhotosNode) {
+        secondLevelNodes.push({
+          ...nikkiPhotosNode,
+          displayName: uidNode.name,
+          children: [],
+        })
       }
     }
   }
 
-  // 创建新的 InfinityNikki 节点，只包含两层结构
-  const newInfinityNikkiNode: FolderTreeNode = {
-    ...infinityNikkiNode,
+  const newGamePlayPhotosNode: FolderTreeNode = {
+    ...gamePlayPhotosNode,
+    displayName: t('plugins.infinityNikki.album.rootDisplayName'),
     children: secondLevelNodes,
   }
 
-  // 替换原始树中的 InfinityNikki 节点
   const newTree = [...tree]
-  newTree[infinityNikkiIndex] = newInfinityNikkiNode
+  newTree[gamePlayPhotosIndex] = newGamePlayPhotosNode
 
   return newTree
 }

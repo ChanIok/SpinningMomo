@@ -1,9 +1,6 @@
 module;
 
-#include <shlguid.h>
-#include <shobjidl.h>
 #include <wil/com.h>
-#include <windows.h>
 
 module Plugins.InfinityNikki.ScreenshotShortcuts;
 
@@ -13,11 +10,12 @@ import Features.Settings.State;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.String;
+import <shlwapi.h>;
+import <shobjidl.h>;
+import <windows.h>;
 
 namespace Plugins::InfinityNikki::ScreenshotShortcuts {
 
-// 文件变更防抖延迟：游戏保存高清照片时会触发多次文件系统事件，延迟聚合后再同步
-constexpr auto kWatchDebounceDelay = std::chrono::milliseconds(1200);
 // 单次同步最多收集的错误条数，避免在大量文件出错时撑爆内存
 constexpr std::size_t kMaxErrorMessages = 50;
 // 游戏高清照片的存储路径结构：GamePlayPhotos/<uid>/NikkiPhotos_HighQuality/<文件名>
@@ -46,50 +44,6 @@ struct SourceAsset {
   std::string original_filename;      // 原始文件名（不含路径）
   std::filesystem::path link_path;    // 将在 ScreenShot 目录中创建的 .lnk 路径
 };
-
-// 文件监视服务的运行时状态，通过 service_runtime() 单例访问
-struct ServiceRuntime {
-  std::mutex mutex;
-  std::jthread watch_thread;
-  std::filesystem::path watch_root;  // 当前监视的目录，用于判断是否需要重启监视线程
-};
-
-// FindFirstChangeNotification 句柄的 RAII 包装，防止句柄泄漏
-struct ChangeNotificationHandle {
-  HANDLE handle = INVALID_HANDLE_VALUE;
-
-  ChangeNotificationHandle() = default;
-  explicit ChangeNotificationHandle(HANDLE raw_handle) : handle(raw_handle) {}
-  ChangeNotificationHandle(const ChangeNotificationHandle&) = delete;
-  auto operator=(const ChangeNotificationHandle&) -> ChangeNotificationHandle& = delete;
-  ChangeNotificationHandle(ChangeNotificationHandle&& other) noexcept : handle(other.handle) {
-    other.handle = INVALID_HANDLE_VALUE;
-  }
-  auto operator=(ChangeNotificationHandle&& other) noexcept -> ChangeNotificationHandle& {
-    if (this == &other) {
-      return *this;
-    }
-    close();
-    handle = other.handle;
-    other.handle = INVALID_HANDLE_VALUE;
-    return *this;
-  }
-  ~ChangeNotificationHandle() { close(); }
-
-  auto close() -> void {
-    if (handle != INVALID_HANDLE_VALUE) {
-      FindCloseChangeNotification(handle);
-      handle = INVALID_HANDLE_VALUE;
-    }
-  }
-
-  [[nodiscard]] auto is_valid() const -> bool { return handle != INVALID_HANDLE_VALUE; }
-};
-
-auto service_runtime() -> ServiceRuntime& {
-  static ServiceRuntime runtime;
-  return runtime;
-}
 
 auto add_error(std::vector<std::string>& errors, std::string message) -> void {
   if (errors.size() >= kMaxErrorMessages) {
@@ -681,92 +635,6 @@ auto sync_shortcuts_internal(
   return result;
 }
 
-// 文件监视循环：监听 GamePlayPhotos 目录下的文件变化，
-// 触发变化后等待防抖延迟（kWatchDebounceDelay）才执行同步，
-// 避免游戏批量写入时反复触发。启动时 pending_sync=true，
-// 确保监视线程启动后即执行一次同步，补偿监视期间错过的变更
-auto watch_loop(std::stop_token stop_token, Core::State::AppState* app_state,
-                std::filesystem::path watch_root) -> void {
-  if (!app_state) {
-    return;
-  }
-
-  auto co_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
-  (void)co_init;
-
-  auto handle = ChangeNotificationHandle(
-      FindFirstChangeNotificationW(watch_root.wstring().c_str(), TRUE,
-                                   FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME |
-                                       FILE_NOTIFY_CHANGE_SIZE | FILE_NOTIFY_CHANGE_LAST_WRITE));
-  if (!handle.is_valid()) {
-    Logger().warn("Infinity Nikki screenshot shortcut watcher failed to start: {}",
-                  Utils::String::ToUtf8(watch_root.wstring()));
-    return;
-  }
-
-  Logger().info("Infinity Nikki screenshot shortcut watcher started: {}",
-                Utils::String::ToUtf8(watch_root.wstring()));
-
-  auto last_change = std::chrono::steady_clock::now();
-  bool pending_sync = true;
-
-  while (!stop_token.stop_requested()) {
-    // 250ms 轮询间隔，兼顾响应性与 CPU 占用
-    auto wait_result = WaitForSingleObject(handle.handle, 250);
-    if (wait_result == WAIT_OBJECT_0) {
-      last_change = std::chrono::steady_clock::now();
-      pending_sync = true;
-      if (!FindNextChangeNotification(handle.handle)) {
-        Logger().warn("Infinity Nikki screenshot shortcut watcher lost notifications: {}",
-                      Utils::String::ToUtf8(watch_root.wstring()));
-        break;
-      }
-      continue;
-    }
-
-    if (wait_result == WAIT_FAILED) {
-      Logger().warn("Infinity Nikki screenshot shortcut watcher wait failed: {}",
-                    Utils::String::ToUtf8(watch_root.wstring()));
-      break;
-    }
-
-    if (!pending_sync) {
-      continue;
-    }
-
-    if (std::chrono::steady_clock::now() - last_change < kWatchDebounceDelay) {
-      continue;
-    }
-
-    pending_sync = false;
-    auto sync_result = sync(*app_state);
-    if (!sync_result) {
-      Logger().warn("Infinity Nikki screenshot shortcut sync failed: {}", sync_result.error());
-      continue;
-    }
-
-    Logger().info(
-        "Infinity Nikki screenshot shortcut sync completed: source={}, created={}, updated={}, "
-        "removed={}, ignored={}",
-        sync_result->source_count, sync_result->created_count, sync_result->updated_count,
-        sync_result->removed_count, sync_result->ignored_count);
-  }
-
-  Logger().info("Infinity Nikki screenshot shortcut watcher stopped: {}",
-                Utils::String::ToUtf8(watch_root.wstring()));
-}
-
-auto stop_watch_thread(ServiceRuntime& runtime) -> void {
-  if (!runtime.watch_thread.joinable()) {
-    runtime.watch_root.clear();
-    return;
-  }
-
-  runtime.watch_thread.request_stop();
-  runtime.watch_thread.join();
-  runtime.watch_root.clear();
-}
-
 auto initialize(
     Core::State::AppState& app_state,
     const std::function<void(const InfinityNikkiInitializeScreenshotShortcutsProgress&)>&
@@ -780,45 +648,13 @@ auto sync(Core::State::AppState& app_state)
   return sync_shortcuts_internal(app_state, false, nullptr);
 }
 
-// 根据当前设置决定是否启动/重启/停止文件监视服务。
-// 若监视目录未变化，则保持现有监视线程不变，避免不必要的重启
-auto refresh_from_settings(Core::State::AppState& app_state) -> void {
-  auto& runtime = service_runtime();
-  std::lock_guard<std::mutex> lock(runtime.mutex);
-
-  if (!app_state.settings) {
-    stop_watch_thread(runtime);
-    return;
-  }
-
-  const auto& config = app_state.settings->raw.plugins.infinity_nikki;
-  if (!config.enable || !config.manage_screenshot_shortcuts || config.game_dir.empty()) {
-    stop_watch_thread(runtime);
-    return;
-  }
-
+auto resolve_watch_directory(Core::State::AppState& app_state)
+    -> std::expected<std::filesystem::path, std::string> {
   auto paths_result = resolve_managed_paths(app_state);
   if (!paths_result) {
-    Logger().warn("Skip Infinity Nikki screenshot shortcut watcher: {}", paths_result.error());
-    stop_watch_thread(runtime);
-    return;
+    return std::unexpected(paths_result.error());
   }
-
-  auto watch_root = paths_result->gameplay_photos_dir;
-  if (runtime.watch_thread.joinable() &&
-      make_path_compare_key(runtime.watch_root) == make_path_compare_key(watch_root)) {
-    return;
-  }
-
-  stop_watch_thread(runtime);
-  runtime.watch_root = watch_root;
-  runtime.watch_thread = std::jthread(watch_loop, &app_state, watch_root);
-}
-
-auto shutdown() -> void {
-  auto& runtime = service_runtime();
-  std::lock_guard<std::mutex> lock(runtime.mutex);
-  stop_watch_thread(runtime);
+  return paths_result->gameplay_photos_dir;
 }
 
 }  // namespace Plugins::InfinityNikki::ScreenshotShortcuts
