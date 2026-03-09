@@ -1,4 +1,5 @@
 import type { FolderTreeNode, ScanAssetsParams, ScanIgnoreRule } from '@/features/gallery/types'
+import { call } from '@/core/rpc'
 import { useI18n } from '@/core/i18n'
 
 interface InfinityNikkiAlbumIgnoreRuleTemplate extends Omit<ScanIgnoreRule, 'description'> {
@@ -13,18 +14,16 @@ const INFINITY_NIKKI_ALBUM_IGNORE_RULES: InfinityNikkiAlbumIgnoreRuleTemplate[] 
     descriptionKey: 'plugins.infinityNikki.scanRules.excludeAll',
   },
   {
-    pattern: 'X6Game/ScreenShot/**',
-    patternType: 'glob',
-    ruleType: 'include',
-    descriptionKey: 'plugins.infinityNikki.scanRules.includeScreenshot',
-  },
-  {
     pattern: 'X6Game/Saved/GamePlayPhotos/*/NikkiPhotos_HighQuality/**',
     patternType: 'glob',
     ruleType: 'include',
     descriptionKey: 'plugins.infinityNikki.scanRules.includeHighQualityPhotos',
   },
 ]
+
+interface StartTaskResult {
+  taskId: string
+}
 
 /**
  * 生成 InfinityNikki 游戏相册扫描参数
@@ -46,12 +45,27 @@ export function createInfinityNikkiAlbumScanParams(gameDir: string): ScanAssetsP
   }
 }
 
+export async function startExtractInfinityNikkiPhotoParams(onlyMissing = true): Promise<string> {
+  const result = await call<StartTaskResult>('plugins.infinityNikki.startExtractPhotoParams', {
+    onlyMissing,
+  })
+  return result.taskId
+}
+
+export async function startInitializeInfinityNikkiScreenshotShortcuts(): Promise<string> {
+  const result = await call<StartTaskResult>(
+    'plugins.infinityNikki.startInitializeScreenshotShortcuts',
+    {}
+  )
+  return result.taskId
+}
+
 /**
  * InfinityNikki 游戏照片管理插件
  *
  * 将深层文件夹结构简化为两层：
  * - 第一层：InfinityNikki 文件夹
- * - 第二层：各账号的 NikkiPhotos_HighQuality 文件夹（显示为 UID）和 ScreenShot 文件夹
+ * - 第二层：各账号的 NikkiPhotos_HighQuality 文件夹（显示为 UID）
  */
 
 /**
@@ -72,7 +86,6 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
 
   // 固定路径遍历：InfinityNikki -> X6Game -> Saved -> GamePlayPhotos
   // 期望结构：InfinityNikki/X6Game/Saved/GamePlayPhotos/[UID]/NikkiPhotos_HighQuality
-  //          InfinityNikki/X6Game/ScreenShot
 
   const x6GameNode = infinityNikkiNode.children?.find((node) => node.name === 'X6Game')
   if (!x6GameNode) {
@@ -102,15 +115,6 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
         }
       }
     }
-  }
-
-  // 处理 ScreenShot 文件夹
-  const screenShotNode = x6GameNode.children?.find((node) => node.name === 'ScreenShot')
-  if (screenShotNode) {
-    secondLevelNodes.push({
-      ...screenShotNode,
-      children: [], // 清空子节点
-    })
   }
 
   // 创建新的 InfinityNikki 节点，只包含两层结构

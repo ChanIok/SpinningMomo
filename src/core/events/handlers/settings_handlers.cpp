@@ -12,6 +12,7 @@ import Core.WebView;
 import Features.Gallery;
 import Features.Settings.Events;
 import Features.Settings.Types;
+import Plugins.InfinityNikki.ScreenshotShortcuts;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.WebViewWindow;
@@ -62,6 +63,16 @@ auto has_language_changes(const Features::Settings::Types::AppSettings& old_sett
   return old_settings.app.language.current != new_settings.app.language.current;
 }
 
+auto has_infinity_nikki_shortcut_setting_changes(
+    const Features::Settings::Types::AppSettings& old_settings,
+    const Features::Settings::Types::AppSettings& new_settings) -> bool {
+  const auto& old_config = old_settings.plugins.infinity_nikki;
+  const auto& new_config = new_settings.plugins.infinity_nikki;
+
+  return old_config.enable != new_config.enable || old_config.game_dir != new_config.game_dir ||
+         old_config.manage_screenshot_shortcuts != new_config.manage_screenshot_shortcuts;
+}
+
 auto apply_runtime_language_from_settings(Core::State::AppState& state,
                                           const Features::Settings::Types::AppSettings& settings)
     -> void {
@@ -103,6 +114,11 @@ auto handle_settings_changed(Core::State::AppState& state,
 
     if (has_hotkey_changes(event.data.old_settings, event.data.new_settings)) {
       refresh_global_hotkeys(state);
+    }
+
+    if (has_infinity_nikki_shortcut_setting_changes(event.data.old_settings,
+                                                    event.data.new_settings)) {
+      Plugins::InfinityNikki::ScreenshotShortcuts::refresh_from_settings(state);
     }
 
     auto webview_host_mode_changed =

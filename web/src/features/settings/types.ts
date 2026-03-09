@@ -254,6 +254,9 @@ export interface AppSettings {
     infinityNikki: {
       enable: boolean
       gameDir: string
+      galleryGuideSeen: boolean
+      allowOnlinePhotoMetadataExtract: boolean
+      manageScreenshotShortcuts: boolean
     }
   }
 }
@@ -415,6 +418,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     infinityNikki: {
       enable: true,
       gameDir: '',
+      galleryGuideSeen: false,
+      allowOnlinePhotoMetadataExtract: false,
+      manageScreenshotShortcuts: false,
     },
   },
 } as const

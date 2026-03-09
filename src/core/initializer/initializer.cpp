@@ -4,6 +4,8 @@ module Core.Initializer;
 
 import std;
 import Core.Async;
+import Core.Commands;
+import Core.Commands.State;
 import Core.WorkerPool;
 import Core.State;
 import Core.State.RuntimeInfo;
@@ -17,8 +19,6 @@ import Core.Initializer.Database;
 import Core.Migration;
 import Features.Gallery;
 import Features.Settings;
-import Core.Commands;
-import Core.Commands.State;
 import Features.Settings.State;
 import Features.Recording;
 import Features.ReplayBuffer;
@@ -27,6 +27,7 @@ import Features.ReplayBuffer.UseCase;
 import Features.Update;
 import Features.VirtualGamepad;
 import Features.Letterbox.State;
+import Plugins.InfinityNikki.ScreenshotShortcuts;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.WebViewWindow;
@@ -83,6 +84,8 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     if (auto settings_result = Features::Settings::initialize(state); !settings_result) {
       return std::unexpected("Failed to initialize settings: " + settings_result.error());
     }
+
+    Plugins::InfinityNikki::ScreenshotShortcuts::refresh_from_settings(state);
 
     // 将后端 i18n 语言与 settings 对齐，确保原生浮窗/通知文案一致
     apply_language_from_settings(state);

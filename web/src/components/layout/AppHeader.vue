@@ -107,6 +107,12 @@ function resolveTaskTypeLabel(type: string): string {
   if (type === 'gallery.scanDirectory') {
     return t('app.header.tasks.type.galleryScan')
   }
+  if (type === 'plugins.infinityNikki.extractPhotoParams') {
+    return t('app.header.tasks.type.infinityNikkiExtractPhotoParams')
+  }
+  if (type === 'plugins.infinityNikki.initializeScreenshotShortcuts') {
+    return t('app.header.tasks.type.infinityNikkiInitScreenshotShortcuts')
+  }
   return type
 }
 

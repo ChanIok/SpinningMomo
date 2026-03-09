@@ -35,4 +35,21 @@ struct InfinityNikkiExtractPhotoParamsResult {
   std::vector<std::string> errors = {};
 };
 
+struct InfinityNikkiInitializeScreenshotShortcutsProgress {
+  std::string stage;
+  std::int64_t current = 0;
+  std::int64_t total = 0;
+  std::optional<double> percent;
+  std::optional<std::string> message;
+};
+
+struct InfinityNikkiInitializeScreenshotShortcutsResult {
+  std::int32_t source_count = 0;
+  std::int32_t created_count = 0;
+  std::int32_t updated_count = 0;
+  std::int32_t removed_count = 0;
+  std::int32_t ignored_count = 0;
+  std::vector<std::string> errors = {};
+};
+
 }  // namespace Plugins::InfinityNikki

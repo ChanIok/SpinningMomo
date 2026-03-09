@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useGalleryData } from '../composables'
 import { useGalleryStore } from '../store'
+import { useSettingsStore } from '@/features/settings/store'
 import GalleryToolbar from '../components/GalleryToolbar.vue'
 import GalleryContent from '../components/GalleryContent.vue'
 import GalleryLightbox from '../components/lightbox/GalleryLightbox.vue'
+import InfinityNikkiGuidePanel from '../components/InfinityNikkiGuidePanel.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
+const settingsStore = useSettingsStore()
+const showInfinityNikkiGuide = computed(() => {
+  const config = settingsStore.appSettings.plugins.infinityNikki
+  return config.enable && Boolean(config.gameDir.trim()) && !config.galleryGuideSeen
+})
 
 // 监听筛选条件和文件夹选项变化，自动重新加载资产
 watch(
@@ -34,7 +41,8 @@ watch(
     <div v-else class="flex h-full flex-col">
       <GalleryToolbar />
       <div class="flex-1 overflow-hidden">
-        <GalleryContent />
+        <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
+        <GalleryContent v-else />
       </div>
     </div>
   </div>
