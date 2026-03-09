@@ -9,6 +9,7 @@ import Core.State;
 import Core.Commands;
 import Core.I18n;
 import Core.WebView;
+import Features.Gallery;
 import Features.Settings.Events;
 import Features.Settings.Types;
 import UI.FloatingWindow;
@@ -94,6 +95,8 @@ auto handle_settings_changed(Core::State::AppState& state,
     if (!event.data.old_settings.app.onboarding.completed &&
         event.data.new_settings.app.onboarding.completed) {
       Logger().info("Onboarding completed, showing floating window and closing webview");
+      Features::Gallery::bootstrap_default_media_sources(
+          state, event.data.new_settings.features.output_dir_path);
       UI::FloatingWindow::show_window(state);
       auto _ = UI::WebViewWindow::close_window(state);
     }

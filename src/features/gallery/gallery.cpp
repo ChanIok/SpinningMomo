@@ -1,8 +1,12 @@
 module;
 
+#include <asio.hpp>
+
 module Features.Gallery;
 
 import std;
+import Core.Async;
+import Core.RPC.NotificationHub;
 import Core.State;
 import Features.Gallery.State;
 import Features.Gallery.Types;
@@ -18,9 +22,59 @@ import Features.Gallery.Watcher;
 import Utils.Image;
 import Utils.Logger;
 import Utils.LRUCache;
+import Utils.Path;
 import Utils.System;
 
 namespace Features::Gallery {
+
+auto make_bootstrap_scan_options(const std::filesystem::path& directory) -> Types::ScanOptions {
+  Types::ScanOptions options;
+  options.directory = directory.string();
+  options.supported_extensions = std::vector<std::string>{
+      ".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif",
+      ".mp4", ".avi",  ".mov", ".mkv", ".wmv",  ".webm",
+  };
+  return options;
+}
+
+auto bootstrap_default_media_sources(Core::State::AppState& app_state,
+                                     const std::string& output_dir_path) -> void {
+  if (!app_state.async) {
+    Logger().warn("Skip gallery bootstrap: async state is not ready");
+    return;
+  }
+
+  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  if (!io_context) {
+    Logger().warn("Skip gallery bootstrap: async runtime is not available");
+    return;
+  }
+
+  auto output_dir_path_snapshot = output_dir_path;
+  asio::co_spawn(
+      *io_context,
+      [&app_state, output_dir_path_snapshot]() -> asio::awaitable<void> {
+        co_await asio::post(asio::use_awaitable);
+
+        auto output_dir_result = Utils::Path::GetOutputDirectory(output_dir_path_snapshot);
+        if (!output_dir_result) {
+          Logger().warn("Failed to resolve gallery bootstrap output directory: {}",
+                        output_dir_result.error());
+        } else {
+          auto scan_result =
+              scan_directory(app_state, make_bootstrap_scan_options(output_dir_result.value()));
+          if (!scan_result) {
+            Logger().warn("Failed to scan gallery bootstrap output directory '{}': {}",
+                          output_dir_result->string(), scan_result.error());
+          } else {
+            Logger().info("Gallery bootstrap scanned output directory: {}",
+                          output_dir_result->string());
+            Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+          }
+        }
+      },
+      asio::detached);
+}
 
 // ============= 初始化和清理 =============
 
