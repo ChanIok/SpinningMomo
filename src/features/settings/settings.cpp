@@ -13,9 +13,24 @@ import Features.Settings.Migration;
 import Features.Settings.Menu;
 import Utils.Path;
 import Utils.Logger;
+import Vendor.Windows;
 import <rfl/json.hpp>;
 
 namespace Features::Settings {
+
+auto detect_default_locale() -> std::string {
+  constexpr Vendor::Windows::LANGID kPrimaryLanguageMask = 0x03ff;
+  constexpr Vendor::Windows::LANGID kChinesePrimaryLanguage = 0x0004;
+
+  auto language_id = Vendor::Windows::GetUserDefaultUILanguage();
+  auto primary_language = static_cast<Vendor::Windows::LANGID>(language_id & kPrimaryLanguageMask);
+
+  if (primary_language == kChinesePrimaryLanguage) {
+    return "zh-CN";
+  }
+
+  return "en-US";
+}
 
 auto get_settings_path() -> std::expected<std::filesystem::path, std::string> {
   auto dir_result = Utils::Path::GetExecutableDirectory();
@@ -114,6 +129,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       Logger().info("Settings file not found, creating default configuration");
 
       auto default_state = State::create_default_settings_state();
+      default_state.raw.app.language.current = detect_default_locale();
       // 新安装用户首次启动应进入欢迎流程
       default_state.raw.app.onboarding.completed = false;
       default_state.raw.app.onboarding.flow_version = Types::CURRENT_ONBOARDING_FLOW_VERSION;

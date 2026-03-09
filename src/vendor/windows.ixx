@@ -10,6 +10,7 @@ namespace Vendor::Windows {
 export using BOOL = ::BOOL;
 export using DWORD = ::DWORD;
 export using UINT = ::UINT;
+export using LANGID = ::LANGID;
 export using WPARAM = ::WPARAM;
 export using LPARAM = ::LPARAM;
 export using LRESULT = ::LRESULT;
@@ -51,6 +52,7 @@ export constexpr DWORD kERROR_CANCELLED = ERROR_CANCELLED;
 export auto GetSystemMetrics(int nIndex) -> int { return ::GetSystemMetrics(nIndex); }
 export auto GetScreenWidth() -> int { return ::GetSystemMetrics(SM_CXSCREEN); }
 export auto GetScreenHeight() -> int { return ::GetSystemMetrics(SM_CYSCREEN); }
+export auto GetUserDefaultUILanguage() -> LANGID { return ::GetUserDefaultUILanguage(); }
 
 // Message box
 export auto MessageBoxW(HWND hWnd, const wchar_t* lpText, const wchar_t* lpCaption, UINT uType)

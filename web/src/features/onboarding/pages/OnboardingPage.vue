@@ -396,7 +396,7 @@ const completeOnboarding = async () => {
 
           <div class="grid gap-4 md:grid-cols-2">
             <div class="space-y-2">
-              <p class="text-sm text-foreground">{{ t('onboarding.step1.languageLabel') }}</p>
+              <p class="text-sm text-foreground">{{ t('common.languageLabelBilingual') }}</p>
               <Select :model-value="language" @update:model-value="(v) => (language = String(v))">
                 <SelectTrigger>
                   <SelectValue />

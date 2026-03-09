@@ -75,7 +75,7 @@ const handleReset = async () => {
         <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
-              {{ t('settings.general.language.displayLanguage') }}
+              {{ t('common.languageLabelBilingual') }}
             </ItemTitle>
             <ItemDescription>
               {{ t('settings.general.language.displayLanguageDescription') }}
@@ -87,7 +87,7 @@ const handleReset = async () => {
               @update:model-value="(v) => updateLanguage(v as string)"
             >
               <SelectTrigger class="w-48">
-                <SelectValue :placeholder="t('settings.general.language.displayLanguage')" />
+                <SelectValue :placeholder="t('common.languageLabelBilingual')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="zh-CN">{{ t('common.languageZhCn') }}</SelectItem>
