@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useSettingsStore } from '../store'
 import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
+import WindowTitlePickerButton from '@/components/WindowTitlePickerButton.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from '@/components/ui/item'
@@ -54,12 +55,23 @@ watch(
 )
 
 const handleTitleChange = async () => {
-  const value = inputTitle.value.trim()
-  if (value === '') {
+  if (inputTitle.value.trim() === '') {
     return
   }
+
   try {
-    await updateWindowTitle(value)
+    await updateWindowTitle(inputTitle.value)
+  } catch (error) {
+    console.error('Failed to update window title:', error)
+  }
+}
+
+const handleTitlePicked = async (title: string) => {
+  inputTitle.value = title
+  isEditingTitle.value = false
+
+  try {
+    await updateWindowTitle(title)
   } catch (error) {
     console.error('Failed to update window title:', error)
   }
@@ -161,19 +173,22 @@ const handleResetSettings = async () => {
             </ItemDescription>
           </ItemContent>
           <ItemActions>
-            <Input
-              v-model="inputTitle"
-              @focus="isEditingTitle = true"
-              @keydown.enter="handleTitleChange"
-              @blur="
-                () => {
-                  isEditingTitle = false
-                  handleTitleChange()
-                }
-              "
-              :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
-              class="w-48"
-            />
+            <div class="flex items-center gap-2">
+              <Input
+                v-model="inputTitle"
+                @focus="isEditingTitle = true"
+                @keydown.enter="handleTitleChange"
+                @blur="
+                  () => {
+                    isEditingTitle = false
+                    handleTitleChange()
+                  }
+                "
+                :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
+                class="w-48"
+              />
+              <WindowTitlePickerButton @select="handleTitlePicked" />
+            </div>
           </ItemActions>
         </Item>
 
