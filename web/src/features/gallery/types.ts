@@ -273,6 +273,20 @@ export interface QueryAssetsParams {
 // 查询响应（复用 ListAssetsResponse）
 export type QueryAssetsResponse = ListAssetsResponse
 
+export interface QueryPhotoMapPointsParams {
+  filters: QueryAssetsFilters
+}
+
+export interface PhotoMapPoint {
+  assetId: number
+  name: string
+  hash?: string
+  fileCreatedAt?: number
+  nikkiLocX: number
+  nikkiLocY: number
+  nikkiLocZ?: number
+}
+
 export interface InfinityNikkiPhotoParams {
   cameraParams?: string
   timeHour?: number

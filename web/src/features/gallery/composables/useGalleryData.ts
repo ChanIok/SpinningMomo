@@ -1,6 +1,7 @@
 import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
 import type { ScanAssetsParams } from '../types'
+import { toQueryAssetsFilters } from '../queryFilters'
 
 /**
  * Gallery数据管理 Composable
@@ -23,17 +24,19 @@ export function useGalleryData() {
       // 清空分页缓存（重新加载时）
       store.clearPaginatedAssets()
 
+      const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+
       // 1. 获取月份元数据（使用完整过滤条件）
       const response = await galleryApi.getTimelineBuckets({
-        folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
-        includeSubfolders: store.includeSubfolders,
-        type: store.filter.type,
-        search: store.filter.searchQuery,
-        tagIds: store.filter.tagIds,
-        tagMatchMode: store.filter.tagMatchMode,
-        clothIds: store.filter.clothIds,
-        clothMatchMode: store.filter.clothMatchMode,
-        colorHexes: store.filter.colorHex ? [store.filter.colorHex] : undefined,
+        folderId: filters.folderId,
+        includeSubfolders: filters.includeSubfolders,
+        type: filters.type,
+        search: filters.search,
+        tagIds: filters.tagIds,
+        tagMatchMode: filters.tagMatchMode,
+        clothIds: filters.clothIds,
+        clothMatchMode: filters.clothMatchMode,
+        colorHexes: filters.colorHexes,
       })
 
       store.setTimelineBuckets(response.buckets)
@@ -68,19 +71,11 @@ export function useGalleryData() {
       // 清空分页缓存（重新加载时）
       store.clearPaginatedAssets()
 
+      const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+
       // 首次请求获取总数和第一页
       const response = await galleryApi.queryAssets({
-        filters: {
-          folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
-          includeSubfolders: store.includeSubfolders,
-          type: store.filter.type,
-          search: store.filter.searchQuery,
-          tagIds: store.filter.tagIds,
-          tagMatchMode: store.filter.tagMatchMode,
-          clothIds: store.filter.clothIds,
-          clothMatchMode: store.filter.clothMatchMode,
-          colorHexes: store.filter.colorHex ? [store.filter.colorHex] : undefined,
-        },
+        filters,
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,
         page: 1,
@@ -115,18 +110,10 @@ export function useGalleryData() {
     }
 
     try {
+      const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+
       const response = await galleryApi.queryAssets({
-        filters: {
-          folderId: store.filter.folderId ? Number(store.filter.folderId) : undefined,
-          includeSubfolders: store.includeSubfolders,
-          type: store.filter.type,
-          search: store.filter.searchQuery,
-          tagIds: store.filter.tagIds,
-          tagMatchMode: store.filter.tagMatchMode,
-          clothIds: store.filter.clothIds,
-          clothMatchMode: store.filter.clothMatchMode,
-          colorHexes: store.filter.colorHex ? [store.filter.colorHex] : undefined,
-        },
+        filters,
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,
         page: pageNum,

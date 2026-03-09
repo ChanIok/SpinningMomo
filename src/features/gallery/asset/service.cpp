@@ -66,18 +66,34 @@ auto build_in_clause_placeholders(std::size_t count) -> std::string {
   return placeholders;
 }
 
+auto qualify_asset_column(std::string_view column, std::string_view asset_table_alias)
+    -> std::string {
+  if (asset_table_alias.empty()) {
+    return std::string(column);
+  }
+
+  return std::string(asset_table_alias) + "." + std::string(column);
+}
+
 // 构建统一的WHERE条件
-auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
+auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
+                                std::string_view asset_table_alias = "")
     -> std::expected<std::pair<std::string, std::vector<Core::Database::Types::DbParam>>,
                      std::string> {
   std::vector<std::string> conditions;
   std::vector<Core::Database::Types::DbParam> params;
+  const auto folder_id_column = qualify_asset_column("folder_id", asset_table_alias);
+  const auto file_created_at_column = qualify_asset_column("file_created_at", asset_table_alias);
+  const auto created_at_column = qualify_asset_column("created_at", asset_table_alias);
+  const auto type_column = qualify_asset_column("type", asset_table_alias);
+  const auto name_column = qualify_asset_column("name", asset_table_alias);
+  const auto id_column = qualify_asset_column("id", asset_table_alias);
 
   // 文件夹筛选
   if (filters.folder_id.has_value()) {
     if (filters.include_subfolders.value_or(false)) {
       // 使用递归CTE查询当前文件夹及所有子文件夹
-      conditions.push_back(R"(folder_id IN (
+      conditions.push_back(std::format(R"({} IN (
         WITH RECURSIVE folder_hierarchy AS (
           SELECT id FROM folders WHERE id = ?
           UNION ALL
@@ -85,11 +101,12 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
           INNER JOIN folder_hierarchy fh ON f.parent_id = fh.id
         )
         SELECT id FROM folder_hierarchy
-      ))");
+      ))",
+                                       folder_id_column));
       params.push_back(filters.folder_id.value());
     } else {
       // 只查询当前文件夹
-      conditions.push_back("folder_id = ?");
+      conditions.push_back(folder_id_column + " = ?");
       params.push_back(filters.folder_id.value());
     }
   }
@@ -101,8 +118,8 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
       // 或者可以在上层进行验证
     } else {
       conditions.push_back(
-          "strftime('%Y-%m', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) = "
-          "?");
+          std::format("strftime('%Y-%m', datetime(COALESCE({}, {})/1000, 'unixepoch')) = ?",
+                      file_created_at_column, created_at_column));
       params.push_back(filters.month.value());
     }
   }
@@ -110,19 +127,20 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
   // 年份筛选
   if (filters.year.has_value()) {
     conditions.push_back(
-        "strftime('%Y', datetime(COALESCE(file_created_at, created_at)/1000, 'unixepoch')) = ?");
+        std::format("strftime('%Y', datetime(COALESCE({}, {})/1000, 'unixepoch')) = ?",
+                    file_created_at_column, created_at_column));
     params.push_back(filters.year.value());
   }
 
   // 类型筛选
   if (filters.type.has_value() && !filters.type->empty()) {
-    conditions.push_back("type = ?");
+    conditions.push_back(type_column + " = ?");
     params.push_back(filters.type.value());
   }
 
   // 搜索
   if (filters.search.has_value() && !filters.search->empty()) {
-    conditions.push_back("name LIKE ?");
+    conditions.push_back(name_column + " LIKE ?");
     params.push_back("%" + filters.search.value() + "%");
   }
 
@@ -133,14 +151,15 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
     if (match_mode == "all") {
       // 匹配所有标签（AND）：资产必须拥有所有指定的标签
       for (const auto& tag_id : filters.tag_ids.value()) {
-        conditions.push_back("id IN (SELECT asset_id FROM asset_tags WHERE tag_id = ?)");
+        conditions.push_back(
+            std::format("{} IN (SELECT asset_id FROM asset_tags WHERE tag_id = ?)", id_column));
         params.push_back(tag_id);
       }
     } else {
       // 匹配任一标签（OR）：资产拥有任意一个标签即可
       auto placeholders = build_in_clause_placeholders(filters.tag_ids->size());
       conditions.push_back(std::format(
-          "id IN (SELECT asset_id FROM asset_tags WHERE tag_id IN ({}))", placeholders));
+          "{} IN (SELECT asset_id FROM asset_tags WHERE tag_id IN ({}))", id_column, placeholders));
       for (const auto& tag_id : filters.tag_ids.value()) {
         params.push_back(tag_id);
       }
@@ -154,14 +173,14 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
 
     if (match_mode == "all") {
       conditions.push_back(std::format(
-          R"(id IN (
+          R"({} IN (
             SELECT asset_id
             FROM asset_infinity_nikki_clothes
             WHERE cloth_id IN ({})
             GROUP BY asset_id
             HAVING COUNT(DISTINCT cloth_id) = ?
           ))",
-          placeholders));
+          id_column, placeholders));
 
       for (const auto cloth_id : filters.cloth_ids.value()) {
         params.push_back(cloth_id);
@@ -169,17 +188,17 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters)
       params.push_back(static_cast<std::int64_t>(filters.cloth_ids->size()));
     } else {
       conditions.push_back(std::format(
-          "id IN (SELECT DISTINCT asset_id FROM asset_infinity_nikki_clothes WHERE cloth_id IN "
+          "{} IN (SELECT DISTINCT asset_id FROM asset_infinity_nikki_clothes WHERE cloth_id IN "
           "({}))",
-          placeholders));
+          id_column, placeholders));
       for (const auto cloth_id : filters.cloth_ids.value()) {
         params.push_back(cloth_id);
       }
     }
   }
 
-  auto color_filter_result =
-      Features::Gallery::Color::Filter::append_color_filter_conditions(filters, conditions, params);
+  auto color_filter_result = Features::Gallery::Color::Filter::append_color_filter_conditions(
+      filters, conditions, params, asset_table_alias);
   if (!color_filter_result) {
     return std::unexpected(color_filter_result.error());
   }
@@ -310,6 +329,53 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
   }
 
   return response;
+}
+
+auto query_photo_map_points(Core::State::AppState& app_state,
+                            const Types::QueryPhotoMapPointsParams& params)
+    -> std::expected<std::vector<Types::PhotoMapPoint>, std::string> {
+  auto where_result = build_unified_where_clause(params.filters, "a");
+  if (!where_result) {
+    return std::unexpected(where_result.error());
+  }
+  auto [where_clause, query_params] = std::move(where_result.value());
+
+  std::vector<std::string> conditions = {
+      "a.type IN ('photo', 'live_photo')",
+      "p.nikki_loc_x IS NOT NULL",
+      "p.nikki_loc_y IS NOT NULL",
+  };
+
+  if (!where_clause.empty()) {
+    conditions.push_back(where_clause.substr(6));
+  }
+
+  auto merged_conditions = std::ranges::fold_left(
+      conditions, std::string{}, [](const std::string& acc, const std::string& cond) {
+        return acc.empty() ? cond : acc + " AND " + cond;
+      });
+
+  std::string sql = std::format(R"(
+    SELECT a.id AS asset_id,
+           a.name,
+           a.hash,
+           a.file_created_at,
+           p.nikki_loc_x,
+           p.nikki_loc_y,
+           p.nikki_loc_z
+    FROM assets a
+    INNER JOIN asset_infinity_nikki_params p ON p.asset_id = a.id
+    WHERE {}
+    ORDER BY COALESCE(a.file_created_at, a.created_at) DESC, a.id DESC
+  )",
+                                merged_conditions);
+
+  auto result = Core::Database::query<Types::PhotoMapPoint>(*app_state.database, sql, query_params);
+  if (!result) {
+    return std::unexpected("Failed to query photo map points: " + result.error());
+  }
+
+  return result.value();
 }
 
 auto get_timeline_buckets(Core::State::AppState& app_state,

@@ -59,6 +59,20 @@ auto handle_query_assets(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_query_photo_map_points(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::QueryPhotoMapPointsParams& params)
+    -> RpcAwaitable<std::vector<Features::Gallery::Types::PhotoMapPoint>> {
+  auto result = Features::Gallery::Asset::Service::query_photo_map_points(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 auto handle_get_infinity_nikki_photo_params(
     Core::State::AppState& app_state,
     const Features::Gallery::Types::GetInfinityNikkiPhotoParamsParams& params)
@@ -152,6 +166,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.queryAssets", handle_query_assets,
       "Unified asset query interface with flexible filters (folder, month, year, type, search) "
       "and optional pagination");
+
+  register_method<Features::Gallery::Types::QueryPhotoMapPointsParams,
+                  std::vector<Features::Gallery::Types::PhotoMapPoint>>(
+      app_state, app_state.rpc->registry, "gallery.queryPhotoMapPoints",
+      handle_query_photo_map_points,
+      "Query Infinity Nikki photo map points using the current gallery filters");
 
   register_method<Features::Gallery::Types::GetInfinityNikkiPhotoParamsParams,
                   std::optional<Features::Gallery::Types::InfinityNikkiPhotoParams>>(

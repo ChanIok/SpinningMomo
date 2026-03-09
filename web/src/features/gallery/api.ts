@@ -15,6 +15,8 @@ import type {
   GetAssetsByMonthResponse,
   QueryAssetsParams,
   QueryAssetsResponse,
+  QueryPhotoMapPointsParams,
+  PhotoMapPoint,
   InfinityNikkiPhotoParams,
   AssetMainColor,
   Tag,
@@ -301,6 +303,27 @@ export async function queryAssets(params: QueryAssetsParams): Promise<QueryAsset
 }
 
 /**
+ * 查询当前筛选下的地图点位
+ */
+export async function queryPhotoMapPoints(
+  params: QueryPhotoMapPointsParams
+): Promise<PhotoMapPoint[]> {
+  try {
+    const result = await call<PhotoMapPoint[]>('gallery.queryPhotoMapPoints', params)
+
+    console.log('🗺️ 查询地图点位成功:', {
+      count: result.length,
+      filters: params.filters,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to query photo map points:', error)
+    throw new Error('查询地图点位失败')
+  }
+}
+
+/**
  * 获取 Infinity Nikki 照片详情参数
  */
 export async function getInfinityNikkiPhotoParams(
@@ -516,6 +539,7 @@ export const galleryApi = {
   openFolderInExplorer,
   removeFolderWatch,
   queryAssets, // 统一查询接口
+  queryPhotoMapPoints,
   getInfinityNikkiPhotoParams,
   getAssetMainColors,
 

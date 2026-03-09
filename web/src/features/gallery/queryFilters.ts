@@ -1,0 +1,18 @@
+import type { AssetFilter, QueryAssetsFilters } from './types'
+
+export function toQueryAssetsFilters(
+  filter: AssetFilter,
+  includeSubfolders: boolean
+): QueryAssetsFilters {
+  return {
+    folderId: filter.folderId ? Number(filter.folderId) : undefined,
+    includeSubfolders,
+    type: filter.type,
+    search: filter.searchQuery,
+    tagIds: filter.tagIds,
+    tagMatchMode: filter.tagMatchMode,
+    clothIds: filter.clothIds,
+    clothMatchMode: filter.clothMatchMode,
+    colorHexes: filter.colorHex ? [filter.colorHex] : undefined,
+  }
+}

@@ -12,6 +12,10 @@ namespace Features::Gallery::Asset::Service {
 export auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsParams& params)
     -> std::expected<Types::ListResponse, std::string>;
 
+export auto query_photo_map_points(Core::State::AppState& app_state,
+                                   const Types::QueryPhotoMapPointsParams& params)
+    -> std::expected<std::vector<Types::PhotoMapPoint>, std::string>;
+
 export auto get_timeline_buckets(Core::State::AppState& app_state,
                                  const Types::TimelineBucketsParams& params)
     -> std::expected<Types::TimelineBucketsResponse, std::string>;

@@ -212,6 +212,16 @@ struct ListResponse {
   std::int32_t total_pages;
 };
 
+struct PhotoMapPoint {
+  std::int64_t asset_id;
+  std::string name;
+  std::optional<std::string> hash;
+  std::optional<std::int64_t> file_created_at;
+  double nikki_loc_x;
+  double nikki_loc_y;
+  std::optional<double> nikki_loc_z;
+};
+
 struct GetParams {
   std::int64_t id;
 };
@@ -324,6 +334,10 @@ struct QueryAssetsParams {
   // 分页是可选的：传page就分页，不传就返回所有结果
   std::optional<std::int32_t> page;
   std::optional<std::int32_t> per_page;
+};
+
+struct QueryPhotoMapPointsParams {
+  QueryAssetsFilters filters;
 };
 
 struct InfinityNikkiPhotoParams {

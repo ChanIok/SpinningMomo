@@ -70,9 +70,18 @@ AND (
 )";
 }
 
+auto qualify_asset_id(std::string_view asset_table_alias) -> std::string {
+  if (asset_table_alias.empty()) {
+    return "id";
+  }
+
+  return std::string(asset_table_alias) + ".id";
+}
+
 auto append_color_filter_conditions(const Features::Gallery::Types::QueryAssetsFilters& filters,
                                     std::vector<std::string>& conditions,
-                                    std::vector<Core::Database::Types::DbParam>& params)
+                                    std::vector<Core::Database::Types::DbParam>& params,
+                                    std::string_view asset_table_alias)
     -> std::expected<void, std::string> {
   if (!filters.color_hexes.has_value() || filters.color_hexes->empty()) {
     return {};
@@ -93,11 +102,12 @@ auto append_color_filter_conditions(const Features::Gallery::Types::QueryAssetsF
       std::max(0.1, filters.color_distance.value_or(kDefaultColorDistance));
   const std::string color_match_sql = build_single_color_match_sql();
   const std::string color_match_mode = filters.color_match_mode.value_or("any");
+  const auto asset_id = qualify_asset_id(asset_table_alias);
 
   if (color_match_mode == "all") {
     for (const auto& target : targets) {
-      conditions.push_back(
-          std::format("id IN (SELECT ac.asset_id FROM asset_colors ac WHERE {})", color_match_sql));
+      conditions.push_back(std::format("{} IN (SELECT ac.asset_id FROM asset_colors ac WHERE {})",
+                                       asset_id, color_match_sql));
       append_color_match_params(params, target, color_distance);
     }
     return {};
@@ -115,8 +125,9 @@ auto append_color_filter_conditions(const Features::Gallery::Types::QueryAssetsF
                                                  return acc.empty() ? item : acc + " OR " + item;
                                                });
 
-  conditions.push_back(std::format(
-      "id IN (SELECT DISTINCT ac.asset_id FROM asset_colors ac WHERE {})", merged_any_sql));
+  conditions.push_back(
+      std::format("{} IN (SELECT DISTINCT ac.asset_id FROM asset_colors ac WHERE {})", asset_id,
+                  merged_any_sql));
   return {};
 }
 
