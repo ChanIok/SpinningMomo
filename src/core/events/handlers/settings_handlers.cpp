@@ -13,6 +13,7 @@ import Features.Gallery;
 import Features.Settings.Events;
 import Features.Settings.Types;
 import Plugins.InfinityNikki.PhotoService;
+import Plugins.InfinityNikki.TaskService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.WebViewWindow;
@@ -70,7 +71,24 @@ auto has_infinity_nikki_shortcut_setting_changes(
   const auto& new_config = new_settings.plugins.infinity_nikki;
 
   return old_config.enable != new_config.enable || old_config.game_dir != new_config.game_dir ||
+         old_config.gallery_guide_seen != new_config.gallery_guide_seen ||
          old_config.manage_screenshot_shortcuts != new_config.manage_screenshot_shortcuts;
+}
+
+auto should_start_infinity_nikki_shortcuts_initialization(
+    const Features::Settings::Types::AppSettings& old_settings,
+    const Features::Settings::Types::AppSettings& new_settings) -> bool {
+  const auto& old_config = old_settings.plugins.infinity_nikki;
+  const auto& new_config = new_settings.plugins.infinity_nikki;
+
+  if (!new_config.enable || new_config.game_dir.empty() || !new_config.gallery_guide_seen ||
+      !new_config.manage_screenshot_shortcuts) {
+    return false;
+  }
+
+  return (!old_config.enable && new_config.enable) || old_config.game_dir != new_config.game_dir ||
+         (!old_config.gallery_guide_seen && new_config.gallery_guide_seen) ||
+         (!old_config.manage_screenshot_shortcuts && new_config.manage_screenshot_shortcuts);
 }
 
 auto apply_runtime_language_from_settings(Core::State::AppState& state,
@@ -119,6 +137,18 @@ auto handle_settings_changed(Core::State::AppState& state,
     if (has_infinity_nikki_shortcut_setting_changes(event.data.old_settings,
                                                     event.data.new_settings)) {
       Plugins::InfinityNikki::PhotoService::refresh_from_settings(state);
+
+      if (should_start_infinity_nikki_shortcuts_initialization(event.data.old_settings,
+                                                               event.data.new_settings)) {
+        auto task_result =
+            Plugins::InfinityNikki::TaskService::start_initialize_screenshot_shortcuts_task(state);
+        if (!task_result) {
+          Logger().warn("Failed to start Infinity Nikki screenshot shortcut task: {}",
+                        task_result.error());
+        } else {
+          Logger().info("Infinity Nikki screenshot shortcut task started: {}", task_result.value());
+        }
+      }
     }
 
     auto webview_host_mode_changed =

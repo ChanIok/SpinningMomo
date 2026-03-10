@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
   Item,
@@ -20,22 +20,12 @@ import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useSettingsStore } from '@/features/settings/store'
 import type { AppSettings } from '@/features/settings/types'
-import {
-  startExtractInfinityNikkiPhotoParams,
-  startInitializeInfinityNikkiScreenshotShortcuts,
-} from '@/plugins/infinity_nikki'
 
 const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const { toast } = useToast()
 
 const isSubmitting = ref(false)
-const isMetadataEnabled = computed(
-  () => settingsStore.appSettings.plugins.infinityNikki.allowOnlinePhotoMetadataExtract
-)
-const isScreenshotShortcutsEnabled = computed(
-  () => settingsStore.appSettings.plugins.infinityNikki.manageScreenshotShortcuts
-)
 
 type InfinityNikkiGuidePatch = Partial<AppSettings['plugins']['infinityNikki']>
 
@@ -75,16 +65,13 @@ async function handleEnableMetadataOnly() {
 
   isSubmitting.value = true
   try {
-    if (!isMetadataEnabled.value) {
-      await startExtractInfinityNikkiPhotoParams(true)
-      toast.success(t('gallery.guide.infinityNikki.metadataTaskStartedTitle'), {
-        description: t('gallery.guide.infinityNikki.metadataTaskStartedDescription'),
-      })
-    }
-
     await saveGuideState({
       galleryGuideSeen: true,
       allowOnlinePhotoMetadataExtract: true,
+    })
+
+    toast.success(t('gallery.guide.infinityNikki.metadataTaskStartedTitle'), {
+      description: t('gallery.guide.infinityNikki.metadataTaskStartedDescription'),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
@@ -103,17 +90,10 @@ async function handleApplyRecommended() {
 
   isSubmitting.value = true
   try {
-    if (!isMetadataEnabled.value) {
-      await startExtractInfinityNikkiPhotoParams(true)
-    }
-
-    if (!isScreenshotShortcutsEnabled.value) {
-      await startInitializeInfinityNikkiScreenshotShortcuts()
-    }
-
     await saveGuideState({
       galleryGuideSeen: true,
       allowOnlinePhotoMetadataExtract: true,
+      manageScreenshotShortcuts: true,
     })
 
     toast.success(t('gallery.guide.infinityNikki.recommendedTaskStartedTitle'), {

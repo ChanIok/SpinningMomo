@@ -132,25 +132,27 @@ auto extract_asset_id_w(std::wstring_view url, std::wstring_view prefix)
   return extract_asset_id_generic(url, prefix);
 }
 
-// 路径安全检查
-auto is_path_safe(const std::filesystem::path& target, const std::filesystem::path& base) -> bool {
-  try {
-    std::error_code ec;
-    auto normalized_base = std::filesystem::weakly_canonical(base, ec);
-    if (ec) return false;
+auto normalize_compare_path(const std::filesystem::path& path) -> std::wstring {
+  auto value = path.generic_wstring();
+  std::transform(value.begin(), value.end(), value.begin(),
+                 [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
+  return value;
+}
 
-    auto normalized_target = std::filesystem::weakly_canonical(target, ec);
-    if (ec) return false;
+auto is_path_within_base(const std::filesystem::path& target, const std::filesystem::path& base)
+    -> bool {
+  auto normalized_base = normalize_compare_path(base.lexically_normal());
+  auto normalized_target = normalize_compare_path(target.lexically_normal());
 
-    auto relative = std::filesystem::relative(normalized_target, normalized_base, ec);
-    if (ec || relative.native().starts_with(L"..")) {
-      return false;
-    }
-
-    return std::filesystem::exists(normalized_target);
-  } catch (...) {
+  if (!normalized_target.starts_with(normalized_base)) {
     return false;
   }
+
+  if (normalized_target.size() == normalized_base.size()) {
+    return true;
+  }
+
+  return normalized_target[normalized_base.size()] == L'/';
 }
 
 // 简化的文件验证（只检查存在性和可读性）
@@ -189,9 +191,13 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
         auto full_path = state.gallery->thumbnails_directory / *relative_path;
 
-        if (!is_path_safe(full_path, state.gallery->thumbnails_directory)) {
+        if (!is_path_within_base(full_path, state.gallery->thumbnails_directory)) {
           Logger().warn("Unsafe thumbnail path requested: {}", full_path.string());
-          return std::unexpected("Unsafe path or file not found");
+          return std::unexpected("Unsafe thumbnail path");
+        }
+        if (!validate_asset_file(full_path)) {
+          Logger().debug("Thumbnail file not found: {}", full_path.string());
+          return std::unexpected("Thumbnail file not found");
         }
 
         Logger().debug("Resolved thumbnail path: {}", full_path.string());
@@ -289,10 +295,13 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
         auto full_path =
             state.gallery->thumbnails_directory / std::filesystem::path(*relative_path);
 
-        if (!is_path_safe(full_path, state.gallery->thumbnails_directory)) {
+        if (!is_path_within_base(full_path, state.gallery->thumbnails_directory)) {
           Logger().warn("Unsafe thumbnail path requested via WebView: {}", full_path.string());
-          return {
-              .success = false, .file_path = {}, .error_message = "Unsafe path or file not found"};
+          return {.success = false, .file_path = {}, .error_message = "Unsafe thumbnail path"};
+        }
+        if (!validate_asset_file(full_path)) {
+          Logger().debug("Thumbnail file not found via WebView: {}", full_path.string());
+          return {.success = false, .file_path = {}, .error_message = "Thumbnail file not found"};
         }
 
         return {.success = true,

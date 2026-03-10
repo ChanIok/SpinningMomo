@@ -14,6 +14,7 @@ import Core.Async;
 import Core.Tasks;
 import Features.Settings;
 import Features.Settings.State;
+import Plugins.InfinityNikki.TaskService;
 import Plugins.InfinityNikki.Types;
 import Plugins.InfinityNikki.GameDirectory;
 import Plugins.InfinityNikki.PhotoExtract;
@@ -174,48 +175,29 @@ auto handle_infinity_nikki_start_extract_photo_params(
     Core::State::AppState& app_state,
     const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& params)
     -> Core::RPC::RpcAwaitable<StartPluginTaskResult> {
-  constexpr auto kTaskType = "plugins.infinityNikki.extractPhotoParams";
-  if (Core::Tasks::has_active_task_of_type(app_state, kTaskType)) {
+  auto task_result =
+      Plugins::InfinityNikki::TaskService::start_extract_photo_params_task(app_state, params);
+  if (!task_result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::InvalidRequest),
-        .message = "Another Infinity Nikki extract task is already running",
+        .message = task_result.error(),
     });
   }
-
-  auto task_id = Core::Tasks::create_task(app_state, kTaskType, "Infinity Nikki photo params");
-  if (task_id.empty()) {
-    co_return std::unexpected(Core::RPC::RpcError{
-        .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-        .message = "Failed to create Infinity Nikki extract task",
-    });
-  }
-
-  launch_extract_photo_params_task(app_state, params, task_id);
-  co_return StartPluginTaskResult{.task_id = task_id};
+  co_return StartPluginTaskResult{.task_id = task_result.value()};
 }
 
 auto handle_infinity_nikki_start_initialize_screenshot_shortcuts(
     Core::State::AppState& app_state, [[maybe_unused]] const rfl::Generic& params)
     -> Core::RPC::RpcAwaitable<StartPluginTaskResult> {
-  constexpr auto kTaskType = "plugins.infinityNikki.initializeScreenshotShortcuts";
-  if (Core::Tasks::has_active_task_of_type(app_state, kTaskType)) {
+  auto task_result =
+      Plugins::InfinityNikki::TaskService::start_initialize_screenshot_shortcuts_task(app_state);
+  if (!task_result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::InvalidRequest),
-        .message = "Another Infinity Nikki screenshot shortcut task is already running",
+        .message = task_result.error(),
     });
   }
-
-  auto task_id =
-      Core::Tasks::create_task(app_state, kTaskType, "Infinity Nikki screenshot shortcuts");
-  if (task_id.empty()) {
-    co_return std::unexpected(Core::RPC::RpcError{
-        .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-        .message = "Failed to create Infinity Nikki screenshot shortcut task",
-    });
-  }
-
-  launch_initialize_screenshot_shortcuts_task(app_state, task_id);
-  co_return StartPluginTaskResult{.task_id = task_id};
+  co_return StartPluginTaskResult{.task_id = task_result.value()};
 }
 
 auto register_all(Core::State::AppState& app_state) -> void {

@@ -4,14 +4,16 @@ module Plugins.InfinityNikki.PhotoService;
 
 import std;
 import Core.State;
+import Core.Tasks;
 import Core.WorkerPool;
+import Features.Gallery;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
 import Features.Gallery.Watcher;
 import Features.Gallery.Types;
 import Features.Settings.State;
+import Plugins.InfinityNikki.TaskService;
 import Plugins.InfinityNikki.ScreenshotShortcuts;
-import Plugins.InfinityNikki.PhotoExtract;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.Path;
@@ -85,42 +87,47 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
   const auto& config = app_state.settings->raw.plugins.infinity_nikki;
 
   if (config.manage_screenshot_shortcuts) {
-    bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
-      auto sync_result = Plugins::InfinityNikki::ScreenshotShortcuts::sync(app_state);
-      if (!sync_result) {
-        Logger().warn("InfinityNikki screenshot shortcuts sync failed: {}", sync_result.error());
-      } else {
-        const auto& r = sync_result.value();
-        Logger().info(
-            "InfinityNikki screenshot shortcuts synced: source={}, created={}, updated={}, "
-            "removed={}, ignored={}",
-            r.source_count, r.created_count, r.updated_count, r.removed_count, r.ignored_count);
+    if (Core::Tasks::has_active_task_of_type(
+            app_state, "plugins.infinityNikki.initializeScreenshotShortcuts")) {
+      Logger().debug("Skip InfinityNikki screenshot shortcut sync: initialization task is active");
+    } else {
+      bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
+        auto sync_result = Plugins::InfinityNikki::ScreenshotShortcuts::sync(app_state);
+        if (!sync_result) {
+          Logger().warn("InfinityNikki screenshot shortcuts sync failed: {}", sync_result.error());
+        } else {
+          const auto& r = sync_result.value();
+          Logger().info(
+              "InfinityNikki screenshot shortcuts synced: source={}, created={}, updated={}, "
+              "removed={}, ignored={}",
+              r.source_count, r.created_count, r.updated_count, r.removed_count, r.ignored_count);
+        }
+      });
+      if (!submitted) {
+        Logger().warn("InfinityNikki shortcuts sync: failed to submit worker task");
       }
-    });
-    if (!submitted) {
-      Logger().warn("InfinityNikki shortcuts sync: failed to submit worker task");
     }
   }
 
   if (config.allow_online_photo_metadata_extract && result.new_items > 0) {
-    bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
-      InfinityNikkiExtractPhotoParamsRequest request{.only_missing = true};
-      auto extract_result =
-          Plugins::InfinityNikki::PhotoExtract::extract_photo_params(app_state, request, nullptr);
-      if (!extract_result) {
-        Logger().warn("InfinityNikki auto photo metadata extract failed: {}",
-                      extract_result.error());
-      } else {
-        const auto& r = extract_result.value();
-        Logger().info(
-            "InfinityNikki auto photo metadata extracted: saved={}, skipped={}, failed={}",
-            r.saved_count, r.skipped_count, r.failed_count);
-      }
-    });
-    if (!submitted) {
-      Logger().warn("InfinityNikki photo extract: failed to submit worker task");
+    auto task_result = Plugins::InfinityNikki::TaskService::start_extract_photo_params_task(
+        app_state, InfinityNikkiExtractPhotoParamsRequest{.only_missing = true});
+    if (!task_result) {
+      Logger().warn("InfinityNikki auto photo metadata extract task not started: {}",
+                    task_result.error());
+    } else {
+      Logger().info("InfinityNikki auto photo metadata extract task started: {}",
+                    task_result.value());
     }
   }
+}
+
+auto make_initial_scan_options(const std::filesystem::path& directory)
+    -> Features::Gallery::Types::ScanOptions {
+  Features::Gallery::Types::ScanOptions options;
+  options.directory = directory.string();
+  options.ignore_rules = make_infinity_nikki_ignore_rules();
+  return options;
 }
 
 // 根据当前的系统设置，注册《无限暖暖》照片服务的监听目录与回调。
@@ -166,6 +173,8 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
   }
 
   auto new_watch_path = dir_result.value();
+  auto requires_initial_scan =
+      state.current_watch_path.empty() || state.current_watch_path != new_watch_path;
   if (!state.current_watch_path.empty() && state.current_watch_path != new_watch_path) {
     stop_current_watcher();
   }
@@ -198,12 +207,26 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
   }
 
   if (start_immediately) {
-    auto start_result =
-        Features::Gallery::Watcher::start_watcher_for_directory(app_state, new_watch_path, true);
-    if (!start_result) {
-      Logger().warn("Failed to start InfinityNikki gallery watcher for '{}': {}",
-                    new_watch_path.string(), start_result.error());
-      return;
+    if (requires_initial_scan) {
+      auto task_result = Plugins::InfinityNikki::TaskService::start_initial_scan_task(
+          app_state, make_initial_scan_options(new_watch_path),
+          [&app_state](const Features::Gallery::Types::ScanResult& result) {
+            on_gallery_scan_complete(app_state, result);
+          });
+      if (!task_result) {
+        Logger().warn("Failed to start InfinityNikki initial scan task for '{}': {}",
+                      new_watch_path.string(), task_result.error());
+        return;
+      }
+      Logger().info("InfinityNikki initial scan task started: {}", task_result.value());
+    } else {
+      auto start_result =
+          Features::Gallery::Watcher::start_watcher_for_directory(app_state, new_watch_path, false);
+      if (!start_result) {
+        Logger().warn("Failed to start InfinityNikki gallery watcher for '{}': {}",
+                      new_watch_path.string(), start_result.error());
+        return;
+      }
     }
   }
 
