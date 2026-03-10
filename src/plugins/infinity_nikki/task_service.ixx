@@ -19,7 +19,7 @@ export auto start_extract_photo_params_task(
     const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::string, std::string>;
 
-export auto start_initialize_screenshot_shortcuts_task(Core::State::AppState& app_state)
+export auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string>;
 
 }  // namespace Plugins::InfinityNikki::TaskService

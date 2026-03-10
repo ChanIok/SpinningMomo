@@ -93,7 +93,7 @@ async function handleApplyRecommended() {
     await saveGuideState({
       galleryGuideSeen: true,
       allowOnlinePhotoMetadataExtract: true,
-      manageScreenshotShortcuts: true,
+      manageScreenshotHardlinks: true,
     })
 
     toast.success(t('gallery.guide.infinityNikki.recommendedTaskStartedTitle'), {
@@ -140,19 +140,19 @@ async function handleApplyRecommended() {
             <FolderSymlink class="size-4 text-primary" />
           </ItemMedia>
           <ItemContent class="flex-1">
-            <ItemTitle>{{ t('gallery.guide.infinityNikki.shortcutsTitle') }}</ItemTitle>
+            <ItemTitle>{{ t('gallery.guide.infinityNikki.hardlinksTitle') }}</ItemTitle>
             <ItemDescription>{{
-              t('gallery.guide.infinityNikki.shortcutsDescription')
+              t('gallery.guide.infinityNikki.hardlinksDescription')
             }}</ItemDescription>
             <Accordion type="single" collapsible class="mt-2 w-full">
               <AccordionItem value="details" class="border-b-0">
                 <AccordionTrigger class="py-2 text-xs text-muted-foreground hover:no-underline">
-                  {{ t('gallery.guide.infinityNikki.shortcutsDetailsTrigger') }}
+                  {{ t('gallery.guide.infinityNikki.hardlinksDetailsTrigger') }}
                 </AccordionTrigger>
                 <AccordionContent
                   class="text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground"
                 >
-                  {{ t('gallery.guide.infinityNikki.shortcutsDetailsContent') }}
+                  {{ t('gallery.guide.infinityNikki.hardlinksDetailsContent') }}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>

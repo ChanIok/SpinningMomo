@@ -256,7 +256,7 @@ export interface AppSettings {
       gameDir: string
       galleryGuideSeen: boolean
       allowOnlinePhotoMetadataExtract: boolean
-      manageScreenshotShortcuts: boolean
+      manageScreenshotHardlinks: boolean
     }
   }
 }
@@ -420,7 +420,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       gameDir: '',
       galleryGuideSeen: false,
       allowOnlinePhotoMetadataExtract: false,
-      manageScreenshotShortcuts: false,
+      manageScreenshotHardlinks: false,
     },
   },
 } as const

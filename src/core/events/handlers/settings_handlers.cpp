@@ -64,7 +64,7 @@ auto has_language_changes(const Features::Settings::Types::AppSettings& old_sett
   return old_settings.app.language.current != new_settings.app.language.current;
 }
 
-auto has_infinity_nikki_shortcut_setting_changes(
+auto has_infinity_nikki_hardlink_setting_changes(
     const Features::Settings::Types::AppSettings& old_settings,
     const Features::Settings::Types::AppSettings& new_settings) -> bool {
   const auto& old_config = old_settings.plugins.infinity_nikki;
@@ -72,23 +72,23 @@ auto has_infinity_nikki_shortcut_setting_changes(
 
   return old_config.enable != new_config.enable || old_config.game_dir != new_config.game_dir ||
          old_config.gallery_guide_seen != new_config.gallery_guide_seen ||
-         old_config.manage_screenshot_shortcuts != new_config.manage_screenshot_shortcuts;
+         old_config.manage_screenshot_hardlinks != new_config.manage_screenshot_hardlinks;
 }
 
-auto should_start_infinity_nikki_shortcuts_initialization(
+auto should_start_infinity_nikki_hardlinks_initialization(
     const Features::Settings::Types::AppSettings& old_settings,
     const Features::Settings::Types::AppSettings& new_settings) -> bool {
   const auto& old_config = old_settings.plugins.infinity_nikki;
   const auto& new_config = new_settings.plugins.infinity_nikki;
 
   if (!new_config.enable || new_config.game_dir.empty() || !new_config.gallery_guide_seen ||
-      !new_config.manage_screenshot_shortcuts) {
+      !new_config.manage_screenshot_hardlinks) {
     return false;
   }
 
   return (!old_config.enable && new_config.enable) || old_config.game_dir != new_config.game_dir ||
          (!old_config.gallery_guide_seen && new_config.gallery_guide_seen) ||
-         (!old_config.manage_screenshot_shortcuts && new_config.manage_screenshot_shortcuts);
+         (!old_config.manage_screenshot_hardlinks && new_config.manage_screenshot_hardlinks);
 }
 
 auto apply_runtime_language_from_settings(Core::State::AppState& state,
@@ -134,19 +134,19 @@ auto handle_settings_changed(Core::State::AppState& state,
       refresh_global_hotkeys(state);
     }
 
-    if (has_infinity_nikki_shortcut_setting_changes(event.data.old_settings,
+    if (has_infinity_nikki_hardlink_setting_changes(event.data.old_settings,
                                                     event.data.new_settings)) {
       Plugins::InfinityNikki::PhotoService::refresh_from_settings(state);
 
-      if (should_start_infinity_nikki_shortcuts_initialization(event.data.old_settings,
+      if (should_start_infinity_nikki_hardlinks_initialization(event.data.old_settings,
                                                                event.data.new_settings)) {
         auto task_result =
-            Plugins::InfinityNikki::TaskService::start_initialize_screenshot_shortcuts_task(state);
+            Plugins::InfinityNikki::TaskService::start_initialize_screenshot_hardlinks_task(state);
         if (!task_result) {
-          Logger().warn("Failed to start Infinity Nikki screenshot shortcut task: {}",
+          Logger().warn("Failed to start Infinity Nikki screenshot hardlink task: {}",
                         task_result.error());
         } else {
-          Logger().info("Infinity Nikki screenshot shortcut task started: {}", task_result.value());
+          Logger().info("Infinity Nikki screenshot hardlink task started: {}", task_result.value());
         }
       }
     }

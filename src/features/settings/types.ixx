@@ -234,7 +234,7 @@ export struct AppSettings {
       std::string game_dir = "";
       bool gallery_guide_seen = false;
       bool allow_online_photo_metadata_extract = false;
-      bool manage_screenshot_shortcuts = false;
+      bool manage_screenshot_hardlinks = false;
     } infinity_nikki;
   } plugins;
 };

@@ -35,7 +35,7 @@ struct InfinityNikkiExtractPhotoParamsResult {
   std::vector<std::string> errors = {};
 };
 
-struct InfinityNikkiInitializeScreenshotShortcutsProgress {
+struct InfinityNikkiInitializeScreenshotHardlinksProgress {
   std::string stage;
   std::int64_t current = 0;
   std::int64_t total = 0;
@@ -43,7 +43,7 @@ struct InfinityNikkiInitializeScreenshotShortcutsProgress {
   std::optional<std::string> message;
 };
 
-struct InfinityNikkiInitializeScreenshotShortcutsResult {
+struct InfinityNikkiInitializeScreenshotHardlinksResult {
   std::int32_t source_count = 0;
   std::int32_t created_count = 0;
   std::int32_t updated_count = 0;

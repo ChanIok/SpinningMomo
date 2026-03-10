@@ -18,7 +18,7 @@ import Plugins.InfinityNikki.TaskService;
 import Plugins.InfinityNikki.Types;
 import Plugins.InfinityNikki.GameDirectory;
 import Plugins.InfinityNikki.PhotoExtract;
-import Plugins.InfinityNikki.ScreenshotShortcuts;
+import Plugins.InfinityNikki.ScreenshotHardlinks;
 import Utils.Logger;
 import <rfl/json.hpp>;
 
@@ -89,7 +89,7 @@ auto launch_extract_photo_params_task(
       asio::detached);
 }
 
-auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_state,
+auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state,
                                                  const std::string& task_id) -> void {
   auto* io_context = Core::Async::get_io_context(*app_state.async);
   if (!io_context) {
@@ -105,7 +105,7 @@ auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_stat
 
         auto progress_callback =
             [&app_state, &task_id](
-                const Plugins::InfinityNikki::InfinityNikkiInitializeScreenshotShortcutsProgress&
+                const Plugins::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksProgress&
                     progress) {
               Core::Tasks::TaskProgress task_progress{
                   .stage = progress.stage,
@@ -118,10 +118,10 @@ auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_stat
             };
 
         auto initialize_result =
-            Plugins::InfinityNikki::ScreenshotShortcuts::initialize(app_state, progress_callback);
+            Plugins::InfinityNikki::ScreenshotHardlinks::initialize(app_state, progress_callback);
         if (!initialize_result) {
           auto error_message =
-              "Infinity Nikki screenshot shortcuts initialize failed: " + initialize_result.error();
+              "Infinity Nikki screenshot hardlinks initialize failed: " + initialize_result.error();
           Logger().error("{}", error_message);
           Core::Tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
@@ -142,12 +142,12 @@ auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_stat
             });
 
         if (app_state.settings &&
-            !app_state.settings->raw.plugins.infinity_nikki.manage_screenshot_shortcuts) {
+            !app_state.settings->raw.plugins.infinity_nikki.manage_screenshot_hardlinks) {
           auto next_settings = app_state.settings->raw;
-          next_settings.plugins.infinity_nikki.manage_screenshot_shortcuts = true;
+          next_settings.plugins.infinity_nikki.manage_screenshot_hardlinks = true;
           if (auto save_result = Features::Settings::update_settings(app_state, next_settings);
               !save_result) {
-            Logger().warn("Failed to persist Infinity Nikki screenshot shortcut setting: {}",
+            Logger().warn("Failed to persist Infinity Nikki screenshot hardlink setting: {}",
                           save_result.error());
           }
         }
@@ -186,11 +186,11 @@ auto handle_infinity_nikki_start_extract_photo_params(
   co_return StartPluginTaskResult{.task_id = task_result.value()};
 }
 
-auto handle_infinity_nikki_start_initialize_screenshot_shortcuts(
+auto handle_infinity_nikki_start_initialize_screenshot_hardlinks(
     Core::State::AppState& app_state, [[maybe_unused]] const rfl::Generic& params)
     -> Core::RPC::RpcAwaitable<StartPluginTaskResult> {
   auto task_result =
-      Plugins::InfinityNikki::TaskService::start_initialize_screenshot_shortcuts_task(app_state);
+      Plugins::InfinityNikki::TaskService::start_initialize_screenshot_hardlinks_task(app_state);
   if (!task_result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::InvalidRequest),
@@ -214,9 +214,9 @@ auto register_all(Core::State::AppState& app_state) -> void {
 
   Core::RPC::register_method<rfl::Generic, StartPluginTaskResult>(
       app_state, app_state.rpc->registry,
-      "plugins.infinityNikki.startInitializeScreenshotShortcuts",
-      handle_infinity_nikki_start_initialize_screenshot_shortcuts,
-      "Create a background task to initialize Infinity Nikki ScreenShot shortcuts");
+      "plugins.infinityNikki.startInitializeScreenshotHardlinks",
+      handle_infinity_nikki_start_initialize_screenshot_hardlinks,
+      "Create a background task to initialize Infinity Nikki ScreenShot hardlinks");
 
   Logger().info("Plugins RPC endpoints registered");
 }

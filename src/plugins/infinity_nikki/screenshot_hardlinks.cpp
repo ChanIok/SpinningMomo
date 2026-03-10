@@ -1,27 +1,21 @@
 module;
 
-#include <wil/com.h>
-
-module Plugins.InfinityNikki.ScreenshotShortcuts;
+module Plugins.InfinityNikki.ScreenshotHardlinks;
 
 import std;
 import Core.State;
 import Features.Settings.State;
 import Plugins.InfinityNikki.Types;
-import Utils.Logger;
 import Utils.String;
-import <shlwapi.h>;
-import <shobjidl.h>;
-import <windows.h>;
 
-namespace Plugins::InfinityNikki::ScreenshotShortcuts {
+namespace Plugins::InfinityNikki::ScreenshotHardlinks {
 
 // 单次同步最多收集的错误条数，避免在大量文件出错时撑爆内存
 constexpr std::size_t kMaxErrorMessages = 50;
 // 游戏高清照片的存储路径结构：GamePlayPhotos/<uid>/NikkiPhotos_HighQuality/<文件名>
 constexpr wchar_t kHighQualityFolderName[] = L"NikkiPhotos_HighQuality";
 constexpr wchar_t kGamePlayPhotosFolderName[] = L"GamePlayPhotos";
-// 游戏截图目录：本功能会将此目录清空并填入指向高清照片的快捷方式
+// 游戏截图目录：本功能会将此目录管理为高清原图的硬链接镜像
 constexpr wchar_t kScreenShotFolderName[] = L"ScreenShot";
 // 首次初始化时，原 ScreenShot 目录的内容会备份至此
 constexpr wchar_t kScreenShotBackupFolderName[] = L"ScreenShot_old";
@@ -33,16 +27,22 @@ struct ManagedPaths {
   std::filesystem::path game_dir;
   std::filesystem::path x6game_dir;
   std::filesystem::path gameplay_photos_dir;    // 扫描高清原图的根目录
-  std::filesystem::path screenshot_dir;         // 放置快捷方式的目录
+  std::filesystem::path screenshot_dir;         // 放置硬链接镜像的目录
   std::filesystem::path screenshot_backup_dir;  // 原截图的备份目录
 };
 
-// 一张高清原图及其对应的快捷方式信息
+// 一张高清原图及其对应的硬链接信息
 struct SourceAsset {
-  std::filesystem::path target_path;  // 高清原图的绝对路径（快捷方式指向目标）
+  std::filesystem::path target_path;  // 高清原图的绝对路径（硬链接目标）
   std::string uid;                    // 照片所属的 UID（路径第一级目录名）
   std::string original_filename;      // 原始文件名（不含路径）
-  std::filesystem::path link_path;    // 将在 ScreenShot 目录中创建的 .lnk 路径
+  std::filesystem::path link_path;    // 将在 ScreenShot 目录中创建的硬链接路径
+};
+
+enum class LinkWriteAction {
+  kNone,
+  kCreated,
+  kUpdated,
 };
 
 auto add_error(std::vector<std::string>& errors, std::string message) -> void {
@@ -53,7 +53,7 @@ auto add_error(std::vector<std::string>& errors, std::string message) -> void {
 }
 
 auto report_progress(
-    const std::function<void(const InfinityNikkiInitializeScreenshotShortcutsProgress&)>&
+    const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
         progress_callback,
     std::string stage, std::int64_t current, std::int64_t total,
     std::optional<double> percent = std::nullopt, std::optional<std::string> message = std::nullopt)
@@ -66,7 +66,7 @@ auto report_progress(
     percent = std::clamp(*percent, 0.0, 100.0);
   }
 
-  progress_callback(InfinityNikkiInitializeScreenshotShortcutsProgress{
+  progress_callback(InfinityNikkiInitializeScreenshotHardlinksProgress{
       .stage = std::move(stage),
       .current = current,
       .total = total,
@@ -184,14 +184,22 @@ auto resolve_managed_paths(Core::State::AppState& app_state)
   };
 }
 
-// 扫描 GamePlayPhotos 目录下所有高清原图，并为每张图计算唯一的 .lnk 快捷方式名称。
+auto make_name_with_suffix_preserving_extension(const std::string& filename, std::int32_t suffix)
+    -> std::string {
+  auto filename_path = std::filesystem::path(Utils::String::FromUtf8(filename));
+  auto stem = Utils::String::ToUtf8(filename_path.stem().wstring());
+  auto extension = Utils::String::ToUtf8(filename_path.extension().wstring());
+  return std::format("{}_{}{}", stem, suffix, extension);
+}
+
+// 扫描 GamePlayPhotos 目录下所有高清原图，并为每张图计算唯一的硬链接文件名。
 // 命名规则：若多张图文件名相同（来自不同 UID），则在文件名前加 "<uid>_" 前缀以区分；
-// 若前缀后仍有冲突，则追加数字后缀 "_2"、"_3" 等
+// 若前缀后仍有冲突，则追加数字后缀 "_2"、"_3" 等（保留扩展名）
 auto collect_source_assets(
     const ManagedPaths& paths,
-    const std::function<void(const InfinityNikkiInitializeScreenshotShortcutsProgress&)>&
+    const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
         progress_callback,
-    InfinityNikkiInitializeScreenshotShortcutsResult& result) -> std::vector<SourceAsset> {
+    InfinityNikkiInitializeScreenshotHardlinksResult& result) -> std::vector<SourceAsset> {
   std::vector<SourceAsset> sources;
   std::error_code ec;
 
@@ -240,7 +248,7 @@ auto collect_source_assets(
     filename_counts[key]++;
   }
 
-  // 为每个 source 分配全局唯一的快捷方式名称
+  // 为每个 source 分配全局唯一的硬链接文件名
   std::unordered_set<std::string> used_link_names;
   used_link_names.reserve(sources.size());
   for (auto& source : sources) {
@@ -254,15 +262,15 @@ auto collect_source_assets(
     auto unique_key = Utils::String::ToLowerAscii(unique_name);
     std::int32_t suffix = 2;
     while (used_link_names.contains(unique_key)) {
-      unique_name = std::format("{}_{}", desired_name, suffix++);
+      unique_name = make_name_with_suffix_preserving_extension(desired_name, suffix++);
       unique_key = Utils::String::ToLowerAscii(unique_name);
     }
     used_link_names.insert(unique_key);
     source.link_path =
-        paths.screenshot_dir / std::filesystem::path(Utils::String::FromUtf8(unique_name + ".lnk"));
+        paths.screenshot_dir / std::filesystem::path(Utils::String::FromUtf8(unique_name));
   }
 
-  // 按快捷方式文件名排序，使游戏内截图列表顺序稳定
+  // 按硬链接文件名排序，使游戏内截图列表顺序稳定
   std::ranges::sort(sources, [](const SourceAsset& lhs, const SourceAsset& rhs) {
     return lhs.link_path.filename().wstring() < rhs.link_path.filename().wstring();
   });
@@ -372,7 +380,7 @@ auto copy_entry_into_backup(const std::filesystem::path& source_path,
 }
 
 // 首次初始化时调用：将现有 ScreenShot 目录的全部内容备份至 ScreenShot_old，
-// 然后清空 ScreenShot 目录，为后续填入快捷方式做准备。
+// 然后清空 ScreenShot 目录，为后续填入硬链接做准备。
 // 若 ScreenShot 目录尚不存在，则直接创建空目录
 auto backup_existing_screenshot_directory(const ManagedPaths& paths)
     -> std::expected<void, std::string> {
@@ -407,106 +415,78 @@ auto backup_existing_screenshot_directory(const ManagedPaths& paths)
   return ensure_directory_exists(paths.screenshot_dir);
 }
 
-// 通过 COM IShellLink 创建 Windows 快捷方式（.lnk）。
-// 先删除同名旧文件（忽略失败），再重新创建，确保快捷方式内容始终是最新的
-auto create_shortcut(const std::filesystem::path& shortcut_path,
-                     const std::filesystem::path& target_path) -> std::expected<void, std::string> {
-  auto ensure_result = ensure_directory_exists(shortcut_path.parent_path());
+auto are_equivalent_entries(const std::filesystem::path& lhs, const std::filesystem::path& rhs)
+    -> bool {
+  std::error_code ec;
+  auto equivalent = std::filesystem::equivalent(lhs, rhs, ec);
+  return !ec && equivalent;
+}
+
+auto ensure_hardlink(const std::filesystem::path& link_path,
+                     const std::filesystem::path& target_path)
+    -> std::expected<LinkWriteAction, std::string> {
+  if (make_path_compare_key(link_path) == make_path_compare_key(target_path)) {
+    return std::unexpected("Managed hard link path must be different from target path: '" +
+                           Utils::String::ToUtf8(link_path.wstring()) + "'");
+  }
+
+  auto ensure_result = ensure_directory_exists(link_path.parent_path());
   if (!ensure_result) {
-    return ensure_result;
+    return std::unexpected(ensure_result.error());
   }
 
   std::error_code ec;
-  std::filesystem::remove(shortcut_path, ec);
-  ec.clear();
-
-  wil::com_ptr<IShellLinkW> shell_link;
-  HRESULT hr = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
-                                IID_PPV_ARGS(shell_link.put()));
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create ShellLink COM instance");
+  auto link_exists = std::filesystem::exists(link_path, ec);
+  if (ec) {
+    return std::unexpected("Failed to inspect ScreenShot entry '" +
+                           Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
   }
 
-  auto target_w = target_path.wstring();
-  hr = shell_link->SetPath(target_w.c_str());
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to set shortcut target path");
+  if (link_exists && are_equivalent_entries(link_path, target_path)) {
+    return LinkWriteAction::kNone;
   }
 
-  auto workdir_w = target_path.parent_path().wstring();
-  hr = shell_link->SetWorkingDirectory(workdir_w.c_str());
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to set shortcut working directory");
+  auto action = link_exists ? LinkWriteAction::kUpdated : LinkWriteAction::kCreated;
+
+  if (link_exists) {
+    std::filesystem::remove_all(link_path, ec);
+    if (ec) {
+      return std::unexpected("Failed to replace existing ScreenShot entry '" +
+                             Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
+    }
   }
 
-  shell_link->SetDescription(L"SpinningMomo Infinity Nikki shortcut");
+  std::filesystem::create_hard_link(target_path, link_path, ec);
+  if (ec) {
+    auto detail = ec.message();
+    if (ec == std::make_error_code(std::errc::cross_device_link)) {
+      detail += " (hard links require source and destination on the same volume)";
+    }
 
-  wil::com_ptr<IPersistFile> persist_file = shell_link.query<IPersistFile>();
-  if (!persist_file) {
-    return std::unexpected("Failed to acquire IPersistFile from ShellLink");
+    return std::unexpected("Failed to create hard link '" +
+                           Utils::String::ToUtf8(link_path.wstring()) + "' -> '" +
+                           Utils::String::ToUtf8(target_path.wstring()) + "': " + detail);
   }
 
-  auto shortcut_w = shortcut_path.wstring();
-  hr = persist_file->Save(shortcut_w.c_str(), TRUE);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to save shortcut file");
-  }
-
-  return {};
+  return action;
 }
 
-// 通过 COM IShellLink 读取 .lnk 快捷方式的指向目标路径
-auto resolve_shortcut_target(const std::filesystem::path& shortcut_path)
-    -> std::expected<std::filesystem::path, std::string> {
-  wil::com_ptr<IShellLinkW> shell_link;
-  HRESULT hr = CoCreateInstance(CLSID_ShellLink, nullptr, CLSCTX_INPROC_SERVER,
-                                IID_PPV_ARGS(shell_link.put()));
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to create ShellLink COM instance");
-  }
-
-  wil::com_ptr<IPersistFile> persist_file = shell_link.query<IPersistFile>();
-  if (!persist_file) {
-    return std::unexpected("Failed to acquire IPersistFile from ShellLink");
-  }
-
-  auto shortcut_w = shortcut_path.wstring();
-  hr = persist_file->Load(shortcut_w.c_str(), STGM_READ);
-  if (FAILED(hr)) {
-    return std::unexpected("Failed to load shortcut file");
-  }
-
-  std::array<wchar_t, 32768> path_buffer{};
-  WIN32_FIND_DATAW find_data{};
-  hr = shell_link->GetPath(path_buffer.data(), static_cast<int>(path_buffer.size()), &find_data,
-                           SLGP_RAWPATH);
-  if (FAILED(hr) || path_buffer[0] == L'\0') {
-    return std::unexpected("Failed to resolve shortcut target path");
-  }
-
-  return normalize_existing_path(std::filesystem::path(path_buffer.data()));
-}
-
-// 快捷方式同步的核心逻辑，分两阶段执行：
-// 1. 清理阶段：遍历 ScreenShot 目录，删除已失效或路径不符的旧快捷方式
-// 2. 同步阶段：遍历 sources，跳过已正确的快捷方式，更新指向变化的，创建缺失的
+// 硬链接同步的核心逻辑，分两阶段执行：
+// 1. 清理阶段：遍历 ScreenShot 目录，删除不在期望集合内的受管目录项
+// 2. 同步阶段：遍历 sources，确保每个期望文件名都存在并指向目标原图
 // backup_existing=true 时（首次初始化）先备份并清空 ScreenShot 目录
-auto sync_shortcuts_internal(
+auto sync_hardlinks_internal(
     Core::State::AppState& app_state, bool backup_existing,
-    const std::function<void(const InfinityNikkiInitializeScreenshotShortcutsProgress&)>&
+    const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
         progress_callback)
-    -> std::expected<InfinityNikkiInitializeScreenshotShortcutsResult, std::string> {
+    -> std::expected<InfinityNikkiInitializeScreenshotHardlinksResult, std::string> {
   auto paths_result = resolve_managed_paths(app_state);
   if (!paths_result) {
     return std::unexpected(paths_result.error());
   }
   const auto paths = paths_result.value();
 
-  InfinityNikkiInitializeScreenshotShortcutsResult result;
-
-  // COM 快捷方式操作需要在 STA 线程中进行
-  auto co_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
-  (void)co_init;
+  InfinityNikkiInitializeScreenshotHardlinksResult result;
 
   if (backup_existing) {
     report_progress(progress_callback, "preparing", 0, 0, 10.0, "Backing up ScreenShot directory");
@@ -525,59 +505,37 @@ auto sync_shortcuts_internal(
   report_progress(progress_callback, "syncing", 0, result.source_count, 20.0,
                   std::format("Found {} high-quality photos", result.source_count));
 
-  // 以目标路径为键建立索引，用于清理阶段快速查找某个 .lnk 是否仍然有效
-  std::unordered_map<std::string, SourceAsset> sources_by_target_key;
-  sources_by_target_key.reserve(sources.size());
-  for (auto& source : sources) {
-    sources_by_target_key.emplace(make_path_compare_key(source.target_path), source);
+  // 以期望硬链接路径为键建立索引，用于清理阶段判断某个目录项是否应保留
+  std::unordered_set<std::string> expected_link_keys;
+  expected_link_keys.reserve(sources.size());
+  for (const auto& source : sources) {
+    expected_link_keys.insert(make_path_compare_key(source.link_path));
   }
 
-  // 清理阶段：删除 ScreenShot 目录中指向高清原图但已过期的快捷方式
-  // （目标文件已不存在，或快捷方式文件名与预期不符）
+  // 清理阶段：删除 ScreenShot 目录中不在期望集合内的内容
   std::error_code ec;
   for (const auto& entry : std::filesystem::directory_iterator(paths.screenshot_dir, ec)) {
     if (ec) {
       return std::unexpected("Failed to enumerate ScreenShot directory: " + ec.message());
     }
 
-    if (!entry.is_regular_file(ec) || ec) {
+    auto entry_key = make_path_compare_key(entry.path());
+    if (expected_link_keys.contains(entry_key)) {
+      continue;
+    }
+
+    std::filesystem::remove_all(entry.path(), ec);
+    if (!ec) {
+      result.removed_count++;
+    } else {
+      add_error(result.errors, "Failed to remove obsolete ScreenShot entry '" +
+                                   Utils::String::ToUtf8(entry.path().wstring()) +
+                                   "': " + ec.message());
       ec.clear();
-      continue;
-    }
-
-    auto entry_path = entry.path();
-    if (Utils::String::ToLowerAscii(entry_path.extension().string()) != ".lnk") {
-      continue;
-    }
-
-    auto target_result = resolve_shortcut_target(entry_path);
-    if (!target_result) {
-      continue;
-    }
-
-    auto target_path = target_result.value();
-    if (!is_hq_photo_file(paths, target_path)) {
-      // 不是本功能管理的快捷方式，跳过，保留用户自行创建的内容
-      continue;
-    }
-
-    auto target_key = make_path_compare_key(target_path);
-    auto expected_it = sources_by_target_key.find(target_key);
-    if (expected_it == sources_by_target_key.end() ||
-        make_path_compare_key(expected_it->second.link_path) != make_path_compare_key(entry_path)) {
-      std::filesystem::remove(entry_path, ec);
-      if (!ec) {
-        result.removed_count++;
-      } else {
-        add_error(result.errors, "Failed to remove obsolete shortcut '" +
-                                     Utils::String::ToUtf8(entry_path.wstring()) +
-                                     "': " + ec.message());
-        ec.clear();
-      }
     }
   }
 
-  // 同步阶段：确保每个 source 都有对应的、指向正确目标的快捷方式
+  // 同步阶段：确保每个 source 都有对应的硬链接
   for (std::size_t index = 0; index < sources.size(); ++index) {
     const auto& source = sources[index];
     report_progress(
@@ -585,47 +543,23 @@ auto sync_shortcuts_internal(
         20.0 + (static_cast<double>(index) * 75.0 / std::max<std::int32_t>(result.source_count, 1)),
         std::format("Syncing {}", source.original_filename));
 
-    std::error_code exists_ec;
-    auto link_exists = std::filesystem::exists(source.link_path, exists_ec) && !exists_ec;
-    if (link_exists) {
-      if (!std::filesystem::is_regular_file(source.link_path, exists_ec) || exists_ec) {
-        // 同名路径存在但不是普通文件（如目录），跳过以免破坏用户数据
-        result.ignored_count++;
-        exists_ec.clear();
-        continue;
-      }
-
-      auto target_result = resolve_shortcut_target(source.link_path);
-      if (target_result) {
-        if (make_path_compare_key(target_result.value()) ==
-            make_path_compare_key(source.target_path)) {
-          // 快捷方式已正确指向目标，无需变更
-          continue;
-        }
-
-        if (!is_hq_photo_file(paths, target_result.value())) {
-          // 同名 .lnk 指向的是非高清原图（用户自行创建的快捷方式），跳过
-          result.ignored_count++;
-          continue;
-        }
-      }
-
-      // 快捷方式指向的目标已变化，重新创建
-      auto recreate_result = create_shortcut(source.link_path, source.target_path);
-      if (!recreate_result) {
-        add_error(result.errors, recreate_result.error());
-        continue;
-      }
-      result.updated_count++;
+    auto ensure_result = ensure_hardlink(source.link_path, source.target_path);
+    if (!ensure_result) {
+      add_error(result.errors, ensure_result.error());
       continue;
     }
 
-    auto create_result = create_shortcut(source.link_path, source.target_path);
-    if (!create_result) {
-      add_error(result.errors, create_result.error());
-      continue;
+    switch (ensure_result.value()) {
+      case LinkWriteAction::kCreated:
+        result.created_count++;
+        break;
+      case LinkWriteAction::kUpdated:
+        result.updated_count++;
+        break;
+      case LinkWriteAction::kNone:
+      default:
+        break;
     }
-    result.created_count++;
   }
 
   report_progress(
@@ -637,15 +571,15 @@ auto sync_shortcuts_internal(
 
 auto initialize(
     Core::State::AppState& app_state,
-    const std::function<void(const InfinityNikkiInitializeScreenshotShortcutsProgress&)>&
+    const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
         progress_callback)
-    -> std::expected<InfinityNikkiInitializeScreenshotShortcutsResult, std::string> {
-  return sync_shortcuts_internal(app_state, true, progress_callback);
+    -> std::expected<InfinityNikkiInitializeScreenshotHardlinksResult, std::string> {
+  return sync_hardlinks_internal(app_state, true, progress_callback);
 }
 
 auto sync(Core::State::AppState& app_state)
-    -> std::expected<InfinityNikkiInitializeScreenshotShortcutsResult, std::string> {
-  return sync_shortcuts_internal(app_state, false, nullptr);
+    -> std::expected<InfinityNikkiInitializeScreenshotHardlinksResult, std::string> {
+  return sync_hardlinks_internal(app_state, false, nullptr);
 }
 
 auto resolve_watch_directory(Core::State::AppState& app_state)
@@ -657,4 +591,4 @@ auto resolve_watch_directory(Core::State::AppState& app_state)
   return paths_result->gameplay_photos_dir;
 }
 
-}  // namespace Plugins::InfinityNikki::ScreenshotShortcuts
+}  // namespace Plugins::InfinityNikki::ScreenshotHardlinks

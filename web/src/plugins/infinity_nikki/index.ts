@@ -57,9 +57,9 @@ export async function startExtractInfinityNikkiPhotoParams(onlyMissing = true): 
   return result.taskId
 }
 
-export async function startInitializeInfinityNikkiScreenshotShortcuts(): Promise<string> {
+export async function startInitializeInfinityNikkiScreenshotHardlinks(): Promise<string> {
   const result = await call<StartTaskResult>(
-    'plugins.infinityNikki.startInitializeScreenshotShortcuts',
+    'plugins.infinityNikki.startInitializeScreenshotHardlinks',
     {}
   )
   return result.taskId

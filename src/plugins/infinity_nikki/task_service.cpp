@@ -14,7 +14,7 @@ import Features.Gallery.Types;
 import Features.Settings;
 import Features.Settings.State;
 import Plugins.InfinityNikki.PhotoExtract;
-import Plugins.InfinityNikki.ScreenshotShortcuts;
+import Plugins.InfinityNikki.ScreenshotHardlinks;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
 
@@ -22,8 +22,8 @@ namespace Plugins::InfinityNikki::TaskService {
 
 constexpr auto kInitialScanTaskType = "plugins.infinityNikki.initialScan";
 constexpr auto kExtractPhotoParamsTaskType = "plugins.infinityNikki.extractPhotoParams";
-constexpr auto kInitializeScreenshotShortcutsTaskType =
-    "plugins.infinityNikki.initializeScreenshotShortcuts";
+constexpr auto kInitializeScreenshotHardlinksTaskType =
+    "plugins.infinityNikki.initializeScreenshotHardlinks";
 constexpr auto kProgressEmitInterval = std::chrono::milliseconds(250);
 
 auto make_task_progress(const Features::Gallery::Types::ScanProgress& progress)
@@ -161,7 +161,7 @@ auto launch_extract_photo_params_task(
       asio::detached);
 }
 
-auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_state,
+auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state,
                                                  const std::string& task_id) -> void {
   if (!app_state.async) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
@@ -184,7 +184,7 @@ auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_stat
         auto last_percent = -1;
         auto progress_callback =
             [&app_state, &task_id, &last_emit_at, &last_percent](
-                const Plugins::InfinityNikki::InfinityNikkiInitializeScreenshotShortcutsProgress&
+                const Plugins::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksProgress&
                     progress) {
               auto percent = static_cast<int>(std::floor(progress.percent.value_or(0.0)));
               auto now = std::chrono::steady_clock::now();
@@ -214,10 +214,10 @@ auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_stat
             };
 
         auto initialize_result =
-            Plugins::InfinityNikki::ScreenshotShortcuts::initialize(app_state, progress_callback);
+            Plugins::InfinityNikki::ScreenshotHardlinks::initialize(app_state, progress_callback);
         if (!initialize_result) {
           auto error_message =
-              "Infinity Nikki screenshot shortcuts initialize failed: " + initialize_result.error();
+              "Infinity Nikki screenshot hardlinks initialize failed: " + initialize_result.error();
           Logger().error("{}", error_message);
           Core::Tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
@@ -238,12 +238,12 @@ auto launch_initialize_screenshot_shortcuts_task(Core::State::AppState& app_stat
             });
 
         if (app_state.settings &&
-            !app_state.settings->raw.plugins.infinity_nikki.manage_screenshot_shortcuts) {
+            !app_state.settings->raw.plugins.infinity_nikki.manage_screenshot_hardlinks) {
           auto next_settings = app_state.settings->raw;
-          next_settings.plugins.infinity_nikki.manage_screenshot_shortcuts = true;
+          next_settings.plugins.infinity_nikki.manage_screenshot_hardlinks = true;
           if (auto save_result = Features::Settings::update_settings(app_state, next_settings);
               !save_result) {
-            Logger().warn("Failed to persist Infinity Nikki screenshot shortcut setting: {}",
+            Logger().warn("Failed to persist Infinity Nikki screenshot hardlink setting: {}",
                           save_result.error());
           }
         }
@@ -288,19 +288,19 @@ auto start_extract_photo_params_task(
   return task_id;
 }
 
-auto start_initialize_screenshot_shortcuts_task(Core::State::AppState& app_state)
+auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string> {
-  if (Core::Tasks::has_active_task_of_type(app_state, kInitializeScreenshotShortcutsTaskType)) {
-    return std::unexpected("Another Infinity Nikki screenshot shortcut task is already running");
+  if (Core::Tasks::has_active_task_of_type(app_state, kInitializeScreenshotHardlinksTaskType)) {
+    return std::unexpected("Another Infinity Nikki screenshot hardlink task is already running");
   }
 
-  auto task_id = Core::Tasks::create_task(app_state, kInitializeScreenshotShortcutsTaskType,
-                                          "Infinity Nikki screenshot shortcuts");
+  auto task_id = Core::Tasks::create_task(app_state, kInitializeScreenshotHardlinksTaskType,
+                                          "Infinity Nikki screenshot hardlinks");
   if (task_id.empty()) {
-    return std::unexpected("Failed to create Infinity Nikki screenshot shortcut task");
+    return std::unexpected("Failed to create Infinity Nikki screenshot hardlink task");
   }
 
-  launch_initialize_screenshot_shortcuts_task(app_state, task_id);
+  launch_initialize_screenshot_hardlinks_task(app_state, task_id);
   return task_id;
 }
 

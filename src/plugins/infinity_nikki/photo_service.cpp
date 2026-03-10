@@ -13,7 +13,7 @@ import Features.Gallery.Watcher;
 import Features.Gallery.Types;
 import Features.Settings.State;
 import Plugins.InfinityNikki.TaskService;
-import Plugins.InfinityNikki.ScreenshotShortcuts;
+import Plugins.InfinityNikki.ScreenshotHardlinks;
 import Plugins.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.Path;
@@ -77,7 +77,7 @@ auto ensure_watch_root_ignore_rules(Core::State::AppState& app_state,
   return {};
 }
 
-// 每次画廊扫描完毕后触发的回调处理，包含同步快捷方式和提取照片参数
+// 每次画廊扫描完毕后触发的回调处理，包含同步 ScreenShot 硬链接和提取照片参数
 auto on_gallery_scan_complete(Core::State::AppState& app_state,
                               const Features::Gallery::Types::ScanResult& result) -> void {
   if (!app_state.settings) {
@@ -86,25 +86,25 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
 
   const auto& config = app_state.settings->raw.plugins.infinity_nikki;
 
-  if (config.manage_screenshot_shortcuts) {
+  if (config.manage_screenshot_hardlinks) {
     if (Core::Tasks::has_active_task_of_type(
-            app_state, "plugins.infinityNikki.initializeScreenshotShortcuts")) {
-      Logger().debug("Skip InfinityNikki screenshot shortcut sync: initialization task is active");
+            app_state, "plugins.infinityNikki.initializeScreenshotHardlinks")) {
+      Logger().debug("Skip InfinityNikki screenshot hardlink sync: initialization task is active");
     } else {
       bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
-        auto sync_result = Plugins::InfinityNikki::ScreenshotShortcuts::sync(app_state);
+        auto sync_result = Plugins::InfinityNikki::ScreenshotHardlinks::sync(app_state);
         if (!sync_result) {
-          Logger().warn("InfinityNikki screenshot shortcuts sync failed: {}", sync_result.error());
+          Logger().warn("InfinityNikki screenshot hardlinks sync failed: {}", sync_result.error());
         } else {
           const auto& r = sync_result.value();
           Logger().info(
-              "InfinityNikki screenshot shortcuts synced: source={}, created={}, updated={}, "
+              "InfinityNikki screenshot hardlinks synced: source={}, created={}, updated={}, "
               "removed={}, ignored={}",
               r.source_count, r.created_count, r.updated_count, r.removed_count, r.ignored_count);
         }
       });
       if (!submitted) {
-        Logger().warn("InfinityNikki shortcuts sync: failed to submit worker task");
+        Logger().warn("InfinityNikki hardlinks sync: failed to submit worker task");
       }
     }
   }
@@ -165,7 +165,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
     return;
   }
 
-  auto dir_result = Plugins::InfinityNikki::ScreenshotShortcuts::resolve_watch_directory(app_state);
+  auto dir_result = Plugins::InfinityNikki::ScreenshotHardlinks::resolve_watch_directory(app_state);
   if (!dir_result) {
     Logger().warn("Skip InfinityNikki gallery watcher: {}", dir_result.error());
     stop_current_watcher();

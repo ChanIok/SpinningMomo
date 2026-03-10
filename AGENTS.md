@@ -61,10 +61,10 @@ The frontend auto-detects its environment (`window.chrome.webview` presence) and
 ### C++ Module System
 The backend uses **C++23 modules** (`.ixx` interface files, `.cpp` implementation files). Module names follow a dotted hierarchy that mirrors the directory structure:
 
-- `Core.*` — framework infrastructure (async runtime, database, events, HTTP server, RPC, WebView, i18n, commands, migrations, worker pool)
-- `Features.*` — business logic (gallery, letterbox, overlay, preview, recording, replay_buffer, screenshot, settings, update, window_control, notifications)
+- `Core.*` — framework infrastructure (async runtime, database, events, HTTP server, RPC, WebView, i18n, commands, migration, worker pool, tasks, runtime info, shutdown, state)
+- `Features.*` — business logic (gallery, letterbox, overlay, preview, recording, replay_buffer, screenshot, settings, update, window_control, notifications, keyboard_pwm, virtual_gamepad)
 - `UI.*` — native Win32 UI (floating_window, tray_icon, context_menu, webview_window)
-- `Utils.*` — shared utilities (logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, lru_cache, time)
+- `Utils.*` — shared utilities (logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, lru_cache, time, plus capture/encoder/crash_dump/crypto utilities)
 - `Vendor.*` — thin wrappers re-exporting Win32 API and third-party types through the module system (e.g. `Vendor.Windows` wraps `<windows.h>`)
 
 ### Design Philosophy
@@ -90,15 +90,22 @@ The C++ backend does **NOT** use OOP class hierarchies. Instead it follows:
 Vue 3 + TypeScript + Pinia + Tailwind CSS v4 + shadcn-vue (reka-ui based). Key directories:
 - `web/src/core/rpc/` — JSON-RPC client with WebView and HTTP transports
 - `web/src/core/i18n/` — client-side i18n
-- `web/src/features/` — feature modules (gallery, settings, home, about)
+- `web/src/core/env/` — runtime environment detection
+- `web/src/core/tasks/` — frontend task orchestration
+- `web/src/features/` — feature modules (gallery, settings, home, about, map, onboarding, common, playground)
 - `web/src/composables/` — shared composables (`useRpc`, `useI18n`, `useToast`)
+- `web/src/plugins/` — game-specific integrations (infinity_nikki)
+- `web/src/router/` — routes
+- `web/src/types/` — shared TS types
+- `web/src/lib/` — shared UI/helpers
+- `web/src/assets/` — static assets
 
 ### RPC Endpoint Organization
 Endpoints live under `src/core/rpc/endpoints/<domain>/`, each domain exposes a `register_all(state)` called from `registry.cpp`. Game-specific adapters in `src/plugins/` (currently `infinity_nikki`) are exposed via `rpc/endpoints/plugins/`.
 
 ### Initialization Order
 `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()` which runs:
-events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings → update → commands → floating window → tray icon → context menu → recording → replay_buffer → gallery → hotkeys.
+events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings (sync language + letterbox) → update → commands → floating window → tray icon → context menu → recording → replay_buffer → gallery (restore/start watchers) → plugins (Infinity Nikki photo service) → virtual gamepad (non-fatal) → onboarding gate (WebView or floating window) → hotkeys → startup auto-update check.
 
 ## Build Output
 - Release: `build\windows\x64\release\`
