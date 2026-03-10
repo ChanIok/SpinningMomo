@@ -32,6 +32,11 @@ import <wrl/client.h>;
 
 namespace UI::ContextMenu {
 
+auto apply_corner_preference(HWND hwnd) -> void {
+  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
+  DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+}
+
 auto register_context_menu_class(HINSTANCE instance, WNDPROC wnd_proc) -> bool {
   WNDCLASSEXW wc{};
   wc.cbSize = sizeof(WNDCLASSEXW);
@@ -66,8 +71,7 @@ auto create_context_menu_window(HINSTANCE instance, WNDPROC wnd_proc,
   if (hwnd) {
     // 设置窗口样式
     SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
-    DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
-    DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
+    apply_corner_preference(hwnd);
   }
 
   return hwnd;
@@ -234,9 +238,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
 
   // 设置窗口样式
   SetLayeredWindowAttributes(menu_state.submenu_hwnd, 0, 255, LWA_ALPHA);
-  DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
-  DwmSetWindowAttribute(menu_state.submenu_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner,
-                        sizeof(corner));
+  apply_corner_preference(menu_state.submenu_hwnd);
 
   // 初始化D2D资源
   if (!UI::ContextMenu::D2DContext::initialize_submenu(state, menu_state.submenu_hwnd)) {
