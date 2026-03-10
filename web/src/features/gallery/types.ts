@@ -95,6 +95,15 @@ export interface TagStats {
   assetCount: number
 }
 
+export interface HomeStats {
+  totalCount: number
+  photoCount: number
+  videoCount: number
+  livePhotoCount: number
+  totalSize: number
+  todayAddedCount: number
+}
+
 // 创建标签参数
 export interface CreateTagParams {
   name: string

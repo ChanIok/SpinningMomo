@@ -124,6 +124,15 @@ struct Stats {
   std::string newest_item_date;
 };
 
+struct HomeStats {
+  int total_count = 0;
+  int photo_count = 0;
+  int video_count = 0;
+  int live_photo_count = 0;
+  std::int64_t total_size = 0;
+  int today_added_count = 0;
+};
+
 struct TagStats {
   std::int64_t tag_id;
   std::string tag_name;

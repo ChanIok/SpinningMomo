@@ -519,6 +519,36 @@ auto get_asset_main_colors(Core::State::AppState& app_state,
   return result.value();
 }
 
+auto get_home_stats(Core::State::AppState& app_state)
+    -> std::expected<Types::HomeStats, std::string> {
+  std::string sql = R"(
+    SELECT
+      COUNT(*) AS total_count,
+      COALESCE(SUM(CASE WHEN type = 'photo' THEN 1 ELSE 0 END), 0) AS photo_count,
+      COALESCE(SUM(CASE WHEN type = 'video' THEN 1 ELSE 0 END), 0) AS video_count,
+      COALESCE(SUM(CASE WHEN type = 'live_photo' THEN 1 ELSE 0 END), 0) AS live_photo_count,
+      COALESCE(SUM(CASE WHEN size IS NOT NULL AND size > 0 THEN size ELSE 0 END), 0) AS total_size,
+      COALESCE(
+        SUM(
+          CASE
+            WHEN date(datetime(COALESCE(file_created_at, created_at) / 1000, 'unixepoch', 'localtime')) =
+                 date('now', 'localtime') THEN 1
+            ELSE 0
+          END
+        ),
+        0
+      ) AS today_added_count
+    FROM assets
+  )";
+
+  auto result = Core::Database::query_single<Types::HomeStats>(*app_state.database, sql);
+  if (!result) {
+    return std::unexpected("Failed to query home stats: " + result.error());
+  }
+
+  return result.value().value_or(Types::HomeStats{});
+}
+
 // ============= 维护服务实现 =============
 
 auto load_asset_cache(Core::State::AppState& app_state)

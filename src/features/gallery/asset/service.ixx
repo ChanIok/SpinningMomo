@@ -32,6 +32,9 @@ export auto get_asset_main_colors(Core::State::AppState& app_state,
                                   const Types::GetAssetMainColorsParams& params)
     -> std::expected<std::vector<Types::AssetMainColor>, std::string>;
 
+export auto get_home_stats(Core::State::AppState& app_state)
+    -> std::expected<Types::HomeStats, std::string>;
+
 // 维护服务
 export auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;

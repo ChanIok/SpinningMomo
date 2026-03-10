@@ -48,10 +48,7 @@ auto paint_context_menu(Core::State::AppState& state, const RECT& client_rect) -
 auto draw_menu_background(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& menu_state = *state.context_menu;
   menu_state.render_target->Clear(D2D1::ColorF(D2D1::ColorF::White, 0.95f));
-  const auto& layout = menu_state.layout;
-  D2D1_ROUNDED_RECT rounded_rect = D2D1::RoundedRect(rect, static_cast<float>(layout.border_radius),
-                                                     static_cast<float>(layout.border_radius));
-  menu_state.render_target->FillRoundedRectangle(rounded_rect, menu_state.background_brush);
+  menu_state.render_target->FillRectangle(rect, menu_state.background_brush);
 }
 
 auto draw_menu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
@@ -149,12 +146,8 @@ auto paint_submenu(Core::State::AppState& state, const RECT& client_rect) -> voi
 
 auto draw_submenu_background(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& menu_state = *state.context_menu;
-  const auto& layout = menu_state.layout;
   menu_state.submenu_render_target->Clear(D2D1::ColorF(D2D1::ColorF::White, 0.95f));
-  D2D1_ROUNDED_RECT rounded_rect = D2D1::RoundedRect(rect, static_cast<float>(layout.border_radius),
-                                                     static_cast<float>(layout.border_radius));
-  menu_state.submenu_render_target->FillRoundedRectangle(rounded_rect,
-                                                         menu_state.submenu_background_brush);
+  menu_state.submenu_render_target->FillRectangle(rect, menu_state.submenu_background_brush);
 }
 
 auto draw_submenu_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {

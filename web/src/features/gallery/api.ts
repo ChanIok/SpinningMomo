@@ -22,6 +22,7 @@ import type {
   Tag,
   TagTreeNode,
   TagStats,
+  HomeStats,
   CreateTagParams,
   UpdateTagParams,
   AddTagsToAssetParams,
@@ -463,6 +464,20 @@ export async function getTagStats(): Promise<TagStats[]> {
 }
 
 /**
+ * 获取首页统计摘要
+ */
+export async function getHomeStats(): Promise<HomeStats> {
+  try {
+    const result = await call<HomeStats>('gallery.getHomeStats', {})
+
+    return result
+  } catch (error) {
+    console.error('Failed to get home stats:', error)
+    throw new Error('获取首页统计失败')
+  }
+}
+
+/**
  * 为资产添加标签
  */
 export async function addTagsToAsset(params: AddTagsToAssetParams): Promise<OperationResult> {
@@ -562,6 +577,7 @@ export const galleryApi = {
   updateTag,
   deleteTag,
   getTagStats,
+  getHomeStats,
 
   // 资产-标签关联
   addTagsToAsset,
