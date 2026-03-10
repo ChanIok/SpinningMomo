@@ -1,5 +1,7 @@
 module;
 
+#include <asio.hpp>
+
 export module Plugins.InfinityNikki.PhotoExtract;
 
 import std;
@@ -11,6 +13,6 @@ namespace Plugins::InfinityNikki::PhotoExtract {
 export auto extract_photo_params(
     Core::State::AppState& app_state, const InfinityNikkiExtractPhotoParamsRequest& request,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
-    -> std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>;
+    -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>>;
 
 }  // namespace Plugins::InfinityNikki::PhotoExtract

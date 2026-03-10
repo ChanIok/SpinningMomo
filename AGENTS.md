@@ -32,15 +32,6 @@ npm run build
 xmake vs
 ```
 
-### Formatting
-```
-# C++ — clang-format (Google style, 100-col limit)
-npm run format:cpp
-
-# Web — Prettier
-npm run format:web
-```
-
 A husky pre-commit hook runs `lint-staged` which auto-formats staged C++ (`.cpp`, `.ixx`, `.h`, `.hpp`) and web files.
 
 ### Web Frontend Dev Server
@@ -61,7 +52,7 @@ The frontend auto-detects its environment (`window.chrome.webview` presence) and
 ### C++ Module System
 The backend uses **C++23 modules** (`.ixx` interface files, `.cpp` implementation files). Module names follow a dotted hierarchy that mirrors the directory structure:
 
-- `Core.*` — framework infrastructure (async runtime, database, events, HTTP server, RPC, WebView, i18n, commands, migration, worker pool, tasks, runtime info, shutdown, state)
+- `Core.*` — framework infrastructure (async runtime, database, events, HTTP client, HTTP server, RPC, WebView, i18n, commands, migration, worker pool, tasks, runtime info, shutdown, state)
 - `Features.*` — business logic (gallery, letterbox, overlay, preview, recording, replay_buffer, screenshot, settings, update, window_control, notifications, keyboard_pwm, virtual_gamepad)
 - `UI.*` — native Win32 UI (floating_window, tray_icon, context_menu, webview_window)
 - `Utils.*` — shared utilities (logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, lru_cache, time, plus capture/encoder/crash_dump/crypto utilities)

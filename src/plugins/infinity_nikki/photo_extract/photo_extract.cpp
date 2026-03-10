@@ -1,5 +1,7 @@
 module;
 
+#include <asio.hpp>
+
 module Plugins.InfinityNikki.PhotoExtract;
 
 import std;
@@ -152,9 +154,9 @@ auto flush_extract_batch(
     Core::State::AppState& app_state, const std::vector<Scan::PreparedPhotoExtractEntry>& entries,
     InfinityNikkiExtractPhotoParamsResult& result, ExtractProgressState& progress,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
-    -> void {
+    -> asio::awaitable<void> {
   if (entries.empty()) {
-    return;
+    co_return;
   }
 
   auto fail_all = [&](const std::string& reason) {
@@ -169,11 +171,11 @@ auto flush_extract_batch(
   Logger().debug("flush_extract_batch: sending batch (uid={}, count={})", entries.front().uid,
                  entries.size());
 
-  auto records_result = Infra::extract_batch_photo_params(entries);
+  auto records_result = co_await Infra::extract_batch_photo_params(app_state, entries);
   if (!records_result) {
     Logger().error("flush_extract_batch: extract batch failed: {}", records_result.error());
     fail_all(records_result.error());
-    return;
+    co_return;
   }
 
   const auto& uid = entries.front().uid;
@@ -199,16 +201,17 @@ auto flush_extract_batch(
   }
 
   report_processing_progress(progress_callback, progress, result, true);
+  co_return;
 }
 
 auto extract_photo_params(
     Core::State::AppState& app_state, const InfinityNikkiExtractPhotoParamsRequest& request,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
-    -> std::expected<InfinityNikkiExtractPhotoParamsResult, std::string> {
+    -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
   InfinityNikkiExtractPhotoParamsResult result;
 
   if (!app_state.database) {
-    return std::unexpected("Database is not initialized");
+    co_return std::unexpected("Database is not initialized");
   }
 
   auto only_missing = request.only_missing.value_or(true);
@@ -218,7 +221,7 @@ auto extract_photo_params(
 
   auto candidates_result = Infra::load_candidate_assets(app_state, only_missing);
   if (!candidates_result) {
-    return std::unexpected(candidates_result.error());
+    co_return std::unexpected(candidates_result.error());
   }
 
   auto candidates = std::move(candidates_result.value());
@@ -229,7 +232,7 @@ auto extract_photo_params(
 
   if (candidates.empty()) {
     report_extract_progress(progress_callback, "completed", 0, 0, 100.0, "No candidate assets");
-    return result;
+    co_return result;
   }
 
   ExtractProgressState progress{
@@ -258,14 +261,14 @@ auto extract_photo_params(
     report_processing_progress(progress_callback, progress, result);
 
     if (batch.size() >= kExtractBatchSize) {
-      flush_extract_batch(app_state, batch, result, progress, progress_callback);
+      co_await flush_extract_batch(app_state, batch, result, progress, progress_callback);
       batch.clear();
     }
   }
 
   for (auto& [uid, batch] : active_batches) {
     (void)uid;
-    flush_extract_batch(app_state, batch, result, progress, progress_callback);
+    co_await flush_extract_batch(app_state, batch, result, progress, progress_callback);
   }
 
   Logger().info(
@@ -279,7 +282,7 @@ auto extract_photo_params(
                           std::format("Done: saved={}, skipped={}, failed={}", result.saved_count,
                                       result.skipped_count, result.failed_count));
 
-  return result;
+  co_return result;
 }
 
 }  // namespace Plugins::InfinityNikki::PhotoExtract

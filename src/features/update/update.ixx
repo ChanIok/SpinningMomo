@@ -1,5 +1,7 @@
 module;
 
+#include <asio.hpp>
+
 export module Features.Update;
 
 import std;
@@ -17,11 +19,11 @@ export auto schedule_startup_auto_update_check(Core::State::AppState& app_state)
 
 // 检查更新
 export auto check_for_update(Core::State::AppState& app_state)
-    -> std::expected<Types::CheckUpdateResult, std::string>;
+    -> asio::awaitable<std::expected<Types::CheckUpdateResult, std::string>>;
 
 // 下载更新
 export auto download_update(Core::State::AppState& app_state)
-    -> std::expected<Types::DownloadUpdateResult, std::string>;
+    -> asio::awaitable<std::expected<Types::DownloadUpdateResult, std::string>>;
 
 // 安装更新
 export auto install_update(Core::State::AppState& app_state,

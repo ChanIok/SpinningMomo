@@ -88,6 +88,10 @@ namespace Core::HttpServer::State {
 export struct HttpServerState;
 }
 
+namespace Core::HttpClient::State {
+export struct HttpClientState;
+}
+
 namespace Core::Database::State {
 export struct DatabaseState;
 }
@@ -119,6 +123,7 @@ export struct AppState {
   std::unique_ptr<Core::State::RuntimeInfo::RuntimeInfoState> runtime_info;
   std::unique_ptr<Core::Database::State::DatabaseState> database;
   std::unique_ptr<Core::HttpServer::State::HttpServerState> http_server;
+  std::unique_ptr<Core::HttpClient::State::HttpClientState> http_client;
   std::unique_ptr<Core::WorkerPool::State::WorkerPoolState> worker_pool;
   std::unique_ptr<Core::Commands::State::CommandState> commands;
   std::unique_ptr<Core::Tasks::State::TaskState> tasks;

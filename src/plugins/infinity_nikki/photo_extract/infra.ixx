@@ -1,5 +1,7 @@
 module;
 
+#include <asio.hpp>
+
 export module Plugins.InfinityNikki.PhotoExtract.Infra;
 
 import std;
@@ -33,8 +35,10 @@ struct ParsedPhotoParamsRecord {
 auto load_candidate_assets(Core::State::AppState& app_state, bool only_missing)
     -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
 
-auto extract_batch_photo_params(const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
-    -> std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string>;
+auto extract_batch_photo_params(Core::State::AppState& app_state,
+                                const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
+    -> asio::awaitable<
+        std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string>>;
 
 auto upsert_photo_params_record(Core::State::AppState& app_state, std::int64_t asset_id,
                                 const std::string& uid, const ParsedPhotoParamsRecord& record)

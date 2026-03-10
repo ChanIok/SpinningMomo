@@ -16,6 +16,9 @@ export using DWORD = ::DWORD;
 export using INTERNET_PORT = ::INTERNET_PORT;
 export using BOOL = ::BOOL;
 export using DWORD_PTR = ::DWORD_PTR;
+export using LPVOID = ::LPVOID;
+export using WINHTTP_STATUS_CALLBACK = ::WINHTTP_STATUS_CALLBACK;
+export using WINHTTP_ASYNC_RESULT = ::WINHTTP_ASYNC_RESULT;
 
 // 导出 WinHTTP 函数
 export auto WinHttpOpen(const wchar_t* pszAgentW, DWORD dwAccessType, const wchar_t* pszProxyW,
@@ -72,6 +75,25 @@ export auto WinHttpCloseHandle(HINTERNET hInternet) -> BOOL {
   return ::WinHttpCloseHandle(hInternet);
 }
 
+export auto WinHttpSetStatusCallback(HINTERNET hInternet,
+                                     WINHTTP_STATUS_CALLBACK lpfnInternetCallback,
+                                     DWORD dwNotificationFlags, DWORD_PTR dwReserved)
+    -> WINHTTP_STATUS_CALLBACK {
+  return ::WinHttpSetStatusCallback(hInternet, lpfnInternetCallback, dwNotificationFlags,
+                                    dwReserved);
+}
+
+export auto WinHttpSetOption(HINTERNET hInternet, DWORD dwOption, LPVOID lpBuffer,
+                             DWORD dwBufferLength) -> BOOL {
+  return ::WinHttpSetOption(hInternet, dwOption, lpBuffer, dwBufferLength);
+}
+
+export auto WinHttpSetTimeouts(HINTERNET hInternet, int nResolveTimeout, int nConnectTimeout,
+                               int nSendTimeout, int nReceiveTimeout) -> BOOL {
+  return ::WinHttpSetTimeouts(hInternet, nResolveTimeout, nConnectTimeout, nSendTimeout,
+                              nReceiveTimeout);
+}
+
 export struct UniqueHInternet {
   HINTERNET handle = nullptr;
 
@@ -101,6 +123,7 @@ export constexpr auto kWINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY = WINHTTP_ACCESS_TYPE
 // Proxy constants
 export constexpr const wchar_t* kWINHTTP_NO_PROXY_NAME = WINHTTP_NO_PROXY_NAME;
 export constexpr const wchar_t* kWINHTTP_NO_PROXY_BYPASS = WINHTTP_NO_PROXY_BYPASS;
+export constexpr auto kWINHTTP_FLAG_ASYNC = WINHTTP_FLAG_ASYNC;
 
 // Request constants
 export constexpr const wchar_t* kWINHTTP_NO_REFERER = WINHTTP_NO_REFERER;
@@ -115,7 +138,33 @@ export constexpr void* kWINHTTP_NO_REQUEST_DATA = WINHTTP_NO_REQUEST_DATA;
 export constexpr auto kWINHTTP_QUERY_STATUS_CODE = WINHTTP_QUERY_STATUS_CODE;
 export constexpr auto kWINHTTP_QUERY_FLAG_NUMBER = WINHTTP_QUERY_FLAG_NUMBER;
 export constexpr const wchar_t* kWINHTTP_HEADER_NAME_BY_INDEX = WINHTTP_HEADER_NAME_BY_INDEX;
+export constexpr auto kWINHTTP_QUERY_RAW_HEADERS_CRLF = WINHTTP_QUERY_RAW_HEADERS_CRLF;
 // Note: WINHTTP_NO_HEADER_INDEX is NULL, so we just use nullptr directly
+
+// Async callback flags
+export constexpr auto kWINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE =
+    WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE;
+export constexpr auto kWINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE =
+    WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE;
+export constexpr auto kWINHTTP_CALLBACK_STATUS_DATA_AVAILABLE =
+    WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE;
+export constexpr auto kWINHTTP_CALLBACK_STATUS_READ_COMPLETE =
+    WINHTTP_CALLBACK_STATUS_READ_COMPLETE;
+export constexpr auto kWINHTTP_CALLBACK_STATUS_REQUEST_ERROR =
+    WINHTTP_CALLBACK_STATUS_REQUEST_ERROR;
+export constexpr auto kWINHTTP_CALLBACK_STATUS_HANDLE_CLOSING =
+    WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING;
+export constexpr auto kWINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS =
+    WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS;
+export constexpr auto kWINHTTP_CALLBACK_FLAG_HANDLES = WINHTTP_CALLBACK_FLAG_HANDLES;
+export constexpr auto kWINHTTP_CALLBACK_FLAG_REDIRECT = WINHTTP_CALLBACK_FLAG_REDIRECT;
+export inline auto kWINHTTP_INVALID_STATUS_CALLBACK = WINHTTP_INVALID_STATUS_CALLBACK;
+
+// Option constants
+export constexpr auto kWINHTTP_OPTION_CONTEXT_VALUE = WINHTTP_OPTION_CONTEXT_VALUE;
+
+// Common error constants
+export constexpr auto kERROR_IO_PENDING = ERROR_IO_PENDING;
 
 // URL scheme constants
 export constexpr auto kINTERNET_SCHEME_HTTPS = INTERNET_SCHEME_HTTPS;

@@ -8,6 +8,7 @@ import Core.Commands.State;
 import Core.Database.State;
 import Core.Events.State;
 import Core.HttpServer.State;
+import Core.HttpClient.State;
 import Core.I18n.State;
 import Core.RPC.State;
 import Core.State.RuntimeInfo;
@@ -40,6 +41,7 @@ AppState::AppState()
       runtime_info(std::make_unique<Core::State::RuntimeInfo::RuntimeInfoState>()),
       database(std::make_unique<Core::Database::State::DatabaseState>()),
       http_server(std::make_unique<Core::HttpServer::State::HttpServerState>()),
+      http_client(std::make_unique<Core::HttpClient::State::HttpClientState>()),
       worker_pool(std::make_unique<Core::WorkerPool::State::WorkerPoolState>()),
       commands(std::make_unique<Core::Commands::State::CommandState>()),
       tasks(std::make_unique<Core::Tasks::State::TaskState>()),

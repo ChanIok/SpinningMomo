@@ -1,5 +1,6 @@
 const { execSync, spawnSync } = require("child_process");
 const fs = require("fs");
+const fg = require("fast-glob");
 
 // 常见的 clang-format 路径（VS2022）
 const KNOWN_PATHS = [
@@ -44,7 +45,7 @@ function main() {
 
   // 获取要格式化的文件
   const args = process.argv.slice(2);
-  
+
   // 检查是否是 --files 模式（lint-staged 传递文件列表）
   let files;
   if (args[0] === "--files") {
@@ -52,17 +53,21 @@ function main() {
   } else if (args.length > 0) {
     files = args;
   } else {
-    // 默认 glob 模式
-    files = ["src/**/*.cpp", "src/**/*.ixx", "src/**/*.h", "src/**/*.hpp"];
+    // 默认模式：在 Node 里自己展开 glob，避免 Windows shell 不展开通配符的问题
+    files = fg.sync(["src/**/*.cpp", "src/**/*.ixx", "src/**/*.h", "src/**/*.hpp"], {
+      dot: false,
+      onlyFiles: true,
+      unique: true,
+    });
   }
 
-  if (files.length === 0) {
+  if (!files || files.length === 0) {
     process.exit(0);
   }
 
-  const result = spawnSync(`"${clangFormat}"`, ["-i", ...files], {
+  const result = spawnSync(clangFormat, ["-i", ...files], {
     stdio: "inherit",
-    shell: true,
+    shell: false,
   });
 
   process.exit(result.status || 0);

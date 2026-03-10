@@ -7,6 +7,7 @@ import std;
 import Core.Async;
 import Core.WorkerPool;
 import Core.HttpServer;
+import Core.HttpClient;
 import Core.Commands;
 import Core.State;
 import Features.Letterbox;
@@ -66,6 +67,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
 
   // 3. 核心服务清理
   Core::HttpServer::shutdown(state);
+  Core::HttpClient::shutdown(state);
 
   // 停止工作线程池（等待所有任务完成）
   Core::WorkerPool::stop(*state.worker_pool);

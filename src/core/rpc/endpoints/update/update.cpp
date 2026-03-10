@@ -1,9 +1,5 @@
 module;
 
-#include <asio.hpp>
-#include <rfl.hpp>
-#include <rfl/json.hpp>
-
 module Core.RPC.Endpoints.Update;
 
 import std;
@@ -13,13 +9,15 @@ import Core.RPC.State;
 import Core.RPC.Types;
 import Features.Update;
 import Features.Update.Types;
+import <asio.hpp>;
+import <rfl.hpp>;
 
 namespace Core::RPC::Endpoints::Update {
 
 auto handle_check_for_update(Core::State::AppState& app_state,
                              [[maybe_unused]] const rfl::Generic& params)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Update::Types::CheckUpdateResult>> {
-  auto result = Features::Update::check_for_update(app_state);
+  auto result = co_await Features::Update::check_for_update(app_state);
 
   if (!result) {
     co_return std::unexpected(
@@ -33,7 +31,7 @@ auto handle_check_for_update(Core::State::AppState& app_state,
 auto handle_download_update(Core::State::AppState& app_state,
                             [[maybe_unused]] const rfl::Generic& params)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Update::Types::DownloadUpdateResult>> {
-  auto result = Features::Update::download_update(app_state);
+  auto result = co_await Features::Update::download_update(app_state);
 
   if (!result) {
     co_return std::unexpected(

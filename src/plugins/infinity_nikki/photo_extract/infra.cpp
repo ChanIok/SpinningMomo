@@ -8,9 +8,10 @@ import std;
 import Core.Database;
 import Core.Database.Types;
 import Core.State;
+import Core.HttpClient;
+import Core.HttpClient.Types;
 import Plugins.InfinityNikki.PhotoExtract.Scan;
-import Utils.String;
-import Vendor.WinHttp;
+import <asio.hpp>;
 
 namespace Plugins::InfinityNikki::PhotoExtract::Infra {
 
@@ -105,98 +106,30 @@ auto to_parsed_record(const SocialPhotoData& sp) -> ParsedPhotoParamsRecord {
   return record;
 }
 
-auto http_post_json(const std::string& url_utf8, const std::string& request_body_utf8)
-    -> std::expected<std::string, std::string> {
-  auto url = Utils::String::FromUtf8(url_utf8);
-  if (url.empty()) {
-    return std::unexpected("Invalid URL encoding");
+auto http_post_json(Core::State::AppState& app_state, const std::string& url_utf8,
+                    const std::string& request_body_utf8)
+    -> asio::awaitable<std::expected<std::string, std::string>> {
+  Core::HttpClient::Types::Request request{
+      .method = "POST",
+      .url = url_utf8,
+      .headers =
+          {
+              Core::HttpClient::Types::Header{.name = "Content-Type", .value = "application/json"},
+              Core::HttpClient::Types::Header{.name = "X-Client", .value = "SpinningMomo"},
+          },
+      .body = request_body_utf8,
+  };
+
+  auto response = co_await Core::HttpClient::fetch(app_state, request);
+  if (!response) {
+    co_return std::unexpected("Failed to send HTTP request: " + response.error());
   }
 
-  Vendor::WinHttp::UniqueHInternet h_session{Vendor::WinHttp::WinHttpOpen(
-      L"SpinningMomo/1.0", Vendor::WinHttp::kWINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-      Vendor::WinHttp::kWINHTTP_NO_PROXY_NAME, Vendor::WinHttp::kWINHTTP_NO_PROXY_BYPASS, 0)};
-  if (!h_session) {
-    return std::unexpected("Failed to open WinHTTP session");
+  if (response->status_code < 200 || response->status_code >= 300) {
+    co_return std::unexpected("HTTP error: " + std::to_string(response->status_code));
   }
 
-  Vendor::WinHttp::URL_COMPONENTS url_components = {sizeof(url_components)};
-  wchar_t host_name[256] = {0};
-  wchar_t url_path[2048] = {0};
-  url_components.lpszHostName = host_name;
-  url_components.dwHostNameLength = sizeof(host_name) / sizeof(wchar_t);
-  url_components.lpszUrlPath = url_path;
-  url_components.dwUrlPathLength = sizeof(url_path) / sizeof(wchar_t);
-
-  if (!Vendor::WinHttp::WinHttpCrackUrl(
-          url.c_str(), static_cast<Vendor::WinHttp::DWORD>(url.size()), 0, &url_components)) {
-    return std::unexpected("Failed to parse URL");
-  }
-
-  Vendor::WinHttp::UniqueHInternet h_connect{
-      Vendor::WinHttp::WinHttpConnect(h_session.get(), host_name, url_components.nPort, 0)};
-  if (!h_connect) {
-    return std::unexpected("Failed to connect to API host");
-  }
-
-  Vendor::WinHttp::DWORD flags = (url_components.nScheme == Vendor::WinHttp::kINTERNET_SCHEME_HTTPS)
-                                     ? Vendor::WinHttp::kWINHTTP_FLAG_SECURE
-                                     : 0;
-  Vendor::WinHttp::UniqueHInternet h_request{Vendor::WinHttp::WinHttpOpenRequest(
-      h_connect.get(), L"POST", url_path, nullptr, Vendor::WinHttp::kWINHTTP_NO_REFERER,
-      Vendor::WinHttp::kWINHTTP_DEFAULT_ACCEPT_TYPES, flags)};
-  if (!h_request) {
-    return std::unexpected("Failed to open HTTP request");
-  }
-
-  std::wstring headers = L"Content-Type: application/json\r\nX-Client: SpinningMomo\r\n";
-  auto body_size = static_cast<Vendor::WinHttp::DWORD>(request_body_utf8.size());
-  void* request_data = body_size == 0 ? Vendor::WinHttp::kWINHTTP_NO_REQUEST_DATA
-                                      : const_cast<char*>(request_body_utf8.data());
-
-  if (!Vendor::WinHttp::WinHttpSendRequest(h_request.get(), headers.c_str(),
-                                           static_cast<Vendor::WinHttp::DWORD>(headers.size()),
-                                           request_data, body_size, body_size, 0)) {
-    return std::unexpected("Failed to send HTTP request");
-  }
-
-  if (!Vendor::WinHttp::WinHttpReceiveResponse(h_request.get(), nullptr)) {
-    return std::unexpected("Failed to receive HTTP response");
-  }
-
-  Vendor::WinHttp::DWORD status_code = 0;
-  Vendor::WinHttp::DWORD status_size = sizeof(status_code);
-  if (Vendor::WinHttp::WinHttpQueryHeaders(
-          h_request.get(),
-          Vendor::WinHttp::kWINHTTP_QUERY_STATUS_CODE | Vendor::WinHttp::kWINHTTP_QUERY_FLAG_NUMBER,
-          Vendor::WinHttp::kWINHTTP_HEADER_NAME_BY_INDEX, &status_code, &status_size, nullptr)) {
-    if (status_code < 200 || status_code >= 300) {
-      return std::unexpected("HTTP error: " + std::to_string(status_code));
-    }
-  }
-
-  std::string response;
-  Vendor::WinHttp::DWORD available = 0;
-  Vendor::WinHttp::DWORD downloaded = 0;
-  char buffer[4096];
-
-  while (true) {
-    available = 0;
-    if (!Vendor::WinHttp::WinHttpQueryDataAvailable(h_request.get(), &available)) {
-      break;
-    }
-    if (available == 0) {
-      break;
-    }
-
-    auto to_read = std::min(available, static_cast<Vendor::WinHttp::DWORD>(sizeof(buffer)));
-    std::memset(buffer, 0, sizeof(buffer));
-    if (!Vendor::WinHttp::WinHttpReadData(h_request.get(), buffer, to_read, &downloaded)) {
-      break;
-    }
-    response.append(buffer, downloaded);
-  }
-
-  return response;
+  co_return response->body;
 }
 
 auto parse_photo_params_records_from_response(const std::string& response_body)
@@ -272,16 +205,18 @@ auto load_candidate_assets(Core::State::AppState& app_state, bool only_missing)
   return query_result.value();
 }
 
-auto extract_batch_photo_params(const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
-    -> std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string> {
+auto extract_batch_photo_params(Core::State::AppState& app_state,
+                                const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
+    -> asio::awaitable<
+        std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string>> {
   if (entries.empty()) {
-    return std::vector<std::optional<ParsedPhotoParamsRecord>>{};
+    co_return std::vector<std::optional<ParsedPhotoParamsRecord>>{};
   }
 
   const auto& uid = entries.front().uid;
   for (const auto& entry : entries) {
     if (entry.uid != uid) {
-      return std::unexpected("Batch contains multiple UIDs");
+      co_return std::unexpected("Batch contains multiple UIDs");
     }
   }
 
@@ -295,23 +230,24 @@ auto extract_batch_photo_params(const std::vector<Scan::PreparedPhotoExtractEntr
   }
 
   auto request_json = rfl::json::write<rfl::SnakeCaseToCamelCase>(request_body);
-  auto response_result = http_post_json(std::string(kExtractApiUrl), request_json);
+  auto response_result =
+      co_await http_post_json(app_state, std::string(kExtractApiUrl), request_json);
   if (!response_result) {
-    return std::unexpected("HTTP error: " + response_result.error());
+    co_return std::unexpected("HTTP error: " + response_result.error());
   }
 
   auto parsed_result = parse_photo_params_records_from_response(response_result.value());
   if (!parsed_result) {
-    return std::unexpected(parsed_result.error());
+    co_return std::unexpected(parsed_result.error());
   }
 
   auto records = std::move(parsed_result.value());
   if (records.size() != entries.size()) {
-    return std::unexpected(
+    co_return std::unexpected(
         std::format("response count mismatch: got {} for {}", records.size(), entries.size()));
   }
 
-  return records;
+  co_return records;
 }
 
 auto upsert_photo_params_record(Core::State::AppState& app_state, std::int64_t asset_id,

@@ -11,6 +11,7 @@ import Core.State;
 import Core.State.RuntimeInfo;
 import Core.I18n;
 import Core.HttpServer;
+import Core.HttpClient;
 import Core.Events;
 import Core.Events.State;
 import Core.Events.Registrar;
@@ -62,6 +63,10 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto result = Core::Async::start(*state.async); !result) {
       return std::unexpected("Failed to start async runtime: " + result.error());
+    }
+
+    if (auto result = Core::HttpClient::initialize(state); !result) {
+      return std::unexpected("Failed to initialize HTTP client: " + result.error());
     }
 
     if (auto result = Core::WorkerPool::start(*state.worker_pool); !result) {

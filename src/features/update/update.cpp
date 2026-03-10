@@ -1,12 +1,16 @@
 module;
 
+#include <asio.hpp>
+
 module Features.Update;
 
 import std;
 import Core.Events;
-import Core.WorkerPool;
+import Core.Async;
 import UI.FloatingWindow.Events;
 import Core.State;
+import Core.HttpClient;
+import Core.HttpClient.Types;
 import Features.Update.State;
 import Features.Update.Types;
 import Features.Settings.State;
@@ -17,7 +21,6 @@ import Utils.String;
 import Vendor.ShellApi;
 import Vendor.Version;
 import Vendor.Windows;
-import Vendor.WinHttp;
 
 namespace Features::Update {
 
@@ -59,109 +62,23 @@ auto is_update_needed(const std::string& current_version, const std::string& lat
   return false;  // 版本相同
 }
 
-auto http_get(const std::wstring& url) -> std::expected<std::string, std::string> {
-  Vendor::WinHttp::HINTERNET hSession = Vendor::WinHttp::WinHttpOpen(
-      L"SpinningMomo/1.0", Vendor::WinHttp::kWINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
-      Vendor::WinHttp::kWINHTTP_NO_PROXY_NAME, Vendor::WinHttp::kWINHTTP_NO_PROXY_BYPASS, 0);
-  if (!hSession) {
-    return std::unexpected("Failed to open WinHTTP session");
+auto http_get(Core::State::AppState& app_state, const std::string& url)
+    -> asio::awaitable<std::expected<std::string, std::string>> {
+  Core::HttpClient::Types::Request request{
+      .method = "GET",
+      .url = url,
+  };
+
+  auto response_result = co_await Core::HttpClient::fetch(app_state, request);
+  if (!response_result) {
+    co_return std::unexpected("Failed to send HTTP request: " + response_result.error());
   }
 
-  Vendor::WinHttp::URL_COMPONENTS urlComponents = {sizeof(urlComponents)};
-  wchar_t szHostName[256] = {0};
-  wchar_t szUrlPath[1024] = {0};
-
-  urlComponents.lpszHostName = szHostName;
-  urlComponents.dwHostNameLength = sizeof(szHostName) / sizeof(wchar_t);
-  urlComponents.lpszUrlPath = szUrlPath;
-  urlComponents.dwUrlPathLength = sizeof(szUrlPath) / sizeof(wchar_t);
-
-  if (!Vendor::WinHttp::WinHttpCrackUrl(url.c_str(), url.length(), 0, &urlComponents)) {
-    Vendor::WinHttp::WinHttpCloseHandle(hSession);
-    return std::unexpected("Failed to parse URL");
+  if (response_result->status_code != 200) {
+    co_return std::unexpected("HTTP error: " + std::to_string(response_result->status_code));
   }
 
-  Vendor::WinHttp::HINTERNET hConnect =
-      Vendor::WinHttp::WinHttpConnect(hSession, szHostName, urlComponents.nPort, 0);
-  if (!hConnect) {
-    Vendor::WinHttp::WinHttpCloseHandle(hSession);
-    return std::unexpected("Failed to connect to server");
-  }
-
-  // 根据URL scheme判断是否需要HTTPS
-  Vendor::WinHttp::DWORD flags = (urlComponents.nScheme == Vendor::WinHttp::kINTERNET_SCHEME_HTTPS)
-                                     ? Vendor::WinHttp::kWINHTTP_FLAG_SECURE
-                                     : 0;
-  Vendor::WinHttp::HINTERNET hRequest = Vendor::WinHttp::WinHttpOpenRequest(
-      hConnect, L"GET", szUrlPath, nullptr, Vendor::WinHttp::kWINHTTP_NO_REFERER,
-      Vendor::WinHttp::kWINHTTP_DEFAULT_ACCEPT_TYPES, flags);
-  if (!hRequest) {
-    Vendor::WinHttp::WinHttpCloseHandle(hConnect);
-    Vendor::WinHttp::WinHttpCloseHandle(hSession);
-    return std::unexpected("Failed to open HTTP request");
-  }
-
-  if (!Vendor::WinHttp::WinHttpSendRequest(hRequest,
-                                           Vendor::WinHttp::kWINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                                           Vendor::WinHttp::kWINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
-    Vendor::WinHttp::WinHttpCloseHandle(hRequest);
-    Vendor::WinHttp::WinHttpCloseHandle(hConnect);
-    Vendor::WinHttp::WinHttpCloseHandle(hSession);
-    return std::unexpected("Failed to send HTTP request");
-  }
-
-  if (!Vendor::WinHttp::WinHttpReceiveResponse(hRequest, nullptr)) {
-    Vendor::WinHttp::WinHttpCloseHandle(hRequest);
-    Vendor::WinHttp::WinHttpCloseHandle(hConnect);
-    Vendor::WinHttp::WinHttpCloseHandle(hSession);
-    return std::unexpected("Failed to receive HTTP response");
-  }
-
-  // 检查HTTP状态码
-  Vendor::WinHttp::DWORD dwStatusCode = 0;
-  Vendor::WinHttp::DWORD headerSize = sizeof(dwStatusCode);
-  if (Vendor::WinHttp::WinHttpQueryHeaders(
-          hRequest,
-          Vendor::WinHttp::kWINHTTP_QUERY_STATUS_CODE | Vendor::WinHttp::kWINHTTP_QUERY_FLAG_NUMBER,
-          Vendor::WinHttp::kWINHTTP_HEADER_NAME_BY_INDEX, &dwStatusCode, &headerSize, nullptr)) {
-    if (dwStatusCode != 200) {
-      Vendor::WinHttp::WinHttpCloseHandle(hRequest);
-      Vendor::WinHttp::WinHttpCloseHandle(hConnect);
-      Vendor::WinHttp::WinHttpCloseHandle(hSession);
-      return std::unexpected("HTTP error: " + std::to_string(dwStatusCode));
-    }
-  }
-
-  // 读取响应数据
-  std::string response;
-  Vendor::WinHttp::DWORD dwSize = 0;
-  Vendor::WinHttp::DWORD dwDownloaded = 0;
-  char buffer[4096];
-
-  do {
-    dwSize = 0;
-    if (!Vendor::WinHttp::WinHttpQueryDataAvailable(hRequest, &dwSize)) {
-      break;
-    }
-
-    if (dwSize == 0) {
-      break;
-    }
-
-    std::memset(buffer, 0, sizeof(buffer));
-    Vendor::WinHttp::DWORD bytesToRead =
-        std::min(dwSize, static_cast<Vendor::WinHttp::DWORD>(sizeof(buffer)));
-    if (!Vendor::WinHttp::WinHttpReadData(hRequest, buffer, bytesToRead, &dwDownloaded)) {
-      break;
-    }
-
-    response.append(buffer, dwDownloaded);
-  } while (dwSize > 0);
-
-  Vendor::WinHttp::WinHttpCloseHandle(hRequest);
-  Vendor::WinHttp::WinHttpCloseHandle(hConnect);
-  Vendor::WinHttp::WinHttpCloseHandle(hSession);
-  return response;
+  co_return response_result->body;
 }
 
 auto get_temp_directory() -> std::expected<std::filesystem::path, std::string> {
@@ -267,44 +184,52 @@ auto detect_portable() -> bool {
 }
 
 // 从版本检查URL获取最新版本号
-auto fetch_latest_version(const std::string& version_url)
-    -> std::expected<std::string, std::string> {
-  std::wstring wide_url(version_url.begin(), version_url.end());
-  auto response = http_get(wide_url);
+auto fetch_latest_version(Core::State::AppState& app_state, const std::string& version_url)
+    -> asio::awaitable<std::expected<std::string, std::string>> {
+  auto response = co_await http_get(app_state, version_url);
   if (!response) {
-    return std::unexpected("Failed to fetch version info: " + response.error());
+    co_return std::unexpected("Failed to fetch version info: " + response.error());
   }
 
   auto version = Utils::String::TrimAscii(response.value());
   if (version.empty()) {
-    return std::unexpected("Empty version response");
+    co_return std::unexpected("Empty version response");
   }
 
-  return version;
+  co_return version;
 }
 
-auto download_file(const std::string& url, const std::filesystem::path& save_path)
-    -> std::expected<void, std::string> {
+auto download_file(Core::State::AppState& app_state, const std::string& url,
+                   const std::filesystem::path& save_path)
+    -> asio::awaitable<std::expected<void, std::string>> {
   try {
-    std::wstring wide_url(url.begin(), url.end());
+    Core::HttpClient::Types::Request request{
+        .method = "GET",
+        .url = url,
+    };
 
-    auto response = http_get(wide_url);
+    auto response = co_await Core::HttpClient::fetch(app_state, request);
     if (!response) {
-      return std::unexpected("Download failed: " + response.error());
+      co_return std::unexpected("Download failed: " + response.error());
+    }
+
+    if (response->status_code != 200) {
+      co_return std::unexpected("Download failed: HTTP error " +
+                                std::to_string(response->status_code));
     }
 
     std::ofstream file(save_path, std::ios::binary);
     if (!file) {
-      return std::unexpected("Failed to create file: " + save_path.string());
+      co_return std::unexpected("Failed to create file: " + save_path.string());
     }
 
-    file << *response;
+    file << response->body;
     file.close();
 
-    return {};
+    co_return std::expected<void, std::string>{};
 
   } catch (const std::exception& e) {
-    return std::unexpected("Download failed: " + std::string(e.what()));
+    co_return std::unexpected("Download failed: " + std::string(e.what()));
   }
 }
 
@@ -391,7 +316,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
 }
 
 auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> void {
-  if (!app_state.settings || !app_state.update || !app_state.worker_pool) {
+  if (!app_state.settings || !app_state.update || !app_state.async) {
     Logger().warn("Skip startup auto update check: state is not ready");
     return;
   }
@@ -401,67 +326,73 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
     return;
   }
 
-  bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
-    Logger().info("Startup auto update check started");
-
-    auto check_result = check_for_update(app_state);
-    if (!check_result) {
-      Logger().warn("Startup auto update check failed: {}", check_result.error());
-      return;
-    }
-
-    if (check_result->has_update) {
-      Logger().info("Startup auto update check found update: current={}, latest={}",
-                    check_result->current_version, check_result->latest_version);
-
-      if (!app_state.settings || !app_state.update) {
-        Logger().warn("Skip startup auto update prepare: state is not ready");
-        return;
-      }
-
-      if (!app_state.settings->raw.update.auto_update_on_exit) {
-        Logger().info("Skip startup auto update prepare: auto_update_on_exit is disabled");
-        return;
-      }
-
-      if (app_state.update->pending_update) {
-        Logger().info("Skip startup auto update prepare: pending update already exists");
-        return;
-      }
-
-      auto download_result = download_update(app_state);
-      if (!download_result) {
-        Logger().warn("Startup auto update download failed: {}", download_result.error());
-        return;
-      }
-
-      Types::InstallUpdateParams install_params;
-      install_params.restart = false;
-
-      auto install_result = install_update(app_state, install_params);
-      if (!install_result) {
-        Logger().warn("Startup auto update prepare failed: {}", install_result.error());
-        return;
-      }
-
-      Logger().info("Startup auto update prepared successfully");
-      return;
-    }
-
-    Logger().info("Startup auto update check completed: current version is up-to-date ({})",
-                  check_result->current_version);
-  });
-
-  if (!submitted) {
-    Logger().warn("Failed to schedule startup auto update check");
+  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  if (!io_context) {
+    Logger().warn("Skip startup auto update check: async runtime is not ready");
+    return;
   }
+
+  asio::co_spawn(
+      *io_context,
+      [&app_state]() -> asio::awaitable<void> {
+        co_await asio::post(asio::use_awaitable);
+        Logger().info("Startup auto update check started");
+
+        auto check_result = co_await check_for_update(app_state);
+        if (!check_result) {
+          Logger().warn("Startup auto update check failed: {}", check_result.error());
+          co_return;
+        }
+
+        if (check_result->has_update) {
+          Logger().info("Startup auto update check found update: current={}, latest={}",
+                        check_result->current_version, check_result->latest_version);
+
+          if (!app_state.settings || !app_state.update) {
+            Logger().warn("Skip startup auto update prepare: state is not ready");
+            co_return;
+          }
+
+          if (!app_state.settings->raw.update.auto_update_on_exit) {
+            Logger().info("Skip startup auto update prepare: auto_update_on_exit is disabled");
+            co_return;
+          }
+
+          if (app_state.update->pending_update) {
+            Logger().info("Skip startup auto update prepare: pending update already exists");
+            co_return;
+          }
+
+          auto download_result = co_await download_update(app_state);
+          if (!download_result) {
+            Logger().warn("Startup auto update download failed: {}", download_result.error());
+            co_return;
+          }
+
+          Types::InstallUpdateParams install_params;
+          install_params.restart = false;
+
+          auto install_result = install_update(app_state, install_params);
+          if (!install_result) {
+            Logger().warn("Startup auto update prepare failed: {}", install_result.error());
+            co_return;
+          }
+
+          Logger().info("Startup auto update prepared successfully");
+          co_return;
+        }
+
+        Logger().info("Startup auto update check completed: current version is up-to-date ({})",
+                      check_result->current_version);
+      },
+      asio::detached);
 }
 
 auto check_for_update(Core::State::AppState& app_state)
-    -> std::expected<Types::CheckUpdateResult, std::string> {
+    -> asio::awaitable<std::expected<Types::CheckUpdateResult, std::string>> {
   try {
     if (!app_state.update) {
-      return std::unexpected("Update not initialized");
+      co_return std::unexpected("Update not initialized");
     }
 
     app_state.update->is_checking = true;
@@ -469,16 +400,16 @@ auto check_for_update(Core::State::AppState& app_state)
 
     if (!app_state.settings) {
       app_state.update->is_checking = false;
-      return std::unexpected("Settings not initialized");
+      co_return std::unexpected("Settings not initialized");
     }
 
     // 从Cloudflare Pages获取最新版本号
     const auto& version_url = app_state.settings->raw.update.version_url;
-    auto latest = fetch_latest_version(version_url);
+    auto latest = co_await fetch_latest_version(app_state, version_url);
     if (!latest) {
       app_state.update->is_checking = false;
       app_state.update->error_message = latest.error();
-      return std::unexpected(latest.error());
+      co_return std::unexpected(latest.error());
     }
 
     auto current_version = Vendor::Version::get_app_version();
@@ -496,14 +427,14 @@ auto check_for_update(Core::State::AppState& app_state)
     Logger().info("Check for update: current={}, latest={}, has_update={}", current_version,
                   result.latest_version, result.has_update);
 
-    return result;
+    co_return result;
 
   } catch (const std::exception& e) {
     if (app_state.update) {
       app_state.update->is_checking = false;
       app_state.update->error_message = e.what();
     }
-    return std::unexpected(std::string(e.what()));
+    co_return std::unexpected(std::string(e.what()));
   }
 }
 
@@ -539,23 +470,23 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
 }
 
 auto download_update(Core::State::AppState& app_state)
-    -> std::expected<Types::DownloadUpdateResult, std::string> {
+    -> asio::awaitable<std::expected<Types::DownloadUpdateResult, std::string>> {
   try {
     if (!app_state.update) {
-      return std::unexpected("Update not initialized");
+      co_return std::unexpected("Update not initialized");
     }
 
     if (app_state.update->latest_version.empty()) {
-      return std::unexpected("No version info available. Please check for updates first.");
+      co_return std::unexpected("No version info available. Please check for updates first.");
     }
 
     if (!app_state.settings) {
-      return std::unexpected("Settings not initialized");
+      co_return std::unexpected("Settings not initialized");
     }
 
     const auto& download_sources = app_state.settings->raw.update.download_sources;
     if (download_sources.empty()) {
-      return std::unexpected("No download sources configured");
+      co_return std::unexpected("No download sources configured");
     }
 
     // 根据安装类型确定文件名和保存路径
@@ -564,7 +495,7 @@ auto download_update(Core::State::AppState& app_state)
 
     auto temp_dir = get_temp_directory();
     if (!temp_dir) {
-      return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
+      co_return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
     }
     std::filesystem::path save_path = *temp_dir / filename;
 
@@ -591,9 +522,7 @@ auto download_update(Core::State::AppState& app_state)
         continue;
       }
 
-      std::wstring wide_checksums_url(checksums_url_result.value().begin(),
-                                      checksums_url_result.value().end());
-      auto checksums_content_result = http_get(wide_checksums_url);
+      auto checksums_content_result = co_await http_get(app_state, checksums_url_result.value());
       if (!checksums_content_result) {
         Logger().warn("Failed to fetch SHA256SUMS from {}: {}", source.name,
                       checksums_content_result.error());
@@ -610,7 +539,8 @@ auto download_update(Core::State::AppState& app_state)
 
       Logger().info("Trying download source: {} ({})", source.name, package_url_result.value());
 
-      auto download_result = download_file(package_url_result.value(), save_path);
+      auto download_result =
+          co_await download_file(app_state, package_url_result.value(), save_path);
       if (download_result) {
         auto verify_result =
             verify_downloaded_file_sha256(save_path, expected_sha256_result.value());
@@ -630,7 +560,7 @@ auto download_update(Core::State::AppState& app_state)
         result.file_path = save_path;
 
         Logger().info("Download completed from {}: {}", source.name, save_path.string());
-        return result;
+        co_return result;
       }
 
       Logger().warn("Download failed from {}: {}", source.name, download_result.error());
@@ -639,14 +569,14 @@ auto download_update(Core::State::AppState& app_state)
     // 所有源都失败
     app_state.update->download_in_progress = false;
     app_state.update->error_message = "All download sources failed";
-    return std::unexpected("All download sources failed");
+    co_return std::unexpected("All download sources failed");
 
   } catch (const std::exception& e) {
     if (app_state.update) {
       app_state.update->download_in_progress = false;
       app_state.update->error_message = e.what();
     }
-    return std::unexpected(std::string(e.what()));
+    co_return std::unexpected(std::string(e.what()));
   }
 }
 

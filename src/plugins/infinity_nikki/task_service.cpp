@@ -129,7 +129,7 @@ auto launch_extract_photo_params_task(
               Core::Tasks::update_task_progress(app_state, task_id, task_progress);
             };
 
-        auto extract_result = Plugins::InfinityNikki::PhotoExtract::extract_photo_params(
+        auto extract_result = co_await Plugins::InfinityNikki::PhotoExtract::extract_photo_params(
             app_state, request, progress_callback);
         if (!extract_result) {
           auto error_message =
