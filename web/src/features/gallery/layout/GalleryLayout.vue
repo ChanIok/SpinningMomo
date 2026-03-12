@@ -6,9 +6,11 @@ import { Split } from '@/components/ui/split'
 import { useGalleryLayout } from '../composables'
 import { useGalleryData } from '../composables/useGalleryData'
 import { useGalleryStore } from '../store'
+import { useSettingsStore } from '@/features/settings/store'
 import GallerySidebar from './GallerySidebar.vue'
 import GalleryViewer from './GalleryViewer.vue'
 import GalleryDetails from './GalleryDetails.vue'
+import InfinityNikkiGuidePanel from '../components/InfinityNikkiGuidePanel.vue'
 
 const LEFT_MIN_SIZE = '180px'
 const RIGHT_MIN_SIZE = '180px'
@@ -24,7 +26,14 @@ const GALLERY_REFRESH_DEBOUNCE_MS = 400
 const { isSidebarOpen, isDetailsOpen, setSidebarOpen, setDetailsOpen } = useGalleryLayout()
 const galleryData = useGalleryData()
 const galleryStore = useGalleryStore()
+const settingsStore = useSettingsStore()
 const isBelowLg = useMediaQuery('(max-width: 1023px)')
+
+// 引导面板显示条件（无限暖暖插件已启用、配置了游戏目录、且尚未看过引导）
+const showInfinityNikkiGuide = computed(() => {
+  const config = settingsStore.appSettings.plugins.infinityNikki
+  return config.enable && Boolean(config.gameDir.trim()) && !config.galleryGuideSeen
+})
 
 let isUnmounted = false
 let refreshInFlight = false
@@ -295,8 +304,11 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- 引导面板：占满整个画廊区域，隐藏三栏布局 -->
+  <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
+
   <!-- 左中右三区域布局 -->
-  <div class="h-full w-full border-t">
+  <div v-else class="h-full w-full border-t">
     <!-- 第一层分割：左侧 + (中右) -->
     <Split
       v-model:size="leftSidebarSize"

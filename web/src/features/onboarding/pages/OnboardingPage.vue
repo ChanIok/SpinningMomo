@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { isWebView } from '@/core/env'
 import { useSettingsStore } from '@/features/settings/store'
 import {
   CURRENT_ONBOARDING_FLOW_VERSION,
@@ -33,6 +32,7 @@ const store = useSettingsStore()
 const { t, setLocale } = useI18n()
 
 const step = ref<Step>(1)
+const direction = ref<'forward' | 'backward'>('forward')
 const isSubmitting = ref(false)
 const stepError = ref('')
 
@@ -56,10 +56,11 @@ const hasDetectedOnce = ref(false)
 const detectionStatus = ref<DetectionStatus>('idle')
 const detectionMessageKey = ref('onboarding.step2.detectPending')
 
-const showHeader = computed(() => isWebView())
-
 const isFirstStep = computed(() => step.value === 1)
 const isLastStep = computed(() => step.value === 3)
+const stepTransitionName = computed(() =>
+  direction.value === 'forward' ? 'ob-step-forward' : 'ob-step-backward'
+)
 const step3DescriptionKey = computed(() =>
   skipInfinityNikki.value ? 'onboarding.step3.descriptionGeneric' : 'onboarding.step3.description'
 )
@@ -246,6 +247,7 @@ const toggleSkipInfinityNikki = () => {
       targetTitle.value = ''
     }
     stepError.value = ''
+    direction.value = 'forward'
     step.value = 3
   }
 }
@@ -259,6 +261,7 @@ const goToNextStep = () => {
   }
 
   if (step.value < 3) {
+    direction.value = 'forward'
     step.value = (step.value + 1) as Step
   }
 }
@@ -266,6 +269,7 @@ const goToNextStep = () => {
 const goToPreviousStep = () => {
   stepError.value = ''
   if (step.value > 1) {
+    direction.value = 'backward'
     step.value = (step.value - 1) as Step
   }
 }
@@ -286,6 +290,7 @@ const completeOnboarding = async () => {
   try {
     if (!skipInfinityNikki.value) {
       if (!trimmedGameDir) {
+        direction.value = 'backward'
         step.value = 2
         stepError.value = t('onboarding.step2.gameDirRequired')
         return
@@ -293,6 +298,7 @@ const completeOnboarding = async () => {
 
       const isValidGameDir = await isValidInfinityNikkiGameDir(trimmedGameDir)
       if (!isValidGameDir) {
+        direction.value = 'backward'
         step.value = 2
         stepError.value = t('onboarding.step2.gameDirInvalid')
         return
@@ -344,6 +350,7 @@ const completeOnboarding = async () => {
       },
     })
 
+    direction.value = 'forward'
     step.value = 4
   } catch (error) {
     stepError.value = t('onboarding.common.saveFailed')
@@ -355,179 +362,260 @@ const completeOnboarding = async () => {
 </script>
 
 <template>
-  <ScrollArea class="h-full w-full">
-    <div
-      class="mx-auto flex min-h-full w-full max-w-3xl items-center justify-center p-8"
-      :class="[showHeader && 'pt-0']"
-    >
-      <div class="surface-middle w-full rounded-md border border-border/60 p-8 shadow-sm">
-        <div class="mb-8">
+  <ScrollArea class="onboarding-scroll h-full w-full">
+    <div class="onboarding-shell w-full max-w-3xl">
+      <div
+        class="surface-middle onboarding-card flex w-full flex-col overflow-hidden rounded-md border border-border/60 shadow-sm"
+      >
+        <div class="shrink-0 p-8 pb-6">
           <h1 class="text-2xl font-semibold text-foreground">
             {{ t('onboarding.title') }}
           </h1>
           <p class="mt-2 text-sm text-muted-foreground">
             {{ t('onboarding.description') }}
           </p>
-        </div>
 
-        <div v-if="step < 4" class="mb-8 flex items-center gap-2 text-xs">
-          <div v-for="currentStep in [1, 2, 3]" :key="currentStep" class="flex items-center gap-2">
+          <div v-if="step < 4" class="mt-8 flex items-center gap-2 text-xs">
             <div
-              class="flex h-6 w-6 items-center justify-center rounded-full border"
-              :class="
-                step >= currentStep
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border text-muted-foreground'
-              "
+              v-for="currentStep in [1, 2, 3]"
+              :key="currentStep"
+              class="flex items-center gap-2"
             >
-              {{ currentStep }}
-            </div>
-            <div v-if="currentStep < 3" class="h-px w-10 bg-border" />
-          </div>
-        </div>
-
-        <div v-if="step === 1" class="space-y-6">
-          <div>
-            <h2 class="text-lg font-medium text-foreground">{{ t('onboarding.step1.title') }}</h2>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {{ t('onboarding.step1.description') }}
-            </p>
-          </div>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <div class="space-y-2">
-              <p class="text-sm text-foreground">{{ t('common.languageLabelBilingual') }}</p>
-              <Select :model-value="language" @update:model-value="(v) => (language = String(v))">
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="zh-CN">{{ t('common.languageZhCn') }}</SelectItem>
-                  <SelectItem value="en-US">{{ t('common.languageEnUs') }}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div class="space-y-2">
-              <p class="text-sm text-foreground">{{ t('onboarding.step1.themeLabel') }}</p>
-              <Select
-                :model-value="themeMode"
-                @update:model-value="(v) => (themeMode = v as WebThemeMode)"
+              <div
+                class="flex h-6 w-6 items-center justify-center rounded-full border"
+                :class="
+                  step >= currentStep
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border text-muted-foreground'
+                "
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="light">{{ t('settings.appearance.theme.light') }}</SelectItem>
-                  <SelectItem value="dark">{{ t('settings.appearance.theme.dark') }}</SelectItem>
-                  <SelectItem value="system">{{
-                    t('settings.appearance.theme.system')
-                  }}</SelectItem>
-                </SelectContent>
-              </Select>
+                {{ currentStep }}
+              </div>
+              <div v-if="currentStep < 3" class="h-px w-10 bg-border" />
             </div>
           </div>
         </div>
 
-        <div v-else-if="step === 2" class="space-y-6">
-          <div>
-            <h2 class="text-lg font-medium text-foreground">{{ t('onboarding.step2.title') }}</h2>
-            <p class="mt-1 text-sm" :class="detectionMessageClass">
-              {{ t(detectionMessageKey) }}
-            </p>
-          </div>
+        <div class="flex min-h-0 flex-1 flex-col justify-end overflow-hidden px-8 pb-6">
+          <Transition :name="stepTransitionName" mode="out-in">
+            <div v-if="step === 1" key="step-1" class="space-y-6">
+              <div>
+                <h2 class="text-lg font-medium text-foreground">
+                  {{ t('onboarding.step1.title') }}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {{ t('onboarding.step1.description') }}
+                </p>
+              </div>
 
-          <div class="space-y-3">
-            <div class="flex gap-2">
-              <Input
-                v-model="gameDir"
-                :placeholder="t('onboarding.step2.gameDirPlaceholder')"
-                :disabled="detectionStatus === 'loading' || skipInfinityNikki"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                class="shrink-0"
-                :disabled="detectionStatus === 'loading' || skipInfinityNikki"
-                @click="selectGameDirectory"
-              >
-                {{ t('onboarding.step2.selectButton') }}
-              </Button>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-2">
+                  <p class="text-sm text-foreground">{{ t('common.languageLabelBilingual') }}</p>
+                  <Select
+                    :model-value="language"
+                    @update:model-value="(v) => (language = String(v))"
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="zh-CN">{{ t('common.languageZhCn') }}</SelectItem>
+                      <SelectItem value="en-US">{{ t('common.languageEnUs') }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div class="space-y-2">
+                  <p class="text-sm text-foreground">{{ t('onboarding.step1.themeLabel') }}</p>
+                  <Select
+                    :model-value="themeMode"
+                    @update:model-value="(v) => (themeMode = v as WebThemeMode)"
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">{{
+                        t('settings.appearance.theme.light')
+                      }}</SelectItem>
+                      <SelectItem value="dark">{{
+                        t('settings.appearance.theme.dark')
+                      }}</SelectItem>
+                      <SelectItem value="system">{{
+                        t('settings.appearance.theme.system')
+                      }}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
 
-            <p class="text-xs text-muted-foreground">
-              <button
-                class="underline underline-offset-2"
-                type="button"
-                @click="toggleSkipInfinityNikki"
-              >
-                {{
-                  skipInfinityNikki
-                    ? t('onboarding.step2.undoSkipLink')
-                    : t('onboarding.step2.skipLink')
-                }}
-              </button>
-            </p>
-          </div>
-        </div>
+            <div v-else-if="step === 2" key="step-2" class="space-y-6">
+              <div>
+                <h2 class="text-lg font-medium text-foreground">
+                  {{ t('onboarding.step2.title') }}
+                </h2>
+                <p class="mt-1 text-sm" :class="detectionMessageClass">
+                  {{ t(detectionMessageKey) }}
+                </p>
+              </div>
 
-        <div v-else-if="step === 3" class="space-y-6">
-          <div>
-            <h2 class="text-lg font-medium text-foreground">{{ t('onboarding.step3.title') }}</h2>
-            <p class="mt-1 text-sm text-muted-foreground">
-              {{ t(step3DescriptionKey) }}
-            </p>
-          </div>
+              <div class="space-y-3">
+                <div class="flex gap-2">
+                  <Input
+                    v-model="gameDir"
+                    :placeholder="t('onboarding.step2.gameDirPlaceholder')"
+                    :disabled="detectionStatus === 'loading' || skipInfinityNikki"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="shrink-0"
+                    :disabled="detectionStatus === 'loading' || skipInfinityNikki"
+                    @click="selectGameDirectory"
+                  >
+                    {{ t('onboarding.step2.selectButton') }}
+                  </Button>
+                </div>
 
-          <div class="space-y-2">
-            <p class="text-sm text-foreground">{{ t('onboarding.step3.targetTitleLabel') }}</p>
-            <div class="flex gap-2">
-              <Input
-                v-model="targetTitle"
-                :placeholder="t(targetTitlePlaceholderKey)"
-                class="flex-1"
-              />
-
-              <WindowTitlePickerButton @select="selectVisibleWindowTitle" />
+                <p class="text-xs text-muted-foreground">
+                  <button
+                    class="underline underline-offset-2"
+                    type="button"
+                    @click="toggleSkipInfinityNikki"
+                  >
+                    {{
+                      skipInfinityNikki
+                        ? t('onboarding.step2.undoSkipLink')
+                        : t('onboarding.step2.skipLink')
+                    }}
+                  </button>
+                </p>
+              </div>
             </div>
-          </div>
+
+            <div v-else-if="step === 3" key="step-3" class="space-y-6">
+              <div>
+                <h2 class="text-lg font-medium text-foreground">
+                  {{ t('onboarding.step3.title') }}
+                </h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                  {{ t(step3DescriptionKey) }}
+                </p>
+              </div>
+
+              <div class="space-y-2">
+                <p class="text-sm text-foreground">{{ t('onboarding.step3.targetTitleLabel') }}</p>
+                <div class="flex gap-2">
+                  <Input
+                    v-model="targetTitle"
+                    :placeholder="t(targetTitlePlaceholderKey)"
+                    class="flex-1"
+                  />
+
+                  <WindowTitlePickerButton @select="selectVisibleWindowTitle" />
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-else-if="step === 4"
+              key="step-4"
+              class="flex h-full flex-col items-center justify-center space-y-6 text-center"
+            >
+              <h2 class="text-xl font-medium text-emerald-500">
+                {{ t('onboarding.completed.title') }}
+              </h2>
+              <p class="max-w-md text-sm text-muted-foreground">
+                {{ t('onboarding.completed.description') }}
+              </p>
+            </div>
+          </Transition>
         </div>
 
-        <div
-          v-else-if="step === 4"
-          class="flex flex-col items-center justify-center space-y-6 py-8 text-center"
-        >
-          <h2 class="text-xl font-medium text-emerald-500">
-            {{ t('onboarding.completed.title') }}
-          </h2>
-          <p class="mt-4 text-sm text-muted-foreground">
-            {{ t('onboarding.completed.description') }}
+        <div v-if="step < 4 || stepError" class="shrink-0 border-t border-border/60 px-8 py-6">
+          <p v-if="stepError" class="text-sm text-red-500">
+            {{ stepError }}
           </p>
-        </div>
 
-        <p v-if="stepError" class="mt-5 text-sm text-red-500">
-          {{ stepError }}
-        </p>
-
-        <div v-if="step < 4" class="mt-8 flex items-center justify-between">
-          <Button
-            variant="outline"
-            :disabled="isFirstStep || isSubmitting"
-            @click="goToPreviousStep"
+          <div
+            v-if="step < 4"
+            class="flex items-center justify-between"
+            :class="[stepError && 'mt-4']"
           >
-            {{ t('onboarding.actions.previous') }}
-          </Button>
+            <Button
+              variant="outline"
+              :disabled="isFirstStep || isSubmitting"
+              @click="goToPreviousStep"
+            >
+              {{ t('onboarding.actions.previous') }}
+            </Button>
 
-          <Button v-if="!isLastStep" :disabled="isSubmitting" @click="goToNextStep">
-            {{ t('onboarding.actions.next') }}
-          </Button>
-          <Button v-else :disabled="isSubmitting" @click="completeOnboarding">
-            {{
-              isSubmitting ? t('onboarding.actions.completing') : t('onboarding.actions.complete')
-            }}
-          </Button>
+            <Button v-if="!isLastStep" :disabled="isSubmitting" @click="goToNextStep">
+              {{ t('onboarding.actions.next') }}
+            </Button>
+            <Button v-else :disabled="isSubmitting" @click="completeOnboarding">
+              {{
+                isSubmitting ? t('onboarding.actions.completing') : t('onboarding.actions.complete')
+              }}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   </ScrollArea>
 </template>
+
+<style scoped>
+.onboarding-scroll :deep([data-slot='scroll-area-viewport'] > *) {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 2rem;
+}
+
+.onboarding-shell {
+  transform: translateY(-20px);
+}
+
+.onboarding-card {
+  height: min(28rem, calc(100dvh - 7rem));
+}
+
+/* 步骤切换：前进方向 — 旧内容向左滑出，新内容从右滑入 */
+.ob-step-forward-enter-active,
+.ob-step-forward-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.ob-step-forward-enter-from {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.ob-step-forward-leave-to {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+/* 步骤切换：后退方向 — 旧内容向右滑出，新内容从左滑入 */
+.ob-step-backward-enter-active,
+.ob-step-backward-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.ob-step-backward-enter-from {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.ob-step-backward-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+</style>

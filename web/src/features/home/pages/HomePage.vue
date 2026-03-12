@@ -143,7 +143,9 @@ onUnmounted(() => {
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
 
         <!-- Subtle Inner Border for Premium Feel -->
-        <div class="pointer-events-none absolute inset-[1px] z-10 border border-foreground/5"></div>
+        <div
+          class="pointer-events-none absolute inset-[1px] z-10 rounded-sm border border-foreground/5"
+        ></div>
 
         <div class="relative z-20 flex min-w-[240px] flex-col p-6">
           <!-- Brand Header -->
@@ -233,7 +235,9 @@ onUnmounted(() => {
         <div class="surface-middle pointer-events-none absolute inset-0 z-0 opacity-90"></div>
 
         <!-- Subtle Inner Border -->
-        <div class="pointer-events-none absolute inset-[1px] z-10 border border-foreground/5"></div>
+        <div
+          class="pointer-events-none absolute inset-[1px] z-10 rounded-sm border border-foreground/5"
+        ></div>
 
         <!-- Hover Overlay -->
         <div
