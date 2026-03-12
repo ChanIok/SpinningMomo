@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Separator } from '@/components/ui/separator'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
+import { copyToClipboard } from '@/lib/utils'
 import type { Asset } from '../types'
 
 interface AssetDetailsContentProps {
@@ -8,9 +11,10 @@ interface AssetDetailsContentProps {
   thumbnailUrl: string
 }
 
-defineProps<AssetDetailsContentProps>()
+const props = defineProps<AssetDetailsContentProps>()
 
 const { t } = useI18n()
+const { toast } = useToast()
 
 function formatFileSize(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB']
@@ -35,42 +39,59 @@ function getAssetTypeLabel(type: Asset['type']): string {
       return t('gallery.details.assetType.unknown')
   }
 }
+
+async function handleCopyFileName() {
+  const success = await copyToClipboard(props.asset.name)
+  if (success) {
+    toast.success(t('gallery.details.asset.copyFileNameSuccess'))
+  } else {
+    toast.error(t('gallery.details.asset.copyFileNameFailed'))
+  }
+}
 </script>
 
 <template>
-  <!-- 资产缩略图 -->
-  <div>
-    <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.asset.preview') }}</h4>
+  <div class="space-y-3">
     <div class="flex justify-center">
-      <img :src="thumbnailUrl" :alt="asset.name" class="max-w-full rounded shadow-md" />
+      <img
+        :src="thumbnailUrl"
+        :alt="asset.name"
+        class="max-h-[180px] max-w-full rounded object-contain shadow-md"
+      />
     </div>
+    <slot name="after-preview" />
   </div>
 
   <Separator />
 
-  <!-- 基本信息 -->
+  <slot name="before-info" />
+
   <div>
     <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.asset.basicInfo') }}</h4>
     <div class="space-y-2 text-xs">
       <div class="flex justify-between gap-2">
         <span class="text-muted-foreground">{{ t('gallery.details.asset.fileName') }}</span>
-        <span class="max-w-32 truncate font-mono" :title="asset.name">
-          {{ asset.name }}
-        </span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                type="button"
+                class="max-w-32 cursor-pointer truncate text-right font-mono transition-colors hover:text-foreground/80 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                @click="handleCopyFileName"
+              >
+                {{ asset.name }}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p class="max-w-80 font-mono text-xs break-all">{{ asset.name }}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       <div class="flex justify-between gap-2">
         <span class="text-muted-foreground">{{ t('gallery.details.asset.type') }}</span>
         <span class="rounded bg-secondary px-2 py-0.5">{{ getAssetTypeLabel(asset.type) }}</span>
       </div>
-    </div>
-  </div>
-
-  <Separator />
-
-  <!-- 尺寸信息 -->
-  <div>
-    <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.asset.sizeInfo') }}</h4>
-    <div class="space-y-2 text-xs">
       <div v-if="asset.width && asset.height" class="flex justify-between gap-2">
         <span class="text-muted-foreground">{{ t('gallery.details.asset.resolution') }}</span>
         <span>{{ asset.width }} × {{ asset.height }}</span>
@@ -82,15 +103,5 @@ function getAssetTypeLabel(type: Asset['type']): string {
     </div>
   </div>
 
-  <slot name="after-size" />
-
-  <Separator />
-
-  <!-- 文件路径 -->
-  <div>
-    <h4 class="mb-2 text-sm font-medium">{{ t('gallery.details.asset.storagePath') }}</h4>
-    <div class="text-xs">
-      <p class="rounded bg-muted/50 p-2 font-mono break-all">{{ asset.path }}</p>
-    </div>
-  </div>
+  <slot name="after-info" />
 </template>

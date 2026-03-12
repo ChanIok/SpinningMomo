@@ -296,3 +296,11 @@
     -moz-osx-font-smoothing: grayscale;
   }
 }
+
+@layer utilities {
+  .font-tnum {
+    font-feature-settings:
+      'tnum' 1,
+      'lnum' 1;
+  }
+}

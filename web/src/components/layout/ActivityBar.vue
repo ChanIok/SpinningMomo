@@ -41,7 +41,7 @@ const menuItems = computed(() => {
   if (import.meta.env.PROD) {
     return baseMenuItems.filter((item) => {
       if ('key' in item) {
-        return item.key !== 'gallery'
+        return item.key !== 'map'
       }
       return true
     })

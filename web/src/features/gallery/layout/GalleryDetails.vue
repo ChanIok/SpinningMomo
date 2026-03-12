@@ -105,8 +105,18 @@ const hasInfinityNikkiDetails = computed(() => {
   const params = infinityNikkiPhotoParams.value
   if (!params) return false
 
-  return Object.values(params).some(
-    (value) => value !== undefined && value !== null && value !== ''
+  return (
+    formatGameTime(params) !== null ||
+    Boolean(params.cameraParams) ||
+    formatNumber(params.cameraFocalLength) !== null ||
+    params.apertureSection !== undefined ||
+    formatMetadataText(params.filterId) !== null ||
+    formatPercentage(params.filterStrength) !== null ||
+    formatPercentage(params.vignetteIntensity) !== null ||
+    formatMetadataText(params.lightId) !== null ||
+    formatPercentage(params.lightStrength) !== null ||
+    params.nikkiHidden !== undefined ||
+    formatPoseId(params.poseId) !== null
   )
 })
 
@@ -211,22 +221,6 @@ function formatNumber(value: number | undefined, digits = 2): string | null {
     .replace(/\.?0+$/, '')
 }
 
-function formatNikkiLocation(params: InfinityNikkiPhotoParams | null): string | null {
-  if (!params) return null
-  if (
-    params.nikkiLocX === undefined ||
-    params.nikkiLocY === undefined ||
-    params.nikkiLocZ === undefined
-  ) {
-    return null
-  }
-
-  const x = formatNumber(params.nikkiLocX, 3)
-  const y = formatNumber(params.nikkiLocY, 3)
-  const z = formatNumber(params.nikkiLocZ, 3)
-  return x && y && z ? `(${x}, ${y}, ${z})` : null
-}
-
 function copyWithExecCommand(text: string): boolean {
   if (typeof document === 'undefined') {
     return false
@@ -276,8 +270,31 @@ async function handleCopyCameraParams(text: string) {
   toast.error(t('gallery.details.infinityNikki.copyCameraParamsFailed'))
 }
 
-function formatPercentage(weight: number): string {
-  return `${formatNumber(weight * 100, 1) ?? '0'}%`
+function formatPercentage(value: number | undefined): string | null {
+  if (value === undefined) return null
+  return `${formatNumber(value * 100, 1) ?? '0'}%`
+}
+
+function formatFocalLength(value: number | undefined): string | null {
+  const formatted = formatNumber(value)
+  return formatted ? `${formatted} mm` : null
+}
+
+function formatApertureSection(value: number | undefined): string | null {
+  if (value === undefined) return null
+  return `${value} ${t('gallery.details.infinityNikki.apertureSectionUnit')}`
+}
+
+function formatMetadataText(value: string | undefined): string | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  if (!trimmed || trimmed.toLowerCase() === 'none') return null
+  return trimmed
+}
+
+function formatPoseId(value: number | undefined): string | null {
+  if (value === undefined || value === 0) return null
+  return String(value)
 }
 
 function getColorHex(color: AssetMainColor): string {
@@ -376,20 +393,16 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
       <!-- 资产详情 -->
       <div v-else-if="detailsFocus.type === 'asset' && activeAsset" class="space-y-4">
-        <h3 class="font-medium">{{ t('gallery.details.title') }}</h3>
         <AssetDetailsContent :asset="activeAsset" :thumbnail-url="thumbnailUrl">
-          <template #after-size>
-            <Separator />
-
-            <div v-if="hasMainColors" class="space-y-3">
-              <h4 class="text-sm font-medium">{{ t('gallery.details.colors.title') }}</h4>
+          <template #after-preview>
+            <div v-if="hasMainColors">
               <TooltipProvider>
-                <div class="flex gap-2 overflow-x-auto pb-1">
+                <div class="flex flex-wrap justify-center gap-2">
                   <Tooltip v-for="(color, index) in assetMainColors" :key="`${index}-${color.r}`">
                     <TooltipTrigger as-child>
                       <button
                         type="button"
-                        class="h-7 w-7 shrink-0 rounded-md border border-border/80 shadow-sm transition-transform hover:scale-[1.04]"
+                        class="h-5 w-5 shrink-0 rounded-sm border border-border/80 shadow-sm transition-transform hover:scale-[1.04]"
                         :style="{ backgroundColor: getColorHex(color) }"
                         @click="handleCopyColorHex(color)"
                       />
@@ -404,154 +417,12 @@ async function handleCopyColorHex(color: AssetMainColor) {
                 </div>
               </TooltipProvider>
             </div>
+          </template>
 
-            <Separator v-if="hasMainColors && hasInfinityNikkiDetails" />
-
-            <template v-if="infinityNikkiPhotoParams">
-              <div v-if="hasInfinityNikkiDetails" class="space-y-3">
-                <h4 class="text-sm font-medium">{{ t('gallery.details.infinityNikki.title') }}</h4>
-                <div class="space-y-2 text-xs">
-                  <div
-                    v-if="formatGameTime(infinityNikkiPhotoParams)"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.gameTime')
-                    }}</span>
-                    <span>{{ formatGameTime(infinityNikkiPhotoParams) }}</span>
-                  </div>
-
-                  <div v-if="infinityNikkiPhotoParams.cameraParams" class="space-y-1.5">
-                    <div class="flex items-center justify-between gap-2">
-                      <span class="text-muted-foreground">{{
-                        t('gallery.details.infinityNikki.cameraParams')
-                      }}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        class="h-6 px-2 text-xs"
-                        @click="handleCopyCameraParams(infinityNikkiPhotoParams.cameraParams)"
-                      >
-                        {{ t('gallery.details.infinityNikki.copyCameraParams') }}
-                      </Button>
-                    </div>
-                    <p
-                      class="truncate rounded bg-muted/50 p-2 font-mono text-[11px]"
-                      :title="infinityNikkiPhotoParams.cameraParams"
-                    >
-                      {{ infinityNikkiPhotoParams.cameraParams }}
-                    </p>
-                  </div>
-
-                  <div
-                    v-if="formatNumber(infinityNikkiPhotoParams.cameraFocalLength)"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.cameraFocalLength')
-                    }}</span>
-                    <span>{{ formatNumber(infinityNikkiPhotoParams.cameraFocalLength) }}</span>
-                  </div>
-                  <div
-                    v-if="infinityNikkiPhotoParams.apertureSection !== undefined"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.apertureSection')
-                    }}</span>
-                    <span>{{ infinityNikkiPhotoParams.apertureSection }}</span>
-                  </div>
-                  <div v-if="infinityNikkiPhotoParams.filterId" class="flex justify-between gap-2">
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.filterId')
-                    }}</span>
-                    <span
-                      class="max-w-32 truncate font-mono"
-                      :title="infinityNikkiPhotoParams.filterId"
-                    >
-                      {{ infinityNikkiPhotoParams.filterId }}
-                    </span>
-                  </div>
-                  <div
-                    v-if="formatNumber(infinityNikkiPhotoParams.filterStrength)"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.filterStrength')
-                    }}</span>
-                    <span>{{ formatNumber(infinityNikkiPhotoParams.filterStrength) }}</span>
-                  </div>
-                  <div
-                    v-if="formatNumber(infinityNikkiPhotoParams.vignetteIntensity)"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.vignetteIntensity')
-                    }}</span>
-                    <span>{{ formatNumber(infinityNikkiPhotoParams.vignetteIntensity) }}</span>
-                  </div>
-                  <div v-if="infinityNikkiPhotoParams.lightId" class="flex justify-between gap-2">
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.lightId')
-                    }}</span>
-                    <span
-                      class="max-w-32 truncate font-mono"
-                      :title="infinityNikkiPhotoParams.lightId"
-                    >
-                      {{ infinityNikkiPhotoParams.lightId }}
-                    </span>
-                  </div>
-                  <div
-                    v-if="formatNumber(infinityNikkiPhotoParams.lightStrength)"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.lightStrength')
-                    }}</span>
-                    <span>{{ formatNumber(infinityNikkiPhotoParams.lightStrength) }}</span>
-                  </div>
-                  <div
-                    v-if="formatNikkiLocation(infinityNikkiPhotoParams)"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.nikkiLocation')
-                    }}</span>
-                    <span class="text-right">{{
-                      formatNikkiLocation(infinityNikkiPhotoParams)
-                    }}</span>
-                  </div>
-                  <div
-                    v-if="infinityNikkiPhotoParams.nikkiHidden !== undefined"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.nikkiHidden')
-                    }}</span>
-                    <span>{{
-                      infinityNikkiPhotoParams.nikkiHidden ? t('common.yes') : t('common.no')
-                    }}</span>
-                  </div>
-                  <div
-                    v-if="infinityNikkiPhotoParams.poseId !== undefined"
-                    class="flex justify-between gap-2"
-                  >
-                    <span class="text-muted-foreground">{{
-                      t('gallery.details.infinityNikki.poseId')
-                    }}</span>
-                    <span>{{ infinityNikkiPhotoParams.poseId }}</span>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <Separator v-if="hasMainColors || hasInfinityNikkiDetails" />
-
-            <!-- 标签信息 -->
+          <template #before-info>
             <div>
               <div class="mb-2 flex items-center justify-between">
                 <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
-                <!-- 添加标签按钮 -->
                 <Popover v-model:open="showTagSelector">
                   <PopoverTrigger as-child>
                     <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
@@ -582,7 +453,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
                 </Popover>
               </div>
 
-              <!-- 标签列表 -->
               <div v-if="assetTags.length > 0" class="flex flex-wrap gap-1.5">
                 <span
                   v-for="tag in assetTags"
@@ -615,6 +485,142 @@ async function handleCopyColorHex(color: AssetMainColor) {
                 {{ t('gallery.details.tags.empty') }}
               </div>
             </div>
+          </template>
+
+          <template #after-info>
+            <Separator />
+
+            <template v-if="infinityNikkiPhotoParams && hasInfinityNikkiDetails">
+              <div class="space-y-3">
+                <h4 class="text-sm font-medium">{{ t('gallery.details.infinityNikki.title') }}</h4>
+                <div class="space-y-2 text-xs">
+                  <div
+                    v-if="formatGameTime(infinityNikkiPhotoParams)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.gameTime')
+                    }}</span>
+                    <span>{{ formatGameTime(infinityNikkiPhotoParams) }}</span>
+                  </div>
+
+                  <div
+                    v-if="infinityNikkiPhotoParams.cameraParams"
+                    class="flex items-center justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.cameraParams')
+                    }}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      class="h-6 px-2 text-xs"
+                      @click="handleCopyCameraParams(infinityNikkiPhotoParams.cameraParams)"
+                    >
+                      {{ t('gallery.details.infinityNikki.copyCameraParams') }}
+                    </Button>
+                  </div>
+
+                  <div
+                    v-if="formatFocalLength(infinityNikkiPhotoParams.cameraFocalLength)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.cameraFocalLength')
+                    }}</span>
+                    <span>{{ formatFocalLength(infinityNikkiPhotoParams.cameraFocalLength) }}</span>
+                  </div>
+                  <div
+                    v-if="formatApertureSection(infinityNikkiPhotoParams.apertureSection)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.apertureSection')
+                    }}</span>
+                    <span>{{
+                      formatApertureSection(infinityNikkiPhotoParams.apertureSection)
+                    }}</span>
+                  </div>
+                  <div
+                    v-if="formatMetadataText(infinityNikkiPhotoParams.filterId)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.filterId')
+                    }}</span>
+                    <span
+                      class="max-w-32 truncate font-mono"
+                      :title="formatMetadataText(infinityNikkiPhotoParams.filterId) ?? undefined"
+                    >
+                      {{ formatMetadataText(infinityNikkiPhotoParams.filterId) }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="formatPercentage(infinityNikkiPhotoParams.filterStrength)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.filterStrength')
+                    }}</span>
+                    <span>{{ formatPercentage(infinityNikkiPhotoParams.filterStrength) }}</span>
+                  </div>
+                  <div
+                    v-if="formatPercentage(infinityNikkiPhotoParams.vignetteIntensity)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.vignetteIntensity')
+                    }}</span>
+                    <span>{{ formatPercentage(infinityNikkiPhotoParams.vignetteIntensity) }}</span>
+                  </div>
+                  <div
+                    v-if="formatMetadataText(infinityNikkiPhotoParams.lightId)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.lightId')
+                    }}</span>
+                    <span
+                      class="max-w-32 truncate font-mono"
+                      :title="formatMetadataText(infinityNikkiPhotoParams.lightId) ?? undefined"
+                    >
+                      {{ formatMetadataText(infinityNikkiPhotoParams.lightId) }}
+                    </span>
+                  </div>
+                  <div
+                    v-if="formatPercentage(infinityNikkiPhotoParams.lightStrength)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.lightStrength')
+                    }}</span>
+                    <span>{{ formatPercentage(infinityNikkiPhotoParams.lightStrength) }}</span>
+                  </div>
+                  <div
+                    v-if="infinityNikkiPhotoParams.nikkiHidden !== undefined"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.nikkiHidden')
+                    }}</span>
+                    <span>{{
+                      infinityNikkiPhotoParams.nikkiHidden ? t('common.yes') : t('common.no')
+                    }}</span>
+                  </div>
+                  <div
+                    v-if="formatPoseId(infinityNikkiPhotoParams.poseId)"
+                    class="flex justify-between gap-2"
+                  >
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.poseId')
+                    }}</span>
+                    <span>{{ formatPoseId(infinityNikkiPhotoParams.poseId) }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <Separator v-if="hasInfinityNikkiDetails" />
           </template>
         </AssetDetailsContent>
       </div>

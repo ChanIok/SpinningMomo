@@ -4,6 +4,7 @@ import { call } from '@/core/rpc'
 import { getCurrentEnvironment } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
+import { copyToClipboard } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
@@ -149,31 +150,6 @@ const formatCapability = (value: boolean | undefined): string => {
   return '-'
 }
 
-const copyWithExecCommand = (text: string): boolean => {
-  if (typeof document === 'undefined') {
-    return false
-  }
-
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.style.position = 'fixed'
-  textarea.style.opacity = '0'
-  textarea.style.pointerEvents = 'none'
-  document.body.appendChild(textarea)
-  textarea.focus()
-  textarea.select()
-
-  let success = false
-  try {
-    success = document.execCommand('copy')
-  } catch {
-    success = false
-  }
-
-  document.body.removeChild(textarea)
-  return success
-}
-
 const markCopied = () => {
   copied.value = true
   if (copiedTimer) {
@@ -260,22 +236,7 @@ const handleUpdateAction = async () => {
 }
 
 const copyDiagnostics = async () => {
-  const text = diagnosticsText.value
-  let success = false
-
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
-      success = true
-    } catch {
-      success = false
-    }
-  }
-
-  if (!success) {
-    success = copyWithExecCommand(text)
-  }
-
+  const success = await copyToClipboard(diagnosticsText.value)
   if (success) {
     markCopied()
   }

@@ -174,7 +174,7 @@ function handleContextMenuCloseAutoFocus(event: Event) {
             </svg>
 
             <!-- 文件夹名称 -->
-            <span class="truncate text-sm">
+            <span class="font-tnum truncate text-sm">
               {{ folder.displayName || folder.name }}
             </span>
           </div>
@@ -184,10 +184,7 @@ function handleContextMenuCloseAutoFocus(event: Event) {
             class="flex flex-shrink-0 items-center gap-2"
             v-if="folder.children && folder.children.length > 0"
           >
-            <span
-              class="-mr-1.5 flex-shrink-0 rounded p-1.5 hover:bg-accent/80"
-              @click.stop="toggleExpand"
-            >
+            <span class="-mr-0.5 flex-shrink-0 rounded p-1.5" @click.stop="toggleExpand">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="12"

@@ -30,6 +30,29 @@ import type {
 } from './types'
 import { getStaticUrl } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/plugins/infinity_nikki'
+import { useI18n } from '@/core/i18n'
+
+/**
+ * 转换默认输出文件夹树结构
+ * 将 SpinningMomo 根文件夹的显示名称设置为应用名称
+ * @param tree 原始文件夹树
+ * @returns 转换后的文件夹树
+ */
+export function transformDefaultOutputFolderTree(tree: FolderTreeNode[]): FolderTreeNode[] {
+  const { t } = useI18n()
+
+  // 遍历并转换所有根文件夹
+  return tree.map((node) => {
+    // 检查是否是 SpinningMomo 根文件夹
+    if (node.name === 'SpinningMomo' && !node.displayName) {
+      return {
+        ...node,
+        displayName: t('app.name'),
+      }
+    }
+    return node
+  })
+}
 
 /**
  * 获取文件夹树结构
@@ -40,8 +63,11 @@ export async function getFolderTree(): Promise<FolderTreeNode[]> {
 
     console.log('📁 获取文件夹树成功:', result.length, '个根文件夹')
 
+    // 应用默认输出文件夹转换
+    let transformedResult = transformDefaultOutputFolderTree(result)
+
     // 应用 InfinityNikki 插件转换
-    const transformedResult = transformInfinityNikkiTree(result)
+    transformedResult = transformInfinityNikkiTree(transformedResult)
 
     return transformedResult
   } catch (error) {

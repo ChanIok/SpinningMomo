@@ -1,27 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGalleryLayout } from '@/features/gallery/composables'
-import GalleryScanDialog from '@/features/gallery/components/GalleryScanDialog.vue'
-import { useSettingsStore } from '@/features/settings/store'
 import { useI18n } from '@/composables/useI18n'
-import { useToast } from '@/composables/useToast'
 import { call } from '@/core/rpc'
 import { useTaskStore } from '@/core/tasks/store'
 import { isWebView } from '@/core/env'
-import { createInfinityNikkiAlbumScanParams } from '@/plugins/infinity_nikki'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
   CircleAlert,
   CircleCheck,
   ChevronDown,
-  Images,
   ListTodo,
   Loader2,
   Minus,
@@ -35,24 +29,9 @@ import {
 
 const route = useRoute()
 const { t } = useI18n()
-const { toast } = useToast()
-const settingsStore = useSettingsStore()
 const taskStore = useTaskStore()
 const showWindowControls = isWebView()
 const isGalleryPage = computed(() => route.name === 'gallery')
-const showInfinityNikkiPluginMenu = computed(() => {
-  return isGalleryPage.value && settingsStore.appSettings.plugins.infinityNikki.enable
-})
-const infinityNikkiGameDir = computed(() =>
-  settingsStore.appSettings.plugins.infinityNikki.gameDir.trim()
-)
-const infinityNikkiScanPreset = computed(() => {
-  if (!infinityNikkiGameDir.value) {
-    return undefined
-  }
-  return createInfinityNikkiAlbumScanParams(infinityNikkiGameDir.value)
-})
-const showInfinityNikkiImportDialog = ref(false)
 const recentTasks = computed(() => taskStore.tasks.slice(0, 6))
 const activeTaskCount = computed(() => taskStore.activeTasks.length)
 const hasTaskRecords = computed(() => taskStore.tasks.length > 0)
@@ -89,18 +68,6 @@ const handleToggleSidebar = () => {
 
 const handleToggleDetails = () => {
   toggleDetails()
-}
-
-const handleOpenInfinityNikkiImportDialog = () => {
-  const gameDir = infinityNikkiGameDir.value
-  if (!gameDir) {
-    toast.error(t('app.header.gallery.plugin.infinityNikki.gameDirMissingTitle'), {
-      description: t('app.header.gallery.plugin.infinityNikki.gameDirMissingDescription'),
-    })
-    return
-  }
-
-  showInfinityNikkiImportDialog.value = true
 }
 
 function resolveTaskTypeLabel(type: string): string {
@@ -155,25 +122,6 @@ function resolveTaskPercent(task: {
 
 <template>
   <header class="flex h-10 items-center justify-between gap-2 bg-transparent pr-1 pl-4">
-    <div v-if="showInfinityNikkiPluginMenu" class="flex items-center">
-      <DropdownMenu>
-        <DropdownMenuTrigger as-child>
-          <Button variant="ghost" size="sm" class="h-8 hover:bg-black/10 dark:hover:bg-white/10">
-            <span class="px-1 text-xs">
-              {{ t('app.header.gallery.infinityNikki.menuTitle') }}
-            </span>
-            <ChevronDown class="h-3.5 w-3.5 opacity-70" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" class="w-52">
-          <DropdownMenuItem @click="handleOpenInfinityNikkiImportDialog">
-            <Images class="mr-2 h-4 w-4" />
-            <span>{{ t('app.header.gallery.plugin.infinityNikki.importAlbum') }}</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-
     <!-- 可拖动区域 -->
     <div class="drag-region h-full flex-1" />
 
@@ -315,11 +263,6 @@ function resolveTaskPercent(task: {
       </Button>
     </div>
   </header>
-
-  <GalleryScanDialog
-    v-model:open="showInfinityNikkiImportDialog"
-    :preset="infinityNikkiScanPreset"
-  />
 </template>
 
 <style scoped>
