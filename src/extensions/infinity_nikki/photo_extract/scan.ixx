@@ -1,10 +1,10 @@
 module;
 
-export module Plugins.InfinityNikki.PhotoExtract.Scan;
+export module Extensions.InfinityNikki.PhotoExtract.Scan;
 
 import std;
 
-export namespace Plugins::InfinityNikki::PhotoExtract::Scan {
+export namespace Extensions::InfinityNikki::PhotoExtract::Scan {
 
 struct CandidateAssetRow {
   std::int64_t id;
@@ -20,4 +20,4 @@ struct PreparedPhotoExtractEntry {
 auto prepare_photo_extract_entry(const CandidateAssetRow& candidate)
     -> std::expected<PreparedPhotoExtractEntry, std::string>;
 
-}  // namespace Plugins::InfinityNikki::PhotoExtract::Scan
+}  // namespace Extensions::InfinityNikki::PhotoExtract::Scan

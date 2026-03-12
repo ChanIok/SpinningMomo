@@ -29,7 +29,7 @@ import Features.ReplayBuffer.UseCase;
 import Features.Update;
 import Features.VirtualGamepad;
 import Features.Letterbox.State;
-import Plugins.InfinityNikki.PhotoService;
+import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.WebViewWindow;
@@ -140,7 +140,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     }
 
     // Gallery 初始化完成后，先注册无限暖暖目录监听，统一在末尾启动
-    Plugins::InfinityNikki::PhotoService::register_from_settings(state);
+    Extensions::InfinityNikki::PhotoService::register_from_settings(state);
 
     // 初始化虚拟手柄（检测 ViGEm 可用性，不自动启用）
     if (auto vg_result = Features::VirtualGamepad::initialize(state); !vg_result) {

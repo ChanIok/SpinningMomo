@@ -1,14 +1,14 @@
 module;
 
-module Plugins.InfinityNikki.ScreenshotHardlinks;
+module Extensions.InfinityNikki.ScreenshotHardlinks;
 
 import std;
 import Core.State;
 import Features.Settings.State;
-import Plugins.InfinityNikki.Types;
+import Extensions.InfinityNikki.Types;
 import Utils.String;
 
-namespace Plugins::InfinityNikki::ScreenshotHardlinks {
+namespace Extensions::InfinityNikki::ScreenshotHardlinks {
 
 // 单次同步最多收集的错误条数，避免在大量文件出错时撑爆内存
 constexpr std::size_t kMaxErrorMessages = 50;
@@ -154,7 +154,7 @@ auto resolve_managed_paths(Core::State::AppState& app_state)
     return std::unexpected("Settings state is not initialized");
   }
 
-  const auto& game_dir_utf8 = app_state.settings->raw.plugins.infinity_nikki.game_dir;
+  const auto& game_dir_utf8 = app_state.settings->raw.extensions.infinity_nikki.game_dir;
   if (game_dir_utf8.empty()) {
     return std::unexpected("Infinity Nikki game directory is empty");
   }
@@ -591,4 +591,4 @@ auto resolve_watch_directory(Core::State::AppState& app_state)
   return paths_result->gameplay_photos_dir;
 }
 
-}  // namespace Plugins::InfinityNikki::ScreenshotHardlinks
+}  // namespace Extensions::InfinityNikki::ScreenshotHardlinks

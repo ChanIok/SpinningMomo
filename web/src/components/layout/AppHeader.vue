@@ -74,13 +74,13 @@ function resolveTaskTypeLabel(type: string): string {
   if (type === 'gallery.scanDirectory') {
     return t('app.header.tasks.type.galleryScan')
   }
-  if (type === 'plugins.infinityNikki.initialScan') {
+  if (type === 'extensions.infinityNikki.initialScan') {
     return t('app.header.tasks.type.infinityNikkiInitialScan')
   }
-  if (type === 'plugins.infinityNikki.extractPhotoParams') {
+  if (type === 'extensions.infinityNikki.extractPhotoParams') {
     return t('app.header.tasks.type.infinityNikkiExtractPhotoParams')
   }
-  if (type === 'plugins.infinityNikki.initializeScreenshotHardlinks') {
+  if (type === 'extensions.infinityNikki.initializeScreenshotHardlinks') {
     return t('app.header.tasks.type.infinityNikkiInitScreenshotHardlinks')
   }
   return type

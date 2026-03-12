@@ -29,9 +29,9 @@ const galleryStore = useGalleryStore()
 const settingsStore = useSettingsStore()
 const isBelowLg = useMediaQuery('(max-width: 1023px)')
 
-// 引导面板显示条件（无限暖暖插件已启用、配置了游戏目录、且尚未看过引导）
+// 引导面板显示条件（无限暖暖拓展已启用、配置了游戏目录、且尚未看过引导）
 const showInfinityNikkiGuide = computed(() => {
-  const config = settingsStore.appSettings.plugins.infinityNikki
+  const config = settingsStore.appSettings.extensions.infinityNikki
   return config.enable && Boolean(config.gameDir.trim()) && !config.galleryGuideSeen
 })
 

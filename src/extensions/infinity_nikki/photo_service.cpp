@@ -1,6 +1,6 @@
 module;
 
-module Plugins.InfinityNikki.PhotoService;
+module Extensions.InfinityNikki.PhotoService;
 
 import std;
 import Core.State;
@@ -12,13 +12,13 @@ import Features.Gallery.Ignore.Repository;
 import Features.Gallery.Watcher;
 import Features.Gallery.Types;
 import Features.Settings.State;
-import Plugins.InfinityNikki.TaskService;
-import Plugins.InfinityNikki.ScreenshotHardlinks;
-import Plugins.InfinityNikki.Types;
+import Extensions.InfinityNikki.TaskService;
+import Extensions.InfinityNikki.ScreenshotHardlinks;
+import Extensions.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.Path;
 
-namespace Plugins::InfinityNikki::PhotoService {
+namespace Extensions::InfinityNikki::PhotoService {
 
 struct ServiceState {
   std::mutex mutex;
@@ -84,15 +84,15 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
     return;
   }
 
-  const auto& config = app_state.settings->raw.plugins.infinity_nikki;
+  const auto& config = app_state.settings->raw.extensions.infinity_nikki;
 
   if (config.manage_screenshot_hardlinks) {
     if (Core::Tasks::has_active_task_of_type(
-            app_state, "plugins.infinityNikki.initializeScreenshotHardlinks")) {
+            app_state, "extensions.infinityNikki.initializeScreenshotHardlinks")) {
       Logger().debug("Skip InfinityNikki screenshot hardlink sync: initialization task is active");
     } else {
       bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
-        auto sync_result = Plugins::InfinityNikki::ScreenshotHardlinks::sync(app_state);
+        auto sync_result = Extensions::InfinityNikki::ScreenshotHardlinks::sync(app_state);
         if (!sync_result) {
           Logger().warn("InfinityNikki screenshot hardlinks sync failed: {}", sync_result.error());
         } else {
@@ -110,7 +110,7 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
   }
 
   if (config.allow_online_photo_metadata_extract && result.new_items > 0) {
-    auto task_result = Plugins::InfinityNikki::TaskService::start_extract_photo_params_task(
+    auto task_result = Extensions::InfinityNikki::TaskService::start_extract_photo_params_task(
         app_state, InfinityNikkiExtractPhotoParamsRequest{.only_missing = true});
     if (!task_result) {
       Logger().warn("InfinityNikki auto photo metadata extract task not started: {}",
@@ -153,7 +153,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
     return;
   }
 
-  const auto& config = app_state.settings->raw.plugins.infinity_nikki;
+  const auto& config = app_state.settings->raw.extensions.infinity_nikki;
   if (!config.enable || config.game_dir.empty()) {
     stop_current_watcher();
     return;
@@ -165,7 +165,8 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
     return;
   }
 
-  auto dir_result = Plugins::InfinityNikki::ScreenshotHardlinks::resolve_watch_directory(app_state);
+  auto dir_result =
+      Extensions::InfinityNikki::ScreenshotHardlinks::resolve_watch_directory(app_state);
   if (!dir_result) {
     Logger().warn("Skip InfinityNikki gallery watcher: {}", dir_result.error());
     stop_current_watcher();
@@ -208,7 +209,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
 
   if (start_immediately) {
     if (requires_initial_scan) {
-      auto task_result = Plugins::InfinityNikki::TaskService::start_initial_scan_task(
+      auto task_result = Extensions::InfinityNikki::TaskService::start_initial_scan_task(
           app_state, make_initial_scan_options(new_watch_path),
           [&app_state](const Features::Gallery::Types::ScanResult& result) {
             on_gallery_scan_complete(app_state, result);
@@ -258,4 +259,4 @@ auto shutdown(Core::State::AppState& app_state) -> void {
   }
 }
 
-}  // namespace Plugins::InfinityNikki::PhotoService
+}  // namespace Extensions::InfinityNikki::PhotoService

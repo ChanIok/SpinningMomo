@@ -2,7 +2,7 @@ module;
 
 #include <rfl/json.hpp>
 
-module Plugins.InfinityNikki.PhotoExtract.Infra;
+module Extensions.InfinityNikki.PhotoExtract.Infra;
 
 import std;
 import Core.Database;
@@ -10,10 +10,10 @@ import Core.Database.Types;
 import Core.State;
 import Core.HttpClient;
 import Core.HttpClient.Types;
-import Plugins.InfinityNikki.PhotoExtract.Scan;
+import Extensions.InfinityNikki.PhotoExtract.Scan;
 import <asio.hpp>;
 
-namespace Plugins::InfinityNikki::PhotoExtract::Infra {
+namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 
 struct ExtractApiRequestBody {
   std::string uid;
@@ -341,4 +341,4 @@ auto upsert_photo_params_record(Core::State::AppState& app_state, std::int64_t a
   return transaction_result;
 }
 
-}  // namespace Plugins::InfinityNikki::PhotoExtract::Infra
+}  // namespace Extensions::InfinityNikki::PhotoExtract::Infra

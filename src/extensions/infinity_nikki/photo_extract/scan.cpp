@@ -1,11 +1,11 @@
 module;
 
-module Plugins.InfinityNikki.PhotoExtract.Scan;
+module Extensions.InfinityNikki.PhotoExtract.Scan;
 
 import std;
 import Utils.String;
 
-namespace Plugins::InfinityNikki::PhotoExtract::Scan {
+namespace Extensions::InfinityNikki::PhotoExtract::Scan {
 
 auto to_filesystem_path(const std::string& utf8_path) -> std::filesystem::path {
   return std::filesystem::path(Utils::String::FromUtf8(utf8_path));
@@ -110,4 +110,4 @@ auto prepare_photo_extract_entry(const CandidateAssetRow& candidate)
   };
 }
 
-}  // namespace Plugins::InfinityNikki::PhotoExtract::Scan
+}  // namespace Extensions::InfinityNikki::PhotoExtract::Scan

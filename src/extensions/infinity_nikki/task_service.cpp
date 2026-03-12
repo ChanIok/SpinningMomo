@@ -2,7 +2,7 @@ module;
 
 #include <asio.hpp>
 
-module Plugins.InfinityNikki.TaskService;
+module Extensions.InfinityNikki.TaskService;
 
 import std;
 import Core.Async;
@@ -13,17 +13,17 @@ import Features.Gallery;
 import Features.Gallery.Types;
 import Features.Settings;
 import Features.Settings.State;
-import Plugins.InfinityNikki.PhotoExtract;
-import Plugins.InfinityNikki.ScreenshotHardlinks;
-import Plugins.InfinityNikki.Types;
+import Extensions.InfinityNikki.PhotoExtract;
+import Extensions.InfinityNikki.ScreenshotHardlinks;
+import Extensions.InfinityNikki.Types;
 import Utils.Logger;
 
-namespace Plugins::InfinityNikki::TaskService {
+namespace Extensions::InfinityNikki::TaskService {
 
-constexpr auto kInitialScanTaskType = "plugins.infinityNikki.initialScan";
-constexpr auto kExtractPhotoParamsTaskType = "plugins.infinityNikki.extractPhotoParams";
+constexpr auto kInitialScanTaskType = "extensions.infinityNikki.initialScan";
+constexpr auto kExtractPhotoParamsTaskType = "extensions.infinityNikki.extractPhotoParams";
 constexpr auto kInitializeScreenshotHardlinksTaskType =
-    "plugins.infinityNikki.initializeScreenshotHardlinks";
+    "extensions.infinityNikki.initializeScreenshotHardlinks";
 constexpr auto kProgressEmitInterval = std::chrono::milliseconds(250);
 
 auto make_task_progress(const Features::Gallery::Types::ScanProgress& progress)
@@ -97,7 +97,7 @@ auto launch_initial_scan_task(
 
 auto launch_extract_photo_params_task(
     Core::State::AppState& app_state,
-    const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request,
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request,
     const std::string& task_id) -> void {
   if (!app_state.async) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
@@ -117,8 +117,9 @@ auto launch_extract_photo_params_task(
         Core::Tasks::mark_task_running(app_state, task_id);
 
         auto progress_callback =
-            [&app_state, &task_id](
-                const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsProgress& progress) {
+            [&app_state,
+             &task_id](const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsProgress&
+                           progress) {
               Core::Tasks::TaskProgress task_progress{
                   .stage = progress.stage,
                   .current = progress.current,
@@ -129,8 +130,9 @@ auto launch_extract_photo_params_task(
               Core::Tasks::update_task_progress(app_state, task_id, task_progress);
             };
 
-        auto extract_result = co_await Plugins::InfinityNikki::PhotoExtract::extract_photo_params(
-            app_state, request, progress_callback);
+        auto extract_result =
+            co_await Extensions::InfinityNikki::PhotoExtract::extract_photo_params(
+                app_state, request, progress_callback);
         if (!extract_result) {
           auto error_message =
               "Infinity Nikki photo params extract failed: " + extract_result.error();
@@ -184,7 +186,7 @@ auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_stat
         auto last_percent = -1;
         auto progress_callback =
             [&app_state, &task_id, &last_emit_at, &last_percent](
-                const Plugins::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksProgress&
+                const Extensions::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksProgress&
                     progress) {
               auto percent = static_cast<int>(std::floor(progress.percent.value_or(0.0)));
               auto now = std::chrono::steady_clock::now();
@@ -213,8 +215,8 @@ auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_stat
               Core::Tasks::update_task_progress(app_state, task_id, task_progress);
             };
 
-        auto initialize_result =
-            Plugins::InfinityNikki::ScreenshotHardlinks::initialize(app_state, progress_callback);
+        auto initialize_result = Extensions::InfinityNikki::ScreenshotHardlinks::initialize(
+            app_state, progress_callback);
         if (!initialize_result) {
           auto error_message =
               "Infinity Nikki screenshot hardlinks initialize failed: " + initialize_result.error();
@@ -238,9 +240,9 @@ auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_stat
             });
 
         if (app_state.settings &&
-            !app_state.settings->raw.plugins.infinity_nikki.manage_screenshot_hardlinks) {
+            !app_state.settings->raw.extensions.infinity_nikki.manage_screenshot_hardlinks) {
           auto next_settings = app_state.settings->raw;
-          next_settings.plugins.infinity_nikki.manage_screenshot_hardlinks = true;
+          next_settings.extensions.infinity_nikki.manage_screenshot_hardlinks = true;
           if (auto save_result = Features::Settings::update_settings(app_state, next_settings);
               !save_result) {
             Logger().warn("Failed to persist Infinity Nikki screenshot hardlink setting: {}",
@@ -272,7 +274,7 @@ auto start_initial_scan_task(
 
 auto start_extract_photo_params_task(
     Core::State::AppState& app_state,
-    const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::string, std::string> {
   if (Core::Tasks::has_active_task_of_type(app_state, kExtractPhotoParamsTaskType)) {
     return std::unexpected("Another Infinity Nikki extract task is already running");
@@ -304,4 +306,4 @@ auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state
   return task_id;
 }
 
-}  // namespace Plugins::InfinityNikki::TaskService
+}  // namespace Extensions::InfinityNikki::TaskService

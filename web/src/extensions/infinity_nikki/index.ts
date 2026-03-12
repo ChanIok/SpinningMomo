@@ -11,13 +11,13 @@ const INFINITY_NIKKI_ALBUM_IGNORE_RULES: InfinityNikkiAlbumIgnoreRuleTemplate[] 
     pattern: '^.*$',
     patternType: 'regex',
     ruleType: 'exclude',
-    descriptionKey: 'plugins.infinityNikki.scanRules.excludeAll',
+    descriptionKey: 'extensions.infinityNikki.scanRules.excludeAll',
   },
   {
     pattern: '^[0-9]+/NikkiPhotos_HighQuality(/.*)?$',
     patternType: 'regex',
     ruleType: 'include',
-    descriptionKey: 'plugins.infinityNikki.scanRules.includeHighQualityPhotos',
+    descriptionKey: 'extensions.infinityNikki.scanRules.includeHighQualityPhotos',
   },
 ]
 
@@ -51,7 +51,7 @@ export function createInfinityNikkiAlbumScanParams(gameDir: string): ScanAssetsP
 }
 
 export async function startExtractInfinityNikkiPhotoParams(onlyMissing = true): Promise<string> {
-  const result = await call<StartTaskResult>('plugins.infinityNikki.startExtractPhotoParams', {
+  const result = await call<StartTaskResult>('extensions.infinityNikki.startExtractPhotoParams', {
     onlyMissing,
   })
   return result.taskId
@@ -59,14 +59,14 @@ export async function startExtractInfinityNikkiPhotoParams(onlyMissing = true): 
 
 export async function startInitializeInfinityNikkiScreenshotHardlinks(): Promise<string> {
   const result = await call<StartTaskResult>(
-    'plugins.infinityNikki.startInitializeScreenshotHardlinks',
+    'extensions.infinityNikki.startInitializeScreenshotHardlinks',
     {}
   )
   return result.taskId
 }
 
 /**
- * InfinityNikki 游戏照片管理插件
+ * Infinity Nikki 游戏照片管理拓展
  *
  * 将深层文件夹结构简化为两层：
  * - 第一层：GamePlayPhotos（显示为大喵相册 / Momo's Album）
@@ -115,7 +115,7 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
 
   const newGamePlayPhotosNode: FolderTreeNode = {
     ...gamePlayPhotosNode,
-    displayName: t('plugins.infinityNikki.album.rootDisplayName'),
+    displayName: t('extensions.infinityNikki.album.rootDisplayName'),
     children: secondLevelNodes,
   }
 

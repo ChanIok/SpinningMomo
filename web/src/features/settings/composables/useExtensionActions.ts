@@ -2,7 +2,7 @@ import { storeToRefs } from 'pinia'
 import { useSettingsStore } from '../store'
 import type { AppSettings } from '../types'
 
-const DEFAULT_INFINITY_NIKKI_SETTINGS: AppSettings['plugins']['infinityNikki'] = {
+const DEFAULT_INFINITY_NIKKI_SETTINGS: AppSettings['extensions']['infinityNikki'] = {
   enable: false,
   gameDir: '',
   galleryGuideSeen: false,
@@ -15,12 +15,12 @@ export const useExtensionActions = () => {
   const { appSettings } = storeToRefs(store)
 
   const updateInfinityNikkiSettings = async (
-    patch: Partial<AppSettings['plugins']['infinityNikki']>
+    patch: Partial<AppSettings['extensions']['infinityNikki']>
   ) => {
     await store.updateSettings({
-      plugins: {
+      extensions: {
         infinityNikki: {
-          ...appSettings.value.plugins.infinityNikki,
+          ...appSettings.value.extensions.infinityNikki,
           ...patch,
         },
       },
@@ -49,7 +49,7 @@ export const useExtensionActions = () => {
 
   const resetExtensionSettings = async () => {
     await store.updateSettings({
-      plugins: {
+      extensions: {
         infinityNikki: {
           ...DEFAULT_INFINITY_NIKKI_SETTINGS,
         },

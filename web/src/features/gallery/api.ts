@@ -29,7 +29,7 @@ import type {
   RemoveTagsFromAssetParams,
 } from './types'
 import { getStaticUrl } from '@/core/env'
-import { transformInfinityNikkiTree } from '@/plugins/infinity_nikki'
+import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
 
 /**
@@ -66,7 +66,7 @@ export async function getFolderTree(): Promise<FolderTreeNode[]> {
     // 应用默认输出文件夹转换
     let transformedResult = transformDefaultOutputFolderTree(result)
 
-    // 应用 InfinityNikki 插件转换
+    // 应用 Infinity Nikki 拓展转换
     transformedResult = transformInfinityNikkiTree(transformedResult)
 
     return transformedResult

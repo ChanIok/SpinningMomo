@@ -43,7 +43,7 @@ type InitializationStatus = {
   description: string
 }
 
-const infinityNikkiSettings = computed(() => appSettings.value.plugins.infinityNikki)
+const infinityNikkiSettings = computed(() => appSettings.value.extensions.infinityNikki)
 const trimmedGameDir = computed(() => infinityNikkiSettings.value.gameDir.trim())
 const canCompleteInitialization = computed(() => {
   return infinityNikkiSettings.value.enable && trimmedGameDir.value.length > 0

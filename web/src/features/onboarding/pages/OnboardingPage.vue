@@ -43,7 +43,7 @@ const getDefaultTargetTitle = (lang: string) =>
 const isDefaultInfinityNikkiTargetTitle = (title: string) =>
   title === '无限暖暖  ' || title === 'Infinity Nikki  '
 
-const gameDir = ref<string>(store.appSettings.plugins.infinityNikki.gameDir || '')
+const gameDir = ref<string>(store.appSettings.extensions.infinityNikki.gameDir || '')
 const targetTitle = ref<string>(
   isDefaultInfinityNikkiTargetTitle(store.appSettings.window.targetTitle)
     ? getDefaultTargetTitle(store.appSettings.app.language.current)
@@ -340,10 +340,10 @@ const completeOnboarding = async () => {
         ...store.appSettings.features,
         externalAlbumPath: skipInfinityNikki.value ? '' : externalAlbumPath,
       },
-      plugins: {
-        ...store.appSettings.plugins,
+      extensions: {
+        ...store.appSettings.extensions,
         infinityNikki: {
-          ...store.appSettings.plugins.infinityNikki,
+          ...store.appSettings.extensions.infinityNikki,
           enable: !skipInfinityNikki.value,
           gameDir: skipInfinityNikki.value ? '' : trimmedGameDir,
         },

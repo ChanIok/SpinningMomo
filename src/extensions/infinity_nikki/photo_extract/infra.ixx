@@ -2,13 +2,13 @@ module;
 
 #include <asio.hpp>
 
-export module Plugins.InfinityNikki.PhotoExtract.Infra;
+export module Extensions.InfinityNikki.PhotoExtract.Infra;
 
 import std;
 import Core.State;
-import Plugins.InfinityNikki.PhotoExtract.Scan;
+import Extensions.InfinityNikki.PhotoExtract.Scan;
 
-export namespace Plugins::InfinityNikki::PhotoExtract::Infra {
+export namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 
 struct ParsedPhotoParamsRecord {
   std::optional<std::string> camera_params;
@@ -44,4 +44,4 @@ auto upsert_photo_params_record(Core::State::AppState& app_state, std::int64_t a
                                 const std::string& uid, const ParsedPhotoParamsRecord& record)
     -> std::expected<std::int32_t, std::string>;
 
-}  // namespace Plugins::InfinityNikki::PhotoExtract::Infra
+}  // namespace Extensions::InfinityNikki::PhotoExtract::Infra

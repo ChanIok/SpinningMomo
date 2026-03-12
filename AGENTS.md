@@ -85,18 +85,18 @@ Vue 3 + TypeScript + Pinia + Tailwind CSS v4 + shadcn-vue (reka-ui based). Key d
 - `web/src/core/tasks/` — frontend task orchestration
 - `web/src/features/` — feature modules (gallery, settings, home, about, map, onboarding, common, playground)
 - `web/src/composables/` — shared composables (`useRpc`, `useI18n`, `useToast`)
-- `web/src/plugins/` — game-specific integrations (infinity_nikki)
+- `web/src/extensions/` — game-specific integrations (infinity_nikki)
 - `web/src/router/` — routes
 - `web/src/types/` — shared TS types
 - `web/src/lib/` — shared UI/helpers
 - `web/src/assets/` — static assets
 
 ### RPC Endpoint Organization
-Endpoints live under `src/core/rpc/endpoints/<domain>/`, each domain exposes a `register_all(state)` called from `registry.cpp`. Game-specific adapters in `src/plugins/` (currently `infinity_nikki`) are exposed via `rpc/endpoints/plugins/`.
+Endpoints live under `src/core/rpc/endpoints/<domain>/`, each domain exposes a `register_all(state)` called from `registry.cpp`. Game-specific adapters in `src/extensions/` (currently `infinity_nikki`) are exposed via `rpc/endpoints/extensions/`.
 
 ### Initialization Order
 `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()` which runs:
-events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings (sync language + letterbox) → update → commands → floating window → tray icon → context menu → recording → replay_buffer → gallery (restore/start watchers) → plugins (Infinity Nikki photo service) → virtual gamepad (non-fatal) → onboarding gate (WebView or floating window) → hotkeys → startup auto-update check.
+events → async runtime → worker pool → RPC registry → HTTP server → database + migrations → settings (sync language + letterbox) → update → commands → floating window → tray icon → context menu → recording → replay_buffer → gallery (restore/start watchers) → extensions (Infinity Nikki photo service) → virtual gamepad (non-fatal) → onboarding gate (WebView or floating window) → hotkeys → startup auto-update check.
 
 ## Build Output
 - Release: `build\windows\x64\release\`

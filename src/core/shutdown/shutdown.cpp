@@ -19,7 +19,7 @@ import Features.Update;
 import Features.Update.State;
 import Features.Gallery;
 import Features.VirtualGamepad;
-import Plugins.InfinityNikki.PhotoService;
+import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.ContextMenu;
@@ -57,7 +57,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   Features::Preview::cleanup_preview(state);
   Features::Overlay::stop_overlay(state);
   Features::Overlay::cleanup_overlay(state);
-  Plugins::InfinityNikki::PhotoService::shutdown(state);
+  Extensions::InfinityNikki::PhotoService::shutdown(state);
   Features::Gallery::cleanup(state);
   if (auto result = Features::Letterbox::shutdown(state); !result) {
     Logger().error("Failed to shutdown Letterbox: {}", result.error());

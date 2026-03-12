@@ -2,16 +2,16 @@ module;
 
 #include <wil/com.h>
 
-module Plugins.InfinityNikki.GameDirectory;
+module Extensions.InfinityNikki.GameDirectory;
 
 import std;
-import Plugins.InfinityNikki.Types;
+import Extensions.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.String;
 import Vendor.ShellApi;
 import Vendor.Windows;
 
-namespace Plugins::InfinityNikki::GameDirectory {
+namespace Extensions::InfinityNikki::GameDirectory {
 
 auto to_filesystem_path(const std::string& utf8_path) -> std::filesystem::path {
   return std::filesystem::path(Utils::String::FromUtf8(utf8_path));
@@ -101,4 +101,4 @@ auto get_game_directory() -> std::expected<InfinityNikkiGameDirResult, std::stri
   return result;
 }
 
-}  // namespace Plugins::InfinityNikki::GameDirectory
+}  // namespace Extensions::InfinityNikki::GameDirectory

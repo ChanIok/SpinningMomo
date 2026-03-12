@@ -45,7 +45,7 @@ export interface WallpaperAnalysisResult {
 }
 
 export async function detectInfinityNikkiGameDirectory(): Promise<InfinityNikkiGameDirResult> {
-  return call<InfinityNikkiGameDirResult>('plugins.infinityNikki.getGameDirectory', {})
+  return call<InfinityNikkiGameDirResult>('extensions.infinityNikki.getGameDirectory', {})
 }
 
 export async function selectDirectory(title: string): Promise<string | null> {

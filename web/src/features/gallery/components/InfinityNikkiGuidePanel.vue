@@ -12,7 +12,7 @@ const { t } = useI18n()
 const { toast } = useToast()
 
 type Step = 1 | 2
-type Patch = Partial<AppSettings['plugins']['infinityNikki']>
+type Patch = Partial<AppSettings['extensions']['infinityNikki']>
 
 const step = ref<Step>(1)
 const wantsMetadata = ref(false)
@@ -20,9 +20,9 @@ const isSubmitting = ref(false)
 
 async function persist(patch: Patch) {
   await settingsStore.updateSettings({
-    plugins: {
+    extensions: {
       infinityNikki: {
-        ...settingsStore.appSettings.plugins.infinityNikki,
+        ...settingsStore.appSettings.extensions.infinityNikki,
         galleryGuideSeen: true,
         ...patch,
       },

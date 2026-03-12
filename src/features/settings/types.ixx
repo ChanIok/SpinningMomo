@@ -227,8 +227,8 @@ export struct AppSettings {
     WebBackgroundSettings background;
   } ui;
 
-  // 插件配置
-  struct Plugins {
+  // 拓展配置
+  struct Extensions {
     struct InfinityNikki {
       bool enable = true;
       std::string game_dir = "";
@@ -236,7 +236,7 @@ export struct AppSettings {
       bool allow_online_photo_metadata_extract = false;
       bool manage_screenshot_hardlinks = false;
     } infinity_nikki;
-  } plugins;
+  } extensions;
 };
 
 // 设置变更事件数据

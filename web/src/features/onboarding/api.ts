@@ -4,7 +4,7 @@ import type { FileInfoResult, InfinityNikkiGameDirResult } from './types'
 
 export const onboardingApi = {
   detectInfinityNikkiGameDirectory: async (): Promise<InfinityNikkiGameDirResult> => {
-    return call<InfinityNikkiGameDirResult>('plugins.infinityNikki.getGameDirectory', {})
+    return call<InfinityNikkiGameDirResult>('extensions.infinityNikki.getGameDirectory', {})
   },
 
   selectDirectory: async (title: string): Promise<string | null> => {

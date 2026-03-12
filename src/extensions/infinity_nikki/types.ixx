@@ -1,10 +1,10 @@
 module;
 
-export module Plugins.InfinityNikki.Types;
+export module Extensions.InfinityNikki.Types;
 
 import std;
 
-export namespace Plugins::InfinityNikki {
+export namespace Extensions::InfinityNikki {
 
 struct InfinityNikkiGameDirResult {
   std::optional<std::string> game_dir;  // 游戏目录，null 表示未找到
@@ -52,4 +52,4 @@ struct InfinityNikkiInitializeScreenshotHardlinksResult {
   std::vector<std::string> errors = {};
 };
 
-}  // namespace Plugins::InfinityNikki
+}  // namespace Extensions::InfinityNikki

@@ -249,8 +249,8 @@ export interface AppSettings {
     background: WebBackgroundSettings
   }
 
-  // 插件配置
-  plugins: {
+  // 拓展配置
+  extensions: {
     infinityNikki: {
       enable: boolean
       gameDir: string
@@ -414,7 +414,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
   },
 
-  plugins: {
+  extensions: {
     infinityNikki: {
       enable: true,
       gameDir: '',

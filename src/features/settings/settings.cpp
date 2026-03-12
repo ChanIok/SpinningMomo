@@ -133,7 +133,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       // 新安装用户首次启动应进入欢迎流程
       default_state.raw.app.onboarding.completed = false;
       default_state.raw.app.onboarding.flow_version = Types::CURRENT_ONBOARDING_FLOW_VERSION;
-      default_state.raw.plugins.infinity_nikki.enable = false;
+      default_state.raw.extensions.infinity_nikki.enable = false;
 
       auto json_str = rfl::json::write(default_state.raw, rfl::json::pretty);
       std::ofstream file(settings_path.value());

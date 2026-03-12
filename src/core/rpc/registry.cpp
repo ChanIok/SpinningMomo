@@ -13,7 +13,7 @@ import Core.RPC.Endpoints.Registry;
 import Core.RPC.Endpoints.Update;
 import Core.RPC.Endpoints.WebView;
 import Core.RPC.Endpoints.Gallery;
-import Core.RPC.Endpoints.PluginEndpoints;
+import Core.RPC.Endpoints.Extensions;
 import Core.RPC.Endpoints.VirtualGamepad;
 import Core.RPC.Endpoints.WindowControl;
 import Utils.Logger;
@@ -51,8 +51,8 @@ auto register_all_endpoints(Core::State::AppState& state) -> void {
   // 注册Gallery端点
   Endpoints::Gallery::register_all(state);
 
-  // 注册插件端点
-  Endpoints::PluginEndpoints::register_all(state);
+  // 注册拓展端点
+  Endpoints::Extensions::register_all(state);
 
   // 注册虚拟手柄端点
   Endpoints::VirtualGamepad::register_all(state);

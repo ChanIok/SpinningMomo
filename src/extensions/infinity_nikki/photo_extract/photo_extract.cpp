@@ -2,16 +2,16 @@ module;
 
 #include <asio.hpp>
 
-module Plugins.InfinityNikki.PhotoExtract;
+module Extensions.InfinityNikki.PhotoExtract;
 
 import std;
 import Core.State;
-import Plugins.InfinityNikki.PhotoExtract.Infra;
-import Plugins.InfinityNikki.PhotoExtract.Scan;
-import Plugins.InfinityNikki.Types;
+import Extensions.InfinityNikki.PhotoExtract.Infra;
+import Extensions.InfinityNikki.PhotoExtract.Scan;
+import Extensions.InfinityNikki.Types;
 import Utils.Logger;
 
-namespace Plugins::InfinityNikki::PhotoExtract {
+namespace Extensions::InfinityNikki::PhotoExtract {
 
 constexpr std::size_t kMaxErrorMessages = 50;
 constexpr std::size_t kExtractBatchSize = 32;
@@ -285,4 +285,4 @@ auto extract_photo_params(
   co_return result;
 }
 
-}  // namespace Plugins::InfinityNikki::PhotoExtract
+}  // namespace Extensions::InfinityNikki::PhotoExtract

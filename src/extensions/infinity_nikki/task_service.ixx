@@ -1,13 +1,13 @@
 module;
 
-export module Plugins.InfinityNikki.TaskService;
+export module Extensions.InfinityNikki.TaskService;
 
 import std;
 import Core.State;
 import Features.Gallery.Types;
-import Plugins.InfinityNikki.Types;
+import Extensions.InfinityNikki.Types;
 
-namespace Plugins::InfinityNikki::TaskService {
+namespace Extensions::InfinityNikki::TaskService {
 
 export auto start_initial_scan_task(
     Core::State::AppState& app_state, const Features::Gallery::Types::ScanOptions& options,
@@ -16,10 +16,10 @@ export auto start_initial_scan_task(
 
 export auto start_extract_photo_params_task(
     Core::State::AppState& app_state,
-    const Plugins::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::string, std::string>;
 
 export auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string>;
 
-}  // namespace Plugins::InfinityNikki::TaskService
+}  // namespace Extensions::InfinityNikki::TaskService

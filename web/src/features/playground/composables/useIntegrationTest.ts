@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { call } from '@/core/rpc'
-import { createInfinityNikkiAlbumScanParams } from '@/plugins/infinity_nikki'
+import { createInfinityNikkiAlbumScanParams } from '@/extensions/infinity_nikki'
 
 // 测试场景分类
 export type ScenarioCategory = 'gallery' | 'database' | 'system'
@@ -60,7 +60,7 @@ export function useIntegrationTest() {
       category: 'gallery',
       steps: [
         {
-          method: 'plugins.infinityNikki.getGameDirectory',
+          method: 'extensions.infinityNikki.getGameDirectory',
           description: '获取游戏目录',
         },
         {
@@ -161,7 +161,7 @@ export function useIntegrationTest() {
         }
 
         // 保存步骤结果到上下文
-        if (step.method === 'plugins.infinityNikki.getGameDirectory') {
+        if (step.method === 'extensions.infinityNikki.getGameDirectory') {
           // 从返回的对象中提取 gameDir 字符串
           context.gameDir = (result.data as any)?.gameDir || result.data
         }

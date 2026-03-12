@@ -1,12 +1,12 @@
 module;
 
-export module Plugins.InfinityNikki.ScreenshotHardlinks;
+export module Extensions.InfinityNikki.ScreenshotHardlinks;
 
 import std;
 import Core.State;
-import Plugins.InfinityNikki.Types;
+import Extensions.InfinityNikki.Types;
 
-namespace Plugins::InfinityNikki::ScreenshotHardlinks {
+namespace Extensions::InfinityNikki::ScreenshotHardlinks {
 
 export auto initialize(
     Core::State::AppState& app_state,
@@ -21,4 +21,4 @@ export auto sync(Core::State::AppState& app_state)
 export auto resolve_watch_directory(Core::State::AppState& app_state)
     -> std::expected<std::filesystem::path, std::string>;
 
-}  // namespace Plugins::InfinityNikki::ScreenshotHardlinks
+}  // namespace Extensions::InfinityNikki::ScreenshotHardlinks
