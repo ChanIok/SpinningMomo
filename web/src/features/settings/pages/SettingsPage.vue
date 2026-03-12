@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import SettingsSidebar, { type SettingsPageKey } from '../components/SettingsSidebar.vue'
 import CaptureSettingsContent from '../components/CaptureSettingsContent.vue'
 import AppearanceContent from '../components/AppearanceContent.vue'
+import ExtensionsContent from '../components/ExtensionsContent.vue'
 import GeneralSettingsContent from '../components/GeneralSettingsContent.vue'
 import HotkeySettingsContent from '../components/HotkeySettingsContent.vue'
 import WindowSceneContent from '../components/WindowSceneContent.vue'
@@ -37,6 +38,7 @@ watch(activePage, () => {
           <GeneralSettingsContent v-if="activePage === 'general'" />
           <HotkeySettingsContent v-if="activePage === 'hotkeys'" />
           <CaptureSettingsContent v-if="activePage === 'capture'" />
+          <ExtensionsContent v-if="activePage === 'extensions'" />
           <WindowSceneContent v-if="activePage === 'windowScene'" />
           <FloatingWindowContent v-if="activePage === 'floatingWindow'" />
           <AppearanceContent v-if="activePage === 'webAppearance'" />

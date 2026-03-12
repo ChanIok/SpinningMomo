@@ -18,11 +18,52 @@ export const settingsApi = {
   },
 }
 
+export interface InfinityNikkiGameDirResult {
+  gameDir?: string
+  configFound: boolean
+  gameDirFound: boolean
+  message: string
+}
+
+export interface FileInfoResult {
+  path: string
+  exists: boolean
+  isDirectory: boolean
+  isRegularFile: boolean
+  isSymlink: boolean
+  size: number
+  extension: string
+  filename: string
+  lastModified: number
+}
+
 export interface WallpaperAnalysisResult {
   themeMode: 'light' | 'dark'
   primaryColor: string
   overlayColors: string[]
   brightness: number
+}
+
+export async function detectInfinityNikkiGameDirectory(): Promise<InfinityNikkiGameDirResult> {
+  return call<InfinityNikkiGameDirResult>('plugins.infinityNikki.getGameDirectory', {})
+}
+
+export async function selectDirectory(title: string): Promise<string | null> {
+  const parentWindowMode = isWebView() ? 1 : 2
+  const result = await call<{ path: string }>(
+    'dialog.openDirectory',
+    {
+      title,
+      parentWindowMode,
+    },
+    0
+  )
+
+  return result.path || null
+}
+
+export async function getFileInfo(path: string): Promise<FileInfoResult> {
+  return call<FileInfoResult>('file.getInfo', { path })
 }
 
 export async function analyzeBackground(
@@ -61,7 +102,7 @@ export async function selectBackgroundImage(): Promise<string | null> {
     )
 
     if (result.paths && result.paths.length > 0) {
-      console.log('🖼️ 已选择背景图片:', result.paths[0])
+      console.log('已选择背景图片:', result.paths[0])
       return result.paths[0] || null
     }
 
@@ -93,7 +134,7 @@ export async function copyBackgroundImageToResources(sourcePath: string): Promis
       overwrite: true,
     })
 
-    console.log('📁 背景图片已复制到资源目录:', destPath)
+    console.log('背景图片已复制到资源目录:', destPath)
     return `${BACKGROUND_WEB_DIR}/${fileName}`
   } catch (error) {
     console.error('复制背景图片失败:', error)

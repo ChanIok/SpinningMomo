@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
-import { Settings, Keyboard, Camera, Monitor, Menu, Palette } from 'lucide-vue-next'
+import { Settings, Keyboard, Camera, Blocks, Monitor, Menu, Palette } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 
 export type SettingsPageKey =
   | 'general'
   | 'hotkeys'
   | 'capture'
+  | 'extensions'
   | 'windowScene'
   | 'floatingWindow'
   | 'webAppearance'
@@ -46,6 +47,12 @@ const settingsMenus: SettingsMenuItem[] = [
     label: 'settings.layout.capture.title',
     icon: Camera,
     description: 'settings.layout.capture.description',
+  },
+  {
+    key: 'extensions',
+    label: 'settings.layout.extensions.title',
+    icon: Blocks,
+    description: 'settings.layout.extensions.description',
   },
   {
     key: 'windowScene',
