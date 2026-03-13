@@ -60,6 +60,14 @@ auto apply_window_ex_style_from_settings(Core::State::AppState& state) -> void {
                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
+auto default_window_style() -> DWORD {
+  return WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
+}
+
+auto fullscreen_window_style(DWORD base_style) -> DWORD {
+  return base_style & ~(WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
+}
+
 auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 如果 WebView 还未初始化，则进行初始化
   if (!state.webview->is_initialized) {
@@ -125,7 +133,7 @@ auto activate_window(Core::State::AppState& state) -> void {
   Logger().info("WebView window activated");
 }
 
-// 窗口控制功能实现
+// Window control helpers
 auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& webview_state = *state.webview;
 
@@ -145,11 +153,78 @@ auto toggle_maximize_window(Core::State::AppState& state) -> std::expected<void,
     return std::unexpected("WebView window not created");
   }
 
+  if (webview_state.window.is_fullscreen) {
+    if (auto result = set_fullscreen_window(state, false); !result) {
+      return result;
+    }
+  }
+
   auto hwnd = webview_state.window.webview_hwnd;
   auto was_maximized = IsZoomed(hwnd) == TRUE;
   ShowWindow(hwnd, was_maximized ? SW_RESTORE : SW_MAXIMIZE);
 
   Logger().debug("WebView window toggled maximize state");
+  return {};
+}
+
+auto set_fullscreen_window(Core::State::AppState& state, bool fullscreen)
+    -> std::expected<void, std::string> {
+  auto& window = state.webview->window;
+  auto hwnd = window.webview_hwnd;
+  if (!hwnd) {
+    return std::unexpected("WebView window not created");
+  }
+
+  if (window.is_fullscreen == fullscreen) {
+    return {};
+  }
+
+  if (fullscreen) {
+    window.fullscreen_restore_placement = WINDOWPLACEMENT{sizeof(WINDOWPLACEMENT)};
+    if (!GetWindowPlacement(hwnd, &window.fullscreen_restore_placement)) {
+      return std::unexpected("Failed to get WebView window placement");
+    }
+
+    window.fullscreen_restore_style = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE));
+    window.has_fullscreen_restore_state = true;
+
+    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO monitor_info = {sizeof(monitor_info)};
+    if (!GetMonitorInfoW(monitor, &monitor_info)) {
+      return std::unexpected("Failed to get monitor info for WebView window");
+    }
+
+    SetWindowLongPtrW(
+        hwnd, GWL_STYLE,
+        static_cast<LONG_PTR>(fullscreen_window_style(window.fullscreen_restore_style)));
+    SetWindowPos(hwnd, HWND_TOPMOST, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
+                 monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
+                 monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top,
+                 SWP_FRAMECHANGED | SWP_SHOWWINDOW);
+
+    window.is_fullscreen = true;
+    Logger().debug("WebView window entered fullscreen");
+    return {};
+  }
+
+  if (!window.has_fullscreen_restore_state) {
+    return std::unexpected("WebView fullscreen restore state is unavailable");
+  }
+
+  SetWindowLongPtrW(hwnd, GWL_STYLE, static_cast<LONG_PTR>(window.fullscreen_restore_style));
+  SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+               SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+  if (!SetWindowPlacement(hwnd, &window.fullscreen_restore_placement)) {
+    return std::unexpected("Failed to restore WebView window placement");
+  }
+
+  auto show_cmd = window.fullscreen_restore_placement.showCmd;
+  ShowWindow(hwnd, show_cmd == SW_SHOWMINIMIZED ? SW_RESTORE : show_cmd);
+
+  window.is_fullscreen = false;
+  window.has_fullscreen_restore_state = false;
+  Logger().debug("WebView window exited fullscreen");
   return {};
 }
 
@@ -160,7 +235,7 @@ auto close_window(Core::State::AppState& state) -> std::expected<void, std::stri
     return std::unexpected("WebView window not created");
   }
 
-  // 发送WM_CLOSE消息关闭窗口
+  // ??WM_CLOSE??????
   PostMessage(webview_state.window.webview_hwnd, WM_CLOSE, 0, 0);
   Logger().debug("WebView window close requested");
   return {};
@@ -425,7 +500,7 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // - WS_THICKFRAME: 支持边缘拖拽调整大小
   // - WS_SYSMENU: 保留系统菜单（Alt+Space）
   // - WS_MAXIMIZEBOX/WS_MINIMIZEBOX: 支持最大化/最小化
-  constexpr DWORD style = WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
+  auto style = default_window_style();
   auto ex_style = desired_window_ex_style(state);
   HWND hwnd = CreateWindowExW(ex_style,                                // 扩展样式
                               L"SpinningMomoWebViewWindowClass",       // 窗口类名
@@ -489,12 +564,18 @@ auto cleanup(Core::State::AppState& state) -> void {
   if (state.webview->window.webview_hwnd) {
     HWND hwnd = state.webview->window.webview_hwnd;
 
-    // 持久化窗口尺寸和位置（若最大化/最小化则保存恢复后尺寸和位置）
+    // Persist window bounds; when maximized, minimized, or fullscreen, save restore bounds.
     int width_to_save = state.webview->window.width;
     int height_to_save = state.webview->window.height;
     int x_to_save = state.webview->window.x;
     int y_to_save = state.webview->window.y;
-    if (IsZoomed(hwnd) || IsIconic(hwnd)) {
+    if (state.webview->window.is_fullscreen && state.webview->window.has_fullscreen_restore_state) {
+      const auto& restore = state.webview->window.fullscreen_restore_placement;
+      width_to_save = restore.rcNormalPosition.right - restore.rcNormalPosition.left;
+      height_to_save = restore.rcNormalPosition.bottom - restore.rcNormalPosition.top;
+      x_to_save = restore.rcNormalPosition.left;
+      y_to_save = restore.rcNormalPosition.top;
+    } else if (IsZoomed(hwnd) || IsIconic(hwnd)) {
       WINDOWPLACEMENT wp = {sizeof(wp)};
       if (GetWindowPlacement(hwnd, &wp)) {
         width_to_save = wp.rcNormalPosition.right - wp.rcNormalPosition.left;
@@ -530,6 +611,8 @@ auto cleanup(Core::State::AppState& state) -> void {
     DestroyWindow(hwnd);
     state.webview->window.webview_hwnd = nullptr;
     state.webview->window.is_visible = false;
+    state.webview->window.is_fullscreen = false;
+    state.webview->window.has_fullscreen_restore_state = false;
     Logger().info("WebView window destroyed");
   }
 }

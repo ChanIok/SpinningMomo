@@ -639,6 +639,7 @@
   "gallery.lightbox.toolbar.filmstripHideTitle": "Hide filmstrip (Tab)",
   "gallery.lightbox.toolbar.fullscreenTitle": "Fullscreen (F)",
   "gallery.lightbox.toolbar.exitFullscreenTitle": "Exit fullscreen (F)",
+  "gallery.lightbox.toolbar.backTitle": "Back to gallery (ESC)",
   "gallery.lightbox.toolbar.closeTitle": "Close (ESC)",
   "gallery.lightbox.image.previousTitle": "Previous (←)",
   "gallery.lightbox.image.nextTitle": "Next (→)",

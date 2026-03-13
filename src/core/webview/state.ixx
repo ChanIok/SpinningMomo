@@ -29,6 +29,10 @@ export struct WindowState {
   int x = 0;
   int y = 0;
   bool is_visible = false;
+  bool is_fullscreen = false;
+  bool has_fullscreen_restore_state = false;
+  DWORD fullscreen_restore_style = 0;
+  WINDOWPLACEMENT fullscreen_restore_placement{sizeof(WINDOWPLACEMENT)};
 };
 
 // WebView核心资源

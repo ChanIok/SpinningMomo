@@ -638,6 +638,7 @@
   "gallery.lightbox.toolbar.filmstripHideTitle": "隐藏缩略图 (Tab)",
   "gallery.lightbox.toolbar.fullscreenTitle": "全屏 (F)",
   "gallery.lightbox.toolbar.exitFullscreenTitle": "退出全屏 (F)",
+  "gallery.lightbox.toolbar.backTitle": "返回 (ESC)",
   "gallery.lightbox.toolbar.closeTitle": "关闭 (ESC)",
   "gallery.lightbox.image.previousTitle": "上一张 (←)",
   "gallery.lightbox.image.nextTitle": "下一张 (→)",

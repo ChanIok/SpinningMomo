@@ -124,12 +124,11 @@ export function useGalleryLightbox() {
     })
   }
 
+  function setFullscreen(fullscreen: boolean) {
+    store.setLightboxFullscreen(fullscreen)
+  }
+
   function toggleFullscreen() {
-    if (!store.lightbox.isFullscreen) {
-      document.documentElement.requestFullscreen?.()
-    } else {
-      document.exitFullscreen?.()
-    }
     store.toggleLightboxFullscreen()
   }
 
@@ -179,6 +178,7 @@ export function useGalleryLightbox() {
   return {
     openLightbox,
     closeLightbox,
+    setFullscreen,
     toggleFullscreen,
     toggleFilmstrip,
     showFitMode,

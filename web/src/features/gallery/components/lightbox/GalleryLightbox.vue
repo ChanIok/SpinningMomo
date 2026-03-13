@@ -1,6 +1,8 @@
-﻿<script setup lang="ts">
-import { computed, ref } from 'vue'
+<script setup lang="ts">
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
+import { call } from '@/core/rpc'
+import { isWebView } from '@/core/env'
 import { useGalleryLightbox } from '../../composables'
 import { useGalleryStore } from '../../store'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
@@ -14,11 +16,24 @@ type LightboxImageExposed = {
   zoomOut: () => Promise<void>
 }
 
+type WebViewFullscreenResult = {
+  success: boolean
+  fullscreen: boolean
+}
+
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
+const lightboxRootRef = ref<HTMLElement | null>(null)
 const lightboxImageRef = ref<LightboxImageExposed | null>(null)
 
-// 键盘事件统一在此父组件注册一次，避免子组件重复绑定
+const isFullscreen = computed(() => store.lightbox.isFullscreen)
+const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
+const lightboxContainerClass = computed(() =>
+  isFullscreen.value
+    ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
+    : 'flex h-full w-full overflow-hidden'
+)
+
 const throttledPrevious = useThrottleFn(() => {
   if (store.lightbox.isOpen) {
     lightbox.goToPrevious()
@@ -43,8 +58,6 @@ const throttledZoomOut = useThrottleFn(() => {
   }
 }, 60)
 
-const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
-
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -53,7 +66,76 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
-function handleBackdropClick() {
+async function syncNativeFullscreen(fullscreen: boolean) {
+  if (!isWebView()) {
+    return
+  }
+
+  try {
+    const result = await call<WebViewFullscreenResult>('webview.setFullscreen', { fullscreen })
+    lightbox.setFullscreen(result.fullscreen)
+  } catch (error) {
+    console.warn(`Failed to ${fullscreen ? 'enter' : 'exit'} WebView fullscreen:`, error)
+  }
+}
+
+async function requestBrowserFullscreen() {
+  const root = lightboxRootRef.value
+  if (!root?.requestFullscreen) {
+    return
+  }
+
+  try {
+    await root.requestFullscreen()
+  } catch (error) {
+    console.warn('Failed to enter browser fullscreen:', error)
+  }
+}
+
+async function exitBrowserFullscreen() {
+  if (!document.fullscreenElement || !document.exitFullscreen) {
+    return
+  }
+
+  try {
+    await document.exitFullscreen()
+  } catch (error) {
+    console.warn('Failed to exit browser fullscreen:', error)
+  }
+}
+
+async function enterFullscreenPresentation() {
+  if (isFullscreen.value) {
+    return
+  }
+
+  lightbox.setFullscreen(true)
+  await nextTick()
+
+  if (isWebView()) {
+    await syncNativeFullscreen(true)
+    return
+  }
+
+  await requestBrowserFullscreen()
+}
+
+async function exitFullscreenPresentation() {
+  if (!isFullscreen.value && !document.fullscreenElement) {
+    return
+  }
+
+  if (isWebView()) {
+    await syncNativeFullscreen(false)
+  } else {
+    await exitBrowserFullscreen()
+  }
+
+  lightbox.setFullscreen(false)
+}
+
+async function handleClose() {
+  await exitFullscreenPresentation()
   lightbox.closeLightbox()
 }
 
@@ -73,6 +155,24 @@ function handleToolbarZoomOut() {
   void lightboxImageRef.value?.zoomOut()
 }
 
+function handleToolbarToggleFilmstrip() {
+  lightbox.toggleFilmstrip()
+}
+
+function handleToolbarToggleFullscreen() {
+  void (isFullscreen.value ? exitFullscreenPresentation() : enterFullscreenPresentation())
+}
+
+function handleDocumentFullscreenChange() {
+  if (isWebView()) {
+    return
+  }
+
+  if (!document.fullscreenElement && isFullscreen.value) {
+    lightbox.setFullscreen(false)
+  }
+}
+
 function handleKeydown(event: KeyboardEvent) {
   if (!store.lightbox.isOpen || isEditableTarget(event.target)) {
     return
@@ -88,16 +188,21 @@ function handleKeydown(event: KeyboardEvent) {
       throttledNext()
       return
     case 'Escape':
-      lightbox.closeLightbox()
+      event.preventDefault()
+      if (isFullscreen.value || document.fullscreenElement) {
+        void exitFullscreenPresentation()
+        return
+      }
+      void handleClose()
       return
     case 'f':
     case 'F':
       event.preventDefault()
-      lightbox.toggleFullscreen()
+      handleToolbarToggleFullscreen()
       return
     case 'Tab':
       event.preventDefault()
-      lightbox.toggleFilmstrip()
+      handleToolbarToggleFilmstrip()
       return
     case '0':
       event.preventDefault()
@@ -129,33 +234,35 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 useEventListener(window, 'keydown', handleKeydown)
-useEventListener(document, 'fullscreenchange', () => {
-  if (!document.fullscreenElement && store.lightbox.isFullscreen) {
-    store.toggleLightboxFullscreen()
+useEventListener(document, 'fullscreenchange', handleDocumentFullscreenChange)
+
+onBeforeUnmount(() => {
+  if (isWebView()) {
+    void syncNativeFullscreen(false)
+  } else if (document.fullscreenElement) {
+    void exitBrowserFullscreen()
   }
 })
 </script>
 
 <template>
-  <Transition
-    enter-active-class="transition-opacity duration-300"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition-opacity duration-300"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
+  <Teleport to="body" :disabled="!isFullscreen">
     <div
-      class="lightbox-container flex h-full w-full overflow-hidden"
-      style="--surface-opacity-scale: 0.95"
-      @click.self="handleBackdropClick"
+      ref="lightboxRootRef"
+      class="lightbox-container"
+      :class="lightboxContainerClass"
+      style="--surface-opacity-scale: 0.96"
+      @click.self="handleClose"
     >
-      <div class="flex h-full w-full flex-col">
+      <div class="flex h-full min-h-0 w-full flex-col">
         <LightboxToolbar
+          @back="handleClose"
           @fit="handleToolbarFit"
           @actual="handleToolbarActual"
           @zoom-in="handleToolbarZoomIn"
           @zoom-out="handleToolbarZoomOut"
+          @toggle-filmstrip="handleToolbarToggleFilmstrip"
+          @toggle-fullscreen="handleToolbarToggleFullscreen"
         />
 
         <div class="min-h-0 flex-1">
@@ -174,5 +281,5 @@ useEventListener(document, 'fullscreenchange', () => {
         </Transition>
       </div>
     </div>
-  </Transition>
+  </Teleport>
 </template>

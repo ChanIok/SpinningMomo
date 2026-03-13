@@ -20,6 +20,8 @@ export auto activate_window(Core::State::AppState& state) -> void;
 export auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::string>;
 export auto toggle_maximize_window(Core::State::AppState& state)
     -> std::expected<void, std::string>;
+export auto set_fullscreen_window(Core::State::AppState& state, bool fullscreen)
+    -> std::expected<void, std::string>;
 export auto close_window(Core::State::AppState& state) -> std::expected<void, std::string>;
 
 }  // namespace UI::WebViewWindow

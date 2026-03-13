@@ -309,13 +309,8 @@ export const useGalleryStore = defineStore('gallery', () => {
   function closeLightbox() {
     lightbox.isOpen = false
     lightbox.currentIndex = 0
+    lightbox.isFullscreen = false
     resetLightboxView()
-
-    // 退出全屏（如果在全屏状态）
-    if (lightbox.isFullscreen && document.fullscreenElement) {
-      document.exitFullscreen()
-      lightbox.isFullscreen = false
-    }
   }
 
   function goToLightboxIndex(index: number) {
@@ -337,8 +332,12 @@ export const useGalleryStore = defineStore('gallery', () => {
     }
   }
 
+  function setLightboxFullscreen(fullscreen: boolean) {
+    lightbox.isFullscreen = fullscreen
+  }
+
   function toggleLightboxFullscreen() {
-    lightbox.isFullscreen = !lightbox.isFullscreen
+    setLightboxFullscreen(!lightbox.isFullscreen)
   }
 
   function toggleLightboxFilmstrip() {
@@ -417,6 +416,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     lightbox.isOpen = false
     lightbox.currentIndex = 0
+    lightbox.isFullscreen = false
 
     sidebar.isOpen = true
     sidebar.activeSection = 'all'
@@ -514,6 +514,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     goToLightboxIndex,
     goToPreviousLightbox,
     goToNextLightbox,
+    setLightboxFullscreen,
     toggleLightboxFullscreen,
     toggleLightboxFilmstrip,
     setLightboxZoom,
