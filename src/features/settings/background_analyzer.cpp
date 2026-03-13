@@ -142,20 +142,36 @@ auto hsl_to_rgb(const HslColor& hsl) -> RgbColor {
   };
 }
 
-// 根据主题明暗对颜色的饱和度和亮度进行补偿，确保叠加色在背景上具有足够的视觉对比度。
-// 浅色主题下适当提亮，深色主题下适当压暗；主色（primary）的调整幅度略大于叠加色。
+// 根据目标亮度计算饱和度上限（倒 U 形曲线）。
+// 在 L≈55% 时峰值约 85%，两端降至约 35%，使极亮和极暗颜色自然淡雅。
+auto saturation_cap_for_lightness(double l) -> double {
+  double t = (l - 55.0) / 55.0;
+  return 35.0 + 50.0 * (1.0 - t * t);
+}
+
+// 将输入颜色的亮度钳制到目标区间，饱和度由目标亮度决定上限（只降不升）。
+// 低饱和输入（S<12）视为灰色系，保持低饱和不推高色调。
 auto compensate_for_theme(const RgbColor& color, std::string_view theme_mode, bool primary)
     -> RgbColor {
   auto hsl = rgb_to_hsl(color);
 
+  double l_min, l_max;
   if (theme_mode == "light") {
-    hsl.s = std::clamp(hsl.s + (primary ? 12.0 : 6.0), primary ? 18.0 : 14.0, 78.0);
-    hsl.l =
-        std::clamp(hsl.l + (primary ? 8.0 : 14.0), primary ? 45.0 : 62.0, primary ? 72.0 : 90.0);
+    l_min = primary ? 35.0 : 80.0;
+    l_max = primary ? 55.0 : 92.0;
   } else {
-    hsl.s = std::clamp(hsl.s + (primary ? 10.0 : 6.0), primary ? 22.0 : 18.0, 80.0);
-    hsl.l =
-        std::clamp(hsl.l - (primary ? 4.0 : 16.0), primary ? 38.0 : 10.0, primary ? 58.0 : 34.0);
+    l_min = primary ? 58.0 : 10.0;
+    l_max = primary ? 72.0 : 22.0;
+  }
+
+  hsl.l = std::clamp(hsl.l, l_min, l_max);
+
+  if (hsl.s < 12.0) {
+    hsl.s = std::min(hsl.s, 20.0);
+  } else {
+    double s_max = saturation_cap_for_lightness(hsl.l);
+    if (!primary) s_max *= 0.6;
+    hsl.s = std::min(hsl.s, s_max);
   }
 
   return hsl_to_rgb(hsl);

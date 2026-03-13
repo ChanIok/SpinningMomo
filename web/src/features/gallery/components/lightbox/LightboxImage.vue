@@ -52,7 +52,11 @@ const viewportInnerHeight = computed(() =>
 )
 
 const currentAsset = computed(() => {
-  const currentIdx = store.lightbox.currentIndex
+  const currentIdx = store.selection.activeIndex
+  if (currentIdx === undefined) {
+    return null
+  }
+
   return store.getAssetsInRange(currentIdx, currentIdx)[0]
 })
 
@@ -71,8 +75,8 @@ const imageState = computed(() => {
   return lightbox.getImageState(currentAsset.value.id)
 })
 
-const canGoToPrevious = computed(() => store.lightbox.currentIndex > 0)
-const canGoToNext = computed(() => store.lightbox.currentIndex < store.totalCount - 1)
+const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
+const canGoToNext = computed(() => (store.selection.activeIndex ?? 0) < store.totalCount - 1)
 const fitMode = computed(() => store.lightbox.fitMode)
 const actualZoom = computed(() => store.lightbox.zoom)
 
@@ -181,11 +185,6 @@ watch(
     naturalHeight.value = newAsset?.height ?? 0
     resetPointerState()
     suppressClick.value = false
-
-    if (newAsset) {
-      store.selectAsset(newAsset.id, true, false)
-      store.setDetailsFocus({ type: 'asset', asset: newAsset })
-    }
   },
   { immediate: true }
 )
@@ -536,8 +535,23 @@ function handleStageLostPointerCapture(event: PointerEvent) {
   }
 }
 
+function isLikelyTrackpadWheel(event: WheelEvent): boolean {
+  if (event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) {
+    return false
+  }
+
+  return Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 60
+}
+
 function handleViewportWheel(event: WheelEvent) {
-  if (!event.ctrlKey || !currentAsset.value || imageError.value) {
+  if (!currentAsset.value || imageError.value) {
+    return
+  }
+
+  const isTrackpad = isLikelyTrackpadWheel(event)
+  const shouldZoom = event.ctrlKey || (fitMode.value === 'actual' && !isTrackpad)
+
+  if (!shouldZoom) {
     return
   }
 

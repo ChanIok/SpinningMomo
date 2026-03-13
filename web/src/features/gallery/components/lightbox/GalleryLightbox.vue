@@ -3,11 +3,20 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { call } from '@/core/rpc'
 import { isWebView } from '@/core/env'
-import { useGalleryLightbox } from '../../composables'
+import { useI18n } from '@/composables/useI18n'
+import { useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
+import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
 import LightboxImage from './LightboxImage.vue'
 import LightboxToolbar from './LightboxToolbar.vue'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 
 type LightboxImageExposed = {
   showFitMode: () => Promise<void>
@@ -23,11 +32,21 @@ type WebViewFullscreenResult = {
 
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
+const gallerySelection = useGallerySelection()
+const { t } = useI18n()
 const lightboxRootRef = ref<HTMLElement | null>(null)
 const lightboxImageRef = ref<LightboxImageExposed | null>(null)
 
 const isFullscreen = computed(() => store.lightbox.isFullscreen)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
+const currentAsset = computed(() => {
+  const currentIndex = store.selection.activeIndex
+  if (currentIndex === undefined) {
+    return null
+  }
+
+  return store.getAssetsInRange(currentIndex, currentIndex)[0]
+})
 const lightboxContainerClass = computed(() =>
   isFullscreen.value
     ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
@@ -163,6 +182,16 @@ function handleToolbarToggleFullscreen() {
   void (isFullscreen.value ? exitFullscreenPresentation() : enterFullscreenPresentation())
 }
 
+function handleImageContextMenu(event: MouseEvent) {
+  const asset = currentAsset.value
+  const currentIndex = store.selection.activeIndex
+  if (!asset || currentIndex === undefined) {
+    return
+  }
+
+  void gallerySelection.handleAssetContextMenu(asset, event, currentIndex)
+}
+
 function handleDocumentFullscreenChange() {
   if (isWebView()) {
     return
@@ -265,7 +294,45 @@ onBeforeUnmount(() => {
           @toggle-fullscreen="handleToolbarToggleFullscreen"
         />
 
-        <div class="min-h-0 flex-1">
+        <ContextMenu v-if="currentAsset">
+          <ContextMenuTrigger as-child>
+            <div class="min-h-0 flex-1" @contextmenu="handleImageContextMenu">
+              <LightboxImage ref="lightboxImageRef" />
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent class="w-56">
+            <ContextMenuItem @click="handleToolbarFit">
+              {{ t('gallery.lightbox.contextMenu.fit') }}
+            </ContextMenuItem>
+            <ContextMenuItem @click="handleToolbarActual">
+              {{ t('gallery.lightbox.contextMenu.actual') }}
+            </ContextMenuItem>
+            <ContextMenuItem @click="handleToolbarZoomIn">
+              {{ t('gallery.lightbox.contextMenu.zoomIn') }}
+            </ContextMenuItem>
+            <ContextMenuItem @click="handleToolbarZoomOut">
+              {{ t('gallery.lightbox.contextMenu.zoomOut') }}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem @click="handleToolbarToggleFilmstrip">
+              {{
+                showFilmstrip
+                  ? t('gallery.lightbox.contextMenu.hideFilmstrip')
+                  : t('gallery.lightbox.contextMenu.showFilmstrip')
+              }}
+            </ContextMenuItem>
+            <ContextMenuItem @click="handleToolbarToggleFullscreen">
+              {{
+                isFullscreen
+                  ? t('gallery.lightbox.contextMenu.exitFullscreen')
+                  : t('gallery.lightbox.contextMenu.fullscreen')
+              }}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <GalleryAssetContextMenuContent />
+          </ContextMenuContent>
+        </ContextMenu>
+        <div v-else class="min-h-0 flex-1">
           <LightboxImage ref="lightboxImageRef" />
         </div>
 

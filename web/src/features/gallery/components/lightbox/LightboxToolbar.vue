@@ -18,7 +18,7 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const store = useGalleryStore()
 
-const currentIndex = computed(() => store.lightbox.currentIndex)
+const currentIndex = computed(() => store.selection.activeIndex ?? 0)
 const totalCount = computed(() => store.totalCount)
 const selectedCount = computed(() => store.selection.selectedIds.size)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)

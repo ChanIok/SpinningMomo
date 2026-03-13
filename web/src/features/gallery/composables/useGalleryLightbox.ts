@@ -1,6 +1,7 @@
 import { ref, watch } from 'vue'
 import { galleryApi } from '../api'
 import { useGalleryStore } from '../store'
+import { useGallerySelection } from './useGallerySelection'
 
 interface ImageState {
   status: 'idle' | 'loading' | 'loaded' | 'error'
@@ -9,6 +10,7 @@ interface ImageState {
 
 export function useGalleryLightbox() {
   const store = useGalleryStore()
+  const gallerySelection = useGallerySelection()
 
   const imageStates = ref<Map<number, ImageState>>(new Map())
   const loading = ref<Set<number>>(new Set())
@@ -105,10 +107,19 @@ export function useGalleryLightbox() {
     return imageStates.value.get(assetId) || { status: 'idle' }
   }
 
+  async function syncLightboxSelection(index: number) {
+    if (store.selectedCount > 1) {
+      await gallerySelection.activateIndex(index, { syncDetails: true })
+      return
+    }
+
+    await gallerySelection.selectOnlyIndex(index)
+  }
+
   watch(
-    () => store.lightbox.currentIndex,
+    () => store.selection.activeIndex,
     (newIndex) => {
-      if (store.lightbox.isOpen) {
+      if (store.lightbox.isOpen && newIndex !== undefined) {
         preloadRange(newIndex).catch((err) => {
           console.warn('Failed to preload lightbox range:', err)
         })
@@ -119,6 +130,7 @@ export function useGalleryLightbox() {
 
   function openLightbox(index: number) {
     store.openLightbox(index)
+    void syncLightboxSelection(index)
     preloadRange(index).catch((err) => {
       console.warn('Failed to preload lightbox range:', err)
     })
@@ -160,15 +172,25 @@ export function useGalleryLightbox() {
   }
 
   function goToPrevious() {
-    store.goToPreviousLightbox()
+    const currentIndex = store.selection.activeIndex
+    if (currentIndex === undefined || currentIndex <= 0) {
+      return
+    }
+
+    void syncLightboxSelection(currentIndex - 1)
   }
 
   function goToNext() {
-    store.goToNextLightbox()
+    const currentIndex = store.selection.activeIndex
+    if (currentIndex === undefined || currentIndex >= store.totalCount - 1) {
+      return
+    }
+
+    void syncLightboxSelection(currentIndex + 1)
   }
 
   function goToIndex(index: number) {
-    store.goToLightboxIndex(index)
+    void syncLightboxSelection(index)
   }
 
   function closeLightbox() {

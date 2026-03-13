@@ -644,5 +644,13 @@
   "gallery.lightbox.image.previousTitle": "Previous (←)",
   "gallery.lightbox.image.nextTitle": "Next (→)",
   "gallery.lightbox.image.loadFailed": "Failed to load image",
-  "gallery.lightbox.image.fitIndicator": "Fit ({percent}%)"
+  "gallery.lightbox.image.fitIndicator": "Fit ({percent}%)",
+  "gallery.lightbox.contextMenu.fit": "Fit to View",
+  "gallery.lightbox.contextMenu.actual": "Actual Size",
+  "gallery.lightbox.contextMenu.zoomIn": "Zoom In",
+  "gallery.lightbox.contextMenu.zoomOut": "Zoom Out",
+  "gallery.lightbox.contextMenu.showFilmstrip": "Show Filmstrip",
+  "gallery.lightbox.contextMenu.hideFilmstrip": "Hide Filmstrip",
+  "gallery.lightbox.contextMenu.fullscreen": "Enter Fullscreen",
+  "gallery.lightbox.contextMenu.exitFullscreen": "Exit Fullscreen"
 }

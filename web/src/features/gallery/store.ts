@@ -76,22 +76,19 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= 选择状态 =============
   const selection = reactive<SelectionState>({
     selectedIds: new Set<number>(),
-    lastSelectedId: undefined,
     anchorIndex: undefined,
-    focusIndex: undefined,
+    activeIndex: undefined,
   })
 
   // ============= Lightbox状态 =============
   const lightbox = reactive<LightboxState>({
     isOpen: false,
-    currentIndex: 0,
     isFullscreen: false,
     showFilmstrip: true,
     zoom: 1.0,
     fitMode: 'contain',
   })
 
-  // ============= UI状态 =============
   const sidebar = reactive<SidebarState>({
     isOpen: true,
     activeSection: 'all',
@@ -258,7 +255,6 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     if (selected) {
       selection.selectedIds.add(id)
-      selection.lastSelectedId = id
     } else {
       selection.selectedIds.delete(id)
     }
@@ -266,27 +262,20 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   function clearSelection() {
     selection.selectedIds.clear()
-    selection.lastSelectedId = undefined
     selection.anchorIndex = undefined
-    selection.focusIndex = undefined
   }
 
-  function replaceSelection(ids: number[], lastSelectedId?: number) {
+  function replaceSelection(ids: number[]) {
     selection.selectedIds.clear()
     ids.forEach((id) => selection.selectedIds.add(id))
-    selection.lastSelectedId = lastSelectedId
   }
 
   function setSelectionAnchor(index?: number) {
     selection.anchorIndex = index
   }
 
-  function setSelectionFocus(index?: number) {
-    selection.focusIndex = index
-  }
-
-  function setSelectionLastSelected(id?: number) {
-    selection.lastSelectedId = id
+  function setSelectionActive(index?: number) {
+    selection.activeIndex = index
   }
 
   // ============= Lightbox操作 Actions =============
@@ -303,12 +292,12 @@ export const useGalleryStore = defineStore('gallery', () => {
   function openLightbox(index: number) {
     resetLightboxView()
     lightbox.isOpen = true
-    lightbox.currentIndex = index
+    const validIndex = Math.max(0, Math.min(index, totalCount.value - 1))
+    selection.activeIndex = validIndex
   }
 
   function closeLightbox() {
     lightbox.isOpen = false
-    lightbox.currentIndex = 0
     lightbox.isFullscreen = false
     resetLightboxView()
   }
@@ -316,19 +305,21 @@ export const useGalleryStore = defineStore('gallery', () => {
   function goToLightboxIndex(index: number) {
     if (lightbox.isOpen) {
       const validIndex = Math.max(0, Math.min(index, totalCount.value - 1))
-      lightbox.currentIndex = validIndex
+      selection.activeIndex = validIndex
     }
   }
 
   function goToPreviousLightbox() {
-    if (lightbox.isOpen && lightbox.currentIndex > 0) {
-      lightbox.currentIndex = lightbox.currentIndex - 1
+    const currentIndex = selection.activeIndex ?? 0
+    if (lightbox.isOpen && currentIndex > 0) {
+      selection.activeIndex = currentIndex - 1
     }
   }
 
   function goToNextLightbox() {
-    if (lightbox.isOpen && lightbox.currentIndex < totalCount.value - 1) {
-      lightbox.currentIndex = lightbox.currentIndex + 1
+    const currentIndex = selection.activeIndex ?? 0
+    if (lightbox.isOpen && currentIndex < totalCount.value - 1) {
+      selection.activeIndex = currentIndex + 1
     }
   }
 
@@ -410,12 +401,10 @@ export const useGalleryStore = defineStore('gallery', () => {
     includeSubfolders.value = true
 
     selection.selectedIds.clear()
-    selection.lastSelectedId = undefined
     selection.anchorIndex = undefined
-    selection.focusIndex = undefined
+    selection.activeIndex = undefined
 
     lightbox.isOpen = false
-    lightbox.currentIndex = 0
     lightbox.isFullscreen = false
 
     sidebar.isOpen = true
@@ -505,8 +494,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     clearSelection,
     replaceSelection,
     setSelectionAnchor,
-    setSelectionFocus,
-    setSelectionLastSelected,
+    setSelectionActive,
 
     resetLightboxView,
     openLightbox,

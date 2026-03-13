@@ -55,34 +55,26 @@ function findLoadedAssetById(id: number): Asset | null {
   return null
 }
 
-function getLastSelectedId(): number | undefined {
-  let lastId: number | undefined
-  store.selection.selectedIds.forEach((id) => {
-    lastId = id
-  })
-  return lastId
-}
-
 const batchActiveAsset = computed(() => {
   if (detailsFocus.value.type !== 'batch') return null
   if (store.selection.selectedIds.size === 0) return null
 
-  const lastSelectedId = store.selection.lastSelectedId
-  if (lastSelectedId !== undefined && store.selection.selectedIds.has(lastSelectedId)) {
-    return findLoadedAssetById(lastSelectedId)
-  }
-
-  const focusIndex = store.selection.focusIndex
-  if (focusIndex !== undefined) {
-    const [focusAsset] = store.getAssetsInRange(focusIndex, focusIndex)
-    if (focusAsset && store.selection.selectedIds.has(focusAsset.id)) {
-      return focusAsset
+  const activeIndex = store.selection.activeIndex
+  if (activeIndex !== undefined) {
+    const [currentAsset] = store.getAssetsInRange(activeIndex, activeIndex)
+    if (currentAsset && store.selection.selectedIds.has(currentAsset.id)) {
+      return currentAsset
     }
   }
 
-  const fallbackSelectedId = getLastSelectedId()
-  if (fallbackSelectedId === undefined) return null
-  return findLoadedAssetById(fallbackSelectedId)
+  for (const id of store.selection.selectedIds) {
+    const asset = findLoadedAssetById(id)
+    if (asset) {
+      return asset
+    }
+  }
+
+  return null
 })
 
 // 计算缩略图URL

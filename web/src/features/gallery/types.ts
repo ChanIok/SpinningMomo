@@ -372,15 +372,13 @@ export interface GetAssetsByMonthResponse {
 // 选择状态
 export interface SelectionState {
   selectedIds: Set<number>
-  lastSelectedId?: number
   anchorIndex?: number
-  focusIndex?: number
+  activeIndex?: number
 }
 
 // Lightbox状态
 export interface LightboxState {
   isOpen: boolean
-  currentIndex: number
   isFullscreen: boolean
   showFilmstrip: boolean
   zoom: number

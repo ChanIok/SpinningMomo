@@ -1,37 +1,25 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useI18n } from '@/composables/useI18n'
-import { useToast } from '@/composables/useToast'
+import { useElementSize } from '@vueuse/core'
 import { useGalleryStore } from '../store'
 import type { Asset } from '../types'
-import { galleryApi } from '../api'
 import {
   useGalleryView,
   useGallerySelection,
   useGalleryLightbox,
   useGridVirtualizer,
 } from '../composables'
-import { useElementSize } from '@vueuse/core'
 import AssetCard from './AssetCard.vue'
+import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
-// Store 和 Composables
 const store = useGalleryStore()
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
-const { t } = useI18n()
-const { toast } = useToast()
 
-// 响应式变量和引用
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
@@ -41,33 +29,26 @@ const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
-  const gap = 16 // gap-4 对应 16px (1rem)
-  console.log('containerWidth', containerWidth.value, itemSize, gap)
+  const gap = 16
   return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
 })
 
-// 统一使用虚拟列表 composable
 const gridVirtualizer = useGridVirtualizer({
   containerRef: scrollContainerRef,
-  columns: columns,
-  containerWidth: containerWidth,
+  columns,
+  containerWidth,
 })
 
-// 监听模式切换，重新初始化
 watch(isTimelineMode, async (newValue) => {
-  // 切换到普通模式时，确保 scrollContainerRef 指向 ScrollArea 的 viewport
   setTimeout(async () => {
     if (!newValue && scrollAreaRef.value) {
       scrollContainerRef.value = scrollAreaRef.value.viewportElement
     }
-    console.log('scrollAreaRef', scrollAreaRef.value)
     await gridVirtualizer.init()
   }, 1000)
 })
 
-// 生命周期钩子
 onMounted(async () => {
-  // 对于普通模式，从 ScrollArea 获取内部的 viewport ref
   if (!isTimelineMode.value && scrollAreaRef.value) {
     scrollContainerRef.value = scrollAreaRef.value.viewportElement
   }
@@ -75,7 +56,6 @@ onMounted(async () => {
   await gridVirtualizer.init()
 })
 
-// 事件处理函数
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
   scrollTop.value = target.scrollTop
@@ -91,87 +71,12 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
   galleryLightbox.openLightbox(index)
 }
 
-function handleAssetContextMenu(asset: Asset, event: MouseEvent) {
-  gallerySelection.handleAssetContextMenu(asset, event)
-}
-
-const selectedAssetIds = computed(() => Array.from(store.selection.selectedIds))
-const isSingleSelection = computed(() => selectedAssetIds.value.length === 1)
-const selectedAssetId = computed(() => {
-  if (!isSingleSelection.value) return undefined
-  return selectedAssetIds.value[0]
-})
-
-async function handleOpenAssetDefault() {
-  const assetId = selectedAssetId.value
-  if (assetId === undefined) return
-
-  try {
-    const result = await galleryApi.openAssetDefault(assetId)
-    if (!result.success) {
-      throw new Error(result.message)
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    toast.error(t('gallery.contextMenu.openDefaultApp.failedTitle'), {
-      description: message,
-    })
-  }
-}
-
-async function handleRevealAssetInExplorer() {
-  const assetId = selectedAssetId.value
-  if (assetId === undefined) return
-
-  try {
-    const result = await galleryApi.revealAssetInExplorer(assetId)
-    if (!result.success) {
-      throw new Error(result.message)
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    toast.error(t('gallery.contextMenu.revealInExplorer.failedTitle'), {
-      description: message,
-    })
-  }
-}
-
-async function handleMoveAssetsToTrash() {
-  if (selectedAssetIds.value.length === 0) {
-    return
-  }
-
-  const ids = [...selectedAssetIds.value]
-  try {
-    const result = await galleryApi.moveAssetsToTrash(ids)
-    const affectedCount = result.affectedCount ?? 0
-    if (!result.success && affectedCount === 0) {
-      throw new Error(result.message)
-    }
-
-    gallerySelection.clearSelection()
-    if (result.success) {
-      toast.success(t('gallery.contextMenu.moveToTrash.successTitle'), {
-        description: t('gallery.contextMenu.moveToTrash.successDescription', {
-          count: affectedCount || ids.length,
-        }),
-      })
-    } else {
-      toast.warning(t('gallery.contextMenu.moveToTrash.partialTitle'), {
-        description: result.message,
-      })
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    toast.error(t('gallery.contextMenu.moveToTrash.failedTitle'), {
-      description: message,
-    })
-  }
+function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
+  void gallerySelection.handleAssetContextMenu(asset, event, index)
 }
 </script>
 
 <template>
-  <!-- 时间线模式 -->
   <div v-if="isTimelineMode" class="flex h-full">
     <div
       ref="scrollContainerRef"
@@ -207,7 +112,6 @@ async function handleMoveAssetsToTrash() {
               v-for="(asset, idx) in virtualRow.assets"
               :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
             >
-              <!-- 已加载的资产 -->
               <ContextMenu v-if="asset !== null">
                 <ContextMenuTrigger as-child>
                   <AssetCard
@@ -217,30 +121,16 @@ async function handleMoveAssetsToTrash() {
                     @double-click="
                       (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
                     "
-                    @context-menu="handleAssetContextMenu"
+                    @context-menu="
+                      (a, e) => handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
+                    "
                   />
                 </ContextMenuTrigger>
                 <ContextMenuContent>
-                  <ContextMenuItem :disabled="!isSingleSelection" @click="handleOpenAssetDefault">
-                    {{ t('gallery.contextMenu.openDefaultApp.label') }}
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    :disabled="!isSingleSelection"
-                    @click="handleRevealAssetInExplorer"
-                  >
-                    {{ t('gallery.contextMenu.revealInExplorer.label') }}
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    class="text-destructive focus:text-destructive"
-                    @click="handleMoveAssetsToTrash"
-                  >
-                    {{ t('gallery.contextMenu.moveToTrash.label') }}
-                  </ContextMenuItem>
+                  <GalleryAssetContextMenuContent />
                 </ContextMenuContent>
               </ContextMenu>
 
-              <!-- 骨架屏占位 -->
               <div
                 v-else
                 class="skeleton-card rounded-lg"
@@ -255,7 +145,6 @@ async function handleMoveAssetsToTrash() {
       </div>
     </div>
 
-    <!-- 时间线滚动条 -->
     <TimelineScrollbar
       v-if="store.timelineBuckets.length > 0"
       :buckets="store.timelineBuckets"
@@ -268,7 +157,6 @@ async function handleMoveAssetsToTrash() {
     />
   </div>
 
-  <!-- 普通网格模式（虚拟列表） -->
   <ScrollArea v-else ref="scrollAreaRef" class="mr-1 h-full">
     <div class="px-6">
       <div
@@ -300,7 +188,6 @@ async function handleMoveAssetsToTrash() {
               v-for="(asset, idx) in virtualRow.assets"
               :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
             >
-              <!-- 已加载的资产 -->
               <ContextMenu v-if="asset !== null">
                 <ContextMenuTrigger as-child>
                   <AssetCard
@@ -310,30 +197,16 @@ async function handleMoveAssetsToTrash() {
                     @double-click="
                       (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
                     "
-                    @context-menu="handleAssetContextMenu"
+                    @context-menu="
+                      (a, e) => handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
+                    "
                   />
                 </ContextMenuTrigger>
                 <ContextMenuContent>
-                  <ContextMenuItem :disabled="!isSingleSelection" @click="handleOpenAssetDefault">
-                    {{ t('gallery.contextMenu.openDefaultApp.label') }}
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    :disabled="!isSingleSelection"
-                    @click="handleRevealAssetInExplorer"
-                  >
-                    {{ t('gallery.contextMenu.revealInExplorer.label') }}
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    class="text-destructive focus:text-destructive"
-                    @click="handleMoveAssetsToTrash"
-                  >
-                    {{ t('gallery.contextMenu.moveToTrash.label') }}
-                  </ContextMenuItem>
+                  <GalleryAssetContextMenuContent />
                 </ContextMenuContent>
               </ContextMenu>
 
-              <!-- 骨架屏占位 -->
               <div
                 v-else
                 class="skeleton-card rounded-lg"
@@ -351,17 +224,14 @@ async function handleMoveAssetsToTrash() {
 </template>
 
 <style scoped>
-/* 隐藏滚动条 - Webkit 浏览器 (Chrome, Safari, Edge) */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
-/* 隐藏滚动条 - Firefox */
 .hide-scrollbar {
   scrollbar-width: none;
 }
 
-/* 骨架屏动画 */
 .skeleton-card {
   background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   background-size: 200% 100%;

@@ -487,6 +487,7 @@
   "gallery.details.rootFolderSummary.title": "根文件夹概览",
   "gallery.details.rootFolderSummary.folderCount": "根文件夹总数",
   "gallery.details.rootFolderSummary.assetCount": "资产总数",
+  "gallery.details.title": "详情",
   "gallery.details.folderInfo": "文件夹信息",
   "gallery.details.folderDisplayName": "显示名称",
   "gallery.details.folderName": "文件夹名",
@@ -643,5 +644,13 @@
   "gallery.lightbox.image.previousTitle": "上一张 (←)",
   "gallery.lightbox.image.nextTitle": "下一张 (→)",
   "gallery.lightbox.image.loadFailed": "图片加载失败",
-  "gallery.lightbox.image.fitIndicator": "适合 ({percent}%)"
+  "gallery.lightbox.image.fitIndicator": "适合 ({percent}%)",
+  "gallery.lightbox.contextMenu.fit": "适合视图",
+  "gallery.lightbox.contextMenu.actual": "实际大小",
+  "gallery.lightbox.contextMenu.zoomIn": "放大",
+  "gallery.lightbox.contextMenu.zoomOut": "缩小",
+  "gallery.lightbox.contextMenu.showFilmstrip": "显示缩略图",
+  "gallery.lightbox.contextMenu.hideFilmstrip": "隐藏缩略图",
+  "gallery.lightbox.contextMenu.fullscreen": "进入全屏",
+  "gallery.lightbox.contextMenu.exitFullscreen": "退出全屏"
 }
