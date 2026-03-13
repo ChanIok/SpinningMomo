@@ -343,7 +343,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // update 设置
   update: {
     autoCheck: true,
-    autoUpdateOnExit: true,
+    autoUpdateOnExit: false,
     versionUrl: 'https://spinning.infinitymomo.com/version.txt',
     downloadSources: [
       {

@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3836 bytes
+// Size: 4014 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -82,6 +82,8 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.settings_format_error": "Format error: ",
   "message.settings_ratio_format_example": "Please use correct format, e.g.: 16:10,17:10",
   "message.settings_resolution_format_example": "Please use correct format, e.g.: 3840x2160,7680x4320",
+  "message.update_available_about_prefix": "A new version is available. Install it from the About page: ",
+  "message.app_updated_to_prefix": "Successfully updated to version ",
 
   "label.app_name": "SpinningMomo",
   "label.language_zh_cn": "中文",

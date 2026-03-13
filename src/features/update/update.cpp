@@ -9,6 +9,7 @@ import Core.Events;
 import Core.Async;
 import UI.FloatingWindow.Events;
 import Core.State;
+import Core.I18n.State;
 import Core.HttpClient;
 import Core.HttpClient.Types;
 import Features.Update.State;
@@ -23,6 +24,25 @@ import Vendor.Version;
 import Vendor.Windows;
 
 namespace Features::Update {
+
+auto post_update_notification(Core::State::AppState& app_state, const std::string& message)
+    -> void {
+  if (!app_state.events || !app_state.i18n) {
+    Logger().warn("Skip update notification: state is not ready");
+    return;
+  }
+
+  auto app_name_it = app_state.i18n->texts.find("label.app_name");
+  if (app_name_it == app_state.i18n->texts.end()) {
+    Logger().warn("Skip update notification: app name text is missing");
+    return;
+  }
+
+  Core::Events::post(*app_state.events, UI::FloatingWindow::Events::NotificationEvent{
+                                            .title = app_name_it->second,
+                                            .message = message,
+                                        });
+}
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)
     -> bool {
@@ -234,7 +254,7 @@ auto download_file(Core::State::AppState& app_state, const std::string& url,
 }
 
 auto create_update_script(const std::filesystem::path& update_package_path, bool is_portable,
-                          bool restart = true)
+                          Vendor::Windows::DWORD target_pid, bool restart = true)
     -> std::expected<std::filesystem::path, std::string> {
   try {
     auto temp_dir = get_temp_directory();
@@ -259,8 +279,12 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
     // 写入批处理脚本
     script << "@echo off\n";
     script << "echo Starting update process...\n";
-    script << "timeout /t 1 /nobreak >nul\n";                  // 等待主程序退出
-    script << "taskkill /f /im SpinningMomo.exe >nul 2>&1\n";  // 确保主程序退出
+    script << "echo Waiting for application to exit...\n";
+    script << "powershell -NoProfile -Command \"$pidToWait = " << target_pid
+           << "; $timeoutMs = 15000; $process = Get-Process -Id $pidToWait -ErrorAction "
+              "SilentlyContinue; if ($process) { if (-not $process.WaitForExit($timeoutMs)) "
+              "{ Stop-Process -Id $pidToWait -Force -ErrorAction SilentlyContinue; "
+              "Start-Sleep -Seconds 1 } }\"\n";
 
     if (is_portable) {
       // 便携版：解压zip覆盖当前目录
@@ -355,6 +379,14 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
 
           if (!app_state.settings->raw.update.auto_update_on_exit) {
             Logger().info("Skip startup auto update prepare: auto_update_on_exit is disabled");
+            if (app_state.i18n) {
+              auto text_it = app_state.i18n->texts.find("message.update_available_about_prefix");
+              if (text_it != app_state.i18n->texts.end()) {
+                post_update_notification(app_state, text_it->second + check_result->latest_version);
+              } else {
+                Logger().warn("Skip update available notification: i18n text is missing");
+              }
+            }
             co_return;
           }
 
@@ -443,26 +475,31 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
     return;
   }
 
-  Logger().info("Executing pending update script: {}",
-                app_state.update->update_script_path.string());
+  const auto script_path = app_state.update->update_script_path;
+
+  Logger().info("Executing pending update script: {}", script_path.string());
+
+  const auto script_directory = script_path.parent_path();
+  const auto command_parameters = std::format(L"/d /c \"{}\"", script_path.wstring());
 
   // 启动更新脚本
   Vendor::ShellApi::SHELLEXECUTEINFOW sei = {sizeof(sei)};
-  sei.fMask = Vendor::ShellApi::kSEE_MASK_NOCLOSEPROCESS;
+  sei.fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC;
   sei.hwnd = nullptr;
   sei.lpVerb = L"open";
-  sei.lpFile = app_state.update->update_script_path.c_str();
-  sei.lpParameters = nullptr;
-  sei.lpDirectory = nullptr;
+  sei.lpFile = L"cmd.exe";
+  sei.lpParameters = command_parameters.c_str();
+  sei.lpDirectory = script_directory.empty() ? nullptr : script_directory.c_str();
   sei.nShow = Vendor::ShellApi::kSW_HIDE;
   sei.hInstApp = nullptr;
 
-  if (Vendor::ShellApi::ShellExecuteExW(&sei) && sei.hProcess) {
-    // 关闭进程句柄
-    Vendor::Windows::CloseHandle(sei.hProcess);
-    Logger().info("Update script started successfully");
+  const bool shell_execute_ok = Vendor::ShellApi::ShellExecuteExW(&sei) != FALSE;
+
+  if (shell_execute_ok) {
+    Logger().info("Update script launch accepted by shell");
   } else {
-    Logger().error("Failed to execute update script");
+    Logger().error("Failed to execute update script: last_error={}, script_path={}",
+                   Vendor::Windows::GetLastError(), script_path.string());
   }
 
   // 清除待处理更新标志
@@ -608,7 +645,8 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
                   app_state.update->is_portable);
 
     auto script_result =
-        create_update_script(update_package_path, app_state.update->is_portable, params.restart);
+        create_update_script(update_package_path, app_state.update->is_portable,
+                             Vendor::Windows::GetCurrentProcessId(), params.restart);
     if (!script_result) {
       return std::unexpected("Failed to create update script: " + script_result.error());
     }

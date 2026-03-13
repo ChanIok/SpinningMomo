@@ -90,6 +90,7 @@ export auto InvalidateRect(HWND hWnd, const RECT* lpRect, BOOL bErase) -> BOOL {
 
 // Application control
 export auto PostQuitMessage(int nExitCode) -> void { ::PostQuitMessage(nExitCode); }
+export auto GetCurrentProcessId() -> DWORD { return ::GetCurrentProcessId(); }
 
 // Synchronization
 export auto MsgWaitForMultipleObjectsEx(DWORD nCount, const HANDLE* pHandles, DWORD dwMilliseconds,

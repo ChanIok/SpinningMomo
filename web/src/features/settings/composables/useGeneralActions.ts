@@ -26,6 +26,27 @@ export const useGeneralActions = () => {
     })
   }
 
+  const updateAutoCheck = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      update: {
+        ...appSettings.value.update,
+        autoCheck: enabled,
+        autoUpdateOnExit: enabled ? appSettings.value.update.autoUpdateOnExit : false,
+      },
+    })
+  }
+
+  const updateAutoUpdateOnExit = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      update: {
+        ...appSettings.value.update,
+        autoUpdateOnExit: enabled,
+      },
+    })
+  }
+
   const updateFloatingWindowHotkey = async (modifiers: number, key: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -91,6 +112,11 @@ export const useGeneralActions = () => {
           },
         },
       },
+      update: {
+        ...appSettings.value.update,
+        autoCheck: DEFAULT_APP_SETTINGS.update.autoCheck,
+        autoUpdateOnExit: DEFAULT_APP_SETTINGS.update.autoUpdateOnExit,
+      },
     })
   }
 
@@ -105,6 +131,11 @@ export const useGeneralActions = () => {
         logger: {
           level: DEFAULT_APP_SETTINGS.app.logger.level,
         },
+      },
+      update: {
+        ...appSettings.value.update,
+        autoCheck: DEFAULT_APP_SETTINGS.update.autoCheck,
+        autoUpdateOnExit: DEFAULT_APP_SETTINGS.update.autoUpdateOnExit,
       },
     })
   }
@@ -135,6 +166,8 @@ export const useGeneralActions = () => {
   return {
     updateLanguage,
     updateLoggerLevel,
+    updateAutoCheck,
+    updateAutoUpdateOnExit,
     updateFloatingWindowHotkey,
     updateScreenshotHotkey,
     updateRecordingHotkey,

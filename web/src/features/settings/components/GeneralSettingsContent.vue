@@ -2,6 +2,8 @@
 import { useSettingsStore } from '../store'
 import { useGeneralActions } from '../composables/useGeneralActions'
 import { storeToRefs } from 'pinia'
+import { RouterLink } from 'vue-router'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -16,7 +18,13 @@ import { useI18n } from '@/composables/useI18n'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const { updateLanguage, updateLoggerLevel, resetGeneralCoreSettings } = useGeneralActions()
+const {
+  updateLanguage,
+  updateLoggerLevel,
+  updateAutoCheck,
+  updateAutoUpdateOnExit,
+  resetGeneralCoreSettings,
+} = useGeneralActions()
 const { clearError } = store
 const { t } = useI18n()
 
@@ -132,6 +140,63 @@ const handleReset = async () => {
                 <SelectItem value="ERROR">ERROR</SelectItem>
               </SelectContent>
             </Select>
+          </ItemActions>
+        </Item>
+      </div>
+
+      <!-- Update -->
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.general.update.title') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.general.update.descriptionPrefix') }}
+            <RouterLink
+              :to="{ name: 'about' }"
+              class="font-medium text-primary underline underline-offset-4 hover:text-primary/80"
+            >
+              {{ t('settings.general.update.descriptionLink') }}
+            </RouterLink>
+            {{ t('settings.general.update.descriptionSuffix') }}
+          </p>
+        </div>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.general.update.autoCheck.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.general.update.autoCheck.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.update.autoCheck"
+              @update:model-value="(value) => updateAutoCheck(Boolean(value))"
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.general.update.autoUpdateOnExit.label') }}
+            </ItemTitle>
+            <ItemDescription class="line-clamp-none">
+              {{ t('settings.general.update.autoUpdateOnExit.description') }}
+              <span v-if="!appSettings.update.autoCheck" class="mt-1 block text-xs">
+                {{ t('settings.general.update.autoUpdateOnExit.requiresAutoCheck') }}
+              </span>
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.update.autoUpdateOnExit"
+              :disabled="!appSettings.update.autoCheck"
+              @update:model-value="(value) => updateAutoUpdateOnExit(Boolean(value))"
+            />
           </ItemActions>
         </Item>
       </div>

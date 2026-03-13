@@ -10,6 +10,7 @@ import Core.WorkerPool;
 import Core.State;
 import Core.State.RuntimeInfo;
 import Core.I18n;
+import Core.I18n.State;
 import Core.HttpServer;
 import Core.HttpClient;
 import Core.Events;
@@ -31,6 +32,7 @@ import Features.VirtualGamepad;
 import Features.Letterbox.State;
 import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
+import UI.FloatingWindow.Events;
 import UI.FloatingWindow.State;
 import UI.WebViewWindow;
 import UI.TrayIcon;
@@ -39,6 +41,24 @@ import Vendor.Windows;
 import Utils.Logger;
 
 namespace Core::Initializer {
+
+auto post_startup_notification(Core::State::AppState& state, const std::string& message) -> void {
+  if (!state.events || !state.i18n) {
+    Logger().warn("Skip startup notification: state is not ready");
+    return;
+  }
+
+  auto app_name_it = state.i18n->texts.find("label.app_name");
+  if (app_name_it == state.i18n->texts.end()) {
+    Logger().warn("Skip startup notification: app name text is missing");
+    return;
+  }
+
+  Core::Events::post(*state.events, UI::FloatingWindow::Events::NotificationEvent{
+                                        .title = app_name_it->second,
+                                        .message = message,
+                                    });
+}
 
 auto apply_language_from_settings(Core::State::AppState& state) -> void {
   if (!state.settings || !state.i18n) {
@@ -60,6 +80,17 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     -> std::expected<void, std::string> {
   try {
     Core::Events::register_all_handlers(state);
+
+    auto last_version_result = Core::Migration::get_last_version();
+    if (!last_version_result) {
+      return std::unexpected("Failed to get last version: " + last_version_result.error());
+    }
+
+    const auto last_version = last_version_result.value();
+    const auto current_version = state.runtime_info ? state.runtime_info->version : std::string{};
+    const bool should_notify_upgrade =
+        !current_version.empty() && last_version != "0.0.0.0" &&
+        Core::Migration::compare_versions(last_version, current_version) < 0;
 
     if (auto result = Core::Async::start(*state.async); !result) {
       return std::unexpected("Failed to start async runtime: " + result.error());
@@ -156,6 +187,15 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     } else {
       // 默认显示悬浮窗
       UI::FloatingWindow::show_window(state);
+    }
+
+    if (should_notify_upgrade) {
+      auto text_it = state.i18n->texts.find("message.app_updated_to_prefix");
+      if (text_it != state.i18n->texts.end()) {
+        post_startup_notification(state, text_it->second + current_version);
+      } else {
+        Logger().warn("Skip upgrade notification: i18n text is missing");
+      }
     }
 
     // 注册所有命令的热键

@@ -149,8 +149,8 @@ export struct AppSettings {
 
   // update 分组 - 更新设置
   struct Update {
-    bool auto_check = true;           // 是否自动检查更新
-    bool auto_update_on_exit = true;  // 是否在退出时自动更新
+    bool auto_check = true;            // 是否自动检查更新
+    bool auto_update_on_exit = false;  // 是否在退出时自动更新
 
     // 版本检查URL（Cloudflare Pages）
     std::string version_url = "https://spinning.infinitymomo.com/version.txt";
