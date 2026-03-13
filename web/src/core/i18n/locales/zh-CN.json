@@ -627,5 +627,20 @@
   "settings.extensions.infinityNikki.metadata.description": "自动获取并解析照片隐藏的拍摄参数，在图库中展示更丰富的信息。",
   "settings.extensions.infinityNikki.hardlinks.label": "管理 ScreenShot 硬链接",
   "settings.extensions.infinityNikki.hardlinks.description": "将 ScreenShot 目录中的重复照片替换为指向大喵相册的硬链接，以节省磁盘空间。",
-  "settings.extensions.infinityNikki.saveFailedTitle": "保存无限暖暖设置失败"
+  "settings.extensions.infinityNikki.saveFailedTitle": "保存无限暖暖设置失败",
+  "gallery.lightbox.toolbar.fit": "适合",
+  "gallery.lightbox.toolbar.selected": "已选",
+  "gallery.lightbox.toolbar.fitTitle": "适合显示区域 (0)",
+  "gallery.lightbox.toolbar.actualTitle": "100% 实际像素 (1)",
+  "gallery.lightbox.toolbar.zoomOutTitle": "缩小 (-)",
+  "gallery.lightbox.toolbar.zoomInTitle": "放大 (= / +)",
+  "gallery.lightbox.toolbar.filmstripShowTitle": "显示缩略图 (Tab)",
+  "gallery.lightbox.toolbar.filmstripHideTitle": "隐藏缩略图 (Tab)",
+  "gallery.lightbox.toolbar.fullscreenTitle": "全屏 (F)",
+  "gallery.lightbox.toolbar.exitFullscreenTitle": "退出全屏 (F)",
+  "gallery.lightbox.toolbar.closeTitle": "关闭 (ESC)",
+  "gallery.lightbox.image.previousTitle": "上一张 (←)",
+  "gallery.lightbox.image.nextTitle": "下一张 (→)",
+  "gallery.lightbox.image.loadFailed": "图片加载失败",
+  "gallery.lightbox.image.fitIndicator": "适合 ({percent}%)"
 }

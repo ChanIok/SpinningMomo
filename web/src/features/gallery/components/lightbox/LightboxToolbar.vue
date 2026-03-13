@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useGalleryStore } from '../../store'
+import { useI18n } from '@/composables/useI18n'
 import { useGalleryLightbox } from '../../composables'
+import { useGalleryStore } from '../../store'
 
+const emit = defineEmits<{
+  fit: []
+  actual: []
+  zoomIn: []
+  zoomOut: []
+}>()
+
+const { t } = useI18n()
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 
@@ -11,6 +20,14 @@ const totalCount = computed(() => store.totalCount)
 const selectedCount = computed(() => store.selection.selectedIds.size)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
 const isFullscreen = computed(() => store.lightbox.isFullscreen)
+const isFitMode = computed(() => store.lightbox.fitMode === 'contain')
+const lightboxMode = computed(() => {
+  if (isFitMode.value) {
+    return t('gallery.lightbox.toolbar.fit')
+  }
+
+  return `${Math.round(store.lightbox.zoom * 100)}%`
+})
 
 function handleClose() {
   lightbox.closeLightbox()
@@ -27,19 +44,76 @@ function handleToggleFilmstrip() {
 
 <template>
   <div class="surface-top flex items-center justify-between border-b border-border px-4 py-3">
-    <!-- 左侧：图片计数 -->
     <div class="flex items-center gap-3 text-foreground">
       <span class="text-sm font-medium"> {{ currentIndex + 1 }} / {{ totalCount }} </span>
-      <span v-if="selectedCount > 0" class="text-xs text-primary"> 已选 {{ selectedCount }} </span>
+      <span class="text-xs text-muted-foreground"> {{ lightboxMode }} </span>
+      <span v-if="selectedCount > 0" class="text-xs text-primary">
+        {{ t('gallery.lightbox.toolbar.selected') }} {{ selectedCount }}
+      </span>
     </div>
 
-    <!-- 右侧：控制按钮 -->
     <div class="flex items-center gap-2">
-      <!-- 切换Filmstrip按钮 -->
+      <div class="mr-2 flex items-center gap-1">
+        <button
+          class="inline-flex h-9 items-center justify-center rounded-md px-3 text-xs transition-colors"
+          :class="
+            isFitMode
+              ? 'bg-accent text-accent-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          "
+          @click="emit('fit')"
+          :title="t('gallery.lightbox.toolbar.fitTitle')"
+        >
+          {{ t('gallery.lightbox.toolbar.fit') }}
+        </button>
+
+        <button
+          class="inline-flex h-9 items-center justify-center rounded-md px-3 text-xs transition-colors"
+          :class="
+            !isFitMode
+              ? 'bg-accent text-accent-foreground'
+              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          "
+          @click="emit('actual')"
+          :title="t('gallery.lightbox.toolbar.actualTitle')"
+        >
+          100%
+        </button>
+
+        <button
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          @click="emit('zoomOut')"
+          :title="t('gallery.lightbox.toolbar.zoomOutTitle')"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+          </svg>
+        </button>
+
+        <button
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          @click="emit('zoomIn')"
+          :title="t('gallery.lightbox.toolbar.zoomInTitle')"
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+        </button>
+      </div>
+
       <button
         class="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         @click="handleToggleFilmstrip"
-        :title="showFilmstrip ? '隐藏缩略图 (Tab)' : '显示缩略图 (Tab)'"
+        :title="
+          showFilmstrip
+            ? t('gallery.lightbox.toolbar.filmstripHideTitle')
+            : t('gallery.lightbox.toolbar.filmstripShowTitle')
+        "
       >
         <svg
           v-if="showFilmstrip"
@@ -60,11 +134,14 @@ function handleToggleFilmstrip() {
         </svg>
       </button>
 
-      <!-- 全屏按钮 -->
       <button
         class="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         @click="handleToggleFullscreen"
-        :title="isFullscreen ? '退出全屏 (F)' : '全屏 (F)'"
+        :title="
+          isFullscreen
+            ? t('gallery.lightbox.toolbar.exitFullscreenTitle')
+            : t('gallery.lightbox.toolbar.fullscreenTitle')
+        "
       >
         <svg
           v-if="isFullscreen"
@@ -90,11 +167,10 @@ function handleToggleFilmstrip() {
         </svg>
       </button>
 
-      <!-- 关闭按钮 -->
       <button
         class="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
         @click="handleClose"
-        title="关闭 (ESC)"
+        :title="t('gallery.lightbox.toolbar.closeTitle')"
       >
         <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path

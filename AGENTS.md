@@ -25,6 +25,9 @@ xmake release          # builds release then restores debug config
 # Web frontend (Vue 3 + Vite, in web/ directory)
 cd web && npm run build
 
+# Frontend type check (in web/ directory)
+cd web && npx vue-tsc -b
+
 # Full build: C++ release + web + assemble dist/
 npm run build
 

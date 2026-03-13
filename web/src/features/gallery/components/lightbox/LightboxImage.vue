@@ -1,46 +1,71 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
-import { useGalleryStore } from '../../store'
-import { useGalleryLightbox } from '../../composables'
-import { useGalleryData } from '../../composables'
 import { galleryApi } from '../../api'
+import { useGalleryData, useGalleryLightbox } from '../../composables'
+import { useGalleryStore } from '../../store'
+import { useI18n } from '@/composables/useI18n'
 
+const VIEWPORT_PADDING = 32
+const ZOOM_STEP = 1.1
+// 缩放吸附容差：实际缩放比例接近 fitScale 的 1.02 倍以内时，自动吸附回适合模式
+const FIT_MODE_SNAP_RATIO = 1.02
+const DRAG_THRESHOLD = 4
+const MIN_ACTUAL_ZOOM = 0.05
+const MAX_ACTUAL_ZOOM = 5
+
+interface ZoomAnchor {
+  pointerX: number
+  pointerY: number
+  imageX: number
+  imageY: number
+}
+
+const { t } = useI18n()
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const galleryData = useGalleryData()
 
 const imageError = ref(false)
 const originalLoaded = ref(false)
+const viewportRef = ref<HTMLElement | null>(null)
+const stageRef = ref<HTMLElement | null>(null)
+const naturalWidth = ref(0)
+const naturalHeight = ref(0)
+const activePointerId = ref<number | null>(null)
+const dragStartX = ref(0)
+const dragStartY = ref(0)
+const dragStartScrollLeft = ref(0)
+const dragStartScrollTop = ref(0)
+const dragMoved = ref(false)
+// 拖拽结束后屏蔽紧随而来的 click 事件，防止误触切换缩放模式
+const suppressClick = ref(false)
+let suppressClickResetTimer: number | null = null
 
-// 使用 useElementSize 获取容器实际大小
-const containerRef = ref<HTMLElement>()
-const { width, height } = useElementSize(containerRef)
+const { width, height } = useElementSize(viewportRef)
 
-// 计算可用空间（用于限制图片最大尺寸）
 const availableWidth = computed(() => width.value)
 const availableHeight = computed(() => height.value)
+const viewportInnerWidth = computed(() => Math.max(availableWidth.value - VIEWPORT_PADDING * 2, 1))
+const viewportInnerHeight = computed(() =>
+  Math.max(availableHeight.value - VIEWPORT_PADDING * 2, 1)
+)
 
-// 从 virtualizer 获取当前资产
 const currentAsset = computed(() => {
   const currentIdx = store.lightbox.currentIndex
-  // 直接使用 store.getAssetsInRange 获取当前资产
   return store.getAssetsInRange(currentIdx, currentIdx)[0]
 })
 
-// 缩略图URL
 const thumbnailUrl = computed(() => {
   if (!currentAsset.value) return ''
   return galleryApi.getAssetThumbnailUrl(currentAsset.value)
 })
 
-// 原图URL
 const originalUrl = computed(() => {
   if (!currentAsset.value) return ''
   return galleryData.getAssetUrl(currentAsset.value.id)
 })
 
-// 获取当前图片加载状态
 const imageState = computed(() => {
   if (!currentAsset.value) return { status: 'idle' as const }
   return lightbox.getImageState(currentAsset.value.id)
@@ -48,27 +73,375 @@ const imageState = computed(() => {
 
 const canGoToPrevious = computed(() => store.lightbox.currentIndex > 0)
 const canGoToNext = computed(() => store.lightbox.currentIndex < store.totalCount - 1)
+const fitMode = computed(() => store.lightbox.fitMode)
+const actualZoom = computed(() => store.lightbox.zoom)
 
-// 监听当前资产变化，重置状态并更新详情面板
-watch(currentAsset, (newAsset) => {
-  originalLoaded.value = false
-  imageError.value = false
+const imageWidth = computed(() => naturalWidth.value || currentAsset.value?.width || 0)
+const imageHeight = computed(() => naturalHeight.value || currentAsset.value?.height || 0)
+const hasImageDimensions = computed(() => imageWidth.value > 0 && imageHeight.value > 0)
 
-  // 更新选中状态和详情面板焦点
-  if (newAsset) {
-    store.selectAsset(newAsset.id, true, false)
-    store.setDetailsFocus({ type: 'asset', asset: newAsset })
+const fitScale = computed(() => {
+  if (
+    !hasImageDimensions.value ||
+    viewportInnerWidth.value <= 0 ||
+    viewportInnerHeight.value <= 0
+  ) {
+    return 1
   }
+
+  return Math.min(
+    viewportInnerWidth.value / imageWidth.value,
+    viewportInnerHeight.value / imageHeight.value,
+    1
+  )
 })
 
-// 监听原图加载状态
-watch(imageState, (state) => {
-  if (state.status === 'loaded') {
-    originalLoaded.value = true
-  } else if (state.status === 'error') {
-    imageError.value = true
+const displayScale = computed(() => {
+  if (fitMode.value === 'contain') {
+    return fitScale.value
   }
+
+  return actualZoom.value
 })
+
+const renderWidth = computed(() => {
+  if (!hasImageDimensions.value) {
+    return Math.max(viewportInnerWidth.value, 1)
+  }
+
+  return Math.max(imageWidth.value * displayScale.value, 1)
+})
+
+const renderHeight = computed(() => {
+  if (!hasImageDimensions.value) {
+    return Math.max(viewportInnerHeight.value, 1)
+  }
+
+  return Math.max(imageHeight.value * displayScale.value, 1)
+})
+
+const canvasWidth = computed(
+  () => Math.max(renderWidth.value, viewportInnerWidth.value) + VIEWPORT_PADDING * 2
+)
+const canvasHeight = computed(
+  () => Math.max(renderHeight.value, viewportInnerHeight.value) + VIEWPORT_PADDING * 2
+)
+
+const canvasStyle = computed(() => ({
+  width: `${canvasWidth.value}px`,
+  height: `${canvasHeight.value}px`,
+  padding: `${VIEWPORT_PADDING}px`,
+}))
+
+const isPannable = computed(
+  () =>
+    fitMode.value === 'actual' &&
+    (renderWidth.value > viewportInnerWidth.value || renderHeight.value > viewportInnerHeight.value)
+)
+
+const isDragging = computed(() => activePointerId.value !== null)
+
+const stageCursor = computed(() => {
+  if (!currentAsset.value || imageError.value) {
+    return 'default'
+  }
+
+  if (fitMode.value === 'contain') {
+    return 'zoom-in'
+  }
+
+  if (isPannable.value) {
+    return isDragging.value ? 'grabbing' : 'grab'
+  }
+
+  return 'zoom-out'
+})
+
+const stageStyle = computed(() => ({
+  width: `${renderWidth.value}px`,
+  height: `${renderHeight.value}px`,
+  cursor: stageCursor.value,
+  touchAction: isPannable.value ? 'none' : 'auto',
+}))
+
+const zoomIndicator = computed(() => {
+  if (fitMode.value === 'contain') {
+    return t('gallery.lightbox.image.fitIndicator', { percent: Math.round(fitScale.value * 100) })
+  }
+
+  return `${Math.round(actualZoom.value * 100)}%`
+})
+
+watch(
+  currentAsset,
+  (newAsset) => {
+    originalLoaded.value = false
+    imageError.value = false
+    naturalWidth.value = newAsset?.width ?? 0
+    naturalHeight.value = newAsset?.height ?? 0
+    resetPointerState()
+    suppressClick.value = false
+
+    if (newAsset) {
+      store.selectAsset(newAsset.id, true, false)
+      store.setDetailsFocus({ type: 'asset', asset: newAsset })
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  imageState,
+  (state) => {
+    if (state.status === 'loaded') {
+      originalLoaded.value = true
+    } else if (state.status === 'error') {
+      imageError.value = true
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => currentAsset.value?.id,
+  async () => {
+    await nextTick()
+    syncViewportPosition()
+  },
+  { flush: 'post' }
+)
+
+watch(
+  [availableWidth, availableHeight],
+  async () => {
+    await nextTick()
+    if (fitMode.value === 'contain') {
+      syncViewportPosition()
+      return
+    }
+
+    clampViewportScroll()
+  },
+  { flush: 'post' }
+)
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
+function clampActualZoom(zoom: number): number {
+  return clamp(zoom, MIN_ACTUAL_ZOOM, MAX_ACTUAL_ZOOM)
+}
+
+function clampViewportScroll() {
+  const viewport = viewportRef.value
+  if (!viewport) return
+
+  viewport.scrollLeft = clamp(
+    viewport.scrollLeft,
+    0,
+    Math.max(viewport.scrollWidth - viewport.clientWidth, 0)
+  )
+  viewport.scrollTop = clamp(
+    viewport.scrollTop,
+    0,
+    Math.max(viewport.scrollHeight - viewport.clientHeight, 0)
+  )
+}
+
+function setViewportScroll(left: number, top: number) {
+  const viewport = viewportRef.value
+  if (!viewport) return
+
+  viewport.scrollLeft = clamp(left, 0, Math.max(viewport.scrollWidth - viewport.clientWidth, 0))
+  viewport.scrollTop = clamp(top, 0, Math.max(viewport.scrollHeight - viewport.clientHeight, 0))
+}
+
+function getCurrentScale(): number {
+  return fitMode.value === 'contain' ? fitScale.value : actualZoom.value
+}
+
+function updateNaturalSize(event: Event) {
+  const target = event.target as HTMLImageElement | null
+  if (!target?.naturalWidth || !target.naturalHeight) {
+    return
+  }
+
+  naturalWidth.value = target.naturalWidth
+  naturalHeight.value = target.naturalHeight
+}
+
+function syncViewportPosition() {
+  const viewport = viewportRef.value
+  if (!viewport) return
+
+  if (fitMode.value === 'contain') {
+    viewport.scrollLeft = 0
+    viewport.scrollTop = 0
+    return
+  }
+
+  setViewportScroll(
+    Math.max((canvasWidth.value - availableWidth.value) / 2, 0),
+    Math.max((canvasHeight.value - availableHeight.value) / 2, 0)
+  )
+}
+
+function getViewportCenterClientPoint() {
+  const viewport = viewportRef.value
+  if (!viewport) return null
+
+  const rect = viewport.getBoundingClientRect()
+  return {
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 2,
+  }
+}
+
+/**
+ * 计算以 (clientX, clientY) 为锚点的缩放锚信息。
+ * 缩放后调用 restoreZoomAnchor 可使该像素点在视口中的位置保持不变，
+ * 实现「以鼠标/视口中心为原点」的平滑缩放体验。
+ */
+function getZoomAnchor(clientX: number, clientY: number, scale: number): ZoomAnchor | null {
+  const viewport = viewportRef.value
+  const stage = stageRef.value
+  if (!viewport || !stage || scale <= 0 || !hasImageDimensions.value) {
+    return null
+  }
+
+  const viewportRect = viewport.getBoundingClientRect()
+  const stageRect = stage.getBoundingClientRect()
+  const pointerX = clamp(clientX - viewportRect.left, 0, viewportRect.width)
+  const pointerY = clamp(clientY - viewportRect.top, 0, viewportRect.height)
+  const stageOffsetLeft = viewport.scrollLeft + (stageRect.left - viewportRect.left)
+  const stageOffsetTop = viewport.scrollTop + (stageRect.top - viewportRect.top)
+
+  return {
+    pointerX,
+    pointerY,
+    imageX: clamp((viewport.scrollLeft + pointerX - stageOffsetLeft) / scale, 0, imageWidth.value),
+    imageY: clamp((viewport.scrollTop + pointerY - stageOffsetTop) / scale, 0, imageHeight.value),
+  }
+}
+
+async function restoreZoomAnchor(anchor: ZoomAnchor, scale: number) {
+  await nextTick()
+
+  const viewport = viewportRef.value
+  const stage = stageRef.value
+  if (!viewport || !stage) {
+    return
+  }
+
+  const viewportRect = viewport.getBoundingClientRect()
+  const stageRect = stage.getBoundingClientRect()
+  const stageOffsetLeft = viewport.scrollLeft + (stageRect.left - viewportRect.left)
+  const stageOffsetTop = viewport.scrollTop + (stageRect.top - viewportRect.top)
+
+  setViewportScroll(
+    stageOffsetLeft + anchor.imageX * scale - anchor.pointerX,
+    stageOffsetTop + anchor.imageY * scale - anchor.pointerY
+  )
+}
+
+async function showFitMode() {
+  lightbox.showFitMode()
+  await nextTick()
+  syncViewportPosition()
+}
+
+async function zoomToScaleAtPoint(
+  targetScale: number,
+  clientX: number,
+  clientY: number,
+  options: { snapToFit?: boolean } = {}
+) {
+  if (!currentAsset.value || imageError.value || !hasImageDimensions.value) {
+    return
+  }
+
+  const snapToFit = options.snapToFit ?? true
+  const clampedScale = clampActualZoom(targetScale)
+
+  if (snapToFit && clampedScale <= fitScale.value * FIT_MODE_SNAP_RATIO) {
+    await showFitMode()
+    return
+  }
+
+  const anchor = getZoomAnchor(clientX, clientY, getCurrentScale())
+  lightbox.setActualZoom(clampedScale)
+
+  if (!anchor) {
+    await nextTick()
+    syncViewportPosition()
+    return
+  }
+
+  await restoreZoomAnchor(anchor, clampedScale)
+}
+
+async function zoomToScaleAtCenter(targetScale: number, options: { snapToFit?: boolean } = {}) {
+  const center = getViewportCenterClientPoint()
+  if (!center) {
+    if ((options.snapToFit ?? true) && targetScale <= fitScale.value * FIT_MODE_SNAP_RATIO) {
+      await showFitMode()
+      return
+    }
+
+    lightbox.setActualZoom(clampActualZoom(targetScale))
+    await nextTick()
+    syncViewportPosition()
+    return
+  }
+
+  await zoomToScaleAtPoint(targetScale, center.clientX, center.clientY, options)
+}
+
+async function showActualSizeAtPoint(clientX: number, clientY: number) {
+  await zoomToScaleAtPoint(1, clientX, clientY, { snapToFit: false })
+}
+
+async function showActualSize() {
+  await zoomToScaleAtCenter(1, { snapToFit: false })
+}
+
+async function zoomIn() {
+  await zoomToScaleAtCenter(getCurrentScale() * ZOOM_STEP)
+}
+
+async function zoomOut() {
+  await zoomToScaleAtCenter(getCurrentScale() / ZOOM_STEP)
+}
+
+function scheduleSuppressClickReset() {
+  if (suppressClickResetTimer !== null) {
+    window.clearTimeout(suppressClickResetTimer)
+  }
+
+  suppressClickResetTimer = window.setTimeout(() => {
+    suppressClick.value = false
+    suppressClickResetTimer = null
+  }, 0)
+}
+
+function resetPointerState(pointerId?: number) {
+  if (pointerId !== undefined && stageRef.value?.hasPointerCapture(pointerId)) {
+    stageRef.value.releasePointerCapture(pointerId)
+  }
+
+  activePointerId.value = null
+  dragMoved.value = false
+}
+
+function handleImageLoad(event: Event) {
+  updateNaturalSize(event)
+}
+
+function handleOriginalLoad(event: Event) {
+  updateNaturalSize(event)
+  originalLoaded.value = true
+}
 
 function handleImageError() {
   imageError.value = true
@@ -82,62 +455,168 @@ function handleNext() {
   lightbox.goToNext()
 }
 
-function handleImageClick() {
-  // 可以添加点击图片的交互，比如切换工具栏显示
+async function handleStageClick(event: MouseEvent) {
+  if (suppressClick.value) {
+    suppressClick.value = false
+    return
+  }
+
+  if (!currentAsset.value || imageError.value) {
+    return
+  }
+
+  if (fitMode.value === 'contain') {
+    await showActualSizeAtPoint(event.clientX, event.clientY)
+    return
+  }
+
+  await showFitMode()
 }
+
+function handleStagePointerDown(event: PointerEvent) {
+  if (event.button !== 0 || !isPannable.value || !viewportRef.value || !stageRef.value) {
+    return
+  }
+
+  activePointerId.value = event.pointerId
+  dragStartX.value = event.clientX
+  dragStartY.value = event.clientY
+  dragStartScrollLeft.value = viewportRef.value.scrollLeft
+  dragStartScrollTop.value = viewportRef.value.scrollTop
+  dragMoved.value = false
+  suppressClick.value = false
+  stageRef.value.setPointerCapture(event.pointerId)
+  event.preventDefault()
+}
+
+function handleStagePointerMove(event: PointerEvent) {
+  if (activePointerId.value !== event.pointerId || !viewportRef.value) {
+    return
+  }
+
+  const deltaX = event.clientX - dragStartX.value
+  const deltaY = event.clientY - dragStartY.value
+
+  if (!dragMoved.value && Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD) {
+    dragMoved.value = true
+  }
+
+  setViewportScroll(dragStartScrollLeft.value - deltaX, dragStartScrollTop.value - deltaY)
+}
+
+function handleStagePointerUp(event: PointerEvent) {
+  if (activePointerId.value !== event.pointerId) {
+    return
+  }
+
+  if (dragMoved.value) {
+    suppressClick.value = true
+    scheduleSuppressClickReset()
+  }
+
+  resetPointerState(event.pointerId)
+}
+
+function handleStagePointerCancel(event: PointerEvent) {
+  if (activePointerId.value !== event.pointerId) {
+    return
+  }
+
+  if (dragMoved.value) {
+    suppressClick.value = true
+    scheduleSuppressClickReset()
+  }
+
+  resetPointerState(event.pointerId)
+}
+
+function handleStageLostPointerCapture(event: PointerEvent) {
+  if (activePointerId.value === event.pointerId) {
+    resetPointerState()
+  }
+}
+
+function handleViewportWheel(event: WheelEvent) {
+  if (!event.ctrlKey || !currentAsset.value || imageError.value) {
+    return
+  }
+
+  event.preventDefault()
+
+  if (!hasImageDimensions.value || fitScale.value <= 0) {
+    return
+  }
+
+  const zoomFactor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP
+  void zoomToScaleAtPoint(getCurrentScale() * zoomFactor, event.clientX, event.clientY)
+}
+
+defineExpose({
+  showFitMode,
+  showActualSize,
+  zoomIn,
+  zoomOut,
+})
 </script>
 
 <template>
-  <div ref="containerRef" class="relative flex h-full w-full items-center justify-center">
-    <!-- 左侧导航按钮 -->
+  <div class="relative h-full w-full">
     <button
       v-if="canGoToPrevious"
-      class="surface-top absolute left-4 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full text-foreground transition-all"
+      class="surface-top absolute top-1/2 left-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-all"
       @click="handlePrevious"
-      title="上一张 (←)"
+      :title="t('gallery.lightbox.image.previousTitle')"
     >
       <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
       </svg>
     </button>
 
-    <!-- 主图片区域 -->
-    <div class="flex h-full w-full items-center justify-center p-8">
-      <div class="relative grid place-items-center">
-        <!-- 缩略图层 -->
-        <img
-          v-if="currentAsset && !imageError"
-          :src="thumbnailUrl"
-          :alt="currentAsset.name"
-          :style="{
-            minWidth: `${currentAsset.width! < availableWidth ? currentAsset.width! : availableWidth}px`,
-            minHeight: `${currentAsset.height! < availableHeight ? currentAsset.height! : availableHeight}px`,
-            maxWidth: `${availableWidth}px`,
-            maxHeight: `${availableHeight}px`,
-          }"
-          class="col-start-1 row-start-1 object-contain select-none"
-          @click.self="handleImageClick"
-        />
-
-        <!-- 原图层 -->
-        <img
-          v-if="currentAsset && !imageError"
-          :src="originalUrl"
-          :alt="currentAsset.name"
-          :style="{
-            maxWidth: `${availableWidth}px`,
-            maxHeight: `${availableHeight}px`,
-            opacity: originalLoaded ? 1 : 0,
-          }"
-          class="col-start-1 row-start-1 object-contain select-none"
-          @error="handleImageError"
-          @click.self="handleImageClick"
-        />
-
-        <!-- 错误状态 -->
+    <div
+      ref="viewportRef"
+      class="lightbox-viewport h-full w-full overflow-auto"
+      @wheel="handleViewportWheel"
+    >
+      <div class="box-border grid min-h-full min-w-full" :style="canvasStyle">
         <div
-          v-if="imageError"
-          class="col-start-1 row-start-1 flex flex-col items-center justify-center text-muted-foreground"
+          v-if="currentAsset && !imageError"
+          ref="stageRef"
+          class="relative col-start-1 row-start-1 self-center justify-self-center select-none"
+          :style="stageStyle"
+          :title="zoomIndicator"
+          @click="handleStageClick"
+          @pointerdown="handleStagePointerDown"
+          @pointermove="handleStagePointerMove"
+          @pointerup="handleStagePointerUp"
+          @pointercancel="handleStagePointerCancel"
+          @lostpointercapture="handleStageLostPointerCapture"
+        >
+          <img
+            :src="thumbnailUrl"
+            :alt="currentAsset.name"
+            class="absolute inset-0 h-full w-full object-contain select-none"
+            draggable="false"
+            @dragstart.prevent
+            @load="handleImageLoad"
+          />
+
+          <img
+            :src="originalUrl"
+            :alt="currentAsset.name"
+            :style="{
+              opacity: originalLoaded ? 1 : 0,
+            }"
+            class="absolute inset-0 h-full w-full object-contain transition-opacity duration-200 select-none"
+            draggable="false"
+            @dragstart.prevent
+            @load="handleOriginalLoad"
+            @error="handleImageError"
+          />
+        </div>
+
+        <div
+          v-else-if="imageError"
+          class="col-start-1 row-start-1 flex min-h-full min-w-full flex-col items-center justify-center text-muted-foreground"
         >
           <svg class="mb-4 h-16 w-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -147,18 +626,17 @@ function handleImageClick() {
               d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <p class="text-lg">图片加载失败</p>
+          <p class="text-lg">{{ t('gallery.lightbox.image.loadFailed') }}</p>
           <p class="mt-2 text-sm text-muted-foreground/70">{{ currentAsset?.name }}</p>
         </div>
       </div>
     </div>
 
-    <!-- 右侧导航按钮 -->
     <button
       v-if="canGoToNext"
-      class="surface-top absolute right-4 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full text-foreground transition-all"
+      class="surface-top absolute top-1/2 right-4 z-10 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-all"
       @click="handleNext"
-      title="下一张 (→)"
+      :title="t('gallery.lightbox.image.nextTitle')"
     >
       <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -166,3 +644,14 @@ function handleImageClick() {
     </button>
   </div>
 </template>
+
+<style scoped>
+.lightbox-viewport {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.lightbox-viewport::-webkit-scrollbar {
+  display: none;
+}
+</style>

@@ -1,71 +1,139 @@
-<script setup lang="ts">
-import { computed, watch } from 'vue'
-import { onKeyStroke, useThrottleFn } from '@vueuse/core'
-import { useGalleryStore } from '../../store'
+﻿<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useGalleryLightbox } from '../../composables'
-import LightboxToolbar from './LightboxToolbar.vue'
-import LightboxImage from './LightboxImage.vue'
+import { useGalleryStore } from '../../store'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
+import LightboxImage from './LightboxImage.vue'
+import LightboxToolbar from './LightboxToolbar.vue'
+
+type LightboxImageExposed = {
+  showFitMode: () => Promise<void>
+  showActualSize: () => Promise<void>
+  zoomIn: () => Promise<void>
+  zoomOut: () => Promise<void>
+}
 
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
+const lightboxImageRef = ref<LightboxImageExposed | null>(null)
 
-// 键盘事件监听（只在父组件注册一次）
+// 键盘事件统一在此父组件注册一次，避免子组件重复绑定
 const throttledPrevious = useThrottleFn(() => {
-  if (store.lightbox.isOpen) lightbox.goToPrevious()
+  if (store.lightbox.isOpen) {
+    lightbox.goToPrevious()
+  }
 }, 200)
 
 const throttledNext = useThrottleFn(() => {
-  if (store.lightbox.isOpen) lightbox.goToNext()
+  if (store.lightbox.isOpen) {
+    lightbox.goToNext()
+  }
 }, 200)
 
-onKeyStroke('ArrowLeft', throttledPrevious)
-onKeyStroke('ArrowRight', throttledNext)
-onKeyStroke('Escape', () => {
-  if (store.lightbox.isOpen) lightbox.closeLightbox()
-})
-onKeyStroke(['f', 'F'], (e) => {
+const throttledZoomIn = useThrottleFn(() => {
   if (store.lightbox.isOpen) {
-    e.preventDefault()
-    lightbox.toggleFullscreen()
+    void lightboxImageRef.value?.zoomIn()
   }
-})
-onKeyStroke('Tab', (e) => {
-  if (store.lightbox.isOpen) {
-    e.preventDefault()
-    lightbox.toggleFilmstrip()
-  }
-})
+}, 60)
 
-const isFullscreen = computed(() => store.lightbox.isFullscreen)
+const throttledZoomOut = useThrottleFn(() => {
+  if (store.lightbox.isOpen) {
+    void lightboxImageRef.value?.zoomOut()
+  }
+}, 60)
+
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
 
-// 点击背景关闭
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
 function handleBackdropClick() {
-  // 可选：点击背景关闭lightbox
   lightbox.closeLightbox()
 }
 
-// 监听全屏状态变化
-watch(isFullscreen, (newValue) => {
-  if (newValue) {
-    document.documentElement.requestFullscreen?.()
-  } else {
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.()
-    }
+function handleToolbarFit() {
+  void lightboxImageRef.value?.showFitMode()
+}
+
+function handleToolbarActual() {
+  void lightboxImageRef.value?.showActualSize()
+}
+
+function handleToolbarZoomIn() {
+  void lightboxImageRef.value?.zoomIn()
+}
+
+function handleToolbarZoomOut() {
+  void lightboxImageRef.value?.zoomOut()
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (!store.lightbox.isOpen || isEditableTarget(event.target)) {
+    return
+  }
+
+  switch (event.key) {
+    case 'ArrowLeft':
+      event.preventDefault()
+      throttledPrevious()
+      return
+    case 'ArrowRight':
+      event.preventDefault()
+      throttledNext()
+      return
+    case 'Escape':
+      lightbox.closeLightbox()
+      return
+    case 'f':
+    case 'F':
+      event.preventDefault()
+      lightbox.toggleFullscreen()
+      return
+    case 'Tab':
+      event.preventDefault()
+      lightbox.toggleFilmstrip()
+      return
+    case '0':
+      event.preventDefault()
+      handleToolbarFit()
+      return
+    case '1':
+      event.preventDefault()
+      handleToolbarActual()
+      return
+    case '=':
+    case '+':
+      event.preventDefault()
+      throttledZoomIn()
+      return
+    case '-':
+    case '_':
+      event.preventDefault()
+      throttledZoomOut()
+      return
+    default:
+      if (event.code === 'NumpadAdd') {
+        event.preventDefault()
+        throttledZoomIn()
+      } else if (event.code === 'NumpadSubtract') {
+        event.preventDefault()
+        throttledZoomOut()
+      }
+  }
+}
+
+useEventListener(window, 'keydown', handleKeydown)
+useEventListener(document, 'fullscreenchange', () => {
+  if (!document.fullscreenElement && store.lightbox.isFullscreen) {
+    store.toggleLightboxFullscreen()
   }
 })
-
-// 监听原生全屏事件（用户按ESC退出全屏）
-watch(
-  () => document.fullscreenElement,
-  (element) => {
-    if (!element && store.lightbox.isFullscreen) {
-      store.toggleLightboxFullscreen()
-    }
-  }
-)
 </script>
 
 <template>
@@ -82,17 +150,18 @@ watch(
       style="--surface-opacity-scale: 0.95"
       @click.self="handleBackdropClick"
     >
-      <!-- Lightbox内容 -->
       <div class="flex h-full w-full flex-col">
-        <!-- 顶部工具栏 -->
-        <LightboxToolbar />
+        <LightboxToolbar
+          @fit="handleToolbarFit"
+          @actual="handleToolbarActual"
+          @zoom-in="handleToolbarZoomIn"
+          @zoom-out="handleToolbarZoomOut"
+        />
 
-        <!-- 主图片区域 -->
         <div class="min-h-0 flex-1">
-          <LightboxImage />
+          <LightboxImage ref="lightboxImageRef" />
         </div>
 
-        <!-- 底部Filmstrip -->
         <Transition
           enter-active-class="transition-all duration-300"
           enter-from-class="translate-y-full opacity-0"

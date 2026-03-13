@@ -17,6 +17,8 @@ import type {
 } from './types'
 
 const GALLERY_VIEW_SIZE_STORAGE_KEY = 'spinningmomo.gallery.view.size'
+const LIGHTBOX_MIN_ZOOM = 0.05
+const LIGHTBOX_MAX_ZOOM = 5
 
 function normalizeGalleryViewSize(size: number): number {
   const numericSize = Number(size)
@@ -293,7 +295,13 @@ export const useGalleryStore = defineStore('gallery', () => {
    * 打开 Lightbox
    * @param index - 要打开的资产的全局索引
    */
+  function resetLightboxView() {
+    lightbox.zoom = 1.0
+    lightbox.fitMode = 'contain'
+  }
+
   function openLightbox(index: number) {
+    resetLightboxView()
     lightbox.isOpen = true
     lightbox.currentIndex = index
   }
@@ -301,8 +309,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   function closeLightbox() {
     lightbox.isOpen = false
     lightbox.currentIndex = 0
-    lightbox.zoom = 1.0
-    lightbox.fitMode = 'contain'
+    resetLightboxView()
 
     // 退出全屏（如果在全屏状态）
     if (lightbox.isFullscreen && document.fullscreenElement) {
@@ -339,7 +346,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   }
 
   function setLightboxZoom(zoom: number) {
-    lightbox.zoom = Math.max(0.5, Math.min(5, zoom))
+    lightbox.zoom = Math.max(LIGHTBOX_MIN_ZOOM, Math.min(LIGHTBOX_MAX_ZOOM, zoom))
   }
 
   function setLightboxFitMode(mode: LightboxState['fitMode']) {
@@ -501,6 +508,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     setSelectionFocus,
     setSelectionLastSelected,
 
+    resetLightboxView,
     openLightbox,
     closeLightbox,
     goToLightboxIndex,

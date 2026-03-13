@@ -628,5 +628,20 @@
   "settings.extensions.infinityNikki.metadata.description": "Automatically fetch and parse hidden shooting parameters so the gallery can show richer details.",
   "settings.extensions.infinityNikki.hardlinks.label": "Manage ScreenShot hardlinks",
   "settings.extensions.infinityNikki.hardlinks.description": "Replace duplicate photos in the ScreenShot directory with hardlinks pointing to Momo's Album to save disk space.",
-  "settings.extensions.infinityNikki.saveFailedTitle": "Failed to save Infinity Nikki settings"
+  "settings.extensions.infinityNikki.saveFailedTitle": "Failed to save Infinity Nikki settings",
+  "gallery.lightbox.toolbar.fit": "Fit",
+  "gallery.lightbox.toolbar.selected": "Selected",
+  "gallery.lightbox.toolbar.fitTitle": "Fit to viewport (0)",
+  "gallery.lightbox.toolbar.actualTitle": "100% actual pixels (1)",
+  "gallery.lightbox.toolbar.zoomOutTitle": "Zoom out (-)",
+  "gallery.lightbox.toolbar.zoomInTitle": "Zoom in (= / +)",
+  "gallery.lightbox.toolbar.filmstripShowTitle": "Show filmstrip (Tab)",
+  "gallery.lightbox.toolbar.filmstripHideTitle": "Hide filmstrip (Tab)",
+  "gallery.lightbox.toolbar.fullscreenTitle": "Fullscreen (F)",
+  "gallery.lightbox.toolbar.exitFullscreenTitle": "Exit fullscreen (F)",
+  "gallery.lightbox.toolbar.closeTitle": "Close (ESC)",
+  "gallery.lightbox.image.previousTitle": "Previous (←)",
+  "gallery.lightbox.image.nextTitle": "Next (→)",
+  "gallery.lightbox.image.loadFailed": "Failed to load image",
+  "gallery.lightbox.image.fitIndicator": "Fit ({percent}%)"
 }
