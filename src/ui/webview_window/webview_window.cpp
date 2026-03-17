@@ -68,6 +68,12 @@ auto fullscreen_window_style(DWORD base_style) -> DWORD {
   return base_style & ~(WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
 }
 
+auto get_window_rect_or_fallback(HWND hwnd, RECT fallback_rect) -> RECT {
+  RECT rect = fallback_rect;
+  GetWindowRect(hwnd, &rect);
+  return rect;
+}
+
 auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 如果 WebView 还未初始化，则进行初始化
   if (!state.webview->is_initialized) {
@@ -302,6 +308,18 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
       return 0;
     }
 
+    case WM_DPICHANGED: {
+      if (state) {
+        RECT* suggested_rect = reinterpret_cast<RECT*>(lparam);
+        SetWindowPos(hwnd, nullptr, suggested_rect->left, suggested_rect->top,
+                     suggested_rect->right - suggested_rect->left,
+                     suggested_rect->bottom - suggested_rect->top, SWP_NOZORDER | SWP_NOACTIVATE);
+        state->webview->window.x = suggested_rect->left;
+        state->webview->window.y = suggested_rect->top;
+      }
+      return 0;
+    }
+
     case WM_NCHITTEST: {
       // 先让系统处理边框缩放命中，再用 WebView 非客户区命中覆盖标题栏/按钮区域
       LRESULT default_hit = DefWindowProcW(hwnd, msg, wparam, lparam);
@@ -351,8 +369,8 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
     case WM_MOVE: {
       if (state) {
-        int x = static_cast<int>(static_cast<short>(LOWORD(lparam)));
-        int y = static_cast<int>(static_cast<short>(HIWORD(lparam)));
+        int x = GET_X_LPARAM(lparam);
+        int y = GET_Y_LPARAM(lparam);
         state->webview->window.x = x;
         state->webview->window.y = y;
       }
@@ -454,11 +472,28 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 注册窗口类
   register_window_class(state.floating_window->window.instance);
 
+  auto style = default_window_style();
+  auto ex_style = desired_window_ex_style(state);
+
   // 从设置读取持久化的尺寸和位置，位置居中
   int width = state.settings->raw.ui.webview_window.width;
   int height = state.settings->raw.ui.webview_window.height;
   int x = state.settings->raw.ui.webview_window.x;
   int y = state.settings->raw.ui.webview_window.y;
+
+  // 首次启动时将默认 96 DPI 逻辑客户区尺寸缩放到当前系统 DPI，
+  // 再换算为窗口外框尺寸，避免高缩放下初始窗口看起来过小。
+  if (x < 0 || y < 0) {
+    UINT dpi = GetDpiForSystem();
+    RECT desired_client_rect = {0, 0, MulDiv(width, dpi, 96), MulDiv(height, dpi, 96)};
+    if (AdjustWindowRectExForDpi(&desired_client_rect, style, FALSE, ex_style, dpi)) {
+      width = desired_client_rect.right - desired_client_rect.left;
+      height = desired_client_rect.bottom - desired_client_rect.top;
+    } else {
+      width = desired_client_rect.right;
+      height = desired_client_rect.bottom;
+    }
+  }
 
   // 限制在合理范围内（最小 320×240，最大为工作区）
   constexpr int kMinWidth = 320;
@@ -500,8 +535,6 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // - WS_THICKFRAME: 支持边缘拖拽调整大小
   // - WS_SYSMENU: 保留系统菜单（Alt+Space）
   // - WS_MAXIMIZEBOX/WS_MINIMIZEBOX: 支持最大化/最小化
-  auto style = default_window_style();
-  auto ex_style = desired_window_ex_style(state);
   HWND hwnd = CreateWindowExW(ex_style,                                // 扩展样式
                               L"SpinningMomoWebViewWindowClass",       // 窗口类名
                               L"SpinningMomo WebView",                 // 窗口标题
@@ -519,14 +552,18 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
 
   // 保存窗口句柄到 WebView 状态中
   state.webview->window.webview_hwnd = hwnd;
-  state.webview->window.width = width;
-  state.webview->window.height = height;
-  state.webview->window.x = x;
-  state.webview->window.y = y;
   state.webview->window.is_visible = false;
 
   // 应用窗口样式（圆角 + 触发边框重算）
   apply_window_style(hwnd);
+
+  RECT client_rect{};
+  GetClientRect(hwnd, &client_rect);
+  auto window_rect = get_window_rect_or_fallback(hwnd, RECT{x, y, x + width, y + height});
+  state.webview->window.width = client_rect.right - client_rect.left;
+  state.webview->window.height = client_rect.bottom - client_rect.top;
+  state.webview->window.x = window_rect.left;
+  state.webview->window.y = window_rect.top;
 
   Logger().info("WebView window created successfully");
   return {};
@@ -583,6 +620,13 @@ auto cleanup(Core::State::AppState& state) -> void {
         x_to_save = wp.rcNormalPosition.left;
         y_to_save = wp.rcNormalPosition.top;
       }
+    } else {
+      RECT rect = get_window_rect_or_fallback(
+          hwnd, RECT{x_to_save, y_to_save, x_to_save + width_to_save, y_to_save + height_to_save});
+      width_to_save = rect.right - rect.left;
+      height_to_save = rect.bottom - rect.top;
+      x_to_save = rect.left;
+      y_to_save = rect.top;
     }
 
     constexpr int kMinWidth = 320;
