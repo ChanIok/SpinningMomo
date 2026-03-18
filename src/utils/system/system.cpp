@@ -6,6 +6,7 @@ import std;
 import <windows.h>;
 import Vendor.ShellApi;
 import Vendor.Windows;
+import Utils.String;
 
 namespace Utils::System {
 
@@ -193,6 +194,45 @@ auto reveal_file_in_explorer(const std::filesystem::path& path)
   }
 
   return {};
+}
+
+auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::string> {
+  if (!OpenClipboard(nullptr)) {
+    return std::unexpected("Failed to open clipboard, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  struct ClipboardCloser {
+    ~ClipboardCloser() { CloseClipboard(); }
+  } clipboard_closer;
+
+  if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+    return std::optional<std::string>{std::nullopt};
+  }
+
+  auto handle = GetClipboardData(CF_UNICODETEXT);
+  if (!handle) {
+    return std::unexpected("Failed to get clipboard text handle, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  auto* text_ptr = static_cast<const wchar_t*>(GlobalLock(handle));
+  if (!text_ptr) {
+    return std::unexpected("Failed to lock clipboard text, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  struct GlobalUnlockGuard {
+    HGLOBAL handle;
+    ~GlobalUnlockGuard() {
+      if (handle) {
+        GlobalUnlock(handle);
+      }
+    }
+  } unlock_guard{handle};
+
+  std::wstring wide_text(text_ptr);
+  return std::optional<std::string>{Utils::String::ToUtf8(wide_text)};
 }
 
 auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)

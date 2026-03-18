@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { rgbToHex } from '@/components/ui/color-picker/colorUtils'
+import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useGalleryStore } from '../store'
@@ -19,6 +20,7 @@ import {
   addTagsToAsset,
   getInfinityNikkiPhotoParams,
   updateAssetDescription,
+  updateInfinityNikkiDyeCode,
 } from '../api'
 import AssetDetailsContent from '../components/AssetDetailsContent.vue'
 import AssetReviewControls from '../components/AssetReviewControls.vue'
@@ -98,24 +100,6 @@ const assetTags = ref<Tag[]>([])
 const assetMainColors = ref<AssetMainColor[]>([])
 const infinityNikkiPhotoParams = ref<InfinityNikkiPhotoParams | null>(null)
 const hasMainColors = computed(() => assetMainColors.value.length > 0)
-const hasInfinityNikkiDetails = computed(() => {
-  const params = infinityNikkiPhotoParams.value
-  if (!params) return false
-
-  return (
-    formatGameTime(params) !== null ||
-    Boolean(params.cameraParams) ||
-    formatNumber(params.cameraFocalLength) !== null ||
-    params.apertureSection !== undefined ||
-    formatMetadataText(params.filterId) !== null ||
-    formatPercentage(params.filterStrength) !== null ||
-    formatPercentage(params.vignetteIntensity) !== null ||
-    formatMetadataText(params.lightId) !== null ||
-    formatPercentage(params.lightStrength) !== null ||
-    params.nikkiHidden !== undefined ||
-    formatPoseId(params.poseId) !== null
-  )
-})
 
 // 当前标签（详情面板焦点为 tag 时）
 const currentTag = computed(() => {
@@ -126,6 +110,9 @@ const rootTagCount = computed(() => store.tags.length)
 const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
 const assetDescriptionDraft = ref('')
 const isSavingAssetDescription = ref(false)
+const dyeCodeDraft = ref('')
+const isSavingDyeCode = ref(false)
+const hasDyeCodeDraft = computed(() => dyeCodeDraft.value.trim().length > 0)
 
 // 监听 activeAsset 变化，加载详情数据
 watch(
@@ -144,16 +131,19 @@ watch(
         assetTags.value = tags
         assetMainColors.value = mainColors
         infinityNikkiPhotoParams.value = photoParams
+        dyeCodeDraft.value = photoParams?.dyeCode ?? ''
       } catch (error) {
         console.error('Failed to load asset details:', error)
         assetTags.value = []
         assetMainColors.value = []
         infinityNikkiPhotoParams.value = null
+        dyeCodeDraft.value = ''
       }
     } else {
       assetTags.value = []
       assetMainColors.value = []
       infinityNikkiPhotoParams.value = null
+      dyeCodeDraft.value = ''
     }
   },
   { immediate: true }
@@ -163,6 +153,7 @@ watch(
   () => activeAsset.value?.id,
   () => {
     assetDescriptionDraft.value = activeAsset.value?.description ?? ''
+    dyeCodeDraft.value = ''
   },
   { immediate: true }
 )
@@ -263,6 +254,46 @@ async function handleAssetDescriptionCommit() {
   }
 }
 
+function resetDyeCodeDraft() {
+  dyeCodeDraft.value = infinityNikkiPhotoParams.value?.dyeCode ?? ''
+}
+
+async function handleDyeCodeCommit() {
+  if (!activeAsset.value || !infinityNikkiPhotoParams.value || isSavingDyeCode.value) {
+    return
+  }
+
+  const normalizedDyeCode = dyeCodeDraft.value.trim()
+  const currentDyeCode = (infinityNikkiPhotoParams.value.dyeCode ?? '').trim()
+  dyeCodeDraft.value = normalizedDyeCode
+
+  if (normalizedDyeCode === currentDyeCode) {
+    return
+  }
+
+  isSavingDyeCode.value = true
+
+  try {
+    await updateInfinityNikkiDyeCode({
+      assetId: activeAsset.value.id,
+      dyeCode: normalizedDyeCode || undefined,
+    })
+
+    infinityNikkiPhotoParams.value = {
+      ...infinityNikkiPhotoParams.value,
+      dyeCode: normalizedDyeCode || undefined,
+    }
+  } catch (error) {
+    resetDyeCodeDraft()
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.details.infinityNikki.updateDyeCodeFailed'), {
+      description: message,
+    })
+  } finally {
+    isSavingDyeCode.value = false
+  }
+}
+
 function padTwoDigits(value: number): string {
   return String(value).padStart(2, '0')
 }
@@ -328,6 +359,52 @@ async function handleCopyCameraParams(text: string) {
   }
 
   toast.error(t('gallery.details.infinityNikki.copyCameraParamsFailed'))
+}
+
+async function handleDyeCodeAction() {
+  if (hasDyeCodeDraft.value) {
+    const success = await (async () => {
+      let copied = false
+
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(dyeCodeDraft.value.trim())
+          copied = true
+        } catch {
+          copied = false
+        }
+      }
+
+      if (!copied) {
+        copied = copyWithExecCommand(dyeCodeDraft.value.trim())
+      }
+
+      return copied
+    })()
+
+    if (success) {
+      toast.success(t('gallery.details.infinityNikki.copyDyeCodeSuccess'))
+      return
+    }
+
+    toast.error(t('gallery.details.infinityNikki.copyDyeCodeFailed'))
+    return
+  }
+
+  let normalizedClipboardText = ''
+
+  try {
+    normalizedClipboardText = (await readClipboardText())?.trim() ?? ''
+  } catch {
+    normalizedClipboardText = ''
+  }
+
+  if (!normalizedClipboardText) {
+    toast.error(t('gallery.details.infinityNikki.pasteDyeCodeFailed'))
+    return
+  }
+
+  dyeCodeDraft.value = normalizedClipboardText
 }
 
 function formatPercentage(value: number | undefined): string | null {
@@ -578,10 +655,40 @@ async function handleCopyColorHex(color: AssetMainColor) {
           <template #after-info>
             <Separator />
 
-            <template v-if="infinityNikkiPhotoParams && hasInfinityNikkiDetails">
+            <template v-if="infinityNikkiPhotoParams">
               <div class="space-y-3">
                 <h4 class="text-sm font-medium">{{ t('gallery.details.infinityNikki.title') }}</h4>
                 <div class="space-y-2 text-xs">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-muted-foreground">{{
+                      t('gallery.details.infinityNikki.dyeCode')
+                    }}</span>
+                    <div class="flex min-w-0 flex-1 items-center gap-2">
+                      <Input
+                        v-model="dyeCodeDraft"
+                        :disabled="isSavingDyeCode"
+                        :placeholder="t('gallery.details.infinityNikki.dyeCodePlaceholder')"
+                        class="h-6 min-w-0 flex-1 px-2 text-xs md:text-xs"
+                        @blur="handleDyeCodeCommit"
+                        @keydown.enter.prevent="handleDyeCodeCommit"
+                        @keydown.esc.prevent="resetDyeCodeDraft"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        class="h-6 px-2 text-xs"
+                        :disabled="isSavingDyeCode"
+                        @click="handleDyeCodeAction"
+                      >
+                        {{
+                          hasDyeCodeDraft
+                            ? t('gallery.details.infinityNikki.copyDyeCode')
+                            : t('gallery.details.infinityNikki.pasteDyeCode')
+                        }}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div
                     v-if="formatGameTime(infinityNikkiPhotoParams)"
                     class="flex justify-between gap-2"
@@ -708,7 +815,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
               </div>
             </template>
 
-            <Separator v-if="hasInfinityNikkiDetails" />
+            <Separator v-if="infinityNikkiPhotoParams" />
           </template>
         </AssetDetailsContent>
       </div>

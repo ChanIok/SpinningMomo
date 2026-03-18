@@ -540,7 +540,8 @@ auto get_infinity_nikki_photo_params(Core::State::AppState& app_state,
            nikki_loc_y,
            nikki_loc_z,
            nikki_hidden,
-           pose_id
+           pose_id,
+           dye_code
     FROM asset_infinity_nikki_params
     WHERE asset_id = ?
   )";
@@ -699,6 +700,57 @@ auto update_asset_description(Core::State::AppState& app_state,
 
   return Types::OperationResult{.success = true,
                                 .message = "Asset description updated successfully",
+                                .affected_count = affected_result->value_or(0)};
+}
+
+auto update_infinity_nikki_dye_code(Core::State::AppState& app_state,
+                                    const Types::UpdateInfinityNikkiDyeCodeParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (params.asset_id <= 0) {
+    return std::unexpected("Asset id must be greater than 0");
+  }
+
+  auto params_exists_result = Core::Database::query_scalar<std::int64_t>(
+      *app_state.database, "SELECT COUNT(1) FROM asset_infinity_nikki_params WHERE asset_id = ?",
+      {params.asset_id});
+  if (!params_exists_result) {
+    return std::unexpected("Failed to load Infinity Nikki photo params before updating dye code: " +
+                           params_exists_result.error());
+  }
+
+  if (params_exists_result->value_or(0) <= 0) {
+    return std::unexpected("Infinity Nikki photo params not found");
+  }
+
+  auto normalized_dye_code =
+      params.dye_code.has_value()
+          ? std::optional<std::string>{trim_ascii_copy(params.dye_code.value())}
+          : std::nullopt;
+  if (normalized_dye_code.has_value() && normalized_dye_code->empty()) {
+    normalized_dye_code = std::nullopt;
+  }
+
+  std::vector<Core::Database::Types::DbParam> db_params;
+  db_params.push_back(normalized_dye_code.has_value()
+                          ? Core::Database::Types::DbParam{normalized_dye_code.value()}
+                          : Core::Database::Types::DbParam{std::monostate{}});
+  db_params.push_back(params.asset_id);
+
+  auto result = Core::Database::execute(
+      *app_state.database, "UPDATE asset_infinity_nikki_params SET dye_code = ? WHERE asset_id = ?",
+      db_params);
+  if (!result) {
+    return std::unexpected("Failed to update Infinity Nikki dye code: " + result.error());
+  }
+
+  auto affected_result =
+      Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT changes()");
+  if (!affected_result) {
+    return std::unexpected("Failed to query updated dye code count: " + affected_result.error());
+  }
+
+  return Types::OperationResult{.success = true,
+                                .message = "Infinity Nikki dye code updated successfully",
                                 .affected_count = affected_result->value_or(0)};
 }
 

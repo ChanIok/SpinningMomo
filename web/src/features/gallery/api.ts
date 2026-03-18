@@ -29,6 +29,7 @@ import type {
   RemoveTagsFromAssetParams,
   UpdateAssetsReviewStateParams,
   UpdateAssetDescriptionParams,
+  UpdateInfinityNikkiDyeCodeParams,
 } from './types'
 import { getStaticUrl } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -589,6 +590,22 @@ export async function updateAssetDescription(
 }
 
 /**
+ * 更新 Infinity Nikki 染色码
+ */
+export async function updateInfinityNikkiDyeCode(
+  params: UpdateInfinityNikkiDyeCodeParams
+): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.updateInfinityNikkiDyeCode', params)
+
+    return result
+  } catch (error) {
+    console.error('Failed to update Infinity Nikki dye code:', error)
+    throw new Error('更新染色码失败')
+  }
+}
+
+/**
  * 批量获取多个资产的标签
  */
 export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<number, Tag[]>> {
@@ -654,4 +671,5 @@ export const galleryApi = {
   moveAssetsToTrash,
   updateAssetsReviewState,
   updateAssetDescription,
+  updateInfinityNikkiDyeCode,
 }

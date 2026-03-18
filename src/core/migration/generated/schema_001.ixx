@@ -222,6 +222,7 @@ CREATE TABLE asset_infinity_nikki_params (
     nikki_loc_z REAL,
     nikki_hidden INTEGER,
     pose_id INTEGER,
+    dye_code TEXT,
     nikki_diy_json TEXT
 )
         )SQL",

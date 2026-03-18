@@ -41,6 +41,9 @@ export auto open_file_with_default_app(const std::filesystem::path& path)
 export auto reveal_file_in_explorer(const std::filesystem::path& path)
     -> std::expected<void, std::string>;
 
+// 读取系统剪贴板中的纯文本内容（UTF-8）
+export auto read_clipboard_text() -> std::expected<std::optional<std::string>, std::string>;
+
 // 将文件移动到系统回收站
 export auto move_files_to_recycle_bin(const std::vector<std::filesystem::path>& paths)
     -> std::expected<void, std::string>;

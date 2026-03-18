@@ -373,6 +373,7 @@ struct InfinityNikkiPhotoParams {
   std::optional<double> nikki_loc_z;
   std::optional<std::int64_t> nikki_hidden;
   std::optional<std::int64_t> pose_id;
+  std::optional<std::string> dye_code;
 };
 
 // ============= 标签相关参数 =============
@@ -413,6 +414,11 @@ struct UpdateAssetsReviewStateParams {
 struct UpdateAssetDescriptionParams {
   std::int64_t asset_id;
   std::optional<std::string> description;
+};
+
+struct UpdateInfinityNikkiDyeCodeParams {
+  std::int64_t asset_id;
+  std::optional<std::string> dye_code;
 };
 
 struct GetTagStatsParams {};

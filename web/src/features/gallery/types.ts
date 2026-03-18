@@ -146,6 +146,11 @@ export interface UpdateAssetDescriptionParams {
   description?: string
 }
 
+export interface UpdateInfinityNikkiDyeCodeParams {
+  assetId: number
+  dyeCode?: string
+}
+
 // 获取资产标签参数
 export interface GetAssetTagsParams {
   assetId: number
@@ -331,6 +336,7 @@ export interface InfinityNikkiPhotoParams {
   nikkiLocZ?: number
   nikkiHidden?: number
   poseId?: number
+  dyeCode?: string
 }
 
 // ============= 时间线相关类型 =============
