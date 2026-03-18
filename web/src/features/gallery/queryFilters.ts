@@ -9,6 +9,8 @@ export function toQueryAssetsFilters(
     includeSubfolders,
     type: filter.type,
     search: filter.searchQuery,
+    rating: filter.rating,
+    reviewFlag: filter.reviewFlag,
     tagIds: filter.tagIds,
     tagMatchMode: filter.tagMatchMode,
     clothIds: filter.clothIds,

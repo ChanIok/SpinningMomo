@@ -10,7 +10,7 @@ import std;
 export namespace Core::Migration::Schema {
 
 struct V001 {
-  static constexpr std::array<std::string_view, 35> statements = {
+  static constexpr std::array<std::string_view, 37> statements = {
       R"SQL(
 CREATE TABLE assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,6 +26,13 @@ CREATE TABLE assets (
     extension TEXT,
     mime_type TEXT,
     hash TEXT,
+    rating INTEGER NOT NULL DEFAULT 0 CHECK (
+        rating BETWEEN 0
+        AND 5
+    ),
+    review_flag TEXT NOT NULL DEFAULT 'none' CHECK (
+        review_flag IN ('none', 'picked', 'rejected')
+    ),
     folder_id INTEGER REFERENCES folders(id) ON DELETE
     SET
         NULL,
@@ -49,6 +56,12 @@ CREATE INDEX idx_assets_created_at ON assets(created_at)
         )SQL",
       R"SQL(
 CREATE INDEX idx_assets_hash ON assets(hash)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_assets_rating ON assets(rating)
+        )SQL",
+      R"SQL(
+CREATE INDEX idx_assets_review_flag ON assets(review_flag)
         )SQL",
       R"SQL(
 CREATE INDEX idx_assets_folder_id ON assets(folder_id)

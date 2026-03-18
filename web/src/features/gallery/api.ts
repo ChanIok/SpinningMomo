@@ -27,6 +27,7 @@ import type {
   UpdateTagParams,
   AddTagsToAssetParams,
   RemoveTagsFromAssetParams,
+  UpdateAssetsReviewStateParams,
 } from './types'
 import { getStaticUrl } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -273,6 +274,21 @@ export async function moveAssetsToTrash(assetIds: number[]): Promise<OperationRe
   } catch (error) {
     console.error('Failed to move assets to trash:', error)
     throw new Error('移到回收站失败')
+  }
+}
+
+/**
+ * 批量更新资产的审片状态（评分 / 留用 / 弃置）
+ */
+export async function updateAssetsReviewState(
+  params: UpdateAssetsReviewStateParams
+): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.updateAssetsReviewState', params)
+    return result
+  } catch (error) {
+    console.error('Failed to update assets review state:', error)
+    throw new Error('更新审片状态失败')
   }
 }
 
@@ -619,4 +635,5 @@ export const galleryApi = {
   openAssetDefault,
   revealAssetInExplorer,
   moveAssetsToTrash,
+  updateAssetsReviewState,
 }

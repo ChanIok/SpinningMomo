@@ -202,6 +202,38 @@
         </Tooltip>
       </TooltipProvider>
 
+      <!-- 评分与标记筛选 -->
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <div>
+              <Popover>
+                <PopoverTrigger as-child>
+                  <Button variant="ghost" size="sm" class="relative">
+                    <Star class="h-4 w-4" :class="hasReviewFilter ? 'text-primary' : ''" />
+                    <span
+                      v-if="hasReviewFilter"
+                      class="absolute right-1 bottom-1 h-2 w-2 rounded-full bg-primary"
+                    />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" class="w-56 p-3">
+                  <ReviewFilterPopover
+                    :rating="filter.rating"
+                    :review-flag="filter.reviewFlag"
+                    @update:rating="(v) => galleryView.setFilter({ rating: v })"
+                    @update:review-flag="(v) => galleryView.setFilter({ reviewFlag: v })"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{{ t('gallery.toolbar.filter.review.tooltip') }}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
       <!-- 视图设置（模式 + 大小调整） -->
       <TooltipProvider>
         <Tooltip>
@@ -281,6 +313,7 @@ import { Slider } from '@/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
+import ReviewFilterPopover from './ReviewFilterPopover.vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -309,6 +342,7 @@ import {
   Palette,
   Type,
   Ruler,
+  Star,
 } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryView } from '../composables'
@@ -350,6 +384,11 @@ const currentSliderPosition = computed(() => galleryView.getSliderPosition())
 const hasSelection = computed(() => props.selectedCount > 0)
 const colorPopoverOpen = ref(false)
 const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
+
+// 评分与标记筛选
+const hasReviewFilter = computed(
+  () => filter.value.rating !== undefined || filter.value.reviewFlag !== undefined
+)
 
 // 视图模式选项
 const viewModes = [

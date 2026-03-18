@@ -9,6 +9,8 @@ export interface Asset {
   path: string
   type: AssetType // photo, video, live_photo, unknown
   dominantColorHex?: string
+  rating: number
+  reviewFlag: ReviewFlag
 
   // 基本信息
   width?: number
@@ -29,6 +31,8 @@ export interface Asset {
 
 // 资产类型枚举
 export type AssetType = 'photo' | 'video' | 'live_photo' | 'unknown'
+
+export type ReviewFlag = 'none' | 'picked' | 'rejected'
 
 // 文件夹类型
 export interface Folder {
@@ -131,6 +135,12 @@ export interface RemoveTagsFromAssetParams {
   tagIds: number[]
 }
 
+export interface UpdateAssetsReviewStateParams {
+  assetIds: number[]
+  rating?: number
+  reviewFlag?: ReviewFlag
+}
+
 // 获取资产标签参数
 export interface GetAssetTagsParams {
   assetId: number
@@ -185,6 +195,8 @@ export interface AssetFilter {
   type?: AssetType // photo, video, live_photo, unknown
   searchQuery?: string
   folderId?: string
+  rating?: number
+  reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
   clothIds?: number[]
@@ -260,6 +272,8 @@ export interface QueryAssetsFilters {
   year?: string // "2024" 格式
   type?: AssetType // photo, video, live_photo
   search?: string // 搜索关键词
+  rating?: number
+  reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
   clothIds?: number[]
@@ -328,6 +342,8 @@ export interface GetTimelineBucketsParams {
   includeSubfolders?: boolean
   type?: AssetType
   search?: string
+  rating?: number
+  reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
   clothIds?: number[]
@@ -351,6 +367,8 @@ export interface GetAssetsByMonthParams {
   sortOrder?: 'asc' | 'desc'
   type?: AssetType
   search?: string
+  rating?: number
+  reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
   clothIds?: number[]

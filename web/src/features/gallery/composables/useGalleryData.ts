@@ -32,6 +32,8 @@ export function useGalleryData() {
         includeSubfolders: filters.includeSubfolders,
         type: filters.type,
         search: filters.search,
+        rating: filters.rating,
+        reviewFlag: filters.reviewFlag,
         tagIds: filters.tagIds,
         tagMatchMode: filters.tagMatchMode,
         clothIds: filters.clothIds,

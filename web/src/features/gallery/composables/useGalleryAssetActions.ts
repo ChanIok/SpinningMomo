@@ -5,6 +5,7 @@ import { galleryApi } from '../api'
 import { useGalleryData } from './useGalleryData'
 import { useGallerySelection } from './useGallerySelection'
 import { useGalleryStore } from '../store'
+import type { ReviewFlag } from '../types'
 
 export function useGalleryAssetActions() {
   const store = useGalleryStore()
@@ -129,6 +130,52 @@ export function useGalleryAssetActions() {
     }
   }
 
+  async function updateSelectedAssetsReviewState(payload: {
+    rating?: number
+    reviewFlag?: ReviewFlag
+  }) {
+    if (selectedAssetIds.value.length === 0) {
+      return
+    }
+
+    try {
+      const result = await galleryApi.updateAssetsReviewState({
+        assetIds: selectedAssetIds.value,
+        rating: payload.rating,
+        reviewFlag: payload.reviewFlag,
+      })
+
+      if (!result.success) {
+        throw new Error(result.message)
+      }
+
+      // 审片是高频操作：成功后优先 patch 当前已加载数据，避免等待整页重载。
+      store.patchAssetsReviewState(selectedAssetIds.value, payload)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(t('gallery.review.update.failedTitle'), {
+        description: message,
+      })
+      throw error
+    }
+  }
+
+  async function setSelectedAssetsRating(rating: number) {
+    await updateSelectedAssetsReviewState({ rating })
+  }
+
+  async function clearSelectedAssetsRating() {
+    await updateSelectedAssetsReviewState({ rating: 0 })
+  }
+
+  async function setSelectedAssetsReviewFlag(reviewFlag: ReviewFlag) {
+    await updateSelectedAssetsReviewState({ reviewFlag })
+  }
+
+  async function clearSelectedAssetsReviewFlag() {
+    await updateSelectedAssetsReviewState({ reviewFlag: 'none' })
+  }
+
   return {
     selectedAssetIds,
     isSingleSelection,
@@ -136,5 +183,10 @@ export function useGalleryAssetActions() {
     handleOpenAssetDefault,
     handleRevealAssetInExplorer,
     handleMoveAssetsToTrash,
+    updateSelectedAssetsReviewState,
+    setSelectedAssetsRating,
+    clearSelectedAssetsRating,
+    setSelectedAssetsReviewFlag,
+    clearSelectedAssetsReviewFlag,
   }
 }

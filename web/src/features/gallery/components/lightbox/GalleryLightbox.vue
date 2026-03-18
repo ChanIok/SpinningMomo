@@ -4,7 +4,7 @@ import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { call } from '@/core/rpc'
 import { isWebView } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
-import { useGalleryLightbox, useGallerySelection } from '../../composables'
+import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
 import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
@@ -33,6 +33,7 @@ type WebViewFullscreenResult = {
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
+const assetActions = useGalleryAssetActions()
 const { t } = useI18n()
 const lightboxRootRef = ref<HTMLElement | null>(null)
 const lightboxImageRef = ref<LightboxImageExposed | null>(null)
@@ -235,11 +236,48 @@ function handleKeydown(event: KeyboardEvent) {
       return
     case '0':
       event.preventDefault()
-      handleToolbarFit()
+      // 让 0~5 与 Lightroom 的审片习惯保持一致；缩放切换改由 Z 负责。
+      void assetActions.clearSelectedAssetsRating()
       return
     case '1':
       event.preventDefault()
-      handleToolbarActual()
+      void assetActions.setSelectedAssetsRating(1)
+      return
+    case '2':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsRating(2)
+      return
+    case '3':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsRating(3)
+      return
+    case '4':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsRating(4)
+      return
+    case '5':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsRating(5)
+      return
+    case 'z':
+    case 'Z':
+      event.preventDefault()
+      lightbox.toggleFitActual()
+      return
+    case 'p':
+    case 'P':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsReviewFlag('picked')
+      return
+    case 'x':
+    case 'X':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsReviewFlag('rejected')
+      return
+    case 'u':
+    case 'U':
+      event.preventDefault()
+      void assetActions.clearSelectedAssetsReviewFlag()
       return
     case '=':
     case '+':

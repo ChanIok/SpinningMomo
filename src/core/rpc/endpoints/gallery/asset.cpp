@@ -159,6 +159,20 @@ auto handle_move_assets_to_trash(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_update_assets_review_state(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::UpdateAssetsReviewStateParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result = Features::Gallery::Asset::Service::update_assets_review_state(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 // ============= RPC 方法注册 =============
 
 auto register_all(Core::State::AppState& app_state) -> void {
@@ -213,6 +227,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
                   Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.moveAssetsToTrash", handle_move_assets_to_trash,
       "Move selected asset files to system recycle bin and remove them from gallery index");
+
+  register_method<Features::Gallery::Types::UpdateAssetsReviewStateParams,
+                  Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.updateAssetsReviewState",
+      handle_update_assets_review_state,
+      "Batch update Lightroom-style review metadata such as rating and pick/reject state");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery::Asset

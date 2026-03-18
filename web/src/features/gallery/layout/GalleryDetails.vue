@@ -10,6 +10,7 @@ import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
+import { useGalleryAssetActions } from '../composables'
 import {
   getAssetMainColors,
   getAssetTags,
@@ -18,12 +19,14 @@ import {
   getInfinityNikkiPhotoParams,
 } from '../api'
 import AssetDetailsContent from '../components/AssetDetailsContent.vue'
+import AssetReviewControls from '../components/AssetReviewControls.vue'
 import TagSelectorPopover from '../components/TagSelectorPopover.vue'
-import type { Asset, AssetMainColor, InfinityNikkiPhotoParams, Tag } from '../types'
+import type { Asset, AssetMainColor, InfinityNikkiPhotoParams, ReviewFlag, Tag } from '../types'
 
 const store = useGalleryStore()
 const { t } = useI18n()
 const { toast } = useToast()
+const assetActions = useGalleryAssetActions()
 
 // 获取详情面板焦点
 const detailsFocus = computed(() => store.detailsPanel)
@@ -193,6 +196,22 @@ async function handleAddTag(tagId: number) {
   } catch (error) {
     console.error('Failed to add tag:', error)
   }
+}
+
+async function handleSetRating(rating: number) {
+  await assetActions.setSelectedAssetsRating(rating)
+}
+
+async function handleClearRating() {
+  await assetActions.clearSelectedAssetsRating()
+}
+
+async function handleSetReviewFlag(reviewFlag: ReviewFlag) {
+  await assetActions.setSelectedAssetsReviewFlag(reviewFlag)
+}
+
+async function handleClearReviewFlag() {
+  await assetActions.clearSelectedAssetsReviewFlag()
 }
 
 function padTwoDigits(value: number): string {
@@ -412,16 +431,69 @@ async function handleCopyColorHex(color: AssetMainColor) {
           </template>
 
           <template #before-info>
-            <div>
-              <div class="mb-2 flex items-center justify-between">
-                <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
-                <Popover v-model:open="showTagSelector">
-                  <PopoverTrigger as-child>
-                    <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
+            <div class="space-y-3">
+              <div class="space-y-2">
+                <h4 class="text-sm font-medium">{{ t('gallery.details.review.title') }}</h4>
+                <AssetReviewControls
+                  :rating="activeAsset.rating"
+                  :review-flag="activeAsset.reviewFlag"
+                  @set-rating="handleSetRating"
+                  @clear-rating="handleClearRating"
+                  @set-flag="handleSetReviewFlag"
+                  @clear-flag="handleClearReviewFlag"
+                />
+              </div>
+
+              <Separator />
+
+              <div>
+                <div class="mb-2 flex items-center justify-between">
+                  <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
+                  <Popover v-model:open="showTagSelector">
+                    <PopoverTrigger as-child>
+                      <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M5 12h14" />
+                          <path d="M12 5v14" />
+                        </svg>
+                        {{ t('gallery.details.tags.add') }}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" class="p-0">
+                      <TagSelectorPopover
+                        :tags="store.tags"
+                        :selected-tag-ids="assetTags.map((t) => t.id)"
+                        @select="handleAddTag"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div v-if="assetTags.length > 0" class="flex flex-wrap gap-1.5">
+                  <span
+                    v-for="tag in assetTags"
+                    :key="tag.id"
+                    class="group inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs text-primary transition-colors hover:bg-primary/20"
+                  >
+                    <span>{{ tag.name }}</span>
+                    <button
+                      class="flex h-3 w-3 items-center justify-center rounded-full opacity-60 transition-opacity hover:bg-primary/30 hover:opacity-100"
+                      @click="handleRemoveTag(tag.id)"
+                    >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        width="12"
-                        height="12"
+                        width="10"
+                        height="10"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"
@@ -429,52 +501,15 @@ async function handleCopyColorHex(color: AssetMainColor) {
                         stroke-linecap="round"
                         stroke-linejoin="round"
                       >
-                        <path d="M5 12h14" />
-                        <path d="M12 5v14" />
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
                       </svg>
-                      {{ t('gallery.details.tags.add') }}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="end" class="p-0">
-                    <TagSelectorPopover
-                      :tags="store.tags"
-                      :selected-tag-ids="assetTags.map((t) => t.id)"
-                      @select="handleAddTag"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div v-if="assetTags.length > 0" class="flex flex-wrap gap-1.5">
-                <span
-                  v-for="tag in assetTags"
-                  :key="tag.id"
-                  class="group inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs text-primary transition-colors hover:bg-primary/20"
-                >
-                  <span>{{ tag.name }}</span>
-                  <button
-                    class="flex h-3 w-3 items-center justify-center rounded-full opacity-60 transition-opacity hover:bg-primary/30 hover:opacity-100"
-                    @click="handleRemoveTag(tag.id)"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <path d="M18 6 6 18" />
-                      <path d="m6 6 12 12" />
-                    </svg>
-                  </button>
-                </span>
-              </div>
-              <div v-else class="text-xs text-muted-foreground">
-                {{ t('gallery.details.tags.empty') }}
+                    </button>
+                  </span>
+                </div>
+                <div v-else class="text-xs text-muted-foreground">
+                  {{ t('gallery.details.tags.empty') }}
+                </div>
               </div>
             </div>
           </template>
@@ -673,6 +708,19 @@ async function handleCopyColorHex(color: AssetMainColor) {
           {{ t('gallery.details.batch.selectedCount', { count: selectedCount }) }}
         </div>
 
+        <div class="space-y-2">
+          <h4 class="text-sm font-medium">{{ t('gallery.details.review.title') }}</h4>
+          <AssetReviewControls
+            :rating="batchActiveAsset?.rating ?? 0"
+            :review-flag="batchActiveAsset?.reviewFlag ?? 'none'"
+            :rating-indeterminate="true"
+            @set-rating="handleSetRating"
+            @clear-rating="handleClearRating"
+            @set-flag="handleSetReviewFlag"
+            @clear-flag="handleClearReviewFlag"
+          />
+        </div>
+
         <template v-if="batchActiveAsset">
           <Separator />
 
@@ -686,9 +734,9 @@ async function handleCopyColorHex(color: AssetMainColor) {
         <Separator />
 
         <div class="space-y-2">
-          <p class="text-sm font-medium">{{ t('gallery.details.batch.title') }}</p>
+          <p class="text-sm font-medium">{{ t('gallery.details.batch.helpTitle') }}</p>
           <div class="text-xs text-muted-foreground">
-            {{ t('gallery.details.batch.placeholder') }}
+            {{ t('gallery.details.batch.reviewHint') }}
           </div>
         </div>
       </div>

@@ -75,6 +75,10 @@ auto qualify_asset_column(std::string_view column, std::string_view asset_table_
   return std::string(asset_table_alias) + "." + std::string(column);
 }
 
+auto is_valid_review_flag(const std::string& review_flag) -> bool {
+  return review_flag == "none" || review_flag == "picked" || review_flag == "rejected";
+}
+
 // 构建统一的WHERE条件
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
                                 std::string_view asset_table_alias = "")
@@ -88,6 +92,8 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
   const auto type_column = qualify_asset_column("type", asset_table_alias);
   const auto name_column = qualify_asset_column("name", asset_table_alias);
   const auto id_column = qualify_asset_column("id", asset_table_alias);
+  const auto rating_column = qualify_asset_column("rating", asset_table_alias);
+  const auto review_flag_column = qualify_asset_column("review_flag", asset_table_alias);
 
   // 文件夹筛选
   if (filters.folder_id.has_value()) {
@@ -142,6 +148,26 @@ auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
   if (filters.search.has_value() && !filters.search->empty()) {
     conditions.push_back(name_column + " LIKE ?");
     params.push_back("%" + filters.search.value() + "%");
+  }
+
+  // 审片筛选：评分和留用/弃置都属于资产固有元数据，因此直接挂在 assets 表上筛选。
+  if (filters.rating.has_value()) {
+    int rating = filters.rating.value();
+    if (rating < 0 || rating > 5) {
+      return std::unexpected("Rating filter must be between 0 and 5");
+    }
+
+    conditions.push_back(rating_column + " = ?");
+    params.push_back(static_cast<std::int64_t>(rating));
+  }
+
+  if (filters.review_flag.has_value() && !filters.review_flag->empty()) {
+    if (!is_valid_review_flag(filters.review_flag.value())) {
+      return std::unexpected("Review flag filter must be one of none, picked, rejected");
+    }
+
+    conditions.push_back(review_flag_column + " = ?");
+    params.push_back(filters.review_flag.value());
   }
 
   // 标签筛选
@@ -268,6 +294,7 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
              ORDER BY ac.weight DESC, ac.id ASC
              LIMIT 1
            ) AS dominant_color_hex,
+           rating, review_flag,
            description, width, height, size, extension, mime_type, hash, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at
@@ -387,6 +414,8 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   filters.include_subfolders = params.include_subfolders;
   filters.type = params.type;
   filters.search = params.search;
+  filters.rating = params.rating;
+  filters.review_flag = params.review_flag;
   filters.tag_ids = params.tag_ids;
   filters.tag_match_mode = params.tag_match_mode;
   filters.cloth_ids = params.cloth_ids;
@@ -449,6 +478,8 @@ auto get_assets_by_month(Core::State::AppState& app_state,
   query_params.filters.month = params.month;  // 关键：月份变成筛选条件
   query_params.filters.type = params.type;
   query_params.filters.search = params.search;
+  query_params.filters.rating = params.rating;
+  query_params.filters.review_flag = params.review_flag;
   query_params.filters.tag_ids = params.tag_ids;
   query_params.filters.tag_match_mode = params.tag_match_mode;
   query_params.filters.cloth_ids = params.cloth_ids;
@@ -549,6 +580,63 @@ auto get_home_stats(Core::State::AppState& app_state)
   return result.value().value_or(Types::HomeStats{});
 }
 
+auto update_assets_review_state(Core::State::AppState& app_state,
+                                const Types::UpdateAssetsReviewStateParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (params.asset_ids.empty()) {
+    return std::unexpected("No assets selected for review update");
+  }
+
+  if (!params.rating.has_value() && !params.review_flag.has_value()) {
+    return std::unexpected("At least one review field must be provided");
+  }
+
+  if (params.rating.has_value() && (params.rating.value() < 0 || params.rating.value() > 5)) {
+    return std::unexpected("Rating must be between 0 and 5");
+  }
+
+  if (params.review_flag.has_value() && !is_valid_review_flag(params.review_flag.value())) {
+    return std::unexpected("Review flag must be one of none, picked, rejected");
+  }
+
+  std::vector<std::string> set_clauses;
+  std::vector<Core::Database::Types::DbParam> db_params;
+
+  // 这里使用统一的批量更新入口，后续如果想扩展标记时间、操作者等元数据，只需在这里继续扩展。
+  if (params.rating.has_value()) {
+    set_clauses.push_back("rating = ?");
+    db_params.push_back(static_cast<std::int64_t>(params.rating.value()));
+  }
+
+  if (params.review_flag.has_value()) {
+    set_clauses.push_back("review_flag = ?");
+    db_params.push_back(params.review_flag.value());
+  }
+
+  auto placeholders = build_in_clause_placeholders(params.asset_ids.size());
+  std::string sql =
+      std::format("UPDATE assets SET {} WHERE id IN ({})",
+                  std::ranges::fold_left(set_clauses, std::string{},
+                                         [](const std::string& acc, const std::string& clause) {
+                                           return acc.empty() ? clause : acc + ", " + clause;
+                                         }),
+                  placeholders);
+
+  for (const auto asset_id : params.asset_ids) {
+    db_params.push_back(asset_id);
+  }
+
+  auto result = Core::Database::execute(*app_state.database, sql, db_params);
+  if (!result) {
+    return std::unexpected("Failed to update assets review state: " + result.error());
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Assets review state updated successfully",
+      .affected_count = static_cast<std::int64_t>(params.asset_ids.size())};
+}
+
 // ============= 维护服务实现 =============
 
 auto load_asset_cache(Core::State::AppState& app_state)
@@ -556,6 +644,7 @@ auto load_asset_cache(Core::State::AppState& app_state)
   std::string sql = R"(
     SELECT id, name, path, type,
            NULL AS dominant_color_hex,
+           rating, review_flag,
            description, width, height, size, extension, mime_type, hash, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at

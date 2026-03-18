@@ -35,6 +35,10 @@ export auto get_asset_main_colors(Core::State::AppState& app_state,
 export auto get_home_stats(Core::State::AppState& app_state)
     -> std::expected<Types::HomeStats, std::string>;
 
+export auto update_assets_review_state(Core::State::AppState& app_state,
+                                       const Types::UpdateAssetsReviewStateParams& params)
+    -> std::expected<Types::OperationResult, std::string>;
+
 // 维护服务
 export auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;

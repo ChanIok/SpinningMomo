@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watch } from 'vue'
-import { useGalleryData } from '../composables'
+import { useEventListener } from '@vueuse/core'
+import { useGalleryAssetActions, useGalleryData } from '../composables'
 import { useGalleryStore } from '../store'
 import GalleryToolbar from '../components/GalleryToolbar.vue'
 import GalleryContent from '../components/GalleryContent.vue'
@@ -8,6 +9,55 @@ import GalleryLightbox from '../components/lightbox/GalleryLightbox.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
+const assetActions = useGalleryAssetActions()
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (
+    store.lightbox.isOpen ||
+    isEditableTarget(event.target) ||
+    store.selection.selectedIds.size === 0
+  ) {
+    return
+  }
+
+  switch (event.key) {
+    case '0':
+      event.preventDefault()
+      void assetActions.clearSelectedAssetsRating()
+      return
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsRating(Number(event.key))
+      return
+    case 'p':
+    case 'P':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsReviewFlag('picked')
+      return
+    case 'x':
+    case 'X':
+      event.preventDefault()
+      void assetActions.setSelectedAssetsReviewFlag('rejected')
+      return
+    case 'u':
+    case 'U':
+      event.preventDefault()
+      void assetActions.clearSelectedAssetsReviewFlag()
+      return
+  }
+}
 
 // 监听筛选条件和文件夹选项变化，自动重新加载资产
 watch(
@@ -23,6 +73,8 @@ watch(
   },
   { deep: true }
 )
+
+useEventListener(window, 'keydown', handleKeydown)
 </script>
 
 <template>

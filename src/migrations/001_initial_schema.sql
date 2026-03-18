@@ -18,6 +18,13 @@ CREATE TABLE assets (
     extension TEXT,
     mime_type TEXT,
     hash TEXT,
+    rating INTEGER NOT NULL DEFAULT 0 CHECK (
+        rating BETWEEN 0
+        AND 5
+    ),
+    review_flag TEXT NOT NULL DEFAULT 'none' CHECK (
+        review_flag IN ('none', 'picked', 'rejected')
+    ),
     folder_id INTEGER REFERENCES folders(id) ON DELETE
     SET
         NULL,
@@ -39,6 +46,10 @@ CREATE INDEX idx_assets_extension ON assets(extension);
 CREATE INDEX idx_assets_created_at ON assets(created_at);
 
 CREATE INDEX idx_assets_hash ON assets(hash);
+
+CREATE INDEX idx_assets_rating ON assets(rating);
+
+CREATE INDEX idx_assets_review_flag ON assets(review_flag);
 
 CREATE INDEX idx_assets_folder_id ON assets(folder_id);
 

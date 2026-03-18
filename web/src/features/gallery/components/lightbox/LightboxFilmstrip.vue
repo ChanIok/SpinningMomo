@@ -4,6 +4,7 @@ import { useVirtualizer } from '@tanstack/vue-virtual'
 import { galleryApi } from '../../api'
 import { useGalleryData, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
+import type { ReviewFlag } from '../../types'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
 import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
@@ -128,6 +129,17 @@ function getThumbnailUrl(index: number) {
   return asset ? galleryApi.getAssetThumbnailUrl(asset) : ''
 }
 
+function getReviewFlagLabel(reviewFlag: ReviewFlag) {
+  switch (reviewFlag) {
+    case 'picked':
+      return 'P'
+    case 'rejected':
+      return 'X'
+    default:
+      return ''
+  }
+}
+
 function handleWheel(event: WheelEvent) {
   if (filmstripRef.value) {
     filmstripRef.value.scrollLeft += event.deltaY
@@ -185,6 +197,25 @@ function handleWheel(event: WheelEvent) {
                       'bg-foreground/18': item.index === currentIndex,
                     }"
                   />
+
+                  <div
+                    v-if="(getAssetAtIndex(item.index)?.rating ?? 0) > 0"
+                    class="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                  >
+                    {{ getAssetAtIndex(item.index)?.rating }}★
+                  </div>
+
+                  <div
+                    v-if="getReviewFlagLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none')"
+                    class="absolute right-1 bottom-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
+                    :class="
+                      getAssetAtIndex(item.index)?.reviewFlag === 'picked'
+                        ? 'bg-emerald-600/85'
+                        : 'bg-rose-600/85'
+                    "
+                  >
+                    {{ getReviewFlagLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none') }}
+                  </div>
 
                   <div
                     v-if="isSelected(item.index)"

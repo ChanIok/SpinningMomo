@@ -174,6 +174,46 @@ export const useGalleryStore = defineStore('gallery', () => {
     paginatedAssets.value.set(pageNum, pageAssets)
   }
 
+  function patchAssetsReviewState(
+    assetIds: number[],
+    updates: Partial<Pick<Asset, 'rating' | 'reviewFlag'>>
+  ) {
+    if (assetIds.length === 0) {
+      return
+    }
+
+    const assetIdSet = new Set(assetIds)
+
+    // 审片操作是高频交互，这里直接原地 patch 当前已加载页面，避免每次按键都整页重载。
+    paginatedAssets.value.forEach((pageAssets, pageNum) => {
+      let hasPageChange = false
+      const nextPageAssets = pageAssets.map((asset) => {
+        if (!assetIdSet.has(asset.id)) {
+          return asset
+        }
+
+        hasPageChange = true
+        return {
+          ...asset,
+          ...(updates.rating !== undefined ? { rating: updates.rating } : {}),
+          ...(updates.reviewFlag !== undefined ? { reviewFlag: updates.reviewFlag } : {}),
+        }
+      })
+
+      if (hasPageChange) {
+        paginatedAssets.value.set(pageNum, nextPageAssets)
+      }
+    })
+
+    if (detailsPanel.type === 'asset' && assetIdSet.has(detailsPanel.asset.id)) {
+      detailsPanel.asset = {
+        ...detailsPanel.asset,
+        ...(updates.rating !== undefined ? { rating: updates.rating } : {}),
+        ...(updates.reviewFlag !== undefined ? { reviewFlag: updates.reviewFlag } : {}),
+      }
+    }
+  }
+
   /**
    * 清空分页缓存（切换筛选条件时调用）
    */
@@ -468,6 +508,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     getAssetsInRange,
     isPageLoaded,
     setPageAssets,
+    patchAssetsReviewState,
     clearPaginatedAssets,
 
     // 时间线 Actions
