@@ -23,6 +23,7 @@ import {
   updateInfinityNikkiDyeCode,
 } from '../api'
 import AssetDetailsContent from '../components/AssetDetailsContent.vue'
+import AssetHistogram from '../components/AssetHistogram.vue'
 import AssetReviewControls from '../components/AssetReviewControls.vue'
 import TagSelectorPopover from '../components/TagSelectorPopover.vue'
 import type { Asset, AssetMainColor, InfinityNikkiPhotoParams, ReviewFlag, Tag } from '../types'
@@ -93,6 +94,22 @@ const thumbnailUrl = computed(() => {
 const batchThumbnailUrl = computed(() => {
   if (!batchActiveAsset.value) return ''
   return getAssetThumbnailUrl(batchActiveAsset.value)
+})
+
+const assetHistogramCacheKey = computed(() => {
+  if (!activeAsset.value) return ''
+  return activeAsset.value.hash ?? `${activeAsset.value.id}:${thumbnailUrl.value}`
+})
+
+const shouldShowAssetHistogram = computed(() => {
+  if (!activeAsset.value) {
+    return false
+  }
+
+  return (
+    (activeAsset.value.type === 'photo' || activeAsset.value.type === 'live_photo') &&
+    thumbnailUrl.value.length > 0
+  )
 })
 
 // 资产标签状态
@@ -653,9 +670,9 @@ async function handleCopyColorHex(color: AssetMainColor) {
           </template>
 
           <template #after-info>
-            <Separator />
-
             <template v-if="infinityNikkiPhotoParams">
+              <Separator />
+
               <div class="space-y-3">
                 <h4 class="text-sm font-medium">{{ t('gallery.details.infinityNikki.title') }}</h4>
                 <div class="space-y-2 text-xs">
@@ -815,7 +832,11 @@ async function handleCopyColorHex(color: AssetMainColor) {
               </div>
             </template>
 
-            <Separator v-if="infinityNikkiPhotoParams" />
+            <template v-if="shouldShowAssetHistogram">
+              <Separator />
+
+              <AssetHistogram :cache-key="assetHistogramCacheKey" :image-url="thumbnailUrl" />
+            </template>
           </template>
         </AssetDetailsContent>
       </div>
