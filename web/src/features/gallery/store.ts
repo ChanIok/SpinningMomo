@@ -214,6 +214,34 @@ export const useGalleryStore = defineStore('gallery', () => {
     }
   }
 
+  function patchAssetDescription(assetId: number, description?: string) {
+    paginatedAssets.value.forEach((pageAssets, pageNum) => {
+      let hasPageChange = false
+      const nextPageAssets = pageAssets.map((asset) => {
+        if (asset.id !== assetId) {
+          return asset
+        }
+
+        hasPageChange = true
+        return {
+          ...asset,
+          description,
+        }
+      })
+
+      if (hasPageChange) {
+        paginatedAssets.value.set(pageNum, nextPageAssets)
+      }
+    })
+
+    if (detailsPanel.type === 'asset' && detailsPanel.asset.id === assetId) {
+      detailsPanel.asset = {
+        ...detailsPanel.asset,
+        description,
+      }
+    }
+  }
+
   /**
    * 清空分页缓存（切换筛选条件时调用）
    */
@@ -509,6 +537,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     isPageLoaded,
     setPageAssets,
     patchAssetsReviewState,
+    patchAssetDescription,
     clearPaginatedAssets,
 
     // 时间线 Actions

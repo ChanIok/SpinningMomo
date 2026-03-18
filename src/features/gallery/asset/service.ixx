@@ -39,6 +39,10 @@ export auto update_assets_review_state(Core::State::AppState& app_state,
                                        const Types::UpdateAssetsReviewStateParams& params)
     -> std::expected<Types::OperationResult, std::string>;
 
+export auto update_asset_description(Core::State::AppState& app_state,
+                                     const Types::UpdateAssetDescriptionParams& params)
+    -> std::expected<Types::OperationResult, std::string>;
+
 // 维护服务
 export auto load_asset_cache(Core::State::AppState& app_state)
     -> std::expected<std::unordered_map<std::string, Types::Metadata>, std::string>;

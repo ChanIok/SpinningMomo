@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -17,6 +18,7 @@ import {
   removeTagsFromAsset,
   addTagsToAsset,
   getInfinityNikkiPhotoParams,
+  updateAssetDescription,
 } from '../api'
 import AssetDetailsContent from '../components/AssetDetailsContent.vue'
 import AssetReviewControls from '../components/AssetReviewControls.vue'
@@ -122,6 +124,8 @@ const currentTag = computed(() => {
 const isRootTagSummary = computed(() => currentTag.value?.id === -1)
 const rootTagCount = computed(() => store.tags.length)
 const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
+const assetDescriptionDraft = ref('')
+const isSavingAssetDescription = ref(false)
 
 // 监听 activeAsset 变化，加载详情数据
 watch(
@@ -151,6 +155,14 @@ watch(
       assetMainColors.value = []
       infinityNikkiPhotoParams.value = null
     }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => activeAsset.value?.id,
+  () => {
+    assetDescriptionDraft.value = activeAsset.value?.description ?? ''
   },
   { immediate: true }
 )
@@ -212,6 +224,43 @@ async function handleSetReviewFlag(reviewFlag: ReviewFlag) {
 
 async function handleClearReviewFlag() {
   await assetActions.clearSelectedAssetsReviewFlag()
+}
+
+function resetAssetDescriptionDraft() {
+  assetDescriptionDraft.value = activeAsset.value?.description ?? ''
+}
+
+async function handleAssetDescriptionCommit() {
+  if (!activeAsset.value || isSavingAssetDescription.value) {
+    return
+  }
+
+  const normalizedDescription = assetDescriptionDraft.value.trim()
+  const currentDescription = (activeAsset.value.description ?? '').trim()
+  assetDescriptionDraft.value = normalizedDescription
+
+  if (normalizedDescription === currentDescription) {
+    return
+  }
+
+  isSavingAssetDescription.value = true
+
+  try {
+    await updateAssetDescription({
+      assetId: activeAsset.value.id,
+      description: normalizedDescription || undefined,
+    })
+
+    store.patchAssetDescription(activeAsset.value.id, normalizedDescription || undefined)
+  } catch (error) {
+    resetAssetDescriptionDraft()
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.details.asset.updateDescriptionFailed'), {
+      description: message,
+    })
+  } finally {
+    isSavingAssetDescription.value = false
+  }
 }
 
 function padTwoDigits(value: number): string {
@@ -428,6 +477,18 @@ async function handleCopyColorHex(color: AssetMainColor) {
                 </div>
               </TooltipProvider>
             </div>
+          </template>
+
+          <template #description>
+            <Input
+              v-model="assetDescriptionDraft"
+              :disabled="isSavingAssetDescription"
+              :placeholder="t('gallery.details.asset.descriptionPlaceholder')"
+              class="h-6 px-2 text-xs md:text-xs"
+              @blur="handleAssetDescriptionCommit"
+              @keydown.enter.prevent="handleAssetDescriptionCommit"
+              @keydown.esc.prevent="resetAssetDescriptionDraft"
+            />
           </template>
 
           <template #before-info>

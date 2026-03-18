@@ -28,6 +28,7 @@ import type {
   AddTagsToAssetParams,
   RemoveTagsFromAssetParams,
   UpdateAssetsReviewStateParams,
+  UpdateAssetDescriptionParams,
 } from './types'
 import { getStaticUrl } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -572,6 +573,22 @@ export async function getAssetTags(assetId: number): Promise<Tag[]> {
 }
 
 /**
+ * 更新资产描述
+ */
+export async function updateAssetDescription(
+  params: UpdateAssetDescriptionParams
+): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.updateAssetDescription', params)
+
+    return result
+  } catch (error) {
+    console.error('Failed to update asset description:', error)
+    throw new Error('更新资产描述失败')
+  }
+}
+
+/**
  * 批量获取多个资产的标签
  */
 export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<number, Tag[]>> {
@@ -636,4 +653,5 @@ export const galleryApi = {
   revealAssetInExplorer,
   moveAssetsToTrash,
   updateAssetsReviewState,
+  updateAssetDescription,
 }

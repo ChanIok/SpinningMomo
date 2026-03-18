@@ -410,6 +410,11 @@ struct UpdateAssetsReviewStateParams {
   std::optional<std::string> review_flag;
 };
 
+struct UpdateAssetDescriptionParams {
+  std::int64_t asset_id;
+  std::optional<std::string> description;
+};
+
 struct GetTagStatsParams {};
 
 }  // namespace Features::Gallery::Types

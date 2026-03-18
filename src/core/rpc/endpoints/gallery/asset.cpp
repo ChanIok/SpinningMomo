@@ -173,6 +173,24 @@ auto handle_update_assets_review_state(
   co_return result.value();
 }
 
+auto handle_update_asset_description(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::UpdateAssetDescriptionParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result = Features::Gallery::Asset::Service::update_asset_description(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  if (result->affected_count.value_or(0) > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+
+  co_return result.value();
+}
+
 // ============= RPC 方法注册 =============
 
 auto register_all(Core::State::AppState& app_state) -> void {
@@ -233,6 +251,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.updateAssetsReviewState",
       handle_update_assets_review_state,
       "Batch update Lightroom-style review metadata such as rating and pick/reject state");
+
+  register_method<Features::Gallery::Types::UpdateAssetDescriptionParams,
+                  Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.updateAssetDescription",
+      handle_update_asset_description,
+      "Update a single asset description in the gallery details panel");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery::Asset

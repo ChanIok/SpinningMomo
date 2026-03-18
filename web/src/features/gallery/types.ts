@@ -141,6 +141,11 @@ export interface UpdateAssetsReviewStateParams {
   reviewFlag?: ReviewFlag
 }
 
+export interface UpdateAssetDescriptionParams {
+  assetId: number
+  description?: string
+}
+
 // 获取资产标签参数
 export interface GetAssetTagsParams {
   assetId: number

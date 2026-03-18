@@ -79,6 +79,22 @@ auto is_valid_review_flag(const std::string& review_flag) -> bool {
   return review_flag == "none" || review_flag == "picked" || review_flag == "rejected";
 }
 
+auto trim_ascii_copy(std::string_view value) -> std::string {
+  auto is_space = [](unsigned char ch) { return std::isspace(ch) != 0; };
+
+  std::size_t start = 0;
+  while (start < value.size() && is_space(static_cast<unsigned char>(value[start]))) {
+    ++start;
+  }
+
+  std::size_t end = value.size();
+  while (end > start && is_space(static_cast<unsigned char>(value[end - 1]))) {
+    --end;
+  }
+
+  return std::string(value.substr(start, end - start));
+}
+
 // 构建统一的WHERE条件
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
                                 std::string_view asset_table_alias = "")
@@ -635,6 +651,55 @@ auto update_assets_review_state(Core::State::AppState& app_state,
       .success = true,
       .message = "Assets review state updated successfully",
       .affected_count = static_cast<std::int64_t>(params.asset_ids.size())};
+}
+
+auto update_asset_description(Core::State::AppState& app_state,
+                              const Types::UpdateAssetDescriptionParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (params.asset_id <= 0) {
+    return std::unexpected("Asset id must be greater than 0");
+  }
+
+  auto asset_result =
+      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+  if (!asset_result) {
+    return std::unexpected("Failed to load asset before updating description: " +
+                           asset_result.error());
+  }
+
+  if (!asset_result->has_value()) {
+    return std::unexpected("Asset not found");
+  }
+
+  auto normalized_description =
+      params.description.has_value()
+          ? std::optional<std::string>{trim_ascii_copy(params.description.value())}
+          : std::nullopt;
+  if (normalized_description.has_value() && normalized_description->empty()) {
+    normalized_description = std::nullopt;
+  }
+
+  std::vector<Core::Database::Types::DbParam> db_params;
+  db_params.push_back(normalized_description.has_value()
+                          ? Core::Database::Types::DbParam{normalized_description.value()}
+                          : Core::Database::Types::DbParam{std::monostate{}});
+  db_params.push_back(params.asset_id);
+
+  auto result = Core::Database::execute(
+      *app_state.database, "UPDATE assets SET description = ? WHERE id = ?", db_params);
+  if (!result) {
+    return std::unexpected("Failed to update asset description: " + result.error());
+  }
+
+  auto affected_result =
+      Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT changes()");
+  if (!affected_result) {
+    return std::unexpected("Failed to query updated asset count: " + affected_result.error());
+  }
+
+  return Types::OperationResult{.success = true,
+                                .message = "Asset description updated successfully",
+                                .affected_count = affected_result->value_or(0)};
 }
 
 // ============= 维护服务实现 =============
