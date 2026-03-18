@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useI18n } from '@/composables/useI18n'
+import { useSettingsStore } from '@/features/settings/store'
 import TagInlineEditor from './TagInlineEditor.vue'
 import type { FolderTreeNode } from '../types'
 
@@ -37,9 +38,15 @@ const emit = defineEmits<{
   renameDisplayName: [folderId: number, displayName: string]
   openInExplorer: [folderId: number]
   removeWatch: [folderId: number]
+  extractInfinityNikkiMetadata: [folderId: number, folderName: string]
 }>()
 
 const { t } = useI18n()
+
+const settingsStore = useSettingsStore()
+const infinityNikkiEnabled = computed(
+  () => settingsStore.appSettings.extensions.infinityNikki.enable
+)
 
 // 展开状态
 const isExpanded = ref(false)
@@ -86,6 +93,14 @@ function handleRenameCancel() {
 
 function handleOpenInExplorer() {
   emit('openInExplorer', props.folder.id)
+}
+
+function handleExtractInfinityNikkiMetadata() {
+  emit(
+    'extractInfinityNikkiMetadata',
+    props.folder.id,
+    props.folder.displayName || props.folder.name
+  )
 }
 
 function requestRemoveWatch() {
@@ -212,6 +227,9 @@ function handleContextMenuCloseAutoFocus(event: Event) {
         <ContextMenuItem @click="handleOpenInExplorer">
           {{ t('gallery.sidebar.folders.menu.openInExplorer') }}
         </ContextMenuItem>
+        <ContextMenuItem v-if="infinityNikkiEnabled" @click="handleExtractInfinityNikkiMetadata">
+          {{ t('gallery.sidebar.folders.menu.extractInfinityNikkiMetadata') }}
+        </ContextMenuItem>
         <template v-if="isRootFolder">
           <ContextMenuSeparator />
           <ContextMenuItem
@@ -238,6 +256,9 @@ function handleContextMenuCloseAutoFocus(event: Event) {
         "
         @open-in-explorer="(folderId) => emit('openInExplorer', folderId)"
         @remove-watch="(folderId) => emit('removeWatch', folderId)"
+        @extract-infinity-nikki-metadata="
+          (folderId, folderName) => emit('extractInfinityNikkiMetadata', folderId, folderName)
+        "
       />
     </div>
   </div>

@@ -15,6 +15,14 @@ struct InfinityNikkiGameDirResult {
 
 struct InfinityNikkiExtractPhotoParamsRequest {
   std::optional<bool> only_missing = true;
+  std::optional<std::int64_t> folder_id;
+  std::optional<std::string> uid_override;
+};
+
+struct InfinityNikkiExtractPhotoParamsForFolderRequest {
+  std::int64_t folder_id = 0;
+  std::string uid;
+  std::optional<bool> only_missing = false;
 };
 
 struct InfinityNikkiExtractPhotoParamsProgress {

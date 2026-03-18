@@ -219,4 +219,32 @@ auto list_tasks(Core::State::AppState& state) -> std::vector<TaskSnapshot> {
   return result;
 }
 
+auto clear_finished_tasks(Core::State::AppState& state) -> std::size_t {
+  if (!state.tasks) {
+    return 0;
+  }
+
+  std::size_t cleared_count = 0;
+  std::lock_guard<std::mutex> lock(state.tasks->mutex);
+
+  std::deque<std::string> active_order;
+  for (const auto& task_id : state.tasks->order) {
+    auto it = state.tasks->tasks.find(task_id);
+    if (it == state.tasks->tasks.end()) {
+      continue;
+    }
+
+    if (is_task_active(it->second.status)) {
+      active_order.push_back(task_id);
+      continue;
+    }
+
+    state.tasks->tasks.erase(it);
+    cleared_count++;
+  }
+
+  state.tasks->order = std::move(active_order);
+  return cleared_count;
+}
+
 }  // namespace Core::Tasks

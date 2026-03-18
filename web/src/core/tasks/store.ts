@@ -3,6 +3,14 @@ import { defineStore } from 'pinia'
 import { call, on, off } from '@/core/rpc'
 import type { TaskSnapshot } from './types'
 
+interface ClearFinishedTasksResult {
+  clearedCount: number
+}
+
+function isTaskActiveStatus(status: string): boolean {
+  return status === 'queued' || status === 'running'
+}
+
 function isTaskSnapshot(value: unknown): value is TaskSnapshot {
   if (typeof value !== 'object' || value === null) {
     return false
@@ -74,9 +82,13 @@ export const useTaskStore = defineStore('core-task-store', () => {
     isInitialized.value = false
   }
 
-  const activeTasks = computed(() =>
-    tasks.value.filter((item) => item.status === 'queued' || item.status === 'running')
-  )
+  const activeTasks = computed(() => tasks.value.filter((item) => isTaskActiveStatus(item.status)))
+
+  async function clearFinished(): Promise<number> {
+    const result = await call<ClearFinishedTasksResult>('task.clearFinished', {})
+    tasks.value = tasks.value.filter((item) => isTaskActiveStatus(item.status))
+    return result.clearedCount
+  }
 
   return {
     tasks,
@@ -84,6 +96,7 @@ export const useTaskStore = defineStore('core-task-store', () => {
     isInitialized,
     error,
     initialize,
+    clearFinished,
     dispose,
   }
 })

@@ -215,11 +215,15 @@ auto extract_photo_params(
   }
 
   auto only_missing = request.only_missing.value_or(true);
+  auto uid_override = request.uid_override;
+  if (uid_override.has_value() && uid_override->empty()) {
+    co_return std::unexpected("UID override is empty");
+  }
 
   report_extract_progress(progress_callback, "preparing", 0, 0, kPreparingPercent,
                           "Loading candidate assets");
 
-  auto candidates_result = Infra::load_candidate_assets(app_state, only_missing);
+  auto candidates_result = Infra::load_candidate_assets(app_state, request);
   if (!candidates_result) {
     co_return std::unexpected(candidates_result.error());
   }
@@ -247,7 +251,7 @@ auto extract_photo_params(
   for (const auto& candidate : candidates) {
     progress.scanned_count++;
 
-    auto prepared_result = Scan::prepare_photo_extract_entry(candidate);
+    auto prepared_result = Scan::prepare_photo_extract_entry(candidate, uid_override);
     if (!prepared_result) {
       mark_candidate_skipped(result, progress, candidate.id, prepared_result.error());
       report_processing_progress(progress_callback, progress, result);

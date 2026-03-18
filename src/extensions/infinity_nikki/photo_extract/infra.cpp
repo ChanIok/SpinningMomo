@@ -10,7 +10,9 @@ import Core.Database.Types;
 import Core.State;
 import Core.HttpClient;
 import Core.HttpClient.Types;
+import Features.Gallery.Folder.Repository;
 import Extensions.InfinityNikki.PhotoExtract.Scan;
+import Extensions.InfinityNikki.Types;
 import <asio.hpp>;
 
 namespace Extensions::InfinityNikki::PhotoExtract::Infra {
@@ -177,8 +179,64 @@ auto to_db_param(const std::optional<T>& value) -> Core::Database::Types::DbPara
   }
 }
 
-auto load_candidate_assets(Core::State::AppState& app_state, bool only_missing)
+auto normalize_path_for_like_match(std::string path) -> std::string {
+  std::replace(path.begin(), path.end(), '\\', '/');
+  return path;
+}
+
+auto load_candidate_assets(
+    Core::State::AppState& app_state,
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string> {
+  auto only_missing = request.only_missing.value_or(true);
+
+  if (request.folder_id.has_value()) {
+    auto folder_result =
+        Features::Gallery::Folder::Repository::get_folder_by_id(app_state, *request.folder_id);
+    if (!folder_result) {
+      return std::unexpected("Failed to query folder for manual extract: " + folder_result.error());
+    }
+    if (!folder_result->has_value()) {
+      return std::unexpected("Folder not found for manual extract: " +
+                             std::to_string(*request.folder_id));
+    }
+
+    auto normalized_folder_path = normalize_path_for_like_match(folder_result->value().path);
+    std::string sql = R"(
+      SELECT a.id, a.path
+      FROM assets a
+      LEFT JOIN asset_infinity_nikki_params p ON p.asset_id = a.id
+      WHERE a.type = 'photo'
+        AND (
+          replace(a.path, '\\', '/') = ?
+          OR replace(a.path, '\\', '/') LIKE ?
+        )
+        AND (lower(coalesce(a.extension, '')) IN ('.jpg', '.jpeg')
+             OR lower(a.path) LIKE '%.jpg'
+             OR lower(a.path) LIKE '%.jpeg')
+    )";
+
+    std::vector<Core::Database::Types::DbParam> params = {
+        normalized_folder_path,
+        normalized_folder_path + "/%",
+    };
+
+    if (only_missing) {
+      sql += " AND p.asset_id IS NULL";
+    }
+
+    sql += " ORDER BY COALESCE(a.file_modified_at, a.created_at) DESC, a.id DESC";
+
+    auto query_result =
+        Core::Database::query<Scan::CandidateAssetRow>(*app_state.database, sql, params);
+    if (!query_result) {
+      return std::unexpected("Failed to query manual extract candidate assets: " +
+                             query_result.error());
+    }
+
+    return query_result.value();
+  }
+
   std::string sql = R"(
     SELECT a.id, a.path
     FROM assets a

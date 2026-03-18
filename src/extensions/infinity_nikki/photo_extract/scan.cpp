@@ -91,11 +91,21 @@ auto extract_params_base64_from_file(const std::filesystem::path& file_path)
   return middle;
 }
 
-auto prepare_photo_extract_entry(const CandidateAssetRow& candidate)
+auto prepare_photo_extract_entry(const CandidateAssetRow& candidate,
+                                 const std::optional<std::string>& uid_override)
     -> std::expected<PreparedPhotoExtractEntry, std::string> {
-  auto uid_result = extract_uid_from_asset_path(candidate.path);
-  if (!uid_result.has_value()) {
-    return std::unexpected("cannot parse UID from path");
+  std::string uid;
+  if (uid_override.has_value()) {
+    if (uid_override->empty()) {
+      return std::unexpected("UID override is empty");
+    }
+    uid = *uid_override;
+  } else {
+    auto uid_result = extract_uid_from_asset_path(candidate.path);
+    if (!uid_result.has_value()) {
+      return std::unexpected("cannot parse UID from path");
+    }
+    uid = std::move(uid_result.value());
   }
 
   auto params_base64_result = extract_params_base64_from_file(to_filesystem_path(candidate.path));
@@ -105,7 +115,7 @@ auto prepare_photo_extract_entry(const CandidateAssetRow& candidate)
 
   return PreparedPhotoExtractEntry{
       .asset_id = candidate.id,
-      .uid = std::move(uid_result.value()),
+      .uid = std::move(uid),
       .params_base64 = std::move(params_base64_result.value()),
   };
 }

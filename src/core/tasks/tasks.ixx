@@ -28,4 +28,6 @@ export auto complete_task_failed(Core::State::AppState& state, const std::string
 
 export auto list_tasks(Core::State::AppState& state) -> std::vector<TaskSnapshot>;
 
+export auto clear_finished_tasks(Core::State::AppState& state) -> std::size_t;
+
 }  // namespace Core::Tasks

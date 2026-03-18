@@ -7,6 +7,7 @@ export module Extensions.InfinityNikki.PhotoExtract.Infra;
 import std;
 import Core.State;
 import Extensions.InfinityNikki.PhotoExtract.Scan;
+import Extensions.InfinityNikki.Types;
 
 export namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 
@@ -32,7 +33,9 @@ struct ParsedPhotoParamsRecord {
   std::vector<std::int64_t> nikki_clothes;
 };
 
-auto load_candidate_assets(Core::State::AppState& app_state, bool only_missing)
+auto load_candidate_assets(
+    Core::State::AppState& app_state,
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
 
 auto extract_batch_photo_params(Core::State::AppState& app_state,

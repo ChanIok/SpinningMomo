@@ -12,6 +12,7 @@ import FolderTreeItem from '../components/FolderTreeItem.vue'
 import TagTreeItem from '../components/TagTreeItem.vue'
 import TagInlineEditor from '../components/TagInlineEditor.vue'
 import GalleryScanDialog from '../components/GalleryScanDialog.vue'
+import InfinityNikkiMetadataExtractDialog from '../components/InfinityNikkiMetadataExtractDialog.vue'
 
 const galleryData = useGalleryData()
 const galleryStore = useGalleryStore()
@@ -44,6 +45,9 @@ const {
 const isCreatingTag = ref(false)
 
 const showAddFolderDialog = ref(false)
+const showInfinityNikkiMetadataDialog = ref(false)
+const infinityNikkiMetadataFolderId = ref<number | null>(null)
+const infinityNikkiMetadataFolderName = ref('')
 
 const isFolderTitleSelected = computed(() => {
   return galleryStore.sidebar.activeSection === 'folders' && selectedFolder.value === null
@@ -59,6 +63,20 @@ function startAddFolder() {
 
 function handleAddFolderDialogOpenChange(open: boolean) {
   showAddFolderDialog.value = open
+}
+
+function openInfinityNikkiMetadataDialog(folderId: number, folderName: string) {
+  infinityNikkiMetadataFolderId.value = folderId
+  infinityNikkiMetadataFolderName.value = folderName
+  showInfinityNikkiMetadataDialog.value = true
+}
+
+function handleInfinityNikkiMetadataDialogOpenChange(open: boolean) {
+  showInfinityNikkiMetadataDialog.value = open
+  if (!open) {
+    infinityNikkiMetadataFolderId.value = null
+    infinityNikkiMetadataFolderName.value = ''
+  }
 }
 
 function startCreateTag() {
@@ -216,6 +234,7 @@ onMounted(() => {
             @rename-display-name="handleRenameFolderDisplayName"
             @open-in-explorer="handleOpenFolderInExplorer"
             @remove-watch="handleRemoveFolderWatch"
+            @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
           />
         </div>
       </div>
@@ -276,5 +295,11 @@ onMounted(() => {
     </div>
 
     <GalleryScanDialog :open="showAddFolderDialog" @update:open="handleAddFolderDialogOpenChange" />
+    <InfinityNikkiMetadataExtractDialog
+      :open="showInfinityNikkiMetadataDialog"
+      :folder-id="infinityNikkiMetadataFolderId"
+      :folder-name="infinityNikkiMetadataFolderName"
+      @update:open="handleInfinityNikkiMetadataDialogOpenChange"
+    />
   </div>
 </template>

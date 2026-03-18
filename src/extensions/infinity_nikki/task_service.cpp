@@ -25,6 +25,12 @@ constexpr auto kExtractPhotoParamsTaskType = "extensions.infinityNikki.extractPh
 constexpr auto kInitializeScreenshotHardlinksTaskType =
     "extensions.infinityNikki.initializeScreenshotHardlinks";
 constexpr auto kProgressEmitInterval = std::chrono::milliseconds(250);
+constexpr std::size_t kMaxTaskErrorDetails = 3;
+
+auto is_numeric_uid(std::string_view uid) -> bool {
+  return !uid.empty() &&
+         std::ranges::all_of(uid, [](unsigned char ch) { return std::isdigit(ch) != 0; });
+}
 
 auto make_task_progress(const Features::Gallery::Types::ScanProgress& progress)
     -> Core::Tasks::TaskProgress {
@@ -35,6 +41,48 @@ auto make_task_progress(const Features::Gallery::Types::ScanProgress& progress)
       .percent = progress.percent,
       .message = progress.message,
   };
+}
+
+auto append_task_error_details(std::string& message, const std::vector<std::string>& errors)
+    -> void {
+  if (errors.empty()) {
+    return;
+  }
+
+  message += " Details: ";
+
+  auto detail_count = std::min(errors.size(), kMaxTaskErrorDetails);
+  for (std::size_t i = 0; i < detail_count; ++i) {
+    if (i > 0) {
+      message += " | ";
+    }
+    message += errors[i];
+  }
+
+  if (errors.size() > detail_count) {
+    message += std::format(" | ... and {} more", errors.size() - detail_count);
+  }
+}
+
+auto make_extract_task_error_message(
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsResult& summary)
+    -> std::string {
+  auto message = std::format(
+      "Infinity Nikki photo params extract failed: {} item(s) failed out of {} processed",
+      summary.failed_count, summary.processed_count);
+  append_task_error_details(message, summary.errors);
+  return message;
+}
+
+auto make_screenshot_hardlinks_task_error_message(
+    const Extensions::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksResult& summary)
+    -> std::string {
+  auto message = std::format(
+      "Infinity Nikki screenshot hardlinks initialize failed: encountered {} error(s) while "
+      "processing {} source file(s)",
+      summary.errors.size(), summary.source_count);
+  append_task_error_details(message, summary.errors);
+  return message;
 }
 
 auto launch_initial_scan_task(
@@ -154,11 +202,19 @@ auto launch_extract_photo_params_task(
                                 summary.candidate_count, summary.processed_count,
                                 summary.saved_count, summary.skipped_count, summary.failed_count),
             });
-        Core::Tasks::complete_task_success(app_state, task_id);
 
         if (summary.saved_count > 0) {
           Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
         }
+
+        if (summary.failed_count > 0) {
+          auto error_message = make_extract_task_error_message(summary);
+          Logger().error("{}", error_message);
+          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          co_return;
+        }
+
+        Core::Tasks::complete_task_success(app_state, task_id);
       },
       asio::detached);
 }
@@ -239,6 +295,13 @@ auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_stat
                                 summary.removed_count, summary.ignored_count),
             });
 
+        if (!summary.errors.empty()) {
+          auto error_message = make_screenshot_hardlinks_task_error_message(summary);
+          Logger().error("{}", error_message);
+          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          co_return;
+        }
+
         if (app_state.settings &&
             !app_state.settings->raw.extensions.infinity_nikki.manage_screenshot_hardlinks) {
           auto next_settings = app_state.settings->raw;
@@ -280,8 +343,7 @@ auto start_extract_photo_params_task(
     return std::unexpected("Another Infinity Nikki extract task is already running");
   }
 
-  auto task_id = Core::Tasks::create_task(app_state, kExtractPhotoParamsTaskType,
-                                          "Infinity Nikki photo params");
+  auto task_id = Core::Tasks::create_task(app_state, kExtractPhotoParamsTaskType);
   if (task_id.empty()) {
     return std::unexpected("Failed to create Infinity Nikki extract task");
   }
@@ -290,14 +352,33 @@ auto start_extract_photo_params_task(
   return task_id;
 }
 
+auto start_extract_photo_params_for_folder_task(
+    Core::State::AppState& app_state,
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsForFolderRequest& request)
+    -> std::expected<std::string, std::string> {
+  if (request.folder_id <= 0) {
+    return std::unexpected("Invalid folder id for manual Infinity Nikki extract");
+  }
+
+  if (!is_numeric_uid(request.uid)) {
+    return std::unexpected("UID must be a non-empty numeric string");
+  }
+
+  return start_extract_photo_params_task(
+      app_state, Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest{
+                     .only_missing = request.only_missing,
+                     .folder_id = request.folder_id,
+                     .uid_override = request.uid,
+                 });
+}
+
 auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string> {
   if (Core::Tasks::has_active_task_of_type(app_state, kInitializeScreenshotHardlinksTaskType)) {
     return std::unexpected("Another Infinity Nikki screenshot hardlink task is already running");
   }
 
-  auto task_id = Core::Tasks::create_task(app_state, kInitializeScreenshotHardlinksTaskType,
-                                          "Infinity Nikki screenshot hardlinks");
+  auto task_id = Core::Tasks::create_task(app_state, kInitializeScreenshotHardlinksTaskType);
   if (task_id.empty()) {
     return std::unexpected("Failed to create Infinity Nikki screenshot hardlink task");
   }

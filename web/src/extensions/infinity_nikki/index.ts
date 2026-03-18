@@ -30,6 +30,12 @@ interface StartTaskResult {
   taskId: string
 }
 
+interface StartExtractPhotoParamsForFolderParams {
+  folderId: number
+  uid: string
+  onlyMissing?: boolean
+}
+
 /**
  * 生成 InfinityNikki 游戏相册扫描参数
  * @param gameDir InfinityNikki 游戏根目录
@@ -54,6 +60,16 @@ export async function startExtractInfinityNikkiPhotoParams(onlyMissing = true): 
   const result = await call<StartTaskResult>('extensions.infinityNikki.startExtractPhotoParams', {
     onlyMissing,
   })
+  return result.taskId
+}
+
+export async function startExtractInfinityNikkiPhotoParamsForFolder(
+  params: StartExtractPhotoParamsForFolderParams
+): Promise<string> {
+  const result = await call<StartTaskResult>(
+    'extensions.infinityNikki.startExtractPhotoParamsForFolder',
+    params
+  )
   return result.taskId
 }
 

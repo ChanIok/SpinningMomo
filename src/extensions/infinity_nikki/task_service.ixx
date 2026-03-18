@@ -19,6 +19,11 @@ export auto start_extract_photo_params_task(
     const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::string, std::string>;
 
+export auto start_extract_photo_params_for_folder_task(
+    Core::State::AppState& app_state,
+    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsForFolderRequest& request)
+    -> std::expected<std::string, std::string>;
+
 export auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string>;
 

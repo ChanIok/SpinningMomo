@@ -17,7 +17,8 @@ struct PreparedPhotoExtractEntry {
   std::string params_base64;
 };
 
-auto prepare_photo_extract_entry(const CandidateAssetRow& candidate)
+auto prepare_photo_extract_entry(const CandidateAssetRow& candidate,
+                                 const std::optional<std::string>& uid_override = std::nullopt)
     -> std::expected<PreparedPhotoExtractEntry, std::string>;
 
 }  // namespace Extensions::InfinityNikki::PhotoExtract::Scan
