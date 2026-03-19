@@ -8,6 +8,7 @@ import { Toaster } from '@/components/ui/sonner'
 import ActivityBar from './ActivityBar.vue'
 import AppHeader from './AppHeader.vue'
 import ContentArea from './ContentArea.vue'
+import WindowResizeOverlay from './WindowResizeOverlay.vue'
 import 'vue-sonner/style.css'
 
 const route = useRoute()
@@ -22,6 +23,8 @@ const hasBackgroundImage = computed(() =>
 <template>
   <SidebarProvider>
     <div class="relative h-screen w-screen overflow-hidden bg-transparent">
+      <WindowResizeOverlay />
+
       <div class="pointer-events-none absolute inset-0 z-0">
         <div
           class="app-background-image absolute inset-0"

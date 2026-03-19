@@ -1,17 +1,20 @@
 module;
 
-#include <d3d11.h>
-#include <dcomp.h>
 #include <wil/com.h>
 
 #include <WebView2.h>  // 必须放最后面
+
 export module Core.WebView.State;
 
 import std;
 import Core.WebView.Types;
+import <d3d11.h>;
+import <dcomp.h>;
 import <windows.h>;
 
 namespace Core::WebView::State {
+
+export constexpr UINT kWM_APP_BEGIN_RESIZE = WM_APP + 2;
 
 // Composition Hosting 运行时资源
 export struct HostRuntime {

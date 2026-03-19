@@ -19,16 +19,93 @@ import Vendor.WIL;
 import <d3d11.h>;
 import <dcomp.h>;
 import <dxgi.h>;
+import <rfl/json.hpp>;
 import <windows.h>;
 import <wrl.h>;
 
 namespace Core::WebView::Host::Detail {
+
+struct DirectWindowBridgeMessage {
+  std::string type;
+  std::optional<std::string> edge;
+};
 
 auto clear_host_runtime(Core::WebView::State::HostRuntime& host_runtime) -> void {
   host_runtime.dcomp_root_visual.reset();
   host_runtime.dcomp_target.reset();
   host_runtime.dcomp_device.reset();
   host_runtime.d3d_device.reset();
+}
+
+auto resize_edge_to_wmsz(std::string_view edge) -> std::optional<WPARAM> {
+  if (edge == "left") {
+    return WMSZ_LEFT;
+  }
+  if (edge == "right") {
+    return WMSZ_RIGHT;
+  }
+  if (edge == "top") {
+    return WMSZ_TOP;
+  }
+  if (edge == "topLeft") {
+    return WMSZ_TOPLEFT;
+  }
+  if (edge == "topRight") {
+    return WMSZ_TOPRIGHT;
+  }
+  if (edge == "bottom") {
+    return WMSZ_BOTTOM;
+  }
+  if (edge == "bottomLeft") {
+    return WMSZ_BOTTOMLEFT;
+  }
+  if (edge == "bottomRight") {
+    return WMSZ_BOTTOMRIGHT;
+  }
+  return std::nullopt;
+}
+
+auto try_handle_direct_window_bridge_message(Core::State::AppState& state,
+                                             const std::string& message) -> bool {
+  auto bridge_message_result = rfl::json::read<DirectWindowBridgeMessage>(message);
+  if (!bridge_message_result) {
+    return false;
+  }
+
+  const auto& bridge_message = bridge_message_result.value();
+  if (bridge_message.type != "window.beginResize") {
+    return false;
+  }
+
+  auto hwnd = state.webview ? state.webview->window.webview_hwnd : nullptr;
+  if (!hwnd) {
+    Logger().warn("Ignored window.beginResize bridge message: WebView window not created");
+    return true;
+  }
+
+  if (!bridge_message.edge) {
+    Logger().warn("Ignored window.beginResize bridge message: missing edge");
+    return true;
+  }
+
+  auto resize_edge = resize_edge_to_wmsz(*bridge_message.edge);
+  if (!resize_edge) {
+    Logger().warn("Ignored window.beginResize bridge message: unsupported edge {}",
+                  *bridge_message.edge);
+    return true;
+  }
+
+  if (state.webview->window.is_fullscreen || IsZoomed(hwnd) == TRUE) {
+    return true;
+  }
+
+  if (!PostMessageW(hwnd, Core::WebView::State::kWM_APP_BEGIN_RESIZE, *resize_edge, 0)) {
+    Logger().warn("Failed to post deferred resize message for edge: {}", *bridge_message.edge);
+    return true;
+  }
+
+  Logger().debug("WebView window deferred resize request from edge: {}", *bridge_message.edge);
+  return true;
 }
 
 auto create_composition_host(HWND hwnd, Core::WebView::State::HostRuntime& host_runtime)
@@ -239,8 +316,8 @@ auto setup_message_handler(Core::State::AppState* state, ICoreWebView2* webview,
 
   auto webview_message_handler =
       Microsoft::WRL::Callback<ICoreWebView2WebMessageReceivedEventHandler>(
-          [message_handler](ICoreWebView2* sender,
-                            ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
+          [state, message_handler](ICoreWebView2* sender,
+                                   ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
             (void)sender;
             try {
               LPWSTR message_raw;
@@ -248,7 +325,9 @@ auto setup_message_handler(Core::State::AppState* state, ICoreWebView2* webview,
 
               if (SUCCEEDED(hr) && message_raw) {
                 std::string message = Utils::String::ToUtf8(message_raw);
-                message_handler(message);
+                if (!Detail::try_handle_direct_window_bridge_message(*state, message)) {
+                  message_handler(message);
+                }
                 CoTaskMemFree(message_raw);
               }
 

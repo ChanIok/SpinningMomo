@@ -269,7 +269,9 @@ watch(
 <template>
   <header class="flex h-10 items-center justify-between gap-2 bg-transparent pr-1 pl-4">
     <!-- 可拖动区域 -->
-    <div class="drag-region h-full flex-1" />
+    <div class="mt-1.5 h-full flex-1">
+      <div class="drag-region h-full" />
+    </div>
 
     <!-- 图库布局控制 -->
     <div v-if="isGalleryPage" class="flex gap-1">

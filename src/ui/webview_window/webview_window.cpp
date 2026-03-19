@@ -61,7 +61,7 @@ auto apply_window_ex_style_from_settings(Core::State::AppState& state) -> void {
 }
 
 auto default_window_style() -> DWORD {
-  return WS_POPUP | WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
+  return WS_POPUP | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
 }
 
 auto fullscreen_window_style(DWORD base_style) -> DWORD {
@@ -263,29 +263,20 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
   }
 
   switch (msg) {
-    case WM_NCCALCSIZE: {
-      // 处理非客户区大小计算，实现无标题栏窗口
-      // wparam == TRUE: 窗口大小改变时，lparam 指向 NCCALCSIZE_PARAMS
-      // wparam == FALSE: 窗口创建时，lparam 指向 RECT
-      if (wparam == TRUE) {
-        NCCALCSIZE_PARAMS* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
-
-        if (IsZoomed(hwnd)) {
-          // 最大化：限制到工作区（不覆盖任务栏）
-          HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-          MONITORINFO mi = {sizeof(mi)};
-          if (GetMonitorInfoW(monitor, &mi)) {
-            params->rgrc[0] = mi.rcWork;
-          }
-        } else {
-          // 非最大化：获取系统计算的边框大小，但移除顶部标题栏
-          RECT original = params->rgrc[0];
-          DefWindowProcW(hwnd, msg, wparam, lparam);
-          // 保留左右底边框，只移除顶部标题栏
-          params->rgrc[0].top = original.top;
-        }
+    case Core::WebView::State::kWM_APP_BEGIN_RESIZE: {
+      if (!state || !state->webview || !state->webview->window.webview_hwnd) {
+        return 0;
       }
-      // 返回 0 表示我们已处理此消息
+
+      auto resize_edge = static_cast<WPARAM>(wparam);
+      auto target_hwnd = state->webview->window.webview_hwnd;
+      if (state->webview->window.is_fullscreen || IsZoomed(target_hwnd) == TRUE) {
+        return 0;
+      }
+
+      ReleaseCapture();
+      SendMessageW(target_hwnd, WM_SYSCOMMAND, SC_SIZE | resize_edge, 0);
+      Logger().debug("WebView window entered deferred resize loop from edge code: {}", resize_edge);
       return 0;
     }
 
@@ -321,18 +312,10 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
     }
 
     case WM_NCHITTEST: {
-      // 先让系统处理边框缩放命中，再用 WebView 非客户区命中覆盖标题栏/按钮区域
-      LRESULT default_hit = DefWindowProcW(hwnd, msg, wparam, lparam);
-      if (default_hit != HTCLIENT) {
-        return default_hit;
-      }
-
-      if (!state || !Core::WebView::is_composition_active(*state)) {
-        return default_hit;
-      }
-
-      if (auto non_client_hit = Core::WebView::hit_test_non_client_region(*state, hwnd, lparam)) {
-        return *non_client_hit;
+      if (state && Core::WebView::is_composition_active(*state)) {
+        if (auto non_client_hit = Core::WebView::hit_test_non_client_region(*state, hwnd, lparam)) {
+          return *non_client_hit;
+        }
       }
       return HTCLIENT;
     }
@@ -462,8 +445,7 @@ auto apply_window_style(HWND hwnd) -> void {
   DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUND;
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
 
-  // 强制触发 WM_NCCALCSIZE 重新计算边框
-  // 这确保窗口创建后立即应用正确的非客户区计算
+  // 强制让 DWM/窗口样式立即生效
   SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
@@ -532,7 +514,6 @@ auto create(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 创建独立窗口
   // 窗口样式：
   // - WS_POPUP: 无边框窗口
-  // - WS_THICKFRAME: 支持边缘拖拽调整大小
   // - WS_SYSMENU: 保留系统菜单（Alt+Space）
   // - WS_MAXIMIZEBOX/WS_MINIMIZEBOX: 支持最大化/最小化
   HWND hwnd = CreateWindowExW(ex_style,                                // 扩展样式
