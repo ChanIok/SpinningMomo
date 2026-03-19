@@ -80,10 +80,6 @@ namespace Features::ReplayBuffer::State {
 export struct ReplayBufferState;
 }
 
-namespace Features::VirtualGamepad::State {
-export struct VirtualGamepadState;
-}
-
 namespace Core::HttpServer::State {
 export struct HttpServerState;
 }
@@ -148,7 +144,6 @@ export struct AppState {
   std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;
   std::unique_ptr<Features::Recording::State::RecordingState> recording;
   std::unique_ptr<Features::ReplayBuffer::State::ReplayBufferState> replay_buffer;
-  std::unique_ptr<Features::VirtualGamepad::State::VirtualGamepadState> virtual_gamepad;
 };
 
 }  // namespace Core::State

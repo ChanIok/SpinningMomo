@@ -18,7 +18,6 @@ import Features.Recording.UseCase;
 import Features.Update;
 import Features.Update.State;
 import Features.Gallery;
-import Features.VirtualGamepad;
 import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
@@ -63,8 +62,6 @@ auto shutdown_application(Core::State::AppState& state) -> void {
     Logger().error("Failed to shutdown Letterbox: {}", result.error());
   }
   Features::Screenshot::cleanup_system(state);
-  Features::VirtualGamepad::shutdown(state);
-
   // 3. 核心服务清理
   Core::HttpServer::shutdown(state);
   Core::HttpClient::shutdown(state);

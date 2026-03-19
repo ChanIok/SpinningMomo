@@ -13,7 +13,7 @@ import std;
 
 export namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 4014 bytes
+// Size: 3962 bytes
 constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -42,7 +42,6 @@ constexpr std::string_view en_us_json = R"EmbeddedJson({
   "menu.replay_buffer_toggle": "Instant Replay",
   "menu.replay_buffer_save": "Save Replay",
   "menu.letterbox_toggle": "Letterbox",
-  "menu.virtual_gamepad_toggle": "Virtual Gamepad",
 
 
   "menu.settings_config": "Open Config",

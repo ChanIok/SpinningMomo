@@ -22,7 +22,6 @@ SpinningMomo is built upon the following excellent open-source projects. We exte
 | [libwebp](https://chromium.googlesource.com/webm/libwebp) | BSD-3-Clause | https://chromium.googlesource.com/webm/libwebp |
 | [zlib](https://zlib.net/) | zlib License | https://zlib.net/ |
 | [libuv](https://libuv.org/) | MIT | https://github.com/libuv/libuv |
-| [ViGEmClient](https://github.com/nefarius/ViGEmClient) | MIT | https://github.com/nefarius/ViGEmClient |
 
 ### Web Frontend
 

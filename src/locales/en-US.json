@@ -26,7 +26,6 @@
   "menu.replay_buffer_toggle": "Instant Replay",
   "menu.replay_buffer_save": "Save Replay",
   "menu.letterbox_toggle": "Letterbox",
-  "menu.virtual_gamepad_toggle": "Virtual Gamepad",
 
 
   "menu.settings_config": "Open Config",

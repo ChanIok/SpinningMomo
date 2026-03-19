@@ -4,14 +4,6 @@ Set-Location (Split-Path -Parent $PSScriptRoot)
 
 New-Item -ItemType Directory -Force "third_party" | Out-Null
 
-$vigemHeader = "third_party/ViGEmClient/include/ViGEm/Client.h"
-if (Test-Path $vigemHeader) {
-    Write-Host "ViGEmClient already exists, skip."
-} else {
-    Write-Host "Cloning ViGEmClient..."
-    git clone --depth 1 https://github.com/nefarius/ViGEmClient.git third_party/ViGEmClient
-}
-
 $dkmHeader = "third_party/dkm/include/dkm.hpp"
 if (Test-Path $dkmHeader) {
     Write-Host "DKM already exists, skip."

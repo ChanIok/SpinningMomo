@@ -28,7 +28,6 @@ import Features.ReplayBuffer;
 import Features.ReplayBuffer.State;
 import Features.ReplayBuffer.UseCase;
 import Features.Update;
-import Features.VirtualGamepad;
 import Features.Letterbox.State;
 import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
@@ -172,12 +171,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // Gallery 初始化完成后，先注册无限暖暖目录监听，统一在末尾启动
     Extensions::InfinityNikki::PhotoService::register_from_settings(state);
-
-    // 初始化虚拟手柄（检测 ViGEm 可用性，不自动启用）
-    if (auto vg_result = Features::VirtualGamepad::initialize(state); !vg_result) {
-      Logger().warn("Virtual gamepad initialization failed: {}", vg_result.error());
-      // 不返回错误，许应用继续运行
-    }
 
     const bool should_open_onboarding =
         Features::Settings::should_show_onboarding(state.settings->raw);
