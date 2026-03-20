@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '../store'
 import { useAppearanceActions } from '../composables/useAppearanceActions'
 import { useTheme } from '../composables/useTheme'
@@ -23,11 +23,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Textarea } from '@/components/ui/textarea'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import OverlayPaletteEditor from './OverlayPaletteEditor.vue'
 import { useI18n } from '@/composables/useI18n'
-import type { CjkFontPreset, WebThemeMode } from '../types'
+import type { WebThemeMode } from '../types'
 import type { OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
 import { getOverlayPaletteFromBackground } from '../overlayPalette'
 import { resolveBackgroundImageUrl } from '../backgroundPath'
@@ -50,7 +51,7 @@ const {
   updateOverlayPalette,
   applyOverlayPalettePreset,
   updateWebViewTransparentBackground,
-  updateCjkFontPreset,
+  updateCustomCss,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
@@ -64,10 +65,16 @@ const themeOptions = [
   { value: 'dark', label: t('settings.appearance.theme.dark') },
   { value: 'system', label: t('settings.appearance.theme.system') },
 ]
-const cjkFontOptions = [
-  { value: 'harmony', label: t('settings.appearance.theme.font.harmony') },
-  { value: 'microsoft', label: t('settings.appearance.theme.font.microsoft') },
-]
+const customCssDraft = ref('')
+
+watch(
+  () => appSettings.value.ui.webTheme.customCss,
+  (v) => {
+    customCssDraft.value = v ?? ''
+  },
+  { immediate: true }
+)
+
 const overlayPalette = computed<OverlayPalette>(() =>
   getOverlayPaletteFromBackground(appSettings.value.ui.background)
 )
@@ -146,11 +153,13 @@ const handleThemeChange = async (themeMode: string) => {
   }
 }
 
-const handleCjkFontPresetChange = async (preset: string) => {
+const handleCustomCssBlur = async () => {
+  const next = customCssDraft.value
+  if (next === (appSettings.value.ui.webTheme.customCss ?? '')) return
   try {
-    await updateCjkFontPreset(preset as CjkFontPreset)
+    await updateCustomCss(next)
   } catch (error) {
-    console.error('Failed to update CJK font preset:', error)
+    console.error('Failed to update custom CSS:', error)
   }
 }
 
@@ -414,36 +423,6 @@ const handleClearError = () => {
         <Item variant="surface" size="sm">
           <ItemContent>
             <ItemTitle>
-              {{ t('settings.appearance.theme.font.label') }}
-            </ItemTitle>
-            <ItemDescription>
-              {{ t('settings.appearance.theme.font.description') }}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Select
-              :model-value="appSettings.ui.webTheme.cjkFontPreset"
-              @update:model-value="(v) => handleCjkFontPresetChange(v as string)"
-            >
-              <SelectTrigger class="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="option in cjkFontOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </ItemActions>
-        </Item>
-
-        <Item variant="surface" size="sm">
-          <ItemContent>
-            <ItemTitle>
               {{ t('settings.appearance.theme.primaryColor.label') }}
             </ItemTitle>
             <ItemDescription>
@@ -492,6 +471,25 @@ const handleClearError = () => {
               @update:model-value="
                 (value) => handleWebViewTransparentBackgroundChange(Boolean(value))
               "
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm" class="flex-col items-stretch gap-3 sm:flex-row">
+          <ItemContent class="min-w-0 shrink-0 sm:max-w-xs">
+            <ItemTitle>
+              {{ t('settings.appearance.theme.customCss.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.theme.customCss.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions class="w-full min-w-0 justify-stretch sm:justify-end">
+            <Textarea
+              v-model="customCssDraft"
+              class="max-h-64 min-h-32 w-full resize-y font-mono text-xs"
+              :placeholder="t('settings.appearance.theme.customCss.placeholder')"
+              @blur="handleCustomCssBlur"
             />
           </ItemActions>
         </Item>

@@ -36,7 +36,6 @@ SpinningMomo is built upon the following excellent open-source projects. We exte
 | [TanStack Virtual](https://tanstack.com/virtual) | MIT | https://github.com/TanStack/virtual |
 | [Lucide](https://lucide.dev/) | ISC | https://github.com/lucide-icons/lucide |
 | [Inter Font](https://rsms.me/inter/) | OFL-1.1 | https://github.com/rsms/inter |
-| [HarmonyOS Sans](https://developer.huawei.com/consumer/en/doc/design-guides/font-0000001828772001) | HarmonyOS Sans Fonts License | https://developer.huawei.com/consumer/en/doc/design-guides/font-0000001828772001 |
 | [Reka UI](https://reka-ui.com/) | MIT | https://github.com/unovue/reka-ui |
 | [shadcn-vue](https://www.shadcn-vue.com/) | MIT | https://github.com/radix-vue/shadcn-vue |
 | [vue-sonner](https://github.com/xiaoluoboding/vue-sonner) | MIT | https://github.com/xiaoluoboding/vue-sonner |

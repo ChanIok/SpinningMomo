@@ -1,17 +1,12 @@
-import type { AppSettings, CjkFontPreset, WebThemeMode } from './types'
+import type { AppSettings, WebThemeMode } from './types'
 import { resolveBackgroundImageUrl } from './backgroundPath'
 import { buildOverlayGradient, getOverlayPaletteFromBackground } from './overlayPalette'
+
+const USER_CUSTOM_STYLE_ID = 'spinning-momo-user-css'
 
 type ResolvedTheme = 'light' | 'dark'
 
 const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/
-
-const CJK_FONT_STACKS: Record<CjkFontPreset, string> = {
-  harmony:
-    "'HarmonyOS Sans SC Web', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC'",
-  microsoft:
-    "'Microsoft YaHei UI', 'Microsoft YaHei', 'HarmonyOS Sans SC Web', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Source Han Sans SC'",
-}
 
 const clamp = (value: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, value))
@@ -40,11 +35,22 @@ const applyTheme = (mode: WebThemeMode): void => {
   }
 }
 
-const applyFont = (settings: AppSettings): void => {
-  const root = document.documentElement
-  const preset = settings.ui.webTheme.cjkFontPreset
-  const stack = CJK_FONT_STACKS[preset] ?? CJK_FONT_STACKS.harmony
-  root.style.setProperty('--app-font-cjk', stack)
+const applyCustomUserCss = (cssText: string): void => {
+  if (typeof document === 'undefined') return
+
+  const trimmed = cssText.trim()
+  let el = document.getElementById(USER_CUSTOM_STYLE_ID) as HTMLStyleElement | null
+  if (!trimmed) {
+    el?.remove()
+    return
+  }
+  if (!el) {
+    el = document.createElement('style')
+    el.id = USER_CUSTOM_STYLE_ID
+    el.setAttribute('type', 'text/css')
+    document.head.appendChild(el)
+  }
+  el.textContent = trimmed
 }
 
 const normalizeHexColor = (value: string | undefined, fallback: string): string => {
@@ -111,8 +117,8 @@ export const applyAppearanceToDocument = (settings: AppSettings): void => {
   if (typeof document === 'undefined') return
 
   applyTheme(settings.ui.webTheme.mode)
-  applyFont(settings)
   applyBackground(settings)
+  applyCustomUserCss(settings.ui.webTheme.customCss ?? '')
 }
 
 export const preloadBackgroundImage = (settings: AppSettings): void => {

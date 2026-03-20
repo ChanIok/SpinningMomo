@@ -55,7 +55,7 @@ initializeRPC()
   watch(
     () => [
       settingsStore.appSettings.ui.webTheme.mode,
-      settingsStore.appSettings.ui.webTheme.cjkFontPreset,
+      settingsStore.appSettings.ui.webTheme.customCss,
       settingsStore.appSettings.ui.background.type,
       settingsStore.appSettings.ui.background.imagePath,
       settingsStore.appSettings.ui.background.backgroundBlurAmount,

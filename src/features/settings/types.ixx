@@ -14,8 +14,8 @@ export constexpr int CURRENT_ONBOARDING_FLOW_VERSION = 1;
 
 // Web 主题设置
 export struct WebThemeSettings {
-  std::string mode = "system";              // "light" | "dark" | "system"
-  std::string cjk_font_preset = "harmony";  // "harmony" | "microsoft"
+  std::string mode = "system";  // "light" | "dark" | "system"
+  std::string custom_css = "";
 };
 
 // Web 背景设置

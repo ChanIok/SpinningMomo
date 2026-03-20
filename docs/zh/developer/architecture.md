@@ -13,7 +13,6 @@
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
 | **xmake** | 最新版 | C++ 构建系统，管理 vcpkg 依赖 |
 | **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
-| **Python 3** | 含 `pip` | 用于生成 HarmonyOS 字体子集 |
 
 ### 安装 xmake
 
@@ -45,13 +44,6 @@ npm install
 
 # Web 前端依赖
 cd web && npm ci
-```
-
-### 3. 生成字体子集（可选，用于内嵌 HarmonyOS 字体）
-
-```powershell
-pip install fonttools brotli zopfli
-npm run font:build:harmonyos
 ```
 
 ---

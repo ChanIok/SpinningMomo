@@ -37,7 +37,6 @@ export const CURRENT_ONBOARDING_FLOW_VERSION = 1
 
 // Web 主题模式（页面主题）
 export type WebThemeMode = 'light' | 'dark' | 'system'
-export type CjkFontPreset = 'harmony' | 'microsoft'
 
 // 浮窗主题模式
 export type FloatingWindowThemeMode = 'dark' | 'light'
@@ -68,7 +67,7 @@ export interface WebBackgroundSettings {
 // Web 主题设置
 export interface WebThemeSettings {
   mode: WebThemeMode
-  cjkFontPreset: CjkFontPreset
+  customCss: string
 }
 
 // 深色主题颜色配置
@@ -400,7 +399,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     webTheme: {
       mode: 'system',
-      cjkFontPreset: 'harmony',
+      customCss: '',
     },
     background: {
       type: 'none',
