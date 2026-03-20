@@ -17,6 +17,7 @@ import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
 import Features.Gallery.Ignore.Service;
+import Utils.Media.VideoAsset;
 import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
@@ -627,6 +628,38 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
         progress_tracker->mark_thumbnail_processed();
       }
     }
+  } else if (asset_type == "video") {
+    // MF：分辨率/时长 + 可选封面 WebP；不做主色（processed.colors 在分支末尾 clear）。
+    auto video_result = Utils::Media::VideoAsset::analyze_video_file(
+        file_path, options.generate_thumbnails.value_or(true)
+                       ? std::optional<std::uint32_t>{options.thumbnail_short_edge.value_or(480)}
+                       : std::nullopt);
+    if (video_result) {
+      asset.width = static_cast<std::int32_t>(video_result->width);
+      asset.height = static_cast<std::int32_t>(video_result->height);
+      asset.mime_type = video_result->mime_type;
+
+      if (video_result->thumbnail.has_value()) {
+        auto save_result = Asset::Thumbnail::save_thumbnail_data(app_state, file_info.hash,
+                                                                 *video_result->thumbnail);
+        if (!save_result) {
+          Logger().warn("Failed to save video thumbnail for {}: {}", file_path.string(),
+                        save_result.error());
+        }
+      }
+    } else {
+      Logger().warn("Could not analyze video file {}: {}", file_path.string(),
+                    video_result.error());
+      asset.width = 0;
+      asset.height = 0;
+      asset.mime_type = "application/octet-stream";
+    }
+
+    if (options.generate_thumbnails.value_or(true) && progress_tracker) {
+      progress_tracker->mark_thumbnail_processed();
+    }
+
+    processed.colors.clear();
   } else {
     // 非图片类型
     asset.width = 0;
@@ -872,7 +905,9 @@ auto run_processing_phase(Core::State::AppState& app_state, const std::filesyste
   if (options.generate_thumbnails.value_or(true)) {
     thumbnail_targets = static_cast<std::int64_t>(
         std::ranges::count_if(files_to_process, [](const Types::FileAnalysisResult& result) {
-          return ScanCommon::is_photo_file(result.file_info.path);
+          auto asset_type = ScanCommon::detect_asset_type(result.file_info.path);
+          // 视频与照片一样计入「缩略图任务」，封面失败时仍会 mark 进度，避免条卡住。
+          return asset_type == "photo" || asset_type == "video";
         }));
   }
 

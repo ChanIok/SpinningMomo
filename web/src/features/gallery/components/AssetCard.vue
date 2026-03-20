@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { Play } from 'lucide-vue-next'
 import { hexToHsv, hsvToHex, normalizeToHex } from '@/components/ui/color-picker/colorUtils'
 import { useGalleryData } from '../composables/useGalleryData'
 import type { Asset } from '../types'
@@ -36,6 +37,7 @@ const thumbnailUrl = computed(() => {
 })
 
 const hasThumbnail = computed(() => thumbnailUrl.value.length > 0)
+const isVideoAsset = computed(() => props.asset.type === 'video')
 
 const showPlaceholder = computed(
   () => isImageLoading.value || imageError.value || !hasThumbnail.value
@@ -182,6 +184,17 @@ function getAdjustedPlaceholderColor(hex?: string): string {
           'group-hover:bg-black/10': !isSelected,
         }"
       />
+
+      <div
+        v-if="isVideoAsset"
+        class="absolute inset-x-0 bottom-0 flex items-end justify-start bg-gradient-to-t from-black/50 via-black/10 to-transparent p-3"
+      >
+        <div
+          class="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white shadow-sm backdrop-blur-sm"
+        >
+          <Play class="ml-0.5 h-4 w-4 fill-current" />
+        </div>
+      </div>
 
       <!-- 选择指示器 -->
       <div

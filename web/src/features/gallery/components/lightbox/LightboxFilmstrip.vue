@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
+import { Play } from 'lucide-vue-next'
 import { galleryApi } from '../../api'
 import { useGalleryData, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
@@ -129,6 +130,10 @@ function getThumbnailUrl(index: number) {
   return asset ? galleryApi.getAssetThumbnailUrl(asset) : ''
 }
 
+function isVideoAsset(index: number): boolean {
+  return getAssetAtIndex(index)?.type === 'video'
+}
+
 function getReviewFlagLabel(reviewFlag: ReviewFlag) {
   switch (reviewFlag) {
     case 'picked':
@@ -197,6 +202,17 @@ function handleWheel(event: WheelEvent) {
                       'bg-foreground/18': item.index === currentIndex,
                     }"
                   />
+
+                  <div
+                    v-if="isVideoAsset(item.index)"
+                    class="absolute inset-x-0 bottom-0 flex items-end justify-start bg-gradient-to-t from-black/55 via-black/10 to-transparent p-1.5"
+                  >
+                    <div
+                      class="flex h-5 w-5 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white shadow-sm"
+                    >
+                      <Play class="ml-px h-2.5 w-2.5 fill-current" />
+                    </div>
+                  </div>
 
                   <div
                     v-if="(getAssetAtIndex(item.index)?.rating ?? 0) > 0"

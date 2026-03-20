@@ -25,12 +25,26 @@ const totalCount = computed(() => store.totalCount)
 const selectedCount = computed(() => store.selection.selectedIds.size)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
 const isFullscreen = computed(() => store.lightbox.isFullscreen)
+const currentAsset = computed(() => {
+  const currentIndex = store.selection.activeIndex
+  if (currentIndex === undefined) {
+    return null
+  }
+
+  return store.getAssetsInRange(currentIndex, currentIndex)[0] ?? null
+})
+// 视频使用原生 controls，不适用灯箱图片的适屏/缩放语义。
+const supportsZoom = computed(() => currentAsset.value?.type !== 'video')
 const isFitMode = computed(() => store.lightbox.fitMode === 'contain')
 const isActualSize = computed(
   () =>
     store.lightbox.fitMode === 'actual' && Math.abs(store.lightbox.zoom - 1) <= ACTUAL_SIZE_EPSILON
 )
 const lightboxMode = computed(() => {
+  if (currentAsset.value?.type === 'video') {
+    return t('gallery.toolbar.filter.type.video')
+  }
+
   if (isFitMode.value) {
     return t('gallery.lightbox.toolbar.fit')
   }
@@ -75,10 +89,13 @@ const hasReviewFilter = computed(
         <button
           class="inline-flex h-9 items-center justify-center rounded-md px-3 text-xs transition-colors"
           :class="
-            isFitMode
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            !supportsZoom
+              ? 'cursor-not-allowed text-muted-foreground/40'
+              : isFitMode
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
           "
+          :disabled="!supportsZoom"
           @click="emit('fit')"
           :title="t('gallery.lightbox.toolbar.fitTitle')"
         >
@@ -88,10 +105,13 @@ const hasReviewFilter = computed(
         <button
           class="inline-flex h-9 items-center justify-center rounded-md px-3 text-xs transition-colors"
           :class="
-            isActualSize
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            !supportsZoom
+              ? 'cursor-not-allowed text-muted-foreground/40'
+              : isActualSize
+                ? 'bg-accent text-accent-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
           "
+          :disabled="!supportsZoom"
           @click="emit('actual')"
           :title="t('gallery.lightbox.toolbar.actualTitle')"
         >
@@ -100,6 +120,10 @@ const hasReviewFilter = computed(
 
         <button
           class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          :class="{
+            'cursor-not-allowed text-muted-foreground/40 hover:bg-transparent': !supportsZoom,
+          }"
+          :disabled="!supportsZoom"
           @click="emit('zoomOut')"
           :title="t('gallery.lightbox.toolbar.zoomOutTitle')"
         >
@@ -110,6 +134,10 @@ const hasReviewFilter = computed(
 
         <button
           class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+          :class="{
+            'cursor-not-allowed text-muted-foreground/40 hover:bg-transparent': !supportsZoom,
+          }"
+          :disabled="!supportsZoom"
           @click="emit('zoomIn')"
           :title="t('gallery.lightbox.toolbar.zoomInTitle')"
         >

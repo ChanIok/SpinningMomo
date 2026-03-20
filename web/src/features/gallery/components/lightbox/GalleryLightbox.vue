@@ -9,6 +9,7 @@ import { useGalleryStore } from '../../store'
 import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
 import LightboxImage from './LightboxImage.vue'
+import LightboxVideo from './LightboxVideo.vue'
 import LightboxToolbar from './LightboxToolbar.vue'
 import {
   ContextMenu,
@@ -48,6 +49,8 @@ const currentAsset = computed(() => {
 
   return store.getAssetsInRange(currentIndex, currentIndex)[0]
 })
+// 缩放、适屏、1:1 都是静态图查看语义；视频在灯箱里保持原生播放器行为。
+const isZoomableAsset = computed(() => currentAsset.value?.type !== 'video')
 const lightboxContainerClass = computed(() =>
   isFullscreen.value
     ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
@@ -160,18 +163,30 @@ async function handleClose() {
 }
 
 function handleToolbarFit() {
+  if (!isZoomableAsset.value) {
+    return
+  }
   void lightboxImageRef.value?.showFitMode()
 }
 
 function handleToolbarActual() {
+  if (!isZoomableAsset.value) {
+    return
+  }
   void lightboxImageRef.value?.showActualSize()
 }
 
 function handleToolbarZoomIn() {
+  if (!isZoomableAsset.value) {
+    return
+  }
   void lightboxImageRef.value?.zoomIn()
 }
 
 function handleToolbarZoomOut() {
+  if (!isZoomableAsset.value) {
+    return
+  }
   void lightboxImageRef.value?.zoomOut()
 }
 
@@ -262,7 +277,9 @@ function handleKeydown(event: KeyboardEvent) {
     case 'z':
     case 'Z':
       event.preventDefault()
-      lightbox.toggleFitActual()
+      if (isZoomableAsset.value) {
+        lightbox.toggleFitActual()
+      }
       return
     case 'p':
     case 'P':
@@ -282,18 +299,22 @@ function handleKeydown(event: KeyboardEvent) {
     case '=':
     case '+':
       event.preventDefault()
-      throttledZoomIn()
+      if (isZoomableAsset.value) {
+        throttledZoomIn()
+      }
       return
     case '-':
     case '_':
       event.preventDefault()
-      throttledZoomOut()
+      if (isZoomableAsset.value) {
+        throttledZoomOut()
+      }
       return
     default:
-      if (event.code === 'NumpadAdd') {
+      if (event.code === 'NumpadAdd' && isZoomableAsset.value) {
         event.preventDefault()
         throttledZoomIn()
-      } else if (event.code === 'NumpadSubtract') {
+      } else if (event.code === 'NumpadSubtract' && isZoomableAsset.value) {
         event.preventDefault()
         throttledZoomOut()
       }
@@ -335,23 +356,26 @@ onBeforeUnmount(() => {
         <ContextMenu v-if="currentAsset">
           <ContextMenuTrigger as-child>
             <div class="min-h-0 flex-1" @contextmenu="handleImageContextMenu">
-              <LightboxImage ref="lightboxImageRef" />
+              <LightboxImage v-if="isZoomableAsset" ref="lightboxImageRef" />
+              <LightboxVideo v-else @previous="throttledPrevious" @next="throttledNext" />
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent class="w-56">
-            <ContextMenuItem @click="handleToolbarFit">
-              {{ t('gallery.lightbox.contextMenu.fit') }}
-            </ContextMenuItem>
-            <ContextMenuItem @click="handleToolbarActual">
-              {{ t('gallery.lightbox.contextMenu.actual') }}
-            </ContextMenuItem>
-            <ContextMenuItem @click="handleToolbarZoomIn">
-              {{ t('gallery.lightbox.contextMenu.zoomIn') }}
-            </ContextMenuItem>
-            <ContextMenuItem @click="handleToolbarZoomOut">
-              {{ t('gallery.lightbox.contextMenu.zoomOut') }}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
+            <template v-if="isZoomableAsset">
+              <ContextMenuItem @click="handleToolbarFit">
+                {{ t('gallery.lightbox.contextMenu.fit') }}
+              </ContextMenuItem>
+              <ContextMenuItem @click="handleToolbarActual">
+                {{ t('gallery.lightbox.contextMenu.actual') }}
+              </ContextMenuItem>
+              <ContextMenuItem @click="handleToolbarZoomIn">
+                {{ t('gallery.lightbox.contextMenu.zoomIn') }}
+              </ContextMenuItem>
+              <ContextMenuItem @click="handleToolbarZoomOut">
+                {{ t('gallery.lightbox.contextMenu.zoomOut') }}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+            </template>
             <ContextMenuItem @click="handleToolbarToggleFilmstrip">
               {{
                 showFilmstrip

@@ -22,13 +22,17 @@ struct StreamContext {
   // 文件相关
   asio::random_access_file file;
   std::filesystem::path file_path;
-  size_t file_size;
-  size_t offset;
+  size_t source_file_size;  // 完整文件大小（Content-Range 里的总长）
+  size_t response_size;     // 本次 HTTP 体长度（uWS tryEnd 的 total；Range 时为片段字节数）
+  size_t file_offset;       // 下一次 async_read 的起始绝对偏移
+  size_t file_end_offset;   // 读到该偏移前停止（exclusive；即「尾字节 + 1」）
 
   // 响应相关
   std::string mime_type;
   std::chrono::seconds cache_duration;
   size_t bytes_sent;
+  int status_code = 200;
+  std::optional<std::string> content_range_header;
 
   // 运行时
   uWS::Loop* loop;

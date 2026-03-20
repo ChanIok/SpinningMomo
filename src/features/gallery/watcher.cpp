@@ -18,6 +18,7 @@ import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Color.Types;
 import Features.Gallery.Color.Extractor;
 import Features.Gallery.Color.Repository;
+import Utils.Media.VideoAsset;
 import Utils.Image;
 import Utils.Logger;
 import Utils.Path;
@@ -353,6 +354,33 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
       asset.height = 0;
       extracted_colors.clear();
     }
+  } else if (asset_type == "video") {
+    // 与扫描一致：仅元数据 + 可选封面；不写颜色索引（末尾 clear）。
+    auto video_result = Utils::Media::VideoAsset::analyze_video_file(
+        normalized, options.generate_thumbnails.value_or(true)
+                        ? std::optional<std::uint32_t>{options.thumbnail_short_edge.value_or(480)}
+                        : std::nullopt);
+    if (video_result) {
+      asset.width = static_cast<std::int32_t>(video_result->width);
+      asset.height = static_cast<std::int32_t>(video_result->height);
+      asset.mime_type = video_result->mime_type;
+
+      if (video_result->thumbnail.has_value()) {
+        auto thumbnail_result = Features::Gallery::Asset::Thumbnail::save_thumbnail_data(
+            app_state, hash, *video_result->thumbnail);
+        if (!thumbnail_result) {
+          Logger().warn("Failed to save video thumbnail for '{}': {}", normalized.string(),
+                        thumbnail_result.error());
+        }
+      }
+    } else {
+      Logger().warn("Failed to analyze video file '{}': {}", normalized.string(),
+                    video_result.error());
+      asset.width = 0;
+      asset.height = 0;
+    }
+
+    extracted_colors.clear();
   } else {
     asset.width = 0;
     asset.height = 0;

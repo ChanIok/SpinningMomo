@@ -9,6 +9,8 @@ import type { Asset } from '../types'
 interface AssetDetailsContentProps {
   asset: Asset
   thumbnailUrl: string
+  /** 原视频文件 URL（静态解析）；仅 type===video 时传给 <video :src> */
+  assetUrl: string
 }
 
 const props = defineProps<AssetDetailsContentProps>()
@@ -53,7 +55,18 @@ async function handleCopyFileName() {
 <template>
   <div class="space-y-3">
     <div class="flex justify-center">
+      <video
+        v-if="asset.type === 'video'"
+        :src="assetUrl"
+        :poster="thumbnailUrl"
+        :aria-label="asset.name"
+        class="max-h-[220px] max-w-full rounded shadow-md"
+        controls
+        playsinline
+        preload="metadata"
+      />
       <img
+        v-else
         :src="thumbnailUrl"
         :alt="asset.name"
         class="max-h-[180px] max-w-full rounded object-contain shadow-md"

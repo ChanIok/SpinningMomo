@@ -211,30 +211,44 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
       return std::unexpected("Failed to generate WebP thumbnail: " + webp_result.error());
     }
 
-    auto webp_data = webp_result.value();
-
-    // 保存缩略图到文件
-    std::ofstream thumbnail_file(thumbnail_path, std::ios::binary);
-    if (!thumbnail_file) {
-      return std::unexpected("Failed to create thumbnail file: " + thumbnail_path.string());
-    }
-
-    thumbnail_file.write(reinterpret_cast<const char*>(webp_data.data.data()),
-                         webp_data.data.size());
-    thumbnail_file.close();
-
-    if (!thumbnail_file.good()) {
-      return std::unexpected("Failed to write thumbnail data to file");
-    }
-
-    Logger().debug("Generated thumbnail: {} ({} bytes)", thumbnail_path.string(),
-                   webp_data.data.size());
-
-    return thumbnail_path;
+    return save_thumbnail_data(app_state, file_hash, webp_result.value());
 
   } catch (const std::exception& e) {
     return std::unexpected("Exception in generate_thumbnail: " + std::string(e.what()));
   }
+}
+
+// 将已编码 WebP 写入按 file_hash
+// 命名的路径；图片解码与视频抽帧共用。存在则跳过，减少扫描并发重复写。
+auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
+                         const Utils::Image::WebPEncodedResult& webp_data)
+    -> std::expected<std::filesystem::path, std::string> {
+  auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
+  if (!thumbnail_path_result) {
+    return std::unexpected(thumbnail_path_result.error());
+  }
+  auto thumbnail_path = thumbnail_path_result.value();
+
+  if (std::filesystem::exists(thumbnail_path)) {
+    Logger().debug("Thumbnail already exists, reusing: {}", thumbnail_path.string());
+    return thumbnail_path;
+  }
+
+  std::ofstream thumbnail_file(thumbnail_path, std::ios::binary);
+  if (!thumbnail_file) {
+    return std::unexpected("Failed to create thumbnail file: " + thumbnail_path.string());
+  }
+
+  thumbnail_file.write(reinterpret_cast<const char*>(webp_data.data.data()), webp_data.data.size());
+  thumbnail_file.close();
+
+  if (!thumbnail_file.good()) {
+    return std::unexpected("Failed to write thumbnail data to file");
+  }
+
+  Logger().debug("Generated thumbnail: {} ({} bytes)", thumbnail_path.string(),
+                 webp_data.data.size());
+  return thumbnail_path;
 }
 
 // ============= 缩略图统计功能 =============

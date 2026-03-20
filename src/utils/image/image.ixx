@@ -64,6 +64,13 @@ export auto convert_to_bgra_bitmap(IWICImagingFactory* factory, IWICBitmapSource
 
 export auto copy_bgra_bitmap_data(IWICBitmap* bitmap) -> std::expected<BGRABitmapData, std::string>;
 
+// 从内存 BGRA（如视频单帧）生成 WebP 缩略图；与 generate_webp_thumbnail(路径) 共享缩放/编码路径。
+export auto generate_webp_thumbnail_from_bgra(IWICImagingFactory* factory,
+                                              const BGRABitmapData& bitmap_data,
+                                              uint32_t short_edge_size,
+                                              const WebPEncodeOptions& options = {})
+    -> std::expected<WebPEncodedResult, std::string>;
+
 // 直接从文件生成WebP缩略图（按短边等比例缩放）
 export auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& path,
                                     uint32_t short_edge_size, const WebPEncodeOptions& options = {})

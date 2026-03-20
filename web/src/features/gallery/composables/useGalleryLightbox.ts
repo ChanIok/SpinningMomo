@@ -2,6 +2,7 @@ import { ref, watch } from 'vue'
 import { galleryApi } from '../api'
 import { useGalleryStore } from '../store'
 import { useGallerySelection } from './useGallerySelection'
+import type { Asset } from '../types'
 
 interface ImageState {
   status: 'idle' | 'loading' | 'loaded' | 'error'
@@ -16,12 +17,33 @@ export function useGalleryLightbox() {
   const loading = ref<Set<number>>(new Set())
   const loaded = ref<Set<number>>(new Set())
 
+  function findLoadedAssetById(assetId: number): Asset | null {
+    for (const pageAssets of store.paginatedAssets.values()) {
+      const found = pageAssets.find((asset) => asset.id === assetId)
+      if (found) {
+        return found
+      }
+    }
+
+    return null
+  }
+
+  function isPreloadableImageAsset(asset: Asset | null): boolean {
+    // 视频交给 <video> 自己按需拉取分片；这里的图片预热只服务 still image 的秒开体验。
+    return asset?.type === 'photo' || asset?.type === 'live_photo'
+  }
+
   /**
    * 预加载单张图片
    * 使用 new Image() 而非 fetch，是为了让浏览器将图片写入 HTTP 缓存，
    * 后续 <img> 标签请求同一 URL 时可直接命中缓存，无需二次下载。
    */
   async function preloadImage(assetId: number): Promise<void> {
+    const asset = findLoadedAssetById(assetId)
+    if (!isPreloadableImageAsset(asset)) {
+      return
+    }
+
     if (loaded.value.has(assetId) || loading.value.has(assetId)) {
       return
     }
@@ -48,8 +70,9 @@ export function useGalleryLightbox() {
   }
 
   /**
-   * 预加载当前图片及前后各 PRELOAD_RANGE 张
-   * 策略：优先 await 当前帧确保尽快显示，再并行预加载相邻帧
+   * 预加载当前图片及前后各 PRELOAD_RANGE 张。
+   * 策略：优先 await 当前帧尽快显示，再并行预加载相邻帧。
+   * video 类型整段跳过：由 <video> 自行分片请求，避免 Image 预拉全文件。
    */
   async function preloadRange(currentIndex: number) {
     const PRELOAD_RANGE = 2
@@ -60,13 +83,15 @@ export function useGalleryLightbox() {
     const currentAsset = store.getAssetsInRange(currentIndex, currentIndex)[0]
     if (!currentAsset) return
 
-    try {
-      await preloadImage(currentAsset.id)
-    } catch (err) {
-      console.warn(
-        `Failed to preload current image [index=${currentIndex}, id=${currentAsset.id}]`,
-        err
-      )
+    if (isPreloadableImageAsset(currentAsset)) {
+      try {
+        await preloadImage(currentAsset.id)
+      } catch (err) {
+        console.warn(
+          `Failed to preload current image [index=${currentIndex}, id=${currentAsset.id}]`,
+          err
+        )
+      }
     }
 
     const preloadPromises: Promise<void>[] = []

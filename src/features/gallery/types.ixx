@@ -167,8 +167,8 @@ struct ScanOptions {
   std::string directory;
   std::optional<bool> generate_thumbnails = true;
   std::optional<std::uint32_t> thumbnail_short_edge = 480;
-  std::optional<std::vector<std::string>> supported_extensions =
-      std::vector<std::string>{".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"};
+  // 留空时统一回落到 ScanCommon::default_supported_extensions()，避免多处维护默认列表。
+  std::optional<std::vector<std::string>> supported_extensions;
   std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };
 

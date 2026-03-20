@@ -123,6 +123,105 @@ auto get_web_root() -> std::filesystem::path {
   return exe_dir / "resources" / "web";
 }
 
+// ---- Range 请求：<video> 拖动进度、分片加载依赖 Accept-Ranges + 206 + Content-Range ----
+struct ByteRange {
+  size_t start = 0;
+  size_t end = 0;  // inclusive
+};
+
+struct RangeHeaderParseResult {
+  bool valid = true;
+  std::optional<ByteRange> range;
+};
+
+auto parse_range_header(std::string_view header_value, size_t file_size) -> RangeHeaderParseResult {
+  if (header_value.empty()) {
+    return {};
+  }
+
+  // V1 仅支持单一 byte range，已经足够覆盖浏览器 / <video> 的 seek 场景。
+  if (!header_value.starts_with("bytes=") || file_size == 0) {
+    return {.valid = false, .range = std::nullopt};
+  }
+
+  auto range_spec = header_value.substr(6);
+  auto comma_pos = range_spec.find(',');
+  if (comma_pos != std::string_view::npos) {
+    return {.valid = false, .range = std::nullopt};
+  }
+
+  auto dash_pos = range_spec.find('-');
+  if (dash_pos == std::string_view::npos) {
+    return {.valid = false, .range = std::nullopt};
+  }
+
+  auto start_part = range_spec.substr(0, dash_pos);
+  auto end_part = range_spec.substr(dash_pos + 1);
+
+  if (start_part.empty()) {
+    size_t suffix_length = 0;
+    auto [ptr, ec] =
+        std::from_chars(end_part.data(), end_part.data() + end_part.size(), suffix_length);
+    if (ec != std::errc{} || ptr != end_part.data() + end_part.size() || suffix_length == 0) {
+      return {.valid = false, .range = std::nullopt};
+    }
+
+    size_t clamped_length = std::min(suffix_length, file_size);
+    return {.valid = true,
+            .range = ByteRange{.start = file_size - clamped_length, .end = file_size - 1}};
+  }
+
+  size_t start = 0;
+  auto [start_ptr, start_ec] =
+      std::from_chars(start_part.data(), start_part.data() + start_part.size(), start);
+  if (start_ec != std::errc{} || start_ptr != start_part.data() + start_part.size() ||
+      start >= file_size) {
+    return {.valid = false, .range = std::nullopt};
+  }
+
+  if (end_part.empty()) {
+    return {.valid = true, .range = ByteRange{.start = start, .end = file_size - 1}};
+  }
+
+  size_t end = 0;
+  auto [end_ptr, end_ec] = std::from_chars(end_part.data(), end_part.data() + end_part.size(), end);
+  if (end_ec != std::errc{} || end_ptr != end_part.data() + end_part.size() || end < start) {
+    return {.valid = false, .range = std::nullopt};
+  }
+
+  return {.valid = true, .range = ByteRange{.start = start, .end = std::min(end, file_size - 1)}};
+}
+
+auto get_response_content_type(const std::string& mime_type) -> std::string {
+  if (mime_type.starts_with("text/") && !mime_type.contains("charset=")) {
+    return mime_type + "; charset=utf-8";
+  }
+
+  return mime_type;
+}
+
+auto write_common_file_headers(auto* res, const std::string& mime_type,
+                               std::chrono::seconds cache_duration,
+                               std::optional<size_t> source_file_size = std::nullopt,
+                               std::optional<ByteRange> range = std::nullopt) -> void {
+  res->writeHeader("Content-Type", get_response_content_type(mime_type));
+  res->writeHeader("Cache-Control", std::format("public, max-age={}", cache_duration.count()));
+  res->writeHeader("X-Content-Type-Options", "nosniff");
+  res->writeHeader("Accept-Ranges", "bytes");
+
+  if (range.has_value() && source_file_size.has_value()) {
+    res->writeHeader("Content-Range", std::format("bytes {}-{}/{}", range->start, range->end,
+                                                  source_file_size.value()));
+  }
+}
+
+auto write_range_not_satisfiable(auto* res, size_t file_size) -> void {
+  res->writeStatus("416 Range Not Satisfiable");
+  res->writeHeader("Accept-Ranges", "bytes");
+  res->writeHeader("Content-Range", std::format("bytes */{}", file_size));
+  res->end();
+}
+
 // 在 uWS 线程中发送数据块
 auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
                        std::shared_ptr<std::string> chunk_data) -> void {
@@ -134,7 +233,8 @@ auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
   // 记录发送前的偏移量（用于处理背压）
   size_t chunk_start_offset = ctx->bytes_sent;
 
-  auto [ok, done] = ctx->res->tryEnd(*chunk_data, ctx->file_size);
+  // tryEnd 的 total 必须为「整个 HTTP 响应体」长度；Range 时为片段长而非文件全长。
+  auto [ok, done] = ctx->res->tryEnd(*chunk_data, ctx->response_size);
 
   if (!ok) {
     // 背压：缓冲区满，需要等待可写
@@ -151,7 +251,7 @@ auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
       if (already_sent >= chunk_data->size()) {
         // 这个块已经全部发送完成
         ctx->bytes_sent = ctx->res->getWriteOffset();
-        ctx->offset += chunk_data->size();
+        ctx->file_offset += chunk_data->size();
 
         // 继续读下一块
         read_and_send_next_chunk(ctx);
@@ -160,12 +260,12 @@ auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
 
       // 发送剩余数据
       auto remaining = chunk_data->substr(already_sent);
-      auto [ok2, done2] = ctx->res->tryEnd(remaining, ctx->file_size);
+      auto [ok2, done2] = ctx->res->tryEnd(remaining, ctx->response_size);
 
       if (ok2 || done2) {
         // 发送成功
         ctx->bytes_sent = ctx->res->getWriteOffset();
-        ctx->offset += chunk_data->size();
+        ctx->file_offset += chunk_data->size();
 
         // 继续读下一块
         read_and_send_next_chunk(ctx);
@@ -178,7 +278,7 @@ auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
   } else {
     // 发送成功，更新状态
     ctx->bytes_sent = ctx->res->getWriteOffset();
-    ctx->offset += chunk_data->size();
+    ctx->file_offset += chunk_data->size();
 
     if (done) {
       // 整个响应已完成
@@ -194,7 +294,7 @@ auto send_chunk_to_uws(std::shared_ptr<Types::StreamContext> ctx,
 // 读取并发送下一个数据块
 auto read_and_send_next_chunk(std::shared_ptr<Types::StreamContext> ctx) -> void {
   // 检查是否完成
-  if (ctx->offset >= ctx->file_size || ctx->is_aborted) {
+  if (ctx->file_offset >= ctx->file_end_offset || ctx->is_aborted) {
     if (!ctx->is_aborted) {
       Logger().debug("Stream completed: {}, sent {} bytes", ctx->file_path.string(),
                      ctx->bytes_sent);
@@ -203,11 +303,11 @@ auto read_and_send_next_chunk(std::shared_ptr<Types::StreamContext> ctx) -> void
   }
 
   // 计算本次读取大小
-  size_t to_read = std::min(Types::STREAM_CHUNK_SIZE, ctx->file_size - ctx->offset);
+  size_t to_read = std::min(Types::STREAM_CHUNK_SIZE, ctx->file_end_offset - ctx->file_offset);
 
   // 异步读取文件块
   ctx->file.async_read_some_at(
-      ctx->offset, asio::buffer(ctx->buffer.data(), to_read),
+      ctx->file_offset, asio::buffer(ctx->buffer.data(), to_read),
       [ctx](std::error_code ec, size_t bytes_read) {
         if (ec || bytes_read == 0) {
           Logger().error("Failed to read file {}: {}", ctx->file_path.string(),
@@ -229,17 +329,22 @@ auto read_and_send_next_chunk(std::shared_ptr<Types::StreamContext> ctx) -> void
 
 // 流式传输文件
 auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file_path,
-                        std::string mime_type, std::chrono::seconds cache_duration, auto* res)
-    -> void {
+                        std::string mime_type, std::chrono::seconds cache_duration,
+                        size_t file_size, std::optional<ByteRange> range, auto* res) -> void {
   auto* loop = uWS::Loop::get();
   auto io_context = Core::Async::get_io_context(*state.async);
 
+  size_t range_start = range.has_value() ? range->start : 0;
+  size_t range_end = range.has_value() ? range->end : (file_size - 1);
+  size_t response_size = range_end >= range_start ? (range_end - range_start + 1) : 0;
+
+  // 对于大文件或分片请求，始终按偏移流式发送，避免把整段视频先读进内存。
   // 在 ASIO 线程中打开文件并初始化
-  asio::post(*io_context, [res, file_path, mime_type, cache_duration, loop, io_context]() {
+  asio::post(*io_context, [res, file_path, mime_type, cache_duration, loop, io_context, file_size,
+                           range, range_start, range_end, response_size]() {
     try {
       // 打开文件
       asio::random_access_file file(*io_context, file_path.string(), asio::file_base::read_only);
-      auto file_size = file.size();
 
       Logger().debug("Starting stream for file: {}, size: {} bytes", file_path.string(), file_size);
 
@@ -247,11 +352,18 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
       auto ctx = std::make_shared<Types::StreamContext>(Types::StreamContext{
           .file = std::move(file),
           .file_path = file_path,
-          .file_size = file_size,
-          .offset = 0,
+          .source_file_size = file_size,
+          .response_size = response_size,
+          .file_offset = range_start,
+          .file_end_offset = range_end + 1,
           .mime_type = mime_type,
           .cache_duration = cache_duration,
           .bytes_sent = 0,
+          .status_code = range.has_value() ? 206 : 200,
+          .content_range_header = range.has_value()
+                                      ? std::optional<std::string>{std::format(
+                                            "bytes {}-{}/{}", range_start, range_end, file_size)}
+                                      : std::nullopt,
           .loop = loop,
           .res = res,
           .buffer = std::vector<char>(Types::STREAM_CHUNK_SIZE),
@@ -260,15 +372,14 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
 
       // 在 uWS 线程中设置响应头并开始传输
       loop->defer([ctx]() {
-        ctx->res->writeStatus("200 OK");
-        ctx->res->writeHeader("Content-Type", ctx->mime_type);
-        ctx->res->writeHeader("Cache-Control",
-                              std::format("public, max-age={}", ctx->cache_duration.count()));
-        ctx->res->writeHeader("X-Content-Type-Options", "nosniff");
-
-        if (ctx->mime_type.starts_with("text/") && !ctx->mime_type.contains("charset=")) {
-          ctx->res->writeHeader("Content-Type", ctx->mime_type + "; charset=utf-8");
-        }
+        ctx->res->writeStatus(ctx->status_code == 206 ? "206 Partial Content" : "200 OK");
+        write_common_file_headers(
+            ctx->res, ctx->mime_type, ctx->cache_duration, ctx->source_file_size,
+            ctx->content_range_header.has_value() ? std::optional<ByteRange>{ByteRange{
+                                                        .start = ctx->file_offset,
+                                                        .end = ctx->file_end_offset - 1,
+                                                    }}
+                                                  : std::nullopt);
 
         // 处理中止
         ctx->res->onAborted([ctx]() {
@@ -290,16 +401,14 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
   });
 }
 
-// 处理自定义解析的文件请求
-auto handle_custom_file_request(Core::State::AppState& state,
-                                const Types::PathResolutionData& resolution, auto* res) -> void {
-  const auto& file_path = resolution.file_path;
-
-  Logger().debug("Serving custom file: {}", file_path.string());
-
+// 图库 /static 原文件与磁盘 web 根路径共用：统一处理 Range、HEAD/GET，并择流式或整读。
+auto serve_resolved_file_request(Core::State::AppState& state,
+                                 const std::filesystem::path& file_path,
+                                 std::optional<std::chrono::seconds> cache_duration_override,
+                                 auto* res, auto* req, bool is_head) -> void {
   // 检查文件是否存在
   if (!std::filesystem::exists(file_path)) {
-    Logger().warn("Custom file not found: {}", file_path.string());
+    Logger().warn("Resolved file not found: {}", file_path.string());
     res->writeStatus("404 Not Found");
     res->end("File not found");
     return;
@@ -311,22 +420,41 @@ auto handle_custom_file_request(Core::State::AppState& state,
   // 决定mime类型和缓存时间
   std::string mime_type = Utils::File::Mime::get_mime_type(file_path);
   std::chrono::seconds cache_duration;
-  if (resolution.cache_duration) {
-    cache_duration = *resolution.cache_duration;
+  if (cache_duration_override) {
+    cache_duration = *cache_duration_override;
   } else {
     auto extension = file_path.extension().string();
     cache_duration = get_cache_duration(extension);
   }
 
-  // 根据文件大小选择处理方式
-  if (file_size > Types::STREAM_THRESHOLD) {
-    Logger().debug("Using stream for large custom file: {} bytes", file_size);
-    handle_file_stream(state, file_path, mime_type, cache_duration, res);
+  auto range_parse = parse_range_header(std::string(req->getHeader("range")), file_size);
+  if (!range_parse.valid) {
+    write_range_not_satisfiable(res, file_size);
     return;
   }
 
-  // 小文件使用一次性读取
-  Logger().debug("Using single-read for small custom file: {} bytes", file_size);
+  size_t content_length = range_parse.range.has_value()
+                              ? (range_parse.range->end - range_parse.range->start + 1)
+                              : file_size;
+
+  if (is_head) {
+    res->writeStatus(range_parse.range.has_value() ? "206 Partial Content" : "200 OK");
+    write_common_file_headers(res, mime_type, cache_duration, file_size, range_parse.range);
+    res->writeHeader("Content-Length", std::to_string(content_length));
+    res->end();
+    return;
+  }
+
+  // 视频任意 Range 都应流式发送，避免小 Range 却整文件读入内存（content_length 可能很小但 file
+  // 很大）。
+  if (content_length > Types::STREAM_THRESHOLD || file_size > Types::STREAM_THRESHOLD) {
+    Logger().debug("Using stream for resolved file: {} bytes", file_size);
+    handle_file_stream(state, file_path, mime_type, cache_duration, file_size, range_parse.range,
+                       res);
+    return;
+  }
+
+  Logger().debug("Using single-read for small resolved file: {} bytes", file_size);
 
   // 获取当前的事件循环
   auto* loop = uWS::Loop::get();
@@ -334,7 +462,8 @@ auto handle_custom_file_request(Core::State::AppState& state,
   // 在异步运行时中处理文件读取
   asio::co_spawn(
       *Core::Async::get_io_context(*state.async),
-      [res, file_path, mime_type, cache_duration, loop]() -> asio::awaitable<void> {
+      [res, file_path, mime_type, cache_duration, loop, file_size,
+       range = range_parse.range]() -> asio::awaitable<void> {
         try {
           // 异步读取文件
           auto file_result = co_await Utils::File::read_file(file_path);
@@ -348,30 +477,26 @@ auto handle_custom_file_request(Core::State::AppState& state,
           }
 
           auto file_data = file_result.value();
+          size_t range_start = range.has_value() ? range->start : 0;
+          size_t range_end = range.has_value() ? range->end : (file_size - 1);
+          size_t content_length = range_end >= range_start ? (range_end - range_start + 1) : 0;
+
+          std::string response_body(
+              reinterpret_cast<const char*>(file_data.data.data() + range_start), content_length);
 
           // 在事件循环线程中发送响应
-          loop->defer([res, file_path, file_data, mime_type, cache_duration]() mutable {
-            res->writeHeader("Content-Type", mime_type);
-            res->writeHeader("Cache-Control",
-                             std::format("public, max-age={}", cache_duration.count()));
+          loop->defer([res, file_path, mime_type, cache_duration, file_size, range,
+                       response_body = std::move(response_body)]() mutable {
+            res->writeStatus(range.has_value() ? "206 Partial Content" : "200 OK");
+            write_common_file_headers(res, mime_type, cache_duration, file_size, range);
+            res->end(response_body);
 
-            // 设置其他安全相关的头
-            res->writeHeader("X-Content-Type-Options", "nosniff");
-
-            // 对于文本文件，设置字符编码
-            if (mime_type.starts_with("text/") && !mime_type.contains("charset=")) {
-              res->writeHeader("Content-Type", mime_type + "; charset=utf-8");
-            }
-
-            res->writeStatus("200 OK");
-            res->end(std::string(file_data.data.begin(), file_data.data.end()));
-
-            Logger().debug("Served custom file: {}, size: {} bytes", file_data.path,
-                           file_data.original_size);
+            Logger().debug("Served resolved file: {}, size: {} bytes", file_path.string(),
+                           response_body.size());
           });
 
         } catch (const std::exception& e) {
-          Logger().error("Error serving custom file {}: {}", file_path.string(), e.what());
+          Logger().error("Error serving resolved file {}: {}", file_path.string(), e.what());
           loop->defer([res]() {
             res->writeStatus("500 Internal Server Error");
             res->end("Internal server error");
@@ -383,12 +508,13 @@ auto handle_custom_file_request(Core::State::AppState& state,
 
 // 处理静态文件请求
 auto handle_static_request(Core::State::AppState& state, const std::string& url_path, auto* res,
-                           auto* req) -> void {
+                           auto* req, bool is_head = false) -> void {
   // 1. 先尝试自定义解析器
   if (auto custom_result = try_custom_resolve(state, url_path)) {
     if (custom_result->has_value()) {
       Logger().debug("Using custom resolver for: {}", url_path);
-      handle_custom_file_request(state, custom_result->value(), res);
+      serve_resolved_file_request(state, custom_result->value().file_path,
+                                  custom_result->value().cache_duration, res, req, is_head);
       return;
     }
   }
@@ -414,75 +540,7 @@ auto handle_static_request(Core::State::AppState& state, const std::string& url_
     return;
   }
 
-  // 获取文件大小
-  size_t file_size = std::filesystem::file_size(file_path);
-
-  // 决定MIME类型和缓存时间
-  std::string mime_type = Utils::File::Mime::get_mime_type(file_path);
-  auto extension = file_path.extension().string();
-  auto cache_duration = get_cache_duration(extension);
-
-  // 根据文件大小选择处理方式
-  if (file_size > Types::STREAM_THRESHOLD) {
-    Logger().debug("Using stream for large file: {} bytes", file_size);
-    handle_file_stream(state, file_path, mime_type, cache_duration, res);
-    return;
-  }
-
-  Logger().debug("Using single-read for small file: {} bytes", file_size);
-
-  // 获取当前的事件循环
-  auto* loop = uWS::Loop::get();
-
-  // 在异步运行时中处理文件读取
-  asio::co_spawn(
-      *Core::Async::get_io_context(*state.async),
-      [res, file_path, mime_type, cache_duration, loop]() -> asio::awaitable<void> {
-        try {
-          // 异步读取文件
-          auto file_result = co_await Utils::File::read_file(file_path);
-          if (!file_result) {
-            Logger().error("Failed to read file: {}", file_result.error());
-            loop->defer([res]() {
-              res->writeStatus("500 Internal Server Error");
-              res->end("Internal server error");
-            });
-            co_return;
-          }
-
-          auto file_data = file_result.value();
-
-          // 在事件循环线程中发送响应
-          loop->defer([res, file_data, mime_type, cache_duration]() mutable {
-            // 设置Content-Type
-            res->writeHeader("Content-Type", mime_type);
-            res->writeHeader("Cache-Control",
-                             std::format("public, max-age={}", cache_duration.count()));
-
-            // 设置其他安全相关的头
-            res->writeHeader("X-Content-Type-Options", "nosniff");
-
-            // 对于文本文件，设置字符编码
-            if (mime_type.starts_with("text/") && !mime_type.contains("charset=")) {
-              res->writeHeader("Content-Type", mime_type + "; charset=utf-8");
-            }
-
-            res->writeStatus("200 OK");
-            res->end(std::string(file_data.data.begin(), file_data.data.end()));
-
-            Logger().debug("Served file: {}, size: {} bytes", file_data.path,
-                           file_data.original_size);
-          });
-
-        } catch (const std::exception& e) {
-          Logger().error("Error serving static file {}: {}", file_path.string(), e.what());
-          loop->defer([res]() {
-            res->writeStatus("500 Internal Server Error");
-            res->end("Internal server error");
-          });
-        }
-      },
-      asio::detached);
+  serve_resolved_file_request(state, file_path, std::nullopt, res, req, is_head);
 }
 
 // 注册静态文件路由
@@ -498,7 +556,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
     res->cork([&state, res, req, url]() {
       Logger().debug("Corking static file request: {}", url);
       // 处理静态文件请求
-      handle_static_request(state, url, res, req);
+      handle_static_request(state, url, res, req, false);
     });
 
     // 连接中止时记录日志
@@ -509,34 +567,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
   app.head("/*", [&state](auto* res, auto* req) {
     std::string url = std::string(req->getUrl());
     Logger().debug("Static file HEAD request: {}", url);
-
-    auto file_path = resolve_file_path(url);
-    auto web_root = get_web_root();
-
-    // 路径安全检查
-    auto safety_check = is_safe_path(file_path, web_root);
-    if (!safety_check.has_value() || !safety_check.value()) {
-      res->writeStatus("403 Forbidden");
-      res->end();
-      return;
-    }
-
-    // 检查文件是否存在
-    if (!std::filesystem::exists(file_path)) {
-      res->writeStatus("404 Not Found");
-      res->end();
-      return;
-    }
-
-    // 设置响应头但不发送内容
-    auto extension = file_path.extension().string();
-    auto cache_duration = get_cache_duration(extension);
-    auto cache_header = std::format("public, max-age={}", cache_duration.count());
-
-    res->writeHeader("Content-Type", Utils::File::Mime::get_mime_type(file_path));
-    res->writeHeader("Cache-Control", cache_header);
-    res->writeStatus("200 OK");
-    res->end();
+    handle_static_request(state, url, res, req, true);
   });
 }
 

@@ -1,5 +1,6 @@
 module;
 
+#include <mfapi.h>
 #include <asio.hpp>
 
 module Features.Gallery;
@@ -13,6 +14,7 @@ import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Scanner;
+import Features.Gallery.ScanCommon;
 import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
@@ -30,10 +32,7 @@ namespace Features::Gallery {
 auto make_bootstrap_scan_options(const std::filesystem::path& directory) -> Types::ScanOptions {
   Types::ScanOptions options;
   options.directory = directory.string();
-  options.supported_extensions = std::vector<std::string>{
-      ".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif",
-      ".mp4", ".avi",  ".mov", ".mkv", ".wmv",  ".webm",
-  };
+  options.supported_extensions = ScanCommon::default_supported_extensions();
   return options;
 }
 
@@ -82,6 +81,11 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   try {
     Logger().info("Initializing gallery module...");
 
+    // 供 Utils::Media::VideoAsset（SourceReader）使用；须在任意 analyze 之前成功。
+    if (FAILED(MFStartup(MF_VERSION))) {
+      return std::unexpected("Failed to initialize Media Foundation for gallery");
+    }
+
     // 确保缩略图目录存在
     auto ensure_dir_result = Asset::Thumbnail::ensure_thumbnails_directory_exists(app_state);
     if (!ensure_dir_result) {
@@ -117,6 +121,9 @@ auto cleanup(Core::State::AppState& app_state) -> void {
 
     // 重置缩略图路径状态
     app_state.gallery->thumbnails_directory.clear();
+
+    // 与 initialize 中 MFStartup 成对；此后不应再调用视频分析。
+    MFShutdown();
 
     Logger().info("Gallery module cleanup completed");
   } catch (const std::exception& e) {

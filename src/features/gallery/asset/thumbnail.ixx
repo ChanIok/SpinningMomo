@@ -15,12 +15,16 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
                         std::uint32_t short_edge_size)
     -> std::expected<std::filesystem::path, std::string>;
 
+// 落盘内存中的 WebP（视频封面帧等）；路径规则与 generate_thumbnail 一致。
+auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
+                         const Utils::Image::WebPEncodedResult& webp_data)
+    -> std::expected<std::filesystem::path, std::string>;
+
 // 路径管理
 auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
     -> std::expected<void, std::string>;
 
-auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash,
-                           uint32_t width, uint32_t height)
+auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash)
     -> std::expected<std::filesystem::path, std::string>;
 
 // 清理功能

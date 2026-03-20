@@ -40,7 +40,22 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
-const defaultSupportedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.tif']
+// 与后端 ScanCommon::default_supported_extensions 保持一致，避免 UI 默认与可扫范围脱节。
+const defaultSupportedExtensions = [
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.bmp',
+  '.webp',
+  '.tiff',
+  '.tif',
+  '.mp4',
+  '.avi',
+  '.mov',
+  '.mkv',
+  '.wmv',
+  '.webm',
+]
 
 const galleryData = useGalleryData()
 const { toast } = useToast()

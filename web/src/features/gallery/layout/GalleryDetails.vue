@@ -49,7 +49,7 @@ const activeAsset = computed(() => {
 })
 
 // 使用gallery数据composable
-const { getAssetThumbnailUrl } = useGalleryData()
+const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
 
 const selectedCount = computed(() => store.selectedCount)
 
@@ -91,9 +91,19 @@ const thumbnailUrl = computed(() => {
   return getAssetThumbnailUrl(activeAsset.value)
 })
 
+const assetUrl = computed(() => {
+  if (!activeAsset.value) return ''
+  return getAssetUrl(activeAsset.value.id)
+})
+
 const batchThumbnailUrl = computed(() => {
   if (!batchActiveAsset.value) return ''
   return getAssetThumbnailUrl(batchActiveAsset.value)
+})
+
+const batchAssetUrl = computed(() => {
+  if (!batchActiveAsset.value) return ''
+  return getAssetUrl(batchActiveAsset.value.id)
 })
 
 const assetHistogramCacheKey = computed(() => {
@@ -547,7 +557,11 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
       <!-- 资产详情 -->
       <div v-else-if="detailsFocus.type === 'asset' && activeAsset" class="space-y-4">
-        <AssetDetailsContent :asset="activeAsset" :thumbnail-url="thumbnailUrl">
+        <AssetDetailsContent
+          :asset="activeAsset"
+          :thumbnail-url="thumbnailUrl"
+          :asset-url="assetUrl"
+        >
           <template #after-preview>
             <div v-if="hasMainColors">
               <TooltipProvider>
@@ -914,7 +928,11 @@ async function handleCopyColorHex(color: AssetMainColor) {
           <Separator />
 
           <h4 class="text-sm font-medium">{{ t('gallery.details.batch.currentFocus') }}</h4>
-          <AssetDetailsContent :asset="batchActiveAsset" :thumbnail-url="batchThumbnailUrl" />
+          <AssetDetailsContent
+            :asset="batchActiveAsset"
+            :thumbnail-url="batchThumbnailUrl"
+            :asset-url="batchAssetUrl"
+          />
         </template>
         <div v-else class="text-xs text-muted-foreground">
           {{ t('gallery.details.batch.focusUnavailable') }}

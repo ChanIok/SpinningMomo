@@ -397,6 +397,43 @@ auto encode_bitmap_to_webp(IWICBitmap* bitmap, const WebPEncodeOptions& options)
   }
 }
 
+// 视频封面：MF 已解码为 RGB32 内存帧，无需落盘即可走与照片相同的缩放 + WebP 编码。
+auto generate_webp_thumbnail_from_bgra(IWICImagingFactory* factory,
+                                       const BGRABitmapData& bitmap_data, uint32_t short_edge_size,
+                                       const WebPEncodeOptions& options)
+    -> std::expected<WebPEncodedResult, std::string> {
+  if (!factory) {
+    return std::unexpected("WIC factory is null");
+  }
+
+  if (bitmap_data.width == 0 || bitmap_data.height == 0 || bitmap_data.stride == 0) {
+    return std::unexpected("Bitmap data is empty");
+  }
+
+  if (bitmap_data.pixels.empty()) {
+    return std::unexpected("Bitmap pixels are empty");
+  }
+
+  try {
+    wil::com_ptr<IWICBitmap> bitmap;
+    THROW_IF_FAILED(factory->CreateBitmapFromMemory(
+        bitmap_data.width, bitmap_data.height, GUID_WICPixelFormat32bppBGRA, bitmap_data.stride,
+        static_cast<UINT>(bitmap_data.pixels.size()), const_cast<BYTE*>(bitmap_data.pixels.data()),
+        bitmap.put()));
+
+    auto scaled_result = scale_bitmap(factory, bitmap.get(), short_edge_size);
+    if (!scaled_result) {
+      return std::unexpected(scaled_result.error());
+    }
+
+    return encode_bitmap_to_webp(scaled_result->get(), options);
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
 // 直接从文件生成WebP缩略图
 auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& path,
                              uint32_t short_edge_size, const WebPEncodeOptions& options)

@@ -10,8 +10,10 @@ import Vendor.XXHash;
 namespace Features::Gallery::ScanCommon {
 
 auto default_supported_extensions() -> const std::vector<std::string>& {
+  // 与 web GalleryScanDialog 默认列表、RPC 扫描选项保持一致，避免前后端可扫范围不一致。
   static const std::vector<std::string> kDefaultSupportedExtensions{
-      ".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif"};
+      ".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff", ".tif",
+      ".mp4", ".avi",  ".mov", ".mkv", ".wmv",  ".webm"};
   return kDefaultSupportedExtensions;
 }
 
