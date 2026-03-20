@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -25,8 +25,7 @@ import { OVERLAY_PALETTE_PRESETS } from '@/features/settings/overlayPalette'
 import { useI18n } from '@/composables/useI18n'
 import { onboardingApi } from '../api'
 
-type Step = 1 | 2 | 3 | 4
-type DetectionStatus = 'idle' | 'loading' | 'success' | 'failed'
+type Step = 1 | 2 | 3
 
 const store = useSettingsStore()
 const { t, setLocale } = useI18n()
@@ -38,37 +37,22 @@ const stepError = ref('')
 
 const language = ref<string>(store.appSettings.app.language.current)
 const themeMode = ref<WebThemeMode>(store.appSettings.ui.webTheme.mode)
+const targetTitle = ref<string>(store.appSettings.window.targetTitle || '')
+const configuredInfinityNikkiGameDir = ref<string>(
+  store.appSettings.extensions.infinityNikki.gameDir
+)
+const resolvedInfinityNikkiGameDir = ref<string | null>(null)
+
+const isFirstStep = computed(() => step.value === 1)
+const isLastStep = computed(() => step.value === 2)
+const stepTransitionName = computed(() =>
+  direction.value === 'forward' ? 'ob-step-forward' : 'ob-step-backward'
+)
 const getDefaultTargetTitle = (lang: string) =>
   lang === 'en-US' ? 'Infinity Nikki  ' : '无限暖暖  '
 const isDefaultInfinityNikkiTargetTitle = (title: string) =>
   title === '无限暖暖  ' || title === 'Infinity Nikki  '
-
-const gameDir = ref<string>(store.appSettings.extensions.infinityNikki.gameDir || '')
-const targetTitle = ref<string>(
-  isDefaultInfinityNikkiTargetTitle(store.appSettings.window.targetTitle)
-    ? getDefaultTargetTitle(store.appSettings.app.language.current)
-    : store.appSettings.window.targetTitle ||
-        getDefaultTargetTitle(store.appSettings.app.language.current)
-)
-const skipInfinityNikki = ref(false)
-
-const hasDetectedOnce = ref(false)
-const detectionStatus = ref<DetectionStatus>('idle')
-const detectionMessageKey = ref('onboarding.step2.detectPending')
-
-const isFirstStep = computed(() => step.value === 1)
-const isLastStep = computed(() => step.value === 3)
-const stepTransitionName = computed(() =>
-  direction.value === 'forward' ? 'ob-step-forward' : 'ob-step-backward'
-)
-const step3DescriptionKey = computed(() =>
-  skipInfinityNikki.value ? 'onboarding.step3.descriptionGeneric' : 'onboarding.step3.description'
-)
-const targetTitlePlaceholderKey = computed(() =>
-  skipInfinityNikki.value
-    ? 'onboarding.step3.targetTitlePlaceholderGeneric'
-    : 'onboarding.step3.targetTitlePlaceholder'
-)
+const isInfinityNikkiUser = computed(() => resolvedInfinityNikkiGameDir.value !== null)
 
 const resolveThemePresetMode = (mode: WebThemeMode): 'light' | 'dark' => {
   if (mode === 'light' || mode === 'dark') {
@@ -127,7 +111,7 @@ watch(
   async (nextLanguage) => {
     await setLocale(nextLanguage as 'zh-CN' | 'en-US')
 
-    if (isDefaultInfinityNikkiTargetTitle(targetTitle.value)) {
+    if (isInfinityNikkiUser.value && isDefaultInfinityNikkiTargetTitle(targetTitle.value)) {
       targetTitle.value = getDefaultTargetTitle(nextLanguage)
     }
   }
@@ -141,126 +125,101 @@ watch(
   { immediate: true }
 )
 
-watch(
-  () => step.value,
-  (currentStep) => {
-    stepError.value = ''
-    if (currentStep === 2 && !skipInfinityNikki.value && !hasDetectedOnce.value) {
-      void detectInfinityNikkiDirectory()
-    }
-  }
-)
-
-const detectionMessageClass = computed(() => {
-  if (detectionStatus.value === 'success') {
-    return 'text-emerald-500'
-  }
-  if (detectionStatus.value === 'failed') {
-    return 'text-amber-500'
-  }
-  return 'text-muted-foreground'
-})
-
 const buildInfinityNikkiExePath = (dir: string) => {
   const base = dir.replace(/\\/g, '/').replace(/\/+$/, '')
   return `${base}/InfinityNikki.exe`
 }
 
+const normalizeDirectoryPath = (dir: string) => dir.trim().replace(/[\\/]+$/, '')
+
 const resolveInfinityNikkiAlbumPath = (dir: string): string => {
-  const base = dir.replace(/\\/g, '/').replace(/\/+$/, '')
+  const base = normalizeDirectoryPath(dir).replace(/\\/g, '/')
   return `${base}/X6Game/ScreenShot`
 }
 
 const isValidInfinityNikkiGameDir = async (dir: string): Promise<boolean> => {
-  const dirInfo = await onboardingApi.getFileInfo(dir)
+  const normalizedDir = normalizeDirectoryPath(dir)
+  if (!normalizedDir) {
+    return false
+  }
+
+  const dirInfo = await onboardingApi.getFileInfo(normalizedDir)
   if (!dirInfo.exists || !dirInfo.isDirectory) {
     return false
   }
 
-  const exeInfo = await onboardingApi.getFileInfo(buildInfinityNikkiExePath(dir))
+  const exeInfo = await onboardingApi.getFileInfo(buildInfinityNikkiExePath(normalizedDir))
   return exeInfo.exists && exeInfo.isRegularFile
 }
 
-const detectInfinityNikkiDirectory = async () => {
-  detectionStatus.value = 'loading'
-  detectionMessageKey.value = 'onboarding.step2.detecting'
+const resolveConfiguredInfinityNikkiGameDir = async (): Promise<string | null> => {
+  const configuredGameDir = normalizeDirectoryPath(configuredInfinityNikkiGameDir.value)
+  if (!configuredGameDir) {
+    return null
+  }
 
+  const isValidGameDir = await isValidInfinityNikkiGameDir(configuredGameDir)
+  return isValidGameDir ? configuredGameDir : null
+}
+
+const detectInfinityNikkiGameDir = async (): Promise<string | null> => {
   try {
     const result = await onboardingApi.detectInfinityNikkiGameDirectory()
-    hasDetectedOnce.value = true
-
-    if (result.gameDirFound && result.gameDir) {
-      gameDir.value = result.gameDir
-      detectionStatus.value = 'success'
-      detectionMessageKey.value = 'onboarding.step2.detectSuccess'
-      return
+    if (!result.gameDirFound || !result.gameDir) {
+      return null
     }
 
-    detectionStatus.value = 'failed'
-    if (!result.configFound) {
-      detectionMessageKey.value = 'onboarding.step2.detectConfigNotFound'
-    } else if (result.configFound && !result.gameDirFound) {
-      detectionMessageKey.value = 'onboarding.step2.detectGameDirNotFound'
-    } else {
-      detectionMessageKey.value = 'onboarding.step2.detectFailed'
+    const detectedGameDir = normalizeDirectoryPath(result.gameDir)
+    const isValidGameDir = await isValidInfinityNikkiGameDir(detectedGameDir)
+    if (!isValidGameDir) {
+      return null
     }
+
+    configuredInfinityNikkiGameDir.value = detectedGameDir
+    return detectedGameDir
   } catch (error) {
-    hasDetectedOnce.value = true
-    detectionStatus.value = 'failed'
-    detectionMessageKey.value = 'onboarding.step2.detectFailed'
     console.error('Failed to detect Infinity Nikki directory:', error)
+    return null
   }
 }
 
-const selectGameDirectory = async () => {
-  try {
-    const selectedPath = await onboardingApi.selectDirectory(t('onboarding.step2.selectDirectory'))
-    if (!selectedPath) {
-      return
-    }
+let infinityNikkiGameDirPromise: Promise<string | null> | null = null
 
-    gameDir.value = selectedPath
-    stepError.value = ''
-    if (detectionStatus.value !== 'success') {
-      detectionStatus.value = 'failed'
-      detectionMessageKey.value = 'onboarding.step2.manualInputHint'
-    }
-  } catch (error) {
-    console.error('Failed to select directory:', error)
+const resolveInfinityNikkiGameDir = () => {
+  if (!infinityNikkiGameDirPromise) {
+    infinityNikkiGameDirPromise = (async () => {
+      const configuredGameDir = await resolveConfiguredInfinityNikkiGameDir()
+      if (configuredGameDir) {
+        return configuredGameDir
+      }
+
+      return detectInfinityNikkiGameDir()
+    })()
   }
+
+  return infinityNikkiGameDirPromise
 }
+
+onMounted(() => {
+  void (async () => {
+    const resolvedGameDir = await resolveInfinityNikkiGameDir()
+    resolvedInfinityNikkiGameDir.value = resolvedGameDir
+
+    if (resolvedGameDir && targetTitle.value.trim() === '') {
+      targetTitle.value = getDefaultTargetTitle(language.value)
+    }
+  })()
+})
 
 const selectVisibleWindowTitle = (title: string) => {
   targetTitle.value = title
   stepError.value = ''
 }
 
-const toggleSkipInfinityNikki = () => {
-  if (skipInfinityNikki.value) {
-    skipInfinityNikki.value = false
-    if (!targetTitle.value.trim()) {
-      targetTitle.value = getDefaultTargetTitle(language.value)
-    }
-  } else {
-    skipInfinityNikki.value = true
-    if (isDefaultInfinityNikkiTargetTitle(targetTitle.value)) {
-      targetTitle.value = ''
-    }
-    stepError.value = ''
-    direction.value = 'forward'
-    step.value = 3
-  }
-}
-
 const goToNextStep = () => {
   stepError.value = ''
 
-  if (step.value === 2 && !skipInfinityNikki.value && !gameDir.value.trim()) {
-    stepError.value = t('onboarding.step2.gameDirRequired')
-    return
-  }
-
-  if (step.value < 3) {
+  if (step.value < 2) {
     direction.value = 'forward'
     step.value = (step.value + 1) as Step
   }
@@ -277,35 +236,12 @@ const goToPreviousStep = () => {
 const completeOnboarding = async () => {
   stepError.value = ''
 
-  const trimmedTargetTitle = targetTitle.value.trim()
-  if (!trimmedTargetTitle) {
-    stepError.value = t('onboarding.step3.targetTitleRequired')
-    return
-  }
-
-  const trimmedGameDir = gameDir.value.trim()
-  let externalAlbumPath = ''
-
   isSubmitting.value = true
   try {
-    if (!skipInfinityNikki.value) {
-      if (!trimmedGameDir) {
-        direction.value = 'backward'
-        step.value = 2
-        stepError.value = t('onboarding.step2.gameDirRequired')
-        return
-      }
-
-      const isValidGameDir = await isValidInfinityNikkiGameDir(trimmedGameDir)
-      if (!isValidGameDir) {
-        direction.value = 'backward'
-        step.value = 2
-        stepError.value = t('onboarding.step2.gameDirInvalid')
-        return
-      }
-
-      externalAlbumPath = resolveInfinityNikkiAlbumPath(trimmedGameDir)
-    }
+    const nextTargetTitle = targetTitle.value.trim() === '' ? '' : targetTitle.value
+    const resolvedGameDir = await resolveInfinityNikkiGameDir()
+    resolvedInfinityNikkiGameDir.value = resolvedGameDir
+    const externalAlbumPath = resolvedGameDir ? resolveInfinityNikkiAlbumPath(resolvedGameDir) : ''
 
     await store.updateSettings({
       ...store.appSettings,
@@ -334,24 +270,24 @@ const completeOnboarding = async () => {
       },
       window: {
         ...store.appSettings.window,
-        targetTitle: targetTitle.value,
+        targetTitle: nextTargetTitle,
       },
       features: {
         ...store.appSettings.features,
-        externalAlbumPath: skipInfinityNikki.value ? '' : externalAlbumPath,
+        externalAlbumPath,
       },
       extensions: {
         ...store.appSettings.extensions,
         infinityNikki: {
           ...store.appSettings.extensions.infinityNikki,
-          enable: !skipInfinityNikki.value,
-          gameDir: skipInfinityNikki.value ? '' : trimmedGameDir,
+          enable: Boolean(resolvedGameDir),
+          gameDir: resolvedGameDir ?? '',
         },
       },
     })
 
     direction.value = 'forward'
-    step.value = 4
+    step.value = 3
   } catch (error) {
     stepError.value = t('onboarding.common.saveFailed')
     console.error('Failed to complete onboarding:', error)
@@ -375,12 +311,8 @@ const completeOnboarding = async () => {
             {{ t('onboarding.description') }}
           </p>
 
-          <div v-if="step < 4" class="mt-8 flex items-center gap-2 text-xs">
-            <div
-              v-for="currentStep in [1, 2, 3]"
-              :key="currentStep"
-              class="flex items-center gap-2"
-            >
+          <div v-if="step < 3" class="mt-8 flex items-center gap-2 text-xs">
+            <div v-for="currentStep in [1, 2]" :key="currentStep" class="flex items-center gap-2">
               <div
                 class="flex h-6 w-6 items-center justify-center rounded-full border"
                 :class="
@@ -391,7 +323,7 @@ const completeOnboarding = async () => {
               >
                 {{ currentStep }}
               </div>
-              <div v-if="currentStep < 3" class="h-px w-10 bg-border" />
+              <div v-if="currentStep < 2" class="h-px w-10 bg-border" />
             </div>
           </div>
         </div>
@@ -455,72 +387,32 @@ const completeOnboarding = async () => {
                 <h2 class="text-lg font-medium text-foreground">
                   {{ t('onboarding.step2.title') }}
                 </h2>
-                <p class="mt-1 text-sm" :class="detectionMessageClass">
-                  {{ t(detectionMessageKey) }}
-                </p>
-              </div>
-
-              <div class="space-y-3">
-                <div class="flex gap-2">
-                  <Input
-                    v-model="gameDir"
-                    :placeholder="t('onboarding.step2.gameDirPlaceholder')"
-                    :disabled="detectionStatus === 'loading' || skipInfinityNikki"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    class="shrink-0"
-                    :disabled="detectionStatus === 'loading' || skipInfinityNikki"
-                    @click="selectGameDirectory"
-                  >
-                    {{ t('onboarding.step2.selectButton') }}
-                  </Button>
-                </div>
-
-                <p class="text-xs text-muted-foreground">
-                  <button
-                    class="underline underline-offset-2"
-                    type="button"
-                    @click="toggleSkipInfinityNikki"
-                  >
-                    {{
-                      skipInfinityNikki
-                        ? t('onboarding.step2.undoSkipLink')
-                        : t('onboarding.step2.skipLink')
-                    }}
-                  </button>
-                </p>
-              </div>
-            </div>
-
-            <div v-else-if="step === 3" key="step-3" class="space-y-6">
-              <div>
-                <h2 class="text-lg font-medium text-foreground">
-                  {{ t('onboarding.step3.title') }}
-                </h2>
                 <p class="mt-1 text-sm text-muted-foreground">
-                  {{ t(step3DescriptionKey) }}
+                  {{ t('onboarding.step2.description') }}
                 </p>
               </div>
 
               <div class="space-y-2">
-                <p class="text-sm text-foreground">{{ t('onboarding.step3.targetTitleLabel') }}</p>
+                <p class="text-sm text-foreground">{{ t('onboarding.step2.targetTitleLabel') }}</p>
                 <div class="flex gap-2">
                   <Input
                     v-model="targetTitle"
-                    :placeholder="t(targetTitlePlaceholderKey)"
+                    :placeholder="t('onboarding.step2.targetTitlePlaceholder')"
                     class="flex-1"
                   />
 
                   <WindowTitlePickerButton @select="selectVisibleWindowTitle" />
                 </div>
+
+                <p class="text-xs text-muted-foreground">
+                  {{ t('onboarding.step2.targetTitleHint') }}
+                </p>
               </div>
             </div>
 
             <div
-              v-else-if="step === 4"
-              key="step-4"
+              v-else-if="step === 3"
+              key="step-3"
               class="flex h-full flex-col items-center justify-center space-y-6 text-center"
             >
               <h2 class="text-xl font-medium text-emerald-500">
@@ -533,13 +425,13 @@ const completeOnboarding = async () => {
           </Transition>
         </div>
 
-        <div v-if="step < 4 || stepError" class="shrink-0 border-t border-border/60 px-8 py-6">
+        <div v-if="step < 3 || stepError" class="shrink-0 border-t border-border/60 px-8 py-6">
           <p v-if="stepError" class="text-sm text-red-500">
             {{ stepError }}
           </p>
 
           <div
-            v-if="step < 4"
+            v-if="step < 3"
             class="flex items-center justify-between"
             :class="[stepError && 'mt-4']"
           >
@@ -583,7 +475,7 @@ const completeOnboarding = async () => {
   height: min(28rem, calc(100dvh - 7rem));
 }
 
-/* 步骤切换：前进方向 — 旧内容向左滑出，新内容从右滑入 */
+/* 步骤切换：前进方向，旧内容向左滑出，新内容从右滑入 */
 .ob-step-forward-enter-active,
 .ob-step-forward-leave-active {
   transition:
@@ -601,7 +493,7 @@ const completeOnboarding = async () => {
   transform: translateX(-20px);
 }
 
-/* 步骤切换：后退方向 — 旧内容向右滑出，新内容从左滑入 */
+/* 步骤切换：后退方向，旧内容向右滑出，新内容从左滑入 */
 .ob-step-backward-enter-active,
 .ob-step-backward-leave-active {
   transition:

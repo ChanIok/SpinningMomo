@@ -55,12 +55,10 @@ watch(
 )
 
 const handleTitleChange = async () => {
-  if (inputTitle.value.trim() === '') {
-    return
-  }
+  const nextTitle = inputTitle.value.trim() === '' ? '' : inputTitle.value
 
   try {
-    await updateWindowTitle(inputTitle.value)
+    await updateWindowTitle(nextTitle)
   } catch (error) {
     console.error('Failed to update window title:', error)
   }

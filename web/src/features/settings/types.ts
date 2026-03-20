@@ -296,7 +296,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
   // window 设置
   window: {
-    targetTitle: '无限暖暖  ',
+    targetTitle: '',
     resetResolution: {
       width: 0,
       height: 0,
@@ -416,7 +416,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
   extensions: {
     infinityNikki: {
-      enable: true,
+      enable: false,
       gameDir: '',
       galleryGuideSeen: false,
       allowOnlinePhotoMetadataExtract: false,

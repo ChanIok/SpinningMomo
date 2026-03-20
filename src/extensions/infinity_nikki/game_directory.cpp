@@ -61,6 +61,7 @@ auto get_game_directory() -> std::expected<InfinityNikkiGameDirResult, std::stri
       L"InfinityNikki Launcher",
       L"InfinityNikkiGlobal Launcher",
       L"InfinityNikkiBili Launcher",
+      L"InfinityNikkiSteam Launcher",
   };
 
   std::string last_error = "No valid launcher config found";
