@@ -68,7 +68,7 @@ function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
 
 function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
   gallerySelection.handleAssetDoubleClick(asset, event)
-  galleryLightbox.openLightbox(index)
+  void galleryLightbox.openLightbox(index)
 }
 
 function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {

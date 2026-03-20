@@ -84,7 +84,7 @@
   --muted: #f8f8f8;
   --muted-foreground: #2e2e2e80;
   --accent: #f2f2f2;
-  --accent-foreground: #2e2e2e80;
+  --accent-foreground: var(--foreground);
   --destructive: #c72e0f;
   --destructive-foreground: #ffffff;
   --border: #e5e5e5;

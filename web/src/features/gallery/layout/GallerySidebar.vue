@@ -50,11 +50,11 @@ const infinityNikkiMetadataFolderId = ref<number | null>(null)
 const infinityNikkiMetadataFolderName = ref('')
 
 const isFolderTitleSelected = computed(() => {
-  return galleryStore.sidebar.activeSection === 'folders' && selectedFolder.value === null
+  return galleryStore.detailsPanel.type === 'folder' && galleryStore.detailsPanel.folder.id === -1
 })
 
 const isTagTitleSelected = computed(() => {
-  return galleryStore.sidebar.activeSection === 'tags' && selectedTag.value === null
+  return galleryStore.detailsPanel.type === 'tag' && galleryStore.detailsPanel.tag.id === -1
 })
 
 function startAddFolder() {

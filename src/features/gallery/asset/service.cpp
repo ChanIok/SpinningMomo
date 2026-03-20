@@ -95,9 +95,113 @@ auto trim_ascii_copy(std::string_view value) -> std::string {
   return std::string(value.substr(start, end - start));
 }
 
-// 构建统一的WHERE条件
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
                                 std::string_view asset_table_alias = "")
+    -> std::expected<std::pair<std::string, std::vector<Core::Database::Types::DbParam>>,
+                     std::string>;
+
+struct QueryOrderConfig {
+  std::string sort_by;
+  std::string sort_order;
+  std::string asset_order_clause;
+  // 给 ROW_NUMBER() 用的排序子句；需要基于中间列名而不是 assets 原始表达式。
+  std::string indexed_order_clause;
+};
+
+auto build_query_order_config(std::optional<std::string> sort_by_param,
+                              std::optional<std::string> sort_order_param) -> QueryOrderConfig {
+  QueryOrderConfig config{
+      .sort_by = sort_by_param.value_or("created_at"),
+      .sort_order = sort_order_param.value_or("desc"),
+  };
+
+  if (config.sort_by != "created_at" && config.sort_by != "name" && config.sort_by != "size" &&
+      config.sort_by != "file_created_at") {
+    config.sort_by = "created_at";
+  }
+  if (config.sort_order != "asc" && config.sort_order != "desc") {
+    config.sort_order = "desc";
+  }
+
+  if (config.sort_by == "created_at") {
+    config.asset_order_clause =
+        std::format("ORDER BY COALESCE(file_created_at, created_at) {}, id {}", config.sort_order,
+                    config.sort_order);
+    config.indexed_order_clause =
+        std::format("ORDER BY sort_created_at {}, id {}", config.sort_order, config.sort_order);
+    return config;
+  }
+
+  if (config.sort_by == "file_created_at") {
+    config.asset_order_clause =
+        std::format("ORDER BY file_created_at {}, id {}", config.sort_order, config.sort_order);
+    config.indexed_order_clause = std::format("ORDER BY sort_file_created_at {}, id {}",
+                                              config.sort_order, config.sort_order);
+    return config;
+  }
+
+  if (config.sort_by == "name") {
+    config.asset_order_clause =
+        std::format("ORDER BY name {}, id {}", config.sort_order, config.sort_order);
+    config.indexed_order_clause =
+        std::format("ORDER BY sort_name {}, id {}", config.sort_order, config.sort_order);
+    return config;
+  }
+
+  config.asset_order_clause =
+      std::format("ORDER BY size {}, id {}", config.sort_order, config.sort_order);
+  config.indexed_order_clause =
+      std::format("ORDER BY sort_size {}, id {}", config.sort_order, config.sort_order);
+  return config;
+}
+
+auto find_active_asset_index(Core::State::AppState& app_state,
+                             const Types::QueryAssetsFilters& filters,
+                             const QueryOrderConfig& order_config, std::int64_t active_asset_id)
+    -> std::expected<std::optional<std::int64_t>, std::string> {
+  // 复用与主查询完全一致的筛选/排序语义，只额外回答“当前 active 资产在第几位”。
+  auto where_result = build_unified_where_clause(filters);
+  if (!where_result) {
+    return std::unexpected(where_result.error());
+  }
+
+  auto [where_clause, query_params] = std::move(where_result.value());
+
+  std::string sql = std::format(R"(
+    WITH filtered_assets AS (
+      SELECT id,
+             COALESCE(file_created_at, created_at) AS sort_created_at,
+             file_created_at AS sort_file_created_at,
+             name AS sort_name,
+             size AS sort_size
+      FROM assets
+      {}
+    ),
+    indexed_assets AS (
+      SELECT id,
+             ROW_NUMBER() OVER ({}) - 1 AS row_index
+      FROM filtered_assets
+    )
+    SELECT row_index
+    FROM indexed_assets
+    WHERE id = ?
+  )",
+                                where_clause, order_config.indexed_order_clause);
+
+  query_params.push_back(active_asset_id);
+
+  auto index_result =
+      Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, query_params);
+  if (!index_result) {
+    return std::unexpected("Failed to query active asset index: " + index_result.error());
+  }
+
+  return index_result.value();
+}
+
+// 构建统一的WHERE条件
+auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
+                                std::string_view asset_table_alias)
     -> std::expected<std::pair<std::string, std::vector<Core::Database::Types::DbParam>>,
                      std::string> {
   std::vector<std::string> conditions;
@@ -271,25 +375,7 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
   auto [where_clause, where_params] = std::move(where_result.value());
 
   // 2. 验证和构建 ORDER BY
-  std::string sort_by = params.sort_by.value_or("created_at");
-  std::string sort_order = params.sort_order.value_or("desc");
-
-  // 安全的排序字段验证
-  if (sort_by != "created_at" && sort_by != "name" && sort_by != "size" &&
-      sort_by != "file_created_at") {
-    sort_by = "created_at";
-  }
-  if (sort_order != "asc" && sort_order != "desc") {
-    sort_order = "desc";
-  }
-
-  // 对于时间相关的排序，使用 COALESCE 处理
-  std::string order_field = sort_by;
-  if (sort_by == "created_at") {
-    order_field = "COALESCE(file_created_at, created_at)";
-  }
-
-  std::string order_clause = std::format("ORDER BY {} {}", order_field, sort_order);
+  auto order_config = build_query_order_config(params.sort_by, params.sort_order);
 
   // 3. 获取总数（用于分页计算或前端显示）
   std::string count_sql = std::format("SELECT COUNT(*) FROM assets {}", where_clause);
@@ -318,7 +404,7 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
     {}
     {}
   )",
-                                where_clause, order_clause);
+                                where_clause, order_config.asset_order_clause);
 
   auto final_params = where_params;
 
@@ -356,6 +442,15 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
     response.current_page = 1;
     response.per_page = total_count;
     response.total_pages = 1;
+  }
+
+  if (params.active_asset_id.has_value()) {
+    auto active_index_result = find_active_asset_index(app_state, params.filters, order_config,
+                                                       params.active_asset_id.value());
+    if (!active_index_result) {
+      return std::unexpected(active_index_result.error());
+    }
+    response.active_asset_index = active_index_result.value();
   }
 
   // 8. 预热缓存：将查询结果的 id->path 映射加入缓存
@@ -440,6 +535,9 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   filters.color_match_mode = params.color_match_mode;
   filters.color_distance = params.color_distance;
 
+  auto order_config =
+      build_query_order_config(std::optional<std::string>{"created_at"}, params.sort_order);
+
   // 复用统一的 WHERE 条件构建器
   auto where_result = build_unified_where_clause(filters);
   if (!where_result) {
@@ -455,9 +553,9 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
     FROM assets 
     {}
     GROUP BY month
-    ORDER BY month DESC
+    ORDER BY month {}
   )",
-                                where_clause);
+                                where_clause, order_config.sort_order);
 
   auto result =
       Core::Database::query<Types::TimelineBucket>(*app_state.database, sql, query_params);
@@ -475,6 +573,15 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   Types::TimelineBucketsResponse response;
   response.buckets = std::move(result.value());
   response.total_count = total_count;
+
+  if (params.active_asset_id.has_value()) {
+    auto active_index_result =
+        find_active_asset_index(app_state, filters, order_config, params.active_asset_id.value());
+    if (!active_index_result) {
+      return std::unexpected(active_index_result.error());
+    }
+    response.active_asset_index = active_index_result.value();
+  }
 
   return response;
 }

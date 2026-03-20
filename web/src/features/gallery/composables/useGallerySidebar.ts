@@ -33,20 +33,15 @@ export function useGallerySidebar() {
   const tagsLoading = computed(() => store.tagsLoading)
   const tagsError = computed(() => store.tagsError)
 
-  const sidebar = computed(() => store.sidebar)
   const selectedFolder = computed(() => {
-    if (sidebar.value.activeSection === 'folders' && store.filter.folderId) {
+    if (store.filter.folderId) {
       const folderId = Number(store.filter.folderId)
       return isNaN(folderId) ? null : folderId
     }
     return null
   })
   const selectedTag = computed(() => {
-    if (
-      sidebar.value.activeSection === 'tags' &&
-      store.filter.tagIds &&
-      store.filter.tagIds.length > 0
-    ) {
+    if (store.filter.tagIds && store.filter.tagIds.length > 0) {
       return store.filter.tagIds[0] ?? null
     }
     return null
@@ -106,7 +101,6 @@ export function useGallerySidebar() {
    * 选择文件夹
    */
   function selectFolder(folderId: number, folderName: string) {
-    store.setSidebarActiveSection('folders')
     store.setFilter({ folderId: String(folderId) })
 
     // 查找文件夹对象并设置详情面板
@@ -122,7 +116,6 @@ export function useGallerySidebar() {
    * 清空文件夹筛选（保留其他筛选）
    */
   function clearFolderFilter() {
-    store.setSidebarActiveSection('folders')
     store.setFilter({ folderId: undefined })
     store.setDetailsFocus({
       type: 'folder',
@@ -191,7 +184,6 @@ export function useGallerySidebar() {
    * 清空标签筛选（保留其他筛选）
    */
   function clearTagFilter() {
-    store.setSidebarActiveSection('tags')
     store.setFilter({ tagIds: [], tagMatchMode: 'any' })
     store.setDetailsFocus({
       type: 'tag',
@@ -237,7 +229,6 @@ export function useGallerySidebar() {
       console.log('🏷️ 取消标签筛选:', tagName)
     } else {
       // 选中新标签
-      store.setSidebarActiveSection('tags')
       store.setFilter({ tagIds: [tagId], tagMatchMode: 'any' })
 
       // 查找标签对象并设置详情面板
@@ -254,8 +245,7 @@ export function useGallerySidebar() {
    * 选择"所有媒体"
    */
   function selectAllMedia() {
-    store.setSidebarActiveSection('all')
-    store.setFilter({})
+    store.resetFilter()
 
     // 清除详情面板焦点
     store.clearDetailsFocus()
@@ -360,7 +350,6 @@ export function useGallerySidebar() {
     tags,
     tagsLoading,
     tagsError,
-    sidebar,
     selectedFolder,
     selectedTag,
 

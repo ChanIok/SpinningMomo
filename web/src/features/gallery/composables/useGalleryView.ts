@@ -136,7 +136,7 @@ export function useGalleryView() {
    * 清空筛选条件
    */
   function clearFilter() {
-    store.setFilter({})
+    store.resetFilter()
     console.log('🧹 筛选条件已清空')
   }
 

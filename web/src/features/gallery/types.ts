@@ -240,6 +240,7 @@ export interface ListAssetsResponse {
   currentPage: number
   perPage: number
   totalPages: number
+  activeAssetIndex?: number
 }
 
 // 操作结果
@@ -298,6 +299,7 @@ export interface QueryAssetsParams {
   filters: QueryAssetsFilters
   sortBy?: SortBy
   sortOrder?: SortOrder
+  activeAssetId?: number
   // 分页是可选的：传page就分页，不传就返回所有结果
   page?: number
   perPage?: number
@@ -351,6 +353,8 @@ export interface TimelineBucket {
 export interface GetTimelineBucketsParams {
   folderId?: number
   includeSubfolders?: boolean
+  sortOrder?: 'asc' | 'desc'
+  activeAssetId?: number
   type?: AssetType
   search?: string
   rating?: number
@@ -368,6 +372,7 @@ export interface GetTimelineBucketsParams {
 export interface TimelineBucketsResponse {
   buckets: TimelineBucket[]
   totalCount: number
+  activeAssetIndex?: number
 }
 
 // 获取指定月份资产参数
@@ -403,6 +408,7 @@ export interface SelectionState {
   selectedIds: Set<number>
   anchorIndex?: number
   activeIndex?: number
+  activeAssetId?: number
 }
 
 // Lightbox状态
@@ -417,7 +423,6 @@ export interface LightboxState {
 // 侧边栏状态
 export interface SidebarState {
   isOpen: boolean
-  activeSection: 'all' | 'folders' | 'tags'
 }
 
 // 详情面板焦点状态

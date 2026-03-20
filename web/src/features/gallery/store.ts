@@ -46,6 +46,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   // ============= 分页缓存状态（普通模式使用） =============
   const paginatedAssets = ref<Map<number, Asset[]>>(new Map()) // key: pageNumber
+  const paginatedAssetsVersion = ref(0)
   const perPage = ref(100) // 每页数量
 
   // ============= 时间线数据状态 =============
@@ -77,7 +78,10 @@ export const useGalleryStore = defineStore('gallery', () => {
   const selection = reactive<SelectionState>({
     selectedIds: new Set<number>(),
     anchorIndex: undefined,
+    // activeIndex 是当前结果集里的位置缓存；筛选/排序变化后可能失效，需要重定位。
     activeIndex: undefined,
+    // activeAssetId 才是“当前聚焦资产”的身份真相源，用来跨结果集变化保留语义。
+    activeAssetId: undefined,
   })
 
   // ============= Lightbox状态 =============
@@ -91,7 +95,6 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   const sidebar = reactive<SidebarState>({
     isOpen: true,
-    activeSection: 'all',
   })
 
   // 详情面板焦点状态
@@ -172,6 +175,7 @@ export const useGalleryStore = defineStore('gallery', () => {
    */
   function setPageAssets(pageNum: number, pageAssets: Asset[]) {
     paginatedAssets.value.set(pageNum, pageAssets)
+    paginatedAssetsVersion.value += 1
   }
 
   function patchAssetsReviewState(
@@ -202,6 +206,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
       if (hasPageChange) {
         paginatedAssets.value.set(pageNum, nextPageAssets)
+        paginatedAssetsVersion.value += 1
       }
     })
 
@@ -231,6 +236,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
       if (hasPageChange) {
         paginatedAssets.value.set(pageNum, nextPageAssets)
+        paginatedAssetsVersion.value += 1
       }
     })
 
@@ -247,6 +253,7 @@ export const useGalleryStore = defineStore('gallery', () => {
    */
   function clearPaginatedAssets() {
     paginatedAssets.value.clear()
+    paginatedAssetsVersion.value += 1
   }
 
   // ============= 时间线数据操作 Actions =============
@@ -305,6 +312,10 @@ export const useGalleryStore = defineStore('gallery', () => {
     filter.value = { ...filter.value, ...newFilter }
   }
 
+  function resetFilter() {
+    filter.value = {}
+  }
+
   function setSorting(newSortBy: SortBy, newSortOrder: SortOrder) {
     sortBy.value = newSortBy
     sortOrder.value = newSortOrder
@@ -346,6 +357,20 @@ export const useGalleryStore = defineStore('gallery', () => {
     selection.activeIndex = index
   }
 
+  function setActiveAsset(assetId: number, index?: number) {
+    selection.activeAssetId = assetId
+    selection.activeIndex = index
+  }
+
+  function setActiveAssetId(assetId?: number) {
+    selection.activeAssetId = assetId
+  }
+
+  function clearActiveAsset() {
+    selection.activeAssetId = undefined
+    selection.activeIndex = undefined
+  }
+
   // ============= Lightbox操作 Actions =============
 
   /**
@@ -357,11 +382,9 @@ export const useGalleryStore = defineStore('gallery', () => {
     lightbox.fitMode = 'contain'
   }
 
-  function openLightbox(index: number) {
+  function openLightbox() {
     resetLightboxView()
     lightbox.isOpen = true
-    const validIndex = Math.max(0, Math.min(index, totalCount.value - 1))
-    selection.activeIndex = validIndex
   }
 
   function closeLightbox() {
@@ -417,10 +440,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     sidebar.isOpen = open
   }
 
-  function setSidebarActiveSection(activeSection: SidebarState['activeSection']) {
-    sidebar.activeSection = activeSection
-  }
-
   function setDetailsOpen(open: boolean) {
     detailsOpen.value = open
   }
@@ -463,7 +482,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     viewConfig.value = { mode: 'adaptive', size: 128 }
     persistedViewSize.value = viewConfig.value.size
-    filter.value = {}
+    resetFilter()
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'
     includeSubfolders.value = true
@@ -471,12 +490,12 @@ export const useGalleryStore = defineStore('gallery', () => {
     selection.selectedIds.clear()
     selection.anchorIndex = undefined
     selection.activeIndex = undefined
+    selection.activeAssetId = undefined
 
     lightbox.isOpen = false
     lightbox.isFullscreen = false
 
     sidebar.isOpen = true
-    sidebar.activeSection = 'all'
     detailsOpen.value = true
   }
 
@@ -491,6 +510,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     // 分页缓存状态
     paginatedAssets,
+    paginatedAssetsVersion,
     perPage,
 
     // 时间线状态
@@ -557,6 +577,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     setViewConfig,
     setFilter,
+    resetFilter,
     setSorting,
     setIncludeSubfolders,
 
@@ -565,6 +586,9 @@ export const useGalleryStore = defineStore('gallery', () => {
     replaceSelection,
     setSelectionAnchor,
     setSelectionActive,
+    setActiveAsset,
+    setActiveAssetId,
+    clearActiveAsset,
 
     resetLightboxView,
     openLightbox,
@@ -579,7 +603,6 @@ export const useGalleryStore = defineStore('gallery', () => {
     setLightboxFitMode,
 
     setSidebarOpen,
-    setSidebarActiveSection,
     setDetailsOpen,
     setDetailsFocus,
     clearDetailsFocus,

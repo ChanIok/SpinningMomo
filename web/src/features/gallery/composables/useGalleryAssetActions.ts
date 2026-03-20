@@ -40,19 +40,19 @@ export function useGalleryAssetActions() {
       if (store.lightbox.isOpen) {
         store.closeLightbox()
       }
-      store.setSelectionActive(undefined)
+      store.clearActiveAsset()
       gallerySelection.clearSelection()
       return
     }
 
     const nextActiveIndex = Math.min(previousActiveIndex ?? 0, store.totalCount - 1)
-    store.setSelectionActive(nextActiveIndex)
 
     if (store.lightbox.isOpen) {
       await gallerySelection.selectOnlyIndex(nextActiveIndex)
       return
     }
 
+    await gallerySelection.activateIndex(nextActiveIndex)
     gallerySelection.clearSelection()
   }
 

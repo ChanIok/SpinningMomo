@@ -11,6 +11,62 @@ import { toQueryAssetsFilters } from '../queryFilters'
 export function useGalleryData() {
   const store = useGalleryStore()
 
+  function findLoadedAssetById(assetId: number) {
+    for (const pageAssets of store.paginatedAssets.values()) {
+      const asset = pageAssets.find((item) => item.id === assetId)
+      if (asset) {
+        return asset
+      }
+    }
+
+    return undefined
+  }
+
+  // 在筛选结果刷新后，用 activeAssetId 将当前位置重建到新的结果集上。
+  async function reconcileActiveAsset(activeAssetIndex?: number) {
+    const activeAssetId = store.selection.activeAssetId
+    if (activeAssetId === undefined) {
+      return
+    }
+
+    // 原资产已不在新结果集里：清空 active，并在灯箱场景下直接退出，避免跳到错误图片。
+    if (activeAssetIndex === undefined) {
+      if (store.lightbox.isOpen) {
+        store.closeLightbox()
+      }
+
+      if (store.detailsPanel.type === 'asset' && store.detailsPanel.asset.id === activeAssetId) {
+        store.clearDetailsFocus()
+      }
+
+      store.clearActiveAsset()
+      return
+    }
+
+    store.setSelectionActive(activeAssetIndex)
+
+    // 重定位只返回索引；这里确保对应页面已加载，后续 UI 才能拿到完整资产对象。
+    const targetPage = Math.floor(activeAssetIndex / store.perPage) + 1
+    if (!store.isPageLoaded(targetPage)) {
+      await loadPage(targetPage)
+    }
+
+    const loadedActiveAsset = findLoadedAssetById(activeAssetId)
+    if (
+      loadedActiveAsset &&
+      store.detailsPanel.type === 'asset' &&
+      store.detailsPanel.asset.id === loadedActiveAsset.id
+    ) {
+      store.setDetailsFocus({ type: 'asset', asset: loadedActiveAsset })
+    }
+
+    if (store.lightbox.isOpen && loadedActiveAsset) {
+      store.replaceSelection([loadedActiveAsset.id])
+      store.setSelectionAnchor(activeAssetIndex)
+      store.setDetailsFocus({ type: 'asset', asset: loadedActiveAsset })
+    }
+  }
+
   // ============= 数据加载操作 =============
 
   /**
@@ -30,6 +86,8 @@ export function useGalleryData() {
       const response = await galleryApi.getTimelineBuckets({
         folderId: filters.folderId,
         includeSubfolders: filters.includeSubfolders,
+        sortOrder: store.sortOrder,
+        activeAssetId: store.selection.activeAssetId,
         type: filters.type,
         search: filters.search,
         rating: filters.rating,
@@ -46,6 +104,8 @@ export function useGalleryData() {
 
       // 2. 设置分页总数（用于虚拟滚动）
       store.setPagination(response.totalCount, 1, false)
+
+      await reconcileActiveAsset(response.activeAssetIndex)
 
       console.log('📅 时间线数据加载成功:', {
         months: response.buckets.length,
@@ -80,6 +140,7 @@ export function useGalleryData() {
         filters,
         sortBy: store.sortBy,
         sortOrder: store.sortOrder,
+        activeAssetId: store.selection.activeAssetId,
         page: 1,
         perPage: store.perPage,
       })
@@ -89,6 +150,8 @@ export function useGalleryData() {
 
       // 缓存第一页数据
       store.setPageAssets(1, response.items)
+
+      await reconcileActiveAsset(response.activeAssetIndex)
 
       console.log('📊 加载完成:', {
         totalCount: response.totalCount,

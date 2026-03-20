@@ -153,6 +153,7 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
       items: virtualizer.value.getVirtualItems(),
       columns: columns.value,
       totalCount: totalCount.value,
+      paginatedAssetsVersion: store.paginatedAssetsVersion,
     }),
     async ({ items, columns: cols, totalCount: total }) => {
       // 1️⃣ 立即同步更新 UI（即使数据未加载，先显示骨架屏）

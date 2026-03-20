@@ -221,6 +221,7 @@ struct ListResponse {
   std::int32_t current_page;
   std::int32_t per_page;
   std::int32_t total_pages;
+  std::optional<std::int64_t> active_asset_index;
 };
 
 struct PhotoMapPoint {
@@ -282,6 +283,8 @@ struct TimelineBucket {
 struct TimelineBucketsParams {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
+  std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
+  std::optional<std::int64_t> active_asset_id;
   std::optional<std::string> type;
   std::optional<std::string> search;
   std::optional<int> rating;
@@ -298,6 +301,7 @@ struct TimelineBucketsParams {
 struct TimelineBucketsResponse {
   std::vector<TimelineBucket> buckets;
   int total_count;  // 总照片数
+  std::optional<std::int64_t> active_asset_index;
 };
 
 struct GetAssetsByMonthParams {
@@ -348,6 +352,7 @@ struct QueryAssetsParams {
   QueryAssetsFilters filters;
   std::optional<std::string> sort_by = "created_at";
   std::optional<std::string> sort_order = "desc";
+  std::optional<std::int64_t> active_asset_id;
   // 分页是可选的：传page就分页，不传就返回所有结果
   std::optional<std::int32_t> page;
   std::optional<std::int32_t> per_page;

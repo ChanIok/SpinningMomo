@@ -134,11 +134,10 @@ export function useGalleryLightbox() {
 
   async function syncLightboxSelection(index: number) {
     if (store.selectedCount > 1) {
-      await gallerySelection.activateIndex(index, { syncDetails: true })
-      return
+      return gallerySelection.activateIndex(index, { syncDetails: true })
     }
 
-    await gallerySelection.selectOnlyIndex(index)
+    return gallerySelection.selectOnlyIndex(index)
   }
 
   watch(
@@ -153,9 +152,13 @@ export function useGalleryLightbox() {
     { immediate: true }
   )
 
-  function openLightbox(index: number) {
-    store.openLightbox(index)
-    void syncLightboxSelection(index)
+  async function openLightbox(index: number) {
+    const asset = await syncLightboxSelection(index)
+    if (!asset) {
+      return
+    }
+
+    store.openLightbox()
     preloadRange(index).catch((err) => {
       console.warn('Failed to preload lightbox range:', err)
     })

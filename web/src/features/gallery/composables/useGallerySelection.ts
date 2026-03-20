@@ -15,6 +15,7 @@ export function useGallerySelection() {
   const selectedCount = computed(() => store.selectedCount)
   const hasSelection = computed(() => store.hasSelection)
   const activeIndex = computed(() => store.selection.activeIndex)
+  const activeAssetId = computed(() => store.selection.activeAssetId)
   const totalCount = computed(() => store.totalCount)
   const perPage = computed(() => store.perPage)
 
@@ -78,9 +79,9 @@ export function useGallerySelection() {
       return preferredAsset
     }
 
-    const currentActiveIndex = activeIndex.value
-    if (currentActiveIndex !== undefined) {
-      const activeAsset = getLoadedAssetByIndex(currentActiveIndex)
+    const currentActiveAssetId = activeAssetId.value
+    if (currentActiveAssetId !== undefined) {
+      const activeAsset = findLoadedAssetById(currentActiveAssetId)
       if (activeAsset && selectedIds.value.has(activeAsset.id)) {
         return activeAsset
       }
@@ -124,7 +125,7 @@ export function useGallerySelection() {
       return undefined
     }
 
-    store.setSelectionActive(normalizedIndex)
+    store.setActiveAsset(asset.id, normalizedIndex)
     if (options.syncDetails) {
       syncDetailsFocusFromSelection(asset)
     }
@@ -145,7 +146,7 @@ export function useGallerySelection() {
 
     store.replaceSelection([asset.id])
     store.setSelectionAnchor(normalizedIndex)
-    store.setSelectionActive(normalizedIndex)
+    store.setActiveAsset(asset.id, normalizedIndex)
     syncDetailsFocusFromSelection(asset)
     return asset
   }
@@ -170,7 +171,7 @@ export function useGallerySelection() {
       store.setSelectionAnchor(undefined)
     }
 
-    store.setSelectionActive(normalizedIndex)
+    store.setActiveAsset(asset.id, normalizedIndex)
     syncDetailsFocusFromSelection(asset)
     return asset
   }
@@ -204,7 +205,11 @@ export function useGallerySelection() {
 
     const targetAsset = getLoadedAssetByIndex(normalizedIndex)
     store.replaceSelection(selectedRangeIds)
-    store.setSelectionActive(normalizedIndex)
+    if (targetAsset) {
+      store.setActiveAsset(targetAsset.id, normalizedIndex)
+    } else {
+      store.setSelectionActive(normalizedIndex)
+    }
     syncDetailsFocusFromSelection(targetAsset)
     return targetAsset
   }
@@ -239,7 +244,7 @@ export function useGallerySelection() {
     }
 
     if (selectedIds.value.has(asset.id)) {
-      store.setSelectionActive(normalizedIndex)
+      store.setActiveAsset(asset.id, normalizedIndex)
       syncDetailsFocusFromSelection(asset)
       return asset
     }
@@ -254,10 +259,12 @@ export function useGallerySelection() {
 
     if (!selectedIds.value.has(asset.id)) {
       store.replaceSelection([asset.id])
+      store.setActiveAssetId(asset.id)
       syncDetailsFocusFromSelection(asset)
       return asset
     }
 
+    store.setActiveAssetId(asset.id)
     syncDetailsFocusFromSelection(asset)
     return asset
   }
@@ -271,6 +278,7 @@ export function useGallerySelection() {
     selectedCount,
     hasSelection,
     activeIndex,
+    activeAssetId,
 
     clearSelection,
     activateIndex,

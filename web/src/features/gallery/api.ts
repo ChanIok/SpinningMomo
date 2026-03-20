@@ -337,6 +337,7 @@ export async function queryAssets(params: QueryAssetsParams): Promise<QueryAsset
       count: result.items.length,
       total: result.totalCount,
       page: result.currentPage,
+      activeAssetIndex: result.activeAssetIndex,
       filters: params.filters,
     })
 
