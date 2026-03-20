@@ -29,6 +29,7 @@ import <windows.h>;
 namespace Features::Gallery::Watcher {
 
 constexpr std::chrono::milliseconds kDebounceDelay{500};
+constexpr std::chrono::milliseconds kFileStabilityQuietPeriod{2000};
 // 监听缓冲区；太小更容易溢出。
 constexpr size_t kWatchBufferSize = 64 * 1024;
 
@@ -45,6 +46,11 @@ struct ParsedNotification {
   std::filesystem::path path;
   DWORD action = 0;
   bool is_directory = false;
+};
+
+struct ProbedFileState {
+  std::int64_t size = 0;
+  std::int64_t modified_at = 0;
 };
 
 // 生成默认的目录扫描配置
@@ -96,7 +102,8 @@ auto get_watcher_scan_options(const std::shared_ptr<State::FolderWatcherState>& 
 // 检查是否有待处理的变更（包含全量重扫标记或文件变更）
 auto has_pending_changes(const std::shared_ptr<State::FolderWatcherState>& watcher) -> bool {
   std::lock_guard<std::mutex> lock(watcher->pending_mutex);
-  return watcher->require_full_rescan || !watcher->pending_file_changes.empty();
+  return watcher->require_full_rescan || !watcher->pending_file_changes.empty() ||
+         !watcher->pending_stable_file_changes.empty();
 }
 
 // 获取并清空当前的待处理变更快照
@@ -119,7 +126,41 @@ auto mark_full_rescan(const std::shared_ptr<State::FolderWatcherState>& watcher)
   // 文件夹有变化时，直接全量扫，逻辑最稳。
   watcher->require_full_rescan = true;
   watcher->pending_file_changes.clear();
+  watcher->pending_stable_file_changes.clear();
   watcher->pending_rescan.store(true, std::memory_order_release);
+}
+
+auto probe_file_state(const std::filesystem::path& path)
+    -> std::expected<std::optional<ProbedFileState>, std::string> {
+  std::error_code ec;
+  if (!std::filesystem::exists(path, ec)) {
+    if (ec) {
+      return std::unexpected("Failed to check file existence: " + ec.message());
+    }
+    return std::optional<ProbedFileState>{std::nullopt};
+  }
+
+  if (!std::filesystem::is_regular_file(path, ec)) {
+    if (ec) {
+      return std::unexpected("Failed to check file type: " + ec.message());
+    }
+    return std::optional<ProbedFileState>{std::nullopt};
+  }
+
+  auto file_size = std::filesystem::file_size(path, ec);
+  if (ec) {
+    return std::unexpected("Failed to read file size: " + ec.message());
+  }
+
+  auto last_write_time = std::filesystem::last_write_time(path, ec);
+  if (ec) {
+    return std::unexpected("Failed to read file modified time: " + ec.message());
+  }
+
+  return ProbedFileState{
+      .size = static_cast<std::int64_t>(file_size),
+      .modified_at = Utils::Time::file_time_to_millis(last_write_time),
+  };
 }
 
 // 将具体的文件变更动作加入到待处理队列，相同路径的新动作会覆盖之前的
@@ -130,8 +171,100 @@ auto queue_file_change(const std::shared_ptr<State::FolderWatcherState>& watcher
 
   // 同一路径只留最后一次动作，避免重复处理。
   watcher->pending_file_changes[normalized_path] = action;
+  watcher->pending_stable_file_changes.erase(normalized_path);
 
   watcher->pending_rescan.store(true, std::memory_order_release);
+}
+
+// 将 UPSERT 事件先放入稳定队列，避免录制中的文件被 watcher 当成成品反复分析。
+auto stage_file_change_for_stability(const std::shared_ptr<State::FolderWatcherState>& watcher,
+                                     const std::string& normalized_path) -> void {
+  auto now = std::chrono::steady_clock::now();
+  auto probe_result = probe_file_state(std::filesystem::path(normalized_path));
+
+  std::lock_guard<std::mutex> lock(watcher->pending_mutex);
+
+  watcher->pending_file_changes.erase(normalized_path);
+
+  auto& pending = watcher->pending_stable_file_changes[normalized_path];
+  pending.action = State::PendingFileChangeAction::UPSERT;
+  pending.ready_not_before = now + kFileStabilityQuietPeriod;
+
+  if (!probe_result) {
+    Logger().debug("Failed to probe staged gallery file '{}': {}", normalized_path,
+                   probe_result.error());
+    pending.last_seen_size.reset();
+    pending.last_seen_modified_at.reset();
+  } else if (probe_result->has_value()) {
+    pending.last_seen_size = probe_result->value().size;
+    pending.last_seen_modified_at = probe_result->value().modified_at;
+  } else {
+    pending.last_seen_size.reset();
+    pending.last_seen_modified_at.reset();
+  }
+
+  watcher->pending_rescan.store(true, std::memory_order_release);
+}
+
+// 二次探测到期候选：
+// 只有当文件在一个静默窗口后，大小和修改时间都没有继续变化，才提升为真正的 UPSERT。
+auto promote_stable_file_changes(const std::shared_ptr<State::FolderWatcherState>& watcher)
+    -> void {
+  std::vector<std::pair<std::string, State::PendingStableFileChange>> due_candidates;
+  auto now = std::chrono::steady_clock::now();
+
+  {
+    std::lock_guard<std::mutex> lock(watcher->pending_mutex);
+    if (watcher->require_full_rescan) {
+      return;
+    }
+
+    due_candidates.reserve(watcher->pending_stable_file_changes.size());
+    for (const auto& [path, pending] : watcher->pending_stable_file_changes) {
+      if (pending.ready_not_before <= now) {
+        due_candidates.emplace_back(path, pending);
+      }
+    }
+  }
+
+  for (const auto& [path, pending] : due_candidates) {
+    auto probe_result = probe_file_state(std::filesystem::path(path));
+
+    std::lock_guard<std::mutex> lock(watcher->pending_mutex);
+    auto it = watcher->pending_stable_file_changes.find(path);
+    if (it == watcher->pending_stable_file_changes.end()) {
+      continue;
+    }
+
+    auto& current = it->second;
+    if (current.action != pending.action || current.ready_not_before != pending.ready_not_before) {
+      continue;
+    }
+
+    if (!probe_result) {
+      Logger().debug("Failed to re-probe staged gallery file '{}': {}", path, probe_result.error());
+      current.ready_not_before = std::chrono::steady_clock::now() + kFileStabilityQuietPeriod;
+      continue;
+    }
+
+    if (!probe_result->has_value()) {
+      watcher->pending_stable_file_changes.erase(it);
+      continue;
+    }
+
+    const auto& probed = probe_result->value();
+    if (!current.last_seen_size.has_value() || !current.last_seen_modified_at.has_value() ||
+        current.last_seen_size.value() != probed.size ||
+        current.last_seen_modified_at.value() != probed.modified_at) {
+      current.last_seen_size = probed.size;
+      current.last_seen_modified_at = probed.modified_at;
+      current.ready_not_before = std::chrono::steady_clock::now() + kFileStabilityQuietPeriod;
+      continue;
+    }
+
+    watcher->pending_file_changes[path] = current.action;
+    watcher->pending_stable_file_changes.erase(it);
+  }
 }
 
 // 解析 Windows ReadDirectoryChangesExW 系统调用返回的变更通知缓冲区
@@ -374,10 +507,8 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
         }
       }
     } else {
-      Logger().warn("Failed to analyze video file '{}': {}", normalized.string(),
-                    video_result.error());
-      asset.width = 0;
-      asset.height = 0;
+      return std::unexpected("Failed to analyze video file '" + normalized.string() +
+                             "': " + video_result.error());
     }
 
     extracted_colors.clear();
@@ -533,11 +664,14 @@ auto process_pending_sync(Core::State::AppState& app_state,
     std::this_thread::sleep_for(kDebounceDelay);
 
     watcher->pending_rescan.store(false, std::memory_order_release);
+    // 先尝试把“已经安静下来”的候选文件提升到最终增量队列。
+    promote_stable_file_changes(watcher);
     auto snapshot = take_pending_snapshot(watcher);
-    bool has_changes = snapshot.require_full_rescan || !snapshot.file_changes.empty();
+    bool has_executable_changes = snapshot.require_full_rescan || !snapshot.file_changes.empty();
 
-    if (!has_changes) {
-      if (watcher->pending_rescan.load(std::memory_order_acquire)) {
+    if (!has_executable_changes) {
+      // 这里可能仍有“未稳定”的候选文件，所以不能直接退出 worker。
+      if (watcher->pending_rescan.load(std::memory_order_acquire) || has_pending_changes(watcher)) {
         continue;
       }
       break;
@@ -632,7 +766,8 @@ auto process_watch_notifications(Core::State::AppState& app_state,
       case FILE_ACTION_ADDED:
       case FILE_ACTION_MODIFIED:
       case FILE_ACTION_RENAMED_NEW_NAME:
-        queue_file_change(watcher, normalized_path, State::PendingFileChangeAction::UPSERT);
+        // 文件刚出现或仍在写入时，先观察稳定性，再决定是否真正入库。
+        stage_file_change_for_stability(watcher, normalized_path);
         break;
       case FILE_ACTION_REMOVED:
       case FILE_ACTION_RENAMED_OLD_NAME:
