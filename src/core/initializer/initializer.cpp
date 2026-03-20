@@ -6,6 +6,7 @@ import std;
 import Core.Async;
 import Core.Commands;
 import Core.Commands.State;
+import Core.DialogService;
 import Core.WorkerPool;
 import Core.State;
 import Core.State.RuntimeInfo;
@@ -36,8 +37,8 @@ import UI.FloatingWindow.State;
 import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
-import Vendor.Windows;
 import Utils.Logger;
+import Vendor.Windows;
 
 namespace Core::Initializer {
 
@@ -101,6 +102,10 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto result = Core::WorkerPool::start(*state.worker_pool); !result) {
       return std::unexpected("Failed to start worker pool: " + result.error());
+    }
+
+    if (auto result = Core::DialogService::start(*state.dialog_service); !result) {
+      return std::unexpected("Failed to start dialog service: " + result.error());
     }
 
     Core::RPC::Registry::register_all_endpoints(state);

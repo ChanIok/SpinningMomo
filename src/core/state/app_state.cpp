@@ -6,6 +6,7 @@ import Core.Async.State;
 import Core.Commands;
 import Core.Commands.State;
 import Core.Database.State;
+import Core.DialogService.State;
 import Core.Events.State;
 import Core.HttpServer.State;
 import Core.HttpClient.State;
@@ -34,6 +35,7 @@ namespace Core::State {
 AppState::AppState()
     : rpc(std::make_unique<Core::RPC::State::RpcState>()),
       async(std::make_unique<Core::Async::State::AsyncState>()),
+      dialog_service(std::make_unique<Core::DialogService::State::DialogServiceState>()),
       events(std::make_unique<Core::Events::State::EventsState>()),
       i18n(std::make_unique<Core::I18n::State::I18nState>()),
       webview(std::make_unique<Core::WebView::State::WebViewState>()),

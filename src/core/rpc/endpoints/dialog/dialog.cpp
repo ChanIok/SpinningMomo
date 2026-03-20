@@ -5,13 +5,14 @@ module;
 module Core.RPC.Endpoints.Dialog;
 
 import std;
-import Vendor.Windows;
+import Core.DialogService;
 import Core.State;
 import Core.WebView.State;
 import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Utils.Dialog;
+import Vendor.Windows;
 import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Dialog {
@@ -34,7 +35,7 @@ auto handle_select_file([[maybe_unused]] Core::State::AppState& app_state,
                         const Utils::Dialog::FileSelectorParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Utils::Dialog::FileSelectorResult>> {
   Vendor::Windows::HWND hwnd = get_parent_window(app_state, params.parent_window_mode);
-  auto result = Utils::Dialog::select_file(params, hwnd);
+  auto result = Core::DialogService::open_file(app_state, params, hwnd);
   if (!result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
@@ -48,7 +49,7 @@ auto handle_select_folder([[maybe_unused]] Core::State::AppState& app_state,
                           const Utils::Dialog::FolderSelectorParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Utils::Dialog::FolderSelectorResult>> {
   Vendor::Windows::HWND hwnd = get_parent_window(app_state, params.parent_window_mode);
-  auto result = Utils::Dialog::select_folder(params, hwnd);
+  auto result = Core::DialogService::open_folder(app_state, params, hwnd);
   if (!result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),

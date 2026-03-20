@@ -12,6 +12,10 @@ namespace Core::Async::State {
 export struct AsyncState;
 }
 
+namespace Core::DialogService::State {
+export struct DialogServiceState;
+}
+
 namespace Core::Events::State {
 export struct EventsState;
 }
@@ -113,6 +117,7 @@ export struct AppState {
   // 应用级状态
   std::unique_ptr<Core::RPC::State::RpcState> rpc;
   std::unique_ptr<Core::Async::State::AsyncState> async;
+  std::unique_ptr<Core::DialogService::State::DialogServiceState> dialog_service;
   std::unique_ptr<Core::Events::State::EventsState> events;
   std::unique_ptr<Core::I18n::State::I18nState> i18n;
   std::unique_ptr<Core::WebView::State::WebViewState> webview;

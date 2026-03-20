@@ -5,6 +5,7 @@ module Core.Shutdown;
 import std;
 
 import Core.Async;
+import Core.DialogService;
 import Core.WorkerPool;
 import Core.HttpServer;
 import Core.HttpClient;
@@ -39,6 +40,8 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   if (state.floating_window) {
     Core::Commands::unregister_all_hotkeys(state, state.floating_window->window.hwnd);
   }
+
+  Core::DialogService::stop(*state.dialog_service);
 
   // 1. UI 清理
   UI::ContextMenu::cleanup(state);
