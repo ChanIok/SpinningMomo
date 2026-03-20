@@ -25,10 +25,12 @@ auto toggle_preview(Core::State::AppState& state) -> void {
 
   if (!is_running) {
     // 启动预览
-    // 预览窗与叠加层互斥，若叠加层运行则先关闭
-    if (state.overlay->running) {
+    // 预览窗与叠加层互斥：以 overlay->enabled（与浮动窗菜单勾选）为准
+    if (state.overlay->enabled) {
       state.overlay->enabled = false;
-      Features::Overlay::stop_overlay(state);
+      if (state.overlay->running) {
+        Features::Overlay::stop_overlay(state);
+      }
       if (state.letterbox->enabled) {
         std::wstring lb_window_title =
             Utils::String::FromUtf8(state.settings->raw.window.target_title);
