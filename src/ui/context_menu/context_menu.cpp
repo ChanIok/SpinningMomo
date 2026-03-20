@@ -58,19 +58,16 @@ auto register_context_menu_class(HINSTANCE instance, WNDPROC wnd_proc) -> bool {
   return true;
 }
 
-auto create_context_menu_window(HINSTANCE instance, WNDPROC wnd_proc,
-                                Core::State::AppState* app_state) -> HWND {
-  HWND hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED,
-                              L"SpinningMomoContextMenuClass",
-                              L"ContextMenu",        // 窗口标题不重要
-                              WS_POPUP, 0, 0, 1, 1,  // 初始尺寸很小，稍后调整
-                              nullptr, nullptr, instance,
-                              app_state  // 将AppState指针作为创建参数传递
+auto create_context_menu_window(HINSTANCE instance, Core::State::AppState* app_state, HWND owner,
+                                const POINT& position, const SIZE& size) -> HWND {
+  HWND hwnd = CreateWindowExW(
+      WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, L"SpinningMomoContextMenuClass",
+      L"ContextMenu",  // 窗口标题不重要
+      WS_POPUP, position.x, position.y, size.cx, size.cy, owner, nullptr, instance,
+      app_state  // 将AppState指针作为创建参数传递
   );
 
   if (hwnd) {
-    // 设置窗口样式
-    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
     apply_corner_preference(hwnd);
   }
 
@@ -218,15 +215,8 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
 
   // 创建子菜单窗口
   HINSTANCE instance = state.floating_window->window.instance;
-  menu_state.submenu_hwnd = CreateWindowExW(
-      WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, L"SpinningMomoContextMenuClass",
-      L"ContextMenu",  // 窗口标题不重要
-      WS_POPUP, menu_state.submenu_position.x, menu_state.submenu_position.y,
-      menu_state.submenu_size.cx, menu_state.submenu_size.cy,
-      menu_state.hwnd,  // 设置父窗口
-      nullptr, instance,
-      &state  // 将AppState指针作为创建参数传递
-  );
+  menu_state.submenu_hwnd = create_context_menu_window(
+      instance, &state, menu_state.hwnd, menu_state.submenu_position, menu_state.submenu_size);
 
   if (!menu_state.submenu_hwnd) {
     Logger().error("Failed to create submenu window. Error: {}", GetLastError());
@@ -236,10 +226,6 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
 
   Logger().debug("Created submenu window: {}", (void*)menu_state.submenu_hwnd);
 
-  // 设置窗口样式
-  SetLayeredWindowAttributes(menu_state.submenu_hwnd, 0, 255, LWA_ALPHA);
-  apply_corner_preference(menu_state.submenu_hwnd);
-
   // 初始化D2D资源
   if (!UI::ContextMenu::D2DContext::initialize_submenu(state, menu_state.submenu_hwnd)) {
     Logger().error("Failed to initialize D2D for submenu.");
@@ -248,6 +234,9 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
     menu_state.submenu_parent_index = -1;  // 重置父索引
     return;
   }
+
+  RECT client_rect{0, 0, menu_state.submenu_size.cx, menu_state.submenu_size.cy};
+  UI::ContextMenu::Painter::paint_submenu(state, client_rect);
 
   // 显示窗口
   ShowWindow(menu_state.submenu_hwnd, SW_SHOW);
@@ -320,33 +309,39 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
   }
 
   // 2. 创建窗口
+  // 2. 应用 DPI 缩放
+  UINT dpi = app_state.floating_window->window.dpi;
+  menu_state.layout.update_dpi_scaling(dpi);
+
+  if (!D2DContext::initialize_text_format(app_state)) {
+    Logger().error("Failed to initialize text format for context menu.");
+    return;
+  }
+
+  // 3. 计算布局和最终位置
+  Layout::calculate_menu_size(app_state);
+  menu_state.position = Layout::calculate_menu_position(app_state, position);
+
+  // 4. 创建窗口（直接使用最终位置和尺寸）
   HINSTANCE instance = app_state.floating_window->window.instance;
-  menu_state.hwnd =
-      create_context_menu_window(instance, MessageHandler::static_window_proc, &app_state);
+  menu_state.hwnd = create_context_menu_window(instance, &app_state, nullptr, menu_state.position,
+                                               menu_state.menu_size);
 
   if (!menu_state.hwnd) {
     Logger().error("Failed to create context menu window.");
     return;
   }
 
-  // 3. 应用 DPI 缩放（必须在 D2D 初始化之前，因为 text_format 创建依赖 layout.font_size）
-  UINT dpi = app_state.floating_window->window.dpi;
-  menu_state.layout.update_dpi_scaling(dpi);
-
-  // 4. 初始化D2D资源
+  // 5. 初始化D2D资源
   if (!D2DContext::initialize_context_menu(app_state, menu_state.hwnd)) {
     Logger().error("Failed to initialize D2D for context menu.");
     DestroyWindow(menu_state.hwnd);
+    menu_state.hwnd = nullptr;
     return;
   }
 
-  // 5. 计算布局和最终位置
-  Layout::calculate_menu_size(app_state);
-  menu_state.position = Layout::calculate_menu_position(app_state, position);
-
-  // 5. 设置窗口最终位置和大小
-  SetWindowPos(menu_state.hwnd, HWND_TOPMOST, menu_state.position.x, menu_state.position.y,
-               menu_state.menu_size.cx, menu_state.menu_size.cy, SWP_NOACTIVATE);
+  RECT client_rect{0, 0, menu_state.menu_size.cx, menu_state.menu_size.cy};
+  Painter::paint_context_menu(app_state, client_rect);
 
   // 6. 显示窗口并设置为前景
   ShowWindow(menu_state.hwnd, SW_SHOWNA);

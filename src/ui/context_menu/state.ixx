@@ -1,17 +1,31 @@
 module;
 
-#include <d2d1.h>
-#include <dwrite.h>
-#include <windows.h>
-
-#include <string>
-
 export module UI.ContextMenu.State;
 
 import std;
 import UI.ContextMenu.Types;
+import <d2d1.h>;
+import <dwrite.h>;
+import <windows.h>;
 
 export namespace UI::ContextMenu::State {
+
+struct RenderSurface {
+  ID2D1DCRenderTarget* render_target = nullptr;
+  HDC memory_dc = nullptr;
+  HBITMAP dib_bitmap = nullptr;
+  HGDIOBJ old_bitmap = nullptr;
+  void* bitmap_bits = nullptr;
+  SIZE bitmap_size{};
+
+  ID2D1SolidColorBrush* background_brush = nullptr;
+  ID2D1SolidColorBrush* text_brush = nullptr;
+  ID2D1SolidColorBrush* separator_brush = nullptr;
+  ID2D1SolidColorBrush* hover_brush = nullptr;
+  ID2D1SolidColorBrush* indicator_brush = nullptr;
+
+  bool is_ready = false;
+};
 
 struct ContextMenuState {
   // 窗口句柄
@@ -19,25 +33,11 @@ struct ContextMenuState {
   HWND submenu_hwnd = nullptr;
 
   // D2D资源
-  ID2D1HwndRenderTarget* render_target = nullptr;
-  ID2D1SolidColorBrush* background_brush = nullptr;
-  ID2D1SolidColorBrush* text_brush = nullptr;
-  ID2D1SolidColorBrush* separator_brush = nullptr;
-  ID2D1SolidColorBrush* hover_brush = nullptr;
-  ID2D1SolidColorBrush* indicator_brush = nullptr;
-
-  ID2D1HwndRenderTarget* submenu_render_target = nullptr;
-  ID2D1SolidColorBrush* submenu_background_brush = nullptr;
-  ID2D1SolidColorBrush* submenu_text_brush = nullptr;
-  ID2D1SolidColorBrush* submenu_separator_brush = nullptr;
-  ID2D1SolidColorBrush* submenu_hover_brush = nullptr;
-  ID2D1SolidColorBrush* submenu_indicator_brush = nullptr;
+  RenderSurface main_surface;
+  RenderSurface submenu_surface;
 
   // 独立的文本格式（DPI 缩放后的字号，不依赖浮窗）
   IDWriteTextFormat* text_format = nullptr;
-
-  bool main_menu_d2d_ready = false;
-  bool submenu_d2d_ready = false;
 
   // 菜单数据和布局
   std::vector<Types::MenuItem> items;

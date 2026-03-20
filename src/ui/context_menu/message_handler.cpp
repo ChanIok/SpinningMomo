@@ -1,8 +1,5 @@
 module;
 
-#include <windows.h>
-#include <windowsx.h>
-
 module UI.ContextMenu.MessageHandler;
 
 import std;
@@ -15,6 +12,8 @@ import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
 import UI.ContextMenu.Interaction;
 import Utils.Logger;
+import <windows.h>;
+import <windowsx.h>;
 
 namespace {
 
@@ -130,10 +129,14 @@ auto handle_size(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   SIZE new_size = {rc.right - rc.left, rc.bottom - rc.top};
   if (hwnd == menu_state.submenu_hwnd) {
     Logger().debug("Resizing submenu to size: {}x{}", new_size.cx, new_size.cy);
-    UI::ContextMenu::D2DContext::resize_submenu(state, new_size);
+    if (UI::ContextMenu::D2DContext::resize_submenu(state, new_size)) {
+      UI::ContextMenu::Painter::paint_submenu(state, rc);
+    }
   } else if (hwnd == menu_state.hwnd) {
     Logger().debug("Resizing context menu to size: {}x{}", new_size.cx, new_size.cy);
-    UI::ContextMenu::D2DContext::resize_context_menu(state, new_size);
+    if (UI::ContextMenu::D2DContext::resize_context_menu(state, new_size)) {
+      UI::ContextMenu::Painter::paint_context_menu(state, rc);
+    }
   }
   return 0;
 }
