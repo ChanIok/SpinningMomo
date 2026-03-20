@@ -60,9 +60,7 @@ auto apply_window_ex_style_from_settings(Core::State::AppState& state) -> void {
                SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-auto default_window_style() -> DWORD {
-  return WS_POPUP | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX;
-}
+auto default_window_style() -> DWORD { return WS_OVERLAPPEDWINDOW; }
 
 auto fullscreen_window_style(DWORD base_style) -> DWORD {
   return base_style & ~(WS_THICKFRAME | WS_SYSMENU | WS_MAXIMIZEBOX | WS_MINIMIZEBOX);
@@ -72,6 +70,51 @@ auto get_window_rect_or_fallback(HWND hwnd, RECT fallback_rect) -> RECT {
   RECT rect = fallback_rect;
   GetWindowRect(hwnd, &rect);
   return rect;
+}
+
+struct WindowFrameInsets {
+  int x = 0;
+  int y = 0;
+};
+
+auto get_window_frame_insets_for_dpi(UINT dpi) -> WindowFrameInsets {
+  auto frame_x = GetSystemMetricsForDpi(SM_CXSIZEFRAME, dpi);
+  auto frame_y = GetSystemMetricsForDpi(SM_CYSIZEFRAME, dpi);
+  auto padded_border = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+
+  return WindowFrameInsets{
+      .x = frame_x + padded_border,
+      .y = frame_y + padded_border,
+  };
+}
+
+auto send_window_state_changed_notification(Core::State::AppState& state) -> void {
+  auto payload = std::format(
+      R"({{"jsonrpc":"2.0","method":"window.stateChanged","params":{{"maximized":{},"fullscreen":{}}}}})",
+      state.webview->window.is_maximized ? "true" : "false",
+      state.webview->window.is_fullscreen ? "true" : "false");
+  Core::WebView::post_message(state, payload);
+}
+
+auto sync_window_state(Core::State::AppState& state, bool notify) -> void {
+  if (!state.webview) {
+    return;
+  }
+
+  auto& window = state.webview->window;
+  auto hwnd = window.webview_hwnd;
+  auto is_maximized = hwnd && IsZoomed(hwnd) == TRUE;
+
+  if (window.is_maximized == is_maximized) {
+    return;
+  }
+
+  window.is_maximized = is_maximized;
+  Logger().debug("WebView window maximize state changed: {}", is_maximized);
+
+  if (notify) {
+    send_window_state_changed_notification(state);
+  }
 }
 
 auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
@@ -209,6 +252,8 @@ auto set_fullscreen_window(Core::State::AppState& state, bool fullscreen)
                  SWP_FRAMECHANGED | SWP_SHOWWINDOW);
 
     window.is_fullscreen = true;
+    sync_window_state(state, false);
+    send_window_state_changed_notification(state);
     Logger().debug("WebView window entered fullscreen");
     return {};
   }
@@ -230,6 +275,8 @@ auto set_fullscreen_window(Core::State::AppState& state, bool fullscreen)
 
   window.is_fullscreen = false;
   window.has_fullscreen_restore_state = false;
+  sync_window_state(state, false);
+  send_window_state_changed_notification(state);
   Logger().debug("WebView window exited fullscreen");
   return {};
 }
@@ -286,17 +333,28 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
       // 设置最小尺寸
       mmi->ptMinTrackSize.x = 320;
       mmi->ptMinTrackSize.y = 240;
-
-      // 设置最大化时的位置和尺寸（工作区，不覆盖任务栏）
-      HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-      MONITORINFO mi = {sizeof(mi)};
-      if (GetMonitorInfoW(monitor, &mi)) {
-        mmi->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
-        mmi->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
-        mmi->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
-        mmi->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
-      }
       return 0;
+    }
+
+    case WM_NCCALCSIZE: {
+      // 保留标准顶层窗口语义（最大化/还原动画、Snap 等），
+      // 同时移除系统默认标题栏和边框绘制，由 Web 头部承载标题栏内容。
+      if (state && state->webview && !state->webview->window.is_fullscreen && wparam == TRUE) {
+        auto* nc_calc_size_params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+
+        if (IsZoomed(hwnd) == TRUE) {
+          auto dpi = GetDpiForWindow(hwnd);
+          auto insets = get_window_frame_insets_for_dpi(dpi);
+
+          nc_calc_size_params->rgrc[0].left += insets.x;
+          nc_calc_size_params->rgrc[0].right -= insets.x;
+          nc_calc_size_params->rgrc[0].top += insets.y;
+          nc_calc_size_params->rgrc[0].bottom -= insets.y;
+        }
+
+        return 0;
+      }
+      break;
     }
 
     case WM_DPICHANGED: {
@@ -322,6 +380,8 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
 
     case WM_SIZE: {
       if (state) {
+        sync_window_state(*state, true);
+
         if (wparam == SIZE_MINIMIZED) {
           break;
         }
@@ -636,6 +696,7 @@ auto cleanup(Core::State::AppState& state) -> void {
     DestroyWindow(hwnd);
     state.webview->window.webview_hwnd = nullptr;
     state.webview->window.is_visible = false;
+    state.webview->window.is_maximized = false;
     state.webview->window.is_fullscreen = false;
     state.webview->window.has_fullscreen_restore_state = false;
     Logger().info("WebView window destroyed");

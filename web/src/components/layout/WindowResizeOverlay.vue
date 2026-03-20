@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isWebView } from '@/core/env'
+import { call, off, on } from '@/core/rpc'
 
 type ResizeEdge =
   | 'top'
@@ -18,7 +19,19 @@ type ResizeHandle = {
   cursor: string
 }
 
-const showResizeOverlay = computed(() => isWebView())
+type WindowState = {
+  maximized: boolean
+  fullscreen: boolean
+}
+
+const windowState = ref<WindowState>({
+  maximized: false,
+  fullscreen: false,
+})
+
+const showResizeOverlay = computed(
+  () => isWebView() && !windowState.value.maximized && !windowState.value.fullscreen
+)
 
 const resizeHandles: ResizeHandle[] = [
   { edge: 'top', className: 'left-0 top-0 h-1.5 w-full', cursor: 'n-resize' },
@@ -45,6 +58,45 @@ function handleMouseDown(edge: ResizeEdge, event: MouseEvent): void {
 
   window.chrome.webview.postMessage({ type: 'window.beginResize', edge })
 }
+
+function applyWindowState(params: unknown): void {
+  if (!params || typeof params !== 'object') {
+    return
+  }
+
+  const nextState = params as Partial<WindowState>
+  windowState.value = {
+    maximized: nextState.maximized === true,
+    fullscreen: nextState.fullscreen === true,
+  }
+}
+
+function handleWindowStateChanged(params: unknown): void {
+  applyWindowState(params)
+}
+
+onMounted(() => {
+  if (!isWebView()) {
+    return
+  }
+
+  on('window.stateChanged', handleWindowStateChanged)
+  call<WindowState>('webview.getWindowState')
+    .then((state) => {
+      applyWindowState(state)
+    })
+    .catch((error) => {
+      console.error('Failed to get initial window state:', error)
+    })
+})
+
+onBeforeUnmount(() => {
+  if (!isWebView()) {
+    return
+  }
+
+  off('window.stateChanged', handleWindowStateChanged)
+})
 </script>
 
 <template>
