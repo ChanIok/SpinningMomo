@@ -89,6 +89,7 @@ auto create_capture_session(
 
   CaptureSession session;
   session.winrt_device = device;
+  session.frame_pool_size = std::max(frame_pool_size, 1);
 
   // 创建捕获项
   auto interop =
@@ -109,7 +110,7 @@ auto create_capture_session(
   session.frame_pool =
       winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
           device, winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-          frame_pool_size, {width, height});
+          session.frame_pool_size, {width, height});
 
   if (!session.frame_pool) {
     auto error_msg = "Failed to create frame pool";
@@ -196,8 +197,8 @@ auto recreate_frame_pool(CaptureSession& session, int width, int height) -> void
   if (session.frame_pool) {
     session.frame_pool.Recreate(
         session.winrt_device,
-        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized, 1,
-        {width, height});
+        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
+        std::max(session.frame_pool_size, 1), {width, height});
   }
 }
 

@@ -66,6 +66,58 @@ auto calculate_capture_dimensions(HWND target_window, bool capture_client_area)
   return dims;
 }
 
+struct FrameCropPlan {
+  bool should_crop = false;
+  Utils::Graphics::CaptureRegion::CropRegion region{};
+};
+
+auto calculate_frame_crop_plan(HWND target_window,
+                               const Features::Recording::Types::RecordingConfig& config,
+                               int frame_width, int frame_height)
+    -> std::expected<FrameCropPlan, std::string> {
+  if (frame_width <= 0 || frame_height <= 0) {
+    return std::unexpected("Invalid frame size");
+  }
+
+  FrameCropPlan plan;
+  if (frame_width == static_cast<int>(config.width) &&
+      frame_height == static_cast<int>(config.height)) {
+    return plan;
+  }
+
+  if (!config.capture_client_area) {
+    return std::unexpected(
+        std::format("Unexpected full-window capture frame size {}x{} (expected {}x{})", frame_width,
+                    frame_height, config.width, config.height));
+  }
+
+  auto dims_result = calculate_capture_dimensions(target_window, false);
+  if (!dims_result) {
+    return std::unexpected(dims_result.error());
+  }
+
+  const auto& dims = *dims_result;
+
+  if (frame_width == dims.window_width && frame_height == dims.window_height) {
+    auto crop_region_result =
+        Utils::Graphics::CaptureRegion::calculate_client_crop_region(target_window);
+    if (!crop_region_result) {
+      return std::unexpected("Failed to calculate client crop region: " +
+                             crop_region_result.error());
+    }
+
+    plan.should_crop = true;
+    plan.region = *crop_region_result;
+    plan.region.width = config.width;
+    plan.region.height = config.height;
+    return plan;
+  }
+
+  return std::unexpected(std::format(
+      "Unexpected client-area capture frame size {}x{} (output={}x{}, window={}x{})", frame_width,
+      frame_height, config.width, config.height, dims.window_width, dims.window_height));
+}
+
 auto build_timestamp_output_path(const std::filesystem::path& reference_output_path)
     -> std::filesystem::path {
   auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
@@ -225,15 +277,31 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
   std::lock_guard resource_lock(state.resource_mutex);
 
   ID3D11Texture2D* current_texture = texture.get();
-  if (state.crop_to_client_area) {
+  auto crop_plan_result = calculate_frame_crop_plan(state.target_window, state.config,
+                                                    content_size.Width, content_size.Height);
+  if (!crop_plan_result) {
+    Logger().error("Failed to resolve recording crop plan: {}", crop_plan_result.error());
+    return;
+  }
+
+  if (crop_plan_result->should_crop) {
     auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
-        state.device.get(), state.context.get(), texture.get(), state.crop_region,
+        state.device.get(), state.context.get(), texture.get(), crop_plan_result->region,
         state.cropped_texture);
     if (!crop_result) {
-      Logger().error("Failed to crop frame to client area: {}", crop_result.error());
+      Logger().error("Failed to crop recording frame: {}", crop_result.error());
       return;
     }
     current_texture = *crop_result;
+  }
+
+  D3D11_TEXTURE2D_DESC current_desc{};
+  current_texture->GetDesc(&current_desc);
+  if (current_desc.Width != state.config.width || current_desc.Height != state.config.height) {
+    Logger().error("Recording frame size mismatch after crop: got {}x{}, expected {}x{}",
+                   current_desc.Width, current_desc.Height, state.config.width,
+                   state.config.height);
+    return;
   }
 
   while (state.frame_index <= target_frame_index) {
@@ -312,23 +380,7 @@ auto start(Features::Recording::State::RecordingState& state, HWND target_window
   state.config.height = output_height;
   state.last_frame_width = window_width;
   state.last_frame_height = window_height;
-  state.crop_to_client_area = false;
-  state.crop_region = {};
   state.cropped_texture = nullptr;
-
-  if (config.capture_client_area) {
-    auto crop_region_result =
-        Utils::Graphics::CaptureRegion::calculate_client_crop_region(target_window);
-    if (!crop_region_result) {
-      return std::unexpected("Failed to calculate client crop region: " +
-                             crop_region_result.error());
-    }
-
-    state.crop_region = *crop_region_result;
-    state.crop_region.width = static_cast<UINT>(output_width);
-    state.crop_region.height = static_cast<UINT>(output_height);
-    state.crop_to_client_area = true;
-  }
 
   // 2. 创建 Headless D3D 设备
   auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
@@ -496,8 +548,6 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
     state.last_frame_width = 0;
     state.last_frame_height = 0;
     state.cropped_texture = nullptr;
-    state.crop_to_client_area = false;
-    state.crop_region = {};
     state.device = nullptr;
     state.context = nullptr;
 
