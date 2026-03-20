@@ -196,6 +196,8 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       }
     }
 
+    Core::Commands::install_keyboard_keepalive_hook(state);
+
     // 注册所有命令的热键
     Core::Commands::register_all_hotkeys(state, state.floating_window->window.hwnd);
 

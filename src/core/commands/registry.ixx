@@ -79,6 +79,12 @@ export struct InvokeCommandResult {
 export auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& registry)
     -> void;
 
+// 安装常驻全局键盘钩子
+export auto install_keyboard_keepalive_hook(Core::State::AppState& state) -> void;
+
+// 卸载常驻全局键盘钩子
+export auto uninstall_keyboard_keepalive_hook(Core::State::AppState& state) -> void;
+
 // === 热键管理 ===
 
 // 注册所有命令的热键

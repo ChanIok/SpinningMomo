@@ -37,6 +37,8 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   // 先停止录制并等待录制切换线程结束，避免与后续 UI/核心清理并发
   Features::Recording::UseCase::stop_recording_if_running(state);
 
+  Core::Commands::uninstall_keyboard_keepalive_hook(state);
+
   if (state.floating_window) {
     Core::Commands::unregister_all_hotkeys(state, state.floating_window->window.hwnd);
   }

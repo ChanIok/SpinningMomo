@@ -13,6 +13,50 @@ namespace Core::Commands {
 
 static Core::Commands::State::CommandState* g_mouse_hotkey_state = nullptr;
 
+// 这个钩子故意不消费任何按键消息，只保留一个最小的全局键盘挂载。
+LRESULT CALLBACK keyboard_keepalive_proc(int code, WPARAM wParam, LPARAM lParam) {
+  return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+auto install_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
+  if (!state.commands) {
+    Logger().warn("Skip keyboard keepalive hook installation: command state is not ready");
+    return;
+  }
+
+  auto& cmd_state = *state.commands;
+  if (cmd_state.keyboard_keepalive_hook) {
+    return;
+  }
+
+  // 独立于 RegisterHotKey/设置刷新生命周期，避免热键重载时反复装卸这个常驻钩子。
+  auto hook =
+      SetWindowsHookExW(WH_KEYBOARD_LL, keyboard_keepalive_proc, GetModuleHandleW(nullptr), 0);
+  if (!hook) {
+    auto error = GetLastError();
+    Logger().warn("Failed to install keyboard keepalive hook, error code: {}", error);
+    return;
+  }
+
+  cmd_state.keyboard_keepalive_hook = hook;
+  Logger().info("Keyboard keepalive hook installed");
+}
+
+auto uninstall_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
+  if (!state.commands) {
+    return;
+  }
+
+  auto& cmd_state = *state.commands;
+  if (!cmd_state.keyboard_keepalive_hook) {
+    return;
+  }
+
+  UnhookWindowsHookEx(cmd_state.keyboard_keepalive_hook);
+  cmd_state.keyboard_keepalive_hook = nullptr;
+  Logger().info("Keyboard keepalive hook uninstalled");
+}
+
 auto is_mouse_side_key(UINT key) -> bool { return key == VK_XBUTTON1 || key == VK_XBUTTON2; }
 
 auto make_mouse_combo(UINT modifiers, UINT key) -> std::uint32_t {
