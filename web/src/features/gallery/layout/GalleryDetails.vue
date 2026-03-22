@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { rgbToHex } from '@/components/ui/color-picker/colorUtils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
+import { useSettingsStore } from '@/features/settings/store'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from '../composables/useGalleryData'
 import { useGalleryAssetActions } from '../composables'
@@ -17,7 +18,7 @@ import {
   getAssetTags,
   removeTagsFromAsset,
   addTagsToAsset,
-  getInfinityNikkiPhotoParams,
+  getInfinityNikkiDetails,
   updateAssetDescription,
 } from '../api'
 import AssetDetailsContent from '../components/AssetDetailsContent.vue'
@@ -25,9 +26,10 @@ import AssetInfinityNikkiDetails from '../components/AssetInfinityNikkiDetails.v
 import AssetHistogram from '../components/AssetHistogram.vue'
 import AssetReviewControls from '../components/AssetReviewControls.vue'
 import TagSelectorPopover from '../components/TagSelectorPopover.vue'
-import type { Asset, AssetMainColor, InfinityNikkiPhotoParams, ReviewFlag, Tag } from '../types'
+import type { Asset, AssetMainColor, InfinityNikkiDetails, ReviewFlag, Tag } from '../types'
 
 const store = useGalleryStore()
+const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const { toast } = useToast()
 const assetActions = useGalleryAssetActions()
@@ -121,10 +123,14 @@ const shouldShowAssetHistogram = computed(() => {
   )
 })
 
+const infinityNikkiEnabled = computed(
+  () => settingsStore.appSettings.extensions.infinityNikki.enable
+)
+
 // 资产标签状态
 const assetTags = ref<Tag[]>([])
 const assetMainColors = ref<AssetMainColor[]>([])
-const infinityNikkiPhotoParams = ref<InfinityNikkiPhotoParams | null>(null)
+const infinityNikkiDetails = ref<InfinityNikkiDetails | null>(null)
 const hasMainColors = computed(() => assetMainColors.value.length > 0)
 
 // 当前标签（详情面板焦点为 tag 时）
@@ -139,31 +145,29 @@ const isSavingAssetDescription = ref(false)
 
 // 监听 activeAsset 变化，加载详情数据
 watch(
-  activeAsset,
-  async (asset) => {
+  [activeAsset, infinityNikkiEnabled],
+  async ([asset, nikkiEnabled]) => {
     if (asset) {
       try {
-        const [tags, mainColors, photoParams] = await Promise.all([
+        const [tags, mainColors, details] = await Promise.all([
           getAssetTags(asset.id),
           getAssetMainColors(asset.id),
-          asset.type === 'photo' || asset.type === 'live_photo'
-            ? getInfinityNikkiPhotoParams(asset.id)
-            : Promise.resolve(null),
+          nikkiEnabled ? getInfinityNikkiDetails(asset.id) : Promise.resolve(null),
         ])
 
         assetTags.value = tags
         assetMainColors.value = mainColors
-        infinityNikkiPhotoParams.value = photoParams
+        infinityNikkiDetails.value = details
       } catch (error) {
         console.error('Failed to load asset details:', error)
         assetTags.value = []
         assetMainColors.value = []
-        infinityNikkiPhotoParams.value = null
+        infinityNikkiDetails.value = null
       }
     } else {
       assetTags.value = []
       assetMainColors.value = []
-      infinityNikkiPhotoParams.value = null
+      infinityNikkiDetails.value = null
     }
   },
   { immediate: true }
@@ -283,8 +287,8 @@ async function handleAssetDescriptionCommit() {
   }
 }
 
-function handleInfinityNikkiParamsUpdated(p: InfinityNikkiPhotoParams) {
-  infinityNikkiPhotoParams.value = p
+function handleInfinityNikkiDetailsUpdated(details: InfinityNikkiDetails) {
+  infinityNikkiDetails.value = details
 }
 
 function copyWithExecCommand(text: string): boolean {
@@ -548,10 +552,10 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
           <template #after-info>
             <AssetInfinityNikkiDetails
-              v-if="infinityNikkiPhotoParams && activeAsset"
+              v-if="infinityNikkiEnabled && infinityNikkiDetails && activeAsset"
               :asset-id="activeAsset.id"
-              :params="infinityNikkiPhotoParams"
-              @updated="handleInfinityNikkiParamsUpdated"
+              :details="infinityNikkiDetails"
+              @updated="handleInfinityNikkiDetailsUpdated"
             />
 
             <template v-if="shouldShowAssetHistogram">

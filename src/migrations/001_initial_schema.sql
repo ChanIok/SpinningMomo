@@ -230,7 +230,6 @@ CREATE TABLE asset_infinity_nikki_params (
     nikki_loc_z REAL,
     nikki_hidden INTEGER,
     pose_id INTEGER,
-    dye_code TEXT,
     nikki_diy_json TEXT
 );
 
@@ -240,6 +239,35 @@ CREATE TABLE asset_infinity_nikki_params (
 CREATE INDEX idx_infinity_nikki_params_uid ON asset_infinity_nikki_params(uid);
 
 CREATE INDEX idx_infinity_nikki_params_pose_id ON asset_infinity_nikki_params(pose_id);
+
+-- ============================================================================
+-- Infinity Nikki User Record Table
+-- ============================================================================
+CREATE TABLE asset_infinity_nikki_user_record (
+    asset_id INTEGER PRIMARY KEY REFERENCES assets(id) ON DELETE CASCADE,
+    code_type TEXT NOT NULL CHECK (
+        code_type IN ('dye', 'home_building')
+    ),
+    code_value TEXT NOT NULL,
+    created_at INTEGER DEFAULT (unixepoch('subsec') * 1000),
+    updated_at INTEGER DEFAULT (unixepoch('subsec') * 1000)
+);
+
+-- ============================================================================
+-- Infinity Nikki User Record Triggers
+-- ============================================================================
+CREATE TRIGGER update_asset_infinity_nikki_user_record_updated_at
+AFTER
+UPDATE
+    ON asset_infinity_nikki_user_record FOR EACH ROW BEGIN
+UPDATE
+    asset_infinity_nikki_user_record
+SET
+    updated_at = (unixepoch('subsec') * 1000)
+WHERE
+    asset_id = NEW.asset_id;
+
+END;
 
 -- ============================================================================
 -- Infinity Nikki Clothes Table

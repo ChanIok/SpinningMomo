@@ -629,10 +629,10 @@ auto get_assets_by_month(Core::State::AppState& app_state,
   return response;
 }
 
-auto get_infinity_nikki_photo_params(Core::State::AppState& app_state,
-                                     const Types::GetInfinityNikkiPhotoParamsParams& params)
-    -> std::expected<std::optional<Types::InfinityNikkiPhotoParams>, std::string> {
-  std::string sql = R"(
+auto get_infinity_nikki_details(Core::State::AppState& app_state,
+                                const Types::GetInfinityNikkiDetailsParams& params)
+    -> std::expected<Types::InfinityNikkiDetails, std::string> {
+  std::string extracted_sql = R"(
     SELECT camera_params,
            time_hour,
            time_min,
@@ -647,19 +647,34 @@ auto get_infinity_nikki_photo_params(Core::State::AppState& app_state,
            nikki_loc_y,
            nikki_loc_z,
            nikki_hidden,
-           pose_id,
-           dye_code
+           pose_id
     FROM asset_infinity_nikki_params
     WHERE asset_id = ?
   )";
 
-  auto result = Core::Database::query_single<Types::InfinityNikkiPhotoParams>(
-      *app_state.database, sql, {params.asset_id});
-  if (!result) {
-    return std::unexpected("Failed to query Infinity Nikki photo params: " + result.error());
+  auto extracted_result = Core::Database::query_single<Types::InfinityNikkiExtractedParams>(
+      *app_state.database, extracted_sql, {params.asset_id});
+  if (!extracted_result) {
+    return std::unexpected("Failed to query Infinity Nikki extracted params: " +
+                           extracted_result.error());
   }
 
-  return result.value();
+  std::string user_record_sql = R"(
+    SELECT code_type,
+           code_value
+    FROM asset_infinity_nikki_user_record
+    WHERE asset_id = ?
+  )";
+
+  auto user_record_result = Core::Database::query_single<Types::InfinityNikkiUserRecord>(
+      *app_state.database, user_record_sql, {params.asset_id});
+  if (!user_record_result) {
+    return std::unexpected("Failed to query Infinity Nikki user record: " +
+                           user_record_result.error());
+  }
+
+  return Types::InfinityNikkiDetails{.extracted = extracted_result.value(),
+                                     .user_record = user_record_result.value()};
 }
 
 auto get_asset_main_colors(Core::State::AppState& app_state,
@@ -810,55 +825,79 @@ auto update_asset_description(Core::State::AppState& app_state,
                                 .affected_count = affected_result->value_or(0)};
 }
 
-auto update_infinity_nikki_dye_code(Core::State::AppState& app_state,
-                                    const Types::UpdateInfinityNikkiDyeCodeParams& params)
+auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
+                                    const Types::SetInfinityNikkiUserRecordParams& params)
     -> std::expected<Types::OperationResult, std::string> {
   if (params.asset_id <= 0) {
     return std::unexpected("Asset id must be greater than 0");
   }
 
-  auto params_exists_result = Core::Database::query_scalar<std::int64_t>(
-      *app_state.database, "SELECT COUNT(1) FROM asset_infinity_nikki_params WHERE asset_id = ?",
-      {params.asset_id});
-  if (!params_exists_result) {
-    return std::unexpected("Failed to load Infinity Nikki photo params before updating dye code: " +
-                           params_exists_result.error());
+  if (params.code_type != "dye" && params.code_type != "home_building") {
+    return std::unexpected("Infinity Nikki code type must be one of dye, home_building");
   }
 
-  if (params_exists_result->value_or(0) <= 0) {
-    return std::unexpected("Infinity Nikki photo params not found");
+  auto asset_result =
+      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+  if (!asset_result) {
+    return std::unexpected("Failed to load asset before updating Infinity Nikki user record: " +
+                           asset_result.error());
   }
 
-  auto normalized_dye_code =
-      params.dye_code.has_value()
-          ? std::optional<std::string>{trim_ascii_copy(params.dye_code.value())}
+  if (!asset_result->has_value()) {
+    return std::unexpected("Asset not found");
+  }
+
+  auto normalized_code_value =
+      params.code_value.has_value()
+          ? std::optional<std::string>{trim_ascii_copy(params.code_value.value())}
           : std::nullopt;
-  if (normalized_dye_code.has_value() && normalized_dye_code->empty()) {
-    normalized_dye_code = std::nullopt;
+  if (normalized_code_value.has_value() && normalized_code_value->empty()) {
+    normalized_code_value = std::nullopt;
   }
 
-  std::vector<Core::Database::Types::DbParam> db_params;
-  db_params.push_back(normalized_dye_code.has_value()
-                          ? Core::Database::Types::DbParam{normalized_dye_code.value()}
-                          : Core::Database::Types::DbParam{std::monostate{}});
-  db_params.push_back(params.asset_id);
+  std::expected<void, std::string> write_result;
+  if (normalized_code_value.has_value()) {
+    auto result =
+        Core::Database::execute(*app_state.database,
+                                R"(
+          INSERT INTO asset_infinity_nikki_user_record (asset_id, code_type, code_value)
+          VALUES (?, ?, ?)
+          ON CONFLICT(asset_id) DO UPDATE SET
+            code_type = excluded.code_type,
+            code_value = excluded.code_value
+        )",
+                                {params.asset_id, params.code_type, normalized_code_value.value()});
+    if (!result) {
+      write_result =
+          std::unexpected("Failed to upsert Infinity Nikki user record: " + result.error());
+    } else {
+      write_result = {};
+    }
+  } else {
+    auto result = Core::Database::execute(
+        *app_state.database, "DELETE FROM asset_infinity_nikki_user_record WHERE asset_id = ?",
+        {params.asset_id});
+    if (!result) {
+      write_result =
+          std::unexpected("Failed to delete Infinity Nikki user record: " + result.error());
+    } else {
+      write_result = {};
+    }
+  }
 
-  auto result = Core::Database::execute(
-      *app_state.database, "UPDATE asset_infinity_nikki_params SET dye_code = ? WHERE asset_id = ?",
-      db_params);
+  if (!write_result) {
+    return std::unexpected(write_result.error());
+  }
+
+  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT changes()");
   if (!result) {
-    return std::unexpected("Failed to update Infinity Nikki dye code: " + result.error());
-  }
-
-  auto affected_result =
-      Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT changes()");
-  if (!affected_result) {
-    return std::unexpected("Failed to query updated dye code count: " + affected_result.error());
+    return std::unexpected("Failed to query updated Infinity Nikki user record count: " +
+                           result.error());
   }
 
   return Types::OperationResult{.success = true,
-                                .message = "Infinity Nikki dye code updated successfully",
-                                .affected_count = affected_result->value_or(0)};
+                                .message = "Infinity Nikki user record updated successfully",
+                                .affected_count = result->value_or(0)};
 }
 
 // ============= 维护服务实现 =============

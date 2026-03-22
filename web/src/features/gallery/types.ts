@@ -146,9 +146,12 @@ export interface UpdateAssetDescriptionParams {
   description?: string
 }
 
-export interface UpdateInfinityNikkiDyeCodeParams {
+export type InfinityNikkiUserRecordCodeType = 'dye' | 'home_building'
+
+export interface SetInfinityNikkiUserRecordParams {
   assetId: number
-  dyeCode?: string
+  codeType: InfinityNikkiUserRecordCodeType
+  codeValue?: string
 }
 
 // 获取资产标签参数
@@ -322,7 +325,7 @@ export interface PhotoMapPoint {
   nikkiLocZ?: number
 }
 
-export interface InfinityNikkiPhotoParams {
+export interface InfinityNikkiExtractedParams {
   cameraParams?: string
   timeHour?: number
   timeMin?: number
@@ -338,7 +341,16 @@ export interface InfinityNikkiPhotoParams {
   nikkiLocZ?: number
   nikkiHidden?: number
   poseId?: number
-  dyeCode?: string
+}
+
+export interface InfinityNikkiUserRecord {
+  codeType: InfinityNikkiUserRecordCodeType
+  codeValue: string
+}
+
+export interface InfinityNikkiDetails {
+  extracted?: InfinityNikkiExtractedParams
+  userRecord?: InfinityNikkiUserRecord
 }
 
 // ============= 时间线相关类型 =============

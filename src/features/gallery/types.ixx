@@ -238,7 +238,7 @@ struct GetParams {
   std::int64_t id;
 };
 
-struct GetInfinityNikkiPhotoParamsParams {
+struct GetInfinityNikkiDetailsParams {
   std::int64_t asset_id;
 };
 
@@ -362,7 +362,7 @@ struct QueryPhotoMapPointsParams {
   QueryAssetsFilters filters;
 };
 
-struct InfinityNikkiPhotoParams {
+struct InfinityNikkiExtractedParams {
   std::optional<std::string> camera_params;
   std::optional<std::int64_t> time_hour;
   std::optional<std::int64_t> time_min;
@@ -378,7 +378,16 @@ struct InfinityNikkiPhotoParams {
   std::optional<double> nikki_loc_z;
   std::optional<std::int64_t> nikki_hidden;
   std::optional<std::int64_t> pose_id;
-  std::optional<std::string> dye_code;
+};
+
+struct InfinityNikkiUserRecord {
+  std::string code_type;
+  std::string code_value;
+};
+
+struct InfinityNikkiDetails {
+  std::optional<InfinityNikkiExtractedParams> extracted;
+  std::optional<InfinityNikkiUserRecord> user_record;
 };
 
 // ============= 标签相关参数 =============
@@ -421,9 +430,10 @@ struct UpdateAssetDescriptionParams {
   std::optional<std::string> description;
 };
 
-struct UpdateInfinityNikkiDyeCodeParams {
+struct SetInfinityNikkiUserRecordParams {
   std::int64_t asset_id;
-  std::optional<std::string> dye_code;
+  std::string code_type;
+  std::optional<std::string> code_value;
 };
 
 struct GetTagStatsParams {};

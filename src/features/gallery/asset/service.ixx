@@ -24,9 +24,9 @@ export auto get_assets_by_month(Core::State::AppState& app_state,
                                 const Types::GetAssetsByMonthParams& params)
     -> std::expected<Types::GetAssetsByMonthResponse, std::string>;
 
-export auto get_infinity_nikki_photo_params(Core::State::AppState& app_state,
-                                            const Types::GetInfinityNikkiPhotoParamsParams& params)
-    -> std::expected<std::optional<Types::InfinityNikkiPhotoParams>, std::string>;
+export auto get_infinity_nikki_details(Core::State::AppState& app_state,
+                                       const Types::GetInfinityNikkiDetailsParams& params)
+    -> std::expected<Types::InfinityNikkiDetails, std::string>;
 
 export auto get_asset_main_colors(Core::State::AppState& app_state,
                                   const Types::GetAssetMainColorsParams& params)
@@ -43,8 +43,8 @@ export auto update_asset_description(Core::State::AppState& app_state,
                                      const Types::UpdateAssetDescriptionParams& params)
     -> std::expected<Types::OperationResult, std::string>;
 
-export auto update_infinity_nikki_dye_code(Core::State::AppState& app_state,
-                                           const Types::UpdateInfinityNikkiDyeCodeParams& params)
+export auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
+                                           const Types::SetInfinityNikkiUserRecordParams& params)
     -> std::expected<Types::OperationResult, std::string>;
 
 // 维护服务

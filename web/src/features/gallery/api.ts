@@ -17,7 +17,7 @@ import type {
   QueryAssetsResponse,
   QueryPhotoMapPointsParams,
   PhotoMapPoint,
-  InfinityNikkiPhotoParams,
+  InfinityNikkiDetails,
   AssetMainColor,
   Tag,
   TagTreeNode,
@@ -29,7 +29,7 @@ import type {
   RemoveTagsFromAssetParams,
   UpdateAssetsReviewStateParams,
   UpdateAssetDescriptionParams,
-  UpdateInfinityNikkiDyeCodeParams,
+  SetInfinityNikkiUserRecordParams,
 } from './types'
 import { getStaticUrl } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -370,23 +370,18 @@ export async function queryPhotoMapPoints(
 }
 
 /**
- * 获取 Infinity Nikki 照片详情参数
+ * 获取 Infinity Nikki 详情
  */
-export async function getInfinityNikkiPhotoParams(
-  assetId: number
-): Promise<InfinityNikkiPhotoParams | null> {
+export async function getInfinityNikkiDetails(assetId: number): Promise<InfinityNikkiDetails> {
   try {
-    const result = await call<InfinityNikkiPhotoParams | null>(
-      'gallery.getInfinityNikkiPhotoParams',
-      {
-        assetId,
-      }
-    )
+    const result = await call<InfinityNikkiDetails>('gallery.getInfinityNikkiDetails', {
+      assetId,
+    })
 
     return result
   } catch (error) {
-    console.error('Failed to get Infinity Nikki photo params:', error)
-    throw new Error('获取无限暖暖照片参数失败')
+    console.error('Failed to get Infinity Nikki details:', error)
+    throw new Error('获取无限暖暖详情失败')
   }
 }
 
@@ -591,18 +586,18 @@ export async function updateAssetDescription(
 }
 
 /**
- * 更新 Infinity Nikki 染色码
+ * 设置 Infinity Nikki 玩家记录
  */
-export async function updateInfinityNikkiDyeCode(
-  params: UpdateInfinityNikkiDyeCodeParams
+export async function setInfinityNikkiUserRecord(
+  params: SetInfinityNikkiUserRecordParams
 ): Promise<OperationResult> {
   try {
-    const result = await call<OperationResult>('gallery.updateInfinityNikkiDyeCode', params)
+    const result = await call<OperationResult>('gallery.setInfinityNikkiUserRecord', params)
 
     return result
   } catch (error) {
-    console.error('Failed to update Infinity Nikki dye code:', error)
-    throw new Error('更新染色码失败')
+    console.error('Failed to set Infinity Nikki user record:', error)
+    throw new Error('更新无限暖暖玩家记录失败')
   }
 }
 
@@ -632,7 +627,7 @@ export const galleryApi = {
   removeFolderWatch,
   queryAssets, // 统一查询接口
   queryPhotoMapPoints,
-  getInfinityNikkiPhotoParams,
+  getInfinityNikkiDetails,
   getAssetMainColors,
 
   // 时间线查询
@@ -672,5 +667,5 @@ export const galleryApi = {
   moveAssetsToTrash,
   updateAssetsReviewState,
   updateAssetDescription,
-  updateInfinityNikkiDyeCode,
+  setInfinityNikkiUserRecord,
 }

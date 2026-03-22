@@ -73,12 +73,11 @@ auto handle_query_photo_map_points(
   co_return result.value();
 }
 
-auto handle_get_infinity_nikki_photo_params(
+auto handle_get_infinity_nikki_details(
     Core::State::AppState& app_state,
-    const Features::Gallery::Types::GetInfinityNikkiPhotoParamsParams& params)
-    -> RpcAwaitable<std::optional<Features::Gallery::Types::InfinityNikkiPhotoParams>> {
-  auto result =
-      Features::Gallery::Asset::Service::get_infinity_nikki_photo_params(app_state, params);
+    const Features::Gallery::Types::GetInfinityNikkiDetailsParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiDetails> {
+  auto result = Features::Gallery::Asset::Service::get_infinity_nikki_details(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -191,12 +190,12 @@ auto handle_update_asset_description(
   co_return result.value();
 }
 
-auto handle_update_infinity_nikki_dye_code(
+auto handle_set_infinity_nikki_user_record(
     Core::State::AppState& app_state,
-    const Features::Gallery::Types::UpdateInfinityNikkiDyeCodeParams& params)
+    const Features::Gallery::Types::SetInfinityNikkiUserRecordParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
   auto result =
-      Features::Gallery::Asset::Service::update_infinity_nikki_dye_code(app_state, params);
+      Features::Gallery::Asset::Service::set_infinity_nikki_user_record(app_state, params);
 
   if (!result) {
     co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
@@ -237,11 +236,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
       handle_query_photo_map_points,
       "Query Infinity Nikki photo map points using the current gallery filters");
 
-  register_method<Features::Gallery::Types::GetInfinityNikkiPhotoParamsParams,
-                  std::optional<Features::Gallery::Types::InfinityNikkiPhotoParams>>(
-      app_state, app_state.rpc->registry, "gallery.getInfinityNikkiPhotoParams",
-      handle_get_infinity_nikki_photo_params,
-      "Get extracted Infinity Nikki photo parameters for the specified asset");
+  register_method<Features::Gallery::Types::GetInfinityNikkiDetailsParams,
+                  Features::Gallery::Types::InfinityNikkiDetails>(
+      app_state, app_state.rpc->registry, "gallery.getInfinityNikkiDetails",
+      handle_get_infinity_nikki_details,
+      "Get Infinity Nikki extracted data and user record for the specified asset");
 
   register_method<Features::Gallery::Types::GetAssetMainColorsParams,
                   std::vector<Features::Gallery::Types::AssetMainColor>>(
@@ -277,11 +276,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
       handle_update_asset_description,
       "Update a single asset description in the gallery details panel");
 
-  register_method<Features::Gallery::Types::UpdateInfinityNikkiDyeCodeParams,
+  register_method<Features::Gallery::Types::SetInfinityNikkiUserRecordParams,
                   Features::Gallery::Types::OperationResult>(
-      app_state, app_state.rpc->registry, "gallery.updateInfinityNikkiDyeCode",
-      handle_update_infinity_nikki_dye_code,
-      "Update a single Infinity Nikki dye code in the gallery details panel");
+      app_state, app_state.rpc->registry, "gallery.setInfinityNikkiUserRecord",
+      handle_set_infinity_nikki_user_record,
+      "Set or clear a single Infinity Nikki user record in the gallery details panel");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery::Asset
