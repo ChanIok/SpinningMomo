@@ -14,11 +14,11 @@ namespace Core::Initializer::Database {
 auto initialize_database(Core::State::AppState& state) -> std::expected<void, std::string> {
   try {
     // 初始化数据库连接
-    auto path_result = Utils::Path::GetExecutableDirectory();
+    auto path_result = Utils::Path::GetAppDataFilePath("database.db");
     if (!path_result) {
-      return std::unexpected("Failed to get executable directory: " + path_result.error());
+      return std::unexpected("Failed to get database path: " + path_result.error());
     }
-    const auto db_path = path_result.value() / "database.db";
+    const auto db_path = path_result.value();
     if (auto result = Core::Database::initialize(*state.database, db_path); !result) {
       Logger().error("Failed to initialize database: {}", result.error());
       return std::unexpected("Failed to initialize database: " + result.error());

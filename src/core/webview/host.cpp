@@ -13,6 +13,7 @@ import Core.WebView.State;
 import Core.WebView.Static;
 import Features.Settings.State;
 import Utils.Logger;
+import Utils.Path;
 import Utils.String;
 import Vendor.BuildConfig;
 import Vendor.WIL;
@@ -353,7 +354,13 @@ auto setup_virtual_host_mapping(ICoreWebView2* webview, Core::WebView::State::We
     -> HRESULT {
   if (!webview) return E_FAIL;
 
-  auto dist_path = std::filesystem::absolute(config.frontend_dist_path).wstring();
+  auto dist_path_result = Utils::Path::GetEmbeddedWebRootDirectory();
+  if (!dist_path_result) {
+    Logger().error("Failed to resolve embedded web root: {}", dist_path_result.error());
+    return E_FAIL;
+  }
+
+  auto dist_path = dist_path_result.value().wstring();
 
   wil::com_ptr<ICoreWebView2_3> webview3;
   HRESULT hr = webview->QueryInterface(IID_PPV_ARGS(&webview3));
@@ -763,11 +770,32 @@ namespace Core::WebView::Host {
 auto start_environment_creation(Core::State::AppState& state, HWND webview_hwnd)
     -> std::expected<void, std::string> {
   try {
+    auto app_data_dir_result = Utils::Path::GetAppDataDirectory();
+    if (!app_data_dir_result) {
+      return std::unexpected("Failed to get app data directory: " + app_data_dir_result.error());
+    }
+
+    auto configured_user_data_folder = std::filesystem::path(
+        state.webview->config.user_data_folder.empty() ? L"webview2"
+                                                       : state.webview->config.user_data_folder);
+    auto user_data_folder = configured_user_data_folder.is_absolute()
+                                ? configured_user_data_folder
+                                : app_data_dir_result.value() / configured_user_data_folder;
+
+    auto ensure_result = Utils::Path::EnsureDirectoryExists(user_data_folder);
+    if (!ensure_result) {
+      return std::unexpected("Failed to create WebView2 user data directory: " +
+                             ensure_result.error());
+    }
+
+    state.webview->resources.user_data_folder = user_data_folder.wstring();
+
     auto environment_handler =
         Microsoft::WRL::Make<Detail::EnvironmentCompletedHandler>(&state, webview_hwnd);
 
-    HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(nullptr, nullptr, nullptr,
-                                                          environment_handler.Get());
+    HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
+        nullptr, state.webview->resources.user_data_folder.c_str(), nullptr,
+        environment_handler.Get());
     Vendor::WIL::throw_if_failed(hr);
 
     return {};

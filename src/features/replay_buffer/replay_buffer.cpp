@@ -134,11 +134,11 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
   state.target_window = target_window;
 
   // 1. 创建缓存目录
-  auto exe_dir = Utils::Path::GetExecutableDirectory();
-  if (!exe_dir) {
-    return std::unexpected("Failed to get executable directory");
+  auto cache_root_result = Utils::Path::GetAppDataSubdirectory("cache");
+  if (!cache_root_result) {
+    return std::unexpected("Failed to get cache directory: " + cache_root_result.error());
   }
-  state.cache_dir = *exe_dir / "cache" / "replay_buffer";
+  state.cache_dir = cache_root_result.value() / "replay_buffer";
 
   auto ensure_result = Utils::Path::EnsureDirectoryExists(state.cache_dir);
   if (!ensure_result) {

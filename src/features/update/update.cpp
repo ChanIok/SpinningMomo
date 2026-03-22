@@ -102,18 +102,7 @@ auto http_get(Core::State::AppState& app_state, const std::string& url)
 }
 
 auto get_temp_directory() -> std::expected<std::filesystem::path, std::string> {
-  auto exec_dir = Utils::Path::GetExecutableDirectory();
-  if (!exec_dir) {
-    return std::unexpected("Failed to get executable directory: " + exec_dir.error());
-  }
-
-  auto temp_dir = *exec_dir / "temp";
-  auto create_result = Utils::Path::EnsureDirectoryExists(temp_dir);
-  if (!create_result) {
-    return std::unexpected("Failed to create temp directory: " + create_result.error());
-  }
-
-  return temp_dir;
+  return Utils::Path::GetAppDataSubdirectory("temp");
 }
 
 auto format_download_url(const std::string& url_template, const std::string& version,
@@ -196,11 +185,7 @@ auto get_update_filename(const std::string& version, bool is_portable) -> std::s
 
 // 检测是否为便携版安装（exe同目录下存在portable标记文件）
 auto detect_portable() -> bool {
-  auto exec_dir = Utils::Path::GetExecutableDirectory();
-  if (!exec_dir) {
-    return true;  // 默认为便携版
-  }
-  return std::filesystem::exists(*exec_dir / "portable");
+  return Utils::Path::GetAppMode() == Utils::Path::AppMode::Portable;
 }
 
 // 从版本检查URL获取最新版本号

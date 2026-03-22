@@ -6,6 +6,23 @@ import std;
 import Vendor.ShellApi;
 import <windows.h>;
 
+namespace Utils::Path::Detail {
+
+constexpr std::wstring_view kPortableMarker = L"portable";
+constexpr std::wstring_view kAppName = L"SpinningMomo";
+
+auto ensure_path_exists(const std::filesystem::path& path)
+    -> std::expected<std::filesystem::path, std::string> {
+  auto ensure_result = Utils::Path::EnsureDirectoryExists(path);
+  if (!ensure_result) {
+    return std::unexpected(ensure_result.error());
+  }
+
+  return path;
+}
+
+}  // namespace Utils::Path::Detail
+
 // 获取当前程序的完整路径
 auto Utils::Path::GetExecutablePath() -> std::expected<std::filesystem::path, std::string> {
   // 静态缓存，只在第一次调用时初始化
@@ -60,6 +77,74 @@ auto Utils::Path::GetExecutableDirectory() -> std::expected<std::filesystem::pat
   } catch (const std::exception& e) {
     return std::unexpected("Exception getting directory: " + std::string(e.what()));
   }
+}
+
+auto Utils::Path::GetAppMode() -> AppMode {
+  auto exe_dir_result = GetExecutableDirectory();
+  if (!exe_dir_result) {
+    return AppMode::Portable;
+  }
+
+  return std::filesystem::exists(exe_dir_result.value() / Detail::kPortableMarker)
+             ? AppMode::Portable
+             : AppMode::Installed;
+}
+
+auto Utils::Path::GetAppDataDirectory() -> std::expected<std::filesystem::path, std::string> {
+  if (GetAppMode() == AppMode::Portable) {
+    auto exe_dir_result = GetExecutableDirectory();
+    if (!exe_dir_result) {
+      return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+    }
+
+    return Detail::ensure_path_exists(exe_dir_result.value() / "data");
+  }
+
+  PWSTR local_app_data_raw = nullptr;
+  const auto hr = Vendor::ShellApi::SHGetKnownFolderPath(Vendor::ShellApi::kFOLDERID_LocalAppData,
+                                                         0, nullptr, &local_app_data_raw);
+  if (FAILED(hr) || !local_app_data_raw) {
+    if (local_app_data_raw) {
+      Vendor::ShellApi::CoTaskMemFree(local_app_data_raw);
+    }
+    return std::unexpected("Failed to get LocalAppData directory, HRESULT: " + std::to_string(hr));
+  }
+
+  std::filesystem::path app_data_root =
+      std::filesystem::path(local_app_data_raw) / Detail::kAppName;
+  Vendor::ShellApi::CoTaskMemFree(local_app_data_raw);
+  return Detail::ensure_path_exists(app_data_root);
+}
+
+auto Utils::Path::GetAppDataSubdirectory(std::string_view name)
+    -> std::expected<std::filesystem::path, std::string> {
+  auto app_data_dir_result = GetAppDataDirectory();
+  if (!app_data_dir_result) {
+    return std::unexpected(app_data_dir_result.error());
+  }
+
+  return Detail::ensure_path_exists(app_data_dir_result.value() /
+                                    std::filesystem::path(std::string{name}));
+}
+
+auto Utils::Path::GetAppDataFilePath(std::string_view filename)
+    -> std::expected<std::filesystem::path, std::string> {
+  auto app_data_dir_result = GetAppDataDirectory();
+  if (!app_data_dir_result) {
+    return std::unexpected(app_data_dir_result.error());
+  }
+
+  return app_data_dir_result.value() / std::filesystem::path(std::string{filename});
+}
+
+auto Utils::Path::GetEmbeddedWebRootDirectory()
+    -> std::expected<std::filesystem::path, std::string> {
+  auto exe_dir_result = GetExecutableDirectory();
+  if (!exe_dir_result) {
+    return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+  }
+
+  return exe_dir_result.value() / "resources" / "web";
 }
 
 // 确保目录存在，如果不存在则创建

@@ -3,6 +3,7 @@ module;
 module Utils.Logger;
 
 import std;
+import Utils.Path;
 import Vendor.BuildConfig;
 import <spdlog/async.h>;
 import <spdlog/sinks/msvc_sink.h>;
@@ -56,9 +57,16 @@ auto initialize() -> std::expected<void, std::string> {
   try {
     spdlog::init_thread_pool(8192, 1);
 
+    auto logs_dir_result = Utils::Path::GetAppDataSubdirectory("logs");
+    if (!logs_dir_result) {
+      return std::unexpected("Failed to get log directory: " + logs_dir_result.error());
+    }
+
+    auto log_file_path = logs_dir_result.value() / "infinity_momo.log";
+
     std::vector<spdlog::sink_ptr> sinks;
     sinks.push_back(std::make_shared<spdlog::sinks::msvc_sink_mt>());
-    sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>("logs/infinity_momo.log",
+    sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(log_file_path.string(),
                                                                            5 * 1024 * 1024, 3));
 
     auto async_logger = std::make_shared<spdlog::async_logger>(

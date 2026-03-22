@@ -113,9 +113,9 @@ auto capture(Core::State::AppState& state) -> void {
 
   std::optional<std::filesystem::path> output_dir_override;
   if (motion_photo_enabled) {
-    auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-    if (exe_dir_result) {
-      auto temp_dir = *exe_dir_result / "cache" / "motion_photo_temp";
+    auto cache_root_result = Utils::Path::GetAppDataSubdirectory("cache");
+    if (cache_root_result) {
+      auto temp_dir = cache_root_result.value() / "motion_photo_temp";
       auto ensure_result = Utils::Path::EnsureDirectoryExists(temp_dir);
       if (ensure_result) {
         output_dir_override = temp_dir;

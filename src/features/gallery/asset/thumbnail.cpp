@@ -47,18 +47,12 @@ auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
   }
 
   // 否则，计算路径、创建目录并保存到状态中
-  auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-  if (!exe_dir_result) {
-    return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+  auto thumbnails_dir_result = Utils::Path::GetAppDataSubdirectory("thumbnails");
+  if (!thumbnails_dir_result) {
+    return std::unexpected("Failed to get thumbnails directory: " + thumbnails_dir_result.error());
   }
 
-  auto thumbnails_dir = exe_dir_result.value() / "thumbnails";
-
-  // 确保目录存在
-  auto ensure_dir_result = Utils::Path::EnsureDirectoryExists(thumbnails_dir);
-  if (!ensure_dir_result) {
-    return std::unexpected("Failed to create thumbnails directory: " + ensure_dir_result.error());
-  }
+  auto thumbnails_dir = thumbnails_dir_result.value();
 
   app_state.gallery->thumbnails_directory = thumbnails_dir;
 

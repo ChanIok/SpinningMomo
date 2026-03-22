@@ -108,8 +108,7 @@ auto get_cache_duration(const std::string& extension) -> std::chrono::seconds {
 
 // 路径解析
 auto resolve_file_path(const std::string& url_path) -> std::filesystem::path {
-  auto exe_dir = Utils::Path::GetExecutableDirectory().value_or(".");
-  auto web_root = exe_dir / "resources" / "web";
+  auto web_root = Utils::Path::GetEmbeddedWebRootDirectory().value_or(".");
 
   auto clean_path = url_path == "/" ? "/index.html" : url_path;
   if (clean_path.ends_with("/")) clean_path += "index.html";
@@ -119,8 +118,7 @@ auto resolve_file_path(const std::string& url_path) -> std::filesystem::path {
 
 // 获取web根目录
 auto get_web_root() -> std::filesystem::path {
-  auto exe_dir = Utils::Path::GetExecutableDirectory().value_or(".");
-  return exe_dir / "resources" / "web";
+  return Utils::Path::GetEmbeddedWebRootDirectory().value_or(".");
 }
 
 // ---- Range 请求：<video> 拖动进度、分片加载依赖 Accept-Ranges + 206 + Content-Range ----

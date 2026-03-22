@@ -160,8 +160,9 @@ auto compensate_for_theme(const RgbColor& color, std::string_view theme_mode, bo
     l_min = primary ? 35.0 : 80.0;
     l_max = primary ? 55.0 : 92.0;
   } else {
-    l_min = primary ? 58.0 : 10.0;
-    l_max = primary ? 72.0 : 22.0;
+    // 暗色 UI 上 accent 需更亮一些，否则从壁纸提取的主色容易偏闷
+    l_min = primary ? 78.0 : 6.0;
+    l_max = primary ? 90.0 : 18.0;
   }
 
   hsl.l = std::clamp(hsl.l, l_min, l_max);
@@ -170,7 +171,7 @@ auto compensate_for_theme(const RgbColor& color, std::string_view theme_mode, bo
     hsl.s = std::min(hsl.s, 20.0);
   } else {
     double s_max = saturation_cap_for_lightness(hsl.l);
-    if (!primary) s_max *= 0.6;
+    if (!primary) s_max *= 0.5;
     hsl.s = std::min(hsl.s, s_max);
   }
 
@@ -215,9 +216,17 @@ auto resolve_wallpaper_path(std::string_view raw_path)
 
   std::string local_path = normalized;
   if (local_path.starts_with("/assets/")) {
-    local_path = "./resources/web" + local_path;
+    auto web_root_result = Utils::Path::GetEmbeddedWebRootDirectory();
+    if (!web_root_result) {
+      return std::unexpected("Failed to get embedded web root: " + web_root_result.error());
+    }
+    return Utils::Path::NormalizePath(web_root_result.value() / local_path.substr(1));
   } else if (local_path.starts_with("assets/")) {
-    local_path = "./resources/web/" + local_path;
+    auto web_root_result = Utils::Path::GetEmbeddedWebRootDirectory();
+    if (!web_root_result) {
+      return std::unexpected("Failed to get embedded web root: " + web_root_result.error());
+    }
+    return Utils::Path::NormalizePath(web_root_result.value() / local_path);
   } else if (local_path.starts_with("/")) {
     local_path = "." + local_path;
   }

@@ -75,7 +75,7 @@ export struct MessageState {
 
 // WebView配置
 export struct WebViewConfig {
-  std::wstring user_data_folder = L"./webview_data";
+  std::wstring user_data_folder = L"webview2";
   std::wstring initial_url = L"";  // 运行时根据编译模式自动设置
   std::vector<std::wstring> allowed_origins;
   bool enable_password_autosave = false;

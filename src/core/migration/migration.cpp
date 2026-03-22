@@ -12,21 +12,7 @@ import Vendor.Version;
 namespace Core::Migration {
 
 auto get_version_file_path() -> std::expected<std::filesystem::path, std::string> {
-  // 存储在程序所在目录的 data 子目录下
-  auto exe_dir = Utils::Path::GetExecutableDirectory();
-  if (!exe_dir) {
-    return std::unexpected("Failed to get executable directory: " + exe_dir.error());
-  }
-
-  auto data_dir = exe_dir.value() / "data";
-
-  // 确保目录存在
-  auto ensure_result = Utils::Path::EnsureDirectoryExists(data_dir);
-  if (!ensure_result) {
-    return std::unexpected("Failed to create data directory: " + ensure_result.error());
-  }
-
-  return data_dir / "app_version.txt";
+  return Utils::Path::GetAppDataFilePath("app_version.txt");
 }
 
 auto get_last_version() -> std::expected<std::string, std::string> {

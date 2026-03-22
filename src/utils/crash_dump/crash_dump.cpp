@@ -45,12 +45,12 @@ auto sanitize_reason(std::string_view reason) -> std::string {
 }
 
 auto make_dump_dir() -> std::expected<std::filesystem::path, std::string> {
-  auto exe_dir_result = Utils::Path::GetExecutableDirectory();
-  if (!exe_dir_result) {
-    return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+  auto logs_dir_result = Utils::Path::GetAppDataSubdirectory("logs");
+  if (!logs_dir_result) {
+    return std::unexpected("Failed to get logs directory: " + logs_dir_result.error());
   }
 
-  const auto dump_dir = exe_dir_result.value() / "logs" / "dumps";
+  const auto dump_dir = logs_dir_result.value() / "dumps";
   if (auto ensure_result = Utils::Path::EnsureDirectoryExists(dump_dir); !ensure_result) {
     return std::unexpected("Failed to create dump directory: " + ensure_result.error());
   }

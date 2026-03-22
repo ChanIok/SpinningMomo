@@ -4,6 +4,7 @@
 #   - WiX v5+: dotnet tool install --global wix --version 5.*
 #   - WiX extensions:
 #       wix extension add WixToolset.UI.wixext
+#       wix extension add WixToolset.Util.wixext
 #       wix extension add WixToolset.BootstrapperApplications.wixext
 
 param(
@@ -54,6 +55,7 @@ wix build `
     -d ProjectDir=$ProjectDir `
     -d DistDir=$distDir `
     -ext WixToolset.UI.wixext `
+    -ext WixToolset.Util.wixext `
     -culture en-US `
     -loc installer/Package.en-us.wxl `
     -out $outputMsi `

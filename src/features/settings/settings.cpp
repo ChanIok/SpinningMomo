@@ -33,12 +33,7 @@ auto detect_default_locale() -> std::string {
 }
 
 auto get_settings_path() -> std::expected<std::filesystem::path, std::string> {
-  auto dir_result = Utils::Path::GetExecutableDirectory();
-  if (!dir_result) {
-    return std::unexpected("Failed to get executable directory: " + dir_result.error());
-  }
-
-  return dir_result.value() / "settings.json";
+  return Utils::Path::GetAppDataFilePath("settings.json");
 }
 
 auto should_show_onboarding(const Types::AppSettings& settings) -> bool {

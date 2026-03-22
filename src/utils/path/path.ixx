@@ -7,11 +7,36 @@ import std;
 // 路径工具命名空间
 namespace Utils::Path {
 
+// 应用运行模式
+export enum class AppMode {
+  Portable,
+  Installed,
+};
+
 // 获取当前程序所在的目录路径
 export auto GetExecutableDirectory() -> std::expected<std::filesystem::path, std::string>;
 
 // 获取当前程序的完整路径
 export auto GetExecutablePath() -> std::expected<std::filesystem::path, std::string>;
+
+// 检测当前是否为便携版模式（exe 同目录存在 portable 标记文件）
+export auto GetAppMode() -> AppMode;
+
+// 获取应用运行时数据根目录：
+// - 便携版：<exe>/data
+// - 安装版：%LOCALAPPDATA%/ChanIok/SpinningMomo
+export auto GetAppDataDirectory() -> std::expected<std::filesystem::path, std::string>;
+
+// 获取应用运行时数据子目录，并确保目录存在
+export auto GetAppDataSubdirectory(std::string_view name)
+    -> std::expected<std::filesystem::path, std::string>;
+
+// 获取应用运行时数据文件路径，并确保数据根目录存在
+export auto GetAppDataFilePath(std::string_view filename)
+    -> std::expected<std::filesystem::path, std::string>;
+
+// 获取内置前端静态资源根目录：<exe>/resources/web
+export auto GetEmbeddedWebRootDirectory() -> std::expected<std::filesystem::path, std::string>;
 
 // 确保目录存在，如果不存在则创建
 export auto EnsureDirectoryExists(const std::filesystem::path& dir)
