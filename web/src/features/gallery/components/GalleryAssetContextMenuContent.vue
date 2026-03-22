@@ -65,18 +65,13 @@ const assetActions = useGalleryAssetActions()
       {{ t('gallery.contextMenu.review.flag.label') }}
     </ContextMenuSubTrigger>
     <ContextMenuSubContent class="w-40">
-      <ContextMenuItem @click="assetActions.setSelectedAssetsReviewFlag('picked')">
-        {{ t('gallery.review.flag.picked') }}
-        <ContextMenuShortcut>P</ContextMenuShortcut>
-      </ContextMenuItem>
-      <ContextMenuItem @click="assetActions.setSelectedAssetsReviewFlag('rejected')">
+      <ContextMenuItem @click="assetActions.setSelectedAssetsRejected()">
         {{ t('gallery.review.flag.rejected') }}
         <ContextMenuShortcut>X</ContextMenuShortcut>
       </ContextMenuItem>
       <ContextMenuSeparator />
-      <ContextMenuItem @click="assetActions.clearSelectedAssetsReviewFlag">
+      <ContextMenuItem @click="assetActions.clearSelectedAssetsRejected">
         {{ t('gallery.contextMenu.review.flag.clear') }}
-        <ContextMenuShortcut>U</ContextMenuShortcut>
       </ContextMenuItem>
     </ContextMenuSubContent>
   </ContextMenuSub>

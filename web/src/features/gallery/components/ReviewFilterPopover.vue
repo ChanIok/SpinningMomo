@@ -24,19 +24,13 @@ function onRatingClick(value: number | 'unrated') {
   const numeric = value === 'unrated' ? 0 : value
   emit('update:rating', activeRating.value === numeric ? undefined : numeric)
 }
-
-function onFlagClick(flag: ReviewFlag) {
-  emit('update:reviewFlag', activeFlag.value === flag ? undefined : flag)
-}
 </script>
 
 <template>
   <div class="space-y-3">
-    <!-- 评分筛选 -->
     <div class="space-y-1.5">
       <p class="text-xs font-medium">{{ t('gallery.toolbar.filter.rating.label') }}</p>
       <div class="flex flex-wrap gap-1">
-        <!-- 全部 -->
         <button
           type="button"
           class="rounded px-2 py-1 text-xs transition-colors"
@@ -50,7 +44,6 @@ function onFlagClick(flag: ReviewFlag) {
           {{ t('gallery.toolbar.filter.rating.all') }}
         </button>
 
-        <!-- 1-5 星 -->
         <button
           v-for="star in STARS"
           :key="star"
@@ -77,7 +70,6 @@ function onFlagClick(flag: ReviewFlag) {
           </svg>
         </button>
 
-        <!-- 未评分 -->
         <button
           type="button"
           class="rounded px-2 py-1 text-xs transition-colors"
@@ -95,33 +87,32 @@ function onFlagClick(flag: ReviewFlag) {
 
     <div class="border-t" />
 
-    <!-- 标记筛选 -->
     <div class="space-y-1.5">
       <p class="text-xs font-medium">{{ t('gallery.toolbar.filter.flag.label') }}</p>
       <div class="flex flex-wrap gap-1">
         <button
-          v-for="flag in ['picked', 'rejected'] as ReviewFlag[]"
-          :key="flag"
           type="button"
           class="rounded-full px-3 py-1 text-xs font-medium transition-colors"
           :class="
-            activeFlag === flag
-              ? flag === 'picked'
-                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                : 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+            activeFlag === undefined
+              ? 'bg-accent text-accent-foreground'
               : 'bg-muted text-muted-foreground hover:text-foreground'
           "
-          @click="onFlagClick(flag)"
-        >
-          {{ t(`gallery.review.flag.${flag}`) }}
-        </button>
-        <button
-          v-if="activeFlag !== undefined"
-          type="button"
-          class="rounded-full px-3 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
           @click="emit('update:reviewFlag', undefined)"
         >
           {{ t('gallery.toolbar.filter.flag.all') }}
+        </button>
+        <button
+          type="button"
+          class="rounded-full px-3 py-1 text-xs font-medium transition-colors"
+          :class="
+            activeFlag === 'rejected'
+              ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+              : 'bg-muted text-muted-foreground hover:text-foreground'
+          "
+          @click="emit('update:reviewFlag', 'rejected')"
+        >
+          {{ t('gallery.review.flag.rejected') }}
         </button>
       </div>
     </div>

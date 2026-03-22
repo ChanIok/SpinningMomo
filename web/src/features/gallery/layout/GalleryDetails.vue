@@ -26,7 +26,7 @@ import AssetInfinityNikkiDetails from '../components/AssetInfinityNikkiDetails.v
 import AssetHistogram from '../components/AssetHistogram.vue'
 import AssetReviewControls from '../components/AssetReviewControls.vue'
 import TagSelectorPopover from '../components/TagSelectorPopover.vue'
-import type { Asset, AssetMainColor, InfinityNikkiDetails, ReviewFlag, Tag } from '../types'
+import type { Asset, AssetMainColor, InfinityNikkiDetails, Tag } from '../types'
 
 const store = useGalleryStore()
 const settingsStore = useSettingsStore()
@@ -242,12 +242,12 @@ async function handleClearRating() {
   await assetActions.clearSelectedAssetsRating()
 }
 
-async function handleSetReviewFlag(reviewFlag: ReviewFlag) {
-  await assetActions.setSelectedAssetsReviewFlag(reviewFlag)
+async function handleSetRejected() {
+  await assetActions.setSelectedAssetsRejected()
 }
 
-async function handleClearReviewFlag() {
-  await assetActions.clearSelectedAssetsReviewFlag()
+async function handleClearRejected() {
+  await assetActions.clearSelectedAssetsRejected()
 }
 
 function resetAssetDescriptionDraft() {
@@ -360,7 +360,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
 <template>
   <ScrollArea class="h-full">
-    <div class="p-4">
+    <div class="h-full p-4">
       <!-- 文件夹详情 -->
       <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
         <div class="flex items-center justify-between">
@@ -475,8 +475,8 @@ async function handleCopyColorHex(color: AssetMainColor) {
                   :review-flag="activeAsset.reviewFlag"
                   @set-rating="handleSetRating"
                   @clear-rating="handleClearRating"
-                  @set-flag="handleSetReviewFlag"
-                  @clear-flag="handleClearReviewFlag"
+                  @set-flag="handleSetRejected"
+                  @clear-flag="handleClearRejected"
                 />
               </div>
 
@@ -631,8 +631,8 @@ async function handleCopyColorHex(color: AssetMainColor) {
             :rating-indeterminate="true"
             @set-rating="handleSetRating"
             @clear-rating="handleClearRating"
-            @set-flag="handleSetReviewFlag"
-            @clear-flag="handleClearReviewFlag"
+            @set-flag="handleSetRejected"
+            @clear-flag="handleClearRejected"
           />
         </div>
 

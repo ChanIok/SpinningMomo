@@ -134,15 +134,8 @@ function isVideoAsset(index: number): boolean {
   return getAssetAtIndex(index)?.type === 'video'
 }
 
-function getReviewFlagLabel(reviewFlag: ReviewFlag) {
-  switch (reviewFlag) {
-    case 'picked':
-      return 'P'
-    case 'rejected':
-      return 'X'
-    default:
-      return ''
-  }
+function getRejectedLabel(reviewFlag: ReviewFlag) {
+  return reviewFlag === 'rejected' ? 'X' : ''
 }
 
 function handleWheel(event: WheelEvent) {
@@ -222,15 +215,10 @@ function handleWheel(event: WheelEvent) {
                   </div>
 
                   <div
-                    v-if="getReviewFlagLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none')"
-                    class="absolute right-1 bottom-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                    :class="
-                      getAssetAtIndex(item.index)?.reviewFlag === 'picked'
-                        ? 'bg-emerald-600/85'
-                        : 'bg-rose-600/85'
-                    "
+                    v-if="getRejectedLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none')"
+                    class="absolute right-1 bottom-1 rounded bg-rose-600/85 px-1.5 py-0.5 text-[10px] font-semibold text-white"
                   >
-                    {{ getReviewFlagLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none') }}
+                    {{ getRejectedLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none') }}
                   </div>
 
                   <div

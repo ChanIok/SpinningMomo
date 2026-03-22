@@ -176,6 +176,14 @@ export function useGalleryAssetActions() {
     await updateSelectedAssetsReviewState({ reviewFlag: 'none' })
   }
 
+  async function setSelectedAssetsRejected() {
+    await setSelectedAssetsReviewFlag('rejected')
+  }
+
+  async function clearSelectedAssetsRejected() {
+    await clearSelectedAssetsReviewFlag()
+  }
+
   return {
     selectedAssetIds,
     isSingleSelection,
@@ -188,5 +196,7 @@ export function useGalleryAssetActions() {
     clearSelectedAssetsRating,
     setSelectedAssetsReviewFlag,
     clearSelectedAssetsReviewFlag,
+    setSelectedAssetsRejected,
+    clearSelectedAssetsRejected,
   }
 }

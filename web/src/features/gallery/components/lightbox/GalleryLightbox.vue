@@ -281,20 +281,14 @@ function handleKeydown(event: KeyboardEvent) {
         lightbox.toggleFitActual()
       }
       return
-    case 'p':
-    case 'P':
-      event.preventDefault()
-      void assetActions.setSelectedAssetsReviewFlag('picked')
-      return
     case 'x':
     case 'X':
       event.preventDefault()
-      void assetActions.setSelectedAssetsReviewFlag('rejected')
-      return
-    case 'u':
-    case 'U':
-      event.preventDefault()
-      void assetActions.clearSelectedAssetsReviewFlag()
+      if (currentAsset.value?.reviewFlag === 'rejected') {
+        void assetActions.clearSelectedAssetsRejected()
+      } else {
+        void assetActions.setSelectedAssetsRejected()
+      }
       return
     case '=':
     case '+':

@@ -11,6 +11,19 @@ const galleryData = useGalleryData()
 const store = useGalleryStore()
 const assetActions = useGalleryAssetActions()
 
+function toggleSelectedAssetsRejected() {
+  const activeIndex = store.selection.activeIndex
+  const activeAsset =
+    activeIndex === undefined ? null : (store.getAssetsInRange(activeIndex, activeIndex)[0] ?? null)
+
+  if (activeAsset?.reviewFlag === 'rejected') {
+    void assetActions.clearSelectedAssetsRejected()
+    return
+  }
+
+  void assetActions.setSelectedAssetsRejected()
+}
+
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) {
     return false
@@ -41,20 +54,10 @@ function handleKeydown(event: KeyboardEvent) {
       event.preventDefault()
       void assetActions.setSelectedAssetsRating(Number(event.key))
       return
-    case 'p':
-    case 'P':
-      event.preventDefault()
-      void assetActions.setSelectedAssetsReviewFlag('picked')
-      return
     case 'x':
     case 'X':
       event.preventDefault()
-      void assetActions.setSelectedAssetsReviewFlag('rejected')
-      return
-    case 'u':
-    case 'U':
-      event.preventDefault()
-      void assetActions.clearSelectedAssetsReviewFlag()
+      toggleSelectedAssetsRejected()
       return
   }
 }
