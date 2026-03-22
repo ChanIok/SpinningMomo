@@ -1,7 +1,7 @@
 # Legal & Privacy
 
-Last updated: 2026-02-28  
-Effective date: 2026-02-28
+Last updated: 2026-03-23  
+Effective date: 2026-03-23
 
 By downloading, installing, or using this software, you acknowledge that you have read and accepted this notice.
 
@@ -17,17 +17,20 @@ This software processes data primarily on your local device, which may include:
 - **Runtime data**: Log and crash files (e.g., the `logs/` directory).
 - **Feature data**: Local indexes and metadata (e.g., `database.db`, used for gallery and similar features).
 
-By default, this project does not include an account system, does not bundle advertising SDKs, and does not actively upload your local file contents.
+By default, this project does not include an account system, does not bundle advertising SDKs, and does not send feature-processing data to project-maintainer-provided network interfaces unless you enable a specific online feature.
 
 ### 3. Network Activity
 
 - When you explicitly trigger "Check for Updates / Download Update", the software will access the update source.
 - If you enable "Automatically check for updates", the software will access the update source at startup.
-- When accessing the update source, your request may be logged by the respective service provider (e.g., IP address, timestamp, User-Agent).
+- "Infinity Nikki photo metadata extraction" is an optional online feature. You can skip it, and not enabling it does not affect other core features.
+- The software only contacts the related service when you enable this feature or manually start an extraction. Requests may include the UID, embedded photo parameters, and basic request information required for parsing; the full image file itself is not uploaded.
+- After you enable this feature, it may automatically run in the background when new related photos are detected.
+- When accessing the update source or the related service above, your request may be logged by the respective service provider (e.g., IP address, timestamp, User-Agent).
 
 ### 4. Data Sharing & User Feedback
 
-- No local data is actively uploaded to developer servers by default.
+- No local data is actively uploaded to developer servers by default, except for optional online features that you choose to enable.
 - If you voluntarily submit an Issue, log file, crash report, or screenshot on a public platform, you agree to make that content public on that platform.
 
 ### 5. Risks & Disclaimer

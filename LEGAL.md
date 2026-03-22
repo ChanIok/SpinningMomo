@@ -1,11 +1,10 @@
 # SpinningMomo Legal & Privacy Notice
 
-Latest version date: 2026-02-24
+Latest version date: 2026-03-23
 
-- Chinese: https://chaniok.github.io/SpinningMomo/zh/legal/notice
-- English: https://chaniok.github.io/SpinningMomo/en/legal/notice
+- Chinese: https://chaniok.github.io/SpinningMomo/zh/about/legal
+- English: https://chaniok.github.io/SpinningMomo/en/about/legal
 
 If the documentation site is unavailable, see:
-- `docs/zh/legal/notice.md`
-- `docs/en/legal/notice.md`
-
+- `docs/zh/about/legal.md`
+- `docs/en/about/legal.md`
