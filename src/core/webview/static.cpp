@@ -155,13 +155,20 @@ auto read_file_range(const std::filesystem::path& file_path, const ByteRange& ra
 
 auto build_response_headers(const std::wstring& content_type, std::uint64_t content_length,
                             std::optional<std::uint64_t> source_file_size = std::nullopt,
-                            std::optional<ByteRange> range = std::nullopt) -> std::wstring {
+                            std::optional<ByteRange> range = std::nullopt,
+                            std::optional<std::wstring> allowed_origin = std::nullopt)
+    -> std::wstring {
   auto headers = std::format(
       L"Content-Type: {}\r\n"
       L"Cache-Control: public, max-age=86400\r\n"
       L"Accept-Ranges: bytes\r\n"
       L"Content-Length: {}\r\n",
       content_type, content_length);
+
+  if (allowed_origin.has_value() && !allowed_origin->empty()) {
+    headers += std::format(L"Access-Control-Allow-Origin: {}\r\n", *allowed_origin);
+    headers += L"Vary: Origin\r\n";
+  }
 
   if (range.has_value() && source_file_size.has_value()) {
     headers += std::format(L"Content-Range: bytes {}-{}/{}\r\n", range->start, range->end,
@@ -241,6 +248,10 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
   // 图库原文件常无显式 content_type，须按扩展名补 MIME，否则播放器可能拒播。
   auto content_type = resolution.content_type.value_or(
       Utils::String::FromUtf8(Utils::File::Mime::get_mime_type(resolution.file_path)));
+  auto allowed_origin =
+      state.webview
+          ? std::optional<std::wstring>(L"https://" + state.webview->config.virtual_host_name)
+          : std::nullopt;
   auto range_header = get_request_header(request.get(), L"Range");
   auto range_parse = parse_range_header(range_header ? Utils::String::ToUtf8(*range_header) : "",
                                         static_cast<std::uint64_t>(file_size));
@@ -248,6 +259,10 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
   if (!range_parse.valid) {
     auto headers = std::format(L"Accept-Ranges: bytes\r\nContent-Range: bytes */{}\r\n",
                                static_cast<std::uint64_t>(file_size));
+    if (allowed_origin.has_value() && !allowed_origin->empty()) {
+      headers += std::format(L"Access-Control-Allow-Origin: {}\r\n", *allowed_origin);
+      headers += L"Vary: Origin\r\n";
+    }
     wil::com_ptr<ICoreWebView2WebResourceResponse> invalid_range_response;
     if (SUCCEEDED(environment->CreateWebResourceResponse(nullptr, 416, L"Range Not Satisfiable",
                                                          headers.c_str(),
@@ -279,7 +294,8 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
     }
 
     headers = build_response_headers(content_type, bytes_result->size(),
-                                     static_cast<std::uint64_t>(file_size), range_parse.range);
+                                     static_cast<std::uint64_t>(file_size), range_parse.range,
+                                     allowed_origin);
     status_code = 206;
     status_text = L"Partial Content";
   } else {
@@ -292,7 +308,8 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
       return S_OK;
     }
 
-    headers = build_response_headers(content_type, static_cast<std::uint64_t>(file_size));
+    headers = build_response_headers(content_type, static_cast<std::uint64_t>(file_size),
+                                     std::nullopt, std::nullopt, allowed_origin);
   }
 
   wil::com_ptr<ICoreWebView2WebResourceResponse> response;

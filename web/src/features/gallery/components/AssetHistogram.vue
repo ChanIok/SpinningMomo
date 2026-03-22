@@ -116,6 +116,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     }
 
     image.decoding = 'async'
+    image.crossOrigin = 'anonymous'
     image.onload = () => {
       if (settled) {
         return
