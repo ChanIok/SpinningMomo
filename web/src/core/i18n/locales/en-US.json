@@ -532,7 +532,6 @@
   "gallery.details.histogram.empty": "No histogram available",
   "gallery.details.infinityNikki.title": "Infinity Nikki",
   "gallery.details.infinityNikki.dyeCode": "Dye Code",
-  "gallery.details.infinityNikki.dyeCodePlaceholder": "Enter or paste dye share code",
   "gallery.details.infinityNikki.pasteDyeCode": "Paste",
   "gallery.details.infinityNikki.copyDyeCode": "Copy",
   "gallery.details.infinityNikki.pasteDyeCodeSuccess": "Dye code pasted",

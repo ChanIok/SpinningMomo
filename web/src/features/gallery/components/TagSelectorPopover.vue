@@ -13,7 +13,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  select: [tagId: number]
+  toggle: [tagId: number]
 }>()
 
 // 标签展开状态
@@ -31,9 +31,9 @@ function toggleExpand(tagId: number) {
   }
 }
 
-// 选择标签
-function handleSelectTag(tagId: number) {
-  emit('select', tagId)
+// 切换标签
+function handleToggleTag(tagId: number) {
+  emit('toggle', tagId)
 }
 
 // 递归渲染标签树项
@@ -49,7 +49,7 @@ function renderTagItem(tag: TagTreeNode, depth = 0) {
 </script>
 
 <template>
-  <div class="w-64 max-h-96 overflow-y-auto p-2">
+  <div class="max-h-96 w-64 overflow-y-auto p-2">
     <!-- 标题 -->
     <div class="mb-2 px-2 text-xs font-medium text-muted-foreground">选择标签</div>
 
@@ -65,7 +65,7 @@ function renderTagItem(tag: TagTreeNode, depth = 0) {
               'h-8 w-full justify-start gap-2 px-2 text-sm',
               renderTagItem(tag).isSelected && 'bg-accent',
             ]"
-            @click="handleSelectTag(tag.id)"
+            @click="handleToggleTag(tag.id)"
           >
             <!-- 展开箭头 -->
             <span
@@ -145,7 +145,7 @@ function renderTagItem(tag: TagTreeNode, depth = 0) {
                     'h-8 w-full justify-start gap-2 px-2 text-sm',
                     selectedIds.has(child.id) && 'bg-accent',
                   ]"
-                  @click="handleSelectTag(child.id)"
+                  @click="handleToggleTag(child.id)"
                 >
                   <!-- 展开箭头（子标签） -->
                   <span
@@ -213,11 +213,7 @@ function renderTagItem(tag: TagTreeNode, depth = 0) {
 
                 <!-- 更深层级的递归（支持三级及以上） -->
                 <div
-                  v-if="
-                    child.children &&
-                    child.children.length > 0 &&
-                    expandedTagIds.has(child.id)
-                  "
+                  v-if="child.children && child.children.length > 0 && expandedTagIds.has(child.id)"
                   class="ml-4 space-y-0.5"
                 >
                   <Button
@@ -229,7 +225,7 @@ function renderTagItem(tag: TagTreeNode, depth = 0) {
                       'h-8 w-full justify-start gap-2 px-2 text-sm',
                       selectedIds.has(grandChild.id) && 'bg-accent',
                     ]"
-                    @click="handleSelectTag(grandChild.id)"
+                    @click="handleToggleTag(grandChild.id)"
                   >
                     <span class="w-4 flex-shrink-0" />
                     <svg

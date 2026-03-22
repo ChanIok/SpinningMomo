@@ -532,7 +532,6 @@
   "gallery.details.histogram.empty": "暂无可用直方图",
   "gallery.details.infinityNikki.title": "无限暖暖",
   "gallery.details.infinityNikki.dyeCode": "染色码",
-  "gallery.details.infinityNikki.dyeCodePlaceholder": "输入或粘贴染色分享码",
   "gallery.details.infinityNikki.pasteDyeCode": "粘贴",
   "gallery.details.infinityNikki.copyDyeCode": "复制",
   "gallery.details.infinityNikki.pasteDyeCodeSuccess": "染色码已粘贴",

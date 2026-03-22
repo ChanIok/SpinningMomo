@@ -85,9 +85,14 @@ export async function startInitializeInfinityNikkiScreenshotHardlinks(): Promise
  * Infinity Nikki 游戏照片管理拓展
  *
  * 将深层文件夹结构简化为两层：
- * - 第一层：GamePlayPhotos（显示为大喵相册 / Momo's Album）
- * - 第二层：各账号的 NikkiPhotos_HighQuality 文件夹（显示为 UID）
+ * - 第一层：GamePlayPhotos（默认显示为大喵相册 / Momo's Album；若库中有 display_name 则优先）
+ * - 第二层：各账号的 NikkiPhotos_HighQuality（默认显示为 UID；若库中有 display_name 则优先）
  */
+
+function pickFolderDisplayName(stored: string | undefined, fallback: string): string {
+  const trimmed = stored?.trim()
+  return trimmed ? trimmed : fallback
+}
 
 /**
  * 转换 InfinityNikki 文件夹树结构
@@ -122,7 +127,7 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
       if (nikkiPhotosNode) {
         secondLevelNodes.push({
           ...nikkiPhotosNode,
-          displayName: uidNode.name,
+          displayName: pickFolderDisplayName(nikkiPhotosNode.displayName, uidNode.name),
           children: [],
         })
       }
@@ -131,7 +136,10 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
 
   const newGamePlayPhotosNode: FolderTreeNode = {
     ...gamePlayPhotosNode,
-    displayName: t('extensions.infinityNikki.album.rootDisplayName'),
+    displayName: pickFolderDisplayName(
+      gamePlayPhotosNode.displayName,
+      t('extensions.infinityNikki.album.rootDisplayName')
+    ),
     children: secondLevelNodes,
   }
 
