@@ -111,7 +111,7 @@
 
 ## ⏩ 下一步
 
-👉 查看[功能说明](/zh/guide/features)了解更多基础功能的详细说明。
+👉 查看[功能说明](/v0/zh/guide/features)了解更多基础功能的详细说明。
 
 ::: tip 喜欢这个工具？
 欢迎到 [GitHub](https://github.com/ChanIok/SpinningMomo) 点个 Star ⭐ 支持一下~

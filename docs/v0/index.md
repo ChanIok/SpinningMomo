@@ -10,7 +10,7 @@ hero:
   actions:
     - theme: brand
       text: 快速开始
-      link: /zh/guide/getting-started
+      link: /v0/zh/guide/getting-started
     - theme: alt
       text: 在 GitHub 上查看
       link: https://github.com/ChanIok/SpinningMomo

@@ -144,13 +144,6 @@ export default defineConfig({
             { text: "常见问题", link: "/v0/zh/advanced/troubleshooting" },
           ],
         },
-        { 
-          text: "法律与隐私", 
-          items: [
-            { text: "法律与隐私说明", link: "/v0/zh/legal/notice" },
-            { text: "开源鸣谢", link: "/v0/zh/credits" }
-          ] 
-        },
       ],
       "/v0/en/": [
         {

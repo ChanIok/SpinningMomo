@@ -168,5 +168,5 @@
 - ⚙️ 调整其他高级选项
 
 ::: tip 想了解更多？
-查看[自定义设置](/zh/advanced/custom-settings)了解详细配置方法。
+查看[自定义设置](/v0/zh/advanced/custom-settings)了解详细配置方法。
 ::: 

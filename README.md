@@ -37,7 +37,7 @@
 ▸ 专为《无限暖暖》优化，同时兼容多数窗口化运行的其他游戏
 
 > 🚧 v2.0 正在翻工中，部分功能尚未就绪。
-> 如需稳定版，请下载 [v0.7.7 旧版本](https://github.com/ChanIok/SpinningMomo/releases/tag/v0.7.7)。
+> 如需稳定版，请下载 [v0.7.7 旧版本](https://github.com/ChanIok/SpinningMomo/releases/tag/v0.7.7)，使用说明见 [v0.7.7 文档](https://chaniok.github.io/SpinningMomo/v0/)。
 
 ### 📥 下载地址
 
@@ -55,7 +55,7 @@
 
 ## 🗺️ 开发状态
 
-✅ **已完成**：录制功能、图库功能
+✅ **已完成**：录制功能、图库功能（基础）
 
 🔨 **进行中**：UI优化、动态照片、HDR支持
 
