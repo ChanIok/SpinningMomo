@@ -3,6 +3,7 @@ module;
 export module Features.WindowControl;
 
 import std;
+import Core.State;
 import Vendor.Windows;
 
 namespace Features::WindowControl {
@@ -60,5 +61,10 @@ export auto reset_window_to_screen(Vendor::Windows::HWND target_window,
 // 调整窗口大小并居中 (保持向后兼容)
 export auto resize_and_center_window(Vendor::Windows::HWND hwnd, int width, int height,
                                      bool activate) -> std::expected<void, std::string>;
+
+export auto start_center_lock_monitor(Core::State::AppState& state)
+    -> std::expected<void, std::string>;
+
+export auto stop_center_lock_monitor(Core::State::AppState& state) -> void;
 
 }  // namespace Features::WindowControl

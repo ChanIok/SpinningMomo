@@ -15,6 +15,7 @@ import Features.Letterbox;
 import Features.Overlay;
 import Features.Preview;
 import Features.Screenshot;
+import Features.WindowControl;
 import Features.Recording.UseCase;
 import Features.Update;
 import Features.Update.State;
@@ -38,6 +39,8 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   Features::Recording::UseCase::stop_recording_if_running(state);
 
   Core::Commands::uninstall_keyboard_keepalive_hook(state);
+
+  Features::WindowControl::stop_center_lock_monitor(state);
 
   if (state.floating_window) {
     Core::Commands::unregister_all_hotkeys(state, state.floating_window->window.hwnd);

@@ -6,6 +6,7 @@ import { storeToRefs } from 'pinia'
 import WindowTitlePickerButton from '@/components/WindowTitlePickerButton.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from '@/components/ui/item'
 import {
   Select,
@@ -19,8 +20,12 @@ import ResetSettingsDialog from './ResetSettingsDialog.vue'
 
 const store = useSettingsStore()
 const { appSettings, error, isInitialized } = storeToRefs(store)
-const { updateWindowTitle, updateWindowResetResolution, resetWindowSceneSettings } =
-  useFunctionActions()
+const {
+  updateWindowTitle,
+  updateWindowCenterLockCursor,
+  updateWindowResetResolution,
+  resetWindowSceneSettings,
+} = useFunctionActions()
 const { clearError } = store
 const { t } = useI18n()
 
@@ -187,6 +192,23 @@ const handleResetSettings = async () => {
               />
               <WindowTitlePickerButton @select="handleTitlePicked" />
             </div>
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.centerLockCursor.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.centerLockCursor.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.window.centerLockCursor"
+              @update:model-value="(value) => updateWindowCenterLockCursor(Boolean(value))"
+            />
           </ItemActions>
         </Item>
 

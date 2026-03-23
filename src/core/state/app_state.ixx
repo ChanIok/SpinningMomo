@@ -72,6 +72,10 @@ namespace Features::Preview::State {
 export struct PreviewState;
 }
 
+namespace Features::WindowControl::State {
+export struct WindowControlState;
+}
+
 namespace Features::Screenshot::State {
 export struct ScreenshotState;
 }
@@ -146,6 +150,7 @@ export struct AppState {
   std::unique_ptr<Features::Gallery::State::GalleryState> gallery;
   std::unique_ptr<Features::Overlay::State::OverlayState> overlay;
   std::unique_ptr<Features::Preview::State::PreviewState> preview;
+  std::unique_ptr<Features::WindowControl::State::WindowControlState> window_control;
   std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;
   std::unique_ptr<Features::Recording::State::RecordingState> recording;
   std::unique_ptr<Features::ReplayBuffer::State::ReplayBufferState> replay_buffer;

@@ -16,6 +16,16 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateWindowCenterLockCursor = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      window: {
+        ...appSettings.value.window,
+        centerLockCursor: enabled,
+      },
+    })
+  }
+
   const updateWindowResetResolution = async (width: number, height: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -344,6 +354,7 @@ export const useFunctionActions = () => {
       window: {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
+        centerLockCursor: DEFAULT_APP_SETTINGS.window.centerLockCursor,
         resetResolution: {
           ...appSettings.value.window.resetResolution,
           width: DEFAULT_APP_SETTINGS.window.resetResolution.width,
@@ -452,6 +463,7 @@ export const useFunctionActions = () => {
 
   return {
     updateWindowTitle,
+    updateWindowCenterLockCursor,
     updateWindowResetResolution,
     updateOutputDir,
     updateGameAlbumPath,

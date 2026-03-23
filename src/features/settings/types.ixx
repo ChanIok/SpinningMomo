@@ -89,7 +89,8 @@ export struct AppSettings {
 
   // window 分组 - 窗口相关设置
   struct Window {
-    std::string target_title = "";  // 目标窗口标题
+    std::string target_title = "";    // 目标窗口标题
+    bool center_lock_cursor = false;  // 锁鼠时强制居中
 
     // 重置窗口尺寸偏好（0 表示跟随屏幕）
     struct ResetResolution {

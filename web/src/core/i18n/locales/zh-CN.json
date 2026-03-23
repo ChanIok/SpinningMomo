@@ -107,6 +107,8 @@
   "settings.function.windowControl.windowTitle.description": "应用将调整的目标窗口名称。",
   "settings.function.windowControl.windowTitle.placeholder": "输入窗口标题...",
   "settings.function.windowControl.windowTitle.update": "更新",
+  "settings.function.windowControl.centerLockCursor.label": "锁鼠时强制居中",
+  "settings.function.windowControl.centerLockCursor.description": "当目标窗口已锁定鼠标时，将鼠标进一步限制在窗口中心的小区域，减少误触悬浮窗或其他置顶窗口。",
   "settings.function.windowControl.resetResolution.mode.label": "重置窗口尺寸",
   "settings.function.windowControl.resetResolution.mode.description": "设置“重置窗口”命令使用屏幕尺寸还是固定分辨率。",
   "settings.function.windowControl.resetResolution.mode.screen": "跟随屏幕",

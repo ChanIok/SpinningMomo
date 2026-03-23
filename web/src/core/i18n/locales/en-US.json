@@ -107,6 +107,8 @@
   "settings.function.windowControl.windowTitle.description": "Name of the target window to adjust.",
   "settings.function.windowControl.windowTitle.placeholder": "Enter window title...",
   "settings.function.windowControl.windowTitle.update": "Update",
+  "settings.function.windowControl.centerLockCursor.label": "Force Cursor to Center While Locked",
+  "settings.function.windowControl.centerLockCursor.description": "When the target window has already locked the cursor, further constrain it to a small region at the center to reduce accidental clicks on the floating window or other always-on-top windows.",
   "settings.function.windowControl.resetResolution.mode.label": "Reset Window Size",
   "settings.function.windowControl.resetResolution.mode.description": "Choose whether the \"Reset Window\" command uses screen size or a fixed resolution.",
   "settings.function.windowControl.resetResolution.mode.screen": "Follow Screen",

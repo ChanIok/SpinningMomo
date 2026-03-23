@@ -30,6 +30,7 @@ import Features.ReplayBuffer.State;
 import Features.ReplayBuffer.UseCase;
 import Features.Update;
 import Features.Letterbox.State;
+import Features.WindowControl;
 import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.Events;
@@ -131,6 +132,10 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 从 settings 同步 letterbox 启用状态
     state.letterbox->enabled = state.settings->raw.features.letterbox.enabled;
+
+    if (auto result = Features::WindowControl::start_center_lock_monitor(state); !result) {
+      return std::unexpected("Failed to start window control monitor: " + result.error());
+    }
 
     if (auto update_result = Features::Update::initialize(state); !update_result) {
       return std::unexpected("Failed to initialize update: " + update_result.error());

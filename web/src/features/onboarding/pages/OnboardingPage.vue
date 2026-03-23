@@ -271,6 +271,7 @@ const completeOnboarding = async () => {
       window: {
         ...store.appSettings.window,
         targetTitle: nextTargetTitle,
+        centerLockCursor: Boolean(resolvedGameDir),
       },
       features: {
         ...store.appSettings.features,
