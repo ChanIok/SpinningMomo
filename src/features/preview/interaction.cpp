@@ -1,15 +1,16 @@
 module;
 
-#include <windows.h>
-
 module Features.Preview.Interaction;
 
 import std;
 import Core.State;
+import Features.Preview.Capture;
 import Features.Preview.State;
 import Features.Preview.Rendering;
 import Utils.Logger;
 import Utils.Throttle;
+import <dwmapi.h>;
+import <windows.h>;
 import <windowsx.h>;
 
 namespace Features::Preview::Interaction {
@@ -483,13 +484,41 @@ auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM wParam) -> LRE
     KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
     // 恢复任务栏重绘
     restore_taskbar_redraw(state);
+    return 0;
   }
+
+  if (wParam == Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP) {
+    KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
+    Features::Preview::Capture::cleanup_capture(state);
+    Features::Preview::Rendering::cleanup_rendering(state);
+    Logger().info("Preview resources cleaned up");
+  }
+
   return 0;
 }
 
 auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT message, WPARAM wParam,
                             LPARAM lParam) -> std::pair<bool, LRESULT> {
   switch (message) {
+    case Features::Preview::Types::WM_SCHEDULE_PREVIEW_CLEANUP:
+      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
+      if (SetTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP, 3000, nullptr) == 0) {
+        Logger().error("Failed to schedule delayed preview cleanup");
+        return {true, 0};
+      }
+      return {true, 1};
+
+    case Features::Preview::Types::WM_CANCEL_PREVIEW_CLEANUP:
+      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
+      return {true, 1};
+
+    case Features::Preview::Types::WM_IMMEDIATE_PREVIEW_CLEANUP:
+      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
+      Features::Preview::Capture::cleanup_capture(state);
+      Features::Preview::Rendering::cleanup_rendering(state);
+      Logger().info("Preview resources cleaned up");
+      return {true, 1};
+
     case WM_PAINT:
       return {true, handle_paint(state, hwnd)};
 
@@ -524,6 +553,7 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
       // 清理资源但不调用PostQuitMessage
       // 确保任务栏重绘被恢复
       KillTimer(hwnd, Features::Preview::Types::TIMER_ID_TASKBAR_REDRAW);
+      KillTimer(hwnd, Features::Preview::Types::TIMER_ID_PREVIEW_CLEANUP);
       restore_taskbar_redraw(state);
       return {true, 0};
 

@@ -13,13 +13,20 @@ import Features.Preview.Rendering;
 import Features.Preview.Capture;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
-import Utils.Timer;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
 import <windowsx.h>;
 
 namespace Features::Preview {
+
+auto send_preview_control_message(HWND preview_hwnd, UINT message) -> bool {
+  if (!preview_hwnd || !IsWindow(preview_hwnd)) {
+    return false;
+  }
+
+  return SendMessageW(preview_hwnd, message, 0, 0) != 0;
+}
 
 auto start_preview(Core::State::AppState& state, HWND target_window)
     -> std::expected<void, std::string> {
@@ -48,9 +55,8 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Target window is minimized");
   }
 
-  // 取消清理定时器
-  if (preview_state.cleanup_timer && preview_state.cleanup_timer->IsRunning()) {
-    preview_state.cleanup_timer->Cancel();
+  if (!send_preview_control_message(preview_state.hwnd, Types::WM_CANCEL_PREVIEW_CLEANUP)) {
+    Logger().warn("Failed to cancel pending preview cleanup");
   }
 
   // 保存目标窗口
@@ -115,17 +121,8 @@ auto stop_preview(Core::State::AppState& state) -> void {
   // 隐藏窗口
   Window::hide_preview_window(state);
 
-  // 启动清理定时器
-  if (!preview_state.cleanup_timer) {
-    preview_state.cleanup_timer.emplace();
-  }
-
-  if (!state.preview->cleanup_timer->IsRunning()) {
-    if (auto result = state.preview->cleanup_timer->SetTimer(
-            std::chrono::milliseconds(3000), [&state]() { cleanup_preview(state); });
-        !result) {
-      Logger().error("Failed to set cleanup timer: {}", static_cast<int>(result.error()));
-    }
+  if (!send_preview_control_message(preview_state.hwnd, Types::WM_SCHEDULE_PREVIEW_CLEANUP)) {
+    cleanup_preview(state);
   }
 
   Logger().info("Preview capture stopped");
@@ -137,15 +134,11 @@ auto update_preview_dpi(Core::State::AppState& state, UINT new_dpi) -> void {
 }
 
 auto cleanup_preview(Core::State::AppState& state) -> void {
-  if (state.preview->cleanup_timer) {
-    state.preview->cleanup_timer->Cancel();
-    state.preview->cleanup_timer.reset();
+  if (send_preview_control_message(state.preview->hwnd, Types::WM_IMMEDIATE_PREVIEW_CLEANUP)) {
+    return;
   }
 
-  // 清理捕获资源
   Capture::cleanup_capture(state);
-
-  // 清理渲染资源
   Rendering::cleanup_rendering(state);
 
   Logger().info("Preview resources cleaned up");

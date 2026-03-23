@@ -16,6 +16,11 @@ export namespace Features::Preview::Types {
 // 窗口类名
 constexpr wchar_t PREVIEW_WINDOW_CLASS[] = L"SpinningMomoPreviewWindowClass";
 
+// 内部消息常量
+constexpr UINT WM_SCHEDULE_PREVIEW_CLEANUP = WM_USER + 1;
+constexpr UINT WM_CANCEL_PREVIEW_CLEANUP = WM_USER + 2;
+constexpr UINT WM_IMMEDIATE_PREVIEW_CLEANUP = WM_USER + 3;
+
 // 顶点结构体
 struct Vertex {
   float x, y;
@@ -41,6 +46,7 @@ struct ViewportState {
 
 // 定时器 ID 常量
 constexpr UINT_PTR TIMER_ID_TASKBAR_REDRAW = 1;
+constexpr UINT_PTR TIMER_ID_PREVIEW_CLEANUP = 2;
 
 // 任务栏重绘延迟时间（毫秒）
 constexpr UINT TASKBAR_REDRAW_DELAY_MS = 200;

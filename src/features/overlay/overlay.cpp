@@ -6,6 +6,7 @@ import std;
 import Core.State;
 import Core.State.RuntimeInfo;
 import Features.Overlay.State;
+import Features.Overlay.Types;
 import Features.Overlay.Window;
 import Features.Overlay.Rendering;
 import Features.Overlay.Capture;
@@ -13,11 +14,18 @@ import Features.Overlay.Interaction;
 import Features.Overlay.Threads;
 import Features.Overlay.Geometry;
 import Utils.Logger;
-import Utils.Timer;
 import <dwmapi.h>;
 import <windows.h>;
 
 namespace Features::Overlay {
+
+auto send_overlay_control_message(HWND overlay_hwnd, UINT message) -> bool {
+  if (!overlay_hwnd || !IsWindow(overlay_hwnd)) {
+    return false;
+  }
+
+  return SendMessageW(overlay_hwnd, message, 0, 0) != 0;
+}
 
 auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze_after_first_frame)
     -> std::expected<void, std::string> {
@@ -71,9 +79,9 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
   // 设置首帧后自动冻结标志
   overlay_state.freeze_after_first_frame = freeze_after_first_frame;
 
-  // 取消清理定时器
-  if (overlay_state.cleanup_timer && overlay_state.cleanup_timer->IsRunning()) {
-    overlay_state.cleanup_timer->Cancel();
+  if (!send_overlay_control_message(overlay_state.window.overlay_hwnd,
+                                    Types::WM_CANCEL_OVERLAY_CLEANUP)) {
+    Logger().warn("Failed to cancel pending overlay cleanup");
   }
 
   // 设置目标窗口
@@ -140,17 +148,9 @@ auto stop_overlay(Core::State::AppState& state) -> void {
   // 清理交互资源
   Interaction::cleanup_interaction(state);
 
-  // 启动清理定时器
-  if (!overlay_state.cleanup_timer) {
-    overlay_state.cleanup_timer.emplace();
-  }
-
-  if (!overlay_state.cleanup_timer->IsRunning()) {
-    if (auto result = overlay_state.cleanup_timer->SetTimer(std::chrono::milliseconds(3000),
-                                                            [&state]() { cleanup_overlay(state); });
-        !result) {
-      Logger().error("Failed to set cleanup timer: {}", static_cast<int>(result.error()));
-    }
+  if (!send_overlay_control_message(overlay_state.window.overlay_hwnd,
+                                    Types::WM_SCHEDULE_OVERLAY_CLEANUP)) {
+    cleanup_overlay(state);
   }
 
   Logger().debug("Overlay stopped");
@@ -172,15 +172,12 @@ auto set_letterbox_mode(Core::State::AppState& state, bool enabled) -> void {
 }
 
 auto cleanup_overlay(Core::State::AppState& state) -> void {
-  if (state.overlay->cleanup_timer) {
-    state.overlay->cleanup_timer->Cancel();
-    state.overlay->cleanup_timer.reset();
+  if (send_overlay_control_message(state.overlay->window.overlay_hwnd,
+                                   Types::WM_IMMEDIATE_OVERLAY_CLEANUP)) {
+    return;
   }
 
-  // 清理捕获资源
   Capture::cleanup_capture(state);
-
-  // 清理渲染资源
   Rendering::cleanup_rendering(state);
 
   Logger().info("Overlay cleaned up");

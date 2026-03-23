@@ -3,7 +3,6 @@ module;
 export module Features.Overlay.Types;
 
 import std;
-import Utils.Timer;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import <d3d11.h>;
@@ -16,6 +15,11 @@ export namespace Features::Overlay::Types {
 constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
 constexpr UINT WM_MOUSE_EVENT = WM_USER + 2;
 constexpr UINT WM_WINDOW_EVENT = WM_USER + 3;
+constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 4;
+constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 5;
+constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 6;
+
+constexpr UINT_PTR OVERLAY_CLEANUP_TIMER_ID = 1;
 
 // 顶点结构体
 struct Vertex {

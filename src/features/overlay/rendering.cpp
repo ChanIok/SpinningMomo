@@ -273,6 +273,9 @@ auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> fr
 auto cleanup_rendering(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
+  overlay_state.rendering.d3d_initialized = false;
+  overlay_state.rendering.resources_busy.store(true, std::memory_order_release);
+
   Utils::Graphics::D3D::cleanup_shader_resources(overlay_state.rendering.shader_resources);
   Utils::Graphics::D3D::cleanup_d3d_context(overlay_state.rendering.d3d_context);
 
@@ -284,7 +287,7 @@ auto cleanup_rendering(Core::State::AppState& state) -> void {
     overlay_state.rendering.frame_latency_object = nullptr;
   }
 
-  overlay_state.rendering.d3d_initialized = false;
+  overlay_state.rendering.resources_busy.store(false, std::memory_order_release);
 }
 
 }  // namespace Features::Overlay::Rendering

@@ -3,7 +3,6 @@ module;
 export module Features.Overlay.State;
 
 import std;
-import Utils.Timer;
 import Features.Overlay.Types;
 
 export namespace Features::Overlay::State {
@@ -16,10 +15,6 @@ struct OverlayState {
   Types::InteractionState interaction;
   Types::ThreadState threads;
 
-  std::optional<Utils::Timer::Timer> cleanup_timer;
-  std::mutex texture_mutex;
-  std::mutex render_target_mutex;
-  std::mutex capture_state_mutex;
   std::condition_variable frame_available;
 
   // 状态标志

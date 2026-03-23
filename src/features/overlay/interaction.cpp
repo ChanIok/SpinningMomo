@@ -4,6 +4,7 @@ module Features.Overlay.Interaction;
 
 import std;
 import Core.State;
+import Features.Overlay.Capture;
 import Features.Overlay.Rendering;
 import Features.Overlay.State;
 import Features.Overlay.Types;
@@ -266,7 +267,30 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
                      SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW | SWP_NOCOPYBITS |
                          SWP_ASYNCWINDOWPOS);
       }
-      return {true, 0};
+      return {true, 1};
+    }
+
+    case Types::WM_SCHEDULE_OVERLAY_CLEANUP: {
+      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
+      if (SetTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID, 3000, nullptr) == 0) {
+        Logger().error("Failed to schedule delayed overlay cleanup");
+        return {true, 0};
+      }
+
+      return {true, 1};
+    }
+
+    case Types::WM_CANCEL_OVERLAY_CLEANUP: {
+      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
+      return {true, 1};
+    }
+
+    case Types::WM_IMMEDIATE_OVERLAY_CLEANUP: {
+      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
+      Features::Overlay::Capture::cleanup_capture(state);
+      Features::Overlay::Rendering::cleanup_rendering(state);
+      Logger().info("Overlay cleaned up");
+      return {true, 1};
     }
 
     case WM_SIZE: {
@@ -287,7 +311,20 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       return {true, 0};
     }
 
+    case WM_TIMER: {
+      if (wParam != Types::OVERLAY_CLEANUP_TIMER_ID) {
+        break;
+      }
+
+      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
+      Features::Overlay::Capture::cleanup_capture(state);
+      Features::Overlay::Rendering::cleanup_rendering(state);
+      Logger().info("Overlay cleaned up");
+      return {true, 1};
+    }
+
     case WM_DESTROY:
+      KillTimer(hwnd, Types::OVERLAY_CLEANUP_TIMER_ID);
       return {true, 0};
   }
 

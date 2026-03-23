@@ -3,7 +3,6 @@ module;
 export module Features.Preview.State;
 
 import std;
-import Utils.Timer;
 import Features.Preview.Types;
 import <windows.h>;
 
@@ -34,9 +33,6 @@ struct PreviewState {
 
   // 捕获状态
   Features::Preview::Types::CaptureState capture_state;
-
-  // 定时器
-  std::optional<Utils::Timer::Timer> cleanup_timer;
 
   // 游戏窗口缓存信息
   RECT game_window_rect{};

@@ -90,22 +90,23 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
 auto cleanup_rendering(Core::State::AppState& state) -> void {
   auto& resources = state.preview->rendering_resources;
 
-  if (resources.initialized) {
-    // 清理着色器资源
-    Utils::Graphics::D3D::cleanup_shader_resources(resources.basic_shaders);
-    Utils::Graphics::D3D::cleanup_shader_resources(resources.viewport_shaders);
-
-    // 清理D3D上下文
-    Utils::Graphics::D3D::cleanup_d3d_context(resources.d3d_context);
-
-    // 重置资源
-    resources.capture_srv.reset();
-    resources.basic_vertex_buffer.reset();
-    resources.viewport_vertex_buffer.reset();
-    resources.initialized = false;
-  }
-
+  resources.initialized = false;
+  resources.resources_busy.store(true, std::memory_order_release);
   state.preview->d3d_initialized = false;
+
+  // 清理着色器资源
+  Utils::Graphics::D3D::cleanup_shader_resources(resources.basic_shaders);
+  Utils::Graphics::D3D::cleanup_shader_resources(resources.viewport_shaders);
+
+  // 清理D3D上下文
+  Utils::Graphics::D3D::cleanup_d3d_context(resources.d3d_context);
+
+  // 重置资源
+  resources.capture_srv.reset();
+  resources.basic_vertex_buffer.reset();
+  resources.viewport_vertex_buffer.reset();
+
+  resources.resources_busy.store(false, std::memory_order_release);
   Logger().info("Preview rendering resources cleaned up");
 }
 
