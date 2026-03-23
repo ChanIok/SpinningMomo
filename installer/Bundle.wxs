@@ -21,8 +21,10 @@
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication
         Theme="hyperlinkLicense"
-        LicenseUrl="https://chaniok.github.io/SpinningMomo/en/about/legal"
+        LocalizationFile="$(var.ProjectDir)\installer\bundle\thm.wxl"
+        LicenseUrl="#(loc.LicenseUrl)"
         LogoFile="$(var.ProjectDir)\docs\public\logo.png" />
+      <PayloadGroupRef Id="BundleLocalizationPayloads" />
     </BootstrapperApplication>
 
     <Chain>
@@ -34,5 +36,15 @@
     </Chain>
 
   </Bundle>
+
+  <Fragment>
+    <PayloadGroup Id="BundleLocalizationPayloads">
+      <Payload Id="BundleLoc1028" Name="1028\thm.wxl" SourceFile="$(var.ProjectDir)\installer\bundle\payloads\2052\thm.wxl" />
+      <Payload Id="BundleLoc2052" Name="2052\thm.wxl" SourceFile="$(var.ProjectDir)\installer\bundle\payloads\2052\thm.wxl" />
+      <Payload Id="BundleLoc3076" Name="3076\thm.wxl" SourceFile="$(var.ProjectDir)\installer\bundle\payloads\2052\thm.wxl" />
+      <Payload Id="BundleLoc4100" Name="4100\thm.wxl" SourceFile="$(var.ProjectDir)\installer\bundle\payloads\2052\thm.wxl" />
+      <Payload Id="BundleLoc5124" Name="5124\thm.wxl" SourceFile="$(var.ProjectDir)\installer\bundle\payloads\2052\thm.wxl" />
+    </PayloadGroup>
+  </Fragment>
 
 </Wix>

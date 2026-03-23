@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WixLocalization Culture="zh-cn" Language="2052" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="Caption" Value="[WixBundleName] 安装程序" />
+  <String Id="Title" Value="[WixBundleName]" />
+  <String Id="CheckingForUpdatesLabel" Value="正在检查更新" />
+  <String Id="UpdateButton" Value="更新到版本 [WixStdBAUpdateAvailable](&amp;U)" />
+  <String Id="InstallHeader" Value="欢迎" />
+  <String Id="InstallMessage" Value="安装程序将在你的电脑上安装 [WixBundleName]。点击“安装”继续，或点击“取消”退出。" />
+  <String Id="InstallMessageOptions" Value="安装程序将在你的电脑上安装 [WixBundleName]。点击“安装”继续，点击“选项”设置安装选项，或点击“取消”退出。" />
+  <String Id="InstallVersion" Value="版本 [WixBundleVersion]" />
+  <String Id="ConfirmCancelMessage" Value="确定要取消安装吗？" />
+  <String Id="ExecuteUpgradeRelatedBundleMessage" Value="旧版本" />
+  <String Id="HelpHeader" Value="安装帮助" />
+  <String Id="HelpText" Value="/install | /repair | /uninstall | /layout [directory] - 安装、修复、卸载，或在指定目录创建完整的本地安装副本。默认执行安装。&#xA;&#xA;/passive | /quiet - 显示最少界面且不提示，或完全不显示界面且不提示。默认显示完整界面和所有提示。&#xA;&#xA;/norestart - 禁止任何重启尝试。默认情况下，界面会在重启前进行提示。&#xA;/log log.txt - 写入指定日志文件。默认会在 %TEMP% 中创建日志文件。" />
+  <String Id="HelpCloseButton" Value="关闭(&amp;C)" />
+  <String Id="InstallLicenseLinkText" Value="[WixBundleName] &lt;a href=&quot;#&quot;&gt;许可条款&lt;/a&gt;。" />
+  <String Id="InstallAcceptCheckbox" Value="我同意许可条款和条件(&amp;A)" />
+  <String Id="InstallOptionsButton" Value="选项(&amp;O)" />
+  <String Id="InstallInstallButton" Value="安装(&amp;I)" />
+  <String Id="InstallCancelButton" Value="取消(&amp;C)" />
+  <String Id="OptionsHeader" Value="安装选项" />
+  <String Id="OptionsLocationLabel" Value="安装位置：" />
+  <String Id="OptionsPerUserScopeText" Value="仅为我安装 [WixBundleName](&amp;M)" />
+  <String Id="OptionsPerMachineScopeText" Value="为所有用户安装 [WixBundleName](&amp;U)" />
+  <String Id="OptionsBrowseButton" Value="浏览(&amp;B)" />
+  <String Id="OptionsOkButton" Value="确定(&amp;O)" />
+  <String Id="OptionsCancelButton" Value="取消(&amp;C)" />
+  <String Id="ProgressHeader" Value="安装进度" />
+  <String Id="ProgressLabel" Value="正在处理：" />
+  <String Id="OverallProgressPackageText" Value="正在初始化..." />
+  <String Id="ProgressCancelButton" Value="取消(&amp;C)" />
+  <String Id="ModifyHeader" Value="修改安装" />
+  <String Id="ModifyRepairButton" Value="修复(&amp;R)" />
+  <String Id="ModifyUninstallButton" Value="卸载(&amp;U)" />
+  <String Id="ModifyCancelButton" Value="取消(&amp;C)" />
+  <String Id="SuccessHeader" Value="安装成功" />
+  <String Id="SuccessCacheHeader" Value="缓存完成" />
+  <String Id="SuccessInstallHeader" Value="安装已完成" />
+  <String Id="SuccessLayoutHeader" Value="布局已完成" />
+  <String Id="SuccessModifyHeader" Value="修改已完成" />
+  <String Id="SuccessRepairHeader" Value="修复已完成" />
+  <String Id="SuccessUninstallHeader" Value="卸载已完成" />
+  <String Id="SuccessUnsafeUninstallHeader" Value="卸载已完成" />
+  <String Id="SuccessLaunchButton" Value="启动(&amp;L)" />
+  <String Id="SuccessRestartText" Value="你必须重新启动电脑后才能使用该软件。" />
+  <String Id="SuccessUninstallRestartText" Value="你必须重新启动电脑才能完成软件移除。" />
+  <String Id="SuccessRestartButton" Value="重启(&amp;R)" />
+  <String Id="SuccessCloseButton" Value="关闭(&amp;C)" />
+  <String Id="FailureHeader" Value="安装失败" />
+  <String Id="FailureCacheHeader" Value="缓存失败" />
+  <String Id="FailureInstallHeader" Value="安装失败" />
+  <String Id="FailureLayoutHeader" Value="布局失败" />
+  <String Id="FailureModifyHeader" Value="修改失败" />
+  <String Id="FailureRepairHeader" Value="修复失败" />
+  <String Id="FailureUninstallHeader" Value="卸载失败" />
+  <String Id="FailureUnsafeUninstallHeader" Value="卸载失败" />
+  <String Id="FailureHyperlinkLogText" Value="一个或多个问题导致安装失败。请先修复这些问题后再重试。更多信息请查看&lt;a href=&quot;#&quot;&gt;日志文件&lt;/a&gt;。" />
+  <String Id="FailureRestartText" Value="你必须重新启动电脑才能完成软件回滚。" />
+  <String Id="FailureRestartButton" Value="重启(&amp;R)" />
+  <String Id="FailureCloseButton" Value="关闭(&amp;C)" />
+  <String Id="FilesInUseTitle" Value="文件正在使用中" />
+  <String Id="FilesInUseLabel" Value="以下应用正在使用需要更新的文件：" />
+  <String Id="FilesInUseNetfxCloseRadioButton" Value="关闭这些应用(&amp;A)。" />
+  <String Id="FilesInUseCloseRadioButton" Value="关闭这些应用，并尝试重新启动它们(&amp;A)。" />
+  <String Id="FilesInUseDontCloseRadioButton" Value="不要关闭应用(&amp;D)。需要重新启动电脑。" />
+  <String Id="FilesInUseRetryButton" Value="重试(&amp;R)" />
+  <String Id="FilesInUseIgnoreButton" Value="忽略(&amp;I)" />
+  <String Id="FilesInUseExitButton" Value="退出(&amp;X)" />
+  <String Id="LicenseUrl" Value="https://chaniok.github.io/SpinningMomo/zh/about/legal" />
+</WixLocalization>
