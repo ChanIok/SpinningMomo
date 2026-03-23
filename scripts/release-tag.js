@@ -89,20 +89,27 @@ function main() {
   updateVersionTxt(versionTxtPath, version);
 
   const changedFiles = run("git diff --name-only");
-  if (!changedFiles) {
-    console.error("No file changes detected after version update.");
-    process.exit(1);
+  const hasChanges = changedFiles.trim().length > 0;
+
+  if (hasChanges) {
+    runInherit('git add "src/version.hpp" "docs/public/version.txt"');
+    runInherit(`git commit -m "chore(release): ${tagName}"`);
+  } else {
+    console.log("No version file changes; skipping commit.");
   }
 
-  runInherit('git add "src/version.hpp" "docs/public/version.txt"');
-  runInherit(`git commit -m "chore(release): ${tagName}"`);
-  runInherit(`git tag -a ${tagName} -m "${tagName}"`);
+  // Lightweight tag is enough for the release workflow (tag ref is what matters).
+  runInherit(`git tag ${tagName}`);
 
   console.log("");
   console.log(`Release prepared: ${tagName}`);
   console.log("Updated:");
-  console.log(`- src/version.hpp -> ${version4Parts.join(".")}`);
-  console.log(`- docs/public/version.txt -> ${version}`);
+  if (hasChanges) {
+    console.log(`- src/version.hpp -> ${version4Parts.join(".")}`);
+    console.log(`- docs/public/version.txt -> ${version}`);
+  } else {
+    console.log(`- (no changes) using current HEAD`);
+  }
   console.log("");
   console.log(`Next: git push origin HEAD ${tagName}`);
 }
