@@ -15,4 +15,6 @@ export auto reset_host_runtime(Core::State::AppState& state) -> void;
 
 export auto apply_background_mode_from_settings(Core::State::AppState& state) -> void;
 
+export auto get_loading_background_color(Core::State::AppState& state) -> COLORREF;
+
 }  // namespace Core::WebView::Host

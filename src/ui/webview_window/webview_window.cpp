@@ -117,6 +117,16 @@ auto sync_window_state(Core::State::AppState& state, bool notify) -> void {
   }
 }
 
+auto should_paint_loading_background(Core::State::AppState* state) -> bool {
+  return state && state->webview && !state->webview->has_initial_content;
+}
+
+auto paint_loading_background(Core::State::AppState& state, HDC hdc, const RECT& rect) -> void {
+  auto background = CreateSolidBrush(Core::WebView::get_loading_background_color(state));
+  FillRect(hdc, &rect, background);
+  DeleteObject(background);
+}
+
 auto show(Core::State::AppState& state) -> std::expected<void, std::string> {
   // 如果 WebView 还未初始化，则进行初始化
   if (!state.webview->is_initialized) {
@@ -421,9 +431,28 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
     }
 
     case WM_ERASEBKGND: {
-      // Composition hosting 下避免宿主窗口刷白底，HWND 控制器走默认擦除逻辑。
+      if (should_paint_loading_background(state)) {
+        if (auto hdc = reinterpret_cast<HDC>(wparam); hdc) {
+          RECT client_rect{};
+          GetClientRect(hwnd, &client_rect);
+          paint_loading_background(*state, hdc, client_rect);
+        }
+        return 1;
+      }
+
       if (state && Core::WebView::is_composition_active(*state)) {
         return 1;
+      }
+      break;
+    }
+
+    case WM_PAINT: {
+      if (should_paint_loading_background(state)) {
+        PAINTSTRUCT ps{};
+        auto hdc = BeginPaint(hwnd, &ps);
+        paint_loading_background(*state, hdc, ps.rcPaint);
+        EndPaint(hwnd, &ps);
+        return 0;
       }
       break;
     }

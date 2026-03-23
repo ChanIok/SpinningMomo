@@ -35,6 +35,7 @@ export auto post_message(Core::State::AppState& state, const std::string& messag
 export auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
                                      std::function<void(const std::string&)> handler) -> void;
 export auto apply_background_mode_from_settings(Core::State::AppState& state) -> void;
+export auto get_loading_background_color(Core::State::AppState& state) -> COLORREF;
 export auto is_composition_active(Core::State::AppState& state) -> bool;
 
 // Composition hosting 输入转发

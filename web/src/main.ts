@@ -7,7 +7,7 @@ import { initializeRPC } from '@/core/rpc'
 import { initI18n } from '@/core/i18n'
 import { useSettingsStore } from '@/features/settings/store'
 import { CURRENT_ONBOARDING_FLOW_VERSION } from '@/features/settings/types'
-import { applyAppearanceToDocument, preloadBackgroundImage } from '@/features/settings/appearance'
+import { applyAppearanceToDocument } from '@/features/settings/appearance'
 import { useTaskStore } from '@/core/tasks/store'
 import './index.css'
 import App from './App.vue'
@@ -49,7 +49,6 @@ initializeRPC()
 
   // 在挂载前应用主题和背景，避免首屏闪烁
   applyAppearanceToDocument(settingsStore.appSettings)
-  preloadBackgroundImage(settingsStore.appSettings)
 
   // 监听设置变化，实时同步外观
   watch(
@@ -67,15 +66,6 @@ initializeRPC()
     ],
     () => {
       applyAppearanceToDocument(settingsStore.appSettings)
-    }
-  )
-
-  // 仅在背景图源变更时预加载
-  watch(
-    () =>
-      `${settingsStore.appSettings.ui.background.type}|${settingsStore.appSettings.ui.background.imagePath}`,
-    () => {
-      preloadBackgroundImage(settingsStore.appSettings)
     }
   )
 

@@ -97,6 +97,7 @@ export struct WebViewState {
 
   bool is_initialized = false;
   bool is_ready = false;
+  bool has_initial_content = false;
 };
 
 }  // namespace Core::WebView::State

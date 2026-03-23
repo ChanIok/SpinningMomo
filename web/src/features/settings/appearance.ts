@@ -3,6 +3,7 @@ import { resolveBackgroundImageUrl } from './backgroundPath'
 import { buildOverlayGradient, getOverlayPaletteFromBackground } from './overlayPalette'
 
 const USER_CUSTOM_STYLE_ID = 'spinning-momo-user-css'
+const decodedBackgroundUrls = new Set<string>()
 
 type ResolvedTheme = 'light' | 'dark'
 
@@ -76,6 +77,82 @@ const resolvePrimaryForeground = (primaryColor: string): string => {
   return luminance >= 0.45 ? '#18181B' : '#FFFFFF'
 }
 
+let backgroundRequestToken = 0
+let appliedBackgroundUrl: string | null = null
+
+const setBackgroundVisibility = (root: HTMLElement, visible: boolean): void => {
+  root.style.setProperty('--app-background-visibility', visible ? '1' : '0')
+  root.style.setProperty('--app-background-scale', visible ? '1' : '1.02')
+}
+
+const decodeImage = async (imageUrl: string): Promise<void> => {
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = imageUrl
+
+  if (typeof image.decode === 'function') {
+    await image.decode()
+    return
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error(`Failed to load background image: ${imageUrl}`))
+  })
+}
+
+const applyDecodedBackgroundImage = (
+  root: HTMLElement,
+  imageUrl: string,
+  requestToken: number
+): void => {
+  root.style.setProperty('--app-background-image', `url("${imageUrl}")`)
+
+  requestAnimationFrame(() => {
+    if (requestToken !== backgroundRequestToken) return
+    setBackgroundVisibility(root, true)
+    appliedBackgroundUrl = imageUrl
+  })
+}
+
+const updateBackgroundImage = (root: HTMLElement, imageUrl: string | null): void => {
+  backgroundRequestToken += 1
+  const requestToken = backgroundRequestToken
+
+  if (!imageUrl) {
+    appliedBackgroundUrl = null
+    root.style.setProperty('--app-background-image', 'none')
+    setBackgroundVisibility(root, false)
+    return
+  }
+
+  if (imageUrl === appliedBackgroundUrl) {
+    setBackgroundVisibility(root, true)
+    return
+  }
+
+  setBackgroundVisibility(root, false)
+
+  if (decodedBackgroundUrls.has(imageUrl)) {
+    applyDecodedBackgroundImage(root, imageUrl, requestToken)
+    return
+  }
+
+  void decodeImage(imageUrl)
+    .then(() => {
+      decodedBackgroundUrls.add(imageUrl)
+      if (requestToken !== backgroundRequestToken) return
+      applyDecodedBackgroundImage(root, imageUrl, requestToken)
+    })
+    .catch((error: unknown) => {
+      if (requestToken !== backgroundRequestToken) return
+      root.style.setProperty('--app-background-image', 'none')
+      setBackgroundVisibility(root, false)
+      appliedBackgroundUrl = null
+      console.warn('Failed to decode background image before display.', error)
+    })
+}
+
 const applyBackground = (settings: AppSettings): void => {
   const root = document.documentElement
   const background = settings.ui.background
@@ -91,7 +168,6 @@ const applyBackground = (settings: AppSettings): void => {
 
   root.style.setProperty('--app-background-opacity', String(backgroundOpacity))
   root.style.setProperty('--app-background-blur', `${backgroundBlur}px`)
-  root.style.setProperty('--app-background-scale', '1')
   root.style.setProperty(
     '--app-background-overlay-image',
     buildOverlayGradient(getOverlayPaletteFromBackground(background))
@@ -105,12 +181,7 @@ const applyBackground = (settings: AppSettings): void => {
   root.style.setProperty('--primary-foreground', primaryForeground)
   root.style.setProperty('--sidebar-primary-foreground', primaryForeground)
 
-  if (!imageUrl) {
-    root.style.setProperty('--app-background-image', 'none')
-    return
-  }
-
-  root.style.setProperty('--app-background-image', `url("${imageUrl}")`)
+  updateBackgroundImage(root, imageUrl)
 }
 
 export const applyAppearanceToDocument = (settings: AppSettings): void => {
@@ -119,15 +190,4 @@ export const applyAppearanceToDocument = (settings: AppSettings): void => {
   applyTheme(settings.ui.webTheme.mode)
   applyBackground(settings)
   applyCustomUserCss(settings.ui.webTheme.customCss ?? '')
-}
-
-export const preloadBackgroundImage = (settings: AppSettings): void => {
-  if (typeof window === 'undefined') return
-
-  const imageUrl = resolveBackgroundImageUrl(settings.ui.background)
-  if (!imageUrl) return
-
-  const image = new Image()
-  image.decoding = 'async'
-  image.src = imageUrl
 }

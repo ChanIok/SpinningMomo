@@ -138,6 +138,7 @@ auto initialize(Core::State::AppState& state, HWND webview_hwnd)
     }
 
     webview_state.is_initialized = true;
+    webview_state.has_initial_content = false;
     Logger().info("WebView2 initialization started");
     return {};
   } catch (const wil::ResultException& e) {
@@ -199,6 +200,7 @@ auto shutdown(Core::State::AppState& state) -> void {
 
   webview_state.is_initialized = false;
   webview_state.is_ready = false;
+  webview_state.has_initial_content = false;
   webview_state.window.is_visible = false;
 
   Logger().info("WebView shutdown completed");
@@ -225,6 +227,10 @@ auto register_message_handler(Core::State::AppState& state, const std::string& m
 
 auto apply_background_mode_from_settings(Core::State::AppState& state) -> void {
   Core::WebView::Host::apply_background_mode_from_settings(state);
+}
+
+auto get_loading_background_color(Core::State::AppState& state) -> COLORREF {
+  return Core::WebView::Host::get_loading_background_color(state);
 }
 
 auto is_composition_active(Core::State::AppState& state) -> bool {

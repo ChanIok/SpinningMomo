@@ -60,8 +60,9 @@
     'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
   --app-background-image: none;
   --app-background-opacity: 1;
+  --app-background-visibility: 0;
   --app-background-blur: 0px;
-  --app-background-scale: 1;
+  --app-background-scale: 1.02;
   --app-background-overlay-image: linear-gradient(to bottom right, #000000, #000000);
   --app-background-overlay-opacity: 0;
   --route-transition-duration: 180ms;
@@ -178,12 +179,13 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: var(--app-background-opacity, 1);
+  opacity: calc(var(--app-background-opacity, 1) * var(--app-background-visibility, 0));
   filter: blur(var(--app-background-blur, 0px));
   transform: scale(var(--app-background-scale, 1));
   transition:
-    opacity 220ms ease,
-    filter 220ms ease;
+    opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform, filter, opacity;
 }
 

@@ -274,6 +274,13 @@ class NavigationCompletedEventHandler
     args->get_IsSuccess(&success);
 
     if (success) {
+      auto& webview_state = *m_state->webview;
+      if (!webview_state.has_initial_content) {
+        webview_state.has_initial_content = true;
+        if (auto hwnd = webview_state.window.webview_hwnd; hwnd) {
+          InvalidateRect(hwnd, nullptr, TRUE);
+        }
+      }
       Logger().info("WebView navigation completed successfully");
     } else {
       COREWEBVIEW2_WEB_ERROR_STATUS error;
@@ -827,6 +834,14 @@ auto apply_background_mode_from_settings(Core::State::AppState& state) -> void {
 
   auto [transparent_enabled, theme_mode] = Detail::read_background_mode(state);
   Detail::apply_default_background(controller, transparent_enabled, theme_mode);
+}
+
+auto get_loading_background_color(Core::State::AppState& state) -> COLORREF {
+  auto [transparent_enabled, theme_mode] = Detail::read_background_mode(state);
+  (void)transparent_enabled;
+
+  auto color = Detail::resolve_opaque_background_color(theme_mode);
+  return RGB(color.R, color.G, color.B);
 }
 
 }  // namespace Core::WebView::Host
