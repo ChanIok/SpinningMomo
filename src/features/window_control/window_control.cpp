@@ -50,20 +50,10 @@ auto is_clip_cursor_active(const RECT& clip_rect) -> bool {
   return !is_rect_similar(clip_rect, get_virtual_screen_rect(), State::kClipTolerance);
 }
 
-auto get_window_title(HWND hwnd) -> std::wstring {
-  int length = GetWindowTextLengthW(hwnd);
-  if (length <= 0) {
-    return L"";
-  }
-
-  std::wstring title(static_cast<size_t>(length) + 1, L'\0');
-  int written = GetWindowTextW(hwnd, title.data(), length + 1);
-  if (written <= 0) {
-    return L"";
-  }
-
-  title.resize(static_cast<size_t>(written));
-  return title;
+auto get_window_process_id(HWND hwnd) -> DWORD {
+  DWORD process_id = 0;
+  GetWindowThreadProcessId(hwnd, &process_id);
+  return process_id;
 }
 
 auto get_client_rect_in_screen_coords(HWND hwnd) -> std::optional<RECT> {
@@ -104,6 +94,8 @@ auto release_center_lock_if_owned(State::WindowControlState& window_control) -> 
     return;
   }
 
+  // 只有当前 ClipCursor 仍然等于我们上次设置的小矩形时才释放。
+  // 如果游戏已经重新写入了新的 clip 区域，这里应当让游戏继续接管。
   auto current_clip_rect = get_clip_rect();
   if (current_clip_rect &&
       are_rects_equal(*current_clip_rect, window_control.last_center_lock_rect)) {
@@ -119,6 +111,7 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
   }
 
   auto& window_control = *state.window_control;
+  // 任一前置条件不满足时，都回到“若是我们接管的 clip，则安全释放”的统一收口。
   auto revert = [&]() { release_center_lock_if_owned(window_control); };
 
   const auto& window_settings = state.settings->raw.window;
@@ -134,7 +127,10 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
   }
 
   auto configured_title = Utils::String::FromUtf8(window_settings.target_title);
-  if (configured_title.empty() || get_window_title(foreground_window) != configured_title) {
+  // 这里先根据设置解析目标 HWND，再比较 foreground HWND。
+  // 不再直接读取前台窗口标题，避免退出阶段对本进程窗口发送同步文本消息而死锁。
+  auto target_window = find_target_window(configured_title);
+  if (!target_window || foreground_window != *target_window) {
     revert();
     return;
   }
@@ -145,7 +141,7 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
     return;
   }
 
-  auto client_rect = get_client_rect_in_screen_coords(foreground_window);
+  auto client_rect = get_client_rect_in_screen_coords(*target_window);
   if (!client_rect) {
     revert();
     return;
@@ -171,11 +167,13 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
 auto center_lock_monitor_thread_proc(Core::State::AppState& state, std::stop_token stop_token)
     -> void {
   auto& window_control = *state.window_control;
+  // stop_token 触发时立即唤醒 wait_for，使 shutdown 阶段的 join() 可以快速返回。
   std::stop_callback on_stop(
       stop_token, [&window_control]() { window_control.center_lock_monitor_cv.notify_all(); });
   std::unique_lock lock(window_control.center_lock_monitor_mutex);
 
   while (!stop_token.stop_requested()) {
+    // 监控逻辑不需要持有互斥量；这里只把锁用于可中断等待。
     lock.unlock();
     process_center_lock_monitor(state);
     lock.lock();
@@ -279,6 +277,11 @@ auto get_visible_windows() -> std::vector<WindowInfo> {
     wchar_t windowText[256];
 
     if (!IsWindowVisible(hwnd)) {
+      return TRUE;
+    }
+    // 跳过本进程窗口，避免锁鼠监控把浮窗 / WebView / 菜单等误当作候选目标，
+    // 也顺带规避本进程窗口文本读取带来的同步消息风险。
+    if (get_window_process_id(hwnd) == GetCurrentProcessId()) {
       return TRUE;
     }
     if (!GetWindowText(hwnd, windowText, 256)) {
