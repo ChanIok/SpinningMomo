@@ -87,7 +87,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= Lightbox状态 =============
   const lightbox = reactive<LightboxState>({
     isOpen: false,
-    isFullscreen: false,
+    isImmersive: false,
     showFilmstrip: true,
     zoom: 1.0,
     fitMode: 'contain',
@@ -389,7 +389,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   function closeLightbox() {
     lightbox.isOpen = false
-    lightbox.isFullscreen = false
+    lightbox.isImmersive = false
     resetLightboxView()
   }
 
@@ -414,12 +414,12 @@ export const useGalleryStore = defineStore('gallery', () => {
     }
   }
 
-  function setLightboxFullscreen(fullscreen: boolean) {
-    lightbox.isFullscreen = fullscreen
+  function setLightboxImmersive(immersive: boolean) {
+    lightbox.isImmersive = immersive
   }
 
-  function toggleLightboxFullscreen() {
-    setLightboxFullscreen(!lightbox.isFullscreen)
+  function toggleLightboxImmersive() {
+    setLightboxImmersive(!lightbox.isImmersive)
   }
 
   function toggleLightboxFilmstrip() {
@@ -493,7 +493,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     selection.activeAssetId = undefined
 
     lightbox.isOpen = false
-    lightbox.isFullscreen = false
+    lightbox.isImmersive = false
 
     sidebar.isOpen = true
     detailsOpen.value = true
@@ -596,8 +596,8 @@ export const useGalleryStore = defineStore('gallery', () => {
     goToLightboxIndex,
     goToPreviousLightbox,
     goToNextLightbox,
-    setLightboxFullscreen,
-    toggleLightboxFullscreen,
+    setLightboxImmersive,
+    toggleLightboxImmersive,
     toggleLightboxFilmstrip,
     setLightboxZoom,
     setLightboxFitMode,

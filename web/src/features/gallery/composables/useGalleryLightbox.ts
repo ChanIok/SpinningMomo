@@ -164,12 +164,12 @@ export function useGalleryLightbox() {
     })
   }
 
-  function setFullscreen(fullscreen: boolean) {
-    store.setLightboxFullscreen(fullscreen)
+  function setImmersive(immersive: boolean) {
+    store.setLightboxImmersive(immersive)
   }
 
-  function toggleFullscreen() {
-    store.toggleLightboxFullscreen()
+  function toggleImmersive() {
+    store.toggleLightboxImmersive()
   }
 
   function toggleFilmstrip() {
@@ -228,8 +228,8 @@ export function useGalleryLightbox() {
   return {
     openLightbox,
     closeLightbox,
-    setFullscreen,
-    toggleFullscreen,
+    setImmersive,
+    toggleImmersive,
     toggleFilmstrip,
     showFitMode,
     showActualSize,

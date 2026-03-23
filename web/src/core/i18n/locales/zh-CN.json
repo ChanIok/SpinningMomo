@@ -691,8 +691,8 @@
   "gallery.lightbox.toolbar.zoomInTitle": "放大 (= / +)",
   "gallery.lightbox.toolbar.filmstripShowTitle": "显示缩略图 (Tab)",
   "gallery.lightbox.toolbar.filmstripHideTitle": "隐藏缩略图 (Tab)",
-  "gallery.lightbox.toolbar.fullscreenTitle": "全屏 (F)",
-  "gallery.lightbox.toolbar.exitFullscreenTitle": "退出全屏 (F)",
+  "gallery.lightbox.toolbar.immersiveTitle": "沉浸模式 (F)",
+  "gallery.lightbox.toolbar.exitImmersiveTitle": "退出沉浸模式 (F)",
   "gallery.lightbox.toolbar.backTitle": "返回 (ESC)",
   "gallery.lightbox.toolbar.closeTitle": "关闭 (ESC)",
   "gallery.lightbox.image.previousTitle": "上一张 (←)",
@@ -705,6 +705,6 @@
   "gallery.lightbox.contextMenu.zoomOut": "缩小",
   "gallery.lightbox.contextMenu.showFilmstrip": "显示缩略图",
   "gallery.lightbox.contextMenu.hideFilmstrip": "隐藏缩略图",
-  "gallery.lightbox.contextMenu.fullscreen": "进入全屏",
-  "gallery.lightbox.contextMenu.exitFullscreen": "退出全屏"
+  "gallery.lightbox.contextMenu.immersive": "进入沉浸模式",
+  "gallery.lightbox.contextMenu.exitImmersive": "退出沉浸模式"
 }

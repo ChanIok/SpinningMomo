@@ -14,7 +14,7 @@ const emit = defineEmits<{
   zoomIn: []
   zoomOut: []
   toggleFilmstrip: []
-  toggleFullscreen: []
+  toggleImmersive: []
 }>()
 
 const { t } = useI18n()
@@ -24,7 +24,7 @@ const currentIndex = computed(() => store.selection.activeIndex ?? 0)
 const totalCount = computed(() => store.totalCount)
 const selectedCount = computed(() => store.selection.selectedIds.size)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
-const isFullscreen = computed(() => store.lightbox.isFullscreen)
+const isImmersive = computed(() => store.lightbox.isImmersive)
 const currentAsset = computed(() => {
   const currentIndex = store.selection.activeIndex
   if (currentIndex === undefined) {
@@ -210,15 +210,15 @@ const hasReviewFilter = computed(
 
       <button
         class="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-        @click="emit('toggleFullscreen')"
+        @click="emit('toggleImmersive')"
         :title="
-          isFullscreen
-            ? t('gallery.lightbox.toolbar.exitFullscreenTitle')
-            : t('gallery.lightbox.toolbar.fullscreenTitle')
+          isImmersive
+            ? t('gallery.lightbox.toolbar.exitImmersiveTitle')
+            : t('gallery.lightbox.toolbar.immersiveTitle')
         "
       >
         <svg
-          v-if="isFullscreen"
+          v-if="isImmersive"
           class="h-5 w-5"
           fill="none"
           stroke="currentColor"

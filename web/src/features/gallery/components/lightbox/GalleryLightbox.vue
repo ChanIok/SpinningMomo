@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
-import { call } from '@/core/rpc'
-import { isWebView } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
@@ -26,20 +24,14 @@ type LightboxImageExposed = {
   zoomOut: () => Promise<void>
 }
 
-type WebViewFullscreenResult = {
-  success: boolean
-  fullscreen: boolean
-}
-
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
 const assetActions = useGalleryAssetActions()
 const { t } = useI18n()
-const lightboxRootRef = ref<HTMLElement | null>(null)
 const lightboxImageRef = ref<LightboxImageExposed | null>(null)
 
-const isFullscreen = computed(() => store.lightbox.isFullscreen)
+const isImmersive = computed(() => store.lightbox.isImmersive)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
 const currentAsset = computed(() => {
   const currentIndex = store.selection.activeIndex
@@ -52,7 +44,7 @@ const currentAsset = computed(() => {
 // 缩放、适屏、1:1 都是静态图查看语义；视频在灯箱里保持原生播放器行为。
 const isZoomableAsset = computed(() => currentAsset.value?.type !== 'video')
 const lightboxContainerClass = computed(() =>
-  isFullscreen.value
+  isImmersive.value
     ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
     : 'flex h-full w-full overflow-hidden'
 )
@@ -89,76 +81,21 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
-async function syncNativeFullscreen(fullscreen: boolean) {
-  if (!isWebView()) {
+function enterImmersive() {
+  if (isImmersive.value) {
     return
   }
-
-  try {
-    const result = await call<WebViewFullscreenResult>('webview.setFullscreen', { fullscreen })
-    lightbox.setFullscreen(result.fullscreen)
-  } catch (error) {
-    console.warn(`Failed to ${fullscreen ? 'enter' : 'exit'} WebView fullscreen:`, error)
-  }
+  lightbox.setImmersive(true)
 }
 
-async function requestBrowserFullscreen() {
-  const root = lightboxRootRef.value
-  if (!root?.requestFullscreen) {
+function exitImmersive() {
+  if (!isImmersive.value) {
     return
   }
-
-  try {
-    await root.requestFullscreen()
-  } catch (error) {
-    console.warn('Failed to enter browser fullscreen:', error)
-  }
+  lightbox.setImmersive(false)
 }
 
-async function exitBrowserFullscreen() {
-  if (!document.fullscreenElement || !document.exitFullscreen) {
-    return
-  }
-
-  try {
-    await document.exitFullscreen()
-  } catch (error) {
-    console.warn('Failed to exit browser fullscreen:', error)
-  }
-}
-
-async function enterFullscreenPresentation() {
-  if (isFullscreen.value) {
-    return
-  }
-
-  lightbox.setFullscreen(true)
-  await nextTick()
-
-  if (isWebView()) {
-    await syncNativeFullscreen(true)
-    return
-  }
-
-  await requestBrowserFullscreen()
-}
-
-async function exitFullscreenPresentation() {
-  if (!isFullscreen.value && !document.fullscreenElement) {
-    return
-  }
-
-  if (isWebView()) {
-    await syncNativeFullscreen(false)
-  } else {
-    await exitBrowserFullscreen()
-  }
-
-  lightbox.setFullscreen(false)
-}
-
-async function handleClose() {
-  await exitFullscreenPresentation()
+function handleClose() {
   lightbox.closeLightbox()
 }
 
@@ -194,8 +131,12 @@ function handleToolbarToggleFilmstrip() {
   lightbox.toggleFilmstrip()
 }
 
-function handleToolbarToggleFullscreen() {
-  void (isFullscreen.value ? exitFullscreenPresentation() : enterFullscreenPresentation())
+function handleToolbarToggleImmersive() {
+  if (isImmersive.value) {
+    exitImmersive()
+  } else {
+    enterImmersive()
+  }
 }
 
 function handleImageContextMenu(event: MouseEvent) {
@@ -206,16 +147,6 @@ function handleImageContextMenu(event: MouseEvent) {
   }
 
   void gallerySelection.handleAssetContextMenu(asset, event, currentIndex)
-}
-
-function handleDocumentFullscreenChange() {
-  if (isWebView()) {
-    return
-  }
-
-  if (!document.fullscreenElement && isFullscreen.value) {
-    lightbox.setFullscreen(false)
-  }
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -234,16 +165,16 @@ function handleKeydown(event: KeyboardEvent) {
       return
     case 'Escape':
       event.preventDefault()
-      if (isFullscreen.value || document.fullscreenElement) {
-        void exitFullscreenPresentation()
+      if (isImmersive.value) {
+        exitImmersive()
         return
       }
-      void handleClose()
+      handleClose()
       return
     case 'f':
     case 'F':
       event.preventDefault()
-      handleToolbarToggleFullscreen()
+      handleToolbarToggleImmersive()
       return
     case 'Tab':
       event.preventDefault()
@@ -316,21 +247,11 @@ function handleKeydown(event: KeyboardEvent) {
 }
 
 useEventListener(window, 'keydown', handleKeydown)
-useEventListener(document, 'fullscreenchange', handleDocumentFullscreenChange)
-
-onBeforeUnmount(() => {
-  if (isWebView()) {
-    void syncNativeFullscreen(false)
-  } else if (document.fullscreenElement) {
-    void exitBrowserFullscreen()
-  }
-})
 </script>
 
 <template>
-  <Teleport to="body" :disabled="!isFullscreen">
+  <Teleport to="body" :disabled="!isImmersive">
     <div
-      ref="lightboxRootRef"
       class="lightbox-container"
       :class="lightboxContainerClass"
       style="--surface-opacity-scale: 0.96"
@@ -344,7 +265,7 @@ onBeforeUnmount(() => {
           @zoom-in="handleToolbarZoomIn"
           @zoom-out="handleToolbarZoomOut"
           @toggle-filmstrip="handleToolbarToggleFilmstrip"
-          @toggle-fullscreen="handleToolbarToggleFullscreen"
+          @toggle-immersive="handleToolbarToggleImmersive"
         />
 
         <ContextMenu v-if="currentAsset">
@@ -377,11 +298,11 @@ onBeforeUnmount(() => {
                   : t('gallery.lightbox.contextMenu.showFilmstrip')
               }}
             </ContextMenuItem>
-            <ContextMenuItem @click="handleToolbarToggleFullscreen">
+            <ContextMenuItem @click="handleToolbarToggleImmersive">
               {{
-                isFullscreen
-                  ? t('gallery.lightbox.contextMenu.exitFullscreen')
-                  : t('gallery.lightbox.contextMenu.fullscreen')
+                isImmersive
+                  ? t('gallery.lightbox.contextMenu.exitImmersive')
+                  : t('gallery.lightbox.contextMenu.immersive')
               }}
             </ContextMenuItem>
             <ContextMenuSeparator />
