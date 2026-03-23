@@ -16,6 +16,10 @@ export struct WindowControlState {
   // 避免误清掉游戏后续自己重新设置的 ClipCursor 状态。
   bool center_lock_owned{false};
   Vendor::Windows::RECT last_center_lock_rect{};
+
+  // 仅在本模块为捕获稳定性 workaround 临时添加了 WS_EX_LAYERED 时负责恢复。
+  bool layered_capture_workaround_owned{false};
+  Vendor::Windows::HWND layered_capture_workaround_hwnd{nullptr};
 };
 
 export constexpr auto kCenterLockPollInterval = std::chrono::milliseconds{50};

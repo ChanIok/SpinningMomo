@@ -49,18 +49,21 @@ export auto calculate_resolution(double ratio, std::uint64_t total_pixels) -> Re
 export auto calculate_resolution_by_screen(double ratio) -> Resolution;
 
 // 窗口变换操作
-export auto apply_window_transform(Vendor::Windows::HWND target_window,
+export auto apply_window_transform(Core::State::AppState& state,
+                                   Vendor::Windows::HWND target_window,
                                    const Resolution& resolution,
                                    const TransformOptions& options = {})
     -> std::expected<void, std::string>;
 
-export auto reset_window_to_screen(Vendor::Windows::HWND target_window,
+export auto reset_window_to_screen(Core::State::AppState& state,
+                                   Vendor::Windows::HWND target_window,
                                    const TransformOptions& options = {})
     -> std::expected<void, std::string>;
 
 // 调整窗口大小并居中 (保持向后兼容)
-export auto resize_and_center_window(Vendor::Windows::HWND hwnd, int width, int height,
-                                     bool activate) -> std::expected<void, std::string>;
+export auto resize_and_center_window(Core::State::AppState& state, Vendor::Windows::HWND hwnd,
+                                     int width, int height, bool activate)
+    -> std::expected<void, std::string>;
 
 export auto start_center_lock_monitor(Core::State::AppState& state)
     -> std::expected<void, std::string>;

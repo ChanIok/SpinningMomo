@@ -23,6 +23,7 @@ const { appSettings, error, isInitialized } = storeToRefs(store)
 const {
   updateWindowTitle,
   updateWindowCenterLockCursor,
+  updateWindowLayeredCaptureWorkaround,
   updateWindowResetResolution,
   resetWindowSceneSettings,
 } = useFunctionActions()
@@ -208,6 +209,23 @@ const handleResetSettings = async () => {
             <Switch
               :model-value="appSettings.window.centerLockCursor"
               @update:model-value="(value) => updateWindowCenterLockCursor(Boolean(value))"
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.layeredCaptureWorkaround.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.layeredCaptureWorkaround.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.window.enableLayeredCaptureWorkaround"
+              @update:model-value="(value) => updateWindowLayeredCaptureWorkaround(Boolean(value))"
             />
           </ItemActions>
         </Item>

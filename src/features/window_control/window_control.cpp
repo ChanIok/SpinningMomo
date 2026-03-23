@@ -37,6 +37,128 @@ auto reset_center_lock_tracking(State::WindowControlState& window_control) -> vo
   window_control.last_center_lock_rect = RECT{};
 }
 
+auto reset_layered_capture_workaround_tracking(State::WindowControlState& window_control) -> void {
+  window_control.layered_capture_workaround_owned = false;
+  window_control.layered_capture_workaround_hwnd = nullptr;
+}
+
+// GetWindowLong：返回值为 0 时可能是合法样式，需用 LastError 区分失败。
+auto get_window_long_checked(HWND hwnd, int index, const char* field_label)
+    -> std::expected<LONG, std::string> {
+  SetLastError(0);
+  const LONG value = GetWindowLong(hwnd, index);
+  if (value == 0 && GetLastError() != 0) {
+    return std::unexpected{std::format("Failed to get window {} (GetWindowLong).", field_label)};
+  }
+  return value;
+}
+
+// SetWindowLong：成功时返回先前值，先前值也可能为 0。
+auto set_window_long_checked(HWND hwnd, int index, LONG new_value, std::string error_message)
+    -> std::expected<void, std::string> {
+  SetLastError(0);
+  if (SetWindowLong(hwnd, index, new_value) == 0 && GetLastError() != 0) {
+    return std::unexpected{std::move(error_message)};
+  }
+  return {};
+}
+
+auto set_layered_window_style(HWND hwnd, DWORD ex_style, bool enabled)
+    -> std::expected<DWORD, std::string> {
+  DWORD next_style = enabled ? (ex_style | WS_EX_LAYERED) : (ex_style & ~WS_EX_LAYERED);
+  if (next_style == ex_style) {
+    return ex_style;
+  }
+
+  SetLastError(0);
+  if (SetWindowLong(hwnd, GWL_EXSTYLE, next_style) == 0 && GetLastError() != 0) {
+    return std::unexpected{enabled ? "Failed to enable layered window style (SetWindowLong)."
+                                   : "Failed to disable layered window style (SetWindowLong)."};
+  }
+
+  return next_style;
+}
+
+auto release_layered_capture_workaround_if_owned(State::WindowControlState& window_control,
+                                                 HWND hwnd) -> std::expected<void, std::string> {
+  if (!window_control.layered_capture_workaround_owned ||
+      window_control.layered_capture_workaround_hwnd != hwnd) {
+    return {};
+  }
+
+  if (!hwnd || !IsWindow(hwnd)) {
+    reset_layered_capture_workaround_tracking(window_control);
+    return {};
+  }
+
+  auto ex_style_long = get_window_long_checked(hwnd, GWL_EXSTYLE, "ex style");
+  if (!ex_style_long) {
+    return std::unexpected{ex_style_long.error()};
+  }
+  const DWORD ex_style = static_cast<DWORD>(*ex_style_long);
+
+  auto release_result = set_layered_window_style(hwnd, ex_style, false);
+  if (!release_result) {
+    return std::unexpected{release_result.error()};
+  }
+
+  reset_layered_capture_workaround_tracking(window_control);
+  return {};
+}
+
+auto apply_layered_capture_workaround(Core::State::AppState& state, HWND hwnd, int width,
+                                      int height, DWORD ex_style)
+    -> std::expected<DWORD, std::string> {
+  auto* window_control = state.window_control.get();
+  if (!window_control) {
+    return ex_style;
+  }
+
+  const int screen_w = GetSystemMetrics(SM_CXSCREEN);
+  const int screen_h = GetSystemMetrics(SM_CYSCREEN);
+  const bool oversized = width > screen_w || height > screen_h;
+  const bool workaround_enabled =
+      state.settings && state.settings->raw.window.enable_layered_capture_workaround;
+
+  if (window_control->layered_capture_workaround_owned &&
+      window_control->layered_capture_workaround_hwnd != hwnd) {
+    if (auto release_result = release_layered_capture_workaround_if_owned(
+            *window_control, window_control->layered_capture_workaround_hwnd);
+        !release_result) {
+      return std::unexpected{release_result.error()};
+    }
+  }
+
+  if (workaround_enabled && oversized) {
+    const bool already_layered = (ex_style & WS_EX_LAYERED) != 0;
+    auto apply_result = set_layered_window_style(hwnd, ex_style, true);
+    if (!apply_result) {
+      return std::unexpected{apply_result.error()};
+    }
+
+    if (!already_layered) {
+      window_control->layered_capture_workaround_owned = true;
+      window_control->layered_capture_workaround_hwnd = hwnd;
+    } else if (!window_control->layered_capture_workaround_owned ||
+               window_control->layered_capture_workaround_hwnd != hwnd) {
+      reset_layered_capture_workaround_tracking(*window_control);
+    }
+
+    return apply_result.value();
+  }
+
+  if (auto release_result = release_layered_capture_workaround_if_owned(*window_control, hwnd);
+      !release_result) {
+    return std::unexpected{release_result.error()};
+  }
+
+  auto refreshed = get_window_long_checked(hwnd, GWL_EXSTYLE, "ex style");
+  if (!refreshed) {
+    return std::unexpected{refreshed.error()};
+  }
+  return static_cast<DWORD>(*refreshed);
+}
+
 auto get_clip_rect() -> std::optional<RECT> {
   RECT clip_rect{};
   if (!GetClipCursor(&clip_rect)) {
@@ -201,8 +323,8 @@ auto find_target_window(const std::wstring& configured_title) -> std::expected<H
 }
 
 // 调整窗口大小并居中
-auto resize_and_center_window(HWND hwnd, int width, int height, bool activate)
-    -> std::expected<void, std::string> {
+auto resize_and_center_window(Core::State::AppState& state, HWND hwnd, int width, int height,
+                              bool activate) -> std::expected<void, std::string> {
   if (!hwnd || !IsWindow(hwnd)) {
     return std::unexpected{"Failed to resize window: Invalid window handle provided."};
   }
@@ -210,27 +332,42 @@ auto resize_and_center_window(HWND hwnd, int width, int height, bool activate)
   const int screen_w = GetSystemMetrics(SM_CXSCREEN);
   const int screen_h = GetSystemMetrics(SM_CYSCREEN);
 
-  // 获取窗口样式
-  DWORD style = GetWindowLong(hwnd, GWL_STYLE);
-  if (style == 0) {
-    return std::unexpected{"Failed to get window style (GetWindowLong)."};
+  auto style_long = get_window_long_checked(hwnd, GWL_STYLE, "style");
+  if (!style_long) {
+    return std::unexpected{style_long.error()};
   }
-  DWORD exStyle = GetWindowLong(hwnd, GWL_EXSTYLE);
+  DWORD style = static_cast<DWORD>(*style_long);
+
+  auto ex_style_long = get_window_long_checked(hwnd, GWL_EXSTYLE, "ex style");
+  if (!ex_style_long) {
+    return std::unexpected{ex_style_long.error()};
+  }
+  DWORD exStyle = static_cast<DWORD>(*ex_style_long);
+
+  auto ex_style_result = apply_layered_capture_workaround(state, hwnd, width, height, exStyle);
+  if (!ex_style_result) {
+    return std::unexpected{ex_style_result.error()};
+  }
+  exStyle = ex_style_result.value();
 
   // 如果是有边框窗口且需要超出屏幕尺寸，转换为无边框
   if ((style & WS_OVERLAPPEDWINDOW) && (width >= screen_w || height >= screen_h)) {
     style &= ~(WS_OVERLAPPEDWINDOW);
     style |= WS_POPUP;
-    if (SetWindowLong(hwnd, GWL_STYLE, style) == 0) {
-      return std::unexpected{"Failed to remove window border (SetWindowLong)."};
+    if (auto r = set_window_long_checked(hwnd, GWL_STYLE, static_cast<LONG>(style),
+                                         "Failed to remove window border (SetWindowLong).");
+        !r) {
+      return std::unexpected{r.error()};
     }
   }
   // 如果是无边框窗口且高度小于屏幕高度，转换为有边框
   else if ((style & WS_POPUP) && width < screen_w && height < screen_h) {
     style &= ~(WS_POPUP);
     style |= WS_OVERLAPPEDWINDOW;
-    if (SetWindowLong(hwnd, GWL_STYLE, style) == 0) {
-      return std::unexpected{"Failed to restore window border (SetWindowLong)."};
+    if (auto r = set_window_long_checked(hwnd, GWL_STYLE, static_cast<LONG>(style),
+                                         "Failed to restore window border (SetWindowLong).");
+        !r) {
+      return std::unexpected{r.error()};
     }
   }
 
@@ -306,11 +443,11 @@ auto toggle_window_border(HWND hwnd) -> std::expected<bool, std::string> {
     return std::unexpected{"Failed to toggle window border: Invalid window handle provided."};
   }
 
-  // 获取当前窗口样式
-  LONG style = GetWindowLong(hwnd, GWL_STYLE);
-  if (style == 0) {
-    return std::unexpected{"Failed to get window style (GetWindowLong)."};
+  auto style_long = get_window_long_checked(hwnd, GWL_STYLE, "style");
+  if (!style_long) {
+    return std::unexpected{style_long.error()};
   }
+  LONG style = *style_long;
 
   // 检查当前是否有边框
   bool hasBorder = (style & WS_OVERLAPPEDWINDOW) != 0;
@@ -325,9 +462,10 @@ auto toggle_window_border(HWND hwnd) -> std::expected<bool, std::string> {
     style |= WS_OVERLAPPEDWINDOW;
   }
 
-  // 应用新样式
-  if (SetWindowLong(hwnd, GWL_STYLE, style) == 0) {
-    return std::unexpected{"Failed to apply new window style (SetWindowLong)."};
+  if (auto r = set_window_long_checked(hwnd, GWL_STYLE, style,
+                                       "Failed to apply new window style (SetWindowLong).");
+      !r) {
+    return std::unexpected{r.error()};
   }
 
   // 强制窗口重绘和重新布局
@@ -371,9 +509,10 @@ auto calculate_resolution_by_screen(double ratio) -> Resolution {
 }
 
 // 应用窗口变换
-auto apply_window_transform(HWND target_window, const Resolution& resolution,
-                            const TransformOptions& options) -> std::expected<void, std::string> {
-  auto result = resize_and_center_window(target_window, resolution.width, resolution.height,
+auto apply_window_transform(Core::State::AppState& state, HWND target_window,
+                            const Resolution& resolution, const TransformOptions& options)
+    -> std::expected<void, std::string> {
+  auto result = resize_and_center_window(state, target_window, resolution.width, resolution.height,
                                          options.activate_window);
   if (!result) {
     return std::unexpected{result.error()};
@@ -382,11 +521,12 @@ auto apply_window_transform(HWND target_window, const Resolution& resolution,
 }
 
 // 重置窗口到屏幕尺寸
-auto reset_window_to_screen(HWND target_window, const TransformOptions& options)
-    -> std::expected<void, std::string> {
+auto reset_window_to_screen(Core::State::AppState& state, HWND target_window,
+                            const TransformOptions& options) -> std::expected<void, std::string> {
   const int screen_width = GetSystemMetrics(SM_CXSCREEN);
   const int screen_height = GetSystemMetrics(SM_CYSCREEN);
-  return apply_window_transform(target_window, Resolution{screen_width, screen_height}, options);
+  return apply_window_transform(state, target_window, Resolution{screen_width, screen_height},
+                                options);
 }
 
 auto start_center_lock_monitor(Core::State::AppState& state) -> std::expected<void, std::string> {
@@ -422,6 +562,13 @@ auto stop_center_lock_monitor(Core::State::AppState& state) -> void {
     window_control.center_lock_monitor_thread.join();
   } else {
     release_center_lock_if_owned(window_control);
+  }
+
+  if (auto release_result = release_layered_capture_workaround_if_owned(
+          window_control, window_control.layered_capture_workaround_hwnd);
+      !release_result) {
+    Logger().warn("Failed to release layered capture workaround on shutdown: {}",
+                  release_result.error());
   }
 
   Logger().info("Window control center lock monitor stopped");

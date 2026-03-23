@@ -109,6 +109,8 @@
   "settings.function.windowControl.windowTitle.update": "Update",
   "settings.function.windowControl.centerLockCursor.label": "Force Cursor to Center While Locked",
   "settings.function.windowControl.centerLockCursor.description": "When the target window has already locked the cursor, further constrain it to a small region at the center to reduce accidental clicks on the floating window or other always-on-top windows.",
+  "settings.function.windowControl.layeredCaptureWorkaround.label": "Oversized Capture Workaround",
+  "settings.function.windowControl.layeredCaptureWorkaround.description": "When the target window is larger than the screen, temporarily enable a layered-window workaround to improve preview and screenshot capture stability outside the visible area.",
   "settings.function.windowControl.resetResolution.mode.label": "Reset Window Size",
   "settings.function.windowControl.resetResolution.mode.description": "Choose whether the \"Reset Window\" command uses screen size or a fixed resolution.",
   "settings.function.windowControl.resetResolution.mode.screen": "Follow Screen",

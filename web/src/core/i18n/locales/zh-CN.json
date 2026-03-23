@@ -109,6 +109,8 @@
   "settings.function.windowControl.windowTitle.update": "更新",
   "settings.function.windowControl.centerLockCursor.label": "锁鼠时强制居中",
   "settings.function.windowControl.centerLockCursor.description": "当目标窗口已锁定鼠标时，将鼠标进一步限制在窗口中心的小区域，减少误触悬浮窗或其他置顶窗口。",
+  "settings.function.windowControl.layeredCaptureWorkaround.label": "超屏捕获稳定性兼容",
+  "settings.function.windowControl.layeredCaptureWorkaround.description": "当目标窗口尺寸超出屏幕时，临时启用 layered 窗口兼容方案，以改善预览和截图只更新可见区域的问题。",
   "settings.function.windowControl.resetResolution.mode.label": "重置窗口尺寸",
   "settings.function.windowControl.resetResolution.mode.description": "设置“重置窗口”命令使用屏幕尺寸还是固定分辨率。",
   "settings.function.windowControl.resetResolution.mode.screen": "跟随屏幕",

@@ -26,6 +26,16 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateWindowLayeredCaptureWorkaround = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      window: {
+        ...appSettings.value.window,
+        enableLayeredCaptureWorkaround: enabled,
+      },
+    })
+  }
+
   const updateWindowResetResolution = async (width: number, height: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -452,6 +462,7 @@ export const useFunctionActions = () => {
       window: {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
+        enableLayeredCaptureWorkaround: DEFAULT_APP_SETTINGS.window.enableLayeredCaptureWorkaround,
         resetResolution: {
           ...appSettings.value.window.resetResolution,
           width: DEFAULT_APP_SETTINGS.window.resetResolution.width,
@@ -464,6 +475,7 @@ export const useFunctionActions = () => {
   return {
     updateWindowTitle,
     updateWindowCenterLockCursor,
+    updateWindowLayeredCaptureWorkaround,
     updateWindowResetResolution,
     updateOutputDir,
     updateGameAlbumPath,

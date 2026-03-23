@@ -154,6 +154,7 @@ export interface AppSettings {
   window: {
     targetTitle: string // 目标窗口标题
     centerLockCursor: boolean // 锁鼠时强制居中
+    enableLayeredCaptureWorkaround: boolean // 超屏时临时启用 layered 捕获兼容方案
     resetResolution: {
       width: number // 重置窗口宽度，0=跟随屏幕
       height: number // 重置窗口高度，0=跟随屏幕
@@ -298,6 +299,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   window: {
     targetTitle: '',
     centerLockCursor: false,
+    enableLayeredCaptureWorkaround: false,
     resetResolution: {
       width: 0,
       height: 0,

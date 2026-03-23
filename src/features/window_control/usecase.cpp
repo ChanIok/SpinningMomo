@@ -152,8 +152,8 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{.activate_window = true};
 
-  auto result =
-      Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
+  auto result = Features::WindowControl::apply_window_transform(state, *target_window,
+                                                                new_resolution, options);
   if (!result) {
     state.overlay->is_transforming = false;
     Features::Notifications::show_notification(
@@ -224,8 +224,8 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
   // 应用窗口变换
   Features::WindowControl::TransformOptions options{.activate_window = true};
 
-  auto result =
-      Features::WindowControl::apply_window_transform(*target_window, new_resolution, options);
+  auto result = Features::WindowControl::apply_window_transform(state, *target_window,
+                                                                new_resolution, options);
   if (!result) {
     state.overlay->is_transforming = false;
     Features::Notifications::show_notification(
@@ -322,9 +322,10 @@ auto reset_window_transform(Core::State::AppState& state) -> void {
         .width = reset_resolution.width,
         .height = reset_resolution.height,
     };
-    result = Features::WindowControl::apply_window_transform(*target_window, resolution, options);
+    result =
+        Features::WindowControl::apply_window_transform(state, *target_window, resolution, options);
   } else {
-    result = Features::WindowControl::reset_window_to_screen(*target_window, options);
+    result = Features::WindowControl::reset_window_to_screen(state, *target_window, options);
   }
 
   if (!result) {
