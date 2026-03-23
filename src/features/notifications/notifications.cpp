@@ -146,12 +146,13 @@ void draw_close_button(HDC hdc, const RECT& rect, bool is_hovered, int dpi, COLO
   DeleteObject(hClosePen);
 }
 
-void on_paint(HDC hdc, Features::Notifications::State::Notification& n, int dpi) {
+void present_notification_frame(HDC reference_hdc, Features::Notifications::State::Notification& n,
+                                int dpi) {
   RECT rect;
   GetClientRect(n.hwnd, &rect);
 
-  HDC memDC = CreateCompatibleDC(hdc);
-  HBITMAP memBitmap = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+  HDC memDC = CreateCompatibleDC(reference_hdc);
+  HBITMAP memBitmap = CreateCompatibleBitmap(reference_hdc, rect.right, rect.bottom);
   HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
 
   SetBkMode(memDC, TRANSPARENT);
@@ -196,7 +197,7 @@ void on_paint(HDC hdc, Features::Notifications::State::Notification& n, int dpi)
   BLENDFUNCTION blend = {AC_SRC_OVER, 0, static_cast<BYTE>(n.opacity * 255), 0};
   POINT ptSrc = {0, 0};
   SIZE sizeWnd = {rect.right - rect.left, rect.bottom - rect.top};
-  UpdateLayeredWindow(n.hwnd, hdc, NULL, &sizeWnd, memDC, &ptSrc, 0, &blend, ULW_ALPHA);
+  UpdateLayeredWindow(n.hwnd, reference_hdc, NULL, &sizeWnd, memDC, &ptSrc, 0, &blend, ULW_ALPHA);
 
   SelectObject(memDC, oldBitmap);
   DeleteObject(titleFont);
@@ -227,7 +228,7 @@ LRESULT CALLBACK NotificationWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
     case WM_PAINT: {
       PAINTSTRUCT ps;
       HDC hdc = BeginPaint(hwnd, &ps);
-      on_paint(hdc, *notification, GetDpiForWindow(hwnd));
+      present_notification_frame(hdc, *notification, GetDpiForWindow(hwnd));
       EndPaint(hwnd, &ps);
       return 0;
     }
@@ -322,8 +323,9 @@ auto create_notification_window(Core::State::AppState& state,
 
   HWND hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
                               Constants::NOTIFICATION_WINDOW_CLASS.c_str(), L"Notification",
-                              WS_POPUP | WS_CLIPCHILDREN, 0, 0, width, notification.height, NULL,
-                              NULL, state.floating_window->window.instance, &notification);
+                              WS_POPUP | WS_CLIPCHILDREN, notification.current_pos.x,
+                              notification.current_pos.y, width, notification.height, NULL, NULL,
+                              state.floating_window->window.instance, &notification);
 
   if (!hwnd) return false;
 
@@ -461,6 +463,12 @@ auto update_notifications(Core::State::AppState& state) -> void {
           notification.state = Features::Notifications::State::NotificationAnimState::SlidingIn;
           notification.last_state_change_time = now;
           notification.total_paused_duration = std::chrono::milliseconds(0);
+
+          if (HDC screen_dc = GetDC(NULL); screen_dc) {
+            present_notification_frame(screen_dc, notification, GetDpiForWindow(notification.hwnd));
+            ReleaseDC(NULL, screen_dc);
+          }
+
           ShowWindow(notification.hwnd, SW_SHOWNA);
           UpdateWindow(notification.hwnd);
         } else {
