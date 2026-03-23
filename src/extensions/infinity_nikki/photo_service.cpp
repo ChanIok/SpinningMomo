@@ -91,18 +91,27 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
             app_state, "extensions.infinityNikki.initializeScreenshotHardlinks")) {
       Logger().debug("Skip InfinityNikki screenshot hardlink sync: initialization task is active");
     } else {
-      bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state]() {
-        auto sync_result = Extensions::InfinityNikki::ScreenshotHardlinks::sync(app_state);
-        if (!sync_result) {
-          Logger().warn("InfinityNikki screenshot hardlinks sync failed: {}", sync_result.error());
-        } else {
-          const auto& r = sync_result.value();
-          Logger().info(
-              "InfinityNikki screenshot hardlinks synced: source={}, created={}, updated={}, "
-              "removed={}, ignored={}",
-              r.source_count, r.created_count, r.updated_count, r.removed_count, r.ignored_count);
-        }
-      });
+      // 增量 watcher 会携带逐文件 changes；只有拿不到变化集时才回退到全量 sync。
+      auto runtime_changes = result.changes;
+      bool submitted = Core::WorkerPool::submit_task(
+          *app_state.worker_pool, [&app_state, runtime_changes = std::move(runtime_changes)]() {
+            auto sync_result =
+                runtime_changes.empty()
+                    ? Extensions::InfinityNikki::ScreenshotHardlinks::sync(app_state)
+                    : Extensions::InfinityNikki::ScreenshotHardlinks::apply_runtime_changes(
+                          app_state, runtime_changes);
+            if (!sync_result) {
+              Logger().warn("InfinityNikki screenshot hardlinks sync failed: {}",
+                            sync_result.error());
+            } else {
+              const auto& r = sync_result.value();
+              Logger().info(
+                  "InfinityNikki screenshot hardlinks synced: source={}, created={}, updated={}, "
+                  "removed={}, ignored={}",
+                  r.source_count, r.created_count, r.updated_count, r.removed_count,
+                  r.ignored_count);
+            }
+          });
       if (!submitted) {
         Logger().warn("InfinityNikki hardlinks sync: failed to submit worker task");
       }

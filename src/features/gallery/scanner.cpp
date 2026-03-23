@@ -290,8 +290,30 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
   return deleted_count;
 }
 
+auto build_expected_folder_paths(const std::vector<Types::FileSystemInfo>& file_infos,
+                                 const std::filesystem::path& normalized_scan_root)
+    -> std::unordered_set<std::string> {
+  std::vector<std::filesystem::path> file_paths;
+  file_paths.reserve(file_infos.size());
+  for (const auto& file_info : file_infos) {
+    file_paths.push_back(file_info.path);
+  }
+
+  auto folder_paths =
+      Folder::Service::extract_unique_folder_paths(file_paths, normalized_scan_root);
+  std::unordered_set<std::string> expected_paths;
+  expected_paths.reserve(folder_paths.size() + 1);
+  for (const auto& folder_path : folder_paths) {
+    expected_paths.insert(folder_path.string());
+  }
+  expected_paths.insert(normalized_scan_root.string());
+
+  return expected_paths;
+}
+
 auto cleanup_missing_folders(Core::State::AppState& app_state,
-                             const std::filesystem::path& normalized_scan_root) -> int {
+                             const std::filesystem::path& normalized_scan_root,
+                             const std::vector<Types::FileSystemInfo>& file_infos) -> int {
   auto all_folders_result = Folder::Repository::list_all_folders(app_state);
   if (!all_folders_result) {
     Logger().warn("Failed to list folders for cleanup: {}", all_folders_result.error());
@@ -299,6 +321,7 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
   }
 
   auto root_str = normalized_scan_root.string();
+  auto expected_paths = build_expected_folder_paths(file_infos, normalized_scan_root);
 
   struct MissingFolder {
     std::int64_t id;
@@ -315,12 +338,8 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
       continue;
     }
 
-    std::error_code ec;
-    auto folder_path = std::filesystem::path(folder.path);
-    bool exists = std::filesystem::exists(folder_path, ec);
-    bool is_directory = exists && std::filesystem::is_directory(folder_path, ec);
-    if (ec || !exists || !is_directory) {
-      // DB 有目录记录，但磁盘目录没了。
+    if (!expected_paths.contains(folder.path)) {
+      // DB 中存在目录记录，但本次扫描后它已不属于有效文件夹集合。
       missing_folders.push_back(MissingFolder{.id = folder.id, .path = folder.path});
     }
   }
@@ -342,7 +361,7 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
   }
 
   if (deleted_folders > 0) {
-    Logger().info("Deleted {} missing folders under '{}'", deleted_folders, root_str);
+    Logger().info("Deleted {} stale folders under '{}'", deleted_folders, root_str);
   }
 
   return deleted_folders;
@@ -1067,7 +1086,8 @@ auto run_cleanup_phase(Core::State::AppState& app_state,
 
   int deleted_items =
       cleanup_removed_assets(app_state, normalized_scan_root, file_infos, asset_cache);
-  [[maybe_unused]] int deleted_folders = cleanup_missing_folders(app_state, normalized_scan_root);
+  [[maybe_unused]] int deleted_folders =
+      cleanup_missing_folders(app_state, normalized_scan_root, file_infos);
   return deleted_items;
 }
 

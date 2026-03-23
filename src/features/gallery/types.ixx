@@ -180,6 +180,19 @@ struct ScanProgress {
   std::optional<std::string> message;
 };
 
+enum class ScanChangeAction {
+  UPSERT,
+  REMOVE,
+};
+
+// 扫描输出的最小变化单元。
+// 供运行时增量消费者（如 Infinity Nikki ScreenShot 硬链接同步）直接复用，
+// 避免再次全量遍历文件系统推导“这次到底哪些文件变了”。
+struct ScanChange {
+  std::string path;
+  ScanChangeAction action = ScanChangeAction::UPSERT;
+};
+
 struct ScanResult {
   int total_files = 0;
   int new_items = 0;
@@ -187,6 +200,9 @@ struct ScanResult {
   int deleted_items = 0;
   std::vector<std::string> errors = {};
   std::string scan_duration = "";
+  // changes 主要在 watcher 增量同步场景下填充；
+  // 全量扫描允许为空，因为它关注的是“最终一致性”而非“逐文件变化集”。
+  std::vector<ScanChange> changes = {};
 };
 
 enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };

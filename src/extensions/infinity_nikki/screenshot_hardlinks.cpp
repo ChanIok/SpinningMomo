@@ -4,6 +4,7 @@ module Extensions.InfinityNikki.ScreenshotHardlinks;
 
 import std;
 import Core.State;
+import Features.Gallery.Types;
 import Features.Settings.State;
 import Extensions.InfinityNikki.Types;
 import Utils.String;
@@ -34,7 +35,6 @@ struct ManagedPaths {
 // 一张高清原图及其对应的硬链接信息
 struct SourceAsset {
   std::filesystem::path target_path;  // 高清原图的绝对路径（硬链接目标）
-  std::string uid;                    // 照片所属的 UID（路径第一级目录名）
   std::string original_filename;      // 原始文件名（不含路径）
   std::filesystem::path link_path;    // 将在 ScreenShot 目录中创建的硬链接路径
 };
@@ -113,20 +113,6 @@ auto is_supported_image_extension(const std::filesystem::path& file_path) -> boo
   });
 }
 
-// 从高清照片路径提取 UID：路径结构为 GamePlayPhotos/<uid>/NikkiPhotos_HighQuality/...，
-// 取相对路径的第一个目录名即为 UID
-auto extract_uid_from_hq_path(const std::filesystem::path& gameplay_photos_dir,
-                              const std::filesystem::path& file_path)
-    -> std::optional<std::string> {
-  std::error_code ec;
-  auto relative_path = std::filesystem::relative(file_path, gameplay_photos_dir, ec);
-  if (ec || relative_path.empty()) {
-    return std::nullopt;
-  }
-
-  return Utils::String::ToUtf8(relative_path.begin()->wstring());
-}
-
 // 判断文件是否为本功能管理的高清原图：需满足普通文件、图片扩展名、
 // 且路径中包含 NikkiPhotos_HighQuality 目录段
 auto is_hq_photo_file(const ManagedPaths& paths, const std::filesystem::path& file_path) -> bool {
@@ -184,23 +170,38 @@ auto resolve_managed_paths(Core::State::AppState& app_state)
   };
 }
 
-auto make_name_with_suffix_preserving_extension(const std::string& filename, std::int32_t suffix)
-    -> std::string {
-  auto filename_path = std::filesystem::path(Utils::String::FromUtf8(filename));
-  auto stem = Utils::String::ToUtf8(filename_path.stem().wstring());
-  auto extension = Utils::String::ToUtf8(filename_path.extension().wstring());
-  return std::format("{}_{}{}", stem, suffix, extension);
+auto make_link_path(const ManagedPaths& paths, const std::filesystem::path& target_path)
+    -> std::filesystem::path {
+  // 领域约束：Infinity Nikki 的照片文件名视为全局唯一，
+  // ScreenShot 中的受管文件名直接等于高清原图文件名本身。
+  return paths.screenshot_dir / target_path.filename();
 }
 
-// 扫描 GamePlayPhotos 目录下所有高清原图，并为每张图计算唯一的硬链接文件名。
-// 命名规则：若多张图文件名相同（来自不同 UID），则在文件名前加 "<uid>_" 前缀以区分；
-// 若前缀后仍有冲突，则追加数字后缀 "_2"、"_3" 等（保留扩展名）
+auto is_managed_hq_photo_path(const ManagedPaths& paths, const std::filesystem::path& file_path)
+    -> bool {
+  if (!is_supported_image_extension(file_path)) {
+    return false;
+  }
+
+  std::error_code ec;
+  auto relative_path = std::filesystem::relative(file_path, paths.gameplay_photos_dir, ec);
+  if (ec || relative_path.empty()) {
+    return false;
+  }
+
+  return path_has_high_quality_segment(relative_path);
+}
+
+// 扫描 GamePlayPhotos 目录下所有高清原图，并直接使用原始文件名生成 ScreenShot 硬链接路径。
+// 若发现重名文件，则视为违反《无限暖暖》文件名全局唯一的领域约束，直接报错。
 auto collect_source_assets(
     const ManagedPaths& paths,
     const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
         progress_callback,
-    InfinityNikkiInitializeScreenshotHardlinksResult& result) -> std::vector<SourceAsset> {
+    InfinityNikkiInitializeScreenshotHardlinksResult& result)
+    -> std::expected<std::vector<SourceAsset>, std::string> {
   std::vector<SourceAsset> sources;
+  std::unordered_map<std::string, std::filesystem::path> filename_to_path;
   std::error_code ec;
 
   report_progress(progress_callback, "preparing", 0, 0, 5.0, "Scanning NikkiPhotos_HighQuality");
@@ -226,48 +227,23 @@ auto collect_source_assets(
       continue;
     }
 
-    auto uid = extract_uid_from_hq_path(paths.gameplay_photos_dir, file_path);
-    if (!uid.has_value()) {
-      add_error(result.errors,
-                "Failed to parse UID from path: " + Utils::String::ToUtf8(file_path.wstring()));
-      continue;
+    auto normalized_target = normalize_existing_path(file_path);
+    auto original_filename = Utils::String::ToUtf8(normalized_target.filename().wstring());
+    auto filename_key = Utils::String::ToLowerAscii(original_filename);
+
+    if (auto it = filename_to_path.find(filename_key); it != filename_to_path.end()) {
+      return std::unexpected("Duplicate Infinity Nikki screenshot filename detected: '" +
+                             original_filename + "' from '" +
+                             Utils::String::ToUtf8(it->second.wstring()) + "' and '" +
+                             Utils::String::ToUtf8(normalized_target.wstring()) + "'");
     }
+    filename_to_path.emplace(filename_key, normalized_target);
 
     sources.push_back(SourceAsset{
-        .target_path = normalize_existing_path(file_path),
-        .uid = std::move(uid.value()),
-        .original_filename = Utils::String::ToUtf8(file_path.filename().wstring()),
+        .target_path = normalized_target,
+        .original_filename = original_filename,
+        .link_path = make_link_path(paths, normalized_target),
     });
-  }
-
-  // 统计各文件名出现次数（不区分大小写），用于判断是否需要加 UID 前缀
-  std::unordered_map<std::string, std::int32_t> filename_counts;
-  filename_counts.reserve(sources.size());
-  for (const auto& source : sources) {
-    auto key = Utils::String::ToLowerAscii(source.original_filename);
-    filename_counts[key]++;
-  }
-
-  // 为每个 source 分配全局唯一的硬链接文件名
-  std::unordered_set<std::string> used_link_names;
-  used_link_names.reserve(sources.size());
-  for (auto& source : sources) {
-    auto desired_name = source.original_filename;
-    auto lower_name = Utils::String::ToLowerAscii(desired_name);
-    if (filename_counts[lower_name] > 1) {
-      desired_name = source.uid + "_" + source.original_filename;
-    }
-
-    auto unique_name = desired_name;
-    auto unique_key = Utils::String::ToLowerAscii(unique_name);
-    std::int32_t suffix = 2;
-    while (used_link_names.contains(unique_key)) {
-      unique_name = make_name_with_suffix_preserving_extension(desired_name, suffix++);
-      unique_key = Utils::String::ToLowerAscii(unique_name);
-    }
-    used_link_names.insert(unique_key);
-    source.link_path =
-        paths.screenshot_dir / std::filesystem::path(Utils::String::FromUtf8(unique_name));
   }
 
   // 按硬链接文件名排序，使游戏内截图列表顺序稳定
@@ -276,7 +252,7 @@ auto collect_source_assets(
   });
 
   result.source_count = static_cast<std::int32_t>(sources.size());
-  return sources;
+  return std::vector<SourceAsset>(std::move(sources));
 }
 
 auto ensure_directory_exists(const std::filesystem::path& path)
@@ -501,7 +477,11 @@ auto sync_hardlinks_internal(
     }
   }
 
-  auto sources = collect_source_assets(paths, progress_callback, result);
+  auto sources_result = collect_source_assets(paths, progress_callback, result);
+  if (!sources_result) {
+    return std::unexpected(sources_result.error());
+  }
+  auto sources = std::move(sources_result.value());
   report_progress(progress_callback, "syncing", 0, result.source_count, 20.0,
                   std::format("Found {} high-quality photos", result.source_count));
 
@@ -566,6 +546,104 @@ auto sync_hardlinks_internal(
       progress_callback, "completed", result.source_count, result.source_count, 100.0,
       std::format("Done: {} created, {} updated, {} removed, {} ignored", result.created_count,
                   result.updated_count, result.removed_count, result.ignored_count));
+  return result;
+}
+
+auto remove_managed_link(const std::filesystem::path& link_path)
+    -> std::expected<bool, std::string> {
+  std::error_code ec;
+  if (!std::filesystem::exists(link_path, ec)) {
+    if (ec) {
+      return std::unexpected("Failed to inspect ScreenShot entry '" +
+                             Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
+    }
+    return false;
+  }
+
+  std::filesystem::remove_all(link_path, ec);
+  if (ec) {
+    return std::unexpected("Failed to remove ScreenShot entry '" +
+                           Utils::String::ToUtf8(link_path.wstring()) + "': " + ec.message());
+  }
+
+  return true;
+}
+
+auto apply_runtime_changes(Core::State::AppState& app_state,
+                           const std::vector<Features::Gallery::Types::ScanChange>& changes)
+    -> std::expected<InfinityNikkiInitializeScreenshotHardlinksResult, std::string> {
+  auto paths_result = resolve_managed_paths(app_state);
+  if (!paths_result) {
+    return std::unexpected(paths_result.error());
+  }
+  const auto paths = paths_result.value();
+
+  InfinityNikkiInitializeScreenshotHardlinksResult result;
+  // 这里的 source_count 语义不再是“全量源图数量”，而是“本次收到的运行时变化条数”。
+  // 保留该字段是为了复用现有的结果结构与日志格式。
+  result.source_count = static_cast<std::int32_t>(changes.size());
+
+  for (const auto& change : changes) {
+    auto changed_path = normalize_existing_path(std::filesystem::path(change.path));
+    // 变化集来自通用 Gallery watcher，这里只消费 Infinity Nikki 管辖的高清原图路径。
+    if (!is_managed_hq_photo_path(paths, changed_path)) {
+      result.ignored_count++;
+      continue;
+    }
+
+    auto link_path = make_link_path(paths, changed_path);
+
+    switch (change.action) {
+      case Features::Gallery::Types::ScanChangeAction::UPSERT: {
+        std::error_code ec;
+        if (!std::filesystem::is_regular_file(changed_path, ec) || ec) {
+          if (ec) {
+            add_error(result.errors, "Failed to inspect runtime source '" +
+                                         Utils::String::ToUtf8(changed_path.wstring()) +
+                                         "': " + ec.message());
+          } else {
+            result.ignored_count++;
+          }
+          break;
+        }
+
+        auto ensure_result = ensure_hardlink(link_path, changed_path);
+        if (!ensure_result) {
+          add_error(result.errors, ensure_result.error());
+          break;
+        }
+
+        switch (ensure_result.value()) {
+          case LinkWriteAction::kCreated:
+            result.created_count++;
+            break;
+          case LinkWriteAction::kUpdated:
+            result.updated_count++;
+            break;
+          case LinkWriteAction::kNone:
+          default:
+            break;
+        }
+        break;
+      }
+      case Features::Gallery::Types::ScanChangeAction::REMOVE: {
+        // 运行时删除只按“同名映射”撤销对应受管硬链接，不再做全目录清理。
+        auto remove_result = remove_managed_link(link_path);
+        if (!remove_result) {
+          add_error(result.errors, remove_result.error());
+          break;
+        }
+        if (remove_result.value()) {
+          result.removed_count++;
+        }
+        break;
+      }
+      default:
+        result.ignored_count++;
+        break;
+    }
+  }
+
   return result;
 }
 

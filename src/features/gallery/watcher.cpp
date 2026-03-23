@@ -570,15 +570,29 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
     return std::unexpected("Failed to load ignore rules: " + rules_result.error());
   }
   auto ignore_rules = std::move(rules_result.value());
+  const auto supported_extensions =
+      options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
 
   std::vector<std::filesystem::path> upsert_paths;
   upsert_paths.reserve(snapshot.file_changes.size());
 
-  // 先收集 UPSERT 路径，后面执行时也是先删后写，rename 更稳。
+  // 先收集真正可能入库的 UPSERT 路径，避免被忽略或不支持的文件污染 folders 索引。
   for (const auto& [path, action] : snapshot.file_changes) {
-    if (action == State::PendingFileChangeAction::UPSERT) {
-      upsert_paths.emplace_back(path);
+    if (action != State::PendingFileChangeAction::UPSERT) {
+      continue;
     }
+
+    auto candidate_path = std::filesystem::path(path);
+    if (!ScanCommon::is_supported_file(candidate_path, supported_extensions)) {
+      continue;
+    }
+
+    if (Features::Gallery::Ignore::Service::apply_ignore_rules(candidate_path, watcher->root_path,
+                                                               ignore_rules)) {
+      continue;
+    }
+
+    upsert_paths.emplace_back(std::move(candidate_path));
   }
 
   std::unordered_map<std::string, std::int64_t> folder_mapping;
@@ -610,6 +624,11 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
 
     if (remove_result.value()) {
       result.deleted_items++;
+      // 把真实删除路径透传给上层扩展，允许其做按文件粒度的派生同步。
+      result.changes.push_back(Types::ScanChange{
+          .path = path,
+          .action = Types::ScanChangeAction::REMOVE,
+      });
     }
   }
 
@@ -628,8 +647,17 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
 
     if (upsert_result.value() == 1) {
       result.new_items++;
+      // NEW / UPDATED 对派生消费者来说都属于“应确保目标状态存在”的 UPSERT。
+      result.changes.push_back(Types::ScanChange{
+          .path = path,
+          .action = Types::ScanChangeAction::UPSERT,
+      });
     } else if (upsert_result.value() == 2) {
       result.updated_items++;
+      result.changes.push_back(Types::ScanChange{
+          .path = path,
+          .action = Types::ScanChangeAction::UPSERT,
+      });
     }
   }
 
@@ -747,9 +775,31 @@ auto process_watch_notifications(Core::State::AppState& app_state,
   bool require_full_rescan = false;
 
   for (const auto& notification : notifications) {
-    if (notification.is_directory) {
-      // 文件夹变化直接走全量，避免漏更新。
-      require_full_rescan = true;
+    if (!notification.is_directory) {
+      continue;
+    }
+
+    switch (notification.action) {
+      case FILE_ACTION_ADDED:
+      case FILE_ACTION_REMOVED:
+      case FILE_ACTION_RENAMED_OLD_NAME:
+      case FILE_ACTION_RENAMED_NEW_NAME:
+        // 目录结构变化直接走全量，避免漏更新。
+        Logger().debug(
+            "Directory structural change detected for '{}', action={}, scheduling full rescan",
+            notification.path.string(), notification.action);
+        require_full_rescan = true;
+        break;
+      case FILE_ACTION_MODIFIED:
+        Logger().debug(
+            "Directory metadata change detected for '{}', action={}, keeping incremental path",
+            notification.path.string(), notification.action);
+        break;
+      default:
+        break;
+    }
+
+    if (require_full_rescan) {
       break;
     }
   }
