@@ -1,4 +1,13 @@
 import { defineConfig } from "vitepress";
+import type { HeadConfig } from "vitepress";
+import {
+  SITE_ORIGIN,
+  getBilingualPathnames,
+  isLegacyDocPath,
+  mdRelativeToPathname,
+  pageLocale,
+  toAbsoluteUrl,
+} from "./seo";
 
 const baseEnv = process.env.VITE_BASE_PATH || "/";
 const base = baseEnv.endsWith("/") ? baseEnv : `${baseEnv}/`;
@@ -18,6 +27,69 @@ export default defineConfig({
 
   // 忽略死链接检查
   ignoreDeadLinks: true,
+
+  sitemap: {
+    hostname: SITE_ORIGIN,
+    transformItems(items) {
+      // VitePress 在此使用相对路径（如 v0/zh/...），不含前导 /v0
+      return items.filter((item) => item.url !== "v0" && !item.url.startsWith("v0/"));
+    },
+  },
+
+  async transformHead(ctx): Promise<HeadConfig[]> {
+    const { pageData, siteData, title, description } = ctx;
+    const relativePath = pageData.relativePath;
+    if (!relativePath || pageData.isNotFound) {
+      return [];
+    }
+
+    const siteBase = siteData.base ?? "/";
+    const pathname = mdRelativeToPathname(relativePath);
+    const canonical = toAbsoluteUrl(SITE_ORIGIN, siteBase, pathname);
+
+    const head: HeadConfig[] = [
+      ["link", { rel: "canonical", href: canonical }],
+    ];
+
+    if (isLegacyDocPath(relativePath)) {
+      head.push(["meta", { name: "robots", content: "noindex, follow" }]);
+    }
+
+    const bilingual = getBilingualPathnames(relativePath);
+    if (bilingual) {
+      const zhUrl = toAbsoluteUrl(SITE_ORIGIN, siteBase, bilingual.zhPathname);
+      const enUrl = toAbsoluteUrl(SITE_ORIGIN, siteBase, bilingual.enPathname);
+      head.push(["link", { rel: "alternate", hreflang: "zh-CN", href: zhUrl }]);
+      head.push(["link", { rel: "alternate", hreflang: "en-US", href: enUrl }]);
+      head.push(["link", { rel: "alternate", hreflang: "x-default", href: enUrl }]);
+    }
+
+    head.push(["meta", { property: "og:title", content: title }]);
+    head.push(["meta", { property: "og:description", content: description }]);
+    head.push(["meta", { property: "og:url", content: canonical }]);
+    head.push(["meta", { property: "og:type", content: "website" }]);
+
+    const loc = pageLocale(relativePath);
+    if (loc) {
+      head.push([
+        "meta",
+        { property: "og:locale", content: loc.replace("-", "_") },
+      ]);
+      head.push([
+        "meta",
+        {
+          property: "og:locale:alternate",
+          content: loc === "zh-CN" ? "en_US" : "zh_CN",
+        },
+      ]);
+    }
+
+    head.push(["meta", { name: "twitter:card", content: "summary" }]);
+    head.push(["meta", { name: "twitter:title", content: title }]);
+    head.push(["meta", { name: "twitter:description", content: description }]);
+
+    return head;
+  },
 
   locales: {
     root: {

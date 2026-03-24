@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://spin.infinitymomo.com/sitemap.xml
