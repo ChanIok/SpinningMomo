@@ -32,7 +32,9 @@ import Utils.Logger;
 namespace Core::Shutdown {
 
 auto shutdown_application(Core::State::AppState& state) -> void {
-  Logger().info("Starting application shutdown sequence...");
+  Logger().info("==================================================");
+  Logger().info("SpinningMomo shutdown begin");
+  Logger().info("==================================================");
 
   // 清理顺序应该与 Core::Initializer::initialize_application 中的初始化顺序相反
 
@@ -81,7 +83,9 @@ auto shutdown_application(Core::State::AppState& state) -> void {
 
   Core::Async::stop(*state.async);
 
-  Logger().info("Application shutdown sequence finished.");
+  Logger().info("==================================================");
+  Logger().info("SpinningMomo shutdown complete");
+  Logger().info("==================================================");
 }
 
 }  // namespace Core::Shutdown

@@ -7,8 +7,6 @@ import Core.Initializer;
 import Core.RuntimeInfo;
 import Core.Shutdown;
 import Core.State;
-import Core.I18n;
-import Core.I18n.Types;
 import UI.FloatingWindow.State;
 import Utils.Logger;
 import Vendor.Windows;
@@ -30,23 +28,6 @@ auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
     m_app_state->floating_window->window.instance = m_h_instance;
 
     Core::RuntimeInfo::collect(*m_app_state);
-
-    // 测试嵌入式多语言系统
-    Logger().info("=== Testing Embedded I18n System ===");
-
-    // 初始化I18n系统
-    if (auto result = Core::I18n::initialize(*m_app_state->i18n, Core::I18n::Types::Language::ZhCN);
-        !result) {
-      Logger().error("Failed to initialize I18n system: {}", result.error());
-    } else {
-      Logger().info("I18n system initialized successfully with default Chinese");
-
-      // 直接访问texts字段测试默认中文
-      const auto& app_name = m_app_state->i18n->texts["label.app_name"];
-      Logger().info("Default app name (Chinese): {}", app_name);
-    }
-
-    Logger().info("=== I18n Testing Complete ===");
 
     // 调用统一的初始化器
     if (auto result = Core::Initializer::initialize_application(*m_app_state, m_h_instance);

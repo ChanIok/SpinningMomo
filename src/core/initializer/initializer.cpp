@@ -12,6 +12,7 @@ import Core.State;
 import Core.State.RuntimeInfo;
 import Core.I18n;
 import Core.I18n.State;
+import Core.I18n.Types;
 import Core.HttpServer;
 import Core.HttpClient;
 import Core.Events;
@@ -80,7 +81,16 @@ auto apply_language_from_settings(Core::State::AppState& state) -> void {
 auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINSTANCE instance)
     -> std::expected<void, std::string> {
   try {
+    Logger().info("==================================================");
+    Logger().info("SpinningMomo startup begin");
+    Logger().info("==================================================");
+
     Core::Events::register_all_handlers(state);
+
+    if (auto result = Core::I18n::initialize(*state.i18n, Core::I18n::Types::Language::EnUS);
+        !result) {
+      return std::unexpected("Failed to initialize i18n: " + result.error());
+    }
 
     auto last_version_result = Core::Migration::get_last_version();
     if (!last_version_result) {
@@ -214,7 +224,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 按设置自动检查更新（异步，不阻塞启动）
     Features::Update::schedule_startup_auto_update_check(state);
 
-    Logger().info("Application initialized successfully");
+    Logger().info("==================================================");
+    Logger().info("SpinningMomo startup ready");
+    Logger().info("==================================================");
     return {};
 
   } catch (const std::exception& e) {
