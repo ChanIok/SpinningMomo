@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version override (e.g., 1.0.0). Leave empty to extract from version.hpp'
+        description: 'Version override (e.g., 1.0.0). Leave empty to extract from version.json'
         required: false
         type: string
 
@@ -66,20 +66,20 @@ jobs:
           wix extension add WixToolset.Util.wixext/6.0.2 --global
           wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 
-      - name: Extract version from version.hpp
+      - name: Extract version from version.json
         id: version
         shell: pwsh
         run: |
-          $versionFile = Get-Content "src/version.hpp" -Raw
-          if ($versionFile -match 'VERSION_STR\s+"([^"]+)"') {
-            $version = $matches[1]
+          $versionJson = Get-Content "version.json" -Raw | ConvertFrom-Json
+          $version = $versionJson.version
+          if (-not [string]::IsNullOrWhiteSpace($version)) {
             # Convert 1.0.0.0 to 1.0.0 for MSI (max 3 parts)
             $versionParts = $version.Split('.')
             $msiVersion = "$($versionParts[0]).$($versionParts[1]).$($versionParts[2])"
             Write-Host "Extracted version: $msiVersion"
             echo "VERSION=$msiVersion" >> $env:GITHUB_OUTPUT
           } else {
-            Write-Error "Could not extract version from version.hpp"
+            Write-Error "Could not extract version from version.json"
             exit 1
           }
 
