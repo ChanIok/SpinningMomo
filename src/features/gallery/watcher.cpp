@@ -104,6 +104,26 @@ auto get_watcher_scan_options(const std::shared_ptr<State::FolderWatcherState>& 
   return options;
 }
 
+auto directory_notification_requires_full_rescan(Core::State::AppState& app_state,
+                                                 const ParsedNotification& notification)
+    -> std::expected<bool, std::string> {
+  switch (notification.action) {
+    case FILE_ACTION_ADDED:
+      // 运行时新建目录时，先不用急着全量扫描。
+      // 真正需要入库的内容，后面还会通过文件通知继续进入增量链路。
+      return false;
+    case FILE_ACTION_REMOVED:
+    case FILE_ACTION_RENAMED_OLD_NAME:
+    case FILE_ACTION_RENAMED_NEW_NAME:
+      // 目录被删掉或改名时，只有当这个目录下面已经有已入库资产，
+      // 才需要 full scan 去重新校正数据库里的路径状态。
+      return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(
+          app_state, notification.path.string());
+    default:
+      return false;
+  }
+}
+
 // 检查是否有待处理的变更（包含全量重扫标记或文件变更）
 auto has_pending_changes(const std::shared_ptr<State::FolderWatcherState>& watcher) -> bool {
   std::lock_guard<std::mutex> lock(watcher->pending_mutex);
@@ -819,13 +839,32 @@ auto process_watch_notifications(Core::State::AppState& app_state,
       case FILE_ACTION_ADDED:
       case FILE_ACTION_REMOVED:
       case FILE_ACTION_RENAMED_OLD_NAME:
-      case FILE_ACTION_RENAMED_NEW_NAME:
-        // 目录结构变化直接走全量，避免漏更新。
-        Logger().debug(
-            "Directory structural change detected for '{}', action={}, scheduling full rescan",
-            notification.path.string(), notification.action);
-        require_full_rescan = true;
-        break;
+      case FILE_ACTION_RENAMED_NEW_NAME: {
+        // 目录事件和文件事件不一样：
+        // 文件可以直接按单个路径做增量，目录则要先判断会不会波及已有资产。
+        auto require_full_scan_result =
+            directory_notification_requires_full_rescan(app_state, notification);
+        if (!require_full_scan_result) {
+          Logger().warn(
+              "Failed to inspect directory change impact for '{}': {}. Scheduling full rescan.",
+              notification.path.string(), require_full_scan_result.error());
+          require_full_rescan = true;
+          break;
+        }
+
+        if (require_full_scan_result.value()) {
+          Logger().debug(
+              "Directory structural change detected for '{}', action={}, indexed assets affected, "
+              "scheduling full rescan",
+              notification.path.string(), notification.action);
+          require_full_rescan = true;
+        } else {
+          Logger().debug(
+              "Directory structural change detected for '{}', action={}, no indexed assets "
+              "affected, keeping incremental path",
+              notification.path.string(), notification.action);
+        }
+      } break;
       case FILE_ACTION_MODIFIED:
         Logger().debug(
             "Directory metadata change detected for '{}', action={}, keeping incremental path",

@@ -14,6 +14,25 @@ import Utils.Time;
 import Utils.LRUCache;
 import <rfl.hpp>;
 
+namespace Features::Gallery::Asset::Repository::Detail {
+
+auto escape_like_pattern(const std::string& input) -> std::string {
+  // SQLite 的 LIKE 会把 % 和 _ 当成通配符。
+  // 这里把路径里的特殊字符转义掉，确保查询按“真实路径文本”匹配，
+  // 而不是把目录名误当成模糊匹配规则。
+  std::string escaped;
+  escaped.reserve(input.size());
+  for (char ch : input) {
+    if (ch == '\\' || ch == '%' || ch == '_') {
+      escaped.push_back('\\');
+    }
+    escaped.push_back(ch);
+  }
+  return escaped;
+}
+
+}  // namespace Features::Gallery::Asset::Repository::Detail
+
 namespace Features::Gallery::Asset::Repository {
 
 auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
@@ -124,6 +143,37 @@ auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path
   }
 
   return result.value();
+}
+
+auto has_assets_under_path_prefix(Core::State::AppState& app_state, const std::string& path_prefix)
+    -> std::expected<bool, std::string> {
+  // 这里不是查“这个目录本身是否有一条 folder 记录”，
+  // 而是查 assets 表里是否已经存在任何文件路径落在该目录下面。
+  // 例如 path_prefix = C:/A/B 时，我们要匹配的是 C:/A/B/xxx.jpg。
+  auto normalized_prefix = path_prefix;
+  if (!normalized_prefix.empty() && normalized_prefix.ends_with('/')) {
+    normalized_prefix.pop_back();
+  }
+
+  auto escaped_prefix = Detail::escape_like_pattern(normalized_prefix);
+  std::string sql = R"(
+            SELECT EXISTS(
+                SELECT 1
+                FROM assets
+                WHERE path LIKE ? ESCAPE '\'
+            )
+        )";
+
+  // 这里拼成 "prefix/%"，只匹配“这个目录的子内容”，
+  // 不会把名称相似但不在该目录下的路径误算进去。
+  std::vector<Core::Database::Types::DbParam> params = {escaped_prefix + "/%"};
+
+  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  if (!result) {
+    return std::unexpected("Failed to query assets by path prefix: " + result.error());
+  }
+
+  return result->value_or(0) != 0;
 }
 
 auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)

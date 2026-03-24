@@ -13,6 +13,7 @@ import Features.Gallery.Recovery.Types;
 import Features.Gallery.Recovery.Repository;
 import Features.Gallery.Ignore.Repository;
 import Features.Gallery.ScanCommon;
+import Features.Gallery.Asset.Repository;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
@@ -386,8 +387,23 @@ auto add_or_replace_change(
   changes_by_path[normalize_existing_path(path).string()] = action;
 }
 
-auto collect_usn_changes(const std::filesystem::path& root_path, std::int64_t start_usn,
-                         const JournalSnapshot& snapshot)
+auto directory_record_requires_full_rescan(Core::State::AppState& app_state,
+                                           const std::filesystem::path& directory_path,
+                                           DWORD reason) -> std::expected<bool, std::string> {
+  // 目录“创建”本身不会让已有资产失真：后续真正重要的是里面是否出现文件记录。
+  // 只有目录“删除/改名”才可能让数据库里已经存在的旧路径整体失效。
+  if ((reason &
+       (USN_REASON_FILE_DELETE | USN_REASON_RENAME_OLD_NAME | USN_REASON_RENAME_NEW_NAME)) == 0) {
+    return false;
+  }
+
+  // 如果这个目录前缀下根本没有已入库资产，就没必要因为它回退 full scan。
+  return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(
+      app_state, normalize_existing_path(directory_path).string());
+}
+
+auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem::path& root_path,
+                         std::int64_t start_usn, const JournalSnapshot& snapshot)
     -> std::expected<std::vector<Features::Gallery::Types::ScanChange>, std::string> {
   // 核心流程：从上次检查点 start_usn 开始读取 Journal，
   // 筛出当前 root 下的文件变更，翻译成 ScanChange 列表。
@@ -478,10 +494,21 @@ auto collect_usn_changes(const std::filesystem::path& root_path, std::int64_t st
         continue;
       }
 
-      // v1 对目录结构变化采取最保守策略：直接回退 full scan。
-      // 目录重命名 / 删除影响大量子路径，增量恢复难以正确处理。
+      // 这里看到的是“目录记录”而不是“文件记录”。
+      // 我们不再像以前那样一刀切 full scan，
+      // 而是只在它真的影响到已入库资产路径时才保守回退。
       if (is_directory_record(record)) {
-        return std::unexpected("Directory structural changes require a full rescan");
+        auto require_full_scan_result =
+            directory_record_requires_full_rescan(app_state, *candidate_path, record.reason);
+        if (!require_full_scan_result) {
+          return std::unexpected(require_full_scan_result.error());
+        }
+        if (require_full_scan_result.value()) {
+          return std::unexpected("Directory structural changes require a full rescan");
+        }
+
+        offset += common_header->RecordLength;
+        continue;
       }
 
       if ((record.reason & (USN_REASON_FILE_DELETE | USN_REASON_RENAME_OLD_NAME)) != 0) {
@@ -600,8 +627,8 @@ auto prepare_startup_recovery(Core::State::AppState& app_state,
     return plan;
   }
 
-  auto changes_result =
-      Detail::collect_usn_changes(*normalized_root_result, *stored_state.checkpoint_usn, snapshot);
+  auto changes_result = Detail::collect_usn_changes(app_state, *normalized_root_result,
+                                                    *stored_state.checkpoint_usn, snapshot);
   if (!changes_result) {
     // 离线追账出现不确定情况，宁可回退全量扫描也不猜测增量。
     plan.mode = Types::StartupRecoveryMode::FullScan;

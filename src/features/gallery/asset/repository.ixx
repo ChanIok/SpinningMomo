@@ -19,6 +19,10 @@ export auto get_asset_by_id(Core::State::AppState& app_state, std::int64_t id)
 export auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path)
     -> std::expected<std::optional<Types::Asset>, std::string>;
 
+export auto has_assets_under_path_prefix(Core::State::AppState& app_state,
+                                         const std::string& path_prefix)
+    -> std::expected<bool, std::string>;
+
 export auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
     -> std::expected<void, std::string>;
 
