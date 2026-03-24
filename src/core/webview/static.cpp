@@ -367,11 +367,14 @@ auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* we
                                  ICoreWebView2Environment* environment,
                                  Core::WebView::State::CoreResources& resources,
                                  Core::WebView::State::WebViewConfig& config) -> HRESULT {
-  auto webview2 = wil::com_ptr<ICoreWebView2>(webview).try_query<ICoreWebView2_2>();
-  if (!webview2) {
-    Logger().warn("ICoreWebView2_2 interface not available, custom resource interception disabled");
+  auto webview22 = wil::com_ptr<ICoreWebView2>(webview).try_query<ICoreWebView2_22>();
+  if (!webview22) {
+    Logger().warn(
+        "ICoreWebView2_22 interface not available, custom resource interception disabled");
     return S_OK;
   }
+
+  constexpr auto source_kinds = COREWEBVIEW2_WEB_RESOURCE_REQUEST_SOURCE_KINDS_DOCUMENT;
 
   std::wstring filter;
   if (Vendor::BuildConfig::is_debug_build()) {
@@ -384,24 +387,24 @@ auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* we
                   Utils::String::ToUtf8(filter));
   }
 
-  HRESULT hr = webview2->AddWebResourceRequestedFilter(filter.c_str(),
-                                                       COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE);
+  HRESULT hr = webview22->AddWebResourceRequestedFilterWithRequestSourceKinds(
+      filter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_IMAGE, source_kinds);
   if (FAILED(hr)) {
     Logger().warn("Failed to add image WebResourceRequested filter: {}", hr);
     return hr;
   }
 
   // <video src> 等请求常落在 MEDIA/OTHER，仅挂 IMAGE 时无法拦截图库原片 URL。
-  hr = webview2->AddWebResourceRequestedFilter(filter.c_str(),
-                                               COREWEBVIEW2_WEB_RESOURCE_CONTEXT_MEDIA);
+  hr = webview22->AddWebResourceRequestedFilterWithRequestSourceKinds(
+      filter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_MEDIA, source_kinds);
   if (FAILED(hr)) {
     Logger().warn("Failed to add media WebResourceRequested filter: {}", hr);
     return hr;
   }
 
   // OTHER：兜底部分导航/子资源上下文，避免漏拦。
-  hr = webview2->AddWebResourceRequestedFilter(filter.c_str(),
-                                               COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER);
+  hr = webview22->AddWebResourceRequestedFilterWithRequestSourceKinds(
+      filter.c_str(), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_OTHER, source_kinds);
   if (FAILED(hr)) {
     Logger().warn("Failed to add WebResourceRequested filter: {}", hr);
     return hr;
