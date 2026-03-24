@@ -38,20 +38,22 @@ auto migrate_v2_0_0_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
-// 未来的迁移脚本在此添加
-// 示例：
-// auto migrate_v2_1_0_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
-//   Logger().info("Executing migration to 2.0.0.0");
-//   // 迁移逻辑
-//   return {};
-// }
-
 auto get_all_migrations() -> const std::vector<MigrationScript>& {
   static const std::vector<MigrationScript> migrations = {
       {"2.0.0.0", "Initialize database schema", migrate_v2_0_0_0},
+      {"2.0.1.0", "Add gallery watch root recovery state",
+       [](Core::State::AppState& app_state) -> std::expected<void, std::string> {
+         Logger().info("Executing migration to 2.0.1.0: Add gallery watch root recovery state");
+         auto result = execute_sql_schema<Core::Migration::Schema::V002>(app_state);
+         if (!result) {
+           return std::unexpected("Failed to add watch root recovery state schema: " +
+                                  result.error());
+         }
+         return {};
+       }},
 
       // 未来版本的迁移脚本在此添加
-      // {"2.1.0.0", "Add user preferences", migrate_v2_1_0_0},
+      // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},
   };
   return migrations;
 }

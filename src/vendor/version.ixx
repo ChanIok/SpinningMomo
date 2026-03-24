@@ -1,13 +1,11 @@
 module;
 
-#include "version.hpp"
-
 export module Vendor.Version;
 
 import std;
 
 namespace Vendor::Version {
 
-export auto get_app_version() -> std::string { return VERSION_STR; }
+export auto get_app_version() -> std::string { return "2.0.1.0"; }
 
 }  // namespace Vendor::Version

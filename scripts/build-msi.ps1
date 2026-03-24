@@ -16,17 +16,14 @@ $ErrorActionPreference = "Stop"
 $ProjectDir = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectDir
 
-# Extract version from version.hpp if not provided
+# Extract version from version.json if not provided
 if ([string]::IsNullOrEmpty($Version)) {
-    $versionFile = Get-Content "src/version.hpp" -Raw
-    if ($versionFile -match 'VERSION_STR\s+"([^"]+)"') {
-        $fullVersion = $matches[1]
-        $versionParts = $fullVersion.Split('.')
-        $Version = "$($versionParts[0]).$($versionParts[1]).$($versionParts[2])"
-    } else {
-        Write-Error "Could not extract version from version.hpp"
+    $versionInfo = Get-Content "version.json" -Raw | ConvertFrom-Json
+    if ($null -eq $versionInfo.version -or $versionInfo.version -notmatch '^\d+\.\d+\.\d+$') {
+        Write-Error "Could not extract version from version.json"
         exit 1
     }
+    $Version = $versionInfo.version
 }
 
 Write-Host "Building SpinningMomo v$Version MSI..." -ForegroundColor Cyan

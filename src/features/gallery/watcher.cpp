@@ -8,6 +8,7 @@ import Core.WorkerPool;
 import Core.RPC.NotificationHub;
 import Features.Gallery.State;
 import Features.Gallery.Types;
+import Features.Gallery.Recovery.Service;
 import Features.Gallery.Scanner;
 import Features.Gallery.ScanCommon;
 import Features.Gallery.Folder.Repository;
@@ -674,6 +675,52 @@ auto apply_full_rescan(Core::State::AppState& app_state,
   return Features::Gallery::Scanner::scan_asset_directory(app_state, options);
 }
 
+auto apply_offline_scan_changes(Core::State::AppState& app_state,
+                                const std::shared_ptr<State::FolderWatcherState>& watcher,
+                                const std::vector<Types::ScanChange>& changes)
+    -> std::expected<Types::ScanResult, std::string> {
+  // 启动恢复并不重新发明一套“离线同步逻辑”，
+  // 而是把 USN 产出的 ScanChange 重新装配成 watcher 已有的增量输入。
+  PendingSnapshot snapshot;
+  for (const auto& change : changes) {
+    snapshot.file_changes[change.path] = change.action == Types::ScanChangeAction::REMOVE
+                                             ? State::PendingFileChangeAction::REMOVE
+                                             : State::PendingFileChangeAction::UPSERT;
+  }
+
+  auto result = apply_incremental_sync(app_state, watcher, snapshot);
+  if (!result) {
+    return std::unexpected(result.error());
+  }
+
+  result->scan_duration = "startup_usn_recovery";
+  return result;
+}
+
+auto dispatch_scan_result(Core::State::AppState& app_state,
+                          const std::shared_ptr<State::FolderWatcherState>& watcher,
+                          const Types::ScanResult& result, std::string_view mode,
+                          bool force_gallery_changed = false) -> void {
+  // 统一收口：日志、gallery.changed 通知、post_scan_callback 都在这里发。
+  // 这样启动恢复与运行时增量可以共用同一套“扫描完成后处理”。
+  Logger().info(
+      "Gallery sync finished for '{}'. mode={}, total={}, new={}, updated={}, deleted={}, "
+      "errors={}",
+      watcher->root_path.string(), mode, result.total_files, result.new_items, result.updated_items,
+      result.deleted_items, result.errors.size());
+
+  if (force_gallery_changed || result.new_items > 0 || result.updated_items > 0 ||
+      result.deleted_items > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+
+  auto post_scan_callback = get_post_scan_callback(watcher);
+  if (post_scan_callback &&
+      (result.new_items > 0 || result.updated_items > 0 || result.deleted_items > 0)) {
+    post_scan_callback(result);
+  }
+}
+
 auto schedule_sync_task(Core::State::AppState& app_state,
                         const std::shared_ptr<State::FolderWatcherState>& watcher) -> void;
 
@@ -713,24 +760,9 @@ auto process_pending_sync(Core::State::AppState& app_state,
       Logger().error("Gallery sync failed for '{}': {}", watcher->root_path.string(),
                      sync_result.error());
     } else {
-      const auto& result = sync_result.value();
-      Logger().info(
-          "Gallery sync finished for '{}'. mode={}, total={}, new={}, updated={}, deleted={}, "
-          "errors={}",
-          watcher->root_path.string(), snapshot.require_full_rescan ? "full" : "incremental",
-          result.total_files, result.new_items, result.updated_items, result.deleted_items,
-          result.errors.size());
-
-      if (snapshot.require_full_rescan || result.new_items > 0 || result.updated_items > 0 ||
-          result.deleted_items > 0) {
-        Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
-      }
-
-      auto post_scan_callback = get_post_scan_callback(watcher);
-      if (post_scan_callback &&
-          (result.new_items > 0 || result.updated_items > 0 || result.deleted_items > 0)) {
-        post_scan_callback(result);
-      }
+      dispatch_scan_result(app_state, watcher, sync_result.value(),
+                           snapshot.require_full_rescan ? "full" : "incremental",
+                           snapshot.require_full_rescan);
     }
 
     if (watcher->pending_rescan.load(std::memory_order_acquire) || has_pending_changes(watcher)) {
@@ -1123,20 +1155,82 @@ auto start_registered_watchers(Core::State::AppState& app_state)
 
   size_t started_count = 0;
   std::optional<std::string> first_error;
-  for (const auto& watcher : watchers) {
-    auto start_result = start_watcher_if_needed(app_state, watcher, true);
-    if (!start_result) {
-      Logger().warn("Skip watcher start for '{}': {}", watcher->root_path.string(),
-                    start_result.error());
+
+  // 公共 helper：启动 watcher 线程并统一处理计数和错误记录。
+  auto try_start_watcher = [&](const std::shared_ptr<State::FolderWatcherState>& w) -> bool {
+    auto result = start_watcher_if_needed(app_state, w, false);
+    if (!result) {
+      Logger().warn("Skip watcher start for '{}': {}", w->root_path.string(), result.error());
       if (!first_error.has_value()) {
-        first_error = start_result.error();
+        first_error = result.error();
       }
+      return false;
+    }
+    if (result.value()) {
+      started_count++;
+    }
+    return true;
+  };
+
+  for (const auto& watcher : watchers) {
+    // 每个 root 的启动流程：
+    // 1. 查询恢复决策（USN 增量 or 全量）
+    // 2. USN 模式先补齐离线变更
+    // 3. 补完后持久化新检查点
+    // 4. 启动实时监听线程
+    auto recovery_plan_result = Features::Gallery::Recovery::Service::prepare_startup_recovery(
+        app_state, watcher->root_path, get_watcher_scan_options(watcher));
+    if (!recovery_plan_result) {
+      Logger().warn("Startup recovery decision failed for '{}': {}. Falling back to full scan.",
+                    watcher->root_path.string(), recovery_plan_result.error());
+      if (!try_start_watcher(watcher)) continue;
+      request_full_rescan(app_state, watcher);
       continue;
     }
 
-    if (start_result.value()) {
-      started_count++;
+    const auto& plan = recovery_plan_result.value();
+
+    if (plan.mode == Features::Gallery::Recovery::Types::StartupRecoveryMode::UsnJournal) {
+      Logger().info("Gallery startup recovery for '{}': mode=usn, reason={}, changes={}",
+                    watcher->root_path.string(), plan.reason, plan.changes.size());
+
+      if (!plan.changes.empty()) {
+        auto recovery_apply_result = apply_offline_scan_changes(app_state, watcher, plan.changes);
+        if (!recovery_apply_result) {
+          Logger().warn("USN recovery apply failed for '{}': {}. Falling back to full scan.",
+                        watcher->root_path.string(), recovery_apply_result.error());
+          // apply 失败时仍必须启动 watcher 线程，否则此 root 将无人监听。
+          if (!try_start_watcher(watcher)) continue;
+          request_full_rescan(app_state, watcher);
+          continue;
+        }
+        dispatch_scan_result(app_state, watcher, recovery_apply_result.value(), "startup_usn");
+      }
+
+      // plan 已携带完整的卷快照信息，直接持久化检查点，无需重新查询 journal。
+      Features::Gallery::Recovery::Types::WatchRootRecoveryState recovery_state{
+          .root_path = plan.root_path,
+          .volume_identity = plan.volume_identity,
+          .journal_id = plan.journal_id,
+          .checkpoint_usn = plan.checkpoint_usn,
+          .rule_fingerprint = plan.rule_fingerprint,
+      };
+      auto persist_result =
+          Features::Gallery::Recovery::Service::persist_recovery_state(app_state, recovery_state);
+      if (!persist_result) {
+        Logger().warn("Failed to persist startup recovery checkpoint for '{}': {}",
+                      watcher->root_path.string(), persist_result.error());
+      }
+
+      if (!try_start_watcher(watcher)) continue;
+      continue;
     }
+
+    Logger().info("Gallery startup recovery for '{}': mode=full_scan, reason={}",
+                  watcher->root_path.string(), plan.reason);
+
+    if (!try_start_watcher(watcher)) continue;
+    request_full_rescan(app_state, watcher);
   }
 
   Logger().info("Gallery watchers started: {} / {}", started_count, watchers.size());

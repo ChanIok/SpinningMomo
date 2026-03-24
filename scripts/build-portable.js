@@ -3,17 +3,12 @@ const fs = require("fs");
 const { execSync } = require("child_process");
 
 function getVersion() {
-  const versionFile = fs.readFileSync(
-    path.join(__dirname, "..", "src", "version.hpp"),
-    "utf8"
-  );
-  const match = versionFile.match(/VERSION_STR\s+"([^"]+)"/);
-  if (!match) {
-    throw new Error("Could not extract version from version.hpp");
+  const versionFile = fs.readFileSync(path.join(__dirname, "..", "version.json"), "utf8");
+  const versionInfo = JSON.parse(versionFile);
+  if (typeof versionInfo.version !== "string" || !/^\d+\.\d+\.\d+$/.test(versionInfo.version)) {
+    throw new Error("Could not extract version from version.json");
   }
-  // Convert 1.0.0.0 to 1.0.0 (max 3 parts for consistency)
-  const parts = match[1].split(".");
-  return `${parts[0]}.${parts[1]}.${parts[2]}`;
+  return versionInfo.version;
 }
 
 function main() {

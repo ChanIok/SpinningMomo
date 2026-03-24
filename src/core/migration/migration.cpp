@@ -95,7 +95,7 @@ auto compare_versions(const std::string& v1, const std::string& v2) -> int {
       }
     }
 
-    // 补齐到4位（与 version.hpp 的格式一致）
+    // 补齐到4位（与应用版本字符串格式一致）
     while (parts.size() < 4) {
       parts.push_back(0);
     }
