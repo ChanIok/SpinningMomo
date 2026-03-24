@@ -7,6 +7,7 @@ module Features.Update;
 import std;
 import Core.Events;
 import Core.Async;
+import Core.Tasks;
 import UI.FloatingWindow.Events;
 import Core.State;
 import Core.I18n.State;
@@ -188,6 +189,19 @@ auto detect_portable() -> bool {
   return Utils::Path::GetAppMode() == Utils::Path::AppMode::Portable;
 }
 
+constexpr auto kUpdateDownloadTaskType = "update.download";
+
+auto make_task_progress(std::string stage, std::optional<std::string> message = std::nullopt,
+                        std::optional<double> percent = std::nullopt) -> Core::Tasks::TaskProgress {
+  return Core::Tasks::TaskProgress{
+      .stage = std::move(stage),
+      .current = 0,
+      .total = 0,
+      .percent = percent,
+      .message = std::move(message),
+  };
+}
+
 // 从版本检查URL获取最新版本号
 auto fetch_latest_version(Core::State::AppState& app_state, const std::string& version_url)
     -> asio::awaitable<std::expected<std::string, std::string>> {
@@ -324,6 +338,197 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   }
 }
 
+auto run_download_update_task(Core::State::AppState& app_state, const std::string& task_id,
+                              const std::string& version, bool prepare_install_on_exit)
+    -> asio::awaitable<void> {
+  try {
+    if (!app_state.update || !app_state.settings) {
+      Core::Tasks::complete_task_failed(app_state, task_id, "Update state is not ready");
+      co_return;
+    }
+
+    Core::Tasks::mark_task_running(app_state, task_id);
+    // 下载开始时使旧的已下载版本标记失效，避免下载期间 install_update 误用旧文件
+    app_state.update->downloaded_version.clear();
+
+    const auto& download_sources = app_state.settings->raw.update.download_sources;
+    if (download_sources.empty()) {
+      Core::Tasks::complete_task_failed(app_state, task_id, "No download sources configured");
+      co_return;
+    }
+
+    auto filename = get_update_filename(version, app_state.update->is_portable);
+    auto temp_dir = get_temp_directory();
+    if (!temp_dir) {
+      auto error_message = "Failed to get temporary directory: " + temp_dir.error();
+      Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+      co_return;
+    }
+
+    std::filesystem::path save_path = *temp_dir / filename;
+
+    Core::Tasks::update_task_progress(
+        app_state, task_id,
+        make_task_progress("prepare", std::format("Preparing update package for {}", version),
+                           0.0));
+
+    // 按优先级依次尝试各下载源，任意一个成功即返回，全部失败才报错
+    for (const auto& source : download_sources) {
+      auto package_url_result = format_download_url(source.url_template, version, filename);
+      if (!package_url_result) {
+        Logger().warn("Skipped source {} due to invalid package URL template: {}", source.name,
+                      package_url_result.error());
+        continue;
+      }
+
+      auto checksums_url_result =
+          format_download_url(source.url_template, version, "SHA256SUMS.txt");
+      if (!checksums_url_result) {
+        Logger().warn("Skipped source {} due to invalid checksum URL template: {}", source.name,
+                      checksums_url_result.error());
+        continue;
+      }
+
+      Core::Tasks::update_task_progress(
+          app_state, task_id,
+          make_task_progress("fetchChecksums",
+                             std::format("Fetching checksums from {}", source.name), 5.0));
+
+      auto checksums_content_result = co_await http_get(app_state, checksums_url_result.value());
+      if (!checksums_content_result) {
+        Logger().warn("Failed to fetch SHA256SUMS from {}: {}", source.name,
+                      checksums_content_result.error());
+        continue;
+      }
+
+      auto expected_sha256_result =
+          parse_sha256sum_for_filename(checksums_content_result.value(), filename);
+      if (!expected_sha256_result) {
+        Logger().warn("Failed to parse SHA256SUMS from {}: {}", source.name,
+                      expected_sha256_result.error());
+        continue;
+      }
+
+      Core::Tasks::update_task_progress(
+          app_state, task_id,
+          make_task_progress("download", std::format("Trying download source: {}", source.name),
+                             15.0));
+      Logger().info("Trying download source: {} ({})", source.name, package_url_result.value());
+
+      auto download_result =
+          co_await download_file(app_state, package_url_result.value(), save_path);
+      if (!download_result) {
+        Logger().warn("Download failed from {}: {}", source.name, download_result.error());
+        continue;
+      }
+
+      Core::Tasks::update_task_progress(
+          app_state, task_id,
+          make_task_progress(
+              "verify", std::format("Verifying downloaded package from {}", source.name), 85.0));
+
+      auto verify_result = verify_downloaded_file_sha256(save_path, expected_sha256_result.value());
+      if (!verify_result) {
+        std::error_code remove_error;
+        std::filesystem::remove(save_path, remove_error);
+        Logger().warn("SHA256 verification failed from {}: {}", source.name, verify_result.error());
+        continue;
+      }
+
+      // SHA256 校验通过后才标记下载完成，确保 install_update 只使用已验证的文件
+      app_state.update->downloaded_version = version;
+
+      if (prepare_install_on_exit) {
+        Core::Tasks::update_task_progress(
+            app_state, task_id,
+            make_task_progress(
+                "prepareInstall",
+                std::format("Downloaded from {}. Preparing install on exit", source.name), 95.0));
+
+        Types::InstallUpdateParams install_params;
+        install_params.restart = false;
+        auto install_result = install_update(app_state, install_params);
+        if (!install_result) {
+          auto error_message = "Failed to prepare downloaded update: " + install_result.error();
+          Logger().warn("Startup auto update prepare failed: {}", install_result.error());
+          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
+          co_return;
+        }
+      }
+
+      Core::Tasks::update_task_progress(
+          app_state, task_id,
+          make_task_progress(
+              "completed",
+              prepare_install_on_exit
+                  ? std::format("Downloaded from {} and scheduled for install on exit", source.name)
+                  : std::format("Download completed from {}", source.name),
+              100.0));
+
+      Logger().info("Download completed from {}: {}", source.name, save_path.string());
+      Core::Tasks::complete_task_success(app_state, task_id);
+      co_return;
+    }
+
+    Core::Tasks::complete_task_failed(app_state, task_id, "All download sources failed");
+  } catch (const std::exception& e) {
+    Core::Tasks::complete_task_failed(app_state, task_id, std::string(e.what()));
+  }
+}
+
+auto start_download_update_task(Core::State::AppState& app_state, bool prepare_install_on_exit)
+    -> asio::awaitable<std::expected<Types::StartDownloadUpdateResult, std::string>> {
+  if (!app_state.update) {
+    co_return std::unexpected("Update not initialized");
+  }
+
+  if (app_state.update->latest_version.empty()) {
+    co_return std::unexpected("No version info available. Please check for updates first.");
+  }
+
+  if (!app_state.settings) {
+    co_return std::unexpected("Settings not initialized");
+  }
+
+  if (!app_state.async) {
+    co_return std::unexpected("Async state is not initialized");
+  }
+
+  // 同一时刻只允许一个下载任务，重复调用直接返回已有任务 ID
+  if (auto active_task = Core::Tasks::find_active_task_of_type(app_state, kUpdateDownloadTaskType);
+      active_task.has_value()) {
+    co_return Types::StartDownloadUpdateResult{
+        .task_id = active_task->task_id,
+        .status = "already_running",
+    };
+  }
+
+  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  if (!io_context) {
+    co_return std::unexpected("Async runtime is not available");
+  }
+
+  auto version = app_state.update->latest_version;
+  auto task_id = Core::Tasks::create_task(app_state, kUpdateDownloadTaskType, version);
+  if (task_id.empty()) {
+    co_return std::unexpected("Failed to create update download task");
+  }
+
+  // co_await asio::post 将实际下载推迟到下一个事件循环周期，使本函数先返回给调用方
+  asio::co_spawn(
+      *io_context,
+      [&app_state, task_id, version, prepare_install_on_exit]() -> asio::awaitable<void> {
+        co_await asio::post(asio::use_awaitable);
+        co_await run_download_update_task(app_state, task_id, version, prepare_install_on_exit);
+      },
+      asio::detached);
+
+  co_return Types::StartDownloadUpdateResult{
+      .task_id = task_id,
+      .status = "started",
+  };
+}
+
 auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> void {
   if (!app_state.settings || !app_state.update || !app_state.async) {
     Logger().warn("Skip startup auto update check: state is not ready");
@@ -380,22 +585,15 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
             co_return;
           }
 
-          auto download_result = co_await download_update(app_state);
-          if (!download_result) {
-            Logger().warn("Startup auto update download failed: {}", download_result.error());
+          auto download_task_result = co_await start_download_update_task(app_state, true);
+          if (!download_task_result) {
+            Logger().warn("Startup auto update download task failed: {}",
+                          download_task_result.error());
             co_return;
           }
 
-          Types::InstallUpdateParams install_params;
-          install_params.restart = false;
-
-          auto install_result = install_update(app_state, install_params);
-          if (!install_result) {
-            Logger().warn("Startup auto update prepare failed: {}", install_result.error());
-            co_return;
-          }
-
-          Logger().info("Startup auto update prepared successfully");
+          Logger().info("Startup auto update background download {}: task_id={}",
+                        download_task_result->status, download_task_result->task_id);
           co_return;
         }
 
@@ -440,6 +638,11 @@ auto check_for_update(Core::State::AppState& app_state)
     app_state.update->is_checking = false;
     app_state.update->update_available = result.has_update;
     app_state.update->latest_version = result.latest_version;
+    // 已下载的版本与最新版本不符时清除，避免安装过期文件
+    if (result.has_update && !app_state.update->downloaded_version.empty() &&
+        app_state.update->downloaded_version != result.latest_version) {
+      app_state.update->downloaded_version.clear();
+    }
 
     Logger().info("Check for update: current={}, latest={}, has_update={}", current_version,
                   result.latest_version, result.has_update);
@@ -491,117 +694,6 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   app_state.update->pending_update = false;
 }
 
-auto download_update(Core::State::AppState& app_state)
-    -> asio::awaitable<std::expected<Types::DownloadUpdateResult, std::string>> {
-  try {
-    if (!app_state.update) {
-      co_return std::unexpected("Update not initialized");
-    }
-
-    if (app_state.update->latest_version.empty()) {
-      co_return std::unexpected("No version info available. Please check for updates first.");
-    }
-
-    if (!app_state.settings) {
-      co_return std::unexpected("Settings not initialized");
-    }
-
-    const auto& download_sources = app_state.settings->raw.update.download_sources;
-    if (download_sources.empty()) {
-      co_return std::unexpected("No download sources configured");
-    }
-
-    // 根据安装类型确定文件名和保存路径
-    auto filename =
-        get_update_filename(app_state.update->latest_version, app_state.update->is_portable);
-
-    auto temp_dir = get_temp_directory();
-    if (!temp_dir) {
-      co_return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
-    }
-    std::filesystem::path save_path = *temp_dir / filename;
-
-    app_state.update->download_in_progress = true;
-    app_state.update->download_progress = 0.0;
-    app_state.update->error_message.clear();
-
-    // 按优先级尝试各下载源
-    for (size_t i = 0; i < download_sources.size(); ++i) {
-      const auto& source = download_sources[i];
-      auto package_url_result =
-          format_download_url(source.url_template, app_state.update->latest_version, filename);
-      if (!package_url_result) {
-        Logger().warn("Skipped source {} due to invalid package URL template: {}", source.name,
-                      package_url_result.error());
-        continue;
-      }
-
-      auto checksums_url_result = format_download_url(
-          source.url_template, app_state.update->latest_version, "SHA256SUMS.txt");
-      if (!checksums_url_result) {
-        Logger().warn("Skipped source {} due to invalid checksum URL template: {}", source.name,
-                      checksums_url_result.error());
-        continue;
-      }
-
-      auto checksums_content_result = co_await http_get(app_state, checksums_url_result.value());
-      if (!checksums_content_result) {
-        Logger().warn("Failed to fetch SHA256SUMS from {}: {}", source.name,
-                      checksums_content_result.error());
-        continue;
-      }
-
-      auto expected_sha256_result =
-          parse_sha256sum_for_filename(checksums_content_result.value(), filename);
-      if (!expected_sha256_result) {
-        Logger().warn("Failed to parse SHA256SUMS from {}: {}", source.name,
-                      expected_sha256_result.error());
-        continue;
-      }
-
-      Logger().info("Trying download source: {} ({})", source.name, package_url_result.value());
-
-      auto download_result =
-          co_await download_file(app_state, package_url_result.value(), save_path);
-      if (download_result) {
-        auto verify_result =
-            verify_downloaded_file_sha256(save_path, expected_sha256_result.value());
-        if (!verify_result) {
-          std::error_code remove_error;
-          std::filesystem::remove(save_path, remove_error);
-          Logger().warn("SHA256 verification failed from {}: {}", source.name,
-                        verify_result.error());
-          continue;
-        }
-
-        app_state.update->download_in_progress = false;
-        app_state.update->download_progress = 1.0;
-
-        Types::DownloadUpdateResult result;
-        result.message = "Download completed from " + source.name;
-        result.file_path = save_path;
-
-        Logger().info("Download completed from {}: {}", source.name, save_path.string());
-        co_return result;
-      }
-
-      Logger().warn("Download failed from {}: {}", source.name, download_result.error());
-    }
-
-    // 所有源都失败
-    app_state.update->download_in_progress = false;
-    app_state.update->error_message = "All download sources failed";
-    co_return std::unexpected("All download sources failed");
-
-  } catch (const std::exception& e) {
-    if (app_state.update) {
-      app_state.update->download_in_progress = false;
-      app_state.update->error_message = e.what();
-    }
-    co_return std::unexpected(std::string(e.what()));
-  }
-}
-
 auto install_update(Core::State::AppState& app_state, const Types::InstallUpdateParams& params)
     -> std::expected<Types::InstallUpdateResult, std::string> {
   try {
@@ -609,13 +701,20 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
       return std::unexpected("Update not initialized");
     }
 
-    if (app_state.update->latest_version.empty()) {
-      return std::unexpected("No version info available");
+    if (app_state.update->downloaded_version.empty()) {
+      return std::unexpected("No downloaded update available");
+    }
+
+    if (!app_state.update->latest_version.empty() &&
+        app_state.update->downloaded_version != app_state.update->latest_version &&
+        app_state.update->update_available) {
+      return std::unexpected(
+          "Downloaded update is outdated. Please download the latest version again.");
     }
 
     // 根据安装类型确定更新包路径
     auto filename =
-        get_update_filename(app_state.update->latest_version, app_state.update->is_portable);
+        get_update_filename(app_state.update->downloaded_version, app_state.update->is_portable);
     auto temp_dir = get_temp_directory();
     if (!temp_dir) {
       return std::unexpected("Failed to get temporary directory: " + temp_dir.error());

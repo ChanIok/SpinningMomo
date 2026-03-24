@@ -28,10 +28,10 @@ auto handle_check_for_update(Core::State::AppState& app_state,
   co_return result.value();
 }
 
-auto handle_download_update(Core::State::AppState& app_state,
-                            [[maybe_unused]] const rfl::Generic& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Update::Types::DownloadUpdateResult>> {
-  auto result = co_await Features::Update::download_update(app_state);
+auto handle_start_download(Core::State::AppState& app_state,
+                           [[maybe_unused]] const rfl::Generic& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Update::Types::StartDownloadUpdateResult>> {
+  auto result = co_await Features::Update::start_download_update_task(app_state);
 
   if (!result) {
     co_return std::unexpected(
@@ -61,9 +61,9 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "update.check_for_update", handle_check_for_update,
       "Check for available updates");
 
-  Core::RPC::register_method<rfl::Generic, Features::Update::Types::DownloadUpdateResult>(
-      app_state, app_state.rpc->registry, "update.download_update", handle_download_update,
-      "Download update package");
+  Core::RPC::register_method<rfl::Generic, Features::Update::Types::StartDownloadUpdateResult>(
+      app_state, app_state.rpc->registry, "update.start_download", handle_start_download,
+      "Start downloading update package in background");
 
   Core::RPC::register_method<Features::Update::Types::InstallUpdateParams,
                              Features::Update::Types::InstallUpdateResult>(

@@ -9,12 +9,11 @@ export namespace Features::Update::State {
 
 struct UpdateState {
   // 运行时状态
-  bool is_checking = false;           // 是否正在检查更新
-  bool download_in_progress = false;  // 是否正在下载
-  bool update_available = false;      // 是否有可用更新
-  std::string latest_version;         // 最新版本号
-  double download_progress = 0.0;     // 下载进度 (0.0-1.0)
-  std::string error_message;          // 错误信息
+  bool is_checking = false;        // 是否正在检查更新
+  bool update_available = false;   // 是否有可用更新
+  std::string latest_version;      // 最新版本号
+  std::string downloaded_version;  // 已下载完成的版本号
+  std::string error_message;       // 错误信息
 
   std::filesystem::path update_script_path;  // 更新脚本路径
   bool pending_update = false;               // 是否有待处理的更新

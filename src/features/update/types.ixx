@@ -16,10 +16,10 @@ struct CheckUpdateResult {
   std::string current_version;  // 当前版本
 };
 
-// 下载更新响应结果
-struct DownloadUpdateResult {
-  std::filesystem::path file_path;  // 下载的文件路径
-  std::string message;              // 结果消息
+// 启动后台下载更新任务响应结果
+struct StartDownloadUpdateResult {
+  std::string task_id;  // 后台任务ID
+  std::string status;   // started | already_running
 };
 
 // 安装更新请求参数

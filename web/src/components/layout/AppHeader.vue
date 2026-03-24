@@ -96,6 +96,9 @@ function resolveTaskTypeLabel(type: string): string {
   if (type === 'gallery.scanDirectory') {
     return t('app.header.tasks.type.galleryScan')
   }
+  if (type === 'update.download') {
+    return t('app.header.tasks.type.updateDownload')
+  }
   if (type === 'extensions.infinityNikki.initialScan') {
     return t('app.header.tasks.type.infinityNikkiInitialScan')
   }

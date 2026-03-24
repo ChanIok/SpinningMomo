@@ -16,6 +16,9 @@ export auto create_task(Core::State::AppState& state, const std::string& type,
 
 export auto has_active_task_of_type(Core::State::AppState& state, const std::string& type) -> bool;
 
+export auto find_active_task_of_type(Core::State::AppState& state, const std::string& type)
+    -> std::optional<TaskSnapshot>;
+
 export auto mark_task_running(Core::State::AppState& state, const std::string& task_id) -> bool;
 
 export auto update_task_progress(Core::State::AppState& state, const std::string& task_id,

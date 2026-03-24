@@ -73,15 +73,30 @@ auto create_task(Core::State::AppState& state, const std::string& type,
 }
 
 auto has_active_task_of_type(Core::State::AppState& state, const std::string& type) -> bool {
+  return find_active_task_of_type(state, type).has_value();
+}
+
+auto find_active_task_of_type(Core::State::AppState& state, const std::string& type)
+    -> std::optional<TaskSnapshot> {
   if (!state.tasks) {
-    return false;
+    return std::nullopt;
   }
 
   std::lock_guard<std::mutex> lock(state.tasks->mutex);
-  return std::ranges::any_of(state.tasks->tasks, [&type](const auto& item) {
-    const auto& snapshot = item.second;
-    return snapshot.type == type && is_task_active(snapshot.status);
-  });
+  // 反向遍历以优先返回最新创建的活跃任务
+  for (auto it = state.tasks->order.rbegin(); it != state.tasks->order.rend(); ++it) {
+    auto task_it = state.tasks->tasks.find(*it);
+    if (task_it == state.tasks->tasks.end()) {
+      continue;
+    }
+
+    const auto& snapshot = task_it->second;
+    if (snapshot.type == type && is_task_active(snapshot.status)) {
+      return snapshot;
+    }
+  }
+
+  return std::nullopt;
 }
 
 auto mark_task_running(Core::State::AppState& state, const std::string& task_id) -> bool {

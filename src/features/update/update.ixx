@@ -21,9 +21,10 @@ export auto schedule_startup_auto_update_check(Core::State::AppState& app_state)
 export auto check_for_update(Core::State::AppState& app_state)
     -> asio::awaitable<std::expected<Types::CheckUpdateResult, std::string>>;
 
-// 下载更新
-export auto download_update(Core::State::AppState& app_state)
-    -> asio::awaitable<std::expected<Types::DownloadUpdateResult, std::string>>;
+// 启动后台下载更新任务
+export auto start_download_update_task(Core::State::AppState& app_state,
+                                       bool prepare_install_on_exit = false)
+    -> asio::awaitable<std::expected<Types::StartDownloadUpdateResult, std::string>>;
 
 // 安装更新
 export auto install_update(Core::State::AppState& app_state,

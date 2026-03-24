@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { call } from '@/core/rpc'
+import { useTaskStore } from '@/core/tasks/store'
 import { getCurrentEnvironment } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -43,14 +44,21 @@ interface CheckUpdateResult {
   currentVersion: string
 }
 
+interface StartDownloadUpdateResult {
+  taskId: string
+  status: 'started' | 'already_running'
+}
+
 const { t, locale } = useI18n()
 const { toast } = useToast()
+const taskStore = useTaskStore()
 
 const runtimeInfo = ref<RuntimeInfo | null>(null)
 const currentVersionFromUpdate = ref<string | null>(null)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const isCheckingUpdate = ref(false)
+const isStartingDownload = ref(false)
 const isInstallingUpdate = ref(false)
 const hasUpdate = ref<boolean | null>(null)
 const latestVersion = ref<string | null>(null)
@@ -82,6 +90,31 @@ const appVersionText = computed(
   () => runtimeInfo.value?.version || currentVersionFromUpdate.value || '-'
 )
 
+const currentUpdateTask = computed(() => {
+  return taskStore.tasks.find((task) => task.type === 'update.download') ?? null
+})
+
+const isDownloadingUpdate = computed(() => {
+  const status = currentUpdateTask.value?.status
+  return status === 'queued' || status === 'running'
+})
+
+const isDownloadedUpdateReady = computed(
+  () => currentUpdateTask.value?.status === 'succeeded' && hasUpdate.value !== false
+)
+
+const resolvedUpdateError = computed(() => {
+  if (updateError.value) {
+    return updateError.value
+  }
+
+  if (currentUpdateTask.value?.status === 'failed') {
+    return currentUpdateTask.value.errorMessage || t('about.status.updateFailed')
+  }
+
+  return null
+})
+
 const actionButtonText = computed(() => {
   if (isInstallingUpdate.value) {
     return t('about.actions.installingUpdate')
@@ -89,8 +122,15 @@ const actionButtonText = computed(() => {
   if (isCheckingUpdate.value) {
     return t('about.actions.checkingUpdate')
   }
+  if (isStartingDownload.value || isDownloadingUpdate.value) {
+    return t('about.actions.downloadingUpdate')
+  }
+  if (isDownloadedUpdateReady.value) {
+    const displayVersion = currentUpdateTask.value?.context || latestVersion.value || ''
+    return t('about.actions.installDownloadedUpdate').replace('{version}', displayVersion)
+  }
   if (hasUpdate.value) {
-    return t('about.actions.updateAvailable').replace('{version}', latestVersion.value || '')
+    return t('about.actions.downloadUpdate').replace('{version}', latestVersion.value || '')
   }
   if (updateChecked.value && !hasUpdate.value) {
     return t('about.status.upToDateShort')
@@ -173,7 +213,7 @@ const loadRuntimeInfo = async () => {
 }
 
 const checkForUpdate = async () => {
-  if (isCheckingUpdate.value || isInstallingUpdate.value) {
+  if (isCheckingUpdate.value || isStartingDownload.value || isInstallingUpdate.value) {
     return
   }
 
@@ -210,25 +250,43 @@ const checkForUpdate = async () => {
 }
 
 const downloadAndInstallUpdate = async () => {
-  if (isCheckingUpdate.value || isInstallingUpdate.value || !hasUpdate.value) {
+  if (isCheckingUpdate.value || isStartingDownload.value || isInstallingUpdate.value) {
     return
   }
 
-  isInstallingUpdate.value = true
+  if (isDownloadedUpdateReady.value) {
+    isInstallingUpdate.value = true
+    updateError.value = null
+
+    try {
+      await call('update.install_update', { restart: true })
+    } catch (e) {
+      updateError.value = toErrorMessage(e)
+      toast.error(t('about.toast.updateInstallFailed'))
+      isInstallingUpdate.value = false
+    }
+    return
+  }
+
+  if (!hasUpdate.value) {
+    return
+  }
+
+  isStartingDownload.value = true
   updateError.value = null
 
   try {
-    await call('update.download_update')
-    await call('update.install_update', { restart: true })
+    await call<StartDownloadUpdateResult>('update.start_download')
   } catch (e) {
     updateError.value = toErrorMessage(e)
-    toast.error(t('about.toast.updateInstallFailed'))
-    isInstallingUpdate.value = false
+    toast.error(t('about.toast.updateDownloadFailed'))
+  } finally {
+    isStartingDownload.value = false
   }
 }
 
 const handleUpdateAction = async () => {
-  if (hasUpdate.value) {
+  if (hasUpdate.value || isDownloadedUpdateReady.value) {
     await downloadAndInstallUpdate()
     return
   }
@@ -283,20 +341,31 @@ onBeforeUnmount(() => {
               ? 'bg-primary shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background hover:bg-primary/90'
               : '',
           ]"
-          :disabled="isCheckingUpdate || isInstallingUpdate"
+          :disabled="
+            isCheckingUpdate || isStartingDownload || isInstallingUpdate || isDownloadingUpdate
+          "
           @click="handleUpdateAction"
         >
           <div class="flex items-center gap-2">
-            <Loader2 v-if="isCheckingUpdate || isInstallingUpdate" class="h-4 w-4 animate-spin" />
+            <Loader2
+              v-if="
+                isCheckingUpdate || isStartingDownload || isInstallingUpdate || isDownloadingUpdate
+              "
+              class="h-4 w-4 animate-spin"
+            />
+            <Package v-else-if="isDownloadedUpdateReady" class="h-4 w-4" />
             <Download v-else-if="hasUpdate" class="h-4 w-4" />
             <Check v-else-if="updateChecked && !hasUpdate" class="h-4 w-4 text-green-500" />
             <RefreshCw v-else class="h-4 w-4 text-muted-foreground" />
             <span>{{ actionButtonText }}</span>
           </div>
         </Button>
-        <p v-if="updateError" class="mt-3 flex items-center gap-1.5 text-sm text-destructive">
+        <p
+          v-if="resolvedUpdateError"
+          class="mt-3 flex items-center gap-1.5 text-sm text-destructive"
+        >
           <TriangleAlert class="h-4 w-4" />
-          {{ updateError }}
+          {{ resolvedUpdateError }}
         </p>
       </div>
 
