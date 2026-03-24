@@ -6,7 +6,10 @@ import std;
 import Core.State;
 import Core.Database;
 import Core.Migration.Schema;
+import Features.Settings;
+import Features.Settings.Types;
 import Utils.Logger;
+import <rfl/json.hpp>;
 
 namespace Core::Migration::Scripts {
 
@@ -38,19 +41,61 @@ auto migrate_v2_0_0_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
+auto migrate_v2_0_1_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.0.1.0: Add gallery watch root recovery state");
+
+  auto result = execute_sql_schema<Core::Migration::Schema::V002>(app_state);
+  if (!result) {
+    return std::unexpected("Failed to add watch root recovery state schema: " + result.error());
+  }
+
+  return {};
+}
+
+auto migrate_v2_0_2_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.0.2.0: Update version check URL");
+
+  auto settings_path_result = Features::Settings::get_settings_path();
+  if (!settings_path_result) {
+    return std::unexpected("Failed to get settings path: " + settings_path_result.error());
+  }
+
+  const auto& settings_path = settings_path_result.value();
+  if (!std::filesystem::exists(settings_path)) {
+    Logger().info("Settings file not found, skip version URL migration");
+    return {};
+  }
+
+  std::ifstream file(settings_path);
+  if (!file) {
+    return std::unexpected("Failed to open settings file: " + settings_path.string());
+  }
+
+  std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+
+  auto settings_result =
+      rfl::json::read<Features::Settings::Types::AppSettings, rfl::DefaultIfMissing>(json_str);
+  if (!settings_result) {
+    return std::unexpected("Failed to parse settings: " + settings_result.error().what());
+  }
+
+  auto settings = settings_result.value();
+  settings.update.version_url = "https://spin.infinitymomo.com/version.txt";
+
+  auto save_result = Features::Settings::save_settings_to_file(settings_path, settings);
+  if (!save_result) {
+    return std::unexpected("Failed to save settings: " + save_result.error());
+  }
+
+  Logger().info("Settings version URL migrated successfully");
+  return {};
+}
+
 auto get_all_migrations() -> const std::vector<MigrationScript>& {
   static const std::vector<MigrationScript> migrations = {
       {"2.0.0.0", "Initialize database schema", migrate_v2_0_0_0},
-      {"2.0.1.0", "Add gallery watch root recovery state",
-       [](Core::State::AppState& app_state) -> std::expected<void, std::string> {
-         Logger().info("Executing migration to 2.0.1.0: Add gallery watch root recovery state");
-         auto result = execute_sql_schema<Core::Migration::Schema::V002>(app_state);
-         if (!result) {
-           return std::unexpected("Failed to add watch root recovery state schema: " +
-                                  result.error());
-         }
-         return {};
-       }},
+      {"2.0.1.0", "Add gallery watch root recovery state", migrate_v2_0_1_0},
+      {"2.0.2.0", "Update version check URL", migrate_v2_0_2_0},
 
       // 未来版本的迁移脚本在此添加
       // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},

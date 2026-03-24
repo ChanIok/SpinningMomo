@@ -155,7 +155,7 @@ export struct AppSettings {
     bool auto_update_on_exit = false;  // 是否在退出时自动更新
 
     // 版本检查URL（Cloudflare Pages）
-    std::string version_url = "https://spinning.infinitymomo.com/version.txt";
+    std::string version_url = "https://spin.infinitymomo.com/version.txt";
 
     // 下载源配置（按优先级排序）
     struct DownloadSource {

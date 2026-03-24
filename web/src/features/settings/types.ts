@@ -347,7 +347,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   update: {
     autoCheck: true,
     autoUpdateOnExit: false,
-    versionUrl: 'https://spinning.infinitymomo.com/version.txt',
+    versionUrl: 'https://spin.infinitymomo.com/version.txt',
     downloadSources: [
       {
         name: 'GitHub',
