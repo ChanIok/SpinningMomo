@@ -20,6 +20,7 @@ import Utils.Crypto;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
+import Utils.Throttle;
 import Vendor.ShellApi;
 import Vendor.Version;
 import Vendor.Windows;
@@ -202,6 +203,47 @@ auto make_task_progress(std::string stage, std::optional<std::string> message = 
   };
 }
 
+auto format_byte_size(std::uint64_t bytes) -> std::string {
+  constexpr std::array<const char*, 5> kUnits = {"B", "KB", "MB", "GB", "TB"};
+  auto value = static_cast<double>(bytes);
+  std::size_t unit_index = 0;
+  while (value >= 1024.0 && unit_index + 1 < kUnits.size()) {
+    value /= 1024.0;
+    ++unit_index;
+  }
+
+  if (unit_index == 0) {
+    return std::format("{} {}", bytes, kUnits[unit_index]);
+  }
+
+  return std::format("{:.1f} {}", value, kUnits[unit_index]);
+}
+
+auto make_download_task_progress(const std::string& source_name,
+                                 const Core::HttpClient::Types::DownloadProgress& progress)
+    -> Core::Tasks::TaskProgress {
+  std::optional<double> percent = std::nullopt;
+  std::optional<std::string> message = std::nullopt;
+
+  if (progress.total_bytes.has_value() && progress.total_bytes.value() > 0) {
+    percent = std::clamp(static_cast<double>(progress.downloaded_bytes) * 100.0 /
+                             static_cast<double>(progress.total_bytes.value()),
+                         0.0, 100.0);
+    message = std::format("{}: {} / {}", source_name, format_byte_size(progress.downloaded_bytes),
+                          format_byte_size(progress.total_bytes.value()));
+  } else {
+    message = std::format("{}: {}", source_name, format_byte_size(progress.downloaded_bytes));
+  }
+
+  return Core::Tasks::TaskProgress{
+      .stage = "download",
+      .current = static_cast<std::int64_t>(progress.downloaded_bytes),
+      .total = static_cast<std::int64_t>(progress.total_bytes.value_or(0)),
+      .percent = percent,
+      .message = std::move(message),
+  };
+}
+
 // 从版本检查URL获取最新版本号
 auto fetch_latest_version(Core::State::AppState& app_state, const std::string& version_url)
     -> asio::awaitable<std::expected<std::string, std::string>> {
@@ -219,7 +261,8 @@ auto fetch_latest_version(Core::State::AppState& app_state, const std::string& v
 }
 
 auto download_file(Core::State::AppState& app_state, const std::string& url,
-                   const std::filesystem::path& save_path)
+                   const std::filesystem::path& save_path,
+                   Core::HttpClient::Types::DownloadProgressCallback progress_callback = nullptr)
     -> asio::awaitable<std::expected<void, std::string>> {
   try {
     Core::HttpClient::Types::Request request{
@@ -227,23 +270,11 @@ auto download_file(Core::State::AppState& app_state, const std::string& url,
         .url = url,
     };
 
-    auto response = co_await Core::HttpClient::fetch(app_state, request);
-    if (!response) {
-      co_return std::unexpected("Download failed: " + response.error());
+    auto result = co_await Core::HttpClient::download_to_file(app_state, request, save_path,
+                                                              progress_callback);
+    if (!result) {
+      co_return std::unexpected("Download failed: " + result.error());
     }
-
-    if (response->status_code != 200) {
-      co_return std::unexpected("Download failed: HTTP error " +
-                                std::to_string(response->status_code));
-    }
-
-    std::ofstream file(save_path, std::ios::binary);
-    if (!file) {
-      co_return std::unexpected("Failed to create file: " + save_path.string());
-    }
-
-    file << response->body;
-    file.close();
 
     co_return std::expected<void, std::string>{};
 
@@ -415,8 +446,21 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
                              15.0));
       Logger().info("Trying download source: {} ({})", source.name, package_url_result.value());
 
-      auto download_result =
-          co_await download_file(app_state, package_url_result.value(), save_path);
+      auto progress_throttle = Utils::Throttle::create<Core::HttpClient::Types::DownloadProgress>(
+          std::chrono::milliseconds(250));
+      auto emit_progress = [&app_state, &task_id,
+                            &source](const Core::HttpClient::Types::DownloadProgress& progress) {
+        Core::Tasks::update_task_progress(app_state, task_id,
+                                          make_download_task_progress(source.name, progress));
+      };
+
+      auto download_result = co_await download_file(
+          app_state, package_url_result.value(), save_path,
+          [&progress_throttle,
+           &emit_progress](const Core::HttpClient::Types::DownloadProgress& progress) {
+            Utils::Throttle::call(*progress_throttle, emit_progress, progress);
+          });
+      Utils::Throttle::flush(*progress_throttle, emit_progress);
       if (!download_result) {
         Logger().warn("Download failed from {}: {}", source.name, download_result.error());
         continue;

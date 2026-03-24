@@ -55,6 +55,8 @@ auto close_connect_handle(RequestOperation& operation) -> void {
   }
 }
 
+// 关闭请求句柄（幂等）。若回调已注册，句柄置空延迟到 HANDLE_CLOSING 回调中处理，
+// 避免在回调仍在运行时提前释放句柄导致悬空指针。
 auto close_request_handle(RequestOperation& operation) -> void {
   if (operation.request_handle == nullptr) {
     return;
@@ -104,6 +106,7 @@ auto to_wide_utf8(const std::string& value, std::string_view field_name)
   return wide;
 }
 
+// HTTP 方法缺省为 GET，并统一转为大写
 auto normalize_method(std::string method) -> std::string {
   if (method.empty()) {
     method = "GET";
@@ -166,6 +169,57 @@ auto parse_raw_headers(std::wstring_view raw_headers) -> std::vector<Types::Head
   return headers;
 }
 
+// 从响应头中查找 Content-Length 并解析为无符号整数；服务器不保证提供，失败时返回 nullopt
+auto find_content_length(const Types::Response& response) -> std::optional<std::uint64_t> {
+  for (const auto& header : response.headers) {
+    if (Utils::String::ToLowerAscii(header.name) != "content-length") {
+      continue;
+    }
+
+    try {
+      return static_cast<std::uint64_t>(std::stoull(Utils::String::TrimAscii(header.value)));
+    } catch (...) {
+      return std::nullopt;
+    }
+  }
+
+  return std::nullopt;
+}
+
+// 向调用方发送当前下载进度快照；无回调或非文件下载模式时为空操作
+auto emit_download_progress(RequestOperation& operation) -> void {
+  if (!operation.download || !operation.download->progress_callback) {
+    return;
+  }
+
+  operation.download->progress_callback(Types::DownloadProgress{
+      .downloaded_bytes = operation.download->downloaded_bytes,
+      .total_bytes = operation.download->total_bytes,
+  });
+}
+
+// 刷新并关闭输出文件；非文件下载模式时为空操作
+auto finalize_file_download(RequestOperation& operation) -> std::expected<void, std::string> {
+  if (!operation.download || !operation.download->output_file.has_value()) {
+    return {};
+  }
+
+  auto& dl = *operation.download;
+  dl.output_file->flush();
+  if (!dl.output_file->good()) {
+    return std::unexpected("Failed to flush output file: " + dl.output_path.string());
+  }
+
+  dl.output_file->close();
+  if (dl.output_file->fail()) {
+    return std::unexpected("Failed to close output file: " + dl.output_path.string());
+  }
+
+  dl.output_file.reset();
+  return {};
+}
+
+// 请求 URL 解析：将字符串分解为 host、path、port、scheme 等字段供后续 WinHTTP 调用使用
 auto parse_request_url(RequestOperation& operation) -> std::expected<void, std::string> {
   auto wide_url_result = to_wide_utf8(operation.request.url, "request.url");
   if (!wide_url_result) {
@@ -208,6 +262,7 @@ auto parse_request_url(RequestOperation& operation) -> std::expected<void, std::
   return {};
 }
 
+// 将请求头列表序列化为 WinHTTP 所需的宽字符串格式（"Name: Value\r\n" 逐行拼接）
 auto build_request_headers(RequestOperation& operation) -> std::expected<void, std::string> {
   operation.wide_headers.clear();
 
@@ -234,6 +289,7 @@ auto build_request_headers(RequestOperation& operation) -> std::expected<void, s
   return {};
 }
 
+// 从 WinHTTP 句柄中读取 HTTP 状态码（如 200、404）并写入 response
 auto query_response_status(RequestOperation& operation) -> std::expected<void, std::string> {
   Vendor::WinHttp::DWORD status_code = 0;
   Vendor::WinHttp::DWORD status_size = sizeof(status_code);
@@ -249,6 +305,7 @@ auto query_response_status(RequestOperation& operation) -> std::expected<void, s
   return {};
 }
 
+// 查询并解析完整响应头列表，解析失败时静默跳过（状态码已单独提取）
 auto query_response_headers(RequestOperation& operation) -> void {
   Vendor::WinHttp::DWORD header_size = 0;
   (void)Vendor::WinHttp::WinHttpQueryHeaders(
@@ -272,6 +329,7 @@ auto query_response_headers(RequestOperation& operation) -> void {
   operation.response.headers = parse_raw_headers(raw_headers);
 }
 
+// 向 WinHTTP 查询当前可读字节数，触发后续 DATA_AVAILABLE 回调
 auto request_more_data(std::shared_ptr<RequestOperation> operation)
     -> std::expected<void, std::string> {
   if (!Vendor::WinHttp::WinHttpQueryDataAvailable(operation->request_handle, nullptr)) {
@@ -280,6 +338,18 @@ auto request_more_data(std::shared_ptr<RequestOperation> operation)
   return {};
 }
 
+// 下载结束收尾：刷新关闭文件、发送最终进度通知、标记操作完成
+auto complete_download(std::shared_ptr<RequestOperation> operation) -> void {
+  auto finalize_result = finalize_file_download(*operation);
+  if (!finalize_result) {
+    complete_with_error(operation, finalize_result.error());
+    return;
+  }
+  emit_download_progress(*operation);
+  complete_operation(operation, operation->response);
+}
+
+// 将回调逻辑派发到协程执行器线程，避免在 WinHTTP 系统线程上直接操作 operation 状态
 template <typename F>
 auto post_status_callback(std::shared_ptr<RequestOperation> operation, F&& fn) -> void {
   asio::post(operation->executor, [operation, fn = std::forward<F>(fn)]() mutable { fn(); });
@@ -325,6 +395,9 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
 
         // 继续提取所有响应头并解析
         query_response_headers(*operation);
+        if (operation->download) {
+          operation->download->total_bytes = find_content_length(operation->response);
+        }
         // 尝试查询是否有可用的响应体数据
         auto query_result = request_more_data(operation);
         if (!query_result) {
@@ -342,7 +415,7 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
         }
         // 若可用数据为 0，说明响应体已经彻底接收完毕
         if (available_bytes == 0) {
-          complete_operation(operation, operation->response);
+          complete_download(operation);
           return;
         }
 
@@ -365,12 +438,31 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
         }
         // 如果读取完成但读取到的字节为0，可能对端提前关闭，同样视为结束
         if (bytes_read == 0) {
-          complete_operation(operation, operation->response);
+          complete_download(operation);
           return;
         }
 
-        // 把刚读到的数据追加到总的 response body 里
-        operation->response.body.append(operation->read_buffer.data(), bytes_read);
+        if (operation->download) {
+          if (!operation->download->output_file.has_value()) {
+            complete_with_error(operation, "Output file is not initialized: " +
+                                               operation->download->output_path.string());
+            return;
+          }
+
+          operation->download->output_file->write(operation->read_buffer.data(),
+                                                  static_cast<std::streamsize>(bytes_read));
+          if (!operation->download->output_file->good()) {
+            complete_with_error(operation, "Failed to write output file: " +
+                                               operation->download->output_path.string());
+            return;
+          }
+
+          operation->download->downloaded_bytes += bytes_read;
+          emit_download_progress(*operation);
+        } else {
+          // 把刚读到的数据追加到总的 response body 里
+          operation->response.body.append(operation->read_buffer.data(), bytes_read);
+        }
         // 循环继续询问还有没有剩余的流数据
         auto query_result = request_more_data(operation);
         if (!query_result) {
@@ -410,7 +502,8 @@ auto CALLBACK winhttp_status_callback(Vendor::WinHttp::HINTERNET h_internet,
   }
 }
 
-// 解析请求参数、创建且配置相应的 WinHTTP 连接和请求句柄，并绑定回调后开始发送
+// 解析请求参数、创建且配置相应的 WinHTTP 连接和请求句柄，绑定异步回调后开始发送。
+// 若此函数返回错误，说明请求完全未进入系统队列，调用方需自行释放 keepalive。
 auto prepare_operation(State::HttpClientState& state, std::shared_ptr<RequestOperation> operation)
     -> std::expected<void, std::string> {
   operation->request.method = normalize_method(operation->request.method);
@@ -506,6 +599,37 @@ auto prepare_operation(State::HttpClientState& state, std::shared_ptr<RequestOpe
   return {};
 }
 
+// 通用 operation 执行：设保活、投递至 WinHTTP、挂起协程直至完成或中断。
+// fetch 和 download_to_file 均通过此函数统一驱动请求生命周期。
+auto execute_operation(State::HttpClientState& client_state,
+                       std::shared_ptr<RequestOperation> operation) -> asio::awaitable<void> {
+  {
+    // 自引用保活：防止局部运行完后 shared_ptr 被回收导致在 WinHTTP 后台回调里出现空指针
+    std::lock_guard<std::mutex> lock(operation->keepalive_mutex);
+    operation->keepalive = operation;
+  }
+
+  // 投递进入 WinHTTP：如果这一步失败，说明完全没丢进系统队列，需直接移除保活引用并返回
+  if (auto prepare_result = prepare_operation(client_state, operation); !prepare_result) {
+    release_keepalive(*operation);
+    operation->result = std::unexpected(prepare_result.error());
+    co_return;
+  }
+
+  if (operation->completed.load()) {
+    co_return;
+  }
+
+  // 让当前的协程(coroutine)在此挂起，直到底层完成全部网络通讯唤醒此 timer
+  std::error_code wait_error;
+  co_await operation->completion_timer->async_wait(
+      asio::redirect_error(asio::use_awaitable, wait_error));
+
+  if (!operation->completed.load()) {
+    complete_with_error(operation, "HTTP request interrupted before completion");
+  }
+}
+
 }  // namespace Core::HttpClient::Detail
 
 namespace Core::HttpClient {
@@ -563,54 +687,51 @@ auto fetch(Core::State::AppState& state, const Core::HttpClient::Types::Request&
   operation->completion_timer.emplace(executor);
   operation->completion_timer->expires_at((std::chrono::steady_clock::time_point::max)());
   operation->request = request;
-  {
-    // 自引用保活：防止局部运行完后 shared_ptr 被回收导致在 WinHTTP 后台回调里出现空指针
-    std::lock_guard<std::mutex> lock(operation->keepalive_mutex);
-    operation->keepalive = operation;
-  }
 
-  // 投递进入 WinHTTP：如果这一步失败，说明完全没丢进系统队列，需直接移除保活引用并返回
-  if (auto prepare_result = Detail::prepare_operation(*state.http_client, operation);
-      !prepare_result) {
-    Detail::release_keepalive(*operation);
-    co_return std::unexpected(prepare_result.error());
-  }
-
-  if (operation->completed.load()) {
-    co_return operation->result;
-  }
-
-  // 最后一步：让当前的协程(coroutine)在此挂起，直到底层完成全部网络通讯唤醒此 timer
-  std::error_code wait_error;
-  co_await operation->completion_timer->async_wait(
-      asio::redirect_error(asio::use_awaitable, wait_error));
-
-  if (!operation->completed.load()) {
-    Detail::complete_with_error(operation, "HTTP request interrupted before completion");
-  }
-
+  co_await Detail::execute_operation(*state.http_client, operation);
   co_return operation->result;
 }
 
 // 便捷封装：执行 HTTP 抓取请求后，将接收到的响应体直接以二进制流写入本地文件中
 auto download_to_file(Core::State::AppState& state, const Core::HttpClient::Types::Request& request,
-                      const std::filesystem::path& output_path)
+                      const std::filesystem::path& output_path,
+                      Core::HttpClient::Types::DownloadProgressCallback progress_callback)
     -> asio::awaitable<std::expected<void, std::string>> {
-  auto response_result = co_await fetch(state, request);
-  if (!response_result) {
-    co_return std::unexpected(response_result.error());
+  if (!state.http_client) {
+    co_return std::unexpected("HTTP client state is not initialized");
+  }
+  if (!state.http_client->is_initialized.load() || !state.http_client->session) {
+    co_return std::unexpected("HTTP client is not initialized");
+  }
+  if (request.url.empty()) {
+    co_return std::unexpected("HTTP request URL is empty");
   }
 
-  std::ofstream output(output_path, std::ios::binary | std::ios::trunc);
-  if (!output) {
+  auto executor = co_await asio::this_coro::executor;
+
+  auto operation = std::make_shared<Core::HttpClient::State::RequestOperation>();
+  operation->executor = executor;
+  operation->completion_timer.emplace(executor);
+  operation->completion_timer->expires_at((std::chrono::steady_clock::time_point::max)());
+  operation->request = request;
+
+  auto& dl = operation->download.emplace();
+  dl.output_path = output_path;
+  dl.progress_callback = std::move(progress_callback);
+  dl.output_file.emplace(output_path, std::ios::binary | std::ios::trunc);
+  if (!dl.output_file->is_open()) {
     co_return std::unexpected("Failed to open output file: " + output_path.string());
   }
 
-  const auto& body = response_result->body;
-  output.write(body.data(), static_cast<std::streamsize>(body.size()));
-  output.flush();
-  if (!output.good()) {
-    co_return std::unexpected("Failed to write output file: " + output_path.string());
+  co_await Detail::execute_operation(*state.http_client, operation);
+
+  if (!operation->result) {
+    operation->download->output_file.reset();
+    co_return std::unexpected(operation->result.error());
+  }
+
+  if (operation->response.status_code != 200) {
+    co_return std::unexpected("HTTP error: " + std::to_string(operation->response.status_code));
   }
 
   co_return std::expected<void, std::string>{};

@@ -6,6 +6,13 @@ import std;
 
 export namespace Core::HttpClient::Types {
 
+struct DownloadProgress {
+  std::uint64_t downloaded_bytes = 0;
+  std::optional<std::uint64_t> total_bytes;
+};
+
+using DownloadProgressCallback = std::function<void(const DownloadProgress&)>;
+
 struct Header {
   std::string name;
   std::string value;
