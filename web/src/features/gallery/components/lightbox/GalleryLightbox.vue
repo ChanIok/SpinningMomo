@@ -33,6 +33,7 @@ const lightboxImageRef = ref<LightboxImageExposed | null>(null)
 
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
+const fitMode = computed(() => store.lightbox.fitMode)
 const currentAsset = computed(() => {
   const currentIndex = store.selection.activeIndex
   if (currentIndex === undefined) {
@@ -147,6 +148,24 @@ function handleImageContextMenu(event: MouseEvent) {
   }
 
   void gallerySelection.handleAssetContextMenu(asset, event, currentIndex)
+}
+
+function handleMediaWheel(event: WheelEvent) {
+  if (!store.lightbox.isOpen || !currentAsset.value || event.deltaY === 0) {
+    return
+  }
+
+  if (isZoomableAsset.value && (event.ctrlKey || fitMode.value === 'actual')) {
+    return
+  }
+
+  event.preventDefault()
+
+  if (event.deltaY > 0) {
+    lightbox.goToNext()
+  } else {
+    lightbox.goToPrevious()
+  }
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -270,7 +289,11 @@ useEventListener(window, 'keydown', handleKeydown)
 
         <ContextMenu v-if="currentAsset">
           <ContextMenuTrigger as-child>
-            <div class="min-h-0 flex-1" @contextmenu="handleImageContextMenu">
+            <div
+              class="min-h-0 flex-1"
+              @contextmenu="handleImageContextMenu"
+              @wheel="handleMediaWheel"
+            >
               <LightboxImage v-if="isZoomableAsset" ref="lightboxImageRef" />
               <LightboxVideo v-else @previous="throttledPrevious" @next="throttledNext" />
             </div>

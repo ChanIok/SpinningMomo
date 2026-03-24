@@ -535,29 +535,19 @@ function handleStageLostPointerCapture(event: PointerEvent) {
   }
 }
 
-function isLikelyTrackpadWheel(event: WheelEvent): boolean {
-  if (event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) {
-    return false
-  }
-
-  return Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) < 60
-}
-
 function handleViewportWheel(event: WheelEvent) {
   if (!currentAsset.value || imageError.value) {
     return
   }
 
-  const isTrackpad = isLikelyTrackpadWheel(event)
-  const shouldZoom = event.ctrlKey || (fitMode.value === 'actual' && !isTrackpad)
-
-  if (!shouldZoom) {
+  if (!event.ctrlKey && fitMode.value !== 'actual') {
     return
   }
 
   event.preventDefault()
+  event.stopPropagation()
 
-  if (!hasImageDimensions.value || fitScale.value <= 0) {
+  if (event.deltaY === 0 || !hasImageDimensions.value || fitScale.value <= 0) {
     return
   }
 

@@ -142,8 +142,12 @@ export function useGalleryLightbox() {
 
   watch(
     () => store.selection.activeIndex,
-    (newIndex) => {
+    (newIndex, oldIndex) => {
       if (store.lightbox.isOpen && newIndex !== undefined) {
+        if (newIndex !== oldIndex) {
+          store.resetLightboxView()
+        }
+
         preloadRange(newIndex).catch((err) => {
           console.warn('Failed to preload lightbox range:', err)
         })
