@@ -34,6 +34,10 @@ constexpr std::chrono::milliseconds kFileStabilityQuietPeriod{2000};
 // 监听缓冲区；太小更容易溢出。
 constexpr size_t kWatchBufferSize = 64 * 1024;
 
+auto is_shutdown_requested(const Core::State::AppState& app_state) -> bool {
+  return app_state.gallery && app_state.gallery->shutdown_requested.load(std::memory_order_acquire);
+}
+
 // 待处理变更快照，用于描述需要增量或全量同步的状态
 struct PendingSnapshot {
   // true 走全量，false 按 file_changes 走增量。
@@ -1145,6 +1149,11 @@ auto restore_watchers_from_db(Core::State::AppState& app_state)
 // 启动所有已经纳入管理的（注册过的）监听器任务
 auto start_registered_watchers(Core::State::AppState& app_state)
     -> std::expected<void, std::string> {
+  if (is_shutdown_requested(app_state)) {
+    Logger().info("Skip gallery watcher startup recovery: shutdown has been requested");
+    return {};
+  }
+
   std::vector<std::shared_ptr<State::FolderWatcherState>> watchers;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
@@ -1158,6 +1167,12 @@ auto start_registered_watchers(Core::State::AppState& app_state)
 
   // 公共 helper：启动 watcher 线程并统一处理计数和错误记录。
   auto try_start_watcher = [&](const std::shared_ptr<State::FolderWatcherState>& w) -> bool {
+    if (is_shutdown_requested(app_state)) {
+      Logger().info("Skip watcher start for '{}': shutdown has been requested",
+                    w->root_path.string());
+      return false;
+    }
+
     auto result = start_watcher_if_needed(app_state, w, false);
     if (!result) {
       Logger().warn("Skip watcher start for '{}': {}", w->root_path.string(), result.error());
@@ -1173,6 +1188,13 @@ auto start_registered_watchers(Core::State::AppState& app_state)
   };
 
   for (const auto& watcher : watchers) {
+    if (is_shutdown_requested(app_state)) {
+      Logger().info(
+          "Stop gallery watcher startup recovery before '{}': shutdown has been requested",
+          watcher->root_path.string());
+      break;
+    }
+
     // 每个 root 的启动流程：
     // 1. 查询恢复决策（USN 增量 or 全量）
     // 2. USN 模式先补齐离线变更
@@ -1238,6 +1260,45 @@ auto start_registered_watchers(Core::State::AppState& app_state)
     return std::unexpected(first_error.value());
   }
   return {};
+}
+
+auto schedule_start_registered_watchers(Core::State::AppState& app_state) -> void {
+  if (!app_state.gallery || !app_state.worker_pool) {
+    Logger().warn(
+        "Skip scheduling gallery watcher startup recovery: gallery state or worker pool is not "
+        "ready");
+    return;
+  }
+
+  if (app_state.gallery->startup_watchers_future.has_value()) {
+    Logger().debug("Skip scheduling gallery watcher startup recovery: task is already running");
+    return;
+  }
+
+  auto promise = std::make_shared<std::promise<void>>();
+  app_state.gallery->startup_watchers_future = promise->get_future();
+
+  bool submitted = Core::WorkerPool::submit_task(
+      *app_state.worker_pool, [&app_state, promise = std::move(promise)]() mutable {
+        auto result = start_registered_watchers(app_state);
+        if (!result && !is_shutdown_requested(app_state)) {
+          Logger().warn("Gallery watcher startup recovery failed: {}", result.error());
+        }
+        promise->set_value();
+      });
+
+  if (!submitted) {
+    app_state.gallery->startup_watchers_future.reset();
+    Logger().warn("Skip scheduling gallery watcher startup recovery: worker pool is unavailable");
+  }
+}
+
+auto wait_for_start_registered_watchers(Core::State::AppState& app_state) -> void {
+  if (!app_state.gallery || !app_state.gallery->startup_watchers_future.has_value()) {
+    return;
+  }
+  app_state.gallery->startup_watchers_future->wait();
+  app_state.gallery->startup_watchers_future.reset();
 }
 
 // 在应用关闭时，优雅关闭所有的监听器线程和句柄资源

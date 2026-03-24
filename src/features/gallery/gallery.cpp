@@ -113,9 +113,6 @@ auto cleanup(Core::State::AppState& app_state) -> void {
   try {
     Logger().info("Cleaning up gallery module resources...");
 
-    // 停止所有目录监听
-    Watcher::shutdown_watchers(app_state);
-
     // 注销静态服务解析器
     StaticResolver::unregister_all_resolvers(app_state);
 

@@ -49,6 +49,12 @@ export struct GalleryState {
   // 缩略图目录路径
   std::filesystem::path thumbnails_directory;
 
+  // 应用关闭时置为 true，用于阻止后台启动恢复继续推进。
+  std::atomic<bool> shutdown_requested{false};
+
+  // 后台 watcher 启动恢复任务的 future，shutdown 时等待其结束。
+  std::optional<std::future<void>> startup_watchers_future;
+
   // 原图路径缓存 (asset_id -> filesystem::path)
   Utils::LRUCache::LRUCacheState<std::int64_t, std::filesystem::path> image_path_cache{
       .capacity = 5000, .map = {}, .list = {}};

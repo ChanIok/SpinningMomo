@@ -216,17 +216,16 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     // 注册所有命令的热键
     Core::Commands::register_all_hotkeys(state, state.floating_window->window.hwnd);
 
-    if (auto watcher_start_result = Features::Gallery::Watcher::start_registered_watchers(state);
-        !watcher_start_result) {
-      Logger().warn("Gallery watcher startup failed: {}", watcher_start_result.error());
-    }
+    Logger().info("==================================================");
+    Logger().info("SpinningMomo startup ready");
+    Logger().info("==================================================");
+
+    // 启动后的后台恢复任务不应阻塞 UI 首屏显示。
+    Features::Gallery::Watcher::schedule_start_registered_watchers(state);
 
     // 按设置自动检查更新（异步，不阻塞启动）
     Features::Update::schedule_startup_auto_update_check(state);
 
-    Logger().info("==================================================");
-    Logger().info("SpinningMomo startup ready");
-    Logger().info("==================================================");
     return {};
 
   } catch (const std::exception& e) {

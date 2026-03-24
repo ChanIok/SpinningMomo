@@ -34,6 +34,12 @@ export auto start_watcher_for_directory(Core::State::AppState& app_state,
 export auto start_registered_watchers(Core::State::AppState& app_state)
     -> std::expected<void, std::string>;
 
+// 启动后在后台线程中恢复并启动所有已注册 watcher。
+export auto schedule_start_registered_watchers(Core::State::AppState& app_state) -> void;
+
+// 等待后台 watcher 启动恢复任务结束。
+export auto wait_for_start_registered_watchers(Core::State::AppState& app_state) -> void;
+
 // 停止并移除某个目录 watcher。返回 true 表示实际移除了 watcher。
 export auto remove_watcher_for_directory(Core::State::AppState& app_state,
                                          const std::filesystem::path& root_directory)
