@@ -17,12 +17,35 @@ import type {
 } from './types'
 
 const GALLERY_VIEW_SIZE_STORAGE_KEY = 'spinningmomo.gallery.view.size'
+// 侧边栏树的展开状态是纯前端视图信息，只需落在 localStorage。
+const GALLERY_EXPANDED_FOLDERS_STORAGE_KEY = 'spinningmomo.gallery.sidebar.expanded-folders'
+const GALLERY_EXPANDED_TAGS_STORAGE_KEY = 'spinningmomo.gallery.sidebar.expanded-tags'
 const LIGHTBOX_MIN_ZOOM = 0.05
 const LIGHTBOX_MAX_ZOOM = 5
 
 function normalizeGalleryViewSize(size: number): number {
   const numericSize = Number(size)
   return Number.isNaN(numericSize) ? 128 : numericSize
+}
+
+function normalizeExpandedIds(ids: unknown): number[] {
+  if (!Array.isArray(ids)) {
+    return []
+  }
+
+  // localStorage 可能被旧值或手工调试污染，进入运行态前统一清洗。
+  return [...new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id)))]
+}
+
+function collectTreeIds<T extends { id: number; children: T[] }>(nodes: T[]): number[] {
+  const ids: number[] = []
+
+  for (const node of nodes) {
+    ids.push(node.id)
+    ids.push(...collectTreeIds(node.children))
+  }
+
+  return ids
 }
 
 /**
@@ -35,6 +58,10 @@ function normalizeGalleryViewSize(size: number): number {
 export const useGalleryStore = defineStore('gallery', () => {
   const persistedViewSize = useStorage<number>(GALLERY_VIEW_SIZE_STORAGE_KEY, 128)
   persistedViewSize.value = normalizeGalleryViewSize(persistedViewSize.value)
+  const persistedExpandedFolderIds = useStorage<number[]>(GALLERY_EXPANDED_FOLDERS_STORAGE_KEY, [])
+  persistedExpandedFolderIds.value = normalizeExpandedIds(persistedExpandedFolderIds.value)
+  const persistedExpandedTagIds = useStorage<number[]>(GALLERY_EXPANDED_TAGS_STORAGE_KEY, [])
+  persistedExpandedTagIds.value = normalizeExpandedIds(persistedExpandedTagIds.value)
 
   // ============= 数据状态 =============
   const isLoading = ref(false)
@@ -118,6 +145,10 @@ export const useGalleryStore = defineStore('gallery', () => {
   const tagsAssetTotalCount = computed(() => {
     return tags.value.reduce((sum, tag) => sum + tag.assetCount, 0)
   })
+
+  // 持久化层使用数组，读取层转成 Set，兼顾存储简单与查询高频。
+  const expandedFolderIdSet = computed(() => new Set(persistedExpandedFolderIds.value))
+  const expandedTagIdSet = computed(() => new Set(persistedExpandedTagIds.value))
 
   // ============= 状态操作 Actions =============
 
@@ -271,10 +302,57 @@ export const useGalleryStore = defineStore('gallery', () => {
     timelineTotalCount.value = 0
   }
 
+  // 这里只持久化“哪些节点被展开”，不把整棵树的 UI 快照塞进本地存储。
+  function setFolderExpanded(folderId: number, expanded: boolean) {
+    const nextExpandedIds = new Set(persistedExpandedFolderIds.value)
+
+    if (expanded) {
+      nextExpandedIds.add(folderId)
+    } else {
+      nextExpandedIds.delete(folderId)
+    }
+
+    persistedExpandedFolderIds.value = [...nextExpandedIds]
+  }
+
+  function toggleFolderExpanded(folderId: number) {
+    setFolderExpanded(folderId, !isFolderExpanded(folderId))
+  }
+
+  function isFolderExpanded(folderId: number): boolean {
+    return expandedFolderIdSet.value.has(folderId)
+  }
+
+  function setTagExpanded(tagId: number, expanded: boolean) {
+    const nextExpandedIds = new Set(persistedExpandedTagIds.value)
+
+    if (expanded) {
+      nextExpandedIds.add(tagId)
+    } else {
+      nextExpandedIds.delete(tagId)
+    }
+
+    persistedExpandedTagIds.value = [...nextExpandedIds]
+  }
+
+  function toggleTagExpanded(tagId: number) {
+    setTagExpanded(tagId, !isTagExpanded(tagId))
+  }
+
+  function isTagExpanded(tagId: number): boolean {
+    return expandedTagIdSet.value.has(tagId)
+  }
+
   // ============= 文件夹树操作 Actions =============
 
   function setFolders(newFolders: FolderTreeNode[]) {
     folders.value = newFolders
+
+    // 树重载后把已不存在的节点 id 裁掉，避免 localStorage 越积越脏。
+    const validFolderIds = new Set(collectTreeIds(newFolders))
+    persistedExpandedFolderIds.value = persistedExpandedFolderIds.value.filter((id) =>
+      validFolderIds.has(id)
+    )
   }
 
   function setFoldersLoading(loading: boolean) {
@@ -289,6 +367,12 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   function setTags(newTags: TagTreeNode[]) {
     tags.value = newTags
+
+    // 标签树和文件夹树一样，刷新后同步清理失效展开状态。
+    const validTagIds = new Set(collectTreeIds(newTags))
+    persistedExpandedTagIds.value = persistedExpandedTagIds.value.filter((id) =>
+      validTagIds.has(id)
+    )
   }
 
   function setTagsLoading(loading: boolean) {
@@ -480,6 +564,9 @@ export const useGalleryStore = defineStore('gallery', () => {
     tagsLoading.value = false
     tagsError.value = null
 
+    persistedExpandedFolderIds.value = []
+    persistedExpandedTagIds.value = []
+
     viewConfig.value = { mode: 'adaptive', size: 128 }
     persistedViewSize.value = viewConfig.value.size
     resetFilter()
@@ -564,6 +651,13 @@ export const useGalleryStore = defineStore('gallery', () => {
     setTimelineBuckets,
     setTimelineTotalCount,
     clearTimelineData,
+
+    setFolderExpanded,
+    toggleFolderExpanded,
+    isFolderExpanded,
+    setTagExpanded,
+    toggleTagExpanded,
+    isTagExpanded,
 
     // 文件夹树 Actions
     setFolders,

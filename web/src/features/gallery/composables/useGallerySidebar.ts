@@ -1,25 +1,18 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
 import type { FolderTreeNode, TagTreeNode } from '../types'
 
 /**
  * Gallery 侧边栏管理 Composable
- * 管理侧边栏UI交互逻辑（展开/收起、选择等）
+ * 管理侧边栏选择、筛选与标签操作逻辑
+ * 树的展开状态已经收敛到 store 持久化，这里不再维护同名本地 UI 状态。
  * 数据获取由 useGalleryData 负责
  */
 export function useGallerySidebar() {
   const store = useGalleryStore()
   const ROOT_FOLDER_ID = -1
   const ROOT_TAG_ID = -1
-
-  // ============= 本地 UI 状态 =============
-
-  // 文件夹展开状态（纯 UI 状态）
-  const expandedFolders = ref<Set<number>>(new Set())
-
-  // 标签展开状态（纯 UI 状态）
-  const expandedTags = ref<Set<number>>(new Set())
 
   // ============= 计算属性 =============
 
@@ -78,24 +71,6 @@ export function useGallerySidebar() {
   }
 
   // ============= UI 交互操作方法 =============
-
-  /**
-   * 切换文件夹展开/收起
-   */
-  function toggleFolderExpanded(folderId: number) {
-    if (expandedFolders.value.has(folderId)) {
-      expandedFolders.value.delete(folderId)
-    } else {
-      expandedFolders.value.add(folderId)
-    }
-  }
-
-  /**
-   * 检查文件夹是否展开
-   */
-  function isFolderExpanded(folderId: number): boolean {
-    return expandedFolders.value.has(folderId)
-  }
 
   /**
    * 选择文件夹
@@ -199,24 +174,6 @@ export function useGallerySidebar() {
       },
     })
     console.log('🏷️ 清空标签筛选')
-  }
-
-  /**
-   * 切换标签展开/收起
-   */
-  function toggleTagExpanded(tagId: number) {
-    if (expandedTags.value.has(tagId)) {
-      expandedTags.value.delete(tagId)
-    } else {
-      expandedTags.value.add(tagId)
-    }
-  }
-
-  /**
-   * 检查标签是否展开
-   */
-  function isTagExpanded(tagId: number): boolean {
-    return expandedTags.value.has(tagId)
   }
 
   /**
@@ -354,10 +311,6 @@ export function useGallerySidebar() {
     selectedTag,
 
     // UI 交互操作
-    toggleFolderExpanded,
-    isFolderExpanded,
-    toggleTagExpanded,
-    isTagExpanded,
     selectFolder,
     clearFolderFilter,
     updateFolderDisplayName,

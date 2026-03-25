@@ -21,6 +21,7 @@ import {
 import { useI18n } from '@/composables/useI18n'
 import { useSettingsStore } from '@/features/settings/store'
 import TagInlineEditor from './TagInlineEditor.vue'
+import { useGalleryStore } from '../store'
 import type { FolderTreeNode } from '../types'
 
 interface Props {
@@ -43,13 +44,14 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const galleryStore = useGalleryStore()
 const settingsStore = useSettingsStore()
 const infinityNikkiEnabled = computed(
   () => settingsStore.appSettings.extensions.infinityNikki.enable
 )
 
-// 展开状态
-const isExpanded = ref(false)
+// 展开状态放在 gallery store，递归节点重挂载后也能恢复，并可跨会话持久化。
+const isExpanded = computed(() => galleryStore.isFolderExpanded(props.folder.id))
 const isEditingDisplayName = ref(false)
 const showRemoveDialog = ref(false)
 const shouldPreventAutoFocus = ref(false)
@@ -60,7 +62,7 @@ const isRootFolder = computed(
 
 // 切换展开状态（独立点击箭头）
 function toggleExpand() {
-  isExpanded.value = !isExpanded.value
+  galleryStore.toggleFolderExpanded(props.folder.id)
 }
 
 // 处理 item 点击
@@ -70,7 +72,7 @@ function handleItemClick() {
 
   if (isCurrentlySelected && hasChildren) {
     // 已选中 + 有子项 → 切换展开
-    isExpanded.value = !isExpanded.value
+    galleryStore.toggleFolderExpanded(props.folder.id)
   } else {
     // 未选中 → 选中
     emit('select', props.folder.id, props.folder.displayName || props.folder.name)

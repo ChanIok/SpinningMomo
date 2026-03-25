@@ -13,7 +13,7 @@
 | **安装版 (.exe)** | [前往 GitHub Release](https://github.com/ChanIok/SpinningMomo/releases/latest) | 推荐，包含安装与卸载管理 |
 | **便携版 (.zip)** | 同上 | 绿色免安装，解压即用 |
 
-备用下载：[蓝奏云](https://wwf.lanzoul.com/b0sxagp0d) (密码: `momo`) ， [百度网盘](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo) (提取码: `momo`)
+备用下载：[百度网盘](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo) (提取码: `momo`)
 
 ### 系统要求
 
@@ -38,11 +38,7 @@
 
 **第 1 步**：选择界面语言和主题（深色/浅色/跟随系统）
 
-**第 2 步**：配置游戏目录
-- 程序会自动检测《无限暖暖》安装路径
-- 非《无限暖暖》用户可点击跳过
-
-**第 3 步**：确认目标窗口标题
+**第 2 步**：确认目标窗口标题
 
 配置完成后，程序浮窗将自动出现在屏幕上。
 

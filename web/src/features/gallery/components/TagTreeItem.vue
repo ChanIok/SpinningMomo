@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { Button } from '@/components/ui/button'
 import {
   ContextMenu,
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import TagInlineEditor from './TagInlineEditor.vue'
+import { useGalleryStore } from '../store'
 import type { TagTreeNode } from '../types'
 
 interface Props {
@@ -38,8 +39,9 @@ const emit = defineEmits<{
   delete: [tagId: number]
 }>()
 
-// 展开状态
-const isExpanded = ref(false)
+const galleryStore = useGalleryStore()
+// 与文件夹树保持一致：展开状态统一走 store，而不是递归组件各自记一份局部状态。
+const isExpanded = computed(() => galleryStore.isTagExpanded(props.tag.id))
 
 // 编辑状态
 const isEditing = ref(false)
@@ -53,7 +55,7 @@ const shouldPreventAutoFocus = ref(false)
 
 // 切换展开状态（独立点击箭头）
 function toggleExpand() {
-  isExpanded.value = !isExpanded.value
+  galleryStore.toggleTagExpanded(props.tag.id)
 }
 
 // 处理 item 点击
@@ -83,7 +85,7 @@ function handleRenameCancel() {
 
 // 开始创建子标签
 function startCreateChild() {
-  isExpanded.value = true // 自动展开
+  galleryStore.setTagExpanded(props.tag.id, true)
   isCreatingChild.value = true
   shouldPreventAutoFocus.value = true // 阻止 ContextMenu 关闭时的自动聚焦
 }
