@@ -46,13 +46,13 @@ export function isWebBrowser(): boolean {
 
 /**
  * 根据环境获取静态资源的完整 URL
- * - 在 WebView 的生产环境中，使用 `https://static.app.local` 协议头
+ * - 在 WebView 的生产环境中，使用 `https://static.test` 协议头
  * - 在其他环境中，使用相对路径
  */
 export function getStaticUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
 
   return isWebView() && !import.meta.env.DEV
-    ? `https://static.app.local${normalizedPath}`
+    ? `https://static.test${normalizedPath}`
     : normalizedPath
 }

@@ -202,8 +202,9 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
         Logger().debug("Resolved thumbnail path: {}", full_path.string());
         return Core::HttpServer::Types::PathResolutionData{
-            .file_path = full_path, .cache_duration = std::chrono::seconds{86400}  // 1天缓存
-        };
+            .file_path = full_path,
+            .cache_duration = std::chrono::seconds{86400},
+            .cache_control_header = std::string{"public, max-age=31536000, immutable"}};
       });
 
   // 原图解析器（基于 asset_id）
@@ -222,9 +223,9 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
             if (validate_asset_file(*cached_path)) {
               Logger().debug("Cache hit for asset {}: {}", *asset_id, cached_path->string());
               return Core::HttpServer::Types::PathResolutionData{
-                  .file_path = *cached_path, .cache_duration = std::chrono::seconds{86400}
-                  // 1天缓存
-              };
+                  .file_path = *cached_path,
+                  .cache_duration = std::chrono::seconds{0},
+                  .cache_control_header = std::string{"private, no-cache"}};
             } else {
               Logger().warn("Cached path for asset {} not found: {}", *asset_id,
                             cached_path->string());
@@ -251,7 +252,9 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
         Logger().debug("Resolved asset {} from database: {}", *asset_id, path->string());
         return Core::HttpServer::Types::PathResolutionData{
-            .file_path = *path, .cache_duration = std::chrono::seconds{86400}};
+            .file_path = *path,
+            .cache_duration = std::chrono::seconds{0},
+            .cache_control_header = std::string{"private, no-cache"}};
       });
 
   Logger().info("Registered HTTP static resolvers for gallery");
@@ -308,7 +311,8 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
                 .file_path = full_path,
                 .error_message = {},
                 .content_type = L"image/webp",
-                .status_code = 200};
+                .status_code = 200,
+                .cache_control_header = L"public, max-age=31536000, immutable"};
       });
 
   // 原图解析器（基于 asset_id）
@@ -339,7 +343,8 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
                       .file_path = *cached_path,
                       .error_message = {},
                       .content_type = std::nullopt,  // 自动检测
-                      .status_code = 200};
+                      .status_code = 200,
+                      .cache_control_header = L"private, no-cache"};
             } else {
               Logger().warn("Cached path for WebView asset {} not found: {}", *asset_id,
                             cached_path->string());
@@ -369,7 +374,8 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
                 .file_path = *path,
                 .error_message = {},
                 .content_type = std::nullopt,  // 自动检测
-                .status_code = 200};
+                .status_code = 200,
+                .cache_control_header = L"private, no-cache"};
       });
 
   Logger().info("Registered WebView resource resolvers for gallery (thumbnails: {}, images: {})",

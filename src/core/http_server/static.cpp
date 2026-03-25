@@ -198,19 +198,112 @@ auto get_response_content_type(const std::string& mime_type) -> std::string {
   return mime_type;
 }
 
+struct CacheValidators {
+  std::string etag;
+  std::string last_modified;
+};
+
+// 去掉条件请求头两端的空白，避免匹配时受逗号分段或客户端格式影响。
+auto trim_http_header_value(std::string_view value) -> std::string_view {
+  while (!value.empty() && std::isspace(static_cast<unsigned char>(value.front()))) {
+    value.remove_prefix(1);
+  }
+  while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back()))) {
+    value.remove_suffix(1);
+  }
+  return value;
+}
+
+// 为默认静态资源生成强缓存头；自定义 resolver 可再覆盖成更具体的策略。
+auto build_cache_control_header(std::chrono::seconds cache_duration) -> std::string {
+  return std::format("public, max-age={}", cache_duration.count());
+}
+
+// 基于文件大小和最后修改时间构造条件缓存校验器，避免为原图额外计算内容哈希。
+auto build_cache_validators(const std::filesystem::path& file_path, size_t file_size)
+    -> std::expected<CacheValidators, std::string> {
+  std::error_code ec;
+  auto last_write_time = std::filesystem::last_write_time(file_path, ec);
+  if (ec) {
+    return std::unexpected("Failed to query file last write time: " + ec.message());
+  }
+
+  auto modified_time = std::chrono::time_point_cast<std::chrono::seconds>(
+      std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+          last_write_time - std::filesystem::file_time_type::clock::now() +
+          std::chrono::system_clock::now()));
+  auto modified_seconds = modified_time.time_since_epoch().count();
+
+  return CacheValidators{
+      .etag = std::format("\"{:x}-{:x}\"", file_size, modified_seconds),
+      .last_modified = std::format("{:%a, %d %b %Y %H:%M:%S GMT}", modified_time)};
+}
+
+// HTTP 的 If-None-Match 允许逗号分隔多个 ETag；这里只要任一命中即可视为未变更。
+auto if_none_match_matches(std::string_view header_value, std::string_view etag) -> bool {
+  auto remaining = header_value;
+  while (!remaining.empty()) {
+    auto comma_pos = remaining.find(',');
+    auto candidate = trim_http_header_value(remaining.substr(0, comma_pos));
+    if (candidate == "*" || candidate == etag) {
+      return true;
+    }
+
+    if (comma_pos == std::string_view::npos) {
+      break;
+    }
+    remaining.remove_prefix(comma_pos + 1);
+  }
+  return false;
+}
+
+// 统一判断当前请求是否满足 304 条件；Range 请求保持走实体响应，避免和部分内容语义混淆。
+auto is_not_modified_request(auto* req, const CacheValidators& validators, bool has_range_request)
+    -> bool {
+  if (has_range_request) {
+    return false;
+  }
+
+  auto if_none_match = trim_http_header_value(std::string_view(req->getHeader("if-none-match")));
+  if (!if_none_match.empty()) {
+    return if_none_match_matches(if_none_match, validators.etag);
+  }
+
+  auto if_modified_since =
+      trim_http_header_value(std::string_view(req->getHeader("if-modified-since")));
+  if (!if_modified_since.empty()) {
+    return if_modified_since == validators.last_modified;
+  }
+
+  return false;
+}
+
+// 写出文件响应的公共缓存/范围头；200 与 206 响应共用这套头部逻辑。
 auto write_common_file_headers(auto* res, const std::string& mime_type,
-                               std::chrono::seconds cache_duration,
+                               std::string_view cache_control, const CacheValidators& validators,
                                std::optional<size_t> source_file_size = std::nullopt,
                                std::optional<ByteRange> range = std::nullopt) -> void {
   res->writeHeader("Content-Type", get_response_content_type(mime_type));
-  res->writeHeader("Cache-Control", std::format("public, max-age={}", cache_duration.count()));
+  res->writeHeader("Cache-Control", std::string(cache_control));
   res->writeHeader("X-Content-Type-Options", "nosniff");
   res->writeHeader("Accept-Ranges", "bytes");
+  res->writeHeader("ETag", validators.etag);
+  res->writeHeader("Last-Modified", validators.last_modified);
 
   if (range.has_value() && source_file_size.has_value()) {
     res->writeHeader("Content-Range", std::format("bytes {}-{}/{}", range->start, range->end,
                                                   source_file_size.value()));
   }
+}
+
+// 304 响应不返回实体，但仍需回写缓存校验头，让浏览器更新缓存元数据。
+auto write_not_modified(auto* res, std::string_view cache_control,
+                        const CacheValidators& validators) -> void {
+  res->writeStatus("304 Not Modified");
+  res->writeHeader("Cache-Control", std::string(cache_control));
+  res->writeHeader("ETag", validators.etag);
+  res->writeHeader("Last-Modified", validators.last_modified);
+  res->end();
 }
 
 auto write_range_not_satisfiable(auto* res, size_t file_size) -> void {
@@ -327,8 +420,9 @@ auto read_and_send_next_chunk(std::shared_ptr<Types::StreamContext> ctx) -> void
 
 // 流式传输文件
 auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file_path,
-                        std::string mime_type, std::chrono::seconds cache_duration,
-                        size_t file_size, std::optional<ByteRange> range, auto* res) -> void {
+                        std::string mime_type, std::string cache_control,
+                        CacheValidators validators, size_t file_size,
+                        std::optional<ByteRange> range, auto* res) -> void {
   auto* loop = uWS::Loop::get();
   auto io_context = Core::Async::get_io_context(*state.async);
 
@@ -338,8 +432,9 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
 
   // 对于大文件或分片请求，始终按偏移流式发送，避免把整段视频先读进内存。
   // 在 ASIO 线程中打开文件并初始化
-  asio::post(*io_context, [res, file_path, mime_type, cache_duration, loop, io_context, file_size,
-                           range, range_start, range_end, response_size]() {
+  asio::post(*io_context, [res, file_path, mime_type, cache_control = std::move(cache_control),
+                           validators = std::move(validators), loop, io_context, file_size, range,
+                           range_start, range_end, response_size]() {
     try {
       // 打开文件
       asio::random_access_file file(*io_context, file_path.string(), asio::file_base::read_only);
@@ -355,7 +450,9 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
           .file_offset = range_start,
           .file_end_offset = range_end + 1,
           .mime_type = mime_type,
-          .cache_duration = cache_duration,
+          .cache_control = cache_control,
+          .etag = validators.etag,
+          .last_modified = validators.last_modified,
           .bytes_sent = 0,
           .status_code = range.has_value() ? 206 : 200,
           .content_range_header = range.has_value()
@@ -372,12 +469,13 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
       loop->defer([ctx]() {
         ctx->res->writeStatus(ctx->status_code == 206 ? "206 Partial Content" : "200 OK");
         write_common_file_headers(
-            ctx->res, ctx->mime_type, ctx->cache_duration, ctx->source_file_size,
-            ctx->content_range_header.has_value() ? std::optional<ByteRange>{ByteRange{
-                                                        .start = ctx->file_offset,
-                                                        .end = ctx->file_end_offset - 1,
-                                                    }}
-                                                  : std::nullopt);
+            ctx->res, ctx->mime_type, ctx->cache_control,
+            CacheValidators{.etag = ctx->etag, .last_modified = ctx->last_modified},
+            ctx->source_file_size,
+            ctx->content_range_header.has_value()
+                ? std::optional<ByteRange>{ByteRange{.start = ctx->file_offset,
+                                                     .end = ctx->file_end_offset - 1}}
+                : std::nullopt);
 
         // 处理中止
         ctx->res->onAborted([ctx]() {
@@ -403,7 +501,8 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
 auto serve_resolved_file_request(Core::State::AppState& state,
                                  const std::filesystem::path& file_path,
                                  std::optional<std::chrono::seconds> cache_duration_override,
-                                 auto* res, auto* req, bool is_head) -> void {
+                                 std::optional<std::string> cache_control_override, auto* res,
+                                 auto* req, bool is_head) -> void {
   // 检查文件是否存在
   if (!std::filesystem::exists(file_path)) {
     Logger().warn("Resolved file not found: {}", file_path.string());
@@ -424,10 +523,26 @@ auto serve_resolved_file_request(Core::State::AppState& state,
     auto extension = file_path.extension().string();
     cache_duration = get_cache_duration(extension);
   }
+  auto cache_control = cache_control_override.value_or(build_cache_control_header(cache_duration));
+
+  auto validators_result = build_cache_validators(file_path, file_size);
+  if (!validators_result) {
+    Logger().error("Failed to build cache validators for {}: {}", file_path.string(),
+                   validators_result.error());
+    res->writeStatus("500 Internal Server Error");
+    res->end("Internal server error");
+    return;
+  }
+  auto validators = std::move(validators_result.value());
 
   auto range_parse = parse_range_header(std::string(req->getHeader("range")), file_size);
   if (!range_parse.valid) {
     write_range_not_satisfiable(res, file_size);
+    return;
+  }
+
+  if (is_not_modified_request(req, validators, range_parse.range.has_value())) {
+    write_not_modified(res, cache_control, validators);
     return;
   }
 
@@ -437,7 +552,8 @@ auto serve_resolved_file_request(Core::State::AppState& state,
 
   if (is_head) {
     res->writeStatus(range_parse.range.has_value() ? "206 Partial Content" : "200 OK");
-    write_common_file_headers(res, mime_type, cache_duration, file_size, range_parse.range);
+    write_common_file_headers(res, mime_type, cache_control, validators, file_size,
+                              range_parse.range);
     res->writeHeader("Content-Length", std::to_string(content_length));
     res->end();
     return;
@@ -447,8 +563,8 @@ auto serve_resolved_file_request(Core::State::AppState& state,
   // 很大）。
   if (content_length > Types::STREAM_THRESHOLD || file_size > Types::STREAM_THRESHOLD) {
     Logger().debug("Using stream for resolved file: {} bytes", file_size);
-    handle_file_stream(state, file_path, mime_type, cache_duration, file_size, range_parse.range,
-                       res);
+    handle_file_stream(state, file_path, mime_type, cache_control, validators, file_size,
+                       range_parse.range, res);
     return;
   }
 
@@ -460,7 +576,8 @@ auto serve_resolved_file_request(Core::State::AppState& state,
   // 在异步运行时中处理文件读取
   asio::co_spawn(
       *Core::Async::get_io_context(*state.async),
-      [res, file_path, mime_type, cache_duration, loop, file_size,
+      [res, file_path, mime_type, cache_control = std::move(cache_control),
+       validators = std::move(validators), loop, file_size,
        range = range_parse.range]() -> asio::awaitable<void> {
         try {
           // 异步读取文件
@@ -483,10 +600,10 @@ auto serve_resolved_file_request(Core::State::AppState& state,
               reinterpret_cast<const char*>(file_data.data.data() + range_start), content_length);
 
           // 在事件循环线程中发送响应
-          loop->defer([res, file_path, mime_type, cache_duration, file_size, range,
+          loop->defer([res, file_path, mime_type, cache_control, validators, file_size, range,
                        response_body = std::move(response_body)]() mutable {
             res->writeStatus(range.has_value() ? "206 Partial Content" : "200 OK");
-            write_common_file_headers(res, mime_type, cache_duration, file_size, range);
+            write_common_file_headers(res, mime_type, cache_control, validators, file_size, range);
             res->end(response_body);
 
             Logger().debug("Served resolved file: {}, size: {} bytes", file_path.string(),
@@ -512,7 +629,8 @@ auto handle_static_request(Core::State::AppState& state, const std::string& url_
     if (custom_result->has_value()) {
       Logger().debug("Using custom resolver for: {}", url_path);
       serve_resolved_file_request(state, custom_result->value().file_path,
-                                  custom_result->value().cache_duration, res, req, is_head);
+                                  custom_result->value().cache_duration,
+                                  custom_result->value().cache_control_header, res, req, is_head);
       return;
     }
   }
@@ -538,7 +656,7 @@ auto handle_static_request(Core::State::AppState& state, const std::string& url_
     return;
   }
 
-  serve_resolved_file_request(state, file_path, std::nullopt, res, req, is_head);
+  serve_resolved_file_request(state, file_path, std::nullopt, std::nullopt, res, req, is_head);
 }
 
 // 注册静态文件路由

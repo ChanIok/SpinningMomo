@@ -12,6 +12,7 @@ struct WebResourceResolution {
   std::string error_message;
   std::optional<std::wstring> content_type;
   std::optional<int> status_code;
+  std::optional<std::wstring> cache_control_header;
 };
 
 using WebResourceResolver = std::function<WebResourceResolution(std::wstring_view)>;

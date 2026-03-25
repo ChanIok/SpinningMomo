@@ -153,17 +153,95 @@ auto read_file_range(const std::filesystem::path& file_path, const ByteRange& ra
   return bytes;
 }
 
+struct CacheValidators {
+  std::wstring etag;
+  std::wstring last_modified;
+};
+
+// 去掉条件请求头两端的空白，便于后续按 HTTP 语义做精确匹配。
+auto trim_http_header_value(std::wstring_view value) -> std::wstring_view {
+  while (!value.empty() && std::iswspace(value.front())) {
+    value.remove_prefix(1);
+  }
+  while (!value.empty() && std::iswspace(value.back())) {
+    value.remove_suffix(1);
+  }
+  return value;
+}
+
+// 基于文件大小和最后修改时间构造 WebView 自定义响应的缓存校验器。
+auto build_cache_validators(const std::filesystem::path& file_path, std::uint64_t file_size)
+    -> std::expected<CacheValidators, std::string> {
+  std::error_code ec;
+  auto last_write_time = std::filesystem::last_write_time(file_path, ec);
+  if (ec) {
+    return std::unexpected("Failed to query file last write time: " + ec.message());
+  }
+
+  auto modified_time = std::chrono::time_point_cast<std::chrono::seconds>(
+      std::chrono::time_point_cast<std::chrono::system_clock::duration>(
+          last_write_time - std::filesystem::file_time_type::clock::now() +
+          std::chrono::system_clock::now()));
+  auto modified_seconds = modified_time.time_since_epoch().count();
+
+  return CacheValidators{
+      .etag = std::format(L"\"{:x}-{:x}\"", file_size, modified_seconds),
+      .last_modified = std::format(L"{:%a, %d %b %Y %H:%M:%S GMT}", modified_time)};
+}
+
+// If-None-Match 允许多个候选值；只要命中当前资源的 ETag 就可以回 304。
+auto if_none_match_matches(std::wstring_view header_value, std::wstring_view etag) -> bool {
+  auto remaining = header_value;
+  while (!remaining.empty()) {
+    auto comma_pos = remaining.find(L',');
+    auto candidate = trim_http_header_value(remaining.substr(0, comma_pos));
+    if (candidate == L"*" || candidate == etag) {
+      return true;
+    }
+
+    if (comma_pos == std::wstring_view::npos) {
+      break;
+    }
+    remaining.remove_prefix(comma_pos + 1);
+  }
+  return false;
+}
+
+// WebView 条件请求判定与 HTTP 服务器保持一致：Range 请求不走 304。
+auto is_not_modified_request(ICoreWebView2WebResourceRequest* request,
+                             const CacheValidators& validators, bool has_range_request) -> bool {
+  if (has_range_request) {
+    return false;
+  }
+
+  auto if_none_match = get_request_header(request, L"If-None-Match");
+  if (if_none_match.has_value()) {
+    return if_none_match_matches(trim_http_header_value(*if_none_match), validators.etag);
+  }
+
+  auto if_modified_since = get_request_header(request, L"If-Modified-Since");
+  if (if_modified_since.has_value()) {
+    return trim_http_header_value(*if_modified_since) == validators.last_modified;
+  }
+
+  return false;
+}
+
+// 构建 200/206 自定义响应头，统一写入缓存校验信息与可选的 Range/CORS 头。
 auto build_response_headers(const std::wstring& content_type, std::uint64_t content_length,
+                            std::wstring_view cache_control, const CacheValidators& validators,
                             std::optional<std::uint64_t> source_file_size = std::nullopt,
                             std::optional<ByteRange> range = std::nullopt,
                             std::optional<std::wstring> allowed_origin = std::nullopt)
     -> std::wstring {
   auto headers = std::format(
       L"Content-Type: {}\r\n"
-      L"Cache-Control: public, max-age=86400\r\n"
+      L"Cache-Control: {}\r\n"
+      L"ETag: {}\r\n"
+      L"Last-Modified: {}\r\n"
       L"Accept-Ranges: bytes\r\n"
       L"Content-Length: {}\r\n",
-      content_type, content_length);
+      content_type, cache_control, validators.etag, validators.last_modified, content_length);
 
   if (allowed_origin.has_value() && !allowed_origin->empty()) {
     headers += std::format(L"Access-Control-Allow-Origin: {}\r\n", *allowed_origin);
@@ -173,6 +251,21 @@ auto build_response_headers(const std::wstring& content_type, std::uint64_t cont
   if (range.has_value() && source_file_size.has_value()) {
     headers += std::format(L"Content-Range: bytes {}-{}/{}\r\n", range->start, range->end,
                            source_file_size.value());
+  }
+
+  return headers;
+}
+
+// 构建 304 响应头；虽然没有实体，但仍需带回缓存相关元数据。
+auto build_not_modified_headers(std::wstring_view cache_control, const CacheValidators& validators,
+                                std::optional<std::wstring> allowed_origin = std::nullopt)
+    -> std::wstring {
+  auto headers = std::format(L"Cache-Control: {}\r\nETag: {}\r\nLast-Modified: {}\r\n",
+                             cache_control, validators.etag, validators.last_modified);
+
+  if (allowed_origin.has_value() && !allowed_origin->empty()) {
+    headers += std::format(L"Access-Control-Allow-Origin: {}\r\n", *allowed_origin);
+    headers += L"Vary: Origin\r\n";
   }
 
   return headers;
@@ -248,6 +341,8 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
   // 图库原文件常无显式 content_type，须按扩展名补 MIME，否则播放器可能拒播。
   auto content_type = resolution.content_type.value_or(
       Utils::String::FromUtf8(Utils::File::Mime::get_mime_type(resolution.file_path)));
+  auto cache_control =
+      resolution.cache_control_header.value_or(std::wstring{L"public, max-age=86400"});
   auto allowed_origin =
       state.webview
           ? std::optional<std::wstring>(L"https://" + state.webview->config.virtual_host_name)
@@ -268,6 +363,29 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
                                                          headers.c_str(),
                                                          invalid_range_response.put()))) {
       args->put_Response(invalid_range_response.get());
+    }
+    return S_OK;
+  }
+
+  auto validators_result =
+      build_cache_validators(resolution.file_path, static_cast<std::uint64_t>(file_size));
+  if (!validators_result) {
+    Logger().error("Failed to build WebView cache validators: {} ({})",
+                   Utils::String::ToUtf8(resolution.file_path.wstring()),
+                   validators_result.error());
+    return S_OK;
+  }
+  auto validators = std::move(validators_result.value());
+
+  if (is_not_modified_request(request.get(), validators, range_parse.range.has_value())) {
+    auto not_modified_headers =
+        build_not_modified_headers(cache_control, validators, allowed_origin);
+    wil::com_ptr<ICoreWebView2WebResourceResponse> not_modified_response;
+    if (SUCCEEDED(environment->CreateWebResourceResponse(nullptr, 304, L"Not Modified",
+                                                         not_modified_headers.c_str(),
+                                                         not_modified_response.put())) &&
+        not_modified_response) {
+      args->put_Response(not_modified_response.get());
     }
     return S_OK;
   }
@@ -293,7 +411,7 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
       return S_OK;
     }
 
-    headers = build_response_headers(content_type, bytes_result->size(),
+    headers = build_response_headers(content_type, bytes_result->size(), cache_control, validators,
                                      static_cast<std::uint64_t>(file_size), range_parse.range,
                                      allowed_origin);
     status_code = 206;
@@ -308,8 +426,9 @@ auto handle_custom_web_resource_request(Core::State::AppState& state,
       return S_OK;
     }
 
-    headers = build_response_headers(content_type, static_cast<std::uint64_t>(file_size),
-                                     std::nullopt, std::nullopt, allowed_origin);
+    headers =
+        build_response_headers(content_type, static_cast<std::uint64_t>(file_size), cache_control,
+                               validators, std::nullopt, std::nullopt, allowed_origin);
   }
 
   wil::com_ptr<ICoreWebView2WebResourceResponse> response;

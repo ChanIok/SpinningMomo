@@ -29,7 +29,9 @@ struct StreamContext {
 
   // 响应相关
   std::string mime_type;
-  std::chrono::seconds cache_duration;
+  std::string cache_control;
+  std::string etag;
+  std::string last_modified;
   size_t bytes_sent;
   int status_code = 200;
   std::optional<std::string> content_range_header;
@@ -47,6 +49,7 @@ struct StreamContext {
 struct PathResolutionData {
   std::filesystem::path file_path;
   std::optional<std::chrono::seconds> cache_duration;
+  std::optional<std::string> cache_control_header;
 };
 
 using PathResolution = std::expected<PathResolutionData, std::string>;
