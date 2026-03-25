@@ -5,7 +5,6 @@ import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { Split } from '@/components/ui/split'
 import { useGalleryLayout } from '../composables'
 import { useGalleryData } from '../composables/useGalleryData'
-import { useGalleryStore } from '../store'
 import { useSettingsStore } from '@/features/settings/store'
 import GallerySidebar from './GallerySidebar.vue'
 import GalleryViewer from './GalleryViewer.vue'
@@ -25,7 +24,6 @@ const GALLERY_REFRESH_DEBOUNCE_MS = 400
 // 使用布局管理
 const { isSidebarOpen, isDetailsOpen, setSidebarOpen, setDetailsOpen } = useGalleryLayout()
 const galleryData = useGalleryData()
-const galleryStore = useGalleryStore()
 const settingsStore = useSettingsStore()
 const isBelowLg = useMediaQuery('(max-width: 1023px)')
 
@@ -268,12 +266,8 @@ async function refreshGalleryFromNotification() {
   do {
     refreshQueued = false
     try {
-      await galleryData.loadFolderTree()
-      if (galleryStore.isTimelineMode) {
-        await galleryData.loadTimelineData()
-      } else {
-        await galleryData.loadAllAssets()
-      }
+      await galleryData.loadFolderTree({ silent: true })
+      await galleryData.refreshCurrentQuery()
     } catch (error) {
       console.error('Failed to refresh gallery after notification:', error)
     }

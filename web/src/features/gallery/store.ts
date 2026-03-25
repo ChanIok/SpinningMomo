@@ -70,11 +70,20 @@ export const useGalleryStore = defineStore('gallery', () => {
   const totalCount = ref(0)
   const currentPage = ref(1)
   const hasNextPage = ref(false)
+  const isRefreshing = ref(false)
+  const queryVersion = ref(0)
 
   // ============= 分页缓存状态（普通模式使用） =============
   const paginatedAssets = ref<Map<number, Asset[]>>(new Map()) // key: pageNumber
   const paginatedAssetsVersion = ref(0)
   const perPage = ref(100) // 每页数量
+  const visibleRange = reactive<{
+    startIndex?: number
+    endIndex?: number
+  }>({
+    startIndex: undefined,
+    endIndex: undefined,
+  })
 
   // ============= 时间线数据状态 =============
   const timelineBuckets = ref<TimelineBucket[]>([])
@@ -170,6 +179,22 @@ export const useGalleryStore = defineStore('gallery', () => {
     hasNextPage.value = hasNext
   }
 
+  function beginQueryRefresh(): number {
+    queryVersion.value += 1
+    isRefreshing.value = true
+    return queryVersion.value
+  }
+
+  function finishQueryRefresh(version: number) {
+    if (queryVersion.value === version) {
+      isRefreshing.value = false
+    }
+  }
+
+  function isQueryVersionCurrent(version: number): boolean {
+    return queryVersion.value === version
+  }
+
   // ============= 分页缓存操作 Actions =============
 
   function setPerPage(count: number) {
@@ -206,6 +231,11 @@ export const useGalleryStore = defineStore('gallery', () => {
    */
   function setPageAssets(pageNum: number, pageAssets: Asset[]) {
     paginatedAssets.value.set(pageNum, pageAssets)
+    paginatedAssetsVersion.value += 1
+  }
+
+  function replacePaginatedAssets(pages: Map<number, Asset[]>) {
+    paginatedAssets.value = new Map(pages)
     paginatedAssetsVersion.value += 1
   }
 
@@ -285,6 +315,11 @@ export const useGalleryStore = defineStore('gallery', () => {
   function clearPaginatedAssets() {
     paginatedAssets.value.clear()
     paginatedAssetsVersion.value += 1
+  }
+
+  function setVisibleRange(startIndex?: number, endIndex?: number) {
+    visibleRange.startIndex = startIndex
+    visibleRange.endIndex = endIndex
   }
 
   // ============= 时间线数据操作 Actions =============
@@ -547,12 +582,15 @@ export const useGalleryStore = defineStore('gallery', () => {
     totalCount.value = 0
     currentPage.value = 1
     hasNextPage.value = false
+    isRefreshing.value = false
+    queryVersion.value = 0
 
     // 清空时间线数据
     clearTimelineData()
 
     // 清空分页缓存
     clearPaginatedAssets()
+    setVisibleRange(undefined, undefined)
 
     // 清空文件夹树数据
     folders.value = []
@@ -594,11 +632,14 @@ export const useGalleryStore = defineStore('gallery', () => {
     totalCount,
     currentPage,
     hasNextPage,
+    isRefreshing,
+    queryVersion,
 
     // 分页缓存状态
     paginatedAssets,
     paginatedAssetsVersion,
     perPage,
+    visibleRange,
 
     // 时间线状态
     timelineBuckets,
@@ -637,15 +678,20 @@ export const useGalleryStore = defineStore('gallery', () => {
     setInitialLoading,
     setError,
     setPagination,
+    beginQueryRefresh,
+    finishQueryRefresh,
+    isQueryVersionCurrent,
 
     // 分页缓存 Actions
     setPerPage,
     getAssetsInRange,
     isPageLoaded,
     setPageAssets,
+    replacePaginatedAssets,
     patchAssetsReviewState,
     patchAssetDescription,
     clearPaginatedAssets,
+    setVisibleRange,
 
     // 时间线 Actions
     setTimelineBuckets,

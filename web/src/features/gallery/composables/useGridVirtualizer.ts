@@ -85,8 +85,15 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
   ) {
     if (items.length === 0) {
       virtualRows.value = []
+      store.setVisibleRange(undefined, undefined)
       return
     }
+
+    const firstVisibleRow = items[0]!
+    const lastVisibleRow = items[items.length - 1]!
+    const startIndex = Math.max(0, firstVisibleRow.index * cols)
+    const endIndex = Math.min(total - 1, (lastVisibleRow.index + 1) * cols - 1)
+    store.setVisibleRange(startIndex, endIndex)
 
     virtualRows.value = items.map((virtualRow) => {
       const startIndex = virtualRow.index * cols

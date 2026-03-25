@@ -1,6 +1,6 @@
 import { useGalleryStore } from '../store'
 import { galleryApi } from '../api'
-import type { ScanAssetsParams } from '../types'
+import type { Asset, ScanAssetsParams } from '../types'
 import { toQueryAssetsFilters } from '../queryFilters'
 
 /**
@@ -22,8 +22,86 @@ export function useGalleryData() {
     return undefined
   }
 
+  function hasRenderableResults(): boolean {
+    return (
+      store.paginatedAssets.size > 0 || store.totalCount > 0 || store.timelineBuckets.length > 0
+    )
+  }
+
+  function getAnchorPageNumber() {
+    const startIndex = store.visibleRange.startIndex
+    if (startIndex === undefined || startIndex < 0) {
+      return 1
+    }
+
+    return Math.floor(startIndex / store.perPage) + 1
+  }
+
+  function getVisiblePageNumbers(total: number): number[] {
+    if (total <= 0) {
+      return []
+    }
+
+    const maxIndex = total - 1
+    const startIndex = store.visibleRange.startIndex
+    const endIndex = store.visibleRange.endIndex
+
+    if (startIndex === undefined || endIndex === undefined) {
+      return [1]
+    }
+
+    const clampedStart = Math.max(0, Math.min(startIndex, maxIndex))
+    const clampedEnd = Math.max(clampedStart, Math.min(endIndex, maxIndex))
+    const startPage = Math.floor(clampedStart / store.perPage) + 1
+    const endPage = Math.floor(clampedEnd / store.perPage) + 1
+    const pages: number[] = []
+
+    for (let pageNum = startPage; pageNum <= endPage; pageNum += 1) {
+      pages.push(pageNum)
+    }
+
+    return pages.length > 0 ? pages : [1]
+  }
+
+  async function queryAssetPage(pageNum: number, activeAssetId?: number) {
+    const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+
+    return galleryApi.queryAssets({
+      filters,
+      sortBy: store.sortBy,
+      sortOrder: store.sortOrder,
+      activeAssetId,
+      page: pageNum,
+      perPage: store.perPage,
+    })
+  }
+
+  async function queryVisiblePages(total: number, preferredPage: number) {
+    if (total <= 0) {
+      return new Map<number, Asset[]>()
+    }
+
+    const maxPage = Math.max(1, Math.ceil(total / store.perPage))
+    const visiblePages = new Set(getVisiblePageNumbers(total))
+    visiblePages.add(Math.max(1, Math.min(preferredPage, maxPage)))
+    const pageNumbers = [...visiblePages].sort((left, right) => left - right)
+
+    const responses = await Promise.all(pageNumbers.map((pageNum) => queryAssetPage(pageNum)))
+    const pages = new Map<number, Asset[]>()
+
+    pageNumbers.forEach((pageNum, index) => {
+      pages.set(pageNum, responses[index]?.items ?? [])
+    })
+
+    return pages
+  }
+
   // 在筛选结果刷新后，用 activeAssetId 将当前位置重建到新的结果集上。
-  async function reconcileActiveAsset(activeAssetIndex?: number) {
+  async function reconcileActiveAsset(activeAssetIndex?: number, requestVersion?: number) {
+    if (requestVersion !== undefined && !store.isQueryVersionCurrent(requestVersion)) {
+      return
+    }
+
     const activeAssetId = store.selection.activeAssetId
     if (activeAssetId === undefined) {
       return
@@ -49,6 +127,9 @@ export function useGalleryData() {
     const targetPage = Math.floor(activeAssetIndex / store.perPage) + 1
     if (!store.isPageLoaded(targetPage)) {
       await loadPage(targetPage)
+      if (requestVersion !== undefined && !store.isQueryVersionCurrent(requestVersion)) {
+        return
+      }
     }
 
     const loadedActiveAsset = findLoadedAssetById(activeAssetId)
@@ -67,23 +148,73 @@ export function useGalleryData() {
     }
   }
 
-  // ============= 数据加载操作 =============
+  async function refreshGridData() {
+    const requestVersion = store.beginQueryRefresh()
+    const shouldShowLoading = !hasRenderableResults()
 
-  /**
-   * 加载时间线数据（月份元数据 + 第一页）
-   */
-  async function loadTimelineData() {
     try {
-      store.setLoading(true)
+      if (shouldShowLoading) {
+        store.setLoading(true)
+      }
       store.setError(null)
 
-      // 清空分页缓存（重新加载时）
-      store.clearPaginatedAssets()
+      let pageNum = getAnchorPageNumber()
+      let response = await queryAssetPage(pageNum, store.selection.activeAssetId)
+
+      if (!store.isQueryVersionCurrent(requestVersion)) {
+        return
+      }
+
+      const maxPage = Math.max(1, Math.ceil(response.totalCount / store.perPage))
+      if (response.totalCount > 0 && pageNum > maxPage) {
+        pageNum = maxPage
+        response = await queryAssetPage(pageNum, store.selection.activeAssetId)
+        if (!store.isQueryVersionCurrent(requestVersion)) {
+          return
+        }
+      }
+
+      const pages = await queryVisiblePages(response.totalCount, pageNum)
+      if (!store.isQueryVersionCurrent(requestVersion)) {
+        return
+      }
+
+      {
+        store.clearTimelineData()
+        store.setPagination(response.totalCount, pageNum, pageNum < maxPage)
+        store.replacePaginatedAssets(pages)
+      }
+
+      await reconcileActiveAsset(response.activeAssetIndex, requestVersion)
+
+      console.log('📊 加载完成:', {
+        totalCount: response.totalCount,
+        loadedPages: [...pages.keys()],
+        perPage: store.perPage,
+      })
+    } catch (error) {
+      console.error('加载失败:', error)
+      store.setError('加载数据失败')
+    } finally {
+      store.finishQueryRefresh(requestVersion)
+      if (shouldShowLoading) {
+        store.setLoading(false)
+      }
+    }
+  }
+
+  async function refreshTimelineData() {
+    const requestVersion = store.beginQueryRefresh()
+    const shouldShowLoading = !hasRenderableResults()
+
+    try {
+      if (shouldShowLoading) {
+        store.setLoading(true)
+      }
+      store.setError(null)
 
       const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
-
-      // 1. 获取月份元数据（使用完整过滤条件）
-      const response = await galleryApi.getTimelineBuckets({
+      const bucketsResponse = await galleryApi.getTimelineBuckets({
         folderId: filters.folderId,
         includeSubfolders: filters.includeSubfolders,
         sortOrder: store.sortOrder,
@@ -99,71 +230,74 @@ export function useGalleryData() {
         colorHexes: filters.colorHexes,
       })
 
-      store.setTimelineBuckets(response.buckets)
-      store.setTimelineTotalCount(response.totalCount)
+      if (!store.isQueryVersionCurrent(requestVersion)) {
+        return
+      }
 
-      // 2. 设置分页总数（用于虚拟滚动）
-      store.setPagination(response.totalCount, 1, false)
+      const pageNum = Math.max(
+        1,
+        Math.min(
+          getAnchorPageNumber(),
+          Math.max(1, Math.ceil(bucketsResponse.totalCount / store.perPage))
+        )
+      )
+      const pages = await queryVisiblePages(bucketsResponse.totalCount, pageNum)
+      if (!store.isQueryVersionCurrent(requestVersion)) {
+        return
+      }
 
-      await reconcileActiveAsset(response.activeAssetIndex)
+      {
+        store.setTimelineBuckets(bucketsResponse.buckets)
+        store.setTimelineTotalCount(bucketsResponse.totalCount)
+        store.setPagination(
+          bucketsResponse.totalCount,
+          pageNum,
+          pageNum < Math.max(1, Math.ceil(bucketsResponse.totalCount / store.perPage))
+        )
+        store.replacePaginatedAssets(pages)
+      }
+
+      await reconcileActiveAsset(bucketsResponse.activeAssetIndex, requestVersion)
 
       console.log('📅 时间线数据加载成功:', {
-        months: response.buckets.length,
-        total: response.totalCount,
+        months: bucketsResponse.buckets.length,
+        total: bucketsResponse.totalCount,
+        loadedPages: [...pages.keys()],
       })
     } catch (error) {
       console.error('Failed to load timeline data:', error)
       store.setError('加载时间线数据失败')
     } finally {
-      store.setLoading(false)
+      store.finishQueryRefresh(requestVersion)
+      if (shouldShowLoading) {
+        store.setLoading(false)
+      }
     }
   }
 
+  // ============= 数据加载操作 =============
+
   /**
-   * 加载普通模式资产 - 首次请求获取总数和第一页
+   * 加载时间线数据（月份元数据 + 当前可见页）
+   */
+  async function loadTimelineData() {
+    await refreshTimelineData()
+  }
+
+  /**
+   * 加载普通模式资产 - 保留旧结果，等新结果就绪后原子替换
    */
   async function loadAllAssets() {
-    try {
-      store.setLoading(true)
-      store.setError(null)
+    await refreshGridData()
+  }
 
-      // 清空时间线数据
-      store.clearTimelineData()
-
-      // 清空分页缓存（重新加载时）
-      store.clearPaginatedAssets()
-
-      const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
-
-      // 首次请求获取总数和第一页
-      const response = await galleryApi.queryAssets({
-        filters,
-        sortBy: store.sortBy,
-        sortOrder: store.sortOrder,
-        activeAssetId: store.selection.activeAssetId,
-        page: 1,
-        perPage: store.perPage,
-      })
-
-      // 设置总数（用于构建虚拟列表）
-      store.setPagination(response.totalCount, 1, false)
-
-      // 缓存第一页数据
-      store.setPageAssets(1, response.items)
-
-      await reconcileActiveAsset(response.activeAssetIndex)
-
-      console.log('📊 加载完成:', {
-        totalCount: response.totalCount,
-        firstPage: response.items.length,
-        perPage: store.perPage,
-      })
-    } catch (error) {
-      console.error('加载失败:', error)
-      store.setError('加载数据失败')
-    } finally {
-      store.setLoading(false)
+  async function refreshCurrentQuery() {
+    if (store.isTimelineMode) {
+      await refreshTimelineData()
+      return
     }
+
+    await refreshGridData()
   }
 
   /**
@@ -174,16 +308,13 @@ export function useGalleryData() {
       return
     }
 
-    try {
-      const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+    const requestVersion = store.queryVersion
 
-      const response = await galleryApi.queryAssets({
-        filters,
-        sortBy: store.sortBy,
-        sortOrder: store.sortOrder,
-        page: pageNum,
-        perPage: store.perPage,
-      })
+    try {
+      const response = await queryAssetPage(pageNum)
+      if (!store.isQueryVersionCurrent(requestVersion)) {
+        return
+      }
 
       store.setPageAssets(pageNum, response.items)
 
@@ -197,19 +328,27 @@ export function useGalleryData() {
   /**
    * 加载文件夹树
    */
-  async function loadFolderTree() {
+  async function loadFolderTree(options: { silent?: boolean } = {}) {
+    const { silent = false } = options
+
     try {
-      store.setFoldersLoading(true)
-      store.setFoldersError(null)
+      if (!silent) {
+        store.setFoldersLoading(true)
+        store.setFoldersError(null)
+      }
 
       const folderTree = await galleryApi.getFolderTree()
       store.setFolders(folderTree)
     } catch (error) {
       console.error('Failed to load folder tree:', error)
-      store.setFoldersError('加载文件夹树失败')
+      if (!silent) {
+        store.setFoldersError('加载文件夹树失败')
+      }
       throw error
     } finally {
-      store.setFoldersLoading(false)
+      if (!silent) {
+        store.setFoldersLoading(false)
+      }
     }
   }
 
@@ -254,10 +393,11 @@ export function useGalleryData() {
 
   return {
     // 数据加载方法
-    loadTimelineData, // 时间线元数据
-    loadAllAssets, // 普通模式首次加载
-    loadPage, // 加载指定页（虚拟列表用）
-    loadFolderTree, // 文件夹树
+    loadTimelineData,
+    loadAllAssets,
+    refreshCurrentQuery,
+    loadPage,
+    loadFolderTree,
     scanAssets,
     startScanAssets,
 
