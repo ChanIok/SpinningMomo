@@ -135,11 +135,11 @@ const handleOverlayPresetApply = async (preset: OverlayPalettePreset) => {
 }
 
 const handleOverlaySampleFromWallpaper = async () => {
-  const imageUrl = resolveBackgroundImageUrl(appSettings.value.ui.background)
-  if (!imageUrl) return
+  const imageFileName = appSettings.value.ui.background.imageFileName
+  if (!imageFileName) return
 
   try {
-    await applyWallpaperAnalysis(imageUrl)
+    await applyWallpaperAnalysis(imageFileName)
   } catch (error) {
     console.error('Failed to sample overlay palette from wallpaper:', error)
   }

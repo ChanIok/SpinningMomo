@@ -9,7 +9,7 @@ import Core.RPC.State;
 import Core.RPC.Types;
 import Features.Settings;
 import Features.Settings.Types;
-import Features.Settings.BackgroundAnalyzer;
+import Features.Settings.Background;
 import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Settings {
@@ -57,9 +57,37 @@ auto handle_patch_settings(Core::State::AppState& app_state,
 }
 
 auto handle_analyze_background([[maybe_unused]] Core::State::AppState& app_state,
-                               const Features::Settings::Types::AnalyzeBackgroundParams& params)
-    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::AnalyzeBackgroundResult>> {
-  auto result = Features::Settings::BackgroundAnalyzer::analyze_background(params);
+                               const Features::Settings::Types::BackgroundAnalysisParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::BackgroundAnalysisResult>> {
+  auto result = Features::Settings::Background::analyze_background(params);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
+auto handle_import_background([[maybe_unused]] Core::State::AppState& app_state,
+                              const Features::Settings::Types::BackgroundImportParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::BackgroundImportResult>> {
+  auto result = Features::Settings::Background::import_background_image(params);
+
+  if (!result) {
+    co_return std::unexpected(
+        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+                            .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
+auto handle_remove_background([[maybe_unused]] Core::State::AppState& app_state,
+                              const Features::Settings::Types::BackgroundRemoveParams& params)
+    -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::BackgroundRemoveResult>> {
+  auto result = Features::Settings::Background::remove_background_image(params);
 
   if (!result) {
     co_return std::unexpected(
@@ -86,10 +114,20 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "settings.patch", handle_patch_settings,
       "Patch settings configuration");
 
-  Core::RPC::register_method<Features::Settings::Types::AnalyzeBackgroundParams,
-                             Features::Settings::Types::AnalyzeBackgroundResult>(
-      app_state, app_state.rpc->registry, "settings.analyzeBackground", handle_analyze_background,
+  Core::RPC::register_method<Features::Settings::Types::BackgroundAnalysisParams,
+                             Features::Settings::Types::BackgroundAnalysisResult>(
+      app_state, app_state.rpc->registry, "settings.background.analyze", handle_analyze_background,
       "Analyze background image and return recommended theme and overlay colors");
+
+  Core::RPC::register_method<Features::Settings::Types::BackgroundImportParams,
+                             Features::Settings::Types::BackgroundImportResult>(
+      app_state, app_state.rpc->registry, "settings.background.import", handle_import_background,
+      "Import a background image into managed app storage and return its logical path");
+
+  Core::RPC::register_method<Features::Settings::Types::BackgroundRemoveParams,
+                             Features::Settings::Types::BackgroundRemoveResult>(
+      app_state, app_state.rpc->registry, "settings.background.remove", handle_remove_background,
+      "Remove a managed background image from app storage");
 }
 
 }  // namespace Core::RPC::Endpoints::Settings

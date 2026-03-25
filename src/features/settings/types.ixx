@@ -21,7 +21,7 @@ export struct WebThemeSettings {
 // Web 背景设置
 export struct WebBackgroundSettings {
   std::string type = "none";  // "none" | "image"
-  std::string image_path = "";
+  std::string image_file_name = "";
   int background_blur_amount = 0;                                    // 0 - 100
   double background_opacity = 1.0;                                   // 0.0 - 1.0
   std::vector<std::string> overlay_colors = {"#000000", "#000000"};  // 1 - 4
@@ -30,16 +30,32 @@ export struct WebBackgroundSettings {
   double surface_opacity = 1.0;  // 0.0 - 1.0
 };
 
-export struct AnalyzeBackgroundParams {
-  std::string image_path;
+export struct BackgroundAnalysisParams {
+  std::string image_file_name;
   std::int32_t overlay_mode = 2;  // 1 - 4
 };
 
-export struct AnalyzeBackgroundResult {
+export struct BackgroundAnalysisResult {
   std::string theme_mode = "dark";  // "light" | "dark"
   std::string primary_color = "#FBBF24";
   std::vector<std::string> overlay_colors;
   double brightness = 0.0;  // 0 - 1
+};
+
+export struct BackgroundImportParams {
+  std::string source_path;
+};
+
+export struct BackgroundImportResult {
+  std::string image_file_name;
+};
+
+export struct BackgroundRemoveParams {
+  std::string image_file_name;
+};
+
+export struct BackgroundRemoveResult {
+  bool removed = false;
 };
 
 // 完整的应用设置（重构后的结构）

@@ -12,9 +12,9 @@ import type {
 } from '../types'
 import {
   selectBackgroundImage,
-  copyBackgroundImageToResources,
+  importBackgroundImage,
   removeBackgroundImageResource,
-  analyzeBackground,
+  analyzeBackgroundImage,
 } from '../api'
 import type { OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
 import { getOverlayPaletteFromBackground, toBackgroundOverlayPatch } from '../overlayPalette'
@@ -196,14 +196,14 @@ export const useAppearanceActions = () => {
     })
   }
 
-  const applyWallpaperAnalysis = async (imagePath: string, persistImage = false) => {
+  const applyWallpaperAnalysis = async (imageFileName: string, persistImage = false) => {
     const currentBackground = appSettings.value.ui.background
     const overlayMode = getOverlayPaletteFromBackground(currentBackground).mode
-    const analysis = await analyzeBackground(imagePath, overlayMode)
+    const analysis = await analyzeBackgroundImage(imageFileName, overlayMode)
 
     const nextBackground = {
       ...currentBackground,
-      ...(persistImage ? { type: 'image' as const, imagePath } : {}),
+      ...(persistImage ? { type: 'image' as const, imageFileName } : {}),
       overlayColors: analysis.overlayColors.slice(0, overlayMode),
       primaryColor: analysis.primaryColor,
     }
@@ -223,21 +223,21 @@ export const useAppearanceActions = () => {
 
   const handleBackgroundImageSelect = async () => {
     try {
-      const previousImagePath = appSettings.value.ui.background.imagePath
+      const previousImageFileName = appSettings.value.ui.background.imageFileName
       const imagePath = await selectBackgroundImage()
       if (imagePath) {
-        const copiedImagePath = await copyBackgroundImageToResources(imagePath)
+        const imageFileName = await importBackgroundImage(imagePath)
         try {
-          await applyWallpaperAnalysis(copiedImagePath, true)
+          await applyWallpaperAnalysis(imageFileName, true)
         } catch (error) {
           console.warn('分析背景图片失败，使用基础背景设置:', error)
           await updateBackgroundSettings({
             type: 'image',
-            imagePath: copiedImagePath,
+            imageFileName,
           })
         }
-        if (previousImagePath && previousImagePath !== copiedImagePath) {
-          void removeBackgroundImageResource(previousImagePath)
+        if (previousImageFileName && previousImageFileName !== imageFileName) {
+          void removeBackgroundImageResource(previousImageFileName)
         }
       }
     } catch (error) {
@@ -248,13 +248,13 @@ export const useAppearanceActions = () => {
 
   const handleBackgroundImageRemove = async () => {
     try {
-      const previousImagePath = appSettings.value.ui.background.imagePath
+      const previousImageFileName = appSettings.value.ui.background.imageFileName
       await updateBackgroundSettings({
         type: 'none',
-        imagePath: '',
+        imageFileName: '',
       })
-      if (previousImagePath) {
-        void removeBackgroundImageResource(previousImagePath)
+      if (previousImageFileName) {
+        void removeBackgroundImageResource(previousImageFileName)
       }
     } catch (error) {
       console.error('移除背景图片失败:', error)

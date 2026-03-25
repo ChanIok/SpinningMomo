@@ -11,6 +11,7 @@ import Features.Settings.State;
 import Features.Settings.Compute;
 import Features.Settings.Migration;
 import Features.Settings.Menu;
+import Features.Settings.Background;
 import Utils.Path;
 import Utils.Logger;
 import Vendor.Windows;
@@ -141,6 +142,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       *app_state.settings = default_state;
       Compute::trigger_compute(app_state);
       app_state.settings->is_initialized = true;
+      Background::register_static_resolvers(app_state);
 
       Logger().info("Default settings created successfully");
       return {};
@@ -169,6 +171,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     *app_state.settings = state;
     Compute::trigger_compute(app_state);
     app_state.settings->is_initialized = true;
+    Background::register_static_resolvers(app_state);
 
     Logger().info("Settings loaded successfully (version {})", config.version);
     return {};

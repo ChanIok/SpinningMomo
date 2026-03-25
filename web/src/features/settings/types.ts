@@ -55,7 +55,7 @@ export interface FloatingWindowColors {
 // Web 背景设置
 export interface WebBackgroundSettings {
   type: 'none' | 'image'
-  imagePath: string
+  imageFileName: string
   backgroundBlurAmount: number
   backgroundOpacity: number
   overlayColors: string[]
@@ -407,7 +407,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     },
     background: {
       type: 'none',
-      imagePath: '',
+      imageFileName: '',
       backgroundBlurAmount: 0,
       backgroundOpacity: 1,
       overlayColors: ['#000000', '#000000'],

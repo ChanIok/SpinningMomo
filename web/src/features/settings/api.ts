@@ -1,8 +1,6 @@
 import { call } from '@/core/rpc'
 import { isWebView } from '@/core/env'
 import type { AppSettings, RuntimeCapabilities } from './types'
-import { BACKGROUND_IMAGE_NAME, BACKGROUND_RESOURCES_DIR, BACKGROUND_WEB_DIR } from './constants'
-import { isManagedBackgroundPath, toResourceFilePath } from './backgroundPath'
 
 export const settingsApi = {
   get: async (): Promise<AppSettings> => {
@@ -37,11 +35,15 @@ export interface FileInfoResult {
   lastModified: number
 }
 
-export interface WallpaperAnalysisResult {
+export interface BackgroundAnalysisResult {
   themeMode: 'light' | 'dark'
   primaryColor: string
   overlayColors: string[]
   brightness: number
+}
+
+export interface BackgroundImportResult {
+  imageFileName: string
 }
 
 export async function detectInfinityNikkiGameDirectory(): Promise<InfinityNikkiGameDirResult> {
@@ -66,14 +68,14 @@ export async function getFileInfo(path: string): Promise<FileInfoResult> {
   return call<FileInfoResult>('file.getInfo', { path })
 }
 
-export async function analyzeBackground(
-  imagePath: string,
+export async function analyzeBackgroundImage(
+  imageFileName: string,
   overlayMode: number
-): Promise<WallpaperAnalysisResult> {
-  return call<WallpaperAnalysisResult>(
-    'settings.analyzeBackground',
+): Promise<BackgroundAnalysisResult> {
+  return call<BackgroundAnalysisResult>(
+    'settings.background.analyze',
     {
-      imagePath,
+      imageFileName,
       overlayMode,
     },
     0
@@ -114,51 +116,37 @@ export async function selectBackgroundImage(): Promise<string | null> {
 }
 
 /**
- * 复制背景图片到资源目录
+ * 导入背景图片到后端托管目录
  */
-export async function copyBackgroundImageToResources(sourcePath: string): Promise<string> {
+export async function importBackgroundImage(sourcePath: string): Promise<string> {
   try {
-    const lastDotIndex = sourcePath.lastIndexOf('.')
-    const ext = lastDotIndex !== -1 ? sourcePath.substring(lastDotIndex).toLowerCase() : ''
-    const safeExt = ext.match(/^\.(jpg|jpeg|png|bmp|gif|webp)$/i) ? ext : '.jpg'
-    const revision = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-    const fileName = `${BACKGROUND_IMAGE_NAME}-${revision}${safeExt}`
-    const destPath = `${BACKGROUND_RESOURCES_DIR}/${fileName}`
+    const result = await call<BackgroundImportResult>(
+      'settings.background.import',
+      {
+        sourcePath,
+      },
+      0
+    )
 
-    await call<{
-      success: boolean
-      message: string
-    }>('file.copy', {
-      sourcePath: sourcePath,
-      destinationPath: destPath,
-      overwrite: true,
-    })
-
-    console.log('背景图片已复制到资源目录:', destPath)
-    return `${BACKGROUND_WEB_DIR}/${fileName}`
+    console.log('背景图片已导入到托管目录:', result.imageFileName)
+    return result.imageFileName
   } catch (error) {
-    console.error('复制背景图片失败:', error)
-    throw new Error('复制背景图片失败')
+    console.error('导入背景图片失败:', error)
+    throw new Error('导入背景图片失败')
   }
 }
 
 /**
  * 删除已管理的背景图片资源（非阻塞容错）
  */
-export async function removeBackgroundImageResource(imagePath: string): Promise<void> {
+export async function removeBackgroundImageResource(imageFileName: string): Promise<void> {
   try {
-    if (!imagePath || !isManagedBackgroundPath(imagePath)) {
+    if (!imageFileName) {
       return
     }
 
-    const resourcePath = toResourceFilePath(imagePath)
-    if (!resourcePath) {
-      return
-    }
-
-    await call('file.delete', {
-      path: resourcePath,
-      recursive: false,
+    await call('settings.background.remove', {
+      imageFileName,
     })
   } catch (error) {
     console.warn('清理旧背景图片失败:', error)

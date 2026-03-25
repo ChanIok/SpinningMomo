@@ -1,17 +1,5 @@
-// 前端资源根目录（文件系统路径）
-export const RESOURCES_WEB_ROOT = './resources/web'
-
-// 资源目录路径（文件系统路径）
-export const RESOURCES_DIR = `${RESOURCES_WEB_ROOT}/assets`
-
-// 背景图片目录（文件系统路径）
-export const BACKGROUND_RESOURCES_DIR = `${RESOURCES_DIR}/backgrounds`
-
 // 背景图片目录（Web 路径）
-export const BACKGROUND_WEB_DIR = '/assets/backgrounds'
-
-// 背景图片文件名
-export const BACKGROUND_IMAGE_NAME = 'background'
+export const BACKGROUND_WEB_DIR = '/static/backgrounds'
 
 // 界面面板不透明度范围
 export const SURFACE_OPACITY_RANGE = {

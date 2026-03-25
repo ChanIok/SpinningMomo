@@ -56,7 +56,7 @@ initializeRPC()
       settingsStore.appSettings.ui.webTheme.mode,
       settingsStore.appSettings.ui.webTheme.customCss,
       settingsStore.appSettings.ui.background.type,
-      settingsStore.appSettings.ui.background.imagePath,
+      settingsStore.appSettings.ui.background.imageFileName,
       settingsStore.appSettings.ui.background.backgroundBlurAmount,
       settingsStore.appSettings.ui.background.backgroundOpacity,
       settingsStore.appSettings.ui.background.overlayColors.join('|'),

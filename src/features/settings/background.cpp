@@ -2,14 +2,21 @@ module;
 
 #include <dkm.hpp>
 
-module Features.Settings.BackgroundAnalyzer;
+module Features.Settings.Background;
 
 import std;
+import Core.State;
+import Core.HttpServer.Static;
+import Core.HttpServer.Types;
+import Core.WebView.State;
+import Core.WebView.Static;
+import Core.WebView.Types;
 import Features.Settings.Types;
 import Utils.Image;
+import Utils.Logger;
 import Utils.Path;
 
-namespace Features::Settings::BackgroundAnalyzer {
+namespace Features::Settings::Background {
 
 struct RgbColor {
   std::uint8_t r = 0;
@@ -37,7 +44,185 @@ constexpr float kRegionSizeRatio = 0.26f;
 constexpr double kLightThemeThreshold = 0.48;
 // K-Means 聚类数，用于提取区域主色
 constexpr std::size_t kRegionClusterCount = 5;
+constexpr std::string_view kBackgroundWebPrefix = "/static/backgrounds/";
+constexpr std::wstring_view kBackgroundWebPrefixW = L"/static/backgrounds/";
+constexpr std::string_view kBackgroundFileName = "background";
 
+// 将外部传入的路径统一成模块内部使用的格式：
+// 1. 统一分隔符为 '/'
+// 2. 去掉 query / fragment
+// 3. 去掉首尾空白
+// 这样后续逻辑只需处理一种规范形态。
+auto normalize_wallpaper_input_path(std::string_view raw_path) -> std::string {
+  std::string normalized(raw_path);
+  for (auto& ch : normalized) {
+    if (ch == '\\') ch = '/';
+  }
+
+  auto query_pos = normalized.find_first_of("?#");
+  if (query_pos != std::string::npos) {
+    normalized = normalized.substr(0, query_pos);
+  }
+
+  auto trim = [](std::string& value) {
+    auto is_space = [](unsigned char ch) { return std::isspace(ch) != 0; };
+    while (!value.empty() && is_space(value.front())) {
+      value.erase(value.begin());
+    }
+    while (!value.empty() && is_space(value.back())) {
+      value.pop_back();
+    }
+  };
+  trim(normalized);
+  return normalized;
+}
+
+// 标准化路径用于比较，统一为小写和通用分隔符
+auto normalize_compare_path(const std::filesystem::path& path) -> std::wstring {
+  auto value = path.generic_wstring();
+  std::transform(value.begin(), value.end(), value.begin(),
+                 [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
+  return value;
+}
+
+// 检查目标路径是否在基目录范围内，防止路径逃逸
+auto is_path_within_base(const std::filesystem::path& target, const std::filesystem::path& base)
+    -> bool {
+  auto normalized_base = normalize_compare_path(base.lexically_normal());
+  auto normalized_target = normalize_compare_path(target.lexically_normal());
+  return normalized_target == normalized_base ||
+         (normalized_target.size() > normalized_base.size() &&
+          normalized_target.starts_with(normalized_base) &&
+          normalized_target[normalized_base.size()] == L'/');
+}
+
+// 检查文件扩展名是否为支持的背景图片格式
+auto is_supported_background_extension(std::string extension) -> bool {
+  std::transform(extension.begin(), extension.end(), extension.begin(),
+                 [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+  return extension == ".jpg" || extension == ".jpeg" || extension == ".png" ||
+         extension == ".bmp" || extension == ".gif" || extension == ".webp";
+}
+
+// 获取标准化的背景图片扩展名，不支持的默认为 .jpg
+auto normalize_background_extension(const std::filesystem::path& path) -> std::string {
+  auto extension = path.extension().generic_string();
+  return is_supported_background_extension(extension) ? extension : ".jpg";
+}
+
+// 从 URL 中提取相对路径（泛型版本）
+template <typename CharT>
+auto extract_relative_path_generic(std::basic_string_view<CharT> url,
+                                   std::basic_string_view<CharT> prefix)
+    -> std::optional<std::basic_string<CharT>> {
+  if (!url.starts_with(prefix)) {
+    return std::nullopt;
+  }
+
+  auto relative = url.substr(prefix.size());
+  auto end_pos =
+      std::min(relative.find(static_cast<CharT>('?')), relative.find(static_cast<CharT>('#')));
+  if (end_pos != std::basic_string_view<CharT>::npos) {
+    relative = relative.substr(0, end_pos);
+  }
+
+  if (relative.empty()) {
+    return std::nullopt;
+  }
+
+  return std::basic_string<CharT>(relative);
+}
+
+// 从完整 URL 中提取路径部分
+auto extract_path_from_url(std::string_view url) -> std::optional<std::string> {
+  auto scheme_pos = url.find("://");
+  if (scheme_pos == std::string_view::npos) {
+    return std::nullopt;
+  }
+
+  auto path_pos = url.find('/', scheme_pos + 3);
+  if (path_pos == std::string_view::npos) {
+    return std::string("/");
+  }
+
+  return std::string(url.substr(path_pos));
+}
+
+// 获取应用数据目录下的 backgrounds 文件夹路径
+auto get_backgrounds_directory() -> std::expected<std::filesystem::path, std::string> {
+  return Utils::Path::GetAppDataSubdirectory("backgrounds");
+}
+
+// 解析托管背景文件的绝对路径，进行安全校验
+auto resolve_managed_background_file(const std::filesystem::path& file_name)
+    -> std::expected<std::filesystem::path, std::string> {
+  // 设置里只保存文件名，不保存路径；因此这里拒绝任何目录信息。
+  if (file_name.empty() || file_name.is_absolute() || file_name.has_parent_path()) {
+    return std::unexpected("Invalid managed background file name");
+  }
+
+  auto backgrounds_dir_result = get_backgrounds_directory();
+  if (!backgrounds_dir_result) {
+    return std::unexpected("Failed to get backgrounds directory: " +
+                           backgrounds_dir_result.error());
+  }
+
+  auto resolved_path_result =
+      Utils::Path::NormalizePath(backgrounds_dir_result.value() / file_name);
+  if (!resolved_path_result) {
+    return std::unexpected("Failed to resolve managed background file path: " +
+                           resolved_path_result.error());
+  }
+
+  auto resolved_path = resolved_path_result.value();
+  if (!is_path_within_base(resolved_path, backgrounds_dir_result.value())) {
+    return std::unexpected("Managed background file escapes storage directory");
+  }
+
+  return resolved_path;
+}
+
+// 从原始路径解析托管背景文件路径
+auto resolve_managed_background_file_name(std::string_view raw_file_name)
+    -> std::expected<std::filesystem::path, std::string> {
+  auto normalized = normalize_wallpaper_input_path(raw_file_name);
+  if (normalized.empty()) {
+    return std::unexpected("Managed background file name is empty");
+  }
+  return resolve_managed_background_file(std::filesystem::path(normalized));
+}
+
+// 确保背景文件存在且是普通文件
+auto ensure_background_file_exists(const std::filesystem::path& path)
+    -> std::expected<std::filesystem::path, std::string> {
+  if (!std::filesystem::exists(path) || !std::filesystem::is_regular_file(path)) {
+    return std::unexpected("Background file not found");
+  }
+  return path;
+}
+
+// 解析并确保托管背景文件存在
+auto resolve_existing_managed_background_file(const std::filesystem::path& relative_path)
+    -> std::expected<std::filesystem::path, std::string> {
+  auto path_result = resolve_managed_background_file(relative_path);
+  if (!path_result) {
+    return std::unexpected(path_result.error());
+  }
+  return ensure_background_file_exists(path_result.value());
+}
+
+// 生成唯一的背景文件名（时间戳 + 随机数）
+auto generate_background_filename(const std::filesystem::path& source_path) -> std::string {
+  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::system_clock::now().time_since_epoch())
+                       .count();
+  std::mt19937 random_engine(static_cast<std::mt19937::result_type>(std::random_device{}()));
+  auto random_value = std::uniform_int_distribution<std::uint32_t>{}(random_engine);
+  return std::format("{}-{:x}-{:08x}{}", kBackgroundFileName, timestamp, random_value,
+                     normalize_background_extension(source_path));
+}
+
+// 将 RGB 颜色转换为十六进制字符串格式
 auto rgb_to_hex(const RgbColor& color) -> std::string {
   return std::format("#{:02X}{:02X}{:02X}", color.r, color.g, color.b);
 }
@@ -60,6 +245,7 @@ auto relative_luminance(const RgbColor& color) -> double {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
+// 将 RGB 颜色转换为 HSL 颜色空间
 auto rgb_to_hsl(const RgbColor& color) -> HslColor {
   double r = static_cast<double>(color.r) / 255.0;
   double g = static_cast<double>(color.g) / 255.0;
@@ -97,6 +283,7 @@ auto rgb_to_hsl(const RgbColor& color) -> HslColor {
   };
 }
 
+// 将 HSL 颜色转换回 RGB 颜色空间
 auto hsl_to_rgb(const HslColor& hsl) -> RgbColor {
   double saturation = std::clamp(hsl.s, 0.0, 100.0) / 100.0;
   double lightness = std::clamp(hsl.l, 0.0, 100.0) / 100.0;
@@ -178,72 +365,24 @@ auto compensate_for_theme(const RgbColor& color, std::string_view theme_mode, bo
   return hsl_to_rgb(hsl);
 }
 
-auto normalize_wallpaper_input_path(std::string_view raw_path) -> std::string {
-  std::string normalized(raw_path);
-  for (auto& ch : normalized) {
-    if (ch == '\\') ch = '/';
-  }
-
-  auto query_pos = normalized.find_first_of("?#");
-  if (query_pos != std::string::npos) {
-    normalized = normalized.substr(0, query_pos);
-  }
-
-  auto trim = [](std::string& value) {
-    auto is_space = [](unsigned char ch) { return std::isspace(ch) != 0; };
-    while (!value.empty() && is_space(value.front())) {
-      value.erase(value.begin());
-    }
-    while (!value.empty() && is_space(value.back())) {
-      value.pop_back();
-    }
-  };
-  trim(normalized);
-  return normalized;
-}
-
-auto resolve_wallpaper_path(std::string_view raw_path)
+// 解析壁纸路径，支持本地绝对路径和托管路径两种格式
+auto resolve_background_file(std::string_view raw_file_name)
     -> std::expected<std::filesystem::path, std::string> {
-  auto normalized = normalize_wallpaper_input_path(raw_path);
-  if (normalized.empty()) {
-    return std::unexpected("Wallpaper path is empty");
+  auto managed_file_result = resolve_managed_background_file_name(raw_file_name);
+  if (!managed_file_result) {
+    return std::unexpected(managed_file_result.error());
   }
 
-  std::filesystem::path direct_path(normalized);
-  if (direct_path.is_absolute() && std::filesystem::exists(direct_path)) {
-    return std::filesystem::weakly_canonical(direct_path);
+  auto existing_path_result = ensure_background_file_exists(managed_file_result.value());
+  if (!existing_path_result) {
+    return std::unexpected("Background file does not exist: " +
+                           managed_file_result.value().string());
   }
 
-  std::string local_path = normalized;
-  if (local_path.starts_with("/assets/")) {
-    auto web_root_result = Utils::Path::GetEmbeddedWebRootDirectory();
-    if (!web_root_result) {
-      return std::unexpected("Failed to get embedded web root: " + web_root_result.error());
-    }
-    return Utils::Path::NormalizePath(web_root_result.value() / local_path.substr(1));
-  } else if (local_path.starts_with("assets/")) {
-    auto web_root_result = Utils::Path::GetEmbeddedWebRootDirectory();
-    if (!web_root_result) {
-      return std::unexpected("Failed to get embedded web root: " + web_root_result.error());
-    }
-    return Utils::Path::NormalizePath(web_root_result.value() / local_path);
-  } else if (local_path.starts_with("/")) {
-    local_path = "." + local_path;
-  }
-
-  auto resolved_result = Utils::Path::NormalizePath(std::filesystem::path(local_path));
-  if (!resolved_result) {
-    return std::unexpected("Failed to normalize wallpaper path: " + resolved_result.error());
-  }
-
-  auto resolved_path = resolved_result.value();
-  if (!std::filesystem::exists(resolved_path)) {
-    return std::unexpected("Wallpaper file does not exist: " + resolved_path.string());
-  }
-
-  return resolved_path;
+  return existing_path_result.value();
 }
 
+// 加载壁纸位图并缩放到分析尺寸，转换为 BGRA 格式
 auto load_wallpaper_bitmap(const std::filesystem::path& path)
     -> std::expected<Utils::Image::BGRABitmapData, std::string> {
   auto wic_result = Utils::Image::get_thread_wic_factory();
@@ -308,6 +447,7 @@ auto collect_points_in_rect(const Utils::Image::BGRABitmapData& bitmap, int x0, 
   return points;
 }
 
+// 从像素点集合计算平均颜色
 auto average_color_from_points(const std::vector<std::array<float, 3>>& points) -> RgbColor {
   if (points.empty()) {
     return RgbColor{};
@@ -364,6 +504,7 @@ auto dominant_color_from_points(const std::vector<std::array<float, 3>>& points)
   }
 }
 
+// 在图像指定相对坐标位置采样区域主色
 auto sample_region_color(const Utils::Image::BGRABitmapData& bitmap, float x_ratio, float y_ratio)
     -> std::expected<RgbColor, std::string> {
   int width = static_cast<int>(bitmap.width);
@@ -386,6 +527,7 @@ auto sample_region_color(const Utils::Image::BGRABitmapData& bitmap, float x_rat
   return dominant_color_from_points(points);
 }
 
+// 估算全图主色
 auto estimate_primary_color(const Utils::Image::BGRABitmapData& bitmap)
     -> std::expected<RgbColor, std::string> {
   auto points = collect_points_in_rect(bitmap, 0, 0, static_cast<int>(bitmap.width),
@@ -429,6 +571,7 @@ auto compute_wallpaper_brightness(const Utils::Image::BGRABitmapData& bitmap) ->
   return std::clamp(total / alpha_weight, 0.0, 1.0);
 }
 
+// 根据亮度值判断主题模式（亮/暗）
 auto resolve_theme_mode(double brightness) -> std::string {
   return brightness >= kLightThemeThreshold ? "light" : "dark";
 }
@@ -463,9 +606,9 @@ auto overlay_sample_points(int mode) -> std::vector<std::pair<float, float>> {
 
 // 壁纸分析主入口：解析路径 → 加载并缩放位图 → 计算亮度/主题 → 提取各锚点叠加色和全图主色，
 // 所有颜色均经过主题补偿后以十六进制字符串返回。
-auto analyze_background(const Types::AnalyzeBackgroundParams& params)
-    -> std::expected<Types::AnalyzeBackgroundResult, std::string> {
-  auto path_result = resolve_wallpaper_path(params.image_path);
+auto analyze_background(const Types::BackgroundAnalysisParams& params)
+    -> std::expected<Types::BackgroundAnalysisResult, std::string> {
+  auto path_result = resolve_background_file(params.image_file_name);
   if (!path_result) {
     return std::unexpected(path_result.error());
   }
@@ -500,7 +643,7 @@ auto analyze_background(const Types::AnalyzeBackgroundParams& params)
 
   auto compensated_primary = compensate_for_theme(primary_color.value(), theme_mode, true);
 
-  return Types::AnalyzeBackgroundResult{
+  return Types::BackgroundAnalysisResult{
       .theme_mode = theme_mode,
       .primary_color = rgb_to_hex(compensated_primary),
       .overlay_colors = std::move(overlay_colors),
@@ -508,4 +651,124 @@ auto analyze_background(const Types::AnalyzeBackgroundParams& params)
   };
 }
 
-}  // namespace Features::Settings::BackgroundAnalyzer
+// 导入背景图片到应用托管目录
+auto import_background_image(const Types::BackgroundImportParams& params)
+    -> std::expected<Types::BackgroundImportResult, std::string> {
+  try {
+    // 导入阶段把用户原始文件复制到 app data 托管目录，
+    // 设置里只保存逻辑路径，不直接保存物理文件系统路径。
+    auto source_path_result = Utils::Path::NormalizePath(std::filesystem::path(params.source_path));
+    if (!source_path_result) {
+      return std::unexpected("Failed to resolve source background path: " +
+                             source_path_result.error());
+    }
+
+    auto source_path = source_path_result.value();
+    if (!std::filesystem::exists(source_path) || !std::filesystem::is_regular_file(source_path)) {
+      return std::unexpected("Background source file does not exist: " + source_path.string());
+    }
+
+    auto backgrounds_dir_result = get_backgrounds_directory();
+    if (!backgrounds_dir_result) {
+      return std::unexpected("Failed to get backgrounds directory: " +
+                             backgrounds_dir_result.error());
+    }
+
+    auto destination_path =
+        backgrounds_dir_result.value() / generate_background_filename(source_path);
+    std::filesystem::copy_file(source_path, destination_path,
+                               std::filesystem::copy_options::overwrite_existing);
+
+    return Types::BackgroundImportResult{
+        .image_file_name = destination_path.filename().generic_string(),
+    };
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to import background image: " + std::string(e.what()));
+  }
+}
+
+// 删除托管的背景图片
+auto remove_background_image(const Types::BackgroundRemoveParams& params)
+    -> std::expected<Types::BackgroundRemoveResult, std::string> {
+  try {
+    // 删除只接受托管路径，避免误删任意本地文件。
+    auto resolved_path_result = resolve_managed_background_file_name(params.image_file_name);
+    if (!resolved_path_result) {
+      return std::unexpected(resolved_path_result.error());
+    }
+
+    bool removed = false;
+    if (std::filesystem::exists(resolved_path_result.value())) {
+      removed = std::filesystem::remove(resolved_path_result.value());
+    }
+
+    return Types::BackgroundRemoveResult{.removed = removed};
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to remove background image: " + std::string(e.what()));
+  }
+}
+
+// 注册背景图片的静态资源解析器（HTTP 和 WebView 两条链路）
+auto register_static_resolvers(Core::State::AppState& app_state) -> void {
+  // 开发环境下浏览器通过 HTTP 访问 /static/backgrounds/*，
+  // 生产环境下 WebView 通过 static host 访问同一组逻辑路径。
+  // 两条链路最终都落到 app data 的背景目录，不再依赖 resources/web。
+  Core::HttpServer::Static::register_path_resolver(
+      app_state, std::string(kBackgroundWebPrefix),
+      [](std::string_view url) -> Core::HttpServer::Types::PathResolution {
+        auto relative_path = extract_relative_path_generic(url, kBackgroundWebPrefix);
+        if (!relative_path) {
+          return std::unexpected("Invalid managed background URL");
+        }
+
+        auto background_path_result =
+            resolve_existing_managed_background_file(std::filesystem::path(*relative_path));
+        if (!background_path_result) {
+          return std::unexpected(background_path_result.error());
+        }
+
+        return Core::HttpServer::Types::PathResolutionData{
+            .file_path = background_path_result.value(),
+            .cache_duration = std::chrono::hours(1),
+        };
+      });
+
+  if (!app_state.webview) {
+    return;
+  }
+
+  auto web_prefix = L"https://" + app_state.webview->config.static_host_name +
+                    std::wstring(kBackgroundWebPrefixW);
+  Core::WebView::Static::register_web_resource_resolver(
+      app_state, web_prefix,
+      [web_prefix](std::wstring_view url) -> Core::WebView::Types::WebResourceResolution {
+        auto relative_path = extract_relative_path_generic(url, std::wstring_view(web_prefix));
+        if (!relative_path) {
+          return {.success = false,
+                  .file_path = {},
+                  .error_message = "Invalid managed background URL",
+                  .content_type = std::nullopt,
+                  .status_code = 404};
+        }
+
+        auto background_path_result =
+            resolve_existing_managed_background_file(std::filesystem::path(*relative_path));
+        if (!background_path_result) {
+          return {.success = false,
+                  .file_path = {},
+                  .error_message = background_path_result.error(),
+                  .content_type = std::nullopt,
+                  .status_code = 404};
+        }
+
+        return {.success = true,
+                .file_path = background_path_result.value(),
+                .error_message = {},
+                .content_type = std::nullopt,
+                .status_code = 200};
+      });
+
+  Logger().info("Registered background static resolvers for {}", std::string(kBackgroundWebPrefix));
+}
+
+}  // namespace Features::Settings::Background
