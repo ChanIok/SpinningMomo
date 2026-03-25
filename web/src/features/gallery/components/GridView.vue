@@ -111,7 +111,7 @@ defineExpose({ scrollToIndex, getCardRect })
   <div v-if="isTimelineMode" class="flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar flex-1 overflow-auto pr-2 pl-6"
+      class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-6"
       @scroll="handleScroll"
     >
       <div

@@ -4,7 +4,7 @@ import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
-import { prepareReverseHero } from '../../composables/useHeroTransition'
+import { computeLightboxHeroRect, prepareReverseHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
 import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
@@ -18,6 +18,11 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu'
+
+/** 与反向 hero、surface 淡出时长（约 220ms）对齐，并留出双 rAF 余量 */
+const CLOSE_AFTER_REVERSE_HERO_MS = 260
+/** 无飞回动画时，与工具栏/内容区 leave ~180ms 对齐 */
+const CLOSE_AFTER_NO_HERO_MS = 180
 
 type LightboxImageExposed = {
   showFitMode: () => Promise<void>
@@ -45,9 +50,10 @@ const gallerySelection = useGallerySelection()
 const assetActions = useGalleryAssetActions()
 const { t } = useI18n()
 const lightboxImageRef = ref<LightboxImageExposed | null>(null)
-const isClosing = ref(false)
+const lightboxRootRef = ref<HTMLElement | null>(null)
 
 const isImmersive = computed(() => store.lightbox.isImmersive)
+const isClosing = computed(() => store.lightbox.isClosing)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
 const fitMode = computed(() => store.lightbox.fitMode)
 const currentAsset = computed(() => {
@@ -60,11 +66,17 @@ const currentAsset = computed(() => {
 })
 // 缩放、适屏、1:1 都是静态图查看语义；视频在灯箱里保持原生播放器行为。
 const isZoomableAsset = computed(() => currentAsset.value?.type !== 'video')
-const lightboxContainerClass = computed(() =>
-  isImmersive.value
+const lightboxRootClass = computed(() => {
+  const immersive = isImmersive.value
+  const closing = store.lightbox.isClosing
+  let cls = immersive
     ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
     : 'absolute inset-0 z-10 flex h-full w-full overflow-hidden'
-)
+  if (immersive && closing) {
+    cls += ' pointer-events-none opacity-0 transition-opacity duration-[280ms] ease-out'
+  }
+  return cls
+})
 
 const throttledPrevious = useThrottleFn(() => {
   if (store.lightbox.isOpen) {
@@ -113,45 +125,36 @@ function exitImmersive() {
 }
 
 function handleClose() {
-  if (isClosing.value) return
-  isClosing.value = true
+  if (store.lightbox.isClosing) return
+  store.setLightboxClosing(true)
 
-  // gallery 始终以 visibility:hidden 保持渲染和正确滚动位置，可直接同步读取 cardRect
+  let didReverseHero = false
+  // gallery 在打开时用 opacity 隐藏但仍可布局，可直接同步读取 cardRect
   const activeIndex = store.selection.activeIndex
   if (activeIndex !== undefined) {
     const galleryContent = props.galleryContentRef
     if (galleryContent) {
       const cardRect = galleryContent.getCardRect(activeIndex)
       const asset = store.getAssetsInRange(activeIndex, activeIndex)[0]
-      if (cardRect && asset) {
-        const TOOLBAR_HEIGHT = 61
-        const FILMSTRIP_HEIGHT = store.lightbox.showFilmstrip ? 101 : 0
-        const VIEWPORT_PADDING = 32
-        const W = document.documentElement.clientWidth
-        const H = document.documentElement.clientHeight
-        const contentW = W - VIEWPORT_PADDING * 2
-        const contentH = H - TOOLBAR_HEIGHT - FILMSTRIP_HEIGHT - VIEWPORT_PADDING * 2
-        const imgW = asset.width ?? 1
-        const imgH = asset.height ?? 1
-        const scale = Math.min(contentW / imgW, contentH / imgH, 1)
-        const targetW = imgW * scale
-        const targetH = imgH * scale
-        const fromRect = new DOMRect(
-          (W - targetW) / 2,
-          TOOLBAR_HEIGHT + (contentH + VIEWPORT_PADDING * 2 - targetH) / 2,
-          targetW,
-          targetH
+      const containerRect = lightboxRootRef.value?.getBoundingClientRect()
+      if (cardRect && asset && containerRect) {
+        const fromRect = computeLightboxHeroRect(
+          containerRect,
+          asset.width ?? 1,
+          asset.height ?? 1,
+          store.lightbox.showFilmstrip
         )
         prepareReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
         emit('requestReverseHero')
+        didReverseHero = true
       }
     }
   }
 
-  setTimeout(() => {
-    isClosing.value = false
+  const delay = didReverseHero ? CLOSE_AFTER_REVERSE_HERO_MS : CLOSE_AFTER_NO_HERO_MS
+  window.setTimeout(() => {
     lightbox.closeLightbox()
-  }, 220)
+  }, delay)
 }
 
 function handleToolbarFit() {
@@ -325,20 +328,21 @@ useEventListener(window, 'keydown', handleKeydown)
 <template>
   <Teleport to="body" :disabled="!isImmersive">
     <div
+      ref="lightboxRootRef"
       class="lightbox-container"
-      :class="lightboxContainerClass"
+      :class="lightboxRootClass"
       style="--surface-opacity-scale: 0.96"
       @click.self="handleClose"
     >
       <div class="flex h-full min-h-0 w-full flex-col">
         <Transition
           appear
-          enter-active-class="transition-all duration-[220ms] ease-out delay-[40ms]"
-          enter-from-class="opacity-0 -translate-y-3"
-          enter-to-class="opacity-100 translate-y-0"
-          leave-active-class="transition-all duration-[180ms] ease-in"
-          leave-from-class="opacity-100 translate-y-0"
-          leave-to-class="opacity-0 -translate-y-3"
+          enter-active-class="transition-opacity duration-[200ms] ease-out"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition-opacity duration-[160ms] ease-in"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
         >
           <LightboxToolbar
             v-if="!isClosing"
@@ -408,7 +412,7 @@ useEventListener(window, 'keydown', handleKeydown)
 
         <Transition
           appear
-          enter-active-class="transition-all duration-300 delay-[80ms]"
+          enter-active-class="transition-all duration-300"
           enter-from-class="translate-y-full opacity-0"
           enter-to-class="translate-y-0 opacity-100"
           leave-active-class="transition-all duration-300"

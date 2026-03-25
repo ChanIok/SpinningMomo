@@ -64,8 +64,8 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
     },
     getScrollElement: () => containerRef.value,
     estimateSize: () => estimatedRowHeight.value,
-    paddingStart: 24,
-    paddingEnd: 24,
+    paddingStart: 0,
+    paddingEnd: 16,
     overscan: 10,
   })
 

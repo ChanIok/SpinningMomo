@@ -123,6 +123,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   // ============= Lightbox状态 =============
   const lightbox = reactive<LightboxState>({
     isOpen: false,
+    isClosing: false,
     isImmersive: false,
     showFilmstrip: true,
     zoom: 1.0,
@@ -503,11 +504,17 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   function openLightbox() {
     resetLightboxView()
+    lightbox.isClosing = false
     lightbox.isOpen = true
+  }
+
+  function setLightboxClosing(closing: boolean) {
+    lightbox.isClosing = closing
   }
 
   function closeLightbox() {
     lightbox.isOpen = false
+    lightbox.isClosing = false
     lightbox.isImmersive = false
     resetLightboxView()
   }
@@ -618,6 +625,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     selection.activeAssetId = undefined
 
     lightbox.isOpen = false
+    lightbox.isClosing = false
     lightbox.isImmersive = false
 
     sidebar.isOpen = true
@@ -732,6 +740,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     resetLightboxView,
     openLightbox,
+    setLightboxClosing,
     closeLightbox,
     goToLightboxIndex,
     goToPreviousLightbox,

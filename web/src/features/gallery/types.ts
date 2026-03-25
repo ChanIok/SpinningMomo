@@ -426,6 +426,8 @@ export interface SelectionState {
 // Lightbox状态
 export interface LightboxState {
   isOpen: boolean
+  /** 关闭动画阶段：为 true 时仍可认为灯箱打开，但 gallery 层已开始淡入 */
+  isClosing: boolean
   /** 沉浸模式：仅页面内 Teleport + 固定层铺满视口，不调用系统/浏览器全屏 */
   isImmersive: boolean
   showFilmstrip: boolean
