@@ -7,6 +7,7 @@ import { computed } from 'vue'
 import { galleryApi } from '../../api'
 import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
+import { heroAnimating } from '../../composables/useHeroTransition'
 
 const emit = defineEmits<{
   previous: []
@@ -66,7 +67,10 @@ function handleNext() {
       </svg>
     </button>
 
-    <div class="flex h-full w-full items-center justify-center p-8">
+    <div
+      class="flex h-full w-full items-center justify-center p-8"
+      :style="heroAnimating ? { visibility: 'hidden' } : {}"
+    >
       <video
         v-if="currentAsset"
         :key="currentAsset.id"

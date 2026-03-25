@@ -114,6 +114,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
 
 <template>
   <div
+    data-asset-card
     class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 contain-[layout_size_paint] select-none"
     :class="[
       {

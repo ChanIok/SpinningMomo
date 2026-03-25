@@ -5,6 +5,7 @@ import { galleryApi } from '../../api'
 import { useGalleryData, useGalleryLightbox } from '../../composables'
 import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
+import { heroAnimating } from '../../composables/useHeroTransition'
 
 const VIEWPORT_PADDING = 32
 const ZOOM_STEP = 1.1
@@ -537,6 +538,7 @@ defineExpose({
     <div
       ref="viewportRef"
       class="lightbox-viewport h-full w-full overflow-auto"
+      :style="heroAnimating ? { visibility: 'hidden' } : {}"
       @wheel="handleViewportWheel"
     >
       <div class="box-border grid min-h-full min-w-full" :style="canvasStyle">

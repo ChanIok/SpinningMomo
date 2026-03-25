@@ -4,6 +4,8 @@ import { useEventListener, useThrottleFn } from '@vueuse/core'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
+import { prepareReverseHero } from '../../composables/useHeroTransition'
+import { galleryApi } from '../../api'
 import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
 import LightboxImage from './LightboxImage.vue'
@@ -24,12 +26,26 @@ type LightboxImageExposed = {
   zoomOut: () => Promise<void>
 }
 
+type GalleryContentRef = {
+  scrollToIndex: (index: number) => void
+  getCardRect: (index: number) => DOMRect | null
+} | null
+
+const props = defineProps<{
+  galleryContentRef: GalleryContentRef
+}>()
+
+const emit = defineEmits<{
+  requestReverseHero: []
+}>()
+
 const store = useGalleryStore()
 const lightbox = useGalleryLightbox()
 const gallerySelection = useGallerySelection()
 const assetActions = useGalleryAssetActions()
 const { t } = useI18n()
 const lightboxImageRef = ref<LightboxImageExposed | null>(null)
+const isClosing = ref(false)
 
 const isImmersive = computed(() => store.lightbox.isImmersive)
 const showFilmstrip = computed(() => store.lightbox.showFilmstrip)
@@ -47,7 +63,7 @@ const isZoomableAsset = computed(() => currentAsset.value?.type !== 'video')
 const lightboxContainerClass = computed(() =>
   isImmersive.value
     ? 'surface-bottom fixed inset-0 z-[100] flex overflow-hidden shadow-2xl'
-    : 'flex h-full w-full overflow-hidden'
+    : 'absolute inset-0 z-10 flex h-full w-full overflow-hidden'
 )
 
 const throttledPrevious = useThrottleFn(() => {
@@ -97,7 +113,45 @@ function exitImmersive() {
 }
 
 function handleClose() {
-  lightbox.closeLightbox()
+  if (isClosing.value) return
+  isClosing.value = true
+
+  // gallery 始终以 visibility:hidden 保持渲染和正确滚动位置，可直接同步读取 cardRect
+  const activeIndex = store.selection.activeIndex
+  if (activeIndex !== undefined) {
+    const galleryContent = props.galleryContentRef
+    if (galleryContent) {
+      const cardRect = galleryContent.getCardRect(activeIndex)
+      const asset = store.getAssetsInRange(activeIndex, activeIndex)[0]
+      if (cardRect && asset) {
+        const TOOLBAR_HEIGHT = 61
+        const FILMSTRIP_HEIGHT = store.lightbox.showFilmstrip ? 101 : 0
+        const VIEWPORT_PADDING = 32
+        const W = document.documentElement.clientWidth
+        const H = document.documentElement.clientHeight
+        const contentW = W - VIEWPORT_PADDING * 2
+        const contentH = H - TOOLBAR_HEIGHT - FILMSTRIP_HEIGHT - VIEWPORT_PADDING * 2
+        const imgW = asset.width ?? 1
+        const imgH = asset.height ?? 1
+        const scale = Math.min(contentW / imgW, contentH / imgH, 1)
+        const targetW = imgW * scale
+        const targetH = imgH * scale
+        const fromRect = new DOMRect(
+          (W - targetW) / 2,
+          TOOLBAR_HEIGHT + (contentH + VIEWPORT_PADDING * 2 - targetH) / 2,
+          targetW,
+          targetH
+        )
+        prepareReverseHero(fromRect, cardRect, galleryApi.getAssetThumbnailUrl(asset))
+        emit('requestReverseHero')
+      }
+    }
+  }
+
+  setTimeout(() => {
+    isClosing.value = false
+    lightbox.closeLightbox()
+  }, 220)
 }
 
 function handleToolbarFit() {
@@ -277,20 +331,32 @@ useEventListener(window, 'keydown', handleKeydown)
       @click.self="handleClose"
     >
       <div class="flex h-full min-h-0 w-full flex-col">
-        <LightboxToolbar
-          @back="handleClose"
-          @fit="handleToolbarFit"
-          @actual="handleToolbarActual"
-          @zoom-in="handleToolbarZoomIn"
-          @zoom-out="handleToolbarZoomOut"
-          @toggle-filmstrip="handleToolbarToggleFilmstrip"
-          @toggle-immersive="handleToolbarToggleImmersive"
-        />
+        <Transition
+          appear
+          enter-active-class="transition-all duration-[220ms] ease-out delay-[40ms]"
+          enter-from-class="opacity-0 -translate-y-3"
+          enter-to-class="opacity-100 translate-y-0"
+          leave-active-class="transition-all duration-[180ms] ease-in"
+          leave-from-class="opacity-100 translate-y-0"
+          leave-to-class="opacity-0 -translate-y-3"
+        >
+          <LightboxToolbar
+            v-if="!isClosing"
+            @back="handleClose"
+            @fit="handleToolbarFit"
+            @actual="handleToolbarActual"
+            @zoom-in="handleToolbarZoomIn"
+            @zoom-out="handleToolbarZoomOut"
+            @toggle-filmstrip="handleToolbarToggleFilmstrip"
+            @toggle-immersive="handleToolbarToggleImmersive"
+          />
+        </Transition>
 
         <ContextMenu v-if="currentAsset">
           <ContextMenuTrigger as-child>
             <div
-              class="min-h-0 flex-1"
+              class="min-h-0 flex-1 transition-opacity duration-[180ms]"
+              :class="isClosing ? 'opacity-0' : 'opacity-100'"
               @contextmenu="handleImageContextMenu"
               @wheel="handleMediaWheel"
             >
@@ -332,19 +398,24 @@ useEventListener(window, 'keydown', handleKeydown)
             <GalleryAssetContextMenuContent />
           </ContextMenuContent>
         </ContextMenu>
-        <div v-else class="min-h-0 flex-1">
+        <div
+          v-else
+          class="min-h-0 flex-1 transition-opacity duration-[180ms]"
+          :class="isClosing ? 'opacity-0' : 'opacity-100'"
+        >
           <LightboxImage ref="lightboxImageRef" />
         </div>
 
         <Transition
-          enter-active-class="transition-all duration-300"
+          appear
+          enter-active-class="transition-all duration-300 delay-[80ms]"
           enter-from-class="translate-y-full opacity-0"
           enter-to-class="translate-y-0 opacity-100"
           leave-active-class="transition-all duration-300"
           leave-from-class="translate-y-0 opacity-100"
           leave-to-class="translate-y-full opacity-0"
         >
-          <LightboxFilmstrip v-if="showFilmstrip" />
+          <LightboxFilmstrip v-if="showFilmstrip && !isClosing" />
         </Transition>
       </div>
     </div>

@@ -9,6 +9,8 @@ import {
   useGalleryLightbox,
   useGridVirtualizer,
 } from '../composables'
+import { prepareHero } from '../composables/useHeroTransition'
+import { galleryApi } from '../api'
 import AssetCard from './AssetCard.vue'
 import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
 import TimelineScrollbar from './TimelineScrollbar.vue'
@@ -67,6 +69,12 @@ function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
 }
 
 function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) {
+  const cardEl = (event.target as HTMLElement).closest('[data-asset-card]')
+  if (cardEl) {
+    const rect = cardEl.getBoundingClientRect()
+    const thumbnailUrl = galleryApi.getAssetThumbnailUrl(asset)
+    prepareHero(rect, thumbnailUrl, asset.width ?? 1, asset.height ?? 1)
+  }
   gallerySelection.handleAssetDoubleClick(asset, event)
   void galleryLightbox.openLightbox(index)
 }
@@ -74,6 +82,29 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
 function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
   void gallerySelection.handleAssetContextMenu(asset, event, index)
 }
+
+function scrollToIndex(index: number) {
+  const row = Math.floor(index / columns.value)
+  gridVirtualizer.virtualizer.value.scrollToIndex(row, { align: 'auto' })
+}
+
+function getCardRect(index: number): DOMRect | null {
+  const container = scrollContainerRef.value
+  if (!container) return null
+  const cards = container.querySelectorAll('[data-asset-card]')
+  // 虚拟列表只渲染可见行，找到与 index 对应的卡片
+  const row = Math.floor(index / columns.value)
+  const col = index % columns.value
+  const virtualRows = gridVirtualizer.virtualRows.value
+  const rowIdx = virtualRows.findIndex((r) => r.index === row)
+  if (rowIdx === -1) return null
+  // 每行有 columns 个卡片，从已渲染的 cards 中定位
+  const cardIndex = rowIdx * columns.value + col
+  const card = cards[cardIndex]
+  return card ? card.getBoundingClientRect() : null
+}
+
+defineExpose({ scrollToIndex, getCardRect })
 </script>
 
 <template>
