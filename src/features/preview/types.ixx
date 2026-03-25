@@ -20,6 +20,7 @@ constexpr wchar_t PREVIEW_WINDOW_CLASS[] = L"SpinningMomoPreviewWindowClass";
 constexpr UINT WM_SCHEDULE_PREVIEW_CLEANUP = WM_USER + 1;
 constexpr UINT WM_CANCEL_PREVIEW_CLEANUP = WM_USER + 2;
 constexpr UINT WM_IMMEDIATE_PREVIEW_CLEANUP = WM_USER + 3;
+constexpr UINT WM_APPLY_CAPTURE_SIZE = WM_USER + 4;
 
 // 顶点结构体
 struct Vertex {
@@ -100,7 +101,7 @@ struct WindowSizeState {
 
 // 渲染相关资源
 struct RenderingResources {
-  bool initialized = false;
+  std::atomic<bool> initialized = false;
   std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
   Utils::Graphics::D3D::D3DContext d3d_context;
   Utils::Graphics::D3D::ShaderResources basic_shaders;

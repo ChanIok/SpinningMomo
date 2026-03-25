@@ -80,8 +80,7 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
   }
   resources.basic_vertex_buffer = std::move(vertex_buffer_result.value());
 
-  resources.initialized = true;
-  state.preview->d3d_initialized = true;
+  resources.initialized.store(true, std::memory_order_release);
 
   Logger().info("Preview rendering system initialized successfully");
   return {};
@@ -90,9 +89,8 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
 auto cleanup_rendering(Core::State::AppState& state) -> void {
   auto& resources = state.preview->rendering_resources;
 
-  resources.initialized = false;
+  resources.initialized.store(false, std::memory_order_release);
   resources.resources_busy.store(true, std::memory_order_release);
-  state.preview->d3d_initialized = false;
 
   // 清理着色器资源
   Utils::Graphics::D3D::cleanup_shader_resources(resources.basic_shaders);
@@ -112,7 +110,7 @@ auto cleanup_rendering(Core::State::AppState& state) -> void {
 
 auto resize_rendering(Core::State::AppState& state, int width, int height)
     -> std::expected<void, std::string> {
-  if (!state.preview->rendering_resources.initialized) {
+  if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire)) {
     return std::unexpected("D3D not initialized");
   }
 
@@ -137,7 +135,7 @@ auto resize_rendering(Core::State::AppState& state, int width, int height)
 
 auto update_capture_srv(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> texture)
     -> std::expected<void, std::string> {
-  if (!state.preview->rendering_resources.initialized || !texture) {
+  if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire) || !texture) {
     return std::unexpected("Invalid rendering resources or texture");
   }
 
@@ -206,7 +204,7 @@ auto render_viewport_frame(Core::State::AppState& state,
 
 auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> capture_texture)
     -> void {
-  if (!state.preview->rendering_resources.initialized) {
+  if (!state.preview->rendering_resources.initialized.load(std::memory_order_acquire)) {
     return;
   }
 
@@ -220,9 +218,9 @@ auto render_frame(Core::State::AppState& state, wil::com_ptr<ID3D11Texture2D> ca
   auto* context = resources.d3d_context.context.get();
 
   // 更新捕获SRV（如果需要）
-  if (state.preview->create_new_srv && capture_texture) {
+  if (state.preview->create_new_srv.load(std::memory_order_acquire) && capture_texture) {
     if (auto srv_result = update_capture_srv(state, capture_texture); srv_result) {
-      state.preview->create_new_srv = false;
+      state.preview->create_new_srv.store(false, std::memory_order_release);
     }
   }
 

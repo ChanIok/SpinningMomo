@@ -35,6 +35,9 @@ export auto update_game_window_position(Core::State::AppState& state) -> void;
 // 处理窗口事件
 export auto handle_window_event(Core::State::AppState& state, DWORD event, HWND hwnd) -> void;
 
+// 同步当前前台窗口对应的焦点状态
+export auto refresh_focus_state(Core::State::AppState& state) -> void;
+
 // 清理交互资源
 export auto cleanup_interaction(Core::State::AppState& state) -> void;
 

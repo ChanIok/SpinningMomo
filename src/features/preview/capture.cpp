@@ -8,6 +8,7 @@ import std;
 import Core.State;
 import Core.State.RuntimeInfo;
 import Features.Preview.State;
+import Features.Preview.Types;
 import Features.Preview.Rendering;
 import Features.Preview.Window;
 import Utils.Graphics.Capture;
@@ -19,7 +20,7 @@ namespace Features::Preview::Capture {
 
 auto on_frame_arrived(Core::State::AppState& state,
                       Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
-  if (!state.preview->running || !frame) {
+  if (!state.preview->running.load(std::memory_order_acquire) || !frame) {
     return;
   }
 
@@ -39,9 +40,14 @@ auto on_frame_arrived(Core::State::AppState& state,
     Utils::Graphics::Capture::recreate_frame_pool(state.preview->capture_state.session,
                                                   content_size.Width, content_size.Height);
 
-    state.preview->create_new_srv = true;
+    state.preview->create_new_srv.store(true, std::memory_order_release);
 
-    Window::set_preview_window_size(*state.preview, content_size.Width, content_size.Height);
+    // 捕获回调线程只负责发现尺寸变化；窗口尺寸状态与 SetWindowPos 统一收口到窗口线程。
+    if (!PostMessage(state.preview->hwnd, Features::Preview::Types::WM_APPLY_CAPTURE_SIZE,
+                     static_cast<WPARAM>(content_size.Width),
+                     static_cast<LPARAM>(content_size.Height))) {
+      Logger().warn("Failed to post preview capture size update message");
+    }
 
     return;
   }
@@ -70,7 +76,7 @@ auto initialize_capture(Core::State::AppState& state, HWND target_window, int wi
 
   // 确保渲染系统已初始化
   auto& rendering_resources = state.preview->rendering_resources;
-  if (!rendering_resources.initialized) {
+  if (!rendering_resources.initialized.load(std::memory_order_acquire)) {
     return std::unexpected("D3D not initialized");
   }
 

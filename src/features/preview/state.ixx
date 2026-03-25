@@ -26,9 +26,8 @@ struct PreviewState {
   Features::Preview::Types::ViewportState viewport;
 
   // 渲染状态
-  bool d3d_initialized = false;
-  bool running = false;
-  bool create_new_srv = true;
+  std::atomic<bool> running = false;
+  std::atomic<bool> create_new_srv = true;
   Features::Preview::Types::RenderingResources rendering_resources;
 
   // 捕获状态

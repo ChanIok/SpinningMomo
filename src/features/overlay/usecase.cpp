@@ -29,7 +29,7 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
   if (!is_enabled) {
     // 用户想启用叠加层
     // 预览窗与叠加层互斥，若预览窗运行则先关闭
-    if (state.preview && state.preview->running) {
+    if (state.preview && state.preview->running.load(std::memory_order_acquire)) {
       Features::Preview::stop_preview(state);
       Features::Notifications::show_notification(
           state, state.i18n->texts["label.app_name"],

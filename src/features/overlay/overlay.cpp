@@ -31,7 +31,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
     -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
-  if (state.overlay->running) {
+  if (state.overlay->running.load(std::memory_order_acquire)) {
     Logger().debug("Overlay already running, skipping");
     return {};
   }
@@ -77,7 +77,7 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
   }
 
   // 设置首帧后自动冻结标志
-  overlay_state.freeze_after_first_frame = freeze_after_first_frame;
+  overlay_state.freeze_after_first_frame.store(freeze_after_first_frame, std::memory_order_release);
 
   if (!send_overlay_control_message(overlay_state.window.overlay_hwnd,
                                     Types::WM_CANCEL_OVERLAY_CLEANUP)) {
@@ -97,23 +97,24 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
     }
   }
 
-  overlay_state.running = true;  // 设置运行状态为true
+  overlay_state.running.store(true, std::memory_order_release);  // 设置运行状态为true
 
   // 初始化捕获
   if (auto result = Capture::initialize_capture(state, target_window, width, height); !result) {
-    overlay_state.running = false;
+    overlay_state.running.store(false, std::memory_order_release);
     return std::unexpected(result.error());
   }
 
   // 启动捕获
   if (auto result = Capture::start_capture(state); !result) {
-    overlay_state.running = false;
+    overlay_state.running.store(false, std::memory_order_release);
     return std::unexpected(result.error());
   }
 
   // 启动线程（只启动钩子和窗口管理线程）
   if (auto result = Threads::start_threads(state); !result) {
-    overlay_state.running = false;  // 如果线程启动失败，设置运行状态为false
+    overlay_state.running.store(
+        false, std::memory_order_release);  // 如果线程启动失败，设置运行状态为false
     return std::unexpected(result.error());
   }
 
@@ -125,9 +126,9 @@ auto stop_overlay(Core::State::AppState& state) -> void {
   Logger().debug("Stopping overlay");
 
   // 设置运行状态为false
-  overlay_state.running = false;
-  overlay_state.freeze_rendering = false;
-  overlay_state.freeze_after_first_frame = false;
+  overlay_state.running.store(false, std::memory_order_release);
+  overlay_state.freeze_rendering.store(false, std::memory_order_release);
+  overlay_state.freeze_after_first_frame.store(false, std::memory_order_release);
   overlay_state.rendering.create_new_srv = true;
 
   // 停止线程
@@ -157,13 +158,13 @@ auto stop_overlay(Core::State::AppState& state) -> void {
 }
 
 auto freeze_overlay(Core::State::AppState& state) -> void {
-  state.overlay->freeze_rendering = true;
+  state.overlay->freeze_rendering.store(true, std::memory_order_release);
   Logger().debug("Overlay frozen");
 }
 
 auto unfreeze_overlay(Core::State::AppState& state) -> void {
-  state.overlay->freeze_rendering = false;
-  state.overlay->freeze_after_first_frame = false;
+  state.overlay->freeze_rendering.store(false, std::memory_order_release);
+  state.overlay->freeze_after_first_frame.store(false, std::memory_order_release);
   Logger().debug("Overlay unfrozen");
 }
 

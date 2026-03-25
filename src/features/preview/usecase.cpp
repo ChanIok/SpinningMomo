@@ -21,14 +21,14 @@ namespace Features::Preview::UseCase {
 
 // 切换预览功能
 auto toggle_preview(Core::State::AppState& state) -> void {
-  bool is_running = state.preview && state.preview->running;
+  bool is_running = state.preview && state.preview->running.load(std::memory_order_acquire);
 
   if (!is_running) {
     // 启动预览
     // 预览窗与叠加层互斥：以 overlay->enabled（与浮动窗菜单勾选）为准
     if (state.overlay->enabled) {
       state.overlay->enabled = false;
-      if (state.overlay->running) {
+      if (state.overlay->running.load(std::memory_order_acquire)) {
         Features::Overlay::stop_overlay(state);
       }
       if (state.letterbox->enabled) {

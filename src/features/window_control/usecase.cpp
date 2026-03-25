@@ -62,20 +62,20 @@ auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HW
   bool will_need_overlay = Features::Overlay::Geometry::should_use_overlay(
       target_width, target_height, screen_w, screen_h);
 
-  if (state.overlay->running) {
+  if (state.overlay->running.load(std::memory_order_acquire)) {
     // overlay 已运行，冻结当前帧
-    state.overlay->is_transforming = true;
+    state.overlay->is_transforming.store(true, std::memory_order_release);
     Features::Overlay::freeze_overlay(state);
     return false;  // 不需要等待首帧
   } else if (will_need_overlay) {
     // overlay 未运行，但目标尺寸需要 overlay，启动并在首帧后自动冻结
-    state.overlay->is_transforming = true;
+    state.overlay->is_transforming.store(true, std::memory_order_release);
     auto overlay_result = Features::Overlay::start_overlay(state, target_window, true);
     if (overlay_result) {
       return true;  // 需要等待首帧
     } else {
       Logger().error("Failed to start overlay before window transform: {}", overlay_result.error());
-      state.overlay->is_transforming = false;
+      state.overlay->is_transforming.store(false, std::memory_order_release);
       return false;
     }
   }
@@ -87,12 +87,18 @@ auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HW
 // 变换后的后续处理
 auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
     -> void {
-  if (state.overlay->is_transforming) {
+  if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     auto dimensions = Features::Overlay::Geometry::get_window_dimensions(target_window);
     auto [screen_w, screen_h] = Features::Overlay::Geometry::get_screen_dimensions();
+    bool still_needs_overlay =
+        dimensions && Features::Overlay::Geometry::should_use_overlay(
+                          dimensions->first, dimensions->second, screen_w, screen_h);
 
-    if (dimensions && Features::Overlay::Geometry::should_use_overlay(
-                          dimensions->first, dimensions->second, screen_w, screen_h)) {
+    // 先结束 transform 状态，再解冻 overlay。
+    // 这样解冻后到达的第一帧新尺寸会被正常消费，而不会再走“变换中忽略 resize”的分支。
+    state.overlay->is_transforming.store(false, std::memory_order_release);
+
+    if (still_needs_overlay) {
       // 仍需 overlay：解冻继续
       Features::Overlay::unfreeze_overlay(state);
       Features::Overlay::Interaction::suppress_taskbar_redraw(state);
@@ -100,12 +106,10 @@ auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND 
       // 不需要 overlay：停止
       Features::Overlay::stop_overlay(state);
     }
-
-    state.overlay->is_transforming = false;
   }
 
   // 重启 letterbox
-  if (!state.overlay->running && state.letterbox->enabled) {
+  if (!state.overlay->running.load(std::memory_order_acquire) && state.letterbox->enabled) {
     auto letterbox_result = Features::Letterbox::show(state, target_window);
     if (!letterbox_result) {
       Logger().error("Failed to restart letterbox after window transform: {}",
@@ -144,7 +148,8 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
 
   // 如果需要等待 overlay 首帧（最多 500ms）
   if (needs_wait_first_frame) {
-    for (int i = 0; i < 50 && !state.overlay->freeze_rendering; ++i) {
+    for (int i = 0; i < 50 && !state.overlay->freeze_rendering.load(std::memory_order_acquire);
+         ++i) {
       co_await Core::Async::ui_delay{std::chrono::milliseconds(10)};
     }
   }
@@ -155,7 +160,7 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   auto result = Features::WindowControl::apply_window_transform(state, *target_window,
                                                                 new_resolution, options);
   if (!result) {
-    state.overlay->is_transforming = false;
+    state.overlay->is_transforming.store(false, std::memory_order_release);
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
@@ -163,7 +168,7 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   }
 
   // 后续处理：等待窗口稳定后决定 overlay 状态
-  if (state.overlay->is_transforming) {
+  if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     co_await Core::Async::ui_delay{std::chrono::milliseconds(400)};
     post_transform_actions(state, *target_window);
   }
@@ -216,7 +221,8 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
 
   // 如果需要等待 overlay 首帧（最多 500ms）
   if (needs_wait_first_frame) {
-    for (int i = 0; i < 50 && !state.overlay->freeze_rendering; ++i) {
+    for (int i = 0; i < 50 && !state.overlay->freeze_rendering.load(std::memory_order_acquire);
+         ++i) {
       co_await Core::Async::ui_delay{std::chrono::milliseconds(10)};
     }
   }
@@ -227,7 +233,7 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
   auto result = Features::WindowControl::apply_window_transform(state, *target_window,
                                                                 new_resolution, options);
   if (!result) {
-    state.overlay->is_transforming = false;
+    state.overlay->is_transforming.store(false, std::memory_order_release);
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
@@ -235,7 +241,7 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
   }
 
   // 后续处理：等待窗口稳定后决定 overlay 状态
-  if (state.overlay->is_transforming) {
+  if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     co_await Core::Async::ui_delay{std::chrono::milliseconds(400)};
     post_transform_actions(state, *target_window);
   }

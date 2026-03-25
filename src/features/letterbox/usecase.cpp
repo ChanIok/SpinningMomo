@@ -54,7 +54,7 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
   auto target_window = Features::WindowControl::find_target_window(window_title);
 
   // 根据叠加层是否运行采取不同的处理方式
-  if (state.overlay->running) {
+  if (state.overlay->running.load(std::memory_order_acquire)) {
     // 叠加层正在运行时，黑边模式由叠加层模块处理
     // 只需重启叠加层以应用新的黑边模式设置
     if (target_window) {

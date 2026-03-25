@@ -43,6 +43,24 @@ void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG id
   }
 }
 
+// 统一维护 overlay 的“当前是否由游戏/overlay 持有焦点”状态。
+// 启动时和前台切换时都走这里，避免 direct-start 与 transform-start 行为不一致。
+auto update_focus_state(Core::State::AppState& state, HWND hwnd) -> void {
+  auto& overlay_state = *state.overlay;
+  bool is_game_or_overlay =
+      (hwnd == overlay_state.window.target_window || hwnd == overlay_state.window.overlay_hwnd);
+
+  overlay_state.interaction.is_game_focused = is_game_or_overlay;
+
+  if (is_game_or_overlay) {
+    if (hwnd == overlay_state.window.target_window && overlay_state.window.overlay_hwnd) {
+      PostMessage(overlay_state.window.overlay_hwnd, Types::WM_GAME_WINDOW_FOREGROUND, 0, 0);
+    }
+  } else {
+    restore_taskbar_redraw(state);
+  }
+}
+
 auto initialize_interaction(Core::State::AppState& state) -> std::expected<void, std::string> {
   g_app_state = &state;
 
@@ -52,6 +70,10 @@ auto initialize_interaction(Core::State::AppState& state) -> std::expected<void,
     GetWindowThreadProcessId(state.overlay->window.target_window, &process_id);
     state.overlay->interaction.game_process_id = process_id;
   }
+
+  // 钩子安装时前台窗口可能早已稳定，不会自动补发 EVENT_SYSTEM_FOREGROUND；
+  // 启动阶段需要主动读取一次当前前台窗口来初始化焦点状态。
+  refresh_focus_state(state);
 
   return {};
 }
@@ -224,25 +246,14 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
 }
 
 auto handle_window_event(Core::State::AppState& state, DWORD event, HWND hwnd) -> void {
-  auto& overlay_state = *state.overlay;
-
   if (event == EVENT_SYSTEM_FOREGROUND) {
-    bool is_game_or_overlay =
-        (hwnd == overlay_state.window.target_window || hwnd == overlay_state.window.overlay_hwnd);
-
-    // 更新焦点状态
-    overlay_state.interaction.is_game_focused = is_game_or_overlay;
-
-    if (is_game_or_overlay) {
-      // 游戏窗口获得焦点，发送消息确保叠加层在上方
-      if (hwnd == overlay_state.window.target_window && overlay_state.window.overlay_hwnd) {
-        PostMessage(overlay_state.window.overlay_hwnd, Types::WM_GAME_WINDOW_FOREGROUND, 0, 0);
-      }
-    } else {
-      // 用户切到其他应用，恢复任务栏重绘
-      restore_taskbar_redraw(state);
-    }
+    update_focus_state(state, hwnd);
   }
+}
+
+auto refresh_focus_state(Core::State::AppState& state) -> void {
+  // 使用系统当前前台窗口做一次同步，供 direct-start 或其它无前台切换的路径复用。
+  update_focus_state(state, GetForegroundWindow());
 }
 
 auto cleanup_interaction(Core::State::AppState& state) -> void {

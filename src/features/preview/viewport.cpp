@@ -234,7 +234,7 @@ auto render_viewport_frame(Core::State::AppState& state, ID3D11DeviceContext* co
 
   // 获取渲染资源
   auto& rendering_resources = state.preview->rendering_resources;
-  if (!rendering_resources.initialized) {
+  if (!rendering_resources.initialized.load(std::memory_order_acquire)) {
     Logger().error("Rendering resources not initialized");
     return;
   }

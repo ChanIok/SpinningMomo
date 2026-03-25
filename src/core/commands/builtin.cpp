@@ -146,19 +146,21 @@ auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& re
   // === 独立功能 ===
 
   // 切换预览窗
-  register_command(registry, {
-                                 .id = "preview.toggle",
-                                 .i18n_key = "menu.preview_toggle",
-                                 .is_toggle = true,
-                                 .action =
-                                     [&state]() {
-                                       Features::Preview::UseCase::toggle_preview(state);
-                                       UI::FloatingWindow::request_repaint(state);
-                                     },
-                                 .get_state = [&state]() -> bool {
-                                   return state.preview ? state.preview->running : false;
-                                 },
-                             });
+  register_command(
+      registry, {
+                    .id = "preview.toggle",
+                    .i18n_key = "menu.preview_toggle",
+                    .is_toggle = true,
+                    .action =
+                        [&state]() {
+                          Features::Preview::UseCase::toggle_preview(state);
+                          UI::FloatingWindow::request_repaint(state);
+                        },
+                    .get_state = [&state]() -> bool {
+                      return state.preview ? state.preview->running.load(std::memory_order_acquire)
+                                           : false;
+                    },
+                });
 
   // 切换叠加层
   register_command(registry, {

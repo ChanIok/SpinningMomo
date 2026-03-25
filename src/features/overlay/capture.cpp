@@ -11,6 +11,7 @@ import Features.Overlay;
 import Features.Overlay.State;
 import Features.Overlay.Rendering;
 import Features.Overlay.Geometry;
+import Features.Overlay.Interaction;
 import Features.Overlay.Window;
 import Utils.Logger;
 import Utils.Graphics.Capture;
@@ -21,12 +22,7 @@ namespace Features::Overlay::Capture {
 
 auto on_frame_arrived(Core::State::AppState& state,
                       Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
-  if (!state.overlay->running || !frame) {
-    return;
-  }
-
-  // 冻结状态下不处理任何帧
-  if (state.overlay->freeze_rendering) {
+  if (!state.overlay->running.load(std::memory_order_acquire) || !frame) {
     return;
   }
 
@@ -34,43 +30,59 @@ auto on_frame_arrived(Core::State::AppState& state,
   auto content_size = frame.ContentSize();
   auto& last_width = state.overlay->capture_state.last_frame_width;
   auto& last_height = state.overlay->capture_state.last_frame_height;
+  bool is_transforming = state.overlay->is_transforming.load(std::memory_order_acquire);
+  bool overlay_window_shown = state.overlay->window.overlay_window_shown;
 
+  // last_frame_* 表示“已经被 overlay 消费并对齐过”的尺寸，
+  // 不是“最近观察到”的尺寸；否则变换收尾时会丢失真正需要应用的 resize。
   bool size_changed = (content_size.Width != last_width) || (content_size.Height != last_height);
 
   if (size_changed) {
-    // 变换流程中，只更新尺寸记录，不做其他处理
-    if (state.overlay->is_transforming) {
+    // 变换流程中，已经显示过的 overlay 不应提前消费新尺寸。
+    // 否则变换收尾前会把 last_frame_* 污染成新值，解冻后就丢失真正的 resize。
+    if (is_transforming && overlay_window_shown) {
+      return;
+    }
+
+    // 变换前临时启动 overlay 时，首帧必须继续推进到 render_frame，
+    // 否则 freeze_after_first_frame 永远不会生效，窗口变换协程也无法正常收口。
+    // 因此这里只更新 last_frame_*，把真正的显示与冻结交给下面的渲染路径。
+    if (is_transforming && !overlay_window_shown) {
       last_width = content_size.Width;
       last_height = content_size.Height;
+    } else {
+      // 检查是否需要退出（非变换场景，如用户手动调整窗口）
+      auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
+      if (!Geometry::should_use_overlay(content_size.Width, content_size.Height, screen_width,
+                                        screen_height)) {
+        stop_overlay(state);
+        return;
+      }
+
+      // 更新记录的尺寸
+      last_width = content_size.Width;
+      last_height = content_size.Height;
+
+      // 重建帧池
+      Utils::Graphics::Capture::recreate_frame_pool(state.overlay->capture_state.session,
+                                                    content_size.Width, content_size.Height);
+
+      state.overlay->rendering.create_new_srv = true;
+
+      Window::set_overlay_window_size(state, content_size.Width, content_size.Height);
+
+      // 延迟防止闪烁
+      if (state.overlay->window.overlay_window_shown) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(400));
+        Logger().debug("Capture size changed, sleeping for 400ms");
+      }
+
       return;
     }
+  }
 
-    // 检查是否需要退出（非变换场景，如用户手动调整窗口）
-    auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
-    if (!Geometry::should_use_overlay(content_size.Width, content_size.Height, screen_width,
-                                      screen_height)) {
-      stop_overlay(state);
-      return;
-    }
-
-    // 更新记录的尺寸
-    last_width = content_size.Width;
-    last_height = content_size.Height;
-
-    // 重建帧池
-    Utils::Graphics::Capture::recreate_frame_pool(state.overlay->capture_state.session,
-                                                  content_size.Width, content_size.Height);
-
-    state.overlay->rendering.create_new_srv = true;
-
-    Window::set_overlay_window_size(state, content_size.Width, content_size.Height);
-
-    // 延迟防止闪烁
-    if (state.overlay->window.overlay_window_shown) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(400));
-      Logger().debug("Capture size changed, sleeping for 400ms");
-    }
-
+  // 冻结状态下不处理渲染，但仍要允许上面的尺寸变化检测继续工作。
+  if (state.overlay->freeze_rendering.load(std::memory_order_acquire)) {
     return;
   }
 
@@ -96,9 +108,16 @@ auto on_frame_arrived(Core::State::AppState& state,
 
     state.overlay->window.overlay_window_shown = true;
 
+    // direct-start 不一定会再收到一次前台切换事件；
+    // 首次显示后主动同步一次焦点状态，确保任务栏压制与窗口层级立即进入正确状态。
+    Features::Overlay::Interaction::refresh_focus_state(state);
+    if (state.overlay->interaction.is_game_focused) {
+      Features::Overlay::Interaction::suppress_taskbar_redraw(state);
+    }
+
     // 首帧后自动冻结（用于窗口变换场景）
-    if (state.overlay->freeze_after_first_frame) {
-      state.overlay->freeze_rendering = true;
+    if (state.overlay->freeze_after_first_frame.load(std::memory_order_acquire)) {
+      state.overlay->freeze_rendering.store(true, std::memory_order_release);
       Logger().debug("First frame rendered, overlay frozen for transform");
     }
   }

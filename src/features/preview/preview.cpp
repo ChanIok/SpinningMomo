@@ -69,7 +69,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   int height = clientRect.bottom - clientRect.top;
 
   // 初始化渲染系统（如果需要）
-  if (!preview_state.d3d_initialized) {
+  if (!preview_state.rendering_resources.initialized.load(std::memory_order_acquire)) {
     auto rendering_result =
         Rendering::initialize_rendering(state, preview_state.hwnd, preview_state.size.window_width,
                                         preview_state.size.window_height);
@@ -99,7 +99,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected(start_result.error());
   }
 
-  preview_state.running = true;
+  preview_state.running.store(true, std::memory_order_release);
 
   Logger().info("Preview capture started successfully");
   return {};
@@ -108,12 +108,12 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
 auto stop_preview(Core::State::AppState& state) -> void {
   auto& preview_state = *state.preview;
 
-  if (!preview_state.running) {
+  if (!preview_state.running.load(std::memory_order_acquire)) {
     return;
   }
 
-  preview_state.running = false;
-  preview_state.create_new_srv = true;
+  preview_state.running.store(false, std::memory_order_release);
+  preview_state.create_new_srv.store(true, std::memory_order_release);
 
   // 停止捕获
   Capture::stop_capture(state);
