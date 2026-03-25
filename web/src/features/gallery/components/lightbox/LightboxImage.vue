@@ -30,8 +30,6 @@ const imageError = ref(false)
 const originalLoaded = ref(false)
 const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
-const naturalWidth = ref(0)
-const naturalHeight = ref(0)
 const activePointerId = ref<number | null>(null)
 const dragStartX = ref(0)
 const dragStartY = ref(0)
@@ -70,18 +68,13 @@ const originalUrl = computed(() => {
   return galleryData.getAssetUrl(currentAsset.value.id)
 })
 
-const imageState = computed(() => {
-  if (!currentAsset.value) return { status: 'idle' as const }
-  return lightbox.getImageState(currentAsset.value.id)
-})
-
 const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
 const canGoToNext = computed(() => (store.selection.activeIndex ?? 0) < store.totalCount - 1)
 const fitMode = computed(() => store.lightbox.fitMode)
 const actualZoom = computed(() => store.lightbox.zoom)
 
-const imageWidth = computed(() => naturalWidth.value || currentAsset.value?.width || 0)
-const imageHeight = computed(() => naturalHeight.value || currentAsset.value?.height || 0)
+const imageWidth = computed(() => currentAsset.value?.width || 0)
+const imageHeight = computed(() => currentAsset.value?.height || 0)
 const hasImageDimensions = computed(() => imageWidth.value > 0 && imageHeight.value > 0)
 
 const fitScale = computed(() => {
@@ -177,37 +170,17 @@ const zoomIndicator = computed(() => {
 })
 
 watch(
-  currentAsset,
-  (newAsset) => {
-    originalLoaded.value = false
-    imageError.value = false
-    naturalWidth.value = newAsset?.width ?? 0
-    naturalHeight.value = newAsset?.height ?? 0
-    resetPointerState()
-    suppressClick.value = false
-  },
-  { immediate: true }
-)
-
-watch(
-  imageState,
-  (state) => {
-    if (state.status === 'loaded') {
-      originalLoaded.value = true
-    } else if (state.status === 'error') {
-      imageError.value = true
-    }
-  },
-  { immediate: true }
-)
-
-watch(
   () => currentAsset.value?.id,
   async () => {
+    originalLoaded.value = false
+    imageError.value = false
+    resetPointerState()
+    suppressClick.value = false
+
     await nextTick()
     syncViewportPosition()
   },
-  { flush: 'post' }
+  { immediate: true, flush: 'post' }
 )
 
 watch(
@@ -258,16 +231,6 @@ function setViewportScroll(left: number, top: number) {
 
 function getCurrentScale(): number {
   return fitMode.value === 'contain' ? fitScale.value : actualZoom.value
-}
-
-function updateNaturalSize(event: Event) {
-  const target = event.target as HTMLImageElement | null
-  if (!target?.naturalWidth || !target.naturalHeight) {
-    return
-  }
-
-  naturalWidth.value = target.naturalWidth
-  naturalHeight.value = target.naturalHeight
 }
 
 function syncViewportPosition() {
@@ -433,12 +396,7 @@ function resetPointerState(pointerId?: number) {
   dragMoved.value = false
 }
 
-function handleImageLoad(event: Event) {
-  updateNaturalSize(event)
-}
-
-function handleOriginalLoad(event: Event) {
-  updateNaturalSize(event)
+function handleOriginalLoad() {
   originalLoaded.value = true
 }
 
@@ -601,7 +559,6 @@ defineExpose({
             class="absolute inset-0 h-full w-full object-contain select-none"
             draggable="false"
             @dragstart.prevent
-            @load="handleImageLoad"
           />
 
           <img
