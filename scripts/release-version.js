@@ -1,5 +1,5 @@
 // 运行此脚本更新版本号
-// npm run release:version -- 2.0.1.0
+// npm run release:version -- 2.0.1
 
 const fs = require("fs");
 const path = require("path");
