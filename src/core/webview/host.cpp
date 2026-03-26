@@ -411,26 +411,27 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
     return E_NOINTERFACE;
   }
 
-  std::vector<std::pair<std::wstring, std::wstring>> mappings;
+  std::vector<std::pair<std::wstring, Core::WebView::State::VirtualHostFolderMapping>> mappings;
   {
     std::lock_guard<std::mutex> lock(state.webview->resources.virtual_host_folder_mappings_mutex);
-    for (const auto& [host_name, folder_path] :
-         state.webview->resources.virtual_host_folder_mappings) {
-      mappings.emplace_back(host_name, folder_path);
+    for (const auto& [host_name, mapping] : state.webview->resources.virtual_host_folder_mappings) {
+      mappings.emplace_back(host_name, mapping);
     }
   }
 
-  for (const auto& [host_name, folder_path] : mappings) {
+  for (const auto& [host_name, mapping] : mappings) {
     hr = webview3->SetVirtualHostNameToFolderMapping(
-        host_name.c_str(), folder_path.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+        host_name.c_str(), mapping.folder_path.c_str(),
+        static_cast<COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND>(mapping.access_kind));
     if (FAILED(hr)) {
       Logger().warn("Failed to restore virtual host mapping {} -> {}: {}",
-                    Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(folder_path), hr);
+                    Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(mapping.folder_path),
+                    hr);
       continue;
     }
 
     Logger().info("Restored virtual host mapping: {} -> {}", Utils::String::ToUtf8(host_name),
-                  Utils::String::ToUtf8(folder_path));
+                  Utils::String::ToUtf8(mapping.folder_path));
   }
 
   return S_OK;

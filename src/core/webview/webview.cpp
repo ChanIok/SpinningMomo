@@ -227,12 +227,15 @@ auto register_message_handler(Core::State::AppState& state, const std::string& m
 
 // 注册一条“虚拟 host -> 本地目录”的映射。
 // 如果 WebView 还没真正创建完成，就先记到 state 里，等 WebView ready 后再统一恢复。
-auto register_virtual_host_folder_mapping(Core::State::AppState& state, std::wstring host_name,
-                                          std::wstring folder_path) -> void {
+auto register_virtual_host_folder_mapping(
+    Core::State::AppState& state, std::wstring host_name, std::wstring folder_path,
+    Core::WebView::State::VirtualHostResourceAccessKind access_kind) -> void {
   auto& resources = state.webview->resources;
   {
     std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
-    resources.virtual_host_folder_mappings[host_name] = folder_path;
+    resources.virtual_host_folder_mappings[host_name] =
+        Core::WebView::State::VirtualHostFolderMapping{.folder_path = folder_path,
+                                                       .access_kind = access_kind};
   }
 
   auto* webview = resources.webview.get();
@@ -250,7 +253,8 @@ auto register_virtual_host_folder_mapping(Core::State::AppState& state, std::wst
   }
 
   hr = webview3->SetVirtualHostNameToFolderMapping(
-      host_name.c_str(), folder_path.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+      host_name.c_str(), folder_path.c_str(),
+      static_cast<COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND>(access_kind));
   if (FAILED(hr)) {
     Logger().warn("Failed to apply WebView virtual host mapping {} -> {}: {}",
                   Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(folder_path), hr);

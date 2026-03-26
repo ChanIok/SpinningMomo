@@ -40,6 +40,17 @@ export struct WindowState {
 };
 
 // WebView核心资源
+export enum class VirtualHostResourceAccessKind {
+  deny = COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY,
+  allow = COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW,
+  deny_cors = COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS,
+};
+
+export struct VirtualHostFolderMapping {
+  std::wstring folder_path;
+  VirtualHostResourceAccessKind access_kind = VirtualHostResourceAccessKind::deny_cors;
+};
+
 export struct CoreResources {
   wil::com_ptr<ICoreWebView2Environment> environment;
   wil::com_ptr<ICoreWebView2Controller> controller;
@@ -58,7 +69,7 @@ export struct CoreResources {
 
   // WebView 资源解析器注册表
   std::unique_ptr<Types::WebResolverRegistry> web_resolvers;
-  std::unordered_map<std::wstring, std::wstring> virtual_host_folder_mappings;
+  std::unordered_map<std::wstring, VirtualHostFolderMapping> virtual_host_folder_mappings;
   std::mutex virtual_host_folder_mappings_mutex;
   HostRuntime host_runtime;
 

@@ -5,6 +5,7 @@ module Features.Gallery.Watcher;
 import std;
 import Core.State;
 import Core.WebView;
+import Core.WebView.State;
 import Core.WorkerPool;
 import Core.RPC.NotificationHub;
 import Features.Gallery.OriginalLocator;
@@ -1057,7 +1058,8 @@ auto sync_root_webview_host_mapping_add(Core::State::AppState& app_state, const 
     auto host_name =
         Features::Gallery::OriginalLocator::make_root_host_name(folder_result->value().id);
     Core::WebView::register_virtual_host_folder_mapping(
-        app_state, std::move(host_name), Utils::String::FromUtf8(folder_result->value().path));
+        app_state, std::move(host_name), Utils::String::FromUtf8(folder_result->value().path),
+        Core::WebView::State::VirtualHostResourceAccessKind::deny_cors);
   }
 }
 

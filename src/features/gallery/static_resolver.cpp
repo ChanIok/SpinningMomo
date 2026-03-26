@@ -239,7 +239,8 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
     // 这样 `<img src>` 会直接从文件夹读取，不再绕回 static.test 的动态拦截链路。
     Core::WebView::register_virtual_host_folder_mapping(
         state, state.webview->config.thumbnail_host_name,
-        state.gallery->thumbnails_directory.wstring());
+        state.gallery->thumbnails_directory.wstring(),
+        Core::WebView::State::VirtualHostResourceAccessKind::allow);
 
     Logger().info("Registered WebView thumbnail host mapping: {} -> {}",
                   Utils::String::ToUtf8(state.webview->config.thumbnail_host_name),
