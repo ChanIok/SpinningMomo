@@ -387,8 +387,8 @@ export function useGalleryData() {
     return galleryApi.getAssetThumbnailUrl(asset)
   }
 
-  function getAssetUrl(assetId: number) {
-    return galleryApi.getAssetUrl(assetId)
+  function getAssetUrl(asset: Asset) {
+    return galleryApi.getAssetUrl(asset)
   }
 
   return {

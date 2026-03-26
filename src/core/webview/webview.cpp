@@ -225,6 +225,77 @@ auto register_message_handler(Core::State::AppState& state, const std::string& m
   Logger().debug("Registered message handler for type: {}", message_type);
 }
 
+// 注册一条“虚拟 host -> 本地目录”的映射。
+// 如果 WebView 还没真正创建完成，就先记到 state 里，等 WebView ready 后再统一恢复。
+auto register_virtual_host_folder_mapping(Core::State::AppState& state, std::wstring host_name,
+                                          std::wstring folder_path) -> void {
+  auto& resources = state.webview->resources;
+  {
+    std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
+    resources.virtual_host_folder_mappings[host_name] = folder_path;
+  }
+
+  auto* webview = resources.webview.get();
+  if (!webview) {
+    Logger().debug("Queued WebView virtual host mapping: {} -> {}",
+                   Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(folder_path));
+    return;
+  }
+
+  wil::com_ptr<ICoreWebView2_3> webview3;
+  auto hr = webview->QueryInterface(IID_PPV_ARGS(&webview3));
+  if (FAILED(hr) || !webview3) {
+    Logger().warn("Failed to query ICoreWebView2_3 for virtual host mapping: {}", hr);
+    return;
+  }
+
+  hr = webview3->SetVirtualHostNameToFolderMapping(
+      host_name.c_str(), folder_path.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+  if (FAILED(hr)) {
+    Logger().warn("Failed to apply WebView virtual host mapping {} -> {}: {}",
+                  Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(folder_path), hr);
+    return;
+  }
+
+  Logger().info("Applied WebView virtual host mapping: {} -> {}", Utils::String::ToUtf8(host_name),
+                Utils::String::ToUtf8(folder_path));
+}
+
+// 注销一条虚拟 host 映射。
+// root watch 被移除时，需要把对应的 r-<rootId>.test 一并移除，避免旧 URL 继续生效。
+auto unregister_virtual_host_folder_mapping(Core::State::AppState& state,
+                                            std::wstring_view host_name) -> void {
+  auto& resources = state.webview->resources;
+  {
+    std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
+    resources.virtual_host_folder_mappings.erase(std::wstring(host_name));
+  }
+
+  auto* webview = resources.webview.get();
+  if (!webview) {
+    Logger().debug("Removed queued WebView virtual host mapping: {}",
+                   Utils::String::ToUtf8(std::wstring(host_name)));
+    return;
+  }
+
+  wil::com_ptr<ICoreWebView2_3> webview3;
+  auto hr = webview->QueryInterface(IID_PPV_ARGS(&webview3));
+  if (FAILED(hr) || !webview3) {
+    Logger().warn("Failed to query ICoreWebView2_3 for virtual host unmapping: {}", hr);
+    return;
+  }
+
+  hr = webview3->ClearVirtualHostNameToFolderMapping(std::wstring(host_name).c_str());
+  if (FAILED(hr)) {
+    Logger().warn("Failed to clear WebView virtual host mapping {}: {}",
+                  Utils::String::ToUtf8(std::wstring(host_name)), hr);
+    return;
+  }
+
+  Logger().info("Cleared WebView virtual host mapping: {}",
+                Utils::String::ToUtf8(std::wstring(host_name)));
+}
+
 auto apply_background_mode_from_settings(Core::State::AppState& state) -> void {
   Core::WebView::Host::apply_background_mode_from_settings(state);
 }

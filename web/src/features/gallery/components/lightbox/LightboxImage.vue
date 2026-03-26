@@ -66,7 +66,7 @@ const thumbnailUrl = computed(() => {
 
 const originalUrl = computed(() => {
   if (!currentAsset.value) return ''
-  return galleryData.getAssetUrl(currentAsset.value.id)
+  return galleryData.getAssetUrl(currentAsset.value)
 })
 
 const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)

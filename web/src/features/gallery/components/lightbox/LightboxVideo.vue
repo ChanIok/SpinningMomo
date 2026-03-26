@@ -31,7 +31,7 @@ const assetUrl = computed(() => {
     return ''
   }
 
-  return galleryApi.getAssetUrl(currentAsset.value.id)
+  return galleryApi.getAssetUrl(currentAsset.value)
 })
 
 const posterUrl = computed(() => {

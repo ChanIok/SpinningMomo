@@ -4,8 +4,10 @@ module Features.Gallery.Watcher;
 
 import std;
 import Core.State;
+import Core.WebView;
 import Core.WorkerPool;
 import Core.RPC.NotificationHub;
+import Features.Gallery.OriginalLocator;
 import Features.Gallery.State;
 import Features.Gallery.Types;
 import Features.Gallery.Recovery.Service;
@@ -1039,6 +1041,44 @@ auto normalize_root_directory(const std::filesystem::path& root_directory)
   return normalized;
 }
 
+// 为 root folder 注册对应的 WebView virtual host mapping。
+// 只对 root folder（无 parent_id）生效，子目录跳过。
+// watcher 注册时调用，让 WebView 能通过 r-<rootId>.test 直接读取该目录下的原图。
+auto sync_root_webview_host_mapping_add(Core::State::AppState& app_state, const std::string& key)
+    -> void {
+  auto folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(app_state, key);
+  if (!folder_result) {
+    Logger().warn("Failed to query root folder for WebView mapping '{}': {}", key,
+                  folder_result.error());
+    return;
+  }
+
+  if (folder_result->has_value() && !folder_result->value().parent_id.has_value()) {
+    auto host_name =
+        Features::Gallery::OriginalLocator::make_root_host_name(folder_result->value().id);
+    Core::WebView::register_virtual_host_folder_mapping(
+        app_state, std::move(host_name), Utils::String::FromUtf8(folder_result->value().path));
+  }
+}
+
+// 移除 root folder 对应的 WebView virtual host mapping。
+// watcher 注销时调用，防止旧 r-<rootId>.test URL 在 root 被删除后继续生效。
+auto sync_root_webview_host_mapping_remove(Core::State::AppState& app_state, const std::string& key)
+    -> void {
+  auto folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(app_state, key);
+  if (!folder_result) {
+    Logger().warn("Failed to query root folder before removing WebView mapping '{}': {}", key,
+                  folder_result.error());
+    return;
+  }
+
+  if (folder_result->has_value() && !folder_result->value().parent_id.has_value()) {
+    auto host_name =
+        Features::Gallery::OriginalLocator::make_root_host_name(folder_result->value().id);
+    Core::WebView::unregister_virtual_host_folder_mapping(app_state, host_name);
+  }
+}
+
 // 注册一个根目录 watcher；若已存在则更新扫描参数。
 auto register_watcher_for_directory(Core::State::AppState& app_state,
                                     const std::filesystem::path& root_directory,
@@ -1069,6 +1109,8 @@ auto register_watcher_for_directory(Core::State::AppState& app_state,
   if (watcher_created || scan_options.has_value()) {
     update_watcher_scan_options(watcher, scan_options);
   }
+
+  sync_root_webview_host_mapping_add(app_state, key);
 
   return {};
 }
@@ -1149,6 +1191,8 @@ auto remove_watcher_for_directory(Core::State::AppState& app_state,
   if (!watcher) {
     return false;
   }
+
+  sync_root_webview_host_mapping_remove(app_state, key);
 
   stop_watcher(watcher);
   Logger().info("Gallery watcher removed: {}", key);

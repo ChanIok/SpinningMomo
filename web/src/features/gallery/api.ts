@@ -31,7 +31,7 @@ import type {
   UpdateAssetDescriptionParams,
   SetInfinityNikkiUserRecordParams,
 } from './types'
-import { getStaticUrl } from '@/core/env'
+import { getStaticUrl, isWebView } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
 
@@ -229,15 +229,50 @@ export function getAssetThumbnailUrl(asset: Asset): string {
 
   const prefix1 = hash.slice(0, 2)
   const prefix2 = hash.slice(2, 4)
+  const relativePath = `${prefix1}/${prefix2}/${hash}.webp`
 
-  return getStaticUrl(`/static/assets/thumbnails/${prefix1}/${prefix2}/${hash}.webp`)
+  // WebView release 直接走缩略图虚拟主机映射，少一层动态解析。
+  if (isWebView() && !import.meta.env.DEV) {
+    return `https://thumbs.test/${relativePath}`
+  }
+
+  return getStaticUrl(`/static/assets/thumbnails/${relativePath}`)
+}
+function encodeRelativePathForUrl(relativePath: string): string {
+  // 逐段编码，而不是把整个路径一起编码。
+  // 这样可以保留目录层级里的 '/'，同时正确处理中文、空格、#、% 等特殊字符。
+  return relativePath
+    .split('/')
+    .filter((segment) => segment.length > 0)
+    .map((segment) => encodeURIComponent(segment))
+    .join('/')
 }
 
 /**
- * 获取资产原图URL
+ * 获取资产原图 URL。
+ *
+ * 新模型下，原图不再通过 assetId 间接解析，而是直接由：
+ * - `rootId`：资源属于哪个 watch root
+ * - `relativePath`：文件在该 root 下的相对路径
+ * - `hash`：作为版本参数，避免内容更新后 URL 不变
+ *
+ * 环境差异：
+ * - WebView：`https://r-<rootId>.test/<relativePath>?v=<hash>`
+ * - 浏览器 dev：`/static/assets/originals/by-root/<rootId>/<relativePath>?v=<hash>`
  */
-export function getAssetUrl(assetId: number): string {
-  return getStaticUrl(`/static/assets/originals/${assetId}`)
+export function getAssetUrl(asset: Asset): string {
+  if (!asset.rootId || !asset.relativePath) {
+    return ''
+  }
+
+  const encodedRelativePath = encodeRelativePathForUrl(asset.relativePath)
+  const versionQuery = asset.hash ? `?v=${encodeURIComponent(asset.hash)}` : ''
+
+  if (isWebView()) {
+    return `https://r-${asset.rootId}.test/${encodedRelativePath}${versionQuery}`
+  }
+
+  return `/static/assets/originals/by-root/${asset.rootId}/${encodedRelativePath}${versionQuery}`
 }
 
 /**

@@ -6,13 +6,12 @@ import std;
 import Core.State;
 import Core.Database;
 import Core.Database.Types;
+import Features.Gallery.OriginalLocator;
 import Features.Gallery.Types;
-import Features.Gallery.State;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Color.Filter;
 import Features.Gallery.Color.Repository;
 import Utils.Logger;
-import Utils.LRUCache;
 
 namespace Features::Gallery::Asset::Service {
 
@@ -397,7 +396,8 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
              LIMIT 1
            ) AS dominant_color_hex,
            rating, review_flag,
-           description, width, height, size, extension, mime_type, hash, folder_id,
+           description, width, height, size, extension, mime_type, hash,
+           NULL AS root_id, NULL AS relative_path, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at
     FROM assets
@@ -431,6 +431,13 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
   // 7. 构建响应
   Types::ListResponse response;
   response.items = std::move(assets_result.value());
+
+  auto locator_result =
+      Features::Gallery::OriginalLocator::populate_asset_locators(app_state, response.items);
+  if (!locator_result) {
+    return std::unexpected(locator_result.error());
+  }
+
   response.total_count = total_count;
 
   if (has_pagination) {
@@ -451,19 +458,6 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
       return std::unexpected(active_index_result.error());
     }
     response.active_asset_index = active_index_result.value();
-  }
-
-  // 8. 预热缓存：将查询结果的 id->path 映射加入缓存
-  if (app_state.gallery && !response.items.empty()) {
-    std::vector<std::pair<std::int64_t, std::filesystem::path>> cache_items;
-    cache_items.reserve(response.items.size());
-
-    for (const auto& asset : response.items) {
-      cache_items.emplace_back(asset.id, std::filesystem::path(asset.path));
-    }
-
-    Utils::LRUCache::warm_up(app_state.gallery->image_path_cache, cache_items);
-    Logger().debug("Warmed up image path cache with {} items", cache_items.size());
   }
 
   return response;
@@ -908,7 +902,8 @@ auto load_asset_cache(Core::State::AppState& app_state)
     SELECT id, name, path, type,
            NULL AS dominant_color_hex,
            rating, review_flag,
-           description, width, height, size, extension, mime_type, hash, folder_id,
+           description, width, height, size, extension, mime_type, hash,
+           NULL AS root_id, NULL AS relative_path, folder_id,
            file_created_at, file_modified_at,
            created_at, updated_at
     FROM assets

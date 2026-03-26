@@ -61,4 +61,12 @@ export auto GetUserVideosDirectory() -> std::expected<std::filesystem::path, std
 export auto GetOutputDirectory(const std::string& configured_output_dir_path)
     -> std::expected<std::filesystem::path, std::string>;
 
+// 把路径转成适合比较的统一形式（小写 + 正斜杠）。
+// 主要用于 Windows 大小写不敏感的前缀匹配场景。
+export auto NormalizeForComparison(const std::filesystem::path& path) -> std::wstring;
+
+// 判断 target 是否位于 base 目录内部（大小写不敏感）。
+export auto IsPathWithinBase(const std::filesystem::path& target, const std::filesystem::path& base)
+    -> bool;
+
 }  // namespace Utils::Path

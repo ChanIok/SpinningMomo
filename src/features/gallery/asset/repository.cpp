@@ -104,7 +104,8 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
             SELECT id, name, path, type,
                    NULL AS dominant_color_hex,
                    rating, review_flag,
-                   description, width, height, size, extension, mime_type, hash, folder_id,
+                   description, width, height, size, extension, mime_type, hash,
+                   NULL AS root_id, NULL AS relative_path, folder_id,
                    file_created_at, file_modified_at,
                    created_at, updated_at
             FROM assets
@@ -128,7 +129,8 @@ auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path
             SELECT id, name, path, type,
                    NULL AS dominant_color_hex,
                    rating, review_flag,
-                   description, width, height, size, extension, mime_type, hash, folder_id,
+                   description, width, height, size, extension, mime_type, hash,
+                   NULL AS root_id, NULL AS relative_path, folder_id,
                    file_created_at, file_modified_at,
                    created_at, updated_at
             FROM assets

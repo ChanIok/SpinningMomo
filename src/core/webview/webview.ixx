@@ -34,6 +34,11 @@ export auto send_message(Core::State::AppState& state, const std::string& messag
 export auto post_message(Core::State::AppState& state, const std::string& message) -> void;
 export auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
                                      std::function<void(const std::string&)> handler) -> void;
+export auto register_virtual_host_folder_mapping(Core::State::AppState& state,
+                                                 std::wstring host_name, std::wstring folder_path)
+    -> void;
+export auto unregister_virtual_host_folder_mapping(Core::State::AppState& state,
+                                                   std::wstring_view host_name) -> void;
 export auto apply_background_mode_from_settings(Core::State::AppState& state) -> void;
 export auto get_loading_background_color(Core::State::AppState& state) -> COLORREF;
 export auto is_composition_active(Core::State::AppState& state) -> bool;

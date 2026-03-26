@@ -58,6 +58,8 @@ export struct CoreResources {
 
   // WebView 资源解析器注册表
   std::unique_ptr<Types::WebResolverRegistry> web_resolvers;
+  std::unordered_map<std::wstring, std::wstring> virtual_host_folder_mappings;
+  std::mutex virtual_host_folder_mappings_mutex;
   HostRuntime host_runtime;
 
   // 构造函数：初始化解析器注册表
@@ -84,7 +86,8 @@ export struct WebViewConfig {
   // 前端加载配置
   std::wstring frontend_dist_path = L"./resources/web";    // 前端构建产物路径
   std::wstring virtual_host_name = L"app.test";            // 前端虚拟主机名
-  std::wstring static_host_name = L"static.test";          // 静态资源路径
+  std::wstring static_host_name = L"static.test";          // 通用静态资源路径
+  std::wstring thumbnail_host_name = L"thumbs.test";       // 缩略图虚拟主机名
   std::wstring dev_server_url = L"http://localhost:5173";  // 开发服务器URL
 };
 

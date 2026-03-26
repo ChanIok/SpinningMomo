@@ -6,14 +6,15 @@ import std;
 import Core.State;
 import Core.HttpServer.Static;
 import Core.HttpServer.Types;
+import Core.WebView;
 import Core.WebView.Static;
 import Core.WebView.State;
 import Core.WebView.Types;
 import Features.Gallery.State;
-import Features.Gallery.Asset.Repository;
+import Features.Gallery.OriginalLocator;
 import Utils.Logger;
+import Utils.Path;
 import Utils.String;
-import Utils.LRUCache;
 import Vendor.BuildConfig;
 
 namespace Features::Gallery::StaticResolver {
@@ -51,48 +52,6 @@ auto extract_relative_path_generic(std::basic_string_view<CharT> url,
   return std::basic_string<CharT>(relative);
 }
 
-// 从 URL 提取 asset_id（通用模板版本）
-template <typename CharT>
-auto extract_asset_id_generic(std::basic_string_view<CharT> url,
-                              std::basic_string_view<CharT> prefix) -> std::optional<std::int64_t> {
-  if (!url.starts_with(prefix)) {
-    return std::nullopt;
-  }
-
-  auto id_str = url.substr(prefix.size());
-  if (id_str.empty() || id_str.front() == static_cast<CharT>('/')) {
-    id_str = id_str.substr(1);
-  }
-
-  // 去掉扩展名和查询参数（找到第一个出现的位置）
-  auto end_pos =
-      std::min(id_str.find(static_cast<CharT>('.')), id_str.find(static_cast<CharT>('?')));
-  if (end_pos != std::basic_string_view<CharT>::npos) {
-    id_str = id_str.substr(0, end_pos);
-  }
-
-  if (id_str.empty()) {
-    return std::nullopt;
-  }
-
-  // 使用 std::from_chars 避免字符串分配（仅对 char 类型）
-  if constexpr (std::same_as<CharT, char>) {
-    std::int64_t result;
-    auto [ptr, ec] = std::from_chars(id_str.data(), id_str.data() + id_str.size(), result);
-    if (ec == std::errc{} && ptr == id_str.data() + id_str.size()) {
-      return result;
-    }
-    return std::nullopt;
-  } else {
-    // wchar_t 版本使用传统方式
-    try {
-      return std::stoll(std::basic_string<CharT>(id_str));
-    } catch (...) {
-      return std::nullopt;
-    }
-  }
-}
-
 // 显示实例化模板函数
 template auto extract_relative_path_generic<char>(std::basic_string_view<char>,
                                                   std::basic_string_view<char>)
@@ -100,13 +59,6 @@ template auto extract_relative_path_generic<char>(std::basic_string_view<char>,
 template auto extract_relative_path_generic<wchar_t>(std::basic_string_view<wchar_t>,
                                                      std::basic_string_view<wchar_t>)
     -> std::optional<std::basic_string<wchar_t>>;
-
-template auto extract_asset_id_generic<char>(std::basic_string_view<char>,
-                                             std::basic_string_view<char>)
-    -> std::optional<std::int64_t>;
-template auto extract_asset_id_generic<wchar_t>(std::basic_string_view<wchar_t>,
-                                                std::basic_string_view<wchar_t>)
-    -> std::optional<std::int64_t>;
 
 // 从 URL 提取相对路径（narrow 版本）
 auto extract_relative_path(std::string_view url, std::string_view prefix)
@@ -120,56 +72,83 @@ auto extract_relative_path_w(std::wstring_view url, std::wstring_view prefix)
   return extract_relative_path_generic(url, prefix);
 }
 
-// 从 URL 提取 asset_id（narrow 版本）
-auto extract_asset_id(std::string_view url, std::string_view prefix)
-    -> std::optional<std::int64_t> {
-  return extract_asset_id_generic(url, prefix);
-}
+// 把 URL 中的 %XX 编码还原成原始字节串。
+// 因为 relative_path 可能包含中文、空格、#、% 等字符，所以 dev 路由必须先解码。
+auto decode_percent_encoded_string(std::string_view input) -> std::optional<std::string> {
+  std::string decoded;
+  decoded.reserve(input.size());
 
-// 从 URL 提取 asset_id（wide 版本）
-auto extract_asset_id_w(std::wstring_view url, std::wstring_view prefix)
-    -> std::optional<std::int64_t> {
-  return extract_asset_id_generic(url, prefix);
-}
+  for (std::size_t index = 0; index < input.size(); ++index) {
+    auto ch = input[index];
+    if (ch == '%') {
+      if (index + 2 >= input.size()) {
+        return std::nullopt;
+      }
 
-auto normalize_compare_path(const std::filesystem::path& path) -> std::wstring {
-  auto value = path.generic_wstring();
-  std::transform(value.begin(), value.end(), value.begin(),
-                 [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
-  return value;
-}
+      unsigned int value = 0;
+      auto hex = input.substr(index + 1, 2);
+      auto [ptr, ec] = std::from_chars(hex.data(), hex.data() + hex.size(), value, 16);
+      if (ec != std::errc{} || ptr != hex.data() + hex.size()) {
+        return std::nullopt;
+      }
 
-auto is_path_within_base(const std::filesystem::path& target, const std::filesystem::path& base)
-    -> bool {
-  auto normalized_base = normalize_compare_path(base.lexically_normal());
-  auto normalized_target = normalize_compare_path(target.lexically_normal());
+      decoded.push_back(static_cast<char>(value));
+      index += 2;
+      continue;
+    }
 
-  if (!normalized_target.starts_with(normalized_base)) {
-    return false;
+    decoded.push_back(ch == '+' ? ' ' : ch);
   }
 
-  if (normalized_target.size() == normalized_base.size()) {
-    return true;
-  }
-
-  return normalized_target[normalized_base.size()] == L'/';
+  return decoded;
 }
 
-// 简化的文件验证（只检查存在性和可读性）
-auto validate_asset_file(const std::filesystem::path& path) -> bool {
-  std::error_code ec;
-  return std::filesystem::exists(path, ec) && std::filesystem::is_regular_file(path, ec) && !ec;
-}
+struct OriginalRequestLocator {
+  std::int64_t root_id = 0;
+  std::string relative_path;
+};
 
-// 从数据库查询 asset 路径
-auto get_asset_path_from_db(Core::State::AppState& state, std::int64_t asset_id)
-    -> std::optional<std::filesystem::path> {
-  auto asset_result = Features::Gallery::Asset::Repository::get_asset_by_id(state, asset_id);
-  if (!asset_result || !asset_result->has_value()) {
+// 从 dev HTTP originals 路由中提取 root_id 和 relative_path。
+// 路径形态是：/static/assets/originals/by-root/<rootId>/<relativePath>?v=<hash>
+auto extract_original_request_locator(std::string_view url, std::string_view prefix)
+    -> std::optional<OriginalRequestLocator> {
+  auto relative = extract_relative_path(url, prefix);
+  if (!relative) {
     return std::nullopt;
   }
 
-  return std::filesystem::path(asset_result->value().path);
+  auto separator = relative->find('/');
+  if (separator == std::string::npos) {
+    return std::nullopt;
+  }
+
+  std::int64_t root_id = 0;
+  auto root_id_part = std::string_view(*relative).substr(0, separator);
+  auto [ptr, ec] =
+      std::from_chars(root_id_part.data(), root_id_part.data() + root_id_part.size(), root_id);
+  if (ec != std::errc{} || ptr != root_id_part.data() + root_id_part.size() || root_id <= 0) {
+    return std::nullopt;
+  }
+
+  auto encoded_relative_path = std::string_view(*relative).substr(separator + 1);
+  if (encoded_relative_path.empty()) {
+    return std::nullopt;
+  }
+
+  auto decoded_relative_path = decode_percent_encoded_string(encoded_relative_path);
+  if (!decoded_relative_path || decoded_relative_path->empty()) {
+    return std::nullopt;
+  }
+
+  return OriginalRequestLocator{.root_id = root_id,
+                                .relative_path = std::move(*decoded_relative_path)};
+}
+
+// resolver 用的最小文件校验。
+// 这里不做业务层判断，只确认文件存在且是普通文件。
+auto validate_asset_file(const std::filesystem::path& path) -> bool {
+  std::error_code ec;
+  return std::filesystem::exists(path, ec) && std::filesystem::is_regular_file(path, ec) && !ec;
 }
 
 // ============= HTTP 静态服务解析器 =============
@@ -191,7 +170,7 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
 
         auto full_path = state.gallery->thumbnails_directory / *relative_path;
 
-        if (!is_path_within_base(full_path, state.gallery->thumbnails_directory)) {
+        if (!Utils::Path::IsPathWithinBase(full_path, state.gallery->thumbnails_directory)) {
           Logger().warn("Unsafe thumbnail path requested: {}", full_path.string());
           return std::unexpected("Unsafe thumbnail path");
         }
@@ -207,52 +186,34 @@ auto register_http_resolvers(Core::State::AppState& state) -> void {
             .cache_control_header = std::string{"public, max-age=31536000, immutable"}};
       });
 
-  // 原图解析器（基于 asset_id）
+  // 原图解析器（基于 root_id + relative_path）。
+  // 这条链路主要给浏览器 dev 环境使用；release WebView 会尽量直接走 root host mapping。
   Core::HttpServer::Static::register_path_resolver(
-      state, "/static/assets/originals",
+      state, "/static/assets/originals/by-root/",
       [&state](std::string_view url_path) -> Core::HttpServer::Types::PathResolution {
-        auto asset_id = extract_asset_id(url_path, "/static/assets/originals");
-        if (!asset_id) {
-          return std::unexpected("Invalid asset ID");
+        auto locator =
+            extract_original_request_locator(url_path, "/static/assets/originals/by-root/");
+        if (!locator) {
+          return std::unexpected("Invalid original locator");
         }
 
-        // 1. 先查缓存
-        if (state.gallery) {
-          auto cached_path = Utils::LRUCache::get(state.gallery->image_path_cache, *asset_id);
-          if (cached_path) {
-            if (validate_asset_file(*cached_path)) {
-              Logger().debug("Cache hit for asset {}: {}", *asset_id, cached_path->string());
-              return Core::HttpServer::Types::PathResolutionData{
-                  .file_path = *cached_path,
-                  .cache_duration = std::chrono::seconds{0},
-                  .cache_control_header = std::string{"private, no-cache"}};
-            } else {
-              Logger().warn("Cached path for asset {} not found: {}", *asset_id,
-                            cached_path->string());
-            }
-          }
+        auto path_result = Features::Gallery::OriginalLocator::resolve_original_file_path(
+            state, locator->root_id, locator->relative_path);
+        if (!path_result) {
+          Logger().warn("Failed to resolve original locator {}/{}: {}", locator->root_id,
+                        locator->relative_path, path_result.error());
+          return std::unexpected(path_result.error());
         }
 
-        // 2. 缓存未命中，查数据库
-        auto path = get_asset_path_from_db(state, *asset_id);
-        if (!path) {
-          Logger().warn("Asset not found in database: {}", *asset_id);
-          return std::unexpected("Asset not found");
-        }
-
-        if (!validate_asset_file(*path)) {
-          Logger().warn("Asset file not found: {}", path->string());
+        if (!validate_asset_file(*path_result)) {
+          Logger().warn("Original file not found: {}", path_result->string());
           return std::unexpected("Asset file not found");
         }
 
-        // 3. 更新缓存
-        if (state.gallery) {
-          Utils::LRUCache::put(state.gallery->image_path_cache, *asset_id, *path);
-        }
-
-        Logger().debug("Resolved asset {} from database: {}", *asset_id, path->string());
+        Logger().debug("Resolved original locator {}/{} to {}", locator->root_id,
+                       locator->relative_path, path_result->string());
         return Core::HttpServer::Types::PathResolutionData{
-            .file_path = *path,
+            .file_path = *path_result,
             .cache_duration = std::chrono::seconds{0},
             .cache_control_header = std::string{"private, no-cache"}};
       });
@@ -268,20 +229,27 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
     return;
   }
 
-  // 根据 debug/release 模式确定前缀
-  std::wstring thumbnail_prefix;
-  if (Vendor::BuildConfig::is_debug_build()) {
-    // Debug 模式：拦截开发服务器的路径
-    thumbnail_prefix = state.webview->config.dev_server_url + L"/static/assets/thumbnails/";
-  } else {
-    // Release 模式：拦截虚拟主机的路径
-    thumbnail_prefix =
-        L"https://" + state.webview->config.static_host_name + L"/static/assets/thumbnails/";
+  if (!state.gallery || state.gallery->thumbnails_directory.empty()) {
+    Logger().warn("Thumbnails directory not initialized, skipping WebView thumbnail setup");
+    return;
   }
 
+  if (!Vendor::BuildConfig::is_debug_build()) {
+    // Release WebView 直接把整个缩略图目录映射成独立 host。
+    // 这样 `<img src>` 会直接从文件夹读取，不再绕回 static.test 的动态拦截链路。
+    Core::WebView::register_virtual_host_folder_mapping(
+        state, state.webview->config.thumbnail_host_name,
+        state.gallery->thumbnails_directory.wstring());
+
+    Logger().info("Registered WebView thumbnail host mapping: {} -> {}",
+                  Utils::String::ToUtf8(state.webview->config.thumbnail_host_name),
+                  state.gallery->thumbnails_directory.string());
+    return;
+  }
+
+  auto thumbnail_prefix = state.webview->config.dev_server_url + L"/static/assets/thumbnails/";
   Core::WebView::Static::register_web_resource_resolver(
-      state,  // 传递 AppState
-      thumbnail_prefix,
+      state, thumbnail_prefix,
       [&state,
        thumbnail_prefix](std::wstring_view url) -> Core::WebView::Types::WebResourceResolution {
         auto relative_path = extract_relative_path_w(url, thumbnail_prefix);
@@ -289,16 +257,10 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
           return {.success = false, .file_path = {}, .error_message = "Invalid thumbnail URL"};
         }
 
-        if (!state.gallery || state.gallery->thumbnails_directory.empty()) {
-          return {.success = false,
-                  .file_path = {},
-                  .error_message = "Thumbnails directory not initialized"};
-        }
-
         auto full_path =
             state.gallery->thumbnails_directory / std::filesystem::path(*relative_path);
 
-        if (!is_path_within_base(full_path, state.gallery->thumbnails_directory)) {
+        if (!Utils::Path::IsPathWithinBase(full_path, state.gallery->thumbnails_directory)) {
           Logger().warn("Unsafe thumbnail path requested via WebView: {}", full_path.string());
           return {.success = false, .file_path = {}, .error_message = "Unsafe thumbnail path"};
         }
@@ -315,83 +277,20 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
                 .cache_control_header = L"public, max-age=31536000, immutable"};
       });
 
-  // 原图解析器（基于 asset_id）
-  std::wstring image_prefix;
-  if (Vendor::BuildConfig::is_debug_build()) {
-    image_prefix = state.webview->config.dev_server_url + L"/static/assets/originals";
-  } else {
-    image_prefix =
-        L"https://" + state.webview->config.static_host_name + L"/static/assets/originals";
-  }
-
-  Core::WebView::Static::register_web_resource_resolver(
-      state, image_prefix,
-      [&state, image_prefix](std::wstring_view url) -> Core::WebView::Types::WebResourceResolution {
-        auto asset_id = extract_asset_id_w(url, image_prefix);
-        if (!asset_id) {
-          return {.success = false, .file_path = {}, .error_message = "Invalid asset ID"};
-        }
-
-        // 1. 先查缓存
-        if (state.gallery) {
-          auto cached_path = Utils::LRUCache::get(state.gallery->image_path_cache, *asset_id);
-          if (cached_path) {
-            if (validate_asset_file(*cached_path)) {
-              Logger().debug("Cache hit for WebView asset {}: {}", *asset_id,
-                             cached_path->string());
-              return {.success = true,
-                      .file_path = *cached_path,
-                      .error_message = {},
-                      .content_type = std::nullopt,  // 自动检测
-                      .status_code = 200,
-                      .cache_control_header = L"private, no-cache"};
-            } else {
-              Logger().warn("Cached path for WebView asset {} not found: {}", *asset_id,
-                            cached_path->string());
-            }
-          }
-        }
-
-        // 2. 缓存未命中，查数据库
-        auto path = get_asset_path_from_db(state, *asset_id);
-        if (!path) {
-          Logger().warn("WebView asset not found in database: {}", *asset_id);
-          return {.success = false, .file_path = {}, .error_message = "Asset not found"};
-        }
-
-        if (!validate_asset_file(*path)) {
-          Logger().warn("WebView asset file not found: {}", path->string());
-          return {.success = false, .file_path = {}, .error_message = "Asset file not found"};
-        }
-
-        // 3. 更新缓存
-        if (state.gallery) {
-          Utils::LRUCache::put(state.gallery->image_path_cache, *asset_id, *path);
-        }
-
-        Logger().debug("Resolved WebView asset {} from database: {}", *asset_id, path->string());
-        return {.success = true,
-                .file_path = *path,
-                .error_message = {},
-                .content_type = std::nullopt,  // 自动检测
-                .status_code = 200,
-                .cache_control_header = L"private, no-cache"};
-      });
-
-  Logger().info("Registered WebView resource resolvers for gallery (thumbnails: {}, images: {})",
-                Utils::String::ToUtf8(thumbnail_prefix), Utils::String::ToUtf8(image_prefix));
+  Logger().info("Registered debug WebView thumbnail resolver: {}",
+                Utils::String::ToUtf8(thumbnail_prefix));
 }
-
 // ============= 清理函数 =============
 
 auto unregister_all_resolvers(Core::State::AppState& state) -> void {
   Core::HttpServer::Static::unregister_path_resolver(state, "/static/assets/thumbnails/");
-  Core::HttpServer::Static::unregister_path_resolver(state, "/static/assets/originals");
+  Core::HttpServer::Static::unregister_path_resolver(state, "/static/assets/originals/by-root/");
 
-  // WebView 注销需要运行时确定前缀
-  // 目前简化处理，可以考虑在 WebView 模块提供 unregister_all 接口
+  if (state.webview) {
+    Core::WebView::unregister_virtual_host_folder_mapping(
+        state, state.webview->config.thumbnail_host_name);
+  }
 
   Logger().info("Unregistered gallery static resolvers");
 }
-
 }  // namespace Features::Gallery::StaticResolver

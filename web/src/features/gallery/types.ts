@@ -18,6 +18,8 @@ export interface Asset {
   size?: number // 文件大小（字节）
   mimeType?: string
   hash?: string
+  rootId?: number
+  relativePath?: string
   folderId?: number
   description?: string
   extension?: string

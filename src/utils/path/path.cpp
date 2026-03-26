@@ -205,6 +205,34 @@ auto Utils::Path::NormalizePath(const std::filesystem::path& path,
   }
 }
 
+// 把路径转成适合比较的统一形式：先 lexically_normal 消除冗余分隔符，
+// 再转小写、统一为正斜杠。用于 Windows 大小写不敏感的前缀匹配场景。
+auto Utils::Path::NormalizeForComparison(const std::filesystem::path& path) -> std::wstring {
+  auto value = path.lexically_normal().generic_wstring();
+  std::ranges::transform(value, value.begin(),
+                         [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
+  return value;
+}
+
+// 判断 target 是否位于 base 目录内部（大小写不敏感，Windows 语义）。
+// 通过前缀匹配实现，匹配后确认紧随字符为 '/' 或路径刚好等长，
+// 防止 /foo/bar 被误判为 /foo/ba 的子目录。
+auto Utils::Path::IsPathWithinBase(const std::filesystem::path& target,
+                                   const std::filesystem::path& base) -> bool {
+  auto normalized_base = NormalizeForComparison(base);
+  auto normalized_target = NormalizeForComparison(target);
+
+  if (!normalized_target.starts_with(normalized_base)) {
+    return false;
+  }
+
+  if (normalized_target.size() == normalized_base.size()) {
+    return true;
+  }
+
+  return normalized_target[normalized_base.size()] == L'/';
+}
+
 // 获取用户视频文件夹路径 (FOLDERID_Videos)
 auto Utils::Path::GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string> {
   PWSTR path = nullptr;

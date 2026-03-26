@@ -40,7 +40,7 @@ export function useGalleryLightbox() {
    */
   async function preloadImage(assetId: number): Promise<void> {
     const asset = findLoadedAssetById(assetId)
-    if (!isPreloadableImageAsset(asset)) {
+    if (!asset || !isPreloadableImageAsset(asset)) {
       return
     }
 
@@ -49,7 +49,7 @@ export function useGalleryLightbox() {
     }
 
     loading.value.add(assetId)
-    const url = galleryApi.getAssetUrl(assetId)
+    const url = galleryApi.getAssetUrl(asset)
     imageStates.value.set(assetId, { status: 'loading', url })
 
     return new Promise((resolve, reject) => {

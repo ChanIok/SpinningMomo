@@ -4,7 +4,6 @@ export module Features.Gallery.State;
 
 import std;
 import Features.Gallery.Types;
-import Utils.LRUCache;
 
 namespace Features::Gallery::State {
 
@@ -54,10 +53,6 @@ export struct GalleryState {
 
   // 后台 watcher 启动恢复任务的 future，shutdown 时等待其结束。
   std::optional<std::future<void>> startup_watchers_future;
-
-  // 原图路径缓存 (asset_id -> filesystem::path)
-  Utils::LRUCache::LRUCacheState<std::int64_t, std::filesystem::path> image_path_cache{
-      .capacity = 5000, .map = {}, .list = {}};
 
   // 根目录 watcher 状态（key = 规范化路径字符串）
   std::unordered_map<std::string, std::shared_ptr<FolderWatcherState>> folder_watchers;

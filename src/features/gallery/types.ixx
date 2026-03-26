@@ -24,6 +24,8 @@ struct Asset {
   std::optional<std::string> extension;
   std::string mime_type;
   std::optional<std::string> hash;  // xxh3哈希
+  std::optional<std::int64_t> root_id;
+  std::optional<std::string> relative_path;
   std::optional<std::int64_t> folder_id;
 
   std::optional<std::int64_t> file_created_at;

@@ -394,6 +394,48 @@ auto setup_virtual_host_mapping(ICoreWebView2* webview, Core::WebView::State::We
   return S_OK;
 }
 
+auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
+                                                   ICoreWebView2* webview) -> HRESULT {
+  // 把“WebView 创建前就登记好的 root host 映射”重新应用到真实 WebView 实例上。
+  // 这样无论 root watch 先恢复还是 WebView 先创建，最终状态都能收敛一致。
+  if (!webview) return E_FAIL;
+
+  wil::com_ptr<ICoreWebView2_3> webview3;
+  auto hr = webview->QueryInterface(IID_PPV_ARGS(&webview3));
+  if (FAILED(hr)) {
+    Logger().warn("Failed to query ICoreWebView2_3 for registered virtual host mappings: {}", hr);
+    return hr;
+  }
+  if (!webview3) {
+    Logger().warn("ICoreWebView2_3 interface not available for registered virtual host mappings");
+    return E_NOINTERFACE;
+  }
+
+  std::vector<std::pair<std::wstring, std::wstring>> mappings;
+  {
+    std::lock_guard<std::mutex> lock(state.webview->resources.virtual_host_folder_mappings_mutex);
+    for (const auto& [host_name, folder_path] :
+         state.webview->resources.virtual_host_folder_mappings) {
+      mappings.emplace_back(host_name, folder_path);
+    }
+  }
+
+  for (const auto& [host_name, folder_path] : mappings) {
+    hr = webview3->SetVirtualHostNameToFolderMapping(
+        host_name.c_str(), folder_path.c_str(), COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+    if (FAILED(hr)) {
+      Logger().warn("Failed to restore virtual host mapping {} -> {}: {}",
+                    Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(folder_path), hr);
+      continue;
+    }
+
+    Logger().info("Restored virtual host mapping: {} -> {}", Utils::String::ToUtf8(host_name),
+                  Utils::String::ToUtf8(folder_path));
+  }
+
+  return S_OK;
+}
+
 auto select_initial_url(Core::WebView::State::WebViewConfig& config) -> void {
   if (Vendor::BuildConfig::is_debug_build()) {
     config.initial_url = config.dev_server_url;
@@ -532,6 +574,11 @@ auto finalize_controller_initialization(Core::State::AppState* state,
     } else {
       return hr;
     }
+  }
+
+  hr = apply_registered_virtual_host_folder_mappings(*state, webview);
+  if (FAILED(hr) && !Vendor::BuildConfig::is_debug_build()) {
+    Logger().warn("Registered virtual host mapping restore failed: {}", hr);
   }
 
   hr = Core::WebView::Static::setup_resource_interception(*state, webview, environment, resources,

@@ -94,7 +94,7 @@ const thumbnailUrl = computed(() => {
 
 const assetUrl = computed(() => {
   if (!activeAsset.value) return ''
-  return getAssetUrl(activeAsset.value.id)
+  return getAssetUrl(activeAsset.value)
 })
 
 const batchThumbnailUrl = computed(() => {
@@ -104,7 +104,7 @@ const batchThumbnailUrl = computed(() => {
 
 const batchAssetUrl = computed(() => {
   if (!batchActiveAsset.value) return ''
-  return getAssetUrl(batchActiveAsset.value.id)
+  return getAssetUrl(batchActiveAsset.value)
 })
 
 const assetHistogramCacheKey = computed(() => {
