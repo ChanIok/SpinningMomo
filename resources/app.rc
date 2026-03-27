@@ -1,7 +1,7 @@
 #include <windows.h>
 
-#define APP_VERSION_NUM 2, 0, 2, 0
-#define APP_VERSION_STR "2.0.2.0"
+#define APP_VERSION_NUM 2, 0, 3, 0
+#define APP_VERSION_STR "2.0.3.0"
 #define PRODUCT_NAME "SpinningMomo"
 #define FILE_DESCRIPTION "SpinningMomo"
 #define COPYRIGHT_INFO "Copyright (c) 2024-2026 ChanIok"

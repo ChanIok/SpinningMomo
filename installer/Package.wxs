@@ -44,6 +44,8 @@
       <ComponentRef Id="StartMenuShortcut" />
       <ComponentRef Id="DesktopShortcut" />
       <ComponentRef Id="CleanupUserData" />
+      <ComponentRef Id="StartMenuShortcutRemove" />
+      <ComponentRef Id="DesktopShortcutRemove" />
     </Feature>
 
     <!-- UI: Use WiX standard install directory UI -->
@@ -94,35 +96,65 @@
 
   <!-- Shortcuts -->
   <Fragment>
-    <!-- Start Menu Shortcut -->
-    <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="C3D4E5F6-A7B8-4C5D-0E1F-2A3B4C5D6E7F">
+    <!-- Start Menu Shortcut - 创建部分（升级保留） -->
+    <Component Id="StartMenuShortcut" 
+               Directory="AppMenuFolder" 
+               Guid="7808BA3C-C658-440F-976C-838362DD1FFF"
+               Permanent="yes">
       <Shortcut Id="StartMenuShortcutFile"
                 Name="SpinningMomo"
                 Description="!(loc.ShortcutDescription)"
                 Target="[INSTALLFOLDER]SpinningMomo.exe"
                 WorkingDirectory="INSTALLFOLDER"
-                Icon="AppIcon" />
-      <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />
+                Icon="AppIcon"
+                Advertise="no" />
+      <RemoveFolder Id="RemoveAppMenuFolder" On="uninstall" />   <!-- 保留原有，清理空文件夹 -->
       <RegistryValue Root="HKCU" Key="Software\SpinningMomo"
                      Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
     </Component>
 
-    <!-- Desktop Shortcut -->
-    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="D4E5F6A7-B8C9-4D5E-1F2A-3B4C5D6E7F8A">
+    <!-- Start Menu Shortcut - 删除部分（仅完全卸载时执行） -->
+    <Component Id="StartMenuShortcutRemove" 
+               Directory="AppMenuFolder" 
+               Guid="5E694D68-9DFD-4510-9EA1-698F8A09739D">   <!-- 新 GUID，必须唯一 -->
+      <RemoveFile Id="RemoveStartMenuLnk" 
+                  Name="SpinningMomo.lnk" 
+                  On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\SpinningMomo"
+                     Name="StartMenuShortcutRemove" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Desktop Shortcut - 创建部分（升级保留） -->
+    <Component Id="DesktopShortcut" 
+               Directory="DesktopFolder" 
+               Guid="CA8D282A-3752-4E74-9252-76AB6F280997"
+               Permanent="yes">
       <Shortcut Id="DesktopShortcutFile"
                 Name="SpinningMomo"
                 Description="!(loc.ShortcutDescription)"
                 Target="[INSTALLFOLDER]SpinningMomo.exe"
                 WorkingDirectory="INSTALLFOLDER"
-                Icon="AppIcon" />
+                Icon="AppIcon"
+                Advertise="no" />
       <RegistryValue Root="HKCU" Key="Software\SpinningMomo"
                      Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <!-- Desktop Shortcut - 删除部分（仅完全卸载时执行） -->
+    <Component Id="DesktopShortcutRemove" 
+               Directory="DesktopFolder" 
+               Guid="81DD2135-CFFF-4EAD-902C-D25BD1C5612B">   <!-- 新 GUID，必须唯一 -->
+      <RemoveFile Id="RemoveDesktopLnk" 
+                  Name="SpinningMomo.lnk" 
+                  On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\SpinningMomo"
+                     Name="DesktopShortcutRemove" Type="integer" Value="1" KeyPath="yes" />
     </Component>
   </Fragment>
 
   <!-- Remove app data on uninstall -->
   <Fragment>
-    <Component Id="CleanupUserData" Directory="INSTALLFOLDER" Guid="E5F6A7B8-C9D0-4E5F-2A3B-4C5D6E7F8A9B">
+    <Component Id="CleanupUserData" Directory="INSTALLFOLDER" Guid="7DF1D902-6FF4-43EF-B58A-837AE33B4494">
       <util:RemoveFolderEx Id="RemoveAppDataRoot" On="uninstall" Property="APPDATAROOT" />
       <!-- Remove install folder itself if empty -->
       <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
