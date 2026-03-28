@@ -3,7 +3,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { copyToClipboard } from '@/lib/utils'
+import { copyToClipboard, formatFileSize } from '@/lib/utils'
 import type { Asset } from '../types'
 
 interface AssetDetailsContentProps {
@@ -17,17 +17,6 @@ const props = defineProps<AssetDetailsContentProps>()
 
 const { t } = useI18n()
 const { toast } = useToast()
-
-function formatFileSize(bytes: number): string {
-  const units = ['B', 'KB', 'MB', 'GB']
-  let size = bytes
-  let unitIndex = 0
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024
-    unitIndex++
-  }
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
-}
 
 function getAssetTypeLabel(type: Asset['type']): string {
   switch (type) {

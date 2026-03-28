@@ -202,7 +202,7 @@ export interface ScanIgnoreRule {
 export type ViewMode = 'masonry' | 'grid' | 'list' | 'adaptive'
 
 // 排序选项
-export type SortBy = 'createdAt' | 'name' | 'size'
+export type SortBy = 'createdAt' | 'name' | 'size' | 'resolution'
 export type SortOrder = 'asc' | 'desc'
 
 // 筛选器

@@ -6,6 +6,7 @@ import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { galleryApi } from '@/features/gallery/api'
 import type { HomeStats } from '@/features/gallery/types'
+import { formatFileSize } from '@/lib/utils'
 import { featuresApi } from '@/features/settings/featuresApi'
 
 const { t, locale } = useI18n()
@@ -31,20 +32,6 @@ const numberFormatter = computed(() => new Intl.NumberFormat(locale.value))
 
 const formatCount = (value: number): string => {
   return numberFormatter.value.format(Math.max(0, value))
-}
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes <= 0) return '0 B'
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let size = bytes
-  let unitIndex = 0
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024
-    unitIndex++
-  }
-
-  return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
 }
 
 const formattedPhotoCount = computed(() => formatCount(photoCount.value))

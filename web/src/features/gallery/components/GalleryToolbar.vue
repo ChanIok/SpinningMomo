@@ -96,6 +96,10 @@
                       <Type class="mr-2 h-4 w-4" />
                       {{ t('gallery.toolbar.sort.name') }}
                     </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="resolution">
+                      <Ruler class="mr-2 h-4 w-4" />
+                      {{ t('gallery.toolbar.sort.resolution') }}
+                    </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="size">
                       <Ruler class="mr-2 h-4 w-4" />
                       {{ t('gallery.toolbar.sort.size') }}

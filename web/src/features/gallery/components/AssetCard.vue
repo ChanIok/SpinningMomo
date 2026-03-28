@@ -11,10 +11,12 @@ const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
 interface AssetCardProps {
   asset: Asset
   isSelected?: boolean
+  aspectRatio?: string
 }
 
 const props = withDefaults(defineProps<AssetCardProps>(), {
   isSelected: false,
+  aspectRatio: '1 / 1',
 })
 
 // Emits 定义
@@ -123,7 +125,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
         'shadow-lg': isSelected,
       },
     ]"
-    style="aspect-ratio: 1/1"
+    :style="{ aspectRatio: props.aspectRatio }"
     @click="handleClick"
     @dblclick="handleDoubleClick"
     @contextmenu="handleContextMenu"

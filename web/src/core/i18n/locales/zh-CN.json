@@ -595,6 +595,7 @@
   "gallery.toolbar.sort.label": "排序方式",
   "gallery.toolbar.sort.createdAt": "创建日期",
   "gallery.toolbar.sort.name": "名称",
+  "gallery.toolbar.sort.resolution": "分辨率",
   "gallery.toolbar.sort.size": "大小",
   "gallery.toolbar.sortOrder.asc": "升序排列",
   "gallery.toolbar.sortOrder.desc": "降序排列",

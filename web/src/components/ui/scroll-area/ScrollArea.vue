@@ -7,7 +7,11 @@ import { ScrollAreaCorner, ScrollAreaRoot, ScrollAreaViewport } from 'reka-ui'
 import { cn } from '@/lib/utils'
 import ScrollBar from './ScrollBar.vue'
 
-const props = defineProps<ScrollAreaRootProps & { class?: HTMLAttributes['class'] }>()
+const props = defineProps<
+  ScrollAreaRootProps & {
+    class?: HTMLAttributes['class']
+  }
+>()
 
 const delegatedProps = reactiveOmit(props, 'class')
 
@@ -38,7 +42,9 @@ defineExpose({
     >
       <slot />
     </ScrollAreaViewport>
-    <ScrollBar />
+    <slot name="scrollbar">
+      <ScrollBar />
+    </slot>
     <ScrollAreaCorner />
   </ScrollAreaRoot>
 </template>

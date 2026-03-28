@@ -114,7 +114,8 @@ auto build_query_order_config(std::optional<std::string> sort_by_param,
       .sort_order = sort_order_param.value_or("desc"),
   };
 
-  if (config.sort_by != "created_at" && config.sort_by != "name" && config.sort_by != "size" &&
+  if (config.sort_by != "created_at" && config.sort_by != "name" &&
+      config.sort_by != "resolution" && config.sort_by != "size" &&
       config.sort_by != "file_created_at") {
     config.sort_by = "created_at";
   }
@@ -147,6 +148,16 @@ auto build_query_order_config(std::optional<std::string> sort_by_param,
     return config;
   }
 
+  if (config.sort_by == "resolution") {
+    config.asset_order_clause = std::format(
+        "ORDER BY (COALESCE(width, 0) * COALESCE(height, 0)) {}, width {}, height {}, id {}",
+        config.sort_order, config.sort_order, config.sort_order, config.sort_order);
+    config.indexed_order_clause =
+        std::format("ORDER BY sort_resolution {}, sort_width {}, sort_height {}, id {}",
+                    config.sort_order, config.sort_order, config.sort_order, config.sort_order);
+    return config;
+  }
+
   config.asset_order_clause =
       std::format("ORDER BY size {}, id {}", config.sort_order, config.sort_order);
   config.indexed_order_clause =
@@ -172,6 +183,9 @@ auto find_active_asset_index(Core::State::AppState& app_state,
              COALESCE(file_created_at, created_at) AS sort_created_at,
              file_created_at AS sort_file_created_at,
              name AS sort_name,
+             (COALESCE(width, 0) * COALESCE(height, 0)) AS sort_resolution,
+             COALESCE(width, 0) AS sort_width,
+             COALESCE(height, 0) AS sort_height,
              size AS sort_size
       FROM assets
       {}

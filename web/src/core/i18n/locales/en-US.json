@@ -595,6 +595,7 @@
   "gallery.toolbar.sort.label": "Sort By",
   "gallery.toolbar.sort.createdAt": "Created At",
   "gallery.toolbar.sort.name": "Name",
+  "gallery.toolbar.sort.resolution": "Resolution",
   "gallery.toolbar.sort.size": "Size",
   "gallery.toolbar.sortOrder.asc": "Ascending",
   "gallery.toolbar.sortOrder.desc": "Descending",
