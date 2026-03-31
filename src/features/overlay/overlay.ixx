@@ -14,8 +14,10 @@ export auto start_overlay(Core::State::AppState& state, HWND target_window,
                           bool freeze_after_first_frame = false)
     -> std::expected<void, std::string>;
 
-// 停止叠加层
-export auto stop_overlay(Core::State::AppState& state) -> void;
+// 停止叠加层。
+// restore_target_window 为 true 时，按“正常关闭”处理；
+// 为 false 时，按“目标窗口已失效”处理，不再尝试恢复目标窗口。
+export auto stop_overlay(Core::State::AppState& state, bool restore_target_window = true) -> void;
 
 // 冻结叠加层（保持当前帧，停止处理新帧）
 export auto freeze_overlay(Core::State::AppState& state) -> void;

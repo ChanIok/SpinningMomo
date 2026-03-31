@@ -18,6 +18,7 @@ constexpr UINT WM_WINDOW_EVENT = WM_USER + 3;
 constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 4;
 constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 5;
 constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 6;
+constexpr UINT WM_TARGET_WINDOW_DESTROYED = WM_USER + 7;
 
 constexpr UINT_PTR OVERLAY_CLEANUP_TIMER_ID = 1;
 
@@ -69,7 +70,8 @@ struct CaptureState {
 // 交互状态
 struct InteractionState {
   HHOOK mouse_hook = nullptr;
-  HWINEVENTHOOK event_hook = nullptr;
+  HWINEVENTHOOK foreground_event_hook = nullptr;
+  HWINEVENTHOOK target_window_event_hook = nullptr;
   POINT current_mouse_pos{};
   POINT last_mouse_pos{};
   DWORD game_process_id = 0;

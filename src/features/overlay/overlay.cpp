@@ -18,13 +18,53 @@ import <dwmapi.h>;
 import <windows.h>;
 
 namespace Features::Overlay {
-
 auto send_overlay_control_message(HWND overlay_hwnd, UINT message) -> bool {
   if (!overlay_hwnd || !IsWindow(overlay_hwnd)) {
     return false;
   }
 
   return SendMessageW(overlay_hwnd, message, 0, 0) != 0;
+}
+
+auto cleanup_overlay(Core::State::AppState& state) -> void {
+  if (send_overlay_control_message(state.overlay->window.overlay_hwnd,
+                                   Types::WM_IMMEDIATE_OVERLAY_CLEANUP)) {
+    return;
+  }
+
+  Capture::cleanup_capture(state);
+  Rendering::cleanup_rendering(state);
+
+  Logger().info("Overlay cleaned up");
+}
+
+auto schedule_overlay_cleanup(Core::State::AppState& state) -> void {
+  if (!send_overlay_control_message(state.overlay->window.overlay_hwnd,
+                                    Types::WM_SCHEDULE_OVERLAY_CLEANUP)) {
+    cleanup_overlay(state);
+  }
+}
+
+auto stop_overlay_runtime(Core::State::AppState& state, bool restore_target_window) -> void {
+  auto& overlay_state = *state.overlay;
+
+  overlay_state.running.store(false, std::memory_order_release);
+  overlay_state.freeze_rendering.store(false, std::memory_order_release);
+  overlay_state.freeze_after_first_frame.store(false, std::memory_order_release);
+  overlay_state.rendering.create_new_srv = true;
+
+  Threads::stop_threads(state);
+  Capture::stop_capture(state);
+
+  if (restore_target_window) {
+    Window::restore_game_window(state);
+  }
+
+  Window::hide_overlay_window(state);
+  overlay_state.window.target_window = nullptr;
+
+  Threads::wait_for_threads(state);
+  Interaction::cleanup_interaction(state);
 }
 
 auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze_after_first_frame)
@@ -121,38 +161,11 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
   return {};
 }
 
-auto stop_overlay(Core::State::AppState& state) -> void {
-  auto& overlay_state = *state.overlay;
+auto stop_overlay(Core::State::AppState& state, bool restore_target_window) -> void {
   Logger().debug("Stopping overlay");
 
-  // 设置运行状态为false
-  overlay_state.running.store(false, std::memory_order_release);
-  overlay_state.freeze_rendering.store(false, std::memory_order_release);
-  overlay_state.freeze_after_first_frame.store(false, std::memory_order_release);
-  overlay_state.rendering.create_new_srv = true;
-
-  // 停止线程
-  Threads::stop_threads(state);
-
-  // 停止捕获
-  Capture::stop_capture(state);
-
-  // 恢复游戏窗口
-  Window::restore_game_window(state);
-
-  // 隐藏窗口
-  Window::hide_overlay_window(state);
-
-  // 等待线程结束
-  Threads::wait_for_threads(state);
-
-  // 清理交互资源
-  Interaction::cleanup_interaction(state);
-
-  if (!send_overlay_control_message(overlay_state.window.overlay_hwnd,
-                                    Types::WM_SCHEDULE_OVERLAY_CLEANUP)) {
-    cleanup_overlay(state);
-  }
+  stop_overlay_runtime(state, restore_target_window);
+  schedule_overlay_cleanup(state);
 
   Logger().debug("Overlay stopped");
 }
@@ -170,18 +183,6 @@ auto unfreeze_overlay(Core::State::AppState& state) -> void {
 
 auto set_letterbox_mode(Core::State::AppState& state, bool enabled) -> void {
   state.overlay->window.use_letterbox_mode = enabled;
-}
-
-auto cleanup_overlay(Core::State::AppState& state) -> void {
-  if (send_overlay_control_message(state.overlay->window.overlay_hwnd,
-                                   Types::WM_IMMEDIATE_OVERLAY_CLEANUP)) {
-    return;
-  }
-
-  Capture::cleanup_capture(state);
-  Rendering::cleanup_rendering(state);
-
-  Logger().info("Overlay cleaned up");
 }
 
 }  // namespace Features::Overlay

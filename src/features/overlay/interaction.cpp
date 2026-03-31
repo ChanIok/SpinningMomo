@@ -4,6 +4,7 @@ module Features.Overlay.Interaction;
 
 import std;
 import Core.State;
+import Features.Overlay;
 import Features.Overlay.Capture;
 import Features.Overlay.Rendering;
 import Features.Overlay.State;
@@ -31,15 +32,33 @@ LRESULT CALLBACK mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam) {
   return CallNextHookEx(nullptr, code, wParam, lParam);
 }
 
-// 窗口事件钩子过程 - 简化版，只发送消息
+// 窗口事件钩子过程。
+// 这里故意不直接操作 overlay 状态，而是把事件转成窗口消息。
+// 原因是 WinEventHook 回调运行在系统回调上下文里，逻辑越轻越安全；
+// 真正的状态切换统一交给 overlay 自己的消息处理函数完成。
 void CALLBACK win_event_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG idObject,
                              LONG idChild, DWORD idEventThread, DWORD dwmsEventTime) {
-  if (g_app_state) {
-    // 只发送消息到timer_window，不直接处理
-    if (g_app_state->overlay->window.timer_window) {
-      PostMessage(g_app_state->overlay->window.timer_window, Types::WM_WINDOW_EVENT,
+  if (!g_app_state) {
+    return;
+  }
+
+  auto& overlay_state = *g_app_state->overlay;
+
+  // 前台切换事件仍然沿用旧路径：先投递到 timer_window，
+  // 再由 window manager 线程更新焦点状态和窗口层级。
+  if (event == EVENT_SYSTEM_FOREGROUND) {
+    if (overlay_state.window.timer_window) {
+      PostMessage(overlay_state.window.timer_window, Types::WM_WINDOW_EVENT,
                   static_cast<WPARAM>(event), reinterpret_cast<LPARAM>(hwnd));
     }
+    return;
+  }
+
+  // 目标窗口被销毁时，不在 hook 回调里直接 stop_overlay()。
+  // 而是通知 overlay 窗口自己处理，避免在回调线程里做复杂停机。
+  if (event == EVENT_OBJECT_DESTROY && hwnd == overlay_state.window.target_window &&
+      idObject == OBJID_WINDOW && idChild == CHILDID_SELF && overlay_state.window.overlay_hwnd) {
+    PostMessage(overlay_state.window.overlay_hwnd, Types::WM_TARGET_WINDOW_DESTROYED, 0, 0);
   }
 }
 
@@ -64,7 +83,9 @@ auto update_focus_state(Core::State::AppState& state, HWND hwnd) -> void {
 auto initialize_interaction(Core::State::AppState& state) -> std::expected<void, std::string> {
   g_app_state = &state;
 
-  // 获取游戏进程ID
+  // 保存目标窗口所属进程 ID。
+  // 后面注册“目标窗口销毁”hook 时会把监听范围限制到这个进程，
+  // 避免收到无关进程的销毁噪声。
   if (state.overlay->window.target_window) {
     DWORD process_id;
     GetWindowThreadProcessId(state.overlay->window.target_window, &process_id);
@@ -102,23 +123,44 @@ auto install_mouse_hook(Core::State::AppState& state) -> std::expected<void, std
 auto install_window_event_hook(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
-  if (overlay_state.interaction.event_hook) {
-    return {};  // 已经安装
+  // 这个 hook 监听全局前台切换。
+  // overlay 需要知道“现在前台还是不是游戏/overlay”，
+  // 这样才能决定是否压制任务栏重绘，以及是否调整窗口层级。
+  if (!overlay_state.interaction.foreground_event_hook) {
+    overlay_state.interaction.foreground_event_hook =
+        SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, win_event_proc,
+                        0, 0, WINEVENT_OUTOFCONTEXT);
+
+    if (!overlay_state.interaction.foreground_event_hook) {
+      DWORD error = GetLastError();
+      auto error_msg = std::format("Failed to install foreground event hook. Error: {}", error);
+      Logger().error(error_msg);
+      return std::unexpected(error_msg);
+    }
   }
 
-  // 使用 0 监听所有进程的前台窗口变化，以便检测用户切换到其他应用
-  overlay_state.interaction.event_hook =
-      SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, nullptr, win_event_proc, 0,
-                      0, WINEVENT_OUTOFCONTEXT);
+  // 这个 hook 只监听目标进程里的“窗口对象销毁”。
+  // 我们真正关心的是目标游戏窗口消失，此时 overlay 应该跟着退出。
+  if (!overlay_state.interaction.target_window_event_hook) {
+    overlay_state.interaction.target_window_event_hook =
+        SetWinEventHook(EVENT_OBJECT_DESTROY, EVENT_OBJECT_DESTROY, nullptr, win_event_proc,
+                        overlay_state.interaction.game_process_id, 0,
+                        WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS);
 
-  if (!overlay_state.interaction.event_hook) {
-    DWORD error = GetLastError();
-    auto error_msg = std::format("Failed to install window event hook. Error: {}", error);
-    Logger().error(error_msg);
-    return std::unexpected(error_msg);
+    if (!overlay_state.interaction.target_window_event_hook) {
+      if (overlay_state.interaction.foreground_event_hook) {
+        UnhookWinEvent(overlay_state.interaction.foreground_event_hook);
+        overlay_state.interaction.foreground_event_hook = nullptr;
+      }
+
+      DWORD error = GetLastError();
+      auto error_msg = std::format("Failed to install target window event hook. Error: {}", error);
+      Logger().error(error_msg);
+      return std::unexpected(error_msg);
+    }
   }
 
-  Logger().info("Window event hook installed successfully");
+  Logger().info("Window event hooks installed successfully");
   return {};
 }
 
@@ -130,9 +172,14 @@ auto uninstall_hooks(Core::State::AppState& state) -> void {
     overlay_state.interaction.mouse_hook = nullptr;
   }
 
-  if (overlay_state.interaction.event_hook) {
-    UnhookWinEvent(overlay_state.interaction.event_hook);
-    overlay_state.interaction.event_hook = nullptr;
+  if (overlay_state.interaction.foreground_event_hook) {
+    UnhookWinEvent(overlay_state.interaction.foreground_event_hook);
+    overlay_state.interaction.foreground_event_hook = nullptr;
+  }
+
+  if (overlay_state.interaction.target_window_event_hook) {
+    UnhookWinEvent(overlay_state.interaction.target_window_event_hook);
+    overlay_state.interaction.target_window_event_hook = nullptr;
   }
 }
 
@@ -180,7 +227,8 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
   int overlay_left = (overlay_state.window.screen_width - overlay_state.window.window_width) / 2;
   int overlay_top = (overlay_state.window.screen_height - overlay_state.window.window_height) / 2;
 
-  // 检查鼠标是否在叠加层窗口范围内
+  // 只有鼠标位于 overlay 显示区域内时，才根据鼠标位置“拖动”游戏窗口。
+  // 这样用户把鼠标移到别处时，不会继续改游戏窗口位置。
   if (current_pos.x >= overlay_left &&
       current_pos.x <= (overlay_left + overlay_state.window.window_width) &&
       current_pos.y >= overlay_top &&
@@ -217,8 +265,7 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
             SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
       }
     } else {
-      // 非黑边模式下的原有逻辑
-      // 计算鼠标在叠加层窗口中的相对位置（0.0 到 1.0）
+      // 非黑边模式：整个 overlay 都是有效显示区，直接按整个 overlay 计算相对位置。
       double relative_x =
           (current_pos.x - overlay_left) / static_cast<double>(overlay_state.window.window_width);
       double relative_y =
@@ -266,6 +313,8 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
                             LPARAM lParam) -> std::pair<bool, LRESULT> {
   auto& overlay_state = *state.overlay;
 
+  // overlay 的“控制面板”。
+  // 外部线程和系统回调尽量只投递消息，真正修改 overlay 状态统一在这里做。
   switch (message) {
     case Types::WM_GAME_WINDOW_FOREGROUND: {
       // 处理游戏窗口前台事件
@@ -301,6 +350,15 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       Features::Overlay::Capture::cleanup_capture(state);
       Features::Overlay::Rendering::cleanup_rendering(state);
       Logger().info("Overlay cleaned up");
+      return {true, 1};
+    }
+
+    case Types::WM_TARGET_WINDOW_DESTROYED: {
+      Logger().info("Target window destroyed, stopping overlay");
+
+      // 目标窗口已不存在，所以这里走“不恢复目标窗口”的 stop 变体。
+      Features::Overlay::stop_overlay(state, false);
+
       return {true, 1};
     }
 
