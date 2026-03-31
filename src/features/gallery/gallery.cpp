@@ -36,16 +36,16 @@ auto make_bootstrap_scan_options(const std::filesystem::path& directory) -> Type
   return options;
 }
 
-auto bootstrap_default_media_sources(Core::State::AppState& app_state,
-                                     const std::string& output_dir_path) -> void {
+auto ensure_output_directory_media_source(Core::State::AppState& app_state,
+                                          const std::string& output_dir_path) -> void {
   if (!app_state.async) {
-    Logger().warn("Skip gallery bootstrap: async state is not ready");
+    Logger().warn("Skip output-directory gallery sync: async state is not ready");
     return;
   }
 
   auto* io_context = Core::Async::get_io_context(*app_state.async);
   if (!io_context) {
-    Logger().warn("Skip gallery bootstrap: async runtime is not available");
+    Logger().warn("Skip output-directory gallery sync: async runtime is not available");
     return;
   }
 
@@ -57,16 +57,16 @@ auto bootstrap_default_media_sources(Core::State::AppState& app_state,
 
         auto output_dir_result = Utils::Path::GetOutputDirectory(output_dir_path_snapshot);
         if (!output_dir_result) {
-          Logger().warn("Failed to resolve gallery bootstrap output directory: {}",
+          Logger().warn("Failed to resolve output directory for gallery sync: {}",
                         output_dir_result.error());
         } else {
           auto scan_result =
               scan_directory(app_state, make_bootstrap_scan_options(output_dir_result.value()));
           if (!scan_result) {
-            Logger().warn("Failed to scan gallery bootstrap output directory '{}': {}",
+            Logger().warn("Failed to scan output directory for gallery sync '{}': {}",
                           output_dir_result->string(), scan_result.error());
           } else {
-            Logger().info("Gallery bootstrap scanned output directory: {}",
+            Logger().info("Output directory added to gallery sources: {}",
                           output_dir_result->string());
             Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
           }

@@ -27,8 +27,8 @@ export auto move_assets_to_trash(Core::State::AppState& app_state,
 export auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
                            std::function<void(const Types::ScanProgress&)> progress_callback =
                                nullptr) -> std::expected<Types::ScanResult, std::string>;
-export auto bootstrap_default_media_sources(Core::State::AppState& app_state,
-                                            const std::string& output_dir_path) -> void;
+export auto ensure_output_directory_media_source(Core::State::AppState& app_state,
+                                                 const std::string& output_dir_path) -> void;
 
 // 缩略图
 export auto cleanup_thumbnails(Core::State::AppState& app_state)
