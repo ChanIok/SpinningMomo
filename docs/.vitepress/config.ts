@@ -12,9 +12,11 @@ import {
 const baseEnv = process.env.VITE_BASE_PATH || "/";
 const base = baseEnv.endsWith("/") ? baseEnv : `${baseEnv}/`;
 const withBasePath = (p: string) => `${base}${p.replace(/^\//, "")}`;
+const SITE_NAME = "SpinningMomo";
+const SITE_NAME_ZH = "旋转吧大喵";
 
 export default defineConfig({
-  title: "SpinningMomo",
+  title: SITE_NAME,
   description: "《无限暖暖》游戏摄影与录像工具",
 
   // 允许通过环境变量自定义基础路径，默认为根路径
@@ -23,6 +25,9 @@ export default defineConfig({
   head: [
     ["link", { rel: "icon", href: withBasePath("/logo.png") }],
     ["link", { rel: "apple-touch-icon", href: withBasePath("/logo.png") }],
+    ["meta", { property: "og:site_name", content: SITE_NAME }],
+    ["meta", { name: "application-name", content: SITE_NAME }],
+    ["meta", { name: "apple-mobile-web-app-title", content: SITE_NAME }],
   ],
 
   // 忽略死链接检查
@@ -65,6 +70,7 @@ export default defineConfig({
     }
 
     head.push(["meta", { property: "og:title", content: title }]);
+    head.push(["meta", { property: "og:site_name", content: SITE_NAME }]);
     head.push(["meta", { property: "og:description", content: description }]);
     head.push(["meta", { property: "og:url", content: canonical }]);
     head.push(["meta", { property: "og:type", content: "website" }]);
@@ -87,6 +93,21 @@ export default defineConfig({
     head.push(["meta", { name: "twitter:card", content: "summary" }]);
     head.push(["meta", { name: "twitter:title", content: title }]);
     head.push(["meta", { name: "twitter:description", content: description }]);
+
+    if (relativePath === "index.md" || relativePath === "en/index.md") {
+      const websiteJsonLd = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: SITE_NAME,
+        alternateName: SITE_NAME_ZH,
+        url: SITE_ORIGIN,
+      };
+      head.push([
+        "script",
+        { type: "application/ld+json" },
+        JSON.stringify(websiteJsonLd),
+      ]);
+    }
 
     return head;
   },
