@@ -1,8 +1,10 @@
 ---
 layout: home
+title: SpinningMomo
+description: Infinity Nikki photography and recording tool
 hero:
   name: SpinningMomo
-  text: 
+  text: 旋转吧大喵
   tagline: Infinity Nikki Game Photography and Recording Tool
   image:
     src: /logo.png

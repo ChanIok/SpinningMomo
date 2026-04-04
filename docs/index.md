@@ -1,8 +1,10 @@
 ---
 layout: home
+title: 旋转吧大喵
+description: 《无限暖暖》游戏摄影与录像工具
 hero:
-  name: SpinningMomo
-  text: 
+  name: 旋转吧大喵
+  text: SpinningMomo
   tagline: 《无限暖暖》游戏摄影与录像工具
   image:
     src: /logo.png

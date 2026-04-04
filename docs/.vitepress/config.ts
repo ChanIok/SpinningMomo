@@ -11,13 +11,16 @@ import {
 
 const baseEnv = process.env.VITE_BASE_PATH || "/";
 const base = baseEnv.endsWith("/") ? baseEnv : `${baseEnv}/`;
+const is_canonical_build = base === "/";
 const withBasePath = (p: string) => `${base}${p.replace(/^\//, "")}`;
-const SITE_NAME = "SpinningMomo";
-const SITE_NAME_ZH = "旋转吧大喵";
+const SITE_NAME = "旋转吧大喵";
+const SITE_NAME_EN = "SpinningMomo";
+const SITE_DESCRIPTION_ZH = "《无限暖暖》游戏摄影与录像工具";
+const SITE_DESCRIPTION_EN = "Infinity Nikki photography and recording tool";
 
 export default defineConfig({
   title: SITE_NAME,
-  description: "《无限暖暖》游戏摄影与录像工具",
+  description: SITE_DESCRIPTION_ZH,
 
   // 允许通过环境变量自定义基础路径，默认为根路径
   base,
@@ -33,37 +36,40 @@ export default defineConfig({
   // 忽略死链接检查
   ignoreDeadLinks: true,
 
-  sitemap: {
-    hostname: SITE_ORIGIN,
-    transformItems(items) {
-      // VitePress 在此使用相对路径（如 v0/zh/...），不含前导 /v0
-      return items.filter((item) => item.url !== "v0" && !item.url.startsWith("v0/"));
-    },
-  },
+  sitemap: is_canonical_build
+    ? {
+        hostname: SITE_ORIGIN,
+        transformItems(items) {
+          // VitePress 在此使用相对路径（如 v0/zh/...），不含前导 /v0
+          return items.filter((item) => item.url !== "v0" && !item.url.startsWith("v0/"));
+        },
+      }
+    : undefined,
 
   async transformHead(ctx): Promise<HeadConfig[]> {
-    const { pageData, siteData, title, description } = ctx;
+    const { pageData, title, description } = ctx;
     const relativePath = pageData.relativePath;
     if (!relativePath || pageData.isNotFound) {
       return [];
     }
 
-    const siteBase = siteData.base ?? "/";
     const pathname = mdRelativeToPathname(relativePath);
-    const canonical = toAbsoluteUrl(SITE_ORIGIN, siteBase, pathname);
+    const canonical = toAbsoluteUrl(SITE_ORIGIN, "/", pathname);
 
     const head: HeadConfig[] = [
       ["link", { rel: "canonical", href: canonical }],
     ];
 
-    if (isLegacyDocPath(relativePath)) {
+    if (!is_canonical_build) {
+      head.push(["meta", { name: "robots", content: "noindex, nofollow" }]);
+    } else if (isLegacyDocPath(relativePath)) {
       head.push(["meta", { name: "robots", content: "noindex, follow" }]);
     }
 
     const bilingual = getBilingualPathnames(relativePath);
     if (bilingual) {
-      const zhUrl = toAbsoluteUrl(SITE_ORIGIN, siteBase, bilingual.zhPathname);
-      const enUrl = toAbsoluteUrl(SITE_ORIGIN, siteBase, bilingual.enPathname);
+      const zhUrl = toAbsoluteUrl(SITE_ORIGIN, "/", bilingual.zhPathname);
+      const enUrl = toAbsoluteUrl(SITE_ORIGIN, "/", bilingual.enPathname);
       head.push(["link", { rel: "alternate", hreflang: "zh-CN", href: zhUrl }]);
       head.push(["link", { rel: "alternate", hreflang: "en-US", href: enUrl }]);
       head.push(["link", { rel: "alternate", hreflang: "x-default", href: enUrl }]);
@@ -99,7 +105,7 @@ export default defineConfig({
         "@context": "https://schema.org",
         "@type": "WebSite",
         name: SITE_NAME,
-        alternateName: SITE_NAME_ZH,
+        alternateName: SITE_NAME_EN,
         url: SITE_ORIGIN,
       };
       head.push([
@@ -116,12 +122,17 @@ export default defineConfig({
     root: {
       label: "简体中文",
       lang: "zh-CN",
+      title: SITE_NAME,
+      description: SITE_DESCRIPTION_ZH,
     },
     en: {
       label: "English",
       lang: "en-US",
       link: "/en/",
+      title: SITE_NAME_EN,
+      description: SITE_DESCRIPTION_EN,
       themeConfig: {
+        siteTitle: SITE_NAME_EN,
         nav: [
           { text: "Guide", link: "/en/guide/getting-started" },
           { text: "Legal", link: "/en/about/legal" },
@@ -166,7 +177,7 @@ export default defineConfig({
 
   themeConfig: {
     logo: withBasePath("/logo.png"),
-    siteTitle: "SpinningMomo",
+    siteTitle: SITE_NAME,
 
     // 社交链接
     socialLinks: [
