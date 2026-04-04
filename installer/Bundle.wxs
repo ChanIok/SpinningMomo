@@ -17,6 +17,13 @@
     AboutUrl="https://github.com/ChanIok/SpinningMomo"
     HelpUrl="https://github.com/ChanIok/SpinningMomo/issues">
 
+    <!-- 与 Package.wxs 中 INSTALLFOLDER 默认一致；Options 页修改的是此变量，需经 MsiProperty 传给 MSI -->
+    <Variable
+      Name="InstallFolder"
+      Type="formatted"
+      Value="[LocalAppDataFolder]Programs\SpinningMomo"
+      bal:Overridable="yes" />
+
     <!-- Standard Bootstrapper Application with modern UI -->
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication
@@ -32,7 +39,9 @@
       <MsiPackage
         Id="MainPackage"
         SourceFile="$(var.MsiPath)"
-        Visible="no" />
+        Visible="no">
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
+      </MsiPackage>
     </Chain>
 
   </Bundle>
