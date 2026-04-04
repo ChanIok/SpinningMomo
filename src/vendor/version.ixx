@@ -6,6 +6,6 @@ import std;
 
 namespace Vendor::Version {
 
-export auto get_app_version() -> std::string { return "2.0.3.0"; }
+export auto get_app_version() -> std::string { return "2.0.4.0"; }
 
 }  // namespace Vendor::Version
