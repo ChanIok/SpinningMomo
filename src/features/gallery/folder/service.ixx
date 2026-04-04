@@ -22,6 +22,10 @@ export auto batch_create_folders_for_paths(Core::State::AppState& app_state,
                                            const std::vector<std::filesystem::path>& folder_paths)
     -> std::expected<std::unordered_map<std::string, std::int64_t>, std::string>;
 
+// 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
+export auto ensure_all_root_folder_webview_mappings(Core::State::AppState& app_state)
+    -> std::expected<void, std::string>;
+
 // 更新文件夹显示名称（仅应用内展示）。
 export auto update_folder_display_name(Core::State::AppState& app_state, std::int64_t folder_id,
                                        const std::optional<std::string>& display_name)

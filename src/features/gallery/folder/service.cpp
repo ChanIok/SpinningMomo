@@ -3,10 +3,13 @@ module;
 module Features.Gallery.Folder.Service;
 
 import std;
+import Core.WebView;
+import Core.WebView.State;
 import Core.State;
 import Core.Database;
 import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
+import Features.Gallery.OriginalLocator;
 import Features.Gallery.Watcher;
 import Features.Gallery.Asset.Thumbnail;
 import Utils.Logger;
@@ -15,6 +18,30 @@ import Utils.String;
 import Utils.System;
 
 namespace Features::Gallery::Folder::Service {
+
+// 确保根文件夹的 WebView 原图 host mappings 就绪。
+auto ensure_root_folder_webview_mapping(Core::State::AppState& app_state,
+                                        const Types::Folder& folder) -> void {
+  if (folder.parent_id.has_value()) {
+    return;
+  }
+
+  auto host_name = Features::Gallery::OriginalLocator::make_root_host_name(folder.id);
+  Core::WebView::register_virtual_host_folder_mapping(
+      app_state, std::move(host_name), Utils::String::FromUtf8(folder.path),
+      Core::WebView::State::VirtualHostResourceAccessKind::deny_cors);
+}
+
+// 移除根文件夹的 WebView 原图 host mappings。
+auto remove_root_folder_webview_mapping(Core::State::AppState& app_state,
+                                        const Types::Folder& folder) -> void {
+  if (folder.parent_id.has_value()) {
+    return;
+  }
+
+  auto host_name = Features::Gallery::OriginalLocator::make_root_host_name(folder.id);
+  Core::WebView::unregister_virtual_host_folder_mapping(app_state, host_name);
+}
 
 // ============= 路径处理辅助函数 =============
 
@@ -161,8 +188,10 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
 
     if (existing_folder_result->has_value()) {
       // 文件夹已存在，直接使用
-      auto folder_id = existing_folder_result->value().id;
+      auto folder = existing_folder_result->value();
+      auto folder_id = folder.id;
       path_to_id_map[path_str] = folder_id;
+      ensure_root_folder_webview_mapping(app_state, folder);
       Logger().debug("Found existing folder '{}' with ID {}", path_str, folder_id);
       continue;
     }
@@ -196,11 +225,31 @@ auto batch_create_folders_for_paths(Core::State::AppState& app_state,
 
     auto folder_id = create_result.value();
     path_to_id_map[path_str] = folder_id;
+    ensure_root_folder_webview_mapping(
+        app_state,
+        Types::Folder{
+            .id = folder_id, .path = path_str, .parent_id = parent_id, .name = folder_name});
     Logger().debug("Created folder '{}' with ID {} (parent_id: {})", path_str, folder_id,
                    parent_id.has_value() ? std::to_string(parent_id.value()) : "NULL");
   }
 
   return path_to_id_map;
+}
+
+// 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
+auto ensure_all_root_folder_webview_mappings(Core::State::AppState& app_state)
+    -> std::expected<void, std::string> {
+  auto folders_result = Repository::list_all_folders(app_state);
+  if (!folders_result) {
+    return std::unexpected("Failed to list folders for WebView mapping sync: " +
+                           folders_result.error());
+  }
+
+  for (const auto& folder : folders_result.value()) {
+    ensure_root_folder_webview_mapping(app_state, folder);
+  }
+
+  return {};
 }
 
 // 规范化文件夹显示名称（去除首尾空白字符，若为空则返回 nullopt）
@@ -355,6 +404,8 @@ auto remove_root_folder_watch(Core::State::AppState& app_state, std::int64_t fol
   if (!cleanup_result) {
     return std::unexpected("Failed to cleanup folder index: " + cleanup_result.error());
   }
+
+  remove_root_folder_webview_mapping(app_state, folder);
 
   // 3. 触发清理因本次操作而处于孤立状态的缩略图缓存
   auto thumbnail_cleanup_result =

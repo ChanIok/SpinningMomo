@@ -98,6 +98,13 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     StaticResolver::register_http_resolvers(app_state);
     StaticResolver::register_webview_resolvers(app_state);
 
+    // 根据数据库里的根文件夹记录，确保 WebView 原图 host mappings 全部就绪。
+    if (auto mapping_result = Folder::Service::ensure_all_root_folder_webview_mappings(app_state);
+        !mapping_result) {
+      return std::unexpected("Failed to sync gallery root WebView mappings: " +
+                             mapping_result.error());
+    }
+
     Logger().info("Gallery module initialized successfully");
     Logger().info("Thumbnail directory set to: {}",
                   app_state.gallery->thumbnails_directory.string());
