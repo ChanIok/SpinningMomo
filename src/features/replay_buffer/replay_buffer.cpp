@@ -49,17 +49,41 @@ auto on_frame_arrived(Features::ReplayBuffer::State::ReplayBufferState& state,
     return;
   }
 
+  D3D11_TEXTURE2D_DESC source_desc{};
+  texture->GetDesc(&source_desc);
+  if (source_desc.Width == 0 || source_desc.Height == 0) {
+    Logger().error("Failed to resolve replay source texture size");
+    return;
+  }
+
   std::lock_guard resource_lock(state.resource_mutex);
   ID3D11Texture2D* current_texture = texture.get();
   if (state.crop_to_client_area) {
+    auto crop_region_result = Utils::Graphics::CaptureRegion::calculate_client_crop_region(
+        state.target_window, source_desc.Width, source_desc.Height);
+    if (!crop_region_result) {
+      Logger().error("Failed to calculate replay crop region: {}", crop_region_result.error());
+      return;
+    }
+
     auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
-        state.device.get(), state.context.get(), texture.get(), state.crop_region,
+        state.device.get(), state.context.get(), texture.get(), *crop_region_result,
         state.cropped_texture);
     if (!crop_result) {
       Logger().error("Failed to crop replay frame to client area: {}", crop_result.error());
       return;
     }
     current_texture = *crop_result;
+  }
+
+  D3D11_TEXTURE2D_DESC current_desc{};
+  current_texture->GetDesc(&current_desc);
+  if (current_desc.Width != state.raw_encoder.frame_width ||
+      current_desc.Height != state.raw_encoder.frame_height) {
+    Logger().error("Replay frame size mismatch after crop: got {}x{}, expected {}x{}",
+                   current_desc.Width, current_desc.Height, state.raw_encoder.frame_width,
+                   state.raw_encoder.frame_height);
+    return;
   }
 
   while (state.frame_index <= target_frame_index) {
@@ -184,7 +208,6 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
   int capture_width = 0;
   int capture_height = 0;
   state.crop_to_client_area = false;
-  state.crop_region = {};
   state.cropped_texture = nullptr;
 
   if (config.use_recording_capture_options) {
@@ -214,15 +237,6 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
     }
 
     if (config.capture_client_area) {
-      auto crop_region_result =
-          Utils::Graphics::CaptureRegion::calculate_client_crop_region(target_window);
-      if (!crop_region_result) {
-        return std::unexpected("Failed to calculate client crop region: " +
-                               crop_region_result.error());
-      }
-      state.crop_region = *crop_region_result;
-      state.crop_region.width = static_cast<UINT>(width);
-      state.crop_region.height = static_cast<UINT>(height);
       state.crop_to_client_area = true;
     }
   } else {
@@ -362,7 +376,6 @@ auto stop_buffering(Features::ReplayBuffer::State::ReplayBufferState& state) -> 
     state.last_encoded_texture = nullptr;
     state.cropped_texture = nullptr;
     state.crop_to_client_area = false;
-    state.crop_region = {};
     state.device = nullptr;
     state.context = nullptr;
 

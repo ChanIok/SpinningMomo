@@ -15,6 +15,7 @@ import Utils.Media.Encoder.Types;
 import Utils.Logger;
 import Utils.String;
 import <d3d11_4.h>;
+import <dwmapi.h>;
 import <mfapi.h>;
 import <wil/com.h>;
 import <windows.h>;
@@ -36,12 +37,26 @@ struct CaptureDimensions {
   int output_height = 0;
 };
 
+auto get_capture_window_rect(HWND target_window, RECT& window_rect) -> bool {
+  return SUCCEEDED(DwmGetWindowAttribute(target_window, DWMWA_EXTENDED_FRAME_BOUNDS, &window_rect,
+                                         sizeof(window_rect))) ||
+         GetWindowRect(target_window, &window_rect);
+}
+
 auto calculate_capture_dimensions(HWND target_window, bool capture_client_area)
     -> std::expected<CaptureDimensions, std::string> {
+  if (!target_window || !IsWindow(target_window)) {
+    return std::unexpected("Target window is invalid");
+  }
+
   RECT window_rect{};
   RECT client_rect{};
-  GetWindowRect(target_window, &window_rect);
-  GetClientRect(target_window, &client_rect);
+  if (!get_capture_window_rect(target_window, window_rect)) {
+    return std::unexpected("Failed to get capture window rect");
+  }
+  if (!GetClientRect(target_window, &client_rect)) {
+    return std::unexpected("Failed to get client rect");
+  }
 
   CaptureDimensions dims;
   dims.window_width = window_rect.right - window_rect.left;
@@ -80,42 +95,30 @@ auto calculate_frame_crop_plan(HWND target_window,
   }
 
   FrameCropPlan plan;
+  if (!config.capture_client_area) {
+    if (frame_width != static_cast<int>(config.width) ||
+        frame_height != static_cast<int>(config.height)) {
+      return std::unexpected(
+          std::format("Unexpected full-window capture frame size {}x{} (expected {}x{})",
+                      frame_width, frame_height, config.width, config.height));
+    }
+    return plan;
+  }
+
   if (frame_width == static_cast<int>(config.width) &&
       frame_height == static_cast<int>(config.height)) {
     return plan;
   }
 
-  if (!config.capture_client_area) {
-    return std::unexpected(
-        std::format("Unexpected full-window capture frame size {}x{} (expected {}x{})", frame_width,
-                    frame_height, config.width, config.height));
+  auto crop_region_result = Utils::Graphics::CaptureRegion::calculate_client_crop_region(
+      target_window, static_cast<UINT>(frame_width), static_cast<UINT>(frame_height));
+  if (!crop_region_result) {
+    return std::unexpected("Failed to calculate client crop region: " + crop_region_result.error());
   }
 
-  auto dims_result = calculate_capture_dimensions(target_window, false);
-  if (!dims_result) {
-    return std::unexpected(dims_result.error());
-  }
-
-  const auto& dims = *dims_result;
-
-  if (frame_width == dims.window_width && frame_height == dims.window_height) {
-    auto crop_region_result =
-        Utils::Graphics::CaptureRegion::calculate_client_crop_region(target_window);
-    if (!crop_region_result) {
-      return std::unexpected("Failed to calculate client crop region: " +
-                             crop_region_result.error());
-    }
-
-    plan.should_crop = true;
-    plan.region = *crop_region_result;
-    plan.region.width = config.width;
-    plan.region.height = config.height;
-    return plan;
-  }
-
-  return std::unexpected(std::format(
-      "Unexpected client-area capture frame size {}x{} (output={}x{}, window={}x{})", frame_width,
-      frame_height, config.width, config.height, dims.window_width, dims.window_height));
+  plan.should_crop = true;
+  plan.region = *crop_region_result;
+  return plan;
 }
 
 auto build_timestamp_output_path(const std::filesystem::path& reference_output_path)
@@ -272,13 +275,21 @@ auto on_frame_arrived(Features::Recording::State::RecordingState& state,
     return;
   }
 
+  D3D11_TEXTURE2D_DESC source_desc{};
+  texture->GetDesc(&source_desc);
+  if (source_desc.Width == 0 || source_desc.Height == 0) {
+    Logger().error("Failed to resolve recording source texture size");
+    return;
+  }
+
   // 填充缺失的帧（使用上一帧或当前帧重复）
   // 使用 resource_mutex 保护帧填充逻辑和 frame_index
   std::lock_guard resource_lock(state.resource_mutex);
 
   ID3D11Texture2D* current_texture = texture.get();
   auto crop_plan_result = calculate_frame_crop_plan(state.target_window, state.config,
-                                                    content_size.Width, content_size.Height);
+                                                    static_cast<int>(source_desc.Width),
+                                                    static_cast<int>(source_desc.Height));
   if (!crop_plan_result) {
     Logger().error("Failed to resolve recording crop plan: {}", crop_plan_result.error());
     return;

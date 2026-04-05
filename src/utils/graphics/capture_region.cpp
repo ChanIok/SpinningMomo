@@ -5,18 +5,30 @@ module;
 module Utils.Graphics.CaptureRegion;
 
 import std;
+import <dwmapi.h>;
 import <windows.h>;
 
 namespace Utils::Graphics::CaptureRegion {
 
-auto calculate_client_crop_region(HWND target_window) -> std::expected<CropRegion, std::string> {
+auto get_capture_window_rect(HWND target_window, RECT& window_rect) -> bool {
+  return SUCCEEDED(DwmGetWindowAttribute(target_window, DWMWA_EXTENDED_FRAME_BOUNDS, &window_rect,
+                                         sizeof(window_rect))) ||
+         GetWindowRect(target_window, &window_rect);
+}
+
+auto calculate_client_crop_region(HWND target_window, UINT texture_width, UINT texture_height)
+    -> std::expected<CropRegion, std::string> {
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Target window is invalid");
   }
 
+  if (texture_width == 0 || texture_height == 0) {
+    return std::unexpected("Texture size is invalid");
+  }
+
   RECT window_rect{};
-  if (!GetWindowRect(target_window, &window_rect)) {
-    return std::unexpected("Failed to get window rect");
+  if (!get_capture_window_rect(target_window, window_rect)) {
+    return std::unexpected("Failed to get capture window rect");
   }
 
   RECT client_rect{};
@@ -29,20 +41,37 @@ auto calculate_client_crop_region(HWND target_window) -> std::expected<CropRegio
     return std::unexpected("Failed to convert client origin to screen coordinates");
   }
 
-  int left = client_origin.x - window_rect.left;
-  int top = client_origin.y - window_rect.top;
-  int width = client_rect.right - client_rect.left;
-  int height = client_rect.bottom - client_rect.top;
+  const int client_width = client_rect.right - client_rect.left;
+  const int client_height = client_rect.bottom - client_rect.top;
+  if (client_width <= 0 || client_height <= 0) {
+    return std::unexpected("Computed client crop region is invalid");
+  }
 
-  if (left < 0 || top < 0 || width <= 0 || height <= 0) {
+  const UINT left = client_origin.x > window_rect.left
+                        ? static_cast<UINT>(client_origin.x - window_rect.left)
+                        : 0;
+  const UINT top =
+      client_origin.y > window_rect.top ? static_cast<UINT>(client_origin.y - window_rect.top) : 0;
+
+  UINT width = 1;
+  if (texture_width > left) {
+    width = std::min(texture_width - left, static_cast<UINT>(client_width));
+  }
+
+  UINT height = 1;
+  if (texture_height > top) {
+    height = std::min(texture_height - top, static_cast<UINT>(client_height));
+  }
+
+  if (left + width > texture_width || top + height > texture_height) {
     return std::unexpected("Computed client crop region is invalid");
   }
 
   return CropRegion{
-      .left = static_cast<UINT>(left),
-      .top = static_cast<UINT>(top),
-      .width = static_cast<UINT>(width),
-      .height = static_cast<UINT>(height),
+      .left = left,
+      .top = top,
+      .width = width,
+      .height = height,
   };
 }
 

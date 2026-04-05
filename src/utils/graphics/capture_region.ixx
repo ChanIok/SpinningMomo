@@ -17,8 +17,9 @@ export struct CropRegion {
   UINT height = 0;
 };
 
-// 计算目标窗口客户区在窗口纹理中的区域
-export auto calculate_client_crop_region(HWND target_window)
+// 基于当前捕获纹理尺寸，计算目标窗口客户区在窗口纹理中的区域。
+export auto calculate_client_crop_region(HWND target_window, UINT texture_width,
+                                         UINT texture_height)
     -> std::expected<CropRegion, std::string>;
 
 // 将源纹理按指定区域裁剪到输出纹理（输出纹理可复用）
