@@ -313,6 +313,38 @@ export interface QueryAssetsParams {
 // 查询响应（复用 ListAssetsResponse）
 export type QueryAssetsResponse = ListAssetsResponse
 
+export interface AssetLayoutMetaItem {
+  id: number
+  width?: number
+  height?: number
+}
+
+export interface QueryAssetLayoutMetaParams {
+  filters: QueryAssetsFilters
+  sortBy?: SortBy
+  sortOrder?: SortOrder
+}
+
+export interface QueryAssetLayoutMetaResponse {
+  items: AssetLayoutMetaItem[]
+  totalCount: number
+}
+
+export interface AdaptiveLayoutRowItem {
+  index: number
+  id: number
+  width: number
+  height: number
+  aspectRatio: number
+}
+
+export interface AdaptiveLayoutRow {
+  index: number
+  start: number
+  size: number
+  items: AdaptiveLayoutRowItem[]
+}
+
 export interface QueryPhotoMapPointsParams {
   filters: QueryAssetsFilters
 }

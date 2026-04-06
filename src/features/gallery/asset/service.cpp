@@ -477,6 +477,44 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
   return response;
 }
 
+auto query_asset_layout_meta(Core::State::AppState& app_state,
+                             const Types::QueryAssetLayoutMetaParams& params)
+    -> std::expected<Types::QueryAssetLayoutMetaResponse, std::string> {
+  auto where_result = build_unified_where_clause(params.filters);
+  if (!where_result) {
+    return std::unexpected(where_result.error());
+  }
+  auto [where_clause, where_params] = std::move(where_result.value());
+
+  auto order_config = build_query_order_config(params.sort_by, params.sort_order);
+
+  std::string count_sql = std::format("SELECT COUNT(*) FROM assets {}", where_clause);
+  auto total_count_result =
+      Core::Database::query_scalar<int>(*app_state.database, count_sql, where_params);
+  if (!total_count_result) {
+    return std::unexpected("Failed to count assets for layout meta: " + total_count_result.error());
+  }
+
+  std::string sql = std::format(R"(
+    SELECT id, width, height
+    FROM assets
+    {}
+    {}
+  )",
+                                where_clause, order_config.asset_order_clause);
+
+  auto items_result =
+      Core::Database::query<Types::AssetLayoutMetaItem>(*app_state.database, sql, where_params);
+  if (!items_result) {
+    return std::unexpected("Failed to query asset layout meta: " + items_result.error());
+  }
+
+  Types::QueryAssetLayoutMetaResponse response;
+  response.items = std::move(items_result.value());
+  response.total_count = total_count_result->value_or(0);
+  return response;
+}
+
 auto query_photo_map_points(Core::State::AppState& app_state,
                             const Types::QueryPhotoMapPointsParams& params)
     -> std::expected<std::vector<Types::PhotoMapPoint>, std::string> {

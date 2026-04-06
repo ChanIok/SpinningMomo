@@ -59,6 +59,20 @@ auto handle_query_assets(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_query_asset_layout_meta(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::QueryAssetLayoutMetaParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::QueryAssetLayoutMetaResponse> {
+  auto result = Features::Gallery::Asset::Service::query_asset_layout_meta(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 auto handle_query_photo_map_points(
     Core::State::AppState& app_state,
     const Features::Gallery::Types::QueryPhotoMapPointsParams& params)
@@ -229,6 +243,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.queryAssets", handle_query_assets,
       "Unified asset query interface with flexible filters (folder, month, year, type, search) "
       "and optional pagination");
+
+  register_method<Features::Gallery::Types::QueryAssetLayoutMetaParams,
+                  Features::Gallery::Types::QueryAssetLayoutMetaResponse>(
+      app_state, app_state.rpc->registry, "gallery.queryAssetLayoutMeta",
+      handle_query_asset_layout_meta,
+      "Query lightweight asset layout metadata for adaptive gallery layout calculation");
 
   register_method<Features::Gallery::Types::QueryPhotoMapPointsParams,
                   std::vector<Features::Gallery::Types::PhotoMapPoint>>(

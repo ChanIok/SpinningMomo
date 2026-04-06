@@ -17,18 +17,20 @@ interface GalleryViewExposed {
 const gridViewRef = ref<GalleryViewExposed | null>(null)
 const listViewRef = ref<GalleryViewExposed | null>(null)
 const masonryViewRef = ref<GalleryViewExposed | null>(null)
+const adaptiveViewRef = ref<GalleryViewExposed | null>(null)
 
 function scrollToIndex(index: number) {
   if (viewMode.value === 'grid') gridViewRef.value?.scrollToIndex(index)
   else if (viewMode.value === 'list') listViewRef.value?.scrollToIndex(index)
   else if (viewMode.value === 'masonry') masonryViewRef.value?.scrollToIndex(index)
+  else adaptiveViewRef.value?.scrollToIndex(index)
 }
 
 function getCardRect(index: number): DOMRect | null {
   if (viewMode.value === 'grid') return gridViewRef.value?.getCardRect(index) ?? null
   if (viewMode.value === 'list') return listViewRef.value?.getCardRect(index) ?? null
   if (viewMode.value === 'masonry') return masonryViewRef.value?.getCardRect(index) ?? null
-  return null
+  return adaptiveViewRef.value?.getCardRect(index) ?? null
 }
 
 defineExpose({ scrollToIndex, getCardRect })
@@ -39,6 +41,6 @@ defineExpose({ scrollToIndex, getCardRect })
     <GridView v-if="viewMode === 'grid'" ref="gridViewRef" />
     <ListView v-else-if="viewMode === 'list'" ref="listViewRef" />
     <MasonryView v-else-if="viewMode === 'masonry'" ref="masonryViewRef" />
-    <AdaptiveView v-else />
+    <AdaptiveView v-else ref="adaptiveViewRef" />
   </div>
 </template>

@@ -376,6 +376,23 @@ struct QueryAssetsParams {
   std::optional<std::int32_t> per_page;
 };
 
+struct AssetLayoutMetaItem {
+  std::int64_t id;
+  std::optional<std::int32_t> width;
+  std::optional<std::int32_t> height;
+};
+
+struct QueryAssetLayoutMetaParams {
+  QueryAssetsFilters filters;
+  std::optional<std::string> sort_by = "created_at";
+  std::optional<std::string> sort_order = "desc";
+};
+
+struct QueryAssetLayoutMetaResponse {
+  std::vector<AssetLayoutMetaItem> items;
+  std::int32_t total_count;
+};
+
 struct QueryPhotoMapPointsParams {
   QueryAssetsFilters filters;
 };

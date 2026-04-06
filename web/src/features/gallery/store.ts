@@ -612,7 +612,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     persistedExpandedFolderIds.value = []
     persistedExpandedTagIds.value = []
 
-    viewConfig.value = { mode: 'adaptive', size: 128 }
+    viewConfig.value = { mode: 'grid', size: 128 }
     persistedViewSize.value = viewConfig.value.size
     resetFilter()
     sortBy.value = 'createdAt'

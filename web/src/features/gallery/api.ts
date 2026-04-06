@@ -15,6 +15,8 @@ import type {
   GetAssetsByMonthResponse,
   QueryAssetsParams,
   QueryAssetsResponse,
+  QueryAssetLayoutMetaParams,
+  QueryAssetLayoutMetaResponse,
   QueryPhotoMapPointsParams,
   PhotoMapPoint,
   InfinityNikkiDetails,
@@ -384,6 +386,28 @@ export async function queryAssets(params: QueryAssetsParams): Promise<QueryAsset
 }
 
 /**
+ * 查询自适应视图需要的轻量布局元数据
+ */
+export async function queryAssetLayoutMeta(
+  params: QueryAssetLayoutMetaParams
+): Promise<QueryAssetLayoutMetaResponse> {
+  try {
+    const result = await call<QueryAssetLayoutMetaResponse>('gallery.queryAssetLayoutMeta', params)
+
+    console.log('🧩 查询布局元数据成功:', {
+      count: result.items.length,
+      total: result.totalCount,
+      filters: params.filters,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to query asset layout meta:', error)
+    throw new Error('查询布局元数据失败')
+  }
+}
+
+/**
  * 查询当前筛选下的地图点位
  */
 export async function queryPhotoMapPoints(
@@ -661,6 +685,7 @@ export const galleryApi = {
   openFolderInExplorer,
   removeFolderWatch,
   queryAssets, // 统一查询接口
+  queryAssetLayoutMeta,
   queryPhotoMapPoints,
   getInfinityNikkiDetails,
   getAssetMainColors,
