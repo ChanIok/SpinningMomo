@@ -1,28 +1,7 @@
 <template>
-  <div class="flex items-center gap-3 p-4">
-    <!-- 左侧：快速操作 -->
-    <div class="flex items-center gap-2">
-      <TooltipProvider>
-        <Tooltip v-if="hasSelection">
-          <TooltipTrigger as-child>
-            <Button variant="ghost" size="sm" @click="$emit('deleteSelected')">
-              <Trash2 class="h-4 w-4" />
-              <span class="ml-1.5 hidden sm:inline">
-                {{ t('gallery.toolbar.deleteSelected.button', { count: selectedCount }) }}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {{ t('gallery.toolbar.deleteSelected.tooltip', { count: selectedCount }) }}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-
-    <!-- 中间：搜索框 -->
-    <div class="max-w-md min-w-[200px] flex-1">
+  <div class="flex items-center justify-between gap-3 p-4">
+    <!-- 左侧：搜索框 -->
+    <div class="max-w-[400px] flex-1">
       <div class="relative">
         <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -42,7 +21,7 @@
     </div>
 
     <!-- 右侧：筛选、排序、视图控制 -->
-    <div class="flex items-center gap-2">
+    <div class="flex shrink-0 items-center gap-2">
       <!-- 筛选与排序下拉菜单 -->
       <TooltipProvider>
         <Tooltip>
@@ -276,11 +255,10 @@
 
                     <!-- 缩略图大小调整 -->
                     <div class="space-y-3">
-                      <div class="flex items-center justify-between">
+                      <div class="flex items-center">
                         <p class="text-sm font-medium">
                           {{ t('gallery.toolbar.thumbnailSize.label') }}
                         </p>
-                        <span class="text-sm text-muted-foreground">{{ viewSize }}px</span>
                       </div>
                       <Slider
                         :model-value="[currentSliderPosition]"
@@ -330,7 +308,6 @@ import {
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import {
-  Trash2,
   Search,
   X,
   ArrowUpDown,
@@ -352,20 +329,6 @@ import { useI18n } from '@/composables/useI18n'
 import { useGalleryView } from '../composables'
 import type { ViewMode, SortBy, AssetType } from '../types'
 
-// Props 定义
-interface GalleryToolbarProps {
-  selectedCount?: number
-}
-
-const props = withDefaults(defineProps<GalleryToolbarProps>(), {
-  selectedCount: 0,
-})
-
-// Emits 定义
-const emit = defineEmits<{
-  deleteSelected: []
-}>()
-
 // i18n
 const { t } = useI18n()
 
@@ -374,7 +337,6 @@ const galleryView = useGalleryView()
 
 // 计算属性
 const viewMode = computed(() => galleryView.viewMode.value)
-const viewSize = computed(() => galleryView.viewSize.value)
 const sortBy = computed(() => galleryView.sortBy.value)
 const sortOrder = computed(() => galleryView.sortOrder.value)
 const filter = computed(() => galleryView.filter.value)
@@ -384,8 +346,6 @@ const activeColorHex = computed(() => filter.value.colorHex)
 
 // 当前slider位置（从实际尺寸反向计算）
 const currentSliderPosition = computed(() => galleryView.getSliderPosition())
-
-const hasSelection = computed(() => props.selectedCount > 0)
 const colorPopoverOpen = ref(false)
 const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
 

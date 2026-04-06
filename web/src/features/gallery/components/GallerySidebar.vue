@@ -8,11 +8,11 @@ import { Plus } from 'lucide-vue-next'
 import { useGallerySidebar, useGalleryData } from '../composables'
 import { useGalleryStore } from '../store'
 import type { FolderTreeNode } from '../types'
-import FolderTreeItem from '../components/FolderTreeItem.vue'
-import TagTreeItem from '../components/TagTreeItem.vue'
-import TagInlineEditor from '../components/TagInlineEditor.vue'
-import GalleryScanDialog from '../components/GalleryScanDialog.vue'
-import InfinityNikkiMetadataExtractDialog from '../components/InfinityNikkiMetadataExtractDialog.vue'
+import FolderTreeItem from './FolderTreeItem.vue'
+import TagTreeItem from './TagTreeItem.vue'
+import TagInlineEditor from './TagInlineEditor.vue'
+import GalleryScanDialog from './GalleryScanDialog.vue'
+import InfinityNikkiMetadataExtractDialog from './InfinityNikkiMetadataExtractDialog.vue'
 
 const galleryData = useGalleryData()
 const galleryStore = useGalleryStore()

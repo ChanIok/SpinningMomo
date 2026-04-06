@@ -21,11 +21,11 @@ import {
   getInfinityNikkiDetails,
   updateAssetDescription,
 } from '../api'
-import AssetDetailsContent from '../components/AssetDetailsContent.vue'
-import AssetInfinityNikkiDetails from '../components/AssetInfinityNikkiDetails.vue'
-import AssetHistogram from '../components/AssetHistogram.vue'
-import AssetReviewControls from '../components/AssetReviewControls.vue'
-import TagSelectorPopover from '../components/TagSelectorPopover.vue'
+import AssetDetailsContent from './AssetDetailsContent.vue'
+import AssetInfinityNikkiDetails from './AssetInfinityNikkiDetails.vue'
+import AssetHistogram from './AssetHistogram.vue'
+import AssetReviewControls from './AssetReviewControls.vue'
+import TagSelectorPopover from './TagSelectorPopover.vue'
 import type { Asset, AssetMainColor, InfinityNikkiDetails, Tag } from '../types'
 
 const store = useGalleryStore()
@@ -360,7 +360,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
 
 <template>
   <ScrollArea class="h-full">
-    <div class="h-full p-4">
+    <div class="p-4">
       <!-- 文件夹详情 -->
       <div v-if="detailsFocus.type === 'folder' && currentFolder" class="space-y-4">
         <div class="flex items-center justify-between">

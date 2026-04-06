@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { hexToHsv, hsvToHex, normalizeToHex } from '@/components/ui/color-picker/colorUtils'
 import { useGalleryData } from '../composables/useGalleryData'
+import MediaStatusChips from './MediaStatusChips.vue'
 import type { Asset } from '../types'
 
 const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
@@ -198,6 +199,8 @@ function getAdjustedPlaceholderColor(hex?: string): string {
           <Play class="ml-0.5 h-4 w-4 fill-current" />
         </div>
       </div>
+
+      <MediaStatusChips :rating="asset.rating" :review-flag="asset.reviewFlag" />
 
       <!-- 选择指示器 -->
       <div

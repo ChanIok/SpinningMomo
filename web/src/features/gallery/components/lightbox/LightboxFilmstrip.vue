@@ -5,10 +5,10 @@ import { Play } from 'lucide-vue-next'
 import { galleryApi } from '../../api'
 import { useGalleryData, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
-import type { ReviewFlag } from '../../types'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
 import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
+import MediaStatusChips from '../MediaStatusChips.vue'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 const store = useGalleryStore()
@@ -134,10 +134,6 @@ function isVideoAsset(index: number): boolean {
   return getAssetAtIndex(index)?.type === 'video'
 }
 
-function getRejectedLabel(reviewFlag: ReviewFlag) {
-  return reviewFlag === 'rejected' ? 'X' : ''
-}
-
 function handleWheel(event: WheelEvent) {
   if (filmstripRef.value) {
     filmstripRef.value.scrollLeft += event.deltaY
@@ -207,19 +203,11 @@ function handleWheel(event: WheelEvent) {
                     </div>
                   </div>
 
-                  <div
-                    v-if="(getAssetAtIndex(item.index)?.rating ?? 0) > 0"
-                    class="absolute top-1 left-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white"
-                  >
-                    {{ getAssetAtIndex(item.index)?.rating }}★
-                  </div>
-
-                  <div
-                    v-if="getRejectedLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none')"
-                    class="absolute right-1 bottom-1 rounded bg-rose-600/85 px-1.5 py-0.5 text-[10px] font-semibold text-white"
-                  >
-                    {{ getRejectedLabel(getAssetAtIndex(item.index)?.reviewFlag ?? 'none') }}
-                  </div>
+                  <MediaStatusChips
+                    :rating="getAssetAtIndex(item.index)?.rating ?? 0"
+                    :review-flag="getAssetAtIndex(item.index)?.reviewFlag ?? 'none'"
+                    compact
+                  />
 
                   <div
                     v-if="isSelected(item.index)"

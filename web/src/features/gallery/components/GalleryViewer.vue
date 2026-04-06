@@ -9,9 +9,9 @@ import {
   endHeroAnimation,
   consumeReverseHero,
 } from '../composables/useHeroTransition'
-import GalleryToolbar from '../components/GalleryToolbar.vue'
-import GalleryContent from '../components/GalleryContent.vue'
-import GalleryLightbox from '../components/lightbox/GalleryLightbox.vue'
+import GalleryToolbar from './GalleryToolbar.vue'
+import GalleryContent from './GalleryContent.vue'
+import GalleryLightbox from './lightbox/GalleryLightbox.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()
