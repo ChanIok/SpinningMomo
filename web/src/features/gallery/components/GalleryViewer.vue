@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted, computed } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
-import { useGalleryAssetActions, useGalleryData } from '../composables'
+import {
+  useGalleryAssetActions,
+  useGalleryData,
+  useGallerySelection,
+  useGalleryView,
+} from '../composables'
 import { useGalleryStore } from '../store'
 import {
   computeLightboxHeroRect,
@@ -16,10 +21,14 @@ import GalleryLightbox from './lightbox/GalleryLightbox.vue'
 const galleryData = useGalleryData()
 const store = useGalleryStore()
 const assetActions = useGalleryAssetActions()
+const gallerySelection = useGallerySelection()
+const galleryView = useGalleryView()
 const viewerRef = ref<HTMLElement | null>(null)
 const galleryContentRef = ref<InstanceType<typeof GalleryContent> | null>(null)
+const contentRef = ref<HTMLElement | null>(null)
 const reduceMotion = usePreferredReducedMotion()
 const shouldReduceMotion = computed(() => reduceMotion.value === 'reduce')
+const CONTENT_WHEEL_ZOOM_THRESHOLD = 96
 
 const galleryColumnClass = computed(() => {
   const hidden = store.lightbox.isOpen && !store.lightbox.isClosing
@@ -45,6 +54,7 @@ let heroRafId: number | null = null
 let pendingGalleryScrollIndex: number | undefined
 let galleryScrollRafId: number | null = null
 let isViewerUnmounted = false
+let wheelZoomDelta = 0
 
 // 反向 hero overlay 动画状态
 const reverseHeroOverlay = ref<{ thumbnailUrl: string } | null>(null)
@@ -134,6 +144,10 @@ onUnmounted(() => {
   if (galleryScrollRafId !== null) cancelAnimationFrame(galleryScrollRafId)
 })
 
+const resetWheelZoomDelta = useDebounceFn(() => {
+  wheelZoomDelta = 0
+}, 140)
+
 function rectToFixedStyle(
   rect: DOMRect,
   animation: 'none' | 'enter' | 'exit'
@@ -212,11 +226,17 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (
-    store.lightbox.isOpen ||
-    isEditableTarget(event.target) ||
-    store.selection.selectedIds.size === 0
-  ) {
+  if (store.lightbox.isOpen || isEditableTarget(event.target)) {
+    return
+  }
+
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+    event.preventDefault()
+    void gallerySelection.selectAllCurrentQuery()
+    return
+  }
+
+  if (store.selection.selectedIds.size === 0) {
     return
   }
 
@@ -241,6 +261,32 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleContentWheel(event: WheelEvent) {
+  if (store.lightbox.isOpen || !event.ctrlKey || isEditableTarget(event.target)) {
+    return
+  }
+
+  event.preventDefault()
+
+  if (event.deltaY === 0) {
+    return
+  }
+
+  wheelZoomDelta += event.deltaY
+  resetWheelZoomDelta()
+
+  while (Math.abs(wheelZoomDelta) >= CONTENT_WHEEL_ZOOM_THRESHOLD) {
+    if (wheelZoomDelta > 0) {
+      galleryView.decreaseSize()
+      wheelZoomDelta -= CONTENT_WHEEL_ZOOM_THRESHOLD
+      continue
+    }
+
+    galleryView.increaseSize()
+    wheelZoomDelta += CONTENT_WHEEL_ZOOM_THRESHOLD
+  }
+}
+
 // 监听筛选条件和文件夹选项变化，自动重新加载资产
 watch(
   () => [store.filter, store.includeSubfolders, store.sortBy, store.sortOrder],
@@ -252,6 +298,7 @@ watch(
 )
 
 useEventListener(window, 'keydown', handleKeydown)
+useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
 </script>
 
 <template>
@@ -262,7 +309,7 @@ useEventListener(window, 'keydown', handleKeydown)
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
       <GalleryToolbar />
-      <div class="flex-1 overflow-hidden">
+      <div ref="contentRef" class="flex-1 overflow-hidden">
         <GalleryContent ref="galleryContentRef" />
       </div>
     </div>

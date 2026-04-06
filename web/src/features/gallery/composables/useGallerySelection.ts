@@ -214,6 +214,34 @@ export function useGallerySelection() {
     return targetAsset
   }
 
+  async function selectAllCurrentQuery() {
+    const ids = await galleryData.queryCurrentAssetIds()
+    if (ids.length === 0) {
+      clearSelection()
+      store.clearActiveAsset()
+      return
+    }
+
+    store.replaceSelection(ids)
+
+    const currentActiveAssetId = store.selection.activeAssetId
+    const activeIndex =
+      currentActiveAssetId === undefined ? -1 : ids.findIndex((id) => id === currentActiveAssetId)
+    const targetIndex = activeIndex >= 0 ? activeIndex : 0
+    const targetAssetId = ids[targetIndex]!
+
+    store.setSelectionAnchor(targetIndex)
+    store.setActiveAsset(targetAssetId, targetIndex)
+
+    if (ids.length === 1) {
+      const asset = await getAssetByIndex(targetIndex)
+      syncDetailsFocusFromSelection(asset)
+      return
+    }
+
+    syncDetailsFocusFromSelection()
+  }
+
   async function handleAssetClick(_asset: Asset, event: MouseEvent, index: number) {
     if (event.shiftKey) {
       await rangeSelectToIndex(index)
@@ -285,6 +313,7 @@ export function useGallerySelection() {
     selectOnlyIndex,
     toggleIndex,
     rangeSelectToIndex,
+    selectAllCurrentQuery,
     syncDetailsFocusFromSelection,
     prepareContextMenuForIndex,
 

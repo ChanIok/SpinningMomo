@@ -222,7 +222,7 @@ export interface AssetFilter {
 // 视图配置
 export interface ViewConfig {
   mode: ViewMode
-  size: number // 缩略图大小，1-5的等级
+  size: number // 缩略图目标尺寸（px）
 }
 
 // ============= API请求/响应类型 =============

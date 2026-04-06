@@ -76,6 +76,17 @@ export function useGalleryData() {
     })
   }
 
+  async function queryCurrentAssetIds() {
+    const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
+    const response = await galleryApi.queryAssetLayoutMeta({
+      filters,
+      sortBy: store.sortBy,
+      sortOrder: store.sortOrder,
+    })
+
+    return response.items.map((item) => item.id)
+  }
+
   async function queryVisiblePages(total: number, preferredPage: number) {
     if (total <= 0) {
       return new Map<number, Asset[]>()
@@ -397,6 +408,7 @@ export function useGalleryData() {
     loadAllAssets,
     refreshCurrentQuery,
     loadPage,
+    queryCurrentAssetIds,
     loadFolderTree,
     scanAssets,
     startScanAssets,
