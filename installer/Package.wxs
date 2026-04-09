@@ -23,11 +23,47 @@
       Description="SpinningMomo - Window adjustment tool for Infinity Nikki"
       Manufacturer="ChanIok" />
 
+    <Binary Id="DetectProcessScript" SourceFile="$(var.ProjectDir)\installer\DetectRunningSpinningMomo.js" />
+    <CustomAction
+      Id="DetectRunningSpinningMomo"
+      BinaryRef="DetectProcessScript"
+      JScriptCall="DetectRunningSpinningMomo"
+      Execute="immediate"
+      Return="check" />
+    <InstallUISequence>
+      <Custom
+        Action="DetectRunningSpinningMomo"
+        Before="LaunchConditions" />
+    </InstallUISequence>
+    <InstallExecuteSequence>
+      <Custom
+        Action="DetectRunningSpinningMomo"
+        Before="LaunchConditions" />
+    </InstallExecuteSequence>
+
     <!-- Upgrade logic: install new version first, then remove old components -->
     <!-- Using afterInstallExecute to preserve desktop shortcut positions -->
     <MajorUpgrade
       DowngradeErrorMessage="!(loc.DowngradeError)"
       Schedule="afterInstallExecute" />
+
+    <!-- Prevent install/upgrade/uninstall from continuing when app process is still running -->
+    <util:CloseApplication
+      Id="CloseSpinningMomo"
+      Target="SpinningMomo.exe"
+      Description="!(loc.CloseAppDescription)"
+      CloseMessage="yes"
+      EndSessionMessage="yes"
+      ElevatedCloseMessage="yes"
+      ElevatedEndSessionMessage="yes"
+      RebootPrompt="no"
+      PromptToContinue="no"
+      Timeout="15"
+      Property="SPINNINGMOMO_RUNNING" />
+
+    <Launch
+      Condition="NOT SPINNINGMOMO_RUNNING"
+      Message="!(loc.CloseAppError)" />
 
     <!-- Embed CAB into MSI -->
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
@@ -100,7 +136,8 @@
     <Component Id="StartMenuShortcut" 
                Directory="AppMenuFolder" 
                Guid="7808BA3C-C658-440F-976C-838362DD1FFF"
-               Permanent="yes">
+               Permanent="yes"
+               Condition="NOT WIX_UPGRADE_DETECTED">
       <Shortcut Id="StartMenuShortcutFile"
                 Name="SpinningMomo"
                 Description="!(loc.ShortcutDescription)"
@@ -128,7 +165,8 @@
     <Component Id="DesktopShortcut" 
                Directory="DesktopFolder" 
                Guid="CA8D282A-3752-4E74-9252-76AB6F280997"
-               Permanent="yes">
+               Permanent="yes"
+               Condition="NOT WIX_UPGRADE_DETECTED">
       <Shortcut Id="DesktopShortcutFile"
                 Name="SpinningMomo"
                 Description="!(loc.ShortcutDescription)"

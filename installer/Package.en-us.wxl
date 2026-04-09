@@ -2,4 +2,6 @@
 <WixLocalization Culture="en-US" xmlns="http://wixtoolset.org/schemas/v4/wxl">
   <String Id="DowngradeError" Value="A newer version of [ProductName] is already installed. Setup will now exit." />
   <String Id="ShortcutDescription" Value="Window adjustment tool for Infinity Nikki photography" />
+  <String Id="CloseAppDescription" Value="[ProductName] is currently running. Please close it before uninstalling or upgrading." />
+  <String Id="CloseAppError" Value="[ProductName] is still running. Please exit the app (including tray icon) and try again." />
 </WixLocalization>
