@@ -29,6 +29,12 @@ const galleryData = useGalleryData()
 
 const imageError = ref(false)
 const originalLoaded = ref(false)
+const switchingFrame = ref(false)
+const previousFrame = ref<{
+  id: number
+  name: string
+  thumbnailUrl: string
+} | null>(null)
 const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
 const activePointerId = ref<number | null>(null)
@@ -170,9 +176,30 @@ const zoomIndicator = computed(() => {
   return `${Math.round(actualZoom.value * 100)}%`
 })
 
+function finishFrameSwitch() {
+  if (!switchingFrame.value) {
+    return
+  }
+
+  switchingFrame.value = false
+  previousFrame.value = null
+}
+
 watch(
-  () => currentAsset.value?.id,
-  async () => {
+  () => currentAsset.value,
+  async (newAsset, oldAsset) => {
+    if (oldAsset && newAsset && oldAsset.id !== newAsset.id && !imageError.value) {
+      previousFrame.value = {
+        id: oldAsset.id,
+        name: oldAsset.name,
+        thumbnailUrl: galleryApi.getAssetThumbnailUrl(oldAsset),
+      }
+      switchingFrame.value = true
+    } else if (!newAsset || !oldAsset) {
+      previousFrame.value = null
+      switchingFrame.value = false
+    }
+
     originalLoaded.value = false
     imageError.value = false
     resetPointerState()
@@ -399,10 +426,16 @@ function resetPointerState(pointerId?: number) {
 
 function handleOriginalLoad() {
   originalLoaded.value = true
+  finishFrameSwitch()
+}
+
+function handleThumbnailLoad() {
+  finishFrameSwitch()
 }
 
 function handleImageError() {
   imageError.value = true
+  finishFrameSwitch()
 }
 
 function handlePrevious() {
@@ -544,6 +577,7 @@ defineExpose({
       <div class="box-border grid min-h-full min-w-full" :style="canvasStyle">
         <div
           v-if="currentAsset && !imageError"
+          :key="currentAsset.id"
           ref="stageRef"
           class="relative col-start-1 row-start-1 self-center justify-self-center select-none"
           :style="stageStyle"
@@ -556,11 +590,21 @@ defineExpose({
           @lostpointercapture="handleStageLostPointerCapture"
         >
           <img
+            v-if="switchingFrame && previousFrame"
+            :src="previousFrame.thumbnailUrl"
+            :alt="previousFrame.name"
+            class="absolute inset-0 h-full w-full object-contain select-none"
+            draggable="false"
+            @dragstart.prevent
+          />
+
+          <img
             :src="thumbnailUrl"
             :alt="currentAsset.name"
             class="absolute inset-0 h-full w-full object-contain select-none"
             draggable="false"
             @dragstart.prevent
+            @load="handleThumbnailLoad"
           />
 
           <img
