@@ -322,9 +322,12 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
       script << "powershell -Command \"Expand-Archive -Path '" << update_package_path.string()
              << "' -DestinationPath '" << current_dir.string() << "' -Force\"\n";
     } else {
-      // 安装版：运行安装程序静默升级
+      // 安装版：以最小界面执行安装，显示进度条并记录日志
+      auto install_log_path =
+          Utils::Path::Combine(temp_dir.value(), "SpinningMomo-Update-Install.log");
       script << "echo Running installer...\n";
-      script << "\"" << update_package_path.string() << "\" /quiet\n";
+      script << "\"" << update_package_path.string() << "\" /passive /norestart /log \""
+             << install_log_path.string() << "\"\n";
     }
 
     if (restart) {
