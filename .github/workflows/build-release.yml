@@ -77,6 +77,13 @@ jobs:
           Show-DirSummary ".xmake-global"
           Show-DirSummary ".vcpkg/archives"
 
+      - name: Ensure xmake/vcpkg cache directories exist
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ".xmake" | Out-Null
+          New-Item -ItemType Directory -Force -Path ".xmake-global" | Out-Null
+          New-Item -ItemType Directory -Force -Path ".vcpkg/archives" | Out-Null
+
       - name: Setup .NET (for WiX)
         uses: actions/setup-dotnet@v4
         with:
