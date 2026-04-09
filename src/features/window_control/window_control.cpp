@@ -169,7 +169,10 @@ auto get_clip_rect() -> std::optional<RECT> {
 }
 
 auto is_clip_cursor_active(const RECT& clip_rect) -> bool {
-  return !is_rect_similar(clip_rect, get_virtual_screen_rect(), State::kClipTolerance);
+  // 仅在 clip 与虚拟屏“完全一致”时才视为未激活。
+  // 全屏/无边框全屏场景下常见 1px 内缩（例如 [1,1,w-1,h-1]），
+  // 不能再被判成 inactive，否则中心锁逻辑永远不触发。
+  return !are_rects_equal(clip_rect, get_virtual_screen_rect());
 }
 
 auto get_window_process_id(HWND hwnd) -> DWORD {
@@ -281,7 +284,12 @@ auto process_center_lock_monitor(Core::State::AppState& state) -> void {
     return;
   }
 
-  ClipCursor(&center_lock_rect);
+  SetLastError(0);
+  if (!ClipCursor(&center_lock_rect)) {
+    revert();
+    return;
+  }
+
   window_control.center_lock_owned = true;
   window_control.last_center_lock_rect = center_lock_rect;
 }
