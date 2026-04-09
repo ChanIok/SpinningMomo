@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: |
             web/package-lock.json
@@ -124,6 +124,18 @@ jobs:
 
       - name: Build all (C++ + Web + Dist)
         run: npm run build:ci
+
+      - name: Dump vcpkg install log on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $log = "build/.packages/v/vcpkg_uwebsockets/latest/cache/installdir.failed/logs/install.txt"
+          if (Test-Path $log) {
+            Write-Host "==== vcpkg install.txt (last 80 lines) ===="
+            Get-Content $log -Tail 80
+          } else {
+            Write-Host "install.txt not found: $log"
+          }
 
       - name: Create Portable ZIP
         run: npm run build:portable
