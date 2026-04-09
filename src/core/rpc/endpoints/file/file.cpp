@@ -10,6 +10,8 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Utils.File;
+import Utils.Path;
+import Utils.System;
 import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::File {
@@ -51,6 +53,13 @@ struct CopyPathParams {
   bool recursive{false};
   bool overwrite{false};
 };
+
+struct OpenAppDataDirectoryResult {
+  bool success;
+  std::string message;
+};
+
+struct OpenAppDataDirectoryParams {};
 
 auto handle_read_file([[maybe_unused]] Core::State::AppState& app_state,
                       const ReadFileParams& params)
@@ -136,6 +145,29 @@ auto handle_copy_path([[maybe_unused]] Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_open_app_data_directory([[maybe_unused]] Core::State::AppState& app_state,
+                                    [[maybe_unused]] const OpenAppDataDirectoryParams& params)
+    -> RpcAwaitable<OpenAppDataDirectoryResult> {
+  auto app_data_directory = Utils::Path::GetAppDataDirectory();
+  if (!app_data_directory) {
+    co_return std::unexpected(
+        RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                 .message = "Failed to get app data directory: " + app_data_directory.error()});
+  }
+
+  auto open_result = Utils::System::open_directory(app_data_directory.value());
+  if (!open_result) {
+    co_return std::unexpected(
+        RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                 .message = "Failed to open app data directory: " + open_result.error()});
+  }
+
+  co_return OpenAppDataDirectoryResult{
+      .success = true,
+      .message = "App data directory opened successfully.",
+  };
+}
+
 auto register_all(Core::State::AppState& app_state) -> void {
   register_method<ReadFileParams, Utils::File::EncodedFileReadResult>(
       app_state, app_state.rpc->registry, "file.read", handle_read_file,
@@ -164,6 +196,10 @@ auto register_all(Core::State::AppState& app_state) -> void {
   register_method<CopyPathParams, Utils::File::CopyResult>(
       app_state, app_state.rpc->registry, "file.copy", handle_copy_path,
       "Copy file or directory with optional recursive copy and overwrite protection");
+
+  register_method<OpenAppDataDirectoryParams, OpenAppDataDirectoryResult>(
+      app_state, app_state.rpc->registry, "file.openAppDataDirectory",
+      handle_open_app_data_directory, "Open app data directory in file explorer");
 }
 
 }  // namespace Core::RPC::Endpoints::File

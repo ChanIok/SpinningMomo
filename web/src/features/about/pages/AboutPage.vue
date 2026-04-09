@@ -24,6 +24,7 @@ import {
   Scale,
   ShieldAlert,
   Heart,
+  FolderOpen,
 } from 'lucide-vue-next'
 
 interface RuntimeInfo {
@@ -49,6 +50,11 @@ interface StartDownloadUpdateResult {
   status: 'started' | 'already_running'
 }
 
+interface OpenAppDataDirectoryResult {
+  success: boolean
+  message: string
+}
+
 const { t, locale } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
@@ -60,6 +66,7 @@ const error = ref<string | null>(null)
 const isCheckingUpdate = ref(false)
 const isStartingDownload = ref(false)
 const isInstallingUpdate = ref(false)
+const isOpeningAppDataDirectory = ref(false)
 const hasUpdate = ref<boolean | null>(null)
 const latestVersion = ref<string | null>(null)
 const updateError = ref<string | null>(null)
@@ -300,6 +307,24 @@ const copyDiagnostics = async () => {
   }
 }
 
+const openAppDataDirectory = async () => {
+  if (isOpeningAppDataDirectory.value) {
+    return
+  }
+
+  isOpeningAppDataDirectory.value = true
+  try {
+    const result = await call<OpenAppDataDirectoryResult>('file.openAppDataDirectory')
+    if (!result.success) {
+      throw new Error(result.message || t('about.toast.openDataDirectoryFailed'))
+    }
+  } catch (e) {
+    toast.error(t('about.toast.openDataDirectoryFailed'))
+  } finally {
+    isOpeningAppDataDirectory.value = false
+  }
+}
+
 onMounted(() => {
   void loadRuntimeInfo()
 })
@@ -529,6 +554,20 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="mt-5 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                class="mr-2 h-8"
+                :disabled="isOpeningAppDataDirectory"
+                @click="openAppDataDirectory"
+              >
+                <FolderOpen
+                  v-if="isOpeningAppDataDirectory"
+                  class="mr-1.5 h-3.5 w-3.5 animate-pulse"
+                />
+                <FolderOpen v-else class="mr-1.5 h-3.5 w-3.5" />
+                {{ t('about.actions.openDataDirectory') }}
+              </Button>
               <Button variant="secondary" size="sm" class="h-8" @click="copyDiagnostics">
                 <Check v-if="copied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />
                 {{ copied ? t('about.status.copied') : t('about.actions.copyDiagnostics') }}
