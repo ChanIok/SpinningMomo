@@ -10,6 +10,7 @@ import type {
   SidebarState,
   SortBy,
   SortOrder,
+  ViewMode,
   TimelineBucket,
   FolderTreeNode,
   TagTreeNode,
@@ -17,6 +18,7 @@ import type {
 } from './types'
 
 const GALLERY_VIEW_SIZE_STORAGE_KEY = 'spinningmomo.gallery.view.size'
+const GALLERY_VIEW_MODE_STORAGE_KEY = 'spinningmomo.gallery.view.mode'
 // 侧边栏树的展开状态是纯前端视图信息，只需落在 localStorage。
 const GALLERY_EXPANDED_FOLDERS_STORAGE_KEY = 'spinningmomo.gallery.sidebar.expanded-folders'
 const GALLERY_EXPANDED_TAGS_STORAGE_KEY = 'spinningmomo.gallery.sidebar.expanded-tags'
@@ -26,6 +28,12 @@ const LIGHTBOX_MAX_ZOOM = 5
 function normalizeGalleryViewSize(size: number): number {
   const numericSize = Number(size)
   return Number.isNaN(numericSize) ? 128 : numericSize
+}
+
+function normalizeGalleryViewMode(mode: unknown): ViewMode {
+  return mode === 'masonry' || mode === 'list' || mode === 'adaptive' || mode === 'grid'
+    ? mode
+    : 'grid'
 }
 
 function normalizeExpandedIds(ids: unknown): number[] {
@@ -58,6 +66,8 @@ function collectTreeIds<T extends { id: number; children: T[] }>(nodes: T[]): nu
 export const useGalleryStore = defineStore('gallery', () => {
   const persistedViewSize = useStorage<number>(GALLERY_VIEW_SIZE_STORAGE_KEY, 128)
   persistedViewSize.value = normalizeGalleryViewSize(persistedViewSize.value)
+  const persistedViewMode = useStorage<ViewMode>(GALLERY_VIEW_MODE_STORAGE_KEY, 'grid')
+  persistedViewMode.value = normalizeGalleryViewMode(persistedViewMode.value)
   const persistedExpandedFolderIds = useStorage<number[]>(GALLERY_EXPANDED_FOLDERS_STORAGE_KEY, [])
   persistedExpandedFolderIds.value = normalizeExpandedIds(persistedExpandedFolderIds.value)
   const persistedExpandedTagIds = useStorage<number[]>(GALLERY_EXPANDED_TAGS_STORAGE_KEY, [])
@@ -101,7 +111,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
   // ============= 视图配置 =============
   const viewConfig = ref<ViewConfig>({
-    mode: 'grid',
+    mode: persistedViewMode.value,
     size: persistedViewSize.value,
   })
 
@@ -424,8 +434,10 @@ export const useGalleryStore = defineStore('gallery', () => {
   function setViewConfig(config: Partial<ViewConfig>) {
     const merged = { ...viewConfig.value, ...config }
     merged.size = normalizeGalleryViewSize(merged.size)
+    merged.mode = normalizeGalleryViewMode(merged.mode)
     viewConfig.value = merged
     persistedViewSize.value = viewConfig.value.size
+    persistedViewMode.value = viewConfig.value.mode
   }
 
   function setFilter(newFilter: Partial<AssetFilter>) {
@@ -614,6 +626,7 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     viewConfig.value = { mode: 'grid', size: 128 }
     persistedViewSize.value = viewConfig.value.size
+    persistedViewMode.value = viewConfig.value.mode
     resetFilter()
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'

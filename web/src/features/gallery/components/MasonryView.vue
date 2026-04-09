@@ -1,29 +1,33 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type ComponentPublicInstance } from 'vue'
-import { useElementSize } from '@vueuse/core'
+import { useElementSize, useEventListener } from '@vueuse/core'
 import type { Asset } from '../types'
 import {
   useGalleryView,
   useGallerySelection,
   useGalleryLightbox,
   useMasonryVirtualizer,
+  useTimelineRail,
 } from '../composables'
 import { prepareHero } from '../composables/useHeroTransition'
 import { galleryApi } from '../api'
+import { useGalleryStore } from '../store'
+import { useI18n } from '@/composables/useI18n'
 import AssetCard from './AssetCard.vue'
 import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
-import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
-import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
+import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
+const store = useGalleryStore()
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
+const { locale } = useI18n()
 
-const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
+const scrollTop = ref(0)
 
-const { width: containerWidth } = useElementSize(scrollContainerRef)
+const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 // 根据容器宽度和卡片目标尺寸计算列数，与 GridView 的算法保持一致
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
@@ -37,14 +41,25 @@ const masonryVirtualizer = useMasonryVirtualizer({
   containerWidth,
 })
 
-onMounted(async () => {
-  // ScrollArea 的真实滚动容器在挂载后才可通过 viewportElement 获取
-  if (scrollAreaRef.value) {
-    scrollContainerRef.value = scrollAreaRef.value.viewportElement
-  }
+const { markers: railMarkers, labels: railLabels } = useTimelineRail({
+  isTimelineMode: computed(() => store.isTimelineMode),
+  buckets: computed(() => store.timelineBuckets),
+  locale,
+  getOffsetByAssetIndex(assetIndex) {
+    return masonryVirtualizer.itemStartByIndex.value.get(assetIndex)
+  },
+})
 
+onMounted(async () => {
   await masonryVirtualizer.init()
 })
+
+function handleScroll(event: Event) {
+  const target = event.target as HTMLElement
+  scrollTop.value = target.scrollTop
+}
+
+useEventListener(scrollContainerRef, 'scroll', handleScroll)
 
 function getAssetAspectRatio(asset: Asset | null): string {
   if (!asset || !asset.width || !asset.height || asset.width <= 0 || asset.height <= 0) {
@@ -103,63 +118,82 @@ defineExpose({ scrollToIndex, getCardRect })
 </script>
 
 <template>
-  <ScrollArea ref="scrollAreaRef" type="always" class="mr-1 h-full">
-    <template #scrollbar>
-      <ScrollBar
-        class="w-4 p-0.5"
-        thumb-class="bg-muted-foreground/35 hover:bg-muted-foreground/50"
-      />
-    </template>
-    <div class="px-6">
-      <div
-        :style="{
-          height: `${masonryVirtualizer.virtualizer.value.getTotalSize()}px`,
-          position: 'relative',
-        }"
-      >
+  <div class="flex h-full">
+    <div
+      ref="scrollContainerRef"
+      class="hide-scrollbar h-full flex-1 overflow-auto py-2 pr-2 pl-6"
+      @scroll="handleScroll"
+    >
+      <div>
         <div
-          v-for="virtualItem in masonryVirtualizer.virtualItems.value"
-          :key="virtualItem.index"
-          :ref="measureItemElement"
-          :data-index="virtualItem.index"
           :style="{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: `${masonryVirtualizer.columnWidth.value}px`,
-            transform: `translateX(${masonryVirtualizer.getLaneOffset(virtualItem.lane)}px) translateY(${virtualItem.start}px)`,
+            height: `${masonryVirtualizer.virtualizer.value.getTotalSize()}px`,
+            position: 'relative',
           }"
         >
-          <ContextMenu v-if="virtualItem.asset !== null">
-            <ContextMenuTrigger as-child>
-              <AssetCard
-                :asset="virtualItem.asset"
-                :aspect-ratio="getAssetAspectRatio(virtualItem.asset)"
-                :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
-                @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
-                @double-click="
-                  (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
-                "
-                @context-menu="
-                  (asset, event) => handleAssetContextMenu(asset, event, virtualItem.index)
-                "
-              />
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <GalleryAssetContextMenuContent />
-            </ContextMenuContent>
-          </ContextMenu>
-
           <div
-            v-else
-            class="animate-pulse rounded-lg bg-muted"
+            v-for="virtualItem in masonryVirtualizer.virtualItems.value"
+            :key="virtualItem.index"
+            :ref="measureItemElement"
+            :data-index="virtualItem.index"
             :style="{
-              width: '100%',
-              height: `${masonryVirtualizer.getAssetHeight(null)}px`,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: `${masonryVirtualizer.columnWidth.value}px`,
+              transform: `translateX(${masonryVirtualizer.getLaneOffset(virtualItem.lane)}px) translateY(${virtualItem.start}px)`,
             }"
-          />
+          >
+            <ContextMenu v-if="virtualItem.asset !== null">
+              <ContextMenuTrigger as-child>
+                <AssetCard
+                  :asset="virtualItem.asset"
+                  :aspect-ratio="getAssetAspectRatio(virtualItem.asset)"
+                  :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
+                  @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
+                  @double-click="
+                    (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
+                  "
+                  @context-menu="
+                    (asset, event) => handleAssetContextMenu(asset, event, virtualItem.index)
+                  "
+                />
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <GalleryAssetContextMenuContent />
+              </ContextMenuContent>
+            </ContextMenu>
+
+            <div
+              v-else
+              class="animate-pulse rounded-lg bg-muted"
+              :style="{
+                width: '100%',
+                height: `${masonryVirtualizer.getAssetHeight(null)}px`,
+              }"
+            />
+          </div>
         </div>
       </div>
     </div>
-  </ScrollArea>
+
+    <GalleryScrollbarRail
+      :container-height="containerHeight"
+      :scroll-top="scrollTop"
+      :viewport-height="containerHeight"
+      :virtualizer="masonryVirtualizer.virtualizer.value"
+      :markers="railMarkers"
+      :labels="railLabels"
+    />
+  </div>
 </template>
+
+<style scoped>
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+</style>

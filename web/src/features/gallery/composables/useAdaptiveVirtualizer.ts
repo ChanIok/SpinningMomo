@@ -116,8 +116,8 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
 
   // 在 adaptive 模式里，viewSize 的语义不再是“方形卡片边长”，而是“目标行高”。
   const targetRowHeight = computed(() => Math.max(100, store.viewConfig.size))
-  // 视图左右仍保留与其他图库视图一致的内边距，因此这里减去内容区水平 padding。
-  const contentWidth = computed(() => Math.max(0, containerWidth.value - 48))
+  // 外层滚动容器直接承担左右内边距，布局宽度直接使用可见内容区宽度。
+  const contentWidth = computed(() => Math.max(0, containerWidth.value))
   const layoutMetaItems = ref<AssetLayoutMetaItem[]>([])
   const virtualRows = ref<VirtualAdaptiveRow[]>([])
   const loadingPages = ref<Set<number>>(new Set())

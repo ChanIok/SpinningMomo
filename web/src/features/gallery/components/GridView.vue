@@ -8,12 +8,14 @@ import {
   useGallerySelection,
   useGalleryLightbox,
   useGridVirtualizer,
+  useTimelineRail,
 } from '../composables'
 import { prepareHero } from '../composables/useHeroTransition'
 import { galleryApi } from '../api'
 import AssetCard from './AssetCard.vue'
 import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
-import TimelineScrollbar from './TimelineScrollbar.vue'
+import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
+import { useI18n } from '@/composables/useI18n'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
@@ -21,6 +23,7 @@ const store = useGalleryStore()
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
+const { locale } = useI18n()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -39,6 +42,16 @@ const gridVirtualizer = useGridVirtualizer({
   containerRef: scrollContainerRef,
   columns,
   containerWidth,
+})
+
+const { markers: railMarkers, labels: railLabels } = useTimelineRail({
+  isTimelineMode,
+  buckets: computed(() => store.timelineBuckets),
+  locale,
+  getOffsetByAssetIndex(assetIndex) {
+    const rowIndex = Math.floor(assetIndex / Math.max(columns.value, 1))
+    return rowIndex * gridVirtualizer.estimatedRowHeight.value
+  },
 })
 
 watch(isTimelineMode, async (newValue) => {
@@ -176,15 +189,13 @@ defineExpose({ scrollToIndex, getCardRect })
       </div>
     </div>
 
-    <TimelineScrollbar
-      v-if="store.timelineBuckets.length > 0"
-      :buckets="store.timelineBuckets"
+    <GalleryScrollbarRail
       :container-height="containerHeight"
       :scroll-top="scrollTop"
       :viewport-height="viewportHeight"
-      :estimated-row-height="gridVirtualizer.estimatedRowHeight.value"
-      :columns="columns"
       :virtualizer="gridVirtualizer.virtualizer.value"
+      :markers="railMarkers"
+      :labels="railLabels"
     />
   </div>
 

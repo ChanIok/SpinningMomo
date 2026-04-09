@@ -73,6 +73,32 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     return Math.max(1, Math.floor((width - totalGap) / Math.max(columns.value, 1)))
   })
 
+  const itemStartByIndex = computed(() => {
+    const startMap = new Map<number, number>()
+    const laneCount = Math.max(1, columns.value)
+    const laneHeights = new Array<number>(laneCount).fill(0)
+
+    for (let index = 0; index < totalCount.value; index++) {
+      let lane = 0
+      for (let i = 1; i < laneCount; i++) {
+        const laneHeight = laneHeights[i] ?? 0
+        const currentMinLaneHeight = laneHeights[lane] ?? 0
+        if (laneHeight < currentMinLaneHeight) {
+          lane = i
+        }
+      }
+
+      const start = laneHeights[lane] ?? 0
+      startMap.set(index, start)
+
+      const [asset] = store.getAssetsInRange(index, index)
+      const itemHeight = getAssetHeight(asset ?? null, columnWidth.value)
+      laneHeights[lane] = start + itemHeight + MASONRY_GAP
+    }
+
+    return startMap
+  })
+
   // 预估高度：virtualizer 初次渲染时使用，后续由 measureElement 实测覆盖
   function estimateSize(index: number): number {
     const [asset] = store.getAssetsInRange(index, index)
@@ -160,8 +186,13 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     }
   }
 
-  /** 初始化：加载总数及第一页数据 */
+  /** 初始化：按当前排序语义加载对应数据源（时间线/普通） */
   async function init() {
+    if (store.isTimelineMode) {
+      await galleryData.loadTimelineData()
+      return
+    }
+
     await galleryData.loadAllAssets()
   }
 
@@ -206,5 +237,6 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     measureElement,
     getLaneOffset,
     getAssetHeight: (asset: Asset | null) => getAssetHeight(asset, columnWidth.value),
+    itemStartByIndex,
   }
 }

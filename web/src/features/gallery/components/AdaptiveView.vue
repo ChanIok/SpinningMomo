@@ -2,21 +2,25 @@
 import { computed, onMounted, ref } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../types'
-import { useAdaptiveVirtualizer, useGallerySelection, useGalleryLightbox } from '../composables'
+import {
+  useAdaptiveVirtualizer,
+  useGallerySelection,
+  useGalleryLightbox,
+  useTimelineRail,
+} from '../composables'
 import { prepareHero } from '../composables/useHeroTransition'
 import { galleryApi } from '../api'
 import { useGalleryStore } from '../store'
+import { useI18n } from '@/composables/useI18n'
 import AssetCard from './AssetCard.vue'
 import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
-import GalleryScrollbarRail, {
-  type GalleryScrollbarLabel,
-  type GalleryScrollbarMarker,
-} from './GalleryScrollbarRail.vue'
+import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
+const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
@@ -29,63 +33,23 @@ const adaptiveVirtualizer = useAdaptiveVirtualizer({
   containerWidth,
 })
 
-const railMarkers = computed((): GalleryScrollbarMarker[] => {
-  // 月份语义只在按时间排序时成立；其他排序下轨道退化为普通滚动条，不显示月份刻度。
-  if (!store.isTimelineMode || store.timelineBuckets.length === 0) {
-    return []
-  }
-
-  // 与 grid 不同，adaptive 的月份位置必须基于真实行 start，而不能再假设固定行高。
-  const rows = adaptiveVirtualizer.rows.value
-  const rowIndexByAssetIndex = adaptiveVirtualizer.rowIndexByAssetIndex.value
-  const markers: GalleryScrollbarMarker[] = []
-  let globalAssetIndex = 0
-
-  for (const bucket of store.timelineBuckets) {
-    const rowIndex = rowIndexByAssetIndex.get(globalAssetIndex)
-    const row = rowIndex === undefined ? null : (rows[rowIndex] ?? null)
-    if (row) {
-      markers.push({
-        id: bucket.month,
-        contentOffset: row.start,
-        label: formatMonthFull(bucket.month),
-      })
+const { markers: railMarkers, labels: railLabels } = useTimelineRail({
+  isTimelineMode: computed(() => store.isTimelineMode),
+  buckets: computed(() => store.timelineBuckets),
+  locale,
+  getOffsetByAssetIndex(assetIndex) {
+    const rowIndex = adaptiveVirtualizer.rowIndexByAssetIndex.value.get(assetIndex)
+    if (rowIndex === undefined) {
+      return undefined
     }
 
-    globalAssetIndex += bucket.count
-  }
-
-  return markers
-})
-
-const railLabels = computed((): GalleryScrollbarLabel[] => {
-  // 年份标签复用月份标记的首出现位置，保持与 grid 时间线视觉一致。
-  const labels: GalleryScrollbarLabel[] = []
-  let currentYear: string | null = null
-
-  for (const marker of railMarkers.value) {
-    const year = marker.id.split('-')[0]
-    if (year && year !== currentYear) {
-      labels.push({
-        id: year,
-        text: year,
-        contentOffset: marker.contentOffset,
-      })
-      currentYear = year
-    }
-  }
-
-  return labels
+    return adaptiveVirtualizer.rows.value[rowIndex]?.start
+  },
 })
 
 onMounted(async () => {
   await adaptiveVirtualizer.init()
 })
-
-function formatMonthFull(monthStr: string): string {
-  const [year, month] = monthStr.split('-')
-  return `${year}年${month}月`
-}
 
 function handleScroll(event: Event) {
   // 轨道指示器与 hover 映射都依赖真实 scrollTop，因此这里直接从原生容器同步。
@@ -138,10 +102,10 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar flex-1 overflow-auto"
+      class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-6"
       @scroll="handleScroll"
     >
-      <div class="px-6 pb-3">
+      <div class="pb-3">
         <div
           :style="{
             height: `${adaptiveVirtualizer.virtualizer.value.getTotalSize()}px`,

@@ -661,7 +661,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
       </div>
 
       <!-- 空状态 -->
-      <div v-else class="flex h-full items-center justify-center">
+      <div v-else class="flex h-[calc(100vh-74px)] items-center justify-center">
         <div class="text-center text-muted-foreground">
           <svg
             xmlns="http://www.w3.org/2000/svg"
