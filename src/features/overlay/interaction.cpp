@@ -19,19 +19,6 @@ namespace Features::Overlay::Interaction {
 // 全局状态指针，用于钩子回调
 Core::State::AppState* g_app_state = nullptr;
 
-// 鼠标钩子过程 - 简化版，只发送消息
-LRESULT CALLBACK mouse_hook_proc(int code, WPARAM wParam, LPARAM lParam) {
-  if (code >= 0 && g_app_state) {
-    auto* mouse_struct = reinterpret_cast<MSLLHOOKSTRUCT*>(lParam);
-    // 只发送消息到timer_window，不直接处理
-    if (g_app_state->overlay->window.timer_window) {
-      PostMessage(g_app_state->overlay->window.timer_window, Types::WM_MOUSE_EVENT,
-                  MAKEWPARAM(mouse_struct->pt.x, mouse_struct->pt.y), 0);
-    }
-  }
-  return CallNextHookEx(nullptr, code, wParam, lParam);
-}
-
 // 窗口事件钩子过程。
 // 这里故意不直接操作 overlay 状态，而是把事件转成窗口消息。
 // 原因是 WinEventHook 回调运行在系统回调上下文里，逻辑越轻越安全；
@@ -99,27 +86,6 @@ auto initialize_interaction(Core::State::AppState& state) -> std::expected<void,
   return {};
 }
 
-auto install_mouse_hook(Core::State::AppState& state) -> std::expected<void, std::string> {
-  auto& overlay_state = *state.overlay;
-
-  if (overlay_state.interaction.mouse_hook) {
-    return {};  // 已经安装
-  }
-
-  overlay_state.interaction.mouse_hook =
-      SetWindowsHookEx(WH_MOUSE_LL, mouse_hook_proc, GetModuleHandle(nullptr), 0);
-
-  if (!overlay_state.interaction.mouse_hook) {
-    DWORD error = GetLastError();
-    auto error_msg = std::format("Failed to install mouse hook. Error: {}", error);
-    Logger().error(error_msg);
-    return std::unexpected(error_msg);
-  }
-
-  Logger().info("Mouse hook installed successfully");
-  return {};
-}
-
 auto install_window_event_hook(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& overlay_state = *state.overlay;
 
@@ -167,11 +133,6 @@ auto install_window_event_hook(Core::State::AppState& state) -> std::expected<vo
 auto uninstall_hooks(Core::State::AppState& state) -> void {
   auto& overlay_state = *state.overlay;
 
-  if (overlay_state.interaction.mouse_hook) {
-    UnhookWindowsHookEx(overlay_state.interaction.mouse_hook);
-    overlay_state.interaction.mouse_hook = nullptr;
-  }
-
   if (overlay_state.interaction.foreground_event_hook) {
     UnhookWinEvent(overlay_state.interaction.foreground_event_hook);
     overlay_state.interaction.foreground_event_hook = nullptr;
@@ -181,11 +142,6 @@ auto uninstall_hooks(Core::State::AppState& state) -> void {
     UnhookWinEvent(overlay_state.interaction.target_window_event_hook);
     overlay_state.interaction.target_window_event_hook = nullptr;
   }
-}
-
-auto handle_mouse_movement(Core::State::AppState& state, POINT mouse_pos) -> void {
-  auto& overlay_state = *state.overlay;
-  overlay_state.interaction.current_mouse_pos = mouse_pos;
 }
 
 auto suppress_taskbar_redraw(Core::State::AppState& state) -> void {
@@ -215,11 +171,8 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
 
   if (!overlay_state.window.target_window) return;
 
-  POINT current_pos = overlay_state.interaction.current_mouse_pos;
-  POINT last_pos = overlay_state.interaction.last_mouse_pos;
-
-  // 只有当鼠标位置发生变化时才更新窗口位置
-  if (current_pos.x == last_pos.x && current_pos.y == last_pos.y) {
+  POINT current_pos{};
+  if (!GetCursorPos(&current_pos)) {
     return;
   }
 
@@ -259,10 +212,17 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
           suppress_taskbar_redraw(state);
         }
 
-        // 更新游戏窗口位置
-        SetWindowPos(
-            overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
-            SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
+        POINT new_game_pos = {new_game_x, new_game_y};
+        if (auto& last_pos = overlay_state.interaction.last_game_window_pos;
+            last_pos && last_pos->x == new_game_pos.x && last_pos->y == new_game_pos.y) {
+          return;
+        }
+
+        if (SetWindowPos(
+                overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING)) {
+          overlay_state.interaction.last_game_window_pos = new_game_pos;
+        }
       }
     } else {
       // 非黑边模式：整个 overlay 都是有效显示区，直接按整个 overlay 计算相对位置。
@@ -282,14 +242,19 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
         suppress_taskbar_redraw(state);
       }
 
-      // 更新游戏窗口位置
-      SetWindowPos(overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
-                   SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING);
+      POINT new_game_pos = {new_game_x, new_game_y};
+      if (auto& last_pos = overlay_state.interaction.last_game_window_pos;
+          last_pos && last_pos->x == new_game_pos.x && last_pos->y == new_game_pos.y) {
+        return;
+      }
+
+      if (SetWindowPos(
+              overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
+              SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING)) {
+        overlay_state.interaction.last_game_window_pos = new_game_pos;
+      }
     }
   }
-
-  // 更新上一次的鼠标位置
-  overlay_state.interaction.last_mouse_pos = current_pos;
 }
 
 auto handle_window_event(Core::State::AppState& state, DWORD event, HWND hwnd) -> void {
@@ -305,6 +270,7 @@ auto refresh_focus_state(Core::State::AppState& state) -> void {
 
 auto cleanup_interaction(Core::State::AppState& state) -> void {
   uninstall_hooks(state);
+  state.overlay->interaction.last_game_window_pos.reset();
   restore_taskbar_redraw(state);  // 确保任务栏重绘被恢复
   g_app_state = nullptr;
 }

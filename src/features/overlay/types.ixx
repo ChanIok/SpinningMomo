@@ -13,12 +13,11 @@ export namespace Features::Overlay::Types {
 
 // 消息常量
 constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
-constexpr UINT WM_MOUSE_EVENT = WM_USER + 2;
-constexpr UINT WM_WINDOW_EVENT = WM_USER + 3;
-constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 4;
-constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 5;
-constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 6;
-constexpr UINT WM_TARGET_WINDOW_DESTROYED = WM_USER + 7;
+constexpr UINT WM_WINDOW_EVENT = WM_USER + 2;
+constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 3;
+constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 4;
+constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 5;
+constexpr UINT WM_TARGET_WINDOW_DESTROYED = WM_USER + 6;
 
 constexpr UINT_PTR OVERLAY_CLEANUP_TIMER_ID = 1;
 
@@ -69,11 +68,9 @@ struct CaptureState {
 
 // 交互状态
 struct InteractionState {
-  HHOOK mouse_hook = nullptr;
   HWINEVENTHOOK foreground_event_hook = nullptr;
   HWINEVENTHOOK target_window_event_hook = nullptr;
-  POINT current_mouse_pos{};
-  POINT last_mouse_pos{};
+  std::optional<POINT> last_game_window_pos;
   DWORD game_process_id = 0;
   bool is_game_focused = false;            // 前台窗口是否是游戏/overlay
   bool taskbar_redraw_suppressed = false;  // 任务栏重绘是否已禁用

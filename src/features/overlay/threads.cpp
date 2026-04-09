@@ -64,11 +64,6 @@ auto hook_thread_proc(Core::State::AppState& state, std::stop_token token) -> vo
     return;
   }
 
-  // 安装钩子
-  if (auto result = Interaction::install_mouse_hook(state); !result) {
-    return;
-  }
-
   if (auto result = Interaction::install_window_event_hook(state); !result) {
     Interaction::uninstall_hooks(state);
     return;
@@ -144,15 +139,6 @@ auto window_manager_thread_proc(Core::State::AppState& state, std::stop_token to
                            SWP_ASYNCWINDOWPOS);
         }
         break;
-
-      case Types::WM_MOUSE_EVENT: {
-        // 处理鼠标事件
-        POINT mouse_pos;
-        mouse_pos.x = LOWORD(msg.wParam);
-        mouse_pos.y = HIWORD(msg.wParam);
-        Interaction::handle_mouse_movement(state, mouse_pos);
-        break;
-      }
 
       case Types::WM_WINDOW_EVENT: {
         // 处理窗口事件

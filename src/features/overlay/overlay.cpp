@@ -124,6 +124,8 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
     Logger().warn("Failed to cancel pending overlay cleanup");
   }
 
+  overlay_state.interaction.last_game_window_pos.reset();
+
   // 设置目标窗口
   overlay_state.window.target_window = target_window;
 

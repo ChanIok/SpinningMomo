@@ -16,18 +16,12 @@ export auto initialize_interaction(Core::State::AppState& state)
 export auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT message,
                                    WPARAM wParam, LPARAM lParam) -> std::pair<bool, LRESULT>;
 
-// 安装鼠标钩子
-export auto install_mouse_hook(Core::State::AppState& state) -> std::expected<void, std::string>;
-
 // 安装窗口事件钩子
 export auto install_window_event_hook(Core::State::AppState& state)
     -> std::expected<void, std::string>;
 
 // 卸载所有钩子
 export auto uninstall_hooks(Core::State::AppState& state) -> void;
-
-// 处理鼠标移动
-export auto handle_mouse_movement(Core::State::AppState& state, POINT mouse_pos) -> void;
 
 // 更新游戏窗口位置
 export auto update_game_window_position(Core::State::AppState& state) -> void;
