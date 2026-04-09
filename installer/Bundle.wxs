@@ -30,6 +30,8 @@
         Theme="hyperlinkLicense"
         LocalizationFile="$(var.ProjectDir)\installer\bundle\thm.wxl"
         LicenseUrl="#(loc.LicenseUrl)"
+        LaunchTarget="[InstallFolder]\SpinningMomo.exe"
+        LaunchWorkingFolder="[InstallFolder]"
         LogoFile="$(var.ProjectDir)\docs\public\logo.png" />
       <PayloadGroupRef Id="BundleLocalizationPayloads" />
     </BootstrapperApplication>
