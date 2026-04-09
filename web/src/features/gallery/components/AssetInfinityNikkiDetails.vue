@@ -233,6 +233,16 @@ function formatPoseId(value: number | undefined): string | null {
   if (value === undefined || value === null || value === 0) return null
   return String(value)
 }
+
+function formatLocation(params: InfinityNikkiExtractedParams | undefined): string | null {
+  if (!params) return null
+  const x = formatNumber(params.nikkiLocX, 2)
+  const y = formatNumber(params.nikkiLocY, 2)
+  if (!x || !y) return null
+
+  const z = formatNumber(params.nikkiLocZ, 2)
+  return z ? `(${x}, ${y}, ${z})` : `(${x}, ${y})`
+}
 </script>
 
 <template>
@@ -299,14 +309,14 @@ function formatPoseId(value: number | undefined): string | null {
 
       <template v-if="extracted">
         <div v-if="formatGameTime(extracted)" class="flex justify-between gap-2">
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.gameTime')
           }}</span>
           <span>{{ formatGameTime(extracted) }}</span>
         </div>
 
         <div v-if="extracted.cameraParams" class="flex items-center justify-between gap-2">
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.cameraParams')
           }}</span>
           <Button
@@ -323,7 +333,7 @@ function formatPoseId(value: number | undefined): string | null {
           v-if="formatFocalLength(extracted.cameraFocalLength)"
           class="flex justify-between gap-2"
         >
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.cameraFocalLength')
           }}</span>
           <span>{{ formatFocalLength(extracted.cameraFocalLength) }}</span>
@@ -332,24 +342,24 @@ function formatPoseId(value: number | undefined): string | null {
           v-if="formatApertureSection(extracted.apertureSection)"
           class="flex justify-between gap-2"
         >
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.apertureSection')
           }}</span>
           <span>{{ formatApertureSection(extracted.apertureSection) }}</span>
         </div>
         <div v-if="formatMetadataText(extracted.filterId)" class="flex justify-between gap-2">
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.filterId')
           }}</span>
           <span
-            class="max-w-32 truncate font-mono"
+            class="max-w-32 truncate"
             :title="formatMetadataText(extracted.filterId) ?? undefined"
           >
             {{ formatMetadataText(extracted.filterId) }}
           </span>
         </div>
         <div v-if="formatPercentage(extracted.filterStrength)" class="flex justify-between gap-2">
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.filterStrength')
           }}</span>
           <span>{{ formatPercentage(extracted.filterStrength) }}</span>
@@ -358,36 +368,46 @@ function formatPoseId(value: number | undefined): string | null {
           v-if="formatPercentage(extracted.vignetteIntensity)"
           class="flex justify-between gap-2"
         >
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.vignetteIntensity')
           }}</span>
           <span>{{ formatPercentage(extracted.vignetteIntensity) }}</span>
         </div>
         <div v-if="formatMetadataText(extracted.lightId)" class="flex justify-between gap-2">
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.lightId')
           }}</span>
           <span
-            class="max-w-32 truncate font-mono"
+            class="max-w-32 truncate"
             :title="formatMetadataText(extracted.lightId) ?? undefined"
           >
             {{ formatMetadataText(extracted.lightId) }}
           </span>
         </div>
         <div v-if="formatPercentage(extracted.lightStrength)" class="flex justify-between gap-2">
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.lightStrength')
           }}</span>
           <span>{{ formatPercentage(extracted.lightStrength) }}</span>
         </div>
+        <div v-if="formatLocation(extracted)" class="flex justify-between gap-2">
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+            t('gallery.details.infinityNikki.nikkiLocation')
+          }}</span>
+          <span class="truncate" :title="formatLocation(extracted) ?? undefined">{{
+            formatLocation(extracted)
+          }}</span>
+        </div>
         <div v-if="extracted.nikkiHidden !== undefined" class="flex justify-between gap-2">
-          <span class="text-muted-foreground">{{
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.nikkiHidden')
           }}</span>
           <span>{{ extracted.nikkiHidden ? t('common.yes') : t('common.no') }}</span>
         </div>
         <div v-if="formatPoseId(extracted.poseId)" class="flex justify-between gap-2">
-          <span class="text-muted-foreground">{{ t('gallery.details.infinityNikki.poseId') }}</span>
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+            t('gallery.details.infinityNikki.poseId')
+          }}</span>
           <span>{{ formatPoseId(extracted.poseId) }}</span>
         </div>
       </template>
