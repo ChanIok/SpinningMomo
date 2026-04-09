@@ -125,17 +125,28 @@ jobs:
       - name: Build all (C++ + Web + Dist)
         run: npm run build:ci
 
-      - name: Dump vcpkg install log on failure
-        if: failure()
+      - name: Dump vcpkg install log when build not successful
+        if: always()
+        timeout-minutes: 2
         shell: pwsh
         run: |
-          $log = "build/.packages/v/vcpkg_uwebsockets/latest/cache/installdir.failed/logs/install.txt"
-          if (Test-Path $log) {
-            Write-Host "==== vcpkg install.txt (last 80 lines) ===="
-            Get-Content $log -Tail 80
-          } else {
-            Write-Host "install.txt not found: $log"
+          if ("${{ job.status }}" -eq "success") {
+            Write-Host "Build succeeded, skip vcpkg failure log dump."
+            exit 0
           }
+
+          $logs = Get-ChildItem "build/.packages/v" -Recurse -File -Filter "install.txt" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -like "*\cache\installdir.failed\logs\install.txt" }
+
+          if (-not $logs -or $logs.Count -eq 0) {
+            Write-Host "No vcpkg failed install log found under build/.packages/v."
+            exit 0
+          }
+
+          $log = $logs[0].FullName
+          Write-Host "==== vcpkg install.txt (last 120 lines) ===="
+          Write-Host "log path: $log"
+          Get-Content $log -Tail 120 -ErrorAction SilentlyContinue
 
       - name: Create Portable ZIP
         run: npm run build:portable
