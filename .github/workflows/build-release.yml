@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 24
           cache: 'npm'
           cache-dependency-path: |
             web/package-lock.json
@@ -58,24 +58,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-
 
+      - name: Ensure cache directories exist
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ".xmake" | Out-Null
+          New-Item -ItemType Directory -Force -Path ".xmake-global" | Out-Null
+          New-Item -ItemType Directory -Force -Path ".vcpkg/archives" | Out-Null
+
       - name: Cache diagnostics (concise)
         shell: pwsh
         run: |
           Write-Host "xmake/vcpkg cache hit: ${{ steps.cache_xmake_vcpkg.outputs.cache-hit }}"
-
-          function Show-DirSummary([string]$path) {
-            if (Test-Path $path) {
-              $size = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
-              $sizeMb = if ($null -eq $size) { 0 } else { [math]::Round($size / 1MB, 2) }
-              Write-Host "$path -> exists, ${sizeMb} MB"
-            } else {
-              Write-Host "$path -> missing"
-            }
-          }
-
-          Show-DirSummary ".xmake"
-          Show-DirSummary ".xmake-global"
-          Show-DirSummary ".vcpkg/archives"
+          Write-Host "binary cache dir: $env:VCPKG_DEFAULT_BINARY_CACHE"
+          Write-Host ".xmake -> $((Test-Path '.xmake') ? 'exists' : 'missing')"
+          Write-Host ".xmake-global -> $((Test-Path '.xmake-global') ? 'exists' : 'missing')"
+          Write-Host ".vcpkg/archives -> $((Test-Path '.vcpkg/archives') ? 'exists' : 'missing')"
 
       - name: Setup .NET (for WiX)
         uses: actions/setup-dotnet@v4
@@ -89,30 +86,25 @@ jobs:
           wix extension add WixToolset.Util.wixext/6.0.2 --global
           wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 
-      - name: Extract version from version.json
-        id: version
-        shell: pwsh
-        run: |
-          $versionJson = Get-Content "version.json" -Raw | ConvertFrom-Json
-          $version = $versionJson.version
-          if (-not [string]::IsNullOrWhiteSpace($version)) {
-            # Convert 1.0.0.0 to 1.0.0 for MSI (max 3 parts)
-            $versionParts = $version.Split('.')
-            $msiVersion = "$($versionParts[0]).$($versionParts[1]).$($versionParts[2])"
-            Write-Host "Extracted version: $msiVersion"
-            echo "VERSION=$msiVersion" >> $env:GITHUB_OUTPUT
-          } else {
-            Write-Error "Could not extract version from version.json"
-            exit 1
-          }
-
-      - name: Override version if specified
+      - name: Resolve final version
         id: final_version
         shell: pwsh
         run: |
           $version = "${{ inputs.version }}"
           if ([string]::IsNullOrEmpty($version)) {
-            $version = "${{ steps.version.outputs.VERSION }}"
+            $versionJson = Get-Content "version.json" -Raw | ConvertFrom-Json
+            $rawVersion = $versionJson.version
+            if ([string]::IsNullOrWhiteSpace($rawVersion)) {
+              Write-Error "Could not extract version from version.json"
+              exit 1
+            }
+            # Convert 1.0.0.0 to 1.0.0 for MSI (max 3 parts)
+            $versionParts = $rawVersion.Split('.')
+            if ($versionParts.Count -lt 3) {
+              Write-Error "version.json version must contain at least 3 parts: $rawVersion"
+              exit 1
+            }
+            $version = "$($versionParts[0]).$($versionParts[1]).$($versionParts[2])"
           }
           Write-Host "Final version: $version"
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
