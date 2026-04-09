@@ -20,6 +20,10 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      # Keep xmake/vcpkg caches in workspace for reliable cache restore on GitHub runners.
+      XMAKE_GLOBALDIR: ${{ github.workspace }}\.xmake-global
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\.vcpkg\archives
     
     steps:
       - name: Checkout
@@ -43,16 +47,35 @@ jobs:
           xmake-version: latest
 
       - name: Cache xmake/vcpkg dependencies
+        id: cache_xmake_vcpkg
         uses: actions/cache@v4
         with:
           path: |
             .xmake
-            ~/.xmake
-            ~/AppData/Local/.xmake
-            ~/AppData/Local/vcpkg/archives
-          key: ${{ runner.os }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock') }}
+            .xmake-global
+            .vcpkg/archives
+          key: ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock') }}
           restore-keys: |
-            ${{ runner.os }}-xmake-vcpkg-
+            ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-
+
+      - name: Cache diagnostics (concise)
+        shell: pwsh
+        run: |
+          Write-Host "xmake/vcpkg cache hit: ${{ steps.cache_xmake_vcpkg.outputs.cache-hit }}"
+
+          function Show-DirSummary([string]$path) {
+            if (Test-Path $path) {
+              $size = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+              $sizeMb = if ($null -eq $size) { 0 } else { [math]::Round($size / 1MB, 2) }
+              Write-Host "$path -> exists, ${sizeMb} MB"
+            } else {
+              Write-Host "$path -> missing"
+            }
+          }
+
+          Show-DirSummary ".xmake"
+          Show-DirSummary ".xmake-global"
+          Show-DirSummary ".vcpkg/archives"
 
       - name: Setup .NET (for WiX)
         uses: actions/setup-dotnet@v4
