@@ -5,6 +5,7 @@ import { useI18n } from '@/composables/useI18n'
 import {
   useGallerySelection,
   useGalleryLightbox,
+  useGalleryContextMenu,
   useGalleryView,
   useListVirtualizer,
 } from '../composables'
@@ -12,10 +13,8 @@ import type { Asset, SortBy, SortOrder } from '../types'
 import { prepareHero } from '../composables/useHeroTransition'
 import { galleryApi } from '../api'
 import AssetListRow from './AssetListRow.vue'
-import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 // 行高 = viewSize * 0.4，使缩略图大小与网格视图的卡片尺寸保持视觉一致
 const LIST_ROW_HEIGHT_FACTOR = 0.4
@@ -26,6 +25,7 @@ const { t } = useI18n()
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
+const galleryContextMenu = useGalleryContextMenu()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -114,8 +114,9 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
   void galleryLightbox.openLightbox(index)
 }
 
-function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
-  void gallerySelection.handleAssetContextMenu(asset, event, index)
+async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
+  await gallerySelection.handleAssetContextMenu(asset, event, index)
+  galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'list' })
 }
 
 function scrollToIndex(index: number) {
@@ -207,27 +208,21 @@ defineExpose({ scrollToIndex, getCardRect })
             transform: `translateY(${virtualItem.start}px)`,
           }"
         >
-          <ContextMenu v-if="virtualItem.asset !== null">
-            <ContextMenuTrigger as-child>
-              <AssetListRow
-                :asset="virtualItem.asset"
-                :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
-                :row-height="rowHeight"
-                :thumbnail-size="thumbnailSize"
-                :columns-template="columnsTemplate"
-                @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
-                @double-click="
-                  (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
-                "
-                @context-menu="
-                  (asset, event) => handleAssetContextMenu(asset, event, virtualItem.index)
-                "
-              />
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <GalleryAssetContextMenuContent />
-            </ContextMenuContent>
-          </ContextMenu>
+          <AssetListRow
+            v-if="virtualItem.asset !== null"
+            :asset="virtualItem.asset"
+            :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
+            :row-height="rowHeight"
+            :thumbnail-size="thumbnailSize"
+            :columns-template="columnsTemplate"
+            @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
+            @double-click="
+              (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
+            "
+            @context-menu="
+              (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)
+            "
+          />
 
           <div
             v-else

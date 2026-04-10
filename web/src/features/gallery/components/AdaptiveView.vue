@@ -4,6 +4,7 @@ import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../types'
 import {
   useAdaptiveVirtualizer,
+  useGalleryContextMenu,
   useGallerySelection,
   useGalleryLightbox,
   useTimelineRail,
@@ -13,13 +14,12 @@ import { galleryApi } from '../api'
 import { useGalleryStore } from '../store'
 import { useI18n } from '@/composables/useI18n'
 import AssetCard from './AssetCard.vue'
-import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
 import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
+const galleryContextMenu = useGalleryContextMenu()
 const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -73,8 +73,9 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
   void galleryLightbox.openLightbox(index)
 }
 
-function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
-  void gallerySelection.handleAssetContextMenu(asset, event, index)
+async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
+  await gallerySelection.handleAssetContextMenu(asset, event, index)
+  galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'adaptive' })
 }
 
 function scrollToIndex(index: number) {
@@ -132,25 +133,17 @@ defineExpose({ scrollToIndex, getCardRect })
                 class="shrink-0"
                 :style="{ width: `${item.width}px`, height: `${item.height}px` }"
               >
-                <ContextMenu v-if="item.asset !== null">
-                  <ContextMenuTrigger as-child>
-                    <AssetCard
-                      :asset="item.asset"
-                      :aspect-ratio="`${item.width} / ${item.height}`"
-                      :is-selected="gallerySelection.isAssetSelected(item.asset.id)"
-                      @click="(asset, event) => handleAssetClick(asset, event, item.index)"
-                      @double-click="
-                        (asset, event) => handleAssetDoubleClick(asset, event, item.index)
-                      "
-                      @context-menu="
-                        (asset, event) => handleAssetContextMenu(asset, event, item.index)
-                      "
-                    />
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <GalleryAssetContextMenuContent />
-                  </ContextMenuContent>
-                </ContextMenu>
+                <AssetCard
+                  v-if="item.asset !== null"
+                  :asset="item.asset"
+                  :aspect-ratio="`${item.width} / ${item.height}`"
+                  :is-selected="gallerySelection.isAssetSelected(item.asset.id)"
+                  @click="(asset, event) => handleAssetClick(asset, event, item.index)"
+                  @double-click="(asset, event) => handleAssetDoubleClick(asset, event, item.index)"
+                  @context-menu="
+                    (asset, event) => void handleAssetContextMenu(asset, event, item.index)
+                  "
+                />
 
                 <div v-else class="h-full w-full animate-pulse rounded-lg bg-muted" />
               </div>

@@ -7,28 +7,26 @@ import {
   useGalleryView,
   useGallerySelection,
   useGalleryLightbox,
+  useGalleryContextMenu,
   useGridVirtualizer,
   useTimelineRail,
 } from '../composables'
 import { prepareHero } from '../composables/useHeroTransition'
 import { galleryApi } from '../api'
 import AssetCard from './AssetCard.vue'
-import GalleryAssetContextMenuContent from './GalleryAssetContextMenuContent.vue'
-import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
+import GridTimelineRailBridge from './GridTimelineRailBridge.vue'
 import { useI18n } from '@/composables/useI18n'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
-import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
 const store = useGalleryStore()
 const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
+const galleryContextMenu = useGalleryContextMenu()
 const { locale } = useI18n()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
-const scrollTop = ref(0)
-const viewportHeight = ref(0)
 
 const isTimelineMode = computed(() => store.isTimelineMode)
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
@@ -71,12 +69,6 @@ onMounted(async () => {
   await gridVirtualizer.init()
 })
 
-function handleScroll(event: Event) {
-  const target = event.target as HTMLElement
-  scrollTop.value = target.scrollTop
-  viewportHeight.value = target.clientHeight
-}
-
 function handleAssetClick(asset: Asset, event: MouseEvent, index: number) {
   void gallerySelection.handleAssetClick(asset, event, index)
 }
@@ -92,8 +84,9 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
   void galleryLightbox.openLightbox(index)
 }
 
-function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
-  void gallerySelection.handleAssetContextMenu(asset, event, index)
+async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
+  await gallerySelection.handleAssetContextMenu(asset, event, index)
+  galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'grid' })
 }
 
 function scrollToIndex(index: number) {
@@ -122,11 +115,7 @@ defineExpose({ scrollToIndex, getCardRect })
 
 <template>
   <div v-if="isTimelineMode" class="flex h-full">
-    <div
-      ref="scrollContainerRef"
-      class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-6"
-      @scroll="handleScroll"
-    >
+    <div ref="scrollContainerRef" class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-6">
       <div
         :style="{
           height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
@@ -156,24 +145,18 @@ defineExpose({ scrollToIndex, getCardRect })
               v-for="(asset, idx) in virtualRow.assets"
               :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
             >
-              <ContextMenu v-if="asset !== null">
-                <ContextMenuTrigger as-child>
-                  <AssetCard
-                    :asset="asset"
-                    :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                    @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
-                    @double-click="
-                      (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
-                    "
-                    @context-menu="
-                      (a, e) => handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
-                    "
-                  />
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <GalleryAssetContextMenuContent />
-                </ContextMenuContent>
-              </ContextMenu>
+              <AssetCard
+                v-if="asset !== null"
+                :asset="asset"
+                :is-selected="gallerySelection.isAssetSelected(asset.id)"
+                @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
+                @double-click="
+                  (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
+                "
+                @context-menu="
+                  (a, e) => void handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
+                "
+              />
 
               <div
                 v-else
@@ -189,10 +172,9 @@ defineExpose({ scrollToIndex, getCardRect })
       </div>
     </div>
 
-    <GalleryScrollbarRail
+    <GridTimelineRailBridge
+      :scroll-container="scrollContainerRef"
       :container-height="containerHeight"
-      :scroll-top="scrollTop"
-      :viewport-height="viewportHeight"
       :virtualizer="gridVirtualizer.virtualizer.value"
       :markers="railMarkers"
       :labels="railLabels"
@@ -230,24 +212,18 @@ defineExpose({ scrollToIndex, getCardRect })
               v-for="(asset, idx) in virtualRow.assets"
               :key="asset?.id ?? `placeholder-${virtualRow.index}-${idx}`"
             >
-              <ContextMenu v-if="asset !== null">
-                <ContextMenuTrigger as-child>
-                  <AssetCard
-                    :asset="asset"
-                    :is-selected="gallerySelection.isAssetSelected(asset.id)"
-                    @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
-                    @double-click="
-                      (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
-                    "
-                    @context-menu="
-                      (a, e) => handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
-                    "
-                  />
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <GalleryAssetContextMenuContent />
-                </ContextMenuContent>
-              </ContextMenu>
+              <AssetCard
+                v-if="asset !== null"
+                :asset="asset"
+                :is-selected="gallerySelection.isAssetSelected(asset.id)"
+                @click="(a, e) => handleAssetClick(a, e, virtualRow.index * columns + idx)"
+                @double-click="
+                  (a, e) => handleAssetDoubleClick(a, e, virtualRow.index * columns + idx)
+                "
+                @context-menu="
+                  (a, e) => void handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
+                "
+              />
 
               <div
                 v-else
