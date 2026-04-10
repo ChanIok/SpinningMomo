@@ -160,12 +160,6 @@ auto Utils::Path::EnsureDirectoryExists(const std::filesystem::path& dir)
   }
 }
 
-// 组合路径，类似于 path1 / path2
-auto Utils::Path::Combine(const std::filesystem::path& base, const std::string& filename)
-    -> std::filesystem::path {
-  return base / filename;
-}
-
 // 规范化路径为绝对路径，默认相对于程序目录
 auto Utils::Path::NormalizePath(const std::filesystem::path& path,
                                 std::optional<std::filesystem::path> base)

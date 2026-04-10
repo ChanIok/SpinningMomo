@@ -46,20 +46,6 @@ export constexpr VideoCodec video_codec_from_string(std::string_view str) {
   return VideoCodec::H264;  // 默认
 }
 
-// 音频源类型
-export enum class AudioSource {
-  None,     // 不录制音频
-  System,   // 系统全部音频（传统 Loopback）
-  GameOnly  // 仅游戏音频（Process Loopback，需 Windows 10 2004+）
-};
-
-// 从字符串转换为 AudioSource
-export constexpr AudioSource audio_source_from_string(std::string_view str) {
-  if (str == "none") return AudioSource::None;
-  if (str == "game_only") return AudioSource::GameOnly;
-  return AudioSource::System;  // 默认
-}
-
 // 编码器配置
 export struct EncoderConfig {
   std::filesystem::path output_path;                    // 输出文件路径

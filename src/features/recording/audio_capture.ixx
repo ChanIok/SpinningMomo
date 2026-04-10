@@ -11,7 +11,7 @@ export namespace Features::Recording::AudioCapture {
 
 // 初始化音频捕获（委托给 Utils.Media.AudioCapture）
 auto initialize(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
-                Features::Recording::Types::AudioSource source, std::uint32_t process_id)
+                Utils::Media::AudioCapture::AudioSource source, std::uint32_t process_id)
     -> std::expected<void, std::string>;
 
 // 启动音频捕获线程（为 Recording 创建回调）

@@ -14,6 +14,7 @@ import Features.Settings.State;
 import Features.WindowControl;
 import UI.FloatingWindow.Events;
 import Utils.Logger;
+import Utils.Media.AudioCapture;
 import Utils.Path;
 import Utils.String;
 import <windows.h>;
@@ -119,7 +120,7 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
     config.capture_cursor = recording_settings.capture_cursor;
     config.auto_restart_on_resize = recording_settings.auto_restart_on_resize;
     config.audio_source =
-        Features::Recording::Types::audio_source_from_string(recording_settings.audio_source);
+        Utils::Media::AudioCapture::audio_source_from_string(recording_settings.audio_source);
     config.audio_bitrate = recording_settings.audio_bitrate;
 
     // 3. 启动

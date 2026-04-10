@@ -8,28 +8,25 @@ import std;
 import Utils.Logger;
 import Utils.File.Mime;
 import Utils.String;
+import Utils.Time;
 
 namespace Utils::File {
 
-auto to_timestamp(std::chrono::system_clock::time_point tp) -> int64_t {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
-}
-
-auto format_file_error(const std::string &operation, const std::filesystem::path &path,
-                       const std::exception &e) -> std::string {
+auto format_file_error(const std::string& operation, const std::filesystem::path& path,
+                       const std::exception& e) -> std::string {
   std::string error_msg = std::format("{} {}: {}", operation, path.string(), e.what());
   Logger().error("{} {}: {}", operation, path.string(), e.what());
   return error_msg;
 }
 
 // 判断MIME类型是否为文本类型
-auto is_text_mime_type(const std::string &mime_type) -> bool {
+auto is_text_mime_type(const std::string& mime_type) -> bool {
   return mime_type.starts_with("text/") || mime_type.starts_with("application/json") ||
          mime_type.starts_with("application/xml") ||
          mime_type.starts_with("application/javascript") || mime_type.ends_with("; charset=utf-8");
 }
 
-auto read_file(const std::filesystem::path &file_path)
+auto read_file(const std::filesystem::path& file_path)
     -> asio::awaitable<std::expected<FileReadResult, std::string>> {
   try {
     // 获取当前executor
@@ -65,12 +62,12 @@ auto read_file(const std::filesystem::path &file_path)
                    result.original_size, result.mime_type);
 
     co_return result;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     co_return std::unexpected(format_file_error("Error reading", file_path, e));
   }
 }
 
-auto read_file_and_encode(const std::filesystem::path &file_path)
+auto read_file_and_encode(const std::filesystem::path& file_path)
     -> asio::awaitable<std::expected<EncodedFileReadResult, std::string>> {
   // 首先读取原始数据
   auto raw_result = co_await read_file(file_path);
@@ -117,7 +114,7 @@ auto read_file_and_encode(const std::filesystem::path &file_path)
   co_return result;
 }
 
-auto write_file(const std::filesystem::path &file_path, const std::string &content, bool is_binary,
+auto write_file(const std::filesystem::path& file_path, const std::string& content, bool is_binary,
                 bool overwrite) -> asio::awaitable<std::expected<FileWriteResult, std::string>> {
   try {
     auto executor = co_await asio::this_coro::executor;
@@ -162,13 +159,13 @@ auto write_file(const std::filesystem::path &file_path, const std::string &conte
 
     FileWriteResult result{.path = file_path.string(), .bytes_written = bytes_written};
     co_return result;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     co_return std::unexpected(format_file_error("Error writing", file_path, e));
   }
 }
 
-auto list_directory(const std::filesystem::path &dir_path,
-                    const std::vector<std::string> &extensions)
+auto list_directory(const std::filesystem::path& dir_path,
+                    const std::vector<std::string>& extensions)
     -> asio::awaitable<std::expected<DirectoryListResult, std::string>> {
   try {
     if (!std::filesystem::exists(dir_path)) {
@@ -182,22 +179,19 @@ auto list_directory(const std::filesystem::path &dir_path,
     DirectoryListResult result{.path = dir_path.string()};
 
     // 创建扩展名过滤函数
-    auto should_include_file = [&extensions](const std::string &file_ext) {
+    auto should_include_file = [&extensions](const std::string& file_ext) {
       if (extensions.empty()) return true;
       return std::ranges::any_of(extensions,
-                                 [&file_ext](const auto &ext) { return file_ext == ext; });
+                                 [&file_ext](const auto& ext) { return file_ext == ext; });
     };
 
     // 遍历目录
-    for (const auto &entry : std::filesystem::directory_iterator(dir_path)) {
+    for (const auto& entry : std::filesystem::directory_iterator(dir_path)) {
       DirectoryEntry dir_entry{.name = entry.path().filename().string(),
                                .path = entry.path().string()};
 
       auto last_write_time = std::filesystem::last_write_time(entry.path());
-      dir_entry.last_modified =
-          to_timestamp(std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-              last_write_time - std::filesystem::file_time_type::clock::now() +
-              std::chrono::system_clock::now()));
+      dir_entry.last_modified = Utils::Time::file_time_to_millis(last_write_time);
 
       if (entry.is_directory()) {
         dir_entry.type = "directory";
@@ -216,12 +210,12 @@ auto list_directory(const std::filesystem::path &dir_path,
     Logger().debug("Successfully listed directory: {}, {} directories, {} files", dir_path.string(),
                    result.directories.size(), result.files.size());
     co_return result;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     co_return std::unexpected(format_file_error("Error listing directory", dir_path, e));
   }
 }
 
-auto get_file_info(const std::filesystem::path &file_path)
+auto get_file_info(const std::filesystem::path& file_path)
     -> asio::awaitable<std::expected<FileInfoResult, std::string>> {
   try {
     if (!std::filesystem::exists(file_path)) {
@@ -243,19 +237,16 @@ auto get_file_info(const std::filesystem::path &file_path)
     }
 
     auto last_write_time = std::filesystem::last_write_time(file_path);
-    result.last_modified =
-        to_timestamp(std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-            last_write_time - std::filesystem::file_time_type::clock::now() +
-            std::chrono::system_clock::now()));
+    result.last_modified = Utils::Time::file_time_to_millis(last_write_time);
 
     Logger().debug("Successfully got file info: {}", file_path.string());
     co_return result;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     co_return std::unexpected(format_file_error("Error getting file info", file_path, e));
   }
 }
 
-auto delete_path(const std::filesystem::path &path, bool recursive)
+auto delete_path(const std::filesystem::path& path, bool recursive)
     -> asio::awaitable<std::expected<DeleteResult, std::string>> {
   try {
     DeleteResult result{.path = path.string()};
@@ -265,8 +256,8 @@ auto delete_path(const std::filesystem::path &path, bool recursive)
     }
 
     // 递归计算要删除的内容统计
-    std::function<void(const std::filesystem::path &)> calculate_stats =
-        [&](const std::filesystem::path &p) {
+    std::function<void(const std::filesystem::path&)> calculate_stats =
+        [&](const std::filesystem::path& p) {
           if (std::filesystem::is_regular_file(p)) {
             result.files_deleted++;
             try {
@@ -277,7 +268,7 @@ auto delete_path(const std::filesystem::path &path, bool recursive)
           } else if (std::filesystem::is_directory(p)) {
             result.directories_deleted++;
             if (recursive) {
-              for (const auto &entry : std::filesystem::directory_iterator(p)) {
+              for (const auto& entry : std::filesystem::directory_iterator(p)) {
                 calculate_stats(entry.path());
               }
             }
@@ -307,13 +298,13 @@ auto delete_path(const std::filesystem::path &path, bool recursive)
     Logger().debug("Delete operation completed: {} files, {} directories, {} bytes freed",
                    result.files_deleted, result.directories_deleted, result.total_bytes_freed);
     co_return result;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     co_return std::unexpected(format_file_error("Error deleting", path, e));
   }
 }
 
-auto move_path(const std::filesystem::path &source_path,
-               const std::filesystem::path &destination_path, bool overwrite)
+auto move_path(const std::filesystem::path& source_path,
+               const std::filesystem::path& destination_path, bool overwrite)
     -> asio::awaitable<std::expected<MoveResult, std::string>> {
   try {
     if (!std::filesystem::exists(source_path)) {
@@ -362,13 +353,13 @@ auto move_path(const std::filesystem::path &source_path,
     }
 
     co_return result;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     co_return std::unexpected(format_file_error("Error moving/renaming", source_path, e));
   }
 }
 
-auto copy_path(const std::filesystem::path &source_path,
-               const std::filesystem::path &destination_path, bool recursive, bool overwrite)
+auto copy_path(const std::filesystem::path& source_path,
+               const std::filesystem::path& destination_path, bool recursive, bool overwrite)
     -> asio::awaitable<std::expected<CopyResult, std::string>> {
   try {
     if (!std::filesystem::exists(source_path)) {
@@ -411,9 +402,9 @@ auto copy_path(const std::filesystem::path &source_path,
         std::filesystem::copy(source_path, destination_path, options);
 
         // 统计复制的文件和目录
-        std::function<void(const std::filesystem::path &)> count_items =
-            [&](const std::filesystem::path &p) {
-              for (const auto &entry : std::filesystem::recursive_directory_iterator(p)) {
+        std::function<void(const std::filesystem::path&)> count_items =
+            [&](const std::filesystem::path& p) {
+              for (const auto& entry : std::filesystem::recursive_directory_iterator(p)) {
                 if (entry.is_regular_file()) {
                   result.files_copied++;
                   try {
@@ -441,7 +432,7 @@ auto copy_path(const std::filesystem::path &source_path,
     Logger().debug("Copy operation completed: {} files, {} directories, {} bytes copied",
                    result.files_copied, result.directories_copied, result.total_bytes_copied);
     co_return result;
-  } catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     co_return std::unexpected(format_file_error("Error copying", source_path, e));
   }
 }

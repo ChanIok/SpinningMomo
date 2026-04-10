@@ -14,11 +14,23 @@ export auto current_millis() -> std::int64_t {
       .count();
 }
 
+// file_time_type 转 system_clock time_point
+export auto file_time_to_system_clock(const std::filesystem::file_time_type& file_time)
+    -> std::chrono::system_clock::time_point {
+  return std::chrono::clock_cast<std::chrono::system_clock>(file_time);
+}
+
 // 文件时间转换为毫秒时间戳
 export auto file_time_to_millis(const std::filesystem::file_time_type& file_time) -> std::int64_t {
-  auto system_time = std::chrono::clock_cast<std::chrono::system_clock>(file_time);
+  auto system_time = file_time_to_system_clock(file_time);
   return std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch())
       .count();
+}
+
+// 文件时间转换为秒时间戳
+export auto file_time_to_seconds(const std::filesystem::file_time_type& file_time) -> std::int64_t {
+  auto system_time = file_time_to_system_clock(file_time);
+  return std::chrono::duration_cast<std::chrono::seconds>(system_time.time_since_epoch()).count();
 }
 
 // 获取文件创建时间的毫秒时间戳

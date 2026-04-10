@@ -13,23 +13,10 @@ import <windows.h>;
 
 namespace Features::Recording::AudioCapture {
 
-// 类型转换: Features AudioSource -> Utils AudioSource
-auto convert_audio_source(Features::Recording::Types::AudioSource source)
-    -> Utils::Media::AudioCapture::AudioSource {
-  switch (source) {
-    case Features::Recording::Types::AudioSource::None:
-      return Utils::Media::AudioCapture::AudioSource::None;
-    case Features::Recording::Types::AudioSource::GameOnly:
-      return Utils::Media::AudioCapture::AudioSource::GameOnly;
-    default:
-      return Utils::Media::AudioCapture::AudioSource::System;
-  }
-}
-
 auto initialize(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
-                Features::Recording::Types::AudioSource source, std::uint32_t process_id)
+                Utils::Media::AudioCapture::AudioSource source, std::uint32_t process_id)
     -> std::expected<void, std::string> {
-  return Utils::Media::AudioCapture::initialize(ctx, convert_audio_source(source), process_id);
+  return Utils::Media::AudioCapture::initialize(ctx, source, process_id);
 }
 
 auto start_capture_thread(Features::Recording::State::RecordingState& state) -> void {

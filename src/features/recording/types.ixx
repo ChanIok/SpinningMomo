@@ -3,6 +3,7 @@ module;
 export module Features.Recording.Types;
 
 import std;
+import Utils.Media.AudioCapture;
 
 namespace Features::Recording::Types {
 
@@ -64,20 +65,6 @@ export enum class VideoCodec {
   H265   // H.265/HEVC
 };
 
-// 音频源类型
-export enum class AudioSource {
-  None,     // 不录制音频
-  System,   // 系统全部音频（传统 Loopback）
-  GameOnly  // 仅游戏音频（Process Loopback，需 Windows 10 2004+）
-};
-
-// 从字符串转换为 AudioSource
-export constexpr AudioSource audio_source_from_string(std::string_view str) {
-  if (str == "none") return AudioSource::None;
-  if (str == "game_only") return AudioSource::GameOnly;
-  return AudioSource::System;  // 默认
-}
-
 // 从字符串转换为 VideoCodec
 export constexpr VideoCodec video_codec_from_string(std::string_view str) {
   if (str == "h265" || str == "hevc") return VideoCodec::H265;
@@ -111,8 +98,9 @@ export struct RecordingConfig {
   bool auto_restart_on_resize = true;                   // 尺寸变化时是否自动切段重启录制
 
   // 音频配置
-  AudioSource audio_source = AudioSource::System;  // 音频源类型 (默认系统音频)
-  std::uint32_t audio_bitrate = 256'000;           // 音频码率 (默认 256kbps)
+  Utils::Media::AudioCapture::AudioSource audio_source =
+      Utils::Media::AudioCapture::AudioSource::System;  // 音频源类型 (默认系统音频)
+  std::uint32_t audio_bitrate = 256'000;                // 音频码率 (默认 256kbps)
 };
 
 // 录制状态枚举

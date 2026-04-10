@@ -13,6 +13,7 @@ import Core.WebView.Types;
 import Utils.File.Mime;
 import Utils.Logger;
 import Utils.String;
+import Utils.Time;
 import Vendor.BuildConfig;
 import <Shlwapi.h>;
 import <windows.h>;
@@ -179,10 +180,8 @@ auto build_cache_validators(const std::filesystem::path& file_path, std::uint64_
   }
 
   auto modified_time = std::chrono::time_point_cast<std::chrono::seconds>(
-      std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-          last_write_time - std::filesystem::file_time_type::clock::now() +
-          std::chrono::system_clock::now()));
-  auto modified_seconds = modified_time.time_since_epoch().count();
+      Utils::Time::file_time_to_system_clock(last_write_time));
+  auto modified_seconds = Utils::Time::file_time_to_seconds(last_write_time);
 
   return CacheValidators{
       .etag = std::format(L"\"{:x}-{:x}\"", file_size, modified_seconds),

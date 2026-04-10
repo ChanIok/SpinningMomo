@@ -466,7 +466,7 @@ auto take_screenshot(
       filename = filename.substr(0, dot_pos) + ".jpg";
     }
   }
-  auto file_path = Utils::Path::Combine(screenshots_dir, filename);
+  auto file_path = screenshots_dir / std::filesystem::path(filename);
 
   // 自动初始化系统（如果尚未初始化）
   if (!state.d3d_initialized || !state.worker_thread) {

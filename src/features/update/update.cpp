@@ -292,7 +292,7 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
       return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
     }
 
-    auto script_path = Utils::Path::Combine(temp_dir.value(), "update.bat");
+    auto script_path = temp_dir.value() / std::filesystem::path("update.bat");
 
     std::ofstream script(script_path);
     if (!script) {
@@ -324,7 +324,7 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
     } else {
       // 安装版：以最小界面执行安装，显示进度条并记录日志
       auto install_log_path =
-          Utils::Path::Combine(temp_dir.value(), "SpinningMomo-Update-Install.log");
+          temp_dir.value() / std::filesystem::path("SpinningMomo-Update-Install.log");
       script << "echo Running installer...\n";
       script << "\"" << update_package_path.string() << "\" /passive /norestart /log \""
              << install_log_path.string() << "\"\n";
@@ -332,8 +332,8 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
 
     if (restart) {
       script << "echo Update completed, restarting application...\n";
-      script << "start \"\" \"" << Utils::Path::Combine(current_dir, "SpinningMomo.exe").string()
-             << "\"\n";
+      script << "start \"\" \""
+             << (current_dir / std::filesystem::path("SpinningMomo.exe")).string() << "\"\n";
     } else {
       script << "echo Update completed successfully.\n";
     }
