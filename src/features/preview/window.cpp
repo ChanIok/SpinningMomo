@@ -12,7 +12,6 @@ import Features.Preview.Rendering;
 import Features.Preview.Capture;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
-import Utils.Timer;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;

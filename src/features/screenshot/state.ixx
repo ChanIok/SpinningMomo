@@ -3,7 +3,7 @@ module;
 export module Features.Screenshot.State;
 
 import std;
-import Utils.Timer;
+import Utils.Timeout;
 import Utils.Image;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
@@ -52,7 +52,7 @@ struct ScreenshotState {
   std::atomic<size_t> next_session_id{1};
 
   // 清理定时器
-  std::optional<Utils::Timer::Timer> cleanup_timer;
+  std::optional<Utils::Timeout::Timeout> cleanup_timer;
 
   // 请求D3D资源清理（线程安全）
   auto request_d3d_cleanup() -> void {

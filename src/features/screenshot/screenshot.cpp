@@ -247,11 +247,11 @@ auto start_cleanup_timer(Features::Screenshot::State::ScreenshotState& state) ->
     state.cleanup_timer.emplace();
   }
 
-  if (state.cleanup_timer->IsRunning()) {
-    state.cleanup_timer->Cancel();
+  if (state.cleanup_timer->is_pending()) {
+    state.cleanup_timer->cancel();
   }
 
-  auto result = state.cleanup_timer->SetTimer(std::chrono::milliseconds(5000), [&state]() {
+  auto result = state.cleanup_timer->set_timeout(std::chrono::milliseconds(5000), [&state]() {
     Logger().debug("Screenshot cleanup timer triggered");
     state.request_d3d_cleanup();  // 请求清理而不是直接清理
   });
@@ -404,8 +404,8 @@ auto cleanup_system(Core::State::AppState& app_state) -> void {
   Logger().debug("Cleaning up screenshot system");
 
   // 取消清理定时器
-  if (state.cleanup_timer && state.cleanup_timer->IsRunning()) {
-    state.cleanup_timer->Cancel();
+  if (state.cleanup_timer && state.cleanup_timer->is_pending()) {
+    state.cleanup_timer->cancel();
   }
 
   // 停止工作线程
@@ -494,8 +494,8 @@ auto take_screenshot(
   }
 
   // 取消清理定时器和清理请求（新请求开始）
-  if (state.cleanup_timer && state.cleanup_timer->IsRunning()) {
-    state.cleanup_timer->Cancel();
+  if (state.cleanup_timer && state.cleanup_timer->is_pending()) {
+    state.cleanup_timer->cancel();
     Logger().debug("Cancelled screenshot cleanup timer due to new request");
   }
   state.cleanup_requested = false;  // 取消任何待处理的清理请求
