@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { copyToClipboard, formatFileSize } from '@/lib/utils'
-import type { Asset } from '../types'
+import type { Asset } from '../../types'
 
 interface AssetDetailsContentProps {
   asset: Asset

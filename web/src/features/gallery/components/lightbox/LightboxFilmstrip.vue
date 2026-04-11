@@ -7,7 +7,7 @@ import { useGalleryContextMenu, useGalleryData, useGallerySelection } from '../.
 import { useGalleryStore } from '../../store'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
-import MediaStatusChips from '../MediaStatusChips.vue'
+import MediaStatusChips from '../asset/MediaStatusChips.vue'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()

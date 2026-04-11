@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
-import { useGalleryStore } from '../store'
-import type { Asset } from '../types'
+import { useGalleryStore } from '../../store'
+import type { Asset } from '../../types'
 import {
   useGalleryView,
   useGallerySelection,
@@ -10,10 +10,10 @@ import {
   useGalleryContextMenu,
   useGridVirtualizer,
   useTimelineRail,
-} from '../composables'
-import { prepareHero } from '../composables/useHeroTransition'
-import { galleryApi } from '../api'
-import AssetCard from './AssetCard.vue'
+} from '../../composables'
+import { prepareHero } from '../../composables/useHeroTransition'
+import { galleryApi } from '../../api'
+import AssetCard from '../asset/AssetCard.vue'
 import GridTimelineRailBridge from './GridTimelineRailBridge.vue'
 import { useI18n } from '@/composables/useI18n'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'

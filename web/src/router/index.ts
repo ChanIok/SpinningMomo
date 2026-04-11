@@ -4,13 +4,13 @@ import type { RouteRecordRaw } from 'vue-router'
 // 懒加载页面组件
 const HomePage = () => import('@/features/home/pages/HomePage.vue')
 const OnboardingPage = () => import('@/features/onboarding/pages/OnboardingPage.vue')
-const GalleryPage = () => import('@/features/gallery/pages/GalleryPage.vue')
 const SettingsPage = () => import('@/features/settings/pages/SettingsPage.vue')
 const AboutPage = () => import('@/features/about/pages/AboutPage.vue')
 const MapPage = () => import('@/features/map/pages/MapPage.vue')
 
 // 导入playground路由
 import { routes as playgroundRoutes } from '@/features/playground'
+import galleryRoutes from '@/features/gallery/routes'
 import NotFoundPage from '@/features/common/pages/NotFoundPage.vue'
 
 // 基础路由配置
@@ -35,14 +35,7 @@ const routes: RouteRecordRaw[] = [
       title: '欢迎',
     },
   },
-  {
-    path: '/gallery',
-    name: 'gallery',
-    component: GalleryPage,
-    meta: {
-      title: '图库',
-    },
-  },
+  ...galleryRoutes,
   {
     path: '/map',
     name: 'map',

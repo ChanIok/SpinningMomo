@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, watch, onUnmounted } from 'vue'
-import type { GalleryScrollbarLabel, GalleryScrollbarMarker } from './GalleryScrollbarRail.vue'
-import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
+import type {
+  GalleryScrollbarLabel,
+  GalleryScrollbarMarker,
+} from '../shell/GalleryScrollbarRail.vue'
+import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 
 interface VirtualizerLike {
   getTotalSize: () => number

@@ -295,7 +295,7 @@ import { Slider } from '@/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
-import ReviewFilterPopover from './ReviewFilterPopover.vue'
+import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -326,8 +326,8 @@ import {
   Star,
 } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
-import { useGalleryView } from '../composables'
-import type { ViewMode, SortBy, AssetType } from '../types'
+import { useGalleryView } from '../../composables'
+import type { ViewMode, SortBy, AssetType } from '../../types'
 
 // i18n
 const { t } = useI18n()

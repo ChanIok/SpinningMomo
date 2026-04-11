@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type ComponentPublicInstance } from 'vue'
 import { useElementSize, useEventListener } from '@vueuse/core'
-import type { Asset } from '../types'
+import type { Asset } from '../../types'
 import {
   useGalleryView,
   useGallerySelection,
@@ -9,13 +9,13 @@ import {
   useGalleryContextMenu,
   useMasonryVirtualizer,
   useTimelineRail,
-} from '../composables'
-import { prepareHero } from '../composables/useHeroTransition'
-import { galleryApi } from '../api'
-import { useGalleryStore } from '../store'
+} from '../../composables'
+import { prepareHero } from '../../composables/useHeroTransition'
+import { galleryApi } from '../../api'
+import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
-import AssetCard from './AssetCard.vue'
-import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
+import AssetCard from '../asset/AssetCard.vue'
+import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 
 const store = useGalleryStore()
 const galleryView = useGalleryView()

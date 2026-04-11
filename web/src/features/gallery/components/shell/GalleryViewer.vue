@@ -6,17 +6,17 @@ import {
   useGalleryData,
   useGallerySelection,
   useGalleryView,
-} from '../composables'
-import { useGalleryStore } from '../store'
+} from '../../composables'
+import { useGalleryStore } from '../../store'
 import {
   computeLightboxHeroRect,
   consumeHero,
   endHeroAnimation,
   consumeReverseHero,
-} from '../composables/useHeroTransition'
+} from '../../composables/useHeroTransition'
 import GalleryToolbar from './GalleryToolbar.vue'
 import GalleryContent from './GalleryContent.vue'
-import GalleryLightbox from './lightbox/GalleryLightbox.vue'
+import GalleryLightbox from '../lightbox/GalleryLightbox.vue'
 
 const galleryData = useGalleryData()
 const store = useGalleryStore()

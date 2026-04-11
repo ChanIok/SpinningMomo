@@ -67,7 +67,7 @@ function handleKeydown(event: KeyboardEvent) {
       v-model="inputValue"
       type="text"
       :placeholder="placeholder"
-      class="h-8 w-full rounded border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      class="h-8 w-full rounded border border-input bg-background px-2 text-sm focus:ring-2 focus:ring-ring focus:outline-none"
       @blur="handleBlur"
       @keydown="handleKeydown"
     />

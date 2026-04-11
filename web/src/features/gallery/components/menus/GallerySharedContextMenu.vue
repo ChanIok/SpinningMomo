@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { nextTick, watch } from 'vue'
-import { useGalleryContextMenu } from '../composables/useGalleryContextMenu'
+import { useGalleryContextMenu } from '../../composables/useGalleryContextMenu'
 import GalleryAssetDropdownMenuContent from './GalleryAssetDropdownMenuContent.vue'
 import {
   DropdownMenu,

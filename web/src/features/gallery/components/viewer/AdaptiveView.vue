@@ -1,20 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useElementSize } from '@vueuse/core'
-import type { Asset } from '../types'
+import type { Asset } from '../../types'
 import {
   useAdaptiveVirtualizer,
   useGalleryContextMenu,
   useGallerySelection,
   useGalleryLightbox,
   useTimelineRail,
-} from '../composables'
-import { prepareHero } from '../composables/useHeroTransition'
-import { galleryApi } from '../api'
-import { useGalleryStore } from '../store'
+} from '../../composables'
+import { prepareHero } from '../../composables/useHeroTransition'
+import { galleryApi } from '../../api'
+import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
-import AssetCard from './AssetCard.vue'
-import GalleryScrollbarRail from './GalleryScrollbarRail.vue'
+import AssetCard from '../asset/AssetCard.vue'
+import GalleryScrollbarRail from '../shell/GalleryScrollbarRail.vue'
 
 const store = useGalleryStore()
 const gallerySelection = useGallerySelection()

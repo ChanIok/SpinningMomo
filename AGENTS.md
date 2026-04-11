@@ -145,8 +145,8 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
   - `web/src/features/gallery/api.ts` is the RPC facade and static URL helper layer.
   - `web/src/features/gallery/store.ts` is the single source of truth for gallery UI state: paginated asset cache, timeline buckets, folder tree, tag tree, filters, selection, lightbox, sidebar, and details panel state.
   - `web/src/features/gallery/composables/` coordinates behavior around data loading, selection, layout, sidebar, lightbox, virtualized grids, and asset actions.
-  - `web/src/features/gallery/pages/GalleryPage.vue` hosts the three-pane shell (sidebar, viewer, details); pane bodies live alongside other views under `web/src/features/gallery/components/`.
-  - `web/src/features/gallery/components/` contains view implementations such as grid/list/masonry, toolbar, dialogs, context menu, and lightbox pieces.
+  - `web/src/features/gallery/pages/GalleryPage.vue` hosts the three-pane shell (sidebar, viewer, details); child views live under `web/src/features/gallery/components/` in subfolders: `shell/` (sidebar, viewer, details, toolbar, content), `viewer/` (grid/list/masonry/adaptive), `asset/`, `tags/`, `folders/`, `dialogs/`, `menus/`, `infinity_nikki/`, and `lightbox/`.
+  - `web/src/features/gallery/routes.ts` defines the `/gallery` route; `web/src/router/index.ts` spreads it so there is a single source of truth for path, name (`gallery`), and meta.
 - **Frontend data flow**:
   - Prefer the existing pattern `component -> composable -> api -> RPC` and let components read state directly from the Pinia store.
   - `useGalleryData()` loads data and writes into store state.

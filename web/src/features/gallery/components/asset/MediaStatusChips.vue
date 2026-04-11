@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Star, X } from 'lucide-vue-next'
-import type { ReviewFlag } from '../types'
+import type { ReviewFlag } from '../../types'
 
 interface MediaStatusChipsProps {
   rating?: number

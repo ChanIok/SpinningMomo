@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Button } from '@/components/ui/button'
-import type { TagTreeNode } from '../types'
+import type { TagTreeNode } from '../../types'
 
 interface Props {
   tags: TagTreeNode[]

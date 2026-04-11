@@ -8,11 +8,11 @@ import {
   useGalleryContextMenu,
   useGalleryView,
   useListVirtualizer,
-} from '../composables'
-import type { Asset, SortBy, SortOrder } from '../types'
-import { prepareHero } from '../composables/useHeroTransition'
-import { galleryApi } from '../api'
-import AssetListRow from './AssetListRow.vue'
+} from '../../composables'
+import type { Asset, SortBy, SortOrder } from '../../types'
+import { prepareHero } from '../../composables/useHeroTransition'
+import { galleryApi } from '../../api'
+import AssetListRow from '../asset/AssetListRow.vue'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
 

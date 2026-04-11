@@ -8,12 +8,12 @@ import { Separator } from '@/components/ui/separator'
 import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { setInfinityNikkiUserRecord } from '../api'
+import { setInfinityNikkiUserRecord } from '../../api'
 import type {
   InfinityNikkiDetails,
   InfinityNikkiExtractedParams,
   InfinityNikkiUserRecordCodeType,
-} from '../types'
+} from '../../types'
 
 const props = defineProps<{
   assetId: number

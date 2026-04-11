@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useGalleryStore } from '../store'
-import GridView from './GridView.vue'
-import ListView from './ListView.vue'
-import MasonryView from './MasonryView.vue'
-import AdaptiveView from './AdaptiveView.vue'
-import GallerySharedContextMenu from './GallerySharedContextMenu.vue'
+import { useGalleryStore } from '../../store'
+import GridView from '../viewer/GridView.vue'
+import ListView from '../viewer/ListView.vue'
+import MasonryView from '../viewer/MasonryView.vue'
+import AdaptiveView from '../viewer/AdaptiveView.vue'
+import GallerySharedContextMenu from '../menus/GallerySharedContextMenu.vue'
 
 const store = useGalleryStore()
 const viewMode = computed(() => store.viewConfig.mode)

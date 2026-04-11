@@ -1,15 +1,15 @@
 import type { RouteRecordRaw } from 'vue-router'
 
-// Gallery 路由配置
+// Gallery 路由配置（与根路由共用，见 web/src/router/index.ts）
 export default [
   {
     path: '/gallery',
-    name: 'Gallery',
+    name: 'gallery',
     component: () => import('./pages/GalleryPage.vue'),
     meta: {
       title: '图库',
       icon: 'gallery',
-      requiresAuth: false, // 根据需要调整
-    }
-  }
+      requiresAuth: false,
+    },
+  },
 ] as RouteRecordRaw[]

@@ -10,9 +10,9 @@ import { rgbToHex } from '@/components/ui/color-picker/colorUtils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useSettingsStore } from '@/features/settings/store'
-import { useGalleryStore } from '../store'
-import { useGalleryData } from '../composables/useGalleryData'
-import { useGalleryAssetActions } from '../composables'
+import { useGalleryStore } from '../../store'
+import { useGalleryData } from '../../composables/useGalleryData'
+import { useGalleryAssetActions } from '../../composables'
 import {
   getAssetMainColors,
   getAssetTags,
@@ -20,13 +20,13 @@ import {
   addTagsToAsset,
   getInfinityNikkiDetails,
   updateAssetDescription,
-} from '../api'
-import AssetDetailsContent from './AssetDetailsContent.vue'
-import AssetInfinityNikkiDetails from './AssetInfinityNikkiDetails.vue'
-import AssetHistogram from './AssetHistogram.vue'
-import AssetReviewControls from './AssetReviewControls.vue'
-import TagSelectorPopover from './TagSelectorPopover.vue'
-import type { Asset, AssetMainColor, InfinityNikkiDetails, Tag } from '../types'
+} from '../../api'
+import AssetDetailsContent from '../asset/AssetDetailsContent.vue'
+import AssetInfinityNikkiDetails from '../infinity_nikki/AssetInfinityNikkiDetails.vue'
+import AssetHistogram from '../asset/AssetHistogram.vue'
+import AssetReviewControls from '../asset/AssetReviewControls.vue'
+import TagSelectorPopover from '../tags/TagSelectorPopover.vue'
+import type { Asset, AssetMainColor, InfinityNikkiDetails, Tag } from '../../types'
 
 const store = useGalleryStore()
 const settingsStore = useSettingsStore()

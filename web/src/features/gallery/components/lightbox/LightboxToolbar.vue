@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import ReviewFilterPopover from '../ReviewFilterPopover.vue'
+import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
 
 const ACTUAL_SIZE_EPSILON = 0.001
 

@@ -8,7 +8,7 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
 } from '@/components/ui/context-menu'
-import { useGalleryAssetActions } from '../composables'
+import { useGalleryAssetActions } from '../../composables'
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()

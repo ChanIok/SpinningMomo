@@ -4,8 +4,8 @@ import { call } from '@/core/rpc'
 import { isWebView } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { useGalleryData } from '../composables/useGalleryData'
-import type { ScanAssetsParams, ScanIgnoreRule } from '../types'
+import { useGalleryData } from '../../composables/useGalleryData'
+import type { ScanAssetsParams, ScanIgnoreRule } from '../../types'
 import {
   Dialog,
   DialogContent,

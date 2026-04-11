@@ -2,9 +2,9 @@
 import { ref, computed, watch } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { hexToHsv, hsvToHex, normalizeToHex } from '@/components/ui/color-picker/colorUtils'
-import { useGalleryData } from '../composables/useGalleryData'
+import { useGalleryData } from '../../composables/useGalleryData'
 import MediaStatusChips from './MediaStatusChips.vue'
-import type { Asset } from '../types'
+import type { Asset } from '../../types'
 
 const FALLBACK_PLACEHOLDER_COLOR = '#6B7280'
 

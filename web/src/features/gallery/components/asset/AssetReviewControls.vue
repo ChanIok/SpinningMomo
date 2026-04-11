@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { Star, X } from 'lucide-vue-next'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
-import type { ReviewFlag } from '../types'
+import type { ReviewFlag } from '../../types'
 
 const props = defineProps<{
   rating: number

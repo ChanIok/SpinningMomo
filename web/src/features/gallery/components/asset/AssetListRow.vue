@@ -2,8 +2,8 @@
 import { computed, ref, watch } from 'vue'
 import { Play } from 'lucide-vue-next'
 import { formatFileSize } from '@/lib/utils'
-import { useGalleryData } from '../composables/useGalleryData'
-import type { Asset } from '../types'
+import { useGalleryData } from '../../composables/useGalleryData'
+import type { Asset } from '../../types'
 
 interface AssetListRowProps {
   asset: Asset

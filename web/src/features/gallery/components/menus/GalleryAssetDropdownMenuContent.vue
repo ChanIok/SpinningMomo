@@ -8,7 +8,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useGalleryAssetActions } from '../composables'
+import { useGalleryAssetActions } from '../../composables'
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()

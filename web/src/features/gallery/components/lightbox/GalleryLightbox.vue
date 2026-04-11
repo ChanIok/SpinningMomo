@@ -6,7 +6,7 @@ import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from 
 import { useGalleryStore } from '../../store'
 import { computeLightboxHeroRect, prepareReverseHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
-import GalleryAssetContextMenuContent from '../GalleryAssetContextMenuContent.vue'
+import GalleryAssetContextMenuContent from '../menus/GalleryAssetContextMenuContent.vue'
 import LightboxFilmstrip from './LightboxFilmstrip.vue'
 import LightboxImage from './LightboxImage.vue'
 import LightboxVideo from './LightboxVideo.vue'

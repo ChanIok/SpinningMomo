@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
-import type { ReviewFlag } from '../types'
+import type { ReviewFlag } from '../../types'
 
 const props = defineProps<{
   rating: number | undefined

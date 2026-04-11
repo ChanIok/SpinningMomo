@@ -19,8 +19,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import TagInlineEditor from './TagInlineEditor.vue'
-import { useGalleryStore } from '../store'
-import type { TagTreeNode } from '../types'
+import { useGalleryStore } from '../../store'
+import type { TagTreeNode } from '../../types'
 
 interface Props {
   tag: TagTreeNode

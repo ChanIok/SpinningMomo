@@ -20,9 +20,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useI18n } from '@/composables/useI18n'
 import { useSettingsStore } from '@/features/settings/store'
-import TagInlineEditor from './TagInlineEditor.vue'
-import { useGalleryStore } from '../store'
-import type { FolderTreeNode } from '../types'
+import TagInlineEditor from '../tags/TagInlineEditor.vue'
+import { useGalleryStore } from '../../store'
+import type { FolderTreeNode } from '../../types'
 
 interface Props {
   folder: FolderTreeNode
