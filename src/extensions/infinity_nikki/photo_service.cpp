@@ -119,15 +119,8 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
   }
 
   if (config.allow_online_photo_metadata_extract && result.new_items > 0) {
-    auto task_result = Extensions::InfinityNikki::TaskService::start_extract_photo_params_task(
+    Extensions::InfinityNikki::TaskService::schedule_silent_extract_photo_params(
         app_state, InfinityNikkiExtractPhotoParamsRequest{.only_missing = true});
-    if (!task_result) {
-      Logger().warn("InfinityNikki auto photo metadata extract task not started: {}",
-                    task_result.error());
-    } else {
-      Logger().info("InfinityNikki auto photo metadata extract task started: {}",
-                    task_result.value());
-    }
   }
 }
 
