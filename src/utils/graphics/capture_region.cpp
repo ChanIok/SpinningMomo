@@ -47,6 +47,13 @@ auto calculate_client_crop_region(HWND target_window, UINT texture_width, UINT t
     return std::unexpected("Computed client crop region is invalid");
   }
 
+  // 与基于 GetClientRect 且将宽高 floor 到偶数的编码输出尺寸一致，避免与编码器差 1px。
+  const int client_extent_w = (client_width / 2) * 2;
+  const int client_extent_h = (client_height / 2) * 2;
+  if (client_extent_w <= 0 || client_extent_h <= 0) {
+    return std::unexpected("Computed client crop region is invalid");
+  }
+
   const UINT left = client_origin.x > window_rect.left
                         ? static_cast<UINT>(client_origin.x - window_rect.left)
                         : 0;
@@ -55,12 +62,12 @@ auto calculate_client_crop_region(HWND target_window, UINT texture_width, UINT t
 
   UINT width = 1;
   if (texture_width > left) {
-    width = std::min(texture_width - left, static_cast<UINT>(client_width));
+    width = std::min(texture_width - left, static_cast<UINT>(client_extent_w));
   }
 
   UINT height = 1;
   if (texture_height > top) {
-    height = std::min(texture_height - top, static_cast<UINT>(client_height));
+    height = std::min(texture_height - top, static_cast<UINT>(client_extent_h));
   }
 
   if (left + width > texture_width || top + height > texture_height) {

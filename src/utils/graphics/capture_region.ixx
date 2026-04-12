@@ -18,6 +18,8 @@ export struct CropRegion {
 };
 
 // 基于当前捕获纹理尺寸，计算目标窗口客户区在窗口纹理中的区域。
+// 客户区宽高按偶数向下对齐（与录制模块 calculate_capture_dimensions
+// 一致），便于与视频编码尺寸一致。
 export auto calculate_client_crop_region(HWND target_window, UINT texture_width,
                                          UINT texture_height)
     -> std::expected<CropRegion, std::string>;
