@@ -126,6 +126,8 @@
   "settings.function.outputDir.selectButton": "Select",
   "settings.function.outputDir.selecting": "Selecting...",
   "settings.function.outputDir.dialogTitle": "Select Output Directory",
+  "settings.function.outputDir.driveRootNotAllowedTitle": "Drive root is not allowed",
+  "settings.function.outputDir.driveRootNotAllowedDescription": "Please pick a separate folder (for example D:\\Videos\\SpinningMomo), not just the drive letter root.",
   "settings.function.screenshot.title": "Game Album",
   "settings.function.screenshot.description": "Configure game album directory path for quick access to game screenshot folder.",
   "settings.function.screenshot.gameAlbum.label": "Game Album Directory",

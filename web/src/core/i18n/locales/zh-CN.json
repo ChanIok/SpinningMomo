@@ -126,6 +126,8 @@
   "settings.function.outputDir.selectButton": "选择",
   "settings.function.outputDir.selecting": "选择中...",
   "settings.function.outputDir.dialogTitle": "选择输出目录",
+  "settings.function.outputDir.driveRootNotAllowedTitle": "无法使用磁盘根目录",
+  "settings.function.outputDir.driveRootNotAllowedDescription": "请选择一个独立的文件夹（例如 D:\\Videos\\SpinningMomo），不要只选择盘符根目录。",
   "settings.function.screenshot.title": "游戏相册",
   "settings.function.screenshot.description": "设置游戏相册目录路径，用于快速打开游戏截图文件夹。",
   "settings.function.screenshot.gameAlbum.label": "游戏相册目录",

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
 import { TriangleAlert } from 'lucide-vue-next'
 import ResetSettingsDialog from './ResetSettingsDialog.vue'
 import { call } from '@/core/rpc'
@@ -58,6 +59,13 @@ const {
 } = useFunctionActions()
 const { clearError } = store
 const { t } = useI18n()
+const { toast } = useToast()
+
+/** 是否为 Windows 盘符根路径（如 C:\\、D:/），用于避免将输出目录设为整盘根。 */
+const isWindowsDriveRoot = (raw: string) => {
+  const normalized = raw.trim().replace(/\\/g, '/')
+  return /^[A-Za-z]:\/?$/.test(normalized)
+}
 
 const isSelectingOutputDir = ref(false)
 const isSelectingGameAlbumDir = ref(false)
@@ -111,6 +119,12 @@ const handleSelectOutputDir = async () => {
       },
       0
     )
+    if (isWindowsDriveRoot(result.path)) {
+      toast.warning(t('settings.function.outputDir.driveRootNotAllowedTitle'), {
+        description: t('settings.function.outputDir.driveRootNotAllowedDescription'),
+      })
+      return
+    }
     await updateOutputDir(result.path)
   } catch (error) {
     console.error('Failed to select output directory:', error)
