@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { cn } from '@/lib/utils'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
@@ -49,13 +50,9 @@ const showInfinityNikkiMetadataDialog = ref(false)
 const infinityNikkiMetadataFolderId = ref<number | null>(null)
 const infinityNikkiMetadataFolderName = ref('')
 
-const isFolderTitleSelected = computed(() => {
-  return galleryStore.detailsPanel.type === 'folder' && galleryStore.detailsPanel.folder.id === -1
-})
-
-const isTagTitleSelected = computed(() => {
-  return galleryStore.detailsPanel.type === 'tag' && galleryStore.detailsPanel.tag.id === -1
-})
+// 区块标题表示该维度的「全体 / 未限定」：与 store.filter 一致，不跟详情面板耦合
+const isFolderTitleSelected = computed(() => selectedFolder.value === null)
+const isTagTitleSelected = computed(() => selectedTag.value === null)
 
 function startAddFolder() {
   showAddFolderDialog.value = true
@@ -200,17 +197,20 @@ onMounted(() => {
         <div class="flex items-center justify-between">
           <button
             type="button"
-            :class="[
-              'cursor-pointer rounded px-2 py-1 text-xs font-medium tracking-wider uppercase transition-colors',
-              isFolderTitleSelected
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            ]"
+            :class="
+              cn(
+                'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
+                'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                isFolderTitleSelected
+                  ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )
+            "
             @click="clearFolderFilter"
           >
             {{ t('gallery.sidebar.folders.title') }}
           </button>
-          <Button variant="ghost" size="icon" class="h-6 w-6" @click="startAddFolder">
+          <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
             <Plus class="h-3 w-3" />
           </Button>
         </div>
@@ -246,17 +246,20 @@ onMounted(() => {
         <div class="flex items-center justify-between">
           <button
             type="button"
-            :class="[
-              'cursor-pointer rounded px-2 py-1 text-xs font-medium tracking-wider uppercase transition-colors',
-              isTagTitleSelected
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            ]"
+            :class="
+              cn(
+                'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
+                'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                isTagTitleSelected
+                  ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )
+            "
             @click="clearTagFilter"
           >
             {{ t('gallery.sidebar.tags.title') }}
           </button>
-          <Button variant="ghost" size="icon" class="h-6 w-6" @click="startCreateTag">
+          <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
             <Plus class="h-3 w-3" />
           </Button>
         </div>

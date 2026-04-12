@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -160,13 +160,17 @@ function handleContextMenuCloseAutoFocus(event: Event) {
 
     <ContextMenu v-else>
       <ContextMenuTrigger as-child>
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          :class="[
-            'group relative h-8 w-full justify-between rounded px-0 transition-colors',
-            selectedFolder === folder.id ? 'bg-accent text-accent-foreground' : '',
-          ]"
+          :class="
+            cn(
+              'group relative flex h-8 w-full cursor-pointer items-center justify-between rounded-md border-0 bg-transparent px-0 text-left text-sm transition-colors duration-200 ease-out outline-none',
+              'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
+              selectedFolder === folder.id
+                ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
+                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )
+          "
           :style="{ paddingLeft: `${depth * 12 + 8}px` }"
           @click="handleItemClick"
         >
@@ -201,7 +205,10 @@ function handleContextMenuCloseAutoFocus(event: Event) {
             class="flex flex-shrink-0 items-center gap-2"
             v-if="folder.children && folder.children.length > 0"
           >
-            <span class="-mr-0.5 flex-shrink-0 rounded p-1.5" @click.stop="toggleExpand">
+            <span
+              class="-mr-0.5 flex-shrink-0 rounded-md p-1.5 hover:bg-sidebar-accent/80"
+              @click.stop="toggleExpand"
+            >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="12"
@@ -219,7 +226,7 @@ function handleContextMenuCloseAutoFocus(event: Event) {
               </svg>
             </span>
           </div>
-        </Button>
+        </button>
       </ContextMenuTrigger>
 
       <ContextMenuContent @close-auto-focus="handleContextMenuCloseAutoFocus">

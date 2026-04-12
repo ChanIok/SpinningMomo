@@ -15,6 +15,9 @@ export const buttonVariants = cva(
           'border bg-background hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input',
         secondary: 'bg-secondary text-secondary-foreground  hover:bg-secondary/80',
         ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+        /** 图库侧栏加号、工具条/灯箱图标按钮等：与 SettingsSidebar 同源 sidebar token */
+        sidebarGhost:
+          'text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 dark:hover:bg-sidebar-accent/80',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
@@ -23,6 +26,7 @@ export const buttonVariants = cva(
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
         icon: 'size-9',
         'icon-sm': 'size-8',
+        'icon-xs': 'size-6',
         'icon-lg': 'size-10',
       },
     },

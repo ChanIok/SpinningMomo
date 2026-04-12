@@ -158,7 +158,7 @@ function handleWheel(event: WheelEvent) {
 </script>
 
 <template>
-  <div class="surface-top flex flex-col border-t border-border">
+  <div class="flex flex-col">
     <ScrollArea ref="scrollAreaRef" class="filmstrip-scroller" @wheel.prevent="handleWheel">
       <div class="px-4 py-3">
         <div

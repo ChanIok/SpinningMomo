@@ -10,13 +10,16 @@
           :placeholder="t('gallery.toolbar.search.placeholder')"
           class="pl-10"
         />
-        <button
+        <Button
           v-if="searchQuery"
-          class="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+          type="button"
+          variant="sidebarGhost"
+          size="icon-sm"
+          class="absolute top-1/2 right-3 -translate-y-1/2"
           @click="clearSearch"
         >
           <X class="h-4 w-4" />
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -29,7 +32,7 @@
             <div>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="sidebarGhost" size="sm">
                     <ListFilter class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -127,7 +130,7 @@
             <div>
               <Popover v-model:open="colorPopoverOpen">
                 <PopoverTrigger as-child>
-                  <Button variant="ghost" size="sm" class="relative">
+                  <Button variant="sidebarGhost" size="sm" class="relative">
                     <Palette class="h-4 w-4" />
                     <span
                       v-if="activeColorHex"
@@ -155,7 +158,7 @@
                       </div>
                       <Button
                         v-if="activeColorHex"
-                        variant="ghost"
+                        variant="sidebarGhost"
                         size="sm"
                         class="h-7 px-2 text-xs"
                         @click="clearColorFilter"
@@ -192,8 +195,13 @@
             <div>
               <Popover>
                 <PopoverTrigger as-child>
-                  <Button variant="ghost" size="sm" class="relative">
-                    <Star class="h-4 w-4" :class="hasReviewFilter ? 'text-primary' : ''" />
+                  <Button
+                    variant="sidebarGhost"
+                    size="sm"
+                    class="relative"
+                    :class="hasReviewFilter ? 'text-primary' : ''"
+                  >
+                    <Star class="h-4 w-4" />
                     <span
                       v-if="hasReviewFilter"
                       class="absolute right-1 bottom-1 h-2 w-2 rounded-full bg-primary"
@@ -224,7 +232,7 @@
             <div>
               <Popover>
                 <PopoverTrigger as-child>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="sidebarGhost" size="sm">
                     <component :is="currentViewModeIcon" class="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
@@ -357,9 +365,9 @@ const hasReviewFilter = computed(
 // 视图模式选项
 const viewModes = [
   { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
+  { value: 'adaptive' as ViewMode, icon: Rows3, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
   { value: 'masonry' as ViewMode, icon: LayoutGrid, i18nKey: 'gallery.toolbar.viewMode.masonry' },
   { value: 'list' as ViewMode, icon: List, i18nKey: 'gallery.toolbar.viewMode.list' },
-  { value: 'adaptive' as ViewMode, icon: Rows3, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
 ]
 
 // 当前视图模式的图标

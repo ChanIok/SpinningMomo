@@ -18,7 +18,7 @@ import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
 
 // 行高 = viewSize * 0.4，使缩略图大小与网格视图的卡片尺寸保持视觉一致
 const LIST_ROW_HEIGHT_FACTOR = 0.4
-// 固定表头高度，需传给 virtualizer 作为 scrollPaddingStart，避免跳转时被表头遮挡
+// 固定表头高度（表头在滚动区外，不参与虚拟列表的 scrollPadding）
 const LIST_HEADER_HEIGHT = 36
 
 const { t } = useI18n()
@@ -32,9 +32,6 @@ const scrollContainerRef = ref<HTMLElement | null>(null)
 
 const rowHeight = computed(() => Math.round(galleryView.viewSize.value * LIST_ROW_HEIGHT_FACTOR))
 
-// headerHeight 作为 computed 传入 virtualizer，确保响应式
-const headerHeight = computed(() => LIST_HEADER_HEIGHT)
-
 // 缩略图尺寸略小于行高，留出上下内边距；最小 28px 保证可辨识
 const thumbnailSize = computed(() => Math.max(28, rowHeight.value - 12))
 // 缩略图列宽 = 缩略图尺寸 + 左右内边距
@@ -47,7 +44,6 @@ const columnsTemplate = computed(
 const listVirtualizer = useListVirtualizer({
   containerRef: scrollContainerRef,
   rowHeight,
-  scrollPaddingStart: headerHeight,
 })
 
 const sortBy = computed(() => galleryView.sortBy.value)
@@ -141,19 +137,13 @@ defineExpose({ scrollToIndex, getCardRect })
 </script>
 
 <template>
-  <ScrollArea ref="scrollAreaRef" type="always" class="mr-1 h-full">
-    <template #scrollbar>
-      <ScrollBar
-        class="w-4 p-0.5"
-        thumb-class="bg-muted-foreground/35 hover:bg-muted-foreground/50"
-      />
-    </template>
-    <div class="px-4 pb-3">
+  <div class="mr-1 flex h-full min-h-0 flex-col">
+    <div class="shrink-0 px-4">
       <div
-        class="sticky top-0 z-10 grid items-center gap-3 border-b bg-background/95 px-3 backdrop-blur-sm"
+        class="grid items-center gap-3 px-3"
         :style="{
           gridTemplateColumns: columnsTemplate,
-          height: `${headerHeight}px`,
+          height: `${LIST_HEADER_HEIGHT}px`,
         }"
       >
         <div />
@@ -188,61 +178,71 @@ defineExpose({ scrollToIndex, getCardRect })
           <component :is="getSortIcon('size')" class="h-3.5 w-3.5" />
         </button>
       </div>
+    </div>
 
-      <div
-        class="relative"
-        :style="{
-          height: `${listVirtualizer.virtualizer.value.getTotalSize()}px`,
-        }"
-      >
+    <ScrollArea ref="scrollAreaRef" type="always" class="min-h-0 flex-1">
+      <template #scrollbar>
+        <ScrollBar
+          class="w-4 p-0.5"
+          thumb-class="bg-muted-foreground/35 hover:bg-muted-foreground/50"
+        />
+      </template>
+      <div class="px-4 pb-3">
         <div
-          v-for="virtualItem in listVirtualizer.virtualItems.value"
-          :key="virtualItem.index"
-          :data-index="virtualItem.index"
+          class="relative"
           :style="{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: `${virtualItem.size}px`,
-            transform: `translateY(${virtualItem.start}px)`,
+            height: `${listVirtualizer.virtualizer.value.getTotalSize()}px`,
           }"
         >
-          <AssetListRow
-            v-if="virtualItem.asset !== null"
-            :asset="virtualItem.asset"
-            :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
-            :row-height="rowHeight"
-            :thumbnail-size="thumbnailSize"
-            :columns-template="columnsTemplate"
-            @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
-            @double-click="
-              (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
-            "
-            @context-menu="
-              (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)
-            "
-          />
-
           <div
-            v-else
-            class="grid animate-pulse items-center gap-3 rounded-sm px-3"
+            v-for="virtualItem in listVirtualizer.virtualItems.value"
+            :key="virtualItem.index"
+            :data-index="virtualItem.index"
             :style="{
-              gridTemplateColumns: columnsTemplate,
-              height: `${rowHeight}px`,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualItem.size}px`,
+              transform: `translateY(${virtualItem.start}px)`,
             }"
           >
-            <div
-              class="rounded-sm bg-muted"
-              :style="{ width: `${thumbnailSize}px`, height: `${thumbnailSize}px` }"
+            <AssetListRow
+              v-if="virtualItem.asset !== null"
+              :asset="virtualItem.asset"
+              :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
+              :row-height="rowHeight"
+              :thumbnail-size="thumbnailSize"
+              :columns-template="columnsTemplate"
+              @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
+              @double-click="
+                (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
+              "
+              @context-menu="
+                (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)
+              "
             />
-            <div class="h-3 rounded bg-muted" />
-            <div class="h-3 rounded bg-muted" />
-            <div class="h-3 rounded bg-muted" />
-            <div class="ml-auto h-3 w-20 rounded bg-muted" />
+
+            <div
+              v-else
+              class="grid animate-pulse items-center gap-3 rounded-sm px-3"
+              :style="{
+                gridTemplateColumns: columnsTemplate,
+                height: `${rowHeight}px`,
+              }"
+            >
+              <div
+                class="rounded-sm bg-muted"
+                :style="{ width: `${thumbnailSize}px`, height: `${thumbnailSize}px` }"
+              />
+              <div class="h-3 rounded bg-muted" />
+              <div class="h-3 rounded bg-muted" />
+              <div class="h-3 rounded bg-muted" />
+              <div class="ml-auto h-3 w-20 rounded bg-muted" />
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  </ScrollArea>
+    </ScrollArea>
+  </div>
 </template>
