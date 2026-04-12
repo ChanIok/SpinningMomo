@@ -417,6 +417,7 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
     for (const auto& [host_name, mapping] : state.webview->resources.virtual_host_folder_mappings) {
       mappings.emplace_back(host_name, mapping);
     }
+    state.webview->resources.applied_virtual_host_folder_mappings.clear();
   }
 
   for (const auto& [host_name, mapping] : mappings) {
@@ -428,6 +429,11 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
                     Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(mapping.folder_path),
                     hr);
       continue;
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(state.webview->resources.virtual_host_folder_mappings_mutex);
+      state.webview->resources.applied_virtual_host_folder_mappings.insert(host_name);
     }
 
     Logger().info("Restored virtual host mapping: {} -> {}", Utils::String::ToUtf8(host_name),

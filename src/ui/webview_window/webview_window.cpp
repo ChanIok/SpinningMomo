@@ -337,6 +337,16 @@ auto window_proc(Vendor::Windows::HWND hwnd, Vendor::Windows::UINT msg,
       return 0;
     }
 
+    // 处理虚拟主机映射协调请求，确保 WebView COM 调用在窗口线程中执行
+    case Core::WebView::State::kWM_APP_RECONCILE_VIRTUAL_HOST_MAPPINGS: {
+      if (!state || !state->webview || !state->webview->window.webview_hwnd) {
+        return 0;
+      }
+
+      Core::WebView::reconcile_virtual_host_folder_mappings(*state);
+      return 0;
+    }
+
     case WM_GETMINMAXINFO: {
       MINMAXINFO* mmi = reinterpret_cast<MINMAXINFO*>(lparam);
 

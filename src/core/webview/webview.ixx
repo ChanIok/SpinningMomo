@@ -39,6 +39,10 @@ export auto register_virtual_host_folder_mapping(
     Core::WebView::State::VirtualHostResourceAccessKind access_kind) -> void;
 export auto unregister_virtual_host_folder_mapping(Core::State::AppState& state,
                                                    std::wstring_view host_name) -> void;
+// 请求协调虚拟主机映射：通过 PostMessage 触发窗口线程执行 reconcile
+export auto request_virtual_host_folder_mapping_reconcile(Core::State::AppState& state) -> void;
+// 执行虚拟主机映射协调：在 WebView 所在线程中比对期望状态与已应用状态，差量更新
+export auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> void;
 export auto apply_background_mode_from_settings(Core::State::AppState& state) -> void;
 export auto get_loading_background_color(Core::State::AppState& state) -> COLORREF;
 export auto is_composition_active(Core::State::AppState& state) -> bool;
