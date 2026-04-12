@@ -452,7 +452,7 @@
   "gallery.guide.infinityNikki.hardlinksTitle": "Optimize photos in the ScreenShot folder as hardlinks",
   "gallery.guide.infinityNikki.hardlinksDescription": "The game saves two identical copies of each photo when taking pictures. This feature will replace the files in ScreenShot with hardlinks to Momo's Album so you keep a single physical file copy.",
   "gallery.guide.infinityNikki.hardlinksDetailsTrigger": "View directory change details",
-  "gallery.guide.infinityNikki.hardlinksDetailsContent": "• The current ScreenShot folder will be backed up to ScreenShot_old (you can delete it later).\n• After that, photos in ScreenShot will share the same file as Momo's Album, new content will stay in sync automatically, and everyday copying or sending will still work as usual.",
+  "gallery.guide.infinityNikki.hardlinksDetailsContent": "• This feature creates hard link mirrors in ScreenShot based on the NikkiPhotos_HighQuality folder, so both locations refer to the same file data.\n• New photos stay in sync automatically, and everyday copying or sending still works as usual.",
   "gallery.guide.infinityNikki.actions.applyRecommended": "Apply recommended setup",
   "gallery.guide.infinityNikki.actions.enableMetadataOnly": "Enable metadata only",
   "gallery.guide.infinityNikki.actions.skipForNow": "Not now",

@@ -190,6 +190,7 @@ enum class ScanChangeAction {
 // 扫描输出的最小变化单元。
 // 供运行时增量消费者（如 Infinity Nikki ScreenShot 硬链接同步）直接复用，
 // 避免再次全量遍历文件系统推导“这次到底哪些文件变了”。
+// REMOVE 表示监视根下该路径对应的文件已从磁盘消失；与索引中是否仍能删到一行资产无关。
 struct ScanChange {
   std::string path;
   ScanChangeAction action = ScanChangeAction::UPSERT;

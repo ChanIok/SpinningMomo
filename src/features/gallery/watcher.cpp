@@ -649,12 +649,13 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
 
     if (remove_result.value()) {
       result.deleted_items++;
-      // 把真实删除路径透传给上层扩展，允许其做按文件粒度的派生同步。
-      result.changes.push_back(Types::ScanChange{
-          .path = path,
-          .action = Types::ScanChangeAction::REMOVE,
-      });
     }
+    // 无论索引里是否仍有该行（例如 RPC 已先行删库），都把 REMOVE 写入 changes：
+    // ScanChange 表示监视根下的路径已从磁盘消失，供扩展做派生同步（如硬链接撤销）。
+    result.changes.push_back(Types::ScanChange{
+        .path = path,
+        .action = Types::ScanChangeAction::REMOVE,
+    });
   }
 
   for (const auto& [path, action] : snapshot.file_changes) {
@@ -734,13 +735,13 @@ auto dispatch_scan_result(Core::State::AppState& app_state,
       result.deleted_items, result.errors.size());
 
   if (force_gallery_changed || result.new_items > 0 || result.updated_items > 0 ||
-      result.deleted_items > 0) {
+      result.deleted_items > 0 || !result.changes.empty()) {
     Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
   }
 
   auto post_scan_callback = get_post_scan_callback(watcher);
-  if (post_scan_callback &&
-      (result.new_items > 0 || result.updated_items > 0 || result.deleted_items > 0)) {
+  if (post_scan_callback && (result.new_items > 0 || result.updated_items > 0 ||
+                             result.deleted_items > 0 || !result.changes.empty())) {
     post_scan_callback(result);
   }
 }

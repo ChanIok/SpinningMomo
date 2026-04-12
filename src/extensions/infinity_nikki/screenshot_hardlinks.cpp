@@ -18,8 +18,6 @@ constexpr wchar_t kHighQualityFolderName[] = L"NikkiPhotos_HighQuality";
 constexpr wchar_t kGamePlayPhotosFolderName[] = L"GamePlayPhotos";
 // 游戏截图目录：本功能会将此目录管理为高清原图的硬链接镜像
 constexpr wchar_t kScreenShotFolderName[] = L"ScreenShot";
-// 首次初始化时，原 ScreenShot 目录的内容会备份至此
-constexpr wchar_t kScreenShotBackupFolderName[] = L"ScreenShot_old";
 constexpr std::array<std::string_view, 7> kSupportedExtensions = {".jpg",  ".jpeg", ".png", ".bmp",
                                                                   ".webp", ".tiff", ".tif"};
 
@@ -27,9 +25,8 @@ constexpr std::array<std::string_view, 7> kSupportedExtensions = {".jpg",  ".jpe
 struct ManagedPaths {
   std::filesystem::path game_dir;
   std::filesystem::path x6game_dir;
-  std::filesystem::path gameplay_photos_dir;    // 扫描高清原图的根目录
-  std::filesystem::path screenshot_dir;         // 放置硬链接镜像的目录
-  std::filesystem::path screenshot_backup_dir;  // 原截图的备份目录
+  std::filesystem::path gameplay_photos_dir;  // 扫描高清原图的根目录
+  std::filesystem::path screenshot_dir;       // 放置硬链接镜像的目录
 };
 
 // 一张高清原图及其对应的硬链接信息
@@ -153,20 +150,18 @@ auto resolve_managed_paths(Core::State::AppState& app_state)
   auto x6game_dir = game_dir / L"X6Game";
   auto gameplay_photos_dir = x6game_dir / L"Saved" / kGamePlayPhotosFolderName;
   auto screenshot_dir = x6game_dir / kScreenShotFolderName;
-  auto screenshot_backup_dir = x6game_dir / kScreenShotBackupFolderName;
 
   std::error_code ec;
   if (!std::filesystem::exists(gameplay_photos_dir, ec) || ec) {
     return std::unexpected("GamePlayPhotos directory does not exist");
   }
 
-  // screenshot_dir 和 backup_dir 在此阶段可能尚不存在，仅做词法规范化
+  // screenshot_dir 在此阶段可能尚不存在，仅做词法规范化
   return ManagedPaths{
       .game_dir = normalize_existing_path(game_dir),
       .x6game_dir = normalize_existing_path(x6game_dir),
       .gameplay_photos_dir = normalize_existing_path(gameplay_photos_dir),
       .screenshot_dir = screenshot_dir.lexically_normal(),
-      .screenshot_backup_dir = screenshot_backup_dir.lexically_normal(),
   };
 }
 
@@ -266,131 +261,6 @@ auto ensure_directory_exists(const std::filesystem::path& path)
   return {};
 }
 
-// 将 source_path（文件或目录）递归复制到 backup_path，
-// 目录情况下保留内部结构，文件情况下直接覆盖复制
-auto copy_entry_into_backup(const std::filesystem::path& source_path,
-                            const std::filesystem::path& backup_path)
-    -> std::expected<void, std::string> {
-  std::error_code ec;
-  if (std::filesystem::is_directory(source_path, ec)) {
-    if (ec) {
-      return std::unexpected("Failed to inspect directory '" +
-                             Utils::String::ToUtf8(source_path.wstring()) + "': " + ec.message());
-    }
-
-    std::filesystem::create_directories(backup_path, ec);
-    if (ec) {
-      return std::unexpected("Failed to create backup directory '" +
-                             Utils::String::ToUtf8(backup_path.wstring()) + "': " + ec.message());
-    }
-
-    std::filesystem::recursive_directory_iterator end_iter;
-    for (std::filesystem::recursive_directory_iterator iter(
-             source_path, std::filesystem::directory_options::skip_permission_denied, ec);
-         iter != end_iter; iter.increment(ec)) {
-      if (ec) {
-        return std::unexpected("Failed to enumerate backup source '" +
-                               Utils::String::ToUtf8(source_path.wstring()) + "': " + ec.message());
-      }
-
-      auto relative_path = std::filesystem::relative(iter->path(), source_path, ec);
-      if (ec) {
-        return std::unexpected("Failed to build backup relative path for '" +
-                               Utils::String::ToUtf8(iter->path().wstring()) +
-                               "': " + ec.message());
-      }
-
-      auto destination_path = backup_path / relative_path;
-      if (iter->is_directory(ec)) {
-        ec.clear();
-        std::filesystem::create_directories(destination_path, ec);
-        if (ec) {
-          return std::unexpected("Failed to create backup directory '" +
-                                 Utils::String::ToUtf8(destination_path.wstring()) +
-                                 "': " + ec.message());
-        }
-        continue;
-      }
-
-      if (!iter->is_regular_file(ec) || ec) {
-        ec.clear();
-        continue;
-      }
-
-      std::filesystem::create_directories(destination_path.parent_path(), ec);
-      if (ec) {
-        return std::unexpected("Failed to create parent directory '" +
-                               Utils::String::ToUtf8(destination_path.parent_path().wstring()) +
-                               "': " + ec.message());
-      }
-      std::filesystem::copy_file(iter->path(), destination_path,
-                                 std::filesystem::copy_options::overwrite_existing, ec);
-      if (ec) {
-        return std::unexpected("Failed to backup file '" +
-                               Utils::String::ToUtf8(iter->path().wstring()) +
-                               "': " + ec.message());
-      }
-    }
-
-    return {};
-  }
-
-  if (!std::filesystem::is_regular_file(source_path, ec) || ec) {
-    return {};
-  }
-
-  std::filesystem::create_directories(backup_path.parent_path(), ec);
-  if (ec) {
-    return std::unexpected("Failed to create parent directory '" +
-                           Utils::String::ToUtf8(backup_path.parent_path().wstring()) +
-                           "': " + ec.message());
-  }
-  std::filesystem::copy_file(source_path, backup_path,
-                             std::filesystem::copy_options::overwrite_existing, ec);
-  if (ec) {
-    return std::unexpected("Failed to backup file '" +
-                           Utils::String::ToUtf8(source_path.wstring()) + "': " + ec.message());
-  }
-
-  return {};
-}
-
-// 首次初始化时调用：将现有 ScreenShot 目录的全部内容备份至 ScreenShot_old，
-// 然后清空 ScreenShot 目录，为后续填入硬链接做准备。
-// 若 ScreenShot 目录尚不存在，则直接创建空目录
-auto backup_existing_screenshot_directory(const ManagedPaths& paths)
-    -> std::expected<void, std::string> {
-  std::error_code ec;
-  if (!std::filesystem::exists(paths.screenshot_dir, ec) || ec) {
-    ec.clear();
-    return ensure_directory_exists(paths.screenshot_dir);
-  }
-
-  auto ensure_result = ensure_directory_exists(paths.screenshot_backup_dir);
-  if (!ensure_result) {
-    return ensure_result;
-  }
-
-  for (const auto& entry : std::filesystem::directory_iterator(paths.screenshot_dir, ec)) {
-    if (ec) {
-      return std::unexpected("Failed to enumerate ScreenShot directory: " + ec.message());
-    }
-
-    auto backup_target = paths.screenshot_backup_dir / entry.path().filename();
-    auto backup_result = copy_entry_into_backup(entry.path(), backup_target);
-    if (!backup_result) {
-      return backup_result;
-    }
-  }
-
-  std::filesystem::remove_all(paths.screenshot_dir, ec);
-  if (ec) {
-    return std::unexpected("Failed to clear ScreenShot directory: " + ec.message());
-  }
-
-  return ensure_directory_exists(paths.screenshot_dir);
-}
-
 auto are_equivalent_entries(const std::filesystem::path& lhs, const std::filesystem::path& rhs)
     -> bool {
   std::error_code ec;
@@ -450,9 +320,8 @@ auto ensure_hardlink(const std::filesystem::path& link_path,
 // 硬链接同步的核心逻辑，分两阶段执行：
 // 1. 清理阶段：遍历 ScreenShot 目录，删除不在期望集合内的受管目录项
 // 2. 同步阶段：遍历 sources，确保每个期望文件名都存在并指向目标原图
-// backup_existing=true 时（首次初始化）先备份并清空 ScreenShot 目录
 auto sync_hardlinks_internal(
-    Core::State::AppState& app_state, bool backup_existing,
+    Core::State::AppState& app_state,
     const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
         progress_callback)
     -> std::expected<InfinityNikkiInitializeScreenshotHardlinksResult, std::string> {
@@ -464,17 +333,9 @@ auto sync_hardlinks_internal(
 
   InfinityNikkiInitializeScreenshotHardlinksResult result;
 
-  if (backup_existing) {
-    report_progress(progress_callback, "preparing", 0, 0, 10.0, "Backing up ScreenShot directory");
-    auto backup_result = backup_existing_screenshot_directory(paths);
-    if (!backup_result) {
-      return std::unexpected(backup_result.error());
-    }
-  } else {
-    auto ensure_result = ensure_directory_exists(paths.screenshot_dir);
-    if (!ensure_result) {
-      return std::unexpected(ensure_result.error());
-    }
+  auto ensure_result = ensure_directory_exists(paths.screenshot_dir);
+  if (!ensure_result) {
+    return std::unexpected(ensure_result.error());
   }
 
   auto sources_result = collect_source_assets(paths, progress_callback, result);
@@ -652,12 +513,12 @@ auto initialize(
     const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
         progress_callback)
     -> std::expected<InfinityNikkiInitializeScreenshotHardlinksResult, std::string> {
-  return sync_hardlinks_internal(app_state, true, progress_callback);
+  return sync_hardlinks_internal(app_state, progress_callback);
 }
 
 auto sync(Core::State::AppState& app_state)
     -> std::expected<InfinityNikkiInitializeScreenshotHardlinksResult, std::string> {
-  return sync_hardlinks_internal(app_state, false, nullptr);
+  return sync_hardlinks_internal(app_state, nullptr);
 }
 
 auto resolve_watch_directory(Core::State::AppState& app_state)

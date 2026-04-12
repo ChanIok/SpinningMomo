@@ -452,7 +452,7 @@
   "gallery.guide.infinityNikki.hardlinksTitle": "优化 ScreenShot 目录的照片为硬链接",
   "gallery.guide.infinityNikki.hardlinksDescription": "游戏在拍摄时会保存两份相同照片。该功能会将 ScreenShot 目录内的文件替换为指向大喵相册的硬链接，只保留一份物理文件以节省存储空间。",
   "gallery.guide.infinityNikki.hardlinksDetailsTrigger": "查看目录变更细节",
-  "gallery.guide.infinityNikki.hardlinksDetailsContent": "• 当前的 ScreenShot 文件夹会先备份到 ScreenShot_old（后续你可以自行删除）。\n• 之后 ScreenShot 中的照片会与大喵相册共用同一份文件，新增内容自动同步，日常复制或发送也不受影响。",
+  "gallery.guide.infinityNikki.hardlinksDetailsContent": "• 本功能会按  NikkiPhotos_HighQuality 在 ScreenShot 中建立硬链接镜像，使两边指向同一份文件。\n• 新增照片自动同步，日常复制或发送也不受影响。",
   "gallery.guide.infinityNikki.actions.applyRecommended": "一键开启推荐配置",
   "gallery.guide.infinityNikki.actions.enableMetadataOnly": "仅开启元数据解析",
   "gallery.guide.infinityNikki.actions.skipForNow": "暂不处理",
