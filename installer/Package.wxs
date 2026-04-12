@@ -24,12 +24,28 @@
       Manufacturer="ChanIok" />
 
     <Binary Id="DetectProcessScript" SourceFile="$(var.ProjectDir)\installer\DetectRunningSpinningMomo.js" />
+    <Binary Id="CleanupAppDataScript" SourceFile="$(var.ProjectDir)\installer\CleanupAppDataRoot.js" />
     <CustomAction
       Id="DetectRunningSpinningMomo"
       BinaryRef="DetectProcessScript"
       JScriptCall="DetectRunningSpinningMomo"
       Execute="immediate"
       Return="check" />
+    <!-- 彻底卸载时递归删除 %LocalAppData%\SpinningMomo；升级卸载旧版时不执行（避免清库） -->
+    <CustomAction
+      Id="PrepareRemoveAppDataRoot"
+      BinaryRef="CleanupAppDataScript"
+      JScriptCall="PrepareRemoveAppDataRoot"
+      Execute="immediate"
+      Return="ignore" />
+    <!-- Id 必须全大写：deferred+Impersonate 时仅「公共属性」会写入 CustomActionData，否则路径传不进去 -->
+    <CustomAction
+      Id="REMOVEAPPDATADIR"
+      BinaryRef="CleanupAppDataScript"
+      JScriptCall="RemoveAppDataRootDeferred"
+      Execute="deferred"
+      Impersonate="yes"
+      Return="ignore" />
     <InstallUISequence>
       <Custom
         Action="DetectRunningSpinningMomo"
@@ -39,6 +55,14 @@
       <Custom
         Action="DetectRunningSpinningMomo"
         Before="LaunchConditions" />
+      <Custom
+        Action="PrepareRemoveAppDataRoot"
+        Before="REMOVEAPPDATADIR"
+        Condition='REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE' />
+      <Custom
+        Action="REMOVEAPPDATADIR"
+        After="RemoveFiles"
+        Condition='REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE' />
     </InstallExecuteSequence>
 
     <!-- Upgrade logic: install new version first, then remove old components -->
@@ -190,10 +214,9 @@
     </Component>
   </Fragment>
 
-  <!-- Remove app data on uninstall -->
+  <!-- Remove app data on uninstall（递归删除由 CleanupAppDataRoot.js 的 deferred CA 完成，避免 RemoveFolderEx 枚举整棵树） -->
   <Fragment>
     <Component Id="CleanupUserData" Directory="INSTALLFOLDER" Guid="7DF1D902-6FF4-43EF-B58A-837AE33B4494">
-      <util:RemoveFolderEx Id="RemoveAppDataRoot" On="uninstall" Property="APPDATAROOT" />
       <!-- Remove install folder itself if empty -->
       <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
       <!-- Registry key for component tracking -->
