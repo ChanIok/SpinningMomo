@@ -278,6 +278,13 @@ export interface StartScanAssetsResult {
   taskId: string
 }
 
+export interface AssetReachability {
+  exists: boolean
+  readable: boolean
+  path?: string
+  reason?: string
+}
+
 // ============= 统一查询相关类型 =============
 
 // 查询过滤器

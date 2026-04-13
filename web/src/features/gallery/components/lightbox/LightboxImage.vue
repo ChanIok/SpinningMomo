@@ -29,6 +29,7 @@ const galleryData = useGalleryData()
 
 const imageError = ref(false)
 const originalLoaded = ref(false)
+const autoRecovering = ref(false)
 const switchingFrame = ref(false)
 const previousFrame = ref<{
   id: number
@@ -433,9 +434,48 @@ function handleThumbnailLoad() {
   finishFrameSwitch()
 }
 
+function isRootMappedOriginalUrl(url: string): boolean {
+  return /^https:\/\/r-\d+\.test\//i.test(url)
+}
+
+async function tryAutoRecoverByReload() {
+  if (autoRecovering.value) {
+    return
+  }
+
+  const asset = currentAsset.value
+  if (!asset) {
+    return
+  }
+
+  if (!isRootMappedOriginalUrl(originalUrl.value)) {
+    return
+  }
+
+  const currentUrl = new URL(window.location.href)
+  if (currentUrl.searchParams.get('lbRetry') === '1') {
+    return
+  }
+
+  const reachability = await galleryApi.checkAssetReachable(asset.id)
+  if (!reachability.exists || !reachability.readable) {
+    return
+  }
+
+  autoRecovering.value = true
+  currentUrl.searchParams.set('lbAssetId', String(asset.id))
+  currentUrl.searchParams.set('lbFolderId', store.filter.folderId ?? 'all')
+  currentUrl.searchParams.set('lbRetry', '1')
+  window.location.replace(currentUrl.toString())
+}
+
 function handleImageError() {
   imageError.value = true
   finishFrameSwitch()
+
+  void tryAutoRecoverByReload().catch((error) => {
+    console.warn('Failed to recover lightbox image:', error)
+  })
 }
 
 function handlePrevious() {

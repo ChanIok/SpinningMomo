@@ -462,25 +462,6 @@ auto register_web_resource_resolver(Core::State::AppState& state, std::wstring p
   Logger().debug("Registered WebView resource resolver for: {}", Utils::String::ToUtf8(prefix));
 }
 
-auto unregister_web_resource_resolver(Core::State::AppState& state, std::wstring_view prefix)
-    -> void {
-  if (!state.webview || !state.webview->resources.web_resolvers) {
-    return;
-  }
-
-  auto& registry = *state.webview->resources.web_resolvers;
-  std::unique_lock lock(registry.write_mutex);
-
-  // RCU 写入：复制当前 vector，删除匹配项，然后原子替换
-  auto current = registry.resolvers.load();
-  auto new_resolvers = std::make_shared<std::vector<Types::WebResolverEntry>>(*current);
-  std::erase_if(*new_resolvers, [prefix](const auto& entry) { return entry.prefix == prefix; });
-  registry.resolvers.store(new_resolvers);
-
-  Logger().debug("Unregistered WebView resource resolver for: {}",
-                 Utils::String::ToUtf8(std::wstring(prefix)));
-}
-
 auto setup_resource_interception(Core::State::AppState& state, ICoreWebView2* webview,
                                  ICoreWebView2Environment* environment,
                                  Core::WebView::State::CoreResources& resources,

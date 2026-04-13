@@ -7,9 +7,7 @@ import Core.State;
 import Core.HttpServer.Static;
 import Core.HttpServer.Types;
 import Core.WebView;
-import Core.WebView.Static;
 import Core.WebView.State;
-import Core.WebView.Types;
 import Features.Gallery.State;
 import Features.Gallery.OriginalLocator;
 import Utils.Logger;
@@ -56,19 +54,10 @@ auto extract_relative_path_generic(std::basic_string_view<CharT> url,
 template auto extract_relative_path_generic<char>(std::basic_string_view<char>,
                                                   std::basic_string_view<char>)
     -> std::optional<std::basic_string<char>>;
-template auto extract_relative_path_generic<wchar_t>(std::basic_string_view<wchar_t>,
-                                                     std::basic_string_view<wchar_t>)
-    -> std::optional<std::basic_string<wchar_t>>;
 
 // 从 URL 提取相对路径（narrow 版本）
 auto extract_relative_path(std::string_view url, std::string_view prefix)
     -> std::optional<std::string> {
-  return extract_relative_path_generic(url, prefix);
-}
-
-// 从 URL 提取相对路径（wide 版本）
-auto extract_relative_path_w(std::wstring_view url, std::wstring_view prefix)
-    -> std::optional<std::wstring> {
   return extract_relative_path_generic(url, prefix);
 }
 
@@ -245,41 +234,7 @@ auto register_webview_resolvers(Core::State::AppState& state) -> void {
     Logger().info("Registered WebView thumbnail host mapping: {} -> {}",
                   Utils::String::ToUtf8(state.webview->config.thumbnail_host_name),
                   state.gallery->thumbnails_directory.string());
-    return;
   }
-
-  auto thumbnail_prefix = state.webview->config.dev_server_url + L"/static/assets/thumbnails/";
-  Core::WebView::Static::register_web_resource_resolver(
-      state, thumbnail_prefix,
-      [&state,
-       thumbnail_prefix](std::wstring_view url) -> Core::WebView::Types::WebResourceResolution {
-        auto relative_path = extract_relative_path_w(url, thumbnail_prefix);
-        if (!relative_path) {
-          return {.success = false, .file_path = {}, .error_message = "Invalid thumbnail URL"};
-        }
-
-        auto full_path =
-            state.gallery->thumbnails_directory / std::filesystem::path(*relative_path);
-
-        if (!Utils::Path::IsPathWithinBase(full_path, state.gallery->thumbnails_directory)) {
-          Logger().warn("Unsafe thumbnail path requested via WebView: {}", full_path.string());
-          return {.success = false, .file_path = {}, .error_message = "Unsafe thumbnail path"};
-        }
-        if (!validate_asset_file(full_path)) {
-          Logger().debug("Thumbnail file not found via WebView: {}", full_path.string());
-          return {.success = false, .file_path = {}, .error_message = "Thumbnail file not found"};
-        }
-
-        return {.success = true,
-                .file_path = full_path,
-                .error_message = {},
-                .content_type = L"image/webp",
-                .status_code = 200,
-                .cache_control_header = L"public, max-age=31536000, immutable"};
-      });
-
-  Logger().info("Registered debug WebView thumbnail resolver: {}",
-                Utils::String::ToUtf8(thumbnail_prefix));
 }
 // ============= 清理函数 =============
 

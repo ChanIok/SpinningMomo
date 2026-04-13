@@ -11,10 +11,22 @@ import Core.RPC.NotificationHub;
 import Features.Gallery;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Service;
+import Features.Gallery.Asset.Repository;
 import <asio.hpp>;
 import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Gallery::Asset {
+
+struct CheckAssetReachableParams {
+  std::int64_t asset_id = 0;
+};
+
+struct CheckAssetReachableResult {
+  bool exists = false;
+  bool readable = false;
+  std::optional<std::string> path;
+  std::optional<std::string> reason;
+};
 
 // ============= 时间线视图 RPC 处理函数 =============
 
@@ -223,6 +235,66 @@ auto handle_set_infinity_nikki_user_record(
   co_return result.value();
 }
 
+auto handle_check_asset_reachable(Core::State::AppState& app_state,
+                                  const CheckAssetReachableParams& params)
+    -> RpcAwaitable<CheckAssetReachableResult> {
+  if (params.asset_id <= 0) {
+    co_return std::unexpected(RpcError{
+        .code = static_cast<int>(ErrorCode::InvalidParams),
+        .message = "assetId must be greater than 0",
+    });
+  }
+
+  auto asset_result =
+      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+  if (!asset_result) {
+    co_return std::unexpected(RpcError{
+        .code = static_cast<int>(ErrorCode::ServerError),
+        .message = "Failed to query asset: " + asset_result.error(),
+    });
+  }
+
+  if (!asset_result->has_value()) {
+    co_return CheckAssetReachableResult{
+        .exists = false,
+        .readable = false,
+        .path = std::nullopt,
+        .reason = std::string("Asset not found in index"),
+    };
+  }
+
+  const auto& asset = asset_result->value();
+  std::filesystem::path file_path(asset.path);
+  std::error_code ec;
+  const bool exists = std::filesystem::exists(file_path, ec) && !ec;
+
+  if (!exists) {
+    co_return CheckAssetReachableResult{
+        .exists = false,
+        .readable = false,
+        .path = asset.path,
+        .reason = std::string("File not found on disk"),
+    };
+  }
+
+  std::ifstream stream(file_path, std::ios::binary);
+  if (!stream.is_open()) {
+    co_return CheckAssetReachableResult{
+        .exists = true,
+        .readable = false,
+        .path = asset.path,
+        .reason = std::string("Failed to open file for reading"),
+    };
+  }
+
+  co_return CheckAssetReachableResult{
+      .exists = true,
+      .readable = true,
+      .path = asset.path,
+      .reason = std::nullopt,
+  };
+}
+
 // ============= RPC 方法注册 =============
 
 auto register_all(Core::State::AppState& app_state) -> void {
@@ -301,6 +373,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.setInfinityNikkiUserRecord",
       handle_set_infinity_nikki_user_record,
       "Set or clear a single Infinity Nikki user record in the gallery details panel");
+
+  register_method<CheckAssetReachableParams, CheckAssetReachableResult>(
+      app_state, app_state.rpc->registry, "gallery.checkAssetReachable",
+      handle_check_asset_reachable,
+      "Check whether an indexed asset file still exists and is readable on disk");
 }
 
 }  // namespace Core::RPC::Endpoints::Gallery::Asset

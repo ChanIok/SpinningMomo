@@ -32,6 +32,7 @@ import type {
   UpdateAssetsReviewStateParams,
   UpdateAssetDescriptionParams,
   SetInfinityNikkiUserRecordParams,
+  AssetReachability,
 } from './types'
 import { getStaticUrl, isWebView } from '@/core/env'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -313,6 +314,16 @@ export async function moveAssetsToTrash(assetIds: number[]): Promise<OperationRe
   } catch (error) {
     console.error('Failed to move assets to trash:', error)
     throw new Error('移到回收站失败')
+  }
+}
+
+export async function checkAssetReachable(assetId: number): Promise<AssetReachability> {
+  try {
+    const result = await call<AssetReachability>('gallery.checkAssetReachable', { assetId })
+    return result
+  } catch (error) {
+    console.error('Failed to check asset reachability:', error)
+    throw new Error('检查资产可达性失败')
   }
 }
 
@@ -725,6 +736,7 @@ export const galleryApi = {
   openAssetDefault,
   revealAssetInExplorer,
   moveAssetsToTrash,
+  checkAssetReachable,
   updateAssetsReviewState,
   updateAssetDescription,
   setInfinityNikkiUserRecord,

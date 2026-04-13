@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onUnmounted, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 import { useDebounceFn, useEventListener, usePreferredReducedMotion } from '@vueuse/core'
 import {
   useGalleryAssetActions,
@@ -55,6 +55,68 @@ let pendingGalleryScrollIndex: number | undefined
 let galleryScrollRafId: number | null = null
 let isViewerUnmounted = false
 let wheelZoomDelta = 0
+let isRestoringLightbox = false
+
+function clearLightboxRecoveryParams() {
+  const currentUrl = new URL(window.location.href)
+  currentUrl.searchParams.delete('lbAssetId')
+  currentUrl.searchParams.delete('lbFolderId')
+  currentUrl.searchParams.delete('lbRetry')
+  window.history.replaceState({}, '', currentUrl.toString())
+}
+
+async function restoreLightboxFromQuery() {
+  const currentUrl = new URL(window.location.href)
+  const assetIdRaw = currentUrl.searchParams.get('lbAssetId')
+  const folderIdRaw = currentUrl.searchParams.get('lbFolderId')
+  if (!assetIdRaw) {
+    return
+  }
+  if (!folderIdRaw) {
+    clearLightboxRecoveryParams()
+    return
+  }
+
+  const assetId = Number(assetIdRaw)
+  if (!Number.isInteger(assetId) || assetId <= 0) {
+    clearLightboxRecoveryParams()
+    return
+  }
+
+  if (folderIdRaw === 'all') {
+    store.setFilter({ folderId: undefined })
+  } else {
+    const folderId = Number(folderIdRaw)
+    if (!Number.isInteger(folderId) || folderId <= 0) {
+      clearLightboxRecoveryParams()
+      return
+    }
+    store.setFilter({ folderId: String(folderId) })
+  }
+
+  try {
+    isRestoringLightbox = true
+    await galleryData.refreshCurrentQuery()
+    const allAssetIds = await galleryData.queryCurrentAssetIds()
+    const index = allAssetIds.findIndex((id) => id === assetId)
+    if (index < 0) {
+      clearLightboxRecoveryParams()
+      return
+    }
+
+    const selectedAsset = await gallerySelection.selectOnlyIndex(index)
+    if (!selectedAsset) {
+      return
+    }
+
+    store.openLightbox()
+    clearLightboxRecoveryParams()
+  } catch (error) {
+    console.warn('Failed to restore lightbox state:', error)
+  } finally {
+    isRestoringLightbox = false
+  }
+}
 
 // 反向 hero overlay 动画状态
 const reverseHeroOverlay = ref<{ thumbnailUrl: string } | null>(null)
@@ -135,6 +197,10 @@ watch(
     })
   }
 )
+
+onMounted(() => {
+  void restoreLightboxFromQuery()
+})
 
 onUnmounted(() => {
   isViewerUnmounted = true
@@ -291,6 +357,9 @@ function handleContentWheel(event: WheelEvent) {
 watch(
   () => [store.filter, store.includeSubfolders, store.sortBy, store.sortOrder],
   async () => {
+    if (isRestoringLightbox) {
+      return
+    }
     console.log('🔄 筛选条件变化，重新加载数据')
     await galleryData.refreshCurrentQuery()
   },
