@@ -31,11 +31,48 @@ namespace Features::Gallery::Watcher {
 
 constexpr std::chrono::milliseconds kDebounceDelay{500};
 constexpr std::chrono::milliseconds kFileStabilityQuietPeriod{2000};
+// 手动 move 结束后额外缓冲一段时间，吸收“晚到”的文件系统通知。
+constexpr std::chrono::milliseconds kManualMoveIgnoreGracePeriod{3000};
 // 监听缓冲区；太小更容易溢出。
 constexpr size_t kWatchBufferSize = 64 * 1024;
 
 auto is_shutdown_requested(const Core::State::AppState& app_state) -> bool {
   return app_state.gallery && app_state.gallery->shutdown_requested.load(std::memory_order_acquire);
+}
+
+auto build_ignore_key(const std::filesystem::path& path)
+    -> std::expected<std::wstring, std::string> {
+  auto normalized_result = Utils::Path::NormalizePath(path);
+  if (!normalized_result) {
+    return std::unexpected("Failed to normalize ignore path: " + normalized_result.error());
+  }
+  return Utils::Path::NormalizeForComparison(normalized_result.value());
+}
+
+auto cleanup_expired_manual_move_ignores(Core::State::AppState& app_state) -> void {
+  auto now = std::chrono::steady_clock::now();
+  std::erase_if(app_state.gallery->manual_move_ignore_paths, [now](const auto& pair) {
+    const auto& entry = pair.second;
+    return entry.in_flight_count <= 0 && entry.ignore_until <= now;
+  });
+}
+
+auto is_path_in_manual_move_ignore(Core::State::AppState& app_state,
+                                   const std::filesystem::path& path) -> bool {
+  auto key_result = build_ignore_key(path);
+  if (!key_result) {
+    return false;
+  }
+
+  std::lock_guard<std::mutex> lock(app_state.gallery->manual_move_ignore_mutex);
+  cleanup_expired_manual_move_ignores(app_state);
+  auto it = app_state.gallery->manual_move_ignore_paths.find(key_result.value());
+  if (it == app_state.gallery->manual_move_ignore_paths.end()) {
+    return false;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  return it->second.in_flight_count > 0 || it->second.ignore_until > now;
 }
 
 // 待处理变更快照，用于描述需要增量或全量同步的状态
@@ -830,8 +867,23 @@ auto process_watch_notifications(Core::State::AppState& app_state,
                                  const std::shared_ptr<State::FolderWatcherState>& watcher,
                                  const std::vector<ParsedNotification>& notifications) -> void {
   bool require_full_rescan = false;
+  std::vector<ParsedNotification> effective_notifications;
+  effective_notifications.reserve(notifications.size());
 
   for (const auto& notification : notifications) {
+    if (is_path_in_manual_move_ignore(app_state, notification.path)) {
+      Logger().debug("Watcher ignored notification for manual move path '{}', action={}",
+                     notification.path.string(), notification.action);
+      continue;
+    }
+    effective_notifications.push_back(notification);
+  }
+
+  if (effective_notifications.empty()) {
+    return;
+  }
+
+  for (const auto& notification : effective_notifications) {
     if (!notification.is_directory) {
       continue;
     }
@@ -885,7 +937,7 @@ auto process_watch_notifications(Core::State::AppState& app_state,
     return;
   }
 
-  for (const auto& notification : notifications) {
+  for (const auto& notification : effective_notifications) {
     auto normalized_path = notification.path.string();
 
     switch (notification.action) {
@@ -1339,6 +1391,71 @@ auto wait_for_start_registered_watchers(Core::State::AppState& app_state) -> voi
   }
   app_state.gallery->startup_watchers_future->wait();
   app_state.gallery->startup_watchers_future.reset();
+}
+
+auto begin_manual_move_ignore(Core::State::AppState& app_state,
+                              const std::filesystem::path& source_path,
+                              const std::filesystem::path& destination_path)
+    -> std::expected<void, std::string> {
+  auto source_key_result = build_ignore_key(source_path);
+  if (!source_key_result) {
+    return std::unexpected(source_key_result.error());
+  }
+  auto destination_key_result = build_ignore_key(destination_path);
+  if (!destination_key_result) {
+    return std::unexpected(destination_key_result.error());
+  }
+
+  std::lock_guard<std::mutex> lock(app_state.gallery->manual_move_ignore_mutex);
+  cleanup_expired_manual_move_ignores(app_state);
+  const auto now = std::chrono::steady_clock::now();
+
+  auto touch = [&](const std::wstring& key) {
+    // in_flight_count 允许多个并发 move 命中同一路径，避免互相提前解除忽略。
+    auto& entry = app_state.gallery->manual_move_ignore_paths[key];
+    entry.in_flight_count += 1;
+    if (entry.ignore_until < now + kManualMoveIgnoreGracePeriod) {
+      entry.ignore_until = now + kManualMoveIgnoreGracePeriod;
+    }
+  };
+
+  touch(source_key_result.value());
+  touch(destination_key_result.value());
+  return {};
+}
+
+auto complete_manual_move_ignore(Core::State::AppState& app_state,
+                                 const std::filesystem::path& source_path,
+                                 const std::filesystem::path& destination_path)
+    -> std::expected<void, std::string> {
+  auto source_key_result = build_ignore_key(source_path);
+  if (!source_key_result) {
+    return std::unexpected(source_key_result.error());
+  }
+  auto destination_key_result = build_ignore_key(destination_path);
+  if (!destination_key_result) {
+    return std::unexpected(destination_key_result.error());
+  }
+
+  std::lock_guard<std::mutex> lock(app_state.gallery->manual_move_ignore_mutex);
+  cleanup_expired_manual_move_ignores(app_state);
+  const auto now = std::chrono::steady_clock::now();
+
+  auto touch = [&](const std::wstring& key) {
+    auto it = app_state.gallery->manual_move_ignore_paths.find(key);
+    if (it == app_state.gallery->manual_move_ignore_paths.end()) {
+      return;
+    }
+
+    // 操作完成后并不立刻解除，保留短暂 grace 窗口来过滤延迟事件。
+    it->second.in_flight_count = std::max(0, it->second.in_flight_count - 1);
+    it->second.ignore_until = now + kManualMoveIgnoreGracePeriod;
+  };
+
+  touch(source_key_result.value());
+  touch(destination_key_result.value());
+  cleanup_expired_manual_move_ignores(app_state);
+  return {};
 }
 
 // 在应用关闭时，优雅关闭所有的监听器线程和句柄资源

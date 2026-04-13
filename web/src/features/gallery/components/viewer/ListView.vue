@@ -12,6 +12,7 @@ import {
 import type { Asset, SortBy, SortOrder } from '../../types'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
+import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
 import AssetListRow from '../asset/AssetListRow.vue'
 import ScrollArea from '@/components/ui/scroll-area/ScrollArea.vue'
 import ScrollBar from '@/components/ui/scroll-area/ScrollBar.vue'
@@ -26,6 +27,7 @@ const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const galleryContextMenu = useGalleryContextMenu()
+const { prepareAssetDrag } = useGalleryDragPayload()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -113,6 +115,10 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
 async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
   await gallerySelection.handleAssetContextMenu(asset, event, index)
   galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'list' })
+}
+
+function handleAssetDragStart(asset: Asset, event: DragEvent) {
+  prepareAssetDrag(event, asset.id)
 }
 
 function scrollToIndex(index: number) {
@@ -221,6 +227,7 @@ defineExpose({ scrollToIndex, getCardRect })
               @context-menu="
                 (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)
               "
+              @drag-start="(asset, event) => handleAssetDragStart(asset, event)"
             />
 
             <div

@@ -13,6 +13,7 @@ import {
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
+import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
 import AssetCard from '../asset/AssetCard.vue'
 import GridTimelineRailBridge from './GridTimelineRailBridge.vue'
 import { useI18n } from '@/composables/useI18n'
@@ -23,6 +24,7 @@ const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const galleryContextMenu = useGalleryContextMenu()
+const { prepareAssetDrag } = useGalleryDragPayload()
 const { locale } = useI18n()
 
 const scrollAreaRef = ref<InstanceType<typeof ScrollArea> | null>(null)
@@ -87,6 +89,10 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
 async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
   await gallerySelection.handleAssetContextMenu(asset, event, index)
   galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'grid' })
+}
+
+function handleAssetDragStart(asset: Asset, event: DragEvent) {
+  prepareAssetDrag(event, asset.id)
 }
 
 function scrollToIndex(index: number) {
@@ -156,6 +162,7 @@ defineExpose({ scrollToIndex, getCardRect })
                 @context-menu="
                   (a, e) => void handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
                 "
+                @drag-start="(a, e) => handleAssetDragStart(a, e)"
               />
 
               <div
@@ -223,6 +230,7 @@ defineExpose({ scrollToIndex, getCardRect })
                 @context-menu="
                   (a, e) => void handleAssetContextMenu(a, e, virtualRow.index * columns + idx)
                 "
+                @drag-start="(a, e) => handleAssetDragStart(a, e)"
               />
 
               <div

@@ -89,39 +89,43 @@ export struct CopyResult {
 };
 
 // 异步读取文件（原始数据）
-export auto read_file(const std::filesystem::path &file_path)
+export auto read_file(const std::filesystem::path& file_path)
     -> asio::awaitable<std::expected<FileReadResult, std::string>>;
 
 // 异步读取文件并编码（用于RPC等需要文本传输的场景）
-export auto read_file_and_encode(const std::filesystem::path &file_path)
+export auto read_file_and_encode(const std::filesystem::path& file_path)
     -> asio::awaitable<std::expected<EncodedFileReadResult, std::string>>;
 
 // 异步写入文件（支持文本和二进制/base64解码）
-export auto write_file(const std::filesystem::path &file_path, const std::string &content,
+export auto write_file(const std::filesystem::path& file_path, const std::string& content,
                        bool is_binary = false, bool overwrite = true)
     -> asio::awaitable<std::expected<FileWriteResult, std::string>>;
 
 // 异步列出目录内容
-export auto list_directory(const std::filesystem::path &dir_path,
-                           const std::vector<std::string> &extensions = {})
+export auto list_directory(const std::filesystem::path& dir_path,
+                           const std::vector<std::string>& extensions = {})
     -> asio::awaitable<std::expected<DirectoryListResult, std::string>>;
 
 // 异步获取文件信息
-export auto get_file_info(const std::filesystem::path &file_path)
+export auto get_file_info(const std::filesystem::path& file_path)
     -> asio::awaitable<std::expected<FileInfoResult, std::string>>;
 
 // 异步删除文件或目录
-export auto delete_path(const std::filesystem::path &path, bool recursive = false)
+export auto delete_path(const std::filesystem::path& path, bool recursive = false)
     -> asio::awaitable<std::expected<DeleteResult, std::string>>;
 
 // 异步移动或重命名文件/目录
-export auto move_path(const std::filesystem::path &source_path,
-                      const std::filesystem::path &destination_path, bool overwrite = false)
+export auto move_path(const std::filesystem::path& source_path,
+                      const std::filesystem::path& destination_path, bool overwrite = false)
     -> asio::awaitable<std::expected<MoveResult, std::string>>;
+// 异步移动或重命名文件/目录（阻塞）
+export auto move_path_blocking(const std::filesystem::path& source_path,
+                               const std::filesystem::path& destination_path,
+                               bool overwrite = false) -> std::expected<MoveResult, std::string>;
 
 // 异步复制文件或目录
-export auto copy_path(const std::filesystem::path &source_path,
-                      const std::filesystem::path &destination_path, bool recursive = false,
+export auto copy_path(const std::filesystem::path& source_path,
+                      const std::filesystem::path& destination_path, bool recursive = false,
                       bool overwrite = false)
     -> asio::awaitable<std::expected<CopyResult, std::string>>;
 

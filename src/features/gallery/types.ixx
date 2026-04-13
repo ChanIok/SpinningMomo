@@ -269,6 +269,11 @@ struct AssetIdsParams {
   std::vector<std::int64_t> ids;
 };
 
+struct MoveAssetsToFolderParams {
+  std::vector<std::int64_t> ids;
+  std::int64_t target_folder_id = 0;
+};
+
 struct DeleteParams {
   std::int64_t id;
   std::optional<bool> delete_file = false;

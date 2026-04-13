@@ -21,6 +21,7 @@ const emit = defineEmits<{
   click: [asset: Asset, event: MouseEvent]
   'double-click': [asset: Asset, event: MouseEvent]
   'context-menu': [asset: Asset, event: MouseEvent]
+  'drag-start': [asset: Asset, event: DragEvent]
 }>()
 
 const { getAssetThumbnailUrl } = useGalleryData()
@@ -77,10 +78,16 @@ function handleDoubleClick(event: MouseEvent) {
 function handleContextMenu(event: MouseEvent) {
   emit('context-menu', props.asset, event)
 }
+
+function handleDragStart(event: DragEvent) {
+  emit('drag-start', props.asset, event)
+}
 </script>
 
 <template>
   <div
+    data-asset-list-row
+    draggable="true"
     class="group grid w-full items-center gap-3 rounded-sm px-3 transition-colors select-none"
     :class="
       props.isSelected ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted/55'
@@ -92,6 +99,7 @@ function handleContextMenu(event: MouseEvent) {
     @click="handleClick"
     @dblclick="handleDoubleClick"
     @contextmenu="handleContextMenu"
+    @dragstart="handleDragStart"
   >
     <div class="flex items-center justify-center">
       <div

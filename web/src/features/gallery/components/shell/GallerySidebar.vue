@@ -14,6 +14,8 @@ import TagTreeItem from '../tags/TagTreeItem.vue'
 import TagInlineEditor from '../tags/TagInlineEditor.vue'
 import GalleryScanDialog from '../dialogs/GalleryScanDialog.vue'
 import InfinityNikkiMetadataExtractDialog from '../infinity_nikki/InfinityNikkiMetadataExtractDialog.vue'
+import { galleryApi } from '../../api'
+import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
 
 const galleryData = useGalleryData()
 const galleryStore = useGalleryStore()
@@ -182,6 +184,62 @@ async function handleRemoveFolderWatch(folderId: number) {
   }
 }
 
+async function handleDropAssetsToFolder(folderId: number, assetIds: number[]) {
+  const uniqueIds = [...new Set(assetIds)]
+  if (uniqueIds.length === 0) {
+    return
+  }
+
+  try {
+    const result = await galleryApi.moveAssetsToFolder({
+      ids: uniqueIds,
+      targetFolderId: folderId,
+    })
+    const affectedCount = result.affectedCount ?? 0
+    if (!result.success && affectedCount === 0) {
+      throw new Error(result.message)
+    }
+
+    await Promise.all([
+      galleryData.loadFolderTree({ silent: true }),
+      galleryData.refreshCurrentQuery(),
+    ])
+    galleryStore.clearSelection()
+
+    if (result.success) {
+      toast.success('移动完成', {
+        description: result.message,
+      })
+    } else {
+      toast.warning('部分移动成功', {
+        description: result.message,
+      })
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error('移动失败', { description: message })
+  }
+}
+
+function handleSidebarDragOver(event: DragEvent) {
+  if (!hasGalleryAssetDragIds(event)) {
+    return
+  }
+  // 让侧边栏空白区域也保持可放置手势，避免出现系统“禁止”图标。
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function handleSidebarDrop(event: DragEvent) {
+  if (!hasGalleryAssetDragIds(event)) {
+    return
+  }
+  // 真正移动仍由 FolderTreeItem 的 drop 处理；这里仅消费默认 drop 行为。
+  event.preventDefault()
+}
+
 onMounted(() => {
   galleryData.loadFolderTree()
   loadTagTree()
@@ -189,7 +247,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
+  <div class="flex h-full flex-col" @dragover="handleSidebarDragOver" @drop="handleSidebarDrop">
     <!-- 导航菜单 -->
     <div class="flex-1 overflow-auto p-4">
       <!-- 文件夹区域 -->
@@ -235,6 +293,7 @@ onMounted(() => {
             @open-in-explorer="handleOpenFolderInExplorer"
             @remove-watch="handleRemoveFolderWatch"
             @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
+            @drop-assets-to-folder="handleDropAssetsToFolder"
           />
         </div>
       </div>

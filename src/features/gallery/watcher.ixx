@@ -48,4 +48,16 @@ export auto remove_watcher_for_directory(Core::State::AppState& app_state,
 // 退出时停掉所有 watcher 线程。
 export auto shutdown_watchers(Core::State::AppState& app_state) -> void;
 
+// 标记某条手动 move 的源/目标路径进入 watcher 忽略集合（in-flight 阶段）。
+export auto begin_manual_move_ignore(Core::State::AppState& app_state,
+                                     const std::filesystem::path& source_path,
+                                     const std::filesystem::path& destination_path)
+    -> std::expected<void, std::string>;
+
+// 手动 move 完成后结束 in-flight，并保留一段短缓冲，吸收延迟到达的目录通知。
+export auto complete_manual_move_ignore(Core::State::AppState& app_state,
+                                        const std::filesystem::path& source_path,
+                                        const std::filesystem::path& destination_path)
+    -> std::expected<void, std::string>;
+
 }  // namespace Features::Gallery::Watcher

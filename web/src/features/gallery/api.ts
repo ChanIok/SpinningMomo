@@ -30,6 +30,7 @@ import type {
   AddTagsToAssetParams,
   RemoveTagsFromAssetParams,
   UpdateAssetsReviewStateParams,
+  MoveAssetsToFolderParams,
   UpdateAssetDescriptionParams,
   SetInfinityNikkiUserRecordParams,
   AssetReachability,
@@ -314,6 +315,18 @@ export async function moveAssetsToTrash(assetIds: number[]): Promise<OperationRe
   } catch (error) {
     console.error('Failed to move assets to trash:', error)
     throw new Error('移到回收站失败')
+  }
+}
+
+export async function moveAssetsToFolder(
+  params: MoveAssetsToFolderParams
+): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.moveAssetsToFolder', params)
+    return result
+  } catch (error) {
+    console.error('Failed to move assets to folder:', error)
+    throw new Error('移动到文件夹失败')
   }
 }
 
@@ -736,6 +749,7 @@ export const galleryApi = {
   openAssetDefault,
   revealAssetInExplorer,
   moveAssetsToTrash,
+  moveAssetsToFolder,
   checkAssetReachable,
   updateAssetsReviewState,
   updateAssetDescription,

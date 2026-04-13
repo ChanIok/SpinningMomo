@@ -184,6 +184,23 @@ auto handle_move_assets_to_trash(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_move_assets_to_folder(Core::State::AppState& app_state,
+                                  const Features::Gallery::Types::MoveAssetsToFolderParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result = Features::Gallery::move_assets_to_folder(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  if (result->affected_count.value_or(0) > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+
+  co_return result.value();
+}
+
 auto handle_update_assets_review_state(
     Core::State::AppState& app_state,
     const Features::Gallery::Types::UpdateAssetsReviewStateParams& params)
@@ -355,6 +372,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
                   Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.moveAssetsToTrash", handle_move_assets_to_trash,
       "Move selected asset files to system recycle bin and remove them from gallery index");
+
+  register_method<Features::Gallery::Types::MoveAssetsToFolderParams,
+                  Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.moveAssetsToFolder",
+      handle_move_assets_to_folder,
+      "Move selected assets to an indexed target folder and update gallery index paths");
 
   register_method<Features::Gallery::Types::UpdateAssetsReviewStateParams,
                   Features::Gallery::Types::OperationResult>(

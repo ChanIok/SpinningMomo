@@ -25,6 +25,7 @@ const emit = defineEmits<{
   click: [asset: Asset, event: MouseEvent]
   'double-click': [asset: Asset, event: MouseEvent]
   'context-menu': [asset: Asset, event: MouseEvent]
+  'drag-start': [asset: Asset, event: DragEvent]
 }>()
 
 // 响应式状态
@@ -70,6 +71,10 @@ function handleDoubleClick(event: MouseEvent) {
 
 function handleContextMenu(event: MouseEvent) {
   emit('context-menu', props.asset, event)
+}
+
+function handleDragStart(event: DragEvent) {
+  emit('drag-start', props.asset, event)
 }
 
 // 图片加载处理
@@ -118,6 +123,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
 <template>
   <div
     data-asset-card
+    draggable="true"
     class="group relative w-full overflow-hidden rounded bg-background transition-all duration-200 contain-[layout_size_paint] select-none"
     :class="[
       {
@@ -130,9 +136,10 @@ function getAdjustedPlaceholderColor(hex?: string): string {
     @click="handleClick"
     @dblclick="handleDoubleClick"
     @contextmenu="handleContextMenu"
+    @dragstart="handleDragStart"
   >
     <!-- 缩略图容器 -->
-    <div class="relative h-full w-full overflow-hidden">
+    <div data-asset-thumbnail class="relative h-full w-full overflow-hidden">
       <!-- 缩略图 -->
       <img
         v-if="hasThumbnail && !imageError"
@@ -182,6 +189,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
 
       <!-- 遮罩层 -->
       <div
+        data-selection-mask
         class="absolute inset-0 bg-black/0 transition-all duration-200"
         :class="{
           'bg-black/20': isSelected,
@@ -205,6 +213,7 @@ function getAdjustedPlaceholderColor(hex?: string): string {
       <!-- 选择指示器 -->
       <div
         v-if="isSelected"
+        data-selection-indicator
         class="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm"
       >
         <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">

@@ -7,6 +7,7 @@ import {
   useGallerySelection,
   useGalleryView,
 } from '../../composables'
+import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
 import { useGalleryStore } from '../../store'
 import {
   computeLightboxHeroRect,
@@ -353,6 +354,25 @@ function handleContentWheel(event: WheelEvent) {
   }
 }
 
+function handleViewerDragOver(event: DragEvent) {
+  if (!hasGalleryAssetDragIds(event)) {
+    return
+  }
+  // 让 viewer 区域在拖拽经过时保持“可移动”手势，避免系统显示禁止图标。
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function handleViewerDrop(event: DragEvent) {
+  if (!hasGalleryAssetDragIds(event)) {
+    return
+  }
+  // viewer 本身不执行移动，仅消费默认 drop 行为以维持一致交互反馈。
+  event.preventDefault()
+}
+
 // 监听筛选条件和文件夹选项变化，自动重新加载资产
 watch(
   () => [store.filter, store.includeSubfolders, store.sortBy, store.sortOrder],
@@ -371,7 +391,12 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
 </script>
 
 <template>
-  <div ref="viewerRef" class="relative h-full">
+  <div
+    ref="viewerRef"
+    class="relative h-full"
+    @dragover="handleViewerDragOver"
+    @drop="handleViewerDrop"
+  >
     <!-- gallery 始终渲染；打开时用 opacity 隐藏以便过渡，关闭阶段 isClosing 时与 lightbox 同步淡入 -->
     <div
       :class="galleryColumnClass"

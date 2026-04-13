@@ -21,6 +21,7 @@ import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Service;
 import Features.Gallery.StaticResolver;
 import Features.Gallery.Watcher;
+import Utils.File;
 import Utils.Image;
 import Utils.Logger;
 import Utils.LRUCache;
@@ -339,6 +340,167 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
 
   for (const auto& error : errors) {
     Logger().warn("move_assets_to_trash: {}", error);
+  }
+
+  return result;
+}
+
+auto move_assets_to_folder(Core::State::AppState& app_state,
+                           const Types::MoveAssetsToFolderParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (params.ids.empty()) {
+    return Types::OperationResult{
+        .success = false,
+        .message = "No assets selected",
+        .affected_count = 0,
+    };
+  }
+
+  if (params.target_folder_id <= 0) {
+    return Types::OperationResult{
+        .success = false,
+        .message = "Invalid target folder",
+        .affected_count = 0,
+    };
+  }
+
+  auto target_folder_result =
+      Folder::Repository::get_folder_by_id(app_state, params.target_folder_id);
+  if (!target_folder_result) {
+    return std::unexpected("Failed to query target folder: " + target_folder_result.error());
+  }
+  if (!target_folder_result->has_value()) {
+    return Types::OperationResult{
+        .success = false,
+        .message = "Target folder not found",
+        .affected_count = 0,
+    };
+  }
+
+  auto normalized_target_folder_result =
+      Utils::Path::NormalizePath(std::filesystem::path(target_folder_result->value().path));
+  if (!normalized_target_folder_result) {
+    return std::unexpected("Failed to normalize target folder path: " +
+                           normalized_target_folder_result.error());
+  }
+
+  auto target_folder_path = normalized_target_folder_result.value();
+  std::unordered_set<std::int64_t> unique_ids(params.ids.begin(), params.ids.end());
+  std::int64_t moved_count = 0;
+  std::int64_t skipped_not_found = 0;
+  std::int64_t skipped_same_folder = 0;
+  std::vector<std::string> errors;
+  errors.reserve(unique_ids.size());
+
+  for (auto id : unique_ids) {
+    auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+    if (!asset_result) {
+      errors.push_back("Failed to query asset " + std::to_string(id) + ": " + asset_result.error());
+      continue;
+    }
+    if (!asset_result->has_value()) {
+      skipped_not_found++;
+      continue;
+    }
+
+    auto asset = asset_result->value();
+    auto normalized_source_result = Utils::Path::NormalizePath(std::filesystem::path(asset.path));
+    if (!normalized_source_result) {
+      errors.push_back("Failed to normalize source path for asset " + std::to_string(asset.id) +
+                       ": " + normalized_source_result.error());
+      continue;
+    }
+
+    auto source_path = normalized_source_result.value();
+    auto destination_path = target_folder_path / source_path.filename();
+    auto normalized_destination_result = Utils::Path::NormalizePath(destination_path);
+    if (!normalized_destination_result) {
+      errors.push_back("Failed to normalize destination path for asset " +
+                       std::to_string(asset.id) + ": " + normalized_destination_result.error());
+      continue;
+    }
+
+    auto normalized_destination_path = normalized_destination_result.value();
+    // 目标与源一致时不报错，按“跳过项”处理，便于批量操作给出可理解反馈。
+    if (Utils::Path::NormalizeForComparison(source_path) ==
+        Utils::Path::NormalizeForComparison(normalized_destination_path)) {
+      skipped_same_folder++;
+      continue;
+    }
+
+    bool manual_ignore_registered = false;
+    // 先注册 watcher ignore，再执行 move，避免 watcher 抢先对同一路径做重复分析。
+    if (auto begin_ignore_result =
+            Watcher::begin_manual_move_ignore(app_state, source_path, normalized_destination_path);
+        begin_ignore_result) {
+      manual_ignore_registered = true;
+    } else {
+      Logger().warn("Failed to register watcher ignore for manual move '{}': {}",
+                    source_path.string(), begin_ignore_result.error());
+    }
+
+    auto complete_manual_ignore = [&]() {
+      if (!manual_ignore_registered) {
+        return;
+      }
+      // 无论成功还是失败都尝试完成 ignore，防止 in-flight 计数泄漏。
+      if (auto complete_ignore_result = Watcher::complete_manual_move_ignore(
+              app_state, source_path, normalized_destination_path);
+          !complete_ignore_result) {
+        Logger().warn("Failed to complete watcher ignore for manual move '{}': {}",
+                      source_path.string(), complete_ignore_result.error());
+      }
+      manual_ignore_registered = false;
+    };
+
+    auto move_result =
+        Utils::File::move_path_blocking(source_path, normalized_destination_path, false);
+    if (!move_result) {
+      complete_manual_ignore();
+      errors.push_back("Failed to move asset " + std::to_string(asset.id) + ": " +
+                       move_result.error());
+      continue;
+    }
+
+    asset.path = normalized_destination_path.generic_string();
+    asset.name = normalized_destination_path.filename().string();
+    asset.folder_id = params.target_folder_id;
+    // 文件系统移动成功后再更新索引，保证 DB 记录与磁盘最终位置保持一致。
+    auto update_result = Asset::Repository::update_asset(app_state, asset);
+    if (!update_result) {
+      complete_manual_ignore();
+      errors.push_back("Failed to update asset index " + std::to_string(asset.id) + ": " +
+                       update_result.error());
+      continue;
+    }
+
+    complete_manual_ignore();
+
+    moved_count++;
+  }
+
+  Types::OperationResult result{
+      .success = errors.empty(),
+      .message = "",
+      .affected_count = moved_count,
+  };
+
+  if (errors.empty()) {
+    result.message = std::format("Moved {} asset(s) to target folder", moved_count);
+    return result;
+  }
+
+  if (moved_count > 0) {
+    result.message =
+        std::format("Moved {} asset(s), {} failed, {} not found, {} already in target folder",
+                    moved_count, errors.size(), skipped_not_found, skipped_same_folder);
+  } else {
+    result.message = std::format("Failed to move assets: {} failed, {} not found, {} unchanged",
+                                 errors.size(), skipped_not_found, skipped_same_folder);
+  }
+
+  for (const auto& error : errors) {
+    Logger().warn("move_assets_to_folder: {}", error);
   }
 
   return result;

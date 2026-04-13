@@ -1,5 +1,6 @@
 module;
 
+#include <windows.h>
 #include <asio.hpp>
 
 module Utils.File;
@@ -11,6 +12,79 @@ import Utils.String;
 import Utils.Time;
 
 namespace Utils::File {
+
+auto is_cross_device_error(const std::error_code& error_code) -> bool {
+  if (!error_code) {
+    return false;
+  }
+  return error_code == std::errc::cross_device_link;
+}
+
+auto copy_file_with_copyfile2(const std::filesystem::path& source_path,
+                              const std::filesystem::path& destination_path, bool overwrite)
+    -> std::expected<void, std::string> {
+  COPYFILE2_EXTENDED_PARAMETERS parameters{};
+  parameters.dwSize = sizeof(COPYFILE2_EXTENDED_PARAMETERS);
+  parameters.dwCopyFlags = overwrite ? 0 : COPY_FILE_FAIL_IF_EXISTS;
+
+  auto source_wide = source_path.wstring();
+  auto destination_wide = destination_path.wstring();
+  auto hr = ::CopyFile2(source_wide.c_str(), destination_wide.c_str(), &parameters);
+  if (FAILED(hr)) {
+    return std::unexpected(std::format("CopyFile2 failed {} -> {} (HRESULT: 0x{:08X})",
+                                       source_path.string(), destination_path.string(),
+                                       static_cast<unsigned int>(hr)));
+  }
+
+  return {};
+}
+
+auto copy_directory_with_copyfile2(const std::filesystem::path& source_path,
+                                   const std::filesystem::path& destination_path, bool overwrite)
+    -> std::expected<void, std::string> {
+  std::error_code ec;
+  std::filesystem::create_directories(destination_path, ec);
+  if (ec) {
+    return std::unexpected("Failed to create destination directory: " + ec.message());
+  }
+
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(source_path)) {
+    auto relative_path = std::filesystem::relative(entry.path(), source_path, ec);
+    if (ec) {
+      return std::unexpected("Failed to build relative path while moving directory: " +
+                             ec.message());
+    }
+
+    auto target_path = destination_path / relative_path;
+    if (entry.is_directory()) {
+      std::filesystem::create_directories(target_path, ec);
+      if (ec) {
+        return std::unexpected("Failed to create directory while moving: " + ec.message());
+      }
+      continue;
+    }
+
+    if (!entry.is_regular_file()) {
+      return std::unexpected("Unsupported filesystem entry while moving directory: " +
+                             entry.path().string());
+    }
+
+    auto parent_path = target_path.parent_path();
+    if (!parent_path.empty()) {
+      std::filesystem::create_directories(parent_path, ec);
+      if (ec) {
+        return std::unexpected("Failed to prepare destination parent directory: " + ec.message());
+      }
+    }
+
+    auto copy_result = copy_file_with_copyfile2(entry.path(), target_path, overwrite);
+    if (!copy_result) {
+      return std::unexpected(copy_result.error());
+    }
+  }
+
+  return {};
+}
 
 auto format_file_error(const std::string& operation, const std::filesystem::path& path,
                        const std::exception& e) -> std::string {
@@ -306,14 +380,20 @@ auto delete_path(const std::filesystem::path& path, bool recursive)
 auto move_path(const std::filesystem::path& source_path,
                const std::filesystem::path& destination_path, bool overwrite)
     -> asio::awaitable<std::expected<MoveResult, std::string>> {
+  co_return move_path_blocking(source_path, destination_path, overwrite);
+}
+
+auto move_path_blocking(const std::filesystem::path& source_path,
+                        const std::filesystem::path& destination_path, bool overwrite)
+    -> std::expected<MoveResult, std::string> {
   try {
     if (!std::filesystem::exists(source_path)) {
-      co_return std::unexpected("Source path does not exist: " + source_path.string());
+      return std::unexpected("Source path does not exist: " + source_path.string());
     }
 
     if (std::filesystem::exists(destination_path) && !overwrite) {
-      co_return std::unexpected("Destination already exists and overwrite is disabled: " +
-                                destination_path.string());
+      return std::unexpected("Destination already exists and overwrite is disabled: " +
+                             destination_path.string());
     }
 
     // 确保目标目录存在
@@ -341,8 +421,41 @@ auto move_path(const std::filesystem::path& source_path,
       result.was_moved = true;
     }
 
-    // 执行移动/重命名
-    std::filesystem::rename(source_path, destination_path);
+    // 先走 rename：同卷通常是元数据级移动，成本最低且行为最接近“原子移动”。
+    std::error_code rename_error;
+    std::filesystem::rename(source_path, destination_path, rename_error);
+    if (rename_error) {
+      if (!is_cross_device_error(rename_error)) {
+        return std::unexpected("Failed to move/rename path: " + rename_error.message());
+      }
+
+      // 跨卷回退到 CopyFile2，再删除源路径；这是当前项目约定的高性能兼容路径。
+      if (std::filesystem::is_regular_file(source_path)) {
+        auto copy_result = copy_file_with_copyfile2(source_path, destination_path, overwrite);
+        if (!copy_result) {
+          return std::unexpected(copy_result.error());
+        }
+      } else if (std::filesystem::is_directory(source_path)) {
+        auto copy_result = copy_directory_with_copyfile2(source_path, destination_path, overwrite);
+        if (!copy_result) {
+          return std::unexpected(copy_result.error());
+        }
+      } else {
+        return std::unexpected("Unsupported source path type for move: " + source_path.string());
+      }
+
+      std::error_code remove_error;
+      if (std::filesystem::is_directory(source_path)) {
+        std::filesystem::remove_all(source_path, remove_error);
+      } else {
+        std::filesystem::remove(source_path, remove_error);
+      }
+      if (remove_error) {
+        // copy 成功但 delete 失败时返回失败，避免上层误认为“已完整搬迁”。
+        return std::unexpected("Failed to remove source after CopyFile2 fallback: " +
+                               remove_error.message());
+      }
+    }
 
     if (result.was_renamed) {
       Logger().debug("Successfully renamed: {} -> {}", source_path.string(),
@@ -352,9 +465,9 @@ auto move_path(const std::filesystem::path& source_path,
                      destination_path.string());
     }
 
-    co_return result;
+    return result;
   } catch (const std::exception& e) {
-    co_return std::unexpected(format_file_error("Error moving/renaming", source_path, e));
+    return std::unexpected(format_file_error("Error moving/renaming", source_path, e));
   }
 }
 

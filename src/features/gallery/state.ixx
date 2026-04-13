@@ -45,6 +45,11 @@ export struct FolderWatcherState {
 };
 
 export struct GalleryState {
+  struct ManualMoveIgnoreEntry {
+    int in_flight_count = 0;
+    std::chrono::steady_clock::time_point ignore_until{};
+  };
+
   // 缩略图目录路径
   std::filesystem::path thumbnails_directory;
 
@@ -57,6 +62,10 @@ export struct GalleryState {
   // 根目录 watcher 状态（key = 规范化路径字符串）
   std::unordered_map<std::string, std::shared_ptr<FolderWatcherState>> folder_watchers;
   std::mutex folder_watchers_mutex;
+
+  // 手动 move 操作的 watcher 去重表（key 为大小写归一化后的路径比较键）。
+  std::unordered_map<std::wstring, ManualMoveIgnoreEntry> manual_move_ignore_paths;
+  std::mutex manual_move_ignore_mutex;
 };
 
 }  // namespace Features::Gallery::State

@@ -143,6 +143,11 @@ export interface UpdateAssetsReviewStateParams {
   reviewFlag?: ReviewFlag
 }
 
+export interface MoveAssetsToFolderParams {
+  ids: number[]
+  targetFolderId: number
+}
+
 export interface UpdateAssetDescriptionParams {
   assetId: number
   description?: string

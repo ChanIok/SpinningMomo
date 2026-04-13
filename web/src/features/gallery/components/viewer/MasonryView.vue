@@ -12,6 +12,7 @@ import {
 } from '../../composables'
 import { prepareHero } from '../../composables/useHeroTransition'
 import { galleryApi } from '../../api'
+import { useGalleryDragPayload } from '../../composables/useGalleryDragPayload'
 import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
 import AssetCard from '../asset/AssetCard.vue'
@@ -22,6 +23,7 @@ const galleryView = useGalleryView()
 const gallerySelection = useGallerySelection()
 const galleryLightbox = useGalleryLightbox()
 const galleryContextMenu = useGalleryContextMenu()
+const { prepareAssetDrag } = useGalleryDragPayload()
 const { locale } = useI18n()
 
 const scrollContainerRef = ref<HTMLElement | null>(null)
@@ -88,6 +90,10 @@ function handleAssetDoubleClick(asset: Asset, event: MouseEvent, index: number) 
 async function handleAssetContextMenu(asset: Asset, event: MouseEvent, index: number) {
   await gallerySelection.handleAssetContextMenu(asset, event, index)
   galleryContextMenu.openForAsset({ asset, event, index, sourceView: 'masonry' })
+}
+
+function handleAssetDragStart(asset: Asset, event: DragEvent) {
+  prepareAssetDrag(event, asset.id)
 }
 
 function scrollToIndex(index: number) {
@@ -157,6 +163,7 @@ defineExpose({ scrollToIndex, getCardRect })
               @context-menu="
                 (asset, event) => void handleAssetContextMenu(asset, event, virtualItem.index)
               "
+              @drag-start="(asset, event) => handleAssetDragStart(asset, event)"
             />
 
             <div
