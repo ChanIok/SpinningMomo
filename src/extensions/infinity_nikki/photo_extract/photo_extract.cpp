@@ -43,6 +43,12 @@ struct BatchExtractOutcome {
       std::unexpected("Batch result unavailable");
 };
 
+struct SlidingWindowState {
+  std::mutex completed_mutex;
+  std::deque<std::size_t> completed_indices;
+  std::atomic<std::size_t> inflight_count{0};
+};
+
 auto add_error(std::vector<std::string>& errors, std::string message) -> void {
   if (errors.size() >= kMaxErrorMessages) {
     return;
@@ -282,38 +288,64 @@ auto build_extract_batches(
   return batches;
 }
 
-auto extract_batch_wave(Core::State::AppState& app_state,
-                        const std::vector<std::vector<Scan::PreparedPhotoExtractEntry>>& batches,
-                        std::size_t wave_start, std::size_t wave_count)
-    -> asio::awaitable<std::vector<BatchExtractOutcome>> {
-  // 第三阶段：一次只放行少量 batch 并发请求远端。
-  // “wave” 可以理解成一小波同时起飞的请求。
-  std::vector<BatchExtractOutcome> outcomes(wave_count);
-  if (wave_count == 0) {
-    co_return outcomes;
-  }
+auto launch_extract_batch(asio::any_io_executor executor, Core::State::AppState& app_state,
+                          const std::vector<std::vector<Scan::PreparedPhotoExtractEntry>>& batches,
+                          std::vector<BatchExtractOutcome>& outcomes, std::size_t batch_index,
+                          const std::shared_ptr<SlidingWindowState>& state) -> void {
+  // 启动一个 batch 后，先把“正在飞行中的 batch 数量” +1。
+  state->inflight_count.fetch_add(1, std::memory_order_relaxed);
 
+  asio::co_spawn(
+      executor,
+      [&app_state, &batch = batches[batch_index], &outcome = outcomes[batch_index], state,
+       batch_index]() -> asio::awaitable<void> {
+        Logger().debug("launch_extract_batch: sending batch (uid={}, count={})", batch.front().uid,
+                       batch.size());
+        outcome.result = co_await Infra::extract_batch_photo_params(app_state, batch);
+
+        {
+          std::lock_guard<std::mutex> lock(state->completed_mutex);
+          // 这里只登记“第几个 batch 做完了”，真正的结果处理统一回到主协程里做。
+          state->completed_indices.push_back(batch_index);
+        }
+
+        state->inflight_count.fetch_sub(1, std::memory_order_relaxed);
+        co_return;
+      },
+      asio::detached);
+}
+
+auto wait_for_completed_batches(const std::shared_ptr<SlidingWindowState>& state)
+    -> asio::awaitable<std::vector<std::size_t>> {
+  // 第三阶段：把 batch 控制成“最多同时飞 3 个”的滑动窗口。
+  // 只要有一个 batch 完成，就立刻把它交还给主协程处理并尝试补发新的 batch。
   auto executor = co_await asio::this_coro::executor;
-  auto completed = std::make_shared<std::atomic<std::size_t>>(0);
+  asio::steady_timer timer(executor);
 
-  for (std::size_t index = 0; index < wave_count; ++index) {
-    auto batch_index = wave_start + index;
+  while (true) {
+    {
+      std::lock_guard<std::mutex> lock(state->completed_mutex);
+      if (!state->completed_indices.empty()) {
+        std::vector<std::size_t> completed;
+        completed.reserve(state->completed_indices.size());
 
-    asio::co_spawn(
-        executor,
-        [&app_state, &batch = batches[batch_index], &outcome = outcomes[index],
-         completed]() -> asio::awaitable<void> {
-          Logger().debug("extract_batch_wave: sending batch (uid={}, count={})", batch.front().uid,
-                         batch.size());
-          outcome.result = co_await Infra::extract_batch_photo_params(app_state, batch);
-          completed->fetch_add(1, std::memory_order_relaxed);
-          co_return;
-        },
-        asio::detached);
+        while (!state->completed_indices.empty()) {
+          completed.push_back(state->completed_indices.front());
+          state->completed_indices.pop_front();
+        }
+
+        co_return completed;
+      }
+    }
+
+    if (state->inflight_count.load(std::memory_order_relaxed) == 0) {
+      co_return std::vector<std::size_t>{};
+    }
+
+    timer.expires_after(std::chrono::milliseconds(kPollIntervalMillis));
+    std::error_code wait_error;
+    co_await timer.async_wait(asio::redirect_error(asio::use_awaitable, wait_error));
   }
-
-  co_await wait_for_completion(*completed, wave_count);
-  co_return outcomes;
 }
 
 auto apply_batch_result(
@@ -440,15 +472,34 @@ auto extract_photo_params(
   auto batches = build_extract_batches(candidates, std::move(prepare_outcomes_result.value()),
                                        result, progress, progress_callback);
 
-  for (std::size_t wave_start = 0; wave_start < batches.size();
-       wave_start += kMaxInflightExtractBatches) {
-    auto wave_count = std::min(kMaxInflightExtractBatches, batches.size() - wave_start);
-    auto wave_outcomes = co_await extract_batch_wave(app_state, batches, wave_start, wave_count);
+  auto executor = co_await asio::this_coro::executor;
+  std::vector<BatchExtractOutcome> batch_outcomes(batches.size());
+  auto sliding_window_state = std::make_shared<SlidingWindowState>();
+  std::size_t next_batch_index = 0;
 
-    for (std::size_t index = 0; index < wave_count; ++index) {
-      apply_batch_result(app_state, batches[wave_start + index], wave_outcomes[index], result,
+  auto launch_until_full = [&]() {
+    // 把空闲并发槽位尽量补满，但永远不超过 kMaxInflightExtractBatches。
+    while (next_batch_index < batches.size() &&
+           sliding_window_state->inflight_count.load(std::memory_order_relaxed) <
+               kMaxInflightExtractBatches) {
+      launch_extract_batch(executor, app_state, batches, batch_outcomes, next_batch_index,
+                           sliding_window_state);
+      next_batch_index++;
+    }
+  };
+
+  launch_until_full();
+
+  while (next_batch_index < batches.size() ||
+         sliding_window_state->inflight_count.load(std::memory_order_relaxed) > 0) {
+    // 谁先完成就先处理谁；处理完后立刻再补发新的 batch。
+    auto completed_indices = co_await wait_for_completed_batches(sliding_window_state);
+    for (const auto batch_index : completed_indices) {
+      apply_batch_result(app_state, batches[batch_index], batch_outcomes[batch_index], result,
                          progress, progress_callback);
     }
+
+    launch_until_full();
   }
 
   Logger().info(
