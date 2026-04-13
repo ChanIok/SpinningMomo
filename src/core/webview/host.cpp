@@ -16,6 +16,7 @@ import Utils.Logger;
 import Utils.Path;
 import Utils.String;
 import Vendor.BuildConfig;
+import Vendor.ShellApi;
 import Vendor.WIL;
 import <d3d11.h>;
 import <dcomp.h>;
@@ -234,6 +235,29 @@ auto apply_default_background(ICoreWebView2Controller* controller, bool transpar
                 transparent_enabled ? "true" : "false", static_cast<int>(color.A));
 }
 
+auto is_http_or_https_uri(std::wstring_view uri) -> bool {
+  auto starts_with_icase = [](std::wstring_view hay, std::wstring_view needle) -> bool {
+    if (hay.size() < needle.size()) {
+      return false;
+    }
+    for (size_t i = 0; i < needle.size(); ++i) {
+      wchar_t a = hay[i];
+      wchar_t b = needle[i];
+      if (a >= L'A' && a <= L'Z') {
+        a = static_cast<wchar_t>(a - L'A' + L'a');
+      }
+      if (b >= L'A' && b <= L'Z') {
+        b = static_cast<wchar_t>(b - L'A' + L'a');
+      }
+      if (a != b) {
+        return false;
+      }
+    }
+    return true;
+  };
+  return starts_with_icase(uri, L"https://") || starts_with_icase(uri, L"http://");
+}
+
 class NavigationStartingEventHandler
     : public Microsoft::WRL::RuntimeClass<
           Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::ClassicCom>,
@@ -313,6 +337,64 @@ auto setup_navigation_events(Core::State::AppState* state, ICoreWebView2* webvie
   }
 
   Logger().debug("Navigation events registered successfully");
+  return S_OK;
+}
+
+auto setup_new_window_requested(Core::State::AppState* state, ICoreWebView2* webview,
+                                Core::WebView::State::CoreResources& resources) -> HRESULT {
+  if (!state || !webview) return E_FAIL;
+  (void)state;
+
+  auto handler = Microsoft::WRL::Callback<ICoreWebView2NewWindowRequestedEventHandler>(
+      [](ICoreWebView2* sender, ICoreWebView2NewWindowRequestedEventArgs* args) -> HRESULT {
+        (void)sender;
+
+        BOOL user_initiated = FALSE;
+        if (FAILED(args->get_IsUserInitiated(&user_initiated))) {
+          args->put_Handled(TRUE);
+          return S_OK;
+        }
+        if (!user_initiated) {
+          args->put_Handled(TRUE);
+          return S_OK;
+        }
+
+        wil::unique_cotaskmem_string uri_raw;
+        if (FAILED(args->get_Uri(&uri_raw)) || !uri_raw) {
+          args->put_Handled(TRUE);
+          return S_OK;
+        }
+
+        if (!is_http_or_https_uri(uri_raw.get())) {
+          Logger().warn("NewWindowRequested ignored non-http(s) URI: {}",
+                        Utils::String::ToUtf8(uri_raw.get()));
+          args->put_Handled(TRUE);
+          return S_OK;
+        }
+
+        Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{
+            .cbSize = sizeof(exec_info),
+            .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+            .lpVerb = L"open",
+            .lpFile = uri_raw.get(),
+            .nShow = Vendor::ShellApi::kSW_SHOWNORMAL,
+        };
+        if (!Vendor::ShellApi::ShellExecuteExW(&exec_info)) {
+          Logger().warn("ShellExecuteExW failed for NewWindowRequested URI: {}",
+                        Utils::String::ToUtf8(uri_raw.get()));
+        }
+        args->put_Handled(TRUE);
+        return S_OK;
+      });
+
+  HRESULT hr =
+      webview->add_NewWindowRequested(handler.Get(), &resources.new_window_requested_token);
+  if (FAILED(hr)) {
+    Logger().error("Failed to register NewWindowRequested event: {}", hr);
+    return hr;
+  }
+
+  Logger().debug("NewWindowRequested handler registered successfully");
   return S_OK;
 }
 
@@ -522,6 +604,7 @@ auto finalize_controller_initialization(Core::State::AppState* state,
 
   resources.navigation_starting_token = {};
   resources.navigation_completed_token = {};
+  resources.new_window_requested_token = {};
   resources.web_message_received_token = {};
   resources.webresource_requested_tokens.clear();
   resources.webview.reset();
@@ -569,6 +652,9 @@ auto finalize_controller_initialization(Core::State::AppState* state,
   apply_default_background(resources.controller.get(), transparent_enabled, theme_mode);
 
   hr = setup_navigation_events(state, webview, resources);
+  if (FAILED(hr)) return hr;
+
+  hr = setup_new_window_requested(state, webview, resources);
   if (FAILED(hr)) return hr;
 
   hr = setup_message_handler(state, webview, resources);

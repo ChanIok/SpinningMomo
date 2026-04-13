@@ -64,6 +64,7 @@ export struct CoreResources {
   // 事件注册令牌，用于清理时取消注册
   EventRegistrationToken navigation_starting_token{};
   EventRegistrationToken navigation_completed_token{};
+  EventRegistrationToken new_window_requested_token{};
   EventRegistrationToken web_message_received_token{};
   std::vector<EventRegistrationToken> webresource_requested_tokens;
 
