@@ -167,6 +167,19 @@ auto handle_reveal_asset_in_explorer(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_copy_assets_to_clipboard(Core::State::AppState& app_state,
+                                     const Features::Gallery::Types::AssetIdsParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result = Features::Gallery::copy_assets_to_clipboard(app_state, params.ids);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 auto handle_move_assets_to_trash(Core::State::AppState& app_state,
                                  const Features::Gallery::Types::AssetIdsParams& params)
     -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
@@ -367,6 +380,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
   register_method<Features::Gallery::Types::GetParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.revealAssetInExplorer",
       handle_reveal_asset_in_explorer, "Reveal and select the asset file in explorer");
+
+  register_method<Features::Gallery::Types::AssetIdsParams,
+                  Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.copyAssetsToClipboard",
+      handle_copy_assets_to_clipboard,
+      "Copy selected asset files to the system clipboard as files");
 
   register_method<Features::Gallery::Types::AssetIdsParams,
                   Features::Gallery::Types::OperationResult>(

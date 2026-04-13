@@ -257,6 +257,119 @@ auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
   };
 }
 
+auto copy_assets_to_clipboard(Core::State::AppState& app_state,
+                              const std::vector<std::int64_t>& ids)
+    -> std::expected<Types::OperationResult, std::string> {
+  // 这一层负责把“选中的资产 ID”转换成真正可复制的磁盘文件路径。
+  // 真正的系统剪贴板写入由 Utils::System 负责。
+  if (ids.empty()) {
+    return Types::OperationResult{
+        .success = false,
+        .message = "No assets selected",
+        .affected_count = 0,
+    };
+  }
+
+  std::vector<std::int64_t> unique_ids;
+  unique_ids.reserve(ids.size());
+  std::unordered_set<std::int64_t> seen_ids;
+  seen_ids.reserve(ids.size());
+
+  // 保持选择集顺序，同时去掉重复 ID，避免重复复制同一个文件。
+  for (auto id : ids) {
+    if (seen_ids.insert(id).second) {
+      unique_ids.push_back(id);
+    }
+  }
+
+  std::vector<std::filesystem::path> clipboard_paths;
+  clipboard_paths.reserve(unique_ids.size());
+
+  std::int64_t copied_count = 0;
+  std::int64_t not_found_count = 0;
+  std::vector<std::string> errors;
+  errors.reserve(unique_ids.size());
+
+  // 逐个把资产 ID 转成文件路径，并过滤掉索引不存在或磁盘不存在的项。
+  for (auto id : unique_ids) {
+    auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
+    if (!asset_result) {
+      errors.push_back("Failed to query asset " + std::to_string(id) + ": " + asset_result.error());
+      continue;
+    }
+
+    if (!asset_result->has_value()) {
+      not_found_count++;
+      continue;
+    }
+
+    const auto& asset = asset_result->value();
+    if (asset.path.empty()) {
+      errors.push_back("Asset path is empty for asset " + std::to_string(asset.id));
+      continue;
+    }
+
+    std::filesystem::path file_path(asset.path);
+    std::error_code ec;
+    const bool file_exists = std::filesystem::exists(file_path, ec);
+    if (ec) {
+      errors.push_back("Failed to access file " + asset.path + ": " + ec.message());
+      continue;
+    }
+
+    if (!file_exists) {
+      not_found_count++;
+      continue;
+    }
+
+    clipboard_paths.push_back(std::move(file_path));
+  }
+
+  // 只有在至少找到一个真实文件时，才真正写入系统剪贴板。
+  if (!clipboard_paths.empty()) {
+    auto copy_result = Utils::System::copy_files_to_clipboard(clipboard_paths);
+    if (!copy_result) {
+      errors.push_back("Failed to copy files to clipboard: " + copy_result.error());
+    } else {
+      copied_count = static_cast<std::int64_t>(clipboard_paths.size());
+    }
+  }
+
+  const auto total_count = static_cast<std::int64_t>(unique_ids.size());
+  const auto failed_count = std::max<std::int64_t>(0, total_count - copied_count - not_found_count);
+
+  // 这里沿用 gallery 现有的 OperationResult 风格，
+  // 方便前端统一做 success / partial / failed 的 toast 提示。
+  Types::OperationResult result{
+      .success = copied_count == total_count,
+      .message = "",
+      .affected_count = copied_count,
+      .failed_count = failed_count,
+      .not_found_count = not_found_count,
+      .unchanged_count = 0,
+  };
+
+  if (result.success) {
+    result.message = std::format("Copied {} asset(s) to clipboard", copied_count);
+    return result;
+  }
+
+  if (copied_count > 0) {
+    result.message = std::format("Copied {} asset(s) to clipboard, {} failed, {} not found",
+                                 copied_count, failed_count, not_found_count);
+  } else {
+    result.message = std::format("Failed to copy assets to clipboard: {} failed, {} not found",
+                                 failed_count, not_found_count);
+  }
+
+  // 详细错误记日志，用户界面只展示汇总结果即可。
+  for (const auto& error : errors) {
+    Logger().warn("copy_assets_to_clipboard: {}", error);
+  }
+
+  return result;
+}
+
 auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<std::int64_t>& ids)
     -> std::expected<Types::OperationResult, std::string> {
   if (ids.empty()) {

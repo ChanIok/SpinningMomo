@@ -19,6 +19,9 @@ export auto open_asset_with_default_app(Core::State::AppState& app_state, std::i
     -> std::expected<Types::OperationResult, std::string>;
 export auto reveal_asset_in_explorer(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<Types::OperationResult, std::string>;
+export auto copy_assets_to_clipboard(Core::State::AppState& app_state,
+                                     const std::vector<std::int64_t>& ids)
+    -> std::expected<Types::OperationResult, std::string>;
 export auto move_assets_to_trash(Core::State::AppState& app_state,
                                  const std::vector<std::int64_t>& ids)
     -> std::expected<Types::OperationResult, std::string>;

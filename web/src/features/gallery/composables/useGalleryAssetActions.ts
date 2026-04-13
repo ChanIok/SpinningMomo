@@ -11,6 +11,7 @@ export function useGalleryAssetActions() {
   const { toast } = useToast()
 
   const selectedAssetIds = computed(() => Array.from(store.selection.selectedIds))
+  const hasSelection = computed(() => selectedAssetIds.value.length > 0)
   const isSingleSelection = computed(() => selectedAssetIds.value.length === 1)
   const selectedAssetId = computed(() => {
     if (!isSingleSelection.value) {
@@ -27,6 +28,18 @@ export function useGalleryAssetActions() {
   }) {
     return t('gallery.contextMenu.moveToTrash.partialDescription', {
       moved: result.affectedCount ?? 0,
+      failed: result.failedCount ?? 0,
+      notFound: result.notFoundCount ?? 0,
+    })
+  }
+
+  function buildCopyFilesDescription(result: {
+    affectedCount?: number
+    failedCount?: number
+    notFoundCount?: number
+  }) {
+    return t('gallery.contextMenu.copyFiles.partialDescription', {
+      copied: result.affectedCount ?? 0,
       failed: result.failedCount ?? 0,
       notFound: result.notFoundCount ?? 0,
     })
@@ -65,6 +78,38 @@ export function useGalleryAssetActions() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       toast.error(t('gallery.contextMenu.revealInExplorer.failedTitle'), {
+        description: message,
+      })
+    }
+  }
+
+  async function handleCopyAssetsToClipboard() {
+    if (selectedAssetIds.value.length === 0) {
+      return
+    }
+
+    try {
+      const result = await galleryApi.copyAssetsToClipboard(selectedAssetIds.value)
+      const copiedCount = result.affectedCount ?? 0
+
+      if (!result.success && copiedCount === 0) {
+        throw new Error(result.message)
+      }
+
+      if (result.success) {
+        toast.success(t('gallery.contextMenu.copyFiles.successTitle'), {
+          description: t('gallery.contextMenu.copyFiles.successDescription', {
+            count: copiedCount || selectedAssetIds.value.length,
+          }),
+        })
+      } else {
+        toast.warning(t('gallery.contextMenu.copyFiles.partialTitle'), {
+          description: buildCopyFilesDescription(result),
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(t('gallery.contextMenu.copyFiles.failedTitle'), {
         description: message,
       })
     }
@@ -183,10 +228,12 @@ export function useGalleryAssetActions() {
 
   return {
     selectedAssetIds,
+    hasSelection,
     isSingleSelection,
     selectedAssetId,
     handleOpenAssetDefault,
     handleRevealAssetInExplorer,
+    handleCopyAssetsToClipboard,
     handleMoveAssetsToTrash,
     updateSelectedAssetsReviewState,
     setSelectedAssetsRating,

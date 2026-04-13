@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n'
-import { Eraser, ExternalLink, Flag, FolderOpen, Star, Trash2, X } from 'lucide-vue-next'
+import { Copy, Eraser, ExternalLink, Flag, FolderOpen, Star, Trash2, X } from 'lucide-vue-next'
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -30,6 +30,14 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
   >
     <FolderOpen />
     {{ t('gallery.contextMenu.revealInExplorer.label') }}
+  </DropdownMenuItem>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem
+    :disabled="!assetActions.hasSelection"
+    @click="assetActions.handleCopyAssetsToClipboard"
+  >
+    <Copy />
+    {{ t('gallery.contextMenu.copyFiles.label') }}
   </DropdownMenuItem>
   <DropdownMenuSeparator />
   <DropdownMenuSub>

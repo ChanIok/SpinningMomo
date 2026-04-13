@@ -10,6 +10,10 @@ import Utils.String;
 
 namespace Utils::System {
 
+// Windows 约定：Preferred DropEffect = 1 表示“复制”，
+// 这样其他程序在粘贴这些文件时会按“复制文件”来理解，而不是“移动文件”。
+constexpr DWORD kClipboardDropEffectCopy = 1;
+
 // 获取当前 Windows 系统版本信息
 [[nodiscard]] auto get_windows_version() noexcept
     -> std::expected<WindowsVersionInfo, std::string> {
@@ -192,6 +196,154 @@ auto reveal_file_in_explorer(const std::filesystem::path& path)
     return std::unexpected("Failed to reveal file in explorer, Win32 error: " +
                            std::to_string(Vendor::Windows::GetLastError()));
   }
+
+  return {};
+}
+
+auto copy_files_to_clipboard(const std::vector<std::filesystem::path>& paths)
+    -> std::expected<void, std::string> {
+  // 这里复制的是“文件对象”到系统剪贴板，不是复制路径文本。
+  // 目标效果要和资源管理器里 Ctrl+C 文件尽量一致。
+  if (paths.empty()) {
+    return std::unexpected("No file paths to copy");
+  }
+
+  std::vector<std::wstring> normalized_paths;
+  normalized_paths.reserve(paths.size());
+
+  size_t total_chars = 0;
+  for (const auto& path : paths) {
+    if (path.empty()) {
+      continue;
+    }
+
+    auto normalized_path = std::filesystem::path(path).make_preferred().wstring();
+    if (normalized_path.empty()) {
+      continue;
+    }
+
+    total_chars += normalized_path.size() + 1;
+    normalized_paths.push_back(std::move(normalized_path));
+  }
+
+  if (normalized_paths.empty()) {
+    return std::unexpected("No valid file paths to copy");
+  }
+
+  auto free_global = [](HGLOBAL handle) {
+    if (handle != nullptr) {
+      GlobalFree(handle);
+    }
+  };
+
+  // CF_HDROP 需要一块连续内存：前面是 DROPFILES 头，后面是以 \0 分隔、\0\0 结尾的宽字符串路径列表。
+  const auto dropfiles_size =
+      sizeof(Vendor::ShellApi::DROPFILES) + ((total_chars + 1) * sizeof(wchar_t));
+  HGLOBAL dropfiles_handle = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, dropfiles_size);
+  if (dropfiles_handle == nullptr) {
+    return std::unexpected("Failed to allocate clipboard file list, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  auto* dropfiles = static_cast<Vendor::ShellApi::DROPFILES*>(GlobalLock(dropfiles_handle));
+  if (dropfiles == nullptr) {
+    free_global(dropfiles_handle);
+    return std::unexpected("Failed to lock clipboard file list, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  dropfiles->pFiles = sizeof(Vendor::ShellApi::DROPFILES);
+  dropfiles->fWide = TRUE;
+
+  // 把所有文件路径顺序写进 DROPFILES 后面的缓冲区。
+  auto* cursor = reinterpret_cast<wchar_t*>(reinterpret_cast<std::byte*>(dropfiles) +
+                                            sizeof(Vendor::ShellApi::DROPFILES));
+  for (const auto& normalized_path : normalized_paths) {
+    const auto byte_count = (normalized_path.size() + 1) * sizeof(wchar_t);
+    std::memcpy(cursor, normalized_path.c_str(), byte_count);
+    cursor += normalized_path.size() + 1;
+  }
+  *cursor = L'\0';
+
+  // GlobalUnlock 返回 0 不一定代表失败。
+  // 所以先清空 last error，再根据是否仍然为 NO_ERROR 来判断。
+  SetLastError(NO_ERROR);
+  if (!GlobalUnlock(dropfiles_handle) && Vendor::Windows::GetLastError() != NO_ERROR) {
+    free_global(dropfiles_handle);
+    return std::unexpected("Failed to unlock clipboard file list, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  // Preferred DropEffect 是 Windows Shell 常用的附加格式，
+  // 用来告诉接收方这次剪贴板语义是“复制”还是“剪切/移动”。
+  const auto preferred_drop_effect_format = RegisterClipboardFormatW(L"Preferred DropEffect");
+  if (preferred_drop_effect_format == 0) {
+    free_global(dropfiles_handle);
+    return std::unexpected("Failed to register clipboard drop effect format, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  HGLOBAL drop_effect_handle = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, sizeof(DWORD));
+  if (drop_effect_handle == nullptr) {
+    free_global(dropfiles_handle);
+    return std::unexpected("Failed to allocate clipboard drop effect, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  auto* drop_effect = static_cast<DWORD*>(GlobalLock(drop_effect_handle));
+  if (drop_effect == nullptr) {
+    free_global(dropfiles_handle);
+    free_global(drop_effect_handle);
+    return std::unexpected("Failed to lock clipboard drop effect, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  *drop_effect = kClipboardDropEffectCopy;
+
+  // 同上：GlobalUnlock 返回 0 时，需要结合 last error 判断是否真失败。
+  SetLastError(NO_ERROR);
+  if (!GlobalUnlock(drop_effect_handle) && Vendor::Windows::GetLastError() != NO_ERROR) {
+    free_global(dropfiles_handle);
+    free_global(drop_effect_handle);
+    return std::unexpected("Failed to unlock clipboard drop effect, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  if (!OpenClipboard(nullptr)) {
+    free_global(dropfiles_handle);
+    free_global(drop_effect_handle);
+    return std::unexpected("Failed to open clipboard, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  struct ClipboardCloser {
+    ~ClipboardCloser() { CloseClipboard(); }
+  } clipboard_closer;
+
+  // OpenClipboard 成功后，当前进程接管剪贴板；
+  // 先清空旧内容，再写入文件列表和“复制”语义。
+  if (!EmptyClipboard()) {
+    free_global(dropfiles_handle);
+    free_global(drop_effect_handle);
+    return std::unexpected("Failed to empty clipboard, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+
+  if (SetClipboardData(Vendor::ShellApi::kCF_HDROP, dropfiles_handle) == nullptr) {
+    free_global(dropfiles_handle);
+    free_global(drop_effect_handle);
+    return std::unexpected("Failed to set clipboard file list, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+  dropfiles_handle = nullptr;
+
+  // 再补一份 Preferred DropEffect，让粘贴方知道这是“复制文件”。
+  if (SetClipboardData(preferred_drop_effect_format, drop_effect_handle) == nullptr) {
+    free_global(drop_effect_handle);
+    return std::unexpected("Failed to set clipboard drop effect, Win32 error: " +
+                           std::to_string(Vendor::Windows::GetLastError()));
+  }
+  drop_effect_handle = nullptr;
 
   return {};
 }

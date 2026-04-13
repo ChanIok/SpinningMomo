@@ -12,6 +12,7 @@ namespace Vendor::ShellApi {
 // 导出 Shell API 相关类型
 export using NOTIFYICONDATAW = ::NOTIFYICONDATAW;
 export using PNOTIFYICONDATAW = ::PNOTIFYICONDATAW;
+export using DROPFILES = ::DROPFILES;
 
 // 导出函数
 export auto Shell_NotifyIconW(DWORD dwMessage, PNOTIFYICONDATAW lpData) -> BOOL {
@@ -43,6 +44,7 @@ export auto ShellExecuteExW(SHELLEXECUTEINFOW* lpExecInfo) -> BOOL {
 // SHFileOperation 相关类型和常量
 export using SHFILEOPSTRUCTW = ::SHFILEOPSTRUCTW;
 export using LPSHFILEOPSTRUCTW = ::LPSHFILEOPSTRUCTW;
+export constexpr auto kCF_HDROP = CF_HDROP;
 export constexpr auto kFO_DELETE = FO_DELETE;
 export constexpr auto kFOF_ALLOWUNDO = FOF_ALLOWUNDO;
 export constexpr auto kFOF_NOCONFIRMATION = FOF_NOCONFIRMATION;

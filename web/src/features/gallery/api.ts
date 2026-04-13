@@ -306,6 +306,19 @@ export async function revealAssetInExplorer(assetId: number): Promise<OperationR
 }
 
 /**
+ * 将资产文件复制到系统剪贴板
+ */
+export async function copyAssetsToClipboard(assetIds: number[]): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.copyAssetsToClipboard', { ids: assetIds })
+    return result
+  } catch (error) {
+    console.error('Failed to copy assets to clipboard:', error)
+    throw new Error('复制文件失败')
+  }
+}
+
+/**
  * 将资产移动到系统回收站
  */
 export async function moveAssetsToTrash(assetIds: number[]): Promise<OperationResult> {
@@ -748,6 +761,7 @@ export const galleryApi = {
   // 资产动作
   openAssetDefault,
   revealAssetInExplorer,
+  copyAssetsToClipboard,
   moveAssetsToTrash,
   moveAssetsToFolder,
   checkAssetReachable,
