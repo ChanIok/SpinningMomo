@@ -73,10 +73,10 @@ let updateCheckedTimer: ReturnType<typeof setTimeout> | null = null
 
 const issuesUrl = 'https://github.com/ChanIok/SpinningMomo/issues'
 const licenseUrl = 'https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE'
-const legalNoticeZhUrl = 'https://chaniok.github.io/SpinningMomo/zh/about/legal'
-const legalNoticeEnUrl = 'https://chaniok.github.io/SpinningMomo/en/about/legal'
-const creditsZhUrl = 'https://chaniok.github.io/SpinningMomo/zh/about/credits'
-const creditsEnUrl = 'https://chaniok.github.io/SpinningMomo/en/about/credits'
+const legalNoticeZhUrl = 'https://spin.infinitymomo.com/zh/about/legal'
+const legalNoticeEnUrl = 'https://spin.infinitymomo.com/en/about/legal'
+const creditsZhUrl = 'https://spin.infinitymomo.com/zh/about/credits'
+const creditsEnUrl = 'https://spin.infinitymomo.com/en/about/credits'
 
 const legalNoticeUrl = computed(() =>
   locale.value === 'en-US' ? legalNoticeEnUrl : legalNoticeZhUrl

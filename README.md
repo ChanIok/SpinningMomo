@@ -17,9 +17,9 @@
 
   <p>
     <b>
-      <a href="https://chaniok.github.io/SpinningMomo">📖 使用文档</a> •
-      <a href="https://chaniok.github.io/SpinningMomo/dev/build-guide">🛠️ 构建指南</a> •
-      <a href="https://chaniok.github.io/SpinningMomo/en/">🌐 English</a>
+      <a href="https://spin.infinitymomo.com">📖 使用文档</a> •
+      <a href="https://spin.infinitymomo.com/dev/build-guide">🛠️ 构建指南</a> •
+      <a href="https://spin.infinitymomo.com/en/">🌐 English</a>
     </b>
   </p>
 
@@ -61,4 +61,4 @@
 
 ## 📄 声明
 
-本项目采用 [GPL 3.0 协议](LICENSE) 开源。项目图标来自游戏《无限暖暖》，版权归属游戏开发商。使用前请阅读 [法律与隐私说明](https://chaniok.github.io/SpinningMomo/zh/legal/notice)。
+本项目采用 [GPL 3.0 协议](LICENSE) 开源。项目图标来自游戏《无限暖暖》，版权归属游戏开发商。使用前请阅读 [法律与隐私说明](https://spin.infinitymomo.com/zh/about/legal)。

@@ -8,19 +8,19 @@
 
 ## 下载程序
 
-| 版本类型 | 下载链接 | 说明 |
-| :--- | :--- | :--- |
-| **安装版 (.exe)** | [前往 GitHub Release](https://github.com/ChanIok/SpinningMomo/releases/latest) | 推荐，包含安装与卸载管理 |
-| **便携版 (.zip)** | 同上 | 绿色免安装，解压即用 |
+| 下载源 | 链接 | 说明 |
+|:--|:--|:--|
+| **GitHub** | [点击下载](https://github.com/ChanIok/SpinningMomo/releases/latest) | 国内访问可能受限 |
+| **百度网盘** | [点击下载](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo) | 提取码：`momo` |
 
-备用下载：[百度网盘](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo) (提取码: `momo`)
+**版本类型说明：** 提供 **安装版（.exe）** 与 **便携版（.zip）**。**推荐大多数用户使用安装版**（含安装与卸载管理）。便携版为免安装绿色包，解压即可运行。
 
 ### 系统要求
 
 ::: warning 运行环境
 - **操作系统**：Windows 10 1903 (Build 18362) 或更高版本（64 位）
 - **显卡驱动**：支持 DirectX 11，并保持驱动为最新版本
-- **WebView2**：界面依赖 [Microsoft WebView2 运行时](https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/)，现代 Windows 通常已内置
+- **WebView2**：主界面依赖 [Microsoft WebView2 运行时](https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/)（**≥ 123.0.2420.47**），现代 Windows 通常已内置
 :::
 
 ## 首次启动

@@ -27,8 +27,3 @@ features:
     title: 适配录像功能
     details: 内置录制功能，无缝适配各种自定义窗口比例，无需繁琐设置。
 ---
-
-<div align="center" style="margin-top: 4rem; color: var(--vp-c-text-2);">
-  当前为 <strong>v2.0 (重构中)</strong> 版本文档。<br>
-  如需查阅旧版说明，请访问 <a href="/v0/">v0.7.7 历史文档</a>。
-</div>

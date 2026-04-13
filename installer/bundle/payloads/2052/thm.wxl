@@ -66,5 +66,5 @@
   <String Id="FilesInUseRetryButton" Value="重试(&amp;R)" />
   <String Id="FilesInUseIgnoreButton" Value="忽略(&amp;I)" />
   <String Id="FilesInUseExitButton" Value="退出(&amp;X)" />
-  <String Id="LicenseUrl" Value="https://chaniok.github.io/SpinningMomo/zh/about/legal" />
+  <String Id="LicenseUrl" Value="https://spin.infinitymomo.com/zh/about/legal" />
 </WixLocalization>

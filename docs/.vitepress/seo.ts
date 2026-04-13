@@ -9,7 +9,7 @@ export function mdRelativeToPathname(relativePath: string): string {
     return `/${dir}/`;
   }
   if (p.endsWith(".md")) {
-    return `/${p.slice(0, -3)}.html`;
+    return `/${p.slice(0, -3)}`;
   }
   return `/${p}`;
 }

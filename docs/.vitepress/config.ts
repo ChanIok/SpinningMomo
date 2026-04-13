@@ -22,6 +22,9 @@ export default defineConfig({
   title: SITE_NAME,
   description: SITE_DESCRIPTION_ZH,
 
+  // Cloudflare Pages 等托管支持无 .html 的干净 URL
+  cleanUrls: true,
+
   // 允许通过环境变量自定义基础路径，默认为根路径
   base,
 

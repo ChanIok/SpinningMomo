@@ -27,8 +27,3 @@ features:
     title: Adaptive Recording
     details: Built-in recording seamlessly adapts to custom window ratios without tedious settings.
 ---
-
-<div align="center" style="margin-top: 4rem; color: var(--vp-c-text-2);">
-  This is the documentation for <strong>v2.0 (WIP)</strong>.<br>
-  For the legacy documentation, please visit <a href="/v0/en/">v0.7.7 Legacy Docs</a>.
-</div>
