@@ -1,0 +1,19 @@
+{
+  "onboarding.actions.complete": "Finish",
+  "onboarding.actions.completing": "Saving...",
+  "onboarding.actions.next": "Next",
+  "onboarding.actions.previous": "Previous",
+  "onboarding.common.saveFailed": "Failed to save onboarding settings. Please try again.",
+  "onboarding.completed.description": "You can now close this page.",
+  "onboarding.completed.title": "Setup Complete!",
+  "onboarding.description": "Please complete this setup on first launch. You can change these later in Settings.",
+  "onboarding.step1.description": "Choose your preferred interface language and theme first.",
+  "onboarding.step1.themeLabel": "Interface Theme",
+  "onboarding.step1.title": "Step 1: Language and Theme",
+  "onboarding.step2.description": "Optionally enter the window title you want to control. If the game is not running yet, you can leave this blank for now.",
+  "onboarding.step2.targetTitleHint": "You can set this later through \"Select Window\" in the floating window's right-click menu.",
+  "onboarding.step2.targetTitleLabel": "Target Window Title",
+  "onboarding.step2.targetTitlePlaceholder": "Enter window title",
+  "onboarding.step2.title": "Step 2: Target Window Title",
+  "onboarding.title": "Welcome to SpinningMomo"
+}

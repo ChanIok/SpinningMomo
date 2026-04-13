@@ -1,0 +1,5 @@
+{
+  "extensions.infinityNikki.album.rootDisplayName": "Infinity Nikki",
+  "extensions.infinityNikki.scanRules.excludeAll": "Exclude all files by default",
+  "extensions.infinityNikki.scanRules.includeHighQualityPhotos": "Include high-quality photo directory"
+}

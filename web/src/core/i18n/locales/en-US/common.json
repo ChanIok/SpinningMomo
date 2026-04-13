@@ -1,0 +1,12 @@
+{
+  "common.languageEnUs": "English",
+  "common.languageLabelBilingual": "语言 / Language",
+  "common.languageZhCn": "简体中文",
+  "common.no": "No",
+  "common.windowTitlePicker.empty": "No visible windows found",
+  "common.windowTitlePicker.loadFailed": "Failed to load the window list",
+  "common.windowTitlePicker.loading": "Loading window list...",
+  "common.windowTitlePicker.retry": "Retry",
+  "common.windowTitlePicker.trigger": "Choose from visible windows",
+  "common.yes": "Yes"
+}

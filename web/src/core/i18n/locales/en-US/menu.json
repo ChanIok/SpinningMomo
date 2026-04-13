@@ -1,0 +1,16 @@
+{
+  "menu.app_exit": "Exit",
+  "menu.app_float": "Floating Window",
+  "menu.app_main": "Main",
+  "menu.external_album_open_folder": "Game Album",
+  "menu.letterbox_toggle": "Letterbox",
+  "menu.motion_photo_toggle": "Motion Photo",
+  "menu.output_open_folder": "Output Folder",
+  "menu.overlay_toggle": "Overlay",
+  "menu.preview_toggle": "Preview",
+  "menu.recording_toggle": "Record",
+  "menu.replay_buffer_save": "Save Replay",
+  "menu.replay_buffer_toggle": "Instant Replay",
+  "menu.screenshot_capture": "Capture",
+  "menu.window_reset": "Reset"
+}

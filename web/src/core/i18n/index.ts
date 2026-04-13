@@ -6,6 +6,17 @@ const locale = ref<Locale>('zh-CN')
 
 // 翻译字典（使用 shallowRef 避免深度响应式，提升性能）
 const messages = shallowRef<Messages>({})
+const LOCALE_DOMAINS = [
+  'common',
+  'app',
+  'settings',
+  'gallery',
+  'about',
+  'onboarding',
+  'menu',
+  'extensions',
+  'home',
+] as const
 
 /**
  * 参数插值：替换文本中的 {key} 占位符
@@ -29,9 +40,23 @@ function t(key: string, params?: Record<string, any>): string {
  */
 async function setLocale(newLocale: Locale): Promise<void> {
   try {
-    // 动态导入对应的语言文件
-    const module = await import(`./locales/${newLocale}.json`)
-    messages.value = module.default || module
+    const merged: Messages = {}
+
+    for (const domain of LOCALE_DOMAINS) {
+      const module = await import(`./locales/${newLocale}/${domain}.json`)
+      const dict = (module.default || module) as Messages
+
+      for (const [key, value] of Object.entries(dict)) {
+        if (key in merged) {
+          console.warn(
+            `[i18n] Duplicate translation key detected while loading ${newLocale}/${domain}.json: ${key}`
+          )
+        }
+        merged[key] = value
+      }
+    }
+
+    messages.value = merged
     locale.value = newLocale
   } catch (error) {
     console.error(`Failed to load locale: ${newLocale}`, error)

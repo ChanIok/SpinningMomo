@@ -52,90 +52,6 @@ const { t, locale } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
 
-const pageMessages = {
-  'zh-CN': {
-    linksIssues: '问题反馈',
-    linksLicense: '开源协议',
-    linksLegalNotice: '法律与隐私说明',
-    actionsShowAdvanced: '显示诊断与支持',
-    actionsHideAdvanced: '隐藏诊断与支持',
-    actionsCopyDiagnostics: '复制诊断信息',
-    statusCopied: '已复制',
-    toastUpdateAvailable: '发现可用更新',
-    toastUpToDate: '当前已是最新版本',
-    toastUpdateCheckFailed: '检查更新失败',
-    toastUpdateDownloadFailed: '启动更新下载失败',
-    toastUpdateInstallFailed: '安装更新失败',
-    toastOpenDataDirectoryFailed: '打开数据目录失败',
-    diagnosticsTitle: 'SpinningMomo 诊断信息',
-    runtimeVersion: '应用版本',
-    runtimeEnvironment: '运行环境',
-    runtimeEnvironmentWeb: '浏览器 (Web)',
-    runtimeEnvironmentWebview: '桌面 WebView2',
-    runtimeOs: 'Windows 版本',
-    runtimeWebview2: 'WebView2',
-    runtimeCapture: '图形捕获支持',
-    runtimeLoopback: '游戏音频回环支持',
-    runtimeSupported: '支持',
-    runtimeUnsupported: '不支持',
-    runtimeAvailable: '可用',
-    runtimeUnavailable: '不可用',
-    actionsOpenDataDirectory: '应用数据',
-    footerOpenSourcePrefix: '旋转吧大喵 的开发与迭代，得益于众多优秀的 ',
-    footerOpenSourceLink: '开源项目',
-    footerOpenSourceSuffix: '。',
-    footerRightsReserved: '保留所有权利。',
-    actionsCheckingUpdate: '正在检查更新...',
-    actionsDownloadUpdate: '下载并安装 {version}',
-    actionsInstallingUpdate: '正在安装...',
-    actionsInstallDownloadedUpdate: '即刻安装 {version}',
-  },
-  'en-US': {
-    linksIssues: 'Report Issue',
-    linksLicense: 'License',
-    linksLegalNotice: 'Legal & Privacy Notice',
-    actionsShowAdvanced: 'Show Diagnostics & Support',
-    actionsHideAdvanced: 'Hide Diagnostics & Support',
-    actionsCopyDiagnostics: 'Copy Diagnostics',
-    statusCopied: 'Copied',
-    toastUpdateAvailable: 'Update is available',
-    toastUpToDate: 'You are up to date',
-    toastUpdateCheckFailed: 'Failed to check for updates',
-    toastUpdateDownloadFailed: 'Failed to start update download',
-    toastUpdateInstallFailed: 'Failed to install update',
-    toastOpenDataDirectoryFailed: 'Failed to open data directory',
-    diagnosticsTitle: 'SpinningMomo Diagnostics',
-    runtimeVersion: 'App Version',
-    runtimeEnvironment: 'Environment',
-    runtimeEnvironmentWeb: 'Browser (Web)',
-    runtimeEnvironmentWebview: 'Desktop WebView2',
-    runtimeOs: 'Windows Version',
-    runtimeWebview2: 'WebView2',
-    runtimeCapture: 'Graphics Capture Support',
-    runtimeLoopback: 'Game Audio Loopback Support',
-    runtimeSupported: 'Supported',
-    runtimeUnsupported: 'Unsupported',
-    runtimeAvailable: 'Available',
-    runtimeUnavailable: 'Unavailable',
-    actionsOpenDataDirectory: 'App Data',
-    footerOpenSourcePrefix: 'SpinningMomo is made possible by many wonderful ',
-    footerOpenSourceLink: 'open source projects',
-    footerOpenSourceSuffix: '.',
-    footerRightsReserved: 'All rights reserved.',
-    actionsCheckingUpdate: 'Checking for updates...',
-    actionsDownloadUpdate: 'Download & Install {version}',
-    actionsInstallingUpdate: 'Installing...',
-    actionsInstallDownloadedUpdate: 'Install now {version}',
-  },
-} as const
-
-type PageMessageKey = keyof (typeof pageMessages)['zh-CN']
-
-const tt = (key: PageMessageKey): string => {
-  const currentLocale = locale.value === 'en-US' ? 'en-US' : 'zh-CN'
-  return pageMessages[currentLocale][key]
-}
-
 const runtimeInfo = ref<RuntimeInfo | null>(null)
 const currentVersionFromUpdate = ref<string | null>(null)
 const isLoading = ref(false)
@@ -186,7 +102,9 @@ const isDownloadedUpdateReady = computed(
 )
 
 const environmentText = computed(() => {
-  return environment === 'webview' ? tt('runtimeEnvironmentWebview') : tt('runtimeEnvironmentWeb')
+  return environment === 'webview'
+    ? t('about.runtime.environmentWebview')
+    : t('about.runtime.environmentWeb')
 })
 
 const osText = computed(() => {
@@ -201,20 +119,20 @@ const webview2Text = computed(() => {
     return '-'
   }
   if (!runtimeInfo.value.isWebview2Available) {
-    return tt('runtimeUnavailable')
+    return t('about.runtime.unavailable')
   }
-  return runtimeInfo.value.webview2Version || tt('runtimeAvailable')
+  return runtimeInfo.value.webview2Version || t('about.runtime.available')
 })
 
 const diagnosticsText = computed(() => {
   return [
-    tt('diagnosticsTitle'),
-    `${tt('runtimeVersion')}: ${appVersionText.value}`,
-    `${tt('runtimeEnvironment')}: ${environmentText.value}`,
-    `${tt('runtimeOs')}: ${osText.value}`,
-    `${tt('runtimeWebview2')}: ${webview2Text.value}`,
-    `${tt('runtimeCapture')}: ${formatCapability(runtimeInfo.value?.isCaptureSupported)}`,
-    `${tt('runtimeLoopback')}: ${formatCapability(runtimeInfo.value?.isProcessLoopbackAudioSupported)}`,
+    t('about.diagnostics.title'),
+    `${t('about.runtime.version')}: ${appVersionText.value}`,
+    `${t('about.runtime.environment')}: ${environmentText.value}`,
+    `${t('about.runtime.os')}: ${osText.value}`,
+    `${t('about.runtime.webview2')}: ${webview2Text.value}`,
+    `${t('about.runtime.capture')}: ${formatCapability(runtimeInfo.value?.isCaptureSupported)}`,
+    `${t('about.runtime.loopback')}: ${formatCapability(runtimeInfo.value?.isProcessLoopbackAudioSupported)}`,
   ].join('\n')
 })
 
@@ -227,10 +145,10 @@ const toErrorMessage = (value: unknown): string => {
 
 const formatCapability = (value: boolean | undefined): string => {
   if (value === true) {
-    return tt('runtimeSupported')
+    return t('about.runtime.supported')
   }
   if (value === false) {
-    return tt('runtimeUnsupported')
+    return t('about.runtime.unsupported')
   }
   return '-'
 }
@@ -278,10 +196,10 @@ const checkForUpdate = async (silent = false) => {
     currentVersionFromUpdate.value = result.currentVersion
 
     if (result.hasUpdate) {
-      if (!silent) toast.success(tt('toastUpdateAvailable'))
+      if (!silent) toast.success(t('about.toast.updateAvailable'))
     } else {
       if (!silent) {
-        toast.info(tt('toastUpToDate'))
+        toast.info(t('about.toast.upToDate'))
         updateChecked.value = true
         updateCheckedTimer = setTimeout(() => {
           updateChecked.value = false
@@ -290,7 +208,7 @@ const checkForUpdate = async (silent = false) => {
     }
   } catch (e) {
     updateError.value = toErrorMessage(e)
-    if (!silent) toast.error(tt('toastUpdateCheckFailed'))
+    if (!silent) toast.error(t('about.toast.updateCheckFailed'))
   } finally {
     isCheckingUpdate.value = false
   }
@@ -309,7 +227,7 @@ const downloadAndInstallUpdate = async () => {
       await call('update.install_update', { restart: true })
     } catch (e) {
       updateError.value = toErrorMessage(e)
-      toast.error(tt('toastUpdateInstallFailed'))
+      toast.error(t('about.toast.updateInstallFailed'))
       isInstallingUpdate.value = false
     }
     return
@@ -326,7 +244,7 @@ const downloadAndInstallUpdate = async () => {
     await call<StartDownloadUpdateResult>('update.start_download')
   } catch (e) {
     updateError.value = toErrorMessage(e)
-    toast.error(tt('toastUpdateDownloadFailed'))
+    toast.error(t('about.toast.updateDownloadFailed'))
   } finally {
     isStartingDownload.value = false
   }
@@ -356,10 +274,10 @@ const openAppDataDirectory = async () => {
   try {
     const result = await call<OpenAppDataDirectoryResult>('file.openAppDataDirectory')
     if (!result.success) {
-      throw new Error(result.message || tt('toastOpenDataDirectoryFailed'))
+      throw new Error(result.message || t('about.toast.openDataDirectoryFailed'))
     }
   } catch (e) {
-    toast.error(tt('toastOpenDataDirectoryFailed'))
+    toast.error(t('about.toast.openDataDirectoryFailed'))
   } finally {
     isOpeningAppDataDirectory.value = false
   }
@@ -423,15 +341,19 @@ onBeforeUnmount(() => {
 
           <!-- Status Text -->
           <span>
-            <template v-if="isCheckingUpdate">{{ tt('actionsCheckingUpdate') }}</template>
-            <template v-else-if="isInstallingUpdate">{{ tt('actionsInstallingUpdate') }}</template>
+            <template v-if="isCheckingUpdate">{{ t('about.actions.checkingUpdate') }}</template>
+            <template v-else-if="isInstallingUpdate">{{
+              t('about.actions.installingUpdate')
+            }}</template>
             <template v-else-if="isDownloadedUpdateReady">{{
-              tt('actionsInstallDownloadedUpdate').replace('{version}', latestVersion || '')
+              t('about.actions.installDownloadedUpdate', { version: latestVersion || '' })
             }}</template>
             <template v-else-if="hasUpdate">{{
-              tt('actionsDownloadUpdate').replace('{version}', latestVersion || '')
+              t('about.actions.downloadUpdate', { version: latestVersion || '' })
             }}</template>
-            <template v-else>{{ tt('runtimeVersion') }} {{ appVersionText }} (64-bit)</template>
+            <template v-else
+              >{{ t('about.runtime.version') }} {{ appVersionText }} (64-bit)</template
+            >
           </span>
         </button>
       </div>
@@ -453,7 +375,9 @@ onBeforeUnmount(() => {
             >
               <Globe class="h-4 w-4" />
             </div>
-            <span class="text-[15px] font-medium text-card-foreground">官方网站</span>
+            <span class="text-[15px] font-medium text-card-foreground">{{
+              t('about.links.officialWebsite')
+            }}</span>
           </div>
           <div class="flex items-center gap-2">
             <span
@@ -480,7 +404,7 @@ onBeforeUnmount(() => {
               <Bug class="h-4 w-4" />
             </div>
             <span class="text-[15px] font-medium text-card-foreground">{{
-              tt('linksIssues')
+              t('about.links.issues')
             }}</span>
           </div>
           <ExternalLink
@@ -498,7 +422,7 @@ onBeforeUnmount(() => {
           @click="showAdvanced = !showAdvanced"
         >
           <Settings class="mr-1.5 h-3.5 w-3.5 opacity-70" />
-          {{ showAdvanced ? tt('actionsHideAdvanced') : tt('actionsShowAdvanced') }}
+          {{ showAdvanced ? t('about.actions.hideAdvanced') : t('about.actions.showAdvanced') }}
         </Button>
 
         <div
@@ -520,12 +444,12 @@ onBeforeUnmount(() => {
               class="h-7 px-2 text-xs"
               @click="openAppDataDirectory"
             >
-              <FolderOpen class="mr-1.5 h-3.5 w-3.5" /> {{ tt('actionsOpenDataDirectory') }}
+              <FolderOpen class="mr-1.5 h-3.5 w-3.5" /> {{ t('about.actions.openDataDirectory') }}
             </Button>
             <Button variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="copyDiagnostics">
               <Check v-if="copied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />
               <Info v-else class="mr-1.5 h-3.5 w-3.5" />
-              {{ copied ? tt('statusCopied') : tt('actionsCopyDiagnostics') }}
+              {{ copied ? t('about.status.copied') : t('about.actions.copyDiagnostics') }}
             </Button>
           </div>
         </div>
@@ -535,17 +459,17 @@ onBeforeUnmount(() => {
       <div
         class="mt-auto flex flex-col items-center space-y-3 text-center text-[13px] text-muted-foreground"
       >
-        <p>&copy; 2026 InfinityMomo. {{ tt('footerRightsReserved') }}</p>
+        <p>&copy; 2026 InfinityMomo. {{ t('about.footer.rightsReserved') }}</p>
         <p>
-          {{ tt('footerOpenSourcePrefix') }}
+          {{ t('about.footer.openSourcePrefix') }}
           <a
             :href="creditsUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="text-primary/80 transition-colors hover:text-primary hover:underline"
           >
-            {{ tt('footerOpenSourceLink') }} </a
-          >{{ tt('footerOpenSourceSuffix') }}
+            {{ t('about.footer.openSourceLink') }} </a
+          >{{ t('about.footer.openSourceSuffix') }}
         </p>
         <div class="flex items-center justify-center gap-5 pt-2">
           <a
@@ -553,14 +477,14 @@ onBeforeUnmount(() => {
             target="_blank"
             rel="noopener noreferrer"
             class="transition-colors hover:text-foreground hover:underline"
-            >{{ tt('linksLegalNotice') }}</a
+            >{{ t('about.links.legalNotice') }}</a
           >
           <a
             :href="licenseUrl"
             target="_blank"
             rel="noopener noreferrer"
             class="transition-colors hover:text-foreground hover:underline"
-            >{{ tt('linksLicense') }}</a
+            >{{ t('about.links.license') }}</a
           >
         </div>
       </div>
