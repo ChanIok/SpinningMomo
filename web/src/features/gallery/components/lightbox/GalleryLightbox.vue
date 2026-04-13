@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useEventListener, useThrottleFn } from '@vueuse/core'
+import { Maximize } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryAssetActions, useGalleryLightbox, useGallerySelection } from '../../composables'
 import { useGalleryStore } from '../../store'
@@ -370,36 +371,37 @@ useEventListener(window, 'keydown', handleKeydown)
           </ContextMenuTrigger>
           <ContextMenuContent class="w-56">
             <template v-if="isZoomableAsset">
-              <ContextMenuItem @click="handleToolbarFit">
+              <GalleryAssetContextMenuContent />
+              <ContextMenuSeparator />
+              <ContextMenuItem inset @click="handleToolbarFit">
                 {{ t('gallery.lightbox.contextMenu.fit') }}
               </ContextMenuItem>
               <ContextMenuItem @click="handleToolbarActual">
+                <Maximize class="size-4 text-muted-foreground" />
                 {{ t('gallery.lightbox.contextMenu.actual') }}
               </ContextMenuItem>
-              <ContextMenuItem @click="handleToolbarZoomIn">
+              <ContextMenuItem inset @click="handleToolbarZoomIn">
                 {{ t('gallery.lightbox.contextMenu.zoomIn') }}
               </ContextMenuItem>
-              <ContextMenuItem @click="handleToolbarZoomOut">
+              <ContextMenuItem inset @click="handleToolbarZoomOut">
                 {{ t('gallery.lightbox.contextMenu.zoomOut') }}
               </ContextMenuItem>
               <ContextMenuSeparator />
             </template>
-            <ContextMenuItem @click="handleToolbarToggleFilmstrip">
+            <ContextMenuItem inset @click="handleToolbarToggleFilmstrip">
               {{
                 showFilmstrip
                   ? t('gallery.lightbox.contextMenu.hideFilmstrip')
                   : t('gallery.lightbox.contextMenu.showFilmstrip')
               }}
             </ContextMenuItem>
-            <ContextMenuItem @click="handleToolbarToggleImmersive">
+            <ContextMenuItem inset @click="handleToolbarToggleImmersive">
               {{
                 isImmersive
                   ? t('gallery.lightbox.contextMenu.exitImmersive')
                   : t('gallery.lightbox.contextMenu.immersive')
               }}
             </ContextMenuItem>
-            <ContextMenuSeparator />
-            <GalleryAssetContextMenuContent />
           </ContextMenuContent>
         </ContextMenu>
         <div

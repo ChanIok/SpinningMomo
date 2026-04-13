@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { FolderOpen, Pen, Sparkles, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -231,20 +232,21 @@ function handleContextMenuCloseAutoFocus(event: Event) {
 
       <ContextMenuContent @close-auto-focus="handleContextMenuCloseAutoFocus">
         <ContextMenuItem @click="startRenameDisplayName">
+          <Pen />
           {{ t('gallery.sidebar.folders.menu.renameDisplayName') }}
         </ContextMenuItem>
         <ContextMenuItem @click="handleOpenInExplorer">
+          <FolderOpen />
           {{ t('gallery.sidebar.folders.menu.openInExplorer') }}
         </ContextMenuItem>
         <ContextMenuItem v-if="infinityNikkiEnabled" @click="handleExtractInfinityNikkiMetadata">
+          <Sparkles />
           {{ t('gallery.sidebar.folders.menu.extractInfinityNikkiMetadata') }}
         </ContextMenuItem>
         <template v-if="isRootFolder">
           <ContextMenuSeparator />
-          <ContextMenuItem
-            class="text-destructive focus:text-destructive"
-            @click="requestRemoveWatch"
-          >
+          <ContextMenuItem variant="destructive" @click="requestRemoveWatch">
+            <Trash2 />
             {{ t('gallery.sidebar.folders.menu.removeWatch') }}
           </ContextMenuItem>
         </template>

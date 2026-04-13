@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n'
+import { Eraser, ExternalLink, Flag, FolderOpen, Star, Trash2, X } from 'lucide-vue-next'
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -12,6 +13,7 @@ import { useGalleryAssetActions } from '../../composables'
 
 const { t } = useI18n()
 const assetActions = useGalleryAssetActions()
+const ratingOptions = [1, 2, 3, 4, 5] as const
 </script>
 
 <template>
@@ -19,42 +21,36 @@ const assetActions = useGalleryAssetActions()
     :disabled="!assetActions.isSingleSelection"
     @click="assetActions.handleOpenAssetDefault"
   >
+    <ExternalLink />
     {{ t('gallery.contextMenu.openDefaultApp.label') }}
   </DropdownMenuItem>
   <DropdownMenuItem
     :disabled="!assetActions.isSingleSelection"
     @click="assetActions.handleRevealAssetInExplorer"
   >
+    <FolderOpen />
     {{ t('gallery.contextMenu.revealInExplorer.label') }}
   </DropdownMenuItem>
   <DropdownMenuSeparator />
   <DropdownMenuSub>
     <DropdownMenuSubTrigger>
+      <Star />
       {{ t('gallery.contextMenu.review.rating.label') }}
     </DropdownMenuSubTrigger>
     <DropdownMenuSubContent class="w-40">
-      <DropdownMenuItem @click="assetActions.setSelectedAssetsRating(1)">
-        1★
-        <DropdownMenuShortcut>1</DropdownMenuShortcut>
-      </DropdownMenuItem>
-      <DropdownMenuItem @click="assetActions.setSelectedAssetsRating(2)">
-        2★
-        <DropdownMenuShortcut>2</DropdownMenuShortcut>
-      </DropdownMenuItem>
-      <DropdownMenuItem @click="assetActions.setSelectedAssetsRating(3)">
-        3★
-        <DropdownMenuShortcut>3</DropdownMenuShortcut>
-      </DropdownMenuItem>
-      <DropdownMenuItem @click="assetActions.setSelectedAssetsRating(4)">
-        4★
-        <DropdownMenuShortcut>4</DropdownMenuShortcut>
-      </DropdownMenuItem>
-      <DropdownMenuItem @click="assetActions.setSelectedAssetsRating(5)">
-        5★
-        <DropdownMenuShortcut>5</DropdownMenuShortcut>
+      <DropdownMenuItem
+        v-for="rating in ratingOptions"
+        :key="rating"
+        @click="assetActions.setSelectedAssetsRating(rating)"
+      >
+        <span class="flex items-center gap-0.5">
+          <Star v-for="index in rating" :key="`${rating}-${index}`" class="fill-current" />
+        </span>
+        <DropdownMenuShortcut>{{ rating }}</DropdownMenuShortcut>
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="assetActions.clearSelectedAssetsRating">
+        <Eraser />
         {{ t('gallery.contextMenu.review.rating.clear') }}
         <DropdownMenuShortcut>0</DropdownMenuShortcut>
       </DropdownMenuItem>
@@ -62,24 +58,25 @@ const assetActions = useGalleryAssetActions()
   </DropdownMenuSub>
   <DropdownMenuSub>
     <DropdownMenuSubTrigger>
+      <Flag />
       {{ t('gallery.contextMenu.review.flag.label') }}
     </DropdownMenuSubTrigger>
     <DropdownMenuSubContent class="w-40">
       <DropdownMenuItem @click="assetActions.setSelectedAssetsRejected()">
+        <X />
         {{ t('gallery.review.flag.rejected') }}
         <DropdownMenuShortcut>X</DropdownMenuShortcut>
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem @click="assetActions.clearSelectedAssetsRejected">
+        <Eraser />
         {{ t('gallery.contextMenu.review.flag.clear') }}
       </DropdownMenuItem>
     </DropdownMenuSubContent>
   </DropdownMenuSub>
   <DropdownMenuSeparator />
-  <DropdownMenuItem
-    class="text-destructive focus:text-destructive"
-    @click="assetActions.handleMoveAssetsToTrash"
-  >
+  <DropdownMenuItem variant="destructive" @click="assetActions.handleMoveAssetsToTrash">
+    <Trash2 />
     {{ t('gallery.contextMenu.moveToTrash.label') }}
   </DropdownMenuItem>
 </template>
