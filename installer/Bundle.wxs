@@ -10,7 +10,7 @@
 
   <Bundle
     Name="SpinningMomo"
-    Manufacturer="ChanIok"
+    Manufacturer="InfinityMomo"
     Version="$(var.ProductVersion)"
     UpgradeCode="F9A8B7C6-5D4E-3F2A-1B0C-9D8E7F6A5B4C"
     IconSourceFile="$(var.ProjectDir)\resources\icon.ico"

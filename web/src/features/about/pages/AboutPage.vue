@@ -12,19 +12,12 @@ import {
   Info,
   Monitor,
   Settings,
-  Camera,
-  TriangleAlert,
-  RefreshCw,
-  Download,
   Check,
-  Loader2,
-  Book,
-  Package,
   Bug,
-  Scale,
-  ShieldAlert,
   Heart,
   FolderOpen,
+  ExternalLink,
+  Globe,
 } from 'lucide-vue-next'
 
 interface RuntimeInfo {
@@ -59,6 +52,90 @@ const { t, locale } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
 
+const pageMessages = {
+  'zh-CN': {
+    linksIssues: '问题反馈',
+    linksLicense: '开源协议',
+    linksLegalNotice: '法律与隐私说明',
+    actionsShowAdvanced: '显示诊断与支持',
+    actionsHideAdvanced: '隐藏诊断与支持',
+    actionsCopyDiagnostics: '复制诊断信息',
+    statusCopied: '已复制',
+    toastUpdateAvailable: '发现可用更新',
+    toastUpToDate: '当前已是最新版本',
+    toastUpdateCheckFailed: '检查更新失败',
+    toastUpdateDownloadFailed: '启动更新下载失败',
+    toastUpdateInstallFailed: '安装更新失败',
+    toastOpenDataDirectoryFailed: '打开数据目录失败',
+    diagnosticsTitle: 'SpinningMomo 诊断信息',
+    runtimeVersion: '应用版本',
+    runtimeEnvironment: '运行环境',
+    runtimeEnvironmentWeb: '浏览器 (Web)',
+    runtimeEnvironmentWebview: '桌面 WebView2',
+    runtimeOs: 'Windows 版本',
+    runtimeWebview2: 'WebView2',
+    runtimeCapture: '图形捕获支持',
+    runtimeLoopback: '游戏音频回环支持',
+    runtimeSupported: '支持',
+    runtimeUnsupported: '不支持',
+    runtimeAvailable: '可用',
+    runtimeUnavailable: '不可用',
+    actionsOpenDataDirectory: '应用数据',
+    footerOpenSourcePrefix: '旋转吧大喵 的开发与迭代，得益于众多优秀的 ',
+    footerOpenSourceLink: '开源项目',
+    footerOpenSourceSuffix: '。',
+    footerRightsReserved: '保留所有权利。',
+    actionsCheckingUpdate: '正在检查更新...',
+    actionsDownloadUpdate: '下载并安装 {version}',
+    actionsInstallingUpdate: '正在安装...',
+    actionsInstallDownloadedUpdate: '即刻安装 {version}',
+  },
+  'en-US': {
+    linksIssues: 'Report Issue',
+    linksLicense: 'License',
+    linksLegalNotice: 'Legal & Privacy Notice',
+    actionsShowAdvanced: 'Show Diagnostics & Support',
+    actionsHideAdvanced: 'Hide Diagnostics & Support',
+    actionsCopyDiagnostics: 'Copy Diagnostics',
+    statusCopied: 'Copied',
+    toastUpdateAvailable: 'Update is available',
+    toastUpToDate: 'You are up to date',
+    toastUpdateCheckFailed: 'Failed to check for updates',
+    toastUpdateDownloadFailed: 'Failed to start update download',
+    toastUpdateInstallFailed: 'Failed to install update',
+    toastOpenDataDirectoryFailed: 'Failed to open data directory',
+    diagnosticsTitle: 'SpinningMomo Diagnostics',
+    runtimeVersion: 'App Version',
+    runtimeEnvironment: 'Environment',
+    runtimeEnvironmentWeb: 'Browser (Web)',
+    runtimeEnvironmentWebview: 'Desktop WebView2',
+    runtimeOs: 'Windows Version',
+    runtimeWebview2: 'WebView2',
+    runtimeCapture: 'Graphics Capture Support',
+    runtimeLoopback: 'Game Audio Loopback Support',
+    runtimeSupported: 'Supported',
+    runtimeUnsupported: 'Unsupported',
+    runtimeAvailable: 'Available',
+    runtimeUnavailable: 'Unavailable',
+    actionsOpenDataDirectory: 'App Data',
+    footerOpenSourcePrefix: 'SpinningMomo is made possible by many wonderful ',
+    footerOpenSourceLink: 'open source projects',
+    footerOpenSourceSuffix: '.',
+    footerRightsReserved: 'All rights reserved.',
+    actionsCheckingUpdate: 'Checking for updates...',
+    actionsDownloadUpdate: 'Download & Install {version}',
+    actionsInstallingUpdate: 'Installing...',
+    actionsInstallDownloadedUpdate: 'Install now {version}',
+  },
+} as const
+
+type PageMessageKey = keyof (typeof pageMessages)['zh-CN']
+
+const tt = (key: PageMessageKey): string => {
+  const currentLocale = locale.value === 'en-US' ? 'en-US' : 'zh-CN'
+  return pageMessages[currentLocale][key]
+}
+
 const runtimeInfo = ref<RuntimeInfo | null>(null)
 const currentVersionFromUpdate = ref<string | null>(null)
 const isLoading = ref(false)
@@ -78,8 +155,6 @@ const environment = getCurrentEnvironment()
 let copiedTimer: ReturnType<typeof setTimeout> | null = null
 let updateCheckedTimer: ReturnType<typeof setTimeout> | null = null
 
-const docsUrl = 'https://chaniok.github.io/SpinningMomo'
-const releaseUrl = 'https://github.com/ChanIok/SpinningMomo/releases/latest'
 const issuesUrl = 'https://github.com/ChanIok/SpinningMomo/issues'
 const licenseUrl = 'https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE'
 const legalNoticeZhUrl = 'https://chaniok.github.io/SpinningMomo/zh/about/legal'
@@ -110,45 +185,8 @@ const isDownloadedUpdateReady = computed(
   () => currentUpdateTask.value?.status === 'succeeded' && hasUpdate.value !== false
 )
 
-const resolvedUpdateError = computed(() => {
-  if (updateError.value) {
-    return updateError.value
-  }
-
-  if (currentUpdateTask.value?.status === 'failed') {
-    return currentUpdateTask.value.errorMessage || t('about.status.updateFailed')
-  }
-
-  return null
-})
-
-const actionButtonText = computed(() => {
-  if (isInstallingUpdate.value) {
-    return t('about.actions.installingUpdate')
-  }
-  if (isCheckingUpdate.value) {
-    return t('about.actions.checkingUpdate')
-  }
-  if (isStartingDownload.value || isDownloadingUpdate.value) {
-    return t('about.actions.downloadingUpdate')
-  }
-  if (isDownloadedUpdateReady.value) {
-    const displayVersion = currentUpdateTask.value?.context || latestVersion.value || ''
-    return t('about.actions.installDownloadedUpdate').replace('{version}', displayVersion)
-  }
-  if (hasUpdate.value) {
-    return t('about.actions.downloadUpdate').replace('{version}', latestVersion.value || '')
-  }
-  if (updateChecked.value && !hasUpdate.value) {
-    return t('about.status.upToDateShort')
-  }
-  return t('about.actions.checkUpdate')
-})
-
 const environmentText = computed(() => {
-  const key =
-    environment === 'webview' ? 'about.runtime.environmentWebview' : 'about.runtime.environmentWeb'
-  return t(key)
+  return environment === 'webview' ? tt('runtimeEnvironmentWebview') : tt('runtimeEnvironmentWeb')
 })
 
 const osText = computed(() => {
@@ -163,20 +201,20 @@ const webview2Text = computed(() => {
     return '-'
   }
   if (!runtimeInfo.value.isWebview2Available) {
-    return t('about.runtime.unavailable')
+    return tt('runtimeUnavailable')
   }
-  return runtimeInfo.value.webview2Version || t('about.runtime.available')
+  return runtimeInfo.value.webview2Version || tt('runtimeAvailable')
 })
 
 const diagnosticsText = computed(() => {
   return [
-    t('about.diagnostics.title'),
-    `${t('about.runtime.version')}: ${appVersionText.value}`,
-    `${t('about.runtime.environment')}: ${environmentText.value}`,
-    `${t('about.runtime.os')}: ${osText.value}`,
-    `${t('about.runtime.webview2')}: ${webview2Text.value}`,
-    `${t('about.runtime.capture')}: ${formatCapability(runtimeInfo.value?.isCaptureSupported)}`,
-    `${t('about.runtime.loopback')}: ${formatCapability(runtimeInfo.value?.isProcessLoopbackAudioSupported)}`,
+    tt('diagnosticsTitle'),
+    `${tt('runtimeVersion')}: ${appVersionText.value}`,
+    `${tt('runtimeEnvironment')}: ${environmentText.value}`,
+    `${tt('runtimeOs')}: ${osText.value}`,
+    `${tt('runtimeWebview2')}: ${webview2Text.value}`,
+    `${tt('runtimeCapture')}: ${formatCapability(runtimeInfo.value?.isCaptureSupported)}`,
+    `${tt('runtimeLoopback')}: ${formatCapability(runtimeInfo.value?.isProcessLoopbackAudioSupported)}`,
   ].join('\n')
 })
 
@@ -189,10 +227,10 @@ const toErrorMessage = (value: unknown): string => {
 
 const formatCapability = (value: boolean | undefined): string => {
   if (value === true) {
-    return t('about.runtime.supported')
+    return tt('runtimeSupported')
   }
   if (value === false) {
-    return t('about.runtime.unsupported')
+    return tt('runtimeUnsupported')
   }
   return '-'
 }
@@ -219,7 +257,7 @@ const loadRuntimeInfo = async () => {
   }
 }
 
-const checkForUpdate = async () => {
+const checkForUpdate = async (silent = false) => {
   if (isCheckingUpdate.value || isStartingDownload.value || isInstallingUpdate.value) {
     return
   }
@@ -240,17 +278,19 @@ const checkForUpdate = async () => {
     currentVersionFromUpdate.value = result.currentVersion
 
     if (result.hasUpdate) {
-      toast.success(t('about.toast.updateAvailable'))
+      if (!silent) toast.success(tt('toastUpdateAvailable'))
     } else {
-      toast.info(t('about.toast.upToDate'))
-      updateChecked.value = true
-      updateCheckedTimer = setTimeout(() => {
-        updateChecked.value = false
-      }, 3000)
+      if (!silent) {
+        toast.info(tt('toastUpToDate'))
+        updateChecked.value = true
+        updateCheckedTimer = setTimeout(() => {
+          updateChecked.value = false
+        }, 3000)
+      }
     }
   } catch (e) {
     updateError.value = toErrorMessage(e)
-    toast.error(t('about.toast.updateCheckFailed'))
+    if (!silent) toast.error(tt('toastUpdateCheckFailed'))
   } finally {
     isCheckingUpdate.value = false
   }
@@ -269,7 +309,7 @@ const downloadAndInstallUpdate = async () => {
       await call('update.install_update', { restart: true })
     } catch (e) {
       updateError.value = toErrorMessage(e)
-      toast.error(t('about.toast.updateInstallFailed'))
+      toast.error(tt('toastUpdateInstallFailed'))
       isInstallingUpdate.value = false
     }
     return
@@ -286,7 +326,7 @@ const downloadAndInstallUpdate = async () => {
     await call<StartDownloadUpdateResult>('update.start_download')
   } catch (e) {
     updateError.value = toErrorMessage(e)
-    toast.error(t('about.toast.updateDownloadFailed'))
+    toast.error(tt('toastUpdateDownloadFailed'))
   } finally {
     isStartingDownload.value = false
   }
@@ -316,10 +356,10 @@ const openAppDataDirectory = async () => {
   try {
     const result = await call<OpenAppDataDirectoryResult>('file.openAppDataDirectory')
     if (!result.success) {
-      throw new Error(result.message || t('about.toast.openDataDirectoryFailed'))
+      throw new Error(result.message || tt('toastOpenDataDirectoryFailed'))
     }
   } catch (e) {
-    toast.error(t('about.toast.openDataDirectoryFailed'))
+    toast.error(tt('toastOpenDataDirectoryFailed'))
   } finally {
     isOpeningAppDataDirectory.value = false
   }
@@ -327,6 +367,7 @@ const openAppDataDirectory = async () => {
 
 onMounted(() => {
   void loadRuntimeInfo()
+  void checkForUpdate(true)
 })
 
 onBeforeUnmount(() => {
@@ -341,239 +382,186 @@ onBeforeUnmount(() => {
 
 <template>
   <ScrollArea class="h-full text-foreground">
-    <div class="mx-auto w-full max-w-3xl p-8 pb-12">
-      <!-- Hero Section -->
-      <div class="mb-8 flex flex-col items-start space-y-3">
-        <div class="flex items-center gap-3">
-          <h1 class="text-3xl font-bold tracking-tight">{{ t('app.name') }}</h1>
-          <div
-            v-if="appVersionText !== '-'"
-            class="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary shadow-sm"
-          >
-            v{{ appVersionText }}
-          </div>
+    <div class="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center px-8 pt-24 pb-12">
+      <!-- Header: Logo, Name, Version -->
+      <div class="group mb-12 flex flex-col items-center">
+        <!-- Spinning Logo -->
+        <div class="perspective-1000 relative mb-6 h-28 w-28">
+          <img
+            src="/logo_192x192.png"
+            alt="SpinningMomo Logo"
+            class="h-full w-full object-contain drop-shadow-2xl transition-transform duration-[1.5s] ease-out group-hover:rotate-[360deg]"
+          />
         </div>
-        <p class="text-[15px] text-muted-foreground">{{ t('about.description') }}</p>
-      </div>
-
-      <!-- Action Button -->
-      <div class="mb-10">
-        <Button
-          :variant="hasUpdate ? 'default' : 'secondary'"
-          :class="[
-            'transition-all duration-300',
-            hasUpdate
-              ? 'bg-primary shadow-md ring-2 ring-primary/20 ring-offset-2 ring-offset-background hover:bg-primary/90'
-              : '',
-          ]"
+        <h1 class="mb-3 text-3xl font-bold tracking-tight text-foreground">{{ t('app.name') }}</h1>
+        <button
+          v-if="appVersionText !== '-'"
+          @click="handleUpdateAction"
           :disabled="
             isCheckingUpdate || isStartingDownload || isInstallingUpdate || isDownloadingUpdate
           "
-          @click="handleUpdateAction"
+          class="group/badge flex items-center gap-2 rounded-full border border-border/50 px-3 py-1 transition-all duration-300 disabled:opacity-80"
+          :class="[
+            hasUpdate || isDownloadedUpdateReady
+              ? 'border-primary bg-primary text-primary-foreground shadow-sm hover:opacity-90'
+              : 'bg-secondary/50 text-[13px] font-medium text-muted-foreground hover:border-border hover:bg-secondary',
+          ]"
         >
-          <div class="flex items-center gap-2">
-            <Loader2
-              v-if="
-                isCheckingUpdate || isStartingDownload || isInstallingUpdate || isDownloadingUpdate
-              "
-              class="h-4 w-4 animate-spin"
-            />
-            <Package v-else-if="isDownloadedUpdateReady" class="h-4 w-4" />
-            <Download v-else-if="hasUpdate" class="h-4 w-4" />
-            <Check v-else-if="updateChecked && !hasUpdate" class="h-4 w-4 text-green-500" />
-            <RefreshCw v-else class="h-4 w-4 text-muted-foreground" />
-            <span>{{ actionButtonText }}</span>
+          <!-- Status Icon -->
+          <Loader2
+            v-if="
+              isCheckingUpdate || isStartingDownload || isInstallingUpdate || isDownloadingUpdate
+            "
+            class="h-3.5 w-3.5 animate-spin"
+          />
+          <Package v-else-if="isDownloadedUpdateReady" class="h-3.5 w-3.5" />
+          <Download v-else-if="hasUpdate" class="h-3.5 w-3.5" />
+          <Check
+            v-else
+            class="h-3.5 w-3.5 text-green-500 transition-transform group-hover/badge:scale-110"
+          />
+
+          <!-- Status Text -->
+          <span>
+            <template v-if="isCheckingUpdate">{{ tt('actionsCheckingUpdate') }}</template>
+            <template v-else-if="isInstallingUpdate">{{ tt('actionsInstallingUpdate') }}</template>
+            <template v-else-if="isDownloadedUpdateReady">{{
+              tt('actionsInstallDownloadedUpdate').replace('{version}', latestVersion || '')
+            }}</template>
+            <template v-else-if="hasUpdate">{{
+              tt('actionsDownloadUpdate').replace('{version}', latestVersion || '')
+            }}</template>
+            <template v-else>{{ tt('runtimeVersion') }} {{ appVersionText }} (64-bit)</template>
+          </span>
+        </button>
+      </div>
+
+      <!-- Actions Card -->
+      <div
+        class="surface-top mb-12 w-full overflow-hidden rounded-md border border-border shadow-sm"
+      >
+        <!-- Official Website Row -->
+        <a
+          href="https://spin.infinitymomo.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="group/link flex items-center justify-between border-b border-border/50 px-5 py-4 transition-colors hover:bg-accent/50"
+        >
+          <div class="flex items-center gap-4">
+            <div
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+            >
+              <Globe class="h-4 w-4" />
+            </div>
+            <span class="text-[15px] font-medium text-card-foreground">官方网站</span>
           </div>
-        </Button>
-        <p
-          v-if="resolvedUpdateError"
-          class="mt-3 flex items-center gap-1.5 text-sm text-destructive"
+          <div class="flex items-center gap-2">
+            <span
+              class="text-sm text-muted-foreground transition-colors group-hover/link:text-foreground"
+              >spin.infinitymomo.com</span
+            >
+            <ExternalLink
+              class="h-4 w-4 text-muted-foreground opacity-70 transition-colors group-hover/link:text-foreground group-hover/link:opacity-100"
+            />
+          </div>
+        </a>
+
+        <!-- Report Issues Row -->
+        <a
+          :href="issuesUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="group/link flex items-center justify-between px-5 py-4 transition-colors hover:bg-accent/50"
         >
-          <TriangleAlert class="h-4 w-4" />
-          {{ resolvedUpdateError }}
-        </p>
+          <div class="flex items-center gap-4">
+            <div
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+            >
+              <Bug class="h-4 w-4" />
+            </div>
+            <span class="text-[15px] font-medium text-card-foreground">{{
+              tt('linksIssues')
+            }}</span>
+          </div>
+          <ExternalLink
+            class="h-4 w-4 text-muted-foreground opacity-70 transition-colors group-hover/link:text-foreground group-hover/link:opacity-100"
+          />
+        </a>
       </div>
 
-      <!-- Links Grid -->
-      <div class="mb-10 pr-4">
-        <h2 class="mb-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-          {{ t('about.links.title') }}
-        </h2>
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Button
-            as-child
-            variant="ghost"
-            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <a :href="docsUrl" target="_blank" rel="noopener noreferrer">
-              <Book class="mr-2 h-4 w-4 opacity-70" />
-              {{ t('about.links.docs') }}
-            </a>
-          </Button>
-          <Button
-            as-child
-            variant="ghost"
-            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <a :href="releaseUrl" target="_blank" rel="noopener noreferrer">
-              <Package class="mr-2 h-4 w-4 opacity-70" />
-              {{ t('about.links.release') }}
-            </a>
-          </Button>
-          <Button
-            as-child
-            variant="ghost"
-            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <a :href="issuesUrl" target="_blank" rel="noopener noreferrer">
-              <Bug class="mr-2 h-4 w-4 opacity-70" />
-              {{ t('about.links.issues') }}
-            </a>
-          </Button>
-          <Button
-            as-child
-            variant="ghost"
-            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <a :href="licenseUrl" target="_blank" rel="noopener noreferrer">
-              <Scale class="mr-2 h-4 w-4 opacity-70" />
-              {{ t('about.links.license') }}
-            </a>
-          </Button>
-          <Button
-            as-child
-            variant="ghost"
-            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <a :href="legalNoticeUrl" target="_blank" rel="noopener noreferrer">
-              <ShieldAlert class="mr-2 h-4 w-4 opacity-70" />
-              {{ t('about.links.legalNotice') }}
-            </a>
-          </Button>
-          <Button
-            as-child
-            variant="ghost"
-            class="h-10 justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <a :href="creditsUrl" target="_blank" rel="noopener noreferrer">
-              <Heart class="mr-2 h-4 w-4 opacity-70" />
-              {{ t('about.links.credits') }}
-            </a>
-          </Button>
-        </div>
-      </div>
-
-      <!-- Advanced Info -->
-      <div class="pr-4">
+      <!-- Advanced Diagnostics (Hidden by default, for support) -->
+      <div class="mb-8 flex w-full flex-1 flex-col items-center text-muted-foreground/80">
         <Button
           variant="ghost"
           size="sm"
-          class="px-2 text-muted-foreground hover:text-foreground"
+          class="h-8 rounded-full text-xs hover:bg-secondary"
           @click="showAdvanced = !showAdvanced"
         >
-          <Settings class="mr-2 h-4 w-4" />
-          {{ showAdvanced ? t('about.actions.hideAdvanced') : t('about.actions.showAdvanced') }}
+          <Settings class="mr-1.5 h-3.5 w-3.5 opacity-70" />
+          {{ showAdvanced ? tt('actionsHideAdvanced') : tt('actionsShowAdvanced') }}
         </Button>
 
         <div
-          v-if="showAdvanced"
-          class="mt-4 rounded-xl border bg-card/40 p-5 shadow-sm transition-all duration-300"
+          v-show="showAdvanced"
+          class="mt-4 w-full max-w-sm space-y-3 rounded-xl border border-border/50 bg-secondary/20 p-4 text-xs"
         >
-          <div v-if="isLoading" class="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 class="h-4 w-4 animate-spin" />
-            {{ t('about.status.loading') }}
+          <div class="flex justify-between border-b border-border/40 pb-2">
+            <span class="flex items-center gap-1.5"><Monitor class="h-3.5 w-3.5" /> OS</span>
+            <span class="font-medium">{{ osText }}</span>
           </div>
-
-          <div v-else-if="error" class="space-y-3">
-            <div class="flex items-center gap-2 text-sm text-destructive">
-              <TriangleAlert class="h-4 w-4" />
-              <p>{{ t('about.status.loadFailed') }}</p>
-            </div>
-            <p class="text-xs text-destructive/80">{{ error }}</p>
-            <Button variant="outline" size="sm" @click="loadRuntimeInfo">
-              <RefreshCw class="mr-2 h-3.5 w-3.5" />
-              {{ t('about.actions.retry') }}
+          <div class="flex justify-between border-b border-border/40 pb-2">
+            <span class="flex items-center gap-1.5"><Heart class="h-3.5 w-3.5" /> WebView2</span>
+            <span class="font-medium">{{ webview2Text }}</span>
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              class="h-7 px-2 text-xs"
+              @click="openAppDataDirectory"
+            >
+              <FolderOpen class="mr-1.5 h-3.5 w-3.5" /> {{ tt('actionsOpenDataDirectory') }}
+            </Button>
+            <Button variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="copyDiagnostics">
+              <Check v-if="copied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />
+              <Info v-else class="mr-1.5 h-3.5 w-3.5" />
+              {{ copied ? tt('statusCopied') : tt('actionsCopyDiagnostics') }}
             </Button>
           </div>
+        </div>
+      </div>
 
-          <template v-else>
-            <div class="space-y-4 text-sm">
-              <div
-                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
-              >
-                <span class="flex items-center gap-2 text-muted-foreground">
-                  <Info class="h-4 w-4 opacity-70" />
-                  {{ t('about.runtime.environment') }}
-                </span>
-                <span class="text-right font-medium">{{ environmentText }}</span>
-              </div>
-
-              <div
-                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
-              >
-                <span class="flex items-center gap-2 text-muted-foreground">
-                  <Monitor class="h-4 w-4 opacity-70" />
-                  {{ t('about.runtime.os') }}
-                </span>
-                <span class="text-right font-medium">{{ osText }}</span>
-              </div>
-
-              <div
-                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
-              >
-                <span class="flex items-center gap-2 text-muted-foreground">
-                  <Settings class="h-4 w-4 opacity-70" />
-                  {{ t('about.runtime.webview2') }}
-                </span>
-                <span class="text-right font-medium">{{ webview2Text }}</span>
-              </div>
-
-              <div
-                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
-              >
-                <span class="flex items-center gap-2 text-muted-foreground">
-                  <Camera class="h-4 w-4 opacity-70" />
-                  {{ t('about.runtime.capture') }}
-                </span>
-                <span class="text-right font-medium">
-                  {{ formatCapability(runtimeInfo?.isCaptureSupported) }}
-                </span>
-              </div>
-
-              <div
-                class="flex items-center justify-between gap-4 border-b border-border/40 pb-3 last:border-0 last:pb-0"
-              >
-                <span class="flex items-center gap-2 text-muted-foreground">
-                  <TriangleAlert class="h-4 w-4 opacity-70" />
-                  {{ t('about.runtime.loopback') }}
-                </span>
-                <span class="text-right font-medium">
-                  {{ formatCapability(runtimeInfo?.isProcessLoopbackAudioSupported) }}
-                </span>
-              </div>
-            </div>
-
-            <div class="mt-5 flex justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                class="mr-2 h-8"
-                :disabled="isOpeningAppDataDirectory"
-                @click="openAppDataDirectory"
-              >
-                <FolderOpen
-                  v-if="isOpeningAppDataDirectory"
-                  class="mr-1.5 h-3.5 w-3.5 animate-pulse"
-                />
-                <FolderOpen v-else class="mr-1.5 h-3.5 w-3.5" />
-                {{ t('about.actions.openDataDirectory') }}
-              </Button>
-              <Button variant="secondary" size="sm" class="h-8" @click="copyDiagnostics">
-                <Check v-if="copied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />
-                {{ copied ? t('about.status.copied') : t('about.actions.copyDiagnostics') }}
-              </Button>
-            </div>
-          </template>
+      <!-- Footer -->
+      <div
+        class="mt-auto flex flex-col items-center space-y-3 text-center text-[13px] text-muted-foreground"
+      >
+        <p>&copy; 2026 InfinityMomo. {{ tt('footerRightsReserved') }}</p>
+        <p>
+          {{ tt('footerOpenSourcePrefix') }}
+          <a
+            :href="creditsUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-primary/80 transition-colors hover:text-primary hover:underline"
+          >
+            {{ tt('footerOpenSourceLink') }} </a
+          >{{ tt('footerOpenSourceSuffix') }}
+        </p>
+        <div class="flex items-center justify-center gap-5 pt-2">
+          <a
+            :href="legalNoticeUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="transition-colors hover:text-foreground hover:underline"
+            >{{ tt('linksLegalNotice') }}</a
+          >
+          <a
+            :href="licenseUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="transition-colors hover:text-foreground hover:underline"
+            >{{ tt('linksLicense') }}</a
+          >
         </div>
       </div>
     </div>

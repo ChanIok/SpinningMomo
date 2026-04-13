@@ -10,7 +10,7 @@
      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
   <Package
     Name="SpinningMomo"
-    Manufacturer="ChanIok"
+    Manufacturer="InfinityMomo"
     Version="$(var.ProductVersion)"
     UpgradeCode="AE1DB654-768A-488C-8DBE-1E213939C662"
     Language="1033"
@@ -21,7 +21,7 @@
 
     <SummaryInformation
       Description="SpinningMomo - Window adjustment tool for Infinity Nikki"
-      Manufacturer="ChanIok" />
+      Manufacturer="InfinityMomo" />
 
     <Binary Id="DetectProcessScript" SourceFile="$(var.ProjectDir)\installer\DetectRunningSpinningMomo.js" />
     <Binary Id="CleanupAppDataScript" SourceFile="$(var.ProjectDir)\installer\CleanupAppDataRoot.js" />

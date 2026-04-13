@@ -4,8 +4,8 @@
 #define APP_VERSION_STR "2.0.6.0"
 #define PRODUCT_NAME "SpinningMomo"
 #define FILE_DESCRIPTION "SpinningMomo"
-#define COPYRIGHT_INFO "Copyright (c) 2024-2026 ChanIok"
-#define AUTHOR_NAME "ChanIok"
+#define COPYRIGHT_INFO "Copyright (c) 2024-2026 InfinityMomo"
+#define AUTHOR_NAME "InfinityMomo"
 #define INTERNAL_NAME "SpinningMomo"
 #define ORIGINAL_FILENAME "SpinningMomo.exe"
 
