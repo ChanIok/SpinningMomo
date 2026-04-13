@@ -249,6 +249,31 @@ auto delete_asset(Core::State::AppState& app_state, int64_t id)
   return {};
 }
 
+auto batch_delete_assets_by_ids(Core::State::AppState& app_state,
+                                const std::vector<std::int64_t>& ids)
+    -> std::expected<void, std::string> {
+  if (ids.empty()) {
+    return {};
+  }
+
+  std::unordered_set<std::int64_t> unique_ids(ids.begin(), ids.end());
+  return Core::Database::execute_transaction(
+      *app_state.database,
+      [&unique_ids](
+          Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+        constexpr std::string_view sql = "DELETE FROM assets WHERE id = ?";
+        for (auto id : unique_ids) {
+          auto result = Core::Database::execute(db_state, std::string(sql), {id});
+          if (!result) {
+            return std::unexpected("Failed to delete asset item (id=" + std::to_string(id) +
+                                   "): " + result.error());
+          }
+        }
+
+        return {};
+      });
+}
+
 auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Types::Asset>& items)
     -> std::expected<std::vector<std::int64_t>, std::string> {
   if (items.empty()) {

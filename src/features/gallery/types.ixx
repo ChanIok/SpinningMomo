@@ -295,6 +295,9 @@ struct OperationResult {
   bool success;
   std::string message;
   std::optional<std::int64_t> affected_count;
+  std::optional<std::int64_t> failed_count = std::nullopt;
+  std::optional<std::int64_t> not_found_count = std::nullopt;
+  std::optional<std::int64_t> unchanged_count = std::nullopt;
 };
 
 // ============= 时间线相关类型 =============

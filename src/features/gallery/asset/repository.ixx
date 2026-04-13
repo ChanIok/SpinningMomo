@@ -28,6 +28,9 @@ export auto update_asset(Core::State::AppState& app_state, const Types::Asset& i
 
 export auto delete_asset(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<void, std::string>;
+export auto batch_delete_assets_by_ids(Core::State::AppState& app_state,
+                                       const std::vector<std::int64_t>& ids)
+    -> std::expected<void, std::string>;
 
 // 批量操作
 export auto batch_create_asset(Core::State::AppState& app_state,

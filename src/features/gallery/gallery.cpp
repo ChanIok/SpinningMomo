@@ -267,7 +267,17 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     };
   }
 
+  struct TrashCandidate {
+    Types::Asset asset;
+    std::filesystem::path file_path;
+    bool file_exists = false;
+    bool manual_ignore_registered = false;
+  };
+
   std::unordered_set<std::int64_t> unique_ids(ids.begin(), ids.end());
+  std::vector<TrashCandidate> candidates;
+  candidates.reserve(unique_ids.size());
+
   std::int64_t moved_count = 0;
   std::int64_t skipped_not_found = 0;
   std::vector<std::string> errors;
@@ -294,35 +304,94 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
       continue;
     }
 
-    if (file_exists) {
-      auto recycle_result = Utils::System::move_files_to_recycle_bin({file_path});
-      if (!recycle_result) {
-        errors.push_back("Failed to move file to recycle bin " + asset.path + ": " +
-                         recycle_result.error());
-        continue;
-      }
-    }
+    candidates.push_back(TrashCandidate{
+        .asset = asset,
+        .file_path = std::move(file_path),
+        .file_exists = file_exists,
+    });
+  }
 
-    if (auto delete_thumbnail_result = Asset::Thumbnail::delete_thumbnail(app_state, asset);
-        !delete_thumbnail_result) {
-      Logger().warn("Failed to delete thumbnail for asset {}: {}", asset.id,
-                    delete_thumbnail_result.error());
-    }
-
-    auto delete_result = Asset::Repository::delete_asset(app_state, asset.id);
-    if (!delete_result) {
-      errors.push_back("Failed to delete asset index " + std::to_string(asset.id) + ": " +
-                       delete_result.error());
+  std::vector<std::filesystem::path> recycle_paths;
+  recycle_paths.reserve(candidates.size());
+  for (auto& candidate : candidates) {
+    if (!candidate.file_exists) {
       continue;
     }
 
-    moved_count++;
+    auto begin_ignore_result =
+        Watcher::begin_manual_move_ignore(app_state, candidate.file_path, candidate.file_path);
+    if (!begin_ignore_result) {
+      Logger().warn("Failed to register watcher ignore for recycle-bin move '{}': {}",
+                    candidate.file_path.string(), begin_ignore_result.error());
+    } else {
+      candidate.manual_ignore_registered = true;
+    }
+
+    recycle_paths.push_back(candidate.file_path);
+  }
+
+  bool recycle_failed = false;
+  if (!recycle_paths.empty()) {
+    auto recycle_result = Utils::System::move_files_to_recycle_bin(recycle_paths);
+    if (!recycle_result) {
+      recycle_failed = true;
+      errors.push_back("Failed to move files to recycle bin: " + recycle_result.error());
+    }
+  }
+
+  std::unordered_set<std::int64_t> failed_recycle_ids;
+  if (recycle_failed) {
+    for (const auto& candidate : candidates) {
+      if (!candidate.file_exists) {
+        continue;
+      }
+      failed_recycle_ids.insert(candidate.asset.id);
+      errors.push_back("Failed to move file to recycle bin " + candidate.asset.path);
+    }
+  }
+
+  std::vector<std::int64_t> delete_ids;
+  delete_ids.reserve(candidates.size());
+  for (const auto& candidate : candidates) {
+    if (failed_recycle_ids.contains(candidate.asset.id)) {
+      continue;
+    }
+    if (auto delete_thumbnail_result =
+            Asset::Thumbnail::delete_thumbnail(app_state, candidate.asset);
+        !delete_thumbnail_result) {
+      Logger().warn("Failed to delete thumbnail for asset {}: {}", candidate.asset.id,
+                    delete_thumbnail_result.error());
+    }
+    delete_ids.push_back(candidate.asset.id);
+  }
+
+  auto delete_result = Asset::Repository::batch_delete_assets_by_ids(app_state, delete_ids);
+  if (!delete_result) {
+    errors.push_back("Failed to delete asset indexes: " + delete_result.error());
+  } else {
+    moved_count = static_cast<std::int64_t>(delete_ids.size());
+  }
+
+  for (auto& candidate : candidates) {
+    if (!candidate.manual_ignore_registered) {
+      continue;
+    }
+    if (auto complete_ignore_result = Watcher::complete_manual_move_ignore(
+            app_state, candidate.file_path, candidate.file_path);
+        !complete_ignore_result) {
+      Logger().warn("Failed to complete watcher ignore for recycle-bin move '{}': {}",
+                    candidate.file_path.string(), complete_ignore_result.error());
+    }
   }
 
   Types::OperationResult result{
       .success = errors.empty(),
       .message = "",
       .affected_count = moved_count,
+      .failed_count =
+          static_cast<std::int64_t>(unique_ids.size()) - moved_count - skipped_not_found,
+      .not_found_count = skipped_not_found,
+      .unchanged_count = 0,
   };
 
   if (errors.empty()) {
@@ -483,6 +552,10 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
       .success = errors.empty(),
       .message = "",
       .affected_count = moved_count,
+      .failed_count = static_cast<std::int64_t>(unique_ids.size()) - moved_count -
+                      skipped_not_found - skipped_same_folder,
+      .not_found_count = skipped_not_found,
+      .unchanged_count = skipped_same_folder,
   };
 
   if (errors.empty()) {

@@ -258,6 +258,9 @@ export interface OperationResult {
   success: boolean
   message: string
   affectedCount?: number
+  failedCount?: number
+  notFoundCount?: number
+  unchangedCount?: number
 }
 
 // 扫描参数

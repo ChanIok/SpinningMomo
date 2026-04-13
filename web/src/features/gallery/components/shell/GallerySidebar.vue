@@ -196,8 +196,17 @@ async function handleDropAssetsToFolder(folderId: number, assetIds: number[]) {
       targetFolderId: folderId,
     })
     const affectedCount = result.affectedCount ?? 0
+    const failedCount = result.failedCount ?? 0
+    const notFoundCount = result.notFoundCount ?? 0
+    const unchangedCount = result.unchangedCount ?? 0
     if (!result.success && affectedCount === 0) {
-      throw new Error(result.message)
+      throw new Error(
+        t('gallery.sidebar.folders.moveAssets.failedDescription', {
+          failed: failedCount,
+          notFound: notFoundCount,
+          unchanged: unchangedCount,
+        })
+      )
     }
 
     await Promise.all([
@@ -207,17 +216,24 @@ async function handleDropAssetsToFolder(folderId: number, assetIds: number[]) {
     galleryStore.clearSelection()
 
     if (result.success) {
-      toast.success('移动完成', {
-        description: result.message,
+      toast.success(t('gallery.sidebar.folders.moveAssets.successTitle'), {
+        description: t('gallery.sidebar.folders.moveAssets.successDescription', {
+          count: affectedCount,
+        }),
       })
     } else {
-      toast.warning('部分移动成功', {
-        description: result.message,
+      toast.warning(t('gallery.sidebar.folders.moveAssets.partialTitle'), {
+        description: t('gallery.sidebar.folders.moveAssets.partialDescription', {
+          moved: affectedCount,
+          failed: failedCount,
+          notFound: notFoundCount,
+          unchanged: unchangedCount,
+        }),
       })
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    toast.error('移动失败', { description: message })
+    toast.error(t('gallery.sidebar.folders.moveAssets.failedTitle'), { description: message })
   }
 }
 

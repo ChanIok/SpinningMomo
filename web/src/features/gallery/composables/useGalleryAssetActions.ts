@@ -2,15 +2,11 @@ import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { galleryApi } from '../api'
-import { useGalleryData } from './useGalleryData'
-import { useGallerySelection } from './useGallerySelection'
 import { useGalleryStore } from '../store'
 import type { ReviewFlag } from '../types'
 
 export function useGalleryAssetActions() {
   const store = useGalleryStore()
-  const galleryData = useGalleryData()
-  const gallerySelection = useGallerySelection()
   const { t } = useI18n()
   const { toast } = useToast()
 
@@ -24,36 +20,16 @@ export function useGalleryAssetActions() {
     return selectedAssetIds.value[0]
   })
 
-  async function reloadGalleryData() {
-    if (store.isTimelineMode) {
-      await galleryData.loadTimelineData()
-      return
-    }
-
-    await galleryData.loadAllAssets()
-  }
-
-  async function restoreStateAfterRemoval(previousActiveIndex?: number) {
-    await reloadGalleryData()
-
-    if (store.totalCount <= 0) {
-      if (store.lightbox.isOpen) {
-        store.closeLightbox()
-      }
-      store.clearActiveAsset()
-      gallerySelection.clearSelection()
-      return
-    }
-
-    const nextActiveIndex = Math.min(previousActiveIndex ?? 0, store.totalCount - 1)
-
-    if (store.lightbox.isOpen) {
-      await gallerySelection.selectOnlyIndex(nextActiveIndex)
-      return
-    }
-
-    await gallerySelection.activateIndex(nextActiveIndex)
-    gallerySelection.clearSelection()
+  function buildMoveToTrashDescription(result: {
+    affectedCount?: number
+    failedCount?: number
+    notFoundCount?: number
+  }) {
+    return t('gallery.contextMenu.moveToTrash.partialDescription', {
+      moved: result.affectedCount ?? 0,
+      failed: result.failedCount ?? 0,
+      notFound: result.notFoundCount ?? 0,
+    })
   }
 
   async function handleOpenAssetDefault() {
@@ -105,11 +81,32 @@ export function useGalleryAssetActions() {
     try {
       const result = await galleryApi.moveAssetsToTrash(ids)
       const affectedCount = result.affectedCount ?? 0
+      const failedCount = result.failedCount ?? 0
+      const notFoundCount = result.notFoundCount ?? 0
       if (!result.success && affectedCount === 0) {
-        throw new Error(result.message)
+        throw new Error(
+          t('gallery.contextMenu.moveToTrash.failedDescription', {
+            failed: failedCount,
+            notFound: notFoundCount,
+          })
+        )
       }
 
-      await restoreStateAfterRemoval(previousActiveIndex)
+      // 等待 gallery.changed 统一刷新，先做最小本地修复避免短暂状态错乱。
+      const nextSelectedIds = selectedAssetIds.value.filter((id) => !ids.includes(id))
+      store.replaceSelection(nextSelectedIds)
+      store.setSelectionAnchor(undefined)
+
+      const activeAssetId = store.selection.activeAssetId
+      if (activeAssetId !== undefined && ids.includes(activeAssetId)) {
+        if (store.lightbox.isOpen) {
+          store.closeLightbox()
+        }
+        store.clearActiveAsset()
+        if (previousActiveIndex !== undefined && previousActiveIndex > 0) {
+          store.setSelectionActive(previousActiveIndex - 1)
+        }
+      }
 
       if (result.success) {
         toast.success(t('gallery.contextMenu.moveToTrash.successTitle'), {
@@ -119,7 +116,7 @@ export function useGalleryAssetActions() {
         })
       } else {
         toast.warning(t('gallery.contextMenu.moveToTrash.partialTitle'), {
-          description: result.message,
+          description: buildMoveToTrashDescription(result),
         })
       }
     } catch (error) {

@@ -56,6 +56,6 @@ const hasBackgroundImage = computed(() =>
     </div>
 
     <!-- Toast 通知 -->
-    <Toaster position="bottom-right" richColors />
+    <Toaster position="bottom-right" />
   </SidebarProvider>
 </template>

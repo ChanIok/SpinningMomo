@@ -268,3 +268,8 @@
       'lnum' 1;
   }
 }
+
+[data-sonner-toast][data-styled='true'] [data-description] {
+  color: var(--foreground) !important;
+  opacity: 0.78;
+}
