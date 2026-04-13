@@ -33,6 +33,11 @@ struct ParsedPhotoParamsRecord {
   std::vector<std::int64_t> nikki_clothes;
 };
 
+struct ParsedPhotoParamsBatchItem {
+  std::int64_t asset_id;
+  ParsedPhotoParamsRecord record;
+};
+
 auto load_candidate_assets(
     Core::State::AppState& app_state,
     const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
@@ -43,8 +48,8 @@ auto extract_batch_photo_params(Core::State::AppState& app_state,
     -> asio::awaitable<
         std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string>>;
 
-auto upsert_photo_params_record(Core::State::AppState& app_state, std::int64_t asset_id,
-                                const std::string& uid, const ParsedPhotoParamsRecord& record)
+auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::string& uid,
+                               const std::vector<ParsedPhotoParamsBatchItem>& items)
     -> std::expected<std::int32_t, std::string>;
 
 }  // namespace Extensions::InfinityNikki::PhotoExtract::Infra

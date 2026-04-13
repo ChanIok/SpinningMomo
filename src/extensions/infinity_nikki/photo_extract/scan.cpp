@@ -7,6 +7,10 @@ import Utils.String;
 
 namespace Extensions::InfinityNikki::PhotoExtract::Scan {
 
+// 暖暖照片里真正要上传解析的数据，藏在 JPEG 尾部附近两个 EOI(FFD9) 之间。
+// 所以这里不再整文件读入，而是优先从文件尾部倒着找这两个边界。
+constexpr std::uint64_t kTailScanWindowBytes = 64 * 1024;
+
 auto to_filesystem_path(const std::string& utf8_path) -> std::filesystem::path {
   return std::filesystem::path(Utils::String::FromUtf8(utf8_path));
 }
@@ -48,6 +52,66 @@ auto is_base64_text(std::string_view text) -> bool {
   return true;
 }
 
+auto find_last_two_eoi_positions(std::ifstream& file, std::uint64_t file_size)
+    -> std::expected<std::pair<std::uint64_t, std::uint64_t>, std::string> {
+  if (file_size < 6) {
+    return std::unexpected("Photo file is too small");
+  }
+
+  std::optional<std::uint64_t> last_eoi;
+  std::optional<std::uint64_t> previous_eoi;
+  std::uint64_t scan_end = file_size;
+
+  while (scan_end > 0) {
+    // 每次只读尾部一个窗口，逐步向前扩展，直到找到最后两个 FFD9。
+    // 这样大多数照片都不需要把整张图搬进内存。
+    auto read_start =
+        scan_end > (kTailScanWindowBytes + 1) ? scan_end - (kTailScanWindowBytes + 1) : 0;
+    auto chunk_size = scan_end - read_start;
+
+    std::vector<std::uint8_t> buffer(static_cast<std::size_t>(chunk_size));
+
+    file.clear();
+    file.seekg(static_cast<std::streamoff>(read_start), std::ios::beg);
+    if (!file) {
+      return std::unexpected("Failed to seek photo file while scanning EOI markers");
+    }
+
+    file.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(chunk_size));
+    if (file.gcount() != static_cast<std::streamsize>(chunk_size)) {
+      return std::unexpected("Failed to read photo file while scanning EOI markers");
+    }
+
+    for (std::size_t i = buffer.size(); i > 1; --i) {
+      auto pos = i - 2;
+      if (buffer[pos] != 0xFF || buffer[pos + 1] != 0xD9) {
+        continue;
+      }
+
+      auto global_pos = read_start + pos;
+      if (!last_eoi.has_value()) {
+        last_eoi = global_pos;
+        continue;
+      }
+
+      if (global_pos == *last_eoi) {
+        continue;
+      }
+
+      previous_eoi = global_pos;
+      return std::pair{*previous_eoi, *last_eoi};
+    }
+
+    if (read_start == 0) {
+      break;
+    }
+
+    scan_end = read_start + 1;
+  }
+
+  return std::unexpected("Not a dual-EOI photo");
+}
+
 auto extract_params_base64_from_file(const std::filesystem::path& file_path)
     -> std::expected<std::string, std::string> {
   std::ifstream file(file_path, std::ios::binary);
@@ -55,31 +119,41 @@ auto extract_params_base64_from_file(const std::filesystem::path& file_path)
     return std::unexpected("Failed to open photo file");
   }
 
-  std::vector<std::uint8_t> data((std::istreambuf_iterator<char>(file)),
-                                 std::istreambuf_iterator<char>());
-  if (data.size() < 6) {
-    return std::unexpected("Photo file is too small");
+  std::error_code file_size_error;
+  auto file_size = std::filesystem::file_size(file_path, file_size_error);
+  if (file_size_error) {
+    return std::unexpected("Failed to get photo file size: " + file_size_error.message());
   }
 
-  std::vector<std::size_t> eoi_positions;
-  eoi_positions.reserve(4);
-  for (std::size_t i = 0; i + 1 < data.size(); ++i) {
-    if (data[i] == 0xFF && data[i + 1] == 0xD9) {
-      eoi_positions.push_back(i);
-    }
+  auto eoi_result = find_last_two_eoi_positions(file, file_size);
+  if (!eoi_result) {
+    return std::unexpected(eoi_result.error());
   }
 
-  if (eoi_positions.size() < 2) {
-    return std::unexpected("Not a dual-EOI photo");
-  }
-
-  auto p1 = eoi_positions[eoi_positions.size() - 2];
-  auto p2 = eoi_positions[eoi_positions.size() - 1];
+  auto [p1, p2] = eoi_result.value();
   if (p2 <= p1 + 2) {
     return std::unexpected("Invalid EOI boundaries");
   }
 
-  std::string middle(reinterpret_cast<const char*>(data.data() + p1 + 2), p2 - (p1 + 2));
+  // 真正需要保留下来的只有这段中间文本。
+  // 读取完之后再去掉空白并验证它看起来像合法 Base64。
+  auto middle_size = p2 - (p1 + 2);
+  if (middle_size > static_cast<std::uint64_t>((std::numeric_limits<std::size_t>::max)())) {
+    return std::unexpected("Embedded Base64 segment is too large");
+  }
+
+  std::string middle(static_cast<std::size_t>(middle_size), '\0');
+  file.clear();
+  file.seekg(static_cast<std::streamoff>(p1 + 2), std::ios::beg);
+  if (!file) {
+    return std::unexpected("Failed to seek embedded Base64 segment");
+  }
+
+  file.read(middle.data(), static_cast<std::streamsize>(middle.size()));
+  if (file.gcount() != static_cast<std::streamsize>(middle.size())) {
+    return std::unexpected("Failed to read embedded Base64 segment");
+  }
+
   middle.erase(std::remove_if(middle.begin(), middle.end(),
                               [](unsigned char ch) { return std::isspace(ch) != 0; }),
                middle.end());

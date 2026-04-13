@@ -278,6 +278,8 @@ auto extract_batch_photo_params(Core::State::AppState& app_state,
     }
   }
 
+  // 远端接口按“同一个 UID 的多张照片”来解析，
+  // 所以这里明确要求一个 batch 内只能有一个 UID。
   ExtractApiRequestBody request_body{
       .uid = uid,
       .params_base64_list = {},
@@ -308,12 +310,18 @@ auto extract_batch_photo_params(Core::State::AppState& app_state,
   co_return records;
 }
 
-auto upsert_photo_params_record(Core::State::AppState& app_state, std::int64_t asset_id,
-                                const std::string& uid, const ParsedPhotoParamsRecord& record)
+auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::string& uid,
+                               const std::vector<ParsedPhotoParamsBatchItem>& items)
     -> std::expected<std::int32_t, std::string> {
+  if (items.empty()) {
+    return 0;
+  }
+
   auto transaction_result = Core::Database::execute_transaction(
       *app_state.database, [&](auto& db_state) -> std::expected<std::int32_t, std::string> {
-        std::string sql = R"(
+        // 这里故意使用“整个 batch 一个事务”。
+        // 目标不是减少 SQL 条数到极致，而是先把最贵的事务提交次数降下来。
+        std::string upsert_sql = R"(
           INSERT INTO asset_infinity_nikki_params (
             asset_id, uid, camera_params,
             time_day, time_hour, time_min, time_sec,
@@ -344,53 +352,60 @@ auto upsert_photo_params_record(Core::State::AppState& app_state, std::int64_t a
             nikki_diy_json = excluded.nikki_diy_json
         )";
 
-        std::vector<Core::Database::Types::DbParam> params = {
-            asset_id,
-            uid,
-            to_db_param(record.camera_params),
-            to_db_param(record.time_day),
-            to_db_param(record.time_hour),
-            to_db_param(record.time_min),
-            to_db_param(record.time_sec),
-            to_db_param(record.camera_focal_length),
-            to_db_param(record.aperture_section),
-            to_db_param(record.filter_id),
-            to_db_param(record.filter_strength),
-            to_db_param(record.vignette_intensity),
-            to_db_param(record.light_id),
-            to_db_param(record.light_strength),
-            to_db_param(record.nikki_loc_x),
-            to_db_param(record.nikki_loc_y),
-            to_db_param(record.nikki_loc_z),
-            to_db_param(record.nikki_hidden),
-            to_db_param(record.pose_id),
-            to_db_param(record.nikki_diy_json),
-        };
-
-        auto upsert_result = Core::Database::execute(db_state, sql, params);
-        if (!upsert_result) {
-          return std::unexpected("Failed to upsert Infinity Nikki params: " +
-                                 upsert_result.error());
-        }
-
-        auto delete_clothes_result = Core::Database::execute(
-            db_state, "DELETE FROM asset_infinity_nikki_clothes WHERE asset_id = ?", {asset_id});
-        if (!delete_clothes_result) {
-          return std::unexpected("Failed to clear existing clothes: " +
-                                 delete_clothes_result.error());
-        }
-
         std::int32_t inserted_clothes = 0;
-        for (const auto cloth_id : record.nikki_clothes) {
+        for (const auto& item : items) {
+          // 每张照片仍然各自 upsert / clear clothes / insert clothes，
+          // 但它们现在被包在同一个事务里，整体成本会低很多。
+          const auto& record = item.record;
+
+          std::vector<Core::Database::Types::DbParam> params = {
+              item.asset_id,
+              uid,
+              to_db_param(record.camera_params),
+              to_db_param(record.time_day),
+              to_db_param(record.time_hour),
+              to_db_param(record.time_min),
+              to_db_param(record.time_sec),
+              to_db_param(record.camera_focal_length),
+              to_db_param(record.aperture_section),
+              to_db_param(record.filter_id),
+              to_db_param(record.filter_strength),
+              to_db_param(record.vignette_intensity),
+              to_db_param(record.light_id),
+              to_db_param(record.light_strength),
+              to_db_param(record.nikki_loc_x),
+              to_db_param(record.nikki_loc_y),
+              to_db_param(record.nikki_loc_z),
+              to_db_param(record.nikki_hidden),
+              to_db_param(record.pose_id),
+              to_db_param(record.nikki_diy_json),
+          };
+
+          auto upsert_result = Core::Database::execute(db_state, upsert_sql, params);
+          if (!upsert_result) {
+            return std::unexpected("Failed to upsert Infinity Nikki params: " +
+                                   upsert_result.error());
+          }
+
           auto insert_cloth_result = Core::Database::execute(
-              db_state,
-              "INSERT INTO asset_infinity_nikki_clothes (asset_id, cloth_id) VALUES (?, ?)",
-              {asset_id, cloth_id});
+              db_state, "DELETE FROM asset_infinity_nikki_clothes WHERE asset_id = ?",
+              {item.asset_id});
           if (!insert_cloth_result) {
-            return std::unexpected("Failed to insert cloth mapping: " +
+            return std::unexpected("Failed to clear existing clothes: " +
                                    insert_cloth_result.error());
           }
-          inserted_clothes++;
+
+          for (const auto cloth_id : record.nikki_clothes) {
+            auto insert_cloth_result = Core::Database::execute(
+                db_state,
+                "INSERT INTO asset_infinity_nikki_clothes (asset_id, cloth_id) VALUES (?, ?)",
+                {item.asset_id, cloth_id});
+            if (!insert_cloth_result) {
+              return std::unexpected("Failed to insert cloth mapping: " +
+                                     insert_cloth_result.error());
+            }
+            inserted_clothes++;
+          }
         }
 
         return inserted_clothes;
