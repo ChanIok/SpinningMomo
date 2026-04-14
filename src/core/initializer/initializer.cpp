@@ -32,6 +32,7 @@ import Features.ReplayBuffer.UseCase;
 import Features.Update;
 import Features.Letterbox.State;
 import Features.WindowControl;
+import Extensions.InfinityNikki.MapService;
 import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.Events;
@@ -190,6 +191,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     }
 
     // Gallery 初始化完成后，先注册无限暖暖目录监听，统一在末尾启动
+    Extensions::InfinityNikki::MapService::register_from_settings(state);
     Extensions::InfinityNikki::PhotoService::register_from_settings(state);
 
     const bool should_open_onboarding =

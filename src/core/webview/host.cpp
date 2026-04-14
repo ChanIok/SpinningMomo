@@ -525,6 +525,37 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
   return S_OK;
 }
 
+auto apply_registered_document_created_scripts(Core::State::AppState& state, ICoreWebView2* webview)
+    -> HRESULT {
+  if (!webview || !state.webview) {
+    return E_FAIL;
+  }
+
+  std::vector<Core::WebView::State::DocumentCreatedScript> scripts;
+  {
+    std::lock_guard<std::mutex> lock(state.webview->resources.document_created_scripts_mutex);
+    scripts.reserve(state.webview->resources.document_created_scripts.size());
+    for (const auto& [id, script] : state.webview->resources.document_created_scripts) {
+      (void)id;
+      scripts.push_back(script);
+    }
+  }
+
+  for (const auto& script : scripts) {
+    HRESULT hr = webview->AddScriptToExecuteOnDocumentCreated(script.script.c_str(), nullptr);
+    if (FAILED(hr)) {
+      Logger().warn("Failed to register document-created script {}: {}", script.id, hr);
+      return hr;
+    }
+  }
+
+  if (!scripts.empty()) {
+    Logger().info("Registered {} WebView document-created script(s)", scripts.size());
+  }
+
+  return S_OK;
+}
+
 auto select_initial_url(Core::WebView::State::WebViewConfig& config) -> void {
   if (Vendor::BuildConfig::is_debug_build()) {
     config.initial_url = config.dev_server_url;
@@ -680,98 +711,10 @@ auto finalize_controller_initialization(Core::State::AppState* state,
     Logger().warn("Resource interception setup failed, continuing without thumbnail support");
   }
 
-  // 注入官方地图劫持脚本
-  const wchar_t* injection_script =
-      LR"SCRIPT(
-if (window.location.hostname === 'myl.nuanpaper.com') {
-    let innerL = undefined;
-    window.__SPINNING_MOMO_PENDING_MARKERS__ = [];
-
-    const renderMarkers = (markers, shouldFlyToFirst = false) => {
-        window.__SPINNING_MOMO_PENDING_MARKERS__ = Array.isArray(markers) ? markers : [];
-
-        const map = window.__SPINNING_MOMO_MAP__;
-        const L = window.L;
-        if (!map || !L) {
-            return;
-        }
-
-        let layer = window.__SPINNING_MOMO_MARKER_LAYER__;
-        if (!layer) {
-            layer = L.layerGroup().addTo(map);
-            window.__SPINNING_MOMO_MARKER_LAYER__ = layer;
-        }
-
-        layer.clearLayers();
-
-        for (const markerData of markers) {
-            if (!markerData) continue;
-
-            const { lat, lng, popupHtml } = markerData;
-            if (lat === undefined || lng === undefined) continue;
-
-            const marker = L.marker([lat, lng]).addTo(layer);
-            if (popupHtml) {
-                marker.bindPopup(popupHtml);
-            }
-        }
-
-        if (shouldFlyToFirst && markers.length > 0) {
-            const firstMarker = markers[0];
-            if (firstMarker?.lat !== undefined && firstMarker?.lng !== undefined) {
-                map.flyTo([firstMarker.lat, firstMarker.lng], 6);
-            }
-        }
-    };
-
-    Object.defineProperty(window, 'L', {
-        get: function() { return innerL; },
-        set: function(val) {
-            innerL = val;
-            if (innerL && innerL.Map && !innerL.Map.__SPINNING_MOMO_PATCHED__) {
-                // 劫持 L.Map 构造函数
-                const OriginalMapClass = innerL.Map;
-                innerL.Map = function(...args) {
-                    const mapInstance = new OriginalMapClass(...args);
-                    window.__SPINNING_MOMO_MAP__ = mapInstance;
-                    if (window.__SPINNING_MOMO_PENDING_MARKERS__.length > 0) {
-                        renderMarkers(window.__SPINNING_MOMO_PENDING_MARKERS__);
-                    }
-                    return mapInstance;
-                };
-                innerL.Map.prototype = OriginalMapClass.prototype;
-                Object.assign(innerL.Map, OriginalMapClass);
-                innerL.Map.__SPINNING_MOMO_PATCHED__ = true;
-            }
-        },
-        configurable: true,
-        enumerable: true
-    });
-
-    window.addEventListener('message', (event) => {
-        if (!event.data) {
-            return;
-        }
-
-        if (event.data.action === 'SET_MARKERS') {
-            const { markers = [] } = event.data.payload || {};
-            renderMarkers(markers);
-            return;
-        }
-
-        if (event.data.action === 'ADD_MARKER') {
-            const marker = event.data.payload;
-            if (!marker) {
-                return;
-            }
-
-            const pendingMarkers = window.__SPINNING_MOMO_PENDING_MARKERS__;
-            renderMarkers([...pendingMarkers, marker], true);
-        }
-    });
-}
-)SCRIPT";
-  webview->AddScriptToExecuteOnDocumentCreated(injection_script, nullptr);
+  hr = apply_registered_document_created_scripts(*state, webview);
+  if (FAILED(hr)) {
+    Logger().warn("Document-created script registration failed: {}", hr);
+  }
 
   select_initial_url(webview_state.config);
 

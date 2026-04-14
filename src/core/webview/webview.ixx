@@ -34,6 +34,8 @@ export auto send_message(Core::State::AppState& state, const std::string& messag
 export auto post_message(Core::State::AppState& state, const std::string& message) -> void;
 export auto register_message_handler(Core::State::AppState& state, const std::string& message_type,
                                      std::function<void(const std::string&)> handler) -> void;
+export auto register_document_created_script(Core::State::AppState& state, std::string script_id,
+                                             std::wstring script_source) -> void;
 export auto register_virtual_host_folder_mapping(
     Core::State::AppState& state, std::wstring host_name, std::wstring folder_path,
     Core::WebView::State::VirtualHostResourceAccessKind access_kind) -> void;

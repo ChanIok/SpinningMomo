@@ -255,6 +255,24 @@ auto register_message_handler(Core::State::AppState& state, const std::string& m
   Logger().debug("Registered message handler for type: {}", message_type);
 }
 
+auto register_document_created_script(Core::State::AppState& state, std::string script_id,
+                                      std::wstring script_source) -> void {
+  if (!state.webview) {
+    return;
+  }
+
+  auto& resources = state.webview->resources;
+  {
+    std::lock_guard<std::mutex> lock(resources.document_created_scripts_mutex);
+    resources.document_created_scripts[script_id] = Core::WebView::State::DocumentCreatedScript{
+        .id = std::move(script_id),
+        .script = std::move(script_source),
+    };
+  }
+
+  Logger().debug("Registered WebView document-created script");
+}
+
 // 注册一条“虚拟 host -> 本地目录”的映射。
 // 这里只登记状态；真正的 WebView COM 调用必须统一回到 WebView 所在线程执行。
 auto register_virtual_host_folder_mapping(
