@@ -708,6 +708,23 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
   Logger().info("Asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}",
                 result.total_files, result.new_items, result.updated_items, result.errors.size());
 
+  // 手动/显式扫描后只做当前目录的“缺失缩略图补回”，
+  // 不在这里顺手做全局孤儿清理，避免把启动级别的缓存对账混进日常扫描。
+  auto thumbnail_repair_result = Asset::Thumbnail::repair_missing_thumbnails(
+      app_state, std::filesystem::path(options.directory),
+      options.thumbnail_short_edge.value_or(480));
+  if (!thumbnail_repair_result) {
+    Logger().warn("Gallery thumbnail repair failed after scan '{}': {}", options.directory,
+                  thumbnail_repair_result.error());
+  } else {
+    const auto& stats = thumbnail_repair_result.value();
+    Logger().info(
+        "Gallery thumbnail repair finished. context=scan_directory, candidates={}, missing={}, "
+        "repaired={}, failed={}, skipped_missing_sources={}",
+        stats.candidate_hashes, stats.missing_thumbnails, stats.repaired_thumbnails,
+        stats.failed_repairs, stats.skipped_missing_sources);
+  }
+
   auto watcher_result = Watcher::register_watcher_for_directory(
       app_state, std::filesystem::path(options.directory), options);
   if (!watcher_result) {

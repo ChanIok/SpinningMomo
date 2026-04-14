@@ -10,10 +10,272 @@ import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Service;
 import Core.Database;
 import Utils.Image;
+import Utils.Media.VideoAsset;
 import Utils.Path;
 import Utils.Logger;
 
 namespace Features::Gallery::Asset::Thumbnail {
+
+// “一个缩略图 hash 应该如何被满足”的最小工作单元。
+// 一个 hash 可能对应多个源文件路径；修复时只需找到其中任意一个仍存在的源文件。
+struct ExpectedThumbnailEntry {
+  std::string hash;
+  std::string type;
+  std::vector<std::filesystem::path> source_paths;
+};
+
+// 内部汇总结构：只关注“缺失缩略图补回”这一件事。
+struct MissingThumbnailRepairSummary {
+  int candidate_hashes = 0;
+  int missing_thumbnails = 0;
+  int repaired_thumbnails = 0;
+  int failed_repairs = 0;
+  int skipped_missing_sources = 0;
+};
+
+auto extract_hash_from_thumbnail(const std::filesystem::path& thumbnail_path)
+    -> std::optional<std::string>;
+
+auto query_thumbnail_candidates(Core::State::AppState& app_state)
+    -> std::expected<std::vector<Types::Asset>, std::string> {
+  std::string sql = R"(
+    SELECT id, name, path, type,
+           NULL AS dominant_color_hex,
+           rating, review_flag,
+           description, width, height, size, extension, mime_type, hash,
+           NULL AS root_id, NULL AS relative_path, folder_id,
+           file_created_at, file_modified_at,
+           created_at, updated_at
+    FROM assets
+    WHERE type IN ('photo', 'video')
+      AND hash IS NOT NULL
+      AND hash != ''
+      AND path IS NOT NULL
+      AND path != ''
+  )";
+
+  auto result = Core::Database::query<Types::Asset>(*app_state.database, sql);
+  if (!result) {
+    return std::unexpected("Failed to query thumbnail candidates: " + result.error());
+  }
+
+  return result.value();
+}
+
+// 局部修复时允许只处理某个 root；全局对账则传 nullopt 表示不过滤。
+auto normalize_thumbnail_root_filter(std::optional<std::filesystem::path> root_directory)
+    -> std::expected<std::optional<std::filesystem::path>, std::string> {
+  if (!root_directory.has_value()) {
+    return std::optional<std::filesystem::path>{std::nullopt};
+  }
+
+  auto normalized_root_result = Utils::Path::NormalizePath(root_directory.value());
+  if (!normalized_root_result) {
+    return std::unexpected("Failed to normalize thumbnail repair root: " +
+                           normalized_root_result.error());
+  }
+
+  return std::optional<std::filesystem::path>{normalized_root_result.value()};
+}
+
+// 从 DB 收集“理论上应当存在缩略图”的集合，并按 hash 去重。
+auto collect_expected_thumbnail_entries(Core::State::AppState& app_state,
+                                        std::optional<std::filesystem::path> root_directory)
+    -> std::expected<std::unordered_map<std::string, ExpectedThumbnailEntry>, std::string> {
+  auto normalized_root_result = normalize_thumbnail_root_filter(root_directory);
+  if (!normalized_root_result) {
+    return std::unexpected(normalized_root_result.error());
+  }
+  const auto& normalized_root_directory = normalized_root_result.value();
+
+  auto candidates_result = query_thumbnail_candidates(app_state);
+  if (!candidates_result) {
+    return std::unexpected(candidates_result.error());
+  }
+
+  std::unordered_map<std::string, ExpectedThumbnailEntry> entries;
+  for (const auto& asset : candidates_result.value()) {
+    if (!asset.hash.has_value() || asset.hash->empty()) {
+      continue;
+    }
+
+    std::filesystem::path asset_path(asset.path);
+    if (normalized_root_directory.has_value() &&
+        !Utils::Path::IsPathWithinBase(asset_path, normalized_root_directory.value())) {
+      continue;
+    }
+
+    auto& entry = entries[asset.hash.value()];
+    if (entry.hash.empty()) {
+      entry.hash = asset.hash.value();
+      entry.type = asset.type;
+    }
+    entry.source_paths.push_back(std::move(asset_path));
+  }
+
+  return entries;
+}
+
+// 从缩略图目录扫描“当前实际存在的缩略图集合”。
+auto scan_existing_thumbnail_files(Core::State::AppState& app_state)
+    -> std::expected<std::unordered_map<std::string, std::filesystem::path>, std::string> {
+  if (app_state.gallery->thumbnails_directory.empty()) {
+    return std::unexpected("Thumbnails directory not initialized");
+  }
+
+  auto thumbnails_dir = app_state.gallery->thumbnails_directory;
+  std::error_code ec;
+  if (!std::filesystem::exists(thumbnails_dir, ec)) {
+    return std::unordered_map<std::string, std::filesystem::path>{};
+  }
+  if (ec) {
+    return std::unexpected("Failed to check thumbnails directory existence: " + ec.message());
+  }
+
+  std::unordered_map<std::string, std::filesystem::path> entries;
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(thumbnails_dir, ec)) {
+    if (ec) {
+      return std::unexpected("Failed to iterate thumbnails directory recursively: " + ec.message());
+    }
+
+    if (!entry.is_regular_file(ec) || entry.path().extension() != ".webp") {
+      continue;
+    }
+    if (ec) {
+      return std::unexpected("Failed to inspect thumbnail entry: " + ec.message());
+    }
+
+    auto hash_result = extract_hash_from_thumbnail(entry.path());
+    if (!hash_result) {
+      continue;
+    }
+
+    entries.try_emplace(*hash_result, entry.path());
+  }
+
+  if (ec) {
+    return std::unexpected("Error during thumbnail inventory scan: " + ec.message());
+  }
+
+  return entries;
+}
+
+// 只负责补“缺失缩略图”；孤儿删除由上层全局对账处理。
+// 如果调用方已经事先拿到了 existing_hashes，就不必再逐个 hash 查磁盘了。
+auto repair_expected_thumbnail_entries(
+    Core::State::AppState& app_state,
+    const std::unordered_map<std::string, ExpectedThumbnailEntry>& expected_entries,
+    const std::unordered_set<std::string>* existing_hashes, std::uint32_t short_edge_size)
+    -> MissingThumbnailRepairSummary {
+  MissingThumbnailRepairSummary stats;
+  stats.candidate_hashes = static_cast<int>(expected_entries.size());
+
+  std::optional<Utils::Image::WICFactory> wic_factory;
+
+  for (const auto& [hash, entry] : expected_entries) {
+    bool thumbnail_exists = false;
+
+    if (existing_hashes != nullptr) {
+      thumbnail_exists = existing_hashes->contains(hash);
+    } else {
+      auto thumbnail_path_result = ensure_thumbnail_path(app_state, hash);
+      if (!thumbnail_path_result) {
+        stats.failed_repairs++;
+        Logger().warn("Failed to resolve thumbnail path for hash {}: {}", hash,
+                      thumbnail_path_result.error());
+        continue;
+      }
+
+      std::error_code exists_ec;
+      thumbnail_exists = std::filesystem::exists(thumbnail_path_result.value(), exists_ec);
+      if (exists_ec) {
+        stats.failed_repairs++;
+        Logger().warn("Failed to check thumbnail existence for hash {}: {}", hash,
+                      exists_ec.message());
+        continue;
+      }
+    }
+
+    if (thumbnail_exists) {
+      continue;
+    }
+
+    stats.missing_thumbnails++;
+
+    std::optional<std::filesystem::path> source_path;
+    // 同一个 hash 可能来自多份重复内容；这里选任意一份还存在的源文件即可重建缩略图。
+    for (const auto& candidate_path : entry.source_paths) {
+      std::error_code source_ec;
+      bool exists = std::filesystem::exists(candidate_path, source_ec);
+      bool is_regular = exists && std::filesystem::is_regular_file(candidate_path, source_ec);
+      if (!source_ec && exists && is_regular) {
+        source_path = candidate_path;
+        break;
+      }
+    }
+
+    if (!source_path.has_value()) {
+      stats.skipped_missing_sources++;
+      Logger().debug("Skip thumbnail repair for hash {}: no source file is available", hash);
+      continue;
+    }
+
+    if (entry.type == "photo") {
+      if (!wic_factory.has_value()) {
+        auto wic_result = Utils::Image::get_thread_wic_factory();
+        if (!wic_result) {
+          stats.failed_repairs++;
+          Logger().warn("Failed to initialize WIC factory for thumbnail repair: {}",
+                        wic_result.error());
+          continue;
+        }
+        wic_factory = std::move(wic_result.value());
+      }
+
+      auto repair_result =
+          generate_thumbnail(app_state, *wic_factory, *source_path, hash, short_edge_size);
+      if (!repair_result) {
+        stats.failed_repairs++;
+        Logger().warn("Failed to repair thumbnail for '{}': {}", source_path->string(),
+                      repair_result.error());
+        continue;
+      }
+
+      stats.repaired_thumbnails++;
+      continue;
+    }
+
+    if (entry.type == "video") {
+      auto video_result =
+          Utils::Media::VideoAsset::analyze_video_file(*source_path, short_edge_size);
+      if (!video_result) {
+        stats.failed_repairs++;
+        Logger().warn("Failed to analyze video during thumbnail repair '{}': {}",
+                      source_path->string(), video_result.error());
+        continue;
+      }
+
+      if (!video_result->thumbnail.has_value()) {
+        stats.failed_repairs++;
+        Logger().warn("Video thumbnail repair yielded no thumbnail data: {}",
+                      source_path->string());
+        continue;
+      }
+
+      auto repair_result = save_thumbnail_data(app_state, hash, *video_result->thumbnail);
+      if (!repair_result) {
+        stats.failed_repairs++;
+        Logger().warn("Failed to save repaired video thumbnail for '{}': {}", source_path->string(),
+                      repair_result.error());
+        continue;
+      }
+
+      stats.repaired_thumbnails++;
+    }
+  }
+
+  return stats;
+}
 
 // ============= 缩略图路径管理 =============
 
@@ -82,6 +344,93 @@ auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& 
   }
 
   return thumbnail_path;
+}
+
+auto repair_missing_thumbnails(Core::State::AppState& app_state,
+                               std::optional<std::filesystem::path> root_directory,
+                               std::uint32_t short_edge_size)
+    -> std::expected<ThumbnailRepairStats, std::string> {
+  auto ensure_result = ensure_thumbnails_directory_exists(app_state);
+  if (!ensure_result) {
+    return std::unexpected(ensure_result.error());
+  }
+
+  // 局部修复：只处理“当前 root 缺哪些缩略图”，不删除孤儿缩略图。
+  auto expected_entries_result = collect_expected_thumbnail_entries(app_state, root_directory);
+  if (!expected_entries_result) {
+    return std::unexpected(expected_entries_result.error());
+  }
+
+  auto summary = repair_expected_thumbnail_entries(app_state, expected_entries_result.value(),
+                                                   nullptr, short_edge_size);
+  return ThumbnailRepairStats{.candidate_hashes = summary.candidate_hashes,
+                              .missing_thumbnails = summary.missing_thumbnails,
+                              .repaired_thumbnails = summary.repaired_thumbnails,
+                              .failed_repairs = summary.failed_repairs,
+                              .skipped_missing_sources = summary.skipped_missing_sources};
+}
+
+auto reconcile_thumbnail_cache(Core::State::AppState& app_state, std::uint32_t short_edge_size)
+    -> std::expected<ThumbnailCacheReconcileStats, std::string> {
+  auto ensure_result = ensure_thumbnails_directory_exists(app_state);
+  if (!ensure_result) {
+    return std::unexpected(ensure_result.error());
+  }
+
+  // 启动时的全局缓存对账：先拿到 DB 认为“应存在”的集合。
+  auto expected_entries_result = collect_expected_thumbnail_entries(app_state, std::nullopt);
+  if (!expected_entries_result) {
+    return std::unexpected(expected_entries_result.error());
+  }
+
+  // 再扫描磁盘上“实际存在”的集合。
+  auto existing_entries_result = scan_existing_thumbnail_files(app_state);
+  if (!existing_entries_result) {
+    return std::unexpected(existing_entries_result.error());
+  }
+
+  const auto& expected_entries = expected_entries_result.value();
+  const auto& existing_entries = existing_entries_result.value();
+
+  std::unordered_set<std::string> existing_hashes;
+  existing_hashes.reserve(existing_entries.size());
+  for (const auto& [hash, _] : existing_entries) {
+    existing_hashes.insert(hash);
+  }
+
+  ThumbnailCacheReconcileStats stats;
+  stats.expected_hashes = static_cast<int>(expected_entries.size());
+  stats.existing_thumbnails = static_cast<int>(existing_entries.size());
+
+  // 先补 missing，再删 orphan。
+  // 对用户体验来说，先恢复可见内容比先回收磁盘空间更重要。
+  auto repair_summary = repair_expected_thumbnail_entries(app_state, expected_entries,
+                                                          &existing_hashes, short_edge_size);
+  stats.missing_thumbnails = repair_summary.missing_thumbnails;
+  stats.repaired_thumbnails = repair_summary.repaired_thumbnails;
+  stats.failed_repairs = repair_summary.failed_repairs;
+  stats.skipped_missing_sources = repair_summary.skipped_missing_sources;
+
+  for (const auto& [hash, thumbnail_path] : existing_entries) {
+    if (expected_entries.contains(hash)) {
+      continue;
+    }
+
+    // 走到这里说明：磁盘上有这个缩略图，但 DB 已不再认为它应该存在。
+    stats.orphaned_thumbnails++;
+    std::error_code remove_ec;
+    if (std::filesystem::remove(thumbnail_path, remove_ec)) {
+      stats.deleted_orphaned_thumbnails++;
+      Logger().debug("Deleted orphaned thumbnail during cache reconcile: {}",
+                     thumbnail_path.string());
+    } else {
+      stats.failed_orphan_deletions++;
+      Logger().warn("Failed to delete orphaned thumbnail during cache reconcile {}: {}",
+                    thumbnail_path.string(), remove_ec.message());
+    }
+  }
+
+  return stats;
 }
 
 // ============= 缩略图清理功能 =============

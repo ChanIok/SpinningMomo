@@ -734,7 +734,26 @@ auto apply_full_rescan(Core::State::AppState& app_state,
                        const std::shared_ptr<State::FolderWatcherState>& watcher)
     -> std::expected<Types::ScanResult, std::string> {
   auto options = get_watcher_scan_options(watcher);
-  return Features::Gallery::Scanner::scan_asset_directory(app_state, options);
+  auto scan_result = Features::Gallery::Scanner::scan_asset_directory(app_state, options);
+  if (!scan_result) {
+    return std::unexpected(scan_result.error());
+  }
+
+  auto thumbnail_repair_result = Features::Gallery::Asset::Thumbnail::repair_missing_thumbnails(
+      app_state, watcher->root_path, options.thumbnail_short_edge.value_or(480));
+  if (!thumbnail_repair_result) {
+    Logger().warn("Gallery watcher thumbnail repair failed for '{}': {}",
+                  watcher->root_path.string(), thumbnail_repair_result.error());
+    return scan_result;
+  }
+
+  const auto& stats = thumbnail_repair_result.value();
+  Logger().info(
+      "Gallery watcher thumbnail repair finished for '{}'. context=full_rescan, candidates={}, "
+      "missing={}, repaired={}, failed={}, skipped_missing_sources={}",
+      watcher->root_path.string(), stats.candidate_hashes, stats.missing_thumbnails,
+      stats.repaired_thumbnails, stats.failed_repairs, stats.skipped_missing_sources);
+  return scan_result;
 }
 
 auto apply_offline_scan_changes(Core::State::AppState& app_state,
@@ -791,6 +810,39 @@ auto request_full_rescan(Core::State::AppState& app_state,
                          const std::shared_ptr<State::FolderWatcherState>& watcher) -> void {
   mark_full_rescan(watcher);
   schedule_sync_task(app_state, watcher);
+}
+
+auto run_startup_full_rescan(Core::State::AppState& app_state,
+                             const std::shared_ptr<State::FolderWatcherState>& watcher)
+    -> std::expected<void, std::string> {
+  // 启动阶段的 full scan 需要“当场跑完”，
+  // 这样所有 root 的原图/DB 一致性收敛后，才能安全进入后面的全局缩略图缓存对账。
+  bool expected = false;
+  if (!watcher->scan_in_progress.compare_exchange_strong(expected, true,
+                                                         std::memory_order_acq_rel)) {
+    return std::unexpected("Startup full rescan skipped: scan task is already in progress");
+  }
+
+  mark_full_rescan(watcher);
+  watcher->pending_rescan.store(false, std::memory_order_release);
+  [[maybe_unused]] auto startup_snapshot = take_pending_snapshot(watcher);
+
+  auto sync_result = apply_full_rescan(app_state, watcher);
+  if (sync_result) {
+    dispatch_scan_result(app_state, watcher, sync_result.value(), "startup_full", true);
+  }
+
+  watcher->scan_in_progress.store(false, std::memory_order_release);
+  if (!watcher->stop_requested.load(std::memory_order_acquire) &&
+      (watcher->pending_rescan.load(std::memory_order_acquire) || has_pending_changes(watcher))) {
+    schedule_sync_task(app_state, watcher);
+  }
+
+  if (!sync_result) {
+    return std::unexpected(sync_result.error());
+  }
+
+  return {};
 }
 
 // 核心后台处理循环，具有防抖动合并（Debounce）功能，负责将积攒的变更应用到数据库
@@ -1256,6 +1308,7 @@ auto start_registered_watchers(Core::State::AppState& app_state)
 
   size_t started_count = 0;
   std::optional<std::string> first_error;
+  std::uint32_t startup_thumbnail_short_edge = 480;
 
   // 公共 helper：启动 watcher 线程并统一处理计数和错误记录。
   auto try_start_watcher = [&](const std::shared_ptr<State::FolderWatcherState>& w) -> bool {
@@ -1287,6 +1340,10 @@ auto start_registered_watchers(Core::State::AppState& app_state)
       break;
     }
 
+    startup_thumbnail_short_edge =
+        std::max(startup_thumbnail_short_edge,
+                 get_watcher_scan_options(watcher).thumbnail_short_edge.value_or(480));
+
     // 每个 root 的启动流程：
     // 1. 查询恢复决策（USN 增量 or 全量）
     // 2. USN 模式先补齐离线变更
@@ -1298,7 +1355,11 @@ auto start_registered_watchers(Core::State::AppState& app_state)
       Logger().warn("Startup recovery decision failed for '{}': {}. Falling back to full scan.",
                     watcher->root_path.string(), recovery_plan_result.error());
       if (!try_start_watcher(watcher)) continue;
-      request_full_rescan(app_state, watcher);
+      auto startup_full_scan_result = run_startup_full_rescan(app_state, watcher);
+      if (!startup_full_scan_result) {
+        Logger().warn("Startup full scan failed for '{}': {}", watcher->root_path.string(),
+                      startup_full_scan_result.error());
+      }
       continue;
     }
 
@@ -1315,7 +1376,11 @@ auto start_registered_watchers(Core::State::AppState& app_state)
                         watcher->root_path.string(), recovery_apply_result.error());
           // apply 失败时仍必须启动 watcher 线程，否则此 root 将无人监听。
           if (!try_start_watcher(watcher)) continue;
-          request_full_rescan(app_state, watcher);
+          auto startup_full_scan_result = run_startup_full_rescan(app_state, watcher);
+          if (!startup_full_scan_result) {
+            Logger().warn("Startup full scan failed for '{}': {}", watcher->root_path.string(),
+                          startup_full_scan_result.error());
+          }
           continue;
         }
         dispatch_scan_result(app_state, watcher, recovery_apply_result.value(), "startup_usn");
@@ -1344,7 +1409,28 @@ auto start_registered_watchers(Core::State::AppState& app_state)
                   watcher->root_path.string(), plan.reason);
 
     if (!try_start_watcher(watcher)) continue;
-    request_full_rescan(app_state, watcher);
+    auto startup_full_scan_result = run_startup_full_rescan(app_state, watcher);
+    if (!startup_full_scan_result) {
+      Logger().warn("Startup full scan failed for '{}': {}", watcher->root_path.string(),
+                    startup_full_scan_result.error());
+    }
+  }
+
+  // 所有 root 的启动恢复都完成后，统一做一次全局缩略图缓存对账：补 missing、删 orphan。
+  auto thumbnail_reconcile_result = Features::Gallery::Asset::Thumbnail::reconcile_thumbnail_cache(
+      app_state, startup_thumbnail_short_edge);
+  if (!thumbnail_reconcile_result) {
+    Logger().warn("Gallery startup thumbnail cache reconcile failed: {}",
+                  thumbnail_reconcile_result.error());
+  } else {
+    const auto& stats = thumbnail_reconcile_result.value();
+    Logger().info(
+        "Gallery startup thumbnail cache reconcile finished. expected={}, existing={}, "
+        "missing={}, repaired={}, orphaned={}, deleted_orphans={}, failed_repairs={}, "
+        "failed_orphan_deletions={}, skipped_missing_sources={}",
+        stats.expected_hashes, stats.existing_thumbnails, stats.missing_thumbnails,
+        stats.repaired_thumbnails, stats.orphaned_thumbnails, stats.deleted_orphaned_thumbnails,
+        stats.failed_repairs, stats.failed_orphan_deletions, stats.skipped_missing_sources);
   }
 
   Logger().info("Gallery watchers started: {} / {}", started_count, watchers.size());
