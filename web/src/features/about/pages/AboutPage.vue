@@ -18,6 +18,9 @@ import {
   FolderOpen,
   ExternalLink,
   Globe,
+  Loader2,
+  Package,
+  Download,
 } from 'lucide-vue-next'
 
 interface RuntimeInfo {
@@ -308,7 +311,7 @@ onBeforeUnmount(() => {
           <img
             src="/logo_192x192.png"
             alt="SpinningMomo Logo"
-            class="h-full w-full object-contain drop-shadow-2xl transition-transform duration-[1.5s] ease-out group-hover:rotate-[360deg]"
+            class="h-full w-full object-contain transition-transform duration-[1.5s] ease-out group-hover:rotate-[360deg]"
           />
         </div>
         <h1 class="mb-3 text-3xl font-bold tracking-tight text-foreground">{{ t('app.name') }}</h1>
@@ -321,8 +324,8 @@ onBeforeUnmount(() => {
           class="group/badge flex items-center gap-2 rounded-full border border-border/50 px-3 py-1 transition-all duration-300 disabled:opacity-80"
           :class="[
             hasUpdate || isDownloadedUpdateReady
-              ? 'border-primary bg-primary text-primary-foreground shadow-sm hover:opacity-90'
-              : 'bg-secondary/50 text-[13px] font-medium text-muted-foreground hover:border-border hover:bg-secondary',
+              ? 'border-primary bg-primary text-sm text-primary-foreground shadow-sm hover:opacity-90'
+              : 'bg-secondary/50 text-sm font-medium text-muted-foreground hover:border-border hover:bg-secondary',
           ]"
         >
           <!-- Status Icon -->
@@ -351,9 +354,7 @@ onBeforeUnmount(() => {
             <template v-else-if="hasUpdate">{{
               t('about.actions.downloadUpdate', { version: latestVersion || '' })
             }}</template>
-            <template v-else
-              >{{ t('about.runtime.version') }} {{ appVersionText }} (64-bit)</template
-            >
+            <template v-else>{{ t('about.runtime.version') }} {{ appVersionText }}</template>
           </span>
         </button>
       </div>
@@ -457,7 +458,7 @@ onBeforeUnmount(() => {
 
       <!-- Footer -->
       <div
-        class="mt-auto flex flex-col items-center space-y-3 text-center text-[13px] text-muted-foreground"
+        class="mt-auto flex flex-col items-center space-y-3 text-center text-[12px] text-muted-foreground"
       >
         <p>&copy; 2026 InfinityMomo. {{ t('about.footer.rightsReserved') }}</p>
         <p>

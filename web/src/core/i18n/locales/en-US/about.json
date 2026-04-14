@@ -1,7 +1,7 @@
 {
   "about.actions.checkingUpdate": "Checking for updates...",
   "about.actions.copyDiagnostics": "Copy Diagnostics",
-  "about.actions.downloadUpdate": "Download & Install {version}",
+  "about.actions.downloadUpdate": "Download update {version}",
   "about.actions.hideAdvanced": "Hide Diagnostics & Support",
   "about.actions.installDownloadedUpdate": "Install now {version}",
   "about.actions.installingUpdate": "Installing...",
@@ -9,7 +9,7 @@
   "about.actions.showAdvanced": "Show Diagnostics & Support",
   "about.diagnostics.title": "SpinningMomo Diagnostics",
   "about.footer.openSourceLink": "open source projects",
-  "about.footer.openSourcePrefix": "SpinningMomo is made possible by many wonderful ",
+  "about.footer.openSourcePrefix": "SpinningMomo wouldn't be possible without many wonderful ",
   "about.footer.openSourceSuffix": ".",
   "about.footer.rightsReserved": "All rights reserved.",
   "about.links.issues": "Report Issue",
