@@ -82,6 +82,8 @@ const handleMenuSelect = (key: string) => {
               <SidebarMenuItem v-else-if="'key' in item">
                 <SidebarMenuButton
                   :tooltip="item.title"
+                  show-tooltip-when-expanded
+                  tooltip-variant="sidebar"
                   :is-active="activeKey === item.key"
                   @click="handleMenuSelect(item.key)"
                   class="h-10 w-10 [&>svg]:mx-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:transition-colors [&[data-active=true]>svg]:text-primary"

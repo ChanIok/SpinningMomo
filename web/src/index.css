@@ -72,8 +72,8 @@
   --surface-middle: rgb(255 255 255 / 0.56);
   --surface-top: #fdfdfd;
   /* Light Modern */
-  --background: var(--surface-bottom);
-  --foreground: #2e2e2e;
+  --background: #ffffff;
+  --foreground: #1b1b1b;
   --card: var(--surface-middle);
   --card-foreground: #2e2e2e80;
   --popover: var(--surface-top);
