@@ -3,6 +3,7 @@ module;
 #include <mfapi.h>
 #include <mferror.h>
 #include <mfidl.h>
+#include <mfobjects.h>
 #include <mfreadwrite.h>
 #include <propvarutil.h>
 #include <wil/com.h>
@@ -12,6 +13,7 @@ module Utils.Media.VideoAsset;
 import std;
 import Utils.File.Mime;
 import Utils.Image;
+import Utils.Logger;
 
 namespace Utils::Media::VideoAsset {
 
@@ -20,6 +22,19 @@ namespace Utils::Media::VideoAsset {
 constexpr std::int64_t kHundredNanosecondsPerMillisecond = 10'000;
 constexpr std::int64_t kMinThumbnailTimestampHns = 2'000'000;
 constexpr std::int64_t kMaxThumbnailTimestampHns = 30'000'000;
+constexpr std::uint32_t kBgraBytesPerPixel = 4;
+
+// Media Foundation 返回的视频帧并不总是“画面宽高 = 内存宽高”。
+// 这里把“解码 surface 的布局”和“真正可见的画面区域”拆开保存，后续就只按这个结构取像素。
+struct VideoFrameLayout {
+  std::uint32_t surface_width = 0;
+  std::uint32_t surface_height = 0;
+  std::int32_t stride = 0;
+  std::uint32_t visible_x = 0;
+  std::uint32_t visible_y = 0;
+  std::uint32_t visible_width = 0;
+  std::uint32_t visible_height = 0;
+};
 
 auto format_hresult(HRESULT hr, const std::string& context) -> std::string {
   char* message_buffer = nullptr;
@@ -73,6 +88,181 @@ auto get_video_frame_size(IMFSourceReader* reader)
   }
 
   return std::make_pair(static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height));
+}
+
+auto try_get_media_type_frame_size(IMFMediaType* media_type)
+    -> std::optional<std::pair<std::uint32_t, std::uint32_t>> {
+  if (!media_type) {
+    return std::nullopt;
+  }
+
+  UINT32 width = 0;
+  UINT32 height = 0;
+  auto hr = MFGetAttributeSize(media_type, MF_MT_FRAME_SIZE, &width, &height);
+  if (FAILED(hr) || width == 0 || height == 0) {
+    return std::nullopt;
+  }
+
+  return std::make_pair(static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height));
+}
+
+auto try_get_media_type_default_stride(IMFMediaType* media_type) -> std::optional<std::int32_t> {
+  if (!media_type) {
+    return std::nullopt;
+  }
+
+  UINT32 stride = 0;
+  auto hr = media_type->GetUINT32(MF_MT_DEFAULT_STRIDE, &stride);
+  if (FAILED(hr)) {
+    return std::nullopt;
+  }
+
+  return static_cast<std::int32_t>(stride);
+}
+
+auto try_get_media_type_video_area(IMFMediaType* media_type, REFGUID key)
+    -> std::optional<MFVideoArea> {
+  if (!media_type) {
+    return std::nullopt;
+  }
+
+  UINT32 blob_size = 0;
+  auto hr = media_type->GetBlobSize(key, &blob_size);
+  if (FAILED(hr) || blob_size != sizeof(MFVideoArea)) {
+    return std::nullopt;
+  }
+
+  MFVideoArea area{};
+  hr = media_type->GetBlob(key, reinterpret_cast<UINT8*>(&area), sizeof(area), nullptr);
+  if (FAILED(hr)) {
+    return std::nullopt;
+  }
+
+  return area;
+}
+
+auto resolve_video_area_offset(const MFOffset& offset, const char* axis_name)
+    -> std::expected<std::uint32_t, std::string> {
+  if (offset.fract != 0 || offset.value < 0) {
+    return std::unexpected(std::format("Unsupported non-integer {} aperture offset", axis_name));
+  }
+
+  return static_cast<std::uint32_t>(offset.value);
+}
+
+auto resolve_video_frame_layout(IMFMediaType* media_type)
+    -> std::expected<VideoFrameLayout, std::string> {
+  if (!media_type) {
+    return std::unexpected("Video media type is null");
+  }
+
+  auto frame_size = try_get_media_type_frame_size(media_type);
+  if (!frame_size) {
+    return std::unexpected("Video media type does not expose MF_MT_FRAME_SIZE");
+  }
+
+  auto default_stride = try_get_media_type_default_stride(media_type);
+  if (!default_stride.has_value()) {
+    return std::unexpected("Video media type does not expose MF_MT_DEFAULT_STRIDE");
+  }
+
+  if (default_stride.value() <= 0) {
+    return std::unexpected("Video media type exposes a non-positive default stride");
+  }
+
+  // 这里要区分两套尺寸：
+  // 1. surface_*：解码器实际输出的内存表面大小，往往会按块对齐。
+  // 2. visible_*：真正应该拿来做缩略图的可见区域。
+  // 某些视频会出现「surface 比画面大一点」的情况；如果直接按 visible 宽高线性读整块
+  // buffer，就会把每行末尾的填充像素误当成下一行开头，从而出现撕裂。
+  VideoFrameLayout layout{
+      .surface_width = frame_size->first,
+      .surface_height = frame_size->second,
+      .stride = default_stride.value(),
+      .visible_x = 0,
+      .visible_y = 0,
+      .visible_width = frame_size->first,
+      .visible_height = frame_size->second,
+  };
+
+  auto minimum_display_aperture =
+      try_get_media_type_video_area(media_type, MF_MT_MINIMUM_DISPLAY_APERTURE);
+  if (!minimum_display_aperture.has_value()) {
+    return layout;
+  }
+
+  auto visible_x_result =
+      resolve_video_area_offset(minimum_display_aperture->OffsetX, "horizontal");
+  if (!visible_x_result) {
+    return std::unexpected(visible_x_result.error());
+  }
+
+  auto visible_y_result = resolve_video_area_offset(minimum_display_aperture->OffsetY, "vertical");
+  if (!visible_y_result) {
+    return std::unexpected(visible_y_result.error());
+  }
+
+  layout.visible_x = visible_x_result.value();
+  layout.visible_y = visible_y_result.value();
+  layout.visible_width = minimum_display_aperture->Area.cx;
+  layout.visible_height = minimum_display_aperture->Area.cy;
+
+  if (layout.visible_width == 0 || layout.visible_height == 0) {
+    return std::unexpected("Video media type exposes an empty minimum display aperture");
+  }
+
+  if (layout.visible_x + layout.visible_width > layout.surface_width ||
+      layout.visible_y + layout.visible_height > layout.surface_height) {
+    return std::unexpected("Video minimum display aperture exceeds decoded surface bounds");
+  }
+
+  return layout;
+}
+
+auto copy_bitmap_data_from_linear_buffer(const BYTE* buffer_start, std::uint32_t buffer_length,
+                                         const VideoFrameLayout& layout)
+    -> std::expected<Utils::Image::BGRABitmapData, std::string> {
+  if (!buffer_start || buffer_length == 0) {
+    return std::unexpected("Video buffer is empty");
+  }
+
+  if (layout.stride <= 0) {
+    return std::unexpected("Video buffer stride must be positive");
+  }
+
+  auto stride = static_cast<std::uint64_t>(layout.stride);
+  auto visible_row_bytes = static_cast<std::uint64_t>(layout.visible_width) * kBgraBytesPerPixel;
+  auto row_offset = static_cast<std::uint64_t>(layout.visible_x) * kBgraBytesPerPixel;
+  if (row_offset + visible_row_bytes > stride) {
+    return std::unexpected("Video aperture row exceeds decoded surface stride");
+  }
+
+  auto last_row_offset =
+      static_cast<std::uint64_t>(layout.visible_y + layout.visible_height - 1) * stride;
+  auto required_bytes = last_row_offset + row_offset + visible_row_bytes;
+  if (required_bytes > buffer_length) {
+    return std::unexpected("Video buffer is smaller than the decoded surface layout requires");
+  }
+
+  auto pixel_bytes = visible_row_bytes * layout.visible_height;
+  Utils::Image::BGRABitmapData result;
+  result.width = layout.visible_width;
+  result.height = layout.visible_height;
+  result.stride = static_cast<std::uint32_t>(visible_row_bytes);
+  result.pixels.resize(static_cast<std::size_t>(pixel_bytes));
+
+  // 这里只拷贝可见区域；surface 右侧/底部的对齐填充会被自然跳过。
+  for (std::uint32_t y = 0; y < layout.visible_height; ++y) {
+    auto source_offset = (static_cast<std::uint64_t>(layout.visible_y + y) * stride) + row_offset;
+    std::memcpy(result.pixels.data() + static_cast<std::size_t>(y) * result.stride,
+                buffer_start + source_offset, result.stride);
+  }
+
+  for (std::size_t i = 3; i < result.pixels.size(); i += kBgraBytesPerPixel) {
+    result.pixels[i] = 255;
+  }
+
+  return result;
 }
 
 auto create_source_reader(const std::filesystem::path& path)
@@ -153,10 +343,35 @@ auto seek_source_reader(IMFSourceReader* reader, std::int64_t position_hns)
   return {};
 }
 
-auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::uint32_t width, std::uint32_t height)
+auto is_transitional_thumbnail_sample(DWORD stream_flags) -> bool {
+  return (stream_flags & MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0;
+}
+
+auto is_stable_thumbnail_timestamp(LONGLONG timestamp_hns, std::int64_t minimum_timestamp_hns)
+    -> bool {
+  if (minimum_timestamp_hns <= 0) {
+    return timestamp_hns > 0;
+  }
+
+  return timestamp_hns > 0 && timestamp_hns >= minimum_timestamp_hns;
+}
+
+auto read_current_video_frame_layout(IMFSourceReader* reader)
+    -> std::expected<VideoFrameLayout, std::string> {
+  wil::com_ptr<IMFMediaType> media_type;
+  auto hr = reader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, media_type.put());
+  if (FAILED(hr) || !media_type) {
+    return std::unexpected(format_hresult(hr, "Failed to get current video media type"));
+  }
+
+  return resolve_video_frame_layout(media_type.get());
+}
+
+auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::int64_t minimum_timestamp_hns)
     -> std::expected<Utils::Image::BGRABitmapData, std::string> {
   constexpr DWORD kReadFlags = 0;
-  // Seek 后前几帧可能是无效/空样本，多试几次再放弃。
+  // Seek 后 reader 可能先吐出媒体类型切换帧、空样本或目标时间点之前的旧帧；
+  // 这里持续读到一张稳定帧再做缩略图。
   constexpr int kMaxReadAttempts = 120;
 
   for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
@@ -179,45 +394,61 @@ auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::uint32_t width, st
       continue;
     }
 
-    wil::com_ptr<IMFMediaBuffer> media_buffer;
-    hr = sample->ConvertToContiguousBuffer(media_buffer.put());
-    if (FAILED(hr) || !media_buffer) {
-      return std::unexpected(format_hresult(hr, "Failed to get video buffer"));
+    // Step 1: 跳过管线刚切换时的过渡帧。
+    if (is_transitional_thumbnail_sample(stream_flags)) {
+      continue;
     }
 
-    BYTE* buffer_ptr = nullptr;
-    DWORD max_length = 0;
+    // Step 2: 只接受时间戳已经稳定、且不早于目标时间点的帧。
+    if (!is_stable_thumbnail_timestamp(timestamp, minimum_timestamp_hns)) {
+      continue;
+    }
+
+    // Step 3: 读取当前帧对应的 surface 布局与可见区域。
+    auto layout_result = read_current_video_frame_layout(reader);
+    if (!layout_result) {
+      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1,
+                    layout_result.error());
+      return std::unexpected(layout_result.error());
+    }
+    const auto& layout = layout_result.value();
+
+    // Step 4: 锁定 sample 的线性内存。
+    wil::com_ptr<IMFMediaBuffer> media_buffer;
+    hr = sample->GetBufferByIndex(0, media_buffer.put());
+    if (FAILED(hr) || !media_buffer) {
+      auto error = format_hresult(hr, "Failed to get video buffer");
+      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1, error);
+      return std::unexpected(error);
+    }
+
     DWORD current_length = 0;
-    hr = media_buffer->Lock(&buffer_ptr, &max_length, &current_length);
+    auto current_length_hr = media_buffer->GetCurrentLength(&current_length);
+
+    BYTE* buffer_start = nullptr;
+    hr = media_buffer->Lock(&buffer_start, nullptr, &current_length);
     if (FAILED(hr)) {
-      return std::unexpected(format_hresult(hr, "Failed to lock video buffer"));
+      auto error = format_hresult(hr, "Failed to lock video buffer");
+      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1, error);
+      return std::unexpected(error);
     }
 
     auto unlock_guard = std::unique_ptr<void, std::function<void(void*)>>(
         media_buffer.get(), [&media_buffer](void*) { media_buffer->Unlock(); });
 
-    if (!buffer_ptr || current_length == 0) {
+    if (!buffer_start || current_length == 0) {
       continue;
     }
 
-    std::uint32_t stride = width * 4;
-    std::uint64_t expected_size = static_cast<std::uint64_t>(stride) * height;
-    if (current_length < expected_size) {
-      return std::unexpected("Video sample is smaller than expected RGB32 frame size");
+    // Step 5: 按 stride 逐行拷贝，并裁出真正可见的画面区域。
+    auto copy_result = copy_bitmap_data_from_linear_buffer(buffer_start, current_length, layout);
+    if (!copy_result) {
+      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1,
+                    copy_result.error());
+      return std::unexpected(copy_result.error());
     }
 
-    Utils::Image::BGRABitmapData result;
-    result.width = width;
-    result.height = height;
-    result.stride = stride;
-    result.pixels.assign(buffer_ptr, buffer_ptr + expected_size);
-
-    // MFVideoFormat_RGB32 的 X 通道未必有意义，统一填不透明 alpha，避免后续 WIC/WebP 出现意外透明。
-    for (std::size_t i = 3; i < result.pixels.size(); i += 4) {
-      result.pixels[i] = 255;
-    }
-
-    return result;
+    return copy_result;
   }
 
   return std::unexpected("Failed to decode a video frame for thumbnail generation");
@@ -281,35 +512,49 @@ auto analyze_video_file(const std::filesystem::path& path,
     return result;
   }
 
+  // Step 1: 要求 reader 输出 RGB32，后续就能直接交给 WIC 生成缩略图。
   auto output_result = configure_rgb32_output(reader.get());
   if (!output_result) {
     return std::unexpected(output_result.error());
   }
 
-  auto seek_result =
-      seek_source_reader(reader.get(), calculate_thumbnail_timestamp_hns(duration_millis));
+  auto seek_hns = calculate_thumbnail_timestamp_hns(duration_millis);
+
+  // Step 2: 先 seek 到目标时间点附近，再往后读到一张稳定帧。
+  auto seek_result = seek_source_reader(reader.get(), seek_hns);
   if (!seek_result) {
+    Logger().warn("Video analysis failed while seeking thumbnail frame. path='{}', error={}",
+                  path.string(), seek_result.error());
     return std::unexpected(seek_result.error());
   }
 
-  auto bitmap_result = read_thumbnail_bitmap_data(reader.get(), width, height);
+  auto bitmap_result = read_thumbnail_bitmap_data(reader.get(), seek_hns);
   if (!bitmap_result) {
+    Logger().warn("Video analysis failed while decoding thumbnail bitmap. path='{}', error={}",
+                  path.string(), bitmap_result.error());
     return std::unexpected(bitmap_result.error());
   }
 
   auto wic_factory_result = Utils::Image::get_thread_wic_factory();
   if (!wic_factory_result) {
-    return std::unexpected("Failed to initialize WIC factory for video thumbnail: " +
-                           wic_factory_result.error());
+    auto error =
+        "Failed to initialize WIC factory for video thumbnail: " + wic_factory_result.error();
+    Logger().warn("Video analysis failed while creating WIC factory. path='{}', error={}",
+                  path.string(), error);
+    return std::unexpected(error);
   }
 
   Utils::Image::WebPEncodeOptions webp_options;
   webp_options.quality = 90.0f;
 
+  // Step 3: 把 BGRA 位图缩放并编码成 WebP，供图库缩略图直接使用。
   auto thumbnail_result = Utils::Image::generate_webp_thumbnail_from_bgra(
       wic_factory_result->get(), bitmap_result.value(), thumbnail_short_edge.value(), webp_options);
   if (!thumbnail_result) {
-    return std::unexpected("Failed to encode video thumbnail: " + thumbnail_result.error());
+    auto error = "Failed to encode video thumbnail: " + thumbnail_result.error();
+    Logger().warn("Video analysis failed while encoding thumbnail. path='{}', error={}",
+                  path.string(), error);
+    return std::unexpected(error);
   }
 
   result.thumbnail = std::move(thumbnail_result.value());
