@@ -3,6 +3,7 @@ module;
 export module Features.Recording;
 
 import std;
+import Core.State;
 import Features.Recording.Types;
 import Features.Recording.State;
 import <windows.h>;
@@ -14,8 +15,8 @@ auto initialize(Features::Recording::State::RecordingState& state)
     -> std::expected<void, std::string>;
 
 // 开始录制
-auto start(Features::Recording::State::RecordingState& state, HWND target_window,
-           const Features::Recording::Types::RecordingConfig& config)
+auto start(Core::State::AppState& app_state, Features::Recording::State::RecordingState& state,
+           HWND target_window, const Features::Recording::Types::RecordingConfig& config)
     -> std::expected<void, std::string>;
 
 // 停止录制

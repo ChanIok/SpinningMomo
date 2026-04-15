@@ -17,6 +17,31 @@ import <windows.h>;
 
 namespace Utils::Graphics::Capture {
 
+auto create_capture_item_for_window(HWND target_window)
+    -> std::expected<winrt::Windows::Graphics::Capture::GraphicsCaptureItem, std::string> {
+  if (!target_window || !IsWindow(target_window)) {
+    return std::unexpected("Target window is invalid");
+  }
+
+  auto interop =
+      winrt::get_activation_factory<winrt::Windows::Graphics::Capture::GraphicsCaptureItem,
+                                    IGraphicsCaptureItemInterop>();
+
+  winrt::Windows::Graphics::Capture::GraphicsCaptureItem capture_item{nullptr};
+  HRESULT hr = interop->CreateForWindow(
+      target_window, winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
+      reinterpret_cast<void**>(winrt::put_abi(capture_item)));
+
+  if (FAILED(hr) || !capture_item) {
+    auto error_msg = std::format("Failed to create capture item, HRESULT: 0x{:08X}",
+                                 static_cast<unsigned int>(hr));
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  }
+
+  return capture_item;
+}
+
 auto is_cursor_capture_control_supported() -> bool {
   try {
     return winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
@@ -74,6 +99,21 @@ auto create_winrt_device(ID3D11Device* d3d_device)
   return winrt_device;
 }
 
+auto get_capture_item_size(HWND target_window) -> std::expected<std::pair<int, int>, std::string> {
+  // 这里只创建 capture item 并读取 Size，不启动真正的捕获会话。
+  auto capture_item_result = create_capture_item_for_window(target_window);
+  if (!capture_item_result) {
+    return std::unexpected(capture_item_result.error());
+  }
+
+  auto size = capture_item_result->Size();
+  if (size.Width <= 0 || size.Height <= 0) {
+    return std::unexpected("Capture item size is invalid");
+  }
+
+  return std::make_pair(size.Width, size.Height);
+}
+
 auto create_capture_session(
     HWND target_window,
     const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
@@ -91,20 +131,11 @@ auto create_capture_session(
   session.winrt_device = device;
   session.frame_pool_size = std::max(frame_pool_size, 1);
 
-  // 创建捕获项
-  auto interop =
-      winrt::get_activation_factory<winrt::Windows::Graphics::Capture::GraphicsCaptureItem,
-                                    IGraphicsCaptureItemInterop>();
-  HRESULT hr = interop->CreateForWindow(
-      target_window, winrt::guid_of<ABI::Windows::Graphics::Capture::IGraphicsCaptureItem>(),
-      reinterpret_cast<void**>(winrt::put_abi(session.capture_item)));
-
-  if (FAILED(hr)) {
-    auto error_msg = std::format("Failed to create capture item, HRESULT: 0x{:08X}",
-                                 static_cast<unsigned int>(hr));
-    Logger().error(error_msg);
-    return std::unexpected(error_msg);
+  auto capture_item_result = create_capture_item_for_window(target_window);
+  if (!capture_item_result) {
+    return std::unexpected(capture_item_result.error());
   }
+  session.capture_item = std::move(*capture_item_result);
 
   // 创建帧池
   session.frame_pool =

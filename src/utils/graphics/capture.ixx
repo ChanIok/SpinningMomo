@@ -43,6 +43,11 @@ export auto create_winrt_device(ID3D11Device* d3d_device)
 export auto is_cursor_capture_control_supported() -> bool;
 export auto is_border_control_supported() -> bool;
 
+// 获取目标窗口对应的 WGC 实际捕获尺寸。
+// 录制模块用它作为“源帧真相”，避免只靠窗口矩形推算导致差 1px 的错配。
+export auto get_capture_item_size(HWND target_window)
+    -> std::expected<std::pair<int, int>, std::string>;
+
 // 创建捕获会话
 export auto create_capture_session(
     HWND target_window,

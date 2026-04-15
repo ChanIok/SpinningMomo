@@ -72,8 +72,6 @@ auto generate_output_path(const Core::State::AppState& state)
 }
 
 auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, std::string> {
-  join_resize_restart_thread(*state.recording);
-
   auto status = state.recording->status.load(std::memory_order_acquire);
 
   if (status == Features::Recording::Types::RecordingStatus::Recording) {
@@ -124,7 +122,7 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
     config.audio_bitrate = recording_settings.audio_bitrate;
 
     // 3. 启动
-    auto result = Features::Recording::start(*state.recording, target.value(), config);
+    auto result = Features::Recording::start(state, *state.recording, target.value(), config);
     if (!result) {
       show_recording_notification(
           state, state.i18n->texts["message.recording_start_failed"] + result.error());
@@ -145,6 +143,11 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     return std::unexpected("Recording state is not initialized");
   }
 
+  // shutdown 已经开始时，不再接受新的录制开关请求，避免退出阶段和 toggle 抢状态。
+  if (state.recording->shutdown_requested.load(std::memory_order_acquire)) {
+    return std::unexpected("Recording shutdown is in progress");
+  }
+
   bool expected = false;
   if (!state.recording->op_in_progress.compare_exchange_strong(expected, true,
                                                                std::memory_order_acq_rel)) {
@@ -163,7 +166,20 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
         Logger().warn("CoInitializeEx failed in recording task: {:08X}", static_cast<uint32_t>(hr));
       }
 
-      auto result = toggle_recording_impl(state);
+      join_resize_restart_thread(*state.recording);
+
+      std::expected<void, std::string> result;
+      {
+        // toggle / resize restart / shutdown stop 共享同一把控制锁，
+        // 保证任意时刻只有一条控制路径在操作录制状态机。
+        std::lock_guard control_lock(state.recording->control_mutex);
+        if (state.recording->shutdown_requested.load(std::memory_order_acquire)) {
+          result = {};
+        } else {
+          result = toggle_recording_impl(state);
+        }
+      }
+
       if (!result) {
         Logger().error("Recording toggle failed: {}", result.error());
       }
@@ -190,16 +206,23 @@ auto stop_recording_if_running(Core::State::AppState& state) -> void {
     return;
   }
 
+  // 退出阶段先宣告 shutdown，再接管 stop；
+  // 这样 resize restart / toggle thread 会主动让路，不会再互相等待。
+  state.recording->shutdown_requested.store(true, std::memory_order_release);
+
   join_resize_restart_thread(*state.recording);
+
+  {
+    std::lock_guard control_lock(state.recording->control_mutex);
+    if (state.recording->status.load(std::memory_order_acquire) ==
+        Features::Recording::Types::RecordingStatus::Recording) {
+      Features::Recording::stop(*state.recording);
+      notify_recording_toggled(state, false);
+    }
+  }
 
   if (state.recording->toggle_thread.joinable()) {
     state.recording->toggle_thread.join();
-  }
-
-  if (state.recording->status.load(std::memory_order_acquire) ==
-      Features::Recording::Types::RecordingStatus::Recording) {
-    Features::Recording::stop(*state.recording);
-    notify_recording_toggled(state, false);
   }
 }
 

@@ -66,7 +66,7 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
   if (FAILED(MFSetAttributeSize(media_type.get(), MF_MT_FRAME_SIZE, width, height))) return nullptr;
 
   if (set_stride) {
-    const INT32 stride = -static_cast<INT32>(width * 4);
+    const INT32 stride = static_cast<INT32>(width * 4);
     if (FAILED(media_type->SetUINT32(MF_MT_DEFAULT_STRIDE, static_cast<UINT32>(stride))))
       return nullptr;
   }

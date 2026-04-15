@@ -5,6 +5,7 @@ export module Features.Recording.State;
 import std;
 import Features.Recording.Types;
 import Utils.Graphics.Capture;
+import Utils.Graphics.CaptureRegion;
 import Utils.Media.AudioCapture;
 import Utils.Media.Encoder.State;
 import <d3d11.h>;
@@ -13,9 +14,24 @@ import <windows.h>;
 
 export namespace Features::Recording::State {
 
+// 录制几何计划：
+// source_* 表示 WGC 实际给到的源帧尺寸；
+// output_* 表示最终送给编码器的尺寸；
+// should_crop/region 描述是否需要先从源帧裁出一块再编码。
+struct CapturePlan {
+  int source_width = 0;
+  int source_height = 0;
+  std::uint32_t output_width = 0;
+  std::uint32_t output_height = 0;
+  bool should_crop = false;
+  Utils::Graphics::CaptureRegion::CropRegion region{};
+};
+
 // 录制完整状态
 struct RecordingState {
   Features::Recording::Types::RecordingConfig config;
+  std::filesystem::path working_output_path;
+  CapturePlan capture_plan;
 
   // 状态标志 - 使用 atomic 避免锁竞争
   std::atomic<Features::Recording::Types::RecordingStatus> status{
@@ -28,6 +44,8 @@ struct RecordingState {
   std::jthread resize_restart_thread;
   // 自动切段重启任务是否正在执行
   std::atomic<bool> resize_restart_in_progress{false};
+  // shutdown 开始后置为 true，阻止新的 toggle / resize restart 再抢控制权
+  std::atomic<bool> shutdown_requested{false};
 
   // D3D 资源 (Headless)
   wil::com_ptr<ID3D11Device> device;
@@ -60,6 +78,8 @@ struct RecordingState {
   std::mutex encoder_write_mutex;
   // resource_mutex: 保护资源的初始化、清理和帧填充逻辑（主线程独占）
   std::mutex resource_mutex;
+  // control_mutex: 串行化 start/stop/toggle/restart/shutdown 控制流
+  std::mutex control_mutex;
 };
 
 }  // namespace Features::Recording::State
