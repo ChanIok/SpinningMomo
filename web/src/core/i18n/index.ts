@@ -16,6 +16,7 @@ const LOCALE_DOMAINS = [
   'menu',
   'extensions',
   'home',
+  'map',
 ] as const
 
 /**
