@@ -150,6 +150,7 @@ export const useGalleryStore = defineStore('gallery', () => {
   })
 
   const detailsOpen = ref(true)
+  const pendingOpenAssetId = ref<number | undefined>(undefined)
 
   // ============= 计算属性 =============
   const selectedCount = computed(() => selection.selectedIds.size)
@@ -582,6 +583,16 @@ export const useGalleryStore = defineStore('gallery', () => {
     detailsOpen.value = open
   }
 
+  function setPendingOpenAssetId(assetId?: number) {
+    pendingOpenAssetId.value = assetId
+  }
+
+  function consumePendingOpenAssetId(): number | undefined {
+    const assetId = pendingOpenAssetId.value
+    pendingOpenAssetId.value = undefined
+    return assetId
+  }
+
   // 详情面板焦点操作
   function setDetailsFocus(focus: DetailsPanelFocus) {
     Object.assign(detailsPanel, focus)
@@ -640,6 +651,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     lightbox.isOpen = false
     lightbox.isClosing = false
     lightbox.isImmersive = false
+    pendingOpenAssetId.value = undefined
 
     sidebar.isOpen = true
     detailsOpen.value = true
@@ -687,6 +699,7 @@ export const useGalleryStore = defineStore('gallery', () => {
     sidebar,
     detailsPanel,
     detailsOpen,
+    pendingOpenAssetId,
 
     // 计算属性
     selectedCount,
@@ -766,6 +779,8 @@ export const useGalleryStore = defineStore('gallery', () => {
 
     setSidebarOpen,
     setDetailsOpen,
+    setPendingOpenAssetId,
+    consumePendingOpenAssetId,
     setDetailsFocus,
     clearDetailsFocus,
 

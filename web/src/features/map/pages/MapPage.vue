@@ -116,6 +116,9 @@ function getThumbnailUrl(point: PhotoMapPoint): string {
 function buildPopupHtml(point: PhotoMapPoint): string {
   const title = escapeHtml(formatPopupTitleFromFilename(point.name, locale.value))
   const thumbnailUrl = getThumbnailUrl(point)
+  const clickableAttr = Number.isFinite(point.assetId)
+    ? ` data-sm-open-asset-id="${point.assetId}"`
+    : ''
   const thumbnailSection = thumbnailUrl
     ? `<div style="margin-top: 8px;">
             <img
@@ -129,7 +132,7 @@ function buildPopupHtml(point: PhotoMapPoint): string {
           </div>`
     : ''
 
-  return `<div style="min-width: 180px; line-height: 1.5;">
+  return `<div${clickableAttr} style="min-width: 180px; line-height: 1.5; cursor: pointer;">
             <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px; color: rgb(123, 93, 74); font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;">${title}</div>
             ${thumbnailSection}
           </div>`

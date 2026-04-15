@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useGalleryStore } from '@/features/gallery/store'
 import { useMapStore } from '@/features/map/store'
 import { buildMapRuntimeScript } from '@/features/map/injection/mapRuntime'
 
@@ -8,6 +9,8 @@ const MAP_URL = 'https://myl.nuanpaper.com/tools/map'
 const MAP_ORIGIN = 'https://myl.nuanpaper.com'
 
 const route = useRoute()
+const router = useRouter()
+const galleryStore = useGalleryStore()
 const mapStore = useMapStore()
 const mapIframe = ref<HTMLIFrameElement | null>(null)
 
@@ -146,6 +149,36 @@ function handleIframeLoad() {
   syncMarkersToMap()
 }
 
+type OpenGalleryAssetMessage = {
+  action: 'SPINNING_MOMO_OPEN_GALLERY_ASSET'
+  payload?: {
+    assetId?: number
+  }
+}
+
+async function handleMapMessage(event: MessageEvent<unknown>) {
+  if (event.origin !== MAP_ORIGIN) {
+    return
+  }
+
+  const data = event.data as OpenGalleryAssetMessage
+  if (!data || data.action !== 'SPINNING_MOMO_OPEN_GALLERY_ASSET') {
+    return
+  }
+
+  const assetId = Number(data.payload?.assetId)
+  if (!Number.isFinite(assetId)) {
+    return
+  }
+
+  galleryStore.setActiveAssetId(assetId)
+  galleryStore.setPendingOpenAssetId(assetId)
+
+  await router.push({
+    name: 'gallery',
+  })
+}
+
 watch(
   () => mapStore.markers,
   () => {
@@ -179,6 +212,14 @@ watch(isMapRoute, (visible) => {
     syncRenderOptionsToMap()
     syncMarkersToMap()
   }
+})
+
+onMounted(() => {
+  window.addEventListener('message', handleMapMessage)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', handleMapMessage)
 })
 </script>
 

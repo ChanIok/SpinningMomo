@@ -19,6 +19,7 @@
     "format:web": "cd web && prettier --write ."
   },
   "devDependencies": {
+    "esbuild": "^0.25.12",
     "fast-glob": "^3.3.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.4"

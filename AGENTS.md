@@ -175,6 +175,7 @@ Installers are built via `scripts/build-msi.ps1`. The script builds an MSI packa
 These must be re-run when their source files change:
 - `node scripts/generate-migrations.js` — after modifying `src/migrations/*.sql`
 - `node scripts/generate-embedded-locales.js` — after modifying `src/locales/*.json` (zh-CN / en-US)
+- `node scripts/generate-map-injection-cpp.js` — after modifying `web/src/features/map/injection/source/*.js` (regenerates minified JS and C++ map injection module)
 
 ## Naming Conventions
 - **C++ module names**: PascalCase with dots — `Features.Gallery`, `Core.RPC.Types`
