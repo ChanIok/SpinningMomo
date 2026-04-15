@@ -14,7 +14,8 @@ struct CandidateAssetRow {
 struct PreparedPhotoExtractEntry {
   std::int64_t asset_id;
   std::string uid;
-  std::string params_base64;
+  std::string md5;
+  std::string encoded;
 };
 
 auto prepare_photo_extract_entry(const CandidateAssetRow& candidate,

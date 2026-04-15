@@ -1,6 +1,6 @@
 module;
 
-#include <rfl/json.hpp>
+#include <asio.hpp>
 
 module Extensions.InfinityNikki.PhotoExtract.Infra;
 
@@ -13,96 +13,120 @@ import Core.HttpClient.Types;
 import Features.Gallery.Folder.Repository;
 import Extensions.InfinityNikki.PhotoExtract.Scan;
 import Extensions.InfinityNikki.Types;
-import <asio.hpp>;
+import <rfl/json.hpp>;
 
 namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 
 struct ExtractApiRequestBody {
   std::string uid;
-  std::vector<std::string> params_base64_list;
+  std::vector<std::array<std::string, 2>> photos;
+  std::optional<bool> raw_data = true;
+  std::optional<bool> raw_id = true;
 };
 
-struct PhotoTime {
-  std::optional<std::int64_t> day;
-  std::optional<std::int64_t> hour;
-  std::optional<std::int64_t> min;
-  std::optional<double> sec;
+struct Nuan5Light {
+  std::optional<std::int64_t> l;
+  std::optional<double> s;
 };
 
-struct PhotoInfo {
-  std::optional<double> camera_focal_length;
-  std::optional<std::int64_t> aperture_section;
-  std::optional<std::string> filter_id;
-  std::optional<double> filter_strength;
-  std::optional<double> vignette_intensity;
-  std::optional<std::string> light_id;
-  std::optional<double> light_strength;
-  std::optional<double> nikki_loc_x;
-  std::optional<double> nikki_loc_y;
-  std::optional<double> nikki_loc_z;
-  std::optional<bool> nikki_hidden;
-  std::optional<std::int64_t> pose_id;
-  rfl::Rename<"nikkiDIY", std::optional<rfl::Generic>> nikki_diy;
-  rfl::Rename<"nikkiClothes", std::optional<std::vector<double>>> nikki_clothes;
+struct Nuan5RawTime {
+  std::optional<std::int64_t> d;
+  std::optional<std::int64_t> h;
+  std::optional<std::int64_t> m;
+  std::optional<double> s;
 };
 
-struct SocialPhotoData {
-  rfl::Rename<"CameraParams", std::optional<std::string>> camera_params;
-  rfl::Rename<"Time", std::optional<PhotoTime>> time;
-  rfl::Rename<"PhotoInfo", std::optional<PhotoInfo>> photo_info;
+struct Nuan5RawPos {
+  std::optional<double> x;
+  std::optional<double> y;
+  std::optional<double> z;
 };
 
-struct ApiError {
-  std::optional<std::string> code;
-  std::optional<std::string> message;
+struct Nuan5RawData {
+  std::optional<Nuan5RawTime> time;
+  std::optional<Nuan5RawPos> pos;
 };
 
-struct SocialPhotoWrapper {
-  rfl::Rename<"SocialPhoto", std::optional<SocialPhotoData>> social_photo;
+struct Nuan5Filter {
+  std::optional<std::int64_t> f;
+  std::optional<double> s;
 };
 
-struct ApiResponse {
-  bool success = false;
-  std::optional<std::vector<std::optional<SocialPhotoWrapper>>> data;
-  std::optional<ApiError> error;
+struct Nuan5DecodedPhoto {
+  std::optional<double> focal;
+  std::optional<double> apeture;
+  std::optional<double> rotation;
+  std::optional<double> vignette;
+  std::optional<Nuan5Filter> filter;
+  std::optional<std::int64_t> pose;
+  std::optional<Nuan5Light> light;
+  std::optional<bool> hide_nikki;
+  std::optional<std::string> camera_params;
+  std::optional<bool> vertical;
+  std::optional<double> bloomIntensity;
+  std::optional<double> bloomThreshold;
+  std::optional<double> brightness;
+  std::optional<double> exposure;
+  std::optional<double> contrast;
+  std::optional<double> saturation;
+  std::optional<double> vibrance;
+  std::optional<double> highlights;
+  std::optional<double> shadow;
+  std::optional<std::vector<std::int64_t>> clothes;
+  std::optional<Nuan5RawData> raw;
 };
 
-constexpr std::string_view kExtractApiUrl = "https://api.infinitymomo.com/api/v1/extract";
+constexpr std::string_view kExtractApiUrl = "https://nuan5.pro/api/decode-photo";
+constexpr auto kNuan5MinRequestInterval = std::chrono::milliseconds(500);
+constexpr std::size_t kMaxNuan5RateLimitRetries = 2;
 
-auto to_parsed_record(const SocialPhotoData& sp) -> ParsedPhotoParamsRecord {
+struct HttpJsonResponse {
+  int status_code = 0;
+  std::string body;
+};
+
+auto to_parsed_record(const Nuan5DecodedPhoto& photo) -> ParsedPhotoParamsRecord {
   ParsedPhotoParamsRecord record;
-  record.camera_params = sp.camera_params.value();
+  record.camera_params = photo.camera_params;
+  record.camera_focal_length = photo.focal;
+  record.rotation = photo.rotation;
+  record.aperture_value = photo.apeture;
+  if (photo.filter.has_value()) {
+    record.filter_id = photo.filter->f;
+    record.filter_strength = photo.filter->s;
+  }
+  record.vignette_intensity = photo.vignette;
+  record.vertical = photo.vertical;
+  record.bloom_intensity = photo.bloomIntensity;
+  record.bloom_threshold = photo.bloomThreshold;
+  record.brightness = photo.brightness;
+  record.exposure = photo.exposure;
+  record.contrast = photo.contrast;
+  record.saturation = photo.saturation;
+  record.vibrance = photo.vibrance;
+  record.highlights = photo.highlights;
+  record.shadow = photo.shadow;
+  record.nikki_hidden = photo.hide_nikki;
+  record.pose_id = photo.pose;
 
-  if (const auto& time = sp.time.value()) {
-    record.time_day = time->day;
-    record.time_hour = time->hour;
-    record.time_min = time->min;
-    record.time_sec = time->sec;
+  if (photo.light.has_value()) {
+    record.light_id = photo.light->l;
+    record.light_strength = photo.light->s;
   }
 
-  if (const auto& photo_info = sp.photo_info.value()) {
-    const auto& pi = *photo_info;
-    record.camera_focal_length = pi.camera_focal_length;
-    record.aperture_section = pi.aperture_section;
-    record.filter_id = pi.filter_id;
-    record.filter_strength = pi.filter_strength;
-    record.vignette_intensity = pi.vignette_intensity;
-    record.light_id = pi.light_id;
-    record.light_strength = pi.light_strength;
-    record.nikki_loc_x = pi.nikki_loc_x;
-    record.nikki_loc_y = pi.nikki_loc_y;
-    record.nikki_loc_z = pi.nikki_loc_z;
-    record.nikki_hidden = pi.nikki_hidden;
-    record.pose_id = pi.pose_id;
-
-    if (const auto& nikki_diy = pi.nikki_diy.value()) {
-      record.nikki_diy_json = rfl::json::write(*nikki_diy);
+  if (photo.raw.has_value()) {
+    if (photo.raw->time.has_value()) {
+      record.time_hour = photo.raw->time->h;
+      record.time_min = photo.raw->time->m;
     }
-    if (const auto& nikki_clothes = pi.nikki_clothes.value()) {
-      for (double value : *nikki_clothes) {
-        record.nikki_clothes.push_back(static_cast<std::int64_t>(std::llround(value)));
-      }
+    if (photo.raw->pos.has_value()) {
+      record.nikki_loc_x = photo.raw->pos->x;
+      record.nikki_loc_y = photo.raw->pos->y;
+      record.nikki_loc_z = photo.raw->pos->z;
     }
+  }
+  if (photo.clothes.has_value()) {
+    record.nikki_clothes = *photo.clothes;
   }
 
   return record;
@@ -110,7 +134,7 @@ auto to_parsed_record(const SocialPhotoData& sp) -> ParsedPhotoParamsRecord {
 
 auto http_post_json(Core::State::AppState& app_state, const std::string& url_utf8,
                     const std::string& request_body_utf8)
-    -> asio::awaitable<std::expected<std::string, std::string>> {
+    -> asio::awaitable<std::expected<HttpJsonResponse, std::string>> {
   Core::HttpClient::Types::Request request{
       .method = "POST",
       .url = url_utf8,
@@ -127,39 +151,59 @@ auto http_post_json(Core::State::AppState& app_state, const std::string& url_utf
     co_return std::unexpected("Failed to send HTTP request: " + response.error());
   }
 
-  if (response->status_code < 200 || response->status_code >= 300) {
-    co_return std::unexpected("HTTP error: " + std::to_string(response->status_code));
-  }
+  co_return HttpJsonResponse{
+      .status_code = response->status_code,
+      .body = std::move(response->body),
+  };
+}
 
-  co_return response->body;
+auto acquire_nuan5_send_slot() -> asio::awaitable<void> {
+  static std::mutex gate_mutex;
+  static auto next_allowed_at = std::chrono::steady_clock::time_point::min();
+
+  auto executor = co_await asio::this_coro::executor;
+  asio::steady_timer timer(executor);
+
+  while (true) {
+    auto wait_duration = std::chrono::steady_clock::duration::zero();
+    {
+      std::lock_guard<std::mutex> lock(gate_mutex);
+      auto now = std::chrono::steady_clock::now();
+      if (now >= next_allowed_at) {
+        next_allowed_at = now + kNuan5MinRequestInterval;
+        co_return;
+      }
+      wait_duration = next_allowed_at - now;
+    }
+
+    timer.expires_after(wait_duration);
+    std::error_code wait_error;
+    co_await timer.async_wait(asio::redirect_error(asio::use_awaitable, wait_error));
+  }
 }
 
 auto parse_photo_params_records_from_response(const std::string& response_body)
-    -> std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string> {
-  auto response =
-      rfl::json::read<ApiResponse, rfl::SnakeCaseToCamelCase, rfl::DefaultIfMissing>(response_body);
+    -> std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string> {
+  auto response = rfl::json::read<std::vector<std::variant<std::string, Nuan5DecodedPhoto>>,
+                                  rfl::DefaultIfMissing>(response_body);
+
   if (!response) {
     return std::unexpected("Invalid JSON response: " + response.error().what());
   }
-  const auto& parsed = response.value();
-
-  if (!parsed.success) {
-    std::string error = "API returned success=false";
-    if (parsed.error && parsed.error->message) {
-      error += ": " + *parsed.error->message;
+  std::vector<ExtractBatchPhotoParamsRecord> records;
+  records.reserve(response->size());
+  for (const auto& item : *response) {
+    if (std::holds_alternative<std::string>(item)) {
+      records.push_back(ExtractBatchPhotoParamsRecord{
+          .record = std::nullopt,
+          .error_message = std::get<std::string>(item),
+      });
+      continue;
     }
-    return std::unexpected(error);
-  }
-
-  if (!parsed.data) {
-    return std::unexpected("Response missing 'data' field");
-  }
-
-  std::vector<std::optional<ParsedPhotoParamsRecord>> records;
-  records.reserve(parsed.data->size());
-  for (const auto& item : *parsed.data) {
-    auto social_photo = item ? item->social_photo.value() : std::nullopt;
-    records.push_back(social_photo ? std::optional{to_parsed_record(*social_photo)} : std::nullopt);
+    records.push_back(ExtractBatchPhotoParamsRecord{
+        .record = to_parsed_record(std::get<Nuan5DecodedPhoto>(item)),
+        .error_message = std::nullopt,
+    });
   }
   return records;
 }
@@ -265,10 +309,9 @@ auto load_candidate_assets(
 
 auto extract_batch_photo_params(Core::State::AppState& app_state,
                                 const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
-    -> asio::awaitable<
-        std::expected<std::vector<std::optional<ParsedPhotoParamsRecord>>, std::string>> {
+    -> asio::awaitable<std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string>> {
   if (entries.empty()) {
-    co_return std::vector<std::optional<ParsedPhotoParamsRecord>>{};
+    co_return std::vector<ExtractBatchPhotoParamsRecord>{};
   }
 
   const auto& uid = entries.front().uid;
@@ -282,21 +325,46 @@ auto extract_batch_photo_params(Core::State::AppState& app_state,
   // 所以这里明确要求一个 batch 内只能有一个 UID。
   ExtractApiRequestBody request_body{
       .uid = uid,
-      .params_base64_list = {},
+      .photos = {},
   };
-  request_body.params_base64_list.reserve(entries.size());
+  request_body.photos.reserve(entries.size());
   for (const auto& entry : entries) {
-    request_body.params_base64_list.push_back(entry.params_base64);
+    request_body.photos.push_back({entry.md5, entry.encoded});
   }
 
-  auto request_json = rfl::json::write<rfl::SnakeCaseToCamelCase>(request_body);
-  auto response_result =
-      co_await http_post_json(app_state, std::string(kExtractApiUrl), request_json);
-  if (!response_result) {
-    co_return std::unexpected("HTTP error: " + response_result.error());
+  auto request_json = rfl::json::write(request_body);
+  std::expected<std::string, std::string> response_body =
+      std::unexpected("HTTP response is unavailable");
+  for (std::size_t attempt = 0; attempt <= kMaxNuan5RateLimitRetries; ++attempt) {
+    co_await acquire_nuan5_send_slot();
+
+    auto response_result =
+        co_await http_post_json(app_state, std::string(kExtractApiUrl), request_json);
+    if (!response_result) {
+      co_return std::unexpected("HTTP error: " + response_result.error());
+    }
+
+    if (response_result->status_code == 429) {
+      if (attempt >= kMaxNuan5RateLimitRetries) {
+        co_return std::unexpected(
+            std::format("HTTP error: 429 (rate limit), retries exhausted after {}", attempt));
+      }
+      continue;
+    }
+
+    if (response_result->status_code < 200 || response_result->status_code >= 300) {
+      co_return std::unexpected("HTTP error: " + std::to_string(response_result->status_code));
+    }
+
+    response_body = std::move(response_result->body);
+    break;
   }
 
-  auto parsed_result = parse_photo_params_records_from_response(response_result.value());
+  if (!response_body) {
+    co_return std::unexpected(response_body.error());
+  }
+
+  auto parsed_result = parse_photo_params_records_from_response(response_body.value());
   if (!parsed_result) {
     co_return std::unexpected(parsed_result.error());
   }
@@ -324,32 +392,43 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
         std::string upsert_sql = R"(
           INSERT INTO asset_infinity_nikki_params (
             asset_id, uid, camera_params,
-            time_day, time_hour, time_min, time_sec,
-            camera_focal_length, aperture_section, filter_id, filter_strength, vignette_intensity,
+            time_hour, time_min,
+            camera_focal_length, rotation, aperture_value,
+            filter_id, filter_strength, vignette_intensity,
             light_id, light_strength,
+            vertical, bloom_intensity, bloom_threshold, brightness, exposure, contrast, saturation,
+            vibrance, highlights, shadow,
             nikki_loc_x, nikki_loc_y, nikki_loc_z,
-            nikki_hidden, pose_id, nikki_diy_json
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            nikki_hidden, pose_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(asset_id) DO UPDATE SET
             uid = excluded.uid,
             camera_params = excluded.camera_params,
-            time_day = excluded.time_day,
             time_hour = excluded.time_hour,
             time_min = excluded.time_min,
-            time_sec = excluded.time_sec,
             camera_focal_length = excluded.camera_focal_length,
-            aperture_section = excluded.aperture_section,
+            rotation = excluded.rotation,
+            aperture_value = excluded.aperture_value,
             filter_id = excluded.filter_id,
             filter_strength = excluded.filter_strength,
             vignette_intensity = excluded.vignette_intensity,
             light_id = excluded.light_id,
             light_strength = excluded.light_strength,
+            vertical = excluded.vertical,
+            bloom_intensity = excluded.bloom_intensity,
+            bloom_threshold = excluded.bloom_threshold,
+            brightness = excluded.brightness,
+            exposure = excluded.exposure,
+            contrast = excluded.contrast,
+            saturation = excluded.saturation,
+            vibrance = excluded.vibrance,
+            highlights = excluded.highlights,
+            shadow = excluded.shadow,
             nikki_loc_x = excluded.nikki_loc_x,
             nikki_loc_y = excluded.nikki_loc_y,
             nikki_loc_z = excluded.nikki_loc_z,
             nikki_hidden = excluded.nikki_hidden,
-            pose_id = excluded.pose_id,
-            nikki_diy_json = excluded.nikki_diy_json
+            pose_id = excluded.pose_id
         )";
 
         std::int32_t inserted_clothes = 0;
@@ -362,23 +441,31 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
               item.asset_id,
               uid,
               to_db_param(record.camera_params),
-              to_db_param(record.time_day),
               to_db_param(record.time_hour),
               to_db_param(record.time_min),
-              to_db_param(record.time_sec),
               to_db_param(record.camera_focal_length),
-              to_db_param(record.aperture_section),
+              to_db_param(record.rotation),
+              to_db_param(record.aperture_value),
               to_db_param(record.filter_id),
               to_db_param(record.filter_strength),
               to_db_param(record.vignette_intensity),
               to_db_param(record.light_id),
               to_db_param(record.light_strength),
+              to_db_param(record.vertical),
+              to_db_param(record.bloom_intensity),
+              to_db_param(record.bloom_threshold),
+              to_db_param(record.brightness),
+              to_db_param(record.exposure),
+              to_db_param(record.contrast),
+              to_db_param(record.saturation),
+              to_db_param(record.vibrance),
+              to_db_param(record.highlights),
+              to_db_param(record.shadow),
               to_db_param(record.nikki_loc_x),
               to_db_param(record.nikki_loc_y),
               to_db_param(record.nikki_loc_z),
               to_db_param(record.nikki_hidden),
               to_db_param(record.pose_id),
-              to_db_param(record.nikki_diy_json),
           };
 
           auto upsert_result = Core::Database::execute(db_state, upsert_sql, params);

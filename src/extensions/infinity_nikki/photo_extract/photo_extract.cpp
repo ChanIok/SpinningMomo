@@ -15,10 +15,7 @@ import Utils.Logger;
 namespace Extensions::InfinityNikki::PhotoExtract {
 
 constexpr std::size_t kMaxErrorMessages = 50;
-constexpr std::size_t kExtractBatchSize = 32;
-// 同时放行的远端批次数上限。
-// 这里故意保守一点：既提升吞吐，又避免一下子把解析服务或本地网络打满。
-constexpr std::size_t kMaxInflightExtractBatches = 4;
+constexpr std::size_t kExtractBatchSize = 50;
 constexpr std::int64_t kMinProgressReportIntervalMillis = 200;
 constexpr std::int64_t kPollIntervalMillis = 50;
 constexpr double kPreparingPercent = 2.0;
@@ -39,14 +36,8 @@ struct PrepareTaskOutcome {
 };
 
 struct BatchExtractOutcome {
-  std::expected<std::vector<std::optional<Infra::ParsedPhotoParamsRecord>>, std::string> result =
+  std::expected<std::vector<Infra::ExtractBatchPhotoParamsRecord>, std::string> result =
       std::unexpected("Batch result unavailable");
-};
-
-struct SlidingWindowState {
-  std::mutex completed_mutex;
-  std::deque<std::size_t> completed_indices;
-  std::atomic<std::size_t> inflight_count{0};
 };
 
 auto add_error(std::vector<std::string>& errors, std::string message) -> void {
@@ -171,181 +162,27 @@ auto mark_candidates_saved(InfinityNikkiExtractPhotoParamsResult& result,
   progress.finalized_count += static_cast<std::int64_t>(saved_count);
 }
 
-auto wait_for_completion(std::atomic<std::size_t>& completed, std::size_t total,
-                         const std::function<void(std::size_t)>& on_progress = {})
+auto wait_for_slot_ready(
+    std::atomic<bool>& slot_ready, std::atomic<std::size_t>& completed_prepare,
+    ExtractProgressState& progress, InfinityNikkiExtractPhotoParamsResult& result,
+    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
     -> asio::awaitable<void> {
-  // 一个很朴素的“等大家干完”的辅助函数。
-  // WorkerPool 和 co_spawn 都没有直接给这里现成的 join/when_all，
-  // 所以我们用原子计数 + 小定时器轮询的方式等待全部任务结束。
   auto executor = co_await asio::this_coro::executor;
   asio::steady_timer timer(executor);
 
-  while (true) {
-    auto current = completed.load(std::memory_order_relaxed);
-    if (on_progress) {
-      on_progress(current);
-    }
-    if (current >= total) {
-      break;
-    }
+  while (!slot_ready.load(std::memory_order_acquire)) {
+    progress.scanned_count =
+        static_cast<std::int64_t>(completed_prepare.load(std::memory_order_relaxed));
+    report_processing_progress(progress_callback, progress, result);
 
     timer.expires_after(std::chrono::milliseconds(kPollIntervalMillis));
     std::error_code wait_error;
     co_await timer.async_wait(asio::redirect_error(asio::use_awaitable, wait_error));
   }
-}
 
-auto prepare_entries(
-    Core::State::AppState& app_state, const std::vector<Scan::CandidateAssetRow>& candidates,
-    const std::optional<std::string>& uid_override, InfinityNikkiExtractPhotoParamsResult& result,
-    ExtractProgressState& progress,
-    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
-    -> asio::awaitable<std::expected<std::vector<PrepareTaskOutcome>, std::string>> {
-  // 第一阶段：把“图库里的候选照片”变成“可以直接发给远端解析服务的数据”。
-  // 这里做的事主要是：解析 UID + 打开图片 + 抠出中间藏着的 Base64 字符串。
-  std::vector<PrepareTaskOutcome> outcomes(candidates.size());
-  if (candidates.empty()) {
-    co_return outcomes;
-  }
-
-  if (!app_state.worker_pool || !Core::WorkerPool::is_running(*app_state.worker_pool)) {
-    co_return std::unexpected("Worker pool is not available for photo extract preparation");
-  }
-
-  auto completed = std::make_shared<std::atomic<std::size_t>>(0);
-  for (std::size_t index = 0; index < candidates.size(); ++index) {
-    // 正常路径：把每张照片的本地提取工作扔给 WorkerPool 并发执行。
-    // 这一步是磁盘 IO + 少量字符串处理，适合工作线程池。
-    auto submitted = Core::WorkerPool::submit_task(
-        *app_state.worker_pool,
-        [&outcomes, completed, candidate = candidates[index], uid_override, index]() mutable {
-          auto prepared_result = Scan::prepare_photo_extract_entry(candidate, uid_override);
-          if (prepared_result) {
-            outcomes[index].entry = std::move(prepared_result.value());
-          } else {
-            outcomes[index].error = prepared_result.error();
-          }
-
-          completed->fetch_add(1, std::memory_order_relaxed);
-        });
-
-    if (!submitted) {
-      outcomes[index].error = "Failed to submit prepare task to worker pool";
-      completed->fetch_add(1, std::memory_order_relaxed);
-    }
-  }
-
-  co_await wait_for_completion(*completed, candidates.size(),
-                               [&progress, &result, &progress_callback](std::size_t current) {
-                                 progress.scanned_count = static_cast<std::int64_t>(current);
-                                 report_processing_progress(progress_callback, progress, result);
-                               });
-
-  co_return outcomes;
-}
-
-auto build_extract_batches(
-    const std::vector<Scan::CandidateAssetRow>& candidates,
-    std::vector<PrepareTaskOutcome> outcomes, InfinityNikkiExtractPhotoParamsResult& result,
-    ExtractProgressState& progress,
-    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
-    -> std::vector<std::vector<Scan::PreparedPhotoExtractEntry>> {
-  // 第二阶段：把已经准备好的条目按 UID 分组，再按固定大小切成批次。
-  // 因为远端接口要求同一个 batch 内只能有一个 UID。
-  std::unordered_map<std::string, std::vector<Scan::PreparedPhotoExtractEntry>> grouped_entries;
-  grouped_entries.reserve(std::min<std::size_t>(outcomes.size(), 256));
-
-  for (std::size_t index = 0; index < outcomes.size(); ++index) {
-    auto& outcome = outcomes[index];
-    if (!outcome.entry.has_value()) {
-      mark_candidate_skipped(result, progress, candidates[index].id,
-                             outcome.error.value_or("unknown prepare error"));
-      continue;
-    }
-
-    auto& bucket = grouped_entries[outcome.entry->uid];
-    bucket.push_back(std::move(*outcome.entry));
-  }
-
-  report_processing_progress(progress_callback, progress, result, true);
-
-  std::vector<std::vector<Scan::PreparedPhotoExtractEntry>> batches;
-  for (auto& [uid, entries] : grouped_entries) {
-    (void)uid;
-
-    for (std::size_t offset = 0; offset < entries.size(); offset += kExtractBatchSize) {
-      auto batch_end = std::min(entries.size(), offset + kExtractBatchSize);
-
-      std::vector<Scan::PreparedPhotoExtractEntry> batch;
-      batch.reserve(batch_end - offset);
-      for (std::size_t index = offset; index < batch_end; ++index) {
-        batch.push_back(std::move(entries[index]));
-      }
-      batches.push_back(std::move(batch));
-    }
-  }
-
-  return batches;
-}
-
-auto launch_extract_batch(asio::any_io_executor executor, Core::State::AppState& app_state,
-                          const std::vector<std::vector<Scan::PreparedPhotoExtractEntry>>& batches,
-                          std::vector<BatchExtractOutcome>& outcomes, std::size_t batch_index,
-                          const std::shared_ptr<SlidingWindowState>& state) -> void {
-  // 启动一个 batch 后，先把“正在飞行中的 batch 数量” +1。
-  state->inflight_count.fetch_add(1, std::memory_order_relaxed);
-
-  asio::co_spawn(
-      executor,
-      [&app_state, &batch = batches[batch_index], &outcome = outcomes[batch_index], state,
-       batch_index]() -> asio::awaitable<void> {
-        Logger().debug("launch_extract_batch: sending batch (uid={}, count={})", batch.front().uid,
-                       batch.size());
-        outcome.result = co_await Infra::extract_batch_photo_params(app_state, batch);
-
-        {
-          std::lock_guard<std::mutex> lock(state->completed_mutex);
-          // 这里只登记“第几个 batch 做完了”，真正的结果处理统一回到主协程里做。
-          state->completed_indices.push_back(batch_index);
-        }
-
-        state->inflight_count.fetch_sub(1, std::memory_order_relaxed);
-        co_return;
-      },
-      asio::detached);
-}
-
-auto wait_for_completed_batches(const std::shared_ptr<SlidingWindowState>& state)
-    -> asio::awaitable<std::vector<std::size_t>> {
-  // 第三阶段：把 batch 控制成“最多同时飞 3 个”的滑动窗口。
-  // 只要有一个 batch 完成，就立刻把它交还给主协程处理并尝试补发新的 batch。
-  auto executor = co_await asio::this_coro::executor;
-  asio::steady_timer timer(executor);
-
-  while (true) {
-    {
-      std::lock_guard<std::mutex> lock(state->completed_mutex);
-      if (!state->completed_indices.empty()) {
-        std::vector<std::size_t> completed;
-        completed.reserve(state->completed_indices.size());
-
-        while (!state->completed_indices.empty()) {
-          completed.push_back(state->completed_indices.front());
-          state->completed_indices.pop_front();
-        }
-
-        co_return completed;
-      }
-    }
-
-    if (state->inflight_count.load(std::memory_order_relaxed) == 0) {
-      co_return std::vector<std::size_t>{};
-    }
-
-    timer.expires_after(std::chrono::milliseconds(kPollIntervalMillis));
-    std::error_code wait_error;
-    co_await timer.async_wait(asio::redirect_error(asio::use_awaitable, wait_error));
-  }
+  progress.scanned_count =
+      static_cast<std::int64_t>(completed_prepare.load(std::memory_order_relaxed));
+  report_processing_progress(progress_callback, progress, result);
 }
 
 auto apply_batch_result(
@@ -381,15 +218,16 @@ auto apply_batch_result(
   auto& records = batch_outcome.result.value();
   for (std::size_t index = 0; index < entries.size(); ++index) {
     const auto& entry = entries[index];
-    if (!records[index].has_value()) {
+    if (!records[index].record.has_value()) {
+      auto reason = records[index].error_message.value_or("photo params unrecognized");
       mark_candidate_failed(result, progress, entry.asset_id,
-                            "API returned null (photo params unrecognized)");
+                            std::format("API returned null ({})", reason));
       continue;
     }
 
     items_to_save.push_back(Infra::ParsedPhotoParamsBatchItem{
         .asset_id = entry.asset_id,
-        .record = std::move(*records[index]),
+        .record = std::move(*records[index].record),
     });
   }
 
@@ -414,15 +252,29 @@ auto apply_batch_result(
   report_processing_progress(progress_callback, progress, result, true);
 }
 
+auto send_extract_batch(
+    Core::State::AppState& app_state, std::vector<Scan::PreparedPhotoExtractEntry> batch,
+    InfinityNikkiExtractPhotoParamsResult& result, ExtractProgressState& progress,
+    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
+    -> asio::awaitable<void> {
+  if (batch.empty()) {
+    co_return;
+  }
+  Logger().debug("extract_photo_params: sending batch (uid={}, count={})", batch.front().uid,
+                 batch.size());
+  BatchExtractOutcome batch_outcome;
+  batch_outcome.result = co_await Infra::extract_batch_photo_params(app_state, batch);
+  apply_batch_result(app_state, batch, batch_outcome, result, progress, progress_callback);
+}
+
 auto extract_photo_params(
     Core::State::AppState& app_state, const InfinityNikkiExtractPhotoParamsRequest& request,
     const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
     -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
-  // 整个流程现在是四步：
+  // 整个流程：
   // 1) 查候选照片
-  // 2) 并发准备本地提取数据
-  // 3) 分批并发请求远端解析
-  // 4) 按批落库并汇总结果
+  // 2) 并发准备本地提取数据（WorkerPool），按候选顺序等待每个 slot
+  // 3) 边准备边分批请求远端（同 UID、每批最多 kExtractBatchSize），顺序落库
   InfinityNikkiExtractPhotoParamsResult result;
 
   if (!app_state.database) {
@@ -463,44 +315,80 @@ auto extract_photo_params(
   report_processing_progress(progress_callback, progress, result, true,
                              std::format("Preparing {} candidate photos", result.candidate_count));
 
-  auto prepare_outcomes_result = co_await prepare_entries(app_state, candidates, uid_override,
-                                                          result, progress, progress_callback);
-  if (!prepare_outcomes_result) {
-    co_return std::unexpected(prepare_outcomes_result.error());
+  if (!app_state.worker_pool || !Core::WorkerPool::is_running(*app_state.worker_pool)) {
+    co_return std::unexpected("Worker pool is not available for photo extract preparation");
   }
 
-  auto batches = build_extract_batches(candidates, std::move(prepare_outcomes_result.value()),
-                                       result, progress, progress_callback);
-
-  auto executor = co_await asio::this_coro::executor;
-  std::vector<BatchExtractOutcome> batch_outcomes(batches.size());
-  auto sliding_window_state = std::make_shared<SlidingWindowState>();
-  std::size_t next_batch_index = 0;
-
-  auto launch_until_full = [&]() {
-    // 把空闲并发槽位尽量补满，但永远不超过 kMaxInflightExtractBatches。
-    while (next_batch_index < batches.size() &&
-           sliding_window_state->inflight_count.load(std::memory_order_relaxed) <
-               kMaxInflightExtractBatches) {
-      launch_extract_batch(executor, app_state, batches, batch_outcomes, next_batch_index,
-                           sliding_window_state);
-      next_batch_index++;
-    }
-  };
-
-  launch_until_full();
-
-  while (next_batch_index < batches.size() ||
-         sliding_window_state->inflight_count.load(std::memory_order_relaxed) > 0) {
-    // 谁先完成就先处理谁；处理完后立刻再补发新的 batch。
-    auto completed_indices = co_await wait_for_completed_batches(sliding_window_state);
-    for (const auto batch_index : completed_indices) {
-      apply_batch_result(app_state, batches[batch_index], batch_outcomes[batch_index], result,
-                         progress, progress_callback);
-    }
-
-    launch_until_full();
+  const auto candidate_count = candidates.size();
+  auto outcomes = std::make_shared<std::vector<PrepareTaskOutcome>>(candidate_count);
+  auto completed_prepare = std::make_shared<std::atomic<std::size_t>>(0);
+  auto slot_ready = std::make_unique<std::atomic<bool>[]>(candidate_count);
+  for (std::size_t i = 0; i < candidate_count; ++i) {
+    slot_ready[i].store(false, std::memory_order_relaxed);
   }
+
+  auto* slot_ready_ptr = slot_ready.get();
+
+  for (std::size_t index = 0; index < candidate_count; ++index) {
+    auto submitted = Core::WorkerPool::submit_task(
+        *app_state.worker_pool, [outcomes, completed_prepare, slot_ready_ptr,
+                                 candidate = candidates[index], uid_override, index]() mutable {
+          auto prepared_result = Scan::prepare_photo_extract_entry(candidate, uid_override);
+          if (prepared_result) {
+            (*outcomes)[index].entry = std::move(prepared_result.value());
+          } else {
+            (*outcomes)[index].error = prepared_result.error();
+          }
+
+          slot_ready_ptr[index].store(true, std::memory_order_release);
+          completed_prepare->fetch_add(1, std::memory_order_relaxed);
+        });
+
+    if (!submitted) {
+      (*outcomes)[index].error = "Failed to submit prepare task to worker pool";
+      slot_ready_ptr[index].store(true, std::memory_order_release);
+      completed_prepare->fetch_add(1, std::memory_order_relaxed);
+    }
+  }
+
+  std::vector<Scan::PreparedPhotoExtractEntry> pending_batch;
+  pending_batch.reserve(kExtractBatchSize);
+
+  for (std::size_t index = 0; index < candidate_count; ++index) {
+    co_await wait_for_slot_ready(slot_ready_ptr[index], *completed_prepare, progress, result,
+                                 progress_callback);
+
+    auto& outcome = (*outcomes)[index];
+    if (!outcome.entry.has_value()) {
+      mark_candidate_skipped(result, progress, candidates[index].id,
+                             outcome.error.value_or("unknown prepare error"));
+      continue;
+    }
+
+    auto entry = std::move(*outcome.entry);
+
+    if (!pending_batch.empty() && pending_batch.front().uid != entry.uid) {
+      co_await send_extract_batch(app_state, std::move(pending_batch), result, progress,
+                                  progress_callback);
+      pending_batch.clear();
+      pending_batch.reserve(kExtractBatchSize);
+    }
+
+    pending_batch.push_back(std::move(entry));
+
+    if (pending_batch.size() >= kExtractBatchSize) {
+      co_await send_extract_batch(app_state, std::move(pending_batch), result, progress,
+                                  progress_callback);
+      pending_batch.clear();
+      pending_batch.reserve(kExtractBatchSize);
+    }
+  }
+
+  progress.scanned_count = static_cast<std::int64_t>(candidate_count);
+  report_processing_progress(progress_callback, progress, result, true);
+
+  co_await send_extract_batch(app_state, std::move(pending_batch), result, progress,
+                              progress_callback);
 
   Logger().info(
       "extract_photo_params: completed. candidates={}, processed={}, saved={}, skipped={}, "

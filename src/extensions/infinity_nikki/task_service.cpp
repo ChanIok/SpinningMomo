@@ -77,16 +77,6 @@ auto append_task_error_details(std::string& message, const std::vector<std::stri
   }
 }
 
-auto make_extract_task_error_message(
-    const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsResult& summary)
-    -> std::string {
-  auto message = std::format(
-      "Infinity Nikki photo params extract failed: {} item(s) failed out of {} processed",
-      summary.failed_count, summary.processed_count);
-  append_task_error_details(message, summary.errors);
-  return message;
-}
-
 auto make_screenshot_hardlinks_task_error_message(
     const Extensions::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksResult& summary)
     -> std::string {
@@ -226,10 +216,12 @@ auto launch_extract_photo_params_task(
         }
 
         if (summary.failed_count > 0) {
-          auto error_message = make_extract_task_error_message(summary);
-          Logger().error("{}", error_message);
-          Core::Tasks::complete_task_failed(app_state, task_id, error_message);
-          co_return;
+          auto warning_message = std::format(
+              "Infinity Nikki photo params extract completed with warnings: failed {} / "
+              "processed {}",
+              summary.failed_count, summary.processed_count);
+          append_task_error_details(warning_message, summary.errors);
+          Logger().warn("{}", warning_message);
         }
 
         Core::Tasks::complete_task_success(app_state, task_id);
@@ -279,7 +271,12 @@ auto schedule_silent_extract_photo_params(
 
         const auto& summary = extract_result.value();
         if (summary.failed_count > 0) {
-          Logger().error("{}", make_extract_task_error_message(summary));
+          auto warning_message = std::format(
+              "Silent Infinity Nikki photo params extract completed with warnings: failed {} / "
+              "processed {}",
+              summary.failed_count, summary.processed_count);
+          append_task_error_details(warning_message, summary.errors);
+          Logger().warn("{}", warning_message);
         } else {
           Logger().info(
               "Silent Infinity Nikki photo params extract completed: candidates={}, "

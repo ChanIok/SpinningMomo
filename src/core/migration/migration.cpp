@@ -125,6 +125,7 @@ auto run_migration_if_needed(Core::State::AppState& app_state) -> bool {
   }
 
   std::string last_version = last_version_result.value();
+  const bool is_fresh_install = compare_versions(last_version, "0.0.0.0") == 0;
 
   Logger().info("Version comparison: {} -> {}", last_version, current_version);
 
@@ -139,6 +140,10 @@ auto run_migration_if_needed(Core::State::AppState& app_state) -> bool {
   std::vector<const Scripts::MigrationScript*> scripts_to_run;
 
   for (const auto& script : all_migrations) {
+    if (is_fresh_install && !script.run_on_fresh_install) {
+      continue;
+    }
+
     // 选择版本号在 (last_version, current_version] 区间的脚本
     if (compare_versions(script.target_version, last_version) > 0 &&
         compare_versions(script.target_version, current_version) <= 0) {

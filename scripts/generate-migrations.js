@@ -156,7 +156,7 @@ function generateCppModule(migrationFile, version, sqlStatements) {
       delimiter += "X";
     }
 
-    return `        R"${delimiter}(
+    return `      R"${delimiter}(
 ${stmt}
         )${delimiter}"`;
   });

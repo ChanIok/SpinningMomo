@@ -11,6 +11,7 @@ namespace Core::Migration::Scripts {
 export struct MigrationScript {
   std::string target_version;
   std::string description;
+  bool run_on_fresh_install = true;
   std::function<std::expected<void, std::string>(Core::State::AppState&)> migration_fn;
 };
 

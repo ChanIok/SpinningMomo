@@ -379,12 +379,23 @@ export interface InfinityNikkiExtractedParams {
   timeHour?: number
   timeMin?: number
   cameraFocalLength?: number
-  apertureSection?: number
-  filterId?: string
+  rotation?: number
+  apertureValue?: number
+  filterId?: number
   filterStrength?: number
   vignetteIntensity?: number
-  lightId?: string
+  lightId?: number
   lightStrength?: number
+  vertical?: number
+  bloomIntensity?: number
+  bloomThreshold?: number
+  brightness?: number
+  exposure?: number
+  contrast?: number
+  saturation?: number
+  vibrance?: number
+  highlights?: number
+  shadow?: number
   nikkiLocX?: number
   nikkiLocY?: number
   nikkiLocZ?: number

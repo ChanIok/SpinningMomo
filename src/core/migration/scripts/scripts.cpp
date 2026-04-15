@@ -91,11 +91,22 @@ auto migrate_v2_0_2_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
+auto migrate_v2_0_8_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.0.8.0: Add nuan5 extended Infinity Nikki columns");
+
+  auto result = execute_sql_schema<Core::Migration::Schema::V003>(app_state);
+  if (!result) {
+    return std::unexpected("Failed to add nuan5 Infinity Nikki columns: " + result.error());
+  }
+  return {};
+}
+
 auto get_all_migrations() -> const std::vector<MigrationScript>& {
   static const std::vector<MigrationScript> migrations = {
-      {"2.0.0.0", "Initialize database schema", migrate_v2_0_0_0},
-      {"2.0.1.0", "Add gallery watch root recovery state", migrate_v2_0_1_0},
-      {"2.0.2.0", "Update version check URL", migrate_v2_0_2_0},
+      {"2.0.0.0", "Initialize database schema", true, migrate_v2_0_0_0},
+      {"2.0.1.0", "Add gallery watch root recovery state", true, migrate_v2_0_1_0},
+      {"2.0.2.0", "Update version check URL", false, migrate_v2_0_2_0},
+      {"2.0.8.0", "Add nuan5 Infinity Nikki extract columns", true, migrate_v2_0_8_0},
 
       // 未来版本的迁移脚本在此添加
       // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},
