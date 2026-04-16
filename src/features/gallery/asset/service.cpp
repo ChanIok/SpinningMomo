@@ -518,41 +518,63 @@ auto query_asset_layout_meta(Core::State::AppState& app_state,
 auto query_photo_map_points(Core::State::AppState& app_state,
                             const Types::QueryPhotoMapPointsParams& params)
     -> std::expected<std::vector<Types::PhotoMapPoint>, std::string> {
+  // 目标：为每个 marker 计算它在“当前 gallery 排序结果集”的 index，
+  // 以便前端打开灯箱时 activeIndex 一次性对齐，避免闪一下。
+
+  // 1) 复用 gallery 的“查询过滤语义”，计算排序 index 时不要提前丢掉视频等其它类型。
   auto where_result = build_unified_where_clause(params.filters, "a");
   if (!where_result) {
     return std::unexpected(where_result.error());
   }
   auto [where_clause, query_params] = std::move(where_result.value());
 
-  std::vector<std::string> conditions = {
-      "a.type IN ('photo', 'live_photo')",
-      "p.nikki_loc_x IS NOT NULL",
-      "p.nikki_loc_y IS NOT NULL",
-  };
+  // 2) 复用 gallery 的排序语义（sort_by/sort_order）。
+  auto order_config = build_query_order_config(params.sort_by, params.sort_order);
 
-  if (!where_clause.empty()) {
-    conditions.push_back(where_clause.substr(6));
-  }
-
-  auto merged_conditions = std::ranges::fold_left(
-      conditions, std::string{}, [](const std::string& acc, const std::string& cond) {
-        return acc.empty() ? cond : acc + " AND " + cond;
-      });
-
+  // 3) 在全量 filtered_assets 上计算 asset_index，再 JOIN Infinity Nikki 坐标表并过滤出可渲染
+  // marker。
+  //    注意：asset_index 是在“全量 filtered_assets 排序结果”里的下标；最终 WHERE 只影响 marker
+  //    子集输出， 不改变 asset_index 的数值。
   std::string sql = std::format(R"(
-    SELECT a.id AS asset_id,
-           a.name,
-           a.hash,
-           a.file_created_at,
+    WITH filtered_assets AS (
+      SELECT a.id,
+             a.name,
+             a.hash,
+             a.file_created_at,
+             a.type AS asset_type,
+
+             COALESCE(a.file_created_at, a.created_at) AS sort_created_at,
+             a.file_created_at AS sort_file_created_at,
+             a.name AS sort_name,
+             (COALESCE(a.width, 0) * COALESCE(a.height, 0)) AS sort_resolution,
+             COALESCE(a.width, 0) AS sort_width,
+             COALESCE(a.height, 0) AS sort_height,
+             a.size AS sort_size
+      FROM assets a
+      {}
+    ),
+    indexed_assets AS (
+      SELECT id,
+             ROW_NUMBER() OVER ({}) - 1 AS asset_index
+      FROM filtered_assets
+    )
+    SELECT fa.id AS asset_id,
+           fa.name,
+           fa.hash,
+           fa.file_created_at,
            p.nikki_loc_x,
            p.nikki_loc_y,
-           p.nikki_loc_z
-    FROM assets a
-    INNER JOIN asset_infinity_nikki_params p ON p.asset_id = a.id
-    WHERE {}
-    ORDER BY COALESCE(a.file_created_at, a.created_at) DESC, a.id DESC
+           p.nikki_loc_z,
+           ia.asset_index AS asset_index
+    FROM indexed_assets ia
+    INNER JOIN filtered_assets fa ON fa.id = ia.id
+    INNER JOIN asset_infinity_nikki_params p ON p.asset_id = ia.id
+    WHERE p.nikki_loc_x IS NOT NULL
+      AND p.nikki_loc_y IS NOT NULL
+      AND fa.asset_type IN ('photo', 'live_photo')
+    ORDER BY ia.asset_index
   )",
-                                merged_conditions);
+                                where_clause, order_config.indexed_order_clause);
 
   auto result = Core::Database::query<Types::PhotoMapPoint>(*app_state.database, sql, query_params);
   if (!result) {

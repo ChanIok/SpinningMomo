@@ -130,6 +130,14 @@ export function useGridVirtualizer(options: UseGridVirtualizerOptions) {
   )
 
   async function init() {
+    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
+    const hasReusableTimelineCache = store.timelineBuckets.length > 0 && hasReusableCache
+
+    // 跨路由回到 gallery 时，优先复用已有分页缓存，避免先 replace 成 page1 再补回邻页。
+    if (isTimelineMode.value ? hasReusableTimelineCache : hasReusableCache) {
+      return
+    }
+
     if (isTimelineMode.value) {
       await galleryData.loadTimelineData()
     } else {

@@ -8,11 +8,13 @@ import { Toaster } from '@/components/ui/sonner'
 import ActivityBar from './ActivityBar.vue'
 import AppHeader from './AppHeader.vue'
 import ContentArea from './ContentArea.vue'
+import GalleryDebugOverlay from './GalleryDebugOverlay.vue'
 import WindowResizeOverlay from './WindowResizeOverlay.vue'
 import 'vue-sonner/style.css'
 
 const route = useRoute()
 const settingsStore = useSettingsStore()
+const isDev = import.meta.env.DEV
 const isWelcome = computed(() => route.name === 'welcome')
 const isHome = computed(() => route.name === 'home')
 const hasBackgroundImage = computed(() =>
@@ -53,6 +55,7 @@ const hasBackgroundImage = computed(() =>
           </div>
         </div>
       </div>
+      <GalleryDebugOverlay v-if="isDev" />
     </div>
 
     <!-- Toast 通知 -->

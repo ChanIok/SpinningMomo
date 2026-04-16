@@ -56,11 +56,17 @@ export function buildPopupSnippet() {
             return;
           }
 
+          const rawAssetIndex = clickableCard.getAttribute('data-sm-open-asset-index');
+          const assetIndex = Number(rawAssetIndex);
+          if (!Number.isFinite(assetIndex)) {
+            return;
+          }
+
           if (window.parent && window.parent !== window) {
             window.parent.postMessage(
               {
                 action: 'SPINNING_MOMO_OPEN_GALLERY_ASSET',
-                payload: { assetId },
+                payload: { assetId, assetIndex },
               },
               '*'
             );

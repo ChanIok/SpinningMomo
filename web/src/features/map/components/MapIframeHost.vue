@@ -153,6 +153,7 @@ type OpenGalleryAssetMessage = {
   action: 'SPINNING_MOMO_OPEN_GALLERY_ASSET'
   payload?: {
     assetId?: number
+    assetIndex?: number
   }
 }
 
@@ -171,7 +172,10 @@ async function handleMapMessage(event: MessageEvent<unknown>) {
     return
   }
 
-  galleryStore.setActiveAssetId(assetId)
+  const assetIndex = Number(data.payload?.assetIndex)
+  const normalizedAssetIndex = Number.isFinite(assetIndex) ? assetIndex : 0
+
+  galleryStore.setActiveAsset(assetId, normalizedAssetIndex)
 
   galleryStore.openLightbox()
 

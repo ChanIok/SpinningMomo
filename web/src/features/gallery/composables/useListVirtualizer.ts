@@ -116,6 +116,12 @@ export function useListVirtualizer(options: UseListVirtualizerOptions) {
 
   /** 初始化：加载总数及第一页数据 */
   async function init() {
+    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
+    // 从其它页面切回 gallery 时，若缓存已可用则不做全量刷新，避免 loadedPages 抖动。
+    if (hasReusableCache) {
+      return
+    }
+
     await galleryData.loadAllAssets()
   }
 

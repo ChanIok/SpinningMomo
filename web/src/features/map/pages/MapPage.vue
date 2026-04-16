@@ -117,7 +117,7 @@ function buildPopupHtml(point: PhotoMapPoint): string {
   const title = escapeHtml(formatPopupTitleFromFilename(point.name, locale.value))
   const thumbnailUrl = getThumbnailUrl(point)
   const clickableAttr = Number.isFinite(point.assetId)
-    ? ` data-sm-open-asset-id="${point.assetId}"`
+    ? ` data-sm-open-asset-id="${point.assetId}" data-sm-open-asset-index="${point.assetIndex}"`
     : ''
   const thumbnailSection = thumbnailUrl
     ? `<div style="margin-top: 8px;">
@@ -159,7 +159,11 @@ async function loadMapPoints() {
 
   try {
     const filters = toQueryAssetsFilters(galleryStore.filter, galleryStore.includeSubfolders)
-    mapPoints.value = await queryPhotoMapPoints({ filters })
+    mapPoints.value = await queryPhotoMapPoints({
+      filters,
+      sortBy: galleryStore.sortBy,
+      sortOrder: galleryStore.sortOrder,
+    })
     mapStore.setMarkers(buildMapMarkers(mapPoints.value))
   } catch (error) {
     console.error('Failed to load map points:', error)
@@ -171,7 +175,13 @@ async function loadMapPoints() {
 }
 
 watch(
-  () => [galleryStore.filter, galleryStore.includeSubfolders],
+  () => [
+    galleryStore.filter,
+    galleryStore.includeSubfolders,
+    // 排序会影响图库“index”的含义，因此地图也必须跟随同一排序条件重算 assetIndex。
+    galleryStore.sortBy,
+    galleryStore.sortOrder,
+  ],
   async () => {
     await loadMapPoints()
   },

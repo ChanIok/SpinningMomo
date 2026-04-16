@@ -199,8 +199,8 @@ watch(
   }
 )
 
-onMounted(() => {
-  void restoreLightboxFromQuery()
+onMounted(async () => {
+  await restoreLightboxFromQuery()
 })
 
 onUnmounted(() => {

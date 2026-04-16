@@ -239,6 +239,8 @@ export interface AdaptiveLayoutRow {
 
 export interface QueryPhotoMapPointsParams {
   filters: QueryAssetsFilters
+  sortBy?: SortBy
+  sortOrder?: SortOrder
 }
 
 export interface PhotoMapPoint {
@@ -249,6 +251,7 @@ export interface PhotoMapPoint {
   nikkiLocX: number
   nikkiLocY: number
   nikkiLocZ?: number
+  assetIndex: number
 }
 
 export interface InfinityNikkiExtractedParams {

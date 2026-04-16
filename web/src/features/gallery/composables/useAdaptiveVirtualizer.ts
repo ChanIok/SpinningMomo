@@ -247,7 +247,15 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
   }
 
   async function init() {
+    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
+
     // 先拿布局元数据，再按当前查询加载可见资产页；两条链路职责分离。
+    // 若已有可用分页缓存，则只更新布局元数据，避免 refreshCurrentQuery 把缓存先替换成 page1。
+    if (hasReusableCache) {
+      await reloadLayoutMeta()
+      return
+    }
+
     await Promise.all([reloadLayoutMeta(), galleryData.refreshCurrentQuery()])
   }
 

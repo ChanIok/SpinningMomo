@@ -188,6 +188,13 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
 
   /** 初始化：按当前排序语义加载对应数据源（时间线/普通） */
   async function init() {
+    const hasReusableCache = store.totalCount > 0 && store.paginatedAssets.size > 0
+    const hasReusableTimelineCache = store.timelineBuckets.length > 0 && hasReusableCache
+
+    if (store.isTimelineMode ? hasReusableTimelineCache : hasReusableCache) {
+      return
+    }
+
     if (store.isTimelineMode) {
       await galleryData.loadTimelineData()
       return
