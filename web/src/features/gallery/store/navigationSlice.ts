@@ -7,14 +7,11 @@ import type {
   FolderTreeNode,
   TagTreeNode,
 } from '../types'
-import { collectTreeIds } from './persistence'
+import { collectTreeIds, createDefaultGallerySettings, type GallerySettings } from './persistence'
 
 interface NavigationSliceArgs {
-  // 由入口注入持久化容器，slice 内只消费，不关心 useStorage 初始化细节。
-  persistedViewSize: Ref<number>
-  persistedViewMode: Ref<ViewConfig['mode']>
-  persistedExpandedFolderIds: Ref<number[]>
-  persistedExpandedTagIds: Ref<number[]>
+  // 由入口注入 gallerySettings 根对象，slice 自行消费所需子域。
+  settings: Ref<GallerySettings>
 }
 
 /**
@@ -26,12 +23,7 @@ interface NavigationSliceArgs {
  * - 视图配置（view mode / size）
  */
 export function createNavigationSlice(args: NavigationSliceArgs) {
-  const {
-    persistedViewSize,
-    persistedViewMode,
-    persistedExpandedFolderIds,
-    persistedExpandedTagIds,
-  } = args
+  const { settings } = args
 
   // 导航数据树（由 useGalleryData/useGallerySidebar 驱动加载）。
   const folders = ref<FolderTreeNode[]>([])
@@ -43,8 +35,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   const tagsError = ref<string | null>(null)
 
   const viewConfig = ref<ViewConfig>({
-    mode: persistedViewMode.value,
-    size: persistedViewSize.value,
+    mode: settings.value.view.mode,
+    size: settings.value.view.size,
   })
   // 这里的 filter 是“查询输入”，不是 UI 临时态。
   const filter = ref<AssetFilter>({})
@@ -62,17 +54,17 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   })
 
   // 读取层用 Set 提升查询效率，持久化层仍保持数组便于序列化。
-  const expandedFolderIdSet = computed(() => new Set(persistedExpandedFolderIds.value))
-  const expandedTagIdSet = computed(() => new Set(persistedExpandedTagIds.value))
+  const expandedFolderIdSet = computed(() => new Set(settings.value.navigation.expandedFolderIds))
+  const expandedTagIdSet = computed(() => new Set(settings.value.navigation.expandedTagIds))
 
   function setFolderExpanded(folderId: number, expanded: boolean) {
-    const nextExpandedIds = new Set(persistedExpandedFolderIds.value)
+    const nextExpandedIds = new Set(settings.value.navigation.expandedFolderIds)
     if (expanded) {
       nextExpandedIds.add(folderId)
     } else {
       nextExpandedIds.delete(folderId)
     }
-    persistedExpandedFolderIds.value = [...nextExpandedIds]
+    settings.value.navigation.expandedFolderIds = [...nextExpandedIds]
   }
 
   function toggleFolderExpanded(folderId: number) {
@@ -84,13 +76,13 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   }
 
   function setTagExpanded(tagId: number, expanded: boolean) {
-    const nextExpandedIds = new Set(persistedExpandedTagIds.value)
+    const nextExpandedIds = new Set(settings.value.navigation.expandedTagIds)
     if (expanded) {
       nextExpandedIds.add(tagId)
     } else {
       nextExpandedIds.delete(tagId)
     }
-    persistedExpandedTagIds.value = [...nextExpandedIds]
+    settings.value.navigation.expandedTagIds = [...nextExpandedIds]
   }
 
   function toggleTagExpanded(tagId: number) {
@@ -106,9 +98,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
 
     // 树重载后把已不存在的节点 id 裁掉，避免 localStorage 越积越脏。
     const validFolderIds = new Set(collectTreeIds(newFolders))
-    persistedExpandedFolderIds.value = persistedExpandedFolderIds.value.filter((id) =>
-      validFolderIds.has(id)
-    )
+    settings.value.navigation.expandedFolderIds =
+      settings.value.navigation.expandedFolderIds.filter((id) => validFolderIds.has(id))
   }
 
   function setFoldersLoading(loading: boolean) {
@@ -124,8 +115,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
 
     // 标签树和文件夹树一样，刷新后同步清理失效展开状态。
     const validTagIds = new Set(collectTreeIds(newTags))
-    persistedExpandedTagIds.value = persistedExpandedTagIds.value.filter((id) =>
-      validTagIds.has(id)
+    settings.value.navigation.expandedTagIds = settings.value.navigation.expandedTagIds.filter(
+      (id) => validTagIds.has(id)
     )
   }
 
@@ -140,8 +131,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   function setViewConfig(config: Partial<ViewConfig>) {
     const merged = { ...viewConfig.value, ...config }
     viewConfig.value = merged
-    persistedViewSize.value = viewConfig.value.size
-    persistedViewMode.value = viewConfig.value.mode
+    settings.value.view.size = viewConfig.value.size
+    settings.value.view.mode = viewConfig.value.mode
   }
 
   function setFilter(newFilter: Partial<AssetFilter>) {
@@ -163,6 +154,8 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
   }
 
   function resetNavigationState() {
+    const defaults = createDefaultGallerySettings()
+
     // 只重置导航/筛选域，不触碰查询缓存与交互态。
     folders.value = []
     foldersLoading.value = false
@@ -172,12 +165,11 @@ export function createNavigationSlice(args: NavigationSliceArgs) {
     tagsLoading.value = false
     tagsError.value = null
 
-    persistedExpandedFolderIds.value = []
-    persistedExpandedTagIds.value = []
+    settings.value.navigation.expandedFolderIds = []
+    settings.value.navigation.expandedTagIds = []
 
-    viewConfig.value = { mode: 'grid', size: 128 }
-    persistedViewSize.value = viewConfig.value.size
-    persistedViewMode.value = viewConfig.value.mode
+    viewConfig.value = { ...defaults.view }
+    settings.value.view = { ...defaults.view }
     resetFilter()
     sortBy.value = 'createdAt'
     sortOrder.value = 'desc'

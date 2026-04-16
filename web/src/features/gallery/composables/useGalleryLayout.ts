@@ -9,16 +9,32 @@ export function useGalleryLayout() {
   const store = useGalleryStore()
 
   // ============= 布局状态 =============
-  const isSidebarOpen = computed(() => store.sidebar.isOpen)
+  const isSidebarOpen = computed(() => store.sidebarOpen)
   const isDetailsOpen = computed(() => store.detailsOpen)
+  const leftSidebarSize = computed({
+    get: () => store.leftSidebarSize,
+    set: (size: string) => store.setLeftSidebarSize(size),
+  })
+  const rightDetailsSize = computed({
+    get: () => store.rightDetailsSize,
+    set: (size: string) => store.setRightDetailsSize(size),
+  })
+  const leftSidebarOpenSize = computed({
+    get: () => store.leftSidebarOpenSize,
+    set: (size: string) => store.setLeftSidebarOpenSize(size),
+  })
+  const rightDetailsOpenSize = computed({
+    get: () => store.rightDetailsOpenSize,
+    set: (size: string) => store.setRightDetailsOpenSize(size),
+  })
 
   // ============= 布局操作 =============
-  
+
   /**
    * 切换侧边栏显示/隐藏
    */
   function toggleSidebar() {
-    store.setSidebarOpen(!store.sidebar.isOpen)
+    store.setSidebarOpen(!store.sidebarOpen)
   }
 
   /**
@@ -46,7 +62,11 @@ export function useGalleryLayout() {
     // 状态
     isSidebarOpen,
     isDetailsOpen,
-    
+    leftSidebarSize,
+    rightDetailsSize,
+    leftSidebarOpenSize,
+    rightDetailsOpenSize,
+
     // 操作
     toggleSidebar,
     toggleDetails,
@@ -54,4 +74,3 @@ export function useGalleryLayout() {
     setDetailsOpen,
   }
 }
-

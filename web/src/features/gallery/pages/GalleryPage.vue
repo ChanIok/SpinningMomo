@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
-import { useDebounceFn, useLocalStorage, useMediaQuery } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core'
 import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { Split } from '@/components/ui/split'
 import { useGalleryLayout } from '../composables'
@@ -15,17 +15,23 @@ const LEFT_MIN_SIZE = '180px'
 const RIGHT_MIN_SIZE = '180px'
 const LEFT_MIN_PX = 180
 const RIGHT_MIN_PX = 180
-const DEFAULT_LEFT_SIZE = '200px'
-const DEFAULT_RIGHT_SIZE = '256px'
 const COLLAPSED_SIZE = '0px'
 const COLLAPSE_TRIGGER_PX = 40
 const GALLERY_REFRESH_DEBOUNCE_MS = 400
 
 // 使用布局管理
-const { isSidebarOpen, isDetailsOpen, setSidebarOpen, setDetailsOpen } = useGalleryLayout()
+const {
+  isSidebarOpen,
+  isDetailsOpen,
+  leftSidebarSize,
+  rightDetailsSize,
+  leftSidebarOpenSize,
+  rightDetailsOpenSize,
+  setSidebarOpen,
+  setDetailsOpen,
+} = useGalleryLayout()
 const galleryData = useGalleryData()
 const settingsStore = useSettingsStore()
-const isBelowLg = useMediaQuery('(max-width: 1023px)')
 
 // 引导面板显示条件（无限暖暖拓展已启用、配置了游戏目录、且尚未看过引导）
 const showInfinityNikkiGuide = computed(() => {
@@ -36,14 +42,6 @@ const showInfinityNikkiGuide = computed(() => {
 let isUnmounted = false
 let refreshInFlight = false
 let refreshQueued = false
-
-// Split 拖动状态持久化
-const leftSidebarSize = useLocalStorage('gallery-left-sidebar-size', DEFAULT_LEFT_SIZE)
-const rightDetailsSize = useLocalStorage('gallery-right-details-size', DEFAULT_RIGHT_SIZE)
-
-// 面板展开时的宽度（用于收起后恢复）
-const leftSidebarOpenSize = useLocalStorage('gallery-left-sidebar-open-size', DEFAULT_LEFT_SIZE)
-const rightDetailsOpenSize = useLocalStorage('gallery-right-details-open-size', DEFAULT_RIGHT_SIZE)
 
 type SplitSize = number | string
 
@@ -75,26 +73,11 @@ function isAtMinSize(size: SplitSize, minPx: number): boolean {
 const leftMinSize = computed(() => (isSidebarOpen.value ? LEFT_MIN_SIZE : COLLAPSED_SIZE))
 const rightMinSize = computed(() => (isDetailsOpen.value ? RIGHT_MIN_SIZE : COLLAPSED_SIZE))
 
-// 仅在进入 <lg 区间时自动折叠详情面板；离开区间不自动恢复
-watch(
-  isBelowLg,
-  (belowLg, prevBelowLg) => {
-    if (belowLg && !prevBelowLg) {
-      setDetailsOpen(false)
-    }
-  },
-  { immediate: true }
-)
-
 watch(
   isSidebarOpen,
   (open) => {
     if (open) {
-      const restoredSize = normalizeOpenSize(
-        leftSidebarOpenSize.value,
-        LEFT_MIN_PX,
-        DEFAULT_LEFT_SIZE
-      )
+      const restoredSize = normalizeOpenSize(leftSidebarOpenSize.value, LEFT_MIN_PX, '200px')
       leftSidebarSize.value = restoredSize
       leftSidebarOpenSize.value = restoredSize
       return
@@ -113,11 +96,7 @@ watch(
   isDetailsOpen,
   (open) => {
     if (open) {
-      const restoredSize = normalizeOpenSize(
-        rightDetailsOpenSize.value,
-        RIGHT_MIN_PX,
-        DEFAULT_RIGHT_SIZE
-      )
+      const restoredSize = normalizeOpenSize(rightDetailsOpenSize.value, RIGHT_MIN_PX, '256px')
       rightDetailsSize.value = restoredSize
       rightDetailsOpenSize.value = restoredSize
       return

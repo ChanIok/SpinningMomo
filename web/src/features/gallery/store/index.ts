@@ -1,16 +1,11 @@
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { computed } from 'vue'
-import type { ViewMode } from '../types'
-import {
-  GALLERY_EXPANDED_FOLDERS_STORAGE_KEY,
-  GALLERY_EXPANDED_TAGS_STORAGE_KEY,
-  GALLERY_VIEW_MODE_STORAGE_KEY,
-  GALLERY_VIEW_SIZE_STORAGE_KEY,
-} from './persistence'
+import { createDefaultGallerySettings, GALLERY_SETTINGS_STORAGE_KEY } from './persistence'
 import { createQuerySlice } from './querySlice'
 import { createNavigationSlice } from './navigationSlice'
 import { createInteractionSlice } from './interactionSlice'
+import { createLayoutSlice } from './layoutSlice'
 
 /**
  * Gallery Pinia Store
@@ -21,25 +16,14 @@ import { createInteractionSlice } from './interactionSlice'
  *
  * 拆分说明:
  * - index.ts 只负责“装配”，不承载具体业务细节
- * - query/navigation/interaction 三个 slice 负责各自领域状态
+ * - query/navigation/layout/interaction 四个 slice 负责各自领域状态
  * - 对外仍然暴露同一个 store，避免调用方心智负担上升
  */
 export const useGalleryStore = defineStore('gallery', () => {
-  // 持久化层保持最短路径：由类型系统约束运行时写入。
-  const persistedViewSize = useStorage<number>(GALLERY_VIEW_SIZE_STORAGE_KEY, 128, localStorage)
-  const persistedViewMode = useStorage<ViewMode>(
-    GALLERY_VIEW_MODE_STORAGE_KEY,
-    'grid',
-    localStorage
-  )
-  const persistedExpandedFolderIds = useStorage<number[]>(
-    GALLERY_EXPANDED_FOLDERS_STORAGE_KEY,
-    [],
-    localStorage
-  )
-  const persistedExpandedTagIds = useStorage<number[]>(
-    GALLERY_EXPANDED_TAGS_STORAGE_KEY,
-    [],
+  // 持久化层保持单一根对象：gallerySettings 是 gallery 偏好的唯一入口。
+  const gallerySettings = useStorage(
+    GALLERY_SETTINGS_STORAGE_KEY,
+    createDefaultGallerySettings(),
     localStorage
   )
 
@@ -47,12 +31,13 @@ export const useGalleryStore = defineStore('gallery', () => {
   const querySlice = createQuerySlice()
   // 导航与筛选层：负责 folder/tag 树、展开态、排序筛选、视图配置。
   const navigationSlice = createNavigationSlice({
-    persistedViewSize,
-    persistedViewMode,
-    persistedExpandedFolderIds,
-    persistedExpandedTagIds,
+    settings: gallerySettings,
   })
-  // 交互层：负责 selection/lightbox/details/sidebar，并依赖 query 结果做就地 patch。
+  // 布局层：负责三栏布局的完整真相源与本地持久化。
+  const layoutSlice = createLayoutSlice({
+    settings: gallerySettings,
+  })
+  // 交互层：负责 selection/lightbox/details focus，并依赖 query 结果做就地 patch。
   const interactionSlice = createInteractionSlice({
     totalCount: querySlice.totalCount,
     paginatedAssets: querySlice.paginatedAssets,
@@ -68,14 +53,17 @@ export const useGalleryStore = defineStore('gallery', () => {
   function reset() {
     querySlice.resetQueryState()
     navigationSlice.resetNavigationState()
+    layoutSlice.resetLayoutState()
     interactionSlice.resetInteractionState()
   }
 
   return {
-    // 展开顺序代表心智顺序：先数据查询，再导航筛选，最后交互 UI。
+    // 展开顺序代表心智顺序：先数据查询，再导航筛选，再布局，最后交互 UI。
     ...querySlice,
     ...navigationSlice,
+    ...layoutSlice,
     ...interactionSlice,
+    gallerySettings,
     isTimelineMode,
     reset,
   }

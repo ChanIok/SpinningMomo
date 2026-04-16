@@ -1,8 +1,46 @@
-export const GALLERY_VIEW_SIZE_STORAGE_KEY = 'spinningmomo.gallery.view.size'
-export const GALLERY_VIEW_MODE_STORAGE_KEY = 'spinningmomo.gallery.view.mode'
-// 侧边栏树的展开状态是纯前端视图信息，只需落在 localStorage。
-export const GALLERY_EXPANDED_FOLDERS_STORAGE_KEY = 'spinningmomo.gallery.sidebar.expanded-folders'
-export const GALLERY_EXPANDED_TAGS_STORAGE_KEY = 'spinningmomo.gallery.sidebar.expanded-tags'
+import type { ViewMode } from '../types'
+
+export interface GallerySettings {
+  view: {
+    size: number
+    mode: ViewMode
+  }
+  navigation: {
+    expandedFolderIds: number[]
+    expandedTagIds: number[]
+  }
+  layout: {
+    sidebarOpen: boolean
+    detailsOpen: boolean
+    leftSidebarSize: string
+    rightDetailsSize: string
+    leftSidebarOpenSize: string
+    rightDetailsOpenSize: string
+  }
+}
+
+export const GALLERY_SETTINGS_STORAGE_KEY = 'spinningmomo.gallery.settings'
+
+export function createDefaultGallerySettings(): GallerySettings {
+  return {
+    view: {
+      size: 128,
+      mode: 'grid' satisfies ViewMode,
+    },
+    navigation: {
+      expandedFolderIds: [],
+      expandedTagIds: [],
+    },
+    layout: {
+      sidebarOpen: true,
+      detailsOpen: true,
+      leftSidebarSize: '200px',
+      rightDetailsSize: '256px',
+      leftSidebarOpenSize: '200px',
+      rightDetailsOpenSize: '256px',
+    },
+  }
+}
 
 export const LIGHTBOX_MIN_ZOOM = 0.05
 export const LIGHTBOX_MAX_ZOOM = 5

@@ -1,11 +1,5 @@
-import { ref, reactive, computed, type Ref } from 'vue'
-import type {
-  Asset,
-  SelectionState,
-  LightboxState,
-  SidebarState,
-  DetailsPanelFocus,
-} from '../types'
+import { reactive, computed, type Ref } from 'vue'
+import type { Asset, SelectionState, LightboxState, DetailsPanelFocus } from '../types'
 import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from './persistence'
 
 interface InteractionSliceArgs {
@@ -20,7 +14,7 @@ interface InteractionSliceArgs {
  * Interaction Slice
  *
  * 关注点:
- * - 用户交互态：selection / lightbox / sidebar / details
+ * - 用户交互态：selection / lightbox / details focus
  * - 与交互强耦合的“本地即时 patch”（评分、描述）
  */
 export function createInteractionSlice(args: InteractionSliceArgs) {
@@ -50,15 +44,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     fitMode: 'contain',
   })
 
-  const sidebar = reactive<SidebarState>({
-    isOpen: true,
-  })
-
   // detailsPanel 是右侧详情“当前焦点类型”的真相源。
   const detailsPanel: DetailsPanelFocus = reactive<DetailsPanelFocus>({
     type: 'none',
   })
-  const detailsOpen = ref(true)
 
   const selectedCount = computed(() => selection.selectedIds.size)
   const hasSelection = computed(() => selectedCount.value > 0)
@@ -247,14 +236,6 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.fitMode = mode
   }
 
-  function setSidebarOpen(open: boolean) {
-    sidebar.isOpen = open
-  }
-
-  function setDetailsOpen(open: boolean) {
-    detailsOpen.value = open
-  }
-
   function setDetailsFocus(focus: DetailsPanelFocus) {
     // 用 assign 保持 reactive 对象引用不变，减少依赖断联风险。
     Object.assign(detailsPanel, focus)
@@ -277,17 +258,13 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.showFilmstrip = true
     resetLightboxView()
 
-    sidebar.isOpen = true
-    detailsOpen.value = true
     clearDetailsFocus()
   }
 
   return {
     selection,
     lightbox,
-    sidebar,
     detailsPanel,
-    detailsOpen,
     selectedCount,
     hasSelection,
     patchAssetsReviewState,
@@ -312,8 +289,6 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     toggleLightboxFilmstrip,
     setLightboxZoom,
     setLightboxFitMode,
-    setSidebarOpen,
-    setDetailsOpen,
     setDetailsFocus,
     clearDetailsFocus,
     resetInteractionState,
