@@ -34,6 +34,49 @@ export function buildPopupSnippet() {
     }, popupCloseDelayMs);
   };
 
+  const bindPopupCardClickBridge = (rootElement) => {
+    if (!rootElement || !rootElement.querySelectorAll) return;
+
+    const clickableNodes = rootElement.querySelectorAll('[data-sm-open-asset-id]');
+    clickableNodes.forEach((node) => {
+      const el = node;
+      if (!el || !el.getAttribute) return;
+      const dataset = el.dataset || {};
+      if (dataset.smCardClickBound === 'true') {
+        return;
+      }
+
+      dataset.smCardClickBound = 'true';
+
+      el.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const rawAssetId = el.getAttribute('data-sm-open-asset-id');
+        const assetId = Number(rawAssetId);
+        if (!Number.isFinite(assetId)) {
+          return;
+        }
+
+        const rawAssetIndex = el.getAttribute('data-sm-open-asset-index');
+        const hasIndex = rawAssetIndex !== null && rawAssetIndex !== undefined;
+        const assetIndex = hasIndex ? Number(rawAssetIndex) : undefined;
+        if (hasIndex && !Number.isFinite(assetIndex)) {
+          return;
+        }
+
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(
+            {
+              action: 'SPINNING_MOMO_OPEN_GALLERY_ASSET',
+              payload: hasIndex ? { assetId, assetIndex } : { assetId },
+            },
+            '*'
+          );
+        }
+      });
+    });
+  };
+
   const bindPopupHoverBridge = (state, marker) => {
     if (!keepPopupVisibleOnHover || !marker || !marker.getPopup) {
       return;
@@ -44,35 +87,7 @@ export function buildPopupSnippet() {
       const popupElement = popup && popup.getElement ? popup.getElement() : null;
       if (!popupElement) return;
 
-      const clickableCard = popupElement.querySelector('[data-sm-open-asset-id]');
-      if (clickableCard && !clickableCard.dataset.smCardClickBound) {
-        clickableCard.dataset.smCardClickBound = 'true';
-        clickableCard.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          const rawAssetId = clickableCard.getAttribute('data-sm-open-asset-id');
-          const assetId = Number(rawAssetId);
-          if (!Number.isFinite(assetId)) {
-            return;
-          }
-
-          const rawAssetIndex = clickableCard.getAttribute('data-sm-open-asset-index');
-          const assetIndex = Number(rawAssetIndex);
-          if (!Number.isFinite(assetIndex)) {
-            return;
-          }
-
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage(
-              {
-                action: 'SPINNING_MOMO_OPEN_GALLERY_ASSET',
-                payload: { assetId, assetIndex },
-              },
-              '*'
-            );
-          }
-        });
-      }
+      bindPopupCardClickBridge(popupElement);
 
       popupElement.addEventListener('mouseenter', () => {
         state.popupHovered = true;

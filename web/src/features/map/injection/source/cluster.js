@@ -1,5 +1,48 @@
 export function buildClusterSnippet() {
   return `
+  const buildClusterCellInnerHtml = (item) => {
+    if (item && item.thumbnailUrl) {
+      return (
+        '<img src="' +
+        item.thumbnailUrl +
+        '" loading="lazy" style="width:100%;height:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;background:#1f2937;display:block;" />'
+      );
+    }
+
+    return (
+      '<div style="width:100%;height:100%;aspect-ratio:1/1;border-radius:6px;background:#1f2937;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;">无图</div>'
+    );
+  };
+
+  const buildClusterPreviewCellHtml = (item) => {
+    const hasAssetId = item && Number.isFinite(Number(item.assetId));
+    const assetIdAttr = hasAssetId ? ' data-sm-open-asset-id="' + String(item.assetId) + '"' : '';
+    const hasAssetIndex = item && Number.isFinite(Number(item.assetIndex));
+    const assetIndexAttr = hasAssetIndex
+      ? ' data-sm-open-asset-index="' + String(item.assetIndex) + '"'
+      : '';
+
+    const innerHtml = buildClusterCellInnerHtml(item);
+    const cellStyle = hasAssetId ? 'width:100%;height:100%;cursor:pointer;' : 'width:100%;height:100%;';
+
+    return '<div' + assetIdAttr + assetIndexAttr + ' style="' + cellStyle + '">' + innerHtml + '</div>';
+  };
+
+  const buildClusterHoverGridHtml = (items, gridColumns, cellPx) => {
+    const cols = Math.min(3, Math.max(1, gridColumns));
+    return (
+      '<div style="display:grid;grid-template-columns:repeat(' +
+      cols +
+      ',' +
+      cellPx +
+      'px);grid-auto-rows:' +
+      cellPx +
+      'px;gap:6px;">' +
+      items.join('') +
+      '</div>'
+    );
+  };
+
   const buildClusterHoverHtml = (clusterMarkers) => {
     const totalCount = clusterMarkers.length;
     const maxGridCells = 9;
@@ -7,16 +50,11 @@ export function buildClusterSnippet() {
     const remainingCount = Math.max(0, totalCount - previewCount);
 
     const cellPx = 96;
-    const previewItems = clusterMarkers.slice(0, previewCount).map((item) => {
-      if (item.thumbnailUrl) {
-        return '<img src="' + item.thumbnailUrl + '" loading="lazy" style="width:100%;height:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;background:#1f2937;display:block;" />';
-      }
-      return '<div style="width:100%;height:100%;aspect-ratio:1/1;border-radius:6px;background:#1f2937;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;">无图</div>';
-    });
+    const previewItems = clusterMarkers.slice(0, previewCount).map((item) => buildClusterPreviewCellHtml(item));
 
     if (remainingCount > 0) {
       previewItems.push(
-        '<div style="width:100%;height:100%;aspect-ratio:1/1;border-radius:6px;background:rgba(17,24,39,0.9);display:flex;align-items:center;justify-content:center;color:#e5e7eb;font-size:13px;font-weight:600;">+' +
+        '<div data-sm-cluster-expand="1" style="width:100%;height:100%;aspect-ratio:1/1;border-radius:6px;background:rgba(17,24,39,0.9);display:flex;align-items:center;justify-content:center;color:#e5e7eb;font-size:13px;font-weight:600;cursor:pointer;">+' +
           remainingCount +
           ' 更多</div>'
       );
@@ -27,8 +65,27 @@ export function buildClusterSnippet() {
 
     return '<div style="display:inline-block; color: #e5e7eb;">' +
       '<div style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: rgb(123, 93, 74); font-family: &quot;Helvetica Neue&quot;, Arial, Helvetica, sans-serif;">' + clusterHeader + '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(' + gridColumns + ',' + cellPx + 'px);grid-auto-rows:' + cellPx + 'px;gap:6px;">' + previewItems.join('') + '</div>' +
+      buildClusterHoverGridHtml(previewItems, gridColumns, cellPx) +
     '</div>';
+  };
+
+  const buildClusterHoverExpandedHtml = (clusterMarkers) => {
+    const cellPx = 96;
+    const titleTpl = runtimeOptions.clusterTitleTemplate || '{count} 张照片';
+    const clusterHeader = String(titleTpl).replace(/\\{count\\}/g, String(clusterMarkers.length));
+    const allItems = clusterMarkers.map((item) => buildClusterPreviewCellHtml(item));
+    const gridColumns = 3;
+
+    return (
+      '<div style="display:inline-block; color: #e5e7eb; max-width: calc(100vw - 32px);">' +
+      '<div style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: rgb(123, 93, 74); font-family: &quot;Helvetica Neue&quot;, Arial, Helvetica, sans-serif;">' +
+      clusterHeader +
+      '</div>' +
+      '<div data-sm-cluster-scroll="1" style="max-height: min(60vh, 420px); overflow-y: auto; overscroll-behavior: contain;">' +
+      buildClusterHoverGridHtml(allItems, gridColumns, cellPx) +
+      '</div>' +
+      '</div>'
+    );
   };
 
   const renderClusterMarker = (clusterMarkers) => {
@@ -57,6 +114,34 @@ export function buildClusterSnippet() {
       if (!keepPopupVisibleOnHover || !runtime.clusterHoverPopup || !runtime.clusterHoverPopup.getElement) return;
       const popupElement = runtime.clusterHoverPopup.getElement();
       if (!popupElement) return;
+
+      bindPopupCardClickBridge(popupElement);
+
+      const expandTarget = popupElement.querySelector('[data-sm-cluster-expand]');
+      if (expandTarget && !expandTarget.dataset.smClusterExpandBound) {
+        expandTarget.dataset.smClusterExpandBound = 'true';
+        expandTarget.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!runtime.clusterHoverPopup || !runtime.clusterHoverPopup.setContent) {
+            return;
+          }
+          runtime.clusterHoverPopup.setContent(buildClusterHoverExpandedHtml(clusterMarkers));
+          bindClusterPopupHoverBridge();
+        });
+      }
+
+      const scrollRoot = popupElement.querySelector('[data-sm-cluster-scroll]');
+      if (scrollRoot && !scrollRoot.dataset.smClusterScrollWheelBound) {
+        scrollRoot.dataset.smClusterScrollWheelBound = 'true';
+        scrollRoot.addEventListener(
+          'wheel',
+          (event) => {
+            event.stopPropagation();
+          },
+          { passive: true }
+        );
+      }
 
       popupElement.onmouseenter = () => {
         hoverState.popupHovered = true;

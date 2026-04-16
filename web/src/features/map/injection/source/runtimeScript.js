@@ -36,7 +36,9 @@ ${buildPaneStyleSnippet()}
   if (!runtime.clusterHoverPopup) {
     runtime.clusterHoverPopup = L.popup({
       pane: clusterPopupPaneName,
-      autoPan: false,
+      autoPan: true,
+      autoPanPaddingTopLeft: [16, 16],
+      autoPanPaddingBottomRight: [16, 16],
       closeButton: false,
       className: clusterPopupClassName,
       offset: [0, -10],

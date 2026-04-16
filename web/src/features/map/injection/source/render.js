@@ -82,6 +82,9 @@ export function buildRenderSnippet() {
       marker.bindPopup(markerData.popupHtml, {
         pane: popupPaneName,
         className: markerPopupClassName,
+        autoPan: true,
+        autoPanPaddingTopLeft: [16, 16],
+        autoPanPaddingBottomRight: [16, 16],
       });
       bindPopupHoverBridge(hoverState, marker);
       if (openPopupOnHover) {

@@ -3,6 +3,8 @@ import { ref } from 'vue'
 
 export interface MapMarker {
   assetId?: number
+  /** 与当前图库查询排序一致的资产序号，用于从地图打开时定位 lightbox */
+  assetIndex?: number
   name?: string
   lat: number
   lng: number

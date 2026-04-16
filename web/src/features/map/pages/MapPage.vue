@@ -144,6 +144,7 @@ function buildMapMarkers(points: PhotoMapPoint[]): MapMarker[] {
 
     return {
       assetId: point.assetId,
+      assetIndex: point.assetIndex,
       name: point.name,
       lat,
       lng,

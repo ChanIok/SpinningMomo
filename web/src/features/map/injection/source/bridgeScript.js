@@ -145,7 +145,12 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
                 }
             });
             if (popupHtml) {
-                marker.bindPopup(popupHtml, { pane: 'spinning-momo-popup-pane' });
+                marker.bindPopup(popupHtml, {
+                    pane: 'spinning-momo-popup-pane',
+                    autoPan: true,
+                    autoPanPaddingTopLeft: [16, 16,
+                    autoPanPaddingBottomRight: [16, 16],
+                });
                 if (openPopupOnHover) {
                     marker.on('mouseover', () => marker.openPopup());
                 }
