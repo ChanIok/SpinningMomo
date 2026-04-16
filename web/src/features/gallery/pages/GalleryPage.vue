@@ -5,8 +5,6 @@ import { on as onRpc, off as offRpc } from '@/core/rpc'
 import { Split } from '@/components/ui/split'
 import { useGalleryLayout } from '../composables'
 import { useGalleryData } from '../composables/useGalleryData'
-import { useGalleryLightbox } from '../composables/useGalleryLightbox'
-import { useGalleryStore } from '../store'
 import { useSettingsStore } from '@/features/settings/store'
 import GallerySidebar from '../components/shell/GallerySidebar.vue'
 import GalleryViewer from '../components/shell/GalleryViewer.vue'
@@ -26,8 +24,6 @@ const GALLERY_REFRESH_DEBOUNCE_MS = 400
 // 使用布局管理
 const { isSidebarOpen, isDetailsOpen, setSidebarOpen, setDetailsOpen } = useGalleryLayout()
 const galleryData = useGalleryData()
-const galleryLightbox = useGalleryLightbox()
-const galleryStore = useGalleryStore()
 const settingsStore = useSettingsStore()
 const isBelowLg = useMediaQuery('(max-width: 1023px)')
 
@@ -290,60 +286,6 @@ const scheduleGalleryRefresh = useDebounceFn(() => {
 const galleryChangedHandler = () => {
   void scheduleGalleryRefresh()
 }
-
-function findLoadedAssetIndex(assetId: number): number | undefined {
-  for (const [pageNum, pageAssets] of galleryStore.paginatedAssets.entries()) {
-    const indexInPage = pageAssets.findIndex((asset) => asset.id === assetId)
-    if (indexInPage >= 0) {
-      return (pageNum - 1) * galleryStore.perPage + indexInPage
-    }
-  }
-
-  return undefined
-}
-
-async function openLightboxByAssetId(assetId: number): Promise<boolean> {
-  let targetIndex = findLoadedAssetIndex(assetId)
-
-  if (targetIndex === undefined) {
-    const ids = await galleryData.queryCurrentAssetIds()
-    targetIndex = ids.findIndex((id) => id === assetId)
-    if (targetIndex < 0) {
-      return false
-    }
-
-    const targetPage = Math.floor(targetIndex / galleryStore.perPage) + 1
-    await galleryData.loadPage(targetPage)
-  }
-
-  await galleryLightbox.openLightbox(targetIndex)
-  return true
-}
-
-let isOpeningFromQuery = false
-watch(
-  () => galleryStore.pendingOpenAssetId,
-  async () => {
-    if (isOpeningFromQuery) {
-      return
-    }
-
-    const assetId = galleryStore.consumePendingOpenAssetId()
-    if (assetId === undefined || !Number.isFinite(assetId)) {
-      return
-    }
-
-    isOpeningFromQuery = true
-    try {
-      await openLightboxByAssetId(assetId)
-    } catch (error) {
-      console.error('Failed to open gallery lightbox from map query:', error)
-    } finally {
-      isOpeningFromQuery = false
-    }
-  },
-  { immediate: true }
-)
 
 onMounted(() => {
   onRpc('gallery.changed', galleryChangedHandler)

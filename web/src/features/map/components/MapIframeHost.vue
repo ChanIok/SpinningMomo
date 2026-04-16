@@ -172,11 +172,16 @@ async function handleMapMessage(event: MessageEvent<unknown>) {
   }
 
   galleryStore.setActiveAssetId(assetId)
-  galleryStore.setPendingOpenAssetId(assetId)
 
-  await router.push({
-    name: 'gallery',
-  })
+  galleryStore.openLightbox()
+
+  try {
+    await router.push({
+      name: 'gallery',
+    })
+  } catch {
+    galleryStore.closeLightbox()
+  }
 }
 
 watch(

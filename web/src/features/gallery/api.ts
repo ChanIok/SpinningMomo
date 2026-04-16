@@ -1,13 +1,11 @@
 import { call } from '@/core/rpc'
+import type { FolderTreeNode, Tag, TagTreeNode } from './types'
+import { getAssetThumbnailUrl, getAssetUrl } from './api/urls'
 import type {
-  Asset,
-  ListAssetsParams,
-  ListAssetsResponse,
   OperationResult,
   ScanAssetsParams,
   ScanAssetsResult,
   StartScanAssetsResult,
-  FolderTreeNode,
   UpdateFolderDisplayNameParams,
   GetTimelineBucketsParams,
   TimelineBucketsResponse,
@@ -21,8 +19,6 @@ import type {
   PhotoMapPoint,
   InfinityNikkiDetails,
   AssetMainColor,
-  Tag,
-  TagTreeNode,
   TagStats,
   HomeStats,
   CreateTagParams,
@@ -34,8 +30,7 @@ import type {
   UpdateAssetDescriptionParams,
   SetInfinityNikkiUserRecordParams,
   AssetReachability,
-} from './types'
-import { getStaticUrl, isWebView } from '@/core/env'
+} from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
 
@@ -125,28 +120,6 @@ export async function removeFolderWatch(folderId: number): Promise<OperationResu
 }
 
 /**
- * 获取资产列表（可按文件夹筛选，可选包含子文件夹）
- */
-export async function listAssets(params: ListAssetsParams = {}): Promise<ListAssetsResponse> {
-  try {
-    const result = await call<ListAssetsResponse>('gallery.listAssets', params)
-
-    console.log('📸 获取资产列表成功:', {
-      count: result.items.length,
-      total: result.totalCount,
-      page: result.currentPage,
-      folderId: params.folderId,
-      includeSubfolders: params.includeSubfolders,
-    })
-
-    return result
-  } catch (error) {
-    console.error('Failed to list assets:', error)
-    throw new Error('获取资产列表失败')
-  }
-}
-
-/**
  * 扫描资产目录
  */
 export async function scanAssets(params: ScanAssetsParams): Promise<ScanAssetsResult> {
@@ -219,64 +192,6 @@ export async function getThumbnailStats(): Promise<string> {
     console.error('Failed to get thumbnail stats:', error)
     throw new Error('获取缩略图统计失败')
   }
-}
-
-/**
- * 获取资产缩略图URL - 从 asset对象直接构建
- * 路径格式: thumbnails/[hash前2位]/[hash第3-4位]/{hash}.webp
- */
-export function getAssetThumbnailUrl(asset: Asset): string {
-  const hash = asset.hash
-  if (!hash) {
-    return ''
-  }
-
-  const prefix1 = hash.slice(0, 2)
-  const prefix2 = hash.slice(2, 4)
-  const relativePath = `${prefix1}/${prefix2}/${hash}.webp`
-
-  // WebView release 直接走缩略图虚拟主机映射，少一层动态解析。
-  if (isWebView() && !import.meta.env.DEV) {
-    return `https://thumbs.test/${relativePath}`
-  }
-
-  return getStaticUrl(`/static/assets/thumbnails/${relativePath}`)
-}
-function encodeRelativePathForUrl(relativePath: string): string {
-  // 逐段编码，而不是把整个路径一起编码。
-  // 这样可以保留目录层级里的 '/'，同时正确处理中文、空格、#、% 等特殊字符。
-  return relativePath
-    .split('/')
-    .filter((segment) => segment.length > 0)
-    .map((segment) => encodeURIComponent(segment))
-    .join('/')
-}
-
-/**
- * 获取资产原图 URL。
- *
- * 新模型下，原图不再通过 assetId 间接解析，而是直接由：
- * - `rootId`：资源属于哪个 watch root
- * - `relativePath`：文件在该 root 下的相对路径
- * - `hash`：作为版本参数，避免内容更新后 URL 不变
- *
- * 环境差异：
- * - WebView：`https://r-<rootId>.test/<relativePath>?v=<hash>`
- * - 浏览器 dev：`/static/assets/originals/by-root/<rootId>/<relativePath>?v=<hash>`
- */
-export function getAssetUrl(asset: Asset): string {
-  if (!asset.rootId || !asset.relativePath) {
-    return ''
-  }
-
-  const encodedRelativePath = encodeRelativePathForUrl(asset.relativePath)
-  const versionQuery = asset.hash ? `?v=${encodeURIComponent(asset.hash)}` : ''
-
-  if (isWebView()) {
-    return `https://r-${asset.rootId}.test/${encodedRelativePath}${versionQuery}`
-  }
-
-  return `/static/assets/originals/by-root/${asset.rootId}/${encodedRelativePath}${versionQuery}`
 }
 
 /**
@@ -716,7 +631,6 @@ export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<numb
  */
 export const galleryApi = {
   // 数据查询
-  listAssets,
   getFolderTree,
   updateFolderDisplayName,
   openFolderInExplorer,

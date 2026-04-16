@@ -143,7 +143,7 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
   - During app initialization, the gallery module is initialized first, then watcher registrations are restored from DB, then Infinity Nikki photo-source registration runs, and finally all registered gallery watchers are started near the end of startup.
 - **Frontend entry points**:
   - `web/src/features/gallery/api.ts` is the RPC facade and static URL helper layer.
-  - `web/src/features/gallery/store.ts` is the single source of truth for gallery UI state: paginated asset cache, timeline buckets, folder tree, tag tree, filters, selection, lightbox, sidebar, and details panel state.
+- `web/src/features/gallery/store/index.ts` is the single source of truth for gallery UI state. Store internals are split into `store/querySlice.ts`, `store/navigationSlice.ts`, `store/interactionSlice.ts`, and shared helpers in `store/persistence.ts`.
   - `web/src/features/gallery/composables/` coordinates behavior around data loading, selection, layout, sidebar, lightbox, virtualized grids, and asset actions.
   - `web/src/features/gallery/pages/GalleryPage.vue` hosts the three-pane shell (sidebar, viewer, details); child views live under `web/src/features/gallery/components/` in subfolders: `shell/` (sidebar, viewer, details, toolbar, content), `viewer/` (grid/list/masonry/adaptive), `asset/`, `tags/`, `folders/`, `dialogs/`, `menus/`, `infinity_nikki/`, and `lightbox/`.
   - `web/src/features/gallery/routes.ts` defines the `/gallery` route; `web/src/router/index.ts` spreads it so there is a single source of truth for path, name (`gallery`), and meta.
@@ -151,7 +151,7 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
   - Prefer the existing pattern `component -> composable -> api -> RPC` and let components read state directly from the Pinia store.
   - `useGalleryData()` loads data and writes into store state.
   - `useGallerySelection()` and `useGalleryAssetActions()` implement higher-level UI behaviors on top of the store instead of duplicating state in components.
-  - When changing filters/sort/view mode, check both `store.ts` and `queryFilters.ts`; when changing visible behavior, check the relevant composable before editing large Vue components.
+- When changing filters/sort/view mode, check `store/index.ts` plus related slices under `store/` and `queryFilters.ts`; when changing visible behavior, check the relevant composable before editing large Vue components.
 - **Domain model summary**:
   - The gallery centers on `Asset`, `FolderTreeNode`, `TagTreeNode`, scan/task progress, and flexible `QueryAssetsFilters`.
   - The same conceptual model exists on both sides: C++ types in `src/features/gallery/types.ixx`, mirrored by TS types in `web/src/features/gallery/types.ts`.
@@ -197,4 +197,4 @@ No automated test suite. Manual testing only:
 3. Add RPC endpoint file under `src/core/rpc/endpoints/<name>/`, implement `register_all(state)`, and wire it in `registry.cpp`.
 4. Register commands in `src/core/commands/builtin.cpp` if the feature needs hotkeys/menu entries.
 5. If the feature needs initialization, add it to `Core::Initializer::initialize_application`.
-6. On the web side, add a feature directory under `web/src/features/<name>/` with `api.ts`, `store.ts`, `types.ts`, components, and pages.
+6. On the web side, add a feature directory under `web/src/features/<name>/` with `api.ts`, `store/index.ts`, `types.ts`, components, and pages.
