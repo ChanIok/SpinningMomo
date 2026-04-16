@@ -9,9 +9,11 @@ import Core.Database.Types;
 import Features.Gallery.OriginalLocator;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.Asset.InfinityNikkiMetadataDict;
 import Features.Gallery.Color.Filter;
 import Features.Gallery.Color.Repository;
 import Utils.Logger;
+import <asio.hpp>;
 
 namespace Features::Gallery::Asset::Service {
 
@@ -977,6 +979,12 @@ auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
   return Types::OperationResult{.success = true,
                                 .message = "Infinity Nikki user record updated successfully",
                                 .affected_count = result->value_or(0)};
+}
+
+auto get_infinity_nikki_metadata_names(Core::State::AppState& app_state,
+                                       const Types::GetInfinityNikkiMetadataNamesParams& params)
+    -> asio::awaitable<std::expected<Types::InfinityNikkiMetadataNames, std::string>> {
+  co_return co_await InfinityNikkiMetadataDict::resolve_metadata_names(app_state, params);
 }
 
 // ============= 维护服务实现 =============

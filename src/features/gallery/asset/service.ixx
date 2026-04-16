@@ -5,6 +5,7 @@ export module Features.Gallery.Asset.Service;
 import std;
 import Core.State;
 import Features.Gallery.Types;
+import <asio.hpp>;
 
 namespace Features::Gallery::Asset::Service {
 
@@ -50,6 +51,10 @@ export auto update_asset_description(Core::State::AppState& app_state,
 export auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
                                            const Types::SetInfinityNikkiUserRecordParams& params)
     -> std::expected<Types::OperationResult, std::string>;
+
+export auto get_infinity_nikki_metadata_names(
+    Core::State::AppState& app_state, const Types::GetInfinityNikkiMetadataNamesParams& params)
+    -> asio::awaitable<std::expected<Types::InfinityNikkiMetadataNames, std::string>>;
 
 // 维护服务
 export auto load_asset_cache(Core::State::AppState& app_state)

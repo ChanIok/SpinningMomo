@@ -18,6 +18,8 @@ import type {
   QueryPhotoMapPointsParams,
   PhotoMapPoint,
   InfinityNikkiDetails,
+  GetInfinityNikkiMetadataNamesParams,
+  InfinityNikkiMetadataNames,
   AssetMainColor,
   TagStats,
   HomeStats,
@@ -397,6 +399,25 @@ export async function getInfinityNikkiDetails(assetId: number): Promise<Infinity
 }
 
 /**
+ * 获取 Infinity Nikki 参数 ID 的本地化名称映射
+ */
+export async function getInfinityNikkiMetadataNames(
+  params: GetInfinityNikkiMetadataNamesParams
+): Promise<InfinityNikkiMetadataNames> {
+  try {
+    const result = await call<InfinityNikkiMetadataNames>(
+      'gallery.getInfinityNikkiMetadataNames',
+      params
+    )
+    return result
+  } catch (error) {
+    console.error('Failed to get Infinity Nikki metadata names:', error)
+    // 该接口用于“增强展示”，失败时返回空映射，让 UI 自动回退原始 ID。
+    return {}
+  }
+}
+
+/**
  * 获取资产主色调板
  */
 export async function getAssetMainColors(assetId: number): Promise<AssetMainColor[]> {
@@ -639,6 +660,7 @@ export const galleryApi = {
   queryAssetLayoutMeta,
   queryPhotoMapPoints,
   getInfinityNikkiDetails,
+  getInfinityNikkiMetadataNames,
   getAssetMainColors,
 
   // 时间线查询

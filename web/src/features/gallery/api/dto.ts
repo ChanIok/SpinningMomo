@@ -293,6 +293,19 @@ export interface InfinityNikkiDetails {
   userRecord?: InfinityNikkiUserRecord
 }
 
+export interface GetInfinityNikkiMetadataNamesParams {
+  filterId?: number
+  poseId?: number
+  lightId?: number
+  locale?: 'zh-CN' | 'en-US'
+}
+
+export interface InfinityNikkiMetadataNames {
+  filterName?: string
+  poseName?: string
+  lightName?: string
+}
+
 // ============= 时间线相关类型 =============
 
 export interface TimelineBucket {

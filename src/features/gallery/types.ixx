@@ -450,6 +450,19 @@ struct InfinityNikkiDetails {
   std::optional<InfinityNikkiUserRecord> user_record;
 };
 
+struct GetInfinityNikkiMetadataNamesParams {
+  std::optional<std::int64_t> filter_id;
+  std::optional<std::int64_t> pose_id;
+  std::optional<std::int64_t> light_id;
+  std::optional<std::string> locale = "zh-CN";
+};
+
+struct InfinityNikkiMetadataNames {
+  std::optional<std::string> filter_name;
+  std::optional<std::string> pose_name;
+  std::optional<std::string> light_name;
+};
+
 // ============= 标签相关参数 =============
 
 struct CreateTagParams {

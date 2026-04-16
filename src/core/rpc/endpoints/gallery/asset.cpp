@@ -113,6 +113,21 @@ auto handle_get_infinity_nikki_details(
   co_return result.value();
 }
 
+auto handle_get_infinity_nikki_metadata_names(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::GetInfinityNikkiMetadataNamesParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiMetadataNames> {
+  auto result = co_await Features::Gallery::Asset::Service::get_infinity_nikki_metadata_names(
+      app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 auto handle_get_asset_main_colors(Core::State::AppState& app_state,
                                   const Features::Gallery::Types::GetAssetMainColorsParams& params)
     -> RpcAwaitable<std::vector<Features::Gallery::Types::AssetMainColor>> {
@@ -363,6 +378,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.getInfinityNikkiDetails",
       handle_get_infinity_nikki_details,
       "Get Infinity Nikki extracted data and user record for the specified asset");
+
+  register_method<Features::Gallery::Types::GetInfinityNikkiMetadataNamesParams,
+                  Features::Gallery::Types::InfinityNikkiMetadataNames>(
+      app_state, app_state.rpc->registry, "gallery.getInfinityNikkiMetadataNames",
+      handle_get_infinity_nikki_metadata_names,
+      "Resolve localized names for Infinity Nikki metadata ids such as pose/filter/light");
 
   register_method<Features::Gallery::Types::GetAssetMainColorsParams,
                   std::vector<Features::Gallery::Types::AssetMainColor>>(

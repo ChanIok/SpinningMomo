@@ -8,10 +8,11 @@ import { Separator } from '@/components/ui/separator'
 import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { setInfinityNikkiUserRecord } from '../../api'
+import { getInfinityNikkiMetadataNames, setInfinityNikkiUserRecord } from '../../api'
 import type {
   InfinityNikkiDetails,
   InfinityNikkiExtractedParams,
+  InfinityNikkiMetadataNames,
   InfinityNikkiUserRecordCodeType,
 } from '../../types'
 
@@ -24,7 +25,7 @@ const emit = defineEmits<{
   updated: [details: InfinityNikkiDetails]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { toast } = useToast()
 
 const codeTypeDraft = ref<InfinityNikkiUserRecordCodeType>('dye')
@@ -36,6 +37,10 @@ const extracted = computed(() => props.details.extracted)
 const currentUserRecord = computed(() => props.details.userRecord)
 const hasCodeValueDraft = computed(() => codeValueDraft.value.trim().length > 0)
 const currentCodeTypeLabel = computed(() => getCodeTypeLabel(codeTypeDraft.value))
+// 当前面板实际使用的“已翻译名称”结果。
+const metadataNames = ref<InfinityNikkiMetadataNames>({})
+// 面板级缓存：key=语言+filter/pose/light 三元组，value=映射结果。
+const metadataNamesCache = new Map<string, InfinityNikkiMetadataNames>()
 
 function syncDraftFromProps() {
   codeTypeDraft.value = currentUserRecord.value?.codeType ?? 'dye'
@@ -240,6 +245,85 @@ function formatPoseId(value: number | undefined): string | null {
   return String(value)
 }
 
+function normalizeLocaleForMetadata(localeValue: string): 'zh-CN' | 'en-US' {
+  // 与后端约定统一只传两种 locale，避免出现多种别名导致缓存碎片。
+  return localeValue.startsWith('zh') ? 'zh-CN' : 'en-US'
+}
+
+function buildMetadataCacheKey(params: {
+  filterId?: number
+  poseId?: number
+  lightId?: number
+  locale: 'zh-CN' | 'en-US'
+}): string {
+  return `${params.locale}|${params.filterId ?? ''}|${params.poseId ?? ''}|${params.lightId ?? ''}`
+}
+
+function formatMetadataDisplay(idText: string | null, name: string | undefined): string | null {
+  if (!idText) return null
+  // 面向普通用户时，命中字典仅展示语义名称；未命中才回退到原始 ID。
+  if (!name) return idText
+  return name
+}
+
+function formatMetadataTitle(idText: string | null, name: string | undefined): string | undefined {
+  if (!idText) return undefined
+  // 命中字典时将 ID 放到 title，保留排查能力但不干扰主视觉。
+  if (name) return `ID: ${idText}`
+  return idText
+}
+
+async function refreshMetadataNames() {
+  const filterId = extracted.value?.filterId
+  const poseId = extracted.value?.poseId
+  const lightId = extracted.value?.lightId
+
+  if (filterId === undefined && poseId === undefined && lightId === undefined) {
+    // 当前资产没有相关参数时清空展示，避免沿用上一张图的结果。
+    metadataNames.value = {}
+    return
+  }
+
+  const normalizedLocale = normalizeLocaleForMetadata(locale.value)
+  const cacheKey = buildMetadataCacheKey({
+    filterId,
+    poseId,
+    lightId,
+    locale: normalizedLocale,
+  })
+
+  const cached = metadataNamesCache.get(cacheKey)
+  if (cached) {
+    // 组件级缓存：同一语言+同一组 ID 直接复用，避免重复 RPC。
+    metadataNames.value = cached
+    return
+  }
+
+  const result = await getInfinityNikkiMetadataNames({
+    filterId,
+    poseId,
+    lightId,
+    locale: normalizedLocale,
+  })
+  // 即使 result 为空对象也会缓存，避免失败场景下短时间重复请求。
+  metadataNamesCache.set(cacheKey, result)
+  metadataNames.value = result
+}
+
+watch(
+  () => [
+    extracted.value?.filterId,
+    extracted.value?.poseId,
+    extracted.value?.lightId,
+    locale.value,
+  ],
+  () => {
+    // 当资产切换或语言切换时刷新映射，保证展示始终与当前上下文一致。
+    void refreshMetadataNames()
+  },
+  { immediate: true }
+)
+
 function formatLocation(params: InfinityNikkiExtractedParams | undefined): string | null {
   if (!params) return null
   const x = formatNumber(params.nikkiLocX, 2)
@@ -318,7 +402,7 @@ function formatLocation(params: InfinityNikkiExtractedParams | undefined): strin
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.gameTime')
           }}</span>
-          <span>{{ formatGameTime(extracted) }}</span>
+          <span class="font-mono">{{ formatGameTime(extracted) }}</span>
         </div>
 
         <div v-if="extracted.cameraParams" class="flex items-center justify-between gap-2">
@@ -342,42 +426,20 @@ function formatLocation(params: InfinityNikkiExtractedParams | undefined): strin
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.cameraFocalLength')
           }}</span>
-          <span>{{ formatFocalLength(extracted.cameraFocalLength) }}</span>
+          <span class="font-mono">{{ formatFocalLength(extracted.cameraFocalLength) }}</span>
         </div>
         <div v-if="formatApertureValue(extracted.apertureValue)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.apertureValue')
           }}</span>
-          <span>{{ formatApertureValue(extracted.apertureValue) }}</span>
+          <span class="font-mono">{{ formatApertureValue(extracted.apertureValue) }}</span>
         </div>
-        <div v-if="extracted.vertical !== undefined" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
-            t('gallery.details.infinityNikki.vertical')
-          }}</span>
-          <span>{{ extracted.vertical ? t('common.yes') : t('common.no') }}</span>
-        </div>
+
         <div v-if="formatSignedNumber(extracted.rotation, 2)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.rotation')
           }}</span>
-          <span>{{ formatSignedNumber(extracted.rotation, 2) }}</span>
-        </div>
-        <div v-if="formatMetadataId(extracted.filterId)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
-            t('gallery.details.infinityNikki.filterId')
-          }}</span>
-          <span
-            class="max-w-32 truncate"
-            :title="formatMetadataId(extracted.filterId) ?? undefined"
-          >
-            {{ formatMetadataId(extracted.filterId) }}
-          </span>
-        </div>
-        <div v-if="formatPercentage(extracted.filterStrength)" class="flex justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
-            t('gallery.details.infinityNikki.filterStrength')
-          }}</span>
-          <span>{{ formatPercentage(extracted.filterStrength) }}</span>
+          <span class="font-mono">{{ formatSignedNumber(extracted.rotation, 2) }}</span>
         </div>
         <div
           v-if="formatPercentage(extracted.vignetteIntensity)"
@@ -386,13 +448,13 @@ function formatLocation(params: InfinityNikkiExtractedParams | undefined): strin
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.vignetteIntensity')
           }}</span>
-          <span>{{ formatPercentage(extracted.vignetteIntensity) }}</span>
+          <span class="font-mono">{{ formatPercentage(extracted.vignetteIntensity) }}</span>
         </div>
         <div v-if="formatPercentage(extracted.bloomIntensity)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.bloomIntensity')
           }}</span>
-          <span>{{ formatPercentage(extracted.bloomIntensity) }}</span>
+          <span class="font-mono">{{ formatPercentage(extracted.bloomIntensity) }}</span>
         </div>
         <div
           v-if="formatSignedNumber(extracted.bloomThreshold, 2)"
@@ -401,64 +463,85 @@ function formatLocation(params: InfinityNikkiExtractedParams | undefined): strin
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.bloomThreshold')
           }}</span>
-          <span>{{ formatSignedNumber(extracted.bloomThreshold, 2) }}</span>
+          <span class="font-mono">{{ formatSignedNumber(extracted.bloomThreshold, 2) }}</span>
         </div>
         <div v-if="formatPercentage(extracted.brightness)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.brightness')
           }}</span>
-          <span>{{ formatPercentage(extracted.brightness) }}</span>
+          <span class="font-mono">{{ formatPercentage(extracted.brightness) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.exposure, 2)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.exposure')
           }}</span>
-          <span>{{ formatSignedNumber(extracted.exposure, 2) }}</span>
+          <span class="font-mono">{{ formatSignedNumber(extracted.exposure, 2) }}</span>
         </div>
         <div v-if="formatPercentage(extracted.contrast)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.contrast')
           }}</span>
-          <span>{{ formatPercentage(extracted.contrast) }}</span>
+          <span class="font-mono">{{ formatPercentage(extracted.contrast) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.saturation, 2)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.saturation')
           }}</span>
-          <span>{{ formatSignedNumber(extracted.saturation, 2) }}</span>
+          <span class="font-mono">{{ formatSignedNumber(extracted.saturation, 2) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.vibrance, 2)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.vibrance')
           }}</span>
-          <span>{{ formatSignedNumber(extracted.vibrance, 2) }}</span>
+          <span class="font-mono">{{ formatSignedNumber(extracted.vibrance, 2) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.highlights, 2)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.highlights')
           }}</span>
-          <span>{{ formatSignedNumber(extracted.highlights, 2) }}</span>
+          <span class="font-mono">{{ formatSignedNumber(extracted.highlights, 2) }}</span>
         </div>
         <div v-if="formatSignedNumber(extracted.shadow, 2)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.shadow')
           }}</span>
-          <span>{{ formatSignedNumber(extracted.shadow, 2) }}</span>
+          <span class="font-mono">{{ formatSignedNumber(extracted.shadow, 2) }}</span>
+        </div>
+        <div v-if="formatPoseId(extracted.poseId)" class="flex justify-between gap-2">
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+            t('gallery.details.infinityNikki.poseId')
+          }}</span>
+          <span
+            class="max-w-32 truncate"
+            :class="{ 'font-mono': !metadataNames.poseName }"
+            :title="formatMetadataTitle(formatPoseId(extracted.poseId), metadataNames.poseName)"
+          >
+            {{ formatMetadataDisplay(formatPoseId(extracted.poseId), metadataNames.poseName) }}
+          </span>
         </div>
         <div v-if="formatMetadataId(extracted.lightId)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.lightId')
           }}</span>
-          <span class="max-w-32 truncate" :title="formatMetadataId(extracted.lightId) ?? undefined">
-            {{ formatMetadataId(extracted.lightId) }}
+          <span
+            class="max-w-32 truncate"
+            :class="{ 'font-mono': !metadataNames.lightName }"
+            :title="
+              formatMetadataTitle(formatMetadataId(extracted.lightId), metadataNames.lightName)
+            "
+          >
+            {{
+              formatMetadataDisplay(formatMetadataId(extracted.lightId), metadataNames.lightName)
+            }}
           </span>
         </div>
         <div v-if="formatPercentage(extracted.lightStrength)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.lightStrength')
           }}</span>
-          <span>{{ formatPercentage(extracted.lightStrength) }}</span>
+          <span class="font-mono">{{ formatPercentage(extracted.lightStrength) }}</span>
         </div>
+
         <div v-if="formatLocation(extracted)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.nikkiLocation')
@@ -467,17 +550,39 @@ function formatLocation(params: InfinityNikkiExtractedParams | undefined): strin
             formatLocation(extracted)
           }}</span>
         </div>
+        <div v-if="formatMetadataId(extracted.filterId)" class="flex justify-between gap-2">
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+            t('gallery.details.infinityNikki.filterId')
+          }}</span>
+          <span
+            class="max-w-32 truncate"
+            :class="{ 'font-mono': !metadataNames.filterName }"
+            :title="
+              formatMetadataTitle(formatMetadataId(extracted.filterId), metadataNames.filterName)
+            "
+          >
+            {{
+              formatMetadataDisplay(formatMetadataId(extracted.filterId), metadataNames.filterName)
+            }}
+          </span>
+        </div>
+        <div v-if="formatPercentage(extracted.filterStrength)" class="flex justify-between gap-2">
+          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
+            t('gallery.details.infinityNikki.filterStrength')
+          }}</span>
+          <span class="font-mono">{{ formatPercentage(extracted.filterStrength) }}</span>
+        </div>
         <div v-if="extracted.nikkiHidden !== undefined" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.nikkiHidden')
           }}</span>
           <span>{{ extracted.nikkiHidden ? t('common.yes') : t('common.no') }}</span>
         </div>
-        <div v-if="formatPoseId(extracted.poseId)" class="flex justify-between gap-2">
+        <div v-if="extracted.vertical !== undefined" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
-            t('gallery.details.infinityNikki.poseId')
+            t('gallery.details.infinityNikki.vertical')
           }}</span>
-          <span>{{ formatPoseId(extracted.poseId) }}</span>
+          <span>{{ extracted.vertical ? t('common.yes') : t('common.no') }}</span>
         </div>
       </template>
     </div>

@@ -163,6 +163,8 @@ export type {
   InfinityNikkiExtractedParams,
   InfinityNikkiUserRecord,
   InfinityNikkiDetails,
+  GetInfinityNikkiMetadataNamesParams,
+  InfinityNikkiMetadataNames,
   // 时间线桶与月视图
   TimelineBucket,
   GetTimelineBucketsParams,
