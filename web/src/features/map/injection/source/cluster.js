@@ -63,8 +63,8 @@ export function buildClusterSnippet() {
     const titleTpl = runtimeOptions.clusterTitleTemplate || '{count} 张照片';
     const clusterHeader = String(titleTpl).replace(/\\{count\\}/g, String(clusterMarkers.length));
 
-    return '<div style="display:inline-block; color: #e5e7eb;">' +
-      '<div style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: rgb(123, 93, 74); font-family: &quot;Helvetica Neue&quot;, Arial, Helvetica, sans-serif;">' + clusterHeader + '</div>' +
+    return '<div style="color: #e5e7eb;">' +
+      '<div class="spinning-momo-popup-title">' + clusterHeader + '</div>' +
       buildClusterHoverGridHtml(previewItems, gridColumns, cellPx) +
     '</div>';
   };
@@ -78,7 +78,7 @@ export function buildClusterSnippet() {
 
     return (
       '<div style="display:inline-block; color: #e5e7eb; max-width: calc(100vw - 32px);">' +
-      '<div style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: rgb(123, 93, 74); font-family: &quot;Helvetica Neue&quot;, Arial, Helvetica, sans-serif;">' +
+      '<div class="spinning-momo-popup-title">' +
       clusterHeader +
       '</div>' +
       '<div data-sm-cluster-scroll="1" style="max-height: min(60vh, 420px); overflow-y: auto; overscroll-behavior: contain;">' +

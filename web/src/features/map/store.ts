@@ -14,6 +14,8 @@ export interface MapMarker {
 }
 
 export interface MapRenderOptions {
+  /** Leaflet 地图容器底色，用于填充无瓦片区域 */
+  mapBackgroundColor?: string
   /** 游戏地图标点外框底图（PNG） */
   markerPinBackgroundUrl?: string
   markerIconUrl?: string
@@ -31,6 +33,7 @@ export interface MapRuntimeOptions {
   clusterEnabled: boolean
   clusterRadius: number
   hoverCardEnabled: boolean
+  markersVisible: boolean
   thumbnailBaseUrl: string
   /** 聚合 hover 标题模板，含 {count}，由 i18n 注入 */
   clusterTitleTemplate?: string
@@ -44,6 +47,7 @@ export const useMapStore = defineStore('map', () => {
     clusterEnabled: true,
     clusterRadius: 44,
     hoverCardEnabled: true,
+    markersVisible: true,
     thumbnailBaseUrl: 'http://127.0.0.1:51206',
   })
 

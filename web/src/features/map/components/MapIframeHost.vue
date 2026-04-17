@@ -54,9 +54,7 @@ function syncClusterOptionsToMap() {
     {
       action: 'SET_CLUSTER_OPTIONS',
       payload: {
-        clusterEnabled: mapStore.runtimeOptions.clusterEnabled,
-        clusterRadius: mapStore.runtimeOptions.clusterRadius,
-        hoverCardEnabled: mapStore.runtimeOptions.hoverCardEnabled,
+        ...mapStore.runtimeOptions,
       },
     },
     MAP_ORIGIN
@@ -75,6 +73,7 @@ function syncRenderOptionsToMap() {
   }
 
   const options = {
+    mapBackgroundColor: mapStore.renderOptions.mapBackgroundColor,
     markerPinBackgroundUrl: mapStore.renderOptions.markerPinBackgroundUrl,
     markerIconUrl: mapStore.renderOptions.markerIconUrl,
     markerIconSize: mapStore.renderOptions.markerIconSize
@@ -157,13 +156,34 @@ type OpenGalleryAssetMessage = {
   }
 }
 
+type SetMarkersVisibleMessage = {
+  action: 'SPINNING_MOMO_SET_MARKERS_VISIBLE'
+  payload?: {
+    markersVisible?: boolean
+  }
+}
+
 async function handleMapMessage(event: MessageEvent<unknown>) {
   if (event.origin !== MAP_ORIGIN) {
     return
   }
 
-  const data = event.data as OpenGalleryAssetMessage
-  if (!data || data.action !== 'SPINNING_MOMO_OPEN_GALLERY_ASSET') {
+  const data = event.data as OpenGalleryAssetMessage | SetMarkersVisibleMessage
+  if (!data) {
+    return
+  }
+
+  if (data.action === 'SPINNING_MOMO_SET_MARKERS_VISIBLE') {
+    const markersVisible = data.payload?.markersVisible
+    if (typeof markersVisible !== 'boolean') {
+      return
+    }
+
+    mapStore.setRuntimeOptions({ markersVisible })
+    return
+  }
+
+  if (data.action !== 'SPINNING_MOMO_OPEN_GALLERY_ASSET') {
     return
   }
 

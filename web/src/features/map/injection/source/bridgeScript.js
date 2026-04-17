@@ -1,3 +1,5 @@
+import { buildRuntimeCoreSnippet } from './runtimeCore.js'
+
 export function buildMapBridgeScriptTemplate() {
   return `
 if (window.location.hostname === 'myl.nuanpaper.com') {
@@ -6,6 +8,8 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
     window.__SPINNING_MOMO_PENDING_MARKERS__ = [];
     window.__SPINNING_MOMO_RENDER_OPTIONS__ = {};
     window.__SPINNING_MOMO_CLUSTER_OPTIONS__ = {};
+
+${buildRuntimeCoreSnippet()}
 
     const normalizeRenderOptions = (options) => {
         if (!options || typeof options !== 'object') {
@@ -39,133 +43,21 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
         window.__SPINNING_MOMO_CLUSTER_OPTIONS__ = { ...options };
     };
 
-    const buildCompositePinIcon = (L, overlayInnerHtml) => {
-        if (!L || !L.divIcon) {
-            return null;
-        }
-        const options = window.__SPINNING_MOMO_RENDER_OPTIONS__ || {};
-        const defaultPinBg = 'https://assets.papegames.com/nikkiweb/infinitynikki/infinitynikki-map/img/58ca045d59db0f9cd8ad.png';
-        const pinBgUrl = options.markerPinBackgroundUrl || defaultPinBg;
-        const pinSize = 48;
-        const pa = options.popupAnchor || [0, -pinSize + 8];
-        const bgLayer = '<div style="position:absolute;inset:0;background-image:url(' + JSON.stringify(pinBgUrl) + ');background-size:contain;background-repeat:no-repeat;background-position:center;pointer-events:none;"></div>';
-        const html = '<div class="spinning-momo-pin-root" style="width:' + pinSize + 'px;height:' + pinSize + 'px;position:relative;overflow:visible;">' + bgLayer + overlayInnerHtml + '</div>';
-        return L.divIcon({
-            className: 'spinning-momo-composite-pin',
-            html: html,
-            iconSize: [pinSize, pinSize],
-            iconAnchor: [pinSize / 2, pinSize],
-            popupAnchor: pa
-        });
-    };
-
-    const buildSingleMarkerIcon = (L) => {
-        const options = window.__SPINNING_MOMO_RENDER_OPTIONS__ || {};
-        const itemUrl = options.markerIconUrl || '';
-        const markerIconSize = Array.isArray(options.markerIconSize) ? options.markerIconSize : [24, 24];
-        const rawW = Number(markerIconSize[0]);
-        const rawH = Number(markerIconSize[1]);
-        const itemW = Number.isFinite(rawW) && rawW > 0 ? rawW : 24;
-        const itemH = Number.isFinite(rawH) && rawH > 0 ? rawH : itemW;
-        const overlay = itemUrl
-            ? '<img src="' + itemUrl + '" alt="" style="position:absolute;left:50%;top:40%;transform:translate(calc(-50% - 2px),calc(-50% + 2px));width:' + itemW + 'px;height:' + itemH + 'px;object-fit:contain;pointer-events:none;z-index:1;" />'
-            : '';
-        return buildCompositePinIcon(L, overlay);
-    };
-
-    const ensureInteractivePanes = (map) => {
-        if (!map || !map.createPane || !map.getPane) {
-            return;
-        }
-
-        const markerPaneName = 'spinning-momo-marker-pane';
-        const popupPaneName = 'spinning-momo-popup-pane';
-
-        let markerPane = map.getPane(markerPaneName);
-        if (!markerPane) {
-            markerPane = map.createPane(markerPaneName);
-        }
-        if (markerPane) {
-            markerPane.style.zIndex = '950';
-            markerPane.style.pointerEvents = 'auto';
-        }
-
-        let popupPane = map.getPane(popupPaneName);
-        if (!popupPane) {
-            popupPane = map.createPane(popupPaneName);
-        }
-        if (popupPane) {
-            popupPane.style.zIndex = '1000';
-            popupPane.style.pointerEvents = 'auto';
-        }
-    };
-
-    const renderMarkers = (markers, shouldFlyToFirst = false) => {
-        window.__SPINNING_MOMO_PENDING_MARKERS__ = Array.isArray(markers) ? markers : [];
-
+    const maybeMountRuntime = (payload = {}) => {
         const map = window.__SPINNING_MOMO_MAP__;
         const L = window.L;
-        if (!map || !L) {
+        if (!map || !L || typeof mountOrUpdateMapRuntime !== 'function') {
             return;
         }
 
-        let layer = window.__SPINNING_MOMO_MARKER_LAYER__;
-        if (!layer) {
-            layer = L.layerGroup().addTo(map);
-            window.__SPINNING_MOMO_MARKER_LAYER__ = layer;
-        }
-        ensureInteractivePanes(map);
-
-        layer.clearLayers();
-        const customMarkerIcon = buildSingleMarkerIcon(L);
-        const renderOptions = window.__SPINNING_MOMO_RENDER_OPTIONS__ || {};
-        const openPopupOnHover = renderOptions.openPopupOnHover !== false;
-        const closePopupOnMouseOut = renderOptions.closePopupOnMouseOut !== false;
-
-        for (const markerData of markers) {
-            if (!markerData) continue;
-
-            const { lat, lng, popupHtml } = markerData;
-            if (lat === undefined || lng === undefined) continue;
-
-            const markerOptions = {
-                pane: 'spinning-momo-marker-pane',
-                interactive: true
-            };
-            if (customMarkerIcon) {
-                markerOptions.icon = customMarkerIcon;
-            }
-
-            const marker = L.marker([lat, lng], markerOptions).addTo(layer);
-            marker.on('add', () => {
-                const iconElement = marker.getElement ? marker.getElement() : null;
-                if (iconElement) {
-                    iconElement.style.cursor = 'pointer';
-                    iconElement.style.pointerEvents = 'auto';
-                }
-            });
-            if (popupHtml) {
-                marker.bindPopup(popupHtml, {
-                    pane: 'spinning-momo-popup-pane',
-                    autoPan: true,
-                    autoPanPaddingTopLeft: [16, 16,
-                    autoPanPaddingBottomRight: [16, 16],
-                });
-                if (openPopupOnHover) {
-                    marker.on('mouseover', () => marker.openPopup());
-                }
-                if (closePopupOnMouseOut) {
-                    marker.on('mouseout', () => marker.closePopup());
-                }
-            }
-        }
-
-        if (shouldFlyToFirst && markers.length > 0) {
-            const firstMarker = markers[0];
-            if (firstMarker?.lat !== undefined && firstMarker?.lng !== undefined) {
-                map.flyTo([firstMarker.lat, firstMarker.lng], 6);
-            }
-        }
+        mountOrUpdateMapRuntime({
+            L,
+            map,
+            markers: window.__SPINNING_MOMO_PENDING_MARKERS__,
+            renderOptions: window.__SPINNING_MOMO_RENDER_OPTIONS__ || {},
+            runtimeOptions: window.__SPINNING_MOMO_CLUSTER_OPTIONS__ || {},
+            flyToFirst: payload.flyToFirst === true,
+        });
     };
 
     Object.defineProperty(window, 'L', {
@@ -177,9 +69,7 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
                 innerL.Map = function(...args) {
                     const mapInstance = new OriginalMapClass(...args);
                     window.__SPINNING_MOMO_MAP__ = mapInstance;
-                    if (window.__SPINNING_MOMO_PENDING_MARKERS__.length > 0) {
-                        renderMarkers(window.__SPINNING_MOMO_PENDING_MARKERS__);
-                    }
+                    maybeMountRuntime();
                     return mapInstance;
                 };
                 innerL.Map.prototype = OriginalMapClass.prototype;
@@ -198,18 +88,20 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
 
         if (event.data.action === 'SET_MARKERS') {
             const { markers = [] } = event.data.payload || {};
-            renderMarkers(markers);
+            window.__SPINNING_MOMO_PENDING_MARKERS__ = Array.isArray(markers) ? markers : [];
+            maybeMountRuntime();
             return;
         }
 
         if (event.data.action === 'SET_RENDER_OPTIONS') {
             setRenderOptions(event.data.payload || {});
-            renderMarkers(window.__SPINNING_MOMO_PENDING_MARKERS__);
+            maybeMountRuntime();
             return;
         }
 
         if (event.data.action === 'SET_CLUSTER_OPTIONS') {
             setClusterOptions(event.data.payload || {});
+            maybeMountRuntime();
             return;
         }
 
@@ -239,7 +131,8 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
             }
 
             const pendingMarkers = window.__SPINNING_MOMO_PENDING_MARKERS__;
-            renderMarkers([...pendingMarkers, marker], true);
+            window.__SPINNING_MOMO_PENDING_MARKERS__ = [...pendingMarkers, marker];
+            maybeMountRuntime({ flyToFirst: true });
         }
     });
 }

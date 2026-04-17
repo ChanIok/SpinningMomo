@@ -23,6 +23,7 @@ const MAP_X_BIAS = 756015.585
 const MAP_Y_SCALE = 1.00001142
 const MAP_Y_BIAS = 392339.507
 const DEFAULT_MAP_RENDER_OPTIONS: MapRenderOptions = {
+  mapBackgroundColor: '#C7BFA7',
   markerPinBackgroundUrl:
     'https://assets.papegames.com/nikkiweb/infinitynikki/infinitynikki-map/img/58ca045d59db0f9cd8ad.png',
   markerIconUrl: 'https://webstatic.papegames.com/a6f47b49876cbaff/images/bg/EzoioGtm0TN1V9Ua.png',
@@ -116,25 +117,20 @@ function getThumbnailUrl(point: PhotoMapPoint): string {
 function buildPopupHtml(point: PhotoMapPoint): string {
   const title = escapeHtml(formatPopupTitleFromFilename(point.name, locale.value))
   const thumbnailUrl = getThumbnailUrl(point)
-  const clickableAttr = Number.isFinite(point.assetId)
-    ? ` data-sm-open-asset-id="${point.assetId}" data-sm-open-asset-index="${point.assetIndex}"`
-    : ''
-  const thumbnailSection = thumbnailUrl
-    ? `<div style="margin-top: 8px;">
-            <img
-              src="${thumbnailUrl}"
-              alt="${title}"
-              loading="lazy"
-              style="display: block; width: 180px; max-width: 100%; border-radius: 6px; background: #f2f2f2;"
-              onerror="this.style.display='none'; const fallback = this.nextElementSibling; if (fallback) fallback.style.display='block';"
-            />
-            <div style="display: none; font-size: 12px; color: #888;">缩略图加载失败</div>
-          </div>`
+  const thumbnailAttrs = thumbnailUrl
+    ? [
+        ` data-sm-thumbnail-url="${escapeHtml(thumbnailUrl)}"`,
+        Number.isFinite(point.assetId) ? ` data-sm-thumbnail-asset-id="${point.assetId}"` : '',
+        Number.isFinite(point.assetIndex)
+          ? ` data-sm-thumbnail-asset-index="${point.assetIndex}"`
+          : '',
+      ].join('')
     : ''
 
-  return `<div${clickableAttr} style="min-width: 180px; line-height: 1.5; cursor: pointer;">
-            <div style="font-size: 13px; font-weight: 600; margin-bottom: 4px; color: rgb(123, 93, 74); font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;">${title}</div>
-            ${thumbnailSection}
+  return `<div style="line-height: 1.5;">
+            <div class="spinning-momo-popup-body"${thumbnailAttrs}>
+              <div class="spinning-momo-popup-title">${title}</div>
+            </div>
           </div>`
 }
 

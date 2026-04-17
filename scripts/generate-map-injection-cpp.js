@@ -34,8 +34,6 @@ async function main() {
     "source",
     "index.js"
   );
-  const generatedScriptDir = path.join(projectRoot, "scripts", "generated");
-  const minifiedScriptPath = path.join(projectRoot, "scripts", "generated", "map_bridge.min.js");
   const generatedModulePath = path.join(
     projectRoot,
     "src",
@@ -60,13 +58,7 @@ async function main() {
     minify: true,
   });
 
-  fs.mkdirSync(generatedScriptDir, { recursive: true });
-  fs.writeFileSync(minifiedScriptPath, minified.code, "utf8");
-  console.log(
-    `Generated minified map bridge script: ${path.relative(projectRoot, minifiedScriptPath)}`
-  );
-
-  const scriptContent = fs.readFileSync(minifiedScriptPath, "utf8").trim();
+  const scriptContent = minified.code.trim();
   fs.mkdirSync(path.dirname(generatedModulePath), { recursive: true });
   fs.writeFileSync(generatedModulePath, toCppModule(scriptContent), "utf8");
 

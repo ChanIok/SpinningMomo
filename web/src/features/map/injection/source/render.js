@@ -1,5 +1,12 @@
 export function buildRenderSnippet() {
   return `
+  const applyMapBackground = () => {
+    const container = map && map.getContainer ? map.getContainer() : null;
+    if (!container) return;
+    const color = renderOptions.mapBackgroundColor || '#C7BFA7';
+    container.style.backgroundColor = String(color);
+  };
+
   const defaultPinBg =
     'https://assets.papegames.com/nikkiweb/infinitynikki/infinitynikki-map/img/58ca045d59db0f9cd8ad.png';
   const pinBgUrl = renderOptions.markerPinBackgroundUrl || defaultPinBg;
@@ -82,6 +89,7 @@ export function buildRenderSnippet() {
       marker.bindPopup(markerData.popupHtml, {
         pane: popupPaneName,
         className: markerPopupClassName,
+        closeButton: false,
         autoPan: true,
         autoPanPaddingTopLeft: [16, 16],
         autoPanPaddingBottomRight: [16, 16],
@@ -90,12 +98,15 @@ export function buildRenderSnippet() {
       if (openPopupOnHover) {
         marker.on('mouseover', () => {
           hoverState.markerHovered = true;
-          scheduleOpen(hoverState, () => marker.openPopup());
+          scheduleOpen(hoverState, () => {
+            void openPreparedMarkerPopup(hoverState, marker);
+          });
         });
       }
       if (closePopupOnMouseOut) {
         marker.on('mouseout', () => {
           hoverState.markerHovered = false;
+          invalidatePendingPopupOpen(hoverState);
           if (!hoverState.popupHovered) {
             scheduleClose(hoverState, () => marker.closePopup());
           }
@@ -105,32 +116,48 @@ export function buildRenderSnippet() {
   };
 
   const render = () => {
+    applyMapBackground();
     runtime.markerLayer.clearLayers();
     runtime.clusterLayer.clearLayers();
+    if (runtime.clusterHoverPopup && map.closePopup) {
+      map.closePopup(runtime.clusterHoverPopup);
+      runtime.activeClusterPopupOwner = null;
+    }
 
-    if (!clusterEnabled || markers.length <= 1 || !map.latLngToLayerPoint) {
-      markers.forEach(renderSingleMarker);
+    const markersVisible = runtimeOptions.markersVisible !== false;
+    if (!markersVisible) {
       return;
     }
 
-    const grouped = new Map();
-    for (const item of markers) {
-      if (item.lat === undefined || item.lng === undefined) continue;
-      const point = map.latLngToLayerPoint([item.lat, item.lng]);
-      const gridX = Math.round(point.x / clusterRadius);
-      const gridY = Math.round(point.y / clusterRadius);
-      const key = gridX + ':' + gridY;
-      if (!grouped.has(key)) grouped.set(key, []);
-      grouped.get(key).push(item);
+    if (!clusterEnabled || markers.length <= 1 || !map.latLngToLayerPoint) {
+      markers.forEach(renderSingleMarker);
+    } else {
+      const grouped = new Map();
+      for (const item of markers) {
+        if (item.lat === undefined || item.lng === undefined) continue;
+        const point = map.latLngToLayerPoint([item.lat, item.lng]);
+        const gridX = Math.round(point.x / clusterRadius);
+        const gridY = Math.round(point.y / clusterRadius);
+        const key = gridX + ':' + gridY;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(item);
+      }
+
+      grouped.forEach((clusterMarkers) => {
+        if (clusterMarkers.length <= 1) {
+          renderSingleMarker(clusterMarkers[0]);
+          return;
+        }
+        renderClusterMarker(clusterMarkers);
+      });
     }
 
-    grouped.forEach((clusterMarkers) => {
-      if (clusterMarkers.length <= 1) {
-        renderSingleMarker(clusterMarkers[0]);
-        return;
+    if (shouldFlyToFirst && markers.length > 0) {
+      const firstMarker = markers[0];
+      if (firstMarker?.lat !== undefined && firstMarker?.lng !== undefined && map.flyTo) {
+        map.flyTo([firstMarker.lat, firstMarker.lng], 6);
       }
-      renderClusterMarker(clusterMarkers);
-    });
+    }
   };
 
   runtime.render = render;
