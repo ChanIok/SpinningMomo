@@ -31,13 +31,11 @@
       JScriptCall="DetectRunningSpinningMomo"
       Execute="immediate"
       Return="check" />
-    <!-- 彻底卸载时递归删除 %LocalAppData%\SpinningMomo；升级卸载旧版时不执行（避免清库） -->
+    <!-- Type 51：由 MSI 设置 REMOVEAPPDATADIR（避免 JScript 写 Session.Property 在部分系统上无效） -->
     <CustomAction
-      Id="PrepareRemoveAppDataRoot"
-      BinaryRef="CleanupAppDataScript"
-      JScriptCall="PrepareRemoveAppDataRoot"
-      Execute="immediate"
-      Return="ignore" />
+      Id="SetRemoveAppDataDir"
+      Property="REMOVEAPPDATADIR"
+      Value="[LocalAppDataFolder]SpinningMomo" />
     <!-- Id 必须全大写：deferred+Impersonate 时仅「公共属性」会写入 CustomActionData，否则路径传不进去 -->
     <CustomAction
       Id="REMOVEAPPDATADIR"
@@ -56,7 +54,7 @@
         Action="DetectRunningSpinningMomo"
         Before="LaunchConditions" />
       <Custom
-        Action="PrepareRemoveAppDataRoot"
+        Action="SetRemoveAppDataDir"
         Before="REMOVEAPPDATADIR"
         Condition='REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE' />
       <Custom
@@ -110,10 +108,6 @@
 
     <!-- UI: Use WiX standard install directory UI -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <Property Id="APPDATAROOT">
-      <RegistrySearch Id="SearchAppDataRoot" Root="HKCU" Key="Software\SpinningMomo"
-                      Name="AppDataRoot" Type="raw" />
-    </Property>
     <WixVariable Id="WixUILicenseRtf" Value="$(var.ProjectDir)\installer\License.rtf" />
     <ui:WixUI Id="WixUI_InstallDir" />
 
@@ -214,7 +208,7 @@
     </Component>
   </Fragment>
 
-  <!-- Remove app data on uninstall（递归删除由 CleanupAppDataRoot.js 的 deferred CA 完成，避免 RemoveFolderEx 枚举整棵树） -->
+  <!-- Remove app data on uninstall（路径由 SetRemoveAppDataDir 写入 REMOVEAPPDATADIR；递归删除由 CleanupAppDataRoot.js 的 deferred CA 完成） -->
   <Fragment>
     <Component Id="CleanupUserData" Directory="INSTALLFOLDER" Guid="7DF1D902-6FF4-43EF-B58A-837AE33B4494">
       <!-- Remove install folder itself if empty -->
