@@ -5,6 +5,8 @@ export function buildPopupSnippet() {
   const popupOpenDelayMs = Math.max(0, Number(renderOptions.popupOpenDelayMs ?? 180));
   const popupCloseDelayMs = Math.max(0, Number(renderOptions.popupCloseDelayMs ?? 260));
   const keepPopupVisibleOnHover = renderOptions.keepPopupVisibleOnHover !== false;
+  const hoverCardBottomOffsetPx = 16;
+  const hoverCardTopOffsetPx = 52;
 
   const scheduleOpen = (state, callback) => {
     if (state.closeTimer) {
@@ -127,73 +129,6 @@ export function buildPopupSnippet() {
     body.removeAttribute('data-sm-thumbnail-asset-index');
   };
 
-  const prepareMarkerPopupContent = async (marker) => {
-    if (!marker || !marker.getPopup) {
-      return;
-    }
-
-    const popup = marker.getPopup();
-    if (!popup || !popup.getContent || !popup.setContent) {
-      return;
-    }
-
-    const popupContent = popup.getContent();
-    if (typeof popupContent !== 'string' || popupContent.length === 0) {
-      return;
-    }
-
-    const template = document.createElement('template');
-    template.innerHTML = popupContent.trim();
-    const rootElement = template.content.firstElementChild;
-    if (!rootElement || !rootElement.querySelector) {
-      return;
-    }
-
-    const body = rootElement.querySelector('.spinning-momo-popup-body');
-    if (!body || !body.getAttribute) {
-      return;
-    }
-
-    const thumbnailUrl = body.getAttribute('data-sm-thumbnail-url');
-    if (!thumbnailUrl) {
-      return;
-    }
-
-    const imageMeta = await preloadPopupThumbnail(thumbnailUrl);
-    buildPreparedThumbnailBlock(rootElement, thumbnailUrl, imageMeta);
-    popup.setContent(rootElement.outerHTML);
-  };
-
-  const openPreparedMarkerPopup = async (state, marker) => {
-    if (!marker || !marker.getPopup) {
-      return;
-    }
-
-    const popup = marker.getPopup();
-    if (!popup) {
-      return;
-    }
-
-    const requestId = Number(state.pendingOpenRequestId || 0) + 1;
-    state.pendingOpenRequestId = requestId;
-
-    try {
-      await prepareMarkerPopupContent(marker);
-    } catch (error) {
-      console.error('[SpinningMomo] Failed to prepare marker popup content:', error);
-    }
-
-    if (Number(state.pendingOpenRequestId || 0) !== requestId) {
-      return;
-    }
-
-    if (!state.markerHovered && !state.popupHovered) {
-      return;
-    }
-
-    marker.openPopup();
-  };
-
   const bindPopupCardClickBridge = (rootElement) => {
     if (!rootElement || !rootElement.querySelectorAll) return;
 
@@ -237,32 +172,213 @@ export function buildPopupSnippet() {
     });
   };
 
-  const bindPopupHoverBridge = (state, marker) => {
-    if (!keepPopupVisibleOnHover || !marker || !marker.getPopup) {
+  const ensureHoverCardRoot = () => {
+    const container = map && map.getContainer ? map.getContainer() : null;
+    if (!container) {
+      return null;
+    }
+
+    if (runtime.hoverCardRoot && runtime.hoverCardRoot.isConnected) {
+      return runtime.hoverCardRoot;
+    }
+
+    const root = document.createElement('div');
+    root.className = 'spinning-momo-hover-card-root is-hidden';
+    root.addEventListener('mouseenter', () => {
+      if (!keepPopupVisibleOnHover) {
+        return;
+      }
+      const activeContext = runtime.activeHoverCardContext;
+      if (!activeContext) {
+        return;
+      }
+      activeContext.state.popupHovered = true;
+      if (activeContext.state.closeTimer) {
+        clearTimeout(activeContext.state.closeTimer);
+        activeContext.state.closeTimer = null;
+      }
+    });
+
+    root.addEventListener('mouseleave', () => {
+      if (!keepPopupVisibleOnHover) {
+        return;
+      }
+      const activeContext = runtime.activeHoverCardContext;
+      if (!activeContext) {
+        return;
+      }
+      activeContext.state.popupHovered = false;
+      if (!activeContext.state.markerHovered && closePopupOnMouseOut) {
+        scheduleClose(activeContext.state, () => hideHoverCard(activeContext.ownerId));
+      }
+    });
+
+    container.appendChild(root);
+    runtime.hoverCardRoot = root;
+    return root;
+  };
+
+  const hideHoverCard = (ownerId) => {
+    if (ownerId && runtime.activeHoverCardOwner && runtime.activeHoverCardOwner !== ownerId) {
       return;
     }
 
-    marker.on('popupopen', () => {
-      const popup = marker.getPopup ? marker.getPopup() : null;
-      const popupElement = popup && popup.getElement ? popup.getElement() : null;
-      if (!popupElement) return;
+    const root = runtime.hoverCardRoot;
+    if (!root) {
+      runtime.activeHoverCardOwner = null;
+      runtime.activeHoverCardContext = null;
+      return;
+    }
 
-      bindPopupCardClickBridge(popupElement);
+    root.innerHTML = '';
+    root.classList.add('is-hidden');
+    root.removeAttribute('data-placement');
+    runtime.activeHoverCardOwner = null;
+    runtime.activeHoverCardContext = null;
+  };
 
-      popupElement.addEventListener('mouseenter', () => {
-        state.popupHovered = true;
-        if (state.closeTimer) {
-          clearTimeout(state.closeTimer);
-          state.closeTimer = null;
-        }
-      });
+  const bindHoverCardMapCloseBridge = () => {
+    if (runtime.boundHideHoverCardOnMapMove || !map || !map.on) {
+      return;
+    }
 
-      popupElement.addEventListener('mouseleave', () => {
-        state.popupHovered = false;
-        if (!state.markerHovered && closePopupOnMouseOut) {
-          scheduleClose(state, () => marker.closePopup());
-        }
-      });
+    runtime.boundHideHoverCardOnMapMove = () => {
+      hideHoverCard();
+    };
+    map.on('movestart', runtime.boundHideHoverCardOnMapMove);
+    map.on('zoomstart', runtime.boundHideHoverCardOnMapMove);
+    map.on('resize', runtime.boundHideHoverCardOnMapMove);
+  };
+
+  const getHoverCardPlacement = (latLng) => {
+    const container = map && map.getContainer ? map.getContainer() : null;
+    const point = map && map.latLngToContainerPoint ? map.latLngToContainerPoint(latLng) : null;
+    if (!container || !point) {
+      return 'top';
+    }
+
+    const containerHeight = Number(container.clientHeight || 0);
+    if (!Number.isFinite(containerHeight) || containerHeight <= 0) {
+      return 'top';
+    }
+
+    return Number(point.y || 0) < containerHeight / 2 ? 'bottom' : 'top';
+  };
+
+  const positionHoverCardRoot = (root, latLng, placement) => {
+    if (!root || !map || !map.latLngToContainerPoint) {
+      return false;
+    }
+
+    const point = map.latLngToContainerPoint(latLng);
+    if (!point) {
+      return false;
+    }
+
+    root.style.left = String(Number(point.x || 0)) + 'px';
+    if (placement === 'bottom') {
+      root.style.top = String(Number(point.y || 0) + hoverCardBottomOffsetPx) + 'px';
+      root.style.transform = 'translate(-50%, 0)';
+    } else {
+      root.style.top = String(Number(point.y || 0) - hoverCardTopOffsetPx) + 'px';
+      root.style.transform = 'translate(-50%, -100%)';
+    }
+    root.dataset.placement = placement;
+    return true;
+  };
+
+  const prepareHoverCardContent = async (contentHtml) => {
+    if (typeof contentHtml !== 'string' || contentHtml.length === 0) {
+      return '';
+    }
+
+    const template = document.createElement('template');
+    template.innerHTML = contentHtml.trim();
+    const rootElement = template.content.firstElementChild;
+    if (!rootElement || !rootElement.querySelector) {
+      return contentHtml;
+    }
+
+    const body = rootElement.querySelector('.spinning-momo-popup-body');
+    if (!body || !body.getAttribute) {
+      return rootElement.outerHTML;
+    }
+
+    const thumbnailUrl = body.getAttribute('data-sm-thumbnail-url');
+    if (thumbnailUrl) {
+      const imageMeta = await preloadPopupThumbnail(thumbnailUrl);
+      buildPreparedThumbnailBlock(rootElement, thumbnailUrl, imageMeta);
+    }
+
+    return rootElement.outerHTML;
+  };
+
+  const showHoverCard = (state, options) => {
+    if (!options || !options.latLng) {
+      return null;
+    }
+
+    bindHoverCardMapCloseBridge();
+    const root = ensureHoverCardRoot();
+    if (!root) {
+      return null;
+    }
+
+    const placement = options.placement || getHoverCardPlacement(options.latLng);
+    root.innerHTML =
+      '<div class="spinning-momo-hover-card-shell">' +
+      '<div class="spinning-momo-hover-card-inner">' +
+      options.contentHtml +
+      '</div>' +
+      '<div class="spinning-momo-hover-card-caret"></div>' +
+      '</div>';
+
+    if (!positionHoverCardRoot(root, options.latLng, placement)) {
+      root.innerHTML = '';
+      return null;
+    }
+
+    runtime.activeHoverCardOwner = options.ownerId || null;
+    runtime.activeHoverCardContext = {
+      ownerId: options.ownerId || null,
+      state,
+    };
+    root.classList.remove('is-hidden');
+
+    bindPopupCardClickBridge(root);
+    if (typeof options.afterOpen === 'function') {
+      options.afterOpen(root);
+    }
+
+    return root;
+  };
+
+  const openPreparedHoverCard = async (state, options) => {
+    if (!options || !options.latLng) {
+      return;
+    }
+
+    const requestId = Number(state.pendingOpenRequestId || 0) + 1;
+    state.pendingOpenRequestId = requestId;
+
+    let preparedContent = '';
+    try {
+      preparedContent = await prepareHoverCardContent(options.contentHtml);
+    } catch (error) {
+      console.error('[SpinningMomo] Failed to prepare hover card content:', error);
+    }
+
+    if (Number(state.pendingOpenRequestId || 0) !== requestId) {
+      return;
+    }
+
+    if (!state.markerHovered && !state.popupHovered) {
+      return;
+    }
+
+    showHoverCard(state, {
+      ...options,
+      contentHtml: preparedContent,
     });
   };
 `

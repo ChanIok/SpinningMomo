@@ -19,7 +19,6 @@ export function buildRenderSnippet() {
 
   const buildCompositePinIcon = (overlayInnerHtml) => {
     if (!L.divIcon) return null;
-    const pa = renderOptions.popupAnchor || [0, -pinSize + 8];
     const html =
       '<div class="spinning-momo-pin-root" style="width:' +
       pinSize +
@@ -36,7 +35,6 @@ export function buildRenderSnippet() {
       html: html,
       iconSize: [pinSize, pinSize],
       iconAnchor: [pinSize / 2, pinSize],
-      popupAnchor: pa,
     });
   };
 
@@ -64,6 +62,8 @@ export function buildRenderSnippet() {
 
   const renderSingleMarker = (markerData) => {
     const compositeIcon = buildSingleMarkerIcon();
+    const markerOwnerId =
+      'marker:' + String(markerData.assetId ?? markerData.name ?? (String(markerData.lat) + ',' + String(markerData.lng)));
     const markerOptions = {
       pane: markerPaneName,
       interactive: true,
@@ -86,20 +86,15 @@ export function buildRenderSnippet() {
     });
 
     if (markerData.popupHtml) {
-      marker.bindPopup(markerData.popupHtml, {
-        pane: popupPaneName,
-        className: markerPopupClassName,
-        closeButton: false,
-        autoPan: true,
-        autoPanPaddingTopLeft: [16, 16],
-        autoPanPaddingBottomRight: [16, 16],
-      });
-      bindPopupHoverBridge(hoverState, marker);
       if (openPopupOnHover) {
         marker.on('mouseover', () => {
           hoverState.markerHovered = true;
           scheduleOpen(hoverState, () => {
-            void openPreparedMarkerPopup(hoverState, marker);
+            void openPreparedHoverCard(hoverState, {
+              ownerId: markerOwnerId,
+              latLng: [markerData.lat, markerData.lng],
+              contentHtml: markerData.popupHtml,
+            });
           });
         });
       }
@@ -108,7 +103,7 @@ export function buildRenderSnippet() {
           hoverState.markerHovered = false;
           invalidatePendingPopupOpen(hoverState);
           if (!hoverState.popupHovered) {
-            scheduleClose(hoverState, () => marker.closePopup());
+            scheduleClose(hoverState, () => hideHoverCard(markerOwnerId));
           }
         });
       }
@@ -117,12 +112,9 @@ export function buildRenderSnippet() {
 
   const render = () => {
     applyMapBackground();
+    hideHoverCard();
     runtime.markerLayer.clearLayers();
     runtime.clusterLayer.clearLayers();
-    if (runtime.clusterHoverPopup && map.closePopup) {
-      map.closePopup(runtime.clusterHoverPopup);
-      runtime.activeClusterPopupOwner = null;
-    }
 
     const markersVisible = runtimeOptions.markersVisible !== false;
     if (!markersVisible) {

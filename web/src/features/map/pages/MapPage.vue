@@ -29,7 +29,6 @@ const DEFAULT_MAP_RENDER_OPTIONS: MapRenderOptions = {
   markerIconUrl: 'https://webstatic.papegames.com/a6f47b49876cbaff/images/bg/EzoioGtm0TN1V9Ua.png',
   markerIconSize: [32, 32],
   markerIconAnchor: [14, 14],
-  popupAnchor: [0, -14],
   openPopupOnHover: true,
   closePopupOnMouseOut: true,
   popupOpenDelayMs: 180,

@@ -30,20 +30,27 @@ ${buildPaneStyleSnippet()}
         runtime.boundMap.off('zoomend', runtime.boundRecluster);
         runtime.boundMap.off('moveend', runtime.boundRecluster);
       }
+      if (runtime.boundHideHoverCardOnMapMove && runtime.boundMap.off) {
+        runtime.boundMap.off('movestart', runtime.boundHideHoverCardOnMapMove);
+        runtime.boundMap.off('zoomstart', runtime.boundHideHoverCardOnMapMove);
+        runtime.boundMap.off('resize', runtime.boundHideHoverCardOnMapMove);
+      }
       if (runtime.markerLayer && runtime.markerLayer.remove) {
         runtime.markerLayer.remove();
       }
       if (runtime.clusterLayer && runtime.clusterLayer.remove) {
         runtime.clusterLayer.remove();
       }
-      if (runtime.clusterHoverPopup && runtime.boundMap.closePopup) {
-        runtime.boundMap.closePopup(runtime.clusterHoverPopup);
+      if (runtime.hoverCardRoot && runtime.hoverCardRoot.remove) {
+        runtime.hoverCardRoot.remove();
       }
       runtime.markerLayer = null;
       runtime.clusterLayer = null;
-      runtime.clusterHoverPopup = null;
       runtime.boundRecluster = null;
-      runtime.activeClusterPopupOwner = null;
+      runtime.hoverCardRoot = null;
+      runtime.boundHideHoverCardOnMapMove = null;
+      runtime.activeHoverCardOwner = null;
+      runtime.activeHoverCardContext = null;
     }
 
     runtime.boundMap = map;
@@ -53,20 +60,6 @@ ${buildPaneStyleSnippet()}
     }
     if (!runtime.clusterLayer) {
       runtime.clusterLayer = L.layerGroup().addTo(map);
-    }
-    if (!runtime.clusterHoverPopup) {
-      runtime.clusterHoverPopup = L.popup({
-        pane: clusterPopupPaneName,
-        autoPan: true,
-        autoPanPaddingTopLeft: [16, 16],
-        autoPanPaddingBottomRight: [16, 16],
-        closeButton: false,
-        className: clusterPopupClassName,
-        offset: [0, -10],
-      });
-    }
-    if (!runtime.activeClusterPopupOwner) {
-      runtime.activeClusterPopupOwner = null;
     }
 
     runtime.markers = markers;

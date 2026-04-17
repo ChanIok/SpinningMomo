@@ -21,7 +21,6 @@ export interface MapRenderOptions {
   markerIconUrl?: string
   markerIconSize?: [number, number]
   markerIconAnchor?: [number, number]
-  popupAnchor?: [number, number]
   openPopupOnHover?: boolean
   closePopupOnMouseOut?: boolean
   popupOpenDelayMs?: number

@@ -63,7 +63,7 @@ export function buildClusterSnippet() {
     const titleTpl = runtimeOptions.clusterTitleTemplate || '{count} 张照片';
     const clusterHeader = String(titleTpl).replace(/\\{count\\}/g, String(clusterMarkers.length));
 
-    return '<div style="color: #e5e7eb;">' +
+    return '<div style="padding:0.75rem;">' +
       '<div class="spinning-momo-popup-title">' + clusterHeader + '</div>' +
       buildClusterHoverGridHtml(previewItems, gridColumns, cellPx) +
     '</div>';
@@ -77,7 +77,7 @@ export function buildClusterSnippet() {
     const gridColumns = 3;
 
     return (
-      '<div style="display:inline-block; color: #e5e7eb; max-width: calc(100vw - 32px);">' +
+      '<div style="display:inline-block; padding:0.75rem; max-width: calc(100vw - 32px);">' +
       '<div class="spinning-momo-popup-title">' +
       clusterHeader +
       '</div>' +
@@ -110,28 +110,28 @@ export function buildClusterSnippet() {
       closeTimer: null,
     };
 
-    const bindClusterPopupHoverBridge = () => {
-      if (!keepPopupVisibleOnHover || !runtime.clusterHoverPopup || !runtime.clusterHoverPopup.getElement) return;
-      const popupElement = runtime.clusterHoverPopup.getElement();
-      if (!popupElement) return;
+    const bindClusterHoverCardInteractions = (rootElement) => {
+      if (!rootElement || !rootElement.querySelector) {
+        return;
+      }
 
-      bindPopupCardClickBridge(popupElement);
-
-      const expandTarget = popupElement.querySelector('[data-sm-cluster-expand]');
+      const expandTarget = rootElement.querySelector('[data-sm-cluster-expand]');
       if (expandTarget && !expandTarget.dataset.smClusterExpandBound) {
         expandTarget.dataset.smClusterExpandBound = 'true';
         expandTarget.addEventListener('click', (event) => {
           event.preventDefault();
           event.stopPropagation();
-          if (!runtime.clusterHoverPopup || !runtime.clusterHoverPopup.setContent) {
-            return;
-          }
-          runtime.clusterHoverPopup.setContent(buildClusterHoverExpandedHtml(clusterMarkers));
-          bindClusterPopupHoverBridge();
+          hoverState.popupHovered = true;
+          showHoverCard(hoverState, {
+            ownerId: clusterOwnerId,
+            latLng: [lat, lng],
+            contentHtml: buildClusterHoverExpandedHtml(clusterMarkers),
+            afterOpen: bindClusterHoverCardInteractions,
+          });
         });
       }
 
-      const scrollRoot = popupElement.querySelector('[data-sm-cluster-scroll]');
+      const scrollRoot = rootElement.querySelector('[data-sm-cluster-scroll]');
       if (scrollRoot && !scrollRoot.dataset.smClusterScrollWheelBound) {
         scrollRoot.dataset.smClusterScrollWheelBound = 'true';
         scrollRoot.addEventListener(
@@ -142,20 +142,6 @@ export function buildClusterSnippet() {
           { passive: true }
         );
       }
-
-      popupElement.onmouseenter = () => {
-        hoverState.popupHovered = true;
-        if (hoverState.closeTimer) {
-          clearTimeout(hoverState.closeTimer);
-          hoverState.closeTimer = null;
-        }
-      };
-      popupElement.onmouseleave = () => {
-        hoverState.popupHovered = false;
-        if (!hoverState.markerHovered) {
-          scheduleClose(hoverState, () => map.closePopup(runtime.clusterHoverPopup));
-        }
-      };
     };
 
     marker.on('mouseover', () => {
@@ -166,12 +152,12 @@ export function buildClusterSnippet() {
       }
       if (!hoverCardEnabled) return;
       scheduleOpen(hoverState, () => {
-        runtime.activeClusterPopupOwner = clusterOwnerId;
-        runtime.clusterHoverPopup
-          .setLatLng([lat, lng])
-          .setContent(buildClusterHoverHtml(clusterMarkers))
-          .openOn(map);
-        bindClusterPopupHoverBridge();
+        void openPreparedHoverCard(hoverState, {
+          ownerId: clusterOwnerId,
+          latLng: [lat, lng],
+          contentHtml: buildClusterHoverHtml(clusterMarkers),
+          afterOpen: bindClusterHoverCardInteractions,
+        });
       });
     });
 
@@ -180,11 +166,7 @@ export function buildClusterSnippet() {
       if (hoverCardEnabled) {
         if (!hoverState.popupHovered) {
           scheduleClose(hoverState, () => {
-            if (runtime.activeClusterPopupOwner !== clusterOwnerId) {
-              return;
-            }
-            runtime.activeClusterPopupOwner = null;
-            map.closePopup(runtime.clusterHoverPopup);
+            hideHoverCard(clusterOwnerId);
           });
         }
       }

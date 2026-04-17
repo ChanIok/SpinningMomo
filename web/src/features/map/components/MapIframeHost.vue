@@ -82,9 +82,6 @@ function syncRenderOptionsToMap() {
     markerIconAnchor: mapStore.renderOptions.markerIconAnchor
       ? [...mapStore.renderOptions.markerIconAnchor]
       : undefined,
-    popupAnchor: mapStore.renderOptions.popupAnchor
-      ? [...mapStore.renderOptions.popupAnchor]
-      : undefined,
     openPopupOnHover: mapStore.renderOptions.openPopupOnHover,
     closePopupOnMouseOut: mapStore.renderOptions.closePopupOnMouseOut,
     popupOpenDelayMs: mapStore.renderOptions.popupOpenDelayMs,
@@ -120,9 +117,6 @@ function injectDevScript() {
         : undefined,
       markerIconAnchor: mapStore.renderOptions.markerIconAnchor
         ? [...mapStore.renderOptions.markerIconAnchor]
-        : undefined,
-      popupAnchor: mapStore.renderOptions.popupAnchor
-        ? [...mapStore.renderOptions.popupAnchor]
         : undefined,
     },
     runtimeOptions: {

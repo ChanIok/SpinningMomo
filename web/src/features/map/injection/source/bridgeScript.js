@@ -24,9 +24,6 @@ ${buildRuntimeCoreSnippet()}
         if (!Array.isArray(normalized.markerIconAnchor) || normalized.markerIconAnchor.length !== 2) {
             normalized.markerIconAnchor = undefined;
         }
-        if (!Array.isArray(normalized.popupAnchor) || normalized.popupAnchor.length !== 2) {
-            normalized.popupAnchor = undefined;
-        }
 
         return normalized;
     };
