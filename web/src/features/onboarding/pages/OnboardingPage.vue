@@ -36,7 +36,12 @@ const isSubmitting = ref(false)
 const stepError = ref('')
 
 const language = ref<string>(store.appSettings.app.language.current)
-const themeMode = ref<WebThemeMode>(store.appSettings.ui.webTheme.mode)
+const normalizeOnboardingTheme = (mode: WebThemeMode): 'light' | 'dark' =>
+  mode === 'dark' ? 'dark' : 'light'
+
+const themeMode = ref<'light' | 'dark'>(
+  normalizeOnboardingTheme(store.appSettings.ui.webTheme.mode)
+)
 const targetTitle = ref<string>(store.appSettings.window.targetTitle || '')
 const configuredInfinityNikkiGameDir = ref<string>(
   store.appSettings.extensions.infinityNikki.gameDir
@@ -54,21 +59,8 @@ const isDefaultInfinityNikkiTargetTitle = (title: string) =>
   title === '无限暖暖  ' || title === 'Infinity Nikki  '
 const isInfinityNikkiUser = computed(() => resolvedInfinityNikkiGameDir.value !== null)
 
-const resolveThemePresetMode = (mode: WebThemeMode): 'light' | 'dark' => {
-  if (mode === 'light' || mode === 'dark') {
-    return mode
-  }
-
-  if (typeof window === 'undefined') {
-    return 'dark'
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-const getDefaultOverlayColorsByTheme = (mode: WebThemeMode): string[] => {
-  const resolvedTheme = resolveThemePresetMode(mode)
-  const firstPreset = OVERLAY_PALETTE_PRESETS.find((preset) => preset.themeMode === resolvedTheme)
+const getDefaultOverlayColorsByTheme = (mode: 'light' | 'dark'): string[] => {
+  const firstPreset = OVERLAY_PALETTE_PRESETS.find((preset) => preset.themeMode === mode)
 
   if (!firstPreset) {
     return [...store.appSettings.ui.background.overlayColors]
@@ -77,11 +69,9 @@ const getDefaultOverlayColorsByTheme = (mode: WebThemeMode): string[] => {
   return firstPreset.colors.slice(0, firstPreset.mode)
 }
 
-const getFloatingWindowThemeByWebTheme = (mode: WebThemeMode): FloatingWindowThemeMode => {
-  return resolveThemePresetMode(mode)
-}
+const getFloatingWindowThemeByWebTheme = (mode: 'light' | 'dark'): FloatingWindowThemeMode => mode
 
-const getFloatingWindowColorsByWebTheme = (mode: WebThemeMode) => {
+const getFloatingWindowColorsByWebTheme = (mode: 'light' | 'dark') => {
   const floatingWindowTheme = getFloatingWindowThemeByWebTheme(mode)
   return floatingWindowTheme === 'light'
     ? LIGHT_FLOATING_WINDOW_COLORS
@@ -100,6 +90,7 @@ const syncPreviewAppearance = () => {
       background: {
         ...store.appSettings.ui.background,
         overlayColors: getDefaultOverlayColorsByTheme(themeMode.value),
+        overlayOpacity: 1,
       },
     },
   }
@@ -266,6 +257,7 @@ const completeOnboarding = async () => {
         background: {
           ...store.appSettings.ui.background,
           overlayColors: getDefaultOverlayColorsByTheme(themeMode.value),
+          overlayOpacity: 0.8,
         },
       },
       window: {
@@ -362,7 +354,7 @@ const completeOnboarding = async () => {
                   <p class="text-sm text-foreground">{{ t('onboarding.step1.themeLabel') }}</p>
                   <Select
                     :model-value="themeMode"
-                    @update:model-value="(v) => (themeMode = v as WebThemeMode)"
+                    @update:model-value="(v) => (themeMode = v as 'light' | 'dark')"
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -373,9 +365,6 @@ const completeOnboarding = async () => {
                       }}</SelectItem>
                       <SelectItem value="dark">{{
                         t('settings.appearance.theme.dark')
-                      }}</SelectItem>
-                      <SelectItem value="system">{{
-                        t('settings.appearance.theme.system')
                       }}</SelectItem>
                     </SelectContent>
                   </Select>
@@ -433,12 +422,13 @@ const completeOnboarding = async () => {
 
           <div
             v-if="step < 3"
-            class="flex items-center justify-between"
-            :class="[stepError && 'mt-4']"
+            class="flex items-center"
+            :class="[isFirstStep ? 'justify-end' : 'justify-between', stepError && 'mt-4']"
           >
             <Button
+              v-if="!isFirstStep"
               variant="outline"
-              :disabled="isFirstStep || isSubmitting"
+              :disabled="isSubmitting"
               @click="goToPreviousStep"
             >
               {{ t('onboarding.actions.previous') }}

@@ -63,8 +63,12 @@ const { t } = useI18n()
 const themeOptions = [
   { value: 'light', label: t('settings.appearance.theme.light') },
   { value: 'dark', label: t('settings.appearance.theme.dark') },
-  { value: 'system', label: t('settings.appearance.theme.system') },
 ]
+
+const webThemeSelectValue = computed(() => {
+  const m = appSettings.value.ui.webTheme.mode
+  return m === 'dark' ? 'dark' : 'light'
+})
 const customCssDraft = ref('')
 
 watch(
@@ -225,6 +229,96 @@ const handleClearError = () => {
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.appearance.quickSetup.title') }}
+          </h3>
+        </div>
+
+        <ItemGroup>
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.image.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.image.autoThemeDescription') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Button variant="outline" size="sm" @click="handleBackgroundImageSelect">
+                {{ t('settings.appearance.background.image.selectButton') }}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                @click="handleBackgroundImageRemove"
+                :disabled="appSettings.ui?.background?.type === 'none'"
+              >
+                {{ t('settings.appearance.background.image.removeButton') }}
+              </Button>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.theme.primaryColor.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.theme.primaryColor.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Popover>
+                <PopoverTrigger as-child>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    class="h-9 w-[13rem] justify-start gap-2 px-2 font-mono text-xs"
+                  >
+                    <div
+                      class="h-5 w-8 shrink-0 rounded-sm border border-border/70"
+                      :style="{ backgroundColor: appSettings.ui.background.primaryColor }"
+                    />
+                    <span class="text-muted-foreground">
+                      {{ appSettings.ui.background.primaryColor }}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" class="w-auto p-3">
+                  <ColorPicker
+                    :model-value="appSettings.ui.background.primaryColor"
+                    @update:model-value="handlePrimaryColorChange"
+                  />
+                </PopoverContent>
+              </Popover>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.appearance.background.overlayPalette.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.appearance.background.overlayPalette.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <OverlayPaletteEditor
+                :model-value="overlayPalette"
+                :show-wallpaper-sampler="canSampleOverlayPaletteFromWallpaper"
+                @update:model-value="handleOverlayPaletteChange"
+                @apply-preset="handleOverlayPresetApply"
+                @sample-from-wallpaper="handleOverlaySampleFromWallpaper"
+              />
+            </ItemActions>
+          </Item>
+        </ItemGroup>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
             {{ t('settings.appearance.background.title') }}
           </h3>
           <p class="mt-1 text-sm text-muted-foreground">
@@ -314,26 +408,6 @@ const handleClearError = () => {
           <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
-                {{ t('settings.appearance.background.overlayPalette.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.appearance.background.overlayPalette.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <OverlayPaletteEditor
-                :model-value="overlayPalette"
-                :show-wallpaper-sampler="canSampleOverlayPaletteFromWallpaper"
-                @update:model-value="handleOverlayPaletteChange"
-                @apply-preset="handleOverlayPresetApply"
-                @sample-from-wallpaper="handleOverlaySampleFromWallpaper"
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="surface" size="sm">
-            <ItemContent>
-              <ItemTitle>
                 {{ t('settings.appearance.background.surfaceOpacity.label') }}
               </ItemTitle>
               <ItemDescription>
@@ -354,27 +428,6 @@ const handleClearError = () => {
                   {{ (appSettings.ui.background.surfaceOpacity * 100).toFixed(0) }}%
                 </span>
               </div>
-            </ItemActions>
-          </Item>
-
-          <Item variant="surface" size="sm">
-            <ItemContent>
-              <ItemTitle>
-                {{ t('settings.appearance.background.image.label') }}
-              </ItemTitle>
-            </ItemContent>
-            <ItemActions>
-              <Button variant="outline" size="sm" @click="handleBackgroundImageSelect">
-                {{ t('settings.appearance.background.image.selectButton') }}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                @click="handleBackgroundImageRemove"
-                :disabled="appSettings.ui?.background?.type === 'none'"
-              >
-                {{ t('settings.appearance.background.image.removeButton') }}
-              </Button>
             </ItemActions>
           </Item>
         </ItemGroup>
@@ -401,7 +454,7 @@ const handleClearError = () => {
           </ItemContent>
           <ItemActions>
             <Select
-              :model-value="appSettings.ui.webTheme.mode"
+              :model-value="webThemeSelectValue"
               @update:model-value="(v) => handleThemeChange(v as string)"
             >
               <SelectTrigger class="w-32">
@@ -417,42 +470,6 @@ const handleClearError = () => {
                 </SelectItem>
               </SelectContent>
             </Select>
-          </ItemActions>
-        </Item>
-
-        <Item variant="surface" size="sm">
-          <ItemContent>
-            <ItemTitle>
-              {{ t('settings.appearance.theme.primaryColor.label') }}
-            </ItemTitle>
-            <ItemDescription>
-              {{ t('settings.appearance.theme.primaryColor.description') }}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Popover>
-              <PopoverTrigger as-child>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  class="h-9 w-[13rem] justify-start gap-2 px-2 font-mono text-xs"
-                >
-                  <div
-                    class="h-5 w-8 shrink-0 rounded-sm border border-border/70"
-                    :style="{ backgroundColor: appSettings.ui.background.primaryColor }"
-                  />
-                  <span class="text-muted-foreground">
-                    {{ appSettings.ui.background.primaryColor }}
-                  </span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" class="w-auto p-3">
-                <ColorPicker
-                  :model-value="appSettings.ui.background.primaryColor"
-                  @update:model-value="handlePrimaryColorChange"
-                />
-              </PopoverContent>
-            </Popover>
           </ItemActions>
         </Item>
 

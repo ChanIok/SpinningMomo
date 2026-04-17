@@ -14,7 +14,7 @@ export constexpr int CURRENT_ONBOARDING_FLOW_VERSION = 1;
 
 // Web 主题设置
 export struct WebThemeSettings {
-  std::string mode = "system";  // "light" | "dark" | "system"
+  std::string mode = "light";  // "light" | "dark"（历史配置可能仍为 system，前端按亮色解析）
   std::string custom_css = "";
 };
 
@@ -22,11 +22,12 @@ export struct WebThemeSettings {
 export struct WebBackgroundSettings {
   std::string type = "none";  // "none" | "image"
   std::string image_file_name = "";
-  int background_blur_amount = 0;                                    // 0 - 100
-  double background_opacity = 1.0;                                   // 0.0 - 1.0
-  std::vector<std::string> overlay_colors = {"#000000", "#000000"};  // 1 - 4
+  int background_blur_amount = 0;   // 0 - 100
+  double background_opacity = 1.0;  // 0.0 - 1.0
+  std::vector<std::string> overlay_colors = {
+      "#F8F0E3"};  // 与前端浅色首个叠加预设（peach）一致，1-4 色
   std::string primary_color = "#F59E0B";
-  double overlay_opacity = 0.8;  // 0.0 - 1.0
+  double overlay_opacity = 1.0;  // 0.0 - 1.0
   double surface_opacity = 1.0;  // 0.0 - 1.0
 };
 

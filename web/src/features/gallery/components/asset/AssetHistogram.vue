@@ -86,18 +86,16 @@ function getHistogramPalette() {
       green: 'rgba(110, 231, 183, 1)', // emerald-300 — 冷青绿，避免荧光感
       blue: 'rgba(96, 165, 250, 1)', // blue-400 — 天蓝调
       compositeOperation: 'screen' as GlobalCompositeOperation,
-      topAlpha: 0.9,
-      bottomAlpha: 0.35,
+      fillAlpha: 0.7,
     }
   }
 
   return {
-    red: 'rgba(248, 113, 113, 1)', // red-400 — multiply 用亮色，重叠区呈品红而非暗泥色
-    green: 'rgba(74, 222, 128, 1)', // green-400
-    blue: 'rgba(96, 165, 250, 1)', // blue-400
+    red: 'rgba(236, 132, 136, 1)', // tuned for light theme neutral overlap
+    green: 'rgba(116, 196, 150, 1)', // reduce green cast after multiply stacking
+    blue: 'rgba(122, 164, 232, 1)', // keep cool balance without cyan overflow
     compositeOperation: 'multiply' as GlobalCompositeOperation,
-    topAlpha: 0.9,
-    bottomAlpha: 0.2,
+    fillAlpha: 0.7,
   }
 }
 
@@ -254,13 +252,8 @@ function drawHistogram(canvas: HTMLCanvasElement, data: HistogramData) {
     ctx.lineTo(chartWidth, chartHeight)
     ctx.closePath()
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, chartHeight)
-    const topColor = color.replace(/[\d.]+\)$/, `${palette.topAlpha})`)
-    const bottomColor = color.replace(/[\d.]+\)$/, `${palette.bottomAlpha})`)
-    gradient.addColorStop(0, topColor)
-    gradient.addColorStop(1, bottomColor)
-
-    ctx.fillStyle = gradient
+    const fillColor = color.replace(/[\d.]+\)$/, `${palette.fillAlpha})`)
+    ctx.fillStyle = fillColor
     ctx.fill()
   }
 

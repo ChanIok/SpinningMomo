@@ -13,14 +13,10 @@ const clamp = (value: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, value))
 }
 
-const detectSystemTheme = (): ResolvedTheme => {
-  if (typeof window === 'undefined') return 'dark'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
 const resolveTheme = (mode: WebThemeMode): ResolvedTheme => {
+  // 历史配置可能仍为 system；不再跟随 OS，统一按亮色解析
   if (mode === 'system') {
-    return detectSystemTheme()
+    return 'light'
   }
   return mode
 }

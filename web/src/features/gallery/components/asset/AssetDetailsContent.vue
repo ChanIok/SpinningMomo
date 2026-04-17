@@ -44,22 +44,24 @@ async function handleCopyFileName() {
 <template>
   <div class="space-y-3">
     <div class="flex justify-center">
-      <video
-        v-if="asset.type === 'video'"
-        :src="assetUrl"
-        :poster="thumbnailUrl"
-        :aria-label="asset.name"
-        class="max-h-[220px] max-w-full rounded shadow-md"
-        controls
-        playsinline
-        preload="metadata"
-      />
-      <img
-        v-else
-        :src="thumbnailUrl"
-        :alt="asset.name"
-        class="max-h-[180px] max-w-full rounded object-contain shadow-md"
-      />
+      <div class="flex h-[180px] w-full items-center justify-center rounded bg-muted/40">
+        <video
+          v-if="asset.type === 'video'"
+          :src="assetUrl"
+          :poster="thumbnailUrl"
+          :aria-label="asset.name"
+          class="max-h-full max-w-full rounded object-contain shadow-md"
+          controls
+          playsinline
+          preload="metadata"
+        />
+        <img
+          v-else
+          :src="thumbnailUrl"
+          :alt="asset.name"
+          class="max-h-full max-w-full rounded object-contain shadow-md"
+        />
+      </div>
     </div>
     <slot name="after-preview" />
   </div>

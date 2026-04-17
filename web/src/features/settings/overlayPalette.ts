@@ -69,6 +69,12 @@ const normalizeOverlayColors = (colors: Array<string | undefined>): string[] => 
 
 export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
   {
+    id: 'peach',
+    themeMode: 'light',
+    mode: 1,
+    colors: ['#F8F0E3', '#F8F0E3', '#F8F0E3', '#F8F0E3'],
+  },
+  {
     id: 'mist',
     themeMode: 'light',
     mode: 1,
@@ -85,12 +91,6 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     themeMode: 'light',
     mode: 2,
     colors: ['#DAE8CA', '#F6EAD3', '#F6EAD3', '#F6EAD3'],
-  },
-  {
-    id: 'daydream',
-    themeMode: 'light',
-    mode: 3,
-    colors: ['#E3F0FF', '#F0E6FA', '#FBE4F0', '#FBE4F0'],
   },
   {
     id: 'graphite',

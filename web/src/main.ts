@@ -69,22 +69,6 @@ initializeRPC()
     }
   )
 
-  // 监听系统主题变化（仅在跟随系统模式下生效）
-  if (typeof window !== 'undefined') {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleSchemeChange = () => {
-      if (settingsStore.appSettings.ui.webTheme.mode === 'system') {
-        applyAppearanceToDocument(settingsStore.appSettings)
-      }
-    }
-
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener('change', handleSchemeChange)
-    } else {
-      mediaQuery.addListener(handleSchemeChange)
-    }
-  }
-
   // 最后挂载应用
   app.mount('#app')
 })()

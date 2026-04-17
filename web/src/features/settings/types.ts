@@ -402,7 +402,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       enableTransparentBackground: false,
     },
     webTheme: {
-      mode: 'system',
+      mode: 'light',
       customCss: '',
     },
     background: {
@@ -410,9 +410,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       imageFileName: '',
       backgroundBlurAmount: 0,
       backgroundOpacity: 1,
-      overlayColors: ['#000000', '#000000'],
+      // 与 overlayPalette 中首个浅色预设（peach）一致
+      overlayColors: ['#F8F0E3'],
       primaryColor: '#F59E0B',
-      overlayOpacity: 0.8,
+      overlayOpacity: 1,
       surfaceOpacity: 1,
     },
   },

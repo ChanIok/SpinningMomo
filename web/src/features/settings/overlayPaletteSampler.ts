@@ -49,15 +49,10 @@ const clamp = (value: number, min: number, max: number): number => {
 }
 
 const resolveTheme = (mode: WebThemeMode): ResolvedTheme => {
-  if (mode !== 'system') {
-    return mode
+  if (mode === 'system') {
+    return 'light'
   }
-
-  if (typeof window === 'undefined') {
-    return 'dark'
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return mode
 }
 
 const loadImage = async (url: string): Promise<HTMLImageElement> => {

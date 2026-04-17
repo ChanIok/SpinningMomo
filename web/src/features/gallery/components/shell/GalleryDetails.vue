@@ -480,8 +480,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
                 />
               </div>
 
-              <Separator />
-
               <div>
                 <div class="mb-2 flex items-center justify-between">
                   <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
@@ -547,6 +545,8 @@ async function handleCopyColorHex(color: AssetMainColor) {
                   {{ t('gallery.details.tags.empty') }}
                 </div>
               </div>
+
+              <Separator />
             </div>
           </template>
 
