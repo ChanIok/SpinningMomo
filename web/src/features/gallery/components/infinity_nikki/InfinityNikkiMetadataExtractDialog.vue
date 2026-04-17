@@ -2,7 +2,10 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { startExtractInfinityNikkiPhotoParamsForFolder } from '@/extensions/infinity_nikki'
+import {
+  INFINITY_NIKKI_LAST_UID_STORAGE_KEY,
+  startExtractInfinityNikkiPhotoParamsForFolder,
+} from '@/extensions/infinity_nikki'
 import {
   Dialog,
   DialogContent,
@@ -21,6 +24,7 @@ interface Props {
   open: boolean
   folderId: number | null
   folderName: string
+  initialUid?: string
 }
 
 const props = defineProps<Props>()
@@ -46,6 +50,10 @@ function resetForm() {
 watch(
   () => props.open,
   (open) => {
+    if (open) {
+      uid.value = props.initialUid?.trim() ?? ''
+      return
+    }
     if (!open && !isSubmitting.value) {
       resetForm()
     }
@@ -72,6 +80,7 @@ async function handleSubmit() {
     return
   }
 
+  localStorage.setItem(INFINITY_NIKKI_LAST_UID_STORAGE_KEY, trimmedUid)
   isSubmitting.value = true
   const loadingToastId = toast.loading(t('gallery.infinityNikki.extractDialog.submitting'))
 

@@ -16,6 +16,10 @@ import GalleryScanDialog from '../dialogs/GalleryScanDialog.vue'
 import InfinityNikkiMetadataExtractDialog from '../infinity_nikki/InfinityNikkiMetadataExtractDialog.vue'
 import { galleryApi } from '../../api'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
+import {
+  extractInfinityNikkiUidFromFolderPath,
+  INFINITY_NIKKI_LAST_UID_STORAGE_KEY,
+} from '@/extensions/infinity_nikki'
 
 const galleryData = useGalleryData()
 const galleryStore = useGalleryStore()
@@ -51,6 +55,7 @@ const showAddFolderDialog = ref(false)
 const showInfinityNikkiMetadataDialog = ref(false)
 const infinityNikkiMetadataFolderId = ref<number | null>(null)
 const infinityNikkiMetadataFolderName = ref('')
+const infinityNikkiMetadataInitialUid = ref('')
 
 // 区块标题表示该维度的「全体 / 未限定」：与 store.filter 一致，不跟详情面板耦合
 const isFolderTitleSelected = computed(() => selectedFolder.value === null)
@@ -67,6 +72,12 @@ function handleAddFolderDialogOpenChange(open: boolean) {
 function openInfinityNikkiMetadataDialog(folderId: number, folderName: string) {
   infinityNikkiMetadataFolderId.value = folderId
   infinityNikkiMetadataFolderName.value = folderName
+  const targetFolder = findFolderById(folders.value, folderId)
+  const uidFromFolderPath = targetFolder
+    ? extractInfinityNikkiUidFromFolderPath(targetFolder.path)
+    : null
+  const uidFromStorage = localStorage.getItem(INFINITY_NIKKI_LAST_UID_STORAGE_KEY)?.trim() || ''
+  infinityNikkiMetadataInitialUid.value = uidFromFolderPath ?? uidFromStorage
   showInfinityNikkiMetadataDialog.value = true
 }
 
@@ -75,7 +86,21 @@ function handleInfinityNikkiMetadataDialogOpenChange(open: boolean) {
   if (!open) {
     infinityNikkiMetadataFolderId.value = null
     infinityNikkiMetadataFolderName.value = ''
+    infinityNikkiMetadataInitialUid.value = ''
   }
+}
+
+function findFolderById(nodes: FolderTreeNode[], folderId: number): FolderTreeNode | null {
+  for (const node of nodes) {
+    if (node.id === folderId) {
+      return node
+    }
+    const foundInChildren = findFolderById(node.children, folderId)
+    if (foundInChildren) {
+      return foundInChildren
+    }
+  }
+  return null
 }
 
 function startCreateTag() {
@@ -427,6 +452,7 @@ onMounted(() => {
       :open="showInfinityNikkiMetadataDialog"
       :folder-id="infinityNikkiMetadataFolderId"
       :folder-name="infinityNikkiMetadataFolderName"
+      :initial-uid="infinityNikkiMetadataInitialUid"
       @update:open="handleInfinityNikkiMetadataDialogOpenChange"
     />
   </div>

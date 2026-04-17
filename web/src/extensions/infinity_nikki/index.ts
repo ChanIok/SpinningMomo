@@ -6,6 +6,8 @@ interface InfinityNikkiAlbumIgnoreRuleTemplate extends Omit<ScanIgnoreRule, 'des
   descriptionKey: string
 }
 
+export const INFINITY_NIKKI_LAST_UID_STORAGE_KEY = 'spinningmomo.infinityNikki.extract.lastUid'
+
 const INFINITY_NIKKI_ALBUM_IGNORE_RULES: InfinityNikkiAlbumIgnoreRuleTemplate[] = [
   {
     pattern: '^.*$',
@@ -79,6 +81,18 @@ export async function startInitializeInfinityNikkiScreenshotHardlinks(): Promise
     {}
   )
   return result.taskId
+}
+
+/**
+ * 从 Infinity Nikki 标准相册路径中提取 UID。
+ * 例如：.../GamePlayPhotos/123456/NikkiPhotos_HighQuality
+ */
+export function extractInfinityNikkiUidFromFolderPath(path: string): string | null {
+  const normalizedPath = path.replace(/\\/g, '/')
+  const match = normalizedPath.match(
+    /(?:^|\/)GamePlayPhotos\/(\d+)\/NikkiPhotos_HighQuality(?:\/|$)/
+  )
+  return match?.[1] ?? null
 }
 
 /**
