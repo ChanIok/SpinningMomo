@@ -233,7 +233,7 @@ auto repair_expected_thumbnail_entries(
       }
 
       auto repair_result =
-          generate_thumbnail(app_state, *wic_factory, *source_path, hash, short_edge_size);
+          generate_thumbnail(app_state, *wic_factory, *source_path, hash, short_edge_size, false);
       if (!repair_result) {
         stats.failed_repairs++;
         Logger().warn("Failed to repair thumbnail for '{}': {}", source_path->string(),
@@ -262,7 +262,7 @@ auto repair_expected_thumbnail_entries(
         continue;
       }
 
-      auto repair_result = save_thumbnail_data(app_state, hash, *video_result->thumbnail);
+      auto repair_result = save_thumbnail_data(app_state, hash, *video_result->thumbnail, false);
       if (!repair_result) {
         stats.failed_repairs++;
         Logger().warn("Failed to save repaired video thumbnail for '{}': {}", source_path->string(),
@@ -529,7 +529,7 @@ auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
 // 使用文件哈希生成缩略图（按短边等比例缩放）
 auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
                         const std::filesystem::path& source_file, const std::string& file_hash,
-                        std::uint32_t short_edge_size)
+                        std::uint32_t short_edge_size, bool force_overwrite)
     -> std::expected<std::filesystem::path, std::string> {
   try {
     auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
@@ -539,7 +539,7 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
     auto thumbnail_path = thumbnail_path_result.value();
 
     // 检查缩略图是否已存在（基于哈希的去重）
-    if (std::filesystem::exists(thumbnail_path)) {
+    if (!force_overwrite && std::filesystem::exists(thumbnail_path)) {
       Logger().debug("Thumbnail already exists, reusing: {}", thumbnail_path.string());
       return thumbnail_path;
     }
@@ -554,7 +554,7 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
       return std::unexpected("Failed to generate WebP thumbnail: " + webp_result.error());
     }
 
-    return save_thumbnail_data(app_state, file_hash, webp_result.value());
+    return save_thumbnail_data(app_state, file_hash, webp_result.value(), force_overwrite);
 
   } catch (const std::exception& e) {
     return std::unexpected("Exception in generate_thumbnail: " + std::string(e.what()));
@@ -564,7 +564,7 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
 // 将已编码 WebP 写入按 file_hash
 // 命名的路径；图片解码与视频抽帧共用。存在则跳过，减少扫描并发重复写。
 auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
-                         const Utils::Image::WebPEncodedResult& webp_data)
+                         const Utils::Image::WebPEncodedResult& webp_data, bool force_overwrite)
     -> std::expected<std::filesystem::path, std::string> {
   auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
   if (!thumbnail_path_result) {
@@ -572,7 +572,7 @@ auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& fi
   }
   auto thumbnail_path = thumbnail_path_result.value();
 
-  if (std::filesystem::exists(thumbnail_path)) {
+  if (!force_overwrite && std::filesystem::exists(thumbnail_path)) {
     Logger().debug("Thumbnail already exists, reusing: {}", thumbnail_path.string());
     return thumbnail_path;
   }

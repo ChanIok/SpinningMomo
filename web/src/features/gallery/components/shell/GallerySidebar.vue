@@ -6,6 +6,16 @@ import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Plus } from 'lucide-vue-next'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useGallerySidebar, useGalleryData } from '../../composables'
 import { useGalleryStore } from '../../store'
 import type { FolderTreeNode } from '../../types'
@@ -16,6 +26,7 @@ import GalleryScanDialog from '../dialogs/GalleryScanDialog.vue'
 import InfinityNikkiMetadataExtractDialog from '../infinity_nikki/InfinityNikkiMetadataExtractDialog.vue'
 import { galleryApi } from '../../api'
 import { hasGalleryAssetDragIds } from '../../composables/useGalleryDragPayload'
+import type { ScanAssetsParams } from '../../api/dto'
 import {
   extractInfinityNikkiUidFromFolderPath,
   INFINITY_NIKKI_LAST_UID_STORAGE_KEY,
@@ -56,6 +67,9 @@ const showInfinityNikkiMetadataDialog = ref(false)
 const infinityNikkiMetadataFolderId = ref<number | null>(null)
 const infinityNikkiMetadataFolderName = ref('')
 const infinityNikkiMetadataInitialUid = ref('')
+const showRescanDialog = ref(false)
+const rescanFolderId = ref<number | null>(null)
+const rescanFolderName = ref('')
 
 // 区块标题表示该维度的「全体 / 未限定」：与 store.filter 一致，不跟详情面板耦合
 const isFolderTitleSelected = computed(() => selectedFolder.value === null)
@@ -88,6 +102,22 @@ function handleInfinityNikkiMetadataDialogOpenChange(open: boolean) {
     infinityNikkiMetadataFolderName.value = ''
     infinityNikkiMetadataInitialUid.value = ''
   }
+}
+
+function openRescanDialog(folderId: number, folderName: string) {
+  rescanFolderId.value = folderId
+  rescanFolderName.value = folderName
+  showRescanDialog.value = true
+}
+
+function handleRescanDialogOpenChange(open: boolean) {
+  showRescanDialog.value = open
+}
+
+function resetRescanDialogState() {
+  showRescanDialog.value = false
+  rescanFolderId.value = null
+  rescanFolderName.value = ''
 }
 
 function findFolderById(nodes: FolderTreeNode[], folderId: number): FolderTreeNode | null {
@@ -206,6 +236,40 @@ async function handleRemoveFolderWatch(folderId: number) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     toast.error(t('gallery.sidebar.folders.removeWatch.failedTitle'), { description: message })
+  }
+}
+
+async function confirmRescanFolder() {
+  const folderId = rescanFolderId.value
+  if (folderId === null) {
+    return
+  }
+
+  const targetFolder = findFolderById(folders.value, folderId)
+  if (!targetFolder) {
+    toast.error(t('gallery.sidebar.folders.rescan.failedTitle'), {
+      description: t('gallery.sidebar.folders.rescan.folderNotFoundDescription'),
+    })
+    resetRescanDialogState()
+    return
+  }
+
+  try {
+    const rescanParams: ScanAssetsParams = {
+      directory: targetFolder.path,
+      forceReanalyze: true,
+      rebuildThumbnails: true,
+    }
+    const result = await galleryData.startScanAssets(rescanParams)
+    toast.success(t('gallery.sidebar.folders.rescan.queuedTitle'), {
+      description: t('gallery.sidebar.folders.rescan.queuedDescription', {
+        taskId: result.taskId,
+      }),
+    })
+    resetRescanDialogState()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.sidebar.folders.rescan.failedTitle'), { description: message })
   }
 }
 
@@ -337,6 +401,31 @@ onMounted(() => {
 
 <template>
   <div class="flex h-full flex-col" @dragover="handleSidebarDragOver" @drop="handleSidebarDrop">
+    <AlertDialog :open="showRescanDialog" @update:open="handleRescanDialogOpenChange">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {{
+              t('gallery.sidebar.folders.rescan.confirmTitle', {
+                name: rescanFolderName,
+              })
+            }}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('gallery.sidebar.folders.rescan.confirmDescription') }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="resetRescanDialogState">
+            {{ t('gallery.sidebar.folders.rescan.cancel') }}
+          </AlertDialogCancel>
+          <AlertDialogAction @click="confirmRescanFolder">
+            {{ t('gallery.sidebar.folders.rescan.confirm') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <!-- 导航菜单 -->
     <div class="flex-1 overflow-auto p-4">
       <!-- 文件夹区域 -->
@@ -382,6 +471,7 @@ onMounted(() => {
             @rename-display-name="handleRenameFolderDisplayName"
             @open-in-explorer="handleOpenFolderInExplorer"
             @remove-watch="handleRemoveFolderWatch"
+            @rescan-folder="openRescanDialog"
             @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
             @drop-assets-to-folder="handleDropAssetsToFolder"
           />

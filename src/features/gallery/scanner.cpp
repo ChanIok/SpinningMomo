@@ -420,8 +420,8 @@ auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::pat
 
 // 状态分析：通过大小和修改时间初步判断文件状态
 auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
-                          const std::unordered_map<std::string, Types::Metadata>& asset_cache)
-    -> std::vector<Types::FileAnalysisResult> {
+                          const std::unordered_map<std::string, Types::Metadata>& asset_cache,
+                          bool force_reanalyze) -> std::vector<Types::FileAnalysisResult> {
   std::vector<Types::FileAnalysisResult> results;
   results.reserve(file_infos.size());
 
@@ -437,6 +437,13 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
       // 文件在数据库中有记录，但需进一步评估是否被修改过。
       const auto& cached_metadata = it->second;
       analysis.existing_metadata = cached_metadata;
+
+      if (force_reanalyze) {
+        // 强制重分析也先走哈希计算，避免后续缩略图流程拿到空 hash。
+        analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
+        results.push_back(std::move(analysis));
+        continue;
+      }
 
       // 快速比较法：检查文件大小和系统修改时间。
       // 因为计算文件 Hash 代价昂贵，所以仅当尺寸或修改时间改变时才触发 NEEDS_HASH_CHECK。
@@ -633,13 +640,17 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
 
     // 生成或更新这幅图的缩略图到缓存目录（用于无感滚动列表展示）
     if (options.generate_thumbnails.value_or(true)) {
-      auto thumbnail_result =
-          Asset::Thumbnail::generate_thumbnail(app_state, wic_factory, file_path, file_info.hash,
-                                               options.thumbnail_short_edge.value_or(480));
+      if (file_info.hash.empty()) {
+        Logger().warn("Skip thumbnail generation for {}: empty hash", file_path.string());
+      } else {
+        auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
+            app_state, wic_factory, file_path, file_info.hash,
+            options.thumbnail_short_edge.value_or(480), options.rebuild_thumbnails.value_or(false));
 
-      if (!thumbnail_result) {
-        Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
-                      thumbnail_result.error());
+        if (!thumbnail_result) {
+          Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
+                        thumbnail_result.error());
+        }
       }
 
       if (progress_tracker) {
@@ -659,11 +670,16 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
       asset.mime_type = video_result->mime_type;
 
       if (video_result->thumbnail.has_value()) {
-        auto save_result = Asset::Thumbnail::save_thumbnail_data(app_state, file_info.hash,
-                                                                 *video_result->thumbnail);
-        if (!save_result) {
-          Logger().warn("Failed to save video thumbnail for {}: {}", file_path.string(),
-                        save_result.error());
+        if (file_info.hash.empty()) {
+          Logger().warn("Skip video thumbnail save for {}: empty hash", file_path.string());
+        } else {
+          auto save_result = Asset::Thumbnail::save_thumbnail_data(
+              app_state, file_info.hash, *video_result->thumbnail,
+              options.rebuild_thumbnails.value_or(false));
+          if (!save_result) {
+            Logger().warn("Failed to save video thumbnail for {}: {}", file_path.string(),
+                          save_result.error());
+          }
         }
       }
     } else {
@@ -885,9 +901,11 @@ auto run_discovery_phase(Core::State::AppState& app_state, const ScanPreparation
 auto run_hash_analysis_phase(
     Core::State::AppState& app_state, const std::vector<Types::FileSystemInfo>& file_infos,
     const std::unordered_map<std::string, Types::Metadata>& asset_cache,
+    const Types::ScanOptions& options,
     const std::function<void(const Types::ScanProgress&)>& progress_callback)
     -> std::expected<std::vector<Types::FileAnalysisResult>, std::string> {
-  auto analysis_results = analyze_file_changes(file_infos, asset_cache);
+  auto analysis_results =
+      analyze_file_changes(file_infos, asset_cache, options.force_reanalyze.value_or(false));
 
   report_scan_progress(progress_callback, "hashing", 0,
                        static_cast<std::int64_t>(analysis_results.size()), kHashingStartPercent,
@@ -895,6 +913,14 @@ auto run_hash_analysis_phase(
 
   if (auto hash_phase = calculate_hash_for_targets(app_state, analysis_results); !hash_phase) {
     return std::unexpected("Hash calculation failed: " + hash_phase.error());
+  }
+
+  if (options.force_reanalyze.value_or(false)) {
+    for (auto& analysis : analysis_results) {
+      if (analysis.existing_metadata.has_value()) {
+        analysis.status = Types::FileStatus::MODIFIED;
+      }
+    }
   }
 
   report_scan_progress(progress_callback, "hashing",
@@ -1116,8 +1142,8 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto file_infos = std::move(file_infos_result.value());
 
   // 步骤 3: 哈希分析阶段 (对比缓存，对于变动的文件进行哈希校检来确定状态)
-  auto files_to_process_result =
-      run_hash_analysis_phase(app_state, file_infos, context.asset_cache, progress_callback);
+  auto files_to_process_result = run_hash_analysis_phase(app_state, file_infos, context.asset_cache,
+                                                         options, progress_callback);
   if (!files_to_process_result) {
     return std::unexpected(files_to_process_result.error());
   }

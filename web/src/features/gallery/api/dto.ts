@@ -152,6 +152,8 @@ export interface ScanAssetsParams {
   thumbnailShortEdge?: number
   supportedExtensions?: string[]
   ignoreRules?: ScanIgnoreRule[]
+  forceReanalyze?: boolean
+  rebuildThumbnails?: boolean
 }
 
 // 扫描结果

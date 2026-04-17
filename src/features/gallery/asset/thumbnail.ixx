@@ -50,12 +50,13 @@ struct ThumbnailCacheReconcileStats {
 // 缩略图生成
 auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
                         const std::filesystem::path& source_file, const std::string& file_hash,
-                        std::uint32_t short_edge_size)
+                        std::uint32_t short_edge_size, bool force_overwrite = false)
     -> std::expected<std::filesystem::path, std::string>;
 
 // 落盘内存中的 WebP（视频封面帧等）；路径规则与 generate_thumbnail 一致。
 auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
-                         const Utils::Image::WebPEncodedResult& webp_data)
+                         const Utils::Image::WebPEncodedResult& webp_data,
+                         bool force_overwrite = false)
     -> std::expected<std::filesystem::path, std::string>;
 
 // 路径管理

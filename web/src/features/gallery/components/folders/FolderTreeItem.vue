@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { FolderOpen, Pen, Sparkles, Trash2 } from 'lucide-vue-next'
+import { FolderOpen, Pen, RefreshCw, Sparkles, Trash2 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import {
   ContextMenu,
@@ -45,6 +45,7 @@ const emit = defineEmits<{
   renameDisplayName: [folderId: number, displayName: string]
   openInExplorer: [folderId: number]
   removeWatch: [folderId: number]
+  rescanFolder: [folderId: number, folderName: string]
   extractInfinityNikkiMetadata: [folderId: number, folderName: string]
   dropAssetsToFolder: [folderId: number, assetIds: number[]]
 }>()
@@ -114,6 +115,10 @@ function handleExtractInfinityNikkiMetadata() {
     props.folder.id,
     props.folder.displayName || props.folder.name
   )
+}
+
+function handleRescanFolder() {
+  emit('rescanFolder', props.folder.id, props.folder.displayName || props.folder.name)
 }
 
 function requestRemoveWatch() {
@@ -288,6 +293,10 @@ function handleDrop(event: DragEvent) {
           <FolderOpen />
           {{ t('gallery.sidebar.folders.menu.openInExplorer') }}
         </ContextMenuItem>
+        <ContextMenuItem @click="handleRescanFolder">
+          <RefreshCw />
+          {{ t('gallery.sidebar.folders.menu.rescan') }}
+        </ContextMenuItem>
         <ContextMenuItem v-if="infinityNikkiEnabled" @click="handleExtractInfinityNikkiMetadata">
           <Sparkles />
           {{ t('gallery.sidebar.folders.menu.extractInfinityNikkiMetadata') }}
@@ -317,6 +326,7 @@ function handleDrop(event: DragEvent) {
         "
         @open-in-explorer="(folderId) => emit('openInExplorer', folderId)"
         @remove-watch="(folderId) => emit('removeWatch', folderId)"
+        @rescan-folder="(folderId, folderName) => emit('rescanFolder', folderId, folderName)"
         @extract-infinity-nikki-metadata="
           (folderId, folderName) => emit('extractInfinityNikkiMetadata', folderId, folderName)
         "
