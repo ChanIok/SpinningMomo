@@ -8,6 +8,13 @@ import Features.Settings.Types;
 
 namespace Features::Settings {
 
+// 启动期仅依赖的最小设置子集。
+// 用于在完整 AppState 初始化之前，先决定提权策略和初始日志级别。
+export struct StartupSettings {
+  bool always_run_as_admin = true;
+  std::optional<std::string> logger_level;
+};
+
 export auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string>;
 
 export auto get_settings(const Types::GetSettingsParams& params)
@@ -39,8 +46,10 @@ export auto should_show_onboarding(const Types::AppSettings& settings) -> bool;
 export auto migrate_settings_file(const std::filesystem::path& file_path, int target_version)
     -> std::expected<void, std::string>;
 
-// 轻量级预读取：检查是否需要以管理员权限运行
-// 此函数不依赖 AppState，可在应用初始化之前调用
-export auto should_run_as_admin() noexcept -> bool;
+// 轻量级预读取：仅解析启动早期需要的少量字段。
+// 设计目标：
+// 1. 避免为了提权判断和早期日志初始化而拉起完整设置模块；
+// 2. 即使 settings.json 缺失、损坏或字段不完整，也能稳定回退到默认值继续启动。
+export auto load_startup_settings() noexcept -> StartupSettings;
 
 }  // namespace Features::Settings

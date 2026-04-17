@@ -79,6 +79,21 @@ auto apply_language_from_settings(Core::State::AppState& state) -> void {
   Logger().info("Runtime language loaded from settings: {}", locale);
 }
 
+auto apply_logger_level_from_settings(Core::State::AppState& state) -> void {
+  if (!state.settings) {
+    Logger().warn("Skip logger level sync from settings: state is not ready");
+    return;
+  }
+
+  const auto& level = state.settings->raw.app.logger.level;
+  if (auto result = Utils::Logging::set_level(level); !result) {
+    Logger().warn("Failed to apply logger level from settings ('{}'): {}", level, result.error());
+    return;
+  }
+
+  Logger().debug("Runtime logger level loaded from settings: {}", level);
+}
+
 auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINSTANCE instance)
     -> std::expected<void, std::string> {
   try {
@@ -140,6 +155,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     // 将后端 i18n 语言与 settings 对齐，确保原生浮窗/通知文案一致
     apply_language_from_settings(state);
+    apply_logger_level_from_settings(state);
 
     // 从 settings 同步 letterbox 启用状态
     state.letterbox->enabled = state.settings->raw.features.letterbox.enabled;

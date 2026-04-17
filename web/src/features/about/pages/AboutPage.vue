@@ -51,6 +51,11 @@ interface OpenAppDataDirectoryResult {
   message: string
 }
 
+interface OpenLogDirectoryResult {
+  success: boolean
+  message: string
+}
+
 const { t, locale } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
@@ -63,6 +68,7 @@ const isCheckingUpdate = ref(false)
 const isStartingDownload = ref(false)
 const isInstallingUpdate = ref(false)
 const isOpeningAppDataDirectory = ref(false)
+const isOpeningLogDirectory = ref(false)
 const hasUpdate = ref<boolean | null>(null)
 const latestVersion = ref<string | null>(null)
 const updateError = ref<string | null>(null)
@@ -286,6 +292,24 @@ const openAppDataDirectory = async () => {
   }
 }
 
+const openLogDirectory = async () => {
+  if (isOpeningLogDirectory.value) {
+    return
+  }
+
+  isOpeningLogDirectory.value = true
+  try {
+    const result = await call<OpenLogDirectoryResult>('file.openLogDirectory')
+    if (!result.success) {
+      throw new Error(result.message || t('about.toast.openLogDirectoryFailed'))
+    }
+  } catch (e) {
+    toast.error(t('about.toast.openLogDirectoryFailed'))
+  } finally {
+    isOpeningLogDirectory.value = false
+  }
+}
+
 onMounted(() => {
   void loadRuntimeInfo()
   void checkForUpdate(true)
@@ -446,6 +470,14 @@ onBeforeUnmount(() => {
               @click="openAppDataDirectory"
             >
               <FolderOpen class="mr-1.5 h-3.5 w-3.5" /> {{ t('about.actions.openDataDirectory') }}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              class="h-7 px-2 text-xs"
+              @click="openLogDirectory"
+            >
+              <FolderOpen class="mr-1.5 h-3.5 w-3.5" /> {{ t('about.actions.openLogDirectory') }}
             </Button>
             <Button variant="secondary" size="sm" class="h-7 px-2 text-xs" @click="copyDiagnostics">
               <Check v-if="copied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />

@@ -19,6 +19,25 @@ import <rfl/json.hpp>;
 
 namespace Features::Settings {
 
+namespace Detail {
+
+// 启动期只关心 app 下的极少数字段；
+// 单独声明一个最小映射结构，避免在完整初始化前引入更多不必要的耦合。
+struct StartupLoggerSettings {
+  std::optional<std::string> level;
+};
+
+struct StartupAppSettings {
+  bool always_run_as_admin = true;
+  StartupLoggerSettings logger;
+};
+
+struct StartupSettingsFile {
+  StartupAppSettings app;
+};
+
+}  // namespace Detail
+
 auto detect_default_locale() -> std::string {
   constexpr Vendor::Windows::LANGID kPrimaryLanguageMask = 0x03ff;
   constexpr Vendor::Windows::LANGID kChinesePrimaryLanguage = 0x0004;
@@ -347,58 +366,43 @@ auto save_settings_to_file(const std::filesystem::path& settings_path,
   }
 }
 
-// 轻量级预读取：检查是否需要以管理员权限运行
-auto should_run_as_admin() noexcept -> bool {
-  try {
-    auto settings_path = get_settings_path();
-    if (!settings_path) {
-      return true;  // 默认需要管理员权限
-    }
+auto load_startup_settings() noexcept -> StartupSettings {
+  StartupSettings startup_settings;
 
-    if (!std::filesystem::exists(settings_path.value())) {
-      return true;  // 文件不存在，使用默认值
+  try {
+    // 启动早期允许 settings.json 不存在；此时直接使用默认值继续启动。
+    auto settings_path = get_settings_path();
+    if (!settings_path || !std::filesystem::exists(settings_path.value())) {
+      return startup_settings;
     }
 
     std::ifstream file(settings_path.value());
     if (!file) {
-      return true;
+      return startup_settings;
     }
 
     std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
-    // 使用 rfl::Generic 解析，只读取需要的字段
-    auto generic_result = rfl::json::read<rfl::Generic::Object>(json_str);
-    if (!generic_result) {
-      return true;
+    // 这里只解析启动阶段真正需要的字段：
+    // - app.always_run_as_admin
+    // - app.logger.level
+    // 任何解析失败都应静默回退到默认值，不能阻塞应用启动。
+    auto startup_result =
+        rfl::json::read<Detail::StartupSettingsFile, rfl::DefaultIfMissing>(json_str);
+    if (!startup_result) {
+      return startup_settings;
     }
 
-    auto& root = generic_result.value();
-
-    // 读取 app.always_run_as_admin
-    auto app_result = root.get("app");
-    if (!app_result) {
-      return true;
+    startup_settings.always_run_as_admin = startup_result->app.always_run_as_admin;
+    if (startup_result->app.logger.level.has_value() &&
+        !startup_result->app.logger.level->empty()) {
+      startup_settings.logger_level = startup_result->app.logger.level;
     }
 
-    auto app_obj = app_result.value().to_object();
-    if (!app_obj) {
-      return true;
-    }
-
-    auto admin_result = app_obj->get("always_run_as_admin");
-    if (!admin_result) {
-      return true;  // 字段不存在，使用默认值
-    }
-
-    auto admin_bool = admin_result.value().to_bool();
-    if (!admin_bool) {
-      return true;
-    }
-
-    return admin_bool.value();
-
+    return startup_settings;
   } catch (...) {
-    return true;  // 任何异常都返回默认值
+    // 启动早期不向上抛异常，统一退回默认行为。
+    return startup_settings;
   }
 }
 

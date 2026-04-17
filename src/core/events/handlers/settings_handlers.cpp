@@ -64,6 +64,11 @@ auto has_language_changes(const Features::Settings::Types::AppSettings& old_sett
   return old_settings.app.language.current != new_settings.app.language.current;
 }
 
+auto has_logger_level_changes(const Features::Settings::Types::AppSettings& old_settings,
+                              const Features::Settings::Types::AppSettings& new_settings) -> bool {
+  return old_settings.app.logger.level != new_settings.app.logger.level;
+}
+
 auto has_infinity_nikki_hardlink_setting_changes(
     const Features::Settings::Types::AppSettings& old_settings,
     const Features::Settings::Types::AppSettings& new_settings) -> bool {
@@ -108,6 +113,17 @@ auto apply_runtime_language_from_settings(Core::State::AppState& state,
   Logger().info("Runtime language switched to {}", locale);
 }
 
+auto apply_runtime_logger_level_from_settings(
+    Core::State::AppState& state, const Features::Settings::Types::AppSettings& settings) -> void {
+  const auto& level = settings.app.logger.level;
+  if (auto result = Utils::Logging::set_level(level); !result) {
+    Logger().warn("Failed to apply runtime logger level ('{}'): {}", level, result.error());
+    return;
+  }
+
+  Logger().debug("Runtime logger level switched to {}", level);
+}
+
 // 处理设置变更事件
 auto handle_settings_changed(Core::State::AppState& state,
                              const Features::Settings::Events::SettingsChangeEvent& event) -> void {
@@ -119,6 +135,10 @@ auto handle_settings_changed(Core::State::AppState& state,
 
     if (has_language_changes(event.data.old_settings, event.data.new_settings)) {
       apply_runtime_language_from_settings(state, event.data.new_settings);
+    }
+
+    if (has_logger_level_changes(event.data.old_settings, event.data.new_settings)) {
+      apply_runtime_logger_level_from_settings(state, event.data.new_settings);
     }
 
     // 通知浮窗刷新UI以反映设置变更

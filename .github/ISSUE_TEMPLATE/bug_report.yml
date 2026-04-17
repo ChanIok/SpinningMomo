@@ -16,8 +16,8 @@ body:
     id: logs
     attributes:
       label: 日志文件
-      description: 请以附件的形式上传 app.log 文件
-      placeholder: 如有必要，请提前在 config.ini 将日志级别设置为 DEBUG 级别
+      description: 请以附件的形式上传 `app.log` 文件（安装版位于 `%LOCALAPPDATA%\SpinningMomo\logs` 目录下，便携版位于程序所在的 `data\logs` 目录下）
+      placeholder: 如有必要，请先在“设置 -> 通用 -> 日志级别”中切换为 DEBUG 后复现问题
     validations:
       required: false
       

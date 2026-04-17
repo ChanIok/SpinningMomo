@@ -8,9 +8,11 @@ import <spdlog/spdlog.h>;
 namespace Utils::Logging {
 
 // 日志管理函数
-export auto initialize() -> std::expected<void, std::string>;
+export auto initialize(const std::optional<std::string>& configured_level = std::nullopt)
+    -> std::expected<void, std::string>;
 export auto shutdown() -> void;
 export auto flush() -> void;
+export auto set_level(std::string_view level) -> std::expected<void, std::string>;
 
 }  // namespace Utils::Logging
 

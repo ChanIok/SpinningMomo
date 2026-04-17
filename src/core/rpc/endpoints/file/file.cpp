@@ -61,6 +61,13 @@ struct OpenAppDataDirectoryResult {
 
 struct OpenAppDataDirectoryParams {};
 
+struct OpenLogDirectoryResult {
+  bool success;
+  std::string message;
+};
+
+struct OpenLogDirectoryParams {};
+
 auto handle_read_file([[maybe_unused]] Core::State::AppState& app_state,
                       const ReadFileParams& params)
     -> RpcAwaitable<Utils::File::EncodedFileReadResult> {
@@ -168,6 +175,29 @@ auto handle_open_app_data_directory([[maybe_unused]] Core::State::AppState& app_
   };
 }
 
+auto handle_open_log_directory([[maybe_unused]] Core::State::AppState& app_state,
+                               [[maybe_unused]] const OpenLogDirectoryParams& params)
+    -> RpcAwaitable<OpenLogDirectoryResult> {
+  auto log_directory = Utils::Path::GetAppDataSubdirectory("logs");
+  if (!log_directory) {
+    co_return std::unexpected(
+        RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                 .message = "Failed to get log directory: " + log_directory.error()});
+  }
+
+  auto open_result = Utils::System::open_directory(log_directory.value());
+  if (!open_result) {
+    co_return std::unexpected(
+        RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                 .message = "Failed to open log directory: " + open_result.error()});
+  }
+
+  co_return OpenLogDirectoryResult{
+      .success = true,
+      .message = "Log directory opened successfully.",
+  };
+}
+
 auto register_all(Core::State::AppState& app_state) -> void {
   register_method<ReadFileParams, Utils::File::EncodedFileReadResult>(
       app_state, app_state.rpc->registry, "file.read", handle_read_file,
@@ -200,6 +230,10 @@ auto register_all(Core::State::AppState& app_state) -> void {
   register_method<OpenAppDataDirectoryParams, OpenAppDataDirectoryResult>(
       app_state, app_state.rpc->registry, "file.openAppDataDirectory",
       handle_open_app_data_directory, "Open app data directory in file explorer");
+
+  register_method<OpenLogDirectoryParams, OpenLogDirectoryResult>(
+      app_state, app_state.rpc->registry, "file.openLogDirectory", handle_open_log_directory,
+      "Open log directory in file explorer");
 }
 
 }  // namespace Core::RPC::Endpoints::File
