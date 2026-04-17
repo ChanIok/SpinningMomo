@@ -28,6 +28,10 @@ export auto add_tags_to_asset(Core::State::AppState& app_state,
                               const Types::AddTagsToAssetParams& params)
     -> std::expected<void, std::string>;
 
+export auto add_tag_to_assets(Core::State::AppState& app_state,
+                              const Types::AddTagToAssetsParams& params)
+    -> std::expected<Types::OperationResult, std::string>;
+
 export auto remove_tags_from_asset(Core::State::AppState& app_state,
                                    const Types::RemoveTagsFromAssetParams& params)
     -> std::expected<void, std::string>;

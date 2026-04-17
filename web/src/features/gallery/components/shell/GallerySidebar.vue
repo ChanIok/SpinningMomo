@@ -237,6 +237,54 @@ async function handleDropAssetsToFolder(folderId: number, assetIds: number[]) {
   }
 }
 
+async function handleDropAssetsToTag(tagId: number, assetIds: number[]) {
+  const uniqueIds = [...new Set(assetIds)]
+  if (uniqueIds.length === 0) {
+    return
+  }
+
+  try {
+    const result = await galleryApi.addTagToAssets({
+      assetIds: uniqueIds,
+      tagId,
+    })
+    const affectedCount = result.affectedCount ?? 0
+    const failedCount = result.failedCount ?? 0
+    const unchangedCount = result.unchangedCount ?? 0
+
+    if (!result.success && affectedCount === 0) {
+      throw new Error(
+        t('gallery.sidebar.tags.addAssets.failedDescription', {
+          failed: failedCount,
+          unchanged: unchangedCount,
+        })
+      )
+    }
+
+    await Promise.all([loadTagTree(), galleryData.refreshCurrentQuery()])
+    galleryStore.clearSelection()
+
+    if (result.success && failedCount === 0 && unchangedCount === 0) {
+      toast.success(t('gallery.sidebar.tags.addAssets.successTitle'), {
+        description: t('gallery.sidebar.tags.addAssets.successDescription', {
+          count: affectedCount,
+        }),
+      })
+    } else {
+      toast.warning(t('gallery.sidebar.tags.addAssets.partialTitle'), {
+        description: t('gallery.sidebar.tags.addAssets.partialDescription', {
+          affected: affectedCount,
+          failed: failedCount,
+          unchanged: unchangedCount,
+        }),
+      })
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.sidebar.tags.addAssets.failedTitle'), { description: message })
+  }
+}
+
 function handleSidebarDragOver(event: DragEvent) {
   if (!hasGalleryAssetDragIds(event)) {
     return
@@ -305,6 +353,7 @@ onMounted(() => {
             :selected-folder="selectedFolder"
             :depth="0"
             @select="selectFolder"
+            @clear-selection="clearFolderFilter"
             @rename-display-name="handleRenameFolderDisplayName"
             @open-in-explorer="handleOpenFolderInExplorer"
             @remove-watch="handleRemoveFolderWatch"
@@ -367,6 +416,7 @@ onMounted(() => {
             @rename="handleRenameTag"
             @create-child="handleCreateChildTag"
             @delete="handleDeleteTag"
+            @drop-assets-to-tag="handleDropAssetsToTag"
           />
         </div>
       </div>

@@ -197,6 +197,84 @@ auto add_tags_to_asset(Core::State::AppState& app_state, const Types::AddTagsToA
       });
 }
 
+auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAssetsParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (params.tag_id <= 0) {
+    return std::unexpected("Tag id must be greater than 0");
+  }
+
+  std::vector<std::int64_t> normalized_asset_ids;
+  normalized_asset_ids.reserve(params.asset_ids.size());
+  std::unordered_set<std::int64_t> seen_asset_ids;
+  std::int64_t invalid_count = 0;
+
+  for (const auto asset_id : params.asset_ids) {
+    if (asset_id <= 0) {
+      ++invalid_count;
+      continue;
+    }
+    if (seen_asset_ids.insert(asset_id).second) {
+      normalized_asset_ids.push_back(asset_id);
+    }
+  }
+
+  if (normalized_asset_ids.empty()) {
+    return Types::OperationResult{
+        .success = true,
+        .message = "No valid assets to tag",
+        .affected_count = 0,
+        .failed_count =
+            invalid_count > 0 ? std::optional<std::int64_t>{invalid_count} : std::nullopt,
+        .unchanged_count = 0,
+    };
+  }
+
+  auto write_result = Core::Database::execute_transaction(
+      *app_state.database,
+      [&](Core::Database::State::DatabaseState& db_state)
+          -> std::expected<std::int64_t, std::string> {
+        std::int64_t affected_count = 0;
+        constexpr std::string_view kInsertSql = R"(
+                INSERT OR IGNORE INTO asset_tags (asset_id, tag_id)
+                VALUES (?, ?)
+            )";
+
+        for (const auto asset_id : normalized_asset_ids) {
+          auto insert_result =
+              Core::Database::execute(db_state, std::string(kInsertSql), {asset_id, params.tag_id});
+          if (!insert_result) {
+            return std::unexpected("Failed to add tag to asset: " + insert_result.error());
+          }
+
+          auto changes_result =
+              Core::Database::query_scalar<std::int64_t>(db_state, "SELECT changes()");
+          if (!changes_result) {
+            return std::unexpected("Failed to query inserted tag relation count: " +
+                                   changes_result.error());
+          }
+          affected_count += changes_result->value_or(0);
+        }
+
+        return affected_count;
+      });
+
+  if (!write_result) {
+    return std::unexpected(write_result.error());
+  }
+
+  const auto affected_count = write_result.value();
+  const auto unchanged_count =
+      static_cast<std::int64_t>(normalized_asset_ids.size()) - affected_count;
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Tag added to assets successfully",
+      .affected_count = affected_count,
+      .failed_count = invalid_count > 0 ? std::optional<std::int64_t>{invalid_count} : std::nullopt,
+      .unchanged_count = unchanged_count,
+  };
+}
+
 auto remove_tags_from_asset(Core::State::AppState& app_state,
                             const Types::RemoveTagsFromAssetParams& params)
     -> std::expected<void, std::string> {

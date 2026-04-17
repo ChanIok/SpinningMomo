@@ -51,7 +51,7 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
         :key="rating"
         @click="assetActions.setSelectedAssetsRating(rating)"
       >
-        <span class="flex items-center gap-0.5">
+        <span class="flex items-center gap-0.5 text-muted-foreground">
           <Star v-for="index in rating" :key="`${rating}-${index}`" class="fill-current" />
         </span>
         <DropdownMenuShortcut>{{ rating }}</DropdownMenuShortcut>

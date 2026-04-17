@@ -26,6 +26,7 @@ import type {
   CreateTagParams,
   UpdateTagParams,
   AddTagsToAssetParams,
+  AddTagToAssetsParams,
   RemoveTagsFromAssetParams,
   UpdateAssetsReviewStateParams,
   MoveAssetsToFolderParams,
@@ -568,6 +569,24 @@ export async function addTagsToAsset(params: AddTagsToAssetParams): Promise<Oper
 }
 
 /**
+ * 为多个资产批量添加同一个标签
+ */
+export async function addTagToAssets(params: AddTagToAssetsParams): Promise<OperationResult> {
+  try {
+    console.log('🏷️ 为多个资产添加标签:', params.assetIds.length, params.tagId)
+
+    const result = await call<OperationResult>('gallery.addTagToAssets', params)
+
+    console.log('✅ 批量标签添加完成:', result.message)
+
+    return result
+  } catch (error) {
+    console.error('Failed to add tag to assets:', error)
+    throw new Error('批量添加标签失败')
+  }
+}
+
+/**
  * 从资产移除标签
  */
 export async function removeTagsFromAsset(
@@ -686,6 +705,7 @@ export const galleryApi = {
 
   // 资产-标签关联
   addTagsToAsset,
+  addTagToAssets,
   removeTagsFromAsset,
   getAssetTags,
   getTagsByAssetIds,

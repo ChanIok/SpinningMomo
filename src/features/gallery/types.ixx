@@ -483,6 +483,11 @@ struct AddTagsToAssetParams {
   std::vector<std::int64_t> tag_ids;
 };
 
+struct AddTagToAssetsParams {
+  std::vector<std::int64_t> asset_ids;
+  std::int64_t tag_id = 0;
+};
+
 struct RemoveTagsFromAssetParams {
   std::int64_t asset_id;
   std::vector<std::int64_t> tag_ids;

@@ -7,6 +7,7 @@ import Core.State;
 import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
+import Core.RPC.NotificationHub;
 import Features.Gallery.Types;
 import Features.Gallery.Tag.Repository;
 import <asio.hpp>;
@@ -103,6 +104,23 @@ auto handle_add_tags_to_asset(Core::State::AppState& app_state,
       .success = true, .message = "Tags added to asset successfully"};
 }
 
+auto handle_add_tag_to_assets(Core::State::AppState& app_state,
+                              const Features::Gallery::Types::AddTagToAssetsParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result = Features::Gallery::Tag::Repository::add_tag_to_assets(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  if (result->affected_count.value_or(0) > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+
+  co_return result.value();
+}
+
 auto handle_remove_tags_from_asset(
     Core::State::AppState& app_state,
     const Features::Gallery::Types::RemoveTagsFromAssetParams& params)
@@ -175,6 +193,11 @@ auto register_all(Core::State::AppState& app_state) -> void {
                   Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.addTagsToAsset", handle_add_tags_to_asset,
       "Add tags to an asset");
+
+  register_method<Features::Gallery::Types::AddTagToAssetsParams,
+                  Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.addTagToAssets", handle_add_tag_to_assets,
+      "Add a tag to multiple assets");
 
   register_method<Features::Gallery::Types::RemoveTagsFromAssetParams,
                   Features::Gallery::Types::OperationResult>(

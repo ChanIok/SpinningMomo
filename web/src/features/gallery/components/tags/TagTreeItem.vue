@@ -21,6 +21,10 @@ import {
 import TagInlineEditor from './TagInlineEditor.vue'
 import { useGalleryStore } from '../../store'
 import type { TagTreeNode } from '../../types'
+import {
+  hasGalleryAssetDragIds,
+  readGalleryAssetDragIds,
+} from '../../composables/useGalleryDragPayload'
 
 interface Props {
   tag: TagTreeNode
@@ -37,6 +41,7 @@ const emit = defineEmits<{
   rename: [tagId: number, newName: string]
   createChild: [parentId: number, name: string]
   delete: [tagId: number]
+  dropAssetsToTag: [tagId: number, assetIds: number[]]
 }>()
 
 const galleryStore = useGalleryStore()
@@ -49,6 +54,7 @@ const isCreatingChild = ref(false)
 
 // 删除确认对话框状态
 const showDeleteDialog = ref(false)
+const isDragOver = ref(false)
 
 // 控制是否阻止 ContextMenu 的 closeAutoFocus
 const shouldPreventAutoFocus = ref(false)
@@ -123,6 +129,39 @@ function confirmDelete() {
   emit('delete', props.tag.id)
   showDeleteDialog.value = false
 }
+
+function handleDragEnter(event: DragEvent) {
+  if (!hasGalleryAssetDragIds(event)) {
+    return
+  }
+  event.preventDefault()
+  isDragOver.value = true
+}
+
+function handleDragOver(event: DragEvent) {
+  if (!hasGalleryAssetDragIds(event)) {
+    return
+  }
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  isDragOver.value = true
+}
+
+function handleDragLeave() {
+  isDragOver.value = false
+}
+
+function handleDrop(event: DragEvent) {
+  event.preventDefault()
+  isDragOver.value = false
+  const assetIds = readGalleryAssetDragIds(event)
+  if (assetIds.length === 0) {
+    return
+  }
+  emit('dropAssetsToTag', props.tag.id, assetIds)
+}
 </script>
 
 <template>
@@ -161,6 +200,7 @@ function confirmDelete() {
             cn(
               'group relative flex h-8 w-full cursor-pointer items-center justify-between rounded-md border-0 bg-transparent px-0 text-left text-sm transition-colors duration-200 ease-out outline-none',
               'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
+              isDragOver ? 'bg-primary/12 text-primary' : '',
               selectedTag === tag.id
                 ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
                 : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -169,6 +209,10 @@ function confirmDelete() {
           :style="{ paddingLeft: `${depth * 12 + 8}px` }"
           @click="handleItemClick"
           @dblclick="handleDoubleClick"
+          @dragenter="handleDragEnter"
+          @dragover="handleDragOver"
+          @dragleave="handleDragLeave"
+          @drop="handleDrop"
         >
           <!-- 左侧：图标 + 名称 -->
           <div class="flex min-w-0 items-center gap-2">
@@ -197,14 +241,11 @@ function confirmDelete() {
             </span>
           </div>
 
-          <!-- 右侧：资产数量 + 箭头 -->
+          <!-- 右侧：展开箭头 -->
           <div
             class="flex flex-shrink-0 items-center gap-2"
             v-if="tag.children && tag.children.length > 0"
           >
-            <!-- 资产数量 -->
-            <span class="rounded border px-1.5 py-0.5 text-xs">{{ tag.assetCount }}</span>
-
             <!-- 展开/收起箭头 -->
             <span
               class="-mr-1.5 flex-shrink-0 rounded-md p-1.5 hover:bg-sidebar-accent/80"
@@ -311,6 +352,7 @@ function confirmDelete() {
         @rename="(tagId, newName) => emit('rename', tagId, newName)"
         @create-child="(parentId, name) => emit('createChild', parentId, name)"
         @delete="(tagId) => emit('delete', tagId)"
+        @drop-assets-to-tag="(tagId, assetIds) => emit('dropAssetsToTag', tagId, assetIds)"
       />
     </div>
   </div>

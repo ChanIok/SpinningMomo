@@ -48,6 +48,11 @@ export interface AddTagsToAssetParams {
   tagIds: number[]
 }
 
+export interface AddTagToAssetsParams {
+  assetIds: number[]
+  tagId: number
+}
+
 // 从资产移除标签参数
 export interface RemoveTagsFromAssetParams {
   assetId: number

@@ -41,6 +41,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   select: [folderId: number, folderName: string]
+  clearSelection: []
   renameDisplayName: [folderId: number, displayName: string]
   openInExplorer: [folderId: number]
   removeWatch: [folderId: number]
@@ -80,6 +81,9 @@ function handleItemClick() {
   if (isCurrentlySelected && hasChildren) {
     // 已选中 + 有子项 → 切换展开
     galleryStore.toggleFolderExpanded(props.folder.id)
+  } else if (isCurrentlySelected) {
+    // 已选中 + 无子项 → 取消选择，回到未筛选状态
+    emit('clearSelection')
   } else {
     // 未选中 → 选中
     emit('select', props.folder.id, props.folder.displayName || props.folder.name)
@@ -307,6 +311,7 @@ function handleDrop(event: DragEvent) {
         :selected-folder="selectedFolder"
         :depth="depth + 1"
         @select="(folderId, folderName) => emit('select', folderId, folderName)"
+        @clear-selection="() => emit('clearSelection')"
         @rename-display-name="
           (folderId, displayName) => emit('renameDisplayName', folderId, displayName)
         "
