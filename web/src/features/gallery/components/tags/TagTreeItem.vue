@@ -203,7 +203,7 @@ function handleDrop(event: DragEvent) {
               isDragOver ? 'bg-primary/12 text-primary' : '',
               selectedTag === tag.id
                 ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
-                : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
             )
           "
           :style="{ paddingLeft: `${depth * 12 + 8}px` }"
@@ -248,7 +248,7 @@ function handleDrop(event: DragEvent) {
           >
             <!-- 展开/收起箭头 -->
             <span
-              class="-mr-1.5 flex-shrink-0 rounded-md p-1.5 hover:bg-sidebar-accent/80"
+              class="-mr-1.5 flex-shrink-0 rounded-md p-1.5 hover:bg-sidebar-hover"
               @click.stop="toggleExpand"
             >
               <svg

@@ -17,7 +17,7 @@ export const buttonVariants = cva(
         ghost: 'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
         /** 图库侧栏加号、工具条/灯箱图标按钮等：与 SettingsSidebar 同源 sidebar token */
         sidebarGhost:
-          'text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 dark:hover:bg-sidebar-accent/80',
+          'text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

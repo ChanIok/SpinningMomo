@@ -33,12 +33,12 @@ defineExpose({
   <ScrollAreaRoot
     data-slot="scroll-area"
     v-bind="delegatedProps"
-    :class="cn('relative', props.class)"
+    :class="cn('relative flex flex-col', props.class)"
   >
     <ScrollAreaViewport
       ref="viewportComponentRef"
       data-slot="scroll-area-viewport"
-      class="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+      class="min-h-0 w-full flex-1 rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
     >
       <slot />
     </ScrollAreaViewport>

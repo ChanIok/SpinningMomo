@@ -439,7 +439,7 @@ onMounted(() => {
                 'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
                 isFolderTitleSelected
                   ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
               )
             "
             @click="clearFolderFilter"
@@ -491,7 +491,7 @@ onMounted(() => {
                 'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
                 isTagTitleSelected
                   ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
               )
             "
             @click="clearTagFilter"

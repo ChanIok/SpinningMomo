@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import WindowTitlePickerButton from '@/components/WindowTitlePickerButton.vue'
 import {
   Select,
@@ -291,12 +290,12 @@ const completeOnboarding = async () => {
 </script>
 
 <template>
-  <ScrollArea class="onboarding-scroll h-full w-full">
-    <div class="onboarding-shell w-full max-w-3xl">
+  <div class="onboarding-scroll">
+    <div class="onboarding-shell w-full max-w-[724px]">
       <div
-        class="surface-middle onboarding-card flex w-full flex-col overflow-hidden rounded-md border border-border/60 shadow-sm"
+        class="surface-middle onboarding-card flex w-full flex-col overflow-hidden rounded-md shadow-sm"
       >
-        <div class="shrink-0 p-8 pb-6">
+        <div class="shrink-0 p-12 pb-6">
           <h1 class="text-2xl font-semibold text-foreground">
             {{ t('onboarding.title') }}
           </h1>
@@ -321,7 +320,7 @@ const completeOnboarding = async () => {
           </div>
         </div>
 
-        <div class="flex min-h-0 flex-1 flex-col justify-end overflow-hidden px-8 pb-6">
+        <div class="flex min-h-0 flex-1 flex-col justify-end overflow-hidden px-12 pb-6">
           <Transition :name="stepTransitionName" mode="out-in">
             <div v-if="step === 1" key="step-1" class="space-y-6">
               <div>
@@ -383,7 +382,6 @@ const completeOnboarding = async () => {
               </div>
 
               <div class="space-y-2">
-                <p class="text-sm text-foreground">{{ t('onboarding.step2.targetTitleLabel') }}</p>
                 <div class="flex gap-2">
                   <Input
                     v-model="targetTitle"
@@ -415,7 +413,7 @@ const completeOnboarding = async () => {
           </Transition>
         </div>
 
-        <div v-if="step < 3 || stepError" class="shrink-0 border-t border-border/60 px-8 py-6">
+        <div v-if="step < 3 || stepError" class="shrink-0 border-t border-border/60 px-12 py-6">
           <p v-if="stepError" class="text-sm text-red-500">
             {{ stepError }}
           </p>
@@ -446,11 +444,11 @@ const completeOnboarding = async () => {
         </div>
       </div>
     </div>
-  </ScrollArea>
+  </div>
 </template>
 
 <style scoped>
-.onboarding-scroll :deep([data-slot='scroll-area-viewport'] > *) {
+.onboarding-scroll {
   min-height: 100%;
   display: grid;
   place-items: center;

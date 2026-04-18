@@ -201,7 +201,7 @@
                     class="relative"
                     :class="hasReviewFilter ? 'text-primary' : ''"
                   >
-                    <Star class="h-4 w-4" />
+                    <Flag class="h-4 w-4" />
                     <span
                       v-if="hasReviewFilter"
                       class="absolute right-1 bottom-1 h-2 w-2 rounded-full bg-primary"
@@ -331,7 +331,7 @@ import {
   Palette,
   Type,
   Ruler,
-  Star,
+  Flag,
 } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryView } from '../../composables'

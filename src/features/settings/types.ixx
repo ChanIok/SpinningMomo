@@ -27,7 +27,7 @@ export struct WebBackgroundSettings {
   std::vector<std::string> overlay_colors = {
       "#F8F0E3"};  // 与前端浅色首个叠加预设（peach）一致，1-4 色
   std::string primary_color = "#F59E0B";
-  double overlay_opacity = 1.0;  // 0.0 - 1.0
+  double overlay_opacity = 0.8;  // 0.0 - 1.0
   double surface_opacity = 1.0;  // 0.0 - 1.0
 };
 

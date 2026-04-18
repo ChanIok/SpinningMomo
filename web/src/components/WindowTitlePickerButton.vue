@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Monitor } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { call } from '@/core/rpc'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/composables/useI18n'
@@ -79,36 +80,43 @@ const handleSelect = (title: string) => {
       </Button>
     </PopoverTrigger>
 
-    <PopoverContent align="end" class="w-80 max-w-[calc(100vw-2rem)] p-1">
-      <div v-if="isLoading" class="px-2 py-2 text-sm text-muted-foreground">
-        {{ t('common.windowTitlePicker.loading') }}
-      </div>
+    <PopoverContent align="end" class="w-80 max-w-[calc(100vw-2rem)] p-1 pr-0">
+      <div class="flex flex-col">
+        <div v-if="isLoading" class="px-2 py-2 text-sm text-muted-foreground">
+          {{ t('common.windowTitlePicker.loading') }}
+        </div>
 
-      <div v-else-if="loadFailed" class="flex items-center justify-between gap-2 px-2 py-2">
-        <span class="text-sm text-muted-foreground">
-          {{ t('common.windowTitlePicker.loadFailed') }}
-        </span>
-        <Button type="button" variant="ghost" size="sm" @click="void loadVisibleWindows()">
-          {{ t('common.windowTitlePicker.retry') }}
-        </Button>
-      </div>
-
-      <div v-else-if="visibleWindows.length === 0" class="px-2 py-2 text-sm text-muted-foreground">
-        {{ t('common.windowTitlePicker.empty') }}
-      </div>
-
-      <div v-else class="max-h-64 overflow-y-auto">
-        <button
-          v-for="window in visibleWindows"
-          :key="window.title"
-          type="button"
-          class="flex w-full rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
-          @click="handleSelect(window.title)"
-        >
-          <span class="break-all whitespace-pre-wrap text-foreground">
-            {{ formatWindowTitle(window.title) }}
+        <div v-else-if="loadFailed" class="flex items-center justify-between gap-2 px-2 py-2">
+          <span class="text-sm text-muted-foreground">
+            {{ t('common.windowTitlePicker.loadFailed') }}
           </span>
-        </button>
+          <Button type="button" variant="ghost" size="sm" @click="void loadVisibleWindows()">
+            {{ t('common.windowTitlePicker.retry') }}
+          </Button>
+        </div>
+
+        <div
+          v-else-if="visibleWindows.length === 0"
+          class="px-2 py-2 text-sm text-muted-foreground"
+        >
+          {{ t('common.windowTitlePicker.empty') }}
+        </div>
+
+        <ScrollArea v-else class="max-h-64">
+          <div>
+            <button
+              v-for="window in visibleWindows"
+              :key="window.title"
+              type="button"
+              class="flex w-full rounded-md px-2 py-2 text-left text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+              @click="handleSelect(window.title)"
+            >
+              <span class="break-all whitespace-pre-wrap text-foreground">
+                {{ formatWindowTitle(window.title) }}
+              </span>
+            </button>
+          </div>
+        </ScrollArea>
       </div>
     </PopoverContent>
   </Popover>

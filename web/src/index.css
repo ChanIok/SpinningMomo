@@ -34,6 +34,7 @@
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-hover: var(--sidebar-hover);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-header: var(--header);
@@ -70,7 +71,7 @@
   --surface-opacity: 1;
   --surface-bottom: #efefef;
   --surface-middle: rgb(255 255 255 / 0.56);
-  --surface-top: #fdfdfd;
+  --surface-top: #fefefe;
   /* Light Modern */
   --background: #ffffff;
   --foreground: #1b1b1b;
@@ -97,6 +98,7 @@
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: var(--surface-top);
   --sidebar-accent-foreground: #000000;
+  --sidebar-hover: rgb(0 0 0 / 0.04);
   --sidebar-border: #e5e5e5;
   --sidebar-ring: #f59e0b;
   --header: #f8f8f8;
@@ -139,6 +141,7 @@
   --sidebar-primary-foreground: #18181b;
   --sidebar-accent: var(--surface-top);
   --sidebar-accent-foreground: #ececec;
+  --sidebar-hover: rgb(255 255 255 / 0.06);
   --sidebar-border: #ffffff1a;
   --sidebar-ring: #fbbf24;
   --header: #181818;

@@ -8,7 +8,7 @@ import { call } from '@/core/rpc'
 import { useTaskStore } from '@/core/tasks/store'
 import { isWebView } from '@/core/env'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -344,7 +344,13 @@ watch(
             {{ t('app.header.tasks.none') }}
           </div>
 
-          <ScrollArea v-else class="max-h-[28rem]">
+          <ScrollArea v-else type="always" class="max-h-[28rem]">
+            <template #scrollbar>
+              <ScrollBar
+                class="w-3 p-[1px]"
+                thumb-class="bg-muted-foreground/35 hover:bg-muted-foreground/50"
+              />
+            </template>
             <div class="space-y-2 p-2">
               <div
                 v-for="task in displayTasks"
