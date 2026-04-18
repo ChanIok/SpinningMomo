@@ -8,9 +8,17 @@ import { galleryApi } from '@/features/gallery/api'
 import type { HomeStats } from '@/features/gallery/types'
 import { formatFileSize } from '@/lib/utils'
 import { featuresApi } from '@/features/settings/featuresApi'
+import { useSettingsStore } from '@/features/settings/store'
+import { resolveBackgroundImageUrl } from '@/features/settings/backgroundPath'
+import momoOutlineSvg from '@/assets/momo-outline.svg?raw'
 
 const { t, locale } = useI18n()
 const { toast } = useToast()
+const settingsStore = useSettingsStore()
+
+const showMomoOutline = computed(
+  () => !resolveBackgroundImageUrl(settingsStore.appSettings.ui.background)
+)
 
 const HOME_STATS_REFRESH_DEBOUNCE_MS = 400
 
@@ -117,7 +125,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="relative h-full w-full">
+  <div class="relative h-full w-full overflow-x-hidden">
+    <div
+      v-if="showMomoOutline"
+      class="pointer-events-none absolute top-10 right-10 bottom-6 z-10 w-[min(46vw,580px)] max-w-full text-white select-none dark:text-white/50"
+      aria-hidden="true"
+    >
+      <div
+        class="flex h-full w-full items-center justify-end [&_svg]:h-full [&_svg]:w-auto [&_svg]:max-w-none [&_svg]:shrink-0"
+        v-html="momoOutlineSvg"
+      ></div>
+    </div>
+
     <div
       v-if="hasLoadedHomeStats"
       class="pointer-events-none absolute bottom-8 left-8 z-20 animate-in duration-600 fade-in-0"

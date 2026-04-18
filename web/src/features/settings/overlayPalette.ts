@@ -72,7 +72,7 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     id: 'peach',
     themeMode: 'light',
     mode: 1,
-    colors: ['#F8F0E3', '#F8F0E3', '#F8F0E3', '#F8F0E3'],
+    colors: ['#F9F1E4', '#F9F1E4', '#F9F1E4', '#F9F1E4'],
   },
   {
     id: 'mist',
@@ -102,13 +102,13 @@ export const OVERLAY_PALETTE_PRESETS: ReadonlyArray<OverlayPalettePreset> = [
     id: 'slate',
     themeMode: 'dark',
     mode: 1,
-    colors: ['#0F172A', '#0F172A', '#0F172A', '#0F172A'],
+    colors: ['#1A1824', '#1A1824', '#1A1824', '#1A1824'],
   },
   {
     id: 'teal',
     themeMode: 'dark',
     mode: 2,
-    colors: ['#0F4D4D', '#062727', '#062727', '#062727'],
+    colors: ['#1A2D2A', '#162421', '#162421', '#162421'],
   },
   {
     id: 'galaxy',
