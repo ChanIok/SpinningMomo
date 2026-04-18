@@ -50,7 +50,8 @@ CREATE TABLE asset_infinity_nikki_params_v2 (
     nikki_loc_y REAL,
     nikki_loc_z REAL,
     nikki_hidden INTEGER,
-    pose_id INTEGER
+    pose_id INTEGER,
+    nikki_diy_json TEXT
 )
         )SQL",
       R"SQL(
@@ -61,7 +62,8 @@ INSERT INTO asset_infinity_nikki_params_v2 (
     filter_id, filter_strength, vignette_intensity,
     light_id, light_strength,
     nikki_loc_x, nikki_loc_y, nikki_loc_z,
-    nikki_hidden, pose_id
+    nikki_hidden, pose_id,
+    nikki_diy_json
 )
 SELECT
     asset_id,
@@ -91,7 +93,8 @@ SELECT
     nikki_loc_y,
     nikki_loc_z,
     nikki_hidden,
-    pose_id
+    pose_id,
+    NULL AS nikki_diy_json
 FROM asset_infinity_nikki_params
         )SQL",
       R"SQL(

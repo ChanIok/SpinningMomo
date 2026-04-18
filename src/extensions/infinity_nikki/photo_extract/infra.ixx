@@ -38,6 +38,7 @@ struct ParsedPhotoParamsRecord {
   std::optional<double> nikki_loc_z;
   std::optional<bool> nikki_hidden;
   std::optional<std::int64_t> pose_id;
+  std::optional<std::string> nikki_diy_json;
   std::vector<std::int64_t> nikki_clothes;
 };
 

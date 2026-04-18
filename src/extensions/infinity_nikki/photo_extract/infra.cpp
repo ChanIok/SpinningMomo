@@ -52,6 +52,12 @@ struct Nuan5Filter {
   std::optional<double> s;
 };
 
+struct Nuan5DiyEntry {
+  std::optional<std::int64_t> i;
+  std::optional<std::string> t;
+  std::optional<std::int64_t> grid;
+};
+
 struct Nuan5DecodedPhoto {
   std::optional<double> focal;
   std::optional<double> apeture;
@@ -73,6 +79,7 @@ struct Nuan5DecodedPhoto {
   std::optional<double> highlights;
   std::optional<double> shadow;
   std::optional<std::vector<std::int64_t>> clothes;
+  std::optional<std::unordered_map<std::string, std::vector<Nuan5DiyEntry>>> diy;
   std::optional<Nuan5RawData> raw;
 };
 
@@ -127,6 +134,9 @@ auto to_parsed_record(const Nuan5DecodedPhoto& photo) -> ParsedPhotoParamsRecord
   }
   if (photo.clothes.has_value()) {
     record.nikki_clothes = *photo.clothes;
+  }
+  if (photo.diy.has_value()) {
+    record.nikki_diy_json = rfl::json::write(*photo.diy);
   }
 
   return record;
@@ -399,8 +409,8 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
             vertical, bloom_intensity, bloom_threshold, brightness, exposure, contrast, saturation,
             vibrance, highlights, shadow,
             nikki_loc_x, nikki_loc_y, nikki_loc_z,
-            nikki_hidden, pose_id
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            nikki_hidden, pose_id, nikki_diy_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(asset_id) DO UPDATE SET
             uid = excluded.uid,
             camera_params = excluded.camera_params,
@@ -428,7 +438,8 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
             nikki_loc_y = excluded.nikki_loc_y,
             nikki_loc_z = excluded.nikki_loc_z,
             nikki_hidden = excluded.nikki_hidden,
-            pose_id = excluded.pose_id
+            pose_id = excluded.pose_id,
+            nikki_diy_json = excluded.nikki_diy_json
         )";
 
         std::int32_t inserted_clothes = 0;
@@ -466,6 +477,7 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
               to_db_param(record.nikki_loc_z),
               to_db_param(record.nikki_hidden),
               to_db_param(record.pose_id),
+              to_db_param(record.nikki_diy_json),
           };
 
           auto upsert_result = Core::Database::execute(db_state, upsert_sql, params);
