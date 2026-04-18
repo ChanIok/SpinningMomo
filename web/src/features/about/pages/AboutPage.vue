@@ -86,6 +86,7 @@ const legalNoticeZhUrl = 'https://spin.infinitymomo.com/zh/about/legal'
 const legalNoticeEnUrl = 'https://spin.infinitymomo.com/en/about/legal'
 const creditsZhUrl = 'https://spin.infinitymomo.com/zh/about/credits'
 const creditsEnUrl = 'https://spin.infinitymomo.com/en/about/credits'
+const nuan5Url = 'https://NUAN5.PRO'
 
 const legalNoticeUrl = computed(() =>
   locale.value === 'en-US' ? legalNoticeEnUrl : legalNoticeZhUrl
@@ -503,6 +504,14 @@ onBeforeUnmount(() => {
           >
             {{ t('about.footer.openSourceLink') }} </a
           >{{ t('about.footer.openSourceSuffix') }}
+          <a
+            :href="nuan5Url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-green-500 transition-colors hover:text-green-600 hover:underline dark:text-green-400 dark:hover:text-green-300"
+          >
+            {{ t('about.footer.creditLink') }} </a
+          >{{ t('about.footer.creditSuffix') }}
         </p>
         <div class="flex items-center justify-center gap-5 pt-2">
           <a

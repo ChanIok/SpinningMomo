@@ -32,7 +32,7 @@ function interpolate(text: string, params: Record<string, any>): string {
  * 翻译函数
  */
 function t(key: string, params?: Record<string, any>): string {
-  const text = messages.value[key] || key
+  const text = messages.value[key] ?? key
   return params ? interpolate(text, params) : text
 }
 

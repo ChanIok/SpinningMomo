@@ -42,7 +42,6 @@
 ### 📥 下载地址
 
 - **GitHub Release**：[点击下载最新版本](https://github.com/ChanIok/SpinningMomo/releases/latest)
-- **蓝奏云**：[点击下载](https://wwf.lanzoul.com/b0sxagp0d)（密码：momo）
 - **百度网盘**：[点击下载](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo)（提取码：momo）
 
 ### 📖 使用指南
@@ -57,7 +56,11 @@
 
 ✅ **已完成**：录制功能、图库功能（基础）
 
-🔨 **进行中**：UI优化、动态照片、HDR支持
+🔨 **进行中**：地图功能、UI优化、HDR支持
+
+## 🙏 致谢
+
+照片数据解析服务由 [NUAN5.PRO](https://NUAN5.PRO) 强力驱动。
 
 ## 📄 声明
 

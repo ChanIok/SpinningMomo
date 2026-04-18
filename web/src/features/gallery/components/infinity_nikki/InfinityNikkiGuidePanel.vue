@@ -11,11 +11,12 @@ const settingsStore = useSettingsStore()
 const { t } = useI18n()
 const { toast } = useToast()
 
-type Step = 1 | 2
+type Step = 1 | 2 | 3
 type Patch = Partial<AppSettings['extensions']['infinityNikki']>
 
 const step = ref<Step>(1)
 const wantsMetadata = ref(false)
+const wantsHardlinks = ref(false)
 const isSubmitting = ref(false)
 
 async function persist(patch: Patch) {
@@ -36,17 +37,23 @@ function selectMetadata(enable: boolean) {
   step.value = 2
 }
 
-// 步骤 2：保存两步的选择结果
-async function selectHardlinks(enable: boolean) {
+// 步骤 2：记录选择，前进到步骤 3
+function selectHardlinks(enable: boolean) {
+  wantsHardlinks.value = enable
+  step.value = 3
+}
+
+// 步骤 3：保存前两步的选择结果
+async function applySelections() {
   if (isSubmitting.value) return
   isSubmitting.value = true
   try {
     await persist({
       allowOnlinePhotoMetadataExtract: wantsMetadata.value,
-      manageScreenshotHardlinks: enable,
+      manageScreenshotHardlinks: wantsHardlinks.value,
     })
 
-    if (wantsMetadata.value && enable) {
+    if (wantsMetadata.value && wantsHardlinks.value) {
       toast.success(t('gallery.guide.infinityNikki.recommendedTaskStartedTitle'), {
         description: t('gallery.guide.infinityNikki.recommendedTaskStartedDescription'),
       })
@@ -54,7 +61,7 @@ async function selectHardlinks(enable: boolean) {
       toast.success(t('gallery.guide.infinityNikki.metadataTaskStartedTitle'), {
         description: t('gallery.guide.infinityNikki.metadataTaskStartedDescription'),
       })
-    } else if (enable) {
+    } else if (wantsHardlinks.value) {
       toast.success(t('gallery.guide.infinityNikki.hardlinksTaskStartedTitle'), {
         description: t('gallery.guide.infinityNikki.hardlinksTaskStartedDescription'),
       })
@@ -71,8 +78,10 @@ async function selectHardlinks(enable: boolean) {
 function handleEnable() {
   if (step.value === 1) {
     selectMetadata(true)
+  } else if (step.value === 2) {
+    selectHardlinks(true)
   } else {
-    void selectHardlinks(true)
+    void applySelections()
   }
 }
 
@@ -80,20 +89,20 @@ function handleSkip() {
   if (step.value === 1) {
     selectMetadata(false)
   } else {
-    void selectHardlinks(false)
+    selectHardlinks(false)
   }
 }
 
 function handlePrevious() {
   if (isSubmitting.value || step.value === 1) return
-  step.value = 1
+  step.value = step.value === 3 ? 2 : 1
 }
 </script>
 
 <template>
   <div class="flex h-full w-full items-center justify-center overflow-y-auto p-6">
     <!-- 卡片主体 -->
-    <div class="flex w-full max-w-2xl flex-col rounded-md border bg-card shadow-sm">
+    <div class="surface-top flex w-full max-w-2xl flex-col rounded-md border shadow-sm">
       <!-- Header：说明来源 + 步骤进度 -->
       <div class="flex shrink-0 items-center justify-between px-6 py-4">
         <div class="flex items-center gap-3">
@@ -122,6 +131,10 @@ function handlePrevious() {
             class="h-1.5 rounded-full transition-all duration-300"
             :class="step === 2 ? 'w-6 bg-primary' : 'w-2.5 bg-muted-foreground/20'"
           />
+          <div
+            class="h-1.5 rounded-full transition-all duration-300"
+            :class="step === 3 ? 'w-6 bg-primary' : 'w-2.5 bg-muted-foreground/20'"
+          />
         </div>
       </div>
 
@@ -135,7 +148,8 @@ function handlePrevious() {
               class="flex size-20 items-center justify-center rounded-2xl bg-primary/10 text-primary"
             >
               <ScanText v-if="step === 1" class="size-10" />
-              <FolderSymlink v-else class="size-10" />
+              <FolderSymlink v-else-if="step === 2" class="size-10" />
+              <Sparkles v-else class="size-10" />
             </div>
           </Transition>
         </div>
@@ -151,10 +165,24 @@ function handlePrevious() {
               <p class="text-sm leading-relaxed text-muted-foreground">
                 {{ t('gallery.guide.infinityNikki.metadataDescription') }}
               </p>
+              <p class="text-xs leading-relaxed text-muted-foreground">
+                <span>
+                  {{ t('gallery.guide.infinityNikki.credit') }}
+                  <a
+                    href="https://NUAN5.PRO"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-green-500 transition-colors hover:text-green-600 dark:text-green-400 dark:hover:text-green-300"
+                  >
+                    {{ t('gallery.guide.infinityNikki.creditLink') }}
+                  </a>
+                  {{ t('gallery.guide.infinityNikki.creditPowered') }}
+                </span>
+              </p>
             </div>
 
             <!-- 步骤 2：硬链接优化 -->
-            <div v-else key="step-2" class="space-y-3">
+            <div v-else-if="step === 2" key="step-2" class="space-y-3">
               <h2 class="text-base font-semibold text-foreground">
                 {{ t('gallery.guide.infinityNikki.step2.title') }}
               </h2>
@@ -168,6 +196,21 @@ function handlePrevious() {
                 {{ t('gallery.guide.infinityNikki.hardlinksDetailsContent') }}
               </p>
             </div>
+
+            <!-- 步骤 3：执行前提醒 -->
+            <div v-else key="step-3" class="space-y-3">
+              <h2 class="text-base font-semibold text-foreground">
+                {{ t('gallery.guide.infinityNikki.step3.title') }}
+              </h2>
+              <p class="text-sm leading-relaxed text-muted-foreground">
+                {{ t('gallery.guide.infinityNikki.step3.description') }}
+              </p>
+              <p
+                class="rounded-lg bg-muted/50 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground"
+              >
+                {{ t('gallery.guide.infinityNikki.step3.timeCostNotice') }}
+              </p>
+            </div>
           </Transition>
         </div>
       </div>
@@ -176,7 +219,7 @@ function handlePrevious() {
       <div class="flex shrink-0 items-center justify-between gap-3 border-t px-6 py-4">
         <div>
           <Button
-            v-if="step === 2"
+            v-if="step !== 1"
             variant="ghost"
             :disabled="isSubmitting"
             @click="handlePrevious"
@@ -185,12 +228,17 @@ function handlePrevious() {
           </Button>
         </div>
 
-        <div class="flex items-center gap-3">
+        <div v-if="step !== 3" class="flex items-center gap-3">
           <Button variant="ghost" :disabled="isSubmitting" @click="handleSkip">
             {{ t('gallery.guide.infinityNikki.actions.skip') }}
           </Button>
           <Button :disabled="isSubmitting" @click="handleEnable">
             {{ t('gallery.guide.infinityNikki.actions.enable') }}
+          </Button>
+        </div>
+        <div v-else class="flex items-center gap-3">
+          <Button :disabled="isSubmitting" @click="handleEnable">
+            {{ t('gallery.guide.infinityNikki.actions.confirmAndApply') }}
           </Button>
         </div>
       </div>
