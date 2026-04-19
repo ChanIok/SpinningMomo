@@ -159,7 +159,43 @@ export function useGalleryData() {
     }
   }
 
-  async function refreshGridData() {
+  /**
+   * 结果集有数据但右侧仍为空白（未选文件夹/标签）时，默认选中第一项，与常见资源管理器行为一致。
+   * 不覆盖 folder/tag/batch 详情焦点。
+   */
+  function tryFocusFirstResultWhenDetailsEmpty(requestVersion: number) {
+    if (!store.isQueryVersionCurrent(requestVersion)) {
+      return
+    }
+    if (store.totalCount <= 0) {
+      return
+    }
+    if (store.detailsPanel.type !== 'none') {
+      return
+    }
+    if (store.selection.activeAssetId !== undefined) {
+      return
+    }
+    if (store.selectedCount > 0) {
+      return
+    }
+
+    const firstAsset = store.paginatedAssets.get(1)?.[0]
+    if (!firstAsset) {
+      return
+    }
+
+    store.replaceSelection([firstAsset.id])
+    store.setSelectionAnchor(0)
+    store.setActiveAsset(firstAsset.id, 0)
+    store.setDetailsFocus({ type: 'asset', asset: firstAsset })
+  }
+
+  /**
+   * 非时间线模式：按当前筛选/排序拉取 `queryAssets` 分页结果并写入 store。
+   * 网格、列表、瀑布流、自适应等视图共用，与布局无关。
+   */
+  async function refreshPagedAssetQuery() {
     const requestVersion = store.beginQueryRefresh()
     const shouldShowLoading = !hasRenderableResults()
 
@@ -197,6 +233,7 @@ export function useGalleryData() {
       }
 
       await reconcileActiveAsset(response.activeAssetIndex, requestVersion)
+      tryFocusFirstResultWhenDetailsEmpty(requestVersion)
 
       console.log('📊 加载完成:', {
         totalCount: response.totalCount,
@@ -269,6 +306,7 @@ export function useGalleryData() {
       }
 
       await reconcileActiveAsset(bucketsResponse.activeAssetIndex, requestVersion)
+      tryFocusFirstResultWhenDetailsEmpty(requestVersion)
 
       console.log('📅 时间线数据加载成功:', {
         months: bucketsResponse.buckets.length,
@@ -299,7 +337,7 @@ export function useGalleryData() {
    * 加载普通模式资产 - 保留旧结果，等新结果就绪后原子替换
    */
   async function loadAllAssets() {
-    await refreshGridData()
+    await refreshPagedAssetQuery()
   }
 
   async function refreshCurrentQuery() {
@@ -308,7 +346,7 @@ export function useGalleryData() {
       return
     }
 
-    await refreshGridData()
+    await refreshPagedAssetQuery()
   }
 
   /**
