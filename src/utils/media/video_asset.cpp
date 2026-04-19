@@ -309,6 +309,7 @@ auto configure_rgb32_output(IMFSourceReader* reader) -> std::expected<void, std:
   return {};
 }
 
+// 策略层：仅用于 seek 目标时间（约 10% 时长等）；不参与「是否接受某一帧」的判断。
 auto calculate_thumbnail_timestamp_hns(std::optional<std::int64_t> duration_millis)
     -> std::int64_t {
   if (!duration_millis.has_value() || duration_millis.value() <= 0) {
@@ -323,8 +324,16 @@ auto calculate_thumbnail_timestamp_hns(std::optional<std::int64_t> duration_mill
       std::max(duration_hns - kHundredNanosecondsPerMillisecond, kMinThumbnailTimestampHns));
 }
 
+// 引擎层：Flush 清空队列后 SetCurrentPosition。STREAMTICK / 类型切换等在
+// read_first_thumbnail_bgra_frame 里跳过。 调用方用 calculate_thumbnail_timestamp_hns 等只决定
+// position_hns；不在此用 PTS 过滤帧。
 auto seek_source_reader(IMFSourceReader* reader, std::int64_t position_hns)
     -> std::expected<void, std::string> {
+  HRESULT flush_hr = reader->Flush(MF_SOURCE_READER_ALL_STREAMS);
+  if (FAILED(flush_hr)) {
+    return std::unexpected(format_hresult(flush_hr, "Failed to flush source reader before seek"));
+  }
+
   PROPVARIANT position;
   PropVariantInit(&position);
 
@@ -347,15 +356,6 @@ auto is_transitional_thumbnail_sample(DWORD stream_flags) -> bool {
   return (stream_flags & MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0;
 }
 
-auto is_stable_thumbnail_timestamp(LONGLONG timestamp_hns, std::int64_t minimum_timestamp_hns)
-    -> bool {
-  if (minimum_timestamp_hns <= 0) {
-    return timestamp_hns > 0;
-  }
-
-  return timestamp_hns > 0 && timestamp_hns >= minimum_timestamp_hns;
-}
-
 auto read_current_video_frame_layout(IMFSourceReader* reader)
     -> std::expected<VideoFrameLayout, std::string> {
   wil::com_ptr<IMFMediaType> media_type;
@@ -367,12 +367,15 @@ auto read_current_video_frame_layout(IMFSourceReader* reader)
   return resolve_video_frame_layout(media_type.get());
 }
 
-auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::int64_t minimum_timestamp_hns)
+// 引擎层：在已有 seek 的前提下，取第一条可解码的 RGB32 帧（不按 PTS 与 seek 目标对齐）。
+auto read_first_thumbnail_bgra_frame(IMFSourceReader* reader)
     -> std::expected<Utils::Image::BGRABitmapData, std::string> {
   constexpr DWORD kReadFlags = 0;
-  // Seek 后 reader 可能先吐出媒体类型切换帧、空样本或目标时间点之前的旧帧；
-  // 这里持续读到一张稳定帧再做缩略图。
-  constexpr int kMaxReadAttempts = 120;
+  constexpr int kMaxReadAttempts = 96;
+
+  bool ended_by_eos = false;
+  LONGLONG last_timestamp_hns = 0;
+  DWORD last_stream_flags = 0;
 
   for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
     DWORD actual_stream_index = 0;
@@ -386,25 +389,27 @@ auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::int64_t minimum_ti
       return std::unexpected(format_hresult(hr, "Failed to read video sample"));
     }
 
+    last_timestamp_hns = timestamp;
+    last_stream_flags = stream_flags;
+
     if ((stream_flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0) {
+      ended_by_eos = true;
       break;
+    }
+
+    if ((stream_flags & MF_SOURCE_READERF_STREAMTICK) != 0) {
+      continue;
     }
 
     if (!sample) {
       continue;
     }
 
-    // Step 1: 跳过管线刚切换时的过渡帧。
     if (is_transitional_thumbnail_sample(stream_flags)) {
       continue;
     }
 
-    // Step 2: 只接受时间戳已经稳定、且不早于目标时间点的帧。
-    if (!is_stable_thumbnail_timestamp(timestamp, minimum_timestamp_hns)) {
-      continue;
-    }
-
-    // Step 3: 读取当前帧对应的 surface 布局与可见区域。
+    // 读取当前帧对应的 surface 布局与可见区域。
     auto layout_result = read_current_video_frame_layout(reader);
     if (!layout_result) {
       Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1,
@@ -413,7 +418,7 @@ auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::int64_t minimum_ti
     }
     const auto& layout = layout_result.value();
 
-    // Step 4: 锁定 sample 的线性内存。
+    // 锁定 sample 的线性内存。
     wil::com_ptr<IMFMediaBuffer> media_buffer;
     hr = sample->GetBufferByIndex(0, media_buffer.put());
     if (FAILED(hr) || !media_buffer) {
@@ -440,7 +445,7 @@ auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::int64_t minimum_ti
       continue;
     }
 
-    // Step 5: 按 stride 逐行拷贝，并裁出真正可见的画面区域。
+    // 按 stride 逐行拷贝，并裁出真正可见的画面区域。
     auto copy_result = copy_bitmap_data_from_linear_buffer(buffer_start, current_length, layout);
     if (!copy_result) {
       Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1,
@@ -450,6 +455,10 @@ auto read_thumbnail_bitmap_data(IMFSourceReader* reader, std::int64_t minimum_ti
 
     return copy_result;
   }
+
+  Logger().warn(
+      "Video thumbnail read exhausted. max_reads={}, eos={}, last_ts_hns={}, last_flags=0x{:08X}",
+      kMaxReadAttempts, ended_by_eos, last_timestamp_hns, last_stream_flags);
 
   return std::unexpected("Failed to decode a video frame for thumbnail generation");
 }
@@ -520,7 +529,6 @@ auto analyze_video_file(const std::filesystem::path& path,
 
   auto seek_hns = calculate_thumbnail_timestamp_hns(duration_millis);
 
-  // Step 2: 先 seek 到目标时间点附近，再往后读到一张稳定帧。
   auto seek_result = seek_source_reader(reader.get(), seek_hns);
   if (!seek_result) {
     Logger().warn("Video analysis failed while seeking thumbnail frame. path='{}', error={}",
@@ -528,7 +536,16 @@ auto analyze_video_file(const std::filesystem::path& path,
     return std::unexpected(seek_result.error());
   }
 
-  auto bitmap_result = read_thumbnail_bitmap_data(reader.get(), seek_hns);
+  auto bitmap_result = read_first_thumbnail_bgra_frame(reader.get());
+  if (!bitmap_result) {
+    auto fallback_seek = seek_source_reader(reader.get(), kMinThumbnailTimestampHns);
+    if (!fallback_seek) {
+      Logger().warn("Video analysis failed while seeking thumbnail fallback. path='{}', error={}",
+                    path.string(), fallback_seek.error());
+      return std::unexpected(fallback_seek.error());
+    }
+    bitmap_result = read_first_thumbnail_bgra_frame(reader.get());
+  }
   if (!bitmap_result) {
     Logger().warn("Video analysis failed while decoding thumbnail bitmap. path='{}', error={}",
                   path.string(), bitmap_result.error());
