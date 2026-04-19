@@ -242,18 +242,11 @@ auto build_photo_tuple(const std::vector<std::uint8_t>& payload, const std::stri
     data_buf.push_back(static_cast<std::uint8_t>(ch));
   }
 
+  // decode-photo2：两 ROI Base64 解码后的字节直接拼接，不再做 XOR 混淆。
   std::vector<std::uint8_t> buf;
   buf.reserve(hash_buf.size() + data_buf.size());
   buf.insert(buf.end(), hash_buf.begin(), hash_buf.end());
   buf.insert(buf.end(), data_buf.begin(), data_buf.end());
-
-  auto hash_len = hash_buf.size();
-  for (std::size_t i = hash_len; i < buf.size(); ++i) {
-    buf[i] ^= buf[i % hash_len];
-  }
-  for (std::size_t i = 0; i < hash_len; ++i) {
-    buf[i] ^= static_cast<std::uint8_t>(uid[i % uid.size()]);
-  }
 
   auto encoded = Utils::String::ToBase64(to_chars(buf));
   auto md5_result = compute_md5_hex(payload, static_cast<std::size_t>(roi1));

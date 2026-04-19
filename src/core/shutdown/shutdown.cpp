@@ -38,12 +38,13 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   Logger().info("SpinningMomo shutdown begin");
   Logger().info("==================================================");
 
+  // 先卸载键盘钩子，避免后续清理过程输入事件被拦截
+  Core::Commands::uninstall_keyboard_keepalive_hook(state);
+
   // 清理顺序应该与 Core::Initializer::initialize_application 中的初始化顺序相反
 
   // 先停止录制并等待录制切换线程结束，避免与后续 UI/核心清理并发
   Features::Recording::UseCase::stop_recording_if_running(state);
-
-  Core::Commands::uninstall_keyboard_keepalive_hook(state);
 
   Features::WindowControl::stop_center_lock_monitor(state);
 

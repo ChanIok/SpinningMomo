@@ -17,11 +17,14 @@ import <rfl/json.hpp>;
 
 namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 
-struct ExtractApiRequestBody {
-  std::string uid;
-  std::vector<std::array<std::string, 2>> photos;
+struct DecodePhoto2ApiRequestBody {
+  std::map<std::string, std::vector<std::array<std::string, 2>>> photos;
   std::optional<bool> raw_data = true;
   std::optional<bool> raw_id = true;
+};
+
+struct DecodePhoto2ErrorField {
+  std::optional<std::string> error;
 };
 
 struct Nuan5Light {
@@ -83,7 +86,7 @@ struct Nuan5DecodedPhoto {
   std::optional<Nuan5RawData> raw;
 };
 
-constexpr std::string_view kExtractApiUrl = "https://nuan5.pro/api/decode-photo";
+constexpr std::string_view kExtractApiUrl = "https://nuan5.pro/api/decode-photo2";
 constexpr auto kNuan5MinRequestInterval = std::chrono::milliseconds(500);
 constexpr std::size_t kMaxNuan5RateLimitRetries = 2;
 
@@ -192,30 +195,75 @@ auto acquire_nuan5_send_slot() -> asio::awaitable<void> {
   }
 }
 
-auto parse_photo_params_records_from_response(const std::string& response_body)
-    -> std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string> {
-  auto response = rfl::json::read<std::vector<std::variant<std::string, Nuan5DecodedPhoto>>,
-                                  rfl::DefaultIfMissing>(response_body);
+auto decode_photo2_variant_to_record(const std::variant<std::string, Nuan5DecodedPhoto>& item)
+    -> ExtractBatchPhotoParamsRecord {
+  if (std::holds_alternative<std::string>(item)) {
+    return ExtractBatchPhotoParamsRecord{
+        .record = std::nullopt,
+        .error_message = std::get<std::string>(item),
+    };
+  }
+  return ExtractBatchPhotoParamsRecord{
+      .record = to_parsed_record(std::get<Nuan5DecodedPhoto>(item)),
+      .error_message = std::nullopt,
+  };
+}
 
-  if (!response) {
-    return std::unexpected("Invalid JSON response: " + response.error().what());
-  }
-  std::vector<ExtractBatchPhotoParamsRecord> records;
-  records.reserve(response->size());
-  for (const auto& item : *response) {
-    if (std::holds_alternative<std::string>(item)) {
-      records.push_back(ExtractBatchPhotoParamsRecord{
-          .record = std::nullopt,
-          .error_message = std::get<std::string>(item),
-      });
-      continue;
+auto align_decode_photo2_response(const std::vector<Scan::PreparedPhotoExtractEntry>& entries,
+                                  const std::string& response_body)
+    -> std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string> {
+  using Item = std::variant<std::string, Nuan5DecodedPhoto>;
+  using Row = std::tuple<std::string, std::vector<Item>>;
+  auto rows = rfl::json::read<std::vector<Row>, rfl::DefaultIfMissing>(response_body);
+  if (!rows) {
+    auto maybe_err = rfl::json::read<DecodePhoto2ErrorField, rfl::DefaultIfMissing>(response_body);
+    if (maybe_err && maybe_err->error.has_value() && !maybe_err->error->empty()) {
+      return std::unexpected(*maybe_err->error);
     }
-    records.push_back(ExtractBatchPhotoParamsRecord{
-        .record = to_parsed_record(std::get<Nuan5DecodedPhoto>(item)),
-        .error_message = std::nullopt,
-    });
+    return std::unexpected(std::string("Invalid decode-photo2 JSON: ") + rows.error().what());
   }
-  return records;
+
+  std::unordered_map<std::string, std::queue<ExtractBatchPhotoParamsRecord>> queues;
+  for (const auto& row : *rows) {
+    const auto& uid = std::get<0>(row);
+    for (const auto& item : std::get<1>(row)) {
+      queues[uid].push(decode_photo2_variant_to_record(item));
+    }
+  }
+
+  std::unordered_map<std::string, std::size_t> expected_per_uid;
+  for (const auto& entry : entries) {
+    expected_per_uid[entry.uid]++;
+  }
+
+  for (const auto& [uid, expected_count] : expected_per_uid) {
+    auto it = queues.find(uid);
+    if (it == queues.end()) {
+      return std::unexpected("decode-photo2: missing results for uid " + uid);
+    }
+    if (it->second.size() != expected_count) {
+      return std::unexpected(
+          std::format("decode-photo2: uid {} result count mismatch (got {}, expected {})", uid,
+                      it->second.size(), expected_count));
+    }
+  }
+
+  for (const auto& [uid, unused_queue] : queues) {
+    (void)unused_queue;
+    if (!expected_per_uid.contains(uid)) {
+      return std::unexpected("decode-photo2: unexpected uid in response: " + uid);
+    }
+  }
+
+  std::vector<ExtractBatchPhotoParamsRecord> aligned;
+  aligned.reserve(entries.size());
+  for (const auto& entry : entries) {
+    auto& q = queues[entry.uid];
+    aligned.push_back(std::move(q.front()));
+    q.pop();
+  }
+
+  return aligned;
 }
 
 template <typename T>
@@ -324,22 +372,9 @@ auto extract_batch_photo_params(Core::State::AppState& app_state,
     co_return std::vector<ExtractBatchPhotoParamsRecord>{};
   }
 
-  const auto& uid = entries.front().uid;
+  DecodePhoto2ApiRequestBody request_body{.photos = {}, .raw_data = true, .raw_id = true};
   for (const auto& entry : entries) {
-    if (entry.uid != uid) {
-      co_return std::unexpected("Batch contains multiple UIDs");
-    }
-  }
-
-  // 远端接口按“同一个 UID 的多张照片”来解析，
-  // 所以这里明确要求一个 batch 内只能有一个 UID。
-  ExtractApiRequestBody request_body{
-      .uid = uid,
-      .photos = {},
-  };
-  request_body.photos.reserve(entries.size());
-  for (const auto& entry : entries) {
-    request_body.photos.push_back({entry.md5, entry.encoded});
+    request_body.photos[entry.uid].push_back(std::array<std::string, 2>{entry.md5, entry.encoded});
   }
 
   auto request_json = rfl::json::write(request_body);
@@ -374,18 +409,12 @@ auto extract_batch_photo_params(Core::State::AppState& app_state,
     co_return std::unexpected(response_body.error());
   }
 
-  auto parsed_result = parse_photo_params_records_from_response(response_body.value());
+  auto parsed_result = align_decode_photo2_response(entries, response_body.value());
   if (!parsed_result) {
     co_return std::unexpected(parsed_result.error());
   }
 
-  auto records = std::move(parsed_result.value());
-  if (records.size() != entries.size()) {
-    co_return std::unexpected(
-        std::format("response count mismatch: got {} for {}", records.size(), entries.size()));
-  }
-
-  co_return records;
+  co_return std::move(parsed_result.value());
 }
 
 auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::string& uid,

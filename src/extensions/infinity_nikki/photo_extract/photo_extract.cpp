@@ -198,7 +198,11 @@ auto apply_batch_result(
   }
 
   auto fail_all = [&](const std::string& reason) {
-    Logger().warn("apply_batch_result: batch failed (uid={}, count={}): {}", entries.front().uid,
+    std::unordered_set<std::string> uid_set;
+    for (const auto& entry : entries) {
+      uid_set.insert(entry.uid);
+    }
+    Logger().warn("apply_batch_result: batch failed (unique_uids={}, count={}): {}", uid_set.size(),
                   entries.size(), reason);
     for (const auto& entry : entries) {
       mark_candidate_failed(result, progress, entry.asset_id, reason);
@@ -212,8 +216,7 @@ auto apply_batch_result(
     return;
   }
 
-  std::vector<Infra::ParsedPhotoParamsBatchItem> items_to_save;
-  items_to_save.reserve(entries.size());
+  std::unordered_map<std::string, std::vector<Infra::ParsedPhotoParamsBatchItem>> items_by_uid;
 
   auto& records = batch_outcome.result.value();
   for (std::size_t index = 0; index < entries.size(); ++index) {
@@ -225,30 +228,38 @@ auto apply_batch_result(
       continue;
     }
 
-    items_to_save.push_back(Infra::ParsedPhotoParamsBatchItem{
+    items_by_uid[entry.uid].push_back(Infra::ParsedPhotoParamsBatchItem{
         .asset_id = entry.asset_id,
         .record = std::move(*records[index].record),
     });
   }
 
-  if (items_to_save.empty()) {
-    report_processing_progress(progress_callback, progress, result, true);
-    return;
-  }
-
-  auto save_result =
-      Infra::upsert_photo_params_batch(app_state, entries.front().uid, items_to_save);
-  if (!save_result) {
-    Logger().error("apply_batch_result: DB batch upsert failed (uid={}, count={}): {}",
-                   entries.front().uid, items_to_save.size(), save_result.error());
-    for (const auto& item : items_to_save) {
-      mark_candidate_failed(result, progress, item.asset_id, save_result.error());
+  std::size_t total_saved = 0;
+  std::int32_t total_clothes = 0;
+  for (const auto& [uid, items] : items_by_uid) {
+    if (items.empty()) {
+      continue;
     }
+    auto save_result = Infra::upsert_photo_params_batch(app_state, uid, items);
+    if (!save_result) {
+      Logger().error("apply_batch_result: DB batch upsert failed (uid={}, count={}): {}", uid,
+                     items.size(), save_result.error());
+      for (const auto& item : items) {
+        mark_candidate_failed(result, progress, item.asset_id, save_result.error());
+      }
+      report_processing_progress(progress_callback, progress, result, true);
+      return;
+    }
+    total_saved += items.size();
+    total_clothes += save_result.value();
+  }
+
+  if (total_saved == 0) {
     report_processing_progress(progress_callback, progress, result, true);
     return;
   }
 
-  mark_candidates_saved(result, progress, items_to_save.size(), save_result.value());
+  mark_candidates_saved(result, progress, total_saved, total_clothes);
   report_processing_progress(progress_callback, progress, result, true);
 }
 
@@ -260,7 +271,11 @@ auto send_extract_batch(
   if (batch.empty()) {
     co_return;
   }
-  Logger().debug("extract_photo_params: sending batch (uid={}, count={})", batch.front().uid,
+  std::unordered_set<std::string> uid_set;
+  for (const auto& entry : batch) {
+    uid_set.insert(entry.uid);
+  }
+  Logger().debug("extract_photo_params: sending batch (unique_uids={}, count={})", uid_set.size(),
                  batch.size());
   BatchExtractOutcome batch_outcome;
   batch_outcome.result = co_await Infra::extract_batch_photo_params(app_state, batch);
@@ -274,7 +289,7 @@ auto extract_photo_params(
   // 整个流程：
   // 1) 查候选照片
   // 2) 并发准备本地提取数据（WorkerPool），按候选顺序等待每个 slot
-  // 3) 边准备边分批请求远端（同 UID、每批最多 kExtractBatchSize），顺序落库
+  // 3) 边准备边分批请求远端（每批最多 kExtractBatchSize，可含多 UID），顺序落库
   InfinityNikkiExtractPhotoParamsResult result;
 
   if (!app_state.database) {
@@ -366,13 +381,6 @@ auto extract_photo_params(
     }
 
     auto entry = std::move(*outcome.entry);
-
-    if (!pending_batch.empty() && pending_batch.front().uid != entry.uid) {
-      co_await send_extract_batch(app_state, std::move(pending_batch), result, progress,
-                                  progress_callback);
-      pending_batch.clear();
-      pending_batch.reserve(kExtractBatchSize);
-    }
 
     pending_batch.push_back(std::move(entry));
 
