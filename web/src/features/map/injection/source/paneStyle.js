@@ -1,7 +1,6 @@
 export function buildPaneStyleSnippet() {
   return `
-  const markerPaneName = 'spinning-momo-marker-pane';
-  const clusterPaneName = 'spinning-momo-cluster-pane';
+  const photoPaneName = 'spinning-momo-photo-pane';
 
   const ensureScopedPopupStyles = () => {
     if (document.getElementById('spinning-momo-popup-style')) {
@@ -133,8 +132,7 @@ export function buildPaneStyleSnippet() {
     return pane;
   };
 
-  ensurePane(markerPaneName, 950);
-  ensurePane(clusterPaneName, 980);
+  ensurePane(photoPaneName, 975);
   ensureScopedPopupStyles();
 `
 }

@@ -1,5 +1,6 @@
 import { buildPaneStyleSnippet } from './paneStyle.js'
 import { buildPopupSnippet } from './popup.js'
+import { buildPhotoCardSnippet } from './photoCardHtml.js'
 import { buildClusterSnippet } from './cluster.js'
 import { buildRenderSnippet } from './render.js'
 import { buildToolbarSnippet } from './toolbar.js'
@@ -67,6 +68,7 @@ ${buildPaneStyleSnippet()}
     runtime.runtimeOptions = runtimeOptions;
 
 ${buildPopupSnippet()}
+${buildPhotoCardSnippet()}
 ${buildClusterSnippet()}
 ${buildToolbarSnippet()}
 ${buildRenderSnippet()}

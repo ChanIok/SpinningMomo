@@ -65,7 +65,7 @@ export function buildRenderSnippet() {
     const markerOwnerId =
       'marker:' + String(markerData.assetId ?? markerData.name ?? (String(markerData.lat) + ',' + String(markerData.lng)));
     const markerOptions = {
-      pane: markerPaneName,
+      pane: photoPaneName,
       interactive: true,
     };
     if (compositeIcon) markerOptions.icon = compositeIcon;
@@ -85,19 +85,15 @@ export function buildRenderSnippet() {
       }
     });
 
-    if (markerData.popupHtml) {
-      if (openPopupOnHover) {
-        marker.on('mouseover', () => {
-          hoverState.markerHovered = true;
-          scheduleOpen(hoverState, () => {
-            void openPreparedHoverCard(hoverState, {
-              ownerId: markerOwnerId,
-              latLng: [markerData.lat, markerData.lng],
-              contentHtml: markerData.popupHtml,
-            });
-          });
+    if (hoverCardEnabled) {
+      marker.on('mouseover', () => {
+        hoverState.markerHovered = true;
+        scheduleOpenHoverCard(hoverState, {
+          ownerId: markerOwnerId,
+          latLng: [markerData.lat, markerData.lng],
+          contentHtml: buildSinglePhotoHoverHtml(markerData),
         });
-      }
+      });
       if (closePopupOnMouseOut) {
         marker.on('mouseout', () => {
           hoverState.markerHovered = false;

@@ -1,3 +1,4 @@
+import { buildIframeBootstrapSnippet } from './iframeBootstrap.js'
 import { buildRuntimeCoreSnippet } from './runtimeCore.js'
 
 export function buildMapBridgeScriptTemplate() {
@@ -9,6 +10,7 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
     window.__SPINNING_MOMO_RENDER_OPTIONS__ = {};
     window.__SPINNING_MOMO_CLUSTER_OPTIONS__ = {};
 
+${buildIframeBootstrapSnippet()}
 ${buildRuntimeCoreSnippet()}
 
     const normalizeRenderOptions = (options) => {
@@ -83,21 +85,12 @@ ${buildRuntimeCoreSnippet()}
             return;
         }
 
-        if (event.data.action === 'SET_MARKERS') {
-            const { markers = [] } = event.data.payload || {};
-            window.__SPINNING_MOMO_PENDING_MARKERS__ = Array.isArray(markers) ? markers : [];
-            maybeMountRuntime();
-            return;
-        }
-
-        if (event.data.action === 'SET_RENDER_OPTIONS') {
-            setRenderOptions(event.data.payload || {});
-            maybeMountRuntime();
-            return;
-        }
-
-        if (event.data.action === 'SET_CLUSTER_OPTIONS') {
-            setClusterOptions(event.data.payload || {});
+        if (event.data.action === 'SPINNING_MOMO_SYNC_RUNTIME') {
+            const runtimePayload = event.data.payload || {};
+            const markers = Array.isArray(runtimePayload.markers) ? runtimePayload.markers : [];
+            window.__SPINNING_MOMO_PENDING_MARKERS__ = markers;
+            setRenderOptions(runtimePayload.renderOptions || {});
+            setClusterOptions(runtimePayload.runtimeOptions || {});
             maybeMountRuntime();
             return;
         }

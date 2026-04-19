@@ -1,37 +1,9 @@
 export function buildClusterSnippet() {
   return `
-  const buildClusterCellInnerHtml = (item) => {
-    if (item && item.thumbnailUrl) {
-      return (
-        '<img src="' +
-        item.thumbnailUrl +
-        '" loading="lazy" style="width:100%;height:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px;background:#1f2937;display:block;" />'
-      );
-    }
-
-    return (
-      '<div style="width:100%;height:100%;aspect-ratio:1/1;border-radius:6px;background:#1f2937;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:11px;">无图</div>'
-    );
-  };
-
-  const buildClusterPreviewCellHtml = (item) => {
-    const hasAssetId = item && Number.isFinite(Number(item.assetId));
-    const assetIdAttr = hasAssetId ? ' data-sm-open-asset-id="' + String(item.assetId) + '"' : '';
-    const hasAssetIndex = item && Number.isFinite(Number(item.assetIndex));
-    const assetIndexAttr = hasAssetIndex
-      ? ' data-sm-open-asset-index="' + String(item.assetIndex) + '"'
-      : '';
-
-    const innerHtml = buildClusterCellInnerHtml(item);
-    const cellStyle = hasAssetId ? 'width:100%;height:100%;cursor:pointer;' : 'width:100%;height:100%;';
-
-    return '<div' + assetIdAttr + assetIndexAttr + ' style="' + cellStyle + '">' + innerHtml + '</div>';
-  };
-
   const buildClusterHoverGridHtml = (items, gridColumns, cellPx) => {
     const cols = Math.min(3, Math.max(1, gridColumns));
     return (
-      '<div style="display:grid;grid-template-columns:repeat(' +
+      '<div data-sm-cluster-grid-root="1" style="display:grid;grid-template-columns:repeat(' +
       cols +
       ',' +
       cellPx +
@@ -50,7 +22,7 @@ export function buildClusterSnippet() {
     const remainingCount = Math.max(0, totalCount - previewCount);
 
     const cellPx = 96;
-    const previewItems = clusterMarkers.slice(0, previewCount).map((item) => buildClusterPreviewCellHtml(item));
+    const previewItems = clusterMarkers.slice(0, previewCount).map((item) => buildPhotoThumbCellHtml(item));
 
     if (remainingCount > 0) {
       previewItems.push(
@@ -63,29 +35,10 @@ export function buildClusterSnippet() {
     const titleTpl = runtimeOptions.clusterTitleTemplate || '{count} 张照片';
     const clusterHeader = String(titleTpl).replace(/\\{count\\}/g, String(clusterMarkers.length));
 
-    return '<div style="padding:0.75rem;">' +
+    return '<div data-sm-cluster-card="1" style="padding:0.75rem;">' +
       '<div class="spinning-momo-popup-title">' + clusterHeader + '</div>' +
       buildClusterHoverGridHtml(previewItems, gridColumns, cellPx) +
     '</div>';
-  };
-
-  const buildClusterHoverExpandedHtml = (clusterMarkers) => {
-    const cellPx = 96;
-    const titleTpl = runtimeOptions.clusterTitleTemplate || '{count} 张照片';
-    const clusterHeader = String(titleTpl).replace(/\\{count\\}/g, String(clusterMarkers.length));
-    const allItems = clusterMarkers.map((item) => buildClusterPreviewCellHtml(item));
-    const gridColumns = 3;
-
-    return (
-      '<div style="display:inline-block; padding:0.75rem; max-width: calc(100vw - 32px);">' +
-      '<div class="spinning-momo-popup-title">' +
-      clusterHeader +
-      '</div>' +
-      '<div data-sm-cluster-scroll="1" style="max-height: min(60vh, 420px); overflow-y: auto; overscroll-behavior: contain;">' +
-      buildClusterHoverGridHtml(allItems, gridColumns, cellPx) +
-      '</div>' +
-      '</div>'
-    );
   };
 
   const renderClusterMarker = (clusterMarkers) => {
@@ -96,10 +49,79 @@ export function buildClusterSnippet() {
       .map((item) => String(item.assetId ?? item.name ?? (String(item.lat) + ',' + String(item.lng))))
       .join('|');
 
+    const cellPx = 96;
+
+    const applyClusterHoverIncrementalExpand = (hoverCardRoot) => {
+      const totalCount = clusterMarkers.length;
+      const maxGridCells = 9;
+      const previewCount =
+        totalCount > maxGridCells ? maxGridCells - 1 : Math.min(totalCount, maxGridCells);
+      const remainingCount = Math.max(0, totalCount - previewCount);
+      if (remainingCount <= 0) {
+        return;
+      }
+
+      const grid = hoverCardRoot.querySelector('[data-sm-cluster-grid-root]');
+      if (!grid || grid.dataset.smClusterExpanded === 'true') {
+        return;
+      }
+
+      const expandEl = grid.querySelector('[data-sm-cluster-expand]');
+      if (!expandEl) {
+        return;
+      }
+
+      expandEl.remove();
+
+      const restHtml = clusterMarkers
+        .slice(previewCount)
+        .map((item) => buildPhotoThumbCellHtml(item))
+        .join('');
+      if (restHtml) {
+        grid.insertAdjacentHTML('beforeend', restHtml);
+      }
+
+      grid.style.gridTemplateColumns = 'repeat(3,' + cellPx + 'px)';
+
+      const cardShell = grid.closest('[data-sm-cluster-card]');
+      if (cardShell) {
+        cardShell.style.display = 'inline-block';
+        cardShell.style.maxWidth = 'calc(100vw - 32px)';
+      }
+
+      const parentEl = grid.parentElement;
+      if (parentEl && parentEl.getAttribute('data-sm-cluster-scroll') !== '1') {
+        const sc = document.createElement('div');
+        sc.setAttribute('data-sm-cluster-scroll', '1');
+        sc.style.maxHeight = 'min(60vh, 420px)';
+        sc.style.overflowY = 'auto';
+        sc.style.overscrollBehavior = 'contain';
+        parentEl.insertBefore(sc, grid);
+        sc.appendChild(grid);
+      }
+
+      grid.dataset.smClusterExpanded = 'true';
+
+      bindPopupCardClickBridge(hoverCardRoot);
+      const scrollRoot = hoverCardRoot.querySelector('[data-sm-cluster-scroll]');
+      if (scrollRoot && scrollRoot.dataset.smClusterScrollWheelBound !== 'true') {
+        scrollRoot.dataset.smClusterScrollWheelBound = 'true';
+        scrollRoot.addEventListener(
+          'wheel',
+          (event) => {
+            event.stopPropagation();
+          },
+          { passive: true }
+        );
+      }
+
+      refreshActiveHoverCardPosition();
+    };
+
     const clusterIcon = buildClusterMarkerIcon(count);
     const marker = L.marker([lat, lng], {
       icon: clusterIcon,
-      pane: clusterPaneName,
+      pane: photoPaneName,
       interactive: true,
     }).addTo(runtime.clusterLayer);
 
@@ -122,17 +144,16 @@ export function buildClusterSnippet() {
           event.preventDefault();
           event.stopPropagation();
           hoverState.popupHovered = true;
-          showHoverCard(hoverState, {
-            ownerId: clusterOwnerId,
-            latLng: [lat, lng],
-            contentHtml: buildClusterHoverExpandedHtml(clusterMarkers),
-            afterOpen: bindClusterHoverCardInteractions,
-          });
+          const hoverCardRoot = runtime.hoverCardRoot;
+          if (!hoverCardRoot) {
+            return;
+          }
+          applyClusterHoverIncrementalExpand(hoverCardRoot);
         });
       }
 
       const scrollRoot = rootElement.querySelector('[data-sm-cluster-scroll]');
-      if (scrollRoot && !scrollRoot.dataset.smClusterScrollWheelBound) {
+      if (scrollRoot && scrollRoot.dataset.smClusterScrollWheelBound !== 'true') {
         scrollRoot.dataset.smClusterScrollWheelBound = 'true';
         scrollRoot.addEventListener(
           'wheel',
@@ -151,13 +172,11 @@ export function buildClusterSnippet() {
         iconElement.style.cursor = 'pointer';
       }
       if (!hoverCardEnabled) return;
-      scheduleOpen(hoverState, () => {
-        void openPreparedHoverCard(hoverState, {
-          ownerId: clusterOwnerId,
-          latLng: [lat, lng],
-          contentHtml: buildClusterHoverHtml(clusterMarkers),
-          afterOpen: bindClusterHoverCardInteractions,
-        });
+      scheduleOpenHoverCard(hoverState, {
+        ownerId: clusterOwnerId,
+        latLng: [lat, lng],
+        contentHtml: buildClusterHoverHtml(clusterMarkers),
+        afterOpen: bindClusterHoverCardInteractions,
       });
     });
 

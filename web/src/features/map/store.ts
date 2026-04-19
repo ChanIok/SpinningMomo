@@ -8,7 +8,8 @@ export interface MapMarker {
   name?: string
   lat: number
   lng: number
-  popupHtml: string
+  /** 悬停卡片标题（宿主侧已按语言格式化） */
+  cardTitle: string
   thumbnailUrl?: string
   fileCreatedAt?: number
 }
@@ -21,7 +22,6 @@ export interface MapRenderOptions {
   markerIconUrl?: string
   markerIconSize?: [number, number]
   markerIconAnchor?: [number, number]
-  openPopupOnHover?: boolean
   closePopupOnMouseOut?: boolean
   popupOpenDelayMs?: number
   popupCloseDelayMs?: number
@@ -50,7 +50,7 @@ export const useMapStore = defineStore('map', () => {
     thumbnailBaseUrl: 'http://127.0.0.1:51206',
   })
 
-  const setMarkers = (nextMarkers: MapMarker[]) => {
+  const replaceMarkers = (nextMarkers: MapMarker[]) => {
     markers.value = nextMarkers
   }
 
@@ -58,11 +58,15 @@ export const useMapStore = defineStore('map', () => {
     renderOptions.value = { ...nextOptions }
   }
 
-  const setRuntimeOptions = (nextOptions: Partial<MapRuntimeOptions>) => {
+  const patchRuntimeOptions = (nextOptions: Partial<MapRuntimeOptions>) => {
     runtimeOptions.value = {
       ...runtimeOptions.value,
       ...nextOptions,
     }
+  }
+
+  const setLoading = (nextLoading: boolean) => {
+    isLoading.value = nextLoading
   }
 
   return {
@@ -70,8 +74,9 @@ export const useMapStore = defineStore('map', () => {
     isLoading,
     renderOptions,
     runtimeOptions,
-    setMarkers,
+    replaceMarkers,
     setRenderOptions,
-    setRuntimeOptions,
+    patchRuntimeOptions,
+    setLoading,
   }
 })
