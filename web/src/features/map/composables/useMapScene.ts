@@ -9,6 +9,8 @@ import {
   createDefaultMapRuntimeOptions,
 } from '@/features/map/domain/defaults'
 import { toMapMarkers } from '@/features/map/domain/markerMapper'
+import { resolveMatchedWorldId } from '@/features/map/domain/worldPolygonFilter'
+import { WORLD_POLYGON_RULES } from '@/features/map/domain/worldPolygons'
 import { useMapStore } from '@/features/map/store'
 
 export function useMapScene() {
@@ -16,6 +18,30 @@ export function useMapScene() {
   const galleryStore = useGalleryStore()
   const mapStore = useMapStore()
   const mapPoints = ref<PhotoMapPoint[]>([])
+
+  function filterMapPointsByCurrentWorld(points: PhotoMapPoint[]): PhotoMapPoint[] {
+    const currentWorldId = String(mapStore.runtimeOptions.currentWorldId ?? '').trim()
+    if (!currentWorldId) {
+      return points
+    }
+
+    return points.filter((point) => {
+      const matchedWorldId = resolveMatchedWorldId(point, WORLD_POLYGON_RULES)
+      return matchedWorldId === currentWorldId
+    })
+  }
+
+  function syncMarkersFromMapPoints() {
+    const filteredPoints = filterMapPointsByCurrentWorld(mapPoints.value)
+    mapStore.replaceMarkers(
+      toMapMarkers(filteredPoints, {
+        locale: locale.value,
+        thumbnailBaseUrl: mapStore.runtimeOptions.thumbnailBaseUrl,
+        cardTitleFallback: t('map.popup.fallbackTitle'),
+        worldId: mapStore.runtimeOptions.currentWorldId,
+      })
+    )
+  }
 
   function syncFilterCountCard(loading: boolean) {
     mapStore.patchRuntimeOptions({
@@ -51,14 +77,7 @@ export function useMapScene() {
         sortBy: galleryStore.sortBy,
         sortOrder: galleryStore.sortOrder,
       })
-
-      mapStore.replaceMarkers(
-        toMapMarkers(mapPoints.value, {
-          locale: locale.value,
-          thumbnailBaseUrl: mapStore.runtimeOptions.thumbnailBaseUrl,
-          cardTitleFallback: t('map.popup.fallbackTitle'),
-        })
-      )
+      syncMarkersFromMapPoints()
     } catch (error) {
       console.error('Failed to load map points:', error)
       mapPoints.value = []
@@ -84,8 +103,15 @@ export function useMapScene() {
 
   watch(locale, () => {
     syncMapRuntimeI18n()
-    void loadMapPoints()
+    syncMarkersFromMapPoints()
   })
+
+  watch(
+    () => mapStore.runtimeOptions.currentWorldId,
+    () => {
+      syncMarkersFromMapPoints()
+    }
+  )
 
   return {
     mapPoints: computed(() => mapPoints.value),

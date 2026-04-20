@@ -7,6 +7,7 @@ type MarkerMapperContext = {
   locale: Locale
   thumbnailBaseUrl: string
   cardTitleFallback: string
+  worldId?: string
 }
 
 const FILENAME_DATE_PREFIX_RE = /^(\d{4})_(\d{2})_(\d{2})_(\d{2})_(\d{2})_(\d{2})/
@@ -58,7 +59,7 @@ function buildThumbnailUrl(point: PhotoMapPoint, thumbnailBaseUrl: string): stri
 
 export function toMapMarkers(points: PhotoMapPoint[], context: MarkerMapperContext): MapMarker[] {
   return points.map((point) => {
-    const { lat, lng } = transformGameToMapCoordinates(point)
+    const { lat, lng } = transformGameToMapCoordinates(point, context.worldId)
     const thumbnailUrl = buildThumbnailUrl(point, context.thumbnailBaseUrl)
 
     return {

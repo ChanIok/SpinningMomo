@@ -3,6 +3,8 @@ import type { Router } from 'vue-router'
 import { useGalleryStore } from '@/features/gallery/store'
 import {
   ACTION_EVAL_SCRIPT,
+  ACTION_EXPORT_POLYGON,
+  ACTION_MAP_WORLD_CHANGED,
   ACTION_OPEN_GALLERY_ASSET,
   ACTION_SET_MARKERS_VISIBLE,
   ACTION_SYNC_RUNTIME,
@@ -11,6 +13,7 @@ import {
   type SyncRuntimeMessage,
   type SyncRuntimePayload,
 } from '@/features/map/bridge/protocol'
+import { downloadPolygonJson } from '@/features/map/domain/polygonExport'
 import { buildMapDevEvalScript } from '@/features/map/injection/mapDevEvalScript'
 import { useMapStore } from '@/features/map/store'
 
@@ -58,6 +61,7 @@ function buildSerializableRuntimePayload(
       clusterRadius: mapStore.runtimeOptions.clusterRadius,
       hoverCardEnabled: mapStore.runtimeOptions.hoverCardEnabled,
       markersVisible: mapStore.runtimeOptions.markersVisible,
+      currentWorldId: mapStore.runtimeOptions.currentWorldId,
       thumbnailBaseUrl: mapStore.runtimeOptions.thumbnailBaseUrl,
       clusterTitleTemplate: mapStore.runtimeOptions.clusterTitleTemplate,
       filterCountCardVisible: mapStore.runtimeOptions.filterCountCardVisible,
@@ -128,6 +132,21 @@ export function useMapBridge(options: UseMapBridgeOptions) {
     }
 
     if (data.action !== ACTION_OPEN_GALLERY_ASSET) {
+      if (data.action === ACTION_EXPORT_POLYGON) {
+        const success = downloadPolygonJson(data.payload ?? {})
+        if (!success) {
+          console.warn(
+            '[MapBridge] Polygon export ignored: at least 3 valid lat/lng points are required.'
+          )
+        }
+        return
+      }
+      if (data.action === ACTION_MAP_WORLD_CHANGED) {
+        const rawWorldId = String(data.payload?.worldId ?? '').trim()
+        mapStore.patchRuntimeOptions({
+          currentWorldId: rawWorldId || undefined,
+        })
+      }
       return
     }
 

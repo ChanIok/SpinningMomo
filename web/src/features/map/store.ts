@@ -33,6 +33,7 @@ export interface MapRuntimeOptions {
   clusterRadius: number
   hoverCardEnabled: boolean
   markersVisible: boolean
+  currentWorldId?: string
   thumbnailBaseUrl: string
   /** 聚合 hover 标题模板，含 {count}，由 i18n 注入 */
   clusterTitleTemplate?: string

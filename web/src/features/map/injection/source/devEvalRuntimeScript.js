@@ -3,12 +3,14 @@
 // 页壳逻辑（如 sidebar 自动收起）只在 `bridgeScript.js` 里执行一次，此处不再重复。
 
 import { buildRuntimeCoreSnippet } from './runtimeCore.js'
+import { buildDevPolygonCollectorSnippet } from './devPolygonCollector.js'
 
 export function buildMapDevEvalScriptFromPayload(serializedPayload) {
   return `
 (() => {
   if (window.location.hostname !== 'myl.nuanpaper.com') return;
 ${buildRuntimeCoreSnippet()}
+${buildDevPolygonCollectorSnippet()}
   const L = window.L;
   const map = window.__SPINNING_MOMO_MAP__;
   if (!L || !map) return;
@@ -20,6 +22,10 @@ ${buildRuntimeCoreSnippet()}
     markers: Array.isArray(payload.markers) ? payload.markers : [],
     renderOptions: payload.renderOptions || {},
     runtimeOptions: payload.runtimeOptions || {},
+  });
+  mountOrUpdateDevPolygonCollector({
+    L,
+    map,
   });
 })();
 `

@@ -8,6 +8,8 @@ export const ACTION_SYNC_RUNTIME = 'SPINNING_MOMO_SYNC_RUNTIME'
 export const ACTION_EVAL_SCRIPT = 'EVAL_SCRIPT'
 export const ACTION_OPEN_GALLERY_ASSET = 'SPINNING_MOMO_OPEN_GALLERY_ASSET'
 export const ACTION_SET_MARKERS_VISIBLE = 'SPINNING_MOMO_SET_MARKERS_VISIBLE'
+export const ACTION_EXPORT_POLYGON = 'SPINNING_MOMO_EXPORT_POLYGON'
+export const ACTION_MAP_WORLD_CHANGED = 'SPINNING_MOMO_MAP_WORLD_CHANGED'
 
 export type SyncRuntimePayload = {
   markers: MapMarker[]
@@ -35,4 +37,33 @@ export type SetMarkersVisibleMessage = {
   }
 }
 
-export type MapInboundMessage = OpenGalleryAssetMessage | SetMarkersVisibleMessage
+export type ExportPolygonMessage = {
+  action: typeof ACTION_EXPORT_POLYGON
+  payload?: {
+    regionName?: string
+    coordinateSystem?: string
+    points?: Array<{
+      lat?: number
+      lng?: number
+    }>
+    closed?: boolean
+    zRange?: {
+      min?: number
+      max?: number
+    }
+    exportedAt?: number
+  }
+}
+
+export type MapWorldChangedMessage = {
+  action: typeof ACTION_MAP_WORLD_CHANGED
+  payload?: {
+    worldId?: string
+  }
+}
+
+export type MapInboundMessage =
+  | OpenGalleryAssetMessage
+  | SetMarkersVisibleMessage
+  | ExportPolygonMessage
+  | MapWorldChangedMessage

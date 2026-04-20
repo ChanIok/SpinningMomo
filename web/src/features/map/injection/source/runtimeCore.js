@@ -4,6 +4,7 @@ import { buildPhotoCardSnippet } from './photoCardHtml.js'
 import { buildClusterSnippet } from './cluster.js'
 import { buildRenderSnippet } from './render.js'
 import { buildToolbarSnippet } from './toolbar.js'
+import { buildWorldIdBridgeSnippet } from './worldIdBridge.js'
 
 export function buildRuntimeCoreSnippet() {
   return `
@@ -70,6 +71,7 @@ ${buildPaneStyleSnippet()}
 ${buildPopupSnippet()}
 ${buildPhotoCardSnippet()}
 ${buildClusterSnippet()}
+${buildWorldIdBridgeSnippet()}
 ${buildToolbarSnippet()}
 ${buildRenderSnippet()}
   };

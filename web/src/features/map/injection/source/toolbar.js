@@ -133,6 +133,7 @@ export function buildToolbarSnippet() {
     return true;
   };
 
+
   const mountMarkerToggleButton = () => {
     const host = document.querySelector(markerToggleHostSelector);
     if (!host) return false;
