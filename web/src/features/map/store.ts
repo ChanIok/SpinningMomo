@@ -36,6 +36,11 @@ export interface MapRuntimeOptions {
   thumbnailBaseUrl: string
   /** 聚合 hover 标题模板，含 {count}，由 i18n 注入 */
   clusterTitleTemplate?: string
+  filterCountCardVisible?: boolean
+  filterCountCardLoading?: boolean
+  filterCountCardText?: string
+  filterCountCardBgColor?: string
+  filterCountCardTextColor?: string
 }
 
 export const useMapStore = defineStore('map', () => {

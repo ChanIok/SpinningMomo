@@ -3,12 +3,8 @@ export function buildPaneStyleSnippet() {
   const photoPaneName = 'spinning-momo-photo-pane';
 
   const ensureScopedPopupStyles = () => {
-    if (document.getElementById('spinning-momo-popup-style')) {
-      return;
-    }
-    const style = document.createElement('style');
-    style.id = 'spinning-momo-popup-style';
-    style.textContent = [
+    const styleId = 'spinning-momo-popup-style';
+    const styleText = [
       '.spinning-momo-hover-card-root {',
       '  position: absolute;',
       '  left: 0;',
@@ -30,6 +26,27 @@ export function buildPaneStyleSnippet() {
       '  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.22);',
       '  cursor: default !important;',
       '  will-change: opacity, transform;',
+      '}',
+      '.spinning-momo-hover-card-close {',
+      '  position: absolute;',
+      '  right: 0.75rem;',
+      '  top: 0.75rem;',
+      '  width: 16px;',
+      '  height: 16px;',
+      '  border: none;',
+      '  padding: 0;',
+      '  margin: 0;',
+      '  border-radius: 999px;',
+      '  background-color: transparent;',
+      '  background-position: center;',
+      '  background-repeat: no-repeat;',
+      '  background-size: contain;',
+      '  cursor: pointer;',
+      '  z-index: 3;',
+      '  opacity: 0.86;',
+      '}',
+      '.spinning-momo-hover-card-close:hover {',
+      '  opacity: 1;',
       '}',
       '.spinning-momo-hover-card-root[data-placement="top"] .spinning-momo-hover-card-shell {',
       '  transform-origin: center bottom;',
@@ -119,7 +136,17 @@ export function buildPaneStyleSnippet() {
       '  }',
       '}',
     ].join('\\n');
-    document.head.appendChild(style);
+
+    let style = document.getElementById(styleId);
+    if (!style) {
+      style = document.createElement('style');
+      style.id = styleId;
+      document.head.appendChild(style);
+    }
+
+    if (style.textContent !== styleText) {
+      style.textContent = styleText;
+    }
   };
 
   const ensurePane = (paneName, zIndex) => {

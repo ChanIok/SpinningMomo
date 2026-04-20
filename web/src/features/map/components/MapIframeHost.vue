@@ -64,10 +64,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    v-show="isMapRoute"
-    class="absolute inset-x-0 top-[calc(var(--titlebar-height,20px)+3rem)] bottom-0 z-0"
-  >
+  <div v-show="isMapRoute" class="absolute inset-x-0 top-0 bottom-0 z-0">
     <iframe
       ref="mapIframe"
       :src="MAP_URL"

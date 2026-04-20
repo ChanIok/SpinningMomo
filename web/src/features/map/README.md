@@ -11,7 +11,7 @@
 
 | 路径                            | 作用                                                                                                                 |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `pages/MapPage.vue`             | 地图页 UI 与 `useMapScene` 初始化                                                                                    |
+| `pages/MapPage.vue`             | 地图页容器与 `useMapScene` 初始化（顶部信息已下沉到注入层右上卡片）                                                  |
 | `store.ts`                      | `markers`、`renderOptions`、`runtimeOptions` 等轻量状态                                                              |
 | `composables/useMapScene.ts`    | 监听图库筛选/排序/语言，拉取点位、写入 `mapStore`                                                                    |
 | `composables/useMapBridge.ts`   | iframe `postMessage`：prod 为 `SYNC_RUNTIME`；dev 为 `EVAL_SCRIPT` + 入站（打开图库/标点显隐）                       |
@@ -47,10 +47,10 @@
 
 - **paneStyle.js**：地图容器上自定义标点共用的 `spinning-momo-photo-pane` 与弹层 CSS（含单图 `thumbnail-image` 的 max 尺寸，横竖图适配）。
 - **photoCardHtml.js**：`buildPhotoThumbCellHtml`（**聚合**方格，1:1 + cover）；`buildSinglePhotoHoverHtml`（**单点**，恢复 `thumbnail-block` / `thumbnail-image` 类以沿用 CSS）。
-- **popup.js**：悬停卡片容器定位、`scheduleOpenHoverCard` / `showHoverCard`、`bindPopupCardClickBridge`（`data-sm-open-asset-id` 点击 → `SPINNING_MOMO_OPEN_GALLERY_ASSET`）；`activeHoverCardContext` 含 **`latLng`**，供 **`refreshActiveHoverCardPosition`** 在内容变高后重算锚点（聚合展开等场景）。
-- **render.js**：单点 Leaflet 标点与 hover 绑定（受 `hoverCardEnabled` 控制）。
+- **popup.js**：悬停卡片容器定位、`scheduleOpenHoverCard` / `showHoverCard`、`pinHoverCard`、`bindPopupCardClickBridge`（`data-sm-open-asset-id` 点击 → `SPINNING_MOMO_OPEN_GALLERY_ASSET`）；`activeHoverCardContext` 含 **`latLng` + `mode`（hover/pinned）**，供 **`refreshActiveHoverCardPosition`** 在内容变高后重算锚点（聚合展开等场景）。`pinned` 态显示关闭按钮且不会因 map move/mouseout 自动关闭。
+- **render.js**：单点 Leaflet 标点与 hover 绑定（受 `hoverCardEnabled` 控制），并支持 click 固定 popup（单例替换）。
 - **cluster.js**：网格聚合；预览网格带 **`data-sm-cluster-grid-root`**，卡片根带 **`data-sm-cluster-card`**。点「+N 更多」时 **增量 DOM**：去掉 `[data-sm-cluster-expand]`、向同一 grid **append** 剩余缩略图、再包 **`data-sm-cluster-scroll`** 与滚轮穿透处理，**不**整卡 `innerHTML` 替换，避免预览缩略图闪烁；`smClusterExpanded` 防重复展开。
-- **iframeBootstrap.js**：与 **map 实例无关** 的第三方页壳（侧栏收起等）；**toolbar.js**：在 **`mountOrUpdateMapRuntime`** 内挂按钮，需读 `runtime` / 与标点显隐同步。二者均属脆弱 DOM 适配。
+- **iframeBootstrap.js**：与 **map 实例无关** 的第三方页壳（侧栏收起等）；**toolbar.js**：在 **`mountOrUpdateMapRuntime`** 内挂注入 UI（左侧工具位标点显隐按钮 + `document.body` 右上角固定筛选计数卡片），需读 `runtime` 并与显隐/文案状态同步。计数卡片由 `runtimeOptions.filterCountCardText`、`filterCountCardLoading`、`filterCountCardBgColor`、`filterCountCardTextColor` 控制。二者均属脆弱 DOM 适配。
 
 ## 与图库联动
 

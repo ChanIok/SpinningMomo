@@ -1,5 +1,8 @@
+import { popupCloseIconDataUri } from './popupCloseIconData.js'
+
 export function buildPopupSnippet() {
   return `
+  const pinnedPopupCloseIconDataUri = ${JSON.stringify(popupCloseIconDataUri)};
   const closePopupOnMouseOut = renderOptions.closePopupOnMouseOut !== false;
   const popupOpenDelayMs = Math.max(0, Number(renderOptions.popupOpenDelayMs ?? 180));
   const popupCloseDelayMs = Math.max(0, Number(renderOptions.popupCloseDelayMs ?? 260));
@@ -94,6 +97,54 @@ export function buildPopupSnippet() {
     });
   };
 
+  const ensurePinnedCloseButton = (rootElement, ownerId, visible) => {
+    if (!rootElement || !rootElement.querySelector) {
+      return;
+    }
+    const shell = rootElement.querySelector('.spinning-momo-hover-card-shell');
+    if (!shell) {
+      return;
+    }
+
+    let closeButton = shell.querySelector('[data-sm-popup-close="1"]');
+    if (!visible) {
+      if (closeButton) {
+        closeButton.remove();
+      }
+      return;
+    }
+
+    if (!closeButton) {
+      closeButton = document.createElement('button');
+      closeButton.type = 'button';
+      closeButton.className = 'spinning-momo-hover-card-close';
+      closeButton.setAttribute('data-sm-popup-close', '1');
+      closeButton.setAttribute('aria-label', '关闭');
+      shell.insertBefore(closeButton, shell.firstChild || null);
+    }
+
+    closeButton.style.backgroundImage = 'url("' + pinnedPopupCloseIconDataUri + '")';
+    closeButton.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      hideHoverCard(ownerId || null);
+    };
+  };
+
+  const clearPopupTimers = (state) => {
+    if (!state) {
+      return;
+    }
+    if (state.openTimer) {
+      clearTimeout(state.openTimer);
+      state.openTimer = null;
+    }
+    if (state.closeTimer) {
+      clearTimeout(state.closeTimer);
+      state.closeTimer = null;
+    }
+  };
+
   const ensureHoverCardRoot = () => {
     const container = map && map.getContainer ? map.getContainer() : null;
     if (!container) {
@@ -129,6 +180,9 @@ export function buildPopupSnippet() {
       if (!activeContext) {
         return;
       }
+      if (activeContext.mode === 'pinned') {
+        return;
+      }
       activeContext.state.popupHovered = false;
       if (!activeContext.state.markerHovered && closePopupOnMouseOut) {
         scheduleClose(activeContext.state, () => hideHoverCard(activeContext.ownerId));
@@ -143,6 +197,13 @@ export function buildPopupSnippet() {
   const hideHoverCard = (ownerId) => {
     if (ownerId && runtime.activeHoverCardOwner && runtime.activeHoverCardOwner !== ownerId) {
       return;
+    }
+
+    const activeContext = runtime.activeHoverCardContext;
+    if (activeContext && activeContext.state) {
+      clearPopupTimers(activeContext.state);
+      activeContext.state.popupHovered = false;
+      activeContext.state.markerHovered = false;
     }
 
     const root = runtime.hoverCardRoot;
@@ -165,6 +226,10 @@ export function buildPopupSnippet() {
     }
 
     runtime.boundHideHoverCardOnMapMove = () => {
+      const activeContext = runtime.activeHoverCardContext;
+      if (activeContext && activeContext.mode === 'pinned') {
+        return;
+      }
       hideHoverCard();
     };
     map.on('movestart', runtime.boundHideHoverCardOnMapMove);
@@ -230,38 +295,61 @@ export function buildPopupSnippet() {
       return null;
     }
 
+    const mode = options.mode === 'pinned' ? 'pinned' : 'hover';
+    const showCloseButton = mode === 'pinned';
+    const ownerId = options.ownerId || null;
+    const sameOwnerActive =
+      Boolean(ownerId) &&
+      runtime.activeHoverCardOwner === ownerId &&
+      runtime.activeHoverCardContext &&
+      runtime.hoverCardRoot &&
+      !runtime.hoverCardRoot.classList.contains('is-hidden');
+
+    if (!sameOwnerActive) {
+      hideHoverCard();
+    }
+
     const placement = options.placement || getHoverCardPlacement(options.latLng);
-    root.innerHTML =
-      '<div class="spinning-momo-hover-card-shell">' +
-      '<div class="spinning-momo-hover-card-inner">' +
-      options.contentHtml +
-      '</div>' +
-      '<div class="spinning-momo-hover-card-caret"></div>' +
-      '</div>';
+    if (!sameOwnerActive) {
+      root.innerHTML =
+        '<div class="spinning-momo-hover-card-shell">' +
+        '<div class="spinning-momo-hover-card-inner">' +
+        options.contentHtml +
+        '</div>' +
+        '<div class="spinning-momo-hover-card-caret"></div>' +
+        '</div>';
+      bindPopupCardClickBridge(root);
+      if (typeof options.afterOpen === 'function') {
+        options.afterOpen(root);
+      }
+    }
 
     if (!positionHoverCardRoot(root, options.latLng, placement)) {
-      root.innerHTML = '';
+      if (!sameOwnerActive) {
+        root.innerHTML = '';
+      }
       return null;
     }
 
-    runtime.activeHoverCardOwner = options.ownerId || null;
+    runtime.activeHoverCardOwner = ownerId;
     runtime.activeHoverCardContext = {
-      ownerId: options.ownerId || null,
+      ownerId,
       state,
       latLng: options.latLng,
+      mode,
     };
     root.classList.remove('is-hidden');
-
-    bindPopupCardClickBridge(root);
-    if (typeof options.afterOpen === 'function') {
-      options.afterOpen(root);
-    }
+    ensurePinnedCloseButton(root, ownerId, showCloseButton);
 
     return root;
   };
 
   const scheduleOpenHoverCard = (state, cardOptions) => {
     if (!cardOptions || !cardOptions.latLng || !cardOptions.contentHtml) {
+      return;
+    }
+    const activeContext = runtime.activeHoverCardContext;
+    if (activeContext && activeContext.mode === 'pinned') {
       return;
     }
     scheduleOpen(state, () => {
@@ -274,7 +362,27 @@ export function buildPopupSnippet() {
         contentHtml: cardOptions.contentHtml,
         afterOpen: cardOptions.afterOpen,
         placement: cardOptions.placement,
+        mode: 'hover',
       });
+    });
+  };
+
+  const pinHoverCard = (state, cardOptions) => {
+    if (!cardOptions || !cardOptions.latLng || !cardOptions.contentHtml) {
+      return;
+    }
+    if (state) {
+      state.markerHovered = true;
+      state.popupHovered = true;
+      clearPopupTimers(state);
+    }
+    showHoverCard(state, {
+      ownerId: cardOptions.ownerId,
+      latLng: cardOptions.latLng,
+      contentHtml: cardOptions.contentHtml,
+      afterOpen: cardOptions.afterOpen,
+      placement: cardOptions.placement,
+      mode: 'pinned',
     });
   };
 `

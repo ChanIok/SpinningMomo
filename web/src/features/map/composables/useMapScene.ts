@@ -17,19 +17,32 @@ export function useMapScene() {
   const mapStore = useMapStore()
   const mapPoints = ref<PhotoMapPoint[]>([])
 
+  function syncFilterCountCard(loading: boolean) {
+    mapStore.patchRuntimeOptions({
+      filterCountCardVisible: true,
+      filterCountCardLoading: loading,
+      filterCountCardText: loading
+        ? '正在同步照片坐标…'
+        : `当前筛选下 ${mapPoints.value.length} 张照片`,
+    })
+  }
+
   function syncMapRuntimeI18n() {
     mapStore.patchRuntimeOptions({
       clusterTitleTemplate: t('map.cluster.title'),
     })
+    syncFilterCountCard(mapStore.isLoading)
   }
 
   function initializeMapDefaults() {
     mapStore.setRenderOptions(createDefaultMapRenderOptions())
     mapStore.patchRuntimeOptions(createDefaultMapRuntimeOptions(t('map.cluster.title')))
+    syncFilterCountCard(mapStore.isLoading)
   }
 
   async function loadMapPoints() {
     mapStore.setLoading(true)
+    syncFilterCountCard(true)
 
     try {
       const filters = toQueryAssetsFilters(galleryStore.filter, galleryStore.includeSubfolders)
@@ -52,6 +65,7 @@ export function useMapScene() {
       mapStore.replaceMarkers([])
     } finally {
       mapStore.setLoading(false)
+      syncFilterCountCard(false)
     }
   }
 

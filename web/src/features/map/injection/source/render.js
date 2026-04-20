@@ -98,22 +98,46 @@ export function buildRenderSnippet() {
         marker.on('mouseout', () => {
           hoverState.markerHovered = false;
           invalidatePendingPopupOpen(hoverState);
+          const activeContext = runtime.activeHoverCardContext;
+          const isPinnedActive =
+            activeContext &&
+            activeContext.ownerId === markerOwnerId &&
+            activeContext.mode === 'pinned';
+          if (isPinnedActive) {
+            return;
+          }
           if (!hoverState.popupHovered) {
             scheduleClose(hoverState, () => hideHoverCard(markerOwnerId));
           }
         });
       }
     }
+
+    marker.on('click', () => {
+      pinHoverCard(hoverState, {
+        ownerId: markerOwnerId,
+        latLng: [markerData.lat, markerData.lng],
+        contentHtml: buildSinglePhotoHoverHtml(markerData),
+      });
+    });
   };
 
   const render = () => {
     applyMapBackground();
-    hideHoverCard();
+    const activeContext = runtime.activeHoverCardContext;
+    const pinnedContext =
+      activeContext && activeContext.mode === 'pinned' ? activeContext : null;
+    if (!pinnedContext) {
+      hideHoverCard();
+    }
     runtime.markerLayer.clearLayers();
     runtime.clusterLayer.clearLayers();
 
     const markersVisible = runtimeOptions.markersVisible !== false;
     if (!markersVisible) {
+      if (pinnedContext) {
+        hideHoverCard();
+      }
       return;
     }
 
@@ -145,6 +169,14 @@ export function buildRenderSnippet() {
       if (firstMarker?.lat !== undefined && firstMarker?.lng !== undefined && map.flyTo) {
         map.flyTo([firstMarker.lat, firstMarker.lng], 6);
       }
+    }
+
+    if (pinnedContext) {
+      runtime.activeHoverCardContext = {
+        ...pinnedContext,
+        mode: 'pinned',
+      };
+      refreshActiveHoverCardPosition();
     }
   };
 

@@ -24,5 +24,10 @@ export function createDefaultMapRuntimeOptions(clusterTitleTemplate: string): Ma
     markersVisible: true,
     thumbnailBaseUrl: 'http://127.0.0.1:51206',
     clusterTitleTemplate,
+    filterCountCardVisible: true,
+    filterCountCardLoading: false,
+    filterCountCardText: '当前筛选下 0 张照片',
+    filterCountCardBgColor: '#39311E',
+    filterCountCardTextColor: '#FFFFFF',
   }
 }

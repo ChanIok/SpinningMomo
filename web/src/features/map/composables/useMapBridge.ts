@@ -60,6 +60,11 @@ function buildSerializableRuntimePayload(
       markersVisible: mapStore.runtimeOptions.markersVisible,
       thumbnailBaseUrl: mapStore.runtimeOptions.thumbnailBaseUrl,
       clusterTitleTemplate: mapStore.runtimeOptions.clusterTitleTemplate,
+      filterCountCardVisible: mapStore.runtimeOptions.filterCountCardVisible,
+      filterCountCardLoading: mapStore.runtimeOptions.filterCountCardLoading,
+      filterCountCardText: mapStore.runtimeOptions.filterCountCardText,
+      filterCountCardBgColor: mapStore.runtimeOptions.filterCountCardBgColor,
+      filterCountCardTextColor: mapStore.runtimeOptions.filterCountCardTextColor,
     },
   }
 }

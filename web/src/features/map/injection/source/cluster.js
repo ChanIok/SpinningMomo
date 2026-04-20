@@ -183,6 +183,14 @@ export function buildClusterSnippet() {
     marker.on('mouseout', () => {
       hoverState.markerHovered = false;
       if (hoverCardEnabled) {
+        const activeContext = runtime.activeHoverCardContext;
+        const isPinnedActive =
+          activeContext &&
+          activeContext.ownerId === clusterOwnerId &&
+          activeContext.mode === 'pinned';
+        if (isPinnedActive) {
+          return;
+        }
         if (!hoverState.popupHovered) {
           scheduleClose(hoverState, () => {
             hideHoverCard(clusterOwnerId);
@@ -192,10 +200,12 @@ export function buildClusterSnippet() {
     });
 
     marker.on('click', () => {
-      const nextZoom = Math.min((map.getZoom ? map.getZoom() : 6) + 2, map.getMaxZoom ? map.getMaxZoom() : 18);
-      if (map.flyTo) {
-        map.flyTo([lat, lng], nextZoom);
-      }
+      pinHoverCard(hoverState, {
+        ownerId: clusterOwnerId,
+        latLng: [lat, lng],
+        contentHtml: buildClusterHoverHtml(clusterMarkers),
+        afterOpen: bindClusterHoverCardInteractions,
+      });
     });
   };
 `
