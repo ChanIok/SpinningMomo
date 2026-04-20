@@ -60,4 +60,9 @@ export auto complete_manual_move_ignore(Core::State::AppState& app_state,
                                         const std::filesystem::path& destination_path)
     -> std::expected<void, std::string>;
 
+// 将手动文件操作产出的 ScanChange 分发到对应 root watcher 的 post_scan_callback。
+export auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
+                                         const std::vector<Types::ScanChange>& changes)
+    -> std::expected<void, std::string>;
+
 }  // namespace Features::Gallery::Watcher

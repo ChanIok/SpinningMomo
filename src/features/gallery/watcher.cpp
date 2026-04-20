@@ -1544,6 +1544,92 @@ auto complete_manual_move_ignore(Core::State::AppState& app_state,
   return {};
 }
 
+auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
+                                  const std::vector<Types::ScanChange>& changes)
+    -> std::expected<void, std::string> {
+  if (changes.empty()) {
+    return {};
+  }
+
+  std::vector<std::shared_ptr<State::FolderWatcherState>> watchers;
+  {
+    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
+    watchers.reserve(app_state.gallery->folder_watchers.size());
+    for (const auto& [_, watcher] : app_state.gallery->folder_watchers) {
+      watchers.push_back(watcher);
+    }
+  }
+
+  if (watchers.empty()) {
+    return {};
+  }
+
+  std::unordered_map<std::string, std::vector<Types::ScanChange>> changes_by_watcher_root;
+  changes_by_watcher_root.reserve(watchers.size());
+
+  for (const auto& change : changes) {
+    auto changed_path_result = Utils::Path::NormalizePath(std::filesystem::path(change.path));
+    if (!changed_path_result) {
+      return std::unexpected("Failed to normalize manual scan change path '" + change.path +
+                             "': " + changed_path_result.error());
+    }
+
+    bool matched = false;
+    for (const auto& watcher : watchers) {
+      if (!watcher) {
+        continue;
+      }
+      if (!Utils::Path::IsPathWithinBase(changed_path_result.value(), watcher->root_path)) {
+        continue;
+      }
+
+      auto& bucket = changes_by_watcher_root[watcher->root_path.string()];
+      bucket.push_back(Types::ScanChange{
+          .path = changed_path_result->string(),
+          .action = change.action,
+      });
+      matched = true;
+    }
+
+    if (!matched) {
+      Logger().debug("Skip manual scan change dispatch: '{}' does not belong to any watcher root",
+                     changed_path_result->string());
+    }
+  }
+
+  for (const auto& watcher : watchers) {
+    if (!watcher) {
+      continue;
+    }
+
+    auto bucket_it = changes_by_watcher_root.find(watcher->root_path.string());
+    if (bucket_it == changes_by_watcher_root.end() || bucket_it->second.empty()) {
+      continue;
+    }
+
+    Types::ScanResult result;
+    result.total_files = static_cast<int>(bucket_it->second.size());
+    result.scan_duration = "manual_dispatch";
+    result.changes = std::move(bucket_it->second);
+
+    for (const auto& change : result.changes) {
+      if (change.action == Types::ScanChangeAction::REMOVE) {
+        result.deleted_items++;
+      } else {
+        // 手动上报场景中，UPSERT 语义是“确保目标状态存在”，统一计入 updated。
+        result.updated_items++;
+      }
+    }
+
+    auto post_scan_callback = get_post_scan_callback(watcher);
+    if (post_scan_callback) {
+      post_scan_callback(result);
+    }
+  }
+
+  return {};
+}
+
 // 在应用关闭时，优雅关闭所有的监听器线程和句柄资源
 auto shutdown_watchers(Core::State::AppState& app_state) -> void {
   std::vector<std::shared_ptr<State::FolderWatcherState>> watchers;

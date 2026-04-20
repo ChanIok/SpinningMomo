@@ -26,6 +26,7 @@ import Utils.Image;
 import Utils.Logger;
 import Utils.LRUCache;
 import Utils.Path;
+import Utils.String;
 import Utils.System;
 
 namespace Features::Gallery {
@@ -395,6 +396,25 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
   std::int64_t skipped_not_found = 0;
   std::vector<std::string> errors;
   errors.reserve(unique_ids.size());
+  std::vector<Types::ScanChange> manual_changes;
+  manual_changes.reserve(unique_ids.size());
+  std::unordered_set<std::string> manual_change_keys;
+  manual_change_keys.reserve(unique_ids.size());
+
+  auto append_manual_change = [&](const std::filesystem::path& path,
+                                  Types::ScanChangeAction action) {
+    auto normalized_key = Utils::Path::NormalizeForComparison(path);
+    auto action_key =
+        action == Types::ScanChangeAction::REMOVE ? std::string("remove:") : std::string("upsert:");
+    auto key = action_key + Utils::String::ToUtf8(normalized_key);
+    if (!manual_change_keys.insert(key).second) {
+      return;
+    }
+    manual_changes.push_back(Types::ScanChange{
+        .path = path.string(),
+        .action = action,
+    });
+  };
 
   for (auto id : unique_ids) {
     auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
@@ -483,6 +503,21 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     errors.push_back("Failed to delete asset indexes: " + delete_result.error());
   } else {
     moved_count = static_cast<std::int64_t>(delete_ids.size());
+    std::unordered_set<std::int64_t> deleted_id_set(delete_ids.begin(), delete_ids.end());
+    for (const auto& candidate : candidates) {
+      if (!deleted_id_set.contains(candidate.asset.id)) {
+        continue;
+      }
+      append_manual_change(candidate.file_path, Types::ScanChangeAction::REMOVE);
+    }
+
+    if (!manual_changes.empty()) {
+      auto dispatch_result = Watcher::dispatch_manual_scan_changes(app_state, manual_changes);
+      if (!dispatch_result) {
+        Logger().warn("Failed to dispatch manual scan changes after trash move: {}",
+                      dispatch_result.error());
+      }
+    }
   }
 
   for (auto& candidate : candidates) {
@@ -573,6 +608,25 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
   std::int64_t skipped_same_folder = 0;
   std::vector<std::string> errors;
   errors.reserve(unique_ids.size());
+  std::vector<Types::ScanChange> manual_changes;
+  manual_changes.reserve(unique_ids.size() * 2);
+  std::unordered_set<std::string> manual_change_keys;
+  manual_change_keys.reserve(unique_ids.size() * 2);
+
+  auto append_manual_change = [&](const std::filesystem::path& path,
+                                  Types::ScanChangeAction action) {
+    auto normalized_key = Utils::Path::NormalizeForComparison(path);
+    auto action_key =
+        action == Types::ScanChangeAction::REMOVE ? std::string("remove:") : std::string("upsert:");
+    auto key = action_key + Utils::String::ToUtf8(normalized_key);
+    if (!manual_change_keys.insert(key).second) {
+      return;
+    }
+    manual_changes.push_back(Types::ScanChange{
+        .path = path.string(),
+        .action = action,
+    });
+  };
 
   for (auto id : unique_ids) {
     auto asset_result = Asset::Repository::get_asset_by_id(app_state, id);
@@ -658,7 +712,17 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
 
     complete_manual_ignore();
 
+    append_manual_change(source_path, Types::ScanChangeAction::REMOVE);
+    append_manual_change(normalized_destination_path, Types::ScanChangeAction::UPSERT);
     moved_count++;
+  }
+
+  if (!manual_changes.empty()) {
+    auto dispatch_result = Watcher::dispatch_manual_scan_changes(app_state, manual_changes);
+    if (!dispatch_result) {
+      Logger().warn("Failed to dispatch manual scan changes after folder move: {}",
+                    dispatch_result.error());
+    }
   }
 
   Types::OperationResult result{
