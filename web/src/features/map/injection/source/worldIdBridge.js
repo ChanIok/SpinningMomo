@@ -1,15 +1,5 @@
 export function buildWorldIdBridgeSnippet() {
   return `
-  const readCurrentWorldId = () => {
-    try {
-      const searchParams = new URLSearchParams(window.location.search || '');
-      const rawWorldId = String(searchParams.get('worldId') || '').trim();
-      return rawWorldId || undefined;
-    } catch {
-      return undefined;
-    }
-  };
-
   const postWorldIdChanged = (worldId) => {
     if (worldId === runtime.lastWorldIdValue) {
       return;
@@ -18,7 +8,7 @@ export function buildWorldIdBridgeSnippet() {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage(
         {
-          action: 'SPINNING_MOMO_MAP_WORLD_CHANGED',
+          action: 'SPINNING_MOMO_MAP_SESSION_READY',
           payload: worldId ? { worldId } : {},
         },
         '*'
@@ -26,14 +16,14 @@ export function buildWorldIdBridgeSnippet() {
     }
   };
 
-  const syncWorldIdFromLocation = () => {
-    postWorldIdChanged(readCurrentWorldId());
+  const syncActiveAreaFromStorage = () => {
+    postWorldIdChanged(readOfficialActiveAreaId());
   };
 
   if (!runtime.boundWorldIdBridge) {
     runtime.boundWorldIdBridge = true;
-    runtime.boundWorldIdPopstate = () => syncWorldIdFromLocation();
-    runtime.boundWorldIdHashchange = () => syncWorldIdFromLocation();
+    runtime.boundWorldIdPopstate = () => syncActiveAreaFromStorage();
+    runtime.boundWorldIdHashchange = () => syncActiveAreaFromStorage();
     window.addEventListener('popstate', runtime.boundWorldIdPopstate);
     window.addEventListener('hashchange', runtime.boundWorldIdHashchange);
 
@@ -48,7 +38,7 @@ export function buildWorldIdBridgeSnippet() {
       runtime['patchedHistory_' + name] = true;
       window.history[name] = function(...args) {
         const result = originalMethod.apply(this, args);
-        syncWorldIdFromLocation();
+        syncActiveAreaFromStorage();
         return result;
       };
     };
@@ -57,6 +47,6 @@ export function buildWorldIdBridgeSnippet() {
     patchHistoryMethod('replaceState');
   }
 
-  syncWorldIdFromLocation();
+  syncActiveAreaFromStorage();
 `
 }

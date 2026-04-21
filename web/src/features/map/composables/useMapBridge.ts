@@ -4,7 +4,7 @@ import { useGalleryStore } from '@/features/gallery/store'
 import {
   ACTION_EVAL_SCRIPT,
   ACTION_EXPORT_POLYGON,
-  ACTION_MAP_WORLD_CHANGED,
+  ACTION_MAP_SESSION_READY,
   ACTION_OPEN_GALLERY_ASSET,
   ACTION_SET_MARKERS_VISIBLE,
   ACTION_SYNC_RUNTIME,
@@ -13,6 +13,11 @@ import {
   type SyncRuntimeMessage,
   type SyncRuntimePayload,
 } from '@/features/map/bridge/protocol'
+import {
+  applyIframeSessionReadyThenFlush,
+  flushMapRuntimeToIframe,
+} from '@/features/map/composables/mapIframeRuntime'
+import { normalizeOfficialWorldId } from '@/features/map/domain/officialWorldId'
 import { downloadPolygonJson } from '@/features/map/domain/polygonExport'
 import { buildMapDevEvalScript } from '@/features/map/injection/mapDevEvalScript'
 import { useMapStore } from '@/features/map/store'
@@ -22,6 +27,16 @@ type UseMapBridgeOptions = {
   mapStore: ReturnType<typeof useMapStore>
   galleryStore: ReturnType<typeof useGalleryStore>
   router: Router
+}
+
+function isAllowedMapMessageOrigin(origin: string): boolean {
+  if (origin === MAP_ORIGIN) {
+    return true
+  }
+  if (import.meta.env.DEV && typeof window !== 'undefined' && origin === window.location.origin) {
+    return true
+  }
+  return false
 }
 
 function buildSerializableRuntimePayload(
@@ -83,6 +98,7 @@ export function useMapBridge(options: UseMapBridgeOptions) {
     }
 
     const payload = buildSerializableRuntimePayload(mapStore)
+    const targetOrigin = import.meta.env.DEV ? '*' : MAP_ORIGIN
 
     if (import.meta.env.DEV) {
       const script = buildMapDevEvalScript(payload)
@@ -92,7 +108,7 @@ export function useMapBridge(options: UseMapBridgeOptions) {
             action: ACTION_EVAL_SCRIPT,
             payload: { script },
           },
-          MAP_ORIGIN
+          targetOrigin
         )
       } catch (error) {
         console.error('[MapBridge] Failed to post dev eval script:', error)
@@ -105,19 +121,40 @@ export function useMapBridge(options: UseMapBridgeOptions) {
       payload,
     }
     try {
-      contentWindow.postMessage(message, MAP_ORIGIN)
+      contentWindow.postMessage(message, targetOrigin)
     } catch (error) {
       console.error('[MapBridge] Failed to post runtime payload:', error)
     }
   }
 
   async function handleMapMessage(event: MessageEvent<unknown>) {
-    if (event.origin !== MAP_ORIGIN) {
+    if (!isAllowedMapMessageOrigin(event.origin)) {
       return
     }
 
     const data = event.data as MapInboundMessage
-    if (!data) {
+    if (!data?.action) {
+      return
+    }
+
+    if (data.action === ACTION_OPEN_GALLERY_ASSET) {
+      const assetId = Number(data.payload?.assetId)
+      if (!Number.isFinite(assetId)) {
+        return
+      }
+
+      const assetIndex = Number(data.payload?.assetIndex)
+      const normalizedAssetIndex = Number.isFinite(assetIndex) ? assetIndex : 0
+      galleryStore.setActiveAsset(assetId, normalizedAssetIndex)
+      galleryStore.openLightbox()
+
+      try {
+        await router.push({
+          name: 'gallery',
+        })
+      } catch {
+        galleryStore.closeLightbox()
+      }
       return
     }
 
@@ -126,46 +163,29 @@ export function useMapBridge(options: UseMapBridgeOptions) {
       if (typeof markersVisible !== 'boolean') {
         return
       }
-
       mapStore.patchRuntimeOptions({ markersVisible })
+      flushMapRuntimeToIframe()
       return
     }
 
-    if (data.action !== ACTION_OPEN_GALLERY_ASSET) {
-      if (data.action === ACTION_EXPORT_POLYGON) {
-        const success = downloadPolygonJson(data.payload ?? {})
-        if (!success) {
-          console.warn(
-            '[MapBridge] Polygon export ignored: at least 3 valid lat/lng points are required.'
-          )
-        }
-        return
-      }
-      if (data.action === ACTION_MAP_WORLD_CHANGED) {
-        const rawWorldId = String(data.payload?.worldId ?? '').trim()
-        mapStore.patchRuntimeOptions({
-          currentWorldId: rawWorldId || undefined,
-        })
+    if (data.action === ACTION_EXPORT_POLYGON) {
+      const success = downloadPolygonJson(data.payload ?? {})
+      if (!success) {
+        console.warn(
+          '[MapBridge] Polygon export ignored: at least 3 valid lat/lng points are required.'
+        )
       }
       return
     }
 
-    const assetId = Number(data.payload?.assetId)
-    if (!Number.isFinite(assetId)) {
-      return
-    }
-
-    const assetIndex = Number(data.payload?.assetIndex)
-    const normalizedAssetIndex = Number.isFinite(assetIndex) ? assetIndex : 0
-    galleryStore.setActiveAsset(assetId, normalizedAssetIndex)
-    galleryStore.openLightbox()
-
-    try {
-      await router.push({
-        name: 'gallery',
+    if (data.action === ACTION_MAP_SESSION_READY) {
+      const worldId = normalizeOfficialWorldId(data.payload?.worldId)
+      mapStore.patchRuntimeOptions({
+        currentWorldId: worldId,
       })
-    } catch {
-      galleryStore.closeLightbox()
+      mapStore.markIframeSessionReady()
+      applyIframeSessionReadyThenFlush()
+      return
     }
   }
 

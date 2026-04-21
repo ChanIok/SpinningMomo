@@ -47,6 +47,8 @@ export interface MapRuntimeOptions {
 export const useMapStore = defineStore('map', () => {
   const markers = ref<MapMarker[]>([])
   const isLoading = ref(false)
+  /** iframe 已上报 SESSION_READY（地图可接收标点）之前不向子页推 markers */
+  const iframeSessionReady = ref(false)
   const renderOptions = ref<MapRenderOptions>({})
   const runtimeOptions = ref<MapRuntimeOptions>({
     clusterEnabled: true,
@@ -75,14 +77,20 @@ export const useMapStore = defineStore('map', () => {
     isLoading.value = nextLoading
   }
 
+  const markIframeSessionReady = () => {
+    iframeSessionReady.value = true
+  }
+
   return {
     markers,
     isLoading,
+    iframeSessionReady,
     renderOptions,
     runtimeOptions,
     replaceMarkers,
     setRenderOptions,
     patchRuntimeOptions,
     setLoading,
+    markIframeSessionReady,
   }
 })

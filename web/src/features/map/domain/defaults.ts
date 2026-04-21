@@ -22,7 +22,6 @@ export function createDefaultMapRuntimeOptions(clusterTitleTemplate: string): Ma
     clusterRadius: 44,
     hoverCardEnabled: true,
     markersVisible: true,
-    currentWorldId: undefined,
     thumbnailBaseUrl: 'http://127.0.0.1:51206',
     clusterTitleTemplate,
     filterCountCardVisible: true,

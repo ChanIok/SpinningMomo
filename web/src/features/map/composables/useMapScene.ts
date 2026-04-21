@@ -11,6 +11,10 @@ import {
 import { toMapMarkers } from '@/features/map/domain/markerMapper'
 import { resolveMatchedWorldId } from '@/features/map/domain/worldPolygonFilter'
 import { WORLD_POLYGON_RULES } from '@/features/map/domain/worldPolygons'
+import {
+  flushMapRuntimeToIframe,
+  registerMapAfterIframeWorld,
+} from '@/features/map/composables/mapIframeRuntime'
 import { useMapStore } from '@/features/map/store'
 
 export function useMapScene() {
@@ -77,7 +81,11 @@ export function useMapScene() {
         sortBy: galleryStore.sortBy,
         sortOrder: galleryStore.sortOrder,
       })
-      syncMarkersFromMapPoints()
+      if (mapStore.iframeSessionReady) {
+        syncMarkersFromMapPoints()
+      } else {
+        mapStore.replaceMarkers([])
+      }
     } catch (error) {
       console.error('Failed to load map points:', error)
       mapPoints.value = []
@@ -85,6 +93,9 @@ export function useMapScene() {
     } finally {
       mapStore.setLoading(false)
       syncFilterCountCard(false)
+      if (mapStore.iframeSessionReady) {
+        flushMapRuntimeToIframe()
+      }
     }
   }
 
@@ -103,15 +114,15 @@ export function useMapScene() {
 
   watch(locale, () => {
     syncMapRuntimeI18n()
-    syncMarkersFromMapPoints()
+    if (mapStore.iframeSessionReady) {
+      syncMarkersFromMapPoints()
+      flushMapRuntimeToIframe()
+    }
   })
 
-  watch(
-    () => mapStore.runtimeOptions.currentWorldId,
-    () => {
-      syncMarkersFromMapPoints()
-    }
-  )
+  registerMapAfterIframeWorld(() => {
+    syncMarkersFromMapPoints()
+  })
 
   return {
     mapPoints: computed(() => mapPoints.value),

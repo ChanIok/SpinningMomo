@@ -9,7 +9,8 @@ export const ACTION_EVAL_SCRIPT = 'EVAL_SCRIPT'
 export const ACTION_OPEN_GALLERY_ASSET = 'SPINNING_MOMO_OPEN_GALLERY_ASSET'
 export const ACTION_SET_MARKERS_VISIBLE = 'SPINNING_MOMO_SET_MARKERS_VISIBLE'
 export const ACTION_EXPORT_POLYGON = 'SPINNING_MOMO_EXPORT_POLYGON'
-export const ACTION_MAP_WORLD_CHANGED = 'SPINNING_MOMO_MAP_WORLD_CHANGED'
+/** iframe：地图 runtime 已挂载或 URL 中 world 已变化，payload 带当前 worldId */
+export const ACTION_MAP_SESSION_READY = 'SPINNING_MOMO_MAP_SESSION_READY'
 
 export type SyncRuntimePayload = {
   markers: MapMarker[]
@@ -55,8 +56,8 @@ export type ExportPolygonMessage = {
   }
 }
 
-export type MapWorldChangedMessage = {
-  action: typeof ACTION_MAP_WORLD_CHANGED
+export type MapSessionReadyMessage = {
+  action: typeof ACTION_MAP_SESSION_READY
   payload?: {
     worldId?: string
   }
@@ -66,4 +67,4 @@ export type MapInboundMessage =
   | OpenGalleryAssetMessage
   | SetMarkersVisibleMessage
   | ExportPolygonMessage
-  | MapWorldChangedMessage
+  | MapSessionReadyMessage

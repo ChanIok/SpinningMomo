@@ -2,9 +2,11 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGalleryStore } from '@/features/gallery/store'
+import { useMapStore } from '@/features/map/store'
 
 const route = useRoute()
 const galleryStore = useGalleryStore()
+const mapStore = useMapStore()
 const isCollapsed = ref(true)
 
 const debugState = computed(() => {
@@ -33,6 +35,8 @@ const debugState = computed(() => {
     filterType: galleryStore.filter.type ?? '-',
     filterSearch: galleryStore.filter.searchQuery?.trim() || '-',
     timelineBuckets: galleryStore.timelineBuckets.length,
+    mapMarkerCount: mapStore.markers.length,
+    mapWorldId: mapStore.runtimeOptions.currentWorldId?.trim() || '-',
   }
 })
 </script>
@@ -77,6 +81,7 @@ const debugState = computed(() => {
       <div>filter: folder={{ debugState.filterFolderId }} / type={{ debugState.filterType }}</div>
       <div>search: {{ debugState.filterSearch }}</div>
       <div>timelineBuckets: {{ debugState.timelineBuckets }}</div>
+      <div>map: markers={{ debugState.mapMarkerCount }} / worldId={{ debugState.mapWorldId }}</div>
     </div>
   </div>
 </template>

@@ -4,6 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { useGalleryStore } from '@/features/gallery/store'
 import { MAP_URL } from '@/features/map/bridge/protocol'
 import { useMapBridge } from '@/features/map/composables/useMapBridge'
+import {
+  flushMapRuntimeToIframe,
+  registerMapIframeFlush,
+} from '@/features/map/composables/mapIframeRuntime'
 import { useMapStore } from '@/features/map/store'
 
 const route = useRoute()
@@ -20,41 +24,16 @@ const { postRuntimeSync, handleMapMessage } = useMapBridge({
   router,
 })
 
-function handleIframeLoad() {
-  postRuntimeSync()
-}
-
-watch(
-  () => mapStore.markers,
-  () => {
-    postRuntimeSync()
-  },
-  { deep: true }
-)
-
-watch(
-  () => mapStore.renderOptions,
-  () => {
-    postRuntimeSync()
-  },
-  { deep: true }
-)
-
-watch(
-  () => mapStore.runtimeOptions,
-  () => {
-    postRuntimeSync()
-  },
-  { deep: true }
-)
-
 watch(isMapRoute, (visible) => {
-  if (visible) {
-    postRuntimeSync()
+  if (visible && mapStore.iframeSessionReady) {
+    flushMapRuntimeToIframe()
   }
 })
 
 onMounted(() => {
+  registerMapIframeFlush(() => {
+    postRuntimeSync()
+  })
   window.addEventListener('message', handleMapMessage)
 })
 
@@ -70,7 +49,6 @@ onUnmounted(() => {
       :src="MAP_URL"
       class="absolute inset-0 h-full w-full border-none"
       allowfullscreen
-      @load="handleIframeLoad"
     ></iframe>
   </div>
 </template>

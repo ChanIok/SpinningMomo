@@ -10,6 +10,29 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
     window.__SPINNING_MOMO_RENDER_OPTIONS__ = {};
     window.__SPINNING_MOMO_CLUSTER_OPTIONS__ = {};
 
+    const normalizeOfficialActiveAreaId = (raw) => {
+        if (typeof raw !== 'string') {
+            return undefined;
+        }
+        let s = raw.trim();
+        if (!s) {
+            return undefined;
+        }
+        if (s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
+            s = s.slice(1, -1).trim();
+        }
+        return s || undefined;
+    };
+
+    const readOfficialActiveAreaId = () => {
+        try {
+            const raw = window.localStorage && window.localStorage.getItem('activeAreaId');
+            return normalizeOfficialActiveAreaId(raw);
+        } catch (e) {
+            return undefined;
+        }
+    };
+
 ${buildIframeBootstrapSnippet()}
 ${buildRuntimeCoreSnippet()}
 
@@ -42,6 +65,20 @@ ${buildRuntimeCoreSnippet()}
         window.__SPINNING_MOMO_CLUSTER_OPTIONS__ = { ...options };
     };
 
+    const notifyHostSessionReady = () => {
+        if (!window.parent || window.parent === window) {
+            return;
+        }
+        const worldId = readOfficialActiveAreaId();
+        window.parent.postMessage(
+            {
+                action: 'SPINNING_MOMO_MAP_SESSION_READY',
+                payload: worldId ? { worldId } : {},
+            },
+            '*'
+        );
+    };
+
     const maybeMountRuntime = (payload = {}) => {
         const map = window.__SPINNING_MOMO_MAP__;
         const L = window.L;
@@ -66,9 +103,12 @@ ${buildRuntimeCoreSnippet()}
             if (innerL && innerL.Map && !innerL.Map.__SPINNING_MOMO_PATCHED__) {
                 const OriginalMapClass = innerL.Map;
                 innerL.Map = function(...args) {
+                    window.__SPINNING_MOMO_MAP_CTOR_COUNT__ =
+                        (window.__SPINNING_MOMO_MAP_CTOR_COUNT__ || 0) + 1;
                     const mapInstance = new OriginalMapClass(...args);
                     window.__SPINNING_MOMO_MAP__ = mapInstance;
                     maybeMountRuntime();
+                    notifyHostSessionReady();
                     return mapInstance;
                 };
                 innerL.Map.prototype = OriginalMapClass.prototype;

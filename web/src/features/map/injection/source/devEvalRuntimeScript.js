@@ -9,6 +9,28 @@ export function buildMapDevEvalScriptFromPayload(serializedPayload) {
   return `
 (() => {
   if (window.location.hostname !== 'myl.nuanpaper.com') return;
+  const normalizeOfficialActiveAreaId = (raw) => {
+    if (typeof raw !== 'string') {
+      return undefined;
+    }
+    let s = raw.trim();
+    if (!s) {
+      return undefined;
+    }
+    if (s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
+      s = s.slice(1, -1).trim();
+    }
+    return s || undefined;
+  };
+
+  const readOfficialActiveAreaId = () => {
+    try {
+      const raw = window.localStorage && window.localStorage.getItem('activeAreaId');
+      return normalizeOfficialActiveAreaId(raw);
+    } catch (e) {
+      return undefined;
+    }
+  };
 ${buildRuntimeCoreSnippet()}
 ${buildDevPolygonCollectorSnippet()}
   const L = window.L;
