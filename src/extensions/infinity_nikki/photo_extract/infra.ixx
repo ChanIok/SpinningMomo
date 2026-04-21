@@ -57,6 +57,10 @@ auto load_candidate_assets(
     const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
 
+auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
+                                  const std::vector<std::int64_t>& candidate_asset_ids)
+    -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
+
 auto extract_batch_photo_params(Core::State::AppState& app_state,
                                 const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
     -> asio::awaitable<std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string>>;

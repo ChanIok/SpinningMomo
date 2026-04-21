@@ -19,6 +19,10 @@ struct InfinityNikkiExtractPhotoParamsRequest {
   std::optional<std::string> uid_override;
 };
 
+struct InfinityNikkiSilentExtractPhotoParamsRequest {
+  std::vector<std::int64_t> candidate_asset_ids;
+};
+
 struct InfinityNikkiExtractPhotoParamsForFolderRequest {
   std::int64_t folder_id = 0;
   std::string uid;

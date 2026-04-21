@@ -7,6 +7,7 @@ import Core.State;
 import Core.Tasks;
 import Core.WorkerPool;
 import Features.Gallery;
+import Features.Gallery.Asset.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Repository;
 import Features.Gallery.Watcher;
@@ -118,9 +119,43 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
     }
   }
 
-  if (config.allow_online_photo_metadata_extract && result.new_items > 0) {
-    Extensions::InfinityNikki::TaskService::schedule_silent_extract_photo_params(
-        app_state, InfinityNikkiExtractPhotoParamsRequest{.only_missing = true});
+  if (config.allow_online_photo_metadata_extract) {
+    // 静默自动解析只消费“本次扫描变更”里的 UPSERT 资产；
+    // 不再从全库补齐 missing，避免拍 1 张触发历史批量解析。
+    std::vector<std::int64_t> candidate_asset_ids;
+    candidate_asset_ids.reserve(result.changes.size());
+    std::unordered_set<std::int64_t> seen_ids;
+    seen_ids.reserve(result.changes.size());
+
+    for (const auto& change : result.changes) {
+      if (change.action != Features::Gallery::Types::ScanChangeAction::UPSERT) {
+        continue;
+      }
+
+      auto asset_result =
+          Features::Gallery::Asset::Repository::get_asset_by_path(app_state, change.path);
+      if (!asset_result) {
+        Logger().warn("Skip silent extract candidate '{}': {}", change.path, asset_result.error());
+        continue;
+      }
+      if (!asset_result->has_value()) {
+        // watcher 与 DB 之间可能有短暂时序差；拿不到资产就跳过本条。
+        continue;
+      }
+
+      auto asset_id = asset_result->value().id;
+      if (seen_ids.insert(asset_id).second) {
+        candidate_asset_ids.push_back(asset_id);
+      }
+    }
+
+    if (!candidate_asset_ids.empty()) {
+      // 传递资产 ID 而非数量/时间窗口，保证候选集与本次变更一一对应。
+      Extensions::InfinityNikki::TaskService::schedule_silent_extract_photo_params(
+          app_state, InfinityNikkiSilentExtractPhotoParamsRequest{
+                         .candidate_asset_ids = std::move(candidate_asset_ids),
+                     });
+    }
   }
 }
 

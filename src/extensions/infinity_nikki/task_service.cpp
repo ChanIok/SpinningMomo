@@ -217,8 +217,8 @@ auto launch_extract_photo_params_task(
 
         if (summary.failed_count > 0) {
           auto warning_message = std::format(
-              "Infinity Nikki photo params extract completed with warnings: failed {} / "
-              "processed {}",
+              "Infinity Nikki photo params extract completed with warnings "
+              "(mode=manual_task): failed {} / processed {}",
               summary.failed_count, summary.processed_count);
           append_task_error_details(warning_message, summary.errors);
           Logger().warn("{}", warning_message);
@@ -233,7 +233,7 @@ auto launch_extract_photo_params_task(
 // gallery.changed。
 auto schedule_silent_extract_photo_params(
     Core::State::AppState& app_state,
-    Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest request) -> void {
+    Extensions::InfinityNikki::InfinityNikkiSilentExtractPhotoParamsRequest request) -> void {
   if (!app_state.async) {
     Logger().warn(
         "Silent Infinity Nikki photo params extract skipped: async state is not initialized");
@@ -259,27 +259,29 @@ auto schedule_silent_extract_photo_params(
           co_return;
         }
 
-        auto extract_result =
-            co_await Extensions::InfinityNikki::PhotoExtract::extract_photo_params(app_state,
-                                                                                   request, {});
+        // 静默增量与手动任务共享执行管线，但候选输入是显式 asset_id 列表。
+        auto extract_result = co_await Extensions::InfinityNikki::PhotoExtract::
+            extract_photo_params_silent_incremental(app_state, request, {});
 
         if (!extract_result) {
-          Logger().error("Silent Infinity Nikki photo params extract failed: {}",
-                         extract_result.error());
+          Logger().error(
+              "Silent Infinity Nikki photo params extract (mode=silent_incremental) failed: {}",
+              extract_result.error());
           co_return;
         }
 
         const auto& summary = extract_result.value();
         if (summary.failed_count > 0) {
           auto warning_message = std::format(
-              "Silent Infinity Nikki photo params extract completed with warnings: failed {} / "
-              "processed {}",
+              "Silent Infinity Nikki photo params extract completed with warnings "
+              "(mode=silent_incremental): failed {} / processed {}",
               summary.failed_count, summary.processed_count);
           append_task_error_details(warning_message, summary.errors);
           Logger().warn("{}", warning_message);
         } else {
           Logger().info(
-              "Silent Infinity Nikki photo params extract completed: candidates={}, "
+              "Silent Infinity Nikki photo params extract completed "
+              "(mode=silent_incremental): candidates={}, "
               "processed={}, saved={}, skipped={}, failed={}",
               summary.candidate_count, summary.processed_count, summary.saved_count,
               summary.skipped_count, summary.failed_count);

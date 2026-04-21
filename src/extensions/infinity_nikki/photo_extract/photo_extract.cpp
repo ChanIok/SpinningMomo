@@ -282,39 +282,17 @@ auto send_extract_batch(
   apply_batch_result(app_state, batch, batch_outcome, result, progress, progress_callback);
 }
 
-auto extract_photo_params(
-    Core::State::AppState& app_state, const InfinityNikkiExtractPhotoParamsRequest& request,
-    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
+auto extract_photo_params_from_candidates(
+    Core::State::AppState& app_state, std::vector<Scan::CandidateAssetRow> candidates,
+    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback,
+    std::string_view mode_tag, const std::optional<std::string>& uid_override)
     -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
-  // 整个流程：
-  // 1) 查候选照片
-  // 2) 并发准备本地提取数据（WorkerPool），按候选顺序等待每个 slot
-  // 3) 边准备边分批请求远端（每批最多 kExtractBatchSize，可含多 UID），顺序落库
+  // 执行层只关心“候选集合”，不关心候选如何产生（手动 folder / 静默 incremental）。
   InfinityNikkiExtractPhotoParamsResult result;
-
-  if (!app_state.database) {
-    co_return std::unexpected("Database is not initialized");
-  }
-
-  auto only_missing = request.only_missing.value_or(true);
-  auto uid_override = request.uid_override;
-  if (uid_override.has_value() && uid_override->empty()) {
-    co_return std::unexpected("UID override is empty");
-  }
-
-  report_extract_progress(progress_callback, "preparing", 0, 0, kPreparingPercent,
-                          "Loading candidate assets");
-
-  auto candidates_result = Infra::load_candidate_assets(app_state, request);
-  if (!candidates_result) {
-    co_return std::unexpected(candidates_result.error());
-  }
-
-  auto candidates = std::move(candidates_result.value());
   result.candidate_count = static_cast<std::int32_t>(candidates.size());
 
-  Logger().info("extract_photo_params: found {} candidate assets (only_missing={})",
-                result.candidate_count, only_missing);
+  Logger().info("extract_photo_params: mode={}, found {} candidate assets", mode_tag,
+                result.candidate_count);
 
   if (candidates.empty()) {
     report_extract_progress(progress_callback, "completed", 0, 0, 100.0, "No candidate assets");
@@ -326,7 +304,6 @@ auto extract_photo_params(
   };
   report_processing_progress(progress_callback, progress, result, true,
                              std::format("Loaded {} candidate photos", result.candidate_count));
-
   report_processing_progress(progress_callback, progress, result, true,
                              std::format("Preparing {} candidate photos", result.candidate_count));
 
@@ -343,7 +320,6 @@ auto extract_photo_params(
   }
 
   auto* slot_ready_ptr = slot_ready.get();
-
   for (std::size_t index = 0; index < candidate_count; ++index) {
     auto submitted = Core::WorkerPool::submit_task(
         *app_state.worker_pool, [outcomes, completed_prepare, slot_ready_ptr,
@@ -381,7 +357,6 @@ auto extract_photo_params(
     }
 
     auto entry = std::move(*outcome.entry);
-
     pending_batch.push_back(std::move(entry));
 
     if (pending_batch.size() >= kExtractBatchSize) {
@@ -394,22 +369,82 @@ auto extract_photo_params(
 
   progress.scanned_count = static_cast<std::int64_t>(candidate_count);
   report_processing_progress(progress_callback, progress, result, true);
-
   co_await send_extract_batch(app_state, std::move(pending_batch), result, progress,
                               progress_callback);
 
   Logger().info(
-      "extract_photo_params: completed. candidates={}, processed={}, saved={}, skipped={}, "
-      "failed={}, clothes_rows={}",
-      result.candidate_count, result.processed_count, result.saved_count, result.skipped_count,
-      result.failed_count, result.clothes_rows_written);
+      "extract_photo_params: mode={}, completed. candidates={}, processed={}, saved={}, "
+      "skipped={}, failed={}, clothes_rows={}",
+      mode_tag, result.candidate_count, result.processed_count, result.saved_count,
+      result.skipped_count, result.failed_count, result.clothes_rows_written);
 
   report_extract_progress(progress_callback, "completed", result.processed_count,
                           result.candidate_count, 100.0,
                           std::format("Done: saved={}, skipped={}, failed={}", result.saved_count,
                                       result.skipped_count, result.failed_count));
-
   co_return result;
+}
+
+auto extract_photo_params(
+    Core::State::AppState& app_state, const InfinityNikkiExtractPhotoParamsRequest& request,
+    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
+    -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
+  // 整个流程：
+  // 1) 查候选照片
+  // 2) 并发准备本地提取数据（WorkerPool），按候选顺序等待每个 slot
+  // 3) 边准备边分批请求远端（每批最多 kExtractBatchSize，可含多 UID），顺序落库
+  InfinityNikkiExtractPhotoParamsResult result;
+
+  if (!app_state.database) {
+    co_return std::unexpected("Database is not initialized");
+  }
+
+  auto only_missing = request.only_missing.value_or(true);
+  auto uid_override = request.uid_override;
+  if (uid_override.has_value() && uid_override->empty()) {
+    co_return std::unexpected("UID override is empty");
+  }
+
+  report_extract_progress(progress_callback, "preparing", 0, 0, kPreparingPercent,
+                          "Loading candidate assets");
+
+  auto candidates_result = Infra::load_candidate_assets(app_state, request);
+  if (!candidates_result) {
+    co_return std::unexpected(candidates_result.error());
+  }
+
+  auto candidates = std::move(candidates_result.value());
+  // 手动任务保留原语义：候选由 folder_id/only_missing 决定。
+  Logger().info("extract_photo_params: mode=manual_task, only_missing={}", only_missing);
+  co_return co_await extract_photo_params_from_candidates(
+      app_state, std::move(candidates), progress_callback, "manual_task", uid_override);
+}
+
+auto extract_photo_params_silent_incremental(
+    Core::State::AppState& app_state, const InfinityNikkiSilentExtractPhotoParamsRequest& request,
+    const std::function<void(const InfinityNikkiExtractPhotoParamsProgress&)>& progress_callback)
+    -> asio::awaitable<std::expected<InfinityNikkiExtractPhotoParamsResult, std::string>> {
+  if (!app_state.database) {
+    co_return std::unexpected("Database is not initialized");
+  }
+
+  report_extract_progress(progress_callback, "preparing", 0, 0, kPreparingPercent,
+                          "Loading incremental candidate assets");
+  Logger().debug("extract_photo_params: mode=silent_incremental, requested_ids={}",
+                 request.candidate_asset_ids.size());
+
+  auto candidates_result =
+      Infra::load_candidate_assets_by_ids(app_state, request.candidate_asset_ids);
+  if (!candidates_result) {
+    co_return std::unexpected(candidates_result.error());
+  }
+
+  auto candidates = std::move(candidates_result.value());
+  // 静默增量明确只解析本次变更集映射出的资产，不混入历史 missing。
+  Logger().info("extract_photo_params: mode=silent_incremental, resolved_candidates={}",
+                candidates.size());
+  co_return co_await extract_photo_params_from_candidates(
+      app_state, std::move(candidates), progress_callback, "silent_incremental", std::nullopt);
 }
 
 }  // namespace Extensions::InfinityNikki::PhotoExtract

@@ -28,7 +28,7 @@ export auto start_extract_photo_params_task(
 // 调用方：PhotoService::on_gallery_scan_complete。
 export auto schedule_silent_extract_photo_params(
     Core::State::AppState& app_state,
-    Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest request) -> void;
+    Extensions::InfinityNikki::InfinityNikkiSilentExtractPhotoParamsRequest request) -> void;
 
 // 图库 UI「按文件夹解析」：校验 folder_id、UID 为数字串后，转调 start_extract_photo_params_task。
 export auto start_extract_photo_params_for_folder_task(

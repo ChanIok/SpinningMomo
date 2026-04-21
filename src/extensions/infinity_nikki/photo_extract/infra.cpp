@@ -365,6 +365,63 @@ auto load_candidate_assets(
   return query_result.value();
 }
 
+auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
+                                  const std::vector<std::int64_t>& candidate_asset_ids)
+    -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string> {
+  if (candidate_asset_ids.empty()) {
+    return std::vector<Scan::CandidateAssetRow>{};
+  }
+
+  std::vector<std::int64_t> unique_ids;
+  unique_ids.reserve(candidate_asset_ids.size());
+  std::unordered_set<std::int64_t> seen_ids;
+  seen_ids.reserve(candidate_asset_ids.size());
+  // 同一次 scan changes 里可能出现重复路径事件；这里先按 asset_id 去重。
+  for (auto asset_id : candidate_asset_ids) {
+    if (seen_ids.insert(asset_id).second) {
+      unique_ids.push_back(asset_id);
+    }
+  }
+
+  std::string placeholders;
+  placeholders.reserve(unique_ids.size() * 3);
+  for (std::size_t i = 0; i < unique_ids.size(); ++i) {
+    if (i > 0) {
+      placeholders += ", ";
+    }
+    placeholders += "?";
+  }
+
+  std::string sql = std::format(
+      R"(
+    SELECT a.id, a.path
+    FROM assets a
+    WHERE a.id IN ({})
+      AND a.type = 'photo'
+      AND instr(replace(a.path, '\\', '/'), '/X6Game/Saved/GamePlayPhotos/') > 0
+      AND instr(replace(a.path, '\\', '/'), '/NikkiPhotos_HighQuality/') > 0
+      AND (lower(coalesce(a.extension, '')) IN ('.jpg', '.jpeg')
+           OR lower(a.path) LIKE '%.jpg'
+           OR lower(a.path) LIKE '%.jpeg')
+    ORDER BY COALESCE(a.file_modified_at, a.created_at) DESC, a.id DESC
+  )",
+      placeholders);
+
+  std::vector<Core::Database::Types::DbParam> params;
+  params.reserve(unique_ids.size());
+  for (auto asset_id : unique_ids) {
+    params.emplace_back(asset_id);
+  }
+
+  auto query_result =
+      Core::Database::query<Scan::CandidateAssetRow>(*app_state.database, sql, params);
+  if (!query_result) {
+    return std::unexpected("Failed to query incremental candidate assets: " + query_result.error());
+  }
+
+  return query_result.value();
+}
+
 auto extract_batch_photo_params(Core::State::AppState& app_state,
                                 const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
     -> asio::awaitable<std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string>> {
