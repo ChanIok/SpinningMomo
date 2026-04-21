@@ -276,6 +276,8 @@ export function useGalleryData() {
         clothIds: filters.clothIds,
         clothMatchMode: filters.clothMatchMode,
         colorHexes: filters.colorHexes,
+        colorMatchMode: filters.colorMatchMode,
+        colorDistance: filters.colorDistance,
       })
 
       if (!store.isQueryVersionCurrent(requestVersion)) {

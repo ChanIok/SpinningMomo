@@ -10,7 +10,7 @@ import Features.Gallery.Color.Extractor;
 namespace Features::Gallery::Color::Filter {
 
 constexpr double kDefaultColorDistance = 18.0;
-constexpr int kColorBinTolerance = 1;
+constexpr int kColorBinTolerance = 2;
 
 struct QueryColorTarget {
   float lab_l = 0.0f;

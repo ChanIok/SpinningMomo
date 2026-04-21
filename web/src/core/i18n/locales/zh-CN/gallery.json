@@ -265,6 +265,7 @@
   "gallery.sidebar.tags.title": "标签",
   "gallery.toolbar.colorFilter.apply": "应用",
   "gallery.toolbar.colorFilter.clear": "清除",
+  "gallery.toolbar.colorFilter.distance.label": "颜色阈值",
   "gallery.toolbar.colorFilter.none": "未筛选",
   "gallery.toolbar.colorFilter.title": "颜色筛选",
   "gallery.toolbar.colorFilter.tooltip": "颜色筛选",

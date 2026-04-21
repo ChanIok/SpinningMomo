@@ -137,7 +137,7 @@ const currentColorRender = computed(() => hsvToHex(hsv.value))
 </script>
 
 <template>
-  <div class="flex w-[200px] flex-col gap-3">
+  <div class="flex w-full flex-col gap-3">
     <!-- Saturation/Brightness Board -->
     <div
       ref="boardRef"

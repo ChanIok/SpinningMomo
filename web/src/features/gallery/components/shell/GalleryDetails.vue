@@ -444,7 +444,7 @@ async function handleCopyColorHex(color: AssetMainColor) {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p class="font-mono text-xs">{{ getColorHex(color) }}</p>
-                      <p class="text-xs text-muted-foreground">
+                      <p class="text-xs">
                         {{ formatPercentage(color.weight) }}
                       </p>
                     </TooltipContent>

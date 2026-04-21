@@ -133,6 +133,7 @@ export interface AssetFilter {
   clothIds?: number[]
   clothMatchMode?: 'any' | 'all'
   colorHex?: string
+  colorDistance?: number
 }
 
 // 视图配置

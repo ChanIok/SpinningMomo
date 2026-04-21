@@ -47,7 +47,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 
       <TooltipArrow
         class="z-50"
-        :class="props.variant === 'sidebar' ? 'fill-background' : 'bg-primary fill-primary'"
+        :class="props.variant === 'sidebar' ? 'fill-background' : 'fill-primary'"
       />
     </TooltipContent>
   </TooltipPortal>

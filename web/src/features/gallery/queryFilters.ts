@@ -16,5 +16,6 @@ export function toQueryAssetsFilters(
     clothIds: filter.clothIds,
     clothMatchMode: filter.clothMatchMode,
     colorHexes: filter.colorHex ? [filter.colorHex] : undefined,
+    colorDistance: filter.colorDistance,
   }
 }

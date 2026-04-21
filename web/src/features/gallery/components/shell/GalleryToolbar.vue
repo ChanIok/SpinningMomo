@@ -1,3 +1,172 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Slider } from '@/components/ui/slider'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
+import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu'
+import {
+  Search,
+  X,
+  ArrowUpDown,
+  Grid3x3,
+  LayoutGrid,
+  List,
+  Rows3,
+  ListFilter,
+  Image,
+  Video,
+  Camera,
+  CalendarClock,
+  Palette,
+  Type,
+  Flag,
+} from 'lucide-vue-next'
+import { useI18n } from '@/composables/useI18n'
+import { useGalleryView } from '../../composables'
+import type { ViewMode, SortBy, AssetType, AssetFilter } from '../../types'
+
+// i18n
+const { t } = useI18n()
+
+// 使用视图管理逻辑
+const galleryView = useGalleryView()
+
+// 计算属性
+const viewMode = computed(() => galleryView.viewMode.value)
+const sortBy = computed(() => galleryView.sortBy.value)
+const sortOrder = computed(() => galleryView.sortOrder.value)
+const filter = computed(() => galleryView.filter.value)
+const searchQuery = computed(() => filter.value.searchQuery || '')
+const includeSubfolders = computed(() => galleryView.includeSubfolders.value)
+const activeColorHex = computed(() => filter.value.colorHex)
+const activeColorDistance = computed(
+  () => (filter.value as AssetFilter & { colorDistance?: number }).colorDistance ?? 18
+)
+const COLOR_DISTANCE_MIN = 1
+const COLOR_DISTANCE_MAX = 40
+const COLOR_DISTANCE_DEFAULT = 18
+
+// 当前slider位置（从实际尺寸反向计算）
+const currentSliderPosition = computed(() => galleryView.getSliderPosition())
+const colorPopoverOpen = ref(false)
+const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
+const draftColorDistance = ref(activeColorDistance.value)
+
+// 评分与标记筛选
+const hasReviewFilter = computed(
+  () => filter.value.rating !== undefined || filter.value.reviewFlag !== undefined
+)
+
+// 视图模式选项
+const viewModes = [
+  { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
+  { value: 'adaptive' as ViewMode, icon: Rows3, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
+  { value: 'masonry' as ViewMode, icon: LayoutGrid, i18nKey: 'gallery.toolbar.viewMode.masonry' },
+  { value: 'list' as ViewMode, icon: List, i18nKey: 'gallery.toolbar.viewMode.list' },
+]
+
+// 当前视图模式的图标
+const currentViewModeIcon = computed(() => {
+  const mode = viewModes.find((m) => m.value === viewMode.value)
+  return mode?.icon || Grid3x3
+})
+
+watch(colorPopoverOpen, (open) => {
+  if (open) {
+    draftColorHex.value = activeColorHex.value || '#FFFFFF'
+    draftColorDistance.value = activeColorDistance.value
+  }
+})
+
+// 方法
+function updateSearchQuery(query: string | number) {
+  galleryView.setSearchQuery(String(query))
+}
+
+function clearSearch() {
+  galleryView.setSearchQuery('')
+}
+
+function onTypeFilterChange(value: string | number | bigint | Record<string, any> | null) {
+  const stringValue = String(value || 'all')
+  const type = stringValue === 'all' ? undefined : (stringValue as AssetType)
+  galleryView.setTypeFilter(type)
+}
+
+function onSortByChange(value: string | number | bigint | Record<string, any> | null) {
+  if (value) {
+    const newSortBy = String(value) as SortBy
+    galleryView.setSorting(newSortBy, sortOrder.value)
+  }
+}
+
+function toggleSortOrder() {
+  galleryView.toggleSortOrder()
+}
+
+function toggleIncludeSubfolders() {
+  galleryView.setIncludeSubfolders(!includeSubfolders.value)
+}
+
+function applyColorFilter() {
+  galleryView.setFilter({
+    colorHex: draftColorHex.value,
+    colorDistance: draftColorDistance.value,
+  })
+}
+
+function clearColorFilter() {
+  galleryView.setFilter({
+    colorHex: undefined,
+    colorDistance: undefined,
+  })
+  draftColorHex.value = '#FFFFFF'
+  draftColorDistance.value = COLOR_DISTANCE_DEFAULT
+  colorPopoverOpen.value = false
+}
+
+function onColorDistanceChange(value: number[] | undefined) {
+  if (value && value.length > 0 && value[0] !== undefined) {
+    draftColorDistance.value = value[0]
+  }
+}
+
+function setViewMode(
+  mode:
+    | string
+    | number
+    | bigint
+    | Record<string, any>
+    | null
+    | (string | number | bigint | Record<string, any> | null)[]
+) {
+  if (mode && typeof mode === 'string') {
+    galleryView.setViewMode(mode as ViewMode)
+  }
+}
+
+function onViewSizeSliderChange(value: number[] | undefined) {
+  if (value && value.length > 0 && value[0] !== undefined) {
+    // 使用非线性映射函数设置尺寸
+    galleryView.setViewSizeFromSlider(value[0])
+  }
+}
+</script>
+
 <template>
   <div class="flex items-center justify-between gap-3 p-4">
     <!-- 左侧：搜索框 -->
@@ -79,12 +248,14 @@
                       {{ t('gallery.toolbar.sort.name') }}
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="resolution">
-                      <Ruler class="mr-2 h-4 w-4" />
-                      {{ t('gallery.toolbar.sort.resolution') }}
+                      <span class="pl-8">
+                        {{ t('gallery.toolbar.sort.resolution') }}
+                      </span>
                     </DropdownMenuRadioItem>
                     <DropdownMenuRadioItem value="size">
-                      <Ruler class="mr-2 h-4 w-4" />
-                      {{ t('gallery.toolbar.sort.size') }}
+                      <span class="pl-8">
+                        {{ t('gallery.toolbar.sort.size') }}
+                      </span>
                     </DropdownMenuRadioItem>
                   </DropdownMenuRadioGroup>
 
@@ -171,6 +342,25 @@
                       :model-value="draftColorHex"
                       @update:model-value="(color) => (draftColorHex = color)"
                     />
+
+                    <div class="space-y-1">
+                      <p class="text-xs font-medium">
+                        {{ t('gallery.toolbar.colorFilter.distance.label') }}
+                      </p>
+                      <div class="flex justify-end">
+                        <span class="font-mono text-[11px] text-muted-foreground">
+                          {{ draftColorDistance }}
+                        </span>
+                      </div>
+                      <Slider
+                        :model-value="[draftColorDistance]"
+                        @update:model-value="onColorDistanceChange"
+                        :min="COLOR_DISTANCE_MIN"
+                        :max="COLOR_DISTANCE_MAX"
+                        :step="1"
+                        class="w-full"
+                      />
+                    </div>
 
                     <div class="flex justify-end">
                       <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
@@ -294,153 +484,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Slider } from '@/components/ui/slider'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
-import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
-} from '@/components/ui/dropdown-menu'
-import {
-  Search,
-  X,
-  ArrowUpDown,
-  Grid3x3,
-  LayoutGrid,
-  List,
-  Rows3,
-  ListFilter,
-  Image,
-  Video,
-  Camera,
-  CalendarClock,
-  Palette,
-  Type,
-  Ruler,
-  Flag,
-} from 'lucide-vue-next'
-import { useI18n } from '@/composables/useI18n'
-import { useGalleryView } from '../../composables'
-import type { ViewMode, SortBy, AssetType } from '../../types'
-
-// i18n
-const { t } = useI18n()
-
-// 使用视图管理逻辑
-const galleryView = useGalleryView()
-
-// 计算属性
-const viewMode = computed(() => galleryView.viewMode.value)
-const sortBy = computed(() => galleryView.sortBy.value)
-const sortOrder = computed(() => galleryView.sortOrder.value)
-const filter = computed(() => galleryView.filter.value)
-const searchQuery = computed(() => filter.value.searchQuery || '')
-const includeSubfolders = computed(() => galleryView.includeSubfolders.value)
-const activeColorHex = computed(() => filter.value.colorHex)
-
-// 当前slider位置（从实际尺寸反向计算）
-const currentSliderPosition = computed(() => galleryView.getSliderPosition())
-const colorPopoverOpen = ref(false)
-const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
-
-// 评分与标记筛选
-const hasReviewFilter = computed(
-  () => filter.value.rating !== undefined || filter.value.reviewFlag !== undefined
-)
-
-// 视图模式选项
-const viewModes = [
-  { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
-  { value: 'adaptive' as ViewMode, icon: Rows3, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
-  { value: 'masonry' as ViewMode, icon: LayoutGrid, i18nKey: 'gallery.toolbar.viewMode.masonry' },
-  { value: 'list' as ViewMode, icon: List, i18nKey: 'gallery.toolbar.viewMode.list' },
-]
-
-// 当前视图模式的图标
-const currentViewModeIcon = computed(() => {
-  const mode = viewModes.find((m) => m.value === viewMode.value)
-  return mode?.icon || Grid3x3
-})
-
-watch(colorPopoverOpen, (open) => {
-  if (open) {
-    draftColorHex.value = activeColorHex.value || '#FFFFFF'
-  }
-})
-
-// 方法
-function updateSearchQuery(query: string | number) {
-  galleryView.setSearchQuery(String(query))
-}
-
-function clearSearch() {
-  galleryView.setSearchQuery('')
-}
-
-function onTypeFilterChange(value: string | number | bigint | Record<string, any> | null) {
-  const stringValue = String(value || 'all')
-  const type = stringValue === 'all' ? undefined : (stringValue as AssetType)
-  galleryView.setTypeFilter(type)
-}
-
-function onSortByChange(value: string | number | bigint | Record<string, any> | null) {
-  if (value) {
-    const newSortBy = String(value) as SortBy
-    galleryView.setSorting(newSortBy, sortOrder.value)
-  }
-}
-
-function toggleSortOrder() {
-  galleryView.toggleSortOrder()
-}
-
-function toggleIncludeSubfolders() {
-  galleryView.setIncludeSubfolders(!includeSubfolders.value)
-}
-
-function applyColorFilter() {
-  galleryView.setColorFilter(draftColorHex.value)
-  colorPopoverOpen.value = false
-}
-
-function clearColorFilter() {
-  galleryView.setColorFilter(undefined)
-  draftColorHex.value = '#FFFFFF'
-  colorPopoverOpen.value = false
-}
-
-function setViewMode(
-  mode:
-    | string
-    | number
-    | bigint
-    | Record<string, any>
-    | null
-    | (string | number | bigint | Record<string, any> | null)[]
-) {
-  if (mode && typeof mode === 'string') {
-    galleryView.setViewMode(mode as ViewMode)
-  }
-}
-
-function onViewSizeSliderChange(value: number[] | undefined) {
-  if (value && value.length > 0 && value[0] !== undefined) {
-    // 使用非线性映射函数设置尺寸
-    galleryView.setViewSizeFromSlider(value[0])
-  }
-}
-</script>

@@ -258,6 +258,7 @@
   "gallery.sidebar.tags.title": "Tags",
   "gallery.toolbar.colorFilter.apply": "Apply",
   "gallery.toolbar.colorFilter.clear": "Clear",
+  "gallery.toolbar.colorFilter.distance.label": "Color Threshold",
   "gallery.toolbar.colorFilter.none": "No color selected",
   "gallery.toolbar.colorFilter.title": "Color Filter",
   "gallery.toolbar.colorFilter.tooltip": "Color Filter",

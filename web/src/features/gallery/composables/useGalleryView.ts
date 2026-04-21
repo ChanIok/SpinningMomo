@@ -157,8 +157,11 @@ export function useGalleryView() {
   /**
    * 设置颜色筛选
    */
-  function setColorFilter(colorHex?: string) {
-    setFilter({ colorHex: colorHex || undefined })
+  function setColorFilter(colorHex?: string, colorDistance?: number) {
+    setFilter({
+      colorHex: colorHex || undefined,
+      colorDistance: colorHex ? colorDistance || 18 : undefined,
+    })
   }
 
   /**
