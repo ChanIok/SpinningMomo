@@ -74,3 +74,21 @@ export function transformGameToMapCoordinates(
     lng: mapX,
   }
 }
+
+export function transformMapToGameCoordinates(
+  point: {
+    lat: number
+    lng: number
+  },
+  worldId?: string
+): {
+  x: number
+  y: number
+} {
+  const profile = resolveCoordinateProfile(worldId)
+
+  return {
+    x: (point.lng - profile.xBias) / profile.xScale,
+    y: (point.lat - profile.yBias) / profile.yScale,
+  }
+}

@@ -293,6 +293,7 @@ export function buildDevPolygonCollectorSnippet() {
         {
           action: 'SPINNING_MOMO_EXPORT_POLYGON',
           payload: {
+            worldId: readOfficialActiveAreaId(),
             regionName: draft.regionName,
             coordinateSystem: 'map_latlng',
             points: draft.points.map((point) => ({
@@ -466,7 +467,7 @@ export function buildDevPolygonCollectorSnippet() {
           clearBtnId +
           '" type="button">清空点</button>' +
           '</div>' +
-          '<div class="spinning-momo-polygon-footnote">输入 x=lng / y=lat；导出即地图坐标系。</div>' +
+          '<div class="spinning-momo-polygon-footnote">输入 x=lng / y=lat；导出时会自动转换为游戏坐标系。</div>' +
           '</div>';
       }
       if (card.parentElement !== document.body) {

@@ -411,6 +411,7 @@ struct QueryPhotoMapPointsParams {
   QueryAssetsFilters filters;
   std::optional<std::string> sort_by = "created_at";
   std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
+  std::string world_id;
 };
 
 struct InfinityNikkiExtractedParams {

@@ -248,6 +248,7 @@ export interface QueryPhotoMapPointsParams {
   filters: QueryAssetsFilters
   sortBy?: SortBy
   sortOrder?: SortOrder
+  worldId: string
 }
 
 export interface PhotoMapPoint {

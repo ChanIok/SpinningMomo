@@ -9,12 +9,7 @@ import {
   createDefaultMapRuntimeOptions,
 } from '@/features/map/domain/defaults'
 import { toMapMarkers } from '@/features/map/domain/markerMapper'
-import { resolveMatchedWorldId } from '@/features/map/domain/worldPolygonFilter'
-import { WORLD_POLYGON_RULES } from '@/features/map/domain/worldPolygons'
-import {
-  flushMapRuntimeToIframe,
-  registerMapAfterIframeWorld,
-} from '@/features/map/composables/mapIframeRuntime'
+import { flushMapRuntimeToIframe } from '@/features/map/composables/mapIframeRuntime'
 import { useMapStore } from '@/features/map/store'
 
 export function useMapScene() {
@@ -22,38 +17,35 @@ export function useMapScene() {
   const galleryStore = useGalleryStore()
   const mapStore = useMapStore()
   const mapPoints = ref<PhotoMapPoint[]>([])
+  let loadSequence = 0
 
-  function filterMapPointsByCurrentWorld(points: PhotoMapPoint[]): PhotoMapPoint[] {
-    const currentWorldId = String(mapStore.runtimeOptions.currentWorldId ?? '').trim()
-    if (!currentWorldId) {
-      return points
-    }
-
-    return points.filter((point) => {
-      const matchedWorldId = resolveMatchedWorldId(point, WORLD_POLYGON_RULES)
-      return matchedWorldId === currentWorldId
-    })
+  function getCurrentWorldId(): string {
+    return String(mapStore.runtimeOptions.currentWorldId ?? '').trim()
   }
 
   function syncMarkersFromMapPoints() {
-    const filteredPoints = filterMapPointsByCurrentWorld(mapPoints.value)
     mapStore.replaceMarkers(
-      toMapMarkers(filteredPoints, {
+      toMapMarkers(mapPoints.value, {
         locale: locale.value,
         thumbnailBaseUrl: mapStore.runtimeOptions.thumbnailBaseUrl,
         cardTitleFallback: t('map.popup.fallbackTitle'),
-        worldId: mapStore.runtimeOptions.currentWorldId,
+        worldId: getCurrentWorldId(),
       })
     )
   }
 
   function syncFilterCountCard(loading: boolean) {
+    const currentWorldId = getCurrentWorldId()
+    const countText = loading
+      ? '正在同步照片坐标…'
+      : currentWorldId
+        ? `当前区域下 ${mapPoints.value.length} 张照片`
+        : '等待地图区域就绪…'
+
     mapStore.patchRuntimeOptions({
       filterCountCardVisible: true,
       filterCountCardLoading: loading,
-      filterCountCardText: loading
-        ? '正在同步照片坐标…'
-        : `当前筛选下 ${mapPoints.value.length} 张照片`,
+      filterCountCardText: countText,
     })
   }
 
@@ -71,45 +63,72 @@ export function useMapScene() {
   }
 
   async function loadMapPoints() {
+    const loadId = ++loadSequence
+    const currentWorldId = getCurrentWorldId()
+    if (!mapStore.iframeSessionReady || !currentWorldId) {
+      if (loadId !== loadSequence) {
+        return
+      }
+      mapStore.setLoading(false)
+      mapPoints.value = []
+      mapStore.replaceMarkers([])
+      syncFilterCountCard(false)
+      if (mapStore.iframeSessionReady) {
+        flushMapRuntimeToIframe()
+      }
+      return
+    }
+
     mapStore.setLoading(true)
     syncFilterCountCard(true)
 
     try {
       const filters = toQueryAssetsFilters(galleryStore.filter, galleryStore.includeSubfolders)
-      mapPoints.value = await queryPhotoMapPoints({
+      const nextMapPoints = await queryPhotoMapPoints({
         filters,
         sortBy: galleryStore.sortBy,
         sortOrder: galleryStore.sortOrder,
+        worldId: currentWorldId,
       })
-      if (mapStore.iframeSessionReady) {
-        syncMarkersFromMapPoints()
-      } else {
-        mapStore.replaceMarkers([])
+      if (loadId !== loadSequence) {
+        return
       }
+      mapPoints.value = nextMapPoints
+      syncMarkersFromMapPoints()
     } catch (error) {
+      if (loadId !== loadSequence) {
+        return
+      }
       console.error('Failed to load map points:', error)
       mapPoints.value = []
       mapStore.replaceMarkers([])
     } finally {
+      if (loadId !== loadSequence) {
+        return
+      }
       mapStore.setLoading(false)
       syncFilterCountCard(false)
-      if (mapStore.iframeSessionReady) {
-        flushMapRuntimeToIframe()
-      }
+      flushMapRuntimeToIframe()
     }
   }
 
+  const mapQueryKey = computed(() =>
+    JSON.stringify({
+      filter: galleryStore.filter,
+      includeSubfolders: galleryStore.includeSubfolders,
+      sortBy: galleryStore.sortBy,
+      sortOrder: galleryStore.sortOrder,
+      iframeSessionReady: mapStore.iframeSessionReady,
+      currentWorldId: getCurrentWorldId(),
+    })
+  )
+
   watch(
-    () => [
-      galleryStore.filter,
-      galleryStore.includeSubfolders,
-      galleryStore.sortBy,
-      galleryStore.sortOrder,
-    ],
+    mapQueryKey,
     async () => {
       await loadMapPoints()
     },
-    { deep: true, immediate: true }
+    { immediate: true }
   )
 
   watch(locale, () => {
@@ -118,10 +137,6 @@ export function useMapScene() {
       syncMarkersFromMapPoints()
       flushMapRuntimeToIframe()
     }
-  })
-
-  registerMapAfterIframeWorld(() => {
-    syncMarkersFromMapPoints()
   })
 
   return {

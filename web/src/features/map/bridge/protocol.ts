@@ -41,6 +41,7 @@ export type SetMarkersVisibleMessage = {
 export type ExportPolygonMessage = {
   action: typeof ACTION_EXPORT_POLYGON
   payload?: {
+    worldId?: string
     regionName?: string
     coordinateSystem?: string
     points?: Array<{

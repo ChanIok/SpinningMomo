@@ -179,6 +179,9 @@ function handlePrevious() {
                   {{ t('gallery.guide.infinityNikki.creditPowered') }}
                 </span>
               </p>
+              <p class="text-xs leading-relaxed text-muted-foreground/70">
+                {{ t('gallery.guide.infinityNikki.step1.mapHint') }}
+              </p>
             </div>
 
             <!-- 步骤 2：硬链接优化 -->

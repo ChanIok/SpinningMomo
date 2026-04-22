@@ -5,6 +5,8 @@ export function buildMapBridgeScriptTemplate() {
   return `
 if (window.location.hostname === 'myl.nuanpaper.com') {
     let innerL = undefined;
+    const DEFAULT_WORLD_ID = '1.1';
+    const WORLD_ID_PATTERN = /^\\d+(?:\\.\\d+)?$/;
     window.__SPINNING_MOMO_ALLOW_DEV_EVAL__ = __ALLOW_DEV_EVAL__;
     window.__SPINNING_MOMO_PENDING_MARKERS__ = [];
     window.__SPINNING_MOMO_RENDER_OPTIONS__ = {};
@@ -21,15 +23,18 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
         if (s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
             s = s.slice(1, -1).trim();
         }
-        return s || undefined;
+        if (!s || !WORLD_ID_PATTERN.test(s)) {
+            return undefined;
+        }
+        return s;
     };
 
     const readOfficialActiveAreaId = () => {
         try {
             const raw = window.localStorage && window.localStorage.getItem('activeAreaId');
-            return normalizeOfficialActiveAreaId(raw);
+            return normalizeOfficialActiveAreaId(raw) || DEFAULT_WORLD_ID;
         } catch (e) {
-            return undefined;
+            return DEFAULT_WORLD_ID;
         }
     };
 

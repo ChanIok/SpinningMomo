@@ -13,11 +13,8 @@ import {
   type SyncRuntimeMessage,
   type SyncRuntimePayload,
 } from '@/features/map/bridge/protocol'
-import {
-  applyIframeSessionReadyThenFlush,
-  flushMapRuntimeToIframe,
-} from '@/features/map/composables/mapIframeRuntime'
-import { normalizeOfficialWorldId } from '@/features/map/domain/officialWorldId'
+import { flushMapRuntimeToIframe } from '@/features/map/composables/mapIframeRuntime'
+import { normalizeOfficialWorldIdOrDefault } from '@/features/map/domain/officialWorldId'
 import { downloadPolygonJson } from '@/features/map/domain/polygonExport'
 import { buildMapDevEvalScript } from '@/features/map/injection/mapDevEvalScript'
 import { useMapStore } from '@/features/map/store'
@@ -171,20 +168,18 @@ export function useMapBridge(options: UseMapBridgeOptions) {
     if (data.action === ACTION_EXPORT_POLYGON) {
       const success = downloadPolygonJson(data.payload ?? {})
       if (!success) {
-        console.warn(
-          '[MapBridge] Polygon export ignored: at least 3 valid lat/lng points are required.'
-        )
+        console.warn('[MapBridge] Polygon export ignored: valid points and worldId are required.')
       }
       return
     }
 
     if (data.action === ACTION_MAP_SESSION_READY) {
-      const worldId = normalizeOfficialWorldId(data.payload?.worldId)
+      const worldId = normalizeOfficialWorldIdOrDefault(data.payload?.worldId)
       mapStore.patchRuntimeOptions({
         currentWorldId: worldId,
       })
       mapStore.markIframeSessionReady()
-      applyIframeSessionReadyThenFlush()
+      flushMapRuntimeToIframe()
       return
     }
   }

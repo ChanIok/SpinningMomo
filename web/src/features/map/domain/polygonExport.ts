@@ -1,9 +1,33 @@
-type PolygonPoint = {
+import { normalizeOfficialWorldId } from '@/features/map/domain/officialWorldId'
+import { transformMapToGameCoordinates } from '@/features/map/domain/coordinates'
+
+type RawMapPoint = {
   lat: number
   lng: number
 }
 
+type PolygonPoint = {
+  x: number
+  y: number
+}
+
+type ZRange = {
+  min: number
+  max: number
+}
+
+type ExportedPolygonJson = {
+  regionName: string
+  worldId: string
+  coordinateSystem: 'game_xy'
+  points: PolygonPoint[]
+  closed: boolean
+  zRange: ZRange
+  exportedAt: number
+}
+
 type ExportPolygonPayload = {
+  worldId?: string
   regionName?: string
   coordinateSystem?: string
   points?: Array<{
@@ -22,7 +46,7 @@ function sanitizeFileNameSegment(value: string): string {
   return value.replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').trim()
 }
 
-function toValidPoints(points: ExportPolygonPayload['points']): PolygonPoint[] {
+function toValidMapPoints(points: ExportPolygonPayload['points']): RawMapPoint[] {
   if (!Array.isArray(points)) {
     return []
   }
@@ -35,32 +59,52 @@ function toValidPoints(points: ExportPolygonPayload['points']): PolygonPoint[] {
     .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
 }
 
-export function downloadPolygonJson(rawPayload: ExportPolygonPayload): boolean {
-  const points = toValidPoints(rawPayload.points)
-  if (points.length < 3) {
-    return false
-  }
+function toGamePolygonPoints(points: RawMapPoint[], worldId: string): PolygonPoint[] {
+  return points.map((point) => transformMapToGameCoordinates(point, worldId))
+}
 
-  const regionName = String(rawPayload.regionName || '').trim() || 'A区域'
-  const coordinateSystem = String(rawPayload.coordinateSystem || '').trim() || 'map_latlng'
-  const closed = rawPayload.closed !== false
-  const now = Number.isFinite(rawPayload.exportedAt) ? Number(rawPayload.exportedAt) : Date.now()
+function toValidZRange(rawPayload: ExportPolygonPayload): ZRange {
   const zMin = Number(rawPayload.zRange?.min)
   const zMax = Number(rawPayload.zRange?.max)
 
-  const output = {
-    regionName,
-    coordinateSystem,
+  return {
+    min: Number.isFinite(zMin) ? zMin : -100000,
+    max: Number.isFinite(zMax) ? zMax : 100000,
+  }
+}
+
+function toExportedPolygonJson(
+  rawPayload: ExportPolygonPayload,
+  worldId: string,
+  points: PolygonPoint[],
+  exportedAt: number
+): ExportedPolygonJson {
+  return {
+    regionName: String(rawPayload.regionName || '').trim() || 'A区域',
+    worldId,
+    coordinateSystem: 'game_xy',
     points,
-    closed,
-    zRange: {
-      min: Number.isFinite(zMin) ? zMin : -100000,
-      max: Number.isFinite(zMax) ? zMax : 100000,
-    },
-    exportedAt: now,
+    closed: rawPayload.closed !== false,
+    zRange: toValidZRange(rawPayload),
+    exportedAt,
+  }
+}
+
+export function downloadPolygonJson(rawPayload: ExportPolygonPayload): boolean {
+  const worldId = normalizeOfficialWorldId(rawPayload.worldId)
+  const mapPoints = toValidMapPoints(rawPayload.points)
+  if (!worldId || mapPoints.length < 3) {
+    return false
   }
 
-  const fileRegion = sanitizeFileNameSegment(regionName) || 'region'
+  const now = Number.isFinite(rawPayload.exportedAt) ? Number(rawPayload.exportedAt) : Date.now()
+  const output = toExportedPolygonJson(
+    rawPayload,
+    worldId,
+    toGamePolygonPoints(mapPoints, worldId),
+    now
+  )
+  const fileRegion = sanitizeFileNameSegment(output.regionName) || 'region'
   const fileName = `polygon_${fileRegion}_${new Date(now).toISOString().replace(/[:.]/g, '-')}.json`
   const blob = new Blob([JSON.stringify(output, null, 2)], {
     type: 'application/json;charset=utf-8',

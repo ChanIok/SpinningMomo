@@ -1,64 +1,66 @@
 # 地图模块（Map）维护说明
 
-面向后续开发与 AI 助手的简版架构与现状说明。详细构建方式见仓库根目录 `AGENTS.md`。
+简版架构说明；构建见仓库根目录 `AGENTS.md`。
 
 ## 产品定位
 
-- 在 **内嵌 WebView/浏览器 iframe** 中加载官方工具站地图：`MAP_URL` / `MAP_ORIGIN` 定义在 [`bridge/protocol.ts`](./bridge/protocol.ts)（`myl.nuanpaper.com`）。
-- 本应用不托管地图，而是通过 **postMessage** 把「图库中照片的坐标 + 展示配置」同步到 iframe 内由注入脚本在 Leaflet 上画标点、聚合、悬停卡片，并支持从卡片跳转图库。
+- 在 **WebView / iframe** 中加载官方地图（`MAP_URL` / `MAP_ORIGIN` 见 [`bridge/protocol.ts`](./bridge/protocol.ts)）。
+- 宿主通过 **postMessage** 把「当前区域照片坐标 + 展示配置」同步进 iframe；注入脚本在 Leaflet 上画点、聚合、悬停卡片；卡片可跳回图库。
+
+## 宿主数据流（最短路径）
+
+1. iframe 上报 **`SPINNING_MOMO_MAP_SESSION_READY`**，payload 带 `worldId`（来自 `localStorage.activeAreaId`，注入侧会去掉首尾多余 `"`）。
+2. [`useMapBridge`](./composables/useMapBridge.ts)：`normalizeOfficialWorldId` → 写入 `runtimeOptions.currentWorldId` → **`markIframeSessionReady()`** → **`flushMapRuntimeToIframe()`**（切换 world 时补一帧同步）。
+3. [`useMapScene`](./composables/useMapScene.ts) 监听筛选/排序/语言及 **`iframeSessionReady` + `currentWorldId`**：二者齐全才 **`gallery.queryPhotoMapPoints`（带 `worldId`）**，再 `replaceMarkers` → **`flushMapRuntimeToIframe()`**；未就绪时清空点位并显示「等待地图区域就绪」类文案。
+4. [`mapIframeRuntime.ts`](./composables/mapIframeRuntime.ts) 只负责注册 **`flush` → `postRuntimeSync`**，无第二套回调。
 
 ## 前端目录职责
 
-| 路径                            | 作用                                                                                                                 |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `pages/MapPage.vue`             | 地图页容器与 `useMapScene` 初始化（顶部信息已下沉到注入层右上卡片）                                                  |
-| `store.ts`                      | `markers`、`renderOptions`、`runtimeOptions` 等轻量状态                                                              |
-| `composables/useMapScene.ts`    | 监听图库筛选/排序/语言，拉取点位、写入 `mapStore`                                                                    |
-| `composables/useMapBridge.ts`   | iframe `postMessage`：prod 为 `SYNC_RUNTIME`；dev 为 `EVAL_SCRIPT` + 入站（打开图库/标点显隐）                       |
-| `bridge/protocol.ts`            | 与 iframe 的 action 常量、payload 类型；生产同步为 `SPINNING_MOMO_SYNC_RUNTIME`，Vite dev 另发 `EVAL_SCRIPT`（见下） |
-| `injection/mapDevEvalScript.ts` | **仅 dev**：把当前 store 快照拼成 iframe 内 eval 用整段脚本                                                          |
-| `domain/*`                      | 与 Vue 无关的纯逻辑：坐标、默认配置、**PhotoMapPoint → MapMarker**                                                   |
-| `api.ts`                        | 对 `gallery.queryPhotoMapPoints` 的 feature 内门面，避免页面直接依赖 gallery API                                     |
-| `components/MapIframeHost.vue`  | 全局布局里常驻的 iframe 容器，避免切路由时地图白屏重载；内部极薄，委托 `useMapBridge`                                |
+| 路径                              | 作用                                                                                                                         |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `pages/MapPage.vue`               | 挂载时 `initializeMapDefaults()`                                                                                             |
+| `store.ts`                        | `markers`、`renderOptions`、`runtimeOptions`、`iframeSessionReady`                                                           |
+| `composables/useMapScene.ts`      | 图库筛选/排序/语言 + 地图 session/world 就绪后拉点、写 markers、flush                                                        |
+| `composables/useMapBridge.ts`     | 出站 `postMessage`（prod `SYNC_RUNTIME`，dev `EVAL_SCRIPT`）；入站处理；`SESSION_READY` 写 world、标记 session，并立即 flush |
+| `composables/mapIframeRuntime.ts` | 注册宿主 → iframe 的 flush 实现                                                                                              |
+| `domain/officialWorldId.ts`       | 规范化 iframe 传来的 world 字符串（如去掉包裹 `"`）                                                                          |
+| `bridge/protocol.ts`              | action 常量与 payload 类型                                                                                                   |
+| `injection/mapDevEvalScript.ts`   | **仅 dev**：把 store 快照拼成 iframe 内 eval 脚本                                                                            |
+| `domain/*`                        | 坐标、默认配置、`PhotoMapPoint` → `MapMarker`                                                                                |
+| `api.ts`                          | 对 `gallery.queryPhotoMapPoints` 的门面                                                                                      |
+| `components/MapIframeHost.vue`    | 全局 iframe 容器、`registerMapIframeFlush`、监听 `message`                                                                   |
 
-## 数据模型（宿主 → iframe 必须可结构化克隆）
+## 数据模型（宿主 → iframe，须可结构化克隆）
 
-`MapMarker` 为 **扁平** 结构（无嵌套 `popup`），见 [`store.ts`](./store.ts)：
+见 [`store.ts`](./store.ts)：`MapMarker` 扁平结构；`useMapBridge` 出站前手工展开为纯对象，避免 `DataCloneError`。
 
-- 坐标：`lat` / `lng`（已按本模块约定从游戏坐标换算为地图坐标）
-- 展示：`cardTitle`（悬停标题，已按 i18n 在 mapper 中格式化）
-- 资源与跳转：`assetId` / `assetIndex` / `thumbnailUrl`（与图库、lightbox 一致）
-- 悬停总开关在 **`MapRuntimeOptions.hoverCardEnabled`**（单点 + 聚合同一语义；不再使用第二套 `openPopupOnHover`）
-- 延时/移出行为在 **`MapRenderOptions`**（如 `popupOpenDelayMs`、`closePopupOnMouseOut` 等），仅表示交互参数，不重复表达「开不开悬停」
+- 悬停总开关：**`MapRuntimeOptions.hoverCardEnabled`**
+- 交互延时等：**`MapRenderOptions`**（与「是否启用悬停」分离）
 
-`useMapBridge` 出站前会把 Pinia 状态**手工展开为纯对象**再 `postMessage`，避免 `DataCloneError`。
+## iframe 注入
 
-## iframe 内注入（核心）
-
-- **源码**：`injection/source/*.js` 以「字符串模板」拼进 `runtimeCore`；修改后**必须**从仓库根目录执行：  
+- **源码**：`injection/source/*.js` 拼进 `runtimeCore`；改后执行：  
   `node scripts/generate-map-injection-cpp.js`  
-  以更新 C++ 嵌入的 [`map_injection_script.ixx`](../../../src/extensions/infinity_nikki/generated/map_injection_script.ixx)（供打包后的 Win32 注入用）。
-- **prod**：宿主 → iframe 仅 `SPINNING_MOMO_SYNC_RUNTIME`，`payload` 为 `{ markers, renderOptions, runtimeOptions }`（与 `useMapBridge` 序列化一致）。
-- **Vite dev**：同一 payload 由 [`injection/mapDevEvalScript.ts`](./injection/mapDevEvalScript.ts) 拼成整段 IIFE，经 `EVAL_SCRIPT` 在 iframe 内 `new Function` 执行，便于**不重新生成 C++ 嵌入串**即可热更 `injection/source`；仅当注入脚本里 `__ALLOW_DEV_EVAL__` 被 C++ 换为 `true`（Debug 构建）时生效，Release 为 `false`。
-- **桥接入口**：[`injection/source/bridgeScript.js`](./injection/source/bridgeScript.js) 只拼两层：**[`iframeBootstrap.js`](./injection/source/iframeBootstrap.js)**（脚本加载后即可跑的页壳，当前含侧栏自动收起）+ **`runtimeCore`**（`mountOrUpdateMapRuntime` 及其子 snippet）。Vite dev 的 `EVAL_SCRIPT` 包（[`devEvalRuntimeScript.js`](./injection/source/devEvalRuntimeScript.js)）**不含** bootstrap，只热更 `runtimeCore`。
-- **拼入顺序**（[`runtimeCore.js`](./injection/source/runtimeCore.js)）：`paneStyle` → `popup`（悬停层、计时、escapeHtml）→ `photoCardHtml` → `cluster` → `toolbar` → `render`。
+  更新 [`map_injection_script.ixx`](../../../src/extensions/infinity_nikki/generated/map_injection_script.ixx)。
+- **prod**：`SPINNING_MOMO_SYNC_RUNTIME`，payload `{ markers, renderOptions, runtimeOptions }`。
+- **dev**：同 payload 经 `mapDevEvalScript` 包成 `EVAL_SCRIPT`；`postMessage` 的 targetOrigin 为 `*`，与 Vite 环境一致。
+- **桥接**：[`bridgeScript.js`](./injection/source/bridgeScript.js) = `iframeBootstrap` + `runtimeCore`；dev 的 [`devEvalRuntimeScript.js`](./injection/source/devEvalRuntimeScript.js) 不含 bootstrap。
+- **拼入顺序**（[`runtimeCore.js`](./injection/source/runtimeCore.js)）：`paneStyle` → `popup` → `photoCardHtml` → `cluster` → **`worldIdBridge`** → `toolbar` → `render`。
 
-### 子模块分工（注入侧）
+### 注入子模块（简述）
 
-- **paneStyle.js**：地图容器上自定义标点共用的 `spinning-momo-photo-pane` 与弹层 CSS（含单图 `thumbnail-image` 的 max 尺寸，横竖图适配）。
-- **photoCardHtml.js**：`buildPhotoThumbCellHtml`（**聚合**方格，1:1 + cover）；`buildSinglePhotoHoverHtml`（**单点**，恢复 `thumbnail-block` / `thumbnail-image` 类以沿用 CSS）。
-- **popup.js**：悬停卡片容器定位、`scheduleOpenHoverCard` / `showHoverCard`、`pinHoverCard`、`bindPopupCardClickBridge`（`data-sm-open-asset-id` 点击 → `SPINNING_MOMO_OPEN_GALLERY_ASSET`）；`activeHoverCardContext` 含 **`latLng` + `mode`（hover/pinned）**，供 **`refreshActiveHoverCardPosition`** 在内容变高后重算锚点（聚合展开等场景）。`pinned` 态显示关闭按钮且不会因 map move/mouseout 自动关闭。
-- **render.js**：单点 Leaflet 标点与 hover 绑定（受 `hoverCardEnabled` 控制），并支持 click 固定 popup（单例替换）。
-- **cluster.js**：网格聚合；预览网格带 **`data-sm-cluster-grid-root`**，卡片根带 **`data-sm-cluster-card`**。点「+N 更多」时 **增量 DOM**：去掉 `[data-sm-cluster-expand]`、向同一 grid **append** 剩余缩略图、再包 **`data-sm-cluster-scroll`** 与滚轮穿透处理，**不**整卡 `innerHTML` 替换，避免预览缩略图闪烁；`smClusterExpanded` 防重复展开。
-- **iframeBootstrap.js**：与 **map 实例无关** 的第三方页壳（侧栏收起等）；**toolbar.js**：在 **`mountOrUpdateMapRuntime`** 内挂注入 UI（左侧工具位标点显隐按钮 + `document.body` 右上角固定筛选计数卡片），需读 `runtime` 并与显隐/文案状态同步。计数卡片由 `runtimeOptions.filterCountCardText`、`filterCountCardLoading`、`filterCountCardBgColor`、`filterCountCardTextColor` 控制。二者均属脆弱 DOM 适配。
+- **paneStyle / photoCardHtml / popup / cluster / render**：样式、卡片 HTML、悬停层、聚合、单点渲染（细节见各文件头注释）。
+- **worldIdBridge.js**：路由/history 变化时同步 `activeAreaId` 并向宿主发 `SESSION_READY`。
+- **iframeBootstrap.js**：与地图实例无关的页壳（如侧栏）。
+- **toolbar.js**：工具条 + 右上角筛选计数卡片（读 `runtimeOptions` 中文案与 loading）。
 
 ## 与图库联动
 
-- 地图点来自 RPC（经 `api.ts`）：仍基于当前图库筛选/排序，保证 `assetIndex` 与图库 lightbox 一致。
-- 卡片内点击经 `useMapBridge` 收到后：`galleryStore` 设活跃资产、打开 lightbox、路由到 gallery。
+- 点位 RPC 带当前图库筛选/排序及 **`worldId`**，与 lightbox 序号一致。
+- 卡片点击 → `useMapBridge` → 设活跃资产、开 lightbox、跳转 gallery。
 
 ## 常见修改点
 
-- 只改数据形状：先改 `store` + `domain/markerMapper.ts` + `useMapBridge` 序列化，再改注入里读取字段。
-- 只改单图/聚合格式：先改 `photoCardHtml.js` 或 `paneStyle.js`；改聚合展开/预览逻辑看 **`cluster.js`**；记得跑 **generate-map-injection**。
-- 不要恢复「`popup` 存在才绑 hover」这类隐式条件；单点与聚合的开关统一用 `hoverCardEnabled`。
+- 改数据形状：`store` → `domain/markerMapper.ts` → `useMapBridge` 序列化 → 注入侧读字段。
+- 改卡片/聚合 UI：`photoCardHtml.js` / `paneStyle.js` / `cluster.js`；改完跑 **generate-map-injection**。
+- 悬停开关统一用 `hoverCardEnabled`，勿再叠隐式「有 popup 才绑 hover」。

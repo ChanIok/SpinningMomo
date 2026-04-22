@@ -12,6 +12,7 @@ import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.InfinityNikkiMetadataDict;
 import Features.Gallery.Color.Filter;
 import Features.Gallery.Color.Repository;
+import Extensions.InfinityNikki.WorldArea;
 import Utils.Logger;
 import <asio.hpp>;
 
@@ -583,7 +584,29 @@ auto query_photo_map_points(Core::State::AppState& app_state,
     return std::unexpected("Failed to query photo map points: " + result.error());
   }
 
-  return result.value();
+  const auto world_id = trim_ascii_copy(params.world_id);
+  if (world_id.empty()) {
+    return std::vector<Types::PhotoMapPoint>{};
+  }
+
+  std::vector<Types::PhotoMapPoint> filtered_points;
+  filtered_points.reserve(result->size());
+
+  for (const auto& point : result.value()) {
+    const Extensions::InfinityNikki::WorldArea::GamePoint game_point{
+        .x = point.nikki_loc_x,
+        .y = point.nikki_loc_y,
+        .z = point.nikki_loc_z,
+    };
+    const auto resolved_world_id =
+        Extensions::InfinityNikki::WorldArea::resolve_world_id_or_default(game_point);
+    if (resolved_world_id != world_id) {
+      continue;
+    }
+    filtered_points.push_back(point);
+  }
+
+  return filtered_points;
 }
 
 auto get_timeline_buckets(Core::State::AppState& app_state,

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home, Images, Map, Settings, Info } from 'lucide-vue-next'
+import { useSettingsStore } from '@/features/settings/store'
 import {
   Sidebar,
   SidebarContent,
@@ -37,16 +38,13 @@ const baseMenuItems: (MenuItem | { type: 'divider' })[] = [
   { title: '关于', key: 'about', icon: Info },
 ]
 
+const settingsStore = useSettingsStore()
+
 const menuItems = computed(() => {
-  if (import.meta.env.PROD) {
-    return baseMenuItems.filter((item) => {
-      if ('key' in item) {
-        return item.key !== 'map'
-      }
-      return true
-    })
-  }
-  return baseMenuItems
+  const infinityNikkiEnabled = settingsStore.appSettings.extensions.infinityNikki.enable
+  return baseMenuItems.filter(
+    (item) => !('key' in item) || item.key !== 'map' || infinityNikkiEnabled
+  )
 })
 
 const route = useRoute()
