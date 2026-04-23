@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { useSettingsStore } from '../store'
 import { useFunctionActions } from '../composables/useFunctionActions'
 import { storeToRefs } from 'pinia'
-import WindowTitlePickerButton from '@/components/WindowTitlePickerButton.vue'
+import WindowTitleInput from '@/components/WindowTitleInput.vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -177,22 +177,20 @@ const handleResetSettings = async () => {
             </ItemDescription>
           </ItemContent>
           <ItemActions>
-            <div class="flex items-center gap-2">
-              <Input
-                v-model="inputTitle"
-                @focus="isEditingTitle = true"
-                @keydown.enter="handleTitleChange"
-                @blur="
-                  () => {
-                    isEditingTitle = false
-                    handleTitleChange()
-                  }
-                "
-                :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
-                class="w-48"
-              />
-              <WindowTitlePickerButton @select="handleTitlePicked" />
-            </div>
+            <WindowTitleInput
+              v-model="inputTitle"
+              @focus="isEditingTitle = true"
+              @keydown.enter="handleTitleChange"
+              @blur="
+                () => {
+                  isEditingTitle = false
+                  handleTitleChange()
+                }
+              "
+              @select="handleTitlePicked"
+              :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
+              class="w-48"
+            />
           </ItemActions>
         </Item>
 

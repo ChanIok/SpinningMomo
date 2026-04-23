@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { Check } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import WindowTitlePickerButton from '@/components/WindowTitlePickerButton.vue'
+import WindowTitleInput from '@/components/WindowTitleInput.vue'
 import {
   Select,
   SelectContent,
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useSettingsStore } from '@/features/settings/store'
 import {
   CURRENT_ONBOARDING_FLOW_VERSION,
@@ -22,17 +23,18 @@ import {
 import { applyAppearanceToDocument } from '@/features/settings/appearance'
 import { OVERLAY_PALETTE_PRESETS } from '@/features/settings/overlayPalette'
 import { useI18n } from '@/composables/useI18n'
+import { useToast } from '@/composables/useToast'
 import { onboardingApi } from '../api'
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 4
 
 const store = useSettingsStore()
 const { t, setLocale } = useI18n()
+const { toast } = useToast()
 
 const step = ref<Step>(1)
 const direction = ref<'forward' | 'backward'>('forward')
 const isSubmitting = ref(false)
-const stepError = ref('')
 
 const language = ref<string>(store.appSettings.app.language.current)
 const normalizeOnboardingTheme = (mode: WebThemeMode): 'light' | 'dark' =>
@@ -48,7 +50,7 @@ const configuredInfinityNikkiGameDir = ref<string>(
 const resolvedInfinityNikkiGameDir = ref<string | null>(null)
 
 const isFirstStep = computed(() => step.value === 1)
-const isLastStep = computed(() => step.value === 2)
+const isLastStep = computed(() => step.value === 3)
 const stepTransitionName = computed(() =>
   direction.value === 'forward' ? 'ob-step-forward' : 'ob-step-backward'
 )
@@ -201,31 +203,23 @@ onMounted(() => {
   })()
 })
 
-const selectVisibleWindowTitle = (title: string) => {
-  targetTitle.value = title
-  stepError.value = ''
-}
-
 const goToNextStep = () => {
-  stepError.value = ''
-
-  if (step.value < 2) {
+  if (step.value < 3) {
     direction.value = 'forward'
     step.value = (step.value + 1) as Step
   }
 }
 
-const goToPreviousStep = () => {
-  stepError.value = ''
-  if (step.value > 1) {
-    direction.value = 'backward'
-    step.value = (step.value - 1) as Step
+const goToStep = (targetStep: Step) => {
+  if (targetStep < 1 || targetStep > 3 || targetStep === step.value || isSubmitting.value) {
+    return
   }
+
+  direction.value = targetStep > step.value ? 'forward' : 'backward'
+  step.value = targetStep
 }
 
 const completeOnboarding = async () => {
-  stepError.value = ''
-
   isSubmitting.value = true
   try {
     const nextTargetTitle = targetTitle.value.trim() === '' ? '' : targetTitle.value
@@ -279,9 +273,9 @@ const completeOnboarding = async () => {
     })
 
     direction.value = 'forward'
-    step.value = 3
+    step.value = 4
   } catch (error) {
-    stepError.value = t('onboarding.common.saveFailed')
+    toast.error(t('onboarding.common.saveFailed'))
     console.error('Failed to complete onboarding:', error)
   } finally {
     isSubmitting.value = false
@@ -290,157 +284,284 @@ const completeOnboarding = async () => {
 </script>
 
 <template>
-  <div class="onboarding-scroll">
-    <div class="onboarding-shell w-full max-w-[724px]">
-      <div
-        class="surface-middle onboarding-card flex w-full flex-col overflow-hidden rounded-md shadow-sm"
-      >
-        <div class="shrink-0 p-12 pb-6">
-          <h1 class="text-2xl font-semibold text-foreground">
-            {{ t('onboarding.title') }}
-          </h1>
-          <p class="mt-2 text-sm text-muted-foreground">
-            {{ t('onboarding.description') }}
-          </p>
-
-          <div v-if="step < 3" class="mt-8 flex items-center gap-2 text-xs">
-            <div v-for="currentStep in [1, 2]" :key="currentStep" class="flex items-center gap-2">
+  <div class="h-full w-full p-2 pt-0">
+    <div class="surface-middle flex h-full w-full flex-col rounded-md">
+      <!-- Main Content Area -->
+      <ScrollArea class="min-h-0 flex-1">
+        <div class="flex min-h-full items-center justify-center px-4">
+          <div class="relative flex w-full max-w-2xl flex-col justify-center py-8">
+            <Transition :name="stepTransitionName" mode="out-in">
+              <!-- Step 1: Start -->
               <div
-                class="flex h-6 w-6 items-center justify-center rounded-full border"
-                :class="
-                  step >= currentStep
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border text-muted-foreground'
-                "
+                v-if="step === 1"
+                key="step-1"
+                class="flex w-full flex-col items-center space-y-8"
               >
-                {{ currentStep }}
-              </div>
-              <div v-if="currentStep < 2" class="h-px w-10 bg-border" />
-            </div>
-          </div>
-        </div>
-
-        <div class="flex min-h-0 flex-1 flex-col justify-end overflow-hidden px-12 pb-6">
-          <Transition :name="stepTransitionName" mode="out-in">
-            <div v-if="step === 1" key="step-1" class="space-y-6">
-              <div>
-                <h2 class="text-lg font-medium text-foreground">
-                  {{ t('onboarding.step1.title') }}
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {{ t('onboarding.step1.description') }}
-                </p>
+                <div class="space-y-4 pt-12 pb-6 text-center">
+                  <h1 class="text-4xl font-bold tracking-tight text-foreground">
+                    {{ t('onboarding.title') }}
+                  </h1>
+                  <p class="mx-auto max-w-md text-base leading-relaxed text-muted-foreground">
+                    {{ t('onboarding.description') }}
+                  </p>
+                </div>
               </div>
 
-              <div class="grid gap-4 md:grid-cols-2">
-                <div class="space-y-2">
-                  <p class="text-sm text-foreground">{{ t('common.languageLabelBilingual') }}</p>
+              <!-- Step 2: Theme & Language -->
+              <div
+                v-else-if="step === 2"
+                key="step-2"
+                class="ob-step2-content flex w-full flex-col items-center"
+              >
+                <div class="space-y-3 text-center">
+                  <h2 class="text-2xl font-semibold tracking-tight text-foreground">
+                    {{ t('onboarding.step1.title') }}
+                  </h2>
+                  <p class="mx-auto max-w-md text-sm text-muted-foreground">
+                    {{ t('onboarding.step1.description') }}
+                  </p>
+                </div>
+
+                <!-- Theme Selection Cards -->
+                <div class="ob-step2-theme-cards flex justify-center gap-5 pt-10">
+                  <!-- Light Theme -->
+                  <button
+                    class="relative flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 p-2 transition-all duration-200 outline-none hover:border-primary/60"
+                    :class="
+                      themeMode === 'light'
+                        ? 'border-primary bg-background'
+                        : 'border-transparent bg-background/50 hover:bg-background/80'
+                    "
+                    @click="themeMode = 'light'"
+                  >
+                    <div
+                      class="flex h-24 w-40 flex-col overflow-hidden rounded-md border border-[#EADFCF] bg-[#F9F1E4]"
+                    >
+                      <div class="h-4 border-b border-[#EADFCF] bg-[#F1E6D5]"></div>
+                      <div class="flex flex-1 gap-2 p-2">
+                        <div class="w-6 flex-shrink-0 rounded-sm bg-[#F1E6D5]"></div>
+                        <div class="mt-0.5 flex flex-1 flex-col gap-1">
+                          <div class="h-1 w-1/3 rounded-full bg-[#DCCBB2]"></div>
+                          <div class="h-1 w-full rounded-full bg-[#DCCBB2]"></div>
+                          <div class="h-1 w-4/5 rounded-full bg-[#DCCBB2]"></div>
+                          <div class="mt-1 h-1 w-2/3 rounded-full bg-[#DCCBB2]"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <span class="text-sm font-medium text-foreground">{{
+                      t('settings.appearance.theme.light')
+                    }}</span>
+                    <div
+                      v-if="themeMode === 'light'"
+                      class="absolute -top-3 -right-3 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                  </button>
+
+                  <!-- Dark Theme -->
+                  <button
+                    class="relative flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 p-2 transition-all duration-200 outline-none hover:border-primary/60"
+                    :class="
+                      themeMode === 'dark'
+                        ? 'border-primary bg-background'
+                        : 'border-transparent bg-background/50 hover:bg-background/80'
+                    "
+                    @click="themeMode = 'dark'"
+                  >
+                    <div
+                      class="flex h-24 w-40 flex-col overflow-hidden rounded-md border border-[#2A3240] bg-[#171B22]"
+                    >
+                      <div class="h-4 border-b border-[#2A3240] bg-[#222834]"></div>
+                      <div class="flex flex-1 gap-2 p-2">
+                        <div class="w-6 flex-shrink-0 rounded-sm bg-[#222834]"></div>
+                        <div class="mt-0.5 flex flex-1 flex-col gap-1">
+                          <div class="h-1 w-1/3 rounded-full bg-[#3A4353]"></div>
+                          <div class="h-1 w-full rounded-full bg-[#3A4353]"></div>
+                          <div class="h-1 w-4/5 rounded-full bg-[#3A4353]"></div>
+                          <div class="mt-1 h-1 w-2/3 rounded-full bg-[#3A4353]"></div>
+                        </div>
+                      </div>
+                    </div>
+                    <span class="text-sm font-medium text-foreground">{{
+                      t('settings.appearance.theme.dark')
+                    }}</span>
+                    <div
+                      v-if="themeMode === 'dark'"
+                      class="absolute -top-3 -right-3 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="3"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                  </button>
+                </div>
+
+                <!-- Divider & Language -->
+                <div class="w-full max-w-sm">
+                  <div class="ob-step2-divider relative flex w-full items-center py-6">
+                    <div class="flex-grow border-t border-border"></div>
+                    <span class="mx-4 flex-shrink-0 text-sm text-muted-foreground">{{
+                      t('common.languageLabelBilingual')
+                    }}</span>
+                    <div class="flex-grow border-t border-border"></div>
+                  </div>
+
                   <Select
                     :model-value="language"
                     @update:model-value="(v) => (language = String(v))"
                   >
-                    <SelectTrigger>
+                    <SelectTrigger
+                      class="surface-top h-11 w-full cursor-pointer justify-center gap-2 rounded-sm text-center"
+                    >
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent class="rounded-sm shadow-none">
                       <SelectItem value="zh-CN">{{ t('common.languageZhCn') }}</SelectItem>
                       <SelectItem value="en-US">{{ t('common.languageEnUs') }}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
 
-                <div class="space-y-2">
-                  <p class="text-sm text-foreground">{{ t('onboarding.step1.themeLabel') }}</p>
-                  <Select
-                    :model-value="themeMode"
-                    @update:model-value="(v) => (themeMode = v as 'light' | 'dark')"
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">{{
-                        t('settings.appearance.theme.light')
-                      }}</SelectItem>
-                      <SelectItem value="dark">{{
-                        t('settings.appearance.theme.dark')
-                      }}</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <!-- Step 3: Target Window -->
+              <div
+                v-else-if="step === 3"
+                key="step-3"
+                class="mx-auto flex w-full max-w-md flex-col items-center space-y-8 pb-12 text-center"
+              >
+                <div class="space-y-3 pb-2">
+                  <h2 class="text-2xl font-semibold tracking-tight text-foreground">
+                    {{ t('onboarding.step2.title') }}
+                  </h2>
+                  <p class="text-sm text-muted-foreground">
+                    {{ t('onboarding.step2.description') }}
+                  </p>
                 </div>
-              </div>
-            </div>
 
-            <div v-else-if="step === 2" key="step-2" class="space-y-6">
-              <div>
-                <h2 class="text-lg font-medium text-foreground">
-                  {{ t('onboarding.step2.title') }}
-                </h2>
-                <p class="mt-1 text-sm text-muted-foreground">
-                  {{ t('onboarding.step2.description') }}
-                </p>
-              </div>
-
-              <div class="space-y-2">
-                <div class="flex gap-2">
-                  <Input
+                <div class="surface-top w-full max-w-sm">
+                  <WindowTitleInput
                     v-model="targetTitle"
                     :placeholder="t('onboarding.step2.targetTitlePlaceholder')"
-                    class="flex-1"
+                    balanced-center
+                    popover-no-shadow
+                    input-class="h-10 text-center"
                   />
-
-                  <WindowTitlePickerButton @select="selectVisibleWindowTitle" />
                 </div>
+              </div>
 
-                <p class="text-xs text-muted-foreground">
-                  {{ t('onboarding.step2.targetTitleHint') }}
+              <!-- Step 4: Completed -->
+              <div
+                v-else-if="step === 4"
+                key="step-4"
+                class="flex flex-col items-center justify-center space-y-5 py-12 text-center"
+              >
+                <div
+                  class="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500"
+                >
+                  <Check class="size-10" />
+                </div>
+                <h2 class="text-3xl font-medium text-emerald-600 dark:text-emerald-400">
+                  {{ t('onboarding.completed.title') }}
+                </h2>
+                <p class="max-w-md text-base text-muted-foreground">
+                  {{ t('onboarding.completed.description') }}
                 </p>
               </div>
-            </div>
+            </Transition>
 
-            <div
-              v-else-if="step === 3"
-              key="step-3"
-              class="flex h-full flex-col items-center justify-center space-y-6 text-center"
-            >
-              <h2 class="text-xl font-medium text-emerald-500">
-                {{ t('onboarding.completed.title') }}
-              </h2>
-              <p class="max-w-md text-sm text-muted-foreground">
-                {{ t('onboarding.completed.description') }}
-              </p>
-            </div>
-          </Transition>
-        </div>
+            <Transition name="ob-action-fade" mode="out-in">
+              <div
+                v-if="step < 4"
+                :key="`step-action-${step}`"
+                class="onboarding-step-action mx-auto mt-16 flex w-full max-w-sm flex-col items-center"
+              >
+                <div class="flex w-full items-center justify-center gap-4">
+                  <Button
+                    v-if="isFirstStep"
+                    class="h-10 w-64 rounded-sm text-sm"
+                    :disabled="isSubmitting"
+                    @click="goToNextStep"
+                  >
+                    {{ t('onboarding.actions.start') }}
+                  </Button>
 
-        <div v-if="step < 3 || stepError" class="shrink-0 border-t border-border/60 px-12 py-6">
-          <p v-if="stepError" class="text-sm text-red-500">
-            {{ stepError }}
-          </p>
+                  <Button
+                    v-else-if="!isLastStep"
+                    class="h-10 w-64 rounded-sm text-sm"
+                    :disabled="isSubmitting"
+                    @click="goToNextStep"
+                  >
+                    {{ t('onboarding.actions.next') }}
+                  </Button>
 
-          <div
-            v-if="step < 3"
-            class="flex items-center"
-            :class="[isFirstStep ? 'justify-end' : 'justify-between', stepError && 'mt-4']"
-          >
-            <Button
-              v-if="!isFirstStep"
-              variant="outline"
-              :disabled="isSubmitting"
-              @click="goToPreviousStep"
-            >
-              {{ t('onboarding.actions.previous') }}
-            </Button>
-
-            <Button v-if="!isLastStep" :disabled="isSubmitting" @click="goToNextStep">
-              {{ t('onboarding.actions.next') }}
-            </Button>
-            <Button v-else :disabled="isSubmitting" @click="completeOnboarding">
-              {{
-                isSubmitting ? t('onboarding.actions.completing') : t('onboarding.actions.complete')
-              }}
-            </Button>
+                  <Button
+                    v-else
+                    class="h-10 w-64 rounded-sm text-sm"
+                    :disabled="isSubmitting"
+                    @click="completeOnboarding"
+                  >
+                    {{
+                      isSubmitting
+                        ? t('onboarding.actions.completing')
+                        : t('onboarding.actions.complete')
+                    }}
+                  </Button>
+                </div>
+              </div>
+            </Transition>
           </div>
+        </div>
+      </ScrollArea>
+
+      <!-- Footer Actions & Pagination -->
+      <div v-if="step < 4" class="flex w-full shrink-0 items-center justify-center px-4 pt-4 pb-8">
+        <!-- Pagination Dots -->
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            class="h-2 cursor-pointer rounded-full transition-all duration-300 disabled:cursor-not-allowed"
+            :class="step === 1 ? 'w-6 bg-primary' : 'w-2 bg-primary/20 hover:bg-primary/40'"
+            :disabled="isSubmitting"
+            :aria-label="`${t('onboarding.actions.start')}: 1`"
+            @click="goToStep(1)"
+          ></button>
+          <button
+            type="button"
+            class="h-2 cursor-pointer rounded-full transition-all duration-300 disabled:cursor-not-allowed"
+            :class="step === 2 ? 'w-6 bg-primary' : 'w-2 bg-primary/20 hover:bg-primary/40'"
+            :disabled="isSubmitting"
+            aria-label="Step 2"
+            @click="goToStep(2)"
+          ></button>
+          <button
+            type="button"
+            class="h-2 cursor-pointer rounded-full transition-all duration-300 disabled:cursor-not-allowed"
+            :class="step === 3 ? 'w-6 bg-primary' : 'w-2 bg-primary/20 hover:bg-primary/40'"
+            :disabled="isSubmitting"
+            aria-label="Step 3"
+            @click="goToStep(3)"
+          ></button>
         </div>
       </div>
     </div>
@@ -448,55 +569,70 @@ const completeOnboarding = async () => {
 </template>
 
 <style scoped>
-.onboarding-scroll {
-  min-height: 100%;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  padding: 2rem;
-}
-
-.onboarding-shell {
-  transform: translateY(-20px);
-}
-
-.onboarding-card {
-  height: min(28rem, calc(100dvh - 7rem));
-}
-
 /* 步骤切换：前进方向，旧内容向左滑出，新内容从右滑入 */
 .ob-step-forward-enter-active,
 .ob-step-forward-leave-active {
   transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
+    opacity 0.25s ease,
+    transform 0.25s ease;
 }
 
 .ob-step-forward-enter-from {
   opacity: 0;
-  transform: translateX(20px);
+  transform: translateX(30px);
 }
 
 .ob-step-forward-leave-to {
   opacity: 0;
-  transform: translateX(-20px);
+  transform: translateX(-30px);
 }
 
 /* 步骤切换：后退方向，旧内容向右滑出，新内容从左滑入 */
 .ob-step-backward-enter-active,
 .ob-step-backward-leave-active {
   transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
+    opacity 0.25s ease,
+    transform 0.25s ease;
 }
 
 .ob-step-backward-enter-from {
   opacity: 0;
-  transform: translateX(-20px);
+  transform: translateX(-30px);
 }
 
 .ob-step-backward-leave-to {
   opacity: 0;
-  transform: translateX(20px);
+  transform: translateX(30px);
+}
+
+.ob-action-fade-enter-active,
+.ob-action-fade-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.ob-action-fade-enter-from,
+.ob-action-fade-leave-to {
+  opacity: 0;
+}
+
+:deep([data-slot='scroll-area-viewport'] > div) {
+  height: 100%;
+}
+
+@media (max-height: 640px) {
+  .ob-step2-theme-cards {
+    padding-top: 1.5rem; /* pt-6 */
+  }
+
+  .ob-step2-divider {
+    padding-top: 1rem; /* py-4 */
+    padding-bottom: 1rem;
+  }
+
+  .ob-step2-content ~ .onboarding-step-action {
+    margin-top: 2rem; /* mt-8 */
+  }
 }
 </style>
