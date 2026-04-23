@@ -283,7 +283,8 @@ auto download_file(Core::State::AppState& app_state, const std::string& url,
   }
 }
 
-auto create_update_script(const std::filesystem::path& update_package_path, bool is_portable,
+auto create_update_script(const std::filesystem::path& update_package_path,
+                          const std::filesystem::path& target_install_directory, bool is_portable,
                           Vendor::Windows::DWORD target_pid, bool restart = true)
     -> std::expected<std::filesystem::path, std::string> {
   try {
@@ -299,13 +300,6 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
       return std::unexpected("Failed to create update script");
     }
 
-    // 获取当前程序目录
-    auto current_dir_result = Utils::Path::GetExecutableDirectory();
-    if (!current_dir_result) {
-      return std::unexpected("Failed to get executable directory: " + current_dir_result.error());
-    }
-    auto current_dir = current_dir_result.value();
-
     // 写入批处理脚本
     script << "@echo off\n";
     script << "echo Starting update process...\n";
@@ -320,20 +314,22 @@ auto create_update_script(const std::filesystem::path& update_package_path, bool
       // 便携版：解压zip覆盖当前目录
       script << "echo Extracting update package...\n";
       script << "powershell -Command \"Expand-Archive -Path '" << update_package_path.string()
-             << "' -DestinationPath '" << current_dir.string() << "' -Force\"\n";
+             << "' -DestinationPath '" << target_install_directory.string() << "' -Force\"\n";
     } else {
-      // 安装版：以最小界面执行安装，显示进度条并记录日志
+      // 安装版：显式传入当前安装目录，避免静默升级回退到默认路径
       auto install_log_path =
           temp_dir.value() / std::filesystem::path("SpinningMomo-Update-Install.log");
       script << "echo Running installer...\n";
-      script << "\"" << update_package_path.string() << "\" /passive /norestart /log \""
+      script << "\"" << update_package_path.string() << "\" InstallFolder=\""
+             << target_install_directory.string() << "\" /passive /norestart /log \""
              << install_log_path.string() << "\"\n";
     }
 
     if (restart) {
       script << "echo Update completed, restarting application...\n";
       script << "start \"\" \""
-             << (current_dir / std::filesystem::path("SpinningMomo.exe")).string() << "\"\n";
+             << (target_install_directory / std::filesystem::path("SpinningMomo.exe")).string()
+             << "\"\n";
     } else {
       script << "echo Update completed successfully.\n";
     }
@@ -775,9 +771,14 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
     Logger().info("Preparing update with package: {} (portable: {})", update_package_path.string(),
                   app_state.update->is_portable);
 
-    auto script_result =
-        create_update_script(update_package_path, app_state.update->is_portable,
-                             Vendor::Windows::GetCurrentProcessId(), params.restart);
+    auto current_dir_result = Utils::Path::GetExecutableDirectory();
+    if (!current_dir_result) {
+      return std::unexpected("Failed to get executable directory: " + current_dir_result.error());
+    }
+
+    auto script_result = create_update_script(
+        update_package_path, current_dir_result.value(), app_state.update->is_portable,
+        Vendor::Windows::GetCurrentProcessId(), params.restart);
     if (!script_result) {
       return std::unexpected("Failed to create update script: " + script_result.error());
     }

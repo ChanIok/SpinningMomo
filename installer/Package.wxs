@@ -36,6 +36,10 @@
       Id="SetRemoveAppDataDir"
       Property="REMOVEAPPDATADIR"
       Value="[LocalAppDataFolder]SpinningMomo" />
+    <CustomAction
+      Id="SetArpInstallLocation"
+      Property="ARPINSTALLLOCATION"
+      Value="[INSTALLFOLDER]" />
     <!-- Id 必须全大写：deferred+Impersonate 时仅「公共属性」会写入 CustomActionData，否则路径传不进去 -->
     <CustomAction
       Id="REMOVEAPPDATADIR"
@@ -57,6 +61,10 @@
         Action="SetRemoveAppDataDir"
         Before="REMOVEAPPDATADIR"
         Condition='REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE' />
+      <Custom
+        Action="SetArpInstallLocation"
+        Before="RegisterProduct"
+        Condition='NOT REMOVE' />
       <Custom
         Action="REMOVEAPPDATADIR"
         After="RemoveFiles"
@@ -213,6 +221,9 @@
     <Component Id="CleanupUserData" Directory="INSTALLFOLDER" Guid="7DF1D902-6FF4-43EF-B58A-837AE33B4494">
       <!-- Remove install folder itself if empty -->
       <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\SpinningMomo"
+                     Name="InstallDir" Type="string"
+                     Value="[INSTALLFOLDER]" />
       <!-- Registry key for component tracking -->
       <RegistryValue Root="HKCU" Key="Software\SpinningMomo"
                      Name="AppDataRoot" Type="string"

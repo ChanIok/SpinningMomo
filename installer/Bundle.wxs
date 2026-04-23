@@ -6,7 +6,8 @@
 -->
 
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
-     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
 
   <Bundle
     Name="SpinningMomo"
@@ -23,6 +24,23 @@
       Type="formatted"
       Value="[LocalAppDataFolder]Programs\SpinningMomo"
       bal:Overridable="yes" />
+    <Variable Name="PreviousInstallFolder"
+              Type="formatted"
+              Value="" />
+    <util:RegistrySearch
+      Id="FindPreviousInstallFolder"
+      Variable="PreviousInstallFolder"
+      Root="HKCU"
+      Key="Software\SpinningMomo"
+      Value="InstallDir"
+      Result="value" />
+    <SetVariable
+      Id="RestoreInstallFolder"
+      Variable="InstallFolder"
+      Type="formatted"
+      Value="[PreviousInstallFolder]"
+      After="FindPreviousInstallFolder"
+      Condition="PreviousInstallFolder" />
 
     <!-- Standard Bootstrapper Application with modern UI -->
     <BootstrapperApplication>

@@ -75,6 +75,7 @@ wix build `
     -d ProductVersion=$Version `
     -d ProjectDir=$ProjectDir `
     -d MsiPath=$outputMsi `
+    -ext WixToolset.Util.wixext `
     -ext WixToolset.BootstrapperApplications.wixext `
     -culture en-US `
     -out $outputExe `
