@@ -16,7 +16,7 @@ constexpr std::size_t kMaxErrorMessages = 50;
 // 游戏高清照片的存储路径结构：GamePlayPhotos/<uid>/NikkiPhotos_HighQuality/<文件名>
 constexpr wchar_t kHighQualityFolderName[] = L"NikkiPhotos_HighQuality";
 constexpr wchar_t kGamePlayPhotosFolderName[] = L"GamePlayPhotos";
-// 游戏截图目录：本功能会将此目录管理为高清原图的硬链接镜像
+// 游戏截图目录：本功能只按“同名文件”维护 HQ->SC 投影，允许 SC 保留其他用户文件
 constexpr wchar_t kScreenShotFolderName[] = L"ScreenShot";
 constexpr std::array<std::string_view, 7> kSupportedExtensions = {".jpg",  ".jpeg", ".png", ".bmp",
                                                                   ".webp", ".tiff", ".tif"};
@@ -295,6 +295,7 @@ auto ensure_hardlink(const std::filesystem::path& link_path,
   auto action = link_exists ? LinkWriteAction::kUpdated : LinkWriteAction::kCreated;
 
   if (link_exists) {
+    // 同名受管语义：SC/<filename> 始终由 HQ/<filename> 投影覆盖。
     std::filesystem::remove_all(link_path, ec);
     if (ec) {
       return std::unexpected("Failed to replace existing ScreenShot entry '" +
@@ -317,9 +318,8 @@ auto ensure_hardlink(const std::filesystem::path& link_path,
   return action;
 }
 
-// 硬链接同步的核心逻辑，分两阶段执行：
-// 1. 清理阶段：遍历 ScreenShot 目录，删除不在期望集合内的受管目录项
-// 2. 同步阶段：遍历 sources，确保每个期望文件名都存在并指向目标原图
+// 硬链接同步核心逻辑：
+// 仅按同名规则确保每个 HQ 源图在 SC 中存在对应硬链接；不会清理异名目录项。
 auto sync_hardlinks_internal(
     Core::State::AppState& app_state,
     const std::function<void(const InfinityNikkiInitializeScreenshotHardlinksProgress&)>&
@@ -345,36 +345,6 @@ auto sync_hardlinks_internal(
   auto sources = std::move(sources_result.value());
   report_progress(progress_callback, "syncing", 0, result.source_count, 20.0,
                   std::format("Found {} high-quality photos", result.source_count));
-
-  // 以期望硬链接路径为键建立索引，用于清理阶段判断某个目录项是否应保留
-  std::unordered_set<std::string> expected_link_keys;
-  expected_link_keys.reserve(sources.size());
-  for (const auto& source : sources) {
-    expected_link_keys.insert(make_path_compare_key(source.link_path));
-  }
-
-  // 清理阶段：删除 ScreenShot 目录中不在期望集合内的内容
-  std::error_code ec;
-  for (const auto& entry : std::filesystem::directory_iterator(paths.screenshot_dir, ec)) {
-    if (ec) {
-      return std::unexpected("Failed to enumerate ScreenShot directory: " + ec.message());
-    }
-
-    auto entry_key = make_path_compare_key(entry.path());
-    if (expected_link_keys.contains(entry_key)) {
-      continue;
-    }
-
-    std::filesystem::remove_all(entry.path(), ec);
-    if (!ec) {
-      result.removed_count++;
-    } else {
-      add_error(result.errors, "Failed to remove obsolete ScreenShot entry '" +
-                                   Utils::String::ToUtf8(entry.path().wstring()) +
-                                   "': " + ec.message());
-      ec.clear();
-    }
-  }
 
   // 同步阶段：确保每个 source 都有对应的硬链接
   for (std::size_t index = 0; index < sources.size(); ++index) {

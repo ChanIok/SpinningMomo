@@ -122,6 +122,7 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
   if (config.allow_online_photo_metadata_extract) {
     // 静默自动解析只消费“本次扫描变更”里的 UPSERT 资产；
     // 不再从全库补齐 missing，避免拍 1 张触发历史批量解析。
+    // 注意：全量 scan 的 ScanResult.changes 允许为空，因此这里不保证能覆盖“首次全量导入”。
     std::vector<std::int64_t> candidate_asset_ids;
     candidate_asset_ids.reserve(result.changes.size());
     std::unordered_set<std::int64_t> seen_ids;
@@ -157,6 +158,43 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
                      });
     }
   }
+}
+
+// 首次 initial scan 完成后的补偿路径：
+// initial scan 关注最终一致性，changes 可能为空，导致 on_gallery_scan_complete 里的增量提取无候选。
+// 因此这里显式触发一次全量解析任务（only_missing=false），确保首次导入可直接获得元数据。
+auto maybe_start_full_extract_after_initial_scan(Core::State::AppState& app_state) -> void {
+  if (!app_state.settings) {
+    return;
+  }
+
+  const auto& config = app_state.settings->raw.extensions.infinity_nikki;
+  if (!config.allow_online_photo_metadata_extract) {
+    return;
+  }
+
+  if (Core::Tasks::has_active_task_of_type(app_state,
+                                           "extensions.infinityNikki.extractPhotoParams")) {
+    // 避免与用户手动触发或其他流程触发的同类任务并发。
+    Logger().debug(
+        "Skip InfinityNikki full metadata extract after initial scan: extract task is active");
+    return;
+  }
+
+  auto task_result = Extensions::InfinityNikki::TaskService::start_extract_photo_params_task(
+      app_state, InfinityNikkiExtractPhotoParamsRequest{
+                     .only_missing = false,
+                     .folder_id = std::nullopt,
+                     .uid_override = std::nullopt,
+                 });
+  if (!task_result) {
+    Logger().warn("Failed to start InfinityNikki full metadata extract after initial scan: {}",
+                  task_result.error());
+    return;
+  }
+
+  Logger().info("InfinityNikki full metadata extract task started after initial scan: {}",
+                task_result.value());
 }
 
 auto make_initial_scan_options(const std::filesystem::path& directory)
@@ -249,7 +287,10 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
       auto task_result = Extensions::InfinityNikki::TaskService::start_initial_scan_task(
           app_state, make_initial_scan_options(new_watch_path),
           [&app_state](const Features::Gallery::Types::ScanResult& result) {
+            // 通用后处理（硬链接同步 + 基于 changes 的静默增量提取）
             on_gallery_scan_complete(app_state, result);
+            // 首次全量补偿：显式全量元数据提取
+            maybe_start_full_extract_after_initial_scan(app_state);
           });
       if (!task_result) {
         Logger().warn("Failed to start InfinityNikki initial scan task for '{}': {}",
