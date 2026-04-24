@@ -539,6 +539,8 @@ auto remove_video_session_directory(Core::State::AppState& app_state,
                            "': " + recycle_result.error());
   }
 
+  Logger().info("InfinityNikki removed video session directory: {}",
+                Utils::String::ToUtf8(session_directory.wstring()));
   return true;
 }
 
@@ -632,18 +634,32 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
 
   InfinityNikkiInitializeMediaHardlinksResult result;
   result.source_count = static_cast<std::int32_t>(changes.size());
+  Logger().info("InfinityNikki apply_runtime_changes: changes={}", changes.size());
 
   for (const auto& change : changes) {
     // 增量路径只处理“仍满足受管规则”的变化；其余变更统一计入 ignored。
     auto changed_path = normalize_existing_path(std::filesystem::path(change.path));
     auto source = try_make_managed_source(paths, changed_path, false);
     if (!source.has_value()) {
+      if (change.action == Features::Gallery::Types::ScanChangeAction::REMOVE) {
+        Logger().warn(
+            "InfinityNikki ignored REMOVE change because path is not a managed media source: {}",
+            Utils::String::ToUtf8(changed_path.wstring()));
+      } else {
+        Logger().debug(
+            "InfinityNikki ignored change because path is not a managed media source: {}",
+            Utils::String::ToUtf8(changed_path.wstring()));
+      }
       result.ignored_count++;
       continue;
     }
 
     switch (change.action) {
       case Features::Gallery::Types::ScanChangeAction::UPSERT: {
+        Logger().debug("InfinityNikki processing UPSERT: kind={}, source='{}', link='{}'",
+                       source->kind == ManagedSourceKind::kVideo ? "video" : "photo",
+                       Utils::String::ToUtf8(changed_path.wstring()),
+                       Utils::String::ToUtf8(source->link_path.wstring()));
         std::error_code ec;
         if (!std::filesystem::is_regular_file(changed_path, ec) || ec) {
           if (ec) {
@@ -676,6 +692,10 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
         break;
       }
       case Features::Gallery::Types::ScanChangeAction::REMOVE: {
+        Logger().info("InfinityNikki processing REMOVE: kind={}, source='{}', link='{}'",
+                      source->kind == ManagedSourceKind::kVideo ? "video" : "photo",
+                      Utils::String::ToUtf8(changed_path.wstring()),
+                      Utils::String::ToUtf8(source->link_path.wstring()));
         // 录像删除时除了删除投影硬链接，还会尝试回收对应 session 目录。
         auto remove_result = remove_managed_link(source->link_path);
         if (!remove_result) {
@@ -685,6 +705,11 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
 
         if (remove_result.value()) {
           result.removed_count++;
+          Logger().info("InfinityNikki removed managed hardlink: {}",
+                        Utils::String::ToUtf8(source->link_path.wstring()));
+        } else {
+          Logger().info("InfinityNikki managed hardlink already absent: {}",
+                        Utils::String::ToUtf8(source->link_path.wstring()));
         }
 
         if (source->kind == ManagedSourceKind::kVideo && source->session_directory.has_value()) {
@@ -692,6 +717,9 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
               remove_video_session_directory(app_state, *source->session_directory);
           if (!cleanup_result) {
             add_error(result.errors, cleanup_result.error());
+          } else if (!cleanup_result.value()) {
+            Logger().info("InfinityNikki video session directory already absent: {}",
+                          Utils::String::ToUtf8(source->session_directory->wstring()));
           }
         }
         break;
@@ -711,11 +739,14 @@ auto apply_scan_result(Core::State::AppState& app_state,
     -> std::expected<InfinityNikkiInitializeMediaHardlinksResult, std::string> {
   // 最优路径：Gallery 已明确给出逐文件变化，直接走增量同步。
   if (!result.changes.empty()) {
+    Logger().info("InfinityNikki apply_scan_result: mode=incremental, changes={}",
+                  result.changes.size());
     return apply_runtime_changes(app_state, result.changes);
   }
 
   // 完全无变化时什么都不做，避免 initial scan 这类路径额外触发一次全量 sync。
   if (result.new_items == 0 && result.updated_items == 0 && result.deleted_items == 0) {
+    Logger().info("InfinityNikki apply_scan_result: mode=noop");
     return InfinityNikkiInitializeMediaHardlinksResult{};
   }
 

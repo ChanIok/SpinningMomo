@@ -99,6 +99,11 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
       // PhotoService 只负责把 Gallery 的事实转发过去。
       bool submitted = Core::WorkerPool::submit_task(
           *app_state.worker_pool, [&app_state, scan_result = result]() {
+            Logger().info(
+                "InfinityNikki managed hardlink worker start: total={}, new={}, updated={}, "
+                "deleted={}, changes={}",
+                scan_result.total_files, scan_result.new_items, scan_result.updated_items,
+                scan_result.deleted_items, scan_result.changes.size());
             auto sync_result = Extensions::InfinityNikki::MediaHardlinks::apply_scan_result(
                 app_state, scan_result);
             if (!sync_result) {

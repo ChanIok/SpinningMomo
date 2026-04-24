@@ -1564,6 +1564,9 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
     return {};
   }
 
+  Logger().info("Gallery manual scan change dispatch: incoming changes={}, watchers={}",
+                changes.size(), watchers.size());
+
   std::unordered_map<std::string, std::vector<Types::ScanChange>> changes_by_watcher_root;
   changes_by_watcher_root.reserve(watchers.size());
 
@@ -1623,6 +1626,10 @@ auto dispatch_manual_scan_changes(Core::State::AppState& app_state,
 
     auto post_scan_callback = get_post_scan_callback(watcher);
     if (post_scan_callback) {
+      Logger().info(
+          "Gallery manual scan change dispatch: root='{}', changes={}, updated={}, deleted={}",
+          watcher->root_path.string(), result.changes.size(), result.updated_items,
+          result.deleted_items);
       post_scan_callback(result);
     }
   }

@@ -79,30 +79,19 @@ struct UsnRecordView {
   std::filesystem::path file_name;
 };
 
-auto normalize_existing_path(const std::filesystem::path& path) -> std::filesystem::path {
-  // 跨多数据源（DB、USN、文件系统）比较路径时，统一解析为标准形态，消除大小写 / 分隔符差异。
-  std::error_code ec;
-  if (std::filesystem::exists(path, ec) && !ec) {
-    auto normalized = std::filesystem::weakly_canonical(path, ec);
-    if (!ec) {
-      return normalized;
-    }
-  }
-  return path.lexically_normal();
-}
+struct PendingScanChange {
+  std::string path;
+  Features::Gallery::Types::ScanChangeAction action;
+};
 
 auto make_path_compare_key(const std::filesystem::path& path) -> std::string {
-  // NTFS 路径大小写不敏感，统一转小写 generic path 用于比较。
-  auto normalized = normalize_existing_path(path).generic_wstring();
-  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
-                 [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
-  return Utils::String::ToUtf8(normalized);
+  // 路径比较只需要稳定的 lexical 形态，不需要再同步访问文件系统。
+  return Utils::String::ToUtf8(Utils::Path::NormalizeForComparison(path));
 }
 
-auto is_path_under_root(const std::filesystem::path& path, const std::string& root_key) -> bool {
+auto is_path_under_root(const std::string& path_key, const std::string& root_key) -> bool {
   // USN 是按卷读取的，记录可能属于同卷上其他目录。
   // 这里根据预计算的 root_key 过滤，只保留当前监视根目录下的路径。
-  auto path_key = make_path_compare_key(path);
   if (path_key == root_key) {
     return true;
   }
@@ -128,7 +117,7 @@ auto strip_extended_path_prefix(std::wstring value) -> std::wstring {
 
 auto get_volume_root_for_path(const std::filesystem::path& path)
     -> std::expected<std::wstring, std::string> {
-  auto path_w = normalize_existing_path(path).wstring();
+  auto path_w = path.wstring();
   std::wstring buffer(MAX_PATH, L'\0');
   if (!GetVolumePathNameW(path_w.c_str(), buffer.data(), static_cast<DWORD>(buffer.size()))) {
     return std::unexpected("GetVolumePathNameW failed: " + std::to_string(GetLastError()));
@@ -330,8 +319,7 @@ auto resolve_path_by_file_reference(
   }
 
   buffer.resize(length);
-  auto resolved_path =
-      normalize_existing_path(std::filesystem::path(strip_extended_path_prefix(buffer)));
+  auto resolved_path = std::filesystem::path(strip_extended_path_prefix(buffer)).lexically_normal();
   cache[file_reference_number] = resolved_path;
   return resolved_path;
 }
@@ -377,19 +365,19 @@ auto resolve_parent_based_path(
     return std::optional<std::filesystem::path>{};
   }
 
-  return parent_path_result->value() / record.file_name;
+  return (parent_path_result->value() / record.file_name).lexically_normal();
 }
 
-auto add_or_replace_change(
-    std::unordered_map<std::string, Features::Gallery::Types::ScanChangeAction>& changes_by_path,
-    const std::filesystem::path& path, Features::Gallery::Types::ScanChangeAction action) -> void {
+auto add_or_replace_change(std::unordered_map<std::string, PendingScanChange>& changes_by_path,
+                           const std::string& path_key, const std::string& normalized_path,
+                           Features::Gallery::Types::ScanChangeAction action) -> void {
   // 同一路径离线期间可能被多次修改，只保留最终需要达到的状态。
-  changes_by_path[normalize_existing_path(path).string()] = action;
+  changes_by_path[path_key] = PendingScanChange{.path = normalized_path, .action = action};
 }
 
 auto directory_record_requires_full_rescan(Core::State::AppState& app_state,
-                                           const std::filesystem::path& directory_path,
-                                           DWORD reason) -> std::expected<bool, std::string> {
+                                           const std::string& directory_path, DWORD reason)
+    -> std::expected<bool, std::string> {
   // 目录“创建”本身不会让已有资产失真：后续真正重要的是里面是否出现文件记录。
   // 只有目录“删除/改名”才可能让数据库里已经存在的旧路径整体失效。
   if ((reason &
@@ -398,8 +386,8 @@ auto directory_record_requires_full_rescan(Core::State::AppState& app_state,
   }
 
   // 如果这个目录前缀下根本没有已入库资产，就没必要因为它回退 full scan。
-  return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(
-      app_state, normalize_existing_path(directory_path).string());
+  return Features::Gallery::Asset::Repository::has_assets_under_path_prefix(app_state,
+                                                                            directory_path);
 }
 
 auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem::path& root_path,
@@ -416,10 +404,10 @@ auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem
     return std::unexpected(volume_handle_result.error());
   }
 
-  auto normalized_root = normalize_existing_path(root_path);
+  auto normalized_root = root_path.lexically_normal();
   auto root_key = make_path_compare_key(normalized_root);
   std::unordered_map<std::int64_t, std::optional<std::filesystem::path>> path_cache;
-  std::unordered_map<std::string, Features::Gallery::Types::ScanChangeAction> changes_by_path;
+  std::unordered_map<std::string, PendingScanChange> changes_by_path;
 
   constexpr DWORD kBufferSize = 64 * 1024;
   std::vector<std::byte> buffer(kBufferSize);
@@ -489,17 +477,25 @@ auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem
         candidate_path = resolved_path_result.value();
       }
 
-      if (!candidate_path.has_value() || !is_path_under_root(*candidate_path, root_key)) {
+      if (!candidate_path.has_value()) {
         offset += common_header->RecordLength;
         continue;
       }
+
+      auto candidate_key = make_path_compare_key(*candidate_path);
+      if (!is_path_under_root(candidate_key, root_key)) {
+        offset += common_header->RecordLength;
+        continue;
+      }
+
+      auto normalized_candidate_path = candidate_path->generic_string();
 
       // 这里看到的是“目录记录”而不是“文件记录”。
       // 我们不再像以前那样一刀切 full scan，
       // 而是只在它真的影响到已入库资产路径时才保守回退。
       if (is_directory_record(record)) {
-        auto require_full_scan_result =
-            directory_record_requires_full_rescan(app_state, *candidate_path, record.reason);
+        auto require_full_scan_result = directory_record_requires_full_rescan(
+            app_state, normalized_candidate_path, record.reason);
         if (!require_full_scan_result) {
           return std::unexpected(require_full_scan_result.error());
         }
@@ -512,14 +508,14 @@ auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem
       }
 
       if ((record.reason & (USN_REASON_FILE_DELETE | USN_REASON_RENAME_OLD_NAME)) != 0) {
-        add_or_replace_change(changes_by_path, *candidate_path,
+        add_or_replace_change(changes_by_path, candidate_key, normalized_candidate_path,
                               Features::Gallery::Types::ScanChangeAction::REMOVE);
       }
 
       if ((record.reason & (USN_REASON_FILE_CREATE | USN_REASON_DATA_OVERWRITE |
                             USN_REASON_DATA_EXTEND | USN_REASON_DATA_TRUNCATION |
                             USN_REASON_BASIC_INFO_CHANGE | USN_REASON_RENAME_NEW_NAME)) != 0) {
-        add_or_replace_change(changes_by_path, *candidate_path,
+        add_or_replace_change(changes_by_path, candidate_key, normalized_candidate_path,
                               Features::Gallery::Types::ScanChangeAction::UPSERT);
       }
 
@@ -534,8 +530,9 @@ auto collect_usn_changes(Core::State::AppState& app_state, const std::filesystem
 
   std::vector<Features::Gallery::Types::ScanChange> changes;
   changes.reserve(changes_by_path.size());
-  for (const auto& [path, action] : changes_by_path) {
-    changes.push_back(Features::Gallery::Types::ScanChange{.path = path, .action = action});
+  for (const auto& [_, change] : changes_by_path) {
+    changes.push_back(
+        Features::Gallery::Types::ScanChange{.path = change.path, .action = change.action});
   }
   std::ranges::sort(changes, [](const auto& lhs, const auto& rhs) { return lhs.path < rhs.path; });
   return changes;

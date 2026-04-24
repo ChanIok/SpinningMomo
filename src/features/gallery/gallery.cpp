@@ -503,6 +503,8 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     errors.push_back("Failed to delete asset indexes: " + delete_result.error());
   } else {
     moved_count = static_cast<std::int64_t>(delete_ids.size());
+    Logger().info("Gallery move_assets_to_trash: moved {} asset file(s) to recycle bin",
+                  moved_count);
     std::unordered_set<std::int64_t> deleted_id_set(delete_ids.begin(), delete_ids.end());
     for (const auto& candidate : candidates) {
       if (!deleted_id_set.contains(candidate.asset.id)) {
@@ -512,6 +514,8 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     }
 
     if (!manual_changes.empty()) {
+      Logger().info("Gallery move_assets_to_trash: dispatching {} manual scan change(s)",
+                    manual_changes.size());
       auto dispatch_result = Watcher::dispatch_manual_scan_changes(app_state, manual_changes);
       if (!dispatch_result) {
         Logger().warn("Failed to dispatch manual scan changes after trash move: {}",
