@@ -40,6 +40,9 @@ auto make_infinity_nikki_ignore_rules() -> std::vector<Features::Gallery::Types:
       ScanIgnoreRule{.pattern = "^[0-9]+/NikkiPhotos_HighQuality(/.*)?$",
                      .pattern_type = "regex",
                      .rule_type = "include"},
+      ScanIgnoreRule{.pattern = "^[0-9]+/Videos/[^/]+/[^/]+\\.mp4$",
+                     .pattern_type = "regex",
+                     .rule_type = "include"},
   };
 }
 

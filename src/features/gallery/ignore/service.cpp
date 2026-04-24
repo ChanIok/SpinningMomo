@@ -5,6 +5,7 @@ module Features.Gallery.Ignore.Service;
 import std;
 import Core.State;
 import Features.Gallery.Types;
+import Features.Gallery.Folder.Repository;
 import Features.Gallery.Ignore.Repository;
 import Features.Gallery.Ignore.Matcher;
 import Utils.Logger;
@@ -27,6 +28,40 @@ auto normalize_path_for_matching(const std::filesystem::path& file_path,
 
 // ============= 业务编排函数 =============
 
+auto resolve_root_folder_id(Core::State::AppState& app_state, std::int64_t folder_id)
+    -> std::expected<std::int64_t, std::string> {
+  std::unordered_set<std::int64_t> visited_ids;
+
+  std::optional<std::int64_t> current_id = folder_id;
+  while (current_id.has_value()) {
+    if (!visited_ids.insert(*current_id).second) {
+      return std::unexpected("Detected folder parent cycle while loading ignore rules: " +
+                             std::to_string(*current_id));
+    }
+
+    auto folder_result =
+        Features::Gallery::Folder::Repository::get_folder_by_id(app_state, *current_id);
+    if (!folder_result) {
+      return std::unexpected("Failed to query folder while loading ignore rules: " +
+                             folder_result.error());
+    }
+    if (!folder_result->has_value()) {
+      return std::unexpected("Folder not found while loading ignore rules: " +
+                             std::to_string(*current_id));
+    }
+
+    const auto& folder = folder_result->value();
+    if (!folder.parent_id.has_value()) {
+      return folder.id;
+    }
+
+    current_id = folder.parent_id;
+  }
+
+  return std::unexpected("Failed to resolve root folder while loading ignore rules: " +
+                         std::to_string(folder_id));
+}
+
 auto load_ignore_rules(Core::State::AppState& app_state, std::optional<std::int64_t> folder_id)
     -> std::expected<std::vector<Types::IgnoreRule>, std::string> {
   std::vector<Types::IgnoreRule> combined_rules;
@@ -38,12 +73,19 @@ auto load_ignore_rules(Core::State::AppState& app_state, std::optional<std::int6
   }
   combined_rules = std::move(global_rules_result.value());
 
-  // 2. 然后追加文件夹特定规则
+  // 2. 对目录扫描只读取所属 root 文件夹的规则。
   if (folder_id.has_value()) {
-    auto folder_rules_result = Repository::get_rules_by_folder_id(app_state, *folder_id);
+    auto root_folder_id_result = resolve_root_folder_id(app_state, *folder_id);
+    if (!root_folder_id_result) {
+      return std::unexpected("Failed to resolve root folder ignore rules: " +
+                             root_folder_id_result.error());
+    }
+
+    auto folder_rules_result =
+        Repository::get_rules_by_folder_id(app_state, root_folder_id_result.value());
     if (!folder_rules_result) {
-      Logger().warn("Failed to load folder-specific ignore rules: {}", folder_rules_result.error());
-      // 不返回错误，继续使用已加载的全局规则
+      Logger().warn("Failed to load root-folder ignore rules for folder_id {}: {}",
+                    root_folder_id_result.value(), folder_rules_result.error());
     } else {
       auto& folder_rules = folder_rules_result.value();
       combined_rules.insert(combined_rules.end(), std::make_move_iterator(folder_rules.begin()),

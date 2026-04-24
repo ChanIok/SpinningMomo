@@ -7,7 +7,6 @@ export * from './types'
 // 导出组合式函数
 export { useApiMethods } from './composables/useApiMethods'
 export { useApiTest } from './composables/useApiTest'
-export { useIntegrationTest } from './composables/useIntegrationTest'
 
 // 导出组件
 export { default as ApiMethodList } from './components/ApiMethodList.vue'

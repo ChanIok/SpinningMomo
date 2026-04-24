@@ -8,7 +8,7 @@ import Features.Gallery.Types;
 
 namespace Features::Gallery::Ignore::Service {
 
-// 加载并合并忽略规则（先加载全局规则，再追加文件夹规则）
+// 加载并合并忽略规则（先加载全局规则，再加载当前目录所属 root 文件夹的规则）
 export auto load_ignore_rules(Core::State::AppState& app_state,
                               std::optional<std::int64_t> folder_id = std::nullopt)
     -> std::expected<std::vector<Types::IgnoreRule>, std::string>;

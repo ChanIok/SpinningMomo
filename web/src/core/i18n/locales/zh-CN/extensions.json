@@ -1,5 +1,5 @@
 {
   "extensions.infinityNikki.album.rootDisplayName": "无限暖暖",
-  "extensions.infinityNikki.scanRules.excludeAll": "默认排除所有文件",
-  "extensions.infinityNikki.scanRules.includeHighQualityPhotos": "包含高质量照片目录"
+  "extensions.infinityNikki.album.photosDisplayName": "照片",
+  "extensions.infinityNikki.album.videosDisplayName": "录像"
 }
