@@ -12,6 +12,9 @@ import <windows.h>;
 
 namespace Features::WindowControl {
 
+constexpr int kWindowSizeAlignment = 8;
+constexpr int kAlignmentSearchRadius = 16;
+
 auto get_virtual_screen_rect() -> RECT {
   return RECT{
       .left = GetSystemMetrics(SM_XVIRTUALSCREEN),
@@ -486,9 +489,166 @@ auto toggle_window_border(HWND hwnd) -> std::expected<bool, std::string> {
   return !hasBorder;
 }
 
-// 根据比例和总像素计算分辨率
-auto calculate_resolution(double ratio, std::uint64_t total_pixels) -> Resolution {
-  double height_d = std::sqrt(static_cast<double>(total_pixels) / ratio);
+// 统一兜底比例，避免异常配置或计算中出现 0/NaN 后继续扩散。
+auto normalize_ratio(double ratio) -> double {
+  if (std::isfinite(ratio) && ratio > 0.0) {
+    return ratio;
+  }
+
+  int screen_width = GetSystemMetrics(SM_CXSCREEN);
+  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  if (screen_width <= 0 || screen_height <= 0) {
+    return 16.0 / 9.0;
+  }
+
+  return static_cast<double>(screen_width) / screen_height;
+}
+
+// Default 分辨率在菜单预设里表示 0x0，不是一个真实像素尺寸。
+auto is_default_resolution_preset(const ResolutionPresetInput& resolution_preset) -> bool {
+  return resolution_preset.base_width == 0 && resolution_preset.base_height == 0;
+}
+
+// 四舍五入到指定倍数，仅作为候选搜索的中心点使用。
+auto round_to_multiple(int value, int multiple) -> int {
+  if (value <= 0) {
+    return multiple;
+  }
+
+  return ((value + multiple / 2) / multiple) * multiple;
+}
+
+struct ResolutionBounds {
+  int max_width = 0;
+  int max_height = 0;
+};
+
+// 对齐 Default 分辨率时需要保留“屏幕内可容纳”的语义，因此支持可选边界。
+auto is_within_bounds(const Resolution& resolution, const std::optional<ResolutionBounds>& bounds)
+    -> bool {
+  if (resolution.width <= 0 || resolution.height <= 0) {
+    return false;
+  }
+
+  if (!bounds) {
+    return true;
+  }
+
+  return resolution.width <= bounds->max_width && resolution.height <= bounds->max_height;
+}
+
+// 将目标尺寸修正为 8 的倍数。
+// 排序优先级是：比例误差最小，其次接近原始目标尺寸，最后接近原始面积。
+auto align_resolution_to_multiple(const Resolution& target, double ratio,
+                                  const std::optional<ResolutionBounds>& bounds = std::nullopt)
+    -> Resolution {
+  if (target.width <= 0 || target.height <= 0) {
+    return target;
+  }
+
+  ratio = normalize_ratio(ratio);
+
+  struct Candidate {
+    Resolution resolution;
+    double ratio_error = 0.0;
+    double distance = 0.0;
+  };
+
+  auto make_candidate = [&](int width, int height) -> std::optional<Candidate> {
+    Resolution resolution{.width = width, .height = height};
+    if (!is_within_bounds(resolution, bounds)) {
+      return std::nullopt;
+    }
+
+    const double candidate_ratio = static_cast<double>(width) / height;
+    const double ratio_error = std::abs(candidate_ratio - ratio) / ratio;
+    const double width_distance =
+        std::abs(width - target.width) / static_cast<double>(std::max(1, target.width));
+    const double height_distance =
+        std::abs(height - target.height) / static_cast<double>(std::max(1, target.height));
+
+    return Candidate{
+        .resolution = resolution,
+        .ratio_error = ratio_error,
+        .distance = width_distance + height_distance,
+    };
+  };
+
+  const auto target_area =
+      static_cast<std::int64_t>(target.width) * static_cast<std::int64_t>(target.height);
+  auto is_better = [target_area](const Candidate& candidate, const Candidate& best) -> bool {
+    constexpr double epsilon = 1e-12;
+    if (candidate.ratio_error + epsilon < best.ratio_error) {
+      return true;
+    }
+    if (best.ratio_error + epsilon < candidate.ratio_error) {
+      return false;
+    }
+
+    if (candidate.distance + epsilon < best.distance) {
+      return true;
+    }
+    if (best.distance + epsilon < candidate.distance) {
+      return false;
+    }
+
+    const auto candidate_area =
+        static_cast<std::int64_t>(candidate.resolution.width) * candidate.resolution.height;
+    const auto best_area =
+        static_cast<std::int64_t>(best.resolution.width) * best.resolution.height;
+    return std::abs(candidate_area - target_area) < std::abs(best_area - target_area);
+  };
+
+  // 不能分别四舍五入宽高，否则容易把比例破坏得比必要更多。
+  // 这里在目标尺寸附近枚举少量 8 倍数候选：先比比例误差，再比尺寸接近程度。
+  const int base_width = round_to_multiple(target.width, kWindowSizeAlignment);
+  const int base_height = round_to_multiple(target.height, kWindowSizeAlignment);
+
+  std::optional<Candidate> best;
+  for (int width_offset = -kAlignmentSearchRadius; width_offset <= kAlignmentSearchRadius;
+       ++width_offset) {
+    const int width = base_width + width_offset * kWindowSizeAlignment;
+    for (int height_offset = -kAlignmentSearchRadius; height_offset <= kAlignmentSearchRadius;
+         ++height_offset) {
+      const int height = base_height + height_offset * kWindowSizeAlignment;
+      auto candidate = make_candidate(width, height);
+      if (!candidate) {
+        continue;
+      }
+
+      if (!best || is_better(*candidate, *best)) {
+        best = *candidate;
+      }
+    }
+  }
+
+  return best ? best->resolution : target;
+}
+
+// 短边模式：分辨率预设的短边固定，长边根据当前比例反推。
+auto calculate_resolution_by_short_edge(double ratio, int short_edge) -> Resolution {
+  if (short_edge <= 0) {
+    return calculate_resolution_by_screen(ratio);
+  }
+
+  ratio = normalize_ratio(ratio);
+  if (ratio >= 1.0) {
+    return Resolution{
+        .width = static_cast<int>(std::round(short_edge * ratio)),
+        .height = short_edge,
+    };
+  }
+
+  return Resolution{
+      .width = short_edge,
+      .height = static_cast<int>(std::round(short_edge / ratio)),
+  };
+}
+
+// 根据比例和目标面积计算分辨率
+auto calculate_resolution_by_area(double ratio, std::uint64_t total_area) -> Resolution {
+  ratio = normalize_ratio(ratio);
+  double height_d = std::sqrt(static_cast<double>(total_area) / ratio);
   double width_d = height_d * ratio;
 
   int height = static_cast<int>(std::round(height_d));
@@ -499,6 +659,7 @@ auto calculate_resolution(double ratio, std::uint64_t total_pixels) -> Resolutio
 
 // 根据屏幕尺寸和比例计算分辨率
 auto calculate_resolution_by_screen(double ratio) -> Resolution {
+  ratio = normalize_ratio(ratio);
   int screen_width = GetSystemMetrics(SM_CXSCREEN);
   int screen_height = GetSystemMetrics(SM_CYSCREEN);
   double screen_ratio = static_cast<double>(screen_width) / screen_height;
@@ -514,6 +675,40 @@ auto calculate_resolution_by_screen(double ratio) -> Resolution {
     int width = static_cast<int>(std::round(height * ratio));
     return {width, height};
   }
+}
+
+// 从菜单预设计算最终窗口客户区尺寸。
+// 这是比例/分辨率菜单的统一入口，避免切比例和切分辨率走出不同规则。
+auto calculate_resolution_from_preset(double ratio, const ResolutionPresetInput& resolution_preset,
+                                      const ResolutionCalculationOptions& options) -> Resolution {
+  ratio = normalize_ratio(ratio);
+
+  if (is_default_resolution_preset(resolution_preset)) {
+    // Default 保持“跟随屏幕可容纳尺寸”的语义，不参与 8 对齐。
+    return calculate_resolution_by_screen(ratio);
+  }
+
+  if (resolution_preset.base_width <= 0 || resolution_preset.base_height <= 0) {
+    return calculate_resolution_by_screen(ratio);
+  }
+
+  Resolution resolution;
+  if (options.use_short_edge) {
+    // 短边模式把 1080P 理解为“短边为 1080”，适合录制构图：
+    // 21:9 -> 2520x1080，3:4 -> 1080x1440。
+    const int short_edge = std::min(resolution_preset.base_width, resolution_preset.base_height);
+    resolution = calculate_resolution_by_short_edge(ratio, short_edge);
+  } else {
+    const auto total_area =
+        static_cast<std::uint64_t>(resolution_preset.base_width) * resolution_preset.base_height;
+    resolution = calculate_resolution_by_area(ratio, total_area);
+  }
+
+  if (options.align_to_8) {
+    return align_resolution_to_multiple(resolution, ratio);
+  }
+
+  return resolution;
 }
 
 // 应用窗口变换

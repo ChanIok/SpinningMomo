@@ -34,7 +34,6 @@ struct RatioData {
 struct ResolutionData {
   size_t index;
   std::wstring name;
-  std::uint64_t total_pixels;
 };
 
 // 业务动作类型 - 类型安全的菜单动作表示
@@ -59,9 +58,8 @@ struct MenuAction {
     return MenuAction{Type::RatioSelection, RatioData{index, name, ratio}};
   }
 
-  static auto resolution_selection(size_t index, const std::wstring& name, std::uint64_t pixels)
-      -> MenuAction {
-    return MenuAction{Type::ResolutionSelection, ResolutionData{index, name, pixels}};
+  static auto resolution_selection(size_t index, const std::wstring& name) -> MenuAction {
+    return MenuAction{Type::ResolutionSelection, ResolutionData{index, name}};
   }
 
   static auto feature_toggle(const std::string& action_id) -> MenuAction {
@@ -123,13 +121,13 @@ struct MenuItem {
     if (resolution.base_width == 0 && resolution.base_height == 0) {
       display_text = resolution.name;
     } else {
-      const double megaPixels = resolution.total_pixels / 1000000.0;
+      const auto total_area =
+          static_cast<std::uint64_t>(resolution.base_width) * resolution.base_height;
+      const double megaPixels = total_area / 1000000.0;
       display_text = std::format(L"{} ({:.1f}M)", resolution.name, megaPixels);
     }
-    return MenuItem(
-        display_text,
-        MenuAction::resolution_selection(index, resolution.name, resolution.total_pixels),
-        selected);
+    return MenuItem(display_text, MenuAction::resolution_selection(index, resolution.name),
+                    selected);
   }
 
   static auto feature_item(const std::wstring& text, const std::string& action_id,

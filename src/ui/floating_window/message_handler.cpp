@@ -83,10 +83,8 @@ auto dispatch_item_click_event(Core::State::AppState& state,
       const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
       if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
         const auto& res_preset = resolutions[item.index];
-        Core::Events::send(*state.events, ResolutionChangeEvent{
-                                              static_cast<size_t>(item.index), res_preset.name,
-                                              res_preset.base_width *
-                                                  static_cast<uint64_t>(res_preset.base_height)});
+        Core::Events::send(*state.events,
+                           ResolutionChangeEvent{static_cast<size_t>(item.index), res_preset.name});
       }
       break;
     }

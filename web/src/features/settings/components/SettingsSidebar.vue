@@ -49,12 +49,6 @@ const settingsMenus: SettingsMenuItem[] = [
     description: 'settings.layout.capture.description',
   },
   {
-    key: 'extensions',
-    label: 'settings.layout.extensions.title',
-    icon: Blocks,
-    description: 'settings.layout.extensions.description',
-  },
-  {
     key: 'windowScene',
     label: 'settings.layout.windowScene.title',
     icon: Monitor,
@@ -71,6 +65,12 @@ const settingsMenus: SettingsMenuItem[] = [
     label: 'settings.layout.webAppearance.title',
     icon: Palette,
     description: 'settings.layout.webAppearance.description',
+  },
+  {
+    key: 'extensions',
+    label: 'settings.layout.extensions.title',
+    icon: Blocks,
+    description: 'settings.layout.extensions.description',
   },
 ]
 

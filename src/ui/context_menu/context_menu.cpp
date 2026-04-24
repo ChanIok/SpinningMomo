@@ -140,11 +140,8 @@ void handle_menu_action(Core::State::AppState& state,
         auto resolution_data = std::any_cast<UI::ContextMenu::Types::ResolutionData>(action.data);
         // 使用新的事件系统发送分辨率改变事件
         Core::Events::send(*state.events, UI::FloatingWindow::Events::ResolutionChangeEvent{
-                                              resolution_data.index, resolution_data.name,
-                                              resolution_data.total_pixels});
-        Logger().info("Resolution selected: {} ({}M pixels)",
-                      Utils::String::ToUtf8(resolution_data.name),
-                      resolution_data.total_pixels / 1000000.0);
+                                              resolution_data.index, resolution_data.name});
+        Logger().info("Resolution selected: {}", Utils::String::ToUtf8(resolution_data.name));
       } catch (const std::bad_any_cast& e) {
         Logger().error("Failed to cast resolution selection data: {}", e.what());
       }

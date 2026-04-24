@@ -24,6 +24,8 @@ const {
   updateWindowTitle,
   updateWindowCenterLockCursor,
   updateWindowLayeredCaptureWorkaround,
+  updateWindowAlignSizeTo8,
+  updateWindowUseResolutionShortEdge,
   updateWindowResetResolution,
   resetWindowSceneSettings,
 } = useFunctionActions()
@@ -190,6 +192,40 @@ const handleResetSettings = async () => {
               @select="handleTitlePicked"
               :placeholder="t('settings.function.windowControl.windowTitle.placeholder')"
               class="w-48"
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.alignWindowSizeTo8.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.alignWindowSizeTo8.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.window.alignWindowSizeTo8"
+              @update:model-value="(value) => updateWindowAlignSizeTo8(Boolean(value))"
+            />
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.function.windowControl.useResolutionShortEdge.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.function.windowControl.useResolutionShortEdge.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.window.useResolutionShortEdge"
+              @update:model-value="(value) => updateWindowUseResolutionShortEdge(Boolean(value))"
             />
           </ItemActions>
         </Item>

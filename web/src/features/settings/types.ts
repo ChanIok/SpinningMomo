@@ -155,6 +155,8 @@ export interface AppSettings {
     targetTitle: string // 目标窗口标题
     centerLockCursor: boolean // 锁鼠时强制居中
     enableLayeredCaptureWorkaround: boolean // 超屏时临时启用 layered 捕获兼容方案
+    alignWindowSizeTo8: boolean // 调整窗口时将宽高对齐到 8 的倍数
+    useResolutionShortEdge: boolean // 分辨率预设按短边计算
     resetResolution: {
       width: number // 重置窗口宽度，0=跟随屏幕
       height: number // 重置窗口高度，0=跟随屏幕
@@ -300,6 +302,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     targetTitle: '',
     centerLockCursor: false,
     enableLayeredCaptureWorkaround: false,
+    alignWindowSizeTo8: true,
+    useResolutionShortEdge: false,
     resetResolution: {
       width: 0,
       height: 0,

@@ -22,13 +22,12 @@ export struct RatioPreset {
 
 // 分辨率预设
 export struct ResolutionPreset {
-  std::wstring name;           // 显示名称（如 "4K"）
-  std::uint64_t total_pixels;  // 总像素数
-  int base_width;              // 基准宽度
-  int base_height;             // 基准高度
+  std::wstring name;  // 显示名称（如 "4K"）
+  int base_width;     // 基准宽度
+  int base_height;    // 基准高度
 
   constexpr ResolutionPreset(const std::wstring& n, int w, int h) noexcept
-      : name(n), total_pixels(static_cast<std::uint64_t>(w) * h), base_width(w), base_height(h) {}
+      : name(n), base_width(w), base_height(h) {}
 };
 
 // === Getters Interface ===

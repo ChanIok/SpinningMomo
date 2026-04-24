@@ -41,13 +41,60 @@ auto get_current_ratio(const Core::State::AppState& state) -> double {
   return static_cast<double>(screen_width) / screen_height;
 }
 
-// 获取当前总像素数
-auto get_current_total_pixels(const Core::State::AppState& state) -> std::uint64_t {
+// 将 settings/menu 的预设结构转成窗口控制模块的纯几何输入。
+auto to_resolution_preset_input(const Features::Settings::Menu::ResolutionPreset* resolution_preset)
+    -> Features::WindowControl::ResolutionPresetInput {
+  if (!resolution_preset) {
+    return {};
+  }
+
+  return Features::WindowControl::ResolutionPresetInput{
+      .base_width = resolution_preset->base_width,
+      .base_height = resolution_preset->base_height,
+  };
+}
+
+// 比例切换时沿用当前选中的分辨率预设。
+auto get_current_resolution_preset(const Core::State::AppState& state)
+    -> Features::WindowControl::ResolutionPresetInput {
   const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
   if (state.floating_window->ui.current_resolution_index < resolutions.size()) {
-    return resolutions[state.floating_window->ui.current_resolution_index].total_pixels;
+    return to_resolution_preset_input(
+        &resolutions[state.floating_window->ui.current_resolution_index]);
   }
-  return 0;  // 表示使用屏幕尺寸
+
+  return {};
+}
+
+// 分辨率切换时使用事件指定的预设；越界时回退为 Default。
+auto get_resolution_preset_by_index(const Core::State::AppState& state, size_t resolution_index)
+    -> Features::WindowControl::ResolutionPresetInput {
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  if (resolution_index < resolutions.size()) {
+    return to_resolution_preset_input(&resolutions[resolution_index]);
+  }
+
+  return {};
+}
+
+// 只提取窗口尺寸计算需要的设置，避免 usecase 参与具体算法。
+auto get_resolution_calculation_options(const Core::State::AppState& state)
+    -> Features::WindowControl::ResolutionCalculationOptions {
+  const auto& window_settings = state.settings->raw.window;
+  return Features::WindowControl::ResolutionCalculationOptions{
+      .align_to_8 = window_settings.align_window_size_to_8,
+      .use_short_edge = window_settings.use_resolution_short_edge,
+  };
+}
+
+// 悬浮窗/托盘菜单产生的尺寸统一从这里进入 WindowControl。
+auto calculate_menu_resolution(const Core::State::AppState& state, double ratio,
+                               const Features::WindowControl::ResolutionPresetInput& preset)
+    -> Features::WindowControl::Resolution {
+  // usecase 只负责把运行时设置和菜单预设翻译成窗口控制模块的输入；
+  // Default、短边模式、8 对齐等尺寸规则统一由 Features.WindowControl 维护。
+  return Features::WindowControl::calculate_resolution_from_preset(
+      ratio, preset, get_resolution_calculation_options(state));
 }
 
 // 变换前的准备
@@ -133,14 +180,10 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   }
 
   // 计算目标分辨率
-  auto total_pixels = get_current_total_pixels(state);
-  Features::WindowControl::Resolution new_resolution;
-
-  if (total_pixels == 0) {
-    new_resolution = Features::WindowControl::calculate_resolution_by_screen(ratio_value);
-  } else {
-    new_resolution = Features::WindowControl::calculate_resolution(ratio_value, total_pixels);
-  }
+  auto new_resolution =
+      calculate_menu_resolution(state, ratio_value, get_current_resolution_preset(state));
+  Logger().info("Window transform target (ratio change): {}x{}", new_resolution.width,
+                new_resolution.height);
 
   // 准备变换
   bool needs_wait_first_frame =
@@ -191,10 +234,9 @@ auto handle_ratio_changed(Core::State::AppState& state,
 }
 
 // 分辨率变换的完整协程流程
-auto transform_resolution_async(Core::State::AppState& state, size_t resolution_index,
-                                std::uint64_t total_pixels) -> Core::Async::ui_task {
-  Logger().debug("[Coroutine] Transforming resolution to index {}, pixels: {}", resolution_index,
-                 total_pixels);
+auto transform_resolution_async(Core::State::AppState& state, size_t resolution_index)
+    -> Core::Async::ui_task {
+  Logger().debug("[Coroutine] Transforming resolution to index {}", resolution_index);
 
   // 查找目标窗口
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
@@ -207,13 +249,10 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
 
   // 计算目标分辨率
   double current_ratio = get_current_ratio(state);
-  Features::WindowControl::Resolution new_resolution;
-
-  if (total_pixels == 0) {
-    new_resolution = Features::WindowControl::calculate_resolution_by_screen(current_ratio);
-  } else {
-    new_resolution = Features::WindowControl::calculate_resolution(current_ratio, total_pixels);
-  }
+  auto new_resolution = calculate_menu_resolution(
+      state, current_ratio, get_resolution_preset_by_index(state, resolution_index));
+  Logger().info("Window transform target (resolution change): {}x{}", new_resolution.width,
+                new_resolution.height);
 
   // 准备变换
   bool needs_wait_first_frame =
@@ -261,7 +300,7 @@ auto handle_resolution_changed(Core::State::AppState& state,
                                const UI::FloatingWindow::Events::ResolutionChangeEvent& event)
     -> void {
   // 直接调用协程函数（ui_task 使用 suspend_never，立即开始执行）
-  transform_resolution_async(state, event.index, event.total_pixels);
+  transform_resolution_async(state, event.index);
 }
 
 // 处理窗口选择事件

@@ -34,6 +34,20 @@ export struct TransformOptions {
   std::optional<Vendor::Windows::HWND> letterbox_window = std::nullopt;
 };
 
+// 分辨率预设的几何信息。
+// base_width/base_height 来自菜单预设（如 1920x1080）；0x0 表示 Default，按屏幕尺寸计算。
+export struct ResolutionPresetInput {
+  int base_width = 0;
+  int base_height = 0;
+};
+
+// 窗口尺寸计算选项，仅影响比例/分辨率菜单产生的目标窗口尺寸。
+// 重置窗口命令直接应用屏幕尺寸或固定宽高，不走这些规则。
+export struct ResolutionCalculationOptions {
+  bool align_to_8 = false;
+  bool use_short_edge = false;
+};
+
 // 查找目标窗口
 export auto find_target_window(const std::wstring& configured_title)
     -> std::expected<Vendor::Windows::HWND, std::string>;
@@ -45,8 +59,12 @@ export auto get_visible_windows() -> std::vector<WindowInfo>;
 export auto toggle_window_border(Vendor::Windows::HWND hwnd) -> std::expected<bool, std::string>;
 
 // 分辨率计算函数
-export auto calculate_resolution(double ratio, std::uint64_t total_pixels) -> Resolution;
+export auto calculate_resolution_by_area(double ratio, std::uint64_t total_area) -> Resolution;
 export auto calculate_resolution_by_screen(double ratio) -> Resolution;
+export auto calculate_resolution_from_preset(double ratio,
+                                             const ResolutionPresetInput& resolution_preset,
+                                             const ResolutionCalculationOptions& options = {})
+    -> Resolution;
 
 // 窗口变换操作
 export auto apply_window_transform(Core::State::AppState& state,

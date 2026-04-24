@@ -28,7 +28,6 @@ export struct RatioChangeEvent {
 export struct ResolutionChangeEvent {
   size_t index;
   std::wstring resolution_name;
-  std::uint64_t total_pixels;
 
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };

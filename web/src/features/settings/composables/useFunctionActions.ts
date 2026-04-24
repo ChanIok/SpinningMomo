@@ -36,6 +36,26 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateWindowAlignSizeTo8 = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      window: {
+        ...appSettings.value.window,
+        alignWindowSizeTo8: enabled,
+      },
+    })
+  }
+
+  const updateWindowUseResolutionShortEdge = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      window: {
+        ...appSettings.value.window,
+        useResolutionShortEdge: enabled,
+      },
+    })
+  }
+
   const updateWindowResetResolution = async (width: number, height: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -365,6 +385,8 @@ export const useFunctionActions = () => {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
         centerLockCursor: DEFAULT_APP_SETTINGS.window.centerLockCursor,
+        alignWindowSizeTo8: DEFAULT_APP_SETTINGS.window.alignWindowSizeTo8,
+        useResolutionShortEdge: DEFAULT_APP_SETTINGS.window.useResolutionShortEdge,
         resetResolution: {
           ...appSettings.value.window.resetResolution,
           width: DEFAULT_APP_SETTINGS.window.resetResolution.width,
@@ -463,6 +485,8 @@ export const useFunctionActions = () => {
         ...appSettings.value.window,
         targetTitle: DEFAULT_APP_SETTINGS.window.targetTitle,
         enableLayeredCaptureWorkaround: DEFAULT_APP_SETTINGS.window.enableLayeredCaptureWorkaround,
+        alignWindowSizeTo8: DEFAULT_APP_SETTINGS.window.alignWindowSizeTo8,
+        useResolutionShortEdge: DEFAULT_APP_SETTINGS.window.useResolutionShortEdge,
         resetResolution: {
           ...appSettings.value.window.resetResolution,
           width: DEFAULT_APP_SETTINGS.window.resetResolution.width,
@@ -476,6 +500,8 @@ export const useFunctionActions = () => {
     updateWindowTitle,
     updateWindowCenterLockCursor,
     updateWindowLayeredCaptureWorkaround,
+    updateWindowAlignSizeTo8,
+    updateWindowUseResolutionShortEdge,
     updateWindowResetResolution,
     updateOutputDir,
     updateGameAlbumPath,
