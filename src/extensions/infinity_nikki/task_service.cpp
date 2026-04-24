@@ -18,7 +18,7 @@ import Features.Gallery.Types;
 import Features.Settings;
 import Features.Settings.State;
 import Extensions.InfinityNikki.PhotoExtract;
-import Extensions.InfinityNikki.ScreenshotHardlinks;
+import Extensions.InfinityNikki.MediaHardlinks;
 import Extensions.InfinityNikki.Types;
 import Utils.Logger;
 
@@ -27,8 +27,8 @@ namespace Extensions::InfinityNikki::TaskService {
 // 与前端 AppHeader / taskStore 的 type 字段一致，勿随意改名。
 constexpr auto kInitialScanTaskType = "extensions.infinityNikki.initialScan";
 constexpr auto kExtractPhotoParamsTaskType = "extensions.infinityNikki.extractPhotoParams";
-constexpr auto kInitializeScreenshotHardlinksTaskType =
-    "extensions.infinityNikki.initializeScreenshotHardlinks";
+constexpr auto kInitializeMediaHardlinksTaskType =
+    "extensions.infinityNikki.initializeMediaHardlinks";
 
 // 硬链接初始化进度上报节流，避免 task.updated 过于频繁。
 constexpr auto kProgressEmitInterval = std::chrono::milliseconds(250);
@@ -77,11 +77,11 @@ auto append_task_error_details(std::string& message, const std::vector<std::stri
   }
 }
 
-auto make_screenshot_hardlinks_task_error_message(
-    const Extensions::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksResult& summary)
+auto make_media_hardlinks_task_error_message(
+    const Extensions::InfinityNikki::InfinityNikkiInitializeMediaHardlinksResult& summary)
     -> std::string {
   auto message = std::format(
-      "Infinity Nikki screenshot hardlinks initialize failed: encountered {} error(s) while "
+      "Infinity Nikki media hardlinks initialize failed: encountered {} error(s) while "
       "processing {} source file(s)",
       summary.errors.size(), summary.source_count);
   append_task_error_details(message, summary.errors);
@@ -296,10 +296,10 @@ auto schedule_silent_extract_photo_params(
       asio::detached);
 }
 
-// 全量建立/校正游戏 ScreenShot 与图库侧的硬链接；完成后可能把设置里 manage_screenshot_hardlinks
+// 全量建立/校正 Infinity Nikki 媒体硬链接；完成后可能把设置里 manage_media_hardlinks
 // 置为 true。
-auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state,
-                                                 const std::string& task_id) -> void {
+auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
+                                            const std::string& task_id) -> void {
   if (!app_state.async) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async state is not initialized");
     return;
@@ -321,7 +321,7 @@ auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_stat
         auto last_percent = -1;
         auto progress_callback =
             [&app_state, &task_id, &last_emit_at, &last_percent](
-                const Extensions::InfinityNikki::InfinityNikkiInitializeScreenshotHardlinksProgress&
+                const Extensions::InfinityNikki::InfinityNikkiInitializeMediaHardlinksProgress&
                     progress) {
               auto percent = static_cast<int>(std::floor(progress.percent.value_or(0.0)));
               auto now = std::chrono::steady_clock::now();
@@ -350,11 +350,11 @@ auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_stat
               Core::Tasks::update_task_progress(app_state, task_id, task_progress);
             };
 
-        auto initialize_result = Extensions::InfinityNikki::ScreenshotHardlinks::initialize(
-            app_state, progress_callback);
+        auto initialize_result =
+            Extensions::InfinityNikki::MediaHardlinks::initialize(app_state, progress_callback);
         if (!initialize_result) {
           auto error_message =
-              "Infinity Nikki screenshot hardlinks initialize failed: " + initialize_result.error();
+              "Infinity Nikki media hardlinks initialize failed: " + initialize_result.error();
           Logger().error("{}", error_message);
           Core::Tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
@@ -375,19 +375,19 @@ auto launch_initialize_screenshot_hardlinks_task(Core::State::AppState& app_stat
             });
 
         if (!summary.errors.empty()) {
-          auto error_message = make_screenshot_hardlinks_task_error_message(summary);
+          auto error_message = make_media_hardlinks_task_error_message(summary);
           Logger().error("{}", error_message);
           Core::Tasks::complete_task_failed(app_state, task_id, error_message);
           co_return;
         }
 
         if (app_state.settings &&
-            !app_state.settings->raw.extensions.infinity_nikki.manage_screenshot_hardlinks) {
+            !app_state.settings->raw.extensions.infinity_nikki.manage_media_hardlinks) {
           auto next_settings = app_state.settings->raw;
-          next_settings.extensions.infinity_nikki.manage_screenshot_hardlinks = true;
+          next_settings.extensions.infinity_nikki.manage_media_hardlinks = true;
           if (auto save_result = Features::Settings::update_settings(app_state, next_settings);
               !save_result) {
-            Logger().warn("Failed to persist Infinity Nikki screenshot hardlink setting: {}",
+            Logger().warn("Failed to persist Infinity Nikki media hardlink setting: {}",
                           save_result.error());
           }
         }
@@ -457,18 +457,18 @@ auto start_extract_photo_params_for_folder_task(
                  });
 }
 
-auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state)
+auto start_initialize_media_hardlinks_task(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string> {
-  if (Core::Tasks::has_active_task_of_type(app_state, kInitializeScreenshotHardlinksTaskType)) {
-    return std::unexpected("Another Infinity Nikki screenshot hardlink task is already running");
+  if (Core::Tasks::has_active_task_of_type(app_state, kInitializeMediaHardlinksTaskType)) {
+    return std::unexpected("Another Infinity Nikki media hardlink task is already running");
   }
 
-  auto task_id = Core::Tasks::create_task(app_state, kInitializeScreenshotHardlinksTaskType);
+  auto task_id = Core::Tasks::create_task(app_state, kInitializeMediaHardlinksTaskType);
   if (task_id.empty()) {
-    return std::unexpected("Failed to create Infinity Nikki screenshot hardlink task");
+    return std::unexpected("Failed to create Infinity Nikki media hardlink task");
   }
 
-  launch_initialize_screenshot_hardlinks_task(app_state, task_id);
+  launch_initialize_media_hardlinks_task(app_state, task_id);
   return task_id;
 }
 

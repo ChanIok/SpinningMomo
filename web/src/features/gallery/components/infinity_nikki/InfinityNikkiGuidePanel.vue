@@ -50,7 +50,7 @@ async function applySelections() {
   try {
     await persist({
       allowOnlinePhotoMetadataExtract: wantsMetadata.value,
-      manageScreenshotHardlinks: wantsHardlinks.value,
+      manageMediaHardlinks: wantsHardlinks.value,
     })
 
     if (wantsMetadata.value && wantsHardlinks.value) {

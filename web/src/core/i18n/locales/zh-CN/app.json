@@ -23,7 +23,7 @@
   "app.header.tasks.type.galleryScan": "图库扫描",
   "app.header.tasks.type.infinityNikkiExtractPhotoParams": "暖暖照片元数据解析",
   "app.header.tasks.type.infinityNikkiInitialScan": "暖暖相册首次扫描",
-  "app.header.tasks.type.infinityNikkiInitScreenshotHardlinks": "ScreenShot 硬链接初始化",
+  "app.header.tasks.type.infinityNikkiInitMediaHardlinks": "Infinity Nikki 媒体硬链接初始化",
   "app.header.tasks.type.updateDownload": "应用更新下载",
   "app.name": "旋转吧大喵"
 }

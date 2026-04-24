@@ -205,8 +205,8 @@ struct ScanResult {
   int deleted_items = 0;
   std::vector<std::string> errors = {};
   std::string scan_duration = "";
-  // changes 主要在 watcher 增量同步场景下填充；
-  // 全量扫描允许为空，因为它关注的是“最终一致性”而非“逐文件变化集”。
+  // changes 供运行时增量消费者消费；
+  // watcher 增量同步与 full scan 都可以填充，后者通常由扫描前后状态对账推导出来。
   std::vector<ScanChange> changes = {};
 };
 

@@ -77,7 +77,7 @@ auto has_infinity_nikki_hardlink_setting_changes(
 
   return old_config.enable != new_config.enable || old_config.game_dir != new_config.game_dir ||
          old_config.gallery_guide_seen != new_config.gallery_guide_seen ||
-         old_config.manage_screenshot_hardlinks != new_config.manage_screenshot_hardlinks;
+         old_config.manage_media_hardlinks != new_config.manage_media_hardlinks;
 }
 
 auto should_start_infinity_nikki_hardlinks_initialization(
@@ -87,13 +87,13 @@ auto should_start_infinity_nikki_hardlinks_initialization(
   const auto& new_config = new_settings.extensions.infinity_nikki;
 
   if (!new_config.enable || new_config.game_dir.empty() || !new_config.gallery_guide_seen ||
-      !new_config.manage_screenshot_hardlinks) {
+      !new_config.manage_media_hardlinks) {
     return false;
   }
 
   return (!old_config.enable && new_config.enable) || old_config.game_dir != new_config.game_dir ||
          (!old_config.gallery_guide_seen && new_config.gallery_guide_seen) ||
-         (!old_config.manage_screenshot_hardlinks && new_config.manage_screenshot_hardlinks);
+         (!old_config.manage_media_hardlinks && new_config.manage_media_hardlinks);
 }
 
 auto apply_runtime_language_from_settings(Core::State::AppState& state,
@@ -167,13 +167,12 @@ auto handle_settings_changed(Core::State::AppState& state,
       if (should_start_infinity_nikki_hardlinks_initialization(event.data.old_settings,
                                                                event.data.new_settings)) {
         auto task_result =
-            Extensions::InfinityNikki::TaskService::start_initialize_screenshot_hardlinks_task(
-                state);
+            Extensions::InfinityNikki::TaskService::start_initialize_media_hardlinks_task(state);
         if (!task_result) {
-          Logger().warn("Failed to start Infinity Nikki screenshot hardlink task: {}",
+          Logger().warn("Failed to start Infinity Nikki media hardlink task: {}",
                         task_result.error());
         } else {
-          Logger().info("Infinity Nikki screenshot hardlink task started: {}", task_result.value());
+          Logger().info("Infinity Nikki media hardlink task started: {}", task_result.value());
         }
       }
     }

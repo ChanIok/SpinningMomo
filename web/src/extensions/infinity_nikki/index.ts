@@ -31,9 +31,9 @@ export async function startExtractInfinityNikkiPhotoParamsForFolder(
   return result.taskId
 }
 
-export async function startInitializeInfinityNikkiScreenshotHardlinks(): Promise<string> {
+export async function startInitializeInfinityNikkiMediaHardlinks(): Promise<string> {
   const result = await call<StartTaskResult>(
-    'extensions.infinityNikki.startInitializeScreenshotHardlinks',
+    'extensions.infinityNikki.startInitializeMediaHardlinks',
     {}
   )
   return result.taskId

@@ -36,9 +36,9 @@ export auto start_extract_photo_params_for_folder_task(
     const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsForFolderRequest& request)
     -> std::expected<std::string, std::string>;
 
-// ScreenShot 目录硬链接初始化（引导 / 设置里的一次性重操作）。任务类型
-// initializeScreenshotHardlinks。
-export auto start_initialize_screenshot_hardlinks_task(Core::State::AppState& app_state)
+// 媒体硬链接初始化（引导 / 设置里的一次性重操作）。任务类型
+// initializeMediaHardlinks。
+export auto start_initialize_media_hardlinks_task(Core::State::AppState& app_state)
     -> std::expected<std::string, std::string>;
 
 }  // namespace Extensions::InfinityNikki::TaskService

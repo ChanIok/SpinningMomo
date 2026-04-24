@@ -66,12 +66,11 @@ auto handle_infinity_nikki_start_extract_photo_params_for_folder(
   co_return StartExtensionTaskResult{.task_id = task_result.value()};
 }
 
-auto handle_infinity_nikki_start_initialize_screenshot_hardlinks(
+auto handle_infinity_nikki_start_initialize_media_hardlinks(
     Core::State::AppState& app_state, [[maybe_unused]] const rfl::Generic& params)
     -> Core::RPC::RpcAwaitable<StartExtensionTaskResult> {
   auto task_result =
-      ::Extensions::InfinityNikki::TaskService::start_initialize_screenshot_hardlinks_task(
-          app_state);
+      ::Extensions::InfinityNikki::TaskService::start_initialize_media_hardlinks_task(app_state);
   if (!task_result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::InvalidRequest),
@@ -102,10 +101,9 @@ auto register_all(Core::State::AppState& app_state) -> void {
       "Create a background task to extract Infinity Nikki photo params for a gallery folder");
 
   Core::RPC::register_method<rfl::Generic, StartExtensionTaskResult>(
-      app_state, app_state.rpc->registry,
-      "extensions.infinityNikki.startInitializeScreenshotHardlinks",
-      handle_infinity_nikki_start_initialize_screenshot_hardlinks,
-      "Create a background task to initialize Infinity Nikki ScreenShot hardlinks");
+      app_state, app_state.rpc->registry, "extensions.infinityNikki.startInitializeMediaHardlinks",
+      handle_infinity_nikki_start_initialize_media_hardlinks,
+      "Create a background task to initialize Infinity Nikki media hardlinks");
 
   Logger().info("Extensions RPC endpoints registered");
 }

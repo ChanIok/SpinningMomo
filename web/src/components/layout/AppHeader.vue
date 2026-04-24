@@ -105,8 +105,8 @@ function resolveTaskTypeLabel(type: string): string {
   if (type === 'extensions.infinityNikki.extractPhotoParams') {
     return t('app.header.tasks.type.infinityNikkiExtractPhotoParams')
   }
-  if (type === 'extensions.infinityNikki.initializeScreenshotHardlinks') {
-    return t('app.header.tasks.type.infinityNikkiInitScreenshotHardlinks')
+  if (type === 'extensions.infinityNikki.initializeMediaHardlinks') {
+    return t('app.header.tasks.type.infinityNikkiInitMediaHardlinks')
   }
   return type
 }

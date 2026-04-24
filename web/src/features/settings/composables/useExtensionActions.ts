@@ -7,7 +7,7 @@ const DEFAULT_INFINITY_NIKKI_SETTINGS: AppSettings['extensions']['infinityNikki'
   gameDir: '',
   galleryGuideSeen: false,
   allowOnlinePhotoMetadataExtract: false,
-  manageScreenshotHardlinks: false,
+  manageMediaHardlinks: false,
 }
 
 export const useExtensionActions = () => {
@@ -39,8 +39,8 @@ export const useExtensionActions = () => {
     await updateInfinityNikkiSettings({ allowOnlinePhotoMetadataExtract: enabled })
   }
 
-  const updateInfinityNikkiManageScreenshotHardlinks = async (enabled: boolean) => {
-    await updateInfinityNikkiSettings({ manageScreenshotHardlinks: enabled })
+  const updateInfinityNikkiManageMediaHardlinks = async (enabled: boolean) => {
+    await updateInfinityNikkiSettings({ manageMediaHardlinks: enabled })
   }
 
   const completeInfinityNikkiInitialization = async () => {
@@ -61,7 +61,7 @@ export const useExtensionActions = () => {
     updateInfinityNikkiEnabled,
     updateInfinityNikkiGameDir,
     updateInfinityNikkiAllowOnlinePhotoMetadataExtract,
-    updateInfinityNikkiManageScreenshotHardlinks,
+    updateInfinityNikkiManageMediaHardlinks,
     completeInfinityNikkiInitialization,
     resetExtensionSettings,
   }

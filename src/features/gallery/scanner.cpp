@@ -236,12 +236,17 @@ auto is_path_under_root(const std::string& candidate_path, const std::string& ro
   return candidate_path[root_path.size()] == '/';
 }
 
+struct CleanupRemovedAssetsResult {
+  int deleted_count = 0;
+  std::vector<std::string> removed_paths;
+};
+
 // 清理磁盘已删除但数据库仍存在的资产
 auto cleanup_removed_assets(Core::State::AppState& app_state,
                             const std::filesystem::path& normalized_scan_root,
                             const std::vector<Types::FileSystemInfo>& file_infos,
                             const std::unordered_map<std::string, Types::Metadata>& asset_cache)
-    -> int {
+    -> CleanupRemovedAssetsResult {
   auto root_str = normalized_scan_root.string();
 
   // 本次磁盘上实际存在的文件。
@@ -263,7 +268,12 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
     }
   }
 
-  int deleted_count = 0;
+  CleanupRemovedAssetsResult result;
+  result.removed_paths.reserve(removed_assets.size());
+  for (const auto& metadata : removed_assets) {
+    result.removed_paths.push_back(metadata.path);
+  }
+
   for (const auto& metadata : removed_assets) {
     auto asset_result = Asset::Repository::get_asset_by_id(app_state, metadata.id);
     if (asset_result && asset_result->has_value()) {
@@ -280,14 +290,14 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
       continue;
     }
 
-    deleted_count++;
+    result.deleted_count++;
   }
 
-  if (deleted_count > 0) {
-    Logger().info("Deleted {} removed assets under '{}'", deleted_count, root_str);
+  if (result.deleted_count > 0) {
+    Logger().info("Deleted {} removed assets under '{}'", result.deleted_count, root_str);
   }
 
-  return deleted_count;
+  return result;
 }
 
 auto build_expected_folder_paths(const std::vector<Types::FileSystemInfo>& file_infos,
@@ -824,6 +834,11 @@ struct ProcessingPhaseResult {
   bool all_db_success = true;
 };
 
+struct CleanupPhaseResult {
+  int deleted_items = 0;
+  std::vector<std::string> removed_paths;
+};
+
 // 准备阶段：规范化路径并加载缓存
 auto prepare_scan_context(Core::State::AppState& app_state, const Types::ScanOptions& options)
     -> std::expected<ScanPreparationContext, std::string> {
@@ -1106,15 +1121,18 @@ auto run_cleanup_phase(Core::State::AppState& app_state,
                        const std::vector<Types::FileSystemInfo>& file_infos,
                        const std::unordered_map<std::string, Types::Metadata>& asset_cache,
                        const std::function<void(const Types::ScanProgress&)>& progress_callback)
-    -> int {
+    -> CleanupPhaseResult {
   report_scan_progress(progress_callback, "cleanup", 0, 1, kCleanupPercent,
                        "Reconciling deleted files");
 
-  int deleted_items =
+  auto removed_assets_result =
       cleanup_removed_assets(app_state, normalized_scan_root, file_infos, asset_cache);
   [[maybe_unused]] int deleted_folders =
       cleanup_missing_folders(app_state, normalized_scan_root, file_infos);
-  return deleted_items;
+  return CleanupPhaseResult{
+      .deleted_items = removed_assets_result.deleted_count,
+      .removed_paths = std::move(removed_assets_result.removed_paths),
+  };
 }
 
 // =============================================================================
@@ -1158,16 +1176,45 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto processing_phase = std::move(processing_result.value());
 
   // 步骤 5: 清理阶段 (从数据库中移除那些在本次磁盘扫描中已经不存在的资产)
-  int deleted_items = run_cleanup_phase(app_state, context.normalized_scan_root, file_infos,
-                                        context.asset_cache, progress_callback);
+  auto cleanup_phase = run_cleanup_phase(app_state, context.normalized_scan_root, file_infos,
+                                         context.asset_cache, progress_callback);
 
   Types::ScanResult result{
       .total_files = static_cast<int>(file_infos.size()),
       .new_items = static_cast<int>(processing_phase.batch_result.new_assets.size()),
       .updated_items = static_cast<int>(processing_phase.batch_result.updated_assets.size()),
-      .deleted_items = deleted_items,
+      .deleted_items = cleanup_phase.deleted_items,
       .errors = std::move(processing_phase.batch_result.errors),
   };
+
+  std::unordered_set<std::string> emitted_change_keys;
+  emitted_change_keys.reserve(result.new_items + result.updated_items +
+                              cleanup_phase.removed_paths.size());
+
+  auto append_scan_change = [&](const std::string& path, Types::ScanChangeAction action) {
+    auto key =
+        std::string(action == Types::ScanChangeAction::REMOVE ? "remove:" : "upsert:") + path;
+    if (!emitted_change_keys.insert(key).second) {
+      return;
+    }
+
+    result.changes.push_back(Types::ScanChange{
+        .path = path,
+        .action = action,
+    });
+  };
+
+  for (const auto& removed_path : cleanup_phase.removed_paths) {
+    append_scan_change(removed_path, Types::ScanChangeAction::REMOVE);
+  }
+
+  for (const auto& entry : processing_phase.batch_result.new_assets) {
+    append_scan_change(entry.asset.path, Types::ScanChangeAction::UPSERT);
+  }
+
+  for (const auto& entry : processing_phase.batch_result.updated_assets) {
+    append_scan_change(entry.asset.path, Types::ScanChangeAction::UPSERT);
+  }
 
   auto end_time = std::chrono::steady_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);

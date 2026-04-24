@@ -23,7 +23,7 @@
   "app.header.tasks.type.galleryScan": "Gallery Scan",
   "app.header.tasks.type.infinityNikkiExtractPhotoParams": "Infinity Nikki Metadata Extract",
   "app.header.tasks.type.infinityNikkiInitialScan": "Infinity Nikki Initial Scan",
-  "app.header.tasks.type.infinityNikkiInitScreenshotHardlinks": "ScreenShot Hardlink Init",
+  "app.header.tasks.type.infinityNikkiInitMediaHardlinks": "Infinity Nikki Media Hardlink Init",
   "app.header.tasks.type.updateDownload": "App Update Download",
   "app.name": "SpinningMomo"
 }

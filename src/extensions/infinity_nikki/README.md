@@ -10,7 +10,7 @@
 ## 先读这些文件
 
 - `src/extensions/infinity_nikki/photo_service.cpp`：监听注册与扫描后回调接线入口。
-- `src/extensions/infinity_nikki/screenshot_hardlinks.cpp`：HQ <-> ScreenShot 硬链接同步核心。
+- `src/extensions/infinity_nikki/media_hardlinks.cpp`：Infinity Nikki 照片/录像受管硬链接同步核心。
 - `src/extensions/infinity_nikki/task_service.cpp`：扩展任务编排与进度上报。
 - `src/extensions/infinity_nikki/types.ixx`：扩展请求/结果结构。
 - `src/core/initializer/initializer.cpp`：扩展在启动流程中的接入时机。
@@ -18,13 +18,13 @@
 ## 核心链路
 
 - 设置驱动注册 watcher -> `PhotoService` 绑定 `post_scan_callback`。
-- callback 收到 `ScanResult.changes` -> `ScreenshotHardlinks::apply_runtime_changes`（增量）。
-- 变更集不可用或初始化场景 -> `ScreenshotHardlinks::sync/initialize`（全量）。
+- callback 收到 `ScanResult.changes` -> `MediaHardlinks::apply_runtime_changes`（增量）。
+- 变更集不可用或初始化场景 -> `MediaHardlinks::sync/initialize`（全量）。
 - 重操作统一通过 `TaskService` 进入任务系统，便于前端观测进度。
 
 ## 关键不变量
 
-- `ScreenShot` 目录是 HQ 原图的受管镜像，不是独立来源目录。
+- Infinity Nikki 的媒体硬链接目录是受管镜像，不是独立来源目录。
 - 运行时优先增量应用，失败或缺失时可回退全量重建。
 - 变更消费基于 gallery 的 `ScanChange` 语义，避免依赖某个具体 RPC 用例。
 

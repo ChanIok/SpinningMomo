@@ -14,7 +14,7 @@ import Features.Gallery.Watcher;
 import Features.Gallery.Types;
 import Features.Settings.State;
 import Extensions.InfinityNikki.TaskService;
-import Extensions.InfinityNikki.ScreenshotHardlinks;
+import Extensions.InfinityNikki.MediaHardlinks;
 import Extensions.InfinityNikki.Types;
 import Utils.Logger;
 import Utils.Path;
@@ -81,7 +81,7 @@ auto ensure_watch_root_ignore_rules(Core::State::AppState& app_state,
   return {};
 }
 
-// 每次画廊扫描完毕后触发的回调处理，包含同步 ScreenShot 硬链接和提取照片参数
+// 每次画廊扫描完毕后触发的回调处理，包含同步受管硬链接（照片/录像）和提取照片参数
 auto on_gallery_scan_complete(Core::State::AppState& app_state,
                               const Features::Gallery::Types::ScanResult& result) -> void {
   if (!app_state.settings) {
@@ -90,27 +90,23 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
 
   const auto& config = app_state.settings->raw.extensions.infinity_nikki;
 
-  if (config.manage_screenshot_hardlinks) {
-    if (Core::Tasks::has_active_task_of_type(
-            app_state, "extensions.infinityNikki.initializeScreenshotHardlinks")) {
-      Logger().debug("Skip InfinityNikki screenshot hardlink sync: initialization task is active");
+  if (config.manage_media_hardlinks) {
+    if (Core::Tasks::has_active_task_of_type(app_state,
+                                             "extensions.infinityNikki.initializeMediaHardlinks")) {
+      Logger().debug("Skip InfinityNikki managed hardlink sync: initialization task is active");
     } else {
-      // 增量 watcher 会携带逐文件 changes；只有拿不到变化集时才回退到全量 sync。
-      auto runtime_changes = result.changes;
+      // 扫描结果如何驱动硬链接同步，由 MediaHardlinks 自己解释；
+      // PhotoService 只负责把 Gallery 的事实转发过去。
       bool submitted = Core::WorkerPool::submit_task(
-          *app_state.worker_pool, [&app_state, runtime_changes = std::move(runtime_changes)]() {
-            auto sync_result =
-                runtime_changes.empty()
-                    ? Extensions::InfinityNikki::ScreenshotHardlinks::sync(app_state)
-                    : Extensions::InfinityNikki::ScreenshotHardlinks::apply_runtime_changes(
-                          app_state, runtime_changes);
+          *app_state.worker_pool, [&app_state, scan_result = result]() {
+            auto sync_result = Extensions::InfinityNikki::MediaHardlinks::apply_scan_result(
+                app_state, scan_result);
             if (!sync_result) {
-              Logger().warn("InfinityNikki screenshot hardlinks sync failed: {}",
-                            sync_result.error());
+              Logger().warn("InfinityNikki managed hardlinks sync failed: {}", sync_result.error());
             } else {
               const auto& r = sync_result.value();
               Logger().info(
-                  "InfinityNikki screenshot hardlinks synced: source={}, created={}, updated={}, "
+                  "InfinityNikki managed hardlinks synced: source={}, created={}, updated={}, "
                   "removed={}, ignored={}",
                   r.source_count, r.created_count, r.updated_count, r.removed_count,
                   r.ignored_count);
@@ -125,7 +121,7 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
   if (config.allow_online_photo_metadata_extract) {
     // 静默自动解析只消费“本次扫描变更”里的 UPSERT 资产；
     // 不再从全库补齐 missing，避免拍 1 张触发历史批量解析。
-    // 注意：全量 scan 的 ScanResult.changes 允许为空，因此这里不保证能覆盖“首次全量导入”。
+    // 若某次扫描未提供 changes，则该轮不会触发静默增量，首次导入仍由后面的补偿任务兜底。
     std::vector<std::int64_t> candidate_asset_ids;
     candidate_asset_ids.reserve(result.changes.size());
     std::unordered_set<std::int64_t> seen_ids;
@@ -243,8 +239,7 @@ auto register_impl(Core::State::AppState& app_state, bool start_immediately) -> 
     return;
   }
 
-  auto dir_result =
-      Extensions::InfinityNikki::ScreenshotHardlinks::resolve_watch_directory(app_state);
+  auto dir_result = Extensions::InfinityNikki::MediaHardlinks::resolve_watch_directory(app_state);
   if (!dir_result) {
     Logger().warn("Skip InfinityNikki gallery watcher: {}", dir_result.error());
     stop_current_watcher();

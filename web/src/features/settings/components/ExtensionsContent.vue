@@ -28,7 +28,7 @@ const {
   updateInfinityNikkiEnabled,
   updateInfinityNikkiGameDir,
   updateInfinityNikkiAllowOnlinePhotoMetadataExtract,
-  updateInfinityNikkiManageScreenshotHardlinks,
+  updateInfinityNikkiManageMediaHardlinks,
   completeInfinityNikkiInitialization,
   resetExtensionSettings,
 } = useExtensionActions()
@@ -128,9 +128,9 @@ const handleAllowOnlinePhotoMetadataExtractChange = async (enabled: boolean) => 
   }
 }
 
-const handleManageScreenshotHardlinksChange = async (enabled: boolean) => {
+const handleManageMediaHardlinksChange = async (enabled: boolean) => {
   try {
-    await updateInfinityNikkiManageScreenshotHardlinks(enabled)
+    await updateInfinityNikkiManageMediaHardlinks(enabled)
   } catch (error) {
     toast.error(t('settings.extensions.infinityNikki.saveFailedTitle'), {
       description: getErrorMessage(error),
@@ -384,10 +384,8 @@ const handleCompleteInitialization = async () => {
             </ItemContent>
             <ItemActions>
               <Switch
-                :model-value="infinityNikkiSettings.manageScreenshotHardlinks"
-                @update:model-value="
-                  (value) => handleManageScreenshotHardlinksChange(Boolean(value))
-                "
+                :model-value="infinityNikkiSettings.manageMediaHardlinks"
+                @update:model-value="(value) => handleManageMediaHardlinksChange(Boolean(value))"
               />
             </ItemActions>
           </Item>
