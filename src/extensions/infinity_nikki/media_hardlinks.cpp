@@ -642,7 +642,7 @@ auto apply_runtime_changes(Core::State::AppState& app_state,
     auto source = try_make_managed_source(paths, changed_path, false);
     if (!source.has_value()) {
       if (change.action == Features::Gallery::Types::ScanChangeAction::REMOVE) {
-        Logger().warn(
+        Logger().debug(
             "InfinityNikki ignored REMOVE change because path is not a managed media source: {}",
             Utils::String::ToUtf8(changed_path.wstring()));
       } else {

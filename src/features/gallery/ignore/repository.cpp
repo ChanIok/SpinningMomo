@@ -7,6 +7,7 @@ import Core.State;
 import Core.Database;
 import Core.Database.State;
 import Core.Database.Types;
+import Features.Gallery.State;
 import Features.Gallery.Types;
 import Utils.Logger;
 import <rfl.hpp>;
@@ -14,6 +15,16 @@ import <rfl.hpp>;
 namespace Features::Gallery::Ignore::Repository {
 
 // ============= 基本 CRUD 操作 =============
+
+auto bump_ignore_rules_version(Core::State::AppState& app_state) -> void {
+  // ignore rules 的真实来源仍然是数据库；这个版本号只用于通知 watcher：
+  // “你手里的早期过滤缓存可能过期了，下次需要重新加载”。
+  if (!app_state.gallery) {
+    return;
+  }
+
+  app_state.gallery->ignore_rules_version.fetch_add(1, std::memory_order_acq_rel);
+}
 
 auto create_ignore_rule(Core::State::AppState& app_state, const Types::IgnoreRule& rule)
     -> std::expected<std::int64_t, std::string> {
@@ -49,6 +60,7 @@ auto create_ignore_rule(Core::State::AppState& app_state, const Types::IgnoreRul
   }
 
   Logger().info("Created ignore rule with ID {}: {}", id_result->value(), rule.rule_pattern);
+  bump_ignore_rules_version(app_state);
   return id_result->value();
 }
 
@@ -99,6 +111,7 @@ auto update_ignore_rule(Core::State::AppState& app_state, const Types::IgnoreRul
   }
 
   Logger().debug("Updated ignore rule ID {}", rule.id);
+  bump_ignore_rules_version(app_state);
   return {};
 }
 
@@ -112,6 +125,7 @@ auto delete_ignore_rule(Core::State::AppState& app_state, std::int64_t id)
   }
 
   Logger().info("Deleted ignore rule ID {}", id);
+  bump_ignore_rules_version(app_state);
   return {};
 }
 
@@ -227,6 +241,7 @@ auto replace_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t f
 
   Logger().info("Replaced ignore rules for folder_id {} with {} rule(s)", folder_id,
                 scan_rules.size());
+  bump_ignore_rules_version(app_state);
   return {};
 }
 
@@ -266,6 +281,9 @@ auto delete_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t fo
   int deleted_count = count_result && count_result->has_value() ? count_result->value() : 0;
 
   Logger().info("Deleted {} ignore rules for folder_id {}", deleted_count, folder_id);
+  if (deleted_count > 0) {
+    bump_ignore_rules_version(app_state);
+  }
   return deleted_count;
 }
 
@@ -285,6 +303,7 @@ auto toggle_rule_enabled(Core::State::AppState& app_state, std::int64_t id, bool
   }
 
   Logger().debug("Toggled ignore rule ID {} to {}", id, enabled ? "enabled" : "disabled");
+  bump_ignore_rules_version(app_state);
   return {};
 }
 
@@ -305,6 +324,7 @@ auto cleanup_orphaned_rules(Core::State::AppState& app_state) -> std::expected<i
 
   if (deleted_count > 0) {
     Logger().info("Cleaned up {} orphaned ignore rules", deleted_count);
+    bump_ignore_rules_version(app_state);
   }
 
   return deleted_count;

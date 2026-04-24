@@ -40,6 +40,12 @@ export struct FolderWatcherState {
   // 已收到事件，但仍在等待稳定的文件改动候选
   std::unordered_map<std::string, PendingStableFileChange> pending_stable_file_changes;
 
+  // watcher 早期过滤使用的忽略规则缓存：
+  // 文件系统事件可能非常密集，如果每个通知批次都查 DB 加载规则，会把“忽略目录里的
+  // 大量无关文件变动”变成数据库压力。这里缓存最近一次加载结果，版本变化时再失效。
+  std::optional<std::vector<Types::IgnoreRule>> cached_ignore_rules;
+  std::uint64_t cached_ignore_rules_version = 0;
+
   // 扫描完成后的回调（可选），由注册方注入，扫描有变化时触发
   std::function<void(const Types::ScanResult&)> post_scan_callback;
 };
@@ -55,6 +61,11 @@ export struct GalleryState {
 
   // 应用关闭时置为 true，用于阻止后台启动恢复继续推进。
   std::atomic<bool> shutdown_requested{false};
+
+  // 忽略规则变更版本：
+  // Repository 每次成功修改 ignore_rules 表后递增；watcher 只比较版本号，
+  // 不需要监听具体哪条规则变了。
+  std::atomic<std::uint64_t> ignore_rules_version{0};
 
   // 后台 watcher 启动恢复任务的 future，shutdown 时等待其结束。
   std::optional<std::future<void>> startup_watchers_future;

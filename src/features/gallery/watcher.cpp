@@ -110,6 +110,8 @@ auto update_watcher_scan_options(const std::shared_ptr<State::FolderWatcherState
   watcher->scan_options.directory = watcher->root_path.string();
   // watcher 同步阶段始终以 DB 中已持久化规则为准。
   watcher->scan_options.ignore_rules.reset();
+  watcher->cached_ignore_rules.reset();
+  watcher->cached_ignore_rules_version = 0;
 }
 
 // 更新扫描完成后的回调函数
@@ -159,6 +161,52 @@ auto directory_notification_requires_full_rescan(Core::State::AppState& app_stat
     default:
       return false;
   }
+}
+
+auto get_cached_watcher_ignore_rules(Core::State::AppState& app_state,
+                                     const std::shared_ptr<State::FolderWatcherState>& watcher)
+    -> std::expected<std::vector<Types::IgnoreRule>, std::string> {
+  // 早期过滤只用于减少无效 watcher 工作量，不是最终入库依据；
+  // apply_incremental_sync 仍会重新从 DB 加载规则做最终判断。
+  const auto current_version =
+      app_state.gallery ? app_state.gallery->ignore_rules_version.load(std::memory_order_acquire)
+                        : 0;
+
+  {
+    std::lock_guard<std::mutex> lock(watcher->pending_mutex);
+    // 版本一致说明 Repository 之后没有改过规则，可以直接复用缓存，避免频繁查库。
+    if (watcher->cached_ignore_rules.has_value() &&
+        watcher->cached_ignore_rules_version == current_version) {
+      return watcher->cached_ignore_rules.value();
+    }
+  }
+
+  auto root_folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(
+      app_state, watcher->root_path.string());
+  if (!root_folder_result) {
+    return std::unexpected("Failed to query root folder: " + root_folder_result.error());
+  }
+
+  std::optional<std::int64_t> root_folder_id;
+  if (root_folder_result->has_value()) {
+    root_folder_id = root_folder_result->value().id;
+  }
+
+  auto rules_result =
+      Features::Gallery::Ignore::Service::load_ignore_rules(app_state, root_folder_id);
+  if (!rules_result) {
+    return std::unexpected("Failed to load ignore rules: " + rules_result.error());
+  }
+
+  auto rules = std::move(rules_result.value());
+  {
+    std::lock_guard<std::mutex> lock(watcher->pending_mutex);
+    // 缓存一份副本给后续通知批次复用；返回值也用副本，避免调用方持有内部引用。
+    watcher->cached_ignore_rules = rules;
+    watcher->cached_ignore_rules_version = current_version;
+  }
+
+  return rules;
 }
 
 // 检查是否有待处理的变更（包含全量重扫标记或文件变更）
@@ -989,26 +1037,74 @@ auto process_watch_notifications(Core::State::AppState& app_state,
     return;
   }
 
+  auto options = get_watcher_scan_options(watcher);
+  const auto supported_extensions =
+      options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
+  std::optional<std::vector<Types::IgnoreRule>> ignore_rules;
+  bool ignore_rules_load_failed = false;
+  bool queued_changes = false;
+
+  // 第二轮只处理文件级事件：
+  // 目录级影响前面已经判断过；这里再把目录放进文件稳定队列没有意义。
   for (const auto& notification : effective_notifications) {
     auto normalized_path = notification.path.string();
 
     switch (notification.action) {
       case FILE_ACTION_ADDED:
       case FILE_ACTION_MODIFIED:
-      case FILE_ACTION_RENAMED_NEW_NAME:
+      case FILE_ACTION_RENAMED_NEW_NAME: {
+        if (notification.is_directory) {
+          break;
+        }
+
+        const auto candidate_path = std::filesystem::path(normalized_path);
+        // 扩展名过滤比 ignore rules 便宜，先用它拦住 .tmp/.bin 等一定不会入库的文件。
+        if (!ScanCommon::is_supported_file(candidate_path, supported_extensions)) {
+          break;
+        }
+
+        // 同一个通知批次最多取一次 ignore rules；底层还有版本缓存，通常不会查 DB。
+        if (!ignore_rules.has_value() && !ignore_rules_load_failed) {
+          auto rules_result = get_cached_watcher_ignore_rules(app_state, watcher);
+          if (rules_result) {
+            ignore_rules = std::move(rules_result.value());
+          } else {
+            ignore_rules_load_failed = true;
+            Logger().warn("Failed to load watcher ignore rules for '{}': {}",
+                          watcher->root_path.string(), rules_result.error());
+          }
+        }
+
+        // UPSERT 可以早过滤：被忽略的新文件本来就不应该进入图库。
+        if (ignore_rules.has_value() &&
+            Features::Gallery::Ignore::Service::apply_ignore_rules(
+                candidate_path, watcher->root_path, ignore_rules.value())) {
+          break;
+        }
+
         // 文件刚出现或仍在写入时，先观察稳定性，再决定是否真正入库。
         stage_file_change_for_stability(watcher, normalized_path);
+        queued_changes = true;
         break;
+      }
       case FILE_ACTION_REMOVED:
       case FILE_ACTION_RENAMED_OLD_NAME:
+        if (notification.is_directory) {
+          break;
+        }
+        // REMOVE 不按 ignore rules 丢弃：
+        // 规则可能是在文件入库后才改的，删除事件仍需要机会清理历史数据库记录。
         queue_file_change(watcher, normalized_path, State::PendingFileChangeAction::REMOVE);
+        queued_changes = true;
         break;
       default:
         break;
     }
   }
 
-  schedule_sync_task(app_state, watcher);
+  if (queued_changes) {
+    schedule_sync_task(app_state, watcher);
+  }
 }
 
 // 目录监听主循环（运行在独立线程中），阻塞调用系统 API 读取文件变更
