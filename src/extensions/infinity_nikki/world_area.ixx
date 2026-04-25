@@ -31,5 +31,6 @@ struct WorldPolygonRule {
 export auto belongs_to_world(const GamePoint& point, std::string_view world_id) -> bool;
 export auto match_world_id(const GamePoint& point) -> std::optional<std::string>;
 export auto resolve_world_id_or_default(const GamePoint& point) -> std::string;
+export auto normalize_world_id(std::string_view world_id) -> std::string;
 
 }  // namespace Extensions::InfinityNikki::WorldArea

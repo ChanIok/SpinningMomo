@@ -8,7 +8,16 @@ import { Separator } from '@/components/ui/separator'
 import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
-import { getInfinityNikkiMetadataNames, setInfinityNikkiUserRecord } from '../../api'
+import {
+  getInfinityNikkiMetadataNames,
+  setInfinityNikkiUserRecord,
+  setInfinityNikkiWorldRecord,
+} from '../../api'
+import {
+  getInfinityNikkiWorldName,
+  INFINITY_NIKKI_WORLD_OPTIONS,
+  normalizeInfinityNikkiWorldId,
+} from '@/extensions/infinity_nikki/worlds'
 import type {
   InfinityNikkiDetails,
   InfinityNikkiExtractedParams,
@@ -32,19 +41,36 @@ const codeTypeDraft = ref<InfinityNikkiUserRecordCodeType>('dye')
 const codeValueDraft = ref('')
 const isSavingUserRecord = ref(false)
 const isCodeTypePopoverOpen = ref(false)
+const isSavingWorldRecord = ref(false)
+const isWorldPopoverOpen = ref(false)
 
 const extracted = computed(() => props.details.extracted)
 const currentUserRecord = computed(() => props.details.userRecord)
+const currentMapArea = computed(() => props.details.mapArea)
 const hasCodeValueDraft = computed(() => codeValueDraft.value.trim().length > 0)
 const currentCodeTypeLabel = computed(() => getCodeTypeLabel(codeTypeDraft.value))
+const currentWorldId = computed(() => currentMapArea.value?.worldId)
+const currentWorldLabel = computed(() =>
+  currentWorldId.value ? getInfinityNikkiWorldName(currentWorldId.value, locale.value) : null
+)
+const currentWorldTitle = computed(() => {
+  if (!currentMapArea.value) return undefined
+  const autoWorldLabel = getInfinityNikkiWorldName(currentMapArea.value.autoWorldId, locale.value)
+  const userWorldLabel = currentMapArea.value.userWorldId
+    ? getInfinityNikkiWorldName(currentMapArea.value.userWorldId, locale.value)
+    : undefined
+  if (!userWorldLabel) {
+    return `ID: ${currentMapArea.value.autoWorldId}`
+  }
+  return `${userWorldLabel} (ID: ${currentMapArea.value.userWorldId}) / ${autoWorldLabel} (ID: ${currentMapArea.value.autoWorldId})`
+})
 // 当前面板实际使用的“已翻译名称”结果。
 const metadataNames = ref<InfinityNikkiMetadataNames>({})
 // 面板级缓存：key=语言+filter/pose/light 三元组，value=映射结果。
 const metadataNamesCache = new Map<string, InfinityNikkiMetadataNames>()
 
 function syncDraftFromProps() {
-  codeTypeDraft.value = currentUserRecord.value?.codeType ?? 'dye'
-  codeValueDraft.value = currentUserRecord.value?.codeValue ?? ''
+  codeValueDraft.value = getCodeValue(currentUserRecord.value, codeTypeDraft.value)
 }
 
 watch(
@@ -118,6 +144,43 @@ function resetUserRecordDraft() {
   syncDraftFromProps()
 }
 
+function getCodeValue(
+  record: InfinityNikkiDetails['userRecord'],
+  codeType: InfinityNikkiUserRecordCodeType
+): string {
+  if (!record) {
+    return ''
+  }
+  return codeType === 'home_building' ? (record.homeBuildingCode ?? '') : (record.dyeCode ?? '')
+}
+
+function buildUserRecord(details: {
+  dyeCode?: string
+  homeBuildingCode?: string
+  worldId?: string
+}): InfinityNikkiDetails['userRecord'] {
+  if (!details.dyeCode && !details.homeBuildingCode && !details.worldId) {
+    return undefined
+  }
+  return {
+    dyeCode: details.dyeCode,
+    homeBuildingCode: details.homeBuildingCode,
+    worldId: details.worldId,
+  }
+}
+
+function buildUpdatedUserRecordForCode(
+  codeType: InfinityNikkiUserRecordCodeType,
+  codeValue: string | undefined
+): InfinityNikkiDetails['userRecord'] {
+  const currentRecord = currentUserRecord.value
+  return buildUserRecord({
+    dyeCode: codeType === 'dye' ? codeValue : currentRecord?.dyeCode,
+    homeBuildingCode: codeType === 'home_building' ? codeValue : currentRecord?.homeBuildingCode,
+    worldId: currentRecord?.worldId,
+  })
+}
+
 async function handleUserRecordCommit() {
   if (isSavingUserRecord.value) {
     return
@@ -125,15 +188,14 @@ async function handleUserRecordCommit() {
 
   const normalizedCodeValue = codeValueDraft.value.trim()
   const nextCodeType = codeTypeDraft.value
-  const currentCodeType = currentUserRecord.value?.codeType ?? 'dye'
-  const currentCodeValue = (currentUserRecord.value?.codeValue ?? '').trim()
+  const currentCodeValue = getCodeValue(currentUserRecord.value, nextCodeType).trim()
   codeValueDraft.value = normalizedCodeValue
 
-  if (!currentUserRecord.value && !normalizedCodeValue) {
+  if (!currentCodeValue && !normalizedCodeValue) {
     return
   }
 
-  if (normalizedCodeValue === currentCodeValue && nextCodeType === currentCodeType) {
+  if (normalizedCodeValue === currentCodeValue) {
     return
   }
 
@@ -148,12 +210,8 @@ async function handleUserRecordCommit() {
 
     emit('updated', {
       extracted: props.details.extracted,
-      userRecord: normalizedCodeValue
-        ? {
-            codeType: nextCodeType,
-            codeValue: normalizedCodeValue,
-          }
-        : undefined,
+      userRecord: buildUpdatedUserRecordForCode(nextCodeType, normalizedCodeValue || undefined),
+      mapArea: props.details.mapArea,
     })
   } catch (error) {
     resetUserRecordDraft()
@@ -207,9 +265,60 @@ async function handleSelectCodeType(nextCodeType: InfinityNikkiUserRecordCodeTyp
     return
   }
 
+  await handleUserRecordCommit()
   codeTypeDraft.value = nextCodeType
-  if (hasCodeValueDraft.value || currentUserRecord.value) {
-    await handleUserRecordCommit()
+  syncDraftFromProps()
+}
+
+async function handleSelectWorldId(nextWorldId: string | undefined) {
+  if (isSavingWorldRecord.value) {
+    return
+  }
+
+  isWorldPopoverOpen.value = false
+  const normalizedWorldId = nextWorldId ? normalizeInfinityNikkiWorldId(nextWorldId) : undefined
+  const currentUserWorldId = currentMapArea.value?.userWorldId
+    ? normalizeInfinityNikkiWorldId(currentMapArea.value.userWorldId)
+    : undefined
+
+  if ((normalizedWorldId ?? '') === (currentUserWorldId ?? '')) {
+    return
+  }
+
+  isSavingWorldRecord.value = true
+
+  try {
+    await setInfinityNikkiWorldRecord({
+      assetId: props.assetId,
+      worldId: normalizedWorldId,
+    })
+
+    const autoWorldId = currentMapArea.value?.autoWorldId
+    const nextMapArea =
+      autoWorldId && (normalizedWorldId || currentMapArea.value)
+        ? {
+            autoWorldId,
+            userWorldId: normalizedWorldId,
+            worldId: normalizedWorldId ?? autoWorldId,
+          }
+        : props.details.mapArea
+
+    emit('updated', {
+      extracted: props.details.extracted,
+      userRecord: buildUserRecord({
+        dyeCode: currentUserRecord.value?.dyeCode,
+        homeBuildingCode: currentUserRecord.value?.homeBuildingCode,
+        worldId: normalizedWorldId,
+      }),
+      mapArea: nextMapArea,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.details.infinityNikki.saveWorldRecordFailed'), {
+      description: message,
+    })
+  } finally {
+    isSavingWorldRecord.value = false
   }
 }
 
@@ -323,16 +432,6 @@ watch(
   },
   { immediate: true }
 )
-
-function formatLocation(params: InfinityNikkiExtractedParams | undefined): string | null {
-  if (!params) return null
-  const x = formatNumber(params.nikkiLocX, 2)
-  const y = formatNumber(params.nikkiLocY, 2)
-  if (!x || !y) return null
-
-  const z = formatNumber(params.nikkiLocZ, 2)
-  return z ? `(${x}, ${y}, ${z})` : `(${x}, ${y})`
-}
 </script>
 
 <template>
@@ -542,13 +641,48 @@ function formatLocation(params: InfinityNikkiExtractedParams | undefined): strin
           <span class="font-mono">{{ formatPercentage(extracted.lightStrength) }}</span>
         </div>
 
-        <div v-if="formatLocation(extracted)" class="flex justify-between gap-2">
+        <div v-if="currentWorldLabel" class="flex items-center justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
             t('gallery.details.infinityNikki.nikkiLocation')
           }}</span>
-          <span class="truncate" :title="formatLocation(extracted) ?? undefined">{{
-            formatLocation(extracted)
-          }}</span>
+          <div class="flex min-w-0 items-center gap-1">
+            <span class="truncate" :title="currentWorldTitle">{{ currentWorldLabel }}</span>
+            <Popover v-model:open="isWorldPopoverOpen">
+              <PopoverTrigger as-child>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-5 w-5 text-muted-foreground"
+                  :disabled="isSavingWorldRecord"
+                >
+                  <ChevronDown class="h-3 w-3" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" class="w-44 p-1">
+                <button
+                  type="button"
+                  class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+                  @click="void handleSelectWorldId(undefined)"
+                >
+                  <span>{{ t('gallery.details.infinityNikki.mapArea.auto') }}</span>
+                  <Check v-if="!currentMapArea?.userWorldId" class="h-3.5 w-3.5" />
+                </button>
+                <button
+                  v-for="world in INFINITY_NIKKI_WORLD_OPTIONS"
+                  :key="world.id"
+                  type="button"
+                  class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
+                  @click="void handleSelectWorldId(world.id)"
+                >
+                  <span>{{ getInfinityNikkiWorldName(world.id, locale) }}</span>
+                  <Check
+                    v-if="normalizeInfinityNikkiWorldId(currentMapArea?.userWorldId) === world.id"
+                    class="h-3.5 w-3.5"
+                  />
+                </button>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
         <div v-if="formatMetadataId(extracted.filterId)" class="flex justify-between gap-2">
           <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{

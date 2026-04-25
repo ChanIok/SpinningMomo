@@ -280,6 +280,25 @@ auto handle_set_infinity_nikki_user_record(
   co_return result.value();
 }
 
+auto handle_set_infinity_nikki_world_record(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::SetInfinityNikkiWorldRecordParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result =
+      Features::Gallery::Asset::Service::set_infinity_nikki_world_record(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  if (result->affected_count.value_or(0) > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+
+  co_return result.value();
+}
+
 auto handle_check_asset_reachable(Core::State::AppState& app_state,
                                   const CheckAssetReachableParams& params)
     -> RpcAwaitable<CheckAssetReachableResult> {
@@ -436,6 +455,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.setInfinityNikkiUserRecord",
       handle_set_infinity_nikki_user_record,
       "Set or clear a single Infinity Nikki user record in the gallery details panel");
+
+  register_method<Features::Gallery::Types::SetInfinityNikkiWorldRecordParams,
+                  Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.setInfinityNikkiWorldRecord",
+      handle_set_infinity_nikki_world_record,
+      "Set or clear a single Infinity Nikki world record in the gallery details panel");
 
   register_method<CheckAssetReachableParams, CheckAssetReachableResult>(
       app_state, app_state.rpc->registry, "gallery.checkAssetReachable",

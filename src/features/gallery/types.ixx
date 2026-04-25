@@ -444,13 +444,21 @@ struct InfinityNikkiExtractedParams {
 };
 
 struct InfinityNikkiUserRecord {
-  std::string code_type;
-  std::string code_value;
+  std::optional<std::string> dye_code;
+  std::optional<std::string> home_building_code;
+  std::optional<std::string> world_id;
+};
+
+struct InfinityNikkiMapArea {
+  std::string auto_world_id;
+  std::optional<std::string> user_world_id;
+  std::string world_id;
 };
 
 struct InfinityNikkiDetails {
   std::optional<InfinityNikkiExtractedParams> extracted;
   std::optional<InfinityNikkiUserRecord> user_record;
+  std::optional<InfinityNikkiMapArea> map_area;
 };
 
 struct GetInfinityNikkiMetadataNamesParams {
@@ -515,6 +523,11 @@ struct SetInfinityNikkiUserRecordParams {
   std::int64_t asset_id;
   std::string code_type;
   std::optional<std::string> code_value;
+};
+
+struct SetInfinityNikkiWorldRecordParams {
+  std::int64_t asset_id;
+  std::optional<std::string> world_id;
 };
 
 struct GetTagStatsParams {};

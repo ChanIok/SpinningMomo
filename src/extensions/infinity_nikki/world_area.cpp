@@ -6,7 +6,7 @@ import std;
 
 namespace Extensions::InfinityNikki::WorldArea {
 
-constexpr std::string_view kDefaultWorldId = "1.1";
+constexpr std::string_view kDefaultWorldId = "1";
 
 const std::vector<WorldPolygonRule> kWorldPolygonRules = {
     {
@@ -27,7 +27,7 @@ const std::vector<WorldPolygonRule> kWorldPolygonRules = {
         .z_range = ZRange{.min = -20000.0, .max = -16000.0},
     },
     {
-        .world_id = "10000001.1",
+        .world_id = "10000001",
         .polygon =
             {
                 {.x = -256683.761, .y = 545333.456},
@@ -42,7 +42,7 @@ const std::vector<WorldPolygonRule> kWorldPolygonRules = {
         .z_range = ZRange{.min = 0.0, .max = 55000.0},
     },
     {
-        .world_id = "10000002.1",
+        .world_id = "10000002",
         .polygon =
             {
                 {.x = -56945.06811, .y = 8981.391768},
@@ -56,7 +56,7 @@ const std::vector<WorldPolygonRule> kWorldPolygonRules = {
         .z_range = ZRange{.min = 0.0, .max = 32000.0},
     },
     {
-        .world_id = "10000010.1",
+        .world_id = "10000010",
         .polygon =
             {
                 {.x = -324475.09316, .y = 186121.062976},
@@ -70,7 +70,7 @@ const std::vector<WorldPolygonRule> kWorldPolygonRules = {
         .z_range = ZRange{.min = -20000.0, .max = 5000.0},
     },
     {
-        .world_id = "10000027.1",
+        .world_id = "10000027",
         .polygon =
             {
                 {.x = -360200.62985, .y = 149027.655483},
@@ -84,7 +84,7 @@ const std::vector<WorldPolygonRule> kWorldPolygonRules = {
         .z_range = ZRange{.min = -20000.0, .max = 5000.0},
     },
     {
-        .world_id = "4020034.3",
+        .world_id = "4020034",
         .polygon =
             {
                 {.x = 42247.93604, .y = -300.600838},
@@ -125,6 +125,14 @@ auto trim_ascii_copy(std::string_view value) -> std::string {
   }
 
   return std::string(value.substr(start, end - start));
+}
+
+auto normalize_world_id(std::string_view world_id) -> std::string {
+  auto normalized_world_id = trim_ascii_copy(world_id);
+  if (const auto dot_pos = normalized_world_id.find('.'); dot_pos != std::string::npos) {
+    normalized_world_id = normalized_world_id.substr(0, dot_pos);
+  }
+  return normalized_world_id;
 }
 
 struct BoundingBox {
@@ -186,7 +194,7 @@ auto get_compiled_rules() -> const std::vector<CompiledWorldPolygonRule>& {
 }
 
 auto find_compiled_rule_by_world_id(std::string_view world_id) -> const CompiledWorldPolygonRule* {
-  const auto normalized_world_id = trim_ascii_copy(world_id);
+  const auto normalized_world_id = normalize_world_id(world_id);
   if (normalized_world_id.empty()) {
     return nullptr;
   }

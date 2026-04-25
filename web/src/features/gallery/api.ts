@@ -32,6 +32,7 @@ import type {
   MoveAssetsToFolderParams,
   UpdateAssetDescriptionParams,
   SetInfinityNikkiUserRecordParams,
+  SetInfinityNikkiWorldRecordParams,
   AssetReachability,
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -653,6 +654,22 @@ export async function setInfinityNikkiUserRecord(
 }
 
 /**
+ * 设置 Infinity Nikki 地图区域记录
+ */
+export async function setInfinityNikkiWorldRecord(
+  params: SetInfinityNikkiWorldRecordParams
+): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.setInfinityNikkiWorldRecord', params)
+
+    return result
+  } catch (error) {
+    console.error('Failed to set Infinity Nikki world record:', error)
+    throw new Error('更新无限暖暖地图区域失败')
+  }
+}
+
+/**
  * 批量获取多个资产的标签
  */
 export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<number, Tag[]>> {
@@ -724,4 +741,5 @@ export const galleryApi = {
   updateAssetsReviewState,
   updateAssetDescription,
   setInfinityNikkiUserRecord,
+  setInfinityNikkiWorldRecord,
 }

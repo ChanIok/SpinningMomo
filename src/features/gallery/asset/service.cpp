@@ -97,6 +97,132 @@ auto trim_ascii_copy(std::string_view value) -> std::string {
   return std::string(value.substr(start, end - start));
 }
 
+auto normalize_world_id_copy(std::string_view value) -> std::string {
+  return Extensions::InfinityNikki::WorldArea::normalize_world_id(value);
+}
+
+struct PhotoMapPointWithWorldRecord {
+  std::int64_t asset_id;
+  std::string name;
+  std::optional<std::string> hash;
+  std::optional<std::int64_t> file_created_at;
+  double nikki_loc_x;
+  double nikki_loc_y;
+  std::optional<double> nikki_loc_z;
+  std::int64_t asset_index;
+  std::optional<std::string> user_world_id;
+};
+
+struct InfinityNikkiUserRecordRow {
+  std::string record_key;
+  std::string record_value;
+};
+
+auto read_infinity_nikki_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
+    -> std::expected<Types::InfinityNikkiUserRecord, std::string> {
+  auto rows_result = Core::Database::query<InfinityNikkiUserRecordRow>(*app_state.database,
+                                                                       R"(
+        SELECT record_key,
+               record_value
+        FROM asset_infinity_nikki_user_record
+        WHERE asset_id = ?
+      )",
+                                                                       {asset_id});
+  if (!rows_result) {
+    return std::unexpected("Failed to query Infinity Nikki user record: " + rows_result.error());
+  }
+
+  Types::InfinityNikkiUserRecord record;
+  for (const auto& row : rows_result.value()) {
+    if (row.record_key == "dye_code") {
+      record.dye_code = row.record_value;
+    } else if (row.record_key == "home_building_code") {
+      record.home_building_code = row.record_value;
+    } else if (row.record_key == "world_id") {
+      record.world_id = normalize_world_id_copy(row.record_value);
+    }
+  }
+
+  return record;
+}
+
+auto has_infinity_nikki_user_record_value(const Types::InfinityNikkiUserRecord& record) -> bool {
+  return record.dye_code.has_value() || record.home_building_code.has_value() ||
+         record.world_id.has_value();
+}
+
+auto user_record_key_for_code_type(std::string_view code_type) -> std::optional<std::string> {
+  if (code_type == "dye") {
+    return std::string("dye_code");
+  }
+  if (code_type == "home_building") {
+    return std::string("home_building_code");
+  }
+  return std::nullopt;
+}
+
+auto build_infinity_nikki_map_area(
+    const std::optional<Types::InfinityNikkiExtractedParams>& extracted,
+    const Types::InfinityNikkiUserRecord& user_record)
+    -> std::optional<Types::InfinityNikkiMapArea> {
+  if (!extracted.has_value() || !extracted->nikki_loc_x.has_value() ||
+      !extracted->nikki_loc_y.has_value()) {
+    return std::nullopt;
+  }
+
+  const Extensions::InfinityNikki::WorldArea::GamePoint game_point{
+      .x = *extracted->nikki_loc_x,
+      .y = *extracted->nikki_loc_y,
+      .z = extracted->nikki_loc_z,
+  };
+  const auto auto_world_id =
+      Extensions::InfinityNikki::WorldArea::resolve_world_id_or_default(game_point);
+  const auto user_world_id =
+      user_record.world_id.has_value()
+          ? std::optional<std::string>{normalize_world_id_copy(*user_record.world_id)}
+          : std::nullopt;
+
+  return Types::InfinityNikkiMapArea{
+      .auto_world_id = auto_world_id,
+      .user_world_id = user_world_id,
+      .world_id = user_world_id.value_or(auto_world_id),
+  };
+}
+
+auto upsert_infinity_nikki_user_record_key(Core::State::AppState& app_state, std::int64_t asset_id,
+                                           std::string_view record_key,
+                                           std::string_view record_value)
+    -> std::expected<void, std::string> {
+  auto result =
+      Core::Database::execute(*app_state.database,
+                              R"(
+      INSERT INTO asset_infinity_nikki_user_record (asset_id, record_key, record_value)
+      VALUES (?, ?, ?)
+      ON CONFLICT(asset_id, record_key) DO UPDATE SET
+        record_value = excluded.record_value
+    )",
+                              {asset_id, std::string(record_key), std::string(record_value)});
+  if (!result) {
+    return std::unexpected("Failed to upsert Infinity Nikki user record key: " + result.error());
+  }
+  return {};
+}
+
+auto delete_infinity_nikki_user_record_keys(Core::State::AppState& app_state, std::int64_t asset_id,
+                                            const std::vector<std::string>& record_keys)
+    -> std::expected<void, std::string> {
+  for (const auto& record_key : record_keys) {
+    auto result = Core::Database::execute(
+        *app_state.database,
+        "DELETE FROM asset_infinity_nikki_user_record WHERE asset_id = ? AND record_key = ?",
+        {asset_id, record_key});
+    if (!result) {
+      return std::unexpected("Failed to delete Infinity Nikki user record key: " + result.error());
+    }
+  }
+  return {};
+}
+
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
                                 std::string_view asset_table_alias = "")
     -> std::expected<std::pair<std::string, std::vector<Core::Database::Types::DbParam>>,
@@ -568,10 +694,14 @@ auto query_photo_map_points(Core::State::AppState& app_state,
            p.nikki_loc_x,
            p.nikki_loc_y,
            p.nikki_loc_z,
-           ia.asset_index AS asset_index
+           ia.asset_index AS asset_index,
+           wr.record_value AS user_world_id
     FROM indexed_assets ia
     INNER JOIN filtered_assets fa ON fa.id = ia.id
     INNER JOIN asset_infinity_nikki_params p ON p.asset_id = ia.id
+    LEFT JOIN asset_infinity_nikki_user_record wr
+      ON wr.asset_id = ia.id
+     AND wr.record_key = 'world_id'
     WHERE p.nikki_loc_x IS NOT NULL
       AND p.nikki_loc_y IS NOT NULL
       AND fa.asset_type IN ('photo', 'live_photo')
@@ -579,12 +709,13 @@ auto query_photo_map_points(Core::State::AppState& app_state,
   )",
                                 where_clause, order_config.indexed_order_clause);
 
-  auto result = Core::Database::query<Types::PhotoMapPoint>(*app_state.database, sql, query_params);
+  auto result =
+      Core::Database::query<PhotoMapPointWithWorldRecord>(*app_state.database, sql, query_params);
   if (!result) {
     return std::unexpected("Failed to query photo map points: " + result.error());
   }
 
-  const auto world_id = trim_ascii_copy(params.world_id);
+  const auto world_id = normalize_world_id_copy(params.world_id);
   if (world_id.empty()) {
     return std::vector<Types::PhotoMapPoint>{};
   }
@@ -599,11 +730,22 @@ auto query_photo_map_points(Core::State::AppState& app_state,
         .z = point.nikki_loc_z,
     };
     const auto resolved_world_id =
-        Extensions::InfinityNikki::WorldArea::resolve_world_id_or_default(game_point);
+        point.user_world_id.has_value()
+            ? normalize_world_id_copy(*point.user_world_id)
+            : Extensions::InfinityNikki::WorldArea::resolve_world_id_or_default(game_point);
     if (resolved_world_id != world_id) {
       continue;
     }
-    filtered_points.push_back(point);
+    filtered_points.push_back(Types::PhotoMapPoint{
+        .asset_id = point.asset_id,
+        .name = point.name,
+        .hash = point.hash,
+        .file_created_at = point.file_created_at,
+        .nikki_loc_x = point.nikki_loc_x,
+        .nikki_loc_y = point.nikki_loc_y,
+        .nikki_loc_z = point.nikki_loc_z,
+        .asset_index = point.asset_index,
+    });
   }
 
   return filtered_points;
@@ -763,22 +905,20 @@ auto get_infinity_nikki_details(Core::State::AppState& app_state,
                            extracted_result.error());
   }
 
-  std::string user_record_sql = R"(
-    SELECT code_type,
-           code_value
-    FROM asset_infinity_nikki_user_record
-    WHERE asset_id = ?
-  )";
-
-  auto user_record_result = Core::Database::query_single<Types::InfinityNikkiUserRecord>(
-      *app_state.database, user_record_sql, {params.asset_id});
+  auto user_record_result = read_infinity_nikki_user_record(app_state, params.asset_id);
   if (!user_record_result) {
-    return std::unexpected("Failed to query Infinity Nikki user record: " +
-                           user_record_result.error());
+    return std::unexpected(user_record_result.error());
   }
 
+  auto user_record = std::move(user_record_result.value());
+  auto map_area = build_infinity_nikki_map_area(extracted_result.value(), user_record);
+  auto user_record_optional = has_infinity_nikki_user_record_value(user_record)
+                                  ? std::optional<Types::InfinityNikkiUserRecord>{user_record}
+                                  : std::nullopt;
+
   return Types::InfinityNikkiDetails{.extracted = extracted_result.value(),
-                                     .user_record = user_record_result.value()};
+                                     .user_record = std::move(user_record_optional),
+                                     .map_area = std::move(map_area)};
 }
 
 auto get_asset_main_colors(Core::State::AppState& app_state,
@@ -939,6 +1079,10 @@ auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
   if (params.code_type != "dye" && params.code_type != "home_building") {
     return std::unexpected("Infinity Nikki code type must be one of dye, home_building");
   }
+  const auto record_key = user_record_key_for_code_type(params.code_type);
+  if (!record_key.has_value()) {
+    return std::unexpected("Unsupported Infinity Nikki code type");
+  }
 
   auto asset_result =
       Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
@@ -959,49 +1103,70 @@ auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
     normalized_code_value = std::nullopt;
   }
 
+  auto write_result = Core::Database::execute_transaction(
+      *app_state.database, [&](auto&) -> std::expected<void, std::string> {
+        if (normalized_code_value.has_value()) {
+          auto value_result = upsert_infinity_nikki_user_record_key(
+              app_state, params.asset_id, *record_key, normalized_code_value.value());
+          if (!value_result) {
+            return std::unexpected(value_result.error());
+          }
+          return {};
+        }
+
+        return delete_infinity_nikki_user_record_keys(app_state, params.asset_id, {*record_key});
+      });
+
+  if (!write_result) {
+    return std::unexpected(write_result.error());
+  }
+
+  return Types::OperationResult{.success = true,
+                                .message = "Infinity Nikki user record updated successfully",
+                                .affected_count = 1};
+}
+
+auto set_infinity_nikki_world_record(Core::State::AppState& app_state,
+                                     const Types::SetInfinityNikkiWorldRecordParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (params.asset_id <= 0) {
+    return std::unexpected("Asset id must be greater than 0");
+  }
+
+  auto asset_result =
+      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+  if (!asset_result) {
+    return std::unexpected("Failed to load asset before updating Infinity Nikki world record: " +
+                           asset_result.error());
+  }
+
+  if (!asset_result->has_value()) {
+    return std::unexpected("Asset not found");
+  }
+
+  auto normalized_world_id =
+      params.world_id.has_value()
+          ? std::optional<std::string>{normalize_world_id_copy(params.world_id.value())}
+          : std::nullopt;
+  if (normalized_world_id.has_value() && normalized_world_id->empty()) {
+    normalized_world_id = std::nullopt;
+  }
+
   std::expected<void, std::string> write_result;
-  if (normalized_code_value.has_value()) {
-    auto result =
-        Core::Database::execute(*app_state.database,
-                                R"(
-          INSERT INTO asset_infinity_nikki_user_record (asset_id, code_type, code_value)
-          VALUES (?, ?, ?)
-          ON CONFLICT(asset_id) DO UPDATE SET
-            code_type = excluded.code_type,
-            code_value = excluded.code_value
-        )",
-                                {params.asset_id, params.code_type, normalized_code_value.value()});
-    if (!result) {
-      write_result =
-          std::unexpected("Failed to upsert Infinity Nikki user record: " + result.error());
-    } else {
-      write_result = {};
-    }
+  if (normalized_world_id.has_value()) {
+    write_result = upsert_infinity_nikki_user_record_key(app_state, params.asset_id, "world_id",
+                                                         normalized_world_id.value());
   } else {
-    auto result = Core::Database::execute(
-        *app_state.database, "DELETE FROM asset_infinity_nikki_user_record WHERE asset_id = ?",
-        {params.asset_id});
-    if (!result) {
-      write_result =
-          std::unexpected("Failed to delete Infinity Nikki user record: " + result.error());
-    } else {
-      write_result = {};
-    }
+    write_result = delete_infinity_nikki_user_record_keys(app_state, params.asset_id, {"world_id"});
   }
 
   if (!write_result) {
     return std::unexpected(write_result.error());
   }
 
-  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT changes()");
-  if (!result) {
-    return std::unexpected("Failed to query updated Infinity Nikki user record count: " +
-                           result.error());
-  }
-
   return Types::OperationResult{.success = true,
-                                .message = "Infinity Nikki user record updated successfully",
-                                .affected_count = result->value_or(0)};
+                                .message = "Infinity Nikki world record updated successfully",
+                                .affected_count = 1};
 }
 
 auto get_infinity_nikki_metadata_names(Core::State::AppState& app_state,

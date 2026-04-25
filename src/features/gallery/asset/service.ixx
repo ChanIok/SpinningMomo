@@ -52,6 +52,10 @@ export auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
                                            const Types::SetInfinityNikkiUserRecordParams& params)
     -> std::expected<Types::OperationResult, std::string>;
 
+export auto set_infinity_nikki_world_record(Core::State::AppState& app_state,
+                                            const Types::SetInfinityNikkiWorldRecordParams& params)
+    -> std::expected<Types::OperationResult, std::string>;
+
 export auto get_infinity_nikki_metadata_names(
     Core::State::AppState& app_state, const Types::GetInfinityNikkiMetadataNamesParams& params)
     -> asio::awaitable<std::expected<Types::InfinityNikkiMetadataNames, std::string>>;

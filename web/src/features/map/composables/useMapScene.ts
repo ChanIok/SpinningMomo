@@ -9,6 +9,7 @@ import {
   createDefaultMapRuntimeOptions,
 } from '@/features/map/domain/defaults'
 import { toMapMarkers } from '@/features/map/domain/markerMapper'
+import { stripOfficialWorldVersion } from '@/features/map/domain/officialWorldId'
 import { flushMapRuntimeToIframe } from '@/features/map/composables/mapIframeRuntime'
 import { useMapStore } from '@/features/map/store'
 
@@ -83,12 +84,13 @@ export function useMapScene() {
     syncFilterCountCard(true)
 
     try {
+      const backendWorldId = stripOfficialWorldVersion(currentWorldId)
       const filters = toQueryAssetsFilters(galleryStore.filter, galleryStore.includeSubfolders)
       const nextMapPoints = await queryPhotoMapPoints({
         filters,
         sortBy: galleryStore.sortBy,
         sortOrder: galleryStore.sortOrder,
-        worldId: currentWorldId,
+        worldId: backendWorldId,
       })
       if (loadId !== loadSequence) {
         return

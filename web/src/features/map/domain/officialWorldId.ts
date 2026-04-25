@@ -20,3 +20,11 @@ export function normalizeOfficialWorldId(raw: unknown): string | undefined {
 export function normalizeOfficialWorldIdOrDefault(raw: unknown): string {
   return normalizeOfficialWorldId(raw) ?? DEFAULT_OFFICIAL_WORLD_ID
 }
+
+export function stripOfficialWorldVersion(worldId: unknown): string {
+  const normalizedWorldId = normalizeOfficialWorldId(worldId)
+  if (!normalizedWorldId) {
+    return ''
+  }
+  return normalizedWorldId.split('.')[0] ?? ''
+}

@@ -83,6 +83,11 @@ export interface SetInfinityNikkiUserRecordParams {
   codeValue?: string
 }
 
+export interface SetInfinityNikkiWorldRecordParams {
+  assetId: number
+  worldId?: string
+}
+
 // 获取资产标签参数
 export interface GetAssetTagsParams {
   assetId: number
@@ -292,13 +297,21 @@ export interface InfinityNikkiExtractedParams {
 }
 
 export interface InfinityNikkiUserRecord {
-  codeType: InfinityNikkiUserRecordCodeType
-  codeValue: string
+  dyeCode?: string
+  homeBuildingCode?: string
+  worldId?: string
+}
+
+export interface InfinityNikkiMapArea {
+  autoWorldId: string
+  userWorldId?: string
+  worldId: string
 }
 
 export interface InfinityNikkiDetails {
   extracted?: InfinityNikkiExtractedParams
   userRecord?: InfinityNikkiUserRecord
+  mapArea?: InfinityNikkiMapArea
 }
 
 export interface GetInfinityNikkiMetadataNamesParams {
