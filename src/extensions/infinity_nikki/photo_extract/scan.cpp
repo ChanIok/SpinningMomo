@@ -118,9 +118,57 @@ auto make_ntstatus_error(std::string_view api_name, NTSTATUS status) -> std::str
   return std::format("{} failed, NTSTATUS=0x{:08X}", api_name, static_cast<unsigned long>(status));
 }
 
-auto compute_md5_hex(const std::vector<std::uint8_t>& input, std::size_t length)
+struct ParsedBhashSegment {
+  std::string bhash;
+  std::optional<std::size_t> v2_md5_window;
+};
+
+auto parse_bhash_segment(std::string bhash_raw) -> std::expected<ParsedBhashSegment, std::string> {
+  constexpr std::string_view kV2Tag = "[V2]";
+  auto tag_pos = bhash_raw.rfind(kV2Tag);
+  if (tag_pos == std::string::npos) {
+    return ParsedBhashSegment{
+        .bhash = std::move(bhash_raw),
+        .v2_md5_window = std::nullopt,
+    };
+  }
+
+  auto digits_begin = tag_pos + kV2Tag.size();
+  if (digits_begin >= bhash_raw.size()) {
+    return ParsedBhashSegment{
+        .bhash = std::move(bhash_raw),
+        .v2_md5_window = std::nullopt,
+    };
+  }
+
+  auto digits_view =
+      std::string_view(bhash_raw).substr(digits_begin, bhash_raw.size() - digits_begin);
+  if (!std::ranges::all_of(digits_view, [](unsigned char ch) { return std::isdigit(ch) != 0; })) {
+    return ParsedBhashSegment{
+        .bhash = std::move(bhash_raw),
+        .v2_md5_window = std::nullopt,
+    };
+  }
+
+  std::size_t md5_window = 0;
+  auto [ptr, ec] =
+      std::from_chars(digits_view.data(), digits_view.data() + digits_view.size(), md5_window);
+  if (ec != std::errc() || ptr != digits_view.data() + digits_view.size()) {
+    return std::unexpected("Invalid [V2] suffix in bhash segment");
+  }
+  if (md5_window == 0) {
+    return std::unexpected("Invalid [V2] suffix in bhash segment: zero-length MD5 window");
+  }
+
+  return ParsedBhashSegment{
+      .bhash = bhash_raw.substr(0, tag_pos),
+      .v2_md5_window = md5_window,
+  };
+}
+
+auto compute_md5_hex(const std::vector<std::uint8_t>& input, std::size_t offset, std::size_t length)
     -> std::expected<std::string, std::string> {
-  if (length > input.size()) {
+  if (offset > input.size() || length > input.size() - offset) {
     return std::unexpected("MD5 input length exceeds payload size");
   }
 
@@ -174,9 +222,9 @@ auto compute_md5_hex(const std::vector<std::uint8_t>& input, std::size_t length)
     return std::unexpected(make_ntstatus_error("BCryptCreateHash", create_hash_status));
   }
 
-  auto hash_data_status =
-      BCryptHashData(hash_handle, const_cast<PUCHAR>(reinterpret_cast<const UCHAR*>(input.data())),
-                     static_cast<ULONG>(length), 0);
+  auto hash_data_status = BCryptHashData(
+      hash_handle, const_cast<PUCHAR>(reinterpret_cast<const UCHAR*>(input.data() + offset)),
+      static_cast<ULONG>(length), 0);
   if (!is_nt_success(hash_data_status)) {
     cleanup();
     return std::unexpected(make_ntstatus_error("BCryptHashData", hash_data_status));
@@ -221,6 +269,12 @@ auto build_photo_tuple(const std::vector<std::uint8_t>& payload, const std::stri
   auto bdata = trim_ascii_whitespace(
       std::string(reinterpret_cast<const char*>(payload.data() + roi2 + 2), (roi1 - 2) - roi2));
 
+  auto parsed_bhash = parse_bhash_segment(std::move(bhash));
+  if (!parsed_bhash) {
+    return std::unexpected(parsed_bhash.error());
+  }
+  bhash = std::move(parsed_bhash->bhash);
+
   if (!is_base64_text(bhash) || !is_base64_text(bdata)) {
     return std::unexpected("Embedded segments are not valid Base64 text");
   }
@@ -249,7 +303,18 @@ auto build_photo_tuple(const std::vector<std::uint8_t>& payload, const std::stri
   buf.insert(buf.end(), data_buf.begin(), data_buf.end());
 
   auto encoded = Utils::String::ToBase64(to_chars(buf));
-  auto md5_result = compute_md5_hex(payload, static_cast<std::size_t>(roi1));
+  std::size_t md5_start = 0;
+  std::size_t md5_length = static_cast<std::size_t>(roi1);
+  if (parsed_bhash->v2_md5_window.has_value()) {
+    auto v2_window = *parsed_bhash->v2_md5_window;
+    if (v2_window > static_cast<std::size_t>(roi1)) {
+      return std::unexpected("Invalid [V2] suffix in bhash segment: MD5 window out of range");
+    }
+    md5_start = static_cast<std::size_t>(roi1) - v2_window;
+    md5_length = v2_window;
+  }
+
+  auto md5_result = compute_md5_hex(payload, md5_start, md5_length);
   if (!md5_result) {
     return std::unexpected(md5_result.error());
   }
