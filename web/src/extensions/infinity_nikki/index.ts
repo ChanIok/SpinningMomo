@@ -108,8 +108,10 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
         (node) => node.name === 'NikkiPhotos_HighQuality'
       )
       const videosNode = uidNode.children?.find((node) => node.name === 'Videos')
+      const hasPhotos = !!nikkiPhotosNode
+      const hasVideos = !!videosNode
 
-      if (nikkiPhotosNode) {
+      if (hasPhotos && hasVideos && nikkiPhotosNode) {
         visibleChildren.push(
           createInfinityNikkiDisplayChild(
             nikkiPhotosNode,
@@ -118,7 +120,7 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
         )
       }
 
-      if (videosNode) {
+      if (hasVideos && videosNode) {
         visibleChildren.push(
           createInfinityNikkiDisplayChild(
             videosNode,
@@ -127,15 +129,26 @@ export function transformInfinityNikkiTree(tree: FolderTreeNode[]): FolderTreeNo
         )
       }
 
-      if (visibleChildren.length === 0) {
+      if (!hasPhotos) {
         continue
       }
 
-      uidNodes.push({
-        ...uidNode,
-        displayName: pickFolderDisplayName(uidNode.displayName, uidNode.name),
-        children: visibleChildren,
-      })
+      // 当 UID 下没有 Videos 时，将 UID 直接映射到照片目录。
+      // 这样在关闭“包含子文件夹”时，UID 仍稳定表示该账号全部照片。
+      if (!hasVideos && nikkiPhotosNode) {
+        uidNodes.push({
+          ...nikkiPhotosNode,
+          name: uidNode.name,
+          displayName: pickFolderDisplayName(uidNode.displayName, uidNode.name),
+          children: [],
+        })
+      } else {
+        uidNodes.push({
+          ...uidNode,
+          displayName: pickFolderDisplayName(uidNode.displayName, uidNode.name),
+          children: visibleChildren,
+        })
+      }
     }
   }
 
