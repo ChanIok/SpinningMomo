@@ -24,7 +24,7 @@ export const GALLERY_SETTINGS_STORAGE_KEY = 'spinningmomo.gallery.settings'
 export function createDefaultGallerySettings(): GallerySettings {
   return {
     view: {
-      size: 128,
+      size: 256,
       mode: 'grid' satisfies ViewMode,
     },
     navigation: {

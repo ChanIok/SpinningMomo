@@ -174,6 +174,7 @@
   "gallery.lightbox.toolbar.fit": "Fit",
   "gallery.lightbox.toolbar.fitTitle": "Fit to viewport (Z)",
   "gallery.lightbox.toolbar.immersiveTitle": "Immersive mode (F)",
+  "gallery.lightbox.toolbar.rotateTitle": "Rotate 90 degrees clockwise (Alt: counterclockwise)",
   "gallery.lightbox.toolbar.selected": "Selected",
   "gallery.lightbox.toolbar.zoomInTitle": "Zoom in (= / +)",
   "gallery.lightbox.toolbar.zoomOutTitle": "Zoom out (-)",

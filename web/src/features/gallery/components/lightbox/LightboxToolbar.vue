@@ -3,9 +3,25 @@ import { computed } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryStore } from '../../store'
 import { cn } from '@/lib/utils'
-import { Flag } from 'lucide-vue-next'
+import {
+  Flag,
+  MoreHorizontal,
+  Film,
+  RotateCw,
+  Minimize,
+  Maximize,
+  ZoomOut,
+  ZoomIn,
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
 
 const ACTUAL_SIZE_EPSILON = 0.001
@@ -16,6 +32,7 @@ const emit = defineEmits<{
   actual: []
   zoomIn: []
   zoomOut: []
+  rotate: [deltaDegrees: number]
   toggleFilmstrip: []
   toggleImmersive: []
 }>()
@@ -38,6 +55,9 @@ const currentAsset = computed(() => {
 })
 // 视频使用原生 controls，不适用灯箱图片的适屏/缩放语义。
 const supportsZoom = computed(() => currentAsset.value?.type !== 'video')
+const supportsRotate = computed(
+  () => currentAsset.value !== null && currentAsset.value.type !== 'video'
+)
 const isFitMode = computed(() => store.lightbox.fitMode === 'contain')
 const isActualSize = computed(
   () =>
@@ -61,19 +81,23 @@ const hasReviewFilter = computed(
 
 const toggleActiveClass =
   'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
+
+function handleRotateClick(event: MouseEvent) {
+  emit('rotate', event.altKey ? -90 : 90)
+}
 </script>
 
 <template>
-  <div class="flex items-center justify-between px-4 py-3">
+  <div class="@container flex items-center justify-between px-2 py-2">
     <div class="flex min-w-0 items-center gap-3 text-foreground">
       <Button
         variant="sidebarGhost"
-        size="icon"
+        size="icon-sm"
         class="shrink-0"
         @click="emit('back')"
         :title="t('gallery.lightbox.toolbar.backTitle')"
       >
-        <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -84,7 +108,7 @@ const toggleActiveClass =
       </Button>
 
       <div class="flex min-w-0 items-center gap-3">
-        <span class="shrink-0 text-sm font-medium">{{ currentIndex + 1 }} / {{ totalCount }}</span>
+        <span class="shrink-0 text-xs font-medium">{{ currentIndex + 1 }} / {{ totalCount }}</span>
         <span class="truncate text-xs text-muted-foreground">{{ lightboxMode }}</span>
         <span v-if="selectedCount > 0" class="shrink-0 text-xs text-primary">
           {{ t('gallery.lightbox.toolbar.selected') }} {{ selectedCount }}
@@ -93,10 +117,11 @@ const toggleActiveClass =
     </div>
 
     <div class="flex items-center gap-2">
-      <div class="mr-2 flex items-center gap-1">
+      <!-- 宽屏缩放控制 -->
+      <div class="mr-2 hidden items-center gap-1 @[640px]:flex">
         <Button
           variant="sidebarGhost"
-          class="h-9 px-3 text-xs"
+          class="h-8 px-2.5 text-xs"
           :disabled="!supportsZoom"
           :class="
             cn(
@@ -112,7 +137,7 @@ const toggleActiveClass =
 
         <Button
           variant="sidebarGhost"
-          class="h-9 px-3 text-xs"
+          class="h-8 px-2.5 text-xs"
           :disabled="!supportsZoom"
           :class="
             cn(
@@ -128,7 +153,7 @@ const toggleActiveClass =
 
         <Button
           variant="sidebarGhost"
-          size="icon"
+          size="icon-sm"
           :disabled="!supportsZoom"
           :class="!supportsZoom && 'cursor-not-allowed'"
           @click="emit('zoomOut')"
@@ -141,7 +166,7 @@ const toggleActiveClass =
 
         <Button
           variant="sidebarGhost"
-          size="icon"
+          size="icon-sm"
           :disabled="!supportsZoom"
           :class="!supportsZoom && 'cursor-not-allowed'"
           @click="emit('zoomIn')"
@@ -158,16 +183,70 @@ const toggleActiveClass =
         </Button>
       </div>
 
+      <Button
+        v-if="supportsRotate"
+        variant="sidebarGhost"
+        size="icon-sm"
+        class="mr-2 hidden @[640px]:inline-flex"
+        @click="handleRotateClick"
+        :title="t('gallery.lightbox.toolbar.rotateTitle')"
+      >
+        <RotateCw class="size-4" />
+      </Button>
+
+      <!-- 窄屏缩放控制 (折叠菜单) -->
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button variant="sidebarGhost" size="icon-sm" class="mr-2 flex @[640px]:hidden">
+            <MoreHorizontal class="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" class="w-40">
+          <DropdownMenuItem
+            :disabled="!supportsZoom"
+            :class="supportsZoom && isFitMode ? 'font-medium text-primary focus:text-primary' : ''"
+            @click="emit('fit')"
+          >
+            <Minimize class="mr-2 size-4" />
+            {{ t('gallery.lightbox.toolbar.fit') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            :disabled="!supportsZoom"
+            :class="
+              supportsZoom && isActualSize ? 'font-medium text-primary focus:text-primary' : ''
+            "
+            @click="emit('actual')"
+          >
+            <Maximize class="mr-2 size-4" />
+            100%
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem :disabled="!supportsZoom" @click="emit('zoomOut')">
+            <ZoomOut class="mr-2 size-4" />
+            {{ t('gallery.lightbox.toolbar.zoomOutTitle') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem :disabled="!supportsZoom" @click="emit('zoomIn')">
+            <ZoomIn class="mr-2 size-4" />
+            {{ t('gallery.lightbox.toolbar.zoomInTitle') }}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator v-if="supportsRotate" />
+          <DropdownMenuItem v-if="supportsRotate" @click="emit('rotate', 90)">
+            <RotateCw class="mr-2 size-4" />
+            {{ t('gallery.lightbox.toolbar.rotateTitle') }}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       <!-- 评分与标记筛选 -->
       <Popover>
         <PopoverTrigger as-child>
           <Button
             variant="sidebarGhost"
-            size="icon"
+            size="icon-sm"
             :class="hasReviewFilter ? 'text-primary' : ''"
             :title="t('gallery.toolbar.filter.review.tooltip')"
           >
-            <Flag class="size-5" />
+            <Flag class="size-4" />
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" class="w-56 p-3">
@@ -182,7 +261,8 @@ const toggleActiveClass =
 
       <Button
         variant="sidebarGhost"
-        size="icon"
+        size="icon-sm"
+        :class="showFilmstrip ? toggleActiveClass : ''"
         @click="emit('toggleFilmstrip')"
         :title="
           showFilmstrip
@@ -190,28 +270,12 @@ const toggleActiveClass =
             : t('gallery.lightbox.toolbar.filmstripShowTitle')
         "
       >
-        <svg
-          v-if="showFilmstrip"
-          class="size-5"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
-        <svg v-else class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-        </svg>
+        <Film class="size-4 rotate-90" />
       </Button>
 
       <Button
         variant="sidebarGhost"
-        size="icon"
+        size="icon-sm"
         @click="emit('toggleImmersive')"
         :title="
           isImmersive
@@ -221,7 +285,7 @@ const toggleActiveClass =
       >
         <svg
           v-if="isImmersive"
-          class="size-5"
+          class="size-4"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -233,7 +297,7 @@ const toggleActiveClass =
             d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3m-1-7l4-4m0 0h-3m3 0v3m-8 1l4-4m0 0v3m0-3H8"
           />
         </svg>
-        <svg v-else class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg v-else class="size-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"

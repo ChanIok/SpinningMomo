@@ -22,7 +22,7 @@ const autoRecovering = ref(false)
 const videoReady = ref(false)
 const viewportRef = ref<HTMLElement | null>(null)
 
-const VIEWPORT_PADDING = 32
+const VIEWPORT_PADDING = 0
 
 const { width, height } = useElementSize(viewportRef)
 const availableWidth = computed(() => width.value)
@@ -180,7 +180,7 @@ function handleNext() {
 
     <div
       ref="viewportRef"
-      class="h-full w-full p-8"
+      class="h-full w-full"
       :style="heroAnimating ? { visibility: 'hidden' } : {}"
     >
       <div class="flex h-full w-full items-center justify-center">
@@ -210,6 +210,7 @@ function handleNext() {
             preload="metadata"
             @loadeddata="handleVideoLoadedData"
             @error="handleVideoError"
+            @contextmenu.prevent
           />
         </div>
 

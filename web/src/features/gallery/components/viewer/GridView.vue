@@ -121,7 +121,7 @@ defineExpose({ scrollToIndex, getCardRect })
 
 <template>
   <div v-if="isTimelineMode" class="flex h-full">
-    <div ref="scrollContainerRef" class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-6">
+    <div ref="scrollContainerRef" class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-4">
       <div
         :style="{
           height: `${gridVirtualizer.virtualizer.value.getTotalSize()}px`,
@@ -142,7 +142,7 @@ defineExpose({ scrollToIndex, getCardRect })
           }"
         >
           <div
-            class="grid justify-items-center gap-4"
+            class="grid justify-items-center gap-3"
             :style="{
               gridTemplateColumns: `repeat(${columns}, 1fr)`,
             }"

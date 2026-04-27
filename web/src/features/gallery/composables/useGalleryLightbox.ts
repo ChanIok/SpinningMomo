@@ -194,6 +194,10 @@ export function useGalleryLightbox() {
     store.setLightboxZoom(zoom)
   }
 
+  function rotateView(deltaDegrees: number) {
+    store.rotateLightboxView(deltaDegrees)
+  }
+
   function toggleFitActual() {
     if (store.lightbox.fitMode === 'contain') {
       showActualSize()
@@ -238,6 +242,7 @@ export function useGalleryLightbox() {
     showFitMode,
     showActualSize,
     setActualZoom,
+    rotateView,
     toggleFitActual,
     goToPrevious,
     goToNext,

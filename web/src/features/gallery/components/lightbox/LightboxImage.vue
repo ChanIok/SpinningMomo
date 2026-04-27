@@ -7,7 +7,7 @@ import { useGalleryStore } from '../../store'
 import { useI18n } from '@/composables/useI18n'
 import { heroAnimating } from '../../composables/useHeroTransition'
 
-const VIEWPORT_PADDING = 32
+const VIEWPORT_PADDING = 0
 const ZOOM_STEP = 1.1
 // 缩放吸附容差：实际缩放比例接近 fitScale 的 1.02 倍以内时，自动吸附回适合模式
 const FIT_MODE_SNAP_RATIO = 1.02
@@ -80,10 +80,19 @@ const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
 const canGoToNext = computed(() => (store.selection.activeIndex ?? 0) < store.totalCount - 1)
 const fitMode = computed(() => store.lightbox.fitMode)
 const actualZoom = computed(() => store.lightbox.zoom)
+const rotationDegrees = computed(() => store.lightbox.rotationDegrees)
 
 const imageWidth = computed(() => currentAsset.value?.width || 0)
 const imageHeight = computed(() => currentAsset.value?.height || 0)
 const hasImageDimensions = computed(() => imageWidth.value > 0 && imageHeight.value > 0)
+const normalizedRotationDegrees = computed(() => ((rotationDegrees.value % 360) + 360) % 360)
+const isQuarterTurn = computed(() => normalizedRotationDegrees.value % 180 !== 0)
+const visualImageWidth = computed(() =>
+  isQuarterTurn.value ? imageHeight.value : imageWidth.value
+)
+const visualImageHeight = computed(() =>
+  isQuarterTurn.value ? imageWidth.value : imageHeight.value
+)
 
 const fitScale = computed(() => {
   if (
@@ -95,8 +104,8 @@ const fitScale = computed(() => {
   }
 
   return Math.min(
-    viewportInnerWidth.value / imageWidth.value,
-    viewportInnerHeight.value / imageHeight.value,
+    viewportInnerWidth.value / visualImageWidth.value,
+    viewportInnerHeight.value / visualImageHeight.value,
     1
   )
 })
@@ -114,7 +123,7 @@ const renderWidth = computed(() => {
     return Math.max(viewportInnerWidth.value, 1)
   }
 
-  return Math.max(imageWidth.value * displayScale.value, 1)
+  return Math.max(visualImageWidth.value * displayScale.value, 1)
 })
 
 const renderHeight = computed(() => {
@@ -122,7 +131,7 @@ const renderHeight = computed(() => {
     return Math.max(viewportInnerHeight.value, 1)
   }
 
-  return Math.max(imageHeight.value * displayScale.value, 1)
+  return Math.max(visualImageHeight.value * displayScale.value, 1)
 })
 
 const canvasWidth = computed(
@@ -168,6 +177,21 @@ const stageStyle = computed(() => ({
   cursor: stageCursor.value,
   touchAction: isPannable.value ? 'none' : 'auto',
 }))
+
+const imageLayerStyle = computed(() => {
+  const layerWidth = hasImageDimensions.value
+    ? Math.max(imageWidth.value * displayScale.value, 1)
+    : renderWidth.value
+  const layerHeight = hasImageDimensions.value
+    ? Math.max(imageHeight.value * displayScale.value, 1)
+    : renderHeight.value
+
+  return {
+    width: `${layerWidth}px`,
+    height: `${layerHeight}px`,
+    transform: `translate(-50%, -50%) rotate(${normalizedRotationDegrees.value}deg)`,
+  }
+})
 
 const zoomIndicator = computed(() => {
   if (fitMode.value === 'contain') {
@@ -222,6 +246,18 @@ watch(
     }
 
     clampViewportScroll()
+  },
+  { flush: 'post' }
+)
+
+watch(
+  () => normalizedRotationDegrees.value,
+  async () => {
+    resetPointerState()
+    suppressClick.value = false
+
+    await nextTick()
+    syncViewportPosition()
   },
   { flush: 'post' }
 )
@@ -311,8 +347,16 @@ function getZoomAnchor(clientX: number, clientY: number, scale: number): ZoomAnc
   return {
     pointerX,
     pointerY,
-    imageX: clamp((viewport.scrollLeft + pointerX - stageOffsetLeft) / scale, 0, imageWidth.value),
-    imageY: clamp((viewport.scrollTop + pointerY - stageOffsetTop) / scale, 0, imageHeight.value),
+    imageX: clamp(
+      (viewport.scrollLeft + pointerX - stageOffsetLeft) / scale,
+      0,
+      visualImageWidth.value
+    ),
+    imageY: clamp(
+      (viewport.scrollTop + pointerY - stageOffsetTop) / scale,
+      0,
+      visualImageHeight.value
+    ),
   }
 }
 
@@ -633,7 +677,8 @@ defineExpose({
             v-if="switchingFrame && previousFrame"
             :src="previousFrame.thumbnailUrl"
             :alt="previousFrame.name"
-            class="absolute inset-0 h-full w-full object-contain select-none"
+            :style="imageLayerStyle"
+            class="absolute top-1/2 left-1/2 max-w-none object-contain select-none"
             draggable="false"
             @dragstart.prevent
           />
@@ -641,7 +686,8 @@ defineExpose({
           <img
             :src="thumbnailUrl"
             :alt="currentAsset.name"
-            class="absolute inset-0 h-full w-full object-contain select-none"
+            :style="imageLayerStyle"
+            class="absolute top-1/2 left-1/2 max-w-none object-contain select-none"
             draggable="false"
             @dragstart.prevent
             @load="handleThumbnailLoad"
@@ -650,10 +696,8 @@ defineExpose({
           <img
             :src="originalUrl"
             :alt="currentAsset.name"
-            :style="{
-              opacity: originalLoaded ? 1 : 0,
-            }"
-            class="absolute inset-0 h-full w-full object-contain transition-opacity duration-200 select-none"
+            :style="[imageLayerStyle, { opacity: originalLoaded ? 1 : 0 }]"
+            class="absolute top-1/2 left-1/2 max-w-none object-contain transition-opacity duration-200 select-none"
             draggable="false"
             @dragstart.prevent
             @load="handleOriginalLoad"

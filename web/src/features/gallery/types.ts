@@ -196,6 +196,7 @@ export interface LightboxState {
   showFilmstrip: boolean
   zoom: number
   fitMode: 'contain' | 'cover' | 'actual'
+  rotationDegrees: number
 }
 
 // 侧边栏状态

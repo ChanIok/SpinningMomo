@@ -186,6 +186,13 @@ function handleToolbarZoomOut() {
   void lightboxImageRef.value?.zoomOut()
 }
 
+function handleToolbarRotate(deltaDegrees: number) {
+  if (!isZoomableAsset.value) {
+    return
+  }
+  lightbox.rotateView(deltaDegrees)
+}
+
 function handleToolbarToggleFilmstrip() {
   lightbox.toggleFilmstrip()
 }
@@ -352,6 +359,7 @@ useEventListener(window, 'keydown', handleKeydown)
             @actual="handleToolbarActual"
             @zoom-in="handleToolbarZoomIn"
             @zoom-out="handleToolbarZoomOut"
+            @rotate="handleToolbarRotate"
             @toggle-filmstrip="handleToolbarToggleFilmstrip"
             @toggle-immersive="handleToolbarToggleImmersive"
           />
@@ -370,8 +378,8 @@ useEventListener(window, 'keydown', handleKeydown)
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent class="w-56">
+            <GalleryAssetContextMenuContent />
             <template v-if="isZoomableAsset">
-              <GalleryAssetContextMenuContent />
               <ContextMenuSeparator />
               <ContextMenuItem inset @click="handleToolbarFit">
                 {{ t('gallery.lightbox.contextMenu.fit') }}
@@ -386,8 +394,8 @@ useEventListener(window, 'keydown', handleKeydown)
               <ContextMenuItem inset @click="handleToolbarZoomOut">
                 {{ t('gallery.lightbox.contextMenu.zoomOut') }}
               </ContextMenuItem>
-              <ContextMenuSeparator />
             </template>
+            <ContextMenuSeparator />
             <ContextMenuItem inset @click="handleToolbarToggleFilmstrip">
               {{
                 showFilmstrip

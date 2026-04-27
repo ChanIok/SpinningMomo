@@ -109,7 +109,7 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-6"
+      class="hide-scrollbar flex-1 overflow-auto py-2 pr-2 pl-4"
       @scroll="handleScroll"
     >
       <div class="pb-3">

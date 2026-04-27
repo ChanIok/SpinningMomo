@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useElementSize } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
@@ -65,6 +66,11 @@ const currentSliderPosition = computed(() => galleryView.getSliderPosition())
 const colorPopoverOpen = ref(false)
 const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
 const draftColorDistance = ref(activeColorDistance.value)
+
+// 监听工具栏宽度
+const toolbarRef = ref<HTMLElement | null>(null)
+const { width: toolbarWidth } = useElementSize(toolbarRef)
+const isWide = computed(() => toolbarWidth.value >= 480)
 
 // 评分与标记筛选
 const hasReviewFilter = computed(
@@ -168,16 +174,16 @@ function onViewSizeSliderChange(value: number[] | undefined) {
 </script>
 
 <template>
-  <div class="flex items-center justify-between gap-3 p-4">
+  <div ref="toolbarRef" class="flex items-center justify-between gap-3 py-2 pr-2 pl-4">
     <!-- 左侧：搜索框 -->
     <div class="max-w-[400px] flex-1">
       <div class="relative">
-        <Search class="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           :model-value="searchQuery"
           @update:model-value="updateSearchQuery"
           :placeholder="t('gallery.toolbar.search.placeholder')"
-          class="pl-10"
+          class="h-8 pl-9"
         />
         <Button
           v-if="searchQuery"
@@ -194,6 +200,22 @@ function onViewSizeSliderChange(value: number[] | undefined) {
 
     <!-- 右侧：筛选、排序、视图控制 -->
     <div class="flex shrink-0 items-center gap-2">
+      <!-- 独立缩略图大小调整 (宽屏) -->
+      <div
+        v-if="isWide"
+        class="mr-2 flex w-28 items-center"
+        :title="t('gallery.toolbar.thumbnailSize.label')"
+      >
+        <Slider
+          :model-value="[currentSliderPosition]"
+          @update:model-value="onViewSizeSliderChange"
+          :min="0"
+          :max="100"
+          :step="1"
+          class="w-full"
+        />
+      </div>
+
       <!-- 筛选与排序下拉菜单 -->
       <TooltipProvider>
         <Tooltip>
@@ -201,7 +223,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
             <div>
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <Button variant="sidebarGhost" size="sm">
+                  <Button variant="sidebarGhost" size="icon-sm">
                     <ListFilter class="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -301,7 +323,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
             <div>
               <Popover v-model:open="colorPopoverOpen">
                 <PopoverTrigger as-child>
-                  <Button variant="sidebarGhost" size="sm" class="relative">
+                  <Button variant="sidebarGhost" size="icon-sm" class="relative">
                     <Palette class="h-4 w-4" />
                     <span
                       v-if="activeColorHex"
@@ -387,7 +409,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                 <PopoverTrigger as-child>
                   <Button
                     variant="sidebarGhost"
-                    size="sm"
+                    size="icon-sm"
                     class="relative"
                     :class="hasReviewFilter ? 'text-primary' : ''"
                   >
@@ -422,7 +444,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
             <div>
               <Popover>
                 <PopoverTrigger as-child>
-                  <Button variant="sidebarGhost" size="sm">
+                  <Button variant="sidebarGhost" size="icon-sm">
                     <component :is="currentViewModeIcon" class="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
@@ -448,11 +470,11 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                       </div>
                     </div>
 
-                    <!-- 分隔线 -->
-                    <div class="border-t" />
+                    <!-- 分隔线 (窄屏) -->
+                    <div v-if="!isWide" class="border-t" />
 
-                    <!-- 缩略图大小调整 -->
-                    <div class="space-y-3">
+                    <!-- 缩略图大小调整 (窄屏) -->
+                    <div v-if="!isWide" class="space-y-3">
                       <div class="flex items-center">
                         <p class="text-sm font-medium">
                           {{ t('gallery.toolbar.thumbnailSize.label') }}

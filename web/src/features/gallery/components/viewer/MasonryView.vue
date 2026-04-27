@@ -29,18 +29,20 @@ const { locale } = useI18n()
 const scrollContainerRef = ref<HTMLElement | null>(null)
 const scrollTop = ref(0)
 
+const GAP = 12 // ← 卡片间距，统一控制水平和垂直
+
 const { width: containerWidth, height: containerHeight } = useElementSize(scrollContainerRef)
 // 根据容器宽度和卡片目标尺寸计算列数，与 GridView 的算法保持一致
 const columns = computed(() => {
   const itemSize = galleryView.viewSize.value
-  const gap = 16
-  return Math.max(1, Math.floor((containerWidth.value + gap) / (itemSize + gap)))
+  return Math.max(1, Math.floor((containerWidth.value + GAP) / (itemSize + GAP)))
 })
 
 const masonryVirtualizer = useMasonryVirtualizer({
   containerRef: scrollContainerRef,
   columns,
   containerWidth,
+  gap: GAP,
 })
 
 const { markers: railMarkers, labels: railLabels } = useTimelineRail({
@@ -128,7 +130,7 @@ defineExpose({ scrollToIndex, getCardRect })
   <div class="flex h-full">
     <div
       ref="scrollContainerRef"
-      class="hide-scrollbar h-full flex-1 overflow-auto py-2 pr-2 pl-6"
+      class="hide-scrollbar h-full flex-1 overflow-auto py-2 pr-2 pl-4"
       @scroll="handleScroll"
     >
       <div>

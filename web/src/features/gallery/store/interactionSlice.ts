@@ -42,6 +42,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     showFilmstrip: true,
     zoom: 1.0,
     fitMode: 'contain',
+    rotationDegrees: 0,
   })
 
   // detailsPanel 是右侧详情“当前焦点类型”的真相源。
@@ -172,9 +173,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   }
 
   function resetLightboxView() {
-    // 只重置缩放与适配，不改变 open/close 状态。
+    // 只重置展示控制态，不改变 open/close 状态。
     lightbox.zoom = 1.0
     lightbox.fitMode = 'contain'
+    lightbox.rotationDegrees = 0
   }
 
   function openLightbox() {
@@ -236,6 +238,14 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.fitMode = mode
   }
 
+  function normalizeLightboxRotation(degrees: number) {
+    return ((degrees % 360) + 360) % 360
+  }
+
+  function rotateLightboxView(deltaDegrees: number) {
+    lightbox.rotationDegrees = normalizeLightboxRotation(lightbox.rotationDegrees + deltaDegrees)
+  }
+
   function setDetailsFocus(focus: DetailsPanelFocus) {
     // 用 assign 保持 reactive 对象引用不变，减少依赖断联风险。
     Object.assign(detailsPanel, focus)
@@ -289,6 +299,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     toggleLightboxFilmstrip,
     setLightboxZoom,
     setLightboxFitMode,
+    rotateLightboxView,
     setDetailsFocus,
     clearDetailsFocus,
     resetInteractionState,

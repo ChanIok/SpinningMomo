@@ -14,8 +14,8 @@ import type { Asset } from '../types'
  * - Masonry 每项独立入列，高度由图片原始宽高比决定，需要实测（measureElement）
  */
 
-/** 列间距（px），与 CSS gap 保持一致 */
-const MASONRY_GAP = 16
+/** 默认列间距（px），与 CSS gap 保持一致 */
+const DEFAULT_MASONRY_GAP = 16
 
 export interface UseMasonryVirtualizerOptions {
   /** 滚动容器元素引用 */
@@ -24,6 +24,8 @@ export interface UseMasonryVirtualizerOptions {
   columns: Ref<number>
   /** 容器宽度（px），用于计算单列宽度 */
   containerWidth: Ref<number>
+  /** 卡片间距（px），水平和垂直统一使用该值 */
+  gap?: number
 }
 
 export interface VirtualMasonryItem {
@@ -54,7 +56,7 @@ function getAssetHeight(asset: Asset | null, columnWidth: number): number {
 }
 
 export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
-  const { containerRef, columns, containerWidth } = options
+  const { containerRef, columns, containerWidth, gap = DEFAULT_MASONRY_GAP } = options
 
   const store = useGalleryStore()
   const galleryData = useGalleryData()
@@ -69,7 +71,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     const width = containerWidth.value || containerRef.value?.clientWidth || 0
     if (width <= 0) return store.viewConfig.size
 
-    const totalGap = Math.max(0, columns.value - 1) * MASONRY_GAP
+    const totalGap = Math.max(0, columns.value - 1) * gap
     return Math.max(1, Math.floor((width - totalGap) / Math.max(columns.value, 1)))
   })
 
@@ -93,7 +95,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
 
       const [asset] = store.getAssetsInRange(index, index)
       const itemHeight = getAssetHeight(asset ?? null, columnWidth.value)
-      laneHeights[lane] = start + itemHeight + MASONRY_GAP
+      laneHeights[lane] = start + itemHeight + gap
     }
 
     return startMap
@@ -113,7 +115,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     estimateSize,
     // measureElement 实测已渲染 DOM 的真实高度，修正瀑布流列布局
     measureElement: (element) => element.getBoundingClientRect().height,
-    gap: MASONRY_GAP,
+    gap,
     get lanes() {
       return columns.value
     },
@@ -124,7 +126,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
 
   /** 计算指定列的水平偏移量（translateX），用于定位绝对布局的卡片 */
   function getLaneOffset(lane: number): number {
-    return lane * (columnWidth.value + MASONRY_GAP)
+    return lane * (columnWidth.value + gap)
   }
 
   /**
@@ -239,7 +241,7 @@ export function useMasonryVirtualizer(options: UseMasonryVirtualizerOptions) {
     virtualizer,
     virtualItems,
     columnWidth,
-    gap: MASONRY_GAP,
+    gap,
     init,
     measureElement,
     getLaneOffset,
