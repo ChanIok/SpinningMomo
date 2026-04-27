@@ -390,23 +390,8 @@ auto load_wallpaper_bitmap(const std::filesystem::path& path)
     return std::unexpected("Failed to initialize WIC factory: " + wic_result.error());
   }
 
-  auto frame_result = Utils::Image::load_bitmap_frame(wic_result->get(), path);
-  if (!frame_result) {
-    return std::unexpected(frame_result.error());
-  }
-
-  auto scaled_result =
-      Utils::Image::scale_bitmap(wic_result->get(), frame_result->get(), kAnalysisSampleShortEdge);
-  if (!scaled_result) {
-    return std::unexpected(scaled_result.error());
-  }
-
-  auto bgra_result = Utils::Image::convert_to_bgra_bitmap(wic_result->get(), scaled_result->get());
-  if (!bgra_result) {
-    return std::unexpected(bgra_result.error());
-  }
-
-  auto bitmap_data_result = Utils::Image::copy_bgra_bitmap_data(bgra_result->get());
+  auto bitmap_data_result =
+      Utils::Image::load_scaled_bgra_bitmap_data(wic_result->get(), path, kAnalysisSampleShortEdge);
   if (!bitmap_data_result) {
     return std::unexpected(bitmap_data_result.error());
   }

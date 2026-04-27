@@ -36,6 +36,16 @@ struct MissingThumbnailRepairSummary {
 auto extract_hash_from_thumbnail(const std::filesystem::path& thumbnail_path)
     -> std::optional<std::string>;
 
+auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::string& file_hash,
+                              const Utils::Image::BGRABitmapData& bitmap_data, bool force_overwrite)
+    -> std::expected<std::filesystem::path, std::string>;
+
+auto make_thumbnail_webp_options() -> Utils::Image::WebPEncodeOptions {
+  Utils::Image::WebPEncodeOptions options;
+  options.quality = 80.0f;
+  return options;
+}
+
 auto query_thumbnail_candidates(Core::State::AppState& app_state)
     -> std::expected<std::vector<Types::Asset>, std::string> {
   std::string sql = R"(
@@ -544,21 +554,40 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
       return thumbnail_path;
     }
 
-    // 生成 WebP 缩略图
-    Utils::Image::WebPEncodeOptions options;
-    options.quality = 90.0f;  // 默认质量
-
-    auto webp_result =
-        Utils::Image::generate_webp_thumbnail(wic_factory, source_file, short_edge_size, options);
-    if (!webp_result) {
-      return std::unexpected("Failed to generate WebP thumbnail: " + webp_result.error());
+    auto bitmap_data_result =
+        Utils::Image::load_scaled_bgra_bitmap_data(wic_factory.get(), source_file, short_edge_size);
+    if (!bitmap_data_result) {
+      return std::unexpected("Failed to load thumbnail bitmap data: " + bitmap_data_result.error());
     }
 
-    return save_thumbnail_data(app_state, file_hash, webp_result.value(), force_overwrite);
+    return save_thumbnail_from_bgra(app_state, file_hash, bitmap_data_result.value(),
+                                    force_overwrite);
 
   } catch (const std::exception& e) {
     return std::unexpected("Exception in generate_thumbnail: " + std::string(e.what()));
   }
+}
+
+auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::string& file_hash,
+                              const Utils::Image::BGRABitmapData& bitmap_data, bool force_overwrite)
+    -> std::expected<std::filesystem::path, std::string> {
+  auto thumbnail_path_result = ensure_thumbnail_path(app_state, file_hash);
+  if (!thumbnail_path_result) {
+    return std::unexpected(thumbnail_path_result.error());
+  }
+  auto thumbnail_path = thumbnail_path_result.value();
+
+  if (!force_overwrite && std::filesystem::exists(thumbnail_path)) {
+    Logger().debug("Thumbnail already exists, reusing: {}", thumbnail_path.string());
+    return thumbnail_path;
+  }
+
+  auto webp_result = Utils::Image::encode_bgra_to_webp(bitmap_data, make_thumbnail_webp_options());
+  if (!webp_result) {
+    return std::unexpected("Failed to encode WebP thumbnail: " + webp_result.error());
+  }
+
+  return save_thumbnail_data(app_state, file_hash, webp_result.value(), force_overwrite);
 }
 
 // 将已编码 WebP 写入按 file_hash

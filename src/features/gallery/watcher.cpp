@@ -575,17 +575,30 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
         asset.height = 0;
       }
 
+      std::optional<Utils::Image::BGRABitmapData> thumbnail_bitmap_data;
       if (options.generate_thumbnails.value_or(true)) {
-        auto thumbnail_result = Features::Gallery::Asset::Thumbnail::generate_thumbnail(
-            app_state, *wic_factory, normalized, hash, options.thumbnail_short_edge.value_or(480));
-        if (!thumbnail_result) {
-          Logger().warn("Failed to generate thumbnail for '{}': {}", normalized.string(),
-                        thumbnail_result.error());
+        auto bitmap_data_result = Utils::Image::load_scaled_bgra_bitmap_data(
+            wic_factory->get(), normalized, options.thumbnail_short_edge.value_or(480));
+        if (!bitmap_data_result) {
+          Logger().warn("Failed to load thumbnail bitmap data for '{}': {}", normalized.string(),
+                        bitmap_data_result.error());
+        } else {
+          thumbnail_bitmap_data = std::move(bitmap_data_result.value());
+
+          auto thumbnail_result = Features::Gallery::Asset::Thumbnail::save_thumbnail_from_bgra(
+              app_state, hash, thumbnail_bitmap_data.value());
+          if (!thumbnail_result) {
+            Logger().warn("Failed to generate thumbnail for '{}': {}", normalized.string(),
+                          thumbnail_result.error());
+          }
         }
       }
 
       auto color_result =
-          Features::Gallery::Color::Extractor::extract_main_colors(*wic_factory, normalized);
+          thumbnail_bitmap_data.has_value()
+              ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
+                    thumbnail_bitmap_data.value())
+              : Features::Gallery::Color::Extractor::extract_main_colors(*wic_factory, normalized);
       if (color_result) {
         extracted_colors = std::move(color_result.value());
       } else {

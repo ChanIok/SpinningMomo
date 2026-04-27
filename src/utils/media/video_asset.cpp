@@ -562,7 +562,7 @@ auto analyze_video_file(const std::filesystem::path& path,
   }
 
   Utils::Image::WebPEncodeOptions webp_options;
-  webp_options.quality = 90.0f;
+  webp_options.quality = 80.0f;
 
   // Step 3: 把 BGRA 位图缩放并编码成 WebP，供图库缩略图直接使用。
   auto thumbnail_result = Utils::Image::generate_webp_thumbnail_from_bgra(

@@ -52,28 +52,24 @@ export auto get_thread_wic_factory() -> std::expected<WICFactory, std::string>;
 export auto get_image_info(IWICImagingFactory* factory, const std::filesystem::path& path)
     -> std::expected<ImageInfo, std::string>;
 
-export auto load_bitmap_frame(IWICImagingFactory* factory, const std::filesystem::path& path)
-    -> std::expected<wil::com_ptr<IWICBitmapFrameDecode>, std::string>;
+export auto load_scaled_bgra_bitmap_data(IWICImagingFactory* factory,
+                                         const std::filesystem::path& path,
+                                         uint32_t short_edge_size)
+    -> std::expected<BGRABitmapData, std::string>;
 
-export auto scale_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source,
-                         uint32_t short_edge_size)
-    -> std::expected<wil::com_ptr<IWICBitmap>, std::string>;
+export auto load_scaled_bgra_bitmap_data(IWICImagingFactory* factory, IWICBitmapSource* source,
+                                         uint32_t short_edge_size)
+    -> std::expected<BGRABitmapData, std::string>;
 
-export auto convert_to_bgra_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source)
-    -> std::expected<wil::com_ptr<IWICBitmap>, std::string>;
+export auto encode_bgra_to_webp(const BGRABitmapData& bitmap_data,
+                                const WebPEncodeOptions& options = {})
+    -> std::expected<WebPEncodedResult, std::string>;
 
-export auto copy_bgra_bitmap_data(IWICBitmap* bitmap) -> std::expected<BGRABitmapData, std::string>;
-
-// 从内存 BGRA（如视频单帧）生成 WebP 缩略图；与 generate_webp_thumbnail(路径) 共享缩放/编码路径。
+// 从内存 BGRA（如视频单帧）生成 WebP 缩略图。
 export auto generate_webp_thumbnail_from_bgra(IWICImagingFactory* factory,
                                               const BGRABitmapData& bitmap_data,
                                               uint32_t short_edge_size,
                                               const WebPEncodeOptions& options = {})
-    -> std::expected<WebPEncodedResult, std::string>;
-
-// 直接从文件生成WebP缩略图（按短边等比例缩放）
-export auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& path,
-                                    uint32_t short_edge_size, const WebPEncodeOptions& options = {})
     -> std::expected<WebPEncodedResult, std::string>;
 
 // 图像输出格式

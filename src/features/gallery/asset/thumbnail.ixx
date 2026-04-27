@@ -53,6 +53,11 @@ auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFacto
                         std::uint32_t short_edge_size, bool force_overwrite = false)
     -> std::expected<std::filesystem::path, std::string>;
 
+auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::string& file_hash,
+                              const Utils::Image::BGRABitmapData& bitmap_data,
+                              bool force_overwrite = false)
+    -> std::expected<std::filesystem::path, std::string>;
+
 // 落盘内存中的 WebP（视频封面帧等）；路径规则与 generate_thumbnail 一致。
 auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
                          const Utils::Image::WebPEncodedResult& webp_data,

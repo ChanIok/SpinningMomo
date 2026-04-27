@@ -638,28 +638,29 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
       asset.mime_type = "application/octet-stream";  // 兜底处理
     }
 
-    auto color_result =
-        Features::Gallery::Color::Extractor::extract_main_colors(wic_factory, file_path);
-    if (color_result) {
-      processed.colors = std::move(color_result.value());
-    } else {
-      Logger().warn("Failed to extract main colors for {}: {}", file_path.string(),
-                    color_result.error());
-      processed.colors.clear();
-    }
+    std::optional<Utils::Image::BGRABitmapData> thumbnail_bitmap_data;
 
-    // 生成或更新这幅图的缩略图到缓存目录（用于无感滚动列表展示）
+    // 生成或更新这幅图的缩略图到缓存目录（用于无感滚动列表展示）。
+    // 缩略图像素同时供主色提取复用，避免同一张照片重复解码和缩放。
     if (options.generate_thumbnails.value_or(true)) {
-      if (file_info.hash.empty()) {
-        Logger().warn("Skip thumbnail generation for {}: empty hash", file_path.string());
+      auto bitmap_data_result = Utils::Image::load_scaled_bgra_bitmap_data(
+          wic_factory.get(), file_path, options.thumbnail_short_edge.value_or(480));
+      if (!bitmap_data_result) {
+        Logger().warn("Failed to load thumbnail bitmap data for {}: {}", file_path.string(),
+                      bitmap_data_result.error());
       } else {
-        auto thumbnail_result = Asset::Thumbnail::generate_thumbnail(
-            app_state, wic_factory, file_path, file_info.hash,
-            options.thumbnail_short_edge.value_or(480), options.rebuild_thumbnails.value_or(false));
+        thumbnail_bitmap_data = std::move(bitmap_data_result.value());
 
-        if (!thumbnail_result) {
-          Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
-                        thumbnail_result.error());
+        if (file_info.hash.empty()) {
+          Logger().warn("Skip thumbnail generation for {}: empty hash", file_path.string());
+        } else {
+          auto thumbnail_result = Asset::Thumbnail::save_thumbnail_from_bgra(
+              app_state, file_info.hash, thumbnail_bitmap_data.value(),
+              options.rebuild_thumbnails.value_or(false));
+          if (!thumbnail_result) {
+            Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
+                          thumbnail_result.error());
+          }
         }
       }
 
@@ -667,6 +668,19 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
         // 利用权重推进总体缩略图进度，保证进度条平滑增长
         progress_tracker->mark_thumbnail_processed();
       }
+    }
+
+    auto color_result =
+        thumbnail_bitmap_data.has_value()
+            ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
+                  thumbnail_bitmap_data.value())
+            : Features::Gallery::Color::Extractor::extract_main_colors(wic_factory, file_path);
+    if (color_result) {
+      processed.colors = std::move(color_result.value());
+    } else {
+      Logger().warn("Failed to extract main colors for {}: {}", file_path.string(),
+                    color_result.error());
+      processed.colors.clear();
     }
   } else if (asset_type == "video") {
     // MF：分辨率/时长 + 可选封面 WebP；不做主色（processed.colors 在分支末尾 clear）。

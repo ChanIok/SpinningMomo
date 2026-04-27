@@ -203,125 +203,46 @@ auto load_bitmap_frame(IWICImagingFactory* factory, const std::filesystem::path&
   }
 }
 
-// 转换为WIC位图
-auto convert_to_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source)
-    -> std::expected<wil::com_ptr<IWICBitmap>, std::string> {
-  if (!factory) {
-    return std::unexpected("WIC factory is null");
-  }
-
+auto copy_bgra_source_pixels(IWICBitmapSource* source)
+    -> std::expected<BGRABitmapData, std::string> {
   if (!source) {
     return std::unexpected("Source bitmap is null");
-  }
-
-  try {
-    wil::com_ptr<IWICBitmap> bitmap;
-    THROW_IF_FAILED(factory->CreateBitmapFromSource(source, WICBitmapCacheOnDemand, bitmap.put()));
-
-    return bitmap;
-  } catch (const wil::ResultException& e) {
-    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
-  } catch (const std::exception& e) {
-    return std::unexpected(std::string("Exception: ") + e.what());
-  }
-}
-
-// 缩放图像
-auto scale_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source, uint32_t short_edge_size)
-    -> std::expected<wil::com_ptr<IWICBitmap>, std::string> {
-  if (!factory) {
-    return std::unexpected("WIC factory is null");
-  }
-
-  if (!source) {
-    return std::unexpected("Source bitmap is null");
-  }
-
-  try {
-    // 获取原始尺寸
-    UINT original_width, original_height;
-    THROW_IF_FAILED(source->GetSize(&original_width, &original_height));
-
-    // 计算缩放后尺寸
-    auto [new_width, new_height] =
-        calculate_scaled_size(original_width, original_height, short_edge_size);
-
-    // 如果尺寸相同，直接转换
-    if (new_width == original_width && new_height == original_height) {
-      return convert_to_bitmap(factory, source);
-    }
-
-    // 创建缩放器
-    wil::com_ptr<IWICBitmapScaler> scaler;
-    THROW_IF_FAILED(factory->CreateBitmapScaler(scaler.put()));
-
-    // 初始化缩放器
-    THROW_IF_FAILED(
-        scaler->Initialize(source, new_width, new_height, WICBitmapInterpolationModeFant));
-
-    // 转换为位图
-    return convert_to_bitmap(factory, scaler.get());
-  } catch (const wil::ResultException& e) {
-    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
-  } catch (const std::exception& e) {
-    return std::unexpected(std::string("Exception: ") + e.what());
-  }
-}
-
-auto convert_to_bgra_bitmap(IWICImagingFactory* factory, IWICBitmapSource* source)
-    -> std::expected<wil::com_ptr<IWICBitmap>, std::string> {
-  if (!factory) {
-    return std::unexpected("WIC factory is null");
-  }
-
-  if (!source) {
-    return std::unexpected("Source bitmap is null");
-  }
-
-  try {
-    wil::com_ptr<IWICFormatConverter> converter;
-    THROW_IF_FAILED(factory->CreateFormatConverter(converter.put()));
-    THROW_IF_FAILED(converter->Initialize(source, GUID_WICPixelFormat32bppBGRA,
-                                          WICBitmapDitherTypeNone, nullptr, 0.0,
-                                          WICBitmapPaletteTypeCustom));
-
-    return convert_to_bitmap(factory, converter.get());
-  } catch (const wil::ResultException& e) {
-    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
-  } catch (const std::exception& e) {
-    return std::unexpected(std::string("Exception: ") + e.what());
-  }
-}
-
-auto copy_bgra_bitmap_data(IWICBitmap* bitmap) -> std::expected<BGRABitmapData, std::string> {
-  if (!bitmap) {
-    return std::unexpected("Bitmap is null");
   }
 
   try {
     UINT width = 0;
     UINT height = 0;
-    THROW_IF_FAILED(bitmap->GetSize(&width, &height));
+    THROW_IF_FAILED(source->GetSize(&width, &height));
 
-    WICRect rect = {0, 0, static_cast<INT>(width), static_cast<INT>(height)};
-    wil::com_ptr<IWICBitmapLock> bitmap_lock;
-    THROW_IF_FAILED(bitmap->Lock(&rect, WICBitmapLockRead, bitmap_lock.put()));
+    if (width == 0 || height == 0) {
+      return std::unexpected("Bitmap source has empty dimensions");
+    }
 
-    UINT stride = 0;
-    UINT data_size = 0;
-    BYTE* data = nullptr;
-    THROW_IF_FAILED(bitmap_lock->GetStride(&stride));
-    THROW_IF_FAILED(bitmap_lock->GetDataPointer(&data_size, &data));
+    if (width > static_cast<UINT>(std::numeric_limits<INT>::max()) ||
+        height > static_cast<UINT>(std::numeric_limits<INT>::max())) {
+      return std::unexpected("Bitmap source is too large to copy");
+    }
 
-    if (!data || data_size == 0) {
-      return std::unexpected("Bitmap data pointer is empty");
+    // 这里约定输出总是紧密排列的 32bpp BGRA，方便后续直接交给 libwebp。
+    constexpr std::uint32_t kBgraBytesPerPixel = 4;
+    auto stride_bytes = static_cast<std::uint64_t>(width) * kBgraBytesPerPixel;
+    auto buffer_size = stride_bytes * height;
+    if (stride_bytes > std::numeric_limits<UINT>::max() ||
+        buffer_size > std::numeric_limits<UINT>::max()) {
+      return std::unexpected("Bitmap source buffer is too large to copy");
     }
 
     BGRABitmapData result;
-    result.width = static_cast<uint32_t>(width);
-    result.height = static_cast<uint32_t>(height);
-    result.stride = static_cast<uint32_t>(stride);
-    result.pixels.assign(data, data + data_size);
+    result.width = static_cast<std::uint32_t>(width);
+    result.height = static_cast<std::uint32_t>(height);
+    result.stride = static_cast<std::uint32_t>(stride_bytes);
+    result.pixels.resize(static_cast<std::size_t>(buffer_size));
+
+    // CopyPixels 是这条流水线真正落到内存的地方；前面的 WIC source 仍可以保持惰性。
+    WICRect rect = {0, 0, static_cast<INT>(width), static_cast<INT>(height)};
+    THROW_IF_FAILED(source->CopyPixels(&rect, result.stride, static_cast<UINT>(buffer_size),
+                                       result.pixels.data()));
+
     return result;
   } catch (const wil::ResultException& e) {
     return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
@@ -330,66 +251,25 @@ auto copy_bgra_bitmap_data(IWICBitmap* bitmap) -> std::expected<BGRABitmapData, 
   }
 }
 
-// 将WIC位图编码为WebP
-auto encode_bitmap_to_webp(IWICBitmap* bitmap, const WebPEncodeOptions& options)
-    -> std::expected<WebPEncodedResult, std::string> {
-  if (!bitmap) {
-    return std::unexpected("Bitmap is null");
+auto convert_source_to_bgra_data(IWICImagingFactory* factory, IWICBitmapSource* source)
+    -> std::expected<BGRABitmapData, std::string> {
+  if (!factory) {
+    return std::unexpected("WIC factory is null");
+  }
+
+  if (!source) {
+    return std::unexpected("Source bitmap is null");
   }
 
   try {
-    // 获取位图尺寸
-    UINT width, height;
-    THROW_IF_FAILED(bitmap->GetSize(&width, &height));
-
-    // 进行格式转换，确保是BGRA格式
-    wil::com_ptr<IWICImagingFactory> factory;
-    THROW_IF_FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                                     IID_PPV_ARGS(&factory)));
-
+    // WIC 解码器输出的像素格式不固定，统一转成 BGRA 后再拷贝。
     wil::com_ptr<IWICFormatConverter> converter;
     THROW_IF_FAILED(factory->CreateFormatConverter(converter.put()));
-
-    THROW_IF_FAILED(converter->Initialize(bitmap, GUID_WICPixelFormat32bppBGRA,
+    THROW_IF_FAILED(converter->Initialize(source, GUID_WICPixelFormat32bppBGRA,
                                           WICBitmapDitherTypeNone, nullptr, 0.0,
                                           WICBitmapPaletteTypeCustom));
 
-    wil::com_ptr<IWICBitmap> bgra_bitmap;
-    THROW_IF_FAILED(factory->CreateBitmapFromSource(converter.get(), WICBitmapCacheOnDemand,
-                                                    bgra_bitmap.put()));
-    bitmap = bgra_bitmap.get();
-
-    // 获取位图锁
-    WICRect rect = {0, 0, static_cast<INT>(width), static_cast<INT>(height)};
-    wil::com_ptr<IWICBitmapLock> bitmap_lock;
-    THROW_IF_FAILED(bitmap->Lock(&rect, WICBitmapLockRead, bitmap_lock.put()));
-
-    // 获取数据指针
-    UINT stride, datasize;
-    BYTE* data;
-    THROW_IF_FAILED(bitmap_lock->GetDataPointer(&datasize, &data));
-    THROW_IF_FAILED(bitmap_lock->GetStride(&stride));
-
-    // 编码为WebP
-    uint8_t* output = nullptr;
-    size_t output_size = 0;
-
-    if (options.lossless) {
-      output_size = WebPEncodeLosslessBGRA(data, width, height, stride, &output);
-    } else {
-      output_size = WebPEncodeBGRA(data, width, height, stride, options.quality, &output);
-    }
-
-    if (output_size == 0 || output == nullptr) {
-      return std::unexpected("Failed to encode WebP image");
-    }
-
-    // 将结果复制到vector
-    std::vector<uint8_t> result_data(output, output + output_size);
-    WebPFree(output);
-
-    return WebPEncodedResult{std::move(result_data), static_cast<uint32_t>(width),
-                             static_cast<uint32_t>(height)};
+    return copy_bgra_source_pixels(converter.get());
   } catch (const wil::ResultException& e) {
     return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
   } catch (const std::exception& e) {
@@ -397,7 +277,163 @@ auto encode_bitmap_to_webp(IWICBitmap* bitmap, const WebPEncodeOptions& options)
   }
 }
 
-// 视频封面：MF 已解码为 RGB32 内存帧，无需落盘即可走与照片相同的缩放 + WebP 编码。
+auto load_scaled_bgra_bitmap_data(IWICImagingFactory* factory, IWICBitmapSource* source,
+                                  uint32_t short_edge_size)
+    -> std::expected<BGRABitmapData, std::string> {
+  if (!factory) {
+    return std::unexpected("WIC factory is null");
+  }
+
+  if (!source) {
+    return std::unexpected("Source bitmap is null");
+  }
+
+  try {
+    UINT original_width = 0;
+    UINT original_height = 0;
+    THROW_IF_FAILED(source->GetSize(&original_width, &original_height));
+
+    auto [new_width, new_height] =
+        calculate_scaled_size(original_width, original_height, short_edge_size);
+
+    // 保持 frame -> scaler 紧邻。WIC 在 JPEG 等格式上可借此使用解码期降采样。
+    IWICBitmapSource* scaled_source = source;
+    wil::com_ptr<IWICBitmapScaler> scaler;
+    if (new_width != original_width || new_height != original_height) {
+      THROW_IF_FAILED(factory->CreateBitmapScaler(scaler.put()));
+      THROW_IF_FAILED(
+          scaler->Initialize(source, new_width, new_height, WICBitmapInterpolationModeFant));
+      scaled_source = scaler.get();
+    }
+
+    return convert_source_to_bgra_data(factory, scaled_source);
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
+auto load_scaled_bgra_bitmap_data(IWICImagingFactory* factory, const std::filesystem::path& path,
+                                  uint32_t short_edge_size)
+    -> std::expected<BGRABitmapData, std::string> {
+  // 文件入口只负责打开第一帧，真正的缩放/格式转换复用 source 入口。
+  auto frame_result = load_bitmap_frame(factory, path);
+  if (!frame_result) {
+    return std::unexpected(frame_result.error());
+  }
+
+  return load_scaled_bgra_bitmap_data(factory, frame_result->get(), short_edge_size);
+}
+
+auto scale_bgra_bitmap_data(IWICImagingFactory* factory, const BGRABitmapData& bitmap_data,
+                            uint32_t short_edge_size)
+    -> std::expected<BGRABitmapData, std::string> {
+  if (!factory) {
+    return std::unexpected("WIC factory is null");
+  }
+
+  if (bitmap_data.width == 0 || bitmap_data.height == 0 || bitmap_data.stride == 0) {
+    return std::unexpected("Bitmap data is empty");
+  }
+
+  if (bitmap_data.pixels.empty()) {
+    return std::unexpected("Bitmap pixels are empty");
+  }
+
+  auto minimum_stride =
+      static_cast<std::uint64_t>(bitmap_data.width) * static_cast<std::uint64_t>(4);
+  if (bitmap_data.stride < minimum_stride) {
+    return std::unexpected("Bitmap stride is smaller than width * 4");
+  }
+
+  auto required_bytes = static_cast<std::uint64_t>(bitmap_data.stride) *
+                        static_cast<std::uint64_t>(bitmap_data.height);
+  if (required_bytes > bitmap_data.pixels.size()) {
+    return std::unexpected("Bitmap pixel buffer is smaller than stride * height");
+  }
+
+  if (bitmap_data.pixels.size() > std::numeric_limits<UINT>::max()) {
+    return std::unexpected("Bitmap data is too large for WIC");
+  }
+
+  try {
+    // 视频封面等来源已经是内存 BGRA，先包成 WIC source，再复用同一套缩放逻辑。
+    wil::com_ptr<IWICBitmap> bitmap;
+    THROW_IF_FAILED(factory->CreateBitmapFromMemory(
+        bitmap_data.width, bitmap_data.height, GUID_WICPixelFormat32bppBGRA, bitmap_data.stride,
+        static_cast<UINT>(bitmap_data.pixels.size()), const_cast<BYTE*>(bitmap_data.pixels.data()),
+        bitmap.put()));
+
+    return load_scaled_bgra_bitmap_data(factory, bitmap.get(), short_edge_size);
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
+auto encode_bgra_to_webp(const BGRABitmapData& bitmap_data, const WebPEncodeOptions& options)
+    -> std::expected<WebPEncodedResult, std::string> {
+  if (bitmap_data.width == 0 || bitmap_data.height == 0 || bitmap_data.stride == 0) {
+    return std::unexpected("Bitmap data is empty");
+  }
+
+  if (bitmap_data.pixels.empty()) {
+    return std::unexpected("Bitmap pixels are empty");
+  }
+
+  if (bitmap_data.width > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
+      bitmap_data.height > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
+      bitmap_data.stride > static_cast<std::uint32_t>(std::numeric_limits<int>::max())) {
+    return std::unexpected("Bitmap data dimensions are too large for WebP");
+  }
+
+  auto minimum_stride =
+      static_cast<std::uint64_t>(bitmap_data.width) * static_cast<std::uint64_t>(4);
+  if (bitmap_data.stride < minimum_stride) {
+    return std::unexpected("Bitmap stride is smaller than width * 4");
+  }
+
+  auto required_bytes = static_cast<std::uint64_t>(bitmap_data.stride) *
+                        static_cast<std::uint64_t>(bitmap_data.height);
+  if (required_bytes > bitmap_data.pixels.size()) {
+    return std::unexpected("Bitmap pixel buffer is smaller than stride * height");
+  }
+
+  try {
+    // libwebp 只需要 BGRA 指针、宽高和 stride；不再额外创建 WIC bitmap。
+    uint8_t* output = nullptr;
+    size_t output_size = 0;
+    auto width = static_cast<int>(bitmap_data.width);
+    auto height = static_cast<int>(bitmap_data.height);
+    auto stride = static_cast<int>(bitmap_data.stride);
+
+    if (options.lossless) {
+      output_size =
+          WebPEncodeLosslessBGRA(bitmap_data.pixels.data(), width, height, stride, &output);
+    } else {
+      output_size = WebPEncodeBGRA(bitmap_data.pixels.data(), width, height, stride,
+                                   options.quality, &output);
+    }
+
+    if (output_size == 0 || output == nullptr) {
+      return std::unexpected("Failed to encode WebP image");
+    }
+
+    // libwebp 分配输出内存；复制到 vector 后必须用 WebPFree 释放。
+    std::vector<uint8_t> result_data(output, output + output_size);
+    WebPFree(output);
+
+    return WebPEncodedResult{std::move(result_data), bitmap_data.width, bitmap_data.height};
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
+// 视频封面：MF 已解码为 RGB32/BGRA 内存帧，无需落盘即可走与照片相同的缩放 + WebP 编码。
 auto generate_webp_thumbnail_from_bgra(IWICImagingFactory* factory,
                                        const BGRABitmapData& bitmap_data, uint32_t short_edge_size,
                                        const WebPEncodeOptions& options)
@@ -414,50 +450,12 @@ auto generate_webp_thumbnail_from_bgra(IWICImagingFactory* factory,
     return std::unexpected("Bitmap pixels are empty");
   }
 
-  try {
-    wil::com_ptr<IWICBitmap> bitmap;
-    THROW_IF_FAILED(factory->CreateBitmapFromMemory(
-        bitmap_data.width, bitmap_data.height, GUID_WICPixelFormat32bppBGRA, bitmap_data.stride,
-        static_cast<UINT>(bitmap_data.pixels.size()), const_cast<BYTE*>(bitmap_data.pixels.data()),
-        bitmap.put()));
-
-    auto scaled_result = scale_bitmap(factory, bitmap.get(), short_edge_size);
-    if (!scaled_result) {
-      return std::unexpected(scaled_result.error());
-    }
-
-    return encode_bitmap_to_webp(scaled_result->get(), options);
-  } catch (const wil::ResultException& e) {
-    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC operation failed"));
-  } catch (const std::exception& e) {
-    return std::unexpected(std::string("Exception: ") + e.what());
-  }
-}
-
-// 直接从文件生成WebP缩略图
-auto generate_webp_thumbnail(WICFactory& factory, const std::filesystem::path& path,
-                             uint32_t short_edge_size, const WebPEncodeOptions& options)
-    -> std::expected<WebPEncodedResult, std::string> {
-  if (!factory) {
-    return std::unexpected("WIC factory is null");
-  }
-
-  // 加载图像帧
-  auto frame_result = load_bitmap_frame(factory.get(), path);
-  if (!frame_result) {
-    return std::unexpected(frame_result.error());
-  }
-  auto frame = std::move(frame_result.value());
-
-  // 缩放图像
-  auto scaled_result = scale_bitmap(factory.get(), frame.get(), short_edge_size);
+  auto scaled_result = scale_bgra_bitmap_data(factory, bitmap_data, short_edge_size);
   if (!scaled_result) {
     return std::unexpected(scaled_result.error());
   }
-  auto scaled_bitmap = std::move(scaled_result.value());
 
-  // 编码为WebP
-  return encode_bitmap_to_webp(scaled_bitmap.get(), options);
+  return encode_bgra_to_webp(scaled_result.value(), options);
 }
 
 // 保存像素数据到文件

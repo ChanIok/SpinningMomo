@@ -126,38 +126,9 @@ auto delta_e_76(const Types::ExtractedColor& lhs, const Types::ExtractedColor& r
   return std::sqrt(dl * dl + da * da + db * db);
 }
 
-auto extract_main_colors(Utils::Image::WICFactory& factory, const std::filesystem::path& path,
-                         const Types::MainColorExtractOptions& options)
+auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_data,
+                                   const Types::MainColorExtractOptions& options)
     -> std::expected<std::vector<Types::ExtractedColor>, std::string> {
-  if (!factory) {
-    return std::unexpected("WIC factory is null");
-  }
-  if (!std::filesystem::exists(path)) {
-    return std::unexpected("File does not exist: " + path.string());
-  }
-
-  auto frame_result = Utils::Image::load_bitmap_frame(factory.get(), path);
-  if (!frame_result) {
-    return std::unexpected(frame_result.error());
-  }
-
-  auto scaled_result =
-      Utils::Image::scale_bitmap(factory.get(), frame_result->get(), options.sample_short_edge);
-  if (!scaled_result) {
-    return std::unexpected(scaled_result.error());
-  }
-
-  auto bgra_result = Utils::Image::convert_to_bgra_bitmap(factory.get(), scaled_result->get());
-  if (!bgra_result) {
-    return std::unexpected(bgra_result.error());
-  }
-
-  auto bitmap_data_result = Utils::Image::copy_bgra_bitmap_data(bgra_result->get());
-  if (!bitmap_data_result) {
-    return std::unexpected(bitmap_data_result.error());
-  }
-  auto bitmap_data = std::move(bitmap_data_result.value());
-
   uint64_t total_pixels = static_cast<uint64_t>(bitmap_data.width) * bitmap_data.height;
   if (total_pixels == 0) {
     return std::unexpected("Image has no pixels");
@@ -334,6 +305,25 @@ auto extract_main_colors(Utils::Image::WICFactory& factory, const std::filesyste
   }
 
   return selected_palette;
+}
+
+auto extract_main_colors(Utils::Image::WICFactory& factory, const std::filesystem::path& path,
+                         const Types::MainColorExtractOptions& options)
+    -> std::expected<std::vector<Types::ExtractedColor>, std::string> {
+  if (!factory) {
+    return std::unexpected("WIC factory is null");
+  }
+  if (!std::filesystem::exists(path)) {
+    return std::unexpected("File does not exist: " + path.string());
+  }
+
+  auto bitmap_data_result =
+      Utils::Image::load_scaled_bgra_bitmap_data(factory.get(), path, options.sample_short_edge);
+  if (!bitmap_data_result) {
+    return std::unexpected(bitmap_data_result.error());
+  }
+
+  return extract_main_colors_from_bgra(bitmap_data_result.value(), options);
 }
 
 }  // namespace Features::Gallery::Color::Extractor
