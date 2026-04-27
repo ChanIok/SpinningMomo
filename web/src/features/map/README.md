@@ -9,7 +9,7 @@
 
 ## 宿主数据流（最短路径）
 
-1. iframe 上报 **`SPINNING_MOMO_MAP_SESSION_READY`**，payload 带 `worldId`（来自 `localStorage.activeAreaId`，注入侧会去掉首尾多余 `"`）。
+1. iframe 上报 **`SPINNING_MOMO_MAP_SESSION_READY`**，payload 带 `worldId`（来自 `localStorage.infinitynikkiMapState-v2.state.currentWorldId`；读取失败或无效时回退 `1.1`，并去掉首尾多余 `"`）。
 2. [`useMapBridge`](./composables/useMapBridge.ts)：`normalizeOfficialWorldId` → 写入 `runtimeOptions.currentWorldId` → **`markIframeSessionReady()`** → **`flushMapRuntimeToIframe()`**（切换 world 时补一帧同步）。
 3. [`useMapScene`](./composables/useMapScene.ts) 监听筛选/排序/语言及 **`iframeSessionReady` + `currentWorldId`**：二者齐全才 **`gallery.queryPhotoMapPoints`（带 `worldId`）**，再 `replaceMarkers` → **`flushMapRuntimeToIframe()`**；未就绪时清空点位并显示「等待地图区域就绪」类文案。
 4. [`mapIframeRuntime.ts`](./composables/mapIframeRuntime.ts) 只负责注册 **`flush` → `postRuntimeSync`**，无第二套回调。
@@ -50,7 +50,7 @@
 ### 注入子模块（简述）
 
 - **paneStyle / photoCardHtml / popup / cluster / render**：样式、卡片 HTML、悬停层、聚合、单点渲染（细节见各文件头注释）。
-- **worldIdBridge.js**：路由/history 变化时同步 `activeAreaId` 并向宿主发 `SESSION_READY`。
+- **worldIdBridge.js**：路由/history 变化时同步 `infinitynikkiMapState-v2.state.currentWorldId` 并向宿主发 `SESSION_READY`（失败回退 `1.1`）。
 - **iframeBootstrap.js**：与地图实例无关的页壳（如侧栏）。
 - **toolbar.js**：工具条 + 右上角筛选计数卡片（读 `runtimeOptions` 中文案与 loading）。
 

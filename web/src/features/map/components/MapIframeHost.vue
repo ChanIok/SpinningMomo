@@ -18,68 +18,54 @@ const mapStore = useMapStore()
 const mapIframe = ref<HTMLIFrameElement | null>(null)
 
 const isMapRoute = computed(() => route.name === 'map')
-const forcedWorldId = computed(() => normalizeOfficialWorldId(readQueryValue(route.query.worldId)))
-const requestedMapIframeSrc = computed(() => {
-  const worldId = forcedWorldId.value
-
-  if (!worldId) {
-    return MAP_URL
-  }
-
-  const url = new URL(MAP_URL)
-  url.searchParams.set('worldId', worldId)
-  return url.toString()
-})
 const mapIframeSrc = ref(MAP_URL)
-const mapFocusTarget = computed(() => {
-  const assetId = readPositiveIntegerQueryValue(route.query.pinAssetId)
-  if (!assetId) {
-    return null
-  }
-
-  return {
-    assetId,
-    requestId: readPositiveIntegerQueryValue(route.query.focusRequestId) ?? assetId,
-  }
-})
 const { postRuntimeSync, handleMapMessage } = useMapBridge({
   mapIframe,
   mapStore,
   galleryStore,
   router,
-  forcedWorldId,
 })
 
-function readQueryValue(value: unknown): string | undefined {
-  const raw = Array.isArray(value) ? value[0] : value
-  if (typeof raw !== 'string') {
-    return undefined
+function applyPendingFocusRequest() {
+  const target = mapStore.pendingFocusRequest
+  if (!target) {
+    return
   }
 
-  const normalized = raw.trim()
-  return normalized ? normalized : undefined
-}
+  const nextWorldId = normalizeOfficialWorldId(target.worldId)
+  const currentWorldId = normalizeOfficialWorldId(mapStore.runtimeOptions.currentWorldId)
 
-function readPositiveIntegerQueryValue(value: unknown): number | undefined {
-  const normalized = readQueryValue(value)
-  if (!normalized) {
-    return undefined
+  if (nextWorldId && nextWorldId !== currentWorldId) {
+    const url = new URL(MAP_URL)
+    url.searchParams.set('worldId', nextWorldId)
+    const nextSrc = url.toString()
+    if (mapIframeSrc.value !== nextSrc) {
+      mapIframeSrc.value = nextSrc
+    }
+    return
   }
 
-  const parsed = Number(normalized)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+  mapStore.consumePendingFocusRequest()
+  mapStore.patchRuntimeOptions({
+    focusedAssetId: target.assetId,
+    focusRequestId: target.requestId,
+    markersVisible: true,
+    currentWorldId: nextWorldId ?? currentWorldId,
+  })
+  if (mapStore.iframeSessionReady) {
+    flushMapRuntimeToIframe()
+  }
 }
 
 watch(
-  [isMapRoute, requestedMapIframeSrc],
-  ([visible, nextSrc]) => {
-    if (!visible || mapIframeSrc.value === nextSrc) {
-      return
-    }
-
-    mapIframeSrc.value = nextSrc
-  },
-  { immediate: true }
+  () => [
+    mapStore.pendingFocusRequest,
+    mapStore.iframeSessionReady,
+    mapStore.runtimeOptions.currentWorldId,
+  ],
+  () => {
+    applyPendingFocusRequest()
+  }
 )
 
 watch(mapIframeSrc, (nextSrc, previousSrc) => {
@@ -93,33 +79,6 @@ watch(mapIframeSrc, (nextSrc, previousSrc) => {
     currentWorldId: undefined,
   })
 })
-
-watch(
-  mapFocusTarget,
-  (target) => {
-    if (!target) {
-      mapStore.patchRuntimeOptions({
-        focusedAssetId: undefined,
-        focusRequestId: undefined,
-      })
-      if (mapStore.iframeSessionReady) {
-        flushMapRuntimeToIframe()
-      }
-      return
-    }
-
-    mapStore.patchRuntimeOptions({
-      focusedAssetId: target.assetId,
-      focusRequestId: target.requestId,
-      markersVisible: true,
-    })
-
-    if (mapStore.iframeSessionReady) {
-      flushMapRuntimeToIframe()
-    }
-  },
-  { immediate: true }
-)
 
 watch(isMapRoute, (visible) => {
   if (visible && mapStore.iframeSessionReady) {

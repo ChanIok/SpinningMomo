@@ -9,7 +9,9 @@ export function buildMapDevEvalScriptFromPayload(serializedPayload) {
   return `
 (() => {
   if (window.location.hostname !== 'myl.nuanpaper.com') return;
-  const normalizeOfficialActiveAreaId = (raw) => {
+  const DEFAULT_WORLD_ID = '1.1';
+  const WORLD_ID_PATTERN = /^\\d+(?:\\.\\d+)?$/;
+  const normalizeOfficialCurrentWorldId = (raw) => {
     if (typeof raw !== 'string') {
       return undefined;
     }
@@ -20,15 +22,25 @@ export function buildMapDevEvalScriptFromPayload(serializedPayload) {
     if (s.length >= 2 && s.charAt(0) === '"' && s.charAt(s.length - 1) === '"') {
       s = s.slice(1, -1).trim();
     }
-    return s || undefined;
+    if (!s || !WORLD_ID_PATTERN.test(s)) {
+      return undefined;
+    }
+    return s;
   };
 
-  const readOfficialActiveAreaId = () => {
+  const readOfficialCurrentWorldId = () => {
     try {
-      const raw = window.localStorage && window.localStorage.getItem('activeAreaId');
-      return normalizeOfficialActiveAreaId(raw);
+      const rawMapState = window.localStorage && window.localStorage.getItem('infinitynikkiMapState-v2');
+      if (typeof rawMapState !== 'string' || rawMapState.length === 0) {
+        return DEFAULT_WORLD_ID;
+      }
+      const parsedMapState = JSON.parse(rawMapState);
+      const worldId = normalizeOfficialCurrentWorldId(
+        parsedMapState && parsedMapState.state && parsedMapState.state.currentWorldId
+      );
+      return worldId || DEFAULT_WORLD_ID;
     } catch (e) {
-      return undefined;
+      return DEFAULT_WORLD_ID;
     }
   };
 ${buildRuntimeCoreSnippet()}

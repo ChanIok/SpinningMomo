@@ -293,7 +293,7 @@ export function buildDevPolygonCollectorSnippet() {
         {
           action: 'SPINNING_MOMO_EXPORT_POLYGON',
           payload: {
-            worldId: readOfficialActiveAreaId(),
+            worldId: readOfficialCurrentWorldId(),
             regionName: draft.regionName,
             coordinateSystem: 'map_latlng',
             points: draft.points.map((point) => ({

@@ -16,14 +16,14 @@ export function buildWorldIdBridgeSnippet() {
     }
   };
 
-  const syncActiveAreaFromStorage = () => {
-    postWorldIdChanged(readOfficialActiveAreaId());
+  const syncCurrentWorldIdFromMapState = () => {
+    postWorldIdChanged(readOfficialCurrentWorldId());
   };
 
   if (!runtime.boundWorldIdBridge) {
     runtime.boundWorldIdBridge = true;
-    runtime.boundWorldIdPopstate = () => syncActiveAreaFromStorage();
-    runtime.boundWorldIdHashchange = () => syncActiveAreaFromStorage();
+    runtime.boundWorldIdPopstate = () => syncCurrentWorldIdFromMapState();
+    runtime.boundWorldIdHashchange = () => syncCurrentWorldIdFromMapState();
     window.addEventListener('popstate', runtime.boundWorldIdPopstate);
     window.addEventListener('hashchange', runtime.boundWorldIdHashchange);
 
@@ -38,7 +38,7 @@ export function buildWorldIdBridgeSnippet() {
       runtime['patchedHistory_' + name] = true;
       window.history[name] = function(...args) {
         const result = originalMethod.apply(this, args);
-        syncActiveAreaFromStorage();
+        syncCurrentWorldIdFromMapState();
         return result;
       };
     };
@@ -47,6 +47,6 @@ export function buildWorldIdBridgeSnippet() {
     patchHistoryMethod('replaceState');
   }
 
-  syncActiveAreaFromStorage();
+  syncCurrentWorldIdFromMapState();
 `
 }

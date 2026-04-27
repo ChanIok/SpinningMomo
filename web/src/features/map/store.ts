@@ -46,6 +46,12 @@ export interface MapRuntimeOptions {
   filterCountCardTextColor?: string
 }
 
+export interface PendingMapFocusRequest {
+  assetId: number
+  requestId: number
+  worldId?: string
+}
+
 export const useMapStore = defineStore('map', () => {
   const markers = ref<MapMarker[]>([])
   const isLoading = ref(false)
@@ -59,6 +65,7 @@ export const useMapStore = defineStore('map', () => {
     markersVisible: true,
     thumbnailBaseUrl: 'http://127.0.0.1:51206',
   })
+  const pendingFocusRequest = ref<PendingMapFocusRequest | null>(null)
 
   const replaceMarkers = (nextMarkers: MapMarker[]) => {
     markers.value = nextMarkers
@@ -87,10 +94,21 @@ export const useMapStore = defineStore('map', () => {
     iframeSessionReady.value = false
   }
 
+  const setPendingFocusRequest = (nextRequest: PendingMapFocusRequest) => {
+    pendingFocusRequest.value = { ...nextRequest }
+  }
+
+  const consumePendingFocusRequest = (): PendingMapFocusRequest | null => {
+    const request = pendingFocusRequest.value
+    pendingFocusRequest.value = null
+    return request
+  }
+
   return {
     markers,
     isLoading,
     iframeSessionReady,
+    pendingFocusRequest,
     renderOptions,
     runtimeOptions,
     replaceMarkers,
@@ -99,5 +117,7 @@ export const useMapStore = defineStore('map', () => {
     setLoading,
     markIframeSessionReady,
     resetIframeSession,
+    setPendingFocusRequest,
+    consumePendingFocusRequest,
   }
 })

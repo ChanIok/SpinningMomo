@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
+import { useMapStore } from '@/features/map/store'
 import { transformGameToMapCoordinates } from '@/features/map/domain/coordinates'
 import { toOfficialWorldIdWithDefaultVersion } from '@/features/map/domain/officialWorldId'
 import {
@@ -40,6 +41,7 @@ const emit = defineEmits<{
 const { t, locale } = useI18n()
 const { toast } = useToast()
 const router = useRouter()
+const mapStore = useMapStore()
 
 const codeTypeDraft = ref<InfinityNikkiUserRecordCodeType>('dye')
 const codeValueDraft = ref('')
@@ -345,15 +347,13 @@ async function handleOpenMapLocation() {
     return
   }
 
+  mapStore.setPendingFocusRequest({
+    assetId: props.assetId,
+    requestId: Date.now(),
+    worldId: target.worldId,
+  })
   await router.push({
     name: 'map',
-    query: {
-      lat: String(target.lat),
-      lng: String(target.lng),
-      worldId: target.worldId,
-      pinAssetId: String(props.assetId),
-      focusRequestId: String(Date.now()),
-    },
   })
 }
 

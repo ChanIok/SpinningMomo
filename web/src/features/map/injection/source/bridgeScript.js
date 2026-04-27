@@ -12,7 +12,7 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
     window.__SPINNING_MOMO_RENDER_OPTIONS__ = {};
     window.__SPINNING_MOMO_CLUSTER_OPTIONS__ = {};
 
-    const normalizeOfficialActiveAreaId = (raw) => {
+    const normalizeOfficialCurrentWorldId = (raw) => {
         if (typeof raw !== 'string') {
             return undefined;
         }
@@ -29,10 +29,15 @@ if (window.location.hostname === 'myl.nuanpaper.com') {
         return s;
     };
 
-    const readOfficialActiveAreaId = () => {
+    const readOfficialCurrentWorldId = () => {
         try {
-            const raw = window.localStorage && window.localStorage.getItem('activeAreaId');
-            return normalizeOfficialActiveAreaId(raw) || DEFAULT_WORLD_ID;
+            const rawMapState = window.localStorage && window.localStorage.getItem('infinitynikkiMapState-v2');
+            if (typeof rawMapState !== 'string' || rawMapState.length === 0) {
+                return DEFAULT_WORLD_ID;
+            }
+            const parsedMapState = JSON.parse(rawMapState);
+            const worldId = normalizeOfficialCurrentWorldId(parsedMapState && parsedMapState.state && parsedMapState.state.currentWorldId);
+            return worldId || DEFAULT_WORLD_ID;
         } catch (e) {
             return DEFAULT_WORLD_ID;
         }
@@ -74,7 +79,7 @@ ${buildRuntimeCoreSnippet()}
         if (!window.parent || window.parent === window) {
             return;
         }
-        const worldId = readOfficialActiveAreaId();
+        const worldId = readOfficialCurrentWorldId();
         window.parent.postMessage(
             {
                 action: 'SPINNING_MOMO_MAP_SESSION_READY',
