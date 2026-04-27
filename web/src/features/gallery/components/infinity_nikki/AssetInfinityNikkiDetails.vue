@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Check, ChevronDown } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +9,8 @@ import { Separator } from '@/components/ui/separator'
 import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
+import { transformGameToMapCoordinates } from '@/features/map/domain/coordinates'
+import { toOfficialWorldIdWithDefaultVersion } from '@/features/map/domain/officialWorldId'
 import {
   getInfinityNikkiMetadataNames,
   setInfinityNikkiUserRecord,
@@ -36,6 +39,7 @@ const emit = defineEmits<{
 
 const { t, locale } = useI18n()
 const { toast } = useToast()
+const router = useRouter()
 
 const codeTypeDraft = ref<InfinityNikkiUserRecordCodeType>('dye')
 const codeValueDraft = ref('')
@@ -53,16 +57,29 @@ const currentWorldId = computed(() => currentMapArea.value?.worldId)
 const currentWorldLabel = computed(() =>
   currentWorldId.value ? getInfinityNikkiWorldName(currentWorldId.value, locale.value) : null
 )
-const currentWorldTitle = computed(() => {
-  if (!currentMapArea.value) return undefined
-  const autoWorldLabel = getInfinityNikkiWorldName(currentMapArea.value.autoWorldId, locale.value)
-  const userWorldLabel = currentMapArea.value.userWorldId
-    ? getInfinityNikkiWorldName(currentMapArea.value.userWorldId, locale.value)
-    : undefined
-  if (!userWorldLabel) {
-    return `ID: ${currentMapArea.value.autoWorldId}`
+const currentMapLocationTarget = computed(() => {
+  const params = extracted.value
+  const worldId = toOfficialWorldIdWithDefaultVersion(currentMapArea.value?.worldId)
+  if (!params || !worldId || params.nikkiLocX === undefined || params.nikkiLocY === undefined) {
+    return null
   }
-  return `${userWorldLabel} (ID: ${currentMapArea.value.userWorldId}) / ${autoWorldLabel} (ID: ${currentMapArea.value.autoWorldId})`
+
+  const { lat, lng } = transformGameToMapCoordinates(
+    {
+      nikkiLocX: params.nikkiLocX,
+      nikkiLocY: params.nikkiLocY,
+    },
+    worldId
+  )
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    return null
+  }
+
+  return {
+    lat,
+    lng,
+    worldId,
+  }
 })
 // 当前面板实际使用的“已翻译名称”结果。
 const metadataNames = ref<InfinityNikkiMetadataNames>({})
@@ -320,6 +337,24 @@ async function handleSelectWorldId(nextWorldId: string | undefined) {
   } finally {
     isSavingWorldRecord.value = false
   }
+}
+
+async function handleOpenMapLocation() {
+  const target = currentMapLocationTarget.value
+  if (!target) {
+    return
+  }
+
+  await router.push({
+    name: 'map',
+    query: {
+      lat: String(target.lat),
+      lng: String(target.lng),
+      worldId: target.worldId,
+      pinAssetId: String(props.assetId),
+      focusRequestId: String(Date.now()),
+    },
+  })
 }
 
 function formatPercentage(value: number | undefined): string | null {
@@ -646,7 +681,14 @@ watch(
             t('gallery.details.infinityNikki.nikkiLocation')
           }}</span>
           <div class="flex min-w-0 items-center gap-1">
-            <span class="truncate" :title="currentWorldTitle">{{ currentWorldLabel }}</span>
+            <button
+              type="button"
+              class="min-w-0 cursor-pointer truncate text-left transition-colors hover:text-primary disabled:cursor-default disabled:text-foreground"
+              :disabled="!currentMapLocationTarget"
+              @click="handleOpenMapLocation"
+            >
+              {{ currentWorldLabel }}
+            </button>
             <Popover v-model:open="isWorldPopoverOpen">
               <PopoverTrigger as-child>
                 <Button

@@ -60,10 +60,16 @@ export function buildRenderSnippet() {
     return buildCompositePinIcon(overlay);
   };
 
-  const renderSingleMarker = (markerData) => {
+  const getMarkerOwnerId = (markerData) => {
+    return (
+      'marker:' +
+      String(markerData.assetId ?? markerData.name ?? (String(markerData.lat) + ',' + String(markerData.lng)))
+    );
+  };
+
+  const renderSingleMarker = (markerData, options = {}) => {
     const compositeIcon = buildSingleMarkerIcon();
-    const markerOwnerId =
-      'marker:' + String(markerData.assetId ?? markerData.name ?? (String(markerData.lat) + ',' + String(markerData.lng)));
+    const markerOwnerId = getMarkerOwnerId(markerData);
     const markerOptions = {
       pane: photoPaneName,
       interactive: true,
@@ -120,13 +126,30 @@ export function buildRenderSnippet() {
         contentHtml: buildSinglePhotoHoverHtml(markerData),
       });
     });
+
+    if (options.forcePinned === true) {
+      pinHoverCard(hoverState, {
+        ownerId: markerOwnerId,
+        latLng: [markerData.lat, markerData.lng],
+        contentHtml: buildSinglePhotoHoverHtml(markerData),
+      });
+    }
+
+    return marker;
   };
 
   const render = () => {
     applyMapBackground();
+    const focusedAssetId = Number(runtimeOptions.focusedAssetId);
+    const hasFocusedAssetId = Number.isFinite(focusedAssetId) && focusedAssetId > 0;
+    const focusedOwnerId = hasFocusedAssetId ? 'marker:' + String(focusedAssetId) : null;
     const activeContext = runtime.activeHoverCardContext;
     const pinnedContext =
-      activeContext && activeContext.mode === 'pinned' ? activeContext : null;
+      activeContext &&
+      activeContext.mode === 'pinned' &&
+      (!focusedOwnerId || activeContext.ownerId === focusedOwnerId)
+        ? activeContext
+        : null;
     if (!pinnedContext) {
       hideHoverCard();
     }
@@ -141,11 +164,22 @@ export function buildRenderSnippet() {
       return;
     }
 
-    if (!clusterEnabled || markers.length <= 1 || !map.latLngToLayerPoint) {
-      markers.forEach(renderSingleMarker);
+    let focusedMarker = null;
+    const normalMarkers = [];
+    for (const item of markers) {
+      const assetId = Number(item && item.assetId);
+      if (!focusedMarker && hasFocusedAssetId && Number.isFinite(assetId) && assetId === focusedAssetId) {
+        focusedMarker = item;
+      } else {
+        normalMarkers.push(item);
+      }
+    }
+
+    if (!clusterEnabled || normalMarkers.length <= 1 || !map.latLngToLayerPoint) {
+      normalMarkers.forEach(renderSingleMarker);
     } else {
       const grouped = new Map();
-      for (const item of markers) {
+      for (const item of normalMarkers) {
         if (item.lat === undefined || item.lng === undefined) continue;
         const point = map.latLngToLayerPoint([item.lat, item.lng]);
         const gridX = Math.round(point.x / clusterRadius);
@@ -162,6 +196,29 @@ export function buildRenderSnippet() {
         }
         renderClusterMarker(clusterMarkers);
       });
+    }
+
+    if (focusedMarker) {
+      const focusRequestId =
+        runtimeOptions.focusRequestId === undefined || runtimeOptions.focusRequestId === null
+          ? ''
+          : String(runtimeOptions.focusRequestId);
+      const shouldApplyFocusRequest =
+        Boolean(focusRequestId) && runtime.lastAppliedFocusRequestId !== focusRequestId;
+
+      renderSingleMarker(focusedMarker, { forcePinned: shouldApplyFocusRequest });
+
+      if (
+        shouldApplyFocusRequest &&
+        map.flyTo &&
+        focusedMarker.lat !== undefined &&
+        focusedMarker.lng !== undefined
+      ) {
+        runtime.lastAppliedFocusRequestId = focusRequestId;
+        map.flyTo([focusedMarker.lat, focusedMarker.lng], 6);
+      }
+    } else if (focusedOwnerId) {
+      hideHoverCard(focusedOwnerId);
     }
 
     if (shouldFlyToFirst && markers.length > 0) {

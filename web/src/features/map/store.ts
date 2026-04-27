@@ -33,6 +33,8 @@ export interface MapRuntimeOptions {
   clusterRadius: number
   hoverCardEnabled: boolean
   markersVisible: boolean
+  focusedAssetId?: number
+  focusRequestId?: number
   currentWorldId?: string
   thumbnailBaseUrl: string
   /** 聚合 hover 标题模板，含 {count}，由 i18n 注入 */
@@ -81,6 +83,10 @@ export const useMapStore = defineStore('map', () => {
     iframeSessionReady.value = true
   }
 
+  const resetIframeSession = () => {
+    iframeSessionReady.value = false
+  }
+
   return {
     markers,
     isLoading,
@@ -92,5 +98,6 @@ export const useMapStore = defineStore('map', () => {
     patchRuntimeOptions,
     setLoading,
     markIframeSessionReady,
+    resetIframeSession,
   }
 })

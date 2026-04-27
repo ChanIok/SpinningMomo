@@ -24,6 +24,7 @@ type UseMapBridgeOptions = {
   mapStore: ReturnType<typeof useMapStore>
   galleryStore: ReturnType<typeof useGalleryStore>
   router: Router
+  forcedWorldId: Readonly<Ref<string | undefined>>
 }
 
 function isAllowedMapMessageOrigin(origin: string): boolean {
@@ -73,6 +74,8 @@ function buildSerializableRuntimePayload(
       clusterRadius: mapStore.runtimeOptions.clusterRadius,
       hoverCardEnabled: mapStore.runtimeOptions.hoverCardEnabled,
       markersVisible: mapStore.runtimeOptions.markersVisible,
+      focusedAssetId: mapStore.runtimeOptions.focusedAssetId,
+      focusRequestId: mapStore.runtimeOptions.focusRequestId,
       currentWorldId: mapStore.runtimeOptions.currentWorldId,
       thumbnailBaseUrl: mapStore.runtimeOptions.thumbnailBaseUrl,
       clusterTitleTemplate: mapStore.runtimeOptions.clusterTitleTemplate,
@@ -86,7 +89,7 @@ function buildSerializableRuntimePayload(
 }
 
 export function useMapBridge(options: UseMapBridgeOptions) {
-  const { mapIframe, mapStore, galleryStore, router } = options
+  const { mapIframe, mapStore, galleryStore, router, forcedWorldId } = options
 
   function postRuntimeSync() {
     const contentWindow = mapIframe.value?.contentWindow
@@ -174,7 +177,8 @@ export function useMapBridge(options: UseMapBridgeOptions) {
     }
 
     if (data.action === ACTION_MAP_SESSION_READY) {
-      const worldId = normalizeOfficialWorldIdOrDefault(data.payload?.worldId)
+      const worldId =
+        forcedWorldId.value ?? normalizeOfficialWorldIdOrDefault(data.payload?.worldId)
       mapStore.patchRuntimeOptions({
         currentWorldId: worldId,
       })
