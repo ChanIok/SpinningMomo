@@ -13,7 +13,9 @@ import { useMapStore } from '@/features/map/store'
 import { transformGameToMapCoordinates } from '@/features/map/domain/coordinates'
 import { toOfficialWorldIdWithDefaultVersion } from '@/features/map/domain/officialWorldId'
 import {
+  fillInfinityNikkiSameOutfitDyeCode,
   getInfinityNikkiMetadataNames,
+  previewInfinityNikkiSameOutfitDyeCodeFill,
   setInfinityNikkiUserRecord,
   setInfinityNikkiWorldRecord,
 } from '../../api'
@@ -26,6 +28,7 @@ import type {
   InfinityNikkiDetails,
   InfinityNikkiExtractedParams,
   InfinityNikkiMetadataNames,
+  InfinityNikkiSameOutfitDyeCodeFillPreview,
   InfinityNikkiUserRecordCodeType,
 } from '../../types'
 
@@ -49,12 +52,25 @@ const isSavingUserRecord = ref(false)
 const isCodeTypePopoverOpen = ref(false)
 const isSavingWorldRecord = ref(false)
 const isWorldPopoverOpen = ref(false)
+const isFillingSameOutfitDyeCode = ref(false)
+const sameOutfitDyeFillPreview = ref<InfinityNikkiSameOutfitDyeCodeFillPreview | null>(null)
+const sameOutfitDyeFillPreviewCodeValue = ref('')
 
 const extracted = computed(() => props.details.extracted)
 const currentUserRecord = computed(() => props.details.userRecord)
 const currentMapArea = computed(() => props.details.mapArea)
 const hasCodeValueDraft = computed(() => codeValueDraft.value.trim().length > 0)
 const currentCodeTypeLabel = computed(() => getCodeTypeLabel(codeTypeDraft.value))
+const canShowSameOutfitDyeFillPrompt = computed(() => {
+  const preview = sameOutfitDyeFillPreview.value
+  return (
+    codeTypeDraft.value === 'dye' &&
+    preview?.sourceHasOutfitDyeState === true &&
+    preview.matchedCount > 0 &&
+    sameOutfitDyeFillPreviewCodeValue.value.length > 0 &&
+    sameOutfitDyeFillPreviewCodeValue.value === codeValueDraft.value.trim()
+  )
+})
 const currentWorldId = computed(() => currentMapArea.value?.worldId)
 const currentWorldLabel = computed(() =>
   currentWorldId.value ? getInfinityNikkiWorldName(currentWorldId.value, locale.value) : null
@@ -98,6 +114,13 @@ watch(
     syncDraftFromProps()
   },
   { deep: true, immediate: true }
+)
+
+watch(
+  () => props.assetId,
+  () => {
+    clearSameOutfitDyeFillPreview()
+  }
 )
 
 function getCodeTypeLabel(codeType: InfinityNikkiUserRecordCodeType): string {
@@ -161,6 +184,12 @@ async function copyTextWithFallback(text: string): Promise<boolean> {
 
 function resetUserRecordDraft() {
   syncDraftFromProps()
+  clearSameOutfitDyeFillPreview()
+}
+
+function clearSameOutfitDyeFillPreview() {
+  sameOutfitDyeFillPreview.value = null
+  sameOutfitDyeFillPreviewCodeValue.value = ''
 }
 
 function getCodeValue(
@@ -200,6 +229,24 @@ function buildUpdatedUserRecordForCode(
   })
 }
 
+async function refreshSameOutfitDyeFillPreview(codeValue: string) {
+  clearSameOutfitDyeFillPreview()
+  if (!codeValue) {
+    return
+  }
+
+  try {
+    const preview = await previewInfinityNikkiSameOutfitDyeCodeFill({
+      assetId: props.assetId,
+    })
+    sameOutfitDyeFillPreview.value = preview
+    sameOutfitDyeFillPreviewCodeValue.value = codeValue
+  } catch {
+    // 预览失败不影响当前照片登记；用户仍可继续浏览或稍后重试保存。
+    clearSameOutfitDyeFillPreview()
+  }
+}
+
 async function handleUserRecordCommit() {
   if (isSavingUserRecord.value) {
     return
@@ -232,6 +279,12 @@ async function handleUserRecordCommit() {
       userRecord: buildUpdatedUserRecordForCode(nextCodeType, normalizedCodeValue || undefined),
       mapArea: props.details.mapArea,
     })
+
+    if (nextCodeType === 'dye' && normalizedCodeValue) {
+      await refreshSameOutfitDyeFillPreview(normalizedCodeValue)
+    } else {
+      clearSameOutfitDyeFillPreview()
+    }
   } catch (error) {
     resetUserRecordDraft()
     const message = error instanceof Error ? error.message : String(error)
@@ -240,6 +293,42 @@ async function handleUserRecordCommit() {
     })
   } finally {
     isSavingUserRecord.value = false
+  }
+}
+
+async function handleFillSameOutfitDyeCode() {
+  if (isFillingSameOutfitDyeCode.value || !canShowSameOutfitDyeFillPrompt.value) {
+    return
+  }
+
+  const codeValue = sameOutfitDyeFillPreviewCodeValue.value
+  isFillingSameOutfitDyeCode.value = true
+
+  try {
+    const result = await fillInfinityNikkiSameOutfitDyeCode({
+      assetId: props.assetId,
+      codeValue,
+    })
+
+    // 覆盖完成后收起提示区，避免重复操作噪音。
+    clearSameOutfitDyeFillPreview()
+
+    toast.success(t('gallery.details.infinityNikki.sameOutfitDyeFill.successTitle'), {
+      description: t(
+        'gallery.details.infinityNikki.sameOutfitDyeFill.successDescriptionOverwriteAll',
+        {
+          count: result.affectedCount,
+          updated: result.updatedExistingCount,
+        }
+      ),
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    toast.error(t('gallery.details.infinityNikki.sameOutfitDyeFill.failedTitle'), {
+      description: message,
+    })
+  } finally {
+    isFillingSameOutfitDyeCode.value = false
   }
 }
 
@@ -527,6 +616,31 @@ watch(
                 ? t('gallery.details.infinityNikki.copyCodeValue')
                 : t('gallery.details.infinityNikki.pasteCodeValue')
             }}
+          </Button>
+        </div>
+      </div>
+
+      <div
+        v-if="canShowSameOutfitDyeFillPrompt"
+        class="space-y-1 rounded border border-border/70 bg-muted/30 px-2 py-1.5"
+      >
+        <div class="text-muted-foreground">
+          {{
+            t('gallery.details.infinityNikki.sameOutfitDyeFill.prompt', {
+              matched: sameOutfitDyeFillPreview?.matchedCount ?? 0,
+              recorded: sameOutfitDyeFillPreview?.recordedCount ?? 0,
+            })
+          }}
+        </div>
+        <div class="flex items-center justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-6 px-2 text-xs"
+            :disabled="isFillingSameOutfitDyeCode"
+            @click="void handleFillSameOutfitDyeCode()"
+          >
+            {{ t('gallery.details.infinityNikki.sameOutfitDyeFill.actionOverwriteAll') }}
           </Button>
         </div>
       </div>

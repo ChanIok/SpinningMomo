@@ -118,6 +118,21 @@ struct InfinityNikkiUserRecordRow {
   std::string record_value;
 };
 
+struct SameOutfitDyeCodeFillStatsRow {
+  std::int64_t matched_count = 0;
+  std::int64_t fillable_count = 0;
+  std::int64_t recorded_count = 0;
+};
+
+struct InfinityNikkiSourceOutfitDyeStateRow {
+  std::optional<std::string> nikki_diy_json;
+  std::int64_t clothes_count = 0;
+};
+
+struct AssetIdRow {
+  std::int64_t asset_id = 0;
+};
+
 auto read_infinity_nikki_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
     -> std::expected<Types::InfinityNikkiUserRecord, std::string> {
   auto rows_result = Core::Database::query<InfinityNikkiUserRecordRow>(*app_state.database,
@@ -221,6 +236,190 @@ auto delete_infinity_nikki_user_record_keys(Core::State::AppState& app_state, st
     }
   }
   return {};
+}
+
+auto db_param_from_optional_string(const std::optional<std::string>& value)
+    -> Core::Database::Types::DbParam {
+  if (!value.has_value()) {
+    return std::monostate{};
+  }
+  return *value;
+}
+
+auto read_infinity_nikki_source_outfit_dye_state(Core::State::AppState& app_state,
+                                                 std::int64_t asset_id)
+    -> std::expected<std::optional<InfinityNikkiSourceOutfitDyeStateRow>, std::string> {
+  auto result =
+      Core::Database::query_single<InfinityNikkiSourceOutfitDyeStateRow>(*app_state.database,
+                                                                         R"(
+        SELECT p.nikki_diy_json AS nikki_diy_json,
+               (
+                 SELECT COUNT(*)
+                 FROM asset_infinity_nikki_clothes c
+                 WHERE c.asset_id = p.asset_id
+               ) AS clothes_count
+        FROM asset_infinity_nikki_params p
+        WHERE p.asset_id = ?
+      )",
+                                                                         {asset_id});
+  if (!result) {
+    return std::unexpected("Failed to query Infinity Nikki outfit and dye state: " +
+                           result.error());
+  }
+
+  return result.value();
+}
+
+auto query_same_outfit_dye_code_fill_preview(
+    Core::State::AppState& app_state, std::int64_t source_asset_id,
+    const InfinityNikkiSourceOutfitDyeStateRow& source_state)
+    -> std::expected<Types::InfinityNikkiSameOutfitDyeCodeFillPreview, std::string> {
+  const auto diy_json_param = db_param_from_optional_string(source_state.nikki_diy_json);
+  auto stats_result = Core::Database::query_single<SameOutfitDyeCodeFillStatsRow>(
+      *app_state.database,
+      R"(
+        SELECT COUNT(*) AS matched_count,
+               COALESCE(SUM(
+                 CASE
+                   WHEN ur.asset_id IS NULL OR trim(ur.record_value) = '' THEN 1
+                   ELSE 0
+                 END
+               ), 0) AS fillable_count,
+               COALESCE(SUM(
+                 CASE
+                   WHEN ur.asset_id IS NOT NULL AND trim(ur.record_value) <> '' THEN 1
+                   ELSE 0
+                 END
+               ), 0) AS recorded_count
+        FROM asset_infinity_nikki_params p
+        LEFT JOIN asset_infinity_nikki_user_record ur
+          ON ur.asset_id = p.asset_id
+         AND ur.record_key = 'dye_code'
+        WHERE p.asset_id <> ?
+          AND ((? IS NULL AND p.nikki_diy_json IS NULL) OR p.nikki_diy_json = ?)
+          AND (
+            SELECT COUNT(*)
+            FROM asset_infinity_nikki_clothes c
+            WHERE c.asset_id = p.asset_id
+          ) = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM asset_infinity_nikki_clothes sc
+            WHERE sc.asset_id = ?
+              AND NOT EXISTS (
+                SELECT 1
+                FROM asset_infinity_nikki_clothes cc
+                WHERE cc.asset_id = p.asset_id
+                  AND cc.cloth_id = sc.cloth_id
+              )
+          )
+      )",
+      {source_asset_id, diy_json_param, diy_json_param, source_state.clothes_count,
+       source_asset_id});
+  if (!stats_result) {
+    return std::unexpected("Failed to count same Infinity Nikki outfit and dye assets: " +
+                           stats_result.error());
+  }
+
+  const auto stats = stats_result->value_or(SameOutfitDyeCodeFillStatsRow{});
+  return Types::InfinityNikkiSameOutfitDyeCodeFillPreview{
+      .source_has_outfit_dye_state = true,
+      .matched_count = stats.matched_count,
+      .fillable_count = stats.fillable_count,
+      .recorded_count = stats.recorded_count,
+  };
+}
+
+auto query_same_outfit_dye_code_fillable_asset_ids(
+    Core::State::AppState& app_state, std::int64_t source_asset_id,
+    const InfinityNikkiSourceOutfitDyeStateRow& source_state)
+    -> std::expected<std::vector<std::int64_t>, std::string> {
+  const auto diy_json_param = db_param_from_optional_string(source_state.nikki_diy_json);
+  auto rows_result =
+      Core::Database::query<AssetIdRow>(*app_state.database,
+                                        R"(
+        SELECT p.asset_id AS asset_id
+        FROM asset_infinity_nikki_params p
+        LEFT JOIN asset_infinity_nikki_user_record ur
+          ON ur.asset_id = p.asset_id
+         AND ur.record_key = 'dye_code'
+        WHERE p.asset_id <> ?
+          AND ((? IS NULL AND p.nikki_diy_json IS NULL) OR p.nikki_diy_json = ?)
+          AND (
+            SELECT COUNT(*)
+            FROM asset_infinity_nikki_clothes c
+            WHERE c.asset_id = p.asset_id
+          ) = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM asset_infinity_nikki_clothes sc
+            WHERE sc.asset_id = ?
+              AND NOT EXISTS (
+                SELECT 1
+                FROM asset_infinity_nikki_clothes cc
+                WHERE cc.asset_id = p.asset_id
+                  AND cc.cloth_id = sc.cloth_id
+              )
+          )
+          AND (ur.asset_id IS NULL OR trim(ur.record_value) = '')
+      )",
+                                        {source_asset_id, diy_json_param, diy_json_param,
+                                         source_state.clothes_count, source_asset_id});
+  if (!rows_result) {
+    return std::unexpected("Failed to query same Infinity Nikki outfit and dye assets: " +
+                           rows_result.error());
+  }
+
+  std::vector<std::int64_t> asset_ids;
+  asset_ids.reserve(rows_result->size());
+  for (const auto& row : rows_result.value()) {
+    asset_ids.push_back(row.asset_id);
+  }
+  return asset_ids;
+}
+
+auto query_same_outfit_dye_code_target_asset_ids(
+    Core::State::AppState& app_state, std::int64_t source_asset_id,
+    const InfinityNikkiSourceOutfitDyeStateRow& source_state)
+    -> std::expected<std::vector<std::int64_t>, std::string> {
+  const auto diy_json_param = db_param_from_optional_string(source_state.nikki_diy_json);
+  auto rows_result =
+      Core::Database::query<AssetIdRow>(*app_state.database,
+                                        R"(
+        SELECT p.asset_id AS asset_id
+        FROM asset_infinity_nikki_params p
+        WHERE p.asset_id <> ?
+          AND ((? IS NULL AND p.nikki_diy_json IS NULL) OR p.nikki_diy_json = ?)
+          AND (
+            SELECT COUNT(*)
+            FROM asset_infinity_nikki_clothes c
+            WHERE c.asset_id = p.asset_id
+          ) = ?
+          AND NOT EXISTS (
+            SELECT 1
+            FROM asset_infinity_nikki_clothes sc
+            WHERE sc.asset_id = ?
+              AND NOT EXISTS (
+                SELECT 1
+                FROM asset_infinity_nikki_clothes cc
+                WHERE cc.asset_id = p.asset_id
+                  AND cc.cloth_id = sc.cloth_id
+              )
+          )
+      )",
+                                        {source_asset_id, diy_json_param, diy_json_param,
+                                         source_state.clothes_count, source_asset_id});
+  if (!rows_result) {
+    return std::unexpected("Failed to query same Infinity Nikki outfit and dye assets: " +
+                           rows_result.error());
+  }
+
+  std::vector<std::int64_t> asset_ids;
+  asset_ids.reserve(rows_result->size());
+  for (const auto& row : rows_result.value()) {
+    asset_ids.push_back(row.asset_id);
+  }
+  return asset_ids;
 }
 
 auto build_unified_where_clause(const Types::QueryAssetsFilters& filters,
@@ -1124,6 +1323,129 @@ auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
   return Types::OperationResult{.success = true,
                                 .message = "Infinity Nikki user record updated successfully",
                                 .affected_count = 1};
+}
+
+auto preview_infinity_nikki_same_outfit_dye_code_fill(
+    Core::State::AppState& app_state,
+    const Types::PreviewInfinityNikkiSameOutfitDyeCodeFillParams& params)
+    -> std::expected<Types::InfinityNikkiSameOutfitDyeCodeFillPreview, std::string> {
+  if (params.asset_id <= 0) {
+    return std::unexpected("Asset id must be greater than 0");
+  }
+
+  auto asset_result =
+      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+  if (!asset_result) {
+    return std::unexpected("Failed to load asset before previewing same outfit and dye fill: " +
+                           asset_result.error());
+  }
+
+  if (!asset_result->has_value()) {
+    return std::unexpected("Asset not found");
+  }
+
+  auto source_state_result =
+      read_infinity_nikki_source_outfit_dye_state(app_state, params.asset_id);
+  if (!source_state_result) {
+    return std::unexpected(source_state_result.error());
+  }
+
+  if (!source_state_result->has_value()) {
+    return Types::InfinityNikkiSameOutfitDyeCodeFillPreview{};
+  }
+
+  const auto& source_state = source_state_result->value();
+  if (source_state.clothes_count <= 0) {
+    return Types::InfinityNikkiSameOutfitDyeCodeFillPreview{};
+  }
+
+  return query_same_outfit_dye_code_fill_preview(app_state, params.asset_id, source_state);
+}
+
+auto fill_infinity_nikki_same_outfit_dye_code(
+    Core::State::AppState& app_state, const Types::FillInfinityNikkiSameOutfitDyeCodeParams& params)
+    -> std::expected<Types::InfinityNikkiSameOutfitDyeCodeFillResult, std::string> {
+  if (params.asset_id <= 0) {
+    return std::unexpected("Asset id must be greater than 0");
+  }
+
+  auto normalized_code_value = trim_ascii_copy(params.code_value);
+  if (normalized_code_value.empty()) {
+    return std::unexpected("Dye code must not be empty");
+  }
+
+  auto asset_result =
+      Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
+  if (!asset_result) {
+    return std::unexpected("Failed to load asset before filling same outfit and dye records: " +
+                           asset_result.error());
+  }
+
+  if (!asset_result->has_value()) {
+    return std::unexpected("Asset not found");
+  }
+
+  auto source_state_result =
+      read_infinity_nikki_source_outfit_dye_state(app_state, params.asset_id);
+  if (!source_state_result) {
+    return std::unexpected(source_state_result.error());
+  }
+
+  if (!source_state_result->has_value()) {
+    return Types::InfinityNikkiSameOutfitDyeCodeFillResult{
+        .success = true,
+        .message = "Source asset has no Infinity Nikki outfit data",
+        .source_has_outfit_dye_state = false,
+    };
+  }
+
+  const auto& source_state = source_state_result->value();
+  if (source_state.clothes_count <= 0) {
+    return Types::InfinityNikkiSameOutfitDyeCodeFillResult{
+        .success = true,
+        .message = "Source asset has no Infinity Nikki outfit data",
+        .source_has_outfit_dye_state = false,
+    };
+  }
+
+  auto preview_result =
+      query_same_outfit_dye_code_fill_preview(app_state, params.asset_id, source_state);
+  if (!preview_result) {
+    return std::unexpected(preview_result.error());
+  }
+
+  auto target_ids_result =
+      query_same_outfit_dye_code_target_asset_ids(app_state, params.asset_id, source_state);
+  if (!target_ids_result) {
+    return std::unexpected(target_ids_result.error());
+  }
+
+  auto target_ids = std::move(target_ids_result.value());
+  auto write_result = Core::Database::execute_transaction(
+      *app_state.database, [&](auto&) -> std::expected<void, std::string> {
+        for (const auto asset_id : target_ids) {
+          auto value_result = upsert_infinity_nikki_user_record_key(app_state, asset_id, "dye_code",
+                                                                    normalized_code_value);
+          if (!value_result) {
+            return std::unexpected(value_result.error());
+          }
+        }
+        return {};
+      });
+
+  if (!write_result) {
+    return std::unexpected(write_result.error());
+  }
+
+  return Types::InfinityNikkiSameOutfitDyeCodeFillResult{
+      .success = true,
+      .message = "Infinity Nikki same outfit and dye records filled successfully",
+      .source_has_outfit_dye_state = true,
+      .matched_count = preview_result->matched_count,
+      .affected_count = static_cast<std::int64_t>(target_ids.size()),
+      .skipped_existing_count = 0,
+      .updated_existing_count = preview_result->recorded_count,
+  };
 }
 
 auto set_infinity_nikki_world_record(Core::State::AppState& app_state,

@@ -525,6 +525,32 @@ struct SetInfinityNikkiUserRecordParams {
   std::optional<std::string> code_value;
 };
 
+struct PreviewInfinityNikkiSameOutfitDyeCodeFillParams {
+  std::int64_t asset_id;
+};
+
+struct InfinityNikkiSameOutfitDyeCodeFillPreview {
+  bool source_has_outfit_dye_state = false;
+  std::int64_t matched_count = 0;
+  std::int64_t fillable_count = 0;
+  std::int64_t recorded_count = 0;
+};
+
+struct FillInfinityNikkiSameOutfitDyeCodeParams {
+  std::int64_t asset_id;
+  std::string code_value;
+};
+
+struct InfinityNikkiSameOutfitDyeCodeFillResult {
+  bool success = false;
+  std::string message;
+  bool source_has_outfit_dye_state = false;
+  std::int64_t matched_count = 0;
+  std::int64_t affected_count = 0;
+  std::int64_t skipped_existing_count = 0;
+  std::int64_t updated_existing_count = 0;
+};
+
 struct SetInfinityNikkiWorldRecordParams {
   std::int64_t asset_id;
   std::optional<std::string> world_id;

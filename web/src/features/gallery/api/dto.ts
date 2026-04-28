@@ -83,6 +83,32 @@ export interface SetInfinityNikkiUserRecordParams {
   codeValue?: string
 }
 
+export interface PreviewInfinityNikkiSameOutfitDyeCodeFillParams {
+  assetId: number
+}
+
+export interface InfinityNikkiSameOutfitDyeCodeFillPreview {
+  sourceHasOutfitDyeState: boolean
+  matchedCount: number
+  fillableCount: number
+  recordedCount: number
+}
+
+export interface FillInfinityNikkiSameOutfitDyeCodeParams {
+  assetId: number
+  codeValue: string
+}
+
+export interface InfinityNikkiSameOutfitDyeCodeFillResult {
+  success: boolean
+  message: string
+  sourceHasOutfitDyeState: boolean
+  matchedCount: number
+  affectedCount: number
+  skippedExistingCount: number
+  updatedExistingCount: number
+}
+
 export interface SetInfinityNikkiWorldRecordParams {
   assetId: number
   worldId?: string

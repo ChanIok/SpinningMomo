@@ -280,6 +280,40 @@ auto handle_set_infinity_nikki_user_record(
   co_return result.value();
 }
 
+auto handle_preview_infinity_nikki_same_outfit_dye_code_fill(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::PreviewInfinityNikkiSameOutfitDyeCodeFillParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillPreview> {
+  auto result = Features::Gallery::Asset::Service::preview_infinity_nikki_same_outfit_dye_code_fill(
+      app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
+auto handle_fill_infinity_nikki_same_outfit_dye_code(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::FillInfinityNikkiSameOutfitDyeCodeParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillResult> {
+  auto result = Features::Gallery::Asset::Service::fill_infinity_nikki_same_outfit_dye_code(
+      app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  if (result->affected_count > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+
+  co_return result.value();
+}
+
 auto handle_set_infinity_nikki_world_record(
     Core::State::AppState& app_state,
     const Features::Gallery::Types::SetInfinityNikkiWorldRecordParams& params)
@@ -455,6 +489,20 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.setInfinityNikkiUserRecord",
       handle_set_infinity_nikki_user_record,
       "Set or clear a single Infinity Nikki user record in the gallery details panel");
+
+  register_method<Features::Gallery::Types::PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
+                  Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillPreview>(
+      app_state, app_state.rpc->registry, "gallery.previewInfinityNikkiSameOutfitDyeCodeFill",
+      handle_preview_infinity_nikki_same_outfit_dye_code_fill,
+      "Preview how many same Infinity Nikki outfit and dye assets can receive the current dye "
+      "code");
+
+  register_method<Features::Gallery::Types::FillInfinityNikkiSameOutfitDyeCodeParams,
+                  Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillResult>(
+      app_state, app_state.rpc->registry, "gallery.fillInfinityNikkiSameOutfitDyeCode",
+      handle_fill_infinity_nikki_same_outfit_dye_code,
+      "Fill dye code records on assets with the same Infinity Nikki outfit and dye data, "
+      "overwriting existing values");
 
   register_method<Features::Gallery::Types::SetInfinityNikkiWorldRecordParams,
                   Features::Gallery::Types::OperationResult>(

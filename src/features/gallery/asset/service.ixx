@@ -52,6 +52,15 @@ export auto set_infinity_nikki_user_record(Core::State::AppState& app_state,
                                            const Types::SetInfinityNikkiUserRecordParams& params)
     -> std::expected<Types::OperationResult, std::string>;
 
+export auto preview_infinity_nikki_same_outfit_dye_code_fill(
+    Core::State::AppState& app_state,
+    const Types::PreviewInfinityNikkiSameOutfitDyeCodeFillParams& params)
+    -> std::expected<Types::InfinityNikkiSameOutfitDyeCodeFillPreview, std::string>;
+
+export auto fill_infinity_nikki_same_outfit_dye_code(
+    Core::State::AppState& app_state, const Types::FillInfinityNikkiSameOutfitDyeCodeParams& params)
+    -> std::expected<Types::InfinityNikkiSameOutfitDyeCodeFillResult, std::string>;
+
 export auto set_infinity_nikki_world_record(Core::State::AppState& app_state,
                                             const Types::SetInfinityNikkiWorldRecordParams& params)
     -> std::expected<Types::OperationResult, std::string>;

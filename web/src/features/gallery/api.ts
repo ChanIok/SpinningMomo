@@ -33,6 +33,10 @@ import type {
   UpdateAssetDescriptionParams,
   SetInfinityNikkiUserRecordParams,
   SetInfinityNikkiWorldRecordParams,
+  PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
+  InfinityNikkiSameOutfitDyeCodeFillPreview,
+  FillInfinityNikkiSameOutfitDyeCodeParams,
+  InfinityNikkiSameOutfitDyeCodeFillResult,
   AssetReachability,
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -654,6 +658,44 @@ export async function setInfinityNikkiUserRecord(
 }
 
 /**
+ * 预览相同 Infinity Nikki 穿搭与染色状态的染色码填充范围
+ */
+export async function previewInfinityNikkiSameOutfitDyeCodeFill(
+  params: PreviewInfinityNikkiSameOutfitDyeCodeFillParams
+): Promise<InfinityNikkiSameOutfitDyeCodeFillPreview> {
+  try {
+    const result = await call<InfinityNikkiSameOutfitDyeCodeFillPreview>(
+      'gallery.previewInfinityNikkiSameOutfitDyeCodeFill',
+      params
+    )
+
+    return result
+  } catch (error) {
+    console.error('Failed to preview Infinity Nikki same outfit and dye fill:', error)
+    throw new Error('获取无限暖暖相同穿搭与染色状态失败')
+  }
+}
+
+/**
+ * 为相同 Infinity Nikki 穿搭与染色状态的照片填充染色码（覆盖已有值）
+ */
+export async function fillInfinityNikkiSameOutfitDyeCode(
+  params: FillInfinityNikkiSameOutfitDyeCodeParams
+): Promise<InfinityNikkiSameOutfitDyeCodeFillResult> {
+  try {
+    const result = await call<InfinityNikkiSameOutfitDyeCodeFillResult>(
+      'gallery.fillInfinityNikkiSameOutfitDyeCode',
+      params
+    )
+
+    return result
+  } catch (error) {
+    console.error('Failed to fill Infinity Nikki same outfit and dye records:', error)
+    throw new Error('填充无限暖暖相同穿搭与染色状态失败')
+  }
+}
+
+/**
  * 设置 Infinity Nikki 地图区域记录
  */
 export async function setInfinityNikkiWorldRecord(
@@ -741,5 +783,7 @@ export const galleryApi = {
   updateAssetsReviewState,
   updateAssetDescription,
   setInfinityNikkiUserRecord,
+  previewInfinityNikkiSameOutfitDyeCodeFill,
+  fillInfinityNikkiSameOutfitDyeCode,
   setInfinityNikkiWorldRecord,
 }

@@ -82,7 +82,7 @@ struct Nuan5DecodedPhoto {
   std::optional<double> highlights;
   std::optional<double> shadow;
   std::optional<std::vector<std::int64_t>> clothes;
-  std::optional<std::unordered_map<std::string, std::vector<Nuan5DiyEntry>>> diy;
+  std::optional<std::map<std::string, std::vector<Nuan5DiyEntry>>> diy;
   std::optional<Nuan5RawData> raw;
 };
 

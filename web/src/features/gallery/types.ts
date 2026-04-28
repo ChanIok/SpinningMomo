@@ -100,6 +100,10 @@ export type {
   UpdateAssetDescriptionParams,
   SetInfinityNikkiUserRecordParams,
   SetInfinityNikkiWorldRecordParams,
+  PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
+  InfinityNikkiSameOutfitDyeCodeFillPreview,
+  FillInfinityNikkiSameOutfitDyeCodeParams,
+  InfinityNikkiSameOutfitDyeCodeFillResult,
   InfinityNikkiUserRecordCodeType,
   GetAssetTagsParams,
   // 统计/展示数据（仅由 API 返回）
