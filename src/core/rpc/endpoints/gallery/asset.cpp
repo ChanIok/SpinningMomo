@@ -85,49 +85,6 @@ auto handle_query_asset_layout_meta(
   co_return result.value();
 }
 
-auto handle_query_photo_map_points(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::QueryPhotoMapPointsParams& params)
-    -> RpcAwaitable<std::vector<Features::Gallery::Types::PhotoMapPoint>> {
-  auto result = Features::Gallery::Asset::Service::query_photo_map_points(app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  co_return result.value();
-}
-
-auto handle_get_infinity_nikki_details(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::GetInfinityNikkiDetailsParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiDetails> {
-  auto result = Features::Gallery::Asset::Service::get_infinity_nikki_details(app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  co_return result.value();
-}
-
-auto handle_get_infinity_nikki_metadata_names(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::GetInfinityNikkiMetadataNamesParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiMetadataNames> {
-  auto result = co_await Features::Gallery::Asset::Service::get_infinity_nikki_metadata_names(
-      app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  co_return result.value();
-}
-
 auto handle_get_asset_main_colors(Core::State::AppState& app_state,
                                   const Features::Gallery::Types::GetAssetMainColorsParams& params)
     -> RpcAwaitable<std::vector<Features::Gallery::Types::AssetMainColor>> {
@@ -261,78 +218,6 @@ auto handle_update_asset_description(
   co_return result.value();
 }
 
-auto handle_set_infinity_nikki_user_record(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::SetInfinityNikkiUserRecordParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result =
-      Features::Gallery::Asset::Service::set_infinity_nikki_user_record(app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  if (result->affected_count.value_or(0) > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
-  }
-
-  co_return result.value();
-}
-
-auto handle_preview_infinity_nikki_same_outfit_dye_code_fill(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::PreviewInfinityNikkiSameOutfitDyeCodeFillParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillPreview> {
-  auto result = Features::Gallery::Asset::Service::preview_infinity_nikki_same_outfit_dye_code_fill(
-      app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  co_return result.value();
-}
-
-auto handle_fill_infinity_nikki_same_outfit_dye_code(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::FillInfinityNikkiSameOutfitDyeCodeParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillResult> {
-  auto result = Features::Gallery::Asset::Service::fill_infinity_nikki_same_outfit_dye_code(
-      app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  if (result->affected_count > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
-  }
-
-  co_return result.value();
-}
-
-auto handle_set_infinity_nikki_world_record(
-    Core::State::AppState& app_state,
-    const Features::Gallery::Types::SetInfinityNikkiWorldRecordParams& params)
-    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
-  auto result =
-      Features::Gallery::Asset::Service::set_infinity_nikki_world_record(app_state, params);
-
-  if (!result) {
-    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
-                                       .message = "Service error: " + result.error()});
-  }
-
-  if (result->affected_count.value_or(0) > 0) {
-    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
-  }
-
-  co_return result.value();
-}
-
 auto handle_check_asset_reachable(Core::State::AppState& app_state,
                                   const CheckAssetReachableParams& params)
     -> RpcAwaitable<CheckAssetReachableResult> {
@@ -420,24 +305,6 @@ auto register_all(Core::State::AppState& app_state) -> void {
       handle_query_asset_layout_meta,
       "Query lightweight asset layout metadata for adaptive gallery layout calculation");
 
-  register_method<Features::Gallery::Types::QueryPhotoMapPointsParams,
-                  std::vector<Features::Gallery::Types::PhotoMapPoint>>(
-      app_state, app_state.rpc->registry, "gallery.queryPhotoMapPoints",
-      handle_query_photo_map_points,
-      "Query Infinity Nikki photo map points using the current gallery filters");
-
-  register_method<Features::Gallery::Types::GetInfinityNikkiDetailsParams,
-                  Features::Gallery::Types::InfinityNikkiDetails>(
-      app_state, app_state.rpc->registry, "gallery.getInfinityNikkiDetails",
-      handle_get_infinity_nikki_details,
-      "Get Infinity Nikki extracted data and user record for the specified asset");
-
-  register_method<Features::Gallery::Types::GetInfinityNikkiMetadataNamesParams,
-                  Features::Gallery::Types::InfinityNikkiMetadataNames>(
-      app_state, app_state.rpc->registry, "gallery.getInfinityNikkiMetadataNames",
-      handle_get_infinity_nikki_metadata_names,
-      "Resolve localized names for Infinity Nikki metadata ids such as pose/filter/light");
-
   register_method<Features::Gallery::Types::GetAssetMainColorsParams,
                   std::vector<Features::Gallery::Types::AssetMainColor>>(
       app_state, app_state.rpc->registry, "gallery.getAssetMainColors",
@@ -483,32 +350,6 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.updateAssetDescription",
       handle_update_asset_description,
       "Update a single asset description in the gallery details panel");
-
-  register_method<Features::Gallery::Types::SetInfinityNikkiUserRecordParams,
-                  Features::Gallery::Types::OperationResult>(
-      app_state, app_state.rpc->registry, "gallery.setInfinityNikkiUserRecord",
-      handle_set_infinity_nikki_user_record,
-      "Set or clear a single Infinity Nikki user record in the gallery details panel");
-
-  register_method<Features::Gallery::Types::PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
-                  Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillPreview>(
-      app_state, app_state.rpc->registry, "gallery.previewInfinityNikkiSameOutfitDyeCodeFill",
-      handle_preview_infinity_nikki_same_outfit_dye_code_fill,
-      "Preview how many same Infinity Nikki outfit and dye assets can receive the current dye "
-      "code");
-
-  register_method<Features::Gallery::Types::FillInfinityNikkiSameOutfitDyeCodeParams,
-                  Features::Gallery::Types::InfinityNikkiSameOutfitDyeCodeFillResult>(
-      app_state, app_state.rpc->registry, "gallery.fillInfinityNikkiSameOutfitDyeCode",
-      handle_fill_infinity_nikki_same_outfit_dye_code,
-      "Fill dye code records on assets with the same Infinity Nikki outfit and dye data, "
-      "overwriting existing values");
-
-  register_method<Features::Gallery::Types::SetInfinityNikkiWorldRecordParams,
-                  Features::Gallery::Types::OperationResult>(
-      app_state, app_state.rpc->registry, "gallery.setInfinityNikkiWorldRecord",
-      handle_set_infinity_nikki_world_record,
-      "Set or clear a single Infinity Nikki world record in the gallery details panel");
 
   register_method<CheckAssetReachableParams, CheckAssetReachableResult>(
       app_state, app_state.rpc->registry, "gallery.checkAssetReachable",

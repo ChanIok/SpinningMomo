@@ -18,7 +18,7 @@ import {
   previewInfinityNikkiSameOutfitDyeCodeFill,
   setInfinityNikkiUserRecord,
   setInfinityNikkiWorldRecord,
-} from '../../api'
+} from '@/extensions/infinity_nikki/api'
 import {
   getInfinityNikkiWorldName,
   INFINITY_NIKKI_WORLD_OPTIONS,
@@ -30,7 +30,7 @@ import type {
   InfinityNikkiMetadataNames,
   InfinityNikkiSameOutfitDyeCodeFillPreview,
   InfinityNikkiUserRecordCodeType,
-} from '../../types'
+} from '@/extensions/infinity_nikki/types'
 
 const props = defineProps<{
   assetId: number

@@ -1,17 +1,17 @@
 module;
 
-module Features.Gallery.Asset.InfinityNikkiMetadataDict;
+module Extensions.InfinityNikki.MetadataDict;
 
 import std;
-import Core.State;
 import Core.HttpClient;
 import Core.HttpClient.Types;
-import Features.Gallery.Types;
+import Core.State;
+import Extensions.InfinityNikki.Types;
 import Utils.Logger;
 import <asio.hpp>;
 import <rfl/json.hpp>;
 
-namespace Features::Gallery::Asset::InfinityNikkiMetadataDict {
+namespace Extensions::InfinityNikki::MetadataDict {
 
 // 远端在线字典地址：不随客户端打包发布。
 constexpr std::string_view kDictionaryUrl =
@@ -164,8 +164,8 @@ auto load_dictionary(Core::State::AppState& app_state)
 }
 
 auto resolve_metadata_names(Core::State::AppState& app_state,
-                            const Types::GetInfinityNikkiMetadataNamesParams& params)
-    -> asio::awaitable<std::expected<Types::InfinityNikkiMetadataNames, std::string>> {
+                            const GetInfinityNikkiMetadataNamesParams& params)
+    -> asio::awaitable<std::expected<InfinityNikkiMetadataNames, std::string>> {
   // 统一入口：先拿字典，再按传入 id + locale 做“最小响应”映射。
   auto dictionary = co_await load_dictionary(app_state);
   if (!dictionary) {
@@ -174,11 +174,11 @@ auto resolve_metadata_names(Core::State::AppState& app_state,
 
   auto locale_key = to_locale_key(params.locale);
 
-  co_return Types::InfinityNikkiMetadataNames{
+  co_return InfinityNikkiMetadataNames{
       .filter_name = resolve_name(dictionary->filters, params.filter_id, locale_key),
       .pose_name = resolve_name(dictionary->poses, params.pose_id, locale_key),
       .light_name = resolve_name(dictionary->lights, params.light_id, locale_key),
   };
 }
 
-}  // namespace Features::Gallery::Asset::InfinityNikkiMetadataDict
+}  // namespace Extensions::InfinityNikki::MetadataDict

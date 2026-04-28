@@ -273,8 +273,6 @@ export function useGalleryData() {
         reviewFlag: filters.reviewFlag,
         tagIds: filters.tagIds,
         tagMatchMode: filters.tagMatchMode,
-        clothIds: filters.clothIds,
-        clothMatchMode: filters.clothMatchMode,
         colorHexes: filters.colorHexes,
         colorMatchMode: filters.colorMatchMode,
         colorDistance: filters.colorDistance,

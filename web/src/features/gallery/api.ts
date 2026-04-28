@@ -15,11 +15,6 @@ import type {
   QueryAssetsResponse,
   QueryAssetLayoutMetaParams,
   QueryAssetLayoutMetaResponse,
-  QueryPhotoMapPointsParams,
-  PhotoMapPoint,
-  InfinityNikkiDetails,
-  GetInfinityNikkiMetadataNamesParams,
-  InfinityNikkiMetadataNames,
   AssetMainColor,
   TagStats,
   HomeStats,
@@ -31,12 +26,6 @@ import type {
   UpdateAssetsReviewStateParams,
   MoveAssetsToFolderParams,
   UpdateAssetDescriptionParams,
-  SetInfinityNikkiUserRecordParams,
-  SetInfinityNikkiWorldRecordParams,
-  PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
-  InfinityNikkiSameOutfitDyeCodeFillPreview,
-  FillInfinityNikkiSameOutfitDyeCodeParams,
-  InfinityNikkiSameOutfitDyeCodeFillResult,
   AssetReachability,
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
@@ -368,62 +357,6 @@ export async function queryAssetLayoutMeta(
 }
 
 /**
- * 查询当前筛选下的地图点位
- */
-export async function queryPhotoMapPoints(
-  params: QueryPhotoMapPointsParams
-): Promise<PhotoMapPoint[]> {
-  try {
-    const result = await call<PhotoMapPoint[]>('gallery.queryPhotoMapPoints', params)
-
-    console.log('🗺️ 查询地图点位成功:', {
-      count: result.length,
-      filters: params.filters,
-    })
-
-    return result
-  } catch (error) {
-    console.error('Failed to query photo map points:', error)
-    throw new Error('查询地图点位失败')
-  }
-}
-
-/**
- * 获取 Infinity Nikki 详情
- */
-export async function getInfinityNikkiDetails(assetId: number): Promise<InfinityNikkiDetails> {
-  try {
-    const result = await call<InfinityNikkiDetails>('gallery.getInfinityNikkiDetails', {
-      assetId,
-    })
-
-    return result
-  } catch (error) {
-    console.error('Failed to get Infinity Nikki details:', error)
-    throw new Error('获取无限暖暖详情失败')
-  }
-}
-
-/**
- * 获取 Infinity Nikki 参数 ID 的本地化名称映射
- */
-export async function getInfinityNikkiMetadataNames(
-  params: GetInfinityNikkiMetadataNamesParams
-): Promise<InfinityNikkiMetadataNames> {
-  try {
-    const result = await call<InfinityNikkiMetadataNames>(
-      'gallery.getInfinityNikkiMetadataNames',
-      params
-    )
-    return result
-  } catch (error) {
-    console.error('Failed to get Infinity Nikki metadata names:', error)
-    // 该接口用于“增强展示”，失败时返回空映射，让 UI 自动回退原始 ID。
-    return {}
-  }
-}
-
-/**
  * 获取资产主色调板
  */
 export async function getAssetMainColors(assetId: number): Promise<AssetMainColor[]> {
@@ -642,76 +575,6 @@ export async function updateAssetDescription(
 }
 
 /**
- * 设置 Infinity Nikki 玩家记录
- */
-export async function setInfinityNikkiUserRecord(
-  params: SetInfinityNikkiUserRecordParams
-): Promise<OperationResult> {
-  try {
-    const result = await call<OperationResult>('gallery.setInfinityNikkiUserRecord', params)
-
-    return result
-  } catch (error) {
-    console.error('Failed to set Infinity Nikki user record:', error)
-    throw new Error('更新无限暖暖玩家记录失败')
-  }
-}
-
-/**
- * 预览相同 Infinity Nikki 穿搭与染色状态的染色码填充范围
- */
-export async function previewInfinityNikkiSameOutfitDyeCodeFill(
-  params: PreviewInfinityNikkiSameOutfitDyeCodeFillParams
-): Promise<InfinityNikkiSameOutfitDyeCodeFillPreview> {
-  try {
-    const result = await call<InfinityNikkiSameOutfitDyeCodeFillPreview>(
-      'gallery.previewInfinityNikkiSameOutfitDyeCodeFill',
-      params
-    )
-
-    return result
-  } catch (error) {
-    console.error('Failed to preview Infinity Nikki same outfit and dye fill:', error)
-    throw new Error('获取无限暖暖相同穿搭与染色状态失败')
-  }
-}
-
-/**
- * 为相同 Infinity Nikki 穿搭与染色状态的照片填充染色码（覆盖已有值）
- */
-export async function fillInfinityNikkiSameOutfitDyeCode(
-  params: FillInfinityNikkiSameOutfitDyeCodeParams
-): Promise<InfinityNikkiSameOutfitDyeCodeFillResult> {
-  try {
-    const result = await call<InfinityNikkiSameOutfitDyeCodeFillResult>(
-      'gallery.fillInfinityNikkiSameOutfitDyeCode',
-      params
-    )
-
-    return result
-  } catch (error) {
-    console.error('Failed to fill Infinity Nikki same outfit and dye records:', error)
-    throw new Error('填充无限暖暖相同穿搭与染色状态失败')
-  }
-}
-
-/**
- * 设置 Infinity Nikki 地图区域记录
- */
-export async function setInfinityNikkiWorldRecord(
-  params: SetInfinityNikkiWorldRecordParams
-): Promise<OperationResult> {
-  try {
-    const result = await call<OperationResult>('gallery.setInfinityNikkiWorldRecord', params)
-
-    return result
-  } catch (error) {
-    console.error('Failed to set Infinity Nikki world record:', error)
-    throw new Error('更新无限暖暖地图区域失败')
-  }
-}
-
-/**
  * 批量获取多个资产的标签
  */
 export async function getTagsByAssetIds(assetIds: number[]): Promise<Record<number, Tag[]>> {
@@ -736,9 +599,6 @@ export const galleryApi = {
   removeFolderWatch,
   queryAssets, // 统一查询接口
   queryAssetLayoutMeta,
-  queryPhotoMapPoints,
-  getInfinityNikkiDetails,
-  getInfinityNikkiMetadataNames,
   getAssetMainColors,
 
   // 时间线查询
@@ -782,8 +642,4 @@ export const galleryApi = {
   checkAssetReachable,
   updateAssetsReviewState,
   updateAssetDescription,
-  setInfinityNikkiUserRecord,
-  previewInfinityNikkiSameOutfitDyeCodeFill,
-  fillInfinityNikkiSameOutfitDyeCode,
-  setInfinityNikkiWorldRecord,
 }

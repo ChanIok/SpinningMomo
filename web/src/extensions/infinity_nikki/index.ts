@@ -2,6 +2,9 @@ import type { FolderTreeNode } from '@/features/gallery/types'
 import { call } from '@/core/rpc'
 import { useI18n } from '@/core/i18n'
 
+export * from './api'
+export type * from './types'
+
 export const INFINITY_NIKKI_LAST_UID_STORAGE_KEY = 'spinningmomo.infinityNikki.extract.lastUid'
 
 interface StartTaskResult {

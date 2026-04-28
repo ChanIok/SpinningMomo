@@ -1,5 +1,5 @@
 import type { Locale } from '@/core/i18n/types'
-import type { PhotoMapPoint } from '@/features/gallery/types'
+import type { PhotoMapPoint } from '@/extensions/infinity_nikki/types'
 import { transformGameToMapCoordinates } from '@/features/map/domain/coordinates'
 import type { MapMarker } from '@/features/map/store'
 

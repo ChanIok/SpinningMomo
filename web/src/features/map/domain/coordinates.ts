@@ -1,4 +1,4 @@
-import type { PhotoMapPoint } from '@/features/gallery/types'
+import type { PhotoMapPoint } from '@/extensions/infinity_nikki/types'
 
 type CoordinateTransformProfile = {
   xScale: number

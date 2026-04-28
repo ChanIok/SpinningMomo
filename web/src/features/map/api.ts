@@ -1,8 +1,8 @@
-import { queryPhotoMapPoints as queryPhotoMapPointsFromGallery } from '@/features/gallery/api'
-import type { QueryPhotoMapPointsParams, PhotoMapPoint } from '@/features/gallery/types'
+import { queryPhotoMapPoints as queryInfinityNikkiPhotoMapPoints } from '@/extensions/infinity_nikki/api'
+import type { QueryPhotoMapPointsParams, PhotoMapPoint } from '@/extensions/infinity_nikki/types'
 
 export async function queryPhotoMapPoints(
   params: QueryPhotoMapPointsParams
 ): Promise<PhotoMapPoint[]> {
-  return queryPhotoMapPointsFromGallery(params)
+  return queryInfinityNikkiPhotoMapPoints(params)
 }

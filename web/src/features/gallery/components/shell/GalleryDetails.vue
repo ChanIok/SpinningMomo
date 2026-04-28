@@ -18,15 +18,16 @@ import {
   getAssetTags,
   removeTagsFromAsset,
   addTagsToAsset,
-  getInfinityNikkiDetails,
   updateAssetDescription,
 } from '../../api'
+import { getInfinityNikkiDetails } from '@/extensions/infinity_nikki/api'
 import AssetDetailsContent from '../asset/AssetDetailsContent.vue'
 import AssetInfinityNikkiDetails from '../infinity_nikki/AssetInfinityNikkiDetails.vue'
 import AssetHistogram from '../asset/AssetHistogram.vue'
 import AssetReviewControls from '../asset/AssetReviewControls.vue'
 import TagSelectorPopover from '../tags/TagSelectorPopover.vue'
-import type { Asset, AssetMainColor, InfinityNikkiDetails, Tag } from '../../types'
+import type { Asset, AssetMainColor, Tag } from '../../types'
+import type { InfinityNikkiDetails } from '@/extensions/infinity_nikki/types'
 
 const store = useGalleryStore()
 const settingsStore = useSettingsStore()

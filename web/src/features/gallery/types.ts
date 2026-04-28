@@ -98,13 +98,6 @@ export type {
   UpdateAssetsReviewStateParams,
   MoveAssetsToFolderParams,
   UpdateAssetDescriptionParams,
-  SetInfinityNikkiUserRecordParams,
-  SetInfinityNikkiWorldRecordParams,
-  PreviewInfinityNikkiSameOutfitDyeCodeFillParams,
-  InfinityNikkiSameOutfitDyeCodeFillPreview,
-  FillInfinityNikkiSameOutfitDyeCodeParams,
-  InfinityNikkiSameOutfitDyeCodeFillResult,
-  InfinityNikkiUserRecordCodeType,
   GetAssetTagsParams,
   // 统计/展示数据（仅由 API 返回）
   TagStats,
@@ -135,8 +128,6 @@ export interface AssetFilter {
   reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
-  clothIds?: number[]
-  clothMatchMode?: 'any' | 'all'
   colorHex?: string
   colorDistance?: number
 }
@@ -163,15 +154,6 @@ export type {
   QueryAssetLayoutMetaResponse,
   AdaptiveLayoutRowItem,
   AdaptiveLayoutRow,
-  QueryPhotoMapPointsParams,
-  PhotoMapPoint,
-  // Infinity Nikki 解析结果
-  InfinityNikkiExtractedParams,
-  InfinityNikkiUserRecord,
-  InfinityNikkiMapArea,
-  InfinityNikkiDetails,
-  GetInfinityNikkiMetadataNamesParams,
-  InfinityNikkiMetadataNames,
   // 时间线桶与月视图
   TimelineBucket,
   GetTimelineBucketsParams,

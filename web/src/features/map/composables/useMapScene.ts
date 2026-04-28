@@ -2,7 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { toQueryAssetsFilters } from '@/features/gallery/queryFilters'
 import { useGalleryStore } from '@/features/gallery/store'
-import type { PhotoMapPoint } from '@/features/gallery/types'
+import type { PhotoMapPoint } from '@/extensions/infinity_nikki/types'
 import { queryPhotoMapPoints } from '@/features/map/api'
 import {
   createDefaultMapRenderOptions,

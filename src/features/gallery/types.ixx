@@ -245,25 +245,8 @@ struct ListResponse {
   std::optional<std::int64_t> active_asset_index;
 };
 
-struct PhotoMapPoint {
-  std::int64_t asset_id;
-  std::string name;
-  std::optional<std::string> hash;
-  std::optional<std::int64_t> file_created_at;
-  double nikki_loc_x;
-  double nikki_loc_y;
-  std::optional<double> nikki_loc_z;
-  // asset_index：该照片在“当前 gallery 排序结果集”里的 0-based 下标
-  // 用于地图点击后原子地对齐灯箱 activeIndex，避免闪一下。
-  std::int64_t asset_index;
-};
-
 struct GetParams {
   std::int64_t id;
-};
-
-struct GetInfinityNikkiDetailsParams {
-  std::int64_t asset_id;
 };
 
 struct GetAssetMainColorsParams {
@@ -323,8 +306,6 @@ struct TimelineBucketsParams {
   std::optional<std::string> review_flag;
   std::optional<std::vector<std::int64_t>> tag_ids;
   std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
-  std::optional<std::vector<std::int64_t>> cloth_ids;
-  std::optional<std::string> cloth_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<std::vector<std::string>> color_hexes;
   std::optional<std::string> color_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<double> color_distance = 18.0;
@@ -347,8 +328,6 @@ struct GetAssetsByMonthParams {
   std::optional<std::string> review_flag;
   std::optional<std::vector<std::int64_t>> tag_ids;
   std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
-  std::optional<std::vector<std::int64_t>> cloth_ids;
-  std::optional<std::string> cloth_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<std::vector<std::string>> color_hexes;
   std::optional<std::string> color_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<double> color_distance = 18.0;
@@ -373,8 +352,6 @@ struct QueryAssetsFilters {
   std::optional<std::string> review_flag;  // "none" | "picked" | "rejected"
   std::optional<std::vector<std::int64_t>> tag_ids;
   std::optional<std::string> tag_match_mode = "any";  // "any" (OR) | "all" (AND)
-  std::optional<std::vector<std::int64_t>> cloth_ids;
-  std::optional<std::string> cloth_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<std::vector<std::string>> color_hexes;
   std::optional<std::string> color_match_mode = "any";  // "any" (OR) | "all" (AND)
   std::optional<double> color_distance = 18.0;
@@ -405,73 +382,6 @@ struct QueryAssetLayoutMetaParams {
 struct QueryAssetLayoutMetaResponse {
   std::vector<AssetLayoutMetaItem> items;
   std::int32_t total_count;
-};
-
-struct QueryPhotoMapPointsParams {
-  QueryAssetsFilters filters;
-  std::optional<std::string> sort_by = "created_at";
-  std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
-  std::string world_id;
-};
-
-struct InfinityNikkiExtractedParams {
-  std::optional<std::string> camera_params;
-  std::optional<std::int64_t> time_hour;
-  std::optional<std::int64_t> time_min;
-  std::optional<double> camera_focal_length;
-  std::optional<double> rotation;
-  std::optional<double> aperture_value;
-  std::optional<std::int64_t> filter_id;
-  std::optional<double> filter_strength;
-  std::optional<double> vignette_intensity;
-  std::optional<std::int64_t> light_id;
-  std::optional<double> light_strength;
-  std::optional<std::int64_t> vertical;
-  std::optional<double> bloom_intensity;
-  std::optional<double> bloom_threshold;
-  std::optional<double> brightness;
-  std::optional<double> exposure;
-  std::optional<double> contrast;
-  std::optional<double> saturation;
-  std::optional<double> vibrance;
-  std::optional<double> highlights;
-  std::optional<double> shadow;
-  std::optional<double> nikki_loc_x;
-  std::optional<double> nikki_loc_y;
-  std::optional<double> nikki_loc_z;
-  std::optional<std::int64_t> nikki_hidden;
-  std::optional<std::int64_t> pose_id;
-};
-
-struct InfinityNikkiUserRecord {
-  std::optional<std::string> dye_code;
-  std::optional<std::string> home_building_code;
-  std::optional<std::string> world_id;
-};
-
-struct InfinityNikkiMapArea {
-  std::string auto_world_id;
-  std::optional<std::string> user_world_id;
-  std::string world_id;
-};
-
-struct InfinityNikkiDetails {
-  std::optional<InfinityNikkiExtractedParams> extracted;
-  std::optional<InfinityNikkiUserRecord> user_record;
-  std::optional<InfinityNikkiMapArea> map_area;
-};
-
-struct GetInfinityNikkiMetadataNamesParams {
-  std::optional<std::int64_t> filter_id;
-  std::optional<std::int64_t> pose_id;
-  std::optional<std::int64_t> light_id;
-  std::optional<std::string> locale = "zh-CN";
-};
-
-struct InfinityNikkiMetadataNames {
-  std::optional<std::string> filter_name;
-  std::optional<std::string> pose_name;
-  std::optional<std::string> light_name;
 };
 
 // ============= 标签相关参数 =============
@@ -517,43 +427,6 @@ struct UpdateAssetsReviewStateParams {
 struct UpdateAssetDescriptionParams {
   std::int64_t asset_id;
   std::optional<std::string> description;
-};
-
-struct SetInfinityNikkiUserRecordParams {
-  std::int64_t asset_id;
-  std::string code_type;
-  std::optional<std::string> code_value;
-};
-
-struct PreviewInfinityNikkiSameOutfitDyeCodeFillParams {
-  std::int64_t asset_id;
-};
-
-struct InfinityNikkiSameOutfitDyeCodeFillPreview {
-  bool source_has_outfit_dye_state = false;
-  std::int64_t matched_count = 0;
-  std::int64_t fillable_count = 0;
-  std::int64_t recorded_count = 0;
-};
-
-struct FillInfinityNikkiSameOutfitDyeCodeParams {
-  std::int64_t asset_id;
-  std::string code_value;
-};
-
-struct InfinityNikkiSameOutfitDyeCodeFillResult {
-  bool success = false;
-  std::string message;
-  bool source_has_outfit_dye_state = false;
-  std::int64_t matched_count = 0;
-  std::int64_t affected_count = 0;
-  std::int64_t skipped_existing_count = 0;
-  std::int64_t updated_existing_count = 0;
-};
-
-struct SetInfinityNikkiWorldRecordParams {
-  std::int64_t asset_id;
-  std::optional<std::string> world_id;
 };
 
 struct GetTagStatsParams {};

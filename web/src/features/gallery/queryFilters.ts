@@ -13,8 +13,6 @@ export function toQueryAssetsFilters(
     reviewFlag: filter.reviewFlag,
     tagIds: filter.tagIds,
     tagMatchMode: filter.tagMatchMode,
-    clothIds: filter.clothIds,
-    clothMatchMode: filter.clothMatchMode,
     colorHexes: filter.colorHex ? [filter.colorHex] : undefined,
     colorDistance: filter.colorDistance,
   }

@@ -11,7 +11,7 @@
 
 1. iframe 上报 **`SPINNING_MOMO_MAP_SESSION_READY`**，payload 带 `worldId`（来自 `localStorage.infinitynikkiMapState-v2.state.currentWorldId`；读取失败或无效时回退 `1.1`，并去掉首尾多余 `"`）。
 2. [`useMapBridge`](./composables/useMapBridge.ts)：`normalizeOfficialWorldId` → 写入 `runtimeOptions.currentWorldId` → **`markIframeSessionReady()`** → **`flushMapRuntimeToIframe()`**（切换 world 时补一帧同步）。
-3. [`useMapScene`](./composables/useMapScene.ts) 监听筛选/排序/语言及 **`iframeSessionReady` + `currentWorldId`**：二者齐全才 **`gallery.queryPhotoMapPoints`（带 `worldId`）**，再 `replaceMarkers` → **`flushMapRuntimeToIframe()`**；未就绪时清空点位并显示「等待地图区域就绪」类文案。
+3. [`useMapScene`](./composables/useMapScene.ts) 监听筛选/排序/语言及 **`iframeSessionReady` + `currentWorldId`**：二者齐全才 **`extensions.infinityNikki.queryPhotoMapPoints`（带 `worldId`）**，再 `replaceMarkers` → **`flushMapRuntimeToIframe()`**；未就绪时清空点位并显示「等待地图区域就绪」类文案。
 4. [`mapIframeRuntime.ts`](./composables/mapIframeRuntime.ts) 只负责注册 **`flush` → `postRuntimeSync`**，无第二套回调。
 
 ## 前端目录职责
@@ -27,7 +27,7 @@
 | `bridge/protocol.ts`              | action 常量与 payload 类型                                                                                                   |
 | `injection/mapDevEvalScript.ts`   | **仅 dev**：把 store 快照拼成 iframe 内 eval 脚本                                                                            |
 | `domain/*`                        | 坐标、默认配置、`PhotoMapPoint` → `MapMarker`                                                                                |
-| `api.ts`                          | 对 `gallery.queryPhotoMapPoints` 的门面                                                                                      |
+| `api.ts`                          | 对 `extensions.infinityNikki.queryPhotoMapPoints` 的门面                                                                     |
 | `components/MapIframeHost.vue`    | 全局 iframe 容器、`registerMapIframeFlush`、监听 `message`                                                                   |
 
 ## 数据模型（宿主 → iframe，须可结构化克隆）
