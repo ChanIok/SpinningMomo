@@ -515,7 +515,7 @@ auto apply_registered_virtual_host_folder_mappings(Core::State::AppState& state,
 
     {
       std::lock_guard<std::mutex> lock(state.webview->resources.virtual_host_folder_mappings_mutex);
-      state.webview->resources.applied_virtual_host_folder_mappings.insert(host_name);
+      state.webview->resources.applied_virtual_host_folder_mappings[host_name] = mapping;
     }
 
     Logger().info("Restored virtual host mapping: {} -> {}", Utils::String::ToUtf8(host_name),

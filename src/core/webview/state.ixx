@@ -79,9 +79,9 @@ export struct CoreResources {
   // WebView 资源解析器注册表
   std::unique_ptr<Types::WebResolverRegistry> web_resolvers;
   std::unordered_map<std::wstring, VirtualHostFolderMapping> virtual_host_folder_mappings;
-  // 已通过 WebView2 COM 接口实际设置的虚拟主机映射集合
-  // 与 virtual_host_folder_mappings（期望状态）共同用于 reconcile 时的差量计算
-  std::unordered_set<std::wstring> applied_virtual_host_folder_mappings;
+  // 已成功应用到 WebView2 的映射快照（host -> mapping）
+  // reconcile 时和 virtual_host_folder_mappings（期望状态）做双向差异计算。
+  std::unordered_map<std::wstring, VirtualHostFolderMapping> applied_virtual_host_folder_mappings;
   std::mutex virtual_host_folder_mappings_mutex;
   std::unordered_map<std::string, DocumentCreatedScript> document_created_scripts;
   std::mutex document_created_scripts_mutex;

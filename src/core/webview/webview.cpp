@@ -105,20 +105,21 @@ namespace Detail {
 
 auto snapshot_virtual_host_folder_mappings(Core::State::AppState& state)
     -> std::pair<std::unordered_map<std::wstring, Core::WebView::State::VirtualHostFolderMapping>,
-                 std::unordered_set<std::wstring>> {
+                 std::unordered_map<std::wstring, Core::WebView::State::VirtualHostFolderMapping>> {
   auto& resources = state.webview->resources;
 
   std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
   return {resources.virtual_host_folder_mappings, resources.applied_virtual_host_folder_mappings};
 }
 
-auto store_applied_virtual_host_folder_mappings(Core::State::AppState& state,
-                                                std::unordered_set<std::wstring> applied_hosts)
-    -> void {
+auto store_applied_virtual_host_folder_mappings(
+    Core::State::AppState& state,
+    std::unordered_map<std::wstring, Core::WebView::State::VirtualHostFolderMapping>
+        applied_mappings) -> void {
   auto& resources = state.webview->resources;
 
   std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
-  resources.applied_virtual_host_folder_mappings = std::move(applied_hosts);
+  resources.applied_virtual_host_folder_mappings = std::move(applied_mappings);
 }
 
 auto clear_applied_virtual_host_folder_mappings(Core::State::AppState& state) -> void {
@@ -279,16 +280,28 @@ auto register_virtual_host_folder_mapping(
     Core::State::AppState& state, std::wstring host_name, std::wstring folder_path,
     Core::WebView::State::VirtualHostResourceAccessKind access_kind) -> void {
   auto& resources = state.webview->resources;
+  bool mapping_changed = false;
   {
     std::lock_guard<std::mutex> lock(resources.virtual_host_folder_mappings_mutex);
-    resources.virtual_host_folder_mappings[host_name] =
-        Core::WebView::State::VirtualHostFolderMapping{.folder_path = folder_path,
-                                                       .access_kind = access_kind};
+    auto new_mapping = Core::WebView::State::VirtualHostFolderMapping{
+        .folder_path = folder_path,
+        .access_kind = access_kind,
+    };
+    auto it = resources.virtual_host_folder_mappings.find(host_name);
+    if (it != resources.virtual_host_folder_mappings.end() &&
+        it->second.folder_path == new_mapping.folder_path &&
+        it->second.access_kind == new_mapping.access_kind) {
+      return;
+    }
+    resources.virtual_host_folder_mappings[host_name] = std::move(new_mapping);
+    mapping_changed = true;
   }
 
-  Logger().debug("Queued WebView virtual host mapping: {} -> {}", Utils::String::ToUtf8(host_name),
-                 Utils::String::ToUtf8(folder_path));
-  request_virtual_host_folder_mapping_reconcile(state);
+  if (mapping_changed) {
+    Logger().debug("Queued WebView virtual host mapping: {} -> {}",
+                   Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(folder_path));
+    request_virtual_host_folder_mapping_reconcile(state);
+  }
 }
 
 // 注销一条虚拟 host 映射。
@@ -340,7 +353,7 @@ auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> voi
     return;
   }
 
-  auto [desired_mappings, applied_hosts] = Detail::snapshot_virtual_host_folder_mappings(state);
+  auto [desired_mappings, applied_mappings] = Detail::snapshot_virtual_host_folder_mappings(state);
 
   wil::com_ptr<ICoreWebView2_3> webview3;
   auto hr = webview->QueryInterface(IID_PPV_ARGS(&webview3));
@@ -349,9 +362,9 @@ auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> voi
     return;
   }
 
-  auto next_applied_hosts = applied_hosts;
+  auto next_applied_mappings = applied_mappings;
 
-  for (const auto& applied_host : applied_hosts) {
+  for (const auto& [applied_host, _] : applied_mappings) {
     if (desired_mappings.contains(applied_host)) {
       continue;
     }
@@ -363,11 +376,18 @@ auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> voi
       continue;
     }
 
-    next_applied_hosts.erase(applied_host);
+    next_applied_mappings.erase(applied_host);
     Logger().info("Cleared WebView virtual host mapping: {}", Utils::String::ToUtf8(applied_host));
   }
 
   for (const auto& [host_name, mapping] : desired_mappings) {
+    auto applied_it = next_applied_mappings.find(host_name);
+    if (applied_it != next_applied_mappings.end() &&
+        applied_it->second.folder_path == mapping.folder_path &&
+        applied_it->second.access_kind == mapping.access_kind) {
+      continue;
+    }
+
     hr = webview3->SetVirtualHostNameToFolderMapping(
         host_name.c_str(), mapping.folder_path.c_str(),
         static_cast<COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND>(mapping.access_kind));
@@ -378,12 +398,12 @@ auto reconcile_virtual_host_folder_mappings(Core::State::AppState& state) -> voi
       continue;
     }
 
-    next_applied_hosts.insert(host_name);
+    next_applied_mappings[host_name] = mapping;
     Logger().info("Applied WebView virtual host mapping: {} -> {}",
                   Utils::String::ToUtf8(host_name), Utils::String::ToUtf8(mapping.folder_path));
   }
 
-  Detail::store_applied_virtual_host_folder_mappings(state, std::move(next_applied_hosts));
+  Detail::store_applied_virtual_host_folder_mappings(state, std::move(next_applied_mappings));
 }
 
 auto apply_background_mode_from_settings(Core::State::AppState& state) -> void {
