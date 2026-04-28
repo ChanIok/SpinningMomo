@@ -95,6 +95,13 @@ struct ProbedFileState {
   std::int64_t modified_at = 0;
 };
 
+struct WatchReadResult {
+  bool ok = false;
+  DWORD bytes_returned = 0;
+  DWORD error = 0;
+  State::DirectoryWatchBackend backend = State::DirectoryWatchBackend::Extended;
+};
+
 // 生成默认的目录扫描配置
 auto make_default_scan_options(const std::filesystem::path& root_path) -> Types::ScanOptions {
   Types::ScanOptions options;
@@ -377,9 +384,63 @@ auto promote_stable_file_changes(const std::shared_ptr<State::FolderWatcherState
   }
 }
 
-// 解析 Windows ReadDirectoryChangesExW 系统调用返回的变更通知缓冲区
-auto parse_notification_buffer(const std::filesystem::path& root_path, const std::byte* buffer,
-                               DWORD bytes_returned) -> std::vector<ParsedNotification> {
+auto read_directory_changes(HANDLE directory_handle, std::byte* buffer, DWORD buffer_size,
+                            DWORD filter, State::DirectoryWatchBackend backend) -> WatchReadResult {
+  WatchReadResult result{
+      .ok = false,
+      .bytes_returned = 0,
+      .error = 0,
+      .backend = backend,
+  };
+
+  auto read_extended = [&]() -> bool {
+    return ReadDirectoryChangesExW(directory_handle, buffer, buffer_size, TRUE, filter,
+                                   &result.bytes_returned, nullptr, nullptr,
+                                   ReadDirectoryNotifyExtendedInformation) != FALSE;
+  };
+
+  auto read_basic = [&]() -> bool {
+    return ReadDirectoryChangesW(directory_handle, buffer, buffer_size, TRUE, filter,
+                                 &result.bytes_returned, nullptr, nullptr) != FALSE;
+  };
+
+  if (backend == State::DirectoryWatchBackend::Extended) {
+    if (read_extended()) {
+      result.ok = true;
+      return result;
+    }
+
+    result.error = GetLastError();
+    if (result.error == ERROR_INVALID_FUNCTION) {
+      // 某些卷不支持 ExW 扩展通知，退回到 W 基础通知继续尝试。
+      result.backend = State::DirectoryWatchBackend::Basic;
+      result.bytes_returned = 0;
+      if (read_basic()) {
+        result.ok = true;
+      } else {
+        result.error = GetLastError();
+      }
+    }
+    return result;
+  }
+
+  if (backend == State::DirectoryWatchBackend::Basic) {
+    if (read_basic()) {
+      result.ok = true;
+    } else {
+      result.error = GetLastError();
+    }
+    return result;
+  }
+
+  result.error = ERROR_INVALID_FUNCTION;
+  return result;
+}
+
+// 解析 Windows ReadDirectoryChangesExW 系统调用返回的扩展变更通知缓冲区
+auto parse_extended_notification_buffer(const std::filesystem::path& root_path,
+                                        const std::byte* buffer, DWORD bytes_returned)
+    -> std::vector<ParsedNotification> {
   std::vector<ParsedNotification> parsed_notifications;
 
   // 通知是链表结构，按 NextEntryOffset 一条条解析。
@@ -396,6 +457,41 @@ auto parse_notification_buffer(const std::filesystem::path& root_path, const std
           .path = normalized_result.value(),
           .action = info->Action,
           .is_directory = (info->FileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0,
+      });
+    } else {
+      Logger().warn("Failed to normalize watcher path '{}': {}", full_path.string(),
+                    normalized_result.error());
+    }
+
+    if (info->NextEntryOffset == 0) {
+      break;
+    }
+    offset += info->NextEntryOffset;
+  }
+
+  return parsed_notifications;
+}
+
+// 解析 Windows ReadDirectoryChangesW 返回的基础变更通知缓冲区
+auto parse_basic_notification_buffer(const std::filesystem::path& root_path,
+                                     const std::byte* buffer, DWORD bytes_returned)
+    -> std::vector<ParsedNotification> {
+  std::vector<ParsedNotification> parsed_notifications;
+
+  size_t offset = 0;
+  while (offset < bytes_returned) {
+    auto* info = reinterpret_cast<const FILE_NOTIFY_INFORMATION*>(buffer + offset);
+    size_t filename_len = static_cast<size_t>(info->FileNameLength / sizeof(wchar_t));
+    std::wstring relative_name(info->FileName, filename_len);
+
+    auto full_path = root_path / std::filesystem::path(relative_name);
+    auto normalized_result = Utils::Path::NormalizePath(full_path);
+    if (normalized_result) {
+      parsed_notifications.push_back(ParsedNotification{
+          .path = normalized_result.value(),
+          .action = info->Action,
+          // 基础结构不包含 FileAttributes，无法可靠区分目录与文件。
+          .is_directory = false,
       });
     } else {
       Logger().warn("Failed to normalize watcher path '{}': {}", full_path.string(),
@@ -1142,14 +1238,19 @@ auto run_watch_loop(Core::State::AppState& app_state,
                  FILE_NOTIFY_CHANGE_SIZE;
 
   while (!stop_token.stop_requested() && !watcher->stop_requested.load(std::memory_order_acquire)) {
-    DWORD bytes_returned = 0;
-    // 这里会阻塞等事件；关闭时用 CancelIoEx 打断。
-    BOOL ok = ReadDirectoryChangesExW(
-        directory_handle, buffer.data(), static_cast<DWORD>(buffer.size()), TRUE, filter,
-        &bytes_returned, nullptr, nullptr, ReadDirectoryNotifyExtendedInformation);
+    auto backend = watcher->watch_backend.load(std::memory_order_acquire);
+    auto read_result = read_directory_changes(directory_handle, buffer.data(),
+                                              static_cast<DWORD>(buffer.size()), filter, backend);
 
-    if (!ok) {
-      auto error = GetLastError();
+    if (read_result.backend != backend) {
+      watcher->watch_backend.store(read_result.backend, std::memory_order_release);
+      // 降级后本会话固定使用 Basic，避免 ExW 失败反复刷日志。
+      Logger().warn("Watcher backend fallback for '{}': extended -> basic",
+                    watcher->root_path.string());
+    }
+
+    if (!read_result.ok) {
+      auto error = read_result.error;
       if (stop_token.stop_requested() || error == ERROR_OPERATION_ABORTED) {
         break;
       }
@@ -1161,19 +1262,33 @@ auto run_watch_loop(Core::State::AppState& app_state,
         continue;
       }
 
+      if (watcher->watch_backend.load(std::memory_order_acquire) ==
+          State::DirectoryWatchBackend::Basic) {
+        // 与产品策略一致：W 也不可用时直接停该 watcher，不做额外扫描兜底。
+        watcher->watch_backend.store(State::DirectoryWatchBackend::Disabled,
+                                     std::memory_order_release);
+        Logger().warn(
+            "ReadDirectoryChangesW failed for '{}', error={}. Disabling watcher for this session.",
+            watcher->root_path.string(), error);
+        break;
+      }
+
       Logger().warn("ReadDirectoryChangesExW failed for '{}', error={}",
                     watcher->root_path.string(), error);
-      std::this_thread::sleep_for(std::chrono::milliseconds(200));
       continue;
     }
 
-    if (bytes_returned == 0) {
+    if (read_result.bytes_returned == 0) {
       request_full_rescan(app_state, watcher);
       continue;
     }
 
-    auto notifications =
-        parse_notification_buffer(watcher->root_path, buffer.data(), bytes_returned);
+    auto notifications = watcher->watch_backend.load(std::memory_order_acquire) ==
+                                 State::DirectoryWatchBackend::Basic
+                             ? parse_basic_notification_buffer(watcher->root_path, buffer.data(),
+                                                               read_result.bytes_returned)
+                             : parse_extended_notification_buffer(watcher->root_path, buffer.data(),
+                                                                  read_result.bytes_returned);
     if (!notifications.empty()) {
       process_watch_notifications(app_state, watcher, notifications);
     }

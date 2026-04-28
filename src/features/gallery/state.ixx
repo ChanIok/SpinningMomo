@@ -19,6 +19,12 @@ export struct PendingStableFileChange {
   std::chrono::steady_clock::time_point ready_not_before{};
 };
 
+export enum class DirectoryWatchBackend {
+  Extended,
+  Basic,
+  Disabled,
+};
+
 export struct FolderWatcherState {
   // 监听的根目录（已规范化）
   std::filesystem::path root_path;
@@ -30,6 +36,7 @@ export struct FolderWatcherState {
   std::atomic<bool> stop_requested{false};
   std::atomic<void*> directory_handle{nullptr};
   std::mutex pending_mutex;
+  std::atomic<DirectoryWatchBackend> watch_backend{DirectoryWatchBackend::Extended};
 
   // true 表示要做全量扫描（会清空增量列表）
   bool require_full_rescan{false};
