@@ -283,62 +283,75 @@ auto download_file(Core::State::AppState& app_state, const std::string& url,
   }
 }
 
-auto create_update_script(const std::filesystem::path& update_package_path,
-                          const std::filesystem::path& target_install_directory, bool is_portable,
-                          Vendor::Windows::DWORD target_pid, bool restart = true)
-    -> std::expected<std::filesystem::path, std::string> {
+auto create_update_script() -> std::expected<std::filesystem::path, std::string> {
   try {
     auto temp_dir = get_temp_directory();
     if (!temp_dir) {
       return std::unexpected("Failed to get temporary directory: " + temp_dir.error());
     }
 
-    auto script_path = temp_dir.value() / std::filesystem::path("update.bat");
+    auto script_path = temp_dir.value() / std::filesystem::path("update.ps1");
 
     std::ofstream script(script_path);
     if (!script) {
       return std::unexpected("Failed to create update script");
     }
 
-    // 写入批处理脚本
-    script << "@echo off\n";
-    script << "echo Starting update process...\n";
-    script << "echo Waiting for application to exit...\n";
-    script << "powershell -NoProfile -Command \"$pidToWait = " << target_pid
-           << "; $timeoutMs = 15000; $process = Get-Process -Id $pidToWait -ErrorAction "
-              "SilentlyContinue; if ($process) { if (-not $process.WaitForExit($timeoutMs)) "
-              "{ Stop-Process -Id $pidToWait -Force -ErrorAction SilentlyContinue; "
-              "Start-Sleep -Seconds 1 } }\"\n";
+    // 脚本保持纯 ASCII；所有路径参数都在执行时以宽字符传入，避免中文路径被 cmd/bat 破坏。
+    script << R"__PS1__(param(
+  [Parameter(Mandatory = $true)]
+  [int]$PidToWait,
+  [Parameter(Mandatory = $true)]
+  [ValidateSet("portable", "installed")]
+  [string]$Mode,
+  [Parameter(Mandatory = $true)]
+  [string]$PackagePath,
+  [Parameter(Mandatory = $true)]
+  [string]$TargetInstallDirectory,
+  [string]$InstallLogPath = "",
+  [switch]$Restart
+)
 
-    if (is_portable) {
-      // 便携版：解压zip覆盖当前目录
-      script << "echo Extracting update package...\n";
-      script << "powershell -Command \"Expand-Archive -Path '" << update_package_path.string()
-             << "' -DestinationPath '" << target_install_directory.string() << "' -Force\"\n";
-    } else {
-      // 安装版：显式传入当前安装目录，避免静默升级回退到默认路径
-      auto install_log_path =
-          temp_dir.value() / std::filesystem::path("SpinningMomo-Update-Install.log");
-      script << "echo Running installer...\n";
-      script << "\"" << update_package_path.string() << "\" InstallFolder=\""
-             << target_install_directory.string() << "\" /passive /norestart /log \""
-             << install_log_path.string() << "\"\n";
-    }
+$ErrorActionPreference = "Stop"
 
-    if (restart) {
-      script << "echo Update completed, restarting application...\n";
-      script << "start \"\" \""
-             << (target_install_directory / std::filesystem::path("SpinningMomo.exe")).string()
-             << "\"\n";
-    } else {
-      script << "echo Update completed successfully.\n";
-    }
+$process = Get-Process -Id $PidToWait -ErrorAction SilentlyContinue
+if ($process) {
+  if (-not $process.WaitForExit(15000)) {
+    Stop-Process -Id $PidToWait -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 1
+  }
+}
 
-    script << "echo Cleaning up temporary files...\n";
-    script << "timeout /t 3 /nobreak >nul\n";
-    script << "del \"" << update_package_path.string() << "\"\n";
-    script << "del \"%~f0\"\n";  // 删除脚本自身
+if ($Mode -eq "portable") {
+  Expand-Archive -LiteralPath $PackagePath -DestinationPath $TargetInstallDirectory -Force
+} else {
+  $argumentList = @(
+    "InstallFolder=$TargetInstallDirectory"
+    "/passive"
+    "/norestart"
+  )
 
+  if ($InstallLogPath -ne "") {
+    $argumentList += @("/log", $InstallLogPath)
+  }
+
+  $installer = Start-Process -FilePath $PackagePath -ArgumentList $argumentList -Wait -PassThru
+  if ($null -eq $installer -or $installer.ExitCode -ne 0) {
+    throw "Installer failed with exit code $($installer.ExitCode)"
+  }
+}
+
+if ($Restart.IsPresent) {
+  $targetExePath = Join-Path -Path $TargetInstallDirectory -ChildPath "SpinningMomo.exe"
+  if (-not (Test-Path -LiteralPath $targetExePath -PathType Leaf)) {
+    throw "Updated executable not found: $targetExePath"
+  }
+
+  Start-Process -FilePath $targetExePath -WorkingDirectory $TargetInstallDirectory | Out-Null
+}
+
+Remove-Item -LiteralPath $PackagePath -Force -ErrorAction SilentlyContinue
+)__PS1__";
     script.close();
 
     return script_path;
@@ -508,7 +521,8 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
                   : std::format("Download completed from {}", source.name),
               100.0));
 
-      Logger().info("Download completed from {}: {}", source.name, save_path.string());
+      Logger().info("Download completed from {}: {}", source.name,
+                    Utils::String::ToUtf8(save_path.wstring()));
       Core::Tasks::complete_task_success(app_state, task_id);
       co_return;
     }
@@ -702,23 +716,54 @@ auto check_for_update(Core::State::AppState& app_state)
 }
 
 auto execute_pending_update(Core::State::AppState& app_state) -> void {
-  if (!app_state.update || !app_state.update->pending_update) {
+  if (!app_state.update || !app_state.update->pending_update.has_value()) {
     return;
   }
 
   const auto script_path = app_state.update->update_script_path;
+  const auto& pending_update = app_state.update->pending_update.value();
+  const auto& package_path = pending_update.package_path;
+  const auto& target_install_directory = pending_update.target_install_directory;
+  const auto& install_log_path = pending_update.install_log_path;
 
-  Logger().info("Executing pending update script: {}", script_path.string());
+  if (script_path.empty() || package_path.empty() || target_install_directory.empty()) {
+    Logger().error("Pending update context is incomplete: script={}, package={}, target={}",
+                   Utils::String::ToUtf8(script_path.wstring()),
+                   Utils::String::ToUtf8(package_path.wstring()),
+                   Utils::String::ToUtf8(target_install_directory.wstring()));
+    app_state.update->pending_update.reset();
+    return;
+  }
+
+  Logger().info("Executing pending update script: {}",
+                Utils::String::ToUtf8(script_path.wstring()));
 
   const auto script_directory = script_path.parent_path();
-  const auto command_parameters = std::format(L"/d /c \"{}\"", script_path.wstring());
+  const auto update_mode =
+      pending_update.is_portable ? std::wstring(L"portable") : std::wstring(L"installed");
+
+  std::wstring command_parameters = std::format(
+      L"-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden "
+      L"-File {} -PidToWait {} -Mode {} -PackagePath {} "
+      L"-TargetInstallDirectory {}",
+      std::format(L"\"{}\"", script_path.wstring()), Vendor::Windows::GetCurrentProcessId(),
+      std::format(L"\"{}\"", update_mode), std::format(L"\"{}\"", package_path.wstring()),
+      std::format(L"\"{}\"", target_install_directory.wstring()));
+
+  if (!install_log_path.empty()) {
+    command_parameters += std::format(L" -InstallLogPath \"{}\"", install_log_path.wstring());
+  }
+
+  if (pending_update.restart) {
+    command_parameters += L" -Restart";
+  }
 
   // 启动更新脚本
   Vendor::ShellApi::SHELLEXECUTEINFOW sei = {sizeof(sei)};
   sei.fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC;
   sei.hwnd = nullptr;
   sei.lpVerb = L"open";
-  sei.lpFile = L"cmd.exe";
+  sei.lpFile = L"powershell.exe";
   sei.lpParameters = command_parameters.c_str();
   sei.lpDirectory = script_directory.empty() ? nullptr : script_directory.c_str();
   sei.nShow = Vendor::ShellApi::kSW_HIDE;
@@ -730,11 +775,12 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
     Logger().info("Update script launch accepted by shell");
   } else {
     Logger().error("Failed to execute update script: last_error={}, script_path={}",
-                   Vendor::Windows::GetLastError(), script_path.string());
+                   Vendor::Windows::GetLastError(), Utils::String::ToUtf8(script_path.wstring()));
   }
 
   // 清除待处理更新标志
-  app_state.update->pending_update = false;
+  app_state.update->update_script_path.clear();
+  app_state.update->pending_update.reset();
 }
 
 auto install_update(Core::State::AppState& app_state, const Types::InstallUpdateParams& params)
@@ -765,10 +811,12 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
     std::filesystem::path update_package_path = *temp_dir / filename;
 
     if (!std::filesystem::exists(update_package_path)) {
-      return std::unexpected("Update package does not exist: " + update_package_path.string());
+      return std::unexpected("Update package does not exist: " +
+                             Utils::String::ToUtf8(update_package_path.wstring()));
     }
 
-    Logger().info("Preparing update with package: {} (portable: {})", update_package_path.string(),
+    Logger().info("Preparing update with package: {} (portable: {})",
+                  Utils::String::ToUtf8(update_package_path.wstring()),
                   app_state.update->is_portable);
 
     auto current_dir_result = Utils::Path::GetExecutableDirectory();
@@ -776,15 +824,24 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
       return std::unexpected("Failed to get executable directory: " + current_dir_result.error());
     }
 
-    auto script_result = create_update_script(
-        update_package_path, current_dir_result.value(), app_state.update->is_portable,
-        Vendor::Windows::GetCurrentProcessId(), params.restart);
+    auto script_result = create_update_script();
     if (!script_result) {
       return std::unexpected("Failed to create update script: " + script_result.error());
     }
 
+    const auto install_log_path =
+        app_state.update->is_portable
+            ? std::filesystem::path{}
+            : *temp_dir / std::filesystem::path("SpinningMomo-Update-Install.log");
+
     app_state.update->update_script_path = script_result.value();
-    app_state.update->pending_update = true;
+    app_state.update->pending_update = State::PendingUpdateContext{
+        .package_path = update_package_path,
+        .target_install_directory = current_dir_result.value(),
+        .install_log_path = install_log_path,
+        .restart = params.restart,
+        .is_portable = app_state.update->is_portable,
+    };
 
     Types::InstallUpdateResult result;
 
