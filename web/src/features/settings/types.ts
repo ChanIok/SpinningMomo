@@ -361,6 +361,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         name: 'Mirror',
         urlTemplate: 'https://r2.infinitymomo.com/releases/v{0}/{1}',
       },
+      {
+        name: 'CNB',
+        urlTemplate: 'https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}',
+      },
     ],
   },
 

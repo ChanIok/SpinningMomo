@@ -12,6 +12,7 @@ struct PendingUpdateContext {
   std::filesystem::path target_install_directory;  // 待更新目标目录
   std::filesystem::path install_log_path;          // 安装器日志路径
   bool restart = true;                             // 更新完成后是否重启
+  bool quiet_install = false;                      // 是否静默安装（仅安装版生效）
   bool is_portable = true;                         // 待执行更新是否为便携版流程
 };
 

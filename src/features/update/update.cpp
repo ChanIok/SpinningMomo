@@ -309,6 +309,7 @@ auto create_update_script() -> std::expected<std::filesystem::path, std::string>
   [Parameter(Mandatory = $true)]
   [string]$TargetInstallDirectory,
   [string]$InstallLogPath = "",
+  [switch]$QuietInstall,
   [switch]$Restart
 )
 
@@ -327,7 +328,7 @@ if ($Mode -eq "portable") {
 } else {
   $argumentList = @(
     "InstallFolder=$TargetInstallDirectory"
-    "/passive"
+    $(if ($QuietInstall.IsPresent) { "/quiet" } else { "/passive" })
     "/norestart"
   )
 
@@ -503,6 +504,7 @@ auto run_download_update_task(Core::State::AppState& app_state, const std::strin
 
         Types::InstallUpdateParams install_params;
         install_params.restart = false;
+        install_params.quiet_install = true;
         auto install_result = install_update(app_state, install_params);
         if (!install_result) {
           auto error_message = "Failed to prepare downloaded update: " + install_result.error();
@@ -757,6 +759,9 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   if (pending_update.restart) {
     command_parameters += L" -Restart";
   }
+  if (pending_update.quiet_install) {
+    command_parameters += L" -QuietInstall";
+  }
 
   // 启动更新脚本
   Vendor::ShellApi::SHELLEXECUTEINFOW sei = {sizeof(sei)};
@@ -840,6 +845,7 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
         .target_install_directory = current_dir_result.value(),
         .install_log_path = install_log_path,
         .restart = params.restart,
+        .quiet_install = params.quiet_install,
         .is_portable = app_state.update->is_portable,
     };
 

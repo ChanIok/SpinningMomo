@@ -60,6 +60,24 @@ const isDefaultInfinityNikkiTargetTitle = (title: string) =>
   title === '无限暖暖  ' || title === 'Infinity Nikki  '
 const isInfinityNikkiUser = computed(() => resolvedInfinityNikkiGameDir.value !== null)
 
+const DOWNLOAD_SOURCE_TEMPLATES = {
+  github: 'https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}',
+  cnb: 'https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}',
+  mirror: 'https://r2.infinitymomo.com/releases/v{0}/{1}',
+} as const
+
+const getOnboardingDownloadSources = (lang: string) => {
+  if (lang !== 'zh-CN') {
+    return store.appSettings.update.downloadSources
+  }
+
+  return [
+    { name: 'CNB', urlTemplate: DOWNLOAD_SOURCE_TEMPLATES.cnb },
+    { name: 'Mirror', urlTemplate: DOWNLOAD_SOURCE_TEMPLATES.mirror },
+    { name: 'GitHub', urlTemplate: DOWNLOAD_SOURCE_TEMPLATES.github },
+  ]
+}
+
 const getDefaultOverlayColorsByTheme = (mode: 'light' | 'dark'): string[] => {
   const firstPreset = OVERLAY_PALETTE_PRESETS.find((preset) => preset.themeMode === mode)
 
@@ -261,6 +279,10 @@ const completeOnboarding = async () => {
       features: {
         ...store.appSettings.features,
         externalAlbumPath,
+      },
+      update: {
+        ...store.appSettings.update,
+        downloadSources: getOnboardingDownloadSources(language.value),
       },
       extensions: {
         ...store.appSettings.extensions,

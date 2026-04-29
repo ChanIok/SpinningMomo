@@ -184,7 +184,8 @@ export struct AppSettings {
 
     std::vector<DownloadSource> download_sources = {
         {"GitHub", "https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}"},
-        {"Mirror", "https://r2.infinitymomo.com/releases/v{0}/{1}"}};
+        {"Mirror", "https://r2.infinitymomo.com/releases/v{0}/{1}"},
+        {"CNB", "https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}"}};
   } update;
 
   // ui 分组 - UI界面设置

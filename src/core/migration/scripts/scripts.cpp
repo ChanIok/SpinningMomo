@@ -112,6 +112,51 @@ auto migrate_v2_0_9_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
+auto migrate_v2_0_10_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.0.10.0: Set update download sources");
+
+  auto settings_path_result = Features::Settings::get_settings_path();
+  if (!settings_path_result) {
+    return std::unexpected("Failed to get settings path: " + settings_path_result.error());
+  }
+
+  const auto& settings_path = settings_path_result.value();
+  if (!std::filesystem::exists(settings_path)) {
+    Logger().info("Settings file not found, skip download source migration");
+    return {};
+  }
+
+  std::ifstream file(settings_path);
+  if (!file) {
+    return std::unexpected("Failed to open settings file: " + settings_path.string());
+  }
+
+  std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+  auto settings_result =
+      rfl::json::read<Features::Settings::Types::AppSettings, rfl::DefaultIfMissing>(json_str);
+  if (!settings_result) {
+    return std::unexpected("Failed to parse settings: " + settings_result.error().what());
+  }
+
+  auto settings = settings_result.value();
+  settings.update.download_sources = {
+      Features::Settings::Types::AppSettings::Update::DownloadSource{
+          "CNB", "https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}"},
+      Features::Settings::Types::AppSettings::Update::DownloadSource{
+          "Mirror", "https://r2.infinitymomo.com/releases/v{0}/{1}"},
+      Features::Settings::Types::AppSettings::Update::DownloadSource{
+          "GitHub", "https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}"},
+  };
+
+  auto save_result = Features::Settings::save_settings_to_file(settings_path, settings);
+  if (!save_result) {
+    return std::unexpected("Failed to save settings: " + save_result.error());
+  }
+
+  Logger().info("Settings download sources set successfully");
+  return {};
+}
+
 auto get_all_migrations() -> const std::vector<MigrationScript>& {
   static const std::vector<MigrationScript> migrations = {
       {"2.0.0.0", "Initialize database schema", true, migrate_v2_0_0_0},
@@ -119,6 +164,7 @@ auto get_all_migrations() -> const std::vector<MigrationScript>& {
       {"2.0.2.0", "Update version check URL", false, migrate_v2_0_2_0},
       {"2.0.8.0", "Add nuan5 Infinity Nikki extract columns", true, migrate_v2_0_8_0},
       {"2.0.9.0", "Rebuild Infinity Nikki user record as key-value", true, migrate_v2_0_9_0},
+      {"2.0.10.0", "Set update download sources", false, migrate_v2_0_10_0},
 
       // 未来版本的迁移脚本在此添加
       // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},

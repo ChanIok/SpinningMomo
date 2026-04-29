@@ -2,6 +2,23 @@ import { useSettingsStore } from '../store'
 import { DEFAULT_APP_SETTINGS } from '../types'
 import { storeToRefs } from 'pinia'
 
+type UpdateSourceMode = 'cn_first' | 'github_first'
+
+const DOWNLOAD_SOURCES = {
+  github: {
+    name: 'GitHub',
+    urlTemplate: 'https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}',
+  },
+  mirror: {
+    name: 'Mirror',
+    urlTemplate: 'https://r2.infinitymomo.com/releases/v{0}/{1}',
+  },
+  cnb: {
+    name: 'CNB',
+    urlTemplate: 'https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}',
+  },
+} as const
+
 export const useGeneralActions = () => {
   const store = useSettingsStore()
   const { appSettings } = storeToRefs(store)
@@ -43,6 +60,21 @@ export const useGeneralActions = () => {
       update: {
         ...appSettings.value.update,
         autoUpdateOnExit: enabled,
+      },
+    })
+  }
+
+  const updateDownloadSourceMode = async (mode: UpdateSourceMode) => {
+    const downloadSources =
+      mode === 'cn_first'
+        ? [DOWNLOAD_SOURCES.cnb, DOWNLOAD_SOURCES.mirror, DOWNLOAD_SOURCES.github]
+        : [DOWNLOAD_SOURCES.github, DOWNLOAD_SOURCES.mirror, DOWNLOAD_SOURCES.cnb]
+
+    await store.updateSettings({
+      ...appSettings.value,
+      update: {
+        ...appSettings.value.update,
+        downloadSources,
       },
     })
   }
@@ -168,6 +200,7 @@ export const useGeneralActions = () => {
     updateLoggerLevel,
     updateAutoCheck,
     updateAutoUpdateOnExit,
+    updateDownloadSourceMode,
     updateFloatingWindowHotkey,
     updateScreenshotHotkey,
     updateRecordingHotkey,

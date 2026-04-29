@@ -24,7 +24,8 @@ struct StartDownloadUpdateResult {
 
 // 安装更新请求参数
 struct InstallUpdateParams {
-  bool restart = true;  // 安装后是否重启程序
+  bool restart = true;         // 安装后是否重启程序
+  bool quiet_install = false;  // 是否静默安装（仅安装版生效）
 };
 
 // 安装更新响应结果

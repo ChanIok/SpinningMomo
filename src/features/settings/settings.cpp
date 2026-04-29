@@ -9,7 +9,6 @@ import Features.Settings.Events;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.Settings.Compute;
-import Features.Settings.Migration;
 import Features.Settings.Menu;
 import Features.Settings.Background;
 import Utils.Path;
@@ -64,72 +63,37 @@ auto should_show_onboarding(const Types::AppSettings& settings) -> bool {
   return settings.app.onboarding.flow_version < Types::CURRENT_ONBOARDING_FLOW_VERSION;
 }
 
-// Migration专用：迁移settings文件到指定版本
-auto migrate_settings_file(const std::filesystem::path& file_path, int target_version)
-    -> std::expected<void, std::string> {
-  try {
-    if (!std::filesystem::exists(file_path)) {
-      return std::unexpected("Settings file does not exist: " + file_path.string());
+auto normalize_update_download_sources(Types::AppSettings& settings) -> bool {
+  const std::vector<Types::AppSettings::Update::DownloadSource> expected = {
+      {"GitHub", "https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}"},
+      {"CNB", "https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}"},
+      {"Mirror", "https://r2.infinitymomo.com/releases/v{0}/{1}"},
+  };
+
+  std::vector<Types::AppSettings::Update::DownloadSource> normalized;
+  normalized.reserve(expected.size() + settings.update.download_sources.size());
+  normalized.insert(normalized.end(), expected.begin(), expected.end());
+
+  for (const auto& source : settings.update.download_sources) {
+    const bool is_builtin =
+        source.name == "GitHub" || source.name == "CNB" || source.name == "Mirror";
+    if (!is_builtin) {
+      normalized.push_back(source);
     }
-
-    // 读取原始JSON
-    std::ifstream file(file_path);
-    if (!file) {
-      return std::unexpected("Failed to open settings file: " + file_path.string());
-    }
-
-    std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    file.close();
-
-    // 使用rfl::Generic解析JSON以获取版本号
-    auto generic_result = rfl::json::read<rfl::Generic::Object>(json_str);
-    if (!generic_result) {
-      return std::unexpected("Failed to parse settings as generic JSON: " +
-                             generic_result.error().what());
-    }
-
-    auto generic_settings = generic_result.value();
-
-    // 提取当前版本号
-    int current_version = 1;  // 默认版本
-    auto version_result = generic_settings.get("version").and_then(rfl::to_int);
-    if (version_result) {
-      current_version = version_result.value();
-    }
-
-    // 如果已经是目标版本，无需迁移
-    if (current_version >= target_version) {
-      Logger().info("Settings already at version {}, no migration needed", current_version);
-      return {};
-    }
-
-    Logger().info("Migrating settings from version {} to {}", current_version, target_version);
-
-    // 执行迁移
-    auto migration_result = Migration::migrate_settings(generic_settings, current_version);
-    if (!migration_result) {
-      return std::unexpected("Settings migration failed: " + migration_result.error());
-    }
-
-    // 转换为AppSettings以验证结构
-    auto app_settings_result = rfl::from_generic<Types::AppSettings>(migration_result.value());
-    if (!app_settings_result) {
-      return std::unexpected("Failed to convert migrated generic JSON to AppSettings: " +
-                             app_settings_result.error().what());
-    }
-
-    // 保存迁移后的设置
-    auto save_result = save_settings_to_file(file_path, app_settings_result.value());
-    if (!save_result) {
-      return std::unexpected("Failed to save migrated settings: " + save_result.error());
-    }
-
-    Logger().info("Settings migration completed successfully");
-    return {};
-
-  } catch (const std::exception& e) {
-    return std::unexpected("Error during settings migration: " + std::string(e.what()));
   }
+
+  const bool changed =
+      normalized.size() != settings.update.download_sources.size() ||
+      !std::equal(normalized.begin(), normalized.end(), settings.update.download_sources.begin(),
+                  [](const auto& lhs, const auto& rhs) {
+                    return lhs.name == rhs.name && lhs.url_template == rhs.url_template;
+                  });
+
+  if (changed) {
+    settings.update.download_sources = std::move(normalized);
+  }
+
+  return changed;
 }
 
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
@@ -181,6 +145,15 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     }
 
     auto config = config_result.value();
+    const bool sources_changed = normalize_update_download_sources(config);
+    if (sources_changed) {
+      auto persist_result = save_settings_to_file(settings_path.value(), config);
+      if (!persist_result) {
+        return std::unexpected("Failed to persist normalized update sources: " +
+                               persist_result.error());
+      }
+      Logger().info("Normalized update download sources in settings");
+    }
 
     // 创建完整状态
     State::SettingsState state;

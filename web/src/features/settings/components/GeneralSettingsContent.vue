@@ -23,10 +23,21 @@ const {
   updateLoggerLevel,
   updateAutoCheck,
   updateAutoUpdateOnExit,
+  updateDownloadSourceMode,
   resetGeneralCoreSettings,
 } = useGeneralActions()
 const { clearError } = store
 const { t } = useI18n()
+
+type UpdateSourceMode = 'cn_first' | 'github_first'
+
+const getCurrentUpdateSourceMode = (): UpdateSourceMode => {
+  const order = appSettings.value.update.downloadSources.map((item) => item.name)
+  if (order.join(',') === 'CNB,Mirror,GitHub') {
+    return 'cn_first'
+  }
+  return 'github_first'
+}
 
 const handleReset = async () => {
   await resetGeneralCoreSettings()
@@ -161,6 +172,35 @@ const handleReset = async () => {
             {{ t('settings.general.update.descriptionSuffix') }}
           </p>
         </div>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.general.update.sourceMode.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.general.update.sourceMode.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="getCurrentUpdateSourceMode()"
+              @update:model-value="(v) => updateDownloadSourceMode(v as UpdateSourceMode)"
+            >
+              <SelectTrigger class="w-56">
+                <SelectValue :placeholder="t('settings.general.update.sourceMode.label')" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cn_first">
+                  {{ t('settings.general.update.sourceMode.cnFirst') }}
+                </SelectItem>
+                <SelectItem value="github_first">
+                  {{ t('settings.general.update.sourceMode.githubFirst') }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </ItemActions>
+        </Item>
 
         <Item variant="surface" size="sm">
           <ItemContent>
