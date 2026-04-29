@@ -1,0 +1,63 @@
+.mirror_release_pipeline: &mirror_release_pipeline
+  git:
+    enable: false
+  docker:
+    image: ubuntu:22.04
+  stages:
+    - name: download release assets from github
+      script: |
+        set -eu
+        apt-get update
+        apt-get install -y curl jq
+
+        REPO="ChanIok/SpinningMomo"
+        TAG="${RELEASE_TAG:-}"
+        if [ -z "${TAG}" ]; then
+          echo "RELEASE_TAG is required, e.g. v1.2.3"
+          exit 1
+        fi
+
+        API_URL="https://api.github.com/repos/${REPO}/releases/tags/${TAG}"
+        if [ -n "${GITHUB_TOKEN:-}" ]; then
+          curl -fsSL -H "Authorization: Bearer ${GITHUB_TOKEN}" "${API_URL}" -o release.json
+        else
+          curl -fsSL "${API_URL}" -o release.json
+        fi
+
+        mkdir -p out
+        for keyword in "Setup.exe" "Portable.zip" "SHA256SUMS.txt"; do
+          url="$(jq -r --arg keyword "${keyword}" '.assets[] | select(.name | contains($keyword)) | .browser_download_url' release.json | head -n1)"
+          if [ -z "${url}" ] || [ "${url}" = "null" ]; then
+            echo "Missing release asset that contains keyword: ${keyword}"
+            exit 1
+          fi
+          file_name="$(basename "${url}")"
+          curl -fL --retry 3 --retry-delay 2 "${url}" -o "out/${file_name}"
+        done
+
+        ls -al out
+
+    - name: ensure cnb release exists
+      type: git:release
+      options:
+        tag: ${RELEASE_TAG}
+        title: ${RELEASE_TAG}
+        overlying: true
+
+    - name: upload mirrored files
+      image: cnbcool/attachments:latest
+      settings:
+        tag: ${RELEASE_TAG}
+        attachments:
+          - out/*
+
+main:
+  tag_push:
+    - <<: *mirror_release_pipeline
+      name: mirror-github-release-by-tag
+      env:
+        RELEASE_TAG: ${CNB_BRANCH}
+
+  web_trigger:
+    - <<: *mirror_release_pipeline
+      name: mirror-github-release-manual

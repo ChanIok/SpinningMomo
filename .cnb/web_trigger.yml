@@ -1,0 +1,13 @@
+branch:
+  - buttons:
+      - name: 同步 GitHub Release
+        description: 从 GitHub Release 拉取并上传到 CNB 附件
+        event: web_trigger
+        isDefault: true
+        inputs:
+          RELEASE_TAG:
+            name: Release Tag
+            description: 请输入 GitHub Release 标签，例如 v1.2.3
+            placeholder: v1.2.3
+            required: true
+            type: input
