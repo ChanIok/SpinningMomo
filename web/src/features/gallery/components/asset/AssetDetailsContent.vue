@@ -44,7 +44,7 @@ async function handleCopyFileName() {
 <template>
   <div class="space-y-3">
     <div class="flex justify-center">
-      <div class="flex h-[180px] w-full items-center justify-center rounded bg-muted/40">
+      <div class="flex h-[180px] w-full items-center justify-center rounded">
         <video
           v-if="asset.type === 'video'"
           :src="assetUrl"

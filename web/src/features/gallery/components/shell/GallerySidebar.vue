@@ -5,6 +5,7 @@ import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Plus } from 'lucide-vue-next'
 import {
   AlertDialog,
@@ -427,115 +428,117 @@ onMounted(() => {
     </AlertDialog>
 
     <!-- 导航菜单 -->
-    <div class="flex-1 overflow-auto p-4">
-      <!-- 文件夹区域 -->
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <button
-            type="button"
-            :class="
-              cn(
-                'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
-                'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                isFolderTitleSelected
-                  ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
-                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
-              )
-            "
-            @click="clearFolderFilter"
-          >
-            {{ t('gallery.sidebar.folders.title') }}
-          </button>
-          <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
-            <Plus class="h-3 w-3" />
-          </Button>
-        </div>
-        <!-- 加载状态 -->
-        <div v-if="foldersLoading" class="px-2 text-xs text-muted-foreground">
-          {{ t('gallery.sidebar.common.loading') }}
-        </div>
-        <!-- 错误状态 -->
-        <div v-else-if="foldersError" class="px-2 text-xs text-destructive">
-          {{ foldersError }}
-        </div>
-        <!-- 文件夹树 -->
-        <div v-else class="space-y-1">
-          <FolderTreeItem
-            v-for="folder in folders"
-            :key="folder.id"
-            :folder="folder"
-            :selected-folder="selectedFolder"
-            :depth="0"
-            @select="selectFolder"
-            @clear-selection="clearFolderFilter"
-            @rename-display-name="handleRenameFolderDisplayName"
-            @open-in-explorer="handleOpenFolderInExplorer"
-            @remove-watch="handleRemoveFolderWatch"
-            @rescan-folder="openRescanDialog"
-            @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
-            @drop-assets-to-folder="handleDropAssetsToFolder"
-          />
-        </div>
-      </div>
-
-      <Separator class="my-4" />
-
-      <!-- 标签区域 -->
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <button
-            type="button"
-            :class="
-              cn(
-                'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
-                'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                isTagTitleSelected
-                  ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
-                  : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
-              )
-            "
-            @click="clearTagFilter"
-          >
-            {{ t('gallery.sidebar.tags.title') }}
-          </button>
-          <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
-            <Plus class="h-3 w-3" />
-          </Button>
-        </div>
-        <!-- 加载状态 -->
-        <div v-if="tagsLoading" class="px-2 text-xs text-muted-foreground">
-          {{ t('gallery.sidebar.common.loading') }}
-        </div>
-        <!-- 错误状态 -->
-        <div v-else-if="tagsError" class="px-2 text-xs text-destructive">
-          {{ tagsError }}
-        </div>
-        <!-- 标签树 -->
-        <div v-else class="space-y-1">
-          <!-- 快速创建标签 -->
-          <div v-if="isCreatingTag" class="px-2">
-            <TagInlineEditor
-              :placeholder="t('gallery.sidebar.tags.createPlaceholder')"
-              @confirm="handleCreateTag"
-              @cancel="handleCancelCreateTag"
+    <ScrollArea class="min-h-0 flex-1">
+      <div class="p-4">
+        <!-- 文件夹区域 -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <button
+              type="button"
+              :class="
+                cn(
+                  'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
+                  'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                  isFolderTitleSelected
+                    ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+                )
+              "
+              @click="clearFolderFilter"
+            >
+              {{ t('gallery.sidebar.folders.title') }}
+            </button>
+            <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
+              <Plus class="h-3 w-3" />
+            </Button>
+          </div>
+          <!-- 加载状态 -->
+          <div v-if="foldersLoading" class="px-2 text-xs text-muted-foreground">
+            {{ t('gallery.sidebar.common.loading') }}
+          </div>
+          <!-- 错误状态 -->
+          <div v-else-if="foldersError" class="px-2 text-xs text-destructive">
+            {{ foldersError }}
+          </div>
+          <!-- 文件夹树 -->
+          <div v-else class="space-y-1">
+            <FolderTreeItem
+              v-for="folder in folders"
+              :key="folder.id"
+              :folder="folder"
+              :selected-folder="selectedFolder"
+              :depth="0"
+              @select="selectFolder"
+              @clear-selection="clearFolderFilter"
+              @rename-display-name="handleRenameFolderDisplayName"
+              @open-in-explorer="handleOpenFolderInExplorer"
+              @remove-watch="handleRemoveFolderWatch"
+              @rescan-folder="openRescanDialog"
+              @extract-infinity-nikki-metadata="openInfinityNikkiMetadataDialog"
+              @drop-assets-to-folder="handleDropAssetsToFolder"
             />
           </div>
-          <!-- 标签列表 -->
-          <TagTreeItem
-            v-for="tag in tags"
-            :key="tag.id"
-            :tag="tag"
-            :selected-tag="selectedTag"
-            :depth="0"
-            @select="selectTag"
-            @rename="handleRenameTag"
-            @create-child="handleCreateChildTag"
-            @delete="handleDeleteTag"
-            @drop-assets-to-tag="handleDropAssetsToTag"
-          />
+        </div>
+
+        <Separator class="my-4" />
+
+        <!-- 标签区域 -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <button
+              type="button"
+              :class="
+                cn(
+                  'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
+                  'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
+                  isTagTitleSelected
+                    ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
+                    : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+                )
+              "
+              @click="clearTagFilter"
+            >
+              {{ t('gallery.sidebar.tags.title') }}
+            </button>
+            <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
+              <Plus class="h-3 w-3" />
+            </Button>
+          </div>
+          <!-- 加载状态 -->
+          <div v-if="tagsLoading" class="px-2 text-xs text-muted-foreground">
+            {{ t('gallery.sidebar.common.loading') }}
+          </div>
+          <!-- 错误状态 -->
+          <div v-else-if="tagsError" class="px-2 text-xs text-destructive">
+            {{ tagsError }}
+          </div>
+          <!-- 标签树 -->
+          <div v-else class="space-y-1">
+            <!-- 快速创建标签 -->
+            <div v-if="isCreatingTag" class="px-2">
+              <TagInlineEditor
+                :placeholder="t('gallery.sidebar.tags.createPlaceholder')"
+                @confirm="handleCreateTag"
+                @cancel="handleCancelCreateTag"
+              />
+            </div>
+            <!-- 标签列表 -->
+            <TagTreeItem
+              v-for="tag in tags"
+              :key="tag.id"
+              :tag="tag"
+              :selected-tag="selectedTag"
+              :depth="0"
+              @select="selectTag"
+              @rename="handleRenameTag"
+              @create-child="handleCreateChildTag"
+              @delete="handleDeleteTag"
+              @drop-assets-to-tag="handleDropAssetsToTag"
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </ScrollArea>
 
     <GalleryScanDialog :open="showAddFolderDialog" @update:open="handleAddFolderDialogOpenChange" />
     <InfinityNikkiMetadataExtractDialog

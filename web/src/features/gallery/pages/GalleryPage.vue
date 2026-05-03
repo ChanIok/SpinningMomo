@@ -281,7 +281,7 @@ onUnmounted(() => {
   <InfinityNikkiGuidePanel v-if="showInfinityNikkiGuide" />
 
   <!-- 左中右三区域布局 -->
-  <div v-else class="h-full w-full border-t">
+  <div v-else class="h-full w-full overflow-hidden border-t">
     <!-- 第一层分割：左侧 + (中右) -->
     <Split
       v-model:size="leftSidebarSize"

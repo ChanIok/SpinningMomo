@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { pushWithViewTransition } from '@/router/viewTransition'
 
 interface MenuItem {
@@ -65,34 +66,36 @@ const handleMenuSelect = (key: string) => {
     collapsible="none"
     :class="['w-14 bg-transparent pt-8', isHome && 'activity-bar-background-blur']"
   >
-    <SidebarContent>
-      <SidebarGroup>
-        <SidebarGroupContent class="px-0">
-          <SidebarMenu>
-            <template
-              v-for="(item, index) in menuItems"
-              :key="'key' in item ? item.key : `divider-${index}`"
-            >
-              <!-- Divider -->
-              <div v-if="'type' in item && item.type === 'divider'" class="mx-2 my-3" />
+    <SidebarContent class="overflow-hidden">
+      <ScrollArea class="min-h-0 flex-1">
+        <SidebarGroup>
+          <SidebarGroupContent class="px-0">
+            <SidebarMenu>
+              <template
+                v-for="(item, index) in menuItems"
+                :key="'key' in item ? item.key : `divider-${index}`"
+              >
+                <!-- Divider -->
+                <div v-if="'type' in item && item.type === 'divider'" class="mx-2 my-3" />
 
-              <!-- Menu Item -->
-              <SidebarMenuItem v-else-if="'key' in item">
-                <SidebarMenuButton
-                  :tooltip="item.title"
-                  show-tooltip-when-expanded
-                  tooltip-variant="sidebar"
-                  :is-active="activeKey === item.key"
-                  @click="handleMenuSelect(item.key)"
-                  class="h-10 w-10 [&>svg]:mx-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:transition-colors [&[data-active=true]>svg]:text-primary"
-                >
-                  <component :is="item.icon" :stroke-width="1.8" />
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </template>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
+                <!-- Menu Item -->
+                <SidebarMenuItem v-else-if="'key' in item">
+                  <SidebarMenuButton
+                    :tooltip="item.title"
+                    show-tooltip-when-expanded
+                    tooltip-variant="sidebar"
+                    :is-active="activeKey === item.key"
+                    @click="handleMenuSelect(item.key)"
+                    class="h-10 w-10 [&>svg]:mx-auto [&>svg]:h-5 [&>svg]:w-5 [&>svg]:transition-colors [&[data-active=true]>svg]:text-primary"
+                  >
+                    <component :is="item.icon" :stroke-width="1.8" />
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </template>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </ScrollArea>
     </SidebarContent>
   </Sidebar>
 </template>

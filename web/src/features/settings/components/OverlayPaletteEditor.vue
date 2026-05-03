@@ -241,7 +241,7 @@ const handleSampleFromWallpaper = () => {
                 <div class="h-full w-full" :style="{ backgroundColor: currentColor }" />
               </button>
             </PopoverTrigger>
-            <PopoverContent align="center" :sideOffset="8" class="w-auto p-3">
+            <PopoverContent align="center" :sideOffset="8" class="w-auto min-w-[16rem] p-3">
               <ColorPicker
                 :model-value="currentColor"
                 :show-hex-input="false"

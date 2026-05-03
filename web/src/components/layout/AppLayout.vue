@@ -44,7 +44,7 @@ const hasBackgroundImage = computed(() =>
 
         <!-- 右侧：Header + 主内容区 -->
         <div
-          class="relative flex min-h-0 flex-1 flex-col rounded-lg text-foreground"
+          class="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-lg text-foreground"
           :class="[!isHome && !isWelcome && 'surface-middle']"
         >
           <!-- 窗口控制栏 -->
