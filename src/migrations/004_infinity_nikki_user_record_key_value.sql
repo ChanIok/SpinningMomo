@@ -1,6 +1,3 @@
--- ============================================================================
--- Infinity Nikki User Record: flexible key-value schema
--- ============================================================================
 DROP TABLE IF EXISTS asset_infinity_nikki_user_record_v2;
 
 DROP TRIGGER IF EXISTS update_asset_infinity_nikki_user_record_updated_at;
@@ -23,16 +20,29 @@ INSERT INTO asset_infinity_nikki_user_record_v2 (
 )
 SELECT
     asset_id,
-    CASE code_type
-        WHEN 'dye' THEN 'dye_code'
-        WHEN 'home_building' THEN 'home_building_code'
-    END AS record_key,
+    'code_type' AS record_key,
+    code_type AS record_value,
+    created_at,
+    updated_at
+FROM asset_infinity_nikki_user_record
+WHERE code_type IS NOT NULL
+  AND trim(code_type) <> '';
+
+INSERT INTO asset_infinity_nikki_user_record_v2 (
+    asset_id,
+    record_key,
+    record_value,
+    created_at,
+    updated_at
+)
+SELECT
+    asset_id,
+    'code_value' AS record_key,
     code_value AS record_value,
     created_at,
     updated_at
 FROM asset_infinity_nikki_user_record
-WHERE code_type IN ('dye', 'home_building')
-  AND code_value IS NOT NULL
+WHERE code_value IS NOT NULL
   AND trim(code_value) <> '';
 
 DROP TABLE asset_infinity_nikki_user_record;

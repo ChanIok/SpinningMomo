@@ -125,7 +125,6 @@ struct InfinityNikkiExtractedParams {
 
 struct InfinityNikkiUserRecord {
   std::optional<std::string> dye_code;
-  std::optional<std::string> home_building_code;
   std::optional<std::string> world_id;
 };
 
@@ -215,7 +214,6 @@ struct InfinityNikkiMetadataNames {
 
 struct SetInfinityNikkiUserRecordParams {
   std::int64_t asset_id;
-  std::string code_type;
   std::optional<std::string> code_value;
 };
 

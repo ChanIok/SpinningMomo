@@ -165,14 +165,7 @@ defineExpose({ scrollToIndex, getCardRect })
                 @drag-start="(a, e) => handleAssetDragStart(a, e)"
               />
 
-              <div
-                v-else
-                class="skeleton-card rounded-lg"
-                :style="{
-                  width: `${galleryView.viewSize.value}px`,
-                  height: `${galleryView.viewSize.value}px`,
-                }"
-              />
+              <div v-else class="skeleton-card w-full rounded" :style="{ aspectRatio: '1 / 1' }" />
             </template>
           </div>
         </div>
@@ -233,14 +226,7 @@ defineExpose({ scrollToIndex, getCardRect })
                 @drag-start="(a, e) => handleAssetDragStart(a, e)"
               />
 
-              <div
-                v-else
-                class="skeleton-card rounded-lg"
-                :style="{
-                  width: `${galleryView.viewSize.value}px`,
-                  height: `${galleryView.viewSize.value}px`,
-                }"
-              />
+              <div v-else class="skeleton-card w-full rounded" :style="{ aspectRatio: '1 / 1' }" />
             </template>
           </div>
         </div>

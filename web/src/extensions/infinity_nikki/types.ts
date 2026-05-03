@@ -1,8 +1,6 @@
 import type { OperationResult, QueryAssetsFilters } from '@/features/gallery/types'
 import type { SortOrder } from '@/features/gallery/types'
 
-export type InfinityNikkiUserRecordCodeType = 'dye' | 'home_building'
-
 export interface QueryPhotoMapPointsParams {
   filters: QueryAssetsFilters
   sortBy?: string
@@ -56,7 +54,6 @@ export interface InfinityNikkiExtractedParams {
 
 export interface InfinityNikkiUserRecord {
   dyeCode?: string
-  homeBuildingCode?: string
   worldId?: string
 }
 
@@ -130,7 +127,6 @@ export interface InfinityNikkiMetadataNames {
 
 export interface SetInfinityNikkiUserRecordParams {
   assetId: number
-  codeType: InfinityNikkiUserRecordCodeType
   codeValue?: string
 }
 

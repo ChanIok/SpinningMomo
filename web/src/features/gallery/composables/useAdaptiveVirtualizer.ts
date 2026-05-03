@@ -2,8 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useGalleryStore } from '../store'
 import { useGalleryData } from './useGalleryData'
-import { galleryApi } from '../api'
-import { toQueryAssetsFilters } from '../queryFilters'
+import { useGalleryLayoutMeta } from './useGalleryLayoutMeta'
 import type { AdaptiveLayoutRow, AdaptiveLayoutRowItem, Asset, AssetLayoutMetaItem } from '../types'
 
 // 自适应视图的行内间距。这里故意比 grid 更紧凑，保持相册式观感。
@@ -118,10 +117,9 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
   const targetRowHeight = computed(() => Math.max(100, store.viewConfig.size))
   // 外层滚动容器直接承担左右内边距，布局宽度直接使用可见内容区宽度。
   const contentWidth = computed(() => Math.max(0, containerWidth.value))
-  const layoutMetaItems = ref<AssetLayoutMetaItem[]>([])
+  const { layoutMetaItems, reloadLayoutMeta } = useGalleryLayoutMeta('adaptive')
   const virtualRows = ref<VirtualAdaptiveRow[]>([])
   const loadingPages = ref<Set<number>>(new Set())
-  const layoutRequestId = ref(0)
 
   const layout = computed(() =>
     buildAdaptiveRows(
@@ -144,35 +142,6 @@ export function useAdaptiveVirtualizer(options: UseAdaptiveVirtualizerOptions) {
     paddingEnd: 16,
     overscan: 8,
   })
-
-  async function reloadLayoutMeta() {
-    // 只要筛选/排序变化，就重新拉取轻量布局元数据，保证整批行断点稳定。
-    const requestId = layoutRequestId.value + 1
-    layoutRequestId.value = requestId
-
-    const filters = toQueryAssetsFilters(store.filter, store.includeSubfolders)
-
-    try {
-      const response = await galleryApi.queryAssetLayoutMeta({
-        filters,
-        sortBy: store.sortBy,
-        sortOrder: store.sortOrder,
-      })
-
-      if (layoutRequestId.value !== requestId) {
-        return
-      }
-
-      layoutMetaItems.value = response.items
-    } catch (error) {
-      if (layoutRequestId.value !== requestId) {
-        return
-      }
-
-      layoutMetaItems.value = []
-      console.error('Failed to reload adaptive layout meta:', error)
-    }
-  }
 
   function syncVirtualRows(items: ReturnType<typeof virtualizer.value.getVirtualItems>) {
     const rows = layout.value.rows

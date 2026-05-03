@@ -30,7 +30,6 @@ import type {
   InfinityNikkiMapConfig,
   InfinityNikkiMetadataNames,
   InfinityNikkiSameOutfitDyeCodeFillPreview,
-  InfinityNikkiUserRecordCodeType,
 } from '@/extensions/infinity_nikki/types'
 
 const props = defineProps<{
@@ -47,10 +46,8 @@ const { toast } = useToast()
 const router = useRouter()
 const mapStore = useMapStore()
 
-const codeTypeDraft = ref<InfinityNikkiUserRecordCodeType>('dye')
 const codeValueDraft = ref('')
 const isSavingUserRecord = ref(false)
-const isCodeTypePopoverOpen = ref(false)
 const isSavingWorldRecord = ref(false)
 const isWorldPopoverOpen = ref(false)
 const isFillingSameOutfitDyeCode = ref(false)
@@ -62,11 +59,9 @@ const extracted = computed(() => props.details.extracted)
 const currentUserRecord = computed(() => props.details.userRecord)
 const currentMapArea = computed(() => props.details.mapArea)
 const hasCodeValueDraft = computed(() => codeValueDraft.value.trim().length > 0)
-const currentCodeTypeLabel = computed(() => getCodeTypeLabel(codeTypeDraft.value))
 const canShowSameOutfitDyeFillPrompt = computed(() => {
   const preview = sameOutfitDyeFillPreview.value
   return (
-    codeTypeDraft.value === 'dye' &&
     preview?.sourceHasOutfitDyeState === true &&
     preview.matchedCount > 0 &&
     sameOutfitDyeFillPreviewCodeValue.value.length > 0 &&
@@ -109,28 +104,7 @@ onMounted(() => {
 })
 
 function syncDraftFromProps() {
-  codeValueDraft.value = getCodeValue(currentUserRecord.value, codeTypeDraft.value)
-}
-
-watch(
-  () => props.details,
-  () => {
-    syncDraftFromProps()
-  },
-  { deep: true, immediate: true }
-)
-
-watch(
-  () => props.assetId,
-  () => {
-    clearSameOutfitDyeFillPreview()
-  }
-)
-
-function getCodeTypeLabel(codeType: InfinityNikkiUserRecordCodeType): string {
-  return codeType === 'home_building'
-    ? t('gallery.details.infinityNikki.codeType.homeBuilding')
-    : t('gallery.details.infinityNikki.codeType.dye')
+  codeValueDraft.value = currentUserRecord.value?.dyeCode ?? ''
 }
 
 function padTwoDigits(value: number): string {
@@ -196,41 +170,24 @@ function clearSameOutfitDyeFillPreview() {
   sameOutfitDyeFillPreviewCodeValue.value = ''
 }
 
-function getCodeValue(
-  record: InfinityNikkiDetails['userRecord'],
-  codeType: InfinityNikkiUserRecordCodeType
-): string {
+function getCodeValue(record: InfinityNikkiDetails['userRecord']): string {
   if (!record) {
     return ''
   }
-  return codeType === 'home_building' ? (record.homeBuildingCode ?? '') : (record.dyeCode ?? '')
+  return record.dyeCode ?? ''
 }
 
 function buildUserRecord(details: {
   dyeCode?: string
-  homeBuildingCode?: string
   worldId?: string
 }): InfinityNikkiDetails['userRecord'] {
-  if (!details.dyeCode && !details.homeBuildingCode && !details.worldId) {
+  if (!details.dyeCode && !details.worldId) {
     return undefined
   }
   return {
     dyeCode: details.dyeCode,
-    homeBuildingCode: details.homeBuildingCode,
     worldId: details.worldId,
   }
-}
-
-function buildUpdatedUserRecordForCode(
-  codeType: InfinityNikkiUserRecordCodeType,
-  codeValue: string | undefined
-): InfinityNikkiDetails['userRecord'] {
-  const currentRecord = currentUserRecord.value
-  return buildUserRecord({
-    dyeCode: codeType === 'dye' ? codeValue : currentRecord?.dyeCode,
-    homeBuildingCode: codeType === 'home_building' ? codeValue : currentRecord?.homeBuildingCode,
-    worldId: currentRecord?.worldId,
-  })
 }
 
 async function refreshSameOutfitDyeFillPreview(codeValue: string) {
@@ -257,8 +214,7 @@ async function handleUserRecordCommit() {
   }
 
   const normalizedCodeValue = codeValueDraft.value.trim()
-  const nextCodeType = codeTypeDraft.value
-  const currentCodeValue = getCodeValue(currentUserRecord.value, nextCodeType).trim()
+  const currentCodeValue = getCodeValue(currentUserRecord.value).trim()
   codeValueDraft.value = normalizedCodeValue
 
   if (!currentCodeValue && !normalizedCodeValue) {
@@ -274,17 +230,19 @@ async function handleUserRecordCommit() {
   try {
     await setInfinityNikkiUserRecord({
       assetId: props.assetId,
-      codeType: nextCodeType,
       codeValue: normalizedCodeValue || undefined,
     })
 
     emit('updated', {
       extracted: props.details.extracted,
-      userRecord: buildUpdatedUserRecordForCode(nextCodeType, normalizedCodeValue || undefined),
+      userRecord: buildUserRecord({
+        dyeCode: normalizedCodeValue || undefined,
+        worldId: currentUserRecord.value?.worldId,
+      }),
       mapArea: props.details.mapArea,
     })
 
-    if (nextCodeType === 'dye' && normalizedCodeValue) {
+    if (normalizedCodeValue) {
       await refreshSameOutfitDyeFillPreview(normalizedCodeValue)
     } else {
       clearSameOutfitDyeFillPreview()
@@ -397,17 +355,6 @@ async function handleCodeValueAction() {
   codeValueDraft.value = normalizedClipboardText
 }
 
-async function handleSelectCodeType(nextCodeType: InfinityNikkiUserRecordCodeType) {
-  isCodeTypePopoverOpen.value = false
-  if (codeTypeDraft.value === nextCodeType) {
-    return
-  }
-
-  await handleUserRecordCommit()
-  codeTypeDraft.value = nextCodeType
-  syncDraftFromProps()
-}
-
 async function handleSelectWorldId(nextWorldId: string | undefined) {
   if (isSavingWorldRecord.value) {
     return
@@ -451,7 +398,6 @@ async function handleSelectWorldId(nextWorldId: string | undefined) {
       extracted: props.details.extracted,
       userRecord: buildUserRecord({
         dyeCode: currentUserRecord.value?.dyeCode,
-        homeBuildingCode: currentUserRecord.value?.homeBuildingCode,
         worldId: normalizedWorldId,
       }),
       mapArea: nextMapArea,
@@ -580,6 +526,21 @@ async function refreshMetadataNames() {
 }
 
 watch(
+  () => props.details,
+  () => {
+    syncDraftFromProps()
+  },
+  { deep: true, immediate: true }
+)
+
+watch(
+  () => props.assetId,
+  () => {
+    clearSameOutfitDyeFillPreview()
+  }
+)
+
+watch(
   () => [
     extracted.value?.filterId,
     extracted.value?.poseId,
@@ -602,36 +563,11 @@ watch(
 
     <div class="space-y-2 text-xs">
       <div class="flex items-center justify-between gap-2">
-        <div class="flex min-w-0 items-center gap-1 text-muted-foreground">
-          <span>{{ currentCodeTypeLabel }}</span>
-          <Popover v-model:open="isCodeTypePopoverOpen">
-            <PopoverTrigger as-child>
-              <Button variant="ghost" size="icon" class="h-5 w-5 text-muted-foreground">
-                <ChevronDown class="h-3 w-3" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" class="w-36 p-1">
-              <button
-                type="button"
-                class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
-                @click="void handleSelectCodeType('dye')"
-              >
-                <span>{{ t('gallery.details.infinityNikki.codeType.dye') }}</span>
-                <Check v-if="codeTypeDraft === 'dye'" class="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
-                @click="void handleSelectCodeType('home_building')"
-              >
-                <span>{{ t('gallery.details.infinityNikki.codeType.homeBuilding') }}</span>
-                <Check v-if="codeTypeDraft === 'home_building'" class="h-3.5 w-3.5" />
-              </button>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <span class="min-w-0 text-muted-foreground">{{
+          t('gallery.details.infinityNikki.codeType.dye')
+        }}</span>
 
-        <div class="flex max-w-54 min-w-0 flex-1 items-center gap-2">
+        <div class="flex max-w-42 min-w-0 flex-1 items-center gap-2">
           <Input
             v-model="codeValueDraft"
             :disabled="isSavingUserRecord"

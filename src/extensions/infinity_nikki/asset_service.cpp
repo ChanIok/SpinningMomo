@@ -83,8 +83,6 @@ auto read_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
   for (const auto& row : rows_result.value()) {
     if (row.record_key == "dye_code") {
       record.dye_code = row.record_value;
-    } else if (row.record_key == "home_building_code") {
-      record.home_building_code = row.record_value;
     } else if (row.record_key == "world_id") {
       record.world_id = WorldArea::normalize_world_id(row.record_value);
     }
@@ -94,18 +92,7 @@ auto read_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
 }
 
 auto has_user_record_value(const InfinityNikkiUserRecord& record) -> bool {
-  return record.dye_code.has_value() || record.home_building_code.has_value() ||
-         record.world_id.has_value();
-}
-
-auto user_record_key_for_code_type(std::string_view code_type) -> std::optional<std::string> {
-  if (code_type == "dye") {
-    return std::string("dye_code");
-  }
-  if (code_type == "home_building") {
-    return std::string("home_building_code");
-  }
-  return std::nullopt;
+  return record.dye_code.has_value() || record.world_id.has_value();
 }
 
 // 根据照片的游戏坐标和用户记录，解析出所属地图区域。
@@ -536,14 +523,6 @@ auto set_user_record(Core::State::AppState& app_state,
     return std::unexpected("Asset id must be greater than 0");
   }
 
-  if (params.code_type != "dye" && params.code_type != "home_building") {
-    return std::unexpected("Infinity Nikki code type must be one of dye, home_building");
-  }
-  const auto record_key = user_record_key_for_code_type(params.code_type);
-  if (!record_key.has_value()) {
-    return std::unexpected("Unsupported Infinity Nikki code type");
-  }
-
   auto asset_result =
       Features::Gallery::Asset::Repository::get_asset_by_id(app_state, params.asset_id);
   if (!asset_result) {
@@ -566,7 +545,7 @@ auto set_user_record(Core::State::AppState& app_state,
   auto write_result = Core::Database::execute_transaction(
       *app_state.database, [&](auto&) -> std::expected<void, std::string> {
         if (normalized_code_value.has_value()) {
-          auto value_result = upsert_user_record_key(app_state, params.asset_id, *record_key,
+          auto value_result = upsert_user_record_key(app_state, params.asset_id, "dye_code",
                                                      normalized_code_value.value());
           if (!value_result) {
             return std::unexpected(value_result.error());
@@ -574,7 +553,7 @@ auto set_user_record(Core::State::AppState& app_state,
           return {};
         }
 
-        return delete_user_record_keys(app_state, params.asset_id, {*record_key});
+        return delete_user_record_keys(app_state, params.asset_id, {"dye_code"});
       });
 
   if (!write_result) {

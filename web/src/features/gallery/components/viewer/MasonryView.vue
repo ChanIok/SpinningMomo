@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, type ComponentPublicInstance } from 'vue'
-import { useElementSize, useEventListener } from '@vueuse/core'
+import { useElementSize } from '@vueuse/core'
 import type { Asset } from '../../types'
 import {
   useGalleryView,
@@ -62,8 +62,6 @@ function handleScroll(event: Event) {
   const target = event.target as HTMLElement
   scrollTop.value = target.scrollTop
 }
-
-useEventListener(scrollContainerRef, 'scroll', handleScroll)
 
 function getAssetAspectRatio(asset: Asset | null): string {
   if (!asset || !asset.width || !asset.height || asset.width <= 0 || asset.height <= 0) {
@@ -158,6 +156,7 @@ defineExpose({ scrollToIndex, getCardRect })
               :asset="virtualItem.asset"
               :aspect-ratio="getAssetAspectRatio(virtualItem.asset)"
               :is-selected="gallerySelection.isAssetSelected(virtualItem.asset.id)"
+              :style="{ minHeight: `${masonryVirtualizer.minItemHeight}px` }"
               @click="(asset, event) => handleAssetClick(asset, event, virtualItem.index)"
               @double-click="
                 (asset, event) => handleAssetDoubleClick(asset, event, virtualItem.index)
@@ -170,10 +169,10 @@ defineExpose({ scrollToIndex, getCardRect })
 
             <div
               v-else
-              class="animate-pulse rounded-lg bg-muted"
+              class="animate-pulse rounded bg-muted"
               :style="{
                 width: '100%',
-                height: `${masonryVirtualizer.getAssetHeight(null)}px`,
+                height: `${masonryVirtualizer.getAssetHeight(null, virtualItem.index)}px`,
               }"
             />
           </div>
