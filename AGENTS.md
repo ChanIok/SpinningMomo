@@ -19,37 +19,28 @@ SpinningMomo (旋转吧大喵) is a Windows-only desktop tool for the game "Infi
 ### Prerequisites
 - Visual Studio 2022+ with Windows SDK 10.0.22621.0+
 - xmake (primary build system)
-- Node.js / npm (for web frontend, docs, and formatting scripts)
+- Node.js / npm (for web frontend and docs)
 - .NET SDK 8.0+ and WiX v5+ when building installers locally
 
 ### Build Commands
 ```
-# C++ backend — debug (default)
-xmake config -m debug
+# C++ backend — debug
 xmake build
 
 # C++ backend — release
-xmake release          # builds release then restores debug config
-
-# Full native + web build via xmake task
-xmake build-all
+xmake release
 
 # Web frontend (in web/ directory)
+cd web && npx vue-tsc -b
 cd web && npm run build
 
 # Full build: C++ release + web + assemble dist/
 npm run build
 
-# Release artifacts
+# Packaging
 npm run build:portable
 npm run build:installer
-npm run release
-
-# Generate VS project files (vsxmake, debug+release)
-xmake vs
 ```
-
-A husky pre-commit hook runs `lint-staged` which auto-formats staged C++ (`.cpp`, `.ixx`, `.h`, `.hpp`) and web files.
 
 ### Web Frontend Dev Server
 ```

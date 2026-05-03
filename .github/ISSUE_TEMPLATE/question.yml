@@ -1,0 +1,22 @@
+name: 使用提问
+description: 使用过程中遇到的问题或疑惑
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 你遇到了什么问题？想要实现什么效果？可附截图辅助说明
+      placeholder: 例如：如何设置竖构图拍摄？录制的视频保存在哪里？
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的方式
+      description: 你尝试过哪些方法？建议先查阅 [使用文档](https://spin.infinitymomo.com) 确认是否已有说明
+      placeholder: 搜索了文档但没找到说明
+    validations:
+      required: false

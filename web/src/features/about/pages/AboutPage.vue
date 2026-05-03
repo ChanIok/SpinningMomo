@@ -2,7 +2,6 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { call } from '@/core/rpc'
 import { useTaskStore } from '@/core/tasks/store'
-import { getCurrentEnvironment } from '@/core/env'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { copyToClipboard } from '@/lib/utils'
@@ -11,17 +10,14 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
-  Info,
-  Monitor,
   Check,
   Bug,
-  Heart,
+  Mail,
   FolderOpen,
   ExternalLink,
   Globe,
@@ -33,14 +29,6 @@ import {
 
 interface RuntimeInfo {
   version: string
-  osName: string
-  osMajorVersion: number
-  osMinorVersion: number
-  osBuildNumber: number
-  isWebview2Available: boolean
-  webview2Version: string
-  isCaptureSupported: boolean
-  isProcessLoopbackAudioSupported: boolean
 }
 
 interface CheckUpdateResult {
@@ -52,11 +40,6 @@ interface CheckUpdateResult {
 interface StartDownloadUpdateResult {
   taskId: string
   status: 'started' | 'already_running'
-}
-
-interface OpenAppDataDirectoryResult {
-  success: boolean
-  message: string
 }
 
 interface OpenLogDirectoryResult {
@@ -76,20 +59,18 @@ const error = ref<string | null>(null)
 const isCheckingUpdate = ref(false)
 const isStartingDownload = ref(false)
 const isInstallingUpdate = ref(false)
-const isOpeningAppDataDirectory = ref(false)
 const isOpeningLogDirectory = ref(false)
 const hasUpdate = ref<boolean | null>(null)
 const latestVersion = ref<string | null>(null)
 const updateError = ref<string | null>(null)
 const updateChecked = ref(false)
 const issuesDialogOpen = ref(false)
-const copied = ref(false)
-const environment = getCurrentEnvironment()
-
-let copiedTimer: ReturnType<typeof setTimeout> | null = null
+const emailCopied = ref(false)
+let emailCopiedTimer: ReturnType<typeof setTimeout> | null = null
 let updateCheckedTimer: ReturnType<typeof setTimeout> | null = null
 
 const issuesUrl = 'https://github.com/ChanIok/SpinningMomo/issues'
+const feedbackEmail = 'hello@infinitymomo.com'
 const licenseUrl = 'https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE'
 const legalNoticeZhUrl = 'https://spin.infinitymomo.com/zh/about/legal'
 const legalNoticeEnUrl = 'https://spin.infinitymomo.com/en/about/legal'
@@ -120,66 +101,11 @@ const isDownloadedUpdateReady = computed(
   () => currentUpdateTask.value?.status === 'succeeded' && hasUpdate.value !== false
 )
 
-const environmentText = computed(() => {
-  return environment === 'webview'
-    ? t('about.runtime.environmentWebview')
-    : t('about.runtime.environmentWeb')
-})
-
-const osText = computed(() => {
-  if (!runtimeInfo.value) {
-    return '-'
-  }
-  return `${runtimeInfo.value.osName} ${runtimeInfo.value.osMajorVersion}.${runtimeInfo.value.osMinorVersion}.${runtimeInfo.value.osBuildNumber}`
-})
-
-const webview2Text = computed(() => {
-  if (!runtimeInfo.value) {
-    return '-'
-  }
-  if (!runtimeInfo.value.isWebview2Available) {
-    return t('about.runtime.unavailable')
-  }
-  return runtimeInfo.value.webview2Version || t('about.runtime.available')
-})
-
-const diagnosticsText = computed(() => {
-  return [
-    t('about.diagnostics.title'),
-    `${t('about.runtime.version')}: ${appVersionText.value}`,
-    `${t('about.runtime.environment')}: ${environmentText.value}`,
-    `${t('about.runtime.os')}: ${osText.value}`,
-    `${t('about.runtime.webview2')}: ${webview2Text.value}`,
-    `${t('about.runtime.capture')}: ${formatCapability(runtimeInfo.value?.isCaptureSupported)}`,
-    `${t('about.runtime.loopback')}: ${formatCapability(runtimeInfo.value?.isProcessLoopbackAudioSupported)}`,
-  ].join('\n')
-})
-
 const toErrorMessage = (value: unknown): string => {
   if (value instanceof Error) {
     return value.message
   }
   return String(value)
-}
-
-const formatCapability = (value: boolean | undefined): string => {
-  if (value === true) {
-    return t('about.runtime.supported')
-  }
-  if (value === false) {
-    return t('about.runtime.unsupported')
-  }
-  return '-'
-}
-
-const markCopied = () => {
-  copied.value = true
-  if (copiedTimer) {
-    clearTimeout(copiedTimer)
-  }
-  copiedTimer = setTimeout(() => {
-    copied.value = false
-  }, 1500)
 }
 
 const loadRuntimeInfo = async () => {
@@ -277,28 +203,17 @@ const handleUpdateAction = async () => {
   await checkForUpdate()
 }
 
-const copyDiagnostics = async () => {
-  const success = await copyToClipboard(diagnosticsText.value)
+const copyFeedbackEmail = async () => {
+  const success = await copyToClipboard(feedbackEmail)
   if (success) {
-    markCopied()
-  }
-}
-
-const openAppDataDirectory = async () => {
-  if (isOpeningAppDataDirectory.value) {
-    return
-  }
-
-  isOpeningAppDataDirectory.value = true
-  try {
-    const result = await call<OpenAppDataDirectoryResult>('file.openAppDataDirectory')
-    if (!result.success) {
-      throw new Error(result.message || t('about.toast.openDataDirectoryFailed'))
+    emailCopied.value = true
+    if (emailCopiedTimer) {
+      clearTimeout(emailCopiedTimer)
     }
-  } catch (e) {
-    toast.error(t('about.toast.openDataDirectoryFailed'))
-  } finally {
-    isOpeningAppDataDirectory.value = false
+    emailCopiedTimer = setTimeout(() => {
+      emailCopied.value = false
+    }, 1500)
+    toast.success(t('about.toast.emailCopied', { email: feedbackEmail }))
   }
 }
 
@@ -326,8 +241,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  if (copiedTimer) {
-    clearTimeout(copiedTimer)
+  if (emailCopiedTimer) {
+    clearTimeout(emailCopiedTimer)
   }
   if (updateCheckedTimer) {
     clearTimeout(updateCheckedTimer)
@@ -453,86 +368,93 @@ onBeforeUnmount(() => {
         </div>
 
         <Dialog v-model:open="issuesDialogOpen">
-          <DialogContent class="gap-4 sm:max-w-md">
+          <DialogContent class="gap-5 sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>{{ t('about.links.issues') }}</DialogTitle>
-              <DialogDescription>{{ t('about.issuesDialog.description') }}</DialogDescription>
+              <DialogDescription>{{ t('about.feedback.dialogDescription') }}</DialogDescription>
             </DialogHeader>
 
-            <div
-              class="max-h-[min(280px,40vh)] divide-y divide-border/40 overflow-y-auto rounded-lg border border-border/60 bg-muted/35 px-3 text-xs"
-            >
-              <div class="flex justify-between gap-3 py-2.5 first:pt-3 last:pb-3">
-                <span class="shrink-0 text-muted-foreground">{{ t('about.runtime.version') }}</span>
-                <span class="min-w-0 text-right font-medium text-foreground">{{
-                  appVersionText
-                }}</span>
-              </div>
-              <div class="flex justify-between gap-3 py-2.5 first:pt-3 last:pb-3">
-                <span class="shrink-0 text-muted-foreground">{{
-                  t('about.runtime.environment')
-                }}</span>
-                <span class="min-w-0 text-right font-medium text-foreground">{{
-                  environmentText
-                }}</span>
-              </div>
-              <div class="flex justify-between gap-3 py-2.5 first:pt-3 last:pb-3">
-                <span class="flex shrink-0 items-center gap-1.5 text-muted-foreground"
-                  ><Monitor class="h-3.5 w-3.5" /> {{ t('about.runtime.os') }}</span
+            <div class="space-y-4">
+              <!-- Step 1: Reproduce -->
+              <div class="flex gap-3">
+                <div
+                  class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary"
                 >
-                <span class="min-w-0 text-right font-medium text-foreground">{{ osText }}</span>
+                  1
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-foreground">
+                    {{ t('about.feedback.step1.title') }}
+                  </p>
+                  <p class="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+                    {{ t('about.feedback.step1.description') }}
+                  </p>
+                </div>
               </div>
-              <div class="flex justify-between gap-3 py-2.5 first:pt-3 last:pb-3">
-                <span class="flex shrink-0 items-center gap-1.5 text-muted-foreground"
-                  ><Heart class="h-3.5 w-3.5" /> {{ t('about.runtime.webview2') }}</span
+
+              <!-- Step 2: Gather Logs -->
+              <div class="flex gap-3">
+                <div
+                  class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary"
                 >
-                <span class="min-w-0 text-right font-medium text-foreground">{{
-                  webview2Text
-                }}</span>
+                  2
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-foreground">
+                    {{ t('about.feedback.step2.title') }}
+                  </p>
+                  <p class="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+                    {{ t('about.feedback.step2.description') }}
+                  </p>
+                  <div class="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="h-7 text-xs"
+                      @click="openLogDirectory"
+                    >
+                      <FolderOpen class="mr-1.5 h-3.5 w-3.5" />
+                      {{ t('about.actions.openLogDirectory') }}
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <div class="flex justify-between gap-3 py-2.5 first:pt-3 last:pb-3">
-                <span class="shrink-0 text-muted-foreground">{{ t('about.runtime.capture') }}</span>
-                <span class="min-w-0 text-right font-medium text-foreground">{{
-                  formatCapability(runtimeInfo?.isCaptureSupported)
-                }}</span>
-              </div>
-              <div class="flex justify-between gap-3 py-2.5 first:pt-3 last:pb-3">
-                <span class="shrink-0 text-muted-foreground">{{
-                  t('about.runtime.loopback')
-                }}</span>
-                <span class="min-w-0 text-right font-medium text-foreground">{{
-                  formatCapability(runtimeInfo?.isProcessLoopbackAudioSupported)
-                }}</span>
+
+              <!-- Step 3: Submit -->
+              <div class="flex gap-3">
+                <div
+                  class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary"
+                >
+                  3
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-foreground">
+                    {{ t('about.feedback.step3.title') }}
+                  </p>
+                  <p class="mt-0.5 text-[13px] leading-relaxed text-muted-foreground">
+                    {{ t('about.feedback.step3.description') }}
+                  </p>
+                  <div class="mt-2 flex gap-2">
+                    <Button as-child size="sm" class="h-7 text-xs">
+                      <a :href="issuesUrl" target="_blank" rel="noopener noreferrer">
+                        <ExternalLink class="mr-1.5 h-3.5 w-3.5" />
+                        {{ t('about.feedback.openGithub') }}
+                      </a>
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      class="h-7 text-xs"
+                      @click="copyFeedbackEmail"
+                    >
+                      <Check v-if="emailCopied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />
+                      <Mail v-else class="mr-1.5 h-3.5 w-3.5" />
+                      {{ emailCopied ? t('about.status.copied') : t('about.feedback.copyEmail') }}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div class="flex flex-wrap gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                class="h-8 text-xs"
-                @click="openAppDataDirectory"
-              >
-                <FolderOpen class="mr-1.5 h-3.5 w-3.5" /> {{ t('about.actions.openDataDirectory') }}
-              </Button>
-              <Button variant="secondary" size="sm" class="h-8 text-xs" @click="openLogDirectory">
-                <FolderOpen class="mr-1.5 h-3.5 w-3.5" /> {{ t('about.actions.openLogDirectory') }}
-              </Button>
-              <Button variant="secondary" size="sm" class="h-8 text-xs" @click="copyDiagnostics">
-                <Check v-if="copied" class="mr-1.5 h-3.5 w-3.5 text-green-500" />
-                <Info v-else class="mr-1.5 h-3.5 w-3.5" />
-                {{ copied ? t('about.status.copied') : t('about.actions.copyDiagnostics') }}
-              </Button>
-            </div>
-
-            <DialogFooter>
-              <Button as-child class="w-full sm:w-full">
-                <a :href="issuesUrl" target="_blank" rel="noopener noreferrer">
-                  {{ t('about.issuesDialog.openOnGithub') }}
-                  <ExternalLink class="ml-2 inline h-4 w-4 align-text-bottom opacity-90" />
-                </a>
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 
