@@ -52,11 +52,9 @@
           - out/*
 
 main:
-  tag_push:
+  api_trigger_release:
     - <<: *mirror_release_pipeline
-      name: mirror-github-release-by-tag
-      env:
-        RELEASE_TAG: ${CNB_BRANCH}
+      name: mirror-github-release-from-github-ci
 
   web_trigger:
     - <<: *mirror_release_pipeline

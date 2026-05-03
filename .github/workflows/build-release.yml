@@ -169,3 +169,38 @@ jobs:
           aws s3 cp "dist/SpinningMomo-$version-x64-Setup.exe" "$dest/SpinningMomo-$version-x64-Setup.exe"
           aws s3 cp "dist/SHA256SUMS.txt" "$dest/SHA256SUMS.txt"
           Write-Host "Uploaded release files to R2: $dest"
+
+      - name: Trigger CNB api_trigger_release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CNB_TOKEN)) {
+            Write-Error "Missing secret: CNB_TOKEN"
+            exit 1
+          }
+
+          $releaseTag = "${{ github.ref_name }}"
+          if ([string]::IsNullOrWhiteSpace($releaseTag)) {
+            Write-Error "Empty release tag from github.ref_name"
+            exit 1
+          }
+
+          $headers = @{
+            Authorization = "Bearer $($env:CNB_TOKEN)"
+            "Content-Type" = "application/json"
+          }
+
+          $payload = @{
+            event = "api_trigger_release"
+            branch = "main"
+            env = @{
+              RELEASE_TAG = $releaseTag
+            }
+          } | ConvertTo-Json -Depth 8
+
+          $uri = "https://api.cnb.cool/infinitymomo/SpinningMomo/-/build/start"
+          Write-Host "Triggering CNB api_trigger_release for tag: $releaseTag"
+          Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -Body $payload | Out-Null
+          Write-Host "CNB trigger request sent."
