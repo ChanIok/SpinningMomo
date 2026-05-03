@@ -3,6 +3,7 @@ import type { OperationResult } from '@/features/gallery/types'
 import type {
   FillInfinityNikkiSameOutfitDyeCodeParams,
   InfinityNikkiDetails,
+  InfinityNikkiMapConfig,
   InfinityNikkiMetadataNames,
   InfinityNikkiSameOutfitDyeCodeFillPreview,
   InfinityNikkiSameOutfitDyeCodeFillResult,
@@ -13,6 +14,9 @@ import type {
   SetInfinityNikkiUserRecordParams,
   SetInfinityNikkiWorldRecordParams,
 } from './types'
+
+let mapConfigCache: InfinityNikkiMapConfig | null = null
+let mapConfigPromise: Promise<InfinityNikkiMapConfig> | null = null
 
 export async function queryPhotoMapPoints(
   params: QueryPhotoMapPointsParams
@@ -33,6 +37,30 @@ export async function queryPhotoMapPoints(
     console.error('Failed to query photo map points:', error)
     throw new Error('查询地图点位失败')
   }
+}
+
+export async function getInfinityNikkiMapConfig(): Promise<InfinityNikkiMapConfig> {
+  if (mapConfigCache) {
+    return mapConfigCache
+  }
+  if (mapConfigPromise) {
+    return mapConfigPromise
+  }
+
+  mapConfigPromise = call<InfinityNikkiMapConfig>('extensions.infinityNikki.getMapConfig', {})
+    .then((result) => {
+      mapConfigCache = result
+      return result
+    })
+    .catch((error) => {
+      console.error('Failed to get Infinity Nikki map config:', error)
+      throw new Error('获取无限暖暖地图配置失败')
+    })
+    .finally(() => {
+      mapConfigPromise = null
+    })
+
+  return mapConfigPromise
 }
 
 export async function getInfinityNikkiDetails(assetId: number): Promise<InfinityNikkiDetails> {

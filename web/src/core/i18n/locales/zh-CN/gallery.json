@@ -66,6 +66,8 @@
   "gallery.details.infinityNikki.copyCameraParams": "复制",
   "gallery.details.infinityNikki.copyCameraParamsFailed": "复制相机参数码失败",
   "gallery.details.infinityNikki.copyCameraParamsSuccess": "相机参数码已复制",
+  "gallery.details.infinityNikki.copyLocationCoordsSuccess": "位置坐标已复制",
+  "gallery.details.infinityNikki.copyLocationCoordsFailed": "复制位置坐标失败",
   "gallery.details.infinityNikki.copyCodeValue": "复制",
   "gallery.details.infinityNikki.copyCodeValueFailed": "复制记录内容失败",
   "gallery.details.infinityNikki.copyCodeValueSuccess": "记录内容已复制",

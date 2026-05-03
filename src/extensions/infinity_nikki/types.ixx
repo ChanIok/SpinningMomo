@@ -73,6 +73,11 @@ struct PhotoMapPoint {
   double nikki_loc_x;
   double nikki_loc_y;
   std::optional<double> nikki_loc_z;
+  // lat/lng：由后端根据远端配置将游戏坐标转换后的地图经纬度，前端直接使用。
+  double lat;
+  double lng;
+  std::string world_id;
+  std::string official_world_id;
   // asset_index：该照片在“当前 gallery 排序结果集”里的 0-based 下标
   // 用于地图点击后原子地对齐灯箱 activeIndex，避免闪一下。
   std::int64_t asset_index;
@@ -124,10 +129,69 @@ struct InfinityNikkiUserRecord {
   std::optional<std::string> world_id;
 };
 
-struct InfinityNikkiMapArea {
-  std::string auto_world_id;
-  std::optional<std::string> user_world_id;
+// 远端地图配置相关类型 —— 从 api.infinitymomo.com/api/v1/map.json 拉取，
+// 用于替代原先硬编码在 C++ 和前端的世界区域 polygon、坐标转换参数和世界名称。
+
+// 世界名称的多语言支持（可选字段，缺失时前端回退到 world_id）。
+struct InfinityNikkiMapLocalizedName {
+  std::optional<std::string> zh;
+  std::optional<std::string> en;
+};
+
+// 坐标变换参数：map_x = game_x * x_scale + x_bias, map_y 同理。
+// JSON 中使用 camelCase（如 xScale），C++ 结构体使用 snake_case，
+// 由 rfl::SnakeCaseToCamelCase 在反序列化时自动映射。
+struct InfinityNikkiMapCoordinateProfile {
+  double x_scale = 1.0;
+  double x_bias = 0.0;
+  double y_scale = 1.0;
+  double y_bias = 0.0;
+};
+
+struct InfinityNikkiMapPolygonPoint {
+  double x = 0.0;
+  double y = 0.0;
+};
+
+struct InfinityNikkiMapZRange {
+  std::optional<double> min;
+  std::optional<double> max;
+};
+
+// 世界区域判定规则：多边形 + 可选的 Z 轴范围。
+// 若游戏坐标落入 polygon 且 z 在 [min, max] 内，则认为属于该世界。
+struct InfinityNikkiMapWorldRule {
+  std::vector<InfinityNikkiMapPolygonPoint> polygon;
+  std::optional<InfinityNikkiMapZRange> z_range;
+};
+
+// 单个地图世界：包含内部 world_id、官方 world_id（带版本号，如 "1.1"）、
+// 坐标变换参数和多条区域判定规则（按顺序匹配，首条命中即归属该世界）。
+struct InfinityNikkiMapWorld {
   std::string world_id;
+  std::string official_world_id;
+  InfinityNikkiMapLocalizedName name;
+  InfinityNikkiMapCoordinateProfile coordinate;
+  std::vector<InfinityNikkiMapWorldRule> rules;
+};
+
+// 远端地图配置的顶层结构。
+// schema_version 目前固定为 1；default_world_id 用于坐标不属于任何 polygon 时的回退。
+struct InfinityNikkiMapConfig {
+  std::int64_t schema_version = 1;
+  std::string default_world_id;
+  std::vector<InfinityNikkiMapWorld> worlds;
+};
+
+// 照片所属地图区域的解析结果。
+// auto_* 是根据坐标自动推断的世界，user_world_id 是用户手动选择的覆盖值，
+// world_id / official_world_id 是最终生效值（用户选择优先）。
+struct InfinityNikkiMapArea {
+  std::string auto_world_id;                 // 自动推断的内部 world_id
+  std::string auto_official_world_id;        // 自动推断的官方 world_id（带版本号）
+  std::optional<std::string> user_world_id;  // 用户手动设置的 world_id（可选）
+  std::string world_id;                      // 最终生效的内部 world_id
+  std::string official_world_id;             // 最终生效的官方 world_id
 };
 
 struct InfinityNikkiDetails {

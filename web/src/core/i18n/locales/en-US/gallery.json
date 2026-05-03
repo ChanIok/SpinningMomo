@@ -70,6 +70,8 @@
   "gallery.details.infinityNikki.copyCameraParams": "Copy",
   "gallery.details.infinityNikki.copyCameraParamsFailed": "Failed to copy camera params",
   "gallery.details.infinityNikki.copyCameraParamsSuccess": "Camera params copied",
+  "gallery.details.infinityNikki.copyLocationCoordsSuccess": "Location coordinates copied",
+  "gallery.details.infinityNikki.copyLocationCoordsFailed": "Failed to copy location coordinates",
   "gallery.details.infinityNikki.copyCodeValue": "Copy",
   "gallery.details.infinityNikki.copyCodeValueFailed": "Failed to copy record value",
   "gallery.details.infinityNikki.copyCodeValueSuccess": "Record value copied",

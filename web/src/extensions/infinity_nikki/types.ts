@@ -18,6 +18,10 @@ export interface PhotoMapPoint {
   nikkiLocX: number
   nikkiLocY: number
   nikkiLocZ?: number
+  lat: number
+  lng: number
+  worldId: string
+  officialWorldId: string
   assetIndex: number
 }
 
@@ -58,14 +62,57 @@ export interface InfinityNikkiUserRecord {
 
 export interface InfinityNikkiMapArea {
   autoWorldId: string
+  autoOfficialWorldId: string
   userWorldId?: string
   worldId: string
+  officialWorldId: string
 }
 
 export interface InfinityNikkiDetails {
   extracted?: InfinityNikkiExtractedParams
   userRecord?: InfinityNikkiUserRecord
   mapArea?: InfinityNikkiMapArea
+}
+
+export interface InfinityNikkiMapLocalizedName {
+  zh?: string
+  en?: string
+}
+
+export interface InfinityNikkiMapCoordinateProfile {
+  xScale: number
+  xBias: number
+  yScale: number
+  yBias: number
+}
+
+export interface InfinityNikkiMapPolygonPoint {
+  x: number
+  y: number
+}
+
+export interface InfinityNikkiMapZRange {
+  min?: number
+  max?: number
+}
+
+export interface InfinityNikkiMapWorldRule {
+  polygon: InfinityNikkiMapPolygonPoint[]
+  zRange?: InfinityNikkiMapZRange
+}
+
+export interface InfinityNikkiMapWorld {
+  worldId: string
+  officialWorldId: string
+  name: InfinityNikkiMapLocalizedName
+  coordinate: InfinityNikkiMapCoordinateProfile
+  rules: InfinityNikkiMapWorldRule[]
+}
+
+export interface InfinityNikkiMapConfig {
+  schemaVersion: number
+  defaultWorldId: string
+  worlds: InfinityNikkiMapWorld[]
 }
 
 export interface GetInfinityNikkiMetadataNamesParams {

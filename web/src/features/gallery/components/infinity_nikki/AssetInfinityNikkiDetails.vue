@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Check, ChevronDown } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
@@ -10,23 +10,24 @@ import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { useMapStore } from '@/features/map/store'
-import { transformGameToMapCoordinates } from '@/features/map/domain/coordinates'
-import { toOfficialWorldIdWithDefaultVersion } from '@/features/map/domain/officialWorldId'
 import {
   fillInfinityNikkiSameOutfitDyeCode,
+  getInfinityNikkiMapConfig,
   getInfinityNikkiMetadataNames,
   previewInfinityNikkiSameOutfitDyeCodeFill,
   setInfinityNikkiUserRecord,
   setInfinityNikkiWorldRecord,
 } from '@/extensions/infinity_nikki/api'
 import {
+  getInfinityNikkiOfficialWorldId,
   getInfinityNikkiWorldName,
-  INFINITY_NIKKI_WORLD_OPTIONS,
+  getInfinityNikkiWorldOptions,
   normalizeInfinityNikkiWorldId,
 } from '@/extensions/infinity_nikki/worlds'
 import type {
   InfinityNikkiDetails,
   InfinityNikkiExtractedParams,
+  InfinityNikkiMapConfig,
   InfinityNikkiMetadataNames,
   InfinityNikkiSameOutfitDyeCodeFillPreview,
   InfinityNikkiUserRecordCodeType,
@@ -55,6 +56,7 @@ const isWorldPopoverOpen = ref(false)
 const isFillingSameOutfitDyeCode = ref(false)
 const sameOutfitDyeFillPreview = ref<InfinityNikkiSameOutfitDyeCodeFillPreview | null>(null)
 const sameOutfitDyeFillPreviewCodeValue = ref('')
+const mapConfig = ref<InfinityNikkiMapConfig | null>(null)
 
 const extracted = computed(() => props.details.extracted)
 const currentUserRecord = computed(() => props.details.userRecord)
@@ -73,29 +75,19 @@ const canShowSameOutfitDyeFillPrompt = computed(() => {
 })
 const currentWorldId = computed(() => currentMapArea.value?.worldId)
 const currentWorldLabel = computed(() =>
-  currentWorldId.value ? getInfinityNikkiWorldName(currentWorldId.value, locale.value) : null
+  currentWorldId.value
+    ? getInfinityNikkiWorldName(currentWorldId.value, locale.value, mapConfig.value)
+    : null
 )
+const worldOptions = computed(() => getInfinityNikkiWorldOptions(mapConfig.value, locale.value))
 const currentMapLocationTarget = computed(() => {
   const params = extracted.value
-  const worldId = toOfficialWorldIdWithDefaultVersion(currentMapArea.value?.worldId)
+  const worldId = currentMapArea.value?.officialWorldId
   if (!params || !worldId || params.nikkiLocX === undefined || params.nikkiLocY === undefined) {
     return null
   }
 
-  const { lat, lng } = transformGameToMapCoordinates(
-    {
-      nikkiLocX: params.nikkiLocX,
-      nikkiLocY: params.nikkiLocY,
-    },
-    worldId
-  )
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return null
-  }
-
   return {
-    lat,
-    lng,
     worldId,
   }
 })
@@ -103,6 +95,18 @@ const currentMapLocationTarget = computed(() => {
 const metadataNames = ref<InfinityNikkiMetadataNames>({})
 // 面板级缓存：key=语言+filter/pose/light 三元组，value=映射结果。
 const metadataNamesCache = new Map<string, InfinityNikkiMetadataNames>()
+
+async function loadMapConfig() {
+  try {
+    mapConfig.value = await getInfinityNikkiMapConfig()
+  } catch {
+    mapConfig.value = null
+  }
+}
+
+onMounted(() => {
+  void loadMapConfig()
+})
 
 function syncDraftFromProps() {
   codeValueDraft.value = getCodeValue(currentUserRecord.value, codeTypeDraft.value)
@@ -341,6 +345,32 @@ async function handleCopyCameraParams(text: string) {
   toast.error(t('gallery.details.infinityNikki.copyCameraParamsFailed'))
 }
 
+function buildNikkiLocationClipboardText(
+  params: InfinityNikkiExtractedParams | undefined
+): string | null {
+  if (!params || params.nikkiLocX === undefined || params.nikkiLocY === undefined) {
+    return null
+  }
+  const parts = [params.nikkiLocX, params.nikkiLocY]
+  if (params.nikkiLocZ !== undefined) {
+    parts.push(params.nikkiLocZ)
+  }
+  return parts.join(',')
+}
+
+async function handleCopyNikkiLocationCoords() {
+  const text = buildNikkiLocationClipboardText(extracted.value)
+  if (!text) {
+    return
+  }
+  const success = await copyTextWithFallback(text)
+  if (success) {
+    toast.success(t('gallery.details.infinityNikki.copyLocationCoordsSuccess'))
+    return
+  }
+  toast.error(t('gallery.details.infinityNikki.copyLocationCoordsFailed'))
+}
+
 async function handleCodeValueAction() {
   if (hasCodeValueDraft.value) {
     const success = await copyTextWithFallback(codeValueDraft.value.trim())
@@ -402,12 +432,18 @@ async function handleSelectWorldId(nextWorldId: string | undefined) {
     })
 
     const autoWorldId = currentMapArea.value?.autoWorldId
+    const autoOfficialWorldId = currentMapArea.value?.autoOfficialWorldId
+    const selectedOfficialWorldId = normalizedWorldId
+      ? getInfinityNikkiOfficialWorldId(normalizedWorldId, mapConfig.value)
+      : undefined
     const nextMapArea =
-      autoWorldId && (normalizedWorldId || currentMapArea.value)
+      autoWorldId && autoOfficialWorldId && (normalizedWorldId || currentMapArea.value)
         ? {
             autoWorldId,
+            autoOfficialWorldId,
             userWorldId: normalizedWorldId,
             worldId: normalizedWorldId ?? autoWorldId,
+            officialWorldId: selectedOfficialWorldId ?? autoOfficialWorldId,
           }
         : props.details.mapArea
 
@@ -791,9 +827,11 @@ watch(
         </div>
 
         <div v-if="currentWorldLabel" class="flex items-center justify-between gap-2">
-          <span class="shrink-0 whitespace-nowrap text-muted-foreground">{{
-            t('gallery.details.infinityNikki.nikkiLocation')
-          }}</span>
+          <span
+            class="shrink-0 whitespace-nowrap text-muted-foreground"
+            @click="void handleCopyNikkiLocationCoords()"
+            >{{ t('gallery.details.infinityNikki.nikkiLocation') }}</span
+          >
           <div class="flex min-w-0 items-center gap-1">
             <button
               type="button"
@@ -824,13 +862,13 @@ watch(
                   <Check v-if="!currentMapArea?.userWorldId" class="h-3.5 w-3.5" />
                 </button>
                 <button
-                  v-for="world in INFINITY_NIKKI_WORLD_OPTIONS"
+                  v-for="world in worldOptions"
                   :key="world.id"
                   type="button"
                   class="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent"
                   @click="void handleSelectWorldId(world.id)"
                 >
-                  <span>{{ getInfinityNikkiWorldName(world.id, locale) }}</span>
+                  <span>{{ world.label }}</span>
                   <Check
                     v-if="normalizeInfinityNikkiWorldId(currentMapArea?.userWorldId) === world.id"
                     class="h-3.5 w-3.5"

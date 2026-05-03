@@ -1,21 +1,11 @@
 import type { Locale } from '@/core/i18n/types'
+import type { InfinityNikkiMapConfig, InfinityNikkiMapWorld } from './types'
 
 export interface InfinityNikkiWorldOption {
   id: string
-  zhCN: string
-  enUS: string
+  officialWorldId: string
+  label: string
 }
-
-export const INFINITY_NIKKI_WORLD_OPTIONS: InfinityNikkiWorldOption[] = [
-  { id: '14000000', zhCN: '星海', enUS: 'Sea of Stars' },
-  { id: '10000001', zhCN: '花焰群岛', enUS: 'Firework Isles' },
-  { id: '10000002', zhCN: '无忧岛', enUS: 'Serenity Island' },
-  { id: '10000010', zhCN: '丹青屿', enUS: 'Danqing Island' },
-  { id: '10000027', zhCN: '丹青之境', enUS: 'Danqing Realm' },
-  { id: '4020034', zhCN: '万相境', enUS: 'Wanxiang Realm' },
-  { id: '8000001', zhCN: '家园', enUS: 'Home' },
-  { id: '1', zhCN: '奇迹大陆', enUS: 'Miraland' },
-]
 
 export function normalizeInfinityNikkiWorldId(worldId: unknown): string {
   const value = String(worldId ?? '').trim()
@@ -25,11 +15,49 @@ export function normalizeInfinityNikkiWorldId(worldId: unknown): string {
   return value.split('.')[0] ?? ''
 }
 
-export function getInfinityNikkiWorldName(worldId: unknown, locale: Locale): string {
+function pickLocalizedWorldName(world: InfinityNikkiMapWorld, locale: Locale): string {
+  const primaryName = locale === 'zh-CN' ? world.name.zh : world.name.en
+  const fallbackName = locale === 'zh-CN' ? world.name.en : world.name.zh
+  return primaryName?.trim() || fallbackName?.trim() || world.worldId
+}
+
+export function getInfinityNikkiWorldName(
+  worldId: unknown,
+  locale: Locale,
+  config?: InfinityNikkiMapConfig | null
+): string {
   const normalizedWorldId = normalizeInfinityNikkiWorldId(worldId)
-  const option = INFINITY_NIKKI_WORLD_OPTIONS.find((item) => item.id === normalizedWorldId)
+  if (!normalizedWorldId) {
+    return ''
+  }
+  const option = config?.worlds.find((item) => item.worldId === normalizedWorldId)
   if (!option) {
     return normalizedWorldId
   }
-  return locale === 'zh-CN' ? option.zhCN : option.enUS
+  return pickLocalizedWorldName(option, locale)
+}
+
+export function getInfinityNikkiOfficialWorldId(
+  worldId: unknown,
+  config?: InfinityNikkiMapConfig | null
+): string | undefined {
+  const normalizedWorldId = normalizeInfinityNikkiWorldId(worldId)
+  if (!normalizedWorldId) {
+    return undefined
+  }
+  return config?.worlds.find((item) => item.worldId === normalizedWorldId)?.officialWorldId
+}
+
+export function getInfinityNikkiWorldOptions(
+  config: InfinityNikkiMapConfig | null,
+  locale: Locale
+): InfinityNikkiWorldOption[] {
+  if (!config) {
+    return []
+  }
+  return config.worlds.map((world) => ({
+    id: world.worldId,
+    officialWorldId: world.officialWorldId,
+    label: pickLocalizedWorldName(world, locale),
+  }))
 }

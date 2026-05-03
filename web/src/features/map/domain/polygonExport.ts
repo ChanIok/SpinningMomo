@@ -1,5 +1,6 @@
 import { normalizeOfficialWorldId } from '@/features/map/domain/officialWorldId'
 import { transformMapToGameCoordinates } from '@/features/map/domain/coordinates'
+import type { InfinityNikkiMapConfig } from '@/extensions/infinity_nikki/types'
 
 type RawMapPoint = {
   lat: number
@@ -59,8 +60,20 @@ function toValidMapPoints(points: ExportPolygonPayload['points']): RawMapPoint[]
     .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
 }
 
-function toGamePolygonPoints(points: RawMapPoint[], worldId: string): PolygonPoint[] {
-  return points.map((point) => transformMapToGameCoordinates(point, worldId))
+function toGamePolygonPoints(
+  points: RawMapPoint[],
+  worldId: string,
+  config: InfinityNikkiMapConfig
+): PolygonPoint[] | null {
+  const output: PolygonPoint[] = []
+  for (const point of points) {
+    const gamePoint = transformMapToGameCoordinates(point, worldId, config)
+    if (!gamePoint) {
+      return null
+    }
+    output.push(gamePoint)
+  }
+  return output
 }
 
 function toValidZRange(rawPayload: ExportPolygonPayload): ZRange {
@@ -90,7 +103,10 @@ function toExportedPolygonJson(
   }
 }
 
-export function downloadPolygonJson(rawPayload: ExportPolygonPayload): boolean {
+export function downloadPolygonJson(
+  rawPayload: ExportPolygonPayload,
+  config: InfinityNikkiMapConfig
+): boolean {
   const worldId = normalizeOfficialWorldId(rawPayload.worldId)
   const mapPoints = toValidMapPoints(rawPayload.points)
   if (!worldId || mapPoints.length < 3) {
@@ -98,12 +114,11 @@ export function downloadPolygonJson(rawPayload: ExportPolygonPayload): boolean {
   }
 
   const now = Number.isFinite(rawPayload.exportedAt) ? Number(rawPayload.exportedAt) : Date.now()
-  const output = toExportedPolygonJson(
-    rawPayload,
-    worldId,
-    toGamePolygonPoints(mapPoints, worldId),
-    now
-  )
+  const gamePoints = toGamePolygonPoints(mapPoints, worldId, config)
+  if (!gamePoints) {
+    return false
+  }
+  const output = toExportedPolygonJson(rawPayload, worldId, gamePoints, now)
   const fileRegion = sanitizeFileNameSegment(output.regionName) || 'region'
   const fileName = `polygon_${fileRegion}_${new Date(now).toISOString().replace(/[:.]/g, '-')}.json`
   const blob = new Blob([JSON.stringify(output, null, 2)], {

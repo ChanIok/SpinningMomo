@@ -88,7 +88,7 @@ auto handle_infinity_nikki_query_photo_map_points(
     const ::Extensions::InfinityNikki::QueryPhotoMapPointsParams& params)
     -> Core::RPC::RpcAwaitable<std::vector<::Extensions::InfinityNikki::PhotoMapPoint>> {
   auto result =
-      ::Extensions::InfinityNikki::AssetService::query_photo_map_points(app_state, params);
+      co_await ::Extensions::InfinityNikki::AssetService::query_photo_map_points(app_state, params);
   if (!result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
@@ -102,7 +102,20 @@ auto handle_infinity_nikki_get_details(
     Core::State::AppState& app_state,
     const ::Extensions::InfinityNikki::GetInfinityNikkiDetailsParams& params)
     -> Core::RPC::RpcAwaitable<::Extensions::InfinityNikki::InfinityNikkiDetails> {
-  auto result = ::Extensions::InfinityNikki::AssetService::get_details(app_state, params);
+  auto result = co_await ::Extensions::InfinityNikki::AssetService::get_details(app_state, params);
+  if (!result) {
+    co_return std::unexpected(Core::RPC::RpcError{
+        .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
+        .message = "Service error: " + result.error(),
+    });
+  }
+  co_return result.value();
+}
+
+auto handle_infinity_nikki_get_map_config(Core::State::AppState& app_state,
+                                          [[maybe_unused]] const rfl::Generic& params)
+    -> Core::RPC::RpcAwaitable<::Extensions::InfinityNikki::InfinityNikkiMapConfig> {
+  auto result = co_await ::Extensions::InfinityNikki::AssetService::get_map_config(app_state);
   if (!result) {
     co_return std::unexpected(Core::RPC::RpcError{
         .code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
@@ -238,6 +251,10 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "extensions.infinityNikki.getDetails",
       handle_infinity_nikki_get_details,
       "Get Infinity Nikki extracted data and user record for the specified asset");
+
+  Core::RPC::register_method<rfl::Generic, ::Extensions::InfinityNikki::InfinityNikkiMapConfig>(
+      app_state, app_state.rpc->registry, "extensions.infinityNikki.getMapConfig",
+      handle_infinity_nikki_get_map_config, "Get online Infinity Nikki map world configuration");
 
   Core::RPC::register_method<::Extensions::InfinityNikki::GetInfinityNikkiMetadataNamesParams,
                              ::Extensions::InfinityNikki::InfinityNikkiMetadataNames>(

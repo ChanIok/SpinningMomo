@@ -18,6 +18,7 @@ import { normalizeOfficialWorldIdOrDefault } from '@/features/map/domain/officia
 import { downloadPolygonJson } from '@/features/map/domain/polygonExport'
 import { buildMapDevEvalScript } from '@/features/map/injection/mapDevEvalScript'
 import { useMapStore } from '@/features/map/store'
+import { getInfinityNikkiMapConfig } from '@/extensions/infinity_nikki/api'
 
 type UseMapBridgeOptions = {
   mapIframe: Ref<HTMLIFrameElement | null>
@@ -168,7 +169,14 @@ export function useMapBridge(options: UseMapBridgeOptions) {
     }
 
     if (data.action === ACTION_EXPORT_POLYGON) {
-      const success = downloadPolygonJson(data.payload ?? {})
+      let success = false
+      try {
+        const mapConfig = await getInfinityNikkiMapConfig()
+        success = downloadPolygonJson(data.payload ?? {}, mapConfig)
+      } catch (error) {
+        console.warn('[MapBridge] Polygon export ignored: map config is unavailable.', error)
+        return
+      }
       if (!success) {
         console.warn('[MapBridge] Polygon export ignored: valid points and worldId are required.')
       }

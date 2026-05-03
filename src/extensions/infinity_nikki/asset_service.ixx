@@ -12,11 +12,14 @@ namespace Extensions::InfinityNikki::AssetService {
 
 export auto query_photo_map_points(Core::State::AppState& app_state,
                                    const QueryPhotoMapPointsParams& params)
-    -> std::expected<std::vector<PhotoMapPoint>, std::string>;
+    -> asio::awaitable<std::expected<std::vector<PhotoMapPoint>, std::string>>;
 
 export auto get_details(Core::State::AppState& app_state,
                         const GetInfinityNikkiDetailsParams& params)
-    -> std::expected<InfinityNikkiDetails, std::string>;
+    -> asio::awaitable<std::expected<InfinityNikkiDetails, std::string>>;
+
+export auto get_map_config(Core::State::AppState& app_state)
+    -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>>;
 
 export auto get_metadata_names(Core::State::AppState& app_state,
                                const GetInfinityNikkiMetadataNamesParams& params)

@@ -30,7 +30,6 @@ export function useMapScene() {
         locale: locale.value,
         thumbnailBaseUrl: mapStore.runtimeOptions.thumbnailBaseUrl,
         cardTitleFallback: t('map.popup.fallbackTitle'),
-        worldId: getCurrentWorldId(),
       })
     )
   }

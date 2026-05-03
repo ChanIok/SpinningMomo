@@ -12,6 +12,7 @@ import Extensions.InfinityNikki.WorldArea;
 import Features.Gallery.Asset.QuerySupport;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Types;
+import Utils.Logger;
 import <asio.hpp>;
 
 namespace Extensions::InfinityNikki::AssetService {
@@ -30,10 +31,6 @@ auto trim_ascii_copy(std::string_view value) -> std::string {
   }
 
   return std::string(value.substr(start, end - start));
-}
-
-auto normalize_world_id_copy(std::string_view value) -> std::string {
-  return Extensions::InfinityNikki::WorldArea::normalize_world_id(value);
 }
 
 struct PhotoMapPointWithWorldRecord {
@@ -89,7 +86,7 @@ auto read_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
     } else if (row.record_key == "home_building_code") {
       record.home_building_code = row.record_value;
     } else if (row.record_key == "world_id") {
-      record.world_id = normalize_world_id_copy(row.record_value);
+      record.world_id = WorldArea::normalize_world_id(row.record_value);
     }
   }
 
@@ -111,7 +108,10 @@ auto user_record_key_for_code_type(std::string_view code_type) -> std::optional<
   return std::nullopt;
 }
 
-auto build_map_area(const std::optional<InfinityNikkiExtractedParams>& extracted,
+// 根据照片的游戏坐标和用户记录，解析出所属地图区域。
+// 优先使用用户手动设置的 world_id，否则根据坐标自动推断。
+auto build_map_area(const InfinityNikkiMapConfig& map_config,
+                    const std::optional<InfinityNikkiExtractedParams>& extracted,
                     const InfinityNikkiUserRecord& user_record)
     -> std::optional<InfinityNikkiMapArea> {
   if (!extracted.has_value() || !extracted->nikki_loc_x.has_value() ||
@@ -119,22 +119,33 @@ auto build_map_area(const std::optional<InfinityNikkiExtractedParams>& extracted
     return std::nullopt;
   }
 
-  const Extensions::InfinityNikki::WorldArea::GamePoint game_point{
+  const WorldArea::GamePoint game_point{
       .x = *extracted->nikki_loc_x,
       .y = *extracted->nikki_loc_y,
       .z = extracted->nikki_loc_z,
   };
-  const auto auto_world_id =
-      Extensions::InfinityNikki::WorldArea::resolve_world_id_or_default(game_point);
-  const auto user_world_id =
-      user_record.world_id.has_value()
-          ? std::optional<std::string>{normalize_world_id_copy(*user_record.world_id)}
-          : std::nullopt;
+  const auto* auto_world = WorldArea::resolve_world_or_default(map_config, game_point);
+  if (auto_world == nullptr) {
+    return std::nullopt;
+  }
+
+  // 用户手动设置的 world_id 优先于自动推断结果。
+  std::optional<std::string> user_world_id;
+  const auto* world = auto_world;
+  if (user_record.world_id.has_value()) {
+    if (const auto* user_world = WorldArea::find_world(map_config, *user_record.world_id);
+        user_world != nullptr) {
+      user_world_id = user_world->world_id;
+      world = user_world;
+    }
+  }
 
   return InfinityNikkiMapArea{
-      .auto_world_id = auto_world_id,
+      .auto_world_id = auto_world->world_id,
+      .auto_official_world_id = auto_world->official_world_id,
       .user_world_id = user_world_id,
-      .world_id = user_world_id.value_or(auto_world_id),
+      .world_id = world->world_id,
+      .official_world_id = world->official_world_id,
   };
 }
 
@@ -306,13 +317,16 @@ auto query_same_outfit_dye_code_target_asset_ids(
   return asset_ids;
 }
 
+// 查询指定世界下的照片地图点位。
+// 加载远端地图配置后，对每个点位进行世界归属判定和坐标变换，
+// 只返回属于请求 world_id 的点位，且每个点位已包含 lat/lng。
 auto query_photo_map_points(Core::State::AppState& app_state,
                             const QueryPhotoMapPointsParams& params)
-    -> std::expected<std::vector<PhotoMapPoint>, std::string> {
+    -> asio::awaitable<std::expected<std::vector<PhotoMapPoint>, std::string>> {
   auto where_result =
       Features::Gallery::Asset::QuerySupport::build_unified_where_clause(params.filters, "a");
   if (!where_result) {
-    return std::unexpected(where_result.error());
+    co_return std::unexpected(where_result.error());
   }
   auto [where_clause, query_params] = std::move(where_result.value());
 
@@ -367,30 +381,53 @@ auto query_photo_map_points(Core::State::AppState& app_state,
   auto result =
       Core::Database::query<PhotoMapPointWithWorldRecord>(*app_state.database, sql, query_params);
   if (!result) {
-    return std::unexpected("Failed to query photo map points: " + result.error());
+    co_return std::unexpected("Failed to query photo map points: " + result.error());
   }
 
-  const auto world_id = normalize_world_id_copy(params.world_id);
+  const auto world_id = WorldArea::normalize_world_id(params.world_id);
   if (world_id.empty()) {
-    return std::vector<PhotoMapPoint>{};
+    co_return std::vector<PhotoMapPoint>{};
+  }
+
+  auto map_config_result = co_await WorldArea::load_map_config(app_state);
+  if (!map_config_result) {
+    co_return std::unexpected(map_config_result.error());
+  }
+  const auto& map_config = map_config_result.value();
+  const auto* requested_world = WorldArea::find_world(map_config, world_id);
+  if (requested_world == nullptr) {
+    co_return std::vector<PhotoMapPoint>{};
   }
 
   std::vector<PhotoMapPoint> filtered_points;
   filtered_points.reserve(result->size());
 
   for (const auto& point : result.value()) {
-    const Extensions::InfinityNikki::WorldArea::GamePoint game_point{
+    const WorldArea::GamePoint game_point{
         .x = point.nikki_loc_x,
         .y = point.nikki_loc_y,
         .z = point.nikki_loc_z,
     };
-    const auto resolved_world_id =
-        point.user_world_id.has_value()
-            ? normalize_world_id_copy(*point.user_world_id)
-            : Extensions::InfinityNikki::WorldArea::resolve_world_id_or_default(game_point);
-    if (resolved_world_id != world_id) {
+
+    // 世界归属判定：优先使用用户手动设置的 world_id，否则根据坐标自动推断。
+    const auto* resolved_world = point.user_world_id.has_value()
+                                     ? WorldArea::find_world(map_config, *point.user_world_id)
+                                     : nullptr;
+    if (resolved_world == nullptr) {
+      resolved_world = WorldArea::resolve_world_or_default(map_config, game_point);
+    }
+    // 只保留属于请求世界的点位。
+    if (resolved_world == nullptr || resolved_world->world_id != requested_world->world_id) {
       continue;
     }
+
+    // 将游戏坐标变换为地图经纬度，前端可直接用于标记点位。
+    const auto map_coordinate =
+        WorldArea::transform_game_to_map_coordinates(game_point, *resolved_world);
+    if (!map_coordinate) {
+      co_return std::unexpected(map_coordinate.error());
+    }
+
     filtered_points.push_back(PhotoMapPoint{
         .asset_id = point.asset_id,
         .name = point.name,
@@ -399,15 +436,19 @@ auto query_photo_map_points(Core::State::AppState& app_state,
         .nikki_loc_x = point.nikki_loc_x,
         .nikki_loc_y = point.nikki_loc_y,
         .nikki_loc_z = point.nikki_loc_z,
+        .lat = map_coordinate->lat,
+        .lng = map_coordinate->lng,
+        .world_id = resolved_world->world_id,
+        .official_world_id = resolved_world->official_world_id,
         .asset_index = point.asset_index,
     });
   }
 
-  return filtered_points;
+  co_return filtered_points;
 }
 
 auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetailsParams& params)
-    -> std::expected<InfinityNikkiDetails, std::string> {
+    -> asio::awaitable<std::expected<InfinityNikkiDetails, std::string>> {
   std::string extracted_sql = R"(
     SELECT camera_params,
            time_hour,
@@ -442,24 +483,44 @@ auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetails
   auto extracted_result = Core::Database::query_single<InfinityNikkiExtractedParams>(
       *app_state.database, extracted_sql, {params.asset_id});
   if (!extracted_result) {
-    return std::unexpected("Failed to query Infinity Nikki extracted params: " +
-                           extracted_result.error());
+    co_return std::unexpected("Failed to query Infinity Nikki extracted params: " +
+                              extracted_result.error());
   }
 
   auto user_record_result = read_user_record(app_state, params.asset_id);
   if (!user_record_result) {
-    return std::unexpected(user_record_result.error());
+    co_return std::unexpected(user_record_result.error());
   }
 
   auto user_record = std::move(user_record_result.value());
-  auto map_area = build_map_area(extracted_result.value(), user_record);
+  // 尝试加载地图配置以构建 map_area 增强信息；
+  // 配置加载失败时降级：详情仍正常返回，只是不包含 map_area。
+  std::optional<InfinityNikkiMapArea> map_area;
+  const auto& extracted = extracted_result.value();
+  if (extracted.has_value() && extracted->nikki_loc_x.has_value() &&
+      extracted->nikki_loc_y.has_value()) {
+    auto map_config_result = co_await WorldArea::load_map_config(app_state);
+    if (map_config_result) {
+      map_area = build_map_area(map_config_result.value(), extracted, user_record);
+    } else {
+      Logger().warn("Skip Infinity Nikki map area details because map config failed: {}",
+                    map_config_result.error());
+    }
+  }
+
   auto user_record_optional = has_user_record_value(user_record)
                                   ? std::optional<InfinityNikkiUserRecord>{user_record}
                                   : std::nullopt;
 
-  return InfinityNikkiDetails{.extracted = extracted_result.value(),
-                              .user_record = std::move(user_record_optional),
-                              .map_area = std::move(map_area)};
+  co_return InfinityNikkiDetails{.extracted = extracted_result.value(),
+                                 .user_record = std::move(user_record_optional),
+                                 .map_area = std::move(map_area)};
+}
+
+// 暴露给 RPC 层的地图配置获取入口，供前端直接调用。
+auto get_map_config(Core::State::AppState& app_state)
+    -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>> {
+  co_return co_await WorldArea::load_map_config(app_state);
 }
 
 auto get_metadata_names(Core::State::AppState& app_state,
@@ -666,7 +727,7 @@ auto set_world_record(Core::State::AppState& app_state,
 
   auto normalized_world_id =
       params.world_id.has_value()
-          ? std::optional<std::string>{normalize_world_id_copy(params.world_id.value())}
+          ? std::optional<std::string>{WorldArea::normalize_world_id(params.world_id.value())}
           : std::nullopt;
   if (normalized_world_id.has_value() && normalized_world_id->empty()) {
     normalized_world_id = std::nullopt;
