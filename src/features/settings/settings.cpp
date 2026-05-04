@@ -63,39 +63,6 @@ auto should_show_onboarding(const Types::AppSettings& settings) -> bool {
   return settings.app.onboarding.flow_version < Types::CURRENT_ONBOARDING_FLOW_VERSION;
 }
 
-auto normalize_update_download_sources(Types::AppSettings& settings) -> bool {
-  const std::vector<Types::AppSettings::Update::DownloadSource> expected = {
-      {"GitHub", "https://github.com/ChanIok/SpinningMomo/releases/download/v{0}/{1}"},
-      {"CNB", "https://cnb.cool/infinitymomo/SpinningMomo/-/releases/download/v{0}/{1}"},
-      {"Mirror", "https://r2.infinitymomo.com/releases/v{0}/{1}"},
-  };
-
-  std::vector<Types::AppSettings::Update::DownloadSource> normalized;
-  normalized.reserve(expected.size() + settings.update.download_sources.size());
-  normalized.insert(normalized.end(), expected.begin(), expected.end());
-
-  for (const auto& source : settings.update.download_sources) {
-    const bool is_builtin =
-        source.name == "GitHub" || source.name == "CNB" || source.name == "Mirror";
-    if (!is_builtin) {
-      normalized.push_back(source);
-    }
-  }
-
-  const bool changed =
-      normalized.size() != settings.update.download_sources.size() ||
-      !std::equal(normalized.begin(), normalized.end(), settings.update.download_sources.begin(),
-                  [](const auto& lhs, const auto& rhs) {
-                    return lhs.name == rhs.name && lhs.url_template == rhs.url_template;
-                  });
-
-  if (changed) {
-    settings.update.download_sources = std::move(normalized);
-  }
-
-  return changed;
-}
-
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   try {
     auto settings_path = get_settings_path();
@@ -145,15 +112,6 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     }
 
     auto config = config_result.value();
-    const bool sources_changed = normalize_update_download_sources(config);
-    if (sources_changed) {
-      auto persist_result = save_settings_to_file(settings_path.value(), config);
-      if (!persist_result) {
-        return std::unexpected("Failed to persist normalized update sources: " +
-                               persist_result.error());
-      }
-      Logger().info("Normalized update download sources in settings");
-    }
 
     // 创建完整状态
     State::SettingsState state;

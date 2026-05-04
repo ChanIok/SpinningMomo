@@ -112,8 +112,8 @@ auto migrate_v2_0_9_0(Core::State::AppState& app_state) -> std::expected<void, s
   return {};
 }
 
-auto migrate_v2_0_10_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
-  Logger().info("Executing migration to 2.0.10.0: Set update download sources");
+auto migrate_v2_0_11_0(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+  Logger().info("Executing migration to 2.0.11.0: Set update download sources");
 
   auto settings_path_result = Features::Settings::get_settings_path();
   if (!settings_path_result) {
@@ -164,7 +164,7 @@ auto get_all_migrations() -> const std::vector<MigrationScript>& {
       {"2.0.2.0", "Update version check URL", false, migrate_v2_0_2_0},
       {"2.0.8.0", "Add nuan5 Infinity Nikki extract columns", true, migrate_v2_0_8_0},
       {"2.0.9.0", "Rebuild Infinity Nikki user record as key-value", true, migrate_v2_0_9_0},
-      {"2.0.10.0", "Set update download sources", false, migrate_v2_0_10_0},
+      {"2.0.11.0", "Set update download sources", false, migrate_v2_0_11_0},
 
       // 未来版本的迁移脚本在此添加
       // {"2.0.2.0", "Add user preferences", migrate_v2_0_2_0},
