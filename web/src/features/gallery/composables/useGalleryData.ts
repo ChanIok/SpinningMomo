@@ -269,7 +269,7 @@ export function useGalleryData() {
         activeAssetId: store.selection.activeAssetId,
         type: filters.type,
         search: filters.search,
-        rating: filters.rating,
+        ratings: filters.ratings,
         reviewFlag: filters.reviewFlag,
         tagIds: filters.tagIds,
         tagMatchMode: filters.tagMatchMode,

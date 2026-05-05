@@ -6,7 +6,7 @@ import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Plus } from 'lucide-vue-next'
+import { Images, Plus } from 'lucide-vue-next'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,8 +52,8 @@ const {
   updateFolderDisplayName,
   openFolderInExplorer,
   removeFolderWatch,
-  clearTagFilter,
   selectTag,
+  selectAllMedia,
   loadTagTree,
   createTag,
   updateTag,
@@ -72,9 +72,9 @@ const showRescanDialog = ref(false)
 const rescanFolderId = ref<number | null>(null)
 const rescanFolderName = ref('')
 
-// 区块标题表示该维度的「全体 / 未限定」：与 store.filter 一致，不跟详情面板耦合
-const isFolderTitleSelected = computed(() => selectedFolder.value === null)
-const isTagTitleSelected = computed(() => selectedTag.value === null)
+const isAllMediaSelected = computed(
+  () => selectedFolder.value === null && selectedTag.value === null
+)
 
 function startAddFolder() {
   showAddFolderDialog.value = true
@@ -430,24 +430,31 @@ onMounted(() => {
     <!-- 导航菜单 -->
     <ScrollArea class="min-h-0 flex-1">
       <div class="p-4">
+        <button
+          type="button"
+          :class="
+            cn(
+              'mb-3 flex h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-sm transition-colors duration-200 ease-out outline-none',
+              'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
+              isAllMediaSelected
+                ? 'bg-sidebar-accent font-medium text-primary hover:text-primary [&_svg]:text-primary'
+                : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
+            )
+          "
+          @click="selectAllMedia"
+        >
+          <Images class="h-4 w-4 shrink-0" />
+          <span class="min-w-0 truncate">{{ t('gallery.sidebar.allMedia') }}</span>
+        </button>
+
         <!-- 文件夹区域 -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <button
-              type="button"
-              :class="
-                cn(
-                  'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
-                  'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                  isFolderTitleSelected
-                    ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
-                )
-              "
-              @click="clearFolderFilter"
+            <div
+              class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
             >
               {{ t('gallery.sidebar.folders.title') }}
-            </button>
+            </div>
             <Button variant="sidebarGhost" size="icon-xs" @click="startAddFolder">
               <Plus class="h-3 w-3" />
             </Button>
@@ -485,21 +492,11 @@ onMounted(() => {
         <!-- 标签区域 -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <button
-              type="button"
-              :class="
-                cn(
-                  'cursor-pointer rounded-md px-2 py-1 text-left text-xs font-medium tracking-wider uppercase transition-colors duration-200 ease-out',
-                  'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:outline-none',
-                  isTagTitleSelected
-                    ? 'bg-sidebar-accent font-medium text-primary hover:text-primary'
-                    : 'text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-accent-foreground'
-                )
-              "
-              @click="clearTagFilter"
+            <div
+              class="px-2 py-1 text-xs font-medium tracking-wider text-muted-foreground uppercase"
             >
               {{ t('gallery.sidebar.tags.title') }}
-            </button>
+            </div>
             <Button variant="sidebarGhost" size="icon-xs" @click="startCreateTag">
               <Plus class="h-3 w-3" />
             </Button>

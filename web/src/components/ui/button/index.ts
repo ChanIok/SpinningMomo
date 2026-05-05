@@ -18,11 +18,19 @@ export const buttonVariants = cva(
         /** 图库侧栏加号、工具条/灯箱图标按钮等：与 SettingsSidebar 同源 sidebar token */
         sidebarGhost:
           'text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
+        /** 图库筛选按钮基态：与 sidebar token 对齐，但不强制侧栏前景色 */
+        toolbarFilter:
+          'text-sidebar-foreground transition-colors duration-200 ease-out hover:bg-sidebar-hover hover:text-sidebar-accent-foreground focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
+        /** 图库筛选按钮选中态：与 sidebar accent 保持一致 */
+        toolbarFilterActive:
+          'bg-sidebar-accent text-sidebar-accent-foreground transition-colors duration-200 ease-out hover:bg-sidebar-accent/80 focus-visible:border-transparent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
         sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
+        /** 图库筛选触发按钮的紧凑尺寸 */
+        'filter-sm': 'h-8 max-w-[180px] shrink-0 gap-1.5 px-2 text-xs has-[>svg]:px-2',
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
         icon: 'size-9',
         'icon-sm': 'size-8',

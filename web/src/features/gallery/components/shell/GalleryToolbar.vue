@@ -2,12 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
-import ReviewFilterPopover from '../tags/ReviewFilterPopover.vue'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,67 +16,81 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
 import {
-  Search,
-  X,
   ArrowUpDown,
+  CalendarClock,
+  Camera,
+  Check,
+  ChevronDown,
+  Flag,
+  Folder,
   Grid3x3,
+  Image,
+  Images,
   LayoutGrid,
   List,
-  Rows3,
-  ListFilter,
-  Image,
-  Video,
-  Camera,
-  CalendarClock,
   Palette,
+  Rows3,
+  Search,
+  Star,
+  Tag,
   Type,
-  Flag,
+  Video,
+  X,
 } from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 import { useGalleryView } from '../../composables'
-import type { ViewMode, SortBy, AssetType, AssetFilter } from '../../types'
+import { useGalleryStore } from '../../store'
+import type {
+  AssetFilter,
+  AssetType,
+  FolderTreeNode,
+  ReviewFlag,
+  SortBy,
+  TagTreeNode,
+  ViewMode,
+} from '../../types'
 
-// i18n
+type SourceType = 'all' | 'folder' | 'tag'
+
 const { t } = useI18n()
-
-// 使用视图管理逻辑
+const store = useGalleryStore()
 const galleryView = useGalleryView()
 
-// 计算属性
 const viewMode = computed(() => galleryView.viewMode.value)
 const sortBy = computed(() => galleryView.sortBy.value)
 const sortOrder = computed(() => galleryView.sortOrder.value)
 const filter = computed(() => galleryView.filter.value)
 const searchQuery = computed(() => filter.value.searchQuery || '')
-const includeSubfolders = computed(() => galleryView.includeSubfolders.value)
 const activeColorHex = computed(() => filter.value.colorHex)
 const activeColorDistance = computed(
   () => (filter.value as AssetFilter & { colorDistance?: number }).colorDistance ?? 18
 )
+
 const COLOR_DISTANCE_MIN = 1
 const COLOR_DISTANCE_MAX = 40
 const COLOR_DISTANCE_DEFAULT = 18
+const STARS = [1, 2, 3, 4, 5] as const
 
-// 当前slider位置（从实际尺寸反向计算）
 const currentSliderPosition = computed(() => galleryView.getSliderPosition())
 const colorPopoverOpen = ref(false)
 const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
 const draftColorDistance = ref(activeColorDistance.value)
 
-// 监听工具栏宽度
 const toolbarRef = ref<HTMLElement | null>(null)
 const { width: toolbarWidth } = useElementSize(toolbarRef)
-const isWide = computed(() => toolbarWidth.value >= 480)
+const isWide = computed(() => toolbarWidth.value >= 720)
 
-// 评分与标记筛选
-const hasReviewFilter = computed(
-  () => filter.value.rating !== undefined || filter.value.reviewFlag !== undefined
+const hasAttributeFilters = computed(
+  () =>
+    Boolean(searchQuery.value) ||
+    filter.value.type !== undefined ||
+    selectedRatings.value.length > 0 ||
+    filter.value.reviewFlag !== undefined ||
+    Boolean(filter.value.colorHex)
 )
 
-// 视图模式选项
 const viewModes = [
   { value: 'grid' as ViewMode, icon: Grid3x3, i18nKey: 'gallery.toolbar.viewMode.grid' },
   { value: 'adaptive' as ViewMode, icon: Rows3, i18nKey: 'gallery.toolbar.viewMode.adaptive' },
@@ -85,11 +98,44 @@ const viewModes = [
   { value: 'list' as ViewMode, icon: List, i18nKey: 'gallery.toolbar.viewMode.list' },
 ]
 
-// 当前视图模式的图标
 const currentViewModeIcon = computed(() => {
   const mode = viewModes.find((m) => m.value === viewMode.value)
   return mode?.icon || Grid3x3
 })
+
+const currentSource = computed<{ type: SourceType; label: string }>(() => {
+  const folderId = filter.value.folderId ? Number(filter.value.folderId) : null
+  if (folderId !== null && Number.isFinite(folderId)) {
+    return {
+      type: 'folder',
+      label:
+        findFolderNameById(store.folders, folderId) ||
+        t('gallery.toolbar.browse.folderFallback', { id: folderId }),
+    }
+  }
+
+  const tagId = filter.value.tagIds?.[0]
+  if (tagId !== undefined) {
+    return {
+      type: 'tag',
+      label:
+        findTagNameById(store.tags, tagId) ||
+        t('gallery.toolbar.browse.tagFallback', { id: tagId }),
+    }
+  }
+
+  return { type: 'all', label: t('gallery.toolbar.browse.all') }
+})
+
+const selectedRatings = computed(() => normalizeRatings(filter.value.ratings))
+const typeFilterLabel = computed(() => getTypeLabel(filter.value.type))
+const ratingFilterLabel = computed(() => getRatingLabel(selectedRatings.value))
+const reviewFlagFilterLabel = computed(() => getReviewFlagLabel(filter.value.reviewFlag))
+const sortOrderLabel = computed(() =>
+  sortOrder.value === 'asc'
+    ? t('gallery.toolbar.sortOrder.asc')
+    : t('gallery.toolbar.sortOrder.desc')
+)
 
 watch(colorPopoverOpen, (open) => {
   if (open) {
@@ -98,7 +144,81 @@ watch(colorPopoverOpen, (open) => {
   }
 })
 
-// 方法
+function findFolderNameById(nodes: FolderTreeNode[], id: number): string | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node.displayName || node.name
+    }
+    const childName = findFolderNameById(node.children, id)
+    if (childName) {
+      return childName
+    }
+  }
+  return null
+}
+
+function findTagNameById(nodes: TagTreeNode[], id: number): string | null {
+  for (const node of nodes) {
+    if (node.id === id) {
+      return node.name
+    }
+    const childName = findTagNameById(node.children, id)
+    if (childName) {
+      return childName
+    }
+  }
+  return null
+}
+
+function getTypeLabel(type?: AssetType): string {
+  if (type === 'photo') return t('gallery.toolbar.filter.type.photo')
+  if (type === 'video') return t('gallery.toolbar.filter.type.video')
+  if (type === 'live_photo') return t('gallery.toolbar.filter.type.livePhoto')
+  return t('gallery.toolbar.filters.fileType')
+}
+
+function normalizeRatings(ratings?: number[]): number[] {
+  return [...new Set(ratings ?? [])]
+    .filter((rating) => Number.isInteger(rating) && rating >= 0 && rating <= 5)
+    .sort((a, b) => b - a)
+}
+
+function getRatingLabel(ratings: number[]): string {
+  if (ratings.length === 0) return t('gallery.toolbar.filters.rating')
+  if (ratings.length === 1) {
+    const rating = ratings[0]
+    if (rating === 0) return t('gallery.toolbar.filter.rating.unrated')
+    return t('gallery.toolbar.filters.ratingValue', { rating })
+  }
+
+  const positiveRatings = ratings.filter((rating) => rating > 0)
+  const includesUnrated = ratings.includes(0)
+  const maxRating = positiveRatings[0]
+  const minRating = positiveRatings[positiveRatings.length - 1]
+  const isContinuous =
+    !includesUnrated &&
+    positiveRatings.length === ratings.length &&
+    maxRating !== undefined &&
+    minRating !== undefined &&
+    maxRating - minRating === positiveRatings.length - 1
+
+  if (isContinuous) {
+    return t('gallery.toolbar.filters.ratingRange', {
+      min: minRating,
+      max: maxRating,
+    })
+  }
+
+  return t('gallery.toolbar.filters.ratingCount', { count: ratings.length })
+}
+
+function getReviewFlagLabel(reviewFlag?: ReviewFlag): string {
+  if (reviewFlag === 'none') return t('gallery.toolbar.filter.flag.none')
+  if (reviewFlag === 'picked') return t('gallery.toolbar.filter.flag.picked')
+  if (reviewFlag === 'rejected') return t('gallery.toolbar.filter.flag.rejected')
+  return t('gallery.toolbar.filters.reviewFlag')
+}
+
 function updateSearchQuery(query: string | number) {
   galleryView.setSearchQuery(String(query))
 }
@@ -107,10 +227,60 @@ function clearSearch() {
   galleryView.setSearchQuery('')
 }
 
+function clearSearchFromTrigger(event: Event) {
+  event.preventDefault()
+  event.stopPropagation()
+  clearSearch()
+}
+
 function onTypeFilterChange(value: string | number | bigint | Record<string, any> | null) {
   const stringValue = String(value || 'all')
   const type = stringValue === 'all' ? undefined : (stringValue as AssetType)
   galleryView.setTypeFilter(type)
+}
+
+function clearTypeFilter(event?: Event) {
+  event?.preventDefault()
+  event?.stopPropagation()
+  galleryView.setTypeFilter(undefined)
+}
+
+function onReviewFlagChange(value: string | number | bigint | Record<string, any> | null) {
+  const stringValue = String(value || 'all')
+  galleryView.setFilter({
+    reviewFlag: stringValue === 'all' ? undefined : (stringValue as ReviewFlag),
+  })
+}
+
+function clearReviewFlagFilter(event?: Event) {
+  event?.preventDefault()
+  event?.stopPropagation()
+  galleryView.setFilter({ reviewFlag: undefined })
+}
+
+function isRatingSelected(value: number): boolean {
+  return selectedRatings.value.includes(value)
+}
+
+function setRatingFilters(values: number[]) {
+  const ratings = normalizeRatings(values)
+  galleryView.setFilter({ ratings: ratings.length > 0 ? ratings : undefined })
+}
+
+function toggleRatingFilter(value: number) {
+  const current = selectedRatings.value
+  if (current.includes(value)) {
+    setRatingFilters(current.filter((rating) => rating !== value))
+    return
+  }
+
+  setRatingFilters([...current, value])
+}
+
+function clearRatingFilter(event?: Event) {
+  event?.preventDefault()
+  event?.stopPropagation()
+  galleryView.setFilter({ ratings: undefined })
 }
 
 function onSortByChange(value: string | number | bigint | Record<string, any> | null) {
@@ -124,10 +294,6 @@ function toggleSortOrder() {
   galleryView.toggleSortOrder()
 }
 
-function toggleIncludeSubfolders() {
-  galleryView.setIncludeSubfolders(!includeSubfolders.value)
-}
-
 function applyColorFilter() {
   galleryView.setFilter({
     colorHex: draftColorHex.value,
@@ -135,7 +301,9 @@ function applyColorFilter() {
   })
 }
 
-function clearColorFilter() {
+function clearColorFilter(event?: Event) {
+  event?.preventDefault()
+  event?.stopPropagation()
   galleryView.setFilter({
     colorHex: undefined,
     colorDistance: undefined,
@@ -149,6 +317,12 @@ function onColorDistanceChange(value: number[] | undefined) {
   if (value && value.length > 0 && value[0] !== undefined) {
     draftColorDistance.value = value[0]
   }
+}
+
+function clearAttributeFilters() {
+  galleryView.clearAttributeFilters()
+  draftColorHex.value = '#FFFFFF'
+  draftColorDistance.value = COLOR_DISTANCE_DEFAULT
 }
 
 function setViewMode(
@@ -167,342 +341,427 @@ function setViewMode(
 
 function onViewSizeSliderChange(value: number[] | undefined) {
   if (value && value.length > 0 && value[0] !== undefined) {
-    // 使用非线性映射函数设置尺寸
     galleryView.setViewSizeFromSlider(value[0])
   }
 }
 </script>
 
 <template>
-  <div ref="toolbarRef" class="flex items-center justify-between gap-3 py-2 pr-2 pl-4">
-    <!-- 左侧：搜索框 -->
-    <div class="max-w-[400px] flex-1">
-      <div class="relative">
-        <Search class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          :model-value="searchQuery"
-          @update:model-value="updateSearchQuery"
-          :placeholder="t('gallery.toolbar.search.placeholder')"
-          class="h-8 pl-9"
-        />
-        <Button
-          v-if="searchQuery"
-          type="button"
-          variant="sidebarGhost"
-          size="icon-sm"
-          class="absolute top-1/2 right-3 -translate-y-1/2"
-          @click="clearSearch"
+  <div ref="toolbarRef" class="flex flex-col">
+    <div class="flex min-h-10 items-center justify-between gap-3 px-2 pt-1.5">
+      <div class="flex min-w-0 items-center gap-2">
+        <div
+          class="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-foreground"
+          :title="currentSource.label"
         >
-          <X class="h-4 w-4" />
-        </Button>
+          <Images v-if="currentSource.type === 'all'" class="h-4 w-4 shrink-0 text-primary" />
+          <Folder
+            v-else-if="currentSource.type === 'folder'"
+            class="h-4 w-4 shrink-0 text-primary"
+          />
+          <Tag v-else class="h-4 w-4 shrink-0 text-primary" />
+          <span class="shrink-0">
+            {{
+              currentSource.type === 'folder'
+                ? t('gallery.toolbar.browse.folder')
+                : currentSource.type === 'tag'
+                  ? t('gallery.toolbar.browse.tag')
+                  : t('gallery.toolbar.browse.source')
+            }}
+          </span>
+          <span class="min-w-0 truncate">{{ currentSource.label }}</span>
+        </div>
+      </div>
+
+      <div class="flex shrink-0 items-center gap-2">
+        <div
+          v-if="isWide"
+          class="mr-2 flex w-28 items-center"
+          :title="t('gallery.toolbar.thumbnailSize.label')"
+        >
+          <Slider
+            :model-value="[currentSliderPosition]"
+            @update:model-value="onViewSizeSliderChange"
+            :min="0"
+            :max="100"
+            :step="1"
+            class="w-full"
+          />
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button variant="sidebarGhost" size="icon-sm" :title="t('gallery.toolbar.sort.label')">
+              <ArrowUpDown class="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-48">
+            <DropdownMenuLabel>{{ t('gallery.toolbar.sort.label') }}</DropdownMenuLabel>
+            <DropdownMenuRadioGroup :model-value="sortBy" @update:model-value="onSortByChange">
+              <DropdownMenuRadioItem value="createdAt">
+                <CalendarClock class="mr-2 h-4 w-4" />
+                {{ t('gallery.toolbar.sort.createdAt') }}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="name">
+                <Type class="mr-2 h-4 w-4" />
+                {{ t('gallery.toolbar.sort.name') }}
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="resolution">
+                <span class="pl-8">{{ t('gallery.toolbar.sort.resolution') }}</span>
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="size">
+                <span class="pl-8">{{ t('gallery.toolbar.sort.size') }}</span>
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem @click="toggleSortOrder">
+              <ArrowUpDown class="mr-2 h-4 w-4" />
+              {{ sortOrderLabel }}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Popover>
+          <PopoverTrigger as-child>
+            <Button
+              variant="sidebarGhost"
+              size="icon-sm"
+              :title="t('gallery.toolbar.viewSettings.tooltip')"
+            >
+              <component :is="currentViewModeIcon" class="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" class="w-72">
+            <div class="space-y-6">
+              <div class="space-y-3">
+                <p class="text-sm font-medium">{{ t('gallery.toolbar.viewMode.label') }}</p>
+                <div class="grid grid-cols-4 gap-2">
+                  <Button
+                    v-for="mode in viewModes"
+                    :key="mode.value"
+                    :variant="viewMode === mode.value ? 'default' : 'outline'"
+                    size="sm"
+                    class="flex h-auto flex-col items-center gap-1.5 py-3"
+                    @click="setViewMode(mode.value)"
+                  >
+                    <component :is="mode.icon" class="h-5 w-5" />
+                    <span class="text-xs">{{ t(mode.i18nKey) }}</span>
+                  </Button>
+                </div>
+              </div>
+
+              <div v-if="!isWide" class="border-t" />
+
+              <div v-if="!isWide" class="space-y-3">
+                <p class="text-sm font-medium">{{ t('gallery.toolbar.thumbnailSize.label') }}</p>
+                <Slider
+                  :model-value="[currentSliderPosition]"
+                  @update:model-value="onViewSizeSliderChange"
+                  :min="0"
+                  :max="100"
+                  :step="1"
+                  class="w-full"
+                />
+                <div class="flex justify-between text-xs">
+                  <span>{{ t('gallery.toolbar.thumbnailSize.fine') }}</span>
+                  <span>{{ t('gallery.toolbar.thumbnailSize.showcase') }}</span>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
 
-    <!-- 右侧：筛选、排序、视图控制 -->
-    <div class="flex shrink-0 items-center gap-2">
-      <!-- 独立缩略图大小调整 (宽屏) -->
-      <div
-        v-if="isWide"
-        class="mr-2 flex w-28 items-center"
-        :title="t('gallery.toolbar.thumbnailSize.label')"
+    <div class="flex min-h-10 items-center gap-1.5 overflow-x-hidden px-2 pb-1.5">
+      <Popover>
+        <PopoverTrigger as-child>
+          <Button
+            :variant="searchQuery ? 'toolbarFilterActive' : 'toolbarFilter'"
+            size="filter-sm"
+            class="has-[>svg]:!pl-2"
+          >
+            <Search class="h-4 w-4" />
+            <span class="min-w-0 truncate">
+              {{ searchQuery || t('gallery.toolbar.filters.keyword') }}
+            </span>
+            <span
+              v-if="searchQuery"
+              class="-mr-1 rounded p-0.5 hover:text-foreground"
+              @pointerdown.stop.prevent
+              @click="clearSearchFromTrigger"
+            >
+              <X class="h-3.5 w-3.5" />
+            </span>
+            <ChevronDown v-else class="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" class="w-72 p-3">
+          <div class="space-y-2">
+            <p class="text-xs font-medium">{{ t('gallery.toolbar.filters.keyword') }}</p>
+            <div class="relative">
+              <Search class="absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2" />
+              <Input
+                :model-value="searchQuery"
+                @update:model-value="updateSearchQuery"
+                :placeholder="t('gallery.toolbar.search.placeholder')"
+                class="h-8 pr-8 pl-9"
+              />
+              <Button
+                v-if="searchQuery"
+                type="button"
+                variant="sidebarGhost"
+                size="icon-xs"
+                class="absolute top-1/2 right-1.5 -translate-y-1/2"
+                @click="clearSearch"
+              >
+                <X class="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover v-model:open="colorPopoverOpen">
+        <PopoverTrigger as-child>
+          <Button
+            :variant="activeColorHex ? 'toolbarFilterActive' : 'toolbarFilter'"
+            size="filter-sm"
+          >
+            <Palette class="h-4 w-4" />
+            <span
+              v-if="activeColorHex"
+              class="h-3.5 w-3.5 shrink-0 rounded-full border border-foreground/50"
+              :style="{ backgroundColor: activeColorHex }"
+            />
+            <span class="min-w-0 truncate">
+              {{ activeColorHex || t('gallery.toolbar.filters.color') }}
+            </span>
+            <span
+              v-if="activeColorHex"
+              class="-mr-1 rounded p-0.5 hover:text-foreground"
+              @pointerdown.stop.prevent
+              @click="clearColorFilter"
+            >
+              <X class="h-3.5 w-3.5" />
+            </span>
+            <ChevronDown v-else class="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" class="w-auto p-3">
+          <div class="w-[220px] space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-2">
+                <div
+                  class="h-5 w-5 shrink-0 rounded border border-border/80"
+                  :style="{ backgroundColor: activeColorHex || draftColorHex }"
+                />
+                <div class="min-w-0">
+                  <p class="text-xs font-medium">{{ t('gallery.toolbar.colorFilter.title') }}</p>
+                  <p class="truncate font-mono text-[11px]">
+                    {{ activeColorHex || t('gallery.toolbar.colorFilter.none') }}
+                  </p>
+                </div>
+              </div>
+              <Button
+                v-if="activeColorHex"
+                variant="sidebarGhost"
+                size="sm"
+                class="h-7 px-2 text-xs"
+                @click="clearColorFilter"
+              >
+                {{ t('gallery.toolbar.colorFilter.clear') }}
+              </Button>
+            </div>
+
+            <ColorPicker
+              :model-value="draftColorHex"
+              @update:model-value="(color) => (draftColorHex = color)"
+            />
+
+            <div class="space-y-1">
+              <p class="text-xs font-medium">
+                {{ t('gallery.toolbar.colorFilter.distance.label') }}
+              </p>
+              <div class="flex justify-end">
+                <span class="font-mono text-[11px]">
+                  {{ draftColorDistance }}
+                </span>
+              </div>
+              <Slider
+                :model-value="[draftColorDistance]"
+                @update:model-value="onColorDistanceChange"
+                :min="COLOR_DISTANCE_MIN"
+                :max="COLOR_DISTANCE_MAX"
+                :step="1"
+                class="w-full"
+              />
+            </div>
+
+            <div class="flex justify-end">
+              <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
+                {{ t('gallery.toolbar.colorFilter.apply') }}
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button :variant="filter.type ? 'toolbarFilterActive' : 'toolbarFilter'" size="filter-sm">
+            <Image class="h-4 w-4" />
+            <span class="min-w-0 truncate">{{ typeFilterLabel }}</span>
+            <span
+              v-if="filter.type"
+              class="-mr-1 rounded p-0.5 hover:text-foreground"
+              @pointerdown.stop.prevent
+              @click="clearTypeFilter"
+            >
+              <X class="h-3.5 w-3.5" />
+            </span>
+            <ChevronDown v-else class="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" class="w-48">
+          <DropdownMenuRadioGroup
+            :model-value="filter.type || 'all'"
+            @update:model-value="onTypeFilterChange"
+          >
+            <DropdownMenuRadioItem value="all">
+              {{ t('gallery.toolbar.filter.type.all') }}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="photo">
+              <Image class="mr-2 h-4 w-4" />
+              {{ t('gallery.toolbar.filter.type.photo') }}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="video">
+              <Video class="mr-2 h-4 w-4" />
+              {{ t('gallery.toolbar.filter.type.video') }}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="live_photo">
+              <Camera class="mr-2 h-4 w-4" />
+              {{ t('gallery.toolbar.filter.type.livePhoto') }}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Popover>
+        <PopoverTrigger as-child>
+          <Button
+            :variant="selectedRatings.length > 0 ? 'toolbarFilterActive' : 'toolbarFilter'"
+            size="filter-sm"
+          >
+            <Star class="h-4 w-4" />
+            <span class="min-w-0 truncate">{{ ratingFilterLabel }}</span>
+            <span
+              v-if="selectedRatings.length > 0"
+              class="-mr-1 rounded p-0.5 hover:text-foreground"
+              @pointerdown.stop.prevent
+              @click="clearRatingFilter"
+            >
+              <X class="h-3.5 w-3.5" />
+            </span>
+            <ChevronDown v-else class="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" class="w-48 p-2">
+          <div class="space-y-1">
+            <button
+              v-for="rating in [5, 4, 3, 2, 1, 0]"
+              :key="rating"
+              type="button"
+              role="checkbox"
+              :aria-checked="isRatingSelected(rating)"
+              class="relative flex w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden transition-colors select-none hover:bg-accent hover:text-accent-foreground"
+              @click="toggleRatingFilter(rating)"
+            >
+              <Checkbox
+                as="span"
+                :model-value="isRatingSelected(rating)"
+                class="pointer-events-none"
+              />
+              <span class="flex min-w-0 items-center gap-0.5">
+                <Star
+                  v-for="s in STARS"
+                  :key="s"
+                  class="h-3.5 w-3.5 transition-colors"
+                  :class="
+                    rating > 0 && s <= rating
+                      ? 'fill-amber-400 text-amber-400'
+                      : 'text-muted-foreground/30'
+                  "
+                />
+              </span>
+            </button>
+
+            <div v-if="selectedRatings.length > 0" class="border-t pt-1">
+              <button
+                type="button"
+                class="relative flex w-full cursor-default items-center rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground outline-hidden transition-colors select-none hover:bg-accent hover:text-accent-foreground"
+                @click="clearRatingFilter"
+              >
+                {{ t('gallery.toolbar.filter.rating.clear') }}
+              </button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button
+            :variant="filter.reviewFlag !== undefined ? 'toolbarFilterActive' : 'toolbarFilter'"
+            size="filter-sm"
+          >
+            <Flag class="h-4 w-4" />
+            <span class="min-w-0 truncate">{{ reviewFlagFilterLabel }}</span>
+            <span
+              v-if="filter.reviewFlag !== undefined"
+              class="-mr-1 rounded p-0.5 hover:text-foreground"
+              @pointerdown.stop.prevent
+              @click="clearReviewFlagFilter"
+            >
+              <X class="h-3.5 w-3.5" />
+            </span>
+            <ChevronDown v-else class="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" class="w-44">
+          <DropdownMenuRadioGroup
+            :model-value="filter.reviewFlag || 'all'"
+            @update:model-value="onReviewFlagChange"
+          >
+            <DropdownMenuRadioItem value="all">
+              {{ t('gallery.toolbar.filter.flag.all') }}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="picked">
+              <Check class="mr-2 h-4 w-4" />
+              {{ t('gallery.toolbar.filter.flag.picked') }}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="rejected">
+              <X class="mr-2 h-4 w-4" />
+              {{ t('gallery.toolbar.filter.flag.rejected') }}
+            </DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="none">
+              <Flag class="mr-2 h-4 w-4" />
+              {{ t('gallery.toolbar.filter.flag.none') }}
+            </DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <Button
+        v-if="hasAttributeFilters"
+        variant="default"
+        size="sm"
+        class="ml-auto h-8 shrink-0 px-2.5 text-xs"
+        @click="clearAttributeFilters"
       >
-        <Slider
-          :model-value="[currentSliderPosition]"
-          @update:model-value="onViewSizeSliderChange"
-          :min="0"
-          :max="100"
-          :step="1"
-          class="w-full"
-        />
-      </div>
-
-      <!-- 筛选与排序下拉菜单 -->
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <div>
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <Button variant="sidebarGhost" size="icon-sm">
-                    <ListFilter class="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" class="w-56">
-                  <!-- 类型筛选 -->
-                  <DropdownMenuLabel>{{
-                    t('gallery.toolbar.filter.type.label')
-                  }}</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup
-                    :model-value="filter.type || 'all'"
-                    @update:model-value="onTypeFilterChange"
-                  >
-                    <DropdownMenuRadioItem value="all">
-                      {{ t('gallery.toolbar.filter.type.all') }}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="photo">
-                      <Image class="mr-2 h-4 w-4" />
-                      {{ t('gallery.toolbar.filter.type.photo') }}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="video">
-                      <Video class="mr-2 h-4 w-4" />
-                      {{ t('gallery.toolbar.filter.type.video') }}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="live_photo">
-                      <Camera class="mr-2 h-4 w-4" />
-                      {{ t('gallery.toolbar.filter.type.livePhoto') }}
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-
-                  <DropdownMenuSeparator />
-
-                  <!-- 排序方式 -->
-                  <DropdownMenuLabel>{{ t('gallery.toolbar.sort.label') }}</DropdownMenuLabel>
-                  <DropdownMenuRadioGroup
-                    :model-value="sortBy"
-                    @update:model-value="onSortByChange"
-                  >
-                    <DropdownMenuRadioItem value="createdAt">
-                      <CalendarClock class="mr-2 h-4 w-4" />
-                      {{ t('gallery.toolbar.sort.createdAt') }}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="name">
-                      <Type class="mr-2 h-4 w-4" />
-                      {{ t('gallery.toolbar.sort.name') }}
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="resolution">
-                      <span class="pl-8">
-                        {{ t('gallery.toolbar.sort.resolution') }}
-                      </span>
-                    </DropdownMenuRadioItem>
-                    <DropdownMenuRadioItem value="size">
-                      <span class="pl-8">
-                        {{ t('gallery.toolbar.sort.size') }}
-                      </span>
-                    </DropdownMenuRadioItem>
-                  </DropdownMenuRadioGroup>
-
-                  <DropdownMenuSeparator />
-
-                  <!-- 排序顺序 -->
-                  <DropdownMenuItem @click="toggleSortOrder">
-                    <ArrowUpDown class="mr-2 h-4 w-4" />
-                    <span>
-                      {{
-                        sortOrder === 'asc'
-                          ? t('gallery.toolbar.sortOrder.asc')
-                          : t('gallery.toolbar.sortOrder.desc')
-                      }}
-                    </span>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuSeparator />
-
-                  <!-- 文件夹选项 -->
-                  <DropdownMenuLabel>{{
-                    t('gallery.toolbar.folderOptions.label')
-                  }}</DropdownMenuLabel>
-                  <DropdownMenuCheckboxItem
-                    :model-value="includeSubfolders"
-                    @update:model-value="toggleIncludeSubfolders"
-                  >
-                    {{ t('gallery.toolbar.folderOptions.includeSubfolders') }}
-                  </DropdownMenuCheckboxItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{{ t('gallery.toolbar.filterAndSort.tooltip') }}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <div>
-              <Popover v-model:open="colorPopoverOpen">
-                <PopoverTrigger as-child>
-                  <Button variant="sidebarGhost" size="icon-sm" class="relative">
-                    <Palette class="h-4 w-4" />
-                    <span
-                      v-if="activeColorHex"
-                      class="absolute right-1 bottom-1 h-2.5 w-2.5 rounded-full border border-background"
-                      :style="{ backgroundColor: activeColorHex }"
-                    />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" class="w-auto p-3">
-                  <div class="w-[220px] space-y-3">
-                    <div class="flex items-center justify-between gap-3">
-                      <div class="flex min-w-0 items-center gap-2">
-                        <div
-                          class="h-5 w-5 shrink-0 rounded border border-border/80"
-                          :style="{ backgroundColor: activeColorHex || draftColorHex }"
-                        />
-                        <div class="min-w-0">
-                          <p class="text-xs font-medium">
-                            {{ t('gallery.toolbar.colorFilter.title') }}
-                          </p>
-                          <p class="truncate font-mono text-[11px] text-muted-foreground">
-                            {{ activeColorHex || t('gallery.toolbar.colorFilter.none') }}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        v-if="activeColorHex"
-                        variant="sidebarGhost"
-                        size="sm"
-                        class="h-7 px-2 text-xs"
-                        @click="clearColorFilter"
-                      >
-                        {{ t('gallery.toolbar.colorFilter.clear') }}
-                      </Button>
-                    </div>
-
-                    <ColorPicker
-                      :model-value="draftColorHex"
-                      @update:model-value="(color) => (draftColorHex = color)"
-                    />
-
-                    <div class="space-y-1">
-                      <p class="text-xs font-medium">
-                        {{ t('gallery.toolbar.colorFilter.distance.label') }}
-                      </p>
-                      <div class="flex justify-end">
-                        <span class="font-mono text-[11px] text-muted-foreground">
-                          {{ draftColorDistance }}
-                        </span>
-                      </div>
-                      <Slider
-                        :model-value="[draftColorDistance]"
-                        @update:model-value="onColorDistanceChange"
-                        :min="COLOR_DISTANCE_MIN"
-                        :max="COLOR_DISTANCE_MAX"
-                        :step="1"
-                        class="w-full"
-                      />
-                    </div>
-
-                    <div class="flex justify-end">
-                      <Button size="sm" class="h-7 px-3 text-xs" @click="applyColorFilter">
-                        {{ t('gallery.toolbar.colorFilter.apply') }}
-                      </Button>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{{ t('gallery.toolbar.colorFilter.tooltip') }}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <!-- 评分与标记筛选 -->
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <div>
-              <Popover>
-                <PopoverTrigger as-child>
-                  <Button
-                    variant="sidebarGhost"
-                    size="icon-sm"
-                    class="relative"
-                    :class="hasReviewFilter ? 'text-primary' : ''"
-                  >
-                    <Flag class="h-4 w-4" />
-                    <span
-                      v-if="hasReviewFilter"
-                      class="absolute right-1 bottom-1 h-2 w-2 rounded-full bg-primary"
-                    />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" class="w-56 p-3">
-                  <ReviewFilterPopover
-                    :rating="filter.rating"
-                    :review-flag="filter.reviewFlag"
-                    @update:rating="(v) => galleryView.setFilter({ rating: v })"
-                    @update:review-flag="(v) => galleryView.setFilter({ reviewFlag: v })"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{{ t('gallery.toolbar.filter.review.tooltip') }}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <!-- 视图设置（模式 + 大小调整） -->
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <div>
-              <Popover>
-                <PopoverTrigger as-child>
-                  <Button variant="sidebarGhost" size="icon-sm">
-                    <component :is="currentViewModeIcon" class="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent align="end" class="w-72">
-                  <div class="space-y-6">
-                    <!-- 视图模式选择 -->
-                    <div class="space-y-3">
-                      <p class="text-sm font-medium">
-                        {{ t('gallery.toolbar.viewMode.label') }}
-                      </p>
-                      <div class="grid grid-cols-4 gap-2">
-                        <Button
-                          v-for="mode in viewModes"
-                          :key="mode.value"
-                          :variant="viewMode === mode.value ? 'default' : 'outline'"
-                          size="sm"
-                          class="flex h-auto flex-col items-center gap-1.5 py-3"
-                          @click="setViewMode(mode.value)"
-                        >
-                          <component :is="mode.icon" class="h-5 w-5" />
-                          <span class="text-xs">{{ t(mode.i18nKey) }}</span>
-                        </Button>
-                      </div>
-                    </div>
-
-                    <!-- 分隔线 (窄屏) -->
-                    <div v-if="!isWide" class="border-t" />
-
-                    <!-- 缩略图大小调整 (窄屏) -->
-                    <div v-if="!isWide" class="space-y-3">
-                      <div class="flex items-center">
-                        <p class="text-sm font-medium">
-                          {{ t('gallery.toolbar.thumbnailSize.label') }}
-                        </p>
-                      </div>
-                      <Slider
-                        :model-value="[currentSliderPosition]"
-                        @update:model-value="onViewSizeSliderChange"
-                        :min="0"
-                        :max="100"
-                        :step="1"
-                        class="w-full"
-                      />
-                      <div class="flex justify-between text-xs text-muted-foreground">
-                        <span>{{ t('gallery.toolbar.thumbnailSize.fine') }}</span>
-                        <span>{{ t('gallery.toolbar.thumbnailSize.showcase') }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{{ t('gallery.toolbar.viewSettings.tooltip') }}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+        <X class="h-4 w-4" />
+        {{ t('gallery.toolbar.filters.clear') }}
+      </Button>
     </div>
   </div>
 </template>

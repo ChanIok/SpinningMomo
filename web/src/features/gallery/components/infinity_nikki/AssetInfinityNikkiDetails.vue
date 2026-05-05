@@ -5,7 +5,6 @@ import { Check, ChevronDown } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Separator } from '@/components/ui/separator'
 import { readClipboardText } from '@/core/clipboard'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
@@ -556,8 +555,6 @@ watch(
 </script>
 
 <template>
-  <Separator />
-
   <div class="space-y-3">
     <h4 class="text-sm font-medium">{{ t('gallery.details.infinityNikki.title') }}</h4>
 

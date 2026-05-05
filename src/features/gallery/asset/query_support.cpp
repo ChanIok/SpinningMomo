@@ -175,14 +175,18 @@ auto build_unified_where_clause(const Features::Gallery::Types::QueryAssetsFilte
     params.push_back("%" + filters.search.value() + "%");
   }
 
-  if (filters.rating.has_value()) {
-    int rating = filters.rating.value();
-    if (rating < 0 || rating > 5) {
-      return std::unexpected("Rating filter must be between 0 and 5");
+  if (filters.ratings.has_value() && !filters.ratings->empty()) {
+    for (int rating : filters.ratings.value()) {
+      if (rating < 0 || rating > 5) {
+        return std::unexpected("Rating filters must be between 0 and 5");
+      }
     }
 
-    conditions.push_back(rating_column + " = ?");
-    params.push_back(static_cast<std::int64_t>(rating));
+    auto placeholders = build_in_clause_placeholders(filters.ratings->size());
+    conditions.push_back(std::format("{} IN ({})", rating_column, placeholders));
+    for (int rating : filters.ratings.value()) {
+      params.push_back(static_cast<std::int64_t>(rating));
+    }
   }
 
   if (filters.review_flag.has_value() && !filters.review_flag->empty()) {

@@ -141,6 +141,21 @@ export function useGalleryView() {
   }
 
   /**
+   * 只清空顶部属性筛选，保留左侧浏览入口（文件夹 / 标签）。
+   */
+  function clearAttributeFilters() {
+    store.setFilter({
+      searchQuery: undefined,
+      type: undefined,
+      ratings: undefined,
+      reviewFlag: undefined,
+      colorHex: undefined,
+      colorDistance: undefined,
+    })
+    console.log('🧹 属性筛选已清空')
+  }
+
+  /**
    * 设置搜索关键词
    */
   function setSearchQuery(query: string) {
@@ -227,6 +242,7 @@ export function useGalleryView() {
     // 筛选操作
     setFilter,
     clearFilter,
+    clearAttributeFilters,
     setSearchQuery,
     setTypeFilter,
     setColorFilter,

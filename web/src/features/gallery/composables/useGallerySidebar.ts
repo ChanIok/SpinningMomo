@@ -34,6 +34,9 @@ export function useGallerySidebar() {
     return null
   })
   const selectedTag = computed(() => {
+    if (store.filter.folderId) {
+      return null
+    }
     if (store.filter.tagIds && store.filter.tagIds.length > 0) {
       return store.filter.tagIds[0] ?? null
     }
@@ -76,7 +79,7 @@ export function useGallerySidebar() {
    * 选择文件夹
    */
   function selectFolder(folderId: number, folderName: string) {
-    store.setFilter({ folderId: String(folderId) })
+    store.setFilter({ folderId: String(folderId), tagIds: [], tagMatchMode: 'any' })
 
     // 查找文件夹对象并设置详情面板
     const folder = findFolderById(store.folders, folderId)
@@ -186,7 +189,7 @@ export function useGallerySidebar() {
       console.log('🏷️ 取消标签筛选:', tagName)
     } else {
       // 选中新标签
-      store.setFilter({ tagIds: [tagId], tagMatchMode: 'any' })
+      store.setFilter({ folderId: undefined, tagIds: [tagId], tagMatchMode: 'any' })
 
       // 查找标签对象并设置详情面板
       const tag = findTagById(store.tags, tagId)
@@ -202,7 +205,7 @@ export function useGallerySidebar() {
    * 选择"所有媒体"
    */
   function selectAllMedia() {
-    store.resetFilter()
+    store.setFilter({ folderId: undefined, tagIds: [], tagMatchMode: 'any' })
 
     // 清除详情面板焦点
     store.clearDetailsFocus()

@@ -1,86 +1,92 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Star } from 'lucide-vue-next'
+import { Checkbox } from '@/components/ui/checkbox'
 import { useI18n } from '@/composables/useI18n'
 import type { ReviewFlag } from '../../types'
 
 const props = defineProps<{
-  rating: number | undefined
+  ratings: number[] | undefined
   reviewFlag: ReviewFlag | undefined
 }>()
 
 const emit = defineEmits<{
-  'update:rating': [value: number | undefined]
+  'update:ratings': [value: number[] | undefined]
   'update:reviewFlag': [value: ReviewFlag | undefined]
 }>()
 
 const { t } = useI18n()
 
 const STARS = [1, 2, 3, 4, 5] as const
+const RATING_OPTIONS = [5, 4, 3, 2, 1, 0] as const
 
-const activeRating = computed(() => props.rating)
+const activeRatings = computed(() => normalizeRatings(props.ratings))
 const activeFlag = computed(() => props.reviewFlag)
 
-function onRatingClick(value: number | 'unrated') {
-  const numeric = value === 'unrated' ? 0 : value
-  emit('update:rating', activeRating.value === numeric ? undefined : numeric)
+function normalizeRatings(ratings?: number[]): number[] {
+  return [...new Set(ratings ?? [])]
+    .filter((rating) => Number.isInteger(rating) && rating >= 0 && rating <= 5)
+    .sort((a, b) => b - a)
+}
+
+function isRatingSelected(value: number): boolean {
+  return activeRatings.value.includes(value)
+}
+
+function emitRatings(values: number[]) {
+  const ratings = normalizeRatings(values)
+  emit('update:ratings', ratings.length > 0 ? ratings : undefined)
+}
+
+function toggleRating(value: number) {
+  const current = activeRatings.value
+  if (current.includes(value)) {
+    emitRatings(current.filter((rating) => rating !== value))
+    return
+  }
+
+  emitRatings([...current, value])
 }
 </script>
 
 <template>
   <div class="space-y-3">
     <div class="space-y-1.5">
-      <p class="text-xs font-medium">{{ t('gallery.toolbar.filter.rating.label') }}</p>
-      <div class="flex flex-wrap gap-1">
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-xs font-medium">{{ t('gallery.toolbar.filter.rating.label') }}</p>
         <button
+          v-if="activeRatings.length > 0"
           type="button"
-          class="rounded px-2 py-1 text-xs transition-colors"
-          :class="
-            activeRating === undefined
-              ? 'bg-accent text-accent-foreground'
-              : 'bg-muted text-muted-foreground hover:text-foreground'
-          "
-          @click="emit('update:rating', undefined)"
+          class="text-xs text-muted-foreground transition-colors hover:text-foreground"
+          @click="emit('update:ratings', undefined)"
         >
-          {{ t('gallery.toolbar.filter.rating.all') }}
+          {{ t('gallery.toolbar.filter.rating.clear') }}
         </button>
+      </div>
 
+      <div class="space-y-1">
         <button
-          v-for="star in STARS"
-          :key="star"
+          v-for="rating in RATING_OPTIONS"
+          :key="rating"
           type="button"
-          class="flex items-center rounded px-2 py-1 transition-colors"
-          :class="
-            activeRating === star
-              ? 'bg-accent text-accent-foreground'
-              : 'bg-muted text-muted-foreground hover:text-foreground'
-          "
-          @click="onRatingClick(star)"
+          role="checkbox"
+          :aria-checked="isRatingSelected(rating)"
+          class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-sidebar-hover"
+          @click="toggleRating(rating)"
         >
-          <svg
-            v-for="s in STARS"
-            :key="s"
-            class="h-3 w-3 transition-colors"
-            :class="s <= star ? 'text-amber-400' : 'text-muted-foreground/30'"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path
-              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+          <Checkbox as="span" :model-value="isRatingSelected(rating)" class="pointer-events-none" />
+          <span class="flex min-w-0 items-center gap-0.5">
+            <Star
+              v-for="s in STARS"
+              :key="s"
+              class="h-3.5 w-3.5 transition-colors"
+              :class="
+                rating > 0 && s <= rating
+                  ? 'fill-primary text-primary'
+                  : 'fill-muted text-muted-foreground/30'
+              "
             />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          class="rounded px-2 py-1 text-xs transition-colors"
-          :class="
-            activeRating === 0
-              ? 'bg-accent text-accent-foreground'
-              : 'bg-muted text-muted-foreground hover:text-foreground'
-          "
-          @click="onRatingClick('unrated')"
-        >
-          {{ t('gallery.toolbar.filter.rating.unrated') }}
+          </span>
         </button>
       </div>
     </div>

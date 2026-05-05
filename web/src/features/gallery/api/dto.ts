@@ -179,7 +179,7 @@ export interface QueryAssetsFilters {
   year?: string // "2024" 格式
   type?: AssetType // photo, video, live_photo
   search?: string // 搜索关键词
-  rating?: number
+  ratings?: number[]
   reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
@@ -248,7 +248,7 @@ export interface GetTimelineBucketsParams {
   activeAssetId?: number
   type?: AssetType
   search?: string
-  rating?: number
+  ratings?: number[]
   reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
@@ -270,7 +270,7 @@ export interface GetAssetsByMonthParams {
   sortOrder?: 'asc' | 'desc'
   type?: AssetType
   search?: string
-  rating?: number
+  ratings?: number[]
   reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'

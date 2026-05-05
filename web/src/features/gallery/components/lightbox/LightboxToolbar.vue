@@ -76,7 +76,7 @@ const lightboxMode = computed(() => {
 })
 
 const hasReviewFilter = computed(
-  () => store.filter.rating !== undefined || store.filter.reviewFlag !== undefined
+  () => (store.filter.ratings?.length ?? 0) > 0 || store.filter.reviewFlag !== undefined
 )
 
 const toggleActiveClass =
@@ -251,9 +251,9 @@ function handleRotateClick(event: MouseEvent) {
         </PopoverTrigger>
         <PopoverContent align="end" class="w-56 p-3">
           <ReviewFilterPopover
-            :rating="store.filter.rating"
+            :ratings="store.filter.ratings"
             :review-flag="store.filter.reviewFlag"
-            @update:rating="(v) => store.setFilter({ rating: v })"
+            @update:ratings="(v) => store.setFilter({ ratings: v })"
             @update:review-flag="(v) => store.setFilter({ reviewFlag: v })"
           />
         </PopoverContent>

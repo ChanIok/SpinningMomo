@@ -546,8 +546,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
                   {{ t('gallery.details.tags.empty') }}
                 </div>
               </div>
-
-              <Separator />
             </div>
           </template>
 
@@ -560,8 +558,6 @@ async function handleCopyColorHex(color: AssetMainColor) {
             />
 
             <template v-if="shouldShowAssetHistogram">
-              <Separator />
-
               <AssetHistogram :cache-key="assetHistogramCacheKey" :image-url="thumbnailUrl" />
             </template>
           </template>

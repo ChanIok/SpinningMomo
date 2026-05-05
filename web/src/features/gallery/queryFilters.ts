@@ -2,14 +2,14 @@ import type { AssetFilter, QueryAssetsFilters } from './types'
 
 export function toQueryAssetsFilters(
   filter: AssetFilter,
-  includeSubfolders: boolean
+  _includeSubfolders: boolean
 ): QueryAssetsFilters {
   return {
     folderId: filter.folderId ? Number(filter.folderId) : undefined,
-    includeSubfolders,
+    includeSubfolders: true,
     type: filter.type,
     search: filter.searchQuery,
-    rating: filter.rating,
+    ratings: filter.ratings,
     reviewFlag: filter.reviewFlag,
     tagIds: filter.tagIds,
     tagMatchMode: filter.tagMatchMode,

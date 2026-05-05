@@ -124,7 +124,7 @@ export interface AssetFilter {
   type?: AssetType // photo, video, live_photo, unknown
   searchQuery?: string
   folderId?: string
-  rating?: number
+  ratings?: number[]
   reviewFlag?: ReviewFlag
   tagIds?: number[]
   tagMatchMode?: 'any' | 'all'
