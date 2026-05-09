@@ -27,6 +27,13 @@ struct CapturePlan {
   Utils::Graphics::CaptureRegion::CropRegion region{};
 };
 
+enum class RecordingControlAction {
+  None,
+  Toggle,
+  RestartAfterResize,
+  ShutdownStop,
+};
+
 // 录制完整状态
 struct RecordingState {
   Features::Recording::Types::RecordingConfig config;
@@ -36,14 +43,12 @@ struct RecordingState {
   // 状态标志 - 使用 atomic 避免锁竞争
   std::atomic<Features::Recording::Types::RecordingStatus> status{
       Features::Recording::Types::RecordingStatus::Idle};
-  // 防止重复触发录制切换任务
-  std::atomic<bool> op_in_progress{false};
-  // 录制开关专用线程（仅执行开始/停止控制逻辑）
-  std::jthread toggle_thread;
-  // 窗口尺寸变化时的自动切段重启线程
-  std::jthread resize_restart_thread;
-  // 自动切段重启任务是否正在执行
-  std::atomic<bool> resize_restart_in_progress{false};
+  // 懒启动的录制控制线程：首次录制请求时启动，之后睡眠等待 toggle / resize / shutdown。
+  std::jthread control_thread;
+  // 控制线程当前是否正在执行 start/stop/restart；用户 toggle 忙时会被忽略。
+  std::atomic<bool> control_action_running{false};
+  // 控制请求只用单槽合并，避免窗口拖拽时堆积 resize 重启任务。
+  RecordingControlAction pending_action{RecordingControlAction::None};
   // shutdown 开始后置为 true，阻止新的 toggle / resize restart 再抢控制权
   std::atomic<bool> shutdown_requested{false};
 
@@ -78,8 +83,9 @@ struct RecordingState {
   std::mutex encoder_write_mutex;
   // resource_mutex: 保护资源的初始化、清理和帧填充逻辑（主线程独占）
   std::mutex resource_mutex;
-  // control_mutex: 串行化 start/stop/toggle/restart/shutdown 控制流
-  std::mutex control_mutex;
+  // control_request_mutex: 只保护 pending_action，不包住真正的 start/stop。
+  std::mutex control_request_mutex;
+  std::condition_variable_any control_cv;
 };
 
 }  // namespace Features::Recording::State

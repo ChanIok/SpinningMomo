@@ -21,14 +21,6 @@ import <windows.h>;
 
 namespace Features::Recording::UseCase {
 
-auto join_resize_restart_thread(Features::Recording::State::RecordingState& recording_state)
-    -> void {
-  if (recording_state.resize_restart_thread.joinable() &&
-      recording_state.resize_restart_thread.get_id() != std::this_thread::get_id()) {
-    recording_state.resize_restart_thread.join();
-  }
-}
-
 auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
   if (!state.events || !state.i18n) {
     Logger().warn("Skip recording notification because events/i18n state is not initialized");
@@ -148,55 +140,32 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     return std::unexpected("Recording shutdown is in progress");
   }
 
-  bool expected = false;
-  if (!state.recording->op_in_progress.compare_exchange_strong(expected, true,
-                                                               std::memory_order_acq_rel)) {
-    return {};
+  Features::Recording::RecordingControlHandlers handlers{
+      .on_toggle =
+          [&state]() {
+            auto result = toggle_recording_impl(state);
+            if (!result) {
+              Logger().error("Recording toggle failed: {}", result.error());
+            }
+          },
+      .on_shutdown_stop =
+          [&state]() {
+            if (state.recording->status.load(std::memory_order_acquire) ==
+                Features::Recording::Types::RecordingStatus::Recording) {
+              Features::Recording::stop(*state.recording);
+              notify_recording_toggled(state, false);
+            }
+          },
+  };
+
+  if (auto result = Features::Recording::ensure_control_thread_started(state, *state.recording,
+                                                                       std::move(handlers));
+      !result) {
+    return result;
   }
 
-  if (state.recording->toggle_thread.joinable()) {
-    state.recording->toggle_thread.join();
-  }
-
-  state.recording->toggle_thread = std::jthread([&state](std::stop_token) {
-    try {
-      HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-      const bool need_uninitialize = SUCCEEDED(hr);
-      if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
-        Logger().warn("CoInitializeEx failed in recording task: {:08X}", static_cast<uint32_t>(hr));
-      }
-
-      join_resize_restart_thread(*state.recording);
-
-      std::expected<void, std::string> result;
-      {
-        // toggle / resize restart / shutdown stop 共享同一把控制锁，
-        // 保证任意时刻只有一条控制路径在操作录制状态机。
-        std::lock_guard control_lock(state.recording->control_mutex);
-        if (state.recording->shutdown_requested.load(std::memory_order_acquire)) {
-          result = {};
-        } else {
-          result = toggle_recording_impl(state);
-        }
-      }
-
-      if (!result) {
-        Logger().error("Recording toggle failed: {}", result.error());
-      }
-
-      state.recording->op_in_progress.store(false, std::memory_order_release);
-
-      if (need_uninitialize) {
-        CoUninitialize();
-      }
-    } catch (const std::exception& e) {
-      Logger().error("Recording toggle thread exception: {}", e.what());
-      state.recording->op_in_progress.store(false, std::memory_order_release);
-    } catch (...) {
-      Logger().error("Recording toggle thread exception: unknown");
-      state.recording->op_in_progress.store(false, std::memory_order_release);
-    }
-  });
+  Features::Recording::request_control_action(
+      *state.recording, Features::Recording::State::RecordingControlAction::Toggle);
 
   return {};
 }
@@ -207,22 +176,20 @@ auto stop_recording_if_running(Core::State::AppState& state) -> void {
   }
 
   // 退出阶段先宣告 shutdown，再接管 stop；
-  // 这样 resize restart / toggle thread 会主动让路，不会再互相等待。
+  // 这样 resize restart / 用户 toggle 的控制任务会主动让路，不会再和退出抢状态。
   state.recording->shutdown_requested.store(true, std::memory_order_release);
 
-  join_resize_restart_thread(*state.recording);
-
-  {
-    std::lock_guard control_lock(state.recording->control_mutex);
-    if (state.recording->status.load(std::memory_order_acquire) ==
-        Features::Recording::Types::RecordingStatus::Recording) {
-      Features::Recording::stop(*state.recording);
-      notify_recording_toggled(state, false);
-    }
-  }
-
-  if (state.recording->toggle_thread.joinable()) {
-    state.recording->toggle_thread.join();
+  if (state.recording->control_thread.joinable()) {
+    Features::Recording::request_control_action(
+        *state.recording, Features::Recording::State::RecordingControlAction::ShutdownStop);
+    Features::Recording::join_control_thread(*state.recording);
+  } else if (state.recording->status.load(std::memory_order_acquire) ==
+             Features::Recording::Types::RecordingStatus::Recording) {
+    // 控制线程是懒启动；没有消费者时不投递请求。此分支代表状态异常，直接兜底保存。
+    Logger().warn(
+        "Recording is active but control thread is not running during shutdown; stopping directly");
+    Features::Recording::stop(*state.recording);
+    notify_recording_toggled(state, false);
   }
 }
 

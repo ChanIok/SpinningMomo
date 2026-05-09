@@ -1,5 +1,6 @@
 module;
 
+#include <wil/com.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
 module Features.Recording;
@@ -19,10 +20,11 @@ import Utils.String;
 import <d3d11_4.h>;
 import <dwmapi.h>;
 import <mfapi.h>;
-import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording {
+
+constexpr std::uint64_t k_discard_video_frame_threshold = 3;
 
 auto floor_to_even(int value) -> int { return (value / 2) * 2; }
 auto start(Core::State::AppState& app_state, Features::Recording::State::RecordingState& state,
@@ -144,6 +146,31 @@ auto rename_working_output_to_final(const std::filesystem::path& working_output_
   return {};
 }
 
+auto delete_working_output_file(const std::filesystem::path& working_output_path,
+                                std::string_view reason) -> void {
+  if (working_output_path.empty()) {
+    return;
+  }
+
+  std::error_code ec;
+  if (!std::filesystem::exists(working_output_path, ec)) {
+    if (ec) {
+      Logger().warn("Failed to probe discarded recording file '{}': {}",
+                    working_output_path.string(), ec.message());
+    }
+    return;
+  }
+
+  std::filesystem::remove(working_output_path, ec);
+  if (ec) {
+    Logger().warn("Failed to delete discarded recording file '{}': {}",
+                  working_output_path.string(), ec.message());
+    return;
+  }
+
+  Logger().info("Discarded recording file '{}': {}", working_output_path.string(), reason);
+}
+
 auto clear_runtime_resources(Features::Recording::State::RecordingState& state) -> void {
   state.capture_session = {};
   state.encoder = {};
@@ -202,98 +229,204 @@ auto build_timestamp_output_path(const std::filesystem::path& reference_output_p
   return reference_output_path.parent_path() / filename;
 }
 
-auto start_resize_restart_task(Core::State::AppState& app_state,
-                               Features::Recording::State::RecordingState& state) -> void {
-  bool expected = false;
-  if (!state.resize_restart_in_progress.compare_exchange_strong(expected, true,
-                                                                std::memory_order_acq_rel)) {
+auto request_control_action(Features::Recording::State::RecordingState& state,
+                            Features::Recording::State::RecordingControlAction action) -> bool {
+  if (state.shutdown_requested.load(std::memory_order_acquire) &&
+      action != State::RecordingControlAction::ShutdownStop) {
+    return false;
+  }
+
+  {
+    std::lock_guard request_lock(state.control_request_mutex);
+
+    if (action == State::RecordingControlAction::ShutdownStop) {
+      // 退出请求优先级最高，覆盖所有尚未执行的控制请求。
+      state.pending_action = action;
+      state.control_cv.notify_one();
+      return true;
+    }
+
+    if (action == State::RecordingControlAction::Toggle) {
+      if (state.control_action_running.load(std::memory_order_acquire) ||
+          state.pending_action != State::RecordingControlAction::None) {
+        return false;
+      }
+
+      state.pending_action = action;
+      state.control_cv.notify_one();
+      return true;
+    }
+
+    if (action == State::RecordingControlAction::RestartAfterResize) {
+      if (state.pending_action == State::RecordingControlAction::ShutdownStop ||
+          state.pending_action == State::RecordingControlAction::Toggle) {
+        return false;
+      }
+
+      // resize 请求可合并：窗口拖拽期间只保留一个待执行的自动重启。
+      state.pending_action = action;
+      state.control_cv.notify_one();
+      return true;
+    }
+  }
+
+  return false;
+}
+
+auto handle_control_action(Core::State::AppState& app_state,
+                           Features::Recording::State::RecordingState& state,
+                           const RecordingControlHandlers& handlers,
+                           Features::Recording::State::RecordingControlAction action) -> bool {
+  switch (action) {
+    case State::RecordingControlAction::Toggle:
+      if (handlers.on_toggle) {
+        handlers.on_toggle();
+      }
+      return true;
+
+    case State::RecordingControlAction::RestartAfterResize:
+      restart_after_resize(app_state, state);
+      return true;
+
+    case State::RecordingControlAction::ShutdownStop:
+      if (handlers.on_shutdown_stop) {
+        handlers.on_shutdown_stop();
+      }
+      return false;
+
+    default:
+      return true;
+  }
+}
+
+auto control_thread_proc(Core::State::AppState& app_state,
+                         Features::Recording::State::RecordingState& state,
+                         RecordingControlHandlers handlers, std::stop_token stop_token) -> void {
+  try {
+    // 控制线程由录制模块创建，直接用 WIL 管理 COM 初始化和反初始化生命周期。
+    auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
+
+    std::stop_callback wake_on_stop(stop_token, [&state]() { state.control_cv.notify_all(); });
+
+    while (true) {
+      State::RecordingControlAction action{State::RecordingControlAction::None};
+
+      {
+        std::unique_lock request_lock(state.control_request_mutex);
+        state.control_cv.wait(request_lock, [&]() {
+          return stop_token.stop_requested() ||
+                 state.pending_action != State::RecordingControlAction::None;
+        });
+
+        if (stop_token.stop_requested() &&
+            state.pending_action == State::RecordingControlAction::None) {
+          break;
+        }
+
+        action = state.pending_action;
+        state.pending_action = State::RecordingControlAction::None;
+        state.control_action_running.store(true, std::memory_order_release);
+      }
+
+      bool keep_running = true;
+      try {
+        keep_running = handle_control_action(app_state, state, handlers, action);
+      } catch (const std::exception& e) {
+        Logger().error("Recording control thread action exception: {}", e.what());
+      } catch (...) {
+        Logger().error("Recording control thread action exception: unknown");
+      }
+
+      state.control_action_running.store(false, std::memory_order_release);
+      if (!keep_running) {
+        break;
+      }
+    }
+  } catch (const wil::ResultException& e) {
+    Logger().error("Recording control thread COM initialization failed: {} (HRESULT: 0x{:08X})",
+                   e.what(), static_cast<unsigned>(e.GetErrorCode()));
+    state.control_action_running.store(false, std::memory_order_release);
+  } catch (const std::exception& e) {
+    Logger().error("Recording control thread exception: {}", e.what());
+    state.control_action_running.store(false, std::memory_order_release);
+  } catch (...) {
+    Logger().error("Recording control thread exception: unknown");
+    state.control_action_running.store(false, std::memory_order_release);
+  }
+}
+
+auto ensure_control_thread_started(Core::State::AppState& app_state,
+                                   Features::Recording::State::RecordingState& state,
+                                   RecordingControlHandlers handlers)
+    -> std::expected<void, std::string> {
+  if (state.shutdown_requested.load(std::memory_order_acquire)) {
+    return std::unexpected("Recording shutdown is in progress");
+  }
+
+  if (state.control_thread.joinable()) {
+    return {};
+  }
+
+  state.control_thread = std::jthread(
+      [&app_state, &state, handlers = std::move(handlers)](std::stop_token stop_token) mutable {
+        control_thread_proc(app_state, state, std::move(handlers), stop_token);
+      });
+  return {};
+}
+
+auto join_control_thread(Features::Recording::State::RecordingState& state) -> void {
+  if (state.control_thread.joinable()) {
+    state.control_thread.join();
+  }
+}
+
+auto request_restart_after_resize(Features::Recording::State::RecordingState& state) -> void {
+  if (state.shutdown_requested.load(std::memory_order_acquire)) {
     return;
   }
 
-  if (state.resize_restart_thread.joinable() &&
-      state.resize_restart_thread.get_id() != std::this_thread::get_id()) {
-    state.resize_restart_thread.join();
+  request_control_action(state, State::RecordingControlAction::RestartAfterResize);
+}
+
+auto restart_after_resize(Core::State::AppState& app_state,
+                          Features::Recording::State::RecordingState& state) -> void {
+  if (state.shutdown_requested.load(std::memory_order_acquire)) {
+    return;
   }
 
-  state.resize_restart_thread = std::jthread([&app_state, &state](std::stop_token) {
-    auto finish_task = [&state]() {
-      state.resize_restart_in_progress.store(false, std::memory_order_release);
-    };
+  if (state.status.load(std::memory_order_acquire) !=
+      Features::Recording::Types::RecordingStatus::Recording) {
+    return;
+  }
 
-    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-    const bool need_uninitialize = SUCCEEDED(hr);
-    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
-      Logger().warn("CoInitializeEx failed in resize restart task: {:08X}",
-                    static_cast<uint32_t>(hr));
-    }
+  Features::Recording::Types::RecordingConfig restart_config;
+  HWND target_window = nullptr;
+  {
+    std::lock_guard resource_lock(state.resource_mutex);
+    restart_config = state.config;
+    target_window = state.target_window;
+  }
 
-    try {
-      std::lock_guard control_lock(state.control_mutex);
+  if (!target_window || !IsWindow(target_window)) {
+    Logger().error("Skip recording auto restart after resize: target window is invalid");
+    return;
+  }
 
-      if (state.shutdown_requested.load(std::memory_order_acquire)) {
-        finish_task();
-        if (need_uninitialize) {
-          CoUninitialize();
-        }
-        return;
-      }
+  restart_config.output_path = build_timestamp_output_path(restart_config.output_path);
+  Logger().info("Recording restarted with timestamp output after resize: {}",
+                restart_config.output_path.string());
 
-      if (state.status.load(std::memory_order_acquire) !=
-          Features::Recording::Types::RecordingStatus::Recording) {
-        finish_task();
-        if (need_uninitialize) {
-          CoUninitialize();
-        }
-        return;
-      }
+  stop(state);
+  if (state.shutdown_requested.load(std::memory_order_acquire)) {
+    return;
+  }
 
-      Features::Recording::Types::RecordingConfig restart_config;
-      HWND target_window = nullptr;
-      {
-        std::lock_guard resource_lock(state.resource_mutex);
-        restart_config = state.config;
-        target_window = state.target_window;
-      }
-
-      if (!target_window || !IsWindow(target_window)) {
-        Logger().error("Skip recording auto restart after resize: target window is invalid");
-        finish_task();
-        if (need_uninitialize) {
-          CoUninitialize();
-        }
-        return;
-      }
-
-      restart_config.output_path = build_timestamp_output_path(restart_config.output_path);
-      Logger().info("Recording restarted with timestamp output after resize: {}",
-                    restart_config.output_path.string());
-
-      stop(state);
-      auto restart_result = start(app_state, state, target_window, restart_config);
-      if (!restart_result) {
-        Logger().error("Failed to restart recording after resize: {}", restart_result.error());
-      } else {
-        UI::FloatingWindow::request_repaint(app_state);
-      }
-
-      finish_task();
-      if (need_uninitialize) {
-        CoUninitialize();
-      }
-    } catch (const std::exception& e) {
-      Logger().error("Resize restart task exception: {}", e.what());
-      finish_task();
-      if (need_uninitialize) {
-        CoUninitialize();
-      }
-    } catch (...) {
-      Logger().error("Resize restart task exception: unknown");
-      finish_task();
-      if (need_uninitialize) {
-        CoUninitialize();
-      }
-    }
-  });
+  auto restart_result = start(app_state, state, target_window, restart_config);
+  if (!restart_result) {
+    Logger().error("Failed to restart recording after resize: {}", restart_result.error());
+  } else {
+    UI::FloatingWindow::request_repaint(app_state);
+  }
 }
 
 auto initialize(Features::Recording::State::RecordingState& state)
@@ -342,7 +475,7 @@ auto on_frame_arrived(Core::State::AppState& app_state,
           (capture_plan_result->output_width != state.config.width ||
            capture_plan_result->output_height != state.config.height)) {
         // 输出尺寸真的变化了：当前编码器已经不再适配，切段重开新文件。
-        start_resize_restart_task(app_state, state);
+        request_restart_after_resize(state);
         return;
       }
 
@@ -385,6 +518,11 @@ auto on_frame_arrived(Core::State::AppState& app_state,
   // 填充缺失的帧（使用上一帧或当前帧重复）
   // 使用 resource_mutex 保护帧填充逻辑和 frame_index
   std::lock_guard resource_lock(state.resource_mutex);
+  // stop() 把状态切到 Stopping 后，已经进入的回调也应尽快退出，不能继续写编码器。
+  if (state.status.load(std::memory_order_acquire) !=
+      Features::Recording::Types::RecordingStatus::Recording) {
+    return;
+  }
 
   ID3D11Texture2D* current_texture = texture.get();
   auto capture_plan = state.capture_plan;
@@ -638,66 +776,45 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
     return;
   }
 
-  // 阶段2: 通知并等待线程退出（无需锁，避免死锁）
-  // 1. 停止音频捕获线程
+  // 阶段2: 停止输入源。状态已经是 Stopping，新进来的帧回调会直接退出。
+  Utils::Graphics::Capture::stop_capture(state.capture_session);
   if (state.encoder.has_audio) {
     Features::Recording::AudioCapture::stop(state.audio);
   }
 
-  // 2. 停止视频捕捉
-  Utils::Graphics::Capture::stop_capture(state.capture_session);
-
   const auto final_output_path = state.config.output_path;
   const auto working_output_path = state.working_output_path;
   bool finalize_succeeded = false;
+  bool should_publish = false;
+  std::uint64_t encoded_video_frames = 0;
 
-  // 阶段3: 清理资源（使用 resource_mutex 保护）
+  // 阶段3: 按已写入视频帧数决定是否封口发布，并清理资源（使用 resource_mutex 保护）
   {
     std::lock_guard resource_lock(state.resource_mutex);
 
-    // 3. 填充最后的视频帧（确保录制时长完整）
-    if (state.last_encoded_texture) {
-      auto now = std::chrono::steady_clock::now();
-      auto elapsed = now - state.start_time;
-      auto elapsed_100ns =
-          std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
+    encoded_video_frames = state.frame_index;
+    should_publish = encoded_video_frames > k_discard_video_frame_threshold;
 
-      int64_t frame_duration_100ns = 10'000'000 / state.config.fps;
-      int64_t final_frame_index = elapsed_100ns / frame_duration_100ns;
-
-      // 用最后一帧填充到结束
-      while (state.frame_index <= final_frame_index) {
-        int64_t timestamp = state.frame_index * frame_duration_100ns;
-        std::expected<void, std::string> result;
-        {
-          std::lock_guard write_lock(state.encoder_write_mutex);
-          result = Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(),
-                                                       state.last_encoded_texture.get(), timestamp,
-                                                       state.config.fps);
-        }
-
-        if (!result) {
-          Logger().error("Failed to encode final frame {}: {}", state.frame_index, result.error());
-          break;
-        }
-        state.frame_index++;
+    if (should_publish) {
+      // Finalize 是 mp4 封口动作，必须和 WriteSample 共用写入锁，避免边写边封口。
+      std::expected<void, std::string> finalize_result;
+      {
+        std::lock_guard write_lock(state.encoder_write_mutex);
+        finalize_result = Utils::Media::Encoder::finalize_encoder(state.encoder);
       }
-
-      Logger().info("Filled {} total frames for recording duration", state.frame_index);
-    }
-
-    // 4. 完成编码
-    auto finalize_result = Utils::Media::Encoder::finalize_encoder(state.encoder);
-    if (!finalize_result) {
-      Logger().error("Failed to finalize encoder: {}", finalize_result.error());
+      if (!finalize_result) {
+        Logger().error("Failed to finalize encoder: {}", finalize_result.error());
+      } else {
+        finalize_succeeded = true;
+      }
     } else {
-      finalize_succeeded = true;
+      Logger().info("Discard recording segment: {} encoded video frames, publish requires > {}",
+                    encoded_video_frames, k_discard_video_frame_threshold);
     }
 
-    // 5. 清理资源
+    // 释放本段录制持有的运行时资源。
     clear_runtime_resources(state);
 
-    // 6. 清理音频资源
     Features::Recording::AudioCapture::cleanup(state.audio);
   }
 
@@ -708,6 +825,9 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
       Logger().error("Failed to publish finalized recording '{}': {}", final_output_path.string(),
                      rename_result.error());
     }
+  } else {
+    delete_working_output_file(working_output_path,
+                               should_publish ? "finalize failed" : "too few video frames");
   }
 
   // 阶段4: 原子设置最终状态
