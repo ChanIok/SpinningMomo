@@ -201,6 +201,8 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   Types::QueryAssetsFilters filters;
   filters.folder_id = params.folder_id;
   filters.include_subfolders = params.include_subfolders;
+  filters.created_at_from = params.created_at_from;
+  filters.created_at_to = params.created_at_to;
   filters.type = params.type;
   filters.search = params.search;
   filters.ratings = params.ratings;
@@ -275,6 +277,8 @@ auto get_assets_by_month(Core::State::AppState& app_state,
   query_params.filters.folder_id = params.folder_id;
   query_params.filters.include_subfolders = params.include_subfolders;
   query_params.filters.month = params.month;  // 关键：月份变成筛选条件
+  query_params.filters.created_at_from = params.created_at_from;
+  query_params.filters.created_at_to = params.created_at_to;
   query_params.filters.type = params.type;
   query_params.filters.search = params.search;
   query_params.filters.ratings = params.ratings;

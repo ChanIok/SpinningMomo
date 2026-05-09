@@ -267,6 +267,8 @@ export function useGalleryData() {
         includeSubfolders: filters.includeSubfolders,
         sortOrder: store.sortOrder,
         activeAssetId: store.selection.activeAssetId,
+        createdAtFrom: filters.createdAtFrom,
+        createdAtTo: filters.createdAtTo,
         type: filters.type,
         search: filters.search,
         ratings: filters.ratings,

@@ -124,6 +124,8 @@ export interface AssetFilter {
   type?: AssetType // photo, video, live_photo, unknown
   searchQuery?: string
   folderId?: string
+  createdAtFrom?: number
+  createdAtTo?: number // 结束日期的下一天 00:00，查询时使用半开区间
   ratings?: number[]
   reviewFlag?: ReviewFlag
   tagIds?: number[]

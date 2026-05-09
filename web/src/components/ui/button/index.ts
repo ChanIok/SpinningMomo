@@ -30,7 +30,7 @@ export const buttonVariants = cva(
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
         sm: 'h-8 rounded-md gap-1.5 px-3 has-[>svg]:px-2.5',
         /** 图库筛选触发按钮的紧凑尺寸 */
-        'filter-sm': 'h-8 max-w-[180px] shrink-0 gap-1.5 px-2 text-xs has-[>svg]:px-2',
+        'filter-sm': 'h-8 max-w-[240px] shrink-0 gap-1.5 px-2 text-xs has-[>svg]:px-2',
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
         icon: 'size-9',
         'icon-sm': 'size-8',

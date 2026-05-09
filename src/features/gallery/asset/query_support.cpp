@@ -124,6 +124,8 @@ auto build_unified_where_clause(const Features::Gallery::Types::QueryAssetsFilte
   const auto folder_id_column = qualify_asset_column("folder_id", asset_table_alias);
   const auto file_created_at_column = qualify_asset_column("file_created_at", asset_table_alias);
   const auto created_at_column = qualify_asset_column("created_at", asset_table_alias);
+  const auto created_at_expr =
+      std::format("COALESCE({}, {})", file_created_at_column, created_at_column);
   const auto type_column = qualify_asset_column("type", asset_table_alias);
   const auto name_column = qualify_asset_column("name", asset_table_alias);
   const auto id_column = qualify_asset_column("id", asset_table_alias);
@@ -163,6 +165,21 @@ auto build_unified_where_clause(const Features::Gallery::Types::QueryAssetsFilte
         std::format("strftime('%Y', datetime(COALESCE({}, {})/1000, 'unixepoch')) = ?",
                     file_created_at_column, created_at_column));
     params.push_back(filters.year.value());
+  }
+
+  if (filters.created_at_from.has_value() && filters.created_at_to.has_value() &&
+      filters.created_at_to.value() <= filters.created_at_from.value()) {
+    return std::unexpected("createdAtTo must be greater than createdAtFrom");
+  }
+
+  if (filters.created_at_from.has_value()) {
+    conditions.push_back(created_at_expr + " >= ?");
+    params.push_back(filters.created_at_from.value());
+  }
+
+  if (filters.created_at_to.has_value()) {
+    conditions.push_back(created_at_expr + " < ?");
+    params.push_back(filters.created_at_to.value());
   }
 
   if (filters.type.has_value() && !filters.type->empty()) {

@@ -7,6 +7,8 @@ export function toQueryAssetsFilters(
   return {
     folderId: filter.folderId ? Number(filter.folderId) : undefined,
     includeSubfolders: true,
+    createdAtFrom: filter.createdAtFrom,
+    createdAtTo: filter.createdAtTo,
     type: filter.type,
     search: filter.searchQuery,
     ratings: filter.ratings,

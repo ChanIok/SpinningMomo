@@ -300,6 +300,8 @@ struct TimelineBucketsParams {
   std::optional<bool> include_subfolders = false;
   std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
   std::optional<std::int64_t> active_asset_id;
+  std::optional<std::int64_t> created_at_from;
+  std::optional<std::int64_t> created_at_to;
   std::optional<std::string> type;
   std::optional<std::string> search;
   std::optional<std::vector<int>> ratings;  // 0 表示未评分，其它为 1~5 星
@@ -322,6 +324,8 @@ struct GetAssetsByMonthParams {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
   std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
+  std::optional<std::int64_t> created_at_from;
+  std::optional<std::int64_t> created_at_to;
   std::optional<std::string> type;
   std::optional<std::string> search;
   std::optional<std::vector<int>> ratings;  // 0 表示未评分，其它为 1~5 星
@@ -344,8 +348,10 @@ struct GetAssetsByMonthResponse {
 struct QueryAssetsFilters {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
-  std::optional<std::string> month;         // "2024-10" 格式
-  std::optional<std::string> year;          // "2024" 格式
+  std::optional<std::string> month;  // "2024-10" 格式
+  std::optional<std::string> year;   // "2024" 格式
+  std::optional<std::int64_t> created_at_from;
+  std::optional<std::int64_t> created_at_to;
   std::optional<std::string> type;          // "photo" | "video" | "live_photo"
   std::optional<std::string> search;        // 搜索关键词
   std::optional<std::vector<int>> ratings;  // 0 表示未评分，其它为 1~5 星

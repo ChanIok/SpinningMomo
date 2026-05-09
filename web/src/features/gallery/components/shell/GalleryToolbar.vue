@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { useElementSize } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { RangeCalendar } from '@/components/ui/range-calendar'
 import ColorPicker from '@/components/ui/color-picker/ColorPicker.vue'
+import { CalendarDate } from '@internationalized/date'
+import type { DateRange, DateValue } from 'reka-ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,7 +23,6 @@ import {
 import {
   ArrowUpDown,
   CalendarClock,
-  Camera,
   Check,
   ChevronDown,
   Flag,
@@ -54,7 +56,7 @@ import type {
 
 type SourceType = 'all' | 'folder' | 'tag'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const store = useGalleryStore()
 const galleryView = useGalleryView()
 
@@ -67,6 +69,8 @@ const activeColorHex = computed(() => filter.value.colorHex)
 const activeColorDistance = computed(
   () => (filter.value as AssetFilter & { colorDistance?: number }).colorDistance ?? 18
 )
+const activeDateFrom = computed(() => filter.value.createdAtFrom)
+const activeDateTo = computed(() => filter.value.createdAtTo)
 
 const COLOR_DISTANCE_MIN = 1
 const COLOR_DISTANCE_MAX = 40
@@ -77,6 +81,8 @@ const currentSliderPosition = computed(() => galleryView.getSliderPosition())
 const colorPopoverOpen = ref(false)
 const draftColorHex = ref(activeColorHex.value || '#FFFFFF')
 const draftColorDistance = ref(activeColorDistance.value)
+const datePopoverOpen = ref(false)
+const draftDateRange = shallowRef<DateRange>({ start: undefined, end: undefined })
 
 const toolbarRef = ref<HTMLElement | null>(null)
 const { width: toolbarWidth } = useElementSize(toolbarRef)
@@ -85,6 +91,8 @@ const isWide = computed(() => toolbarWidth.value >= 720)
 const hasAttributeFilters = computed(
   () =>
     Boolean(searchQuery.value) ||
+    activeDateFrom.value !== undefined ||
+    activeDateTo.value !== undefined ||
     filter.value.type !== undefined ||
     selectedRatings.value.length > 0 ||
     filter.value.reviewFlag !== undefined ||
@@ -131,6 +139,29 @@ const selectedRatings = computed(() => normalizeRatings(filter.value.ratings))
 const typeFilterLabel = computed(() => getTypeLabel(filter.value.type))
 const ratingFilterLabel = computed(() => getRatingLabel(selectedRatings.value))
 const reviewFlagFilterLabel = computed(() => getReviewFlagLabel(filter.value.reviewFlag))
+const displayDateRangeMillis = computed(() => {
+  const draftStart = draftDateRange.value.start
+  if (draftStart) {
+    const draftEnd = draftDateRange.value.end ?? draftStart
+    const [rangeStart, rangeEnd] = orderRangeDates(draftStart, draftEnd)
+    return {
+      from: calendarDateToLocalStartMillis(rangeStart),
+      to: calendarDateToExclusiveEndMillis(rangeEnd),
+    }
+  }
+
+  return {
+    from: activeDateFrom.value,
+    to: activeDateTo.value,
+  }
+})
+const displayDateFilterLabel = computed(() =>
+  getDateFilterLabel(displayDateRangeMillis.value.from, displayDateRangeMillis.value.to)
+)
+const hasDisplayDateRange = computed(
+  () =>
+    displayDateRangeMillis.value.from !== undefined || displayDateRangeMillis.value.to !== undefined
+)
 const sortOrderLabel = computed(() =>
   sortOrder.value === 'asc'
     ? t('gallery.toolbar.sortOrder.asc')
@@ -141,6 +172,15 @@ watch(colorPopoverOpen, (open) => {
   if (open) {
     draftColorHex.value = activeColorHex.value || '#FFFFFF'
     draftColorDistance.value = activeColorDistance.value
+  }
+})
+
+watch(datePopoverOpen, (open) => {
+  if (open) {
+    draftDateRange.value = {
+      start: millisToCalendarDate(activeDateFrom.value),
+      end: millisToCalendarDate(activeDateTo.value, true),
+    }
   }
 })
 
@@ -173,7 +213,6 @@ function findTagNameById(nodes: TagTreeNode[], id: number): string | null {
 function getTypeLabel(type?: AssetType): string {
   if (type === 'photo') return t('gallery.toolbar.filter.type.photo')
   if (type === 'video') return t('gallery.toolbar.filter.type.video')
-  if (type === 'live_photo') return t('gallery.toolbar.filter.type.livePhoto')
   return t('gallery.toolbar.filters.fileType')
 }
 
@@ -217,6 +256,102 @@ function getReviewFlagLabel(reviewFlag?: ReviewFlag): string {
   if (reviewFlag === 'picked') return t('gallery.toolbar.filter.flag.picked')
   if (reviewFlag === 'rejected') return t('gallery.toolbar.filter.flag.rejected')
   return t('gallery.toolbar.filters.reviewFlag')
+}
+
+function millisToCalendarDate(value?: number, exclusiveEnd = false): DateValue | undefined {
+  if (value === undefined) return undefined
+
+  const date = new Date(exclusiveEnd ? value - 1 : value)
+  if (!Number.isFinite(date.getTime())) return undefined
+
+  return new CalendarDate(date.getFullYear(), date.getMonth() + 1, date.getDate())
+}
+
+function calendarDateToLocalStartMillis(date: DateValue): number {
+  return new Date(date.year, date.month - 1, date.day).getTime()
+}
+
+function calendarDateToExclusiveEndMillis(date: DateValue): number {
+  return new Date(date.year, date.month - 1, date.day + 1).getTime()
+}
+
+function orderRangeDates(start: DateValue, end: DateValue): [DateValue, DateValue] {
+  return start.compare(end) <= 0 ? [start, end] : [end, start]
+}
+
+function formatDateMillis(value?: number, exclusiveEnd = false): string {
+  if (value === undefined) return ''
+
+  const date = new Date(exclusiveEnd ? value - 1 : value)
+  if (!Number.isFinite(date.getTime())) return ''
+
+  return new Intl.DateTimeFormat(locale.value, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+function getDateFilterLabel(from?: number, to?: number): string {
+  if (from === undefined && to === undefined) {
+    return t('gallery.toolbar.filters.date')
+  }
+
+  const fromLabel = formatDateMillis(from)
+  const toLabel = formatDateMillis(to, true)
+  if (fromLabel && toLabel && fromLabel === toLabel) {
+    return fromLabel
+  }
+  if (fromLabel && toLabel) {
+    return t('gallery.toolbar.dateFilter.rangeLabel', { from: fromLabel, to: toLabel })
+  }
+  if (fromLabel) {
+    return t('gallery.toolbar.dateFilter.fromLabel', { from: fromLabel })
+  }
+  return t('gallery.toolbar.dateFilter.toLabel', { to: toLabel })
+}
+
+function onDateRangeChange(value: DateRange) {
+  draftDateRange.value = value
+}
+
+function applyDateFilter() {
+  const start = draftDateRange.value.start
+  if (!start) {
+    clearDateFilter()
+    return
+  }
+
+  const end = draftDateRange.value.end ?? start
+  const [rangeStart, rangeEnd] = orderRangeDates(start, end)
+
+  galleryView.setFilter({
+    createdAtFrom: calendarDateToLocalStartMillis(rangeStart),
+    createdAtTo: calendarDateToExclusiveEndMillis(rangeEnd),
+  })
+  datePopoverOpen.value = false
+}
+
+function clearDateFilter(event?: Event) {
+  event?.preventDefault()
+  event?.stopPropagation()
+  galleryView.setFilter({
+    createdAtFrom: undefined,
+    createdAtTo: undefined,
+  })
+  draftDateRange.value = { start: undefined, end: undefined }
+  datePopoverOpen.value = false
+}
+
+function keepDatePopoverForCalendarSelect(event: CustomEvent<{ originalEvent?: Event }>) {
+  const originalEvent = event.detail?.originalEvent
+  const target = originalEvent?.target ?? event.target
+  if (!(target instanceof Element)) return
+
+  // 年月 Select 的焦点切换会被外层 Popover 识别为 outside，需要保留日期面板。
+  if (target.closest('[data-range-calendar-jump="true"]')) {
+    event.preventDefault()
+  }
 }
 
 function updateSearchQuery(query: string | number) {
@@ -323,6 +458,7 @@ function clearAttributeFilters() {
   galleryView.clearAttributeFilters()
   draftColorHex.value = '#FFFFFF'
   draftColorDistance.value = COLOR_DISTANCE_DEFAULT
+  draftDateRange.value = { start: undefined, end: undefined }
 }
 
 function setViewMode(
@@ -522,6 +658,61 @@ function onViewSizeSliderChange(value: number[] | undefined) {
         </PopoverContent>
       </Popover>
 
+      <Popover v-model:open="datePopoverOpen">
+        <PopoverTrigger as-child>
+          <Button
+            :variant="hasDisplayDateRange ? 'toolbarFilterActive' : 'toolbarFilter'"
+            size="filter-sm"
+          >
+            <CalendarClock class="h-4 w-4" />
+            <span class="min-w-0 truncate">{{ displayDateFilterLabel }}</span>
+            <span
+              v-if="hasDisplayDateRange"
+              class="-mr-1 rounded p-0.5 hover:text-foreground"
+              @pointerdown.stop.prevent
+              @click="clearDateFilter"
+            >
+              <X class="h-3.5 w-3.5" />
+            </span>
+            <ChevronDown v-else class="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          class="w-auto p-3"
+          @focus-outside="keepDatePopoverForCalendarSelect"
+          @interact-outside="keepDatePopoverForCalendarSelect"
+        >
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-xs font-medium">{{ t('gallery.toolbar.dateFilter.title') }}</p>
+                <p class="truncate text-[11px] text-muted-foreground">
+                  {{ displayDateFilterLabel }}
+                </p>
+              </div>
+            </div>
+
+            <RangeCalendar
+              :model-value="draftDateRange"
+              @update:model-value="onDateRangeChange"
+              :locale="locale"
+              initial-focus
+              class="p-0"
+            />
+
+            <div class="flex justify-end gap-2">
+              <Button variant="outline" size="sm" class="h-7 px-3 text-xs" @click="clearDateFilter">
+                {{ t('gallery.toolbar.dateFilter.clear') }}
+              </Button>
+              <Button size="sm" class="h-7 px-3 text-xs" @click="applyDateFilter">
+                {{ t('gallery.toolbar.dateFilter.apply') }}
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
       <Popover v-model:open="colorPopoverOpen">
         <PopoverTrigger as-child>
           <Button
@@ -639,10 +830,6 @@ function onViewSizeSliderChange(value: number[] | undefined) {
               <Video class="mr-2 h-4 w-4" />
               {{ t('gallery.toolbar.filter.type.video') }}
             </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="live_photo">
-              <Camera class="mr-2 h-4 w-4" />
-              {{ t('gallery.toolbar.filter.type.livePhoto') }}
-            </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -690,7 +877,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
                   :class="
                     rating > 0 && s <= rating
                       ? 'fill-amber-400 text-amber-400'
-                      : 'text-muted-foreground/30'
+                      : 'text-foreground/40'
                   "
                 />
               </span>

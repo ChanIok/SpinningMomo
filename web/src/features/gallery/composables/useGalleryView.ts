@@ -146,6 +146,8 @@ export function useGalleryView() {
   function clearAttributeFilters() {
     store.setFilter({
       searchQuery: undefined,
+      createdAtFrom: undefined,
+      createdAtTo: undefined,
       type: undefined,
       ratings: undefined,
       reviewFlag: undefined,

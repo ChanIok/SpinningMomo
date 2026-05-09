@@ -177,6 +177,8 @@ export interface QueryAssetsFilters {
   includeSubfolders?: boolean
   month?: string // "2024-10" 格式
   year?: string // "2024" 格式
+  createdAtFrom?: number
+  createdAtTo?: number
   type?: AssetType // photo, video, live_photo
   search?: string // 搜索关键词
   ratings?: number[]
@@ -246,6 +248,8 @@ export interface GetTimelineBucketsParams {
   includeSubfolders?: boolean
   sortOrder?: 'asc' | 'desc'
   activeAssetId?: number
+  createdAtFrom?: number
+  createdAtTo?: number
   type?: AssetType
   search?: string
   ratings?: number[]
@@ -268,6 +272,8 @@ export interface GetAssetsByMonthParams {
   folderId?: number
   includeSubfolders?: boolean
   sortOrder?: 'asc' | 'desc'
+  createdAtFrom?: number
+  createdAtTo?: number
   type?: AssetType
   search?: string
   ratings?: number[]
