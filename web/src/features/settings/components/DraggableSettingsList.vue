@@ -20,6 +20,7 @@ const props = defineProps<{
 
   // Customization
   addPlaceholder?: string
+  normalizeInput?: (value: string) => string
   validateInput?: (value: string) => boolean
   getLabel?: (id: string) => string
 }>()
@@ -54,7 +55,10 @@ const rafId = ref<number | null>(null)
 
 const handleAddItem = () => {
   if (!props.allowAdd) return
-  const value = newItemValue.value.trim()
+  const normalizedValue = props.normalizeInput
+    ? props.normalizeInput(newItemValue.value)
+    : newItemValue.value
+  const value = normalizedValue.trim()
   if (!value) return
   if (props.items.some((item) => item.id === value)) return // Exists
   if (props.validateInput && !props.validateInput(value)) return // Invalid

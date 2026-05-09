@@ -77,6 +77,22 @@ const getFeatureItemLabel = (id: string): string => {
   return id
 }
 
+const normalizeAspectRatioInput = (value: string): string => {
+  return value.normalize('NFKC').replace(/\s+/g, '')
+}
+
+const normalizeResolutionInput = (value: string): string => {
+  const normalized = value
+    .normalize('NFKC')
+    .replace(/\s+/g, '')
+    .replace(/[Xx*＊×]/g, 'x')
+  if (/^default$/i.test(normalized)) return 'Default'
+  return normalized.replace(
+    /(\d+)([kp])$/i,
+    (_, n: string, suffix: string) => `${n}${suffix.toUpperCase()}`
+  )
+}
+
 const validateAspectRatio = (value: string): boolean => {
   const regex = /^\d+:\d+$/
   return regex.test(value) && !value.includes('0:') && !value.includes(':0')
@@ -191,6 +207,7 @@ const handleResetSettings = async () => {
             :allow-remove="true"
             :show-toggle="false"
             :add-placeholder="t('settings.menu.aspectRatio.placeholder')"
+            :normalize-input="normalizeAspectRatioInput"
             :validate-input="validateAspectRatio"
             @reorder="handleAspectRatioReorder"
             @add="handleAspectRatioAdd"
@@ -205,6 +222,7 @@ const handleResetSettings = async () => {
             :allow-remove="true"
             :show-toggle="false"
             :add-placeholder="t('settings.menu.resolution.placeholder')"
+            :normalize-input="normalizeResolutionInput"
             :validate-input="validateResolution"
             @reorder="handleResolutionReorder"
             @add="handleResolutionAdd"
