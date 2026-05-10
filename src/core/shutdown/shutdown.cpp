@@ -10,6 +10,7 @@ import Core.WorkerPool;
 import Core.HttpServer;
 import Core.HttpClient;
 import Core.Commands;
+import Core.Database;
 import Core.State;
 import Features.Letterbox;
 import Features.Overlay;
@@ -89,6 +90,10 @@ auto shutdown_application(Core::State::AppState& state) -> void {
 
   // 停止工作线程池（等待所有任务完成）
   Core::WorkerPool::stop(*state.worker_pool);
+
+  if (state.database) {
+    Core::Database::shutdown(*state.database);
+  }
 
   Core::Async::stop(*state.async);
 

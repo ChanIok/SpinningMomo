@@ -36,6 +36,7 @@ auto create_ignore_rule(Core::State::AppState& app_state, const Types::IgnoreRul
       strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
       strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
     )
+    RETURNING id
   )";
 
   std::vector<Core::Database::Types::DbParam> params = {
@@ -48,20 +49,15 @@ auto create_ignore_rule(Core::State::AppState& app_state, const Types::IgnoreRul
       rule.description.has_value() ? Core::Database::Types::DbParam{rule.description.value()}
                                    : Core::Database::Types::DbParam{std::monostate{}}};
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
-  if (!result) {
-    return std::unexpected("Failed to create ignore rule: " + result.error());
+  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  if (!result || !result->has_value()) {
+    return std::unexpected("Failed to create ignore rule: " +
+                           (result ? std::string("missing returned ID") : result.error()));
   }
 
-  auto id_result =
-      Core::Database::query_scalar<int64_t>(*app_state.database, "SELECT last_insert_rowid()");
-  if (!id_result || !id_result->has_value()) {
-    return std::unexpected("Failed to get inserted rule ID");
-  }
-
-  Logger().info("Created ignore rule with ID {}: {}", id_result->value(), rule.rule_pattern);
+  Logger().info("Created ignore rule with ID {}: {}", result->value(), rule.rule_pattern);
   bump_ignore_rules_version(app_state);
-  return id_result->value();
+  return result->value();
 }
 
 auto get_ignore_rule_by_id(Core::State::AppState& app_state, std::int64_t id)
@@ -269,16 +265,15 @@ auto batch_update_ignore_rules(Core::State::AppState& app_state,
 
 auto delete_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t folder_id)
     -> std::expected<int, std::string> {
-  std::string sql = "DELETE FROM ignore_rules WHERE folder_id = ?";
+  std::string sql = "DELETE FROM ignore_rules WHERE folder_id = ? RETURNING id";
 
-  auto result = Core::Database::execute(*app_state.database, sql, {folder_id});
+  auto result =
+      Core::Database::query<Core::Database::ReturningIdRow>(*app_state.database, sql, {folder_id});
   if (!result) {
     return std::unexpected("Failed to delete rules by folder_id: " + result.error());
   }
 
-  // 获取删除的行数
-  auto count_result = Core::Database::query_scalar<int>(*app_state.database, "SELECT changes()");
-  int deleted_count = count_result && count_result->has_value() ? count_result->value() : 0;
+  auto deleted_count = static_cast<int>(result->size());
 
   Logger().info("Deleted {} ignore rules for folder_id {}", deleted_count, folder_id);
   if (deleted_count > 0) {
@@ -312,15 +307,15 @@ auto cleanup_orphaned_rules(Core::State::AppState& app_state) -> std::expected<i
     DELETE FROM ignore_rules 
     WHERE folder_id IS NOT NULL 
       AND folder_id NOT IN (SELECT id FROM folders)
+    RETURNING id
   )";
 
-  auto result = Core::Database::execute(*app_state.database, sql);
+  auto result = Core::Database::query<Core::Database::ReturningIdRow>(*app_state.database, sql);
   if (!result) {
     return std::unexpected("Failed to cleanup orphaned rules: " + result.error());
   }
 
-  auto count_result = Core::Database::query_scalar<int>(*app_state.database, "SELECT changes()");
-  int deleted_count = count_result && count_result->has_value() ? count_result->value() : 0;
+  auto deleted_count = static_cast<int>(result->size());
 
   if (deleted_count > 0) {
     Logger().info("Cleaned up {} orphaned ignore rules", deleted_count);

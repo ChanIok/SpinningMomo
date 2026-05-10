@@ -438,21 +438,16 @@ auto update_asset_description(Core::State::AppState& app_state,
                           : Core::Database::Types::DbParam{std::monostate{}});
   db_params.push_back(params.asset_id);
 
-  auto result = Core::Database::execute(
-      *app_state.database, "UPDATE assets SET description = ? WHERE id = ?", db_params);
+  auto result = Core::Database::query_scalar<std::int64_t>(
+      *app_state.database, "UPDATE assets SET description = ? WHERE id = ? RETURNING id",
+      db_params);
   if (!result) {
     return std::unexpected("Failed to update asset description: " + result.error());
   }
 
-  auto affected_result =
-      Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT changes()");
-  if (!affected_result) {
-    return std::unexpected("Failed to query updated asset count: " + affected_result.error());
-  }
-
   return Types::OperationResult{.success = true,
                                 .message = "Asset description updated successfully",
-                                .affected_count = affected_result->value_or(0)};
+                                .affected_count = result->has_value() ? 1 : 0};
 }
 
 // ============= 维护服务实现 =============

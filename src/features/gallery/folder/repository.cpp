@@ -19,6 +19,7 @@ auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder
                 path, parent_id, name, display_name, 
                 sort_order, is_hidden
             ) VALUES (?, ?, ?, ?, ?, ?)
+            RETURNING id
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
@@ -37,19 +38,13 @@ auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder
   params.push_back(static_cast<int64_t>(folder.sort_order));
   params.push_back(folder.is_hidden);
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
-  if (!result) {
-    return std::unexpected("Failed to insert folder: " + result.error());
+  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  if (!result || !result->has_value()) {
+    return std::unexpected("Failed to insert folder: " +
+                           (result ? std::string("missing returned ID") : result.error()));
   }
 
-  // 获取插入的 ID
-  auto id_result =
-      Core::Database::query_scalar<int64_t>(*app_state.database, "SELECT last_insert_rowid()");
-  if (!id_result) {
-    return std::unexpected("Failed to get inserted folder ID: " + id_result.error());
-  }
-
-  return id_result->value_or(0);
+  return result->value();
 }
 
 auto get_folder_by_path(Core::State::AppState& app_state, const std::string& path)

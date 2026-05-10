@@ -43,6 +43,7 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
                 description, width, height, size, extension, mime_type, hash, folder_id,
                 file_created_at, file_modified_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id
         )";
 
   std::vector<Core::Database::Types::DbParam> params;
@@ -83,19 +84,13 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
                        ? Core::Database::Types::DbParam{item.file_modified_at.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
-  if (!result) {
-    return std::unexpected("Failed to insert asset item: " + result.error());
+  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  if (!result || !result->has_value()) {
+    return std::unexpected("Failed to insert asset item: " +
+                           (result ? std::string("missing returned ID") : result.error()));
   }
 
-  // 获取插入的 ID
-  auto id_result =
-      Core::Database::query_scalar<int64_t>(*app_state.database, "SELECT last_insert_rowid()");
-  if (!id_result) {
-    return std::unexpected("Failed to get inserted ID: " + id_result.error());
-  }
-
-  return id_result->value_or(0);
+  return result->value();
 }
 
 auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)

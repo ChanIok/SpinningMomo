@@ -274,21 +274,14 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
   return Core::Database::execute_transaction(
       *app_state.database, [&](auto& db_state) -> std::expected<std::int64_t, std::string> {
         // 1. 基于路径匹配，删除该目录下及所有子目录内的资产记录
-        auto delete_assets_result =
-            Core::Database::execute(db_state, "DELETE FROM assets WHERE path = ? OR path LIKE ?",
-                                    {root_path, root_path + "/%"});
+        auto delete_assets_result = Core::Database::query<Core::Database::ReturningIdRow>(
+            db_state, "DELETE FROM assets WHERE path = ? OR path LIKE ? RETURNING id",
+            {root_path, root_path + "/%"});
         if (!delete_assets_result) {
           return std::unexpected("Failed to delete assets under root path: " +
                                  delete_assets_result.error());
         }
-
-        auto deleted_assets_result =
-            Core::Database::query_scalar<std::int64_t>(db_state, "SELECT changes()");
-        if (!deleted_assets_result) {
-          return std::unexpected("Failed to query deleted assets count: " +
-                                 deleted_assets_result.error());
-        }
-        auto deleted_assets = deleted_assets_result->value_or(0);
+        auto deleted_assets = static_cast<std::int64_t>(delete_assets_result->size());
 
         // 2. 使用递归 CTE 查找并删除该文件夹及其所有嵌套级别的子文件夹记录
         std::string delete_folders_sql = R"(
@@ -302,22 +295,16 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
             )
             SELECT id FROM folder_tree
           )
+          RETURNING id
         )";
 
-        auto delete_folders_result =
-            Core::Database::execute(db_state, delete_folders_sql, {root_folder_id});
+        auto delete_folders_result = Core::Database::query<Core::Database::ReturningIdRow>(
+            db_state, delete_folders_sql, {root_folder_id});
         if (!delete_folders_result) {
           return std::unexpected("Failed to delete folders under root: " +
                                  delete_folders_result.error());
         }
-
-        auto deleted_folders_result =
-            Core::Database::query_scalar<std::int64_t>(db_state, "SELECT changes()");
-        if (!deleted_folders_result) {
-          return std::unexpected("Failed to query deleted folders count: " +
-                                 deleted_folders_result.error());
-        }
-        auto deleted_folders = deleted_folders_result->value_or(0);
+        auto deleted_folders = static_cast<std::int64_t>(delete_folders_result->size());
 
         return deleted_assets + deleted_folders;
       });

@@ -19,6 +19,7 @@ auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& 
   std::string sql = R"(
             INSERT INTO tags (name, parent_id, sort_order)
             VALUES (?, ?, ?)
+            RETURNING id
         )";
 
   std::vector<Core::Database::Types::DbParam> db_params;
@@ -30,19 +31,13 @@ auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& 
 
   db_params.push_back(static_cast<std::int64_t>(params.sort_order.value_or(0)));
 
-  auto result = Core::Database::execute(*app_state.database, sql, db_params);
-  if (!result) {
-    return std::unexpected("Failed to create tag: " + result.error());
+  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, db_params);
+  if (!result || !result->has_value()) {
+    return std::unexpected("Failed to create tag: " +
+                           (result ? std::string("missing returned ID") : result.error()));
   }
 
-  // 获取插入的 ID
-  auto id_result =
-      Core::Database::query_scalar<std::int64_t>(*app_state.database, "SELECT last_insert_rowid()");
-  if (!id_result) {
-    return std::unexpected("Failed to get inserted tag ID: " + id_result.error());
-  }
-
-  return id_result->value_or(0);
+  return result->value();
 }
 
 auto get_tag_by_id(Core::State::AppState& app_state, std::int64_t id)
@@ -237,22 +232,17 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
         constexpr std::string_view kInsertSql = R"(
                 INSERT OR IGNORE INTO asset_tags (asset_id, tag_id)
                 VALUES (?, ?)
+                RETURNING asset_id
             )";
 
         for (const auto asset_id : normalized_asset_ids) {
-          auto insert_result =
-              Core::Database::execute(db_state, std::string(kInsertSql), {asset_id, params.tag_id});
+          auto insert_result = Core::Database::query_scalar<std::int64_t>(
+              db_state, std::string(kInsertSql), {asset_id, params.tag_id});
           if (!insert_result) {
             return std::unexpected("Failed to add tag to asset: " + insert_result.error());
           }
 
-          auto changes_result =
-              Core::Database::query_scalar<std::int64_t>(db_state, "SELECT changes()");
-          if (!changes_result) {
-            return std::unexpected("Failed to query inserted tag relation count: " +
-                                   changes_result.error());
-          }
-          affected_count += changes_result->value_or(0);
+          affected_count += insert_result->has_value() ? 1 : 0;
         }
 
         return affected_count;
