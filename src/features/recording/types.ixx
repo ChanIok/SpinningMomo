@@ -100,7 +100,7 @@ export struct RecordingConfig {
   // 音频配置
   Utils::Media::AudioCapture::AudioSource audio_source =
       Utils::Media::AudioCapture::AudioSource::System;  // 音频源类型 (默认系统音频)
-  std::uint32_t audio_bitrate = 256'000;                // 音频码率 (默认 256kbps)
+  std::uint32_t audio_bitrate = 192'000;                // 音频码率 (默认 192kbps)
 };
 
 // 录制状态枚举

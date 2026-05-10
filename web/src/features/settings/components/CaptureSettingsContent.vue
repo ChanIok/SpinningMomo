@@ -75,7 +75,7 @@ const inputBitrateMbps = ref(
 const inputQuality = ref(appSettings.value?.features?.recording?.quality || 70)
 const inputQp = ref(appSettings.value?.features?.recording?.qp || 23)
 const inputAudioBitrateKbps = ref(
-  (appSettings.value?.features?.recording?.audioBitrate || 320000) / 1000
+  (appSettings.value?.features?.recording?.audioBitrate || 192000) / 1000
 )
 const inputFps = ref(appSettings.value?.features?.recording?.fps || 60)
 
@@ -208,9 +208,9 @@ const handleReplayBufferDurationChange = async () => {
 const handleResetSettings = async () => {
   await resetCaptureExportSettings()
   inputBitrateMbps.value = 80
-  inputQuality.value = 100
+  inputQuality.value = 80
   inputQp.value = 23
-  inputAudioBitrateKbps.value = 320
+  inputAudioBitrateKbps.value = 192
   inputFps.value = 60
   inputMotionPhotoDuration.value = 3
   inputMotionPhotoFps.value = 30
@@ -657,7 +657,6 @@ const handleResetSettings = async () => {
                 v-model.number="inputAudioBitrateKbps"
                 type="number"
                 :min="64"
-                :max="512"
                 class="w-24"
                 @blur="handleAudioBitrateChange"
                 @keydown.enter="handleAudioBitrateChange"

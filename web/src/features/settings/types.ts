@@ -343,7 +343,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       captureCursor: false,
       autoRestartOnResize: true,
       audioSource: 'system',
-      audioBitrate: 320000,
+      audioBitrate: 192000,
     },
   },
 

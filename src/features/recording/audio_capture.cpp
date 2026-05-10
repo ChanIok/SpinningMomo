@@ -52,6 +52,11 @@ auto start_capture_thread(Features::Recording::State::RecordingState& state) -> 
 
             sample->AddBuffer(buffer.get());
             sample->SetSampleTime(timestamp_100ns);
+            if (state.audio.wave_format && state.audio.wave_format->nSamplesPerSec > 0) {
+              const auto duration_100ns = static_cast<LONGLONG>(num_frames) * 10'000'000 /
+                                          state.audio.wave_format->nSamplesPerSec;
+              sample->SetSampleDuration(duration_100ns);
+            }
 
             std::lock_guard write_lock(state.encoder_write_mutex);
             HRESULT hr = encoder.sink_writer->WriteSample(encoder.audio_stream_index, sample.get());

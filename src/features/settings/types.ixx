@@ -164,7 +164,7 @@ export struct AppSettings {
 
       // 音频配置
       std::string audio_source = "system";    // 音频源: "none" | "system" | "game_only"
-      std::uint32_t audio_bitrate = 320'000;  // 音频码率 (bps)，默认 320kbps
+      std::uint32_t audio_bitrate = 192'000;  // 音频码率 (bps)，默认 192kbps
     } recording;
   } features;
 
