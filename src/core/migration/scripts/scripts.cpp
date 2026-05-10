@@ -16,13 +16,16 @@ namespace Core::Migration::Scripts {
 // 执行 SQL Schema 迁移的辅助函数
 template <typename SchemaModule>
 auto execute_sql_schema(Core::State::AppState& app_state) -> std::expected<void, std::string> {
-  for (const auto& sql : SchemaModule::statements) {
-    auto result = Core::Database::execute(*app_state.database, std::string(sql));
-    if (!result) {
-      return std::unexpected(std::format("SQL execution failed: {}", result.error()));
-    }
-  }
-  return {};
+  return Core::Database::execute_transaction(
+      *app_state.database, [](auto& db_state) -> std::expected<void, std::string> {
+        for (const auto& sql : SchemaModule::statements) {
+          auto result = Core::Database::execute(db_state, std::string(sql));
+          if (!result) {
+            return std::unexpected(std::format("SQL execution failed: {}", result.error()));
+          }
+        }
+        return {};
+      });
 }
 
 // Migration: 2.0.0.0 - Initialize database schema
