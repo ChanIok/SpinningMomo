@@ -144,7 +144,6 @@
   <Fragment>
     <ComponentGroup Id="MainComponents" Directory="INSTALLFOLDER">
       <File Source="$(var.DistDir)\SpinningMomo.exe" />
-      <File Source="$(var.DistDir)\LEGAL.md" />
       <File Source="$(var.DistDir)\LICENSE" />
     </ComponentGroup>
   </Fragment>

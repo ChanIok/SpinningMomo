@@ -1,8 +1,9 @@
+[English](https://spin.infinitymomo.com/en) | [简体中文](README.md)
 <div align="center">
   <h1>
     <img src="./docs/public/logo.png" width="200" alt="SpinningMomo Logo">
     <br/>
-    🎮 旋转吧大喵
+    旋转吧大喵
     <br/><br/>
     <sup>《无限暖暖》游戏摄影与录像工具</sup>
     <br/>
@@ -15,18 +16,11 @@
     <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square" />
   </p>
 
-  <p>
-    <b>
-      <a href="https://spin.infinitymomo.com">📖 使用文档</a> •
-      <a href="https://spin.infinitymomo.com/dev/build-guide">🛠️ 构建指南</a> •
-      <a href="https://spin.infinitymomo.com/en/">🌐 English</a>
-    </b>
-  </p>
 
   <img src="./docs/public/README.webp" alt="Screenshot" >
 </div>
 
-## 🎯 项目简介
+## 简介
 
 旋转吧大喵（SpinningMomo）
 
@@ -36,32 +30,38 @@
 
 ▸ 专为《无限暖暖》优化，同时兼容多数窗口化运行的其他游戏
 
-> 🚧 v2.0 正在翻工中，部分功能尚未就绪。
-> 如需稳定版，请下载 [v0.7.7 旧版本](https://github.com/ChanIok/SpinningMomo/releases/tag/v0.7.7)，使用说明见 [v0.7.7 文档](https://chaniok.github.io/SpinningMomo/v0/)。
+> v2.0 正在翻工中，部分功能尚未就绪。
+> 如需稳定版，请下载 [v0.7.7 旧版本](https://github.com/ChanIok/SpinningMomo/releases/tag/v0.7.7)，使用说明见 [v0.7.7 文档](https://spin.infinitymomo.com/v0/)。
 
-### 📥 下载地址
+### 下载地址
 
 - **GitHub Release**：[点击下载最新版本](https://github.com/ChanIok/SpinningMomo/releases/latest)
 - **百度网盘**：[点击下载](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo)（提取码：momo）
 
-### 📖 使用指南
+### 使用指南
 
- 查看 [使用文档](https://chaniok.github.io/SpinningMomo) 了解更多详细信息。
+ 查看 [使用文档](https://spin.infinitymomo.com) 了解更多详细信息。
 
-### 🛠️ 构建指南
+### 构建指南
 
-查看 [构建指南](https://chaniok.github.io/SpinningMomo/dev/build-guide) 了解环境要求和构建步骤。
+查看 [构建指南](https://spin.infinitymomo.com/zh/developer/architecture) 了解环境要求和构建步骤。
 
-## 🗺️ 开发状态
+## 开发状态
 
-✅ **已完成**：录制功能、图库功能（基础）
+**已完成**：录制功能、图库功能（基础）、地图功能
 
-🔨 **进行中**：地图功能、UI优化、HDR支持
+**进行中**：UI优化、HDR支持
 
-## 🙏 致谢
+## 致谢
 
-照片数据解析服务由 [NUAN5.PRO](https://NUAN5.PRO) 强力驱动。
+感谢 [NUAN5.PRO](https://NUAN5.PRO) 提供照片数据解析服务支持。
 
-## 📄 声明
+本项目使用的第三方开源项目及其许可信息请见 [CREDITS.md](CREDITS.md)。
 
-本项目采用 [GPL 3.0 协议](LICENSE) 开源。项目图标来自游戏《无限暖暖》，版权归属游戏开发商。使用前请阅读 [法律与隐私说明](https://spin.infinitymomo.com/zh/about/legal)。
+## 声明
+
+本项目采用 [GPL 3.0 协议](LICENSE) 开源。
+
+使用前请阅读 [法律与隐私说明](https://spin.infinitymomo.com/zh/about/legal)。
+
+项目图标来自游戏《无限暖暖》，版权归属游戏开发商。

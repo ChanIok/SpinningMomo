@@ -13,6 +13,7 @@
     "build:portable": "node scripts/build-portable.js",
     "build:installer": "powershell -ExecutionPolicy Bypass -File scripts/build-msi.ps1",
     "build:checksums": "node scripts/generate-checksums.js",
+    "dev:web": "cd web && npm run dev",
     "release": "npm run build && npm run build:portable && npm run build:installer && npm run build:checksums",
     "release:version": "node scripts/release-version.js",
     "format:cpp": "node scripts/format-cpp.js",

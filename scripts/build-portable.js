@@ -18,7 +18,6 @@ function main() {
   // Verify dist directory exists with required files
   const exePath = path.join(distDir, "SpinningMomo.exe");
   const resourcesDir = path.join(distDir, "resources");
-  const legalPath = path.join(distDir, "LEGAL.md");
   const licensePath = path.join(distDir, "LICENSE");
 
   if (!fs.existsSync(exePath)) {
@@ -28,10 +27,6 @@ function main() {
 
   if (!fs.existsSync(resourcesDir)) {
     console.error("dist/resources not found. Run 'npm run build' first.");
-    process.exit(1);
-  }
-  if (!fs.existsSync(legalPath)) {
-    console.error("dist/LEGAL.md not found. Run 'npm run build' first.");
     process.exit(1);
   }
   if (!fs.existsSync(licensePath)) {
@@ -55,7 +50,7 @@ function main() {
   }
 
   // Create ZIP using PowerShell (Windows native, no extra dependencies)
-  const filesToZip = ["SpinningMomo.exe", "resources", "LEGAL.md", "LICENSE", "portable"]
+  const filesToZip = ["SpinningMomo.exe", "resources", "LICENSE", "portable"]
     .map((f) => `"${path.join(distDir, f)}"`)
     .join(", ");
 
