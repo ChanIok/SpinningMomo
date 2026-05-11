@@ -30,41 +30,42 @@ auto start_capture_thread(Features::Recording::State::RecordingState& state) -> 
       },
       // is_active
       [&state]() -> bool {
-        return state.status.load(std::memory_order_acquire) ==
-                   Features::Recording::Types::RecordingStatus::Recording &&
-               state.encoder.has_audio;
+        return state.accepting_input.load(std::memory_order_acquire) &&
+               !state.finish_requested.load(std::memory_order_acquire) &&
+               state.has_audio.load(std::memory_order_acquire);
       },
-      // on_packet: 在锁外创建 MF Sample，只在写入时加锁
+      // on_packet: 只复制音频数据并入队，SinkWriter 只在录制编码线程中使用。
       [&state](const BYTE* data, UINT32 num_frames, UINT32 bytes_per_frame,
                std::int64_t timestamp_100ns) {
-        auto& encoder = state.encoder;
-        DWORD buffer_size = num_frames * bytes_per_frame;
-        wil::com_ptr<IMFSample> sample;
-        wil::com_ptr<IMFMediaBuffer> buffer;
-
-        if (SUCCEEDED(MFCreateSample(sample.put())) &&
-            SUCCEEDED(MFCreateMemoryBuffer(buffer_size, buffer.put()))) {
-          BYTE* buffer_data = nullptr;
-          if (SUCCEEDED(buffer->Lock(&buffer_data, nullptr, nullptr))) {
-            std::memcpy(buffer_data, data, buffer_size);
-            buffer->Unlock();
-            buffer->SetCurrentLength(buffer_size);
-
-            sample->AddBuffer(buffer.get());
-            sample->SetSampleTime(timestamp_100ns);
-            if (state.audio.wave_format && state.audio.wave_format->nSamplesPerSec > 0) {
-              const auto duration_100ns = static_cast<LONGLONG>(num_frames) * 10'000'000 /
-                                          state.audio.wave_format->nSamplesPerSec;
-              sample->SetSampleDuration(duration_100ns);
-            }
-
-            std::lock_guard write_lock(state.encoder_write_mutex);
-            HRESULT hr = encoder.sink_writer->WriteSample(encoder.audio_stream_index, sample.get());
-            if (FAILED(hr)) {
-              Logger().error("Failed to write audio sample: {:08X}", static_cast<uint32_t>(hr));
-            }
-          }
+        if (!data || num_frames == 0 || bytes_per_frame == 0 ||
+            !state.accepting_input.load(std::memory_order_acquire)) {
+          return;
         }
+
+        State::QueuedAudioPacket packet;
+        packet.num_frames = num_frames;
+        packet.bytes_per_frame = bytes_per_frame;
+        packet.timestamp_100ns = timestamp_100ns;
+        if (state.audio.wave_format) {
+          packet.sample_rate = state.audio.wave_format->nSamplesPerSec;
+        }
+
+        const auto byte_count = static_cast<std::size_t>(num_frames) * bytes_per_frame;
+        packet.data.resize(byte_count);
+        std::memcpy(packet.data.data(), data, byte_count);
+
+        {
+          std::lock_guard queue_lock(state.queue_mutex);
+          if (!state.accepting_input.load(std::memory_order_acquire)) {
+            return;
+          }
+          if (state.audio_queue.size() >= State::k_max_audio_queue_size) {
+            state.audio_queue.pop_front();
+            state.dropped_audio_packets.fetch_add(1, std::memory_order_relaxed);
+          }
+          state.audio_queue.push_back(std::move(packet));
+        }
+        state.queue_cv.notify_one();
       });
 }
 

@@ -67,11 +67,17 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
   auto status = state.recording->status.load(std::memory_order_acquire);
 
   if (status == Features::Recording::Types::RecordingStatus::Recording) {
-    // 停止录制（保存路径在 stop 前读取，stop 不清理 config）
+    // 停止录制前先保存目标路径，stop 会清理当前录制段状态。
     std::filesystem::path saved_path = state.recording->config.output_path;
     Features::Recording::stop(*state.recording);
-    show_recording_notification(state, state.i18n->texts["message.recording_saved"] +
-                                           Utils::String::ToUtf8(saved_path.wstring()));
+    std::error_code ec;
+    if (std::filesystem::exists(saved_path, ec) && !ec) {
+      show_recording_notification(state, state.i18n->texts["message.recording_saved"] +
+                                             Utils::String::ToUtf8(saved_path.wstring()));
+    } else {
+      show_recording_notification(state, state.i18n->texts["message.recording_stop_failed"] +
+                                             Utils::String::ToUtf8(saved_path.wstring()));
+    }
     notify_recording_toggled(state, false);
   } else if (status == Features::Recording::Types::RecordingStatus::Idle) {
     // 开始录制
