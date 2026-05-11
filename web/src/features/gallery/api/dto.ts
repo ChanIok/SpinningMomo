@@ -1,4 +1,4 @@
-import type { Asset, AssetType, ReviewFlag, SortBy, SortOrder } from '../types'
+import type { Asset, AssetType, ReviewFlag, SortBy, SortOrder, Tag } from '../types'
 
 // =========================
 // Gallery API DTO (RPC types)
@@ -53,6 +53,11 @@ export interface AddTagToAssetsParams {
   tagId: number
 }
 
+export interface RemoveTagFromAssetsParams {
+  assetIds: number[]
+  tagId: number
+}
+
 // 从资产移除标签参数
 export interface RemoveTagsFromAssetParams {
   assetId: number
@@ -92,6 +97,13 @@ export interface AssetMainColor {
   g: number
   b: number
   weight: number
+}
+
+export interface BatchSelectionSummary {
+  selectedCount: number
+  rating: number | null
+  rejectedState: boolean | null
+  commonTags: Tag[]
 }
 
 // 忽略规则类型

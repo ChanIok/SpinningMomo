@@ -361,6 +361,7 @@ export function useGalleryAssetActions() {
 
       // 审片是高频操作：成功后优先 patch 当前已加载数据，避免等待整页重载。
       store.patchAssetsReviewState(selectedAssetIds.value, payload)
+      store.patchBatchSummaryReviewState(payload)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       toast.error(t('gallery.review.update.failedTitle'), {
@@ -394,6 +395,42 @@ export function useGalleryAssetActions() {
     await clearSelectedAssetsReviewFlag()
   }
 
+  async function addTagToSelectedAssets(tagId: number) {
+    const assetIds = [...new Set(selectedAssetIds.value)].filter((assetId) => assetId > 0)
+    if (assetIds.length === 0) {
+      return
+    }
+
+    const result = await galleryApi.addTagToAssets({
+      assetIds,
+      tagId,
+    })
+
+    if (!result.success && (result.affectedCount ?? 0) === 0) {
+      throw new Error(result.message)
+    }
+
+    await refreshTagViewsAfterMutation()
+  }
+
+  async function removeTagFromSelectedAssets(tagId: number) {
+    const assetIds = [...new Set(selectedAssetIds.value)].filter((assetId) => assetId > 0)
+    if (assetIds.length === 0) {
+      return
+    }
+
+    const result = await galleryApi.removeTagFromAssets({
+      assetIds,
+      tagId,
+    })
+
+    if (!result.success && (result.affectedCount ?? 0) === 0) {
+      throw new Error(result.message)
+    }
+
+    await refreshTagViewsAfterMutation()
+  }
+
   return {
     selectedAssetIds,
     hasSelection,
@@ -415,5 +452,7 @@ export function useGalleryAssetActions() {
     clearSelectedAssetsReviewFlag,
     setSelectedAssetsRejected,
     clearSelectedAssetsRejected,
+    addTagToSelectedAssets,
+    removeTagFromSelectedAssets,
   }
 }

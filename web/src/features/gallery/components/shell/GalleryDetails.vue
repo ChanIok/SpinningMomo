@@ -16,8 +16,9 @@ import { useGalleryAssetActions } from '../../composables'
 import {
   getAssetMainColors,
   getAssetTags,
-  removeTagsFromAsset,
   addTagsToAsset,
+  getBatchSelectionSummary,
+  removeTagsFromAsset,
   updateAssetDescription,
 } from '../../api'
 import { getInfinityNikkiDetails } from '@/extensions/infinity_nikki/api'
@@ -54,6 +55,24 @@ const activeAsset = computed(() => {
 const { getAssetThumbnailUrl, getAssetUrl } = useGalleryData()
 
 const selectedCount = computed(() => store.selectedCount)
+const batchSummary = computed(() => store.batchSummary)
+const batchSummaryLoading = computed(() => store.batchSummaryLoading)
+const batchCommonTags = computed(() => batchSummary.value?.commonTags ?? [])
+const batchSelectedTagIds = computed(() => batchCommonTags.value.map((tag) => tag.id))
+const batchReviewRating = computed(() => batchSummary.value?.rating ?? 0)
+const batchRatingIndeterminate = computed(
+  () =>
+    batchSummaryLoading.value || batchSummary.value === null || batchSummary.value.rating === null
+)
+const batchReviewFlag = computed(() =>
+  batchSummary.value?.rejectedState === true ? 'rejected' : 'none'
+)
+const batchFlagIndeterminate = computed(
+  () =>
+    batchSummaryLoading.value ||
+    batchSummary.value === null ||
+    batchSummary.value.rejectedState === null
+)
 
 function findLoadedAssetById(id: number): Asset | null {
   for (const pageAssets of store.paginatedAssets.values()) {
@@ -69,6 +88,8 @@ const batchActiveAsset = computed(() => {
   if (detailsFocus.value.type !== 'batch') return null
   if (store.selection.selectedIds.size === 0) return null
 
+  // 批量详情分成两层：
+  // 上半部分读选择集摘要；这里只负责给下半部分“当前焦点项预览”找一个可展示的资产。
   const activeIndex = store.selection.activeIndex
   if (activeIndex !== undefined) {
     const [currentAsset] = store.getAssetsInRange(activeIndex, activeIndex)
@@ -144,6 +165,38 @@ const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
 const assetDescriptionDraft = ref('')
 const isSavingAssetDescription = ref(false)
 
+async function reloadBatchSummary() {
+  if (detailsFocus.value.type !== 'batch') {
+    store.resetBatchSummary()
+    return
+  }
+
+  const assetIds = Array.from(new Set(store.selection.selectedIds)).filter((id) => id > 0)
+  if (assetIds.length === 0) {
+    store.resetBatchSummary()
+    return
+  }
+
+  const requestVersion = store.beginBatchSummaryRefresh()
+
+  try {
+    const summary = await getBatchSelectionSummary(assetIds)
+    // 选择集可能在请求返回前已变化；只接受最新那次请求的结果。
+    if (!store.isBatchSummaryRequestCurrent(requestVersion)) {
+      return
+    }
+
+    store.setBatchSummary(summary)
+  } catch (error) {
+    if (store.isBatchSummaryRequestCurrent(requestVersion)) {
+      store.setBatchSummary(null)
+    }
+    console.error('Failed to load batch selection summary:', error)
+  } finally {
+    store.finishBatchSummaryRefresh(requestVersion)
+  }
+}
+
 // 监听 activeAsset 变化，加载详情数据
 watch(
   [activeAsset, infinityNikkiEnabled],
@@ -177,6 +230,15 @@ watch(
 watch(
   () => store.assetTagsVersion,
   async () => {
+    if (detailsFocus.value.type === 'batch') {
+      try {
+        await reloadBatchSummary()
+      } catch (error) {
+        console.error('Failed to reload batch summary:', error)
+      }
+      return
+    }
+
     if (!activeAsset.value) {
       return
     }
@@ -194,6 +256,22 @@ watch(
   () => activeAsset.value?.id,
   () => {
     assetDescriptionDraft.value = activeAsset.value?.description ?? ''
+  },
+  { immediate: true }
+)
+
+watch(
+  () => ({
+    type: detailsFocus.value.type,
+    selectedIds: Array.from(store.selection.selectedIds),
+  }),
+  async ({ type, selectedIds }) => {
+    if (type !== 'batch' || selectedIds.length === 0) {
+      store.resetBatchSummary()
+      return
+    }
+
+    await reloadBatchSummary()
   },
   { immediate: true }
 )
@@ -248,6 +326,28 @@ async function handleToggleTag(tagId: number) {
     await reloadActiveAssetTags()
   } catch (error) {
     console.error('Failed to toggle tag:', error)
+  }
+}
+
+async function handleRemoveBatchTag(tagId: number) {
+  try {
+    await assetActions.removeTagFromSelectedAssets(tagId)
+  } catch (error) {
+    console.error('Failed to remove tag from selection:', error)
+  }
+}
+
+async function handleToggleBatchTag(tagId: number) {
+  const hasTag = batchCommonTags.value.some((tag) => tag.id === tagId)
+
+  try {
+    if (hasTag) {
+      await assetActions.removeTagFromSelectedAssets(tagId)
+    } else {
+      await assetActions.addTagToSelectedAssets(tagId)
+    }
+  } catch (error) {
+    console.error('Failed to toggle tag on selection:', error)
   }
 }
 
@@ -639,14 +739,81 @@ async function handleCopyColorHex(color: AssetMainColor) {
         <div class="space-y-2">
           <h4 class="text-sm font-medium">{{ t('gallery.details.review.title') }}</h4>
           <AssetReviewControls
-            :rating="batchActiveAsset?.rating ?? 0"
-            :review-flag="batchActiveAsset?.reviewFlag ?? 'none'"
-            :rating-indeterminate="true"
+            :rating="batchReviewRating"
+            :review-flag="batchReviewFlag"
+            :rating-indeterminate="batchRatingIndeterminate"
+            :flag-indeterminate="batchFlagIndeterminate"
             @set-rating="handleSetRating"
             @clear-rating="handleClearRating"
             @set-flag="handleSetRejected"
             @clear-flag="handleClearRejected"
           />
+        </div>
+
+        <div>
+          <div class="mb-2 flex items-center justify-between">
+            <h4 class="text-sm font-medium">{{ t('gallery.details.tags.title') }}</h4>
+            <Popover v-model:open="showTagSelector">
+              <PopoverTrigger as-child>
+                <Button variant="ghost" size="sm" class="h-6 gap-1 px-2 text-xs">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="M12 5v14" />
+                  </svg>
+                  {{ t('gallery.details.tags.add') }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" class="p-0">
+                <TagSelectorPopover
+                  :tags="store.tags"
+                  :selected-tag-ids="batchSelectedTagIds"
+                  @toggle="handleToggleBatchTag"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div v-if="batchCommonTags.length > 0" class="flex flex-wrap gap-1.5">
+            <span
+              v-for="tag in batchCommonTags"
+              :key="tag.id"
+              class="group inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs text-primary transition-colors hover:bg-primary/20"
+            >
+              <span>{{ tag.name }}</span>
+              <button
+                class="flex h-3 w-3 items-center justify-center rounded-full opacity-60 transition-opacity hover:bg-primary/30 hover:opacity-100"
+                @click="handleRemoveBatchTag(tag.id)"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </span>
+          </div>
+          <div v-else class="text-xs text-muted-foreground">
+            {{ t('gallery.details.tags.empty') }}
+          </div>
         </div>
 
         <template v-if="batchActiveAsset">

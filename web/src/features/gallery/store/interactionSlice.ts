@@ -1,5 +1,11 @@
 import { reactive, computed, ref, type Ref } from 'vue'
-import type { Asset, SelectionState, LightboxState, DetailsPanelFocus } from '../types'
+import type {
+  Asset,
+  SelectionState,
+  LightboxState,
+  DetailsPanelFocus,
+  BatchSelectionSummary,
+} from '../types'
 import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from './persistence'
 
 interface InteractionSliceArgs {
@@ -54,6 +60,9 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
   const hasSelection = computed(() => selectedCount.value > 0)
   // 右侧详情的标签列表不是 query 资产字段的一部分，用独立版本号驱动重载最直接。
   const assetTagsVersion = ref(0)
+  const batchSummary = ref<BatchSelectionSummary | null>(null)
+  const batchSummaryLoading = ref(false)
+  const batchSummaryRequestVersion = ref(0)
 
   function patchAssetsReviewState(
     assetIds: number[],
@@ -130,6 +139,50 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
 
   function bumpAssetTagsVersion() {
     assetTagsVersion.value += 1
+  }
+
+  function beginBatchSummaryRefresh(): number {
+    // 批量摘要跟随选择集变化很频繁；每次开始新请求都先清空旧摘要，
+    // 避免用户在快速切换选择时看到过期的“公共评分/公共标签”。
+    batchSummaryRequestVersion.value += 1
+    batchSummaryLoading.value = true
+    batchSummary.value = null
+    return batchSummaryRequestVersion.value
+  }
+
+  function finishBatchSummaryRefresh(version: number) {
+    if (batchSummaryRequestVersion.value === version) {
+      batchSummaryLoading.value = false
+    }
+  }
+
+  function isBatchSummaryRequestCurrent(version: number): boolean {
+    return batchSummaryRequestVersion.value === version
+  }
+
+  function setBatchSummary(summary: BatchSelectionSummary | null) {
+    batchSummary.value = summary
+  }
+
+  function resetBatchSummary() {
+    batchSummaryRequestVersion.value += 1
+    batchSummaryLoading.value = false
+    batchSummary.value = null
+  }
+
+  function patchBatchSummaryReviewState(updates: Partial<Pick<Asset, 'rating' | 'reviewFlag'>>) {
+    if (detailsPanel.type !== 'batch' || batchSummary.value === null) {
+      return
+    }
+
+    // 批量评分/弃置成功后先同步摘要层，避免等异步重查期间右侧面板短暂回弹到旧状态。
+    batchSummary.value = {
+      ...batchSummary.value,
+      ...(updates.rating !== undefined ? { rating: updates.rating } : {}),
+      ...(updates.reviewFlag !== undefined
+        ? { rejectedState: updates.reviewFlag === 'rejected' }
+        : {}),
+    }
   }
 
   function selectAsset(id: number, selected: boolean, multi = false) {
@@ -275,6 +328,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     resetLightboxView()
 
     assetTagsVersion.value = 0
+    resetBatchSummary()
     clearDetailsFocus()
   }
 
@@ -285,9 +339,18 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     selectedCount,
     hasSelection,
     assetTagsVersion,
+    batchSummary,
+    batchSummaryLoading,
+    batchSummaryRequestVersion,
     patchAssetsReviewState,
     patchAssetDescription,
+    patchBatchSummaryReviewState,
     bumpAssetTagsVersion,
+    beginBatchSummaryRefresh,
+    finishBatchSummaryRefresh,
+    isBatchSummaryRequestCurrent,
+    setBatchSummary,
+    resetBatchSummary,
     selectAsset,
     clearSelection,
     replaceSelection,

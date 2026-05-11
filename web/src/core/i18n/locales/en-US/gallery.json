@@ -53,7 +53,7 @@
   "gallery.details.batch.focusUnavailable": "Current focus item is unavailable (it may not be loaded yet or was filtered out).",
   "gallery.details.batch.helpTitle": "Batch Review",
   "gallery.details.batch.placeholder": "Coming soon...",
-  "gallery.details.batch.reviewHint": "Use 0~5, P, X and U to update the current selection quickly.",
+  "gallery.details.batch.reviewHint": "Use 0~5, X and U to update the current selection quickly.",
   "gallery.details.batch.selectedCount": "{count} item(s) selected",
   "gallery.details.batch.title": "Batch Actions",
   "gallery.details.colors.copyFailed": "Failed to copy color",

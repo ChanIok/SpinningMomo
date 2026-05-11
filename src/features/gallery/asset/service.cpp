@@ -34,6 +34,27 @@ auto build_in_clause_placeholders(std::size_t count) -> std::string {
   return placeholders;
 }
 
+auto normalize_asset_ids(const std::vector<std::int64_t>& asset_ids)
+    -> std::pair<std::vector<std::int64_t>, std::int64_t> {
+  std::vector<std::int64_t> normalized_asset_ids;
+  normalized_asset_ids.reserve(asset_ids.size());
+  std::unordered_set<std::int64_t> seen_asset_ids;
+  std::int64_t invalid_count = 0;
+
+  for (const auto asset_id : asset_ids) {
+    if (asset_id <= 0) {
+      ++invalid_count;
+      continue;
+    }
+
+    if (seen_asset_ids.insert(asset_id).second) {
+      normalized_asset_ids.push_back(asset_id);
+    }
+  }
+
+  return {std::move(normalized_asset_ids), invalid_count};
+}
+
 auto is_valid_review_flag(const std::string& review_flag) -> bool {
   return review_flag == "none" || review_flag == "picked" || review_flag == "rejected";
 }
@@ -347,6 +368,103 @@ auto get_home_stats(Core::State::AppState& app_state)
   }
 
   return result.value().value_or(Types::HomeStats{});
+}
+
+auto get_batch_selection_summary(Core::State::AppState& app_state,
+                                 const Types::BatchSelectionSummaryParams& params)
+    -> std::expected<Types::BatchSelectionSummary, std::string> {
+  auto [normalized_asset_ids, invalid_count] = normalize_asset_ids(params.asset_ids);
+
+  Types::BatchSelectionSummary summary{
+      .selected_count = static_cast<std::int64_t>(normalized_asset_ids.size()),
+      .rating = std::nullopt,
+      .rejected_state = std::nullopt,
+      .common_tags = {},
+  };
+
+  if (invalid_count > 0 || normalized_asset_ids.empty()) {
+    return summary;
+  }
+
+  const auto placeholders = build_in_clause_placeholders(normalized_asset_ids.size());
+
+  struct BatchReviewAggregate {
+    std::int64_t matched_count = 0;
+    std::int64_t distinct_ratings = 0;
+    std::optional<int> min_rating;
+    std::int64_t rejected_count = 0;
+  };
+
+  const auto aggregate_sql = std::format(R"(
+    SELECT
+      COUNT(*) AS matched_count,
+      COUNT(DISTINCT rating) AS distinct_ratings,
+      MIN(rating) AS min_rating,
+      COALESCE(SUM(CASE WHEN review_flag = 'rejected' THEN 1 ELSE 0 END), 0) AS rejected_count
+    FROM assets
+    WHERE id IN ({})
+  )",
+                                         placeholders);
+
+  std::vector<Core::Database::Types::DbParam> aggregate_params;
+  aggregate_params.reserve(normalized_asset_ids.size());
+  for (const auto asset_id : normalized_asset_ids) {
+    aggregate_params.push_back(asset_id);
+  }
+
+  auto aggregate_result = Core::Database::query_single<BatchReviewAggregate>(
+      *app_state.database, aggregate_sql, aggregate_params);
+  if (!aggregate_result) {
+    return std::unexpected("Failed to query batch selection summary: " + aggregate_result.error());
+  }
+
+  const auto aggregate = aggregate_result->value_or(BatchReviewAggregate{});
+  // 摘要必须严格对应“当前真实选择集”；
+  // 只要有 id 非法、缺失或不在库里，就回退到中性态，避免前端把部分结果误当成全量摘要。
+  if (aggregate.matched_count != static_cast<std::int64_t>(normalized_asset_ids.size())) {
+    return summary;
+  }
+
+  if (aggregate.distinct_ratings == 1) {
+    summary.rating = aggregate.min_rating.value_or(0);
+  }
+
+  if (aggregate.rejected_count == aggregate.matched_count) {
+    summary.rejected_state = true;
+  } else if (aggregate.rejected_count == 0) {
+    summary.rejected_state = false;
+  }
+
+  const auto common_tags_sql = std::format(R"(
+    SELECT
+      t.id,
+      t.name,
+      t.parent_id,
+      t.sort_order,
+      t.created_at,
+      t.updated_at
+    FROM tags t
+    INNER JOIN asset_tags at ON t.id = at.tag_id
+    WHERE at.asset_id IN ({})
+    GROUP BY t.id, t.name, t.parent_id, t.sort_order, t.created_at, t.updated_at
+    HAVING COUNT(DISTINCT at.asset_id) = ?
+    ORDER BY t.sort_order, t.name
+  )",
+                                           placeholders);
+
+  std::vector<Core::Database::Types::DbParam> tag_params = aggregate_params;
+  tag_params.push_back(aggregate.matched_count);
+
+  auto common_tags_result =
+      Core::Database::query<Types::Tag>(*app_state.database, common_tags_sql, tag_params);
+  if (!common_tags_result) {
+    return std::unexpected("Failed to query common tags for batch selection: " +
+                           common_tags_result.error());
+  }
+
+  // 批量标签区只显示交集，不显示并集或部分命中的标签。
+  summary.common_tags = std::move(common_tags_result.value());
+  return summary;
 }
 
 auto update_assets_review_state(Core::State::AppState& app_state,

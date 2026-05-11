@@ -12,6 +12,27 @@ import Utils.Logger;
 
 namespace Features::Gallery::Tag::Repository {
 
+auto normalize_asset_ids(const std::vector<std::int64_t>& asset_ids)
+    -> std::pair<std::vector<std::int64_t>, std::int64_t> {
+  std::vector<std::int64_t> normalized_asset_ids;
+  normalized_asset_ids.reserve(asset_ids.size());
+  std::unordered_set<std::int64_t> seen_asset_ids;
+  std::int64_t invalid_count = 0;
+
+  for (const auto asset_id : asset_ids) {
+    if (asset_id <= 0) {
+      ++invalid_count;
+      continue;
+    }
+
+    if (seen_asset_ids.insert(asset_id).second) {
+      normalized_asset_ids.push_back(asset_id);
+    }
+  }
+
+  return {std::move(normalized_asset_ids), invalid_count};
+}
+
 // ============= 基本 CRUD 操作 =============
 
 auto create_tag(Core::State::AppState& app_state, const Types::CreateTagParams& params)
@@ -198,20 +219,7 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
     return std::unexpected("Tag id must be greater than 0");
   }
 
-  std::vector<std::int64_t> normalized_asset_ids;
-  normalized_asset_ids.reserve(params.asset_ids.size());
-  std::unordered_set<std::int64_t> seen_asset_ids;
-  std::int64_t invalid_count = 0;
-
-  for (const auto asset_id : params.asset_ids) {
-    if (asset_id <= 0) {
-      ++invalid_count;
-      continue;
-    }
-    if (seen_asset_ids.insert(asset_id).second) {
-      normalized_asset_ids.push_back(asset_id);
-    }
-  }
+  auto [normalized_asset_ids, invalid_count] = normalize_asset_ids(params.asset_ids);
 
   if (normalized_asset_ids.empty()) {
     return Types::OperationResult{
@@ -259,6 +267,68 @@ auto add_tag_to_assets(Core::State::AppState& app_state, const Types::AddTagToAs
   return Types::OperationResult{
       .success = true,
       .message = "Tag added to assets successfully",
+      .affected_count = affected_count,
+      .failed_count = invalid_count > 0 ? std::optional<std::int64_t>{invalid_count} : std::nullopt,
+      .unchanged_count = unchanged_count,
+  };
+}
+
+auto remove_tag_from_assets(Core::State::AppState& app_state,
+                            const Types::RemoveTagFromAssetsParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  if (params.tag_id <= 0) {
+    return std::unexpected("Tag id must be greater than 0");
+  }
+
+  auto [normalized_asset_ids, invalid_count] = normalize_asset_ids(params.asset_ids);
+  if (normalized_asset_ids.empty()) {
+    return Types::OperationResult{
+        .success = true,
+        .message = "No valid assets to remove tag from",
+        .affected_count = 0,
+        .failed_count =
+            invalid_count > 0 ? std::optional<std::int64_t>{invalid_count} : std::nullopt,
+        .unchanged_count = 0,
+    };
+  }
+
+  // 这里按“一个标签 -> 多个资产”的粒度做对称批处理，
+  // 这样能和 add_tag_to_assets 共用同一套前端交互模型与结果语义。
+  std::string placeholders = std::string(normalized_asset_ids.size() * 2 - 1, '?');
+  for (size_t i = 1; i < normalized_asset_ids.size(); ++i) {
+    placeholders[i * 2 - 1] = ',';
+  }
+
+  std::string sql = std::format(R"(
+            DELETE FROM asset_tags
+            WHERE tag_id = ? AND asset_id IN ({})
+            RETURNING asset_id
+        )",
+                                placeholders);
+
+  struct DeletedAssetId {
+    std::int64_t asset_id = 0;
+  };
+
+  std::vector<Core::Database::Types::DbParam> db_params;
+  db_params.reserve(normalized_asset_ids.size() + 1);
+  db_params.push_back(params.tag_id);
+  for (const auto asset_id : normalized_asset_ids) {
+    db_params.push_back(asset_id);
+  }
+
+  auto result = Core::Database::query<DeletedAssetId>(*app_state.database, sql, db_params);
+  if (!result) {
+    return std::unexpected("Failed to remove tag from assets: " + result.error());
+  }
+
+  const auto affected_count = static_cast<std::int64_t>(result->size());
+  const auto unchanged_count =
+      static_cast<std::int64_t>(normalized_asset_ids.size()) - affected_count;
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Tag removed from assets successfully",
       .affected_count = affected_count,
       .failed_count = invalid_count > 0 ? std::optional<std::int64_t>{invalid_count} : std::nullopt,
       .unchanged_count = unchanged_count,

@@ -31,6 +31,10 @@ export auto get_asset_main_colors(Core::State::AppState& app_state,
 export auto get_home_stats(Core::State::AppState& app_state)
     -> std::expected<Types::HomeStats, std::string>;
 
+export auto get_batch_selection_summary(Core::State::AppState& app_state,
+                                        const Types::BatchSelectionSummaryParams& params)
+    -> std::expected<Types::BatchSelectionSummary, std::string>;
+
 export auto update_assets_review_state(Core::State::AppState& app_state,
                                        const Types::UpdateAssetsReviewStateParams& params)
     -> std::expected<Types::OperationResult, std::string>;

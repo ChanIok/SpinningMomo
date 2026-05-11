@@ -84,6 +84,13 @@ struct Tag {
   std::int64_t updated_at;
 };
 
+struct BatchSelectionSummary {
+  std::int64_t selected_count = 0;
+  std::optional<int> rating;
+  std::optional<bool> rejected_state;
+  std::vector<Tag> common_tags;
+};
+
 struct TagTreeNode {
   std::int64_t id;
   std::string name;
@@ -415,6 +422,11 @@ struct AddTagToAssetsParams {
   std::int64_t tag_id = 0;
 };
 
+struct RemoveTagFromAssetsParams {
+  std::vector<std::int64_t> asset_ids;
+  std::int64_t tag_id = 0;
+};
+
 struct RemoveTagsFromAssetParams {
   std::int64_t asset_id;
   std::vector<std::int64_t> tag_ids;
@@ -422,6 +434,10 @@ struct RemoveTagsFromAssetParams {
 
 struct GetAssetTagsParams {
   std::int64_t asset_id;
+};
+
+struct BatchSelectionSummaryParams {
+  std::vector<std::int64_t> asset_ids;
 };
 
 struct UpdateAssetsReviewStateParams {

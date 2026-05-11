@@ -111,6 +111,20 @@ auto handle_get_home_stats(Core::State::AppState& app_state,
   co_return result.value();
 }
 
+auto handle_get_batch_selection_summary(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::BatchSelectionSummaryParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::BatchSelectionSummary> {
+  auto result = Features::Gallery::Asset::Service::get_batch_selection_summary(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  co_return result.value();
+}
+
 // ============= 资产动作 RPC 处理函数 =============
 
 auto handle_open_asset_default(Core::State::AppState& app_state,
@@ -313,6 +327,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
   register_method<EmptyParams, Features::Gallery::Types::HomeStats>(
       app_state, app_state.rpc->registry, "gallery.getHomeStats", handle_get_home_stats,
       "Get home page gallery stats summary");
+
+  register_method<Features::Gallery::Types::BatchSelectionSummaryParams,
+                  Features::Gallery::Types::BatchSelectionSummary>(
+      app_state, app_state.rpc->registry, "gallery.getBatchSelectionSummary",
+      handle_get_batch_selection_summary,
+      "Get the aggregated review and common-tag summary for the current selection");
 
   register_method<Features::Gallery::Types::GetParams, Features::Gallery::Types::OperationResult>(
       app_state, app_state.rpc->registry, "gallery.openAssetDefault", handle_open_asset_default,

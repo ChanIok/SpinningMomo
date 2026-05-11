@@ -22,11 +22,13 @@ import type {
   UpdateTagParams,
   AddTagsToAssetParams,
   AddTagToAssetsParams,
+  RemoveTagFromAssetsParams,
   RemoveTagsFromAssetParams,
   UpdateAssetsReviewStateParams,
   MoveAssetsToFolderParams,
   UpdateAssetDescriptionParams,
   AssetReachability,
+  BatchSelectionSummary,
 } from './api/dto'
 import { transformInfinityNikkiTree } from '@/extensions/infinity_nikki'
 import { useI18n } from '@/core/i18n'
@@ -488,6 +490,19 @@ export async function getHomeStats(): Promise<HomeStats> {
   }
 }
 
+export async function getBatchSelectionSummary(assetIds: number[]): Promise<BatchSelectionSummary> {
+  try {
+    const result = await call<BatchSelectionSummary>('gallery.getBatchSelectionSummary', {
+      assetIds,
+    })
+
+    return result
+  } catch (error) {
+    console.error('Failed to get batch selection summary:', error)
+    throw new Error('获取批量选择摘要失败')
+  }
+}
+
 /**
  * 为资产添加标签
  */
@@ -521,6 +536,23 @@ export async function addTagToAssets(params: AddTagToAssetsParams): Promise<Oper
   } catch (error) {
     console.error('Failed to add tag to assets:', error)
     throw new Error('批量添加标签失败')
+  }
+}
+
+export async function removeTagFromAssets(
+  params: RemoveTagFromAssetsParams
+): Promise<OperationResult> {
+  try {
+    console.log('🗑️ 从多个资产移除标签:', params.assetIds.length, params.tagId)
+
+    const result = await call<OperationResult>('gallery.removeTagFromAssets', params)
+
+    console.log('✅ 批量标签移除完成:', result.message)
+
+    return result
+  } catch (error) {
+    console.error('Failed to remove tag from assets:', error)
+    throw new Error('批量移除标签失败')
   }
 }
 
@@ -621,10 +653,12 @@ export const galleryApi = {
   deleteTag,
   getTagStats,
   getHomeStats,
+  getBatchSelectionSummary,
 
   // 资产-标签关联
   addTagsToAsset,
   addTagToAssets,
+  removeTagFromAssets,
   removeTagsFromAsset,
   getAssetTags,
   getTagsByAssetIds,
