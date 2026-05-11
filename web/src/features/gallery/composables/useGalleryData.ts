@@ -118,16 +118,42 @@ export function useGalleryData() {
       return
     }
 
-    // 原资产已不在新结果集里：清空 active，并在灯箱场景下直接退出，避免跳到错误图片。
+    // 资产详情/暗房是当前查询结果集的连续浏览器：当前资产消失时，落到同索引的新资产。
     if (activeAssetIndex === undefined) {
+      const detailsTracksActiveAsset =
+        store.detailsPanel.type === 'asset' && store.detailsPanel.asset.id === activeAssetId
+      const detailsTracksSelection = detailsTracksActiveAsset || store.detailsPanel.type === 'batch'
+      const shouldRestoreAdjacentFocus = store.lightbox.isOpen || detailsTracksSelection
+
+      if (shouldRestoreAdjacentFocus && store.totalCount > 0) {
+        const targetIndex = Math.min(store.selection.activeIndex ?? 0, store.totalCount - 1)
+        const targetPage = Math.floor(targetIndex / store.perPage) + 1
+        if (!store.isPageLoaded(targetPage)) {
+          await loadPage(targetPage)
+          if (requestVersion !== undefined && !store.isQueryVersionCurrent(requestVersion)) {
+            return
+          }
+        }
+
+        const targetAsset = store.getAssetsInRange(targetIndex, targetIndex)[0]
+        if (targetAsset) {
+          store.setActiveAsset(targetAsset.id, targetIndex)
+          store.replaceSelection([targetAsset.id])
+          store.setSelectionAnchor(targetIndex)
+          store.setDetailsFocus({ type: 'asset', asset: targetAsset })
+          return
+        }
+      }
+
       if (store.lightbox.isOpen) {
         store.closeLightbox()
       }
 
-      if (store.detailsPanel.type === 'asset' && store.detailsPanel.asset.id === activeAssetId) {
+      if (detailsTracksSelection) {
         store.clearDetailsFocus()
       }
 
+      store.clearSelection()
       store.clearActiveAsset()
       return
     }

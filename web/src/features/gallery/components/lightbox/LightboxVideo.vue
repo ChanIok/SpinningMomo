@@ -187,7 +187,7 @@ function handleNext() {
         <div
           v-if="currentAsset && !videoError"
           :key="currentAsset.id"
-          class="relative overflow-hidden rounded-lg shadow-2xl"
+          class="relative overflow-hidden"
           :style="stageStyle"
         >
           <img
@@ -210,7 +210,6 @@ function handleNext() {
             preload="metadata"
             @loadeddata="handleVideoLoadedData"
             @error="handleVideoError"
-            @contextmenu.prevent
           />
         </div>
 

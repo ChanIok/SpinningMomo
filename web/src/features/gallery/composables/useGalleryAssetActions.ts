@@ -171,7 +171,7 @@ export function useGalleryAssetActions() {
     }
 
     const ids = [...selectedAssetIds.value]
-    const previousActiveIndex = store.selection.activeIndex
+    const previousActiveAssetId = store.selection.activeAssetId
 
     try {
       const result = await galleryApi.moveAssetsToTrash(ids)
@@ -187,20 +187,13 @@ export function useGalleryAssetActions() {
         )
       }
 
-      // 等待 gallery.changed 统一刷新，先做最小本地修复避免短暂状态错乱。
+      // 先做最小本地修复；当前焦点被删除时主动刷新，由查询协调层重建焦点。
       const nextSelectedIds = selectedAssetIds.value.filter((id) => !ids.includes(id))
       store.replaceSelection(nextSelectedIds)
       store.setSelectionAnchor(undefined)
 
-      const activeAssetId = store.selection.activeAssetId
-      if (activeAssetId !== undefined && ids.includes(activeAssetId)) {
-        if (store.lightbox.isOpen) {
-          store.closeLightbox()
-        }
-        store.clearActiveAsset()
-        if (previousActiveIndex !== undefined && previousActiveIndex > 0) {
-          store.setSelectionActive(previousActiveIndex - 1)
-        }
+      if (previousActiveAssetId !== undefined && ids.includes(previousActiveAssetId)) {
+        await galleryData.refreshCurrentQuery()
       }
 
       if (result.success) {

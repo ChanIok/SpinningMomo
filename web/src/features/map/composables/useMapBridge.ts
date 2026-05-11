@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { Router } from 'vue-router'
+import { useGallerySelection } from '@/features/gallery/composables'
 import { useGalleryStore } from '@/features/gallery/store'
 import {
   ACTION_EVAL_SCRIPT,
@@ -90,6 +91,7 @@ function buildSerializableRuntimePayload(
 
 export function useMapBridge(options: UseMapBridgeOptions) {
   const { mapIframe, mapStore, galleryStore, router } = options
+  const gallerySelection = useGallerySelection()
 
   function postRuntimeSync() {
     const contentWindow = mapIframe.value?.contentWindow
@@ -145,7 +147,16 @@ export function useMapBridge(options: UseMapBridgeOptions) {
 
       const assetIndex = Number(data.payload?.assetIndex)
       const normalizedAssetIndex = Number.isFinite(assetIndex) ? assetIndex : 0
-      galleryStore.setActiveAsset(assetId, normalizedAssetIndex)
+      const selectedAsset = await gallerySelection.selectOnlyIndex(normalizedAssetIndex)
+      if (!selectedAsset || selectedAsset.id !== assetId) {
+        console.warn('[MapBridge] Ignored stale gallery asset request:', {
+          assetId,
+          assetIndex: normalizedAssetIndex,
+          selectedAssetId: selectedAsset?.id,
+        })
+        return
+      }
+
       galleryStore.openLightbox()
 
       try {
