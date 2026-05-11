@@ -1,5 +1,7 @@
 module;
 
+#include <winrt/Windows.Graphics.Capture.h>
+
 export module Features.Recording.State;
 
 import std;
@@ -8,6 +10,7 @@ import Utils.Graphics.Capture;
 import Utils.Graphics.CaptureRegion;
 import Utils.Media.AudioCapture;
 import Utils.Media.Encoder.State;
+import Utils.Timeout;
 import <d3d11.h>;
 import <wil/com.h>;
 import <windows.h>;
@@ -34,6 +37,7 @@ enum class RecordingControlAction {
   None,
   Toggle,
   RestartAfterResize,
+  CleanupD3D,
   ShutdownStop,
 };
 
@@ -64,6 +68,8 @@ struct RecordingState {
   // D3D / WGC / 音频 / 编码器资源
   wil::com_ptr<ID3D11Device> device;
   wil::com_ptr<ID3D11DeviceContext> context;
+  winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
+  bool d3d_initialized = false;
   Utils::Graphics::Capture::CaptureSession capture_session;
   wil::com_ptr<ID3D11Texture2D> cropped_texture;
   Utils::Media::AudioCapture::AudioCaptureContext audio;
@@ -110,6 +116,9 @@ struct RecordingState {
   // control_request_mutex: 只保护 pending_action，不包住真正的 start/stop。
   std::mutex control_request_mutex;
   std::condition_variable control_cv;
+
+  // 延迟释放可复用 D3D 资源，优化高频启停体验。
+  std::optional<Utils::Timeout::Timeout> cleanup_timer;
 };
 
 }  // namespace Features::Recording::State

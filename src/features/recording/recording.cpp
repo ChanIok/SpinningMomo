@@ -47,6 +47,8 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
            HWND target_window, const Features::Recording::Types::RecordingConfig& config)
     -> std::expected<void, std::string>;
 auto stop(Features::Recording::State::RecordingState& state) -> void;
+auto request_control_action(Features::Recording::State::RecordingState& state,
+                            Features::Recording::State::RecordingControlAction action) -> bool;
 
 auto resolve_capture_plan(HWND target_window, bool capture_client_area, int frame_width,
                           int frame_height)
@@ -245,14 +247,12 @@ auto clear_queues(State::RecordingState& state) -> void {
   state.audio_queue.clear();
 }
 
-auto clear_runtime_fields(State::RecordingState& state) -> void {
-  // 完整清空一个录制段的运行态。调用前必须保证相关线程已经停好或尚未启动。
+auto clear_session_runtime_fields(State::RecordingState& state) -> void {
+  // 清空一个录制段的会话态，不动可复用 D3D 设备。
   state.config = {};
   state.working_output_path.clear();
   state.target_window = nullptr;
   state.capture_plan = {};
-  state.device = nullptr;
-  state.context = nullptr;
   state.capture_session = {};
   state.cropped_texture = nullptr;
   state.encoder = {};
@@ -274,6 +274,13 @@ auto clear_runtime_fields(State::RecordingState& state) -> void {
   state.encoder_error.clear();
 }
 
+auto clear_persistent_runtime_fields(State::RecordingState& state) -> void {
+  state.winrt_device = nullptr;
+  state.context = nullptr;
+  state.device = nullptr;
+  state.d3d_initialized = false;
+}
+
 auto notify_encoder_ready(State::RecordingState& state, bool succeeded, std::string error = {})
     -> void {
   // 编码器在编码线程里创建。start() 会等这个信号，确认能不能真正开始捕获。
@@ -291,6 +298,67 @@ auto notify_encoder_ready(State::RecordingState& state, bool succeeded, std::str
 auto wait_encoder_ready(State::RecordingState& state) -> void {
   std::unique_lock ready_lock(state.encoder_ready_mutex);
   state.encoder_ready_cv.wait(ready_lock, [&state]() { return state.encoder_ready; });
+}
+
+auto cancel_cleanup_timer(State::RecordingState& state) -> void {
+  if (state.cleanup_timer && state.cleanup_timer->is_pending()) {
+    state.cleanup_timer->cancel();
+  }
+}
+
+auto start_cleanup_timer(State::RecordingState& state) -> void {
+  if (!state.d3d_initialized) {
+    return;
+  }
+
+  if (!state.cleanup_timer) {
+    state.cleanup_timer.emplace();
+  }
+
+  cancel_cleanup_timer(state);
+  auto result = state.cleanup_timer->set_timeout(std::chrono::milliseconds(5000), [&state]() {
+    request_control_action(state, State::RecordingControlAction::CleanupD3D);
+  });
+  if (!result) {
+    Logger().warn("Failed to set recording D3D cleanup timer");
+    return;
+  }
+
+  Logger().debug("Recording D3D cleanup timer started (5 seconds)");
+}
+
+auto cleanup_d3d_resources(State::RecordingState& state) -> void {
+  cancel_cleanup_timer(state);
+  clear_persistent_runtime_fields(state);
+}
+
+auto ensure_d3d_resources_ready(State::RecordingState& state) -> std::expected<void, std::string> {
+  if (state.d3d_initialized && state.device && state.context && state.winrt_device) {
+    return {};
+  }
+
+  auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
+  if (!d3d_result) {
+    cleanup_d3d_resources(state);
+    return std::unexpected("Failed to create D3D device: " + d3d_result.error());
+  }
+  state.device = d3d_result->first;
+  state.context = d3d_result->second;
+
+  wil::com_ptr<ID3D11Multithread> multithread;
+  if (SUCCEEDED(state.device->QueryInterface(IID_PPV_ARGS(multithread.put())))) {
+    multithread->SetMultithreadProtected(TRUE);
+  }
+
+  auto winrt_device_result = Utils::Graphics::Capture::create_winrt_device(state.device.get());
+  if (!winrt_device_result) {
+    cleanup_d3d_resources(state);
+    return std::unexpected("Failed to create WinRT device: " + winrt_device_result.error());
+  }
+
+  state.winrt_device = *winrt_device_result;
+  state.d3d_initialized = true;
+  return {};
 }
 
 auto pop_next_queued_item(State::RecordingState& state) -> QueuedItem {
@@ -583,6 +651,18 @@ auto request_control_action(Features::Recording::State::RecordingState& state,
       state.control_cv.notify_one();
       return true;
     }
+
+    if (action == State::RecordingControlAction::CleanupD3D) {
+      if (state.pending_action == State::RecordingControlAction::ShutdownStop ||
+          state.pending_action == State::RecordingControlAction::Toggle ||
+          state.pending_action == State::RecordingControlAction::RestartAfterResize) {
+        return false;
+      }
+
+      state.pending_action = action;
+      state.control_cv.notify_one();
+      return true;
+    }
   }
 
   return false;
@@ -608,6 +688,14 @@ auto handle_control_action(Core::State::AppState& app_state,
         handlers.on_shutdown_stop();
       }
       return false;
+
+    case State::RecordingControlAction::CleanupD3D:
+      if (state.status.load(std::memory_order_acquire) ==
+          Features::Recording::Types::RecordingStatus::Idle) {
+        cleanup_d3d_resources(state);
+        Logger().debug("Recording reusable D3D resources cleaned up");
+      }
+      return true;
 
     default:
       return true;
@@ -744,7 +832,6 @@ auto restart_after_resize(Core::State::AppState& app_state,
 
 auto initialize(Features::Recording::State::RecordingState& state)
     -> std::expected<void, std::string> {
-  clear_runtime_fields(state);
   if (FAILED(MFStartup(MF_VERSION))) {
     return std::unexpected("Failed to initialize Media Foundation");
   }
@@ -914,7 +1001,7 @@ auto cleanup_failed_start(State::RecordingState& state, std::string_view reason)
   Features::Recording::AudioCapture::cleanup(state.audio);
   Utils::Graphics::Capture::cleanup_capture_session(state.capture_session);
   delete_working_output_file(state.working_output_path, reason);
-  clear_runtime_fields(state);
+  clear_session_runtime_fields(state);
 }
 
 auto start(Core::State::AppState& app_state, Features::Recording::State::RecordingState& state,
@@ -927,7 +1014,8 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
     return std::unexpected("Recording is not idle");
   }
 
-  clear_runtime_fields(state);
+  clear_session_runtime_fields(state);
+  cancel_cleanup_timer(state);
 
   // 先算清楚这次录制的源尺寸和输出尺寸。编码器创建后，宽高就不能再改。
   auto capture_plan_result = build_startup_capture_plan(target_window, config.capture_client_area);
@@ -944,25 +1032,11 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
   state.config.width = static_cast<std::uint32_t>(capture_plan_result->output_width);
   state.config.height = static_cast<std::uint32_t>(capture_plan_result->output_height);
 
-  // 录制用独立的 D3D 设备，不复用预览或其他模块的设备，减少互相影响。
-  auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
-  if (!d3d_result) {
-    clear_runtime_fields(state);
-    return std::unexpected("Failed to create D3D device: " + d3d_result.error());
-  }
-  state.device = d3d_result->first;
-  state.context = d3d_result->second;
-
-  wil::com_ptr<ID3D11Multithread> multithread;
-  if (SUCCEEDED(state.device->QueryInterface(IID_PPV_ARGS(multithread.put())))) {
-    // 捕获回调和编码线程都会用这个 D3D device/context，打开 D3D11 自带的多线程保护。
-    multithread->SetMultithreadProtected(TRUE);
-  }
-
-  auto winrt_device_result = Utils::Graphics::Capture::create_winrt_device(state.device.get());
-  if (!winrt_device_result) {
-    cleanup_failed_start(state, "recording start failed");
-    return std::unexpected("Failed to create WinRT device: " + winrt_device_result.error());
+  // 录制内复用 D3D 设备，避免高频启停反复初始化。
+  auto d3d_ready_result = ensure_d3d_resources_ready(state);
+  if (!d3d_ready_result) {
+    clear_session_runtime_fields(state);
+    return d3d_ready_result;
   }
 
   DWORD process_id = 0;
@@ -996,7 +1070,7 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
 
   // WGC 回调只复制纹理并入队，不直接写编码器。
   auto capture_result = Utils::Graphics::Capture::create_capture_session(
-      target_window, *winrt_device_result, state.capture_plan.source_width,
+      target_window, state.winrt_device, state.capture_plan.source_width,
       state.capture_plan.source_height, [&state](auto frame) { on_frame_arrived(state, frame); }, 2,
       capture_options);
 
@@ -1088,13 +1162,15 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
                   dropped_audio);
   }
 
-  clear_runtime_fields(state);
+  clear_session_runtime_fields(state);
   state.status.store(Features::Recording::Types::RecordingStatus::Idle, std::memory_order_release);
+  start_cleanup_timer(state);
   Logger().info("Recording stopped");
 }
 
 auto cleanup(Features::Recording::State::RecordingState& state) -> void {
   stop(state);
+  cleanup_d3d_resources(state);
   MFShutdown();
 }
 
