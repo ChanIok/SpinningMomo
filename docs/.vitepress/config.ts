@@ -154,6 +154,10 @@ export default defineConfig({
               items: [{ text: "Getting Started", link: "/en/guide/getting-started" }],
             },
             {
+              text: "FAQ",
+              items: [{ text: "FAQ", link: "/en/guide/faq" }],
+            },
+            {
               text: "Features",
               items: [
                 { text: "Window & Resolution", link: "/en/features/window" },
@@ -190,7 +194,6 @@ export default defineConfig({
     // 导航栏
     nav: [
       { text: "指南", link: "/zh/guide/getting-started" },
-      { text: "开发者", link: "/zh/developer/architecture" },
       {
         text: "版本",
         items: [
@@ -207,13 +210,13 @@ export default defineConfig({
     sidebar: {
       "/zh/": [
         {
-          text: "🚀 快速上手",
+          text: "快速上手",
           items: [
             { text: "安装与运行", link: "/zh/guide/getting-started" },
           ],
         },
         {
-          text: "⚡ 功能",
+          text: "功能",
           items: [
             { text: "比例与分辨率调整", link: "/zh/features/window" },
             { text: "超清截图", link: "/zh/features/screenshot" },
@@ -221,17 +224,24 @@ export default defineConfig({
           ],
         },
         {
-          text: "🛠️ 开发者指南",
+          text: "帮助",
+          items: [
+            { text: "使用技巧", link: "/zh/guide/tips" },
+            { text: "常见问题", link: "/zh/guide/faq" },
+          ],
+        },
+        {
+          text: "开发者指南",
           items: [
             { text: "架构与构建", link: "/zh/developer/architecture" },
           ],
         },
-        { 
-          text: "📄 关于", 
+        {
+          text: "关于",
           items: [
             { text: "法律与隐私", link: "/zh/about/legal" },
             { text: "开源鸣谢", link: "/zh/about/credits" },
-          ] 
+          ]
         },
       ],
       // 保留旧版本的配置
