@@ -394,6 +394,22 @@ function handleSidebarDrop(event: DragEvent) {
   event.preventDefault()
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+function handleSidebarContextMenu(event: MouseEvent) {
+  if (isEditableTarget(event.target)) {
+    return
+  }
+
+  event.preventDefault()
+}
+
 onMounted(() => {
   galleryData.loadFolderTree()
   loadTagTree()
@@ -401,7 +417,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col" @dragover="handleSidebarDragOver" @drop="handleSidebarDrop">
+  <div
+    class="flex h-full flex-col"
+    @dragover="handleSidebarDragOver"
+    @drop="handleSidebarDrop"
+    @contextmenu="handleSidebarContextMenu"
+  >
     <AlertDialog :open="showRescanDialog" @update:open="handleRescanDialogOpenChange">
       <AlertDialogContent>
         <AlertDialogHeader>

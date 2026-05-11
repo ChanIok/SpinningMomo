@@ -403,6 +403,30 @@ export function useGalleryData() {
     }
   }
 
+  async function loadTagTree(options: { silent?: boolean } = {}) {
+    const { silent = false } = options
+
+    try {
+      if (!silent) {
+        store.setTagsLoading(true)
+        store.setTagsError(null)
+      }
+
+      const tagTree = await galleryApi.getTagTree()
+      store.setTags(tagTree)
+    } catch (error) {
+      console.error('Failed to load tag tree:', error)
+      if (!silent) {
+        store.setTagsError('加载标签树失败')
+      }
+      throw error
+    } finally {
+      if (!silent) {
+        store.setTagsLoading(false)
+      }
+    }
+  }
+
   /**
    * 扫描资产目录
    */
@@ -450,6 +474,7 @@ export function useGalleryData() {
     loadPage,
     queryCurrentAssetIds,
     loadFolderTree,
+    loadTagTree,
     scanAssets,
     startScanAssets,
 

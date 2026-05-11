@@ -461,6 +461,22 @@ function clearAttributeFilters() {
   draftDateRange.value = { start: undefined, end: undefined }
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+function handleToolbarContextMenu(event: MouseEvent) {
+  if (isEditableTarget(event.target)) {
+    return
+  }
+
+  event.preventDefault()
+}
+
 function setViewMode(
   mode:
     | string
@@ -483,7 +499,7 @@ function onViewSizeSliderChange(value: number[] | undefined) {
 </script>
 
 <template>
-  <div ref="toolbarRef" class="flex flex-col">
+  <div ref="toolbarRef" class="flex flex-col" @contextmenu="handleToolbarContextMenu">
     <div class="flex min-h-10 items-center justify-between gap-3 px-2 pt-1.5">
       <div class="flex min-w-0 items-center gap-2">
         <div

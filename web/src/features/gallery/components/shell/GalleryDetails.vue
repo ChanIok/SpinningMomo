@@ -175,6 +175,22 @@ watch(
 )
 
 watch(
+  () => store.assetTagsVersion,
+  async () => {
+    if (!activeAsset.value) {
+      return
+    }
+
+    try {
+      // 右键菜单/快捷键会在详情面板外修改标签，这里只负责把当前焦点项补刷回来。
+      await reloadActiveAssetTags()
+    } catch (error) {
+      console.error('Failed to reload active asset tags:', error)
+    }
+  }
+)
+
+watch(
   () => activeAsset.value?.id,
   () => {
     assetDescriptionDraft.value = activeAsset.value?.description ?? ''

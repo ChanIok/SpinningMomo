@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n'
-import { Copy, Eraser, ExternalLink, Flag, FolderOpen, Star, Trash2, X } from 'lucide-vue-next'
+import {
+  ClipboardPaste,
+  Copy,
+  Eraser,
+  ExternalLink,
+  Flag,
+  FolderOpen,
+  Star,
+  Tags,
+  Trash2,
+  X,
+} from 'lucide-vue-next'
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -38,6 +49,23 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
   >
     <Copy />
     {{ t('gallery.contextMenu.copyFiles.label') }}
+  </DropdownMenuItem>
+  <DropdownMenuSeparator />
+  <DropdownMenuItem
+    :disabled="!assetActions.canCopyTags"
+    @click="assetActions.copySelectedAssetTags"
+  >
+    <Tags />
+    {{ t('gallery.contextMenu.copyTags.label') }}
+    <DropdownMenuShortcut>Ctrl+Shift+C</DropdownMenuShortcut>
+  </DropdownMenuItem>
+  <DropdownMenuItem
+    :disabled="!assetActions.canPasteTags"
+    @click="assetActions.pasteCopiedTagsToSelection"
+  >
+    <ClipboardPaste />
+    {{ t('gallery.contextMenu.pasteTags.label') }}
+    <DropdownMenuShortcut>Ctrl+Shift+V</DropdownMenuShortcut>
   </DropdownMenuItem>
   <DropdownMenuSeparator />
   <DropdownMenuSub>

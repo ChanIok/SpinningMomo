@@ -297,6 +297,20 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
+    const key = event.key.toLowerCase()
+    if (key === 'c') {
+      event.preventDefault()
+      void assetActions.copySelectedAssetTags()
+      return
+    }
+    if (key === 'v') {
+      event.preventDefault()
+      void assetActions.pasteCopiedTagsToSelection()
+      return
+    }
+  }
+
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
     event.preventDefault()
     void gallerySelection.selectAllCurrentQuery()
@@ -354,6 +368,14 @@ function handleContentWheel(event: WheelEvent) {
   }
 }
 
+function handleContentContextMenu(event: MouseEvent) {
+  if (isEditableTarget(event.target)) {
+    return
+  }
+
+  event.preventDefault()
+}
+
 function handleViewerDragOver(event: DragEvent) {
   if (!hasGalleryAssetDragIds(event)) {
     return
@@ -403,7 +425,7 @@ useEventListener(contentRef, 'wheel', handleContentWheel, { passive: false })
       :aria-hidden="store.lightbox.isOpen && !store.lightbox.isClosing ? true : undefined"
     >
       <GalleryToolbar />
-      <div ref="contentRef" class="flex-1 overflow-hidden">
+      <div ref="contentRef" class="flex-1 overflow-hidden" @contextmenu="handleContentContextMenu">
         <GalleryContent ref="galleryContentRef" />
       </div>
     </div>

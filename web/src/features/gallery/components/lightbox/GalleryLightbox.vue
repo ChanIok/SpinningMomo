@@ -238,6 +238,20 @@ function handleKeydown(event: KeyboardEvent) {
     return
   }
 
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey) {
+    const key = event.key.toLowerCase()
+    if (key === 'c') {
+      event.preventDefault()
+      void assetActions.copySelectedAssetTags()
+      return
+    }
+    if (key === 'v') {
+      event.preventDefault()
+      void assetActions.pasteCopiedTagsToSelection()
+      return
+    }
+  }
+
   switch (event.key) {
     case 'ArrowLeft':
       event.preventDefault()

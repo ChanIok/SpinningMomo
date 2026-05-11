@@ -1,4 +1,4 @@
-import { reactive, computed, type Ref } from 'vue'
+import { reactive, computed, ref, type Ref } from 'vue'
 import type { Asset, SelectionState, LightboxState, DetailsPanelFocus } from '../types'
 import { LIGHTBOX_MAX_ZOOM, LIGHTBOX_MIN_ZOOM } from './persistence'
 
@@ -52,6 +52,8 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
 
   const selectedCount = computed(() => selection.selectedIds.size)
   const hasSelection = computed(() => selectedCount.value > 0)
+  // 右侧详情的标签列表不是 query 资产字段的一部分，用独立版本号驱动重载最直接。
+  const assetTagsVersion = ref(0)
 
   function patchAssetsReviewState(
     assetIds: number[],
@@ -124,6 +126,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
         description,
       }
     }
+  }
+
+  function bumpAssetTagsVersion() {
+    assetTagsVersion.value += 1
   }
 
   function selectAsset(id: number, selected: boolean, multi = false) {
@@ -268,6 +274,7 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     lightbox.showFilmstrip = true
     resetLightboxView()
 
+    assetTagsVersion.value = 0
     clearDetailsFocus()
   }
 
@@ -277,8 +284,10 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     detailsPanel,
     selectedCount,
     hasSelection,
+    assetTagsVersion,
     patchAssetsReviewState,
     patchAssetDescription,
+    bumpAssetTagsVersion,
     selectAsset,
     clearSelection,
     replaceSelection,

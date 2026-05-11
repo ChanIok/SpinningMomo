@@ -85,10 +85,29 @@ const toggleActiveClass =
 function handleRotateClick(event: MouseEvent) {
   emit('rotate', event.altKey ? -90 : 90)
 }
+
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+}
+
+function handleToolbarContextMenu(event: MouseEvent) {
+  if (isEditableTarget(event.target)) {
+    return
+  }
+
+  event.preventDefault()
+}
 </script>
 
 <template>
-  <div class="@container flex items-center justify-between px-2 py-2">
+  <div
+    class="@container flex items-center justify-between px-2 py-2"
+    @contextmenu="handleToolbarContextMenu"
+  >
     <div class="flex min-w-0 items-center gap-3 text-foreground">
       <Button
         variant="sidebarGhost"

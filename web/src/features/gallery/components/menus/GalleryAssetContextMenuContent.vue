@@ -1,6 +1,17 @@
 <script setup lang="ts">
 import { useI18n } from '@/composables/useI18n'
-import { Copy, Eraser, ExternalLink, Flag, FolderOpen, Star, Trash2, X } from 'lucide-vue-next'
+import {
+  ClipboardPaste,
+  Copy,
+  Eraser,
+  ExternalLink,
+  Flag,
+  FolderOpen,
+  Star,
+  Tags,
+  Trash2,
+  X,
+} from 'lucide-vue-next'
 import {
   ContextMenuItem,
   ContextMenuSeparator,
@@ -38,6 +49,23 @@ const ratingOptions = [1, 2, 3, 4, 5] as const
   >
     <Copy />
     {{ t('gallery.contextMenu.copyFiles.label') }}
+  </ContextMenuItem>
+  <ContextMenuSeparator />
+  <ContextMenuItem
+    :disabled="!assetActions.canCopyTags"
+    @click="assetActions.copySelectedAssetTags"
+  >
+    <Tags />
+    {{ t('gallery.contextMenu.copyTags.label') }}
+    <ContextMenuShortcut>Ctrl+Shift+C</ContextMenuShortcut>
+  </ContextMenuItem>
+  <ContextMenuItem
+    :disabled="!assetActions.canPasteTags"
+    @click="assetActions.pasteCopiedTagsToSelection"
+  >
+    <ClipboardPaste />
+    {{ t('gallery.contextMenu.pasteTags.label') }}
+    <ContextMenuShortcut>Ctrl+Shift+V</ContextMenuShortcut>
   </ContextMenuItem>
   <ContextMenuSeparator />
   <ContextMenuSub>
