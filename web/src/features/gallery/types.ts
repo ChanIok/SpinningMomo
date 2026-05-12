@@ -100,6 +100,7 @@ export type {
   UpdateAssetsReviewStateParams,
   MoveAssetsToFolderParams,
   UpdateAssetDescriptionParams,
+  UpdateAssetsDescriptionParams,
   GetAssetTagsParams,
   BatchSelectionSummary,
   // 统计/展示数据（仅由 API 返回）

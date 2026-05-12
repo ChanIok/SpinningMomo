@@ -80,6 +80,11 @@ export interface UpdateAssetDescriptionParams {
   description?: string
 }
 
+export interface UpdateAssetsDescriptionParams {
+  assetIds: number[]
+  description?: string
+}
+
 // 获取资产标签参数
 export interface GetAssetTagsParams {
   assetId: number
@@ -103,6 +108,7 @@ export interface BatchSelectionSummary {
   selectedCount: number
   rating: number | null
   rejectedState: boolean | null
+  description: string | null
   commonTags: Tag[]
 }
 

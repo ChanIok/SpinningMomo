@@ -88,6 +88,7 @@ struct BatchSelectionSummary {
   std::int64_t selected_count = 0;
   std::optional<int> rating;
   std::optional<bool> rejected_state;
+  std::optional<std::string> description;
   std::vector<Tag> common_tags;
 };
 
@@ -448,6 +449,11 @@ struct UpdateAssetsReviewStateParams {
 
 struct UpdateAssetDescriptionParams {
   std::int64_t asset_id;
+  std::optional<std::string> description;
+};
+
+struct UpdateAssetsDescriptionParams {
+  std::vector<std::int64_t> asset_ids;
   std::optional<std::string> description;
 };
 

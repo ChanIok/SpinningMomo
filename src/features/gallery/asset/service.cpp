@@ -379,6 +379,7 @@ auto get_batch_selection_summary(Core::State::AppState& app_state,
       .selected_count = static_cast<std::int64_t>(normalized_asset_ids.size()),
       .rating = std::nullopt,
       .rejected_state = std::nullopt,
+      .description = std::nullopt,
       .common_tags = {},
   };
 
@@ -393,6 +394,8 @@ auto get_batch_selection_summary(Core::State::AppState& app_state,
     std::int64_t distinct_ratings = 0;
     std::optional<int> min_rating;
     std::int64_t rejected_count = 0;
+    std::int64_t distinct_descriptions = 0;
+    std::optional<std::string> common_description;
   };
 
   const auto aggregate_sql = std::format(R"(
@@ -400,7 +403,9 @@ auto get_batch_selection_summary(Core::State::AppState& app_state,
       COUNT(*) AS matched_count,
       COUNT(DISTINCT rating) AS distinct_ratings,
       MIN(rating) AS min_rating,
-      COALESCE(SUM(CASE WHEN review_flag = 'rejected' THEN 1 ELSE 0 END), 0) AS rejected_count
+      COALESCE(SUM(CASE WHEN review_flag = 'rejected' THEN 1 ELSE 0 END), 0) AS rejected_count,
+      COUNT(DISTINCT COALESCE(description, '')) AS distinct_descriptions,
+      MIN(COALESCE(description, '')) AS common_description
     FROM assets
     WHERE id IN ({})
   )",
@@ -433,6 +438,10 @@ auto get_batch_selection_summary(Core::State::AppState& app_state,
     summary.rejected_state = true;
   } else if (aggregate.rejected_count == 0) {
     summary.rejected_state = false;
+  }
+
+  if (aggregate.distinct_descriptions == 1) {
+    summary.description = aggregate.common_description.value_or("");
   }
 
   const auto common_tags_sql = std::format(R"(
@@ -566,6 +575,61 @@ auto update_asset_description(Core::State::AppState& app_state,
   return Types::OperationResult{.success = true,
                                 .message = "Asset description updated successfully",
                                 .affected_count = result->has_value() ? 1 : 0};
+}
+
+auto update_assets_description(Core::State::AppState& app_state,
+                               const Types::UpdateAssetsDescriptionParams& params)
+    -> std::expected<Types::OperationResult, std::string> {
+  auto [normalized_asset_ids, invalid_count] = normalize_asset_ids(params.asset_ids);
+
+  if (normalized_asset_ids.empty()) {
+    return Types::OperationResult{
+        .success = true,
+        .message = "No valid assets to update description",
+        .affected_count = 0,
+        .failed_count =
+            invalid_count > 0 ? std::optional<std::int64_t>{invalid_count} : std::nullopt,
+    };
+  }
+
+  auto normalized_description =
+      params.description.has_value()
+          ? std::optional<std::string>{trim_ascii_copy(params.description.value())}
+          : std::nullopt;
+  if (normalized_description.has_value() && normalized_description->empty()) {
+    normalized_description = std::nullopt;
+  }
+
+  const auto placeholders = build_in_clause_placeholders(normalized_asset_ids.size());
+  const auto sql =
+      std::format("UPDATE assets SET description = ? WHERE id IN ({}) RETURNING id", placeholders);
+
+  std::vector<Core::Database::Types::DbParam> db_params;
+  db_params.reserve(normalized_asset_ids.size() + 1);
+  db_params.push_back(normalized_description.has_value()
+                          ? Core::Database::Types::DbParam{normalized_description.value()}
+                          : Core::Database::Types::DbParam{std::monostate{}});
+  for (const auto asset_id : normalized_asset_ids) {
+    db_params.push_back(asset_id);
+  }
+
+  struct UpdatedAssetId {
+    std::int64_t id = 0;
+  };
+
+  auto result = Core::Database::query<UpdatedAssetId>(*app_state.database, sql, db_params);
+  if (!result) {
+    return std::unexpected("Failed to update assets description: " + result.error());
+  }
+
+  return Types::OperationResult{
+      .success = true,
+      .message = "Assets description updated successfully",
+      .affected_count = static_cast<std::int64_t>(result->size()),
+      .failed_count = invalid_count > 0 ? std::optional<std::int64_t>{invalid_count} : std::nullopt,
+      .unchanged_count = static_cast<std::int64_t>(normalized_asset_ids.size()) -
+                         static_cast<std::int64_t>(result->size()),
+  };
 }
 
 // ============= 维护服务实现 =============

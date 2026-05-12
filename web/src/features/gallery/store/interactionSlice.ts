@@ -137,6 +137,41 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     }
   }
 
+  function patchAssetsDescription(assetIds: number[], description?: string) {
+    if (assetIds.length === 0) {
+      return
+    }
+
+    const assetIdSet = new Set(assetIds)
+
+    paginatedAssets.value.forEach((pageAssets, pageNum) => {
+      let hasPageChange = false
+      const nextPageAssets = pageAssets.map((asset) => {
+        if (!assetIdSet.has(asset.id)) {
+          return asset
+        }
+
+        hasPageChange = true
+        return {
+          ...asset,
+          description,
+        }
+      })
+
+      if (hasPageChange) {
+        paginatedAssets.value.set(pageNum, nextPageAssets)
+        bumpPaginatedAssetsVersion()
+      }
+    })
+
+    if (detailsPanel.type === 'asset' && assetIdSet.has(detailsPanel.asset.id)) {
+      detailsPanel.asset = {
+        ...detailsPanel.asset,
+        description,
+      }
+    }
+  }
+
   function bumpAssetTagsVersion() {
     assetTagsVersion.value += 1
   }
@@ -182,6 +217,17 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
       ...(updates.reviewFlag !== undefined
         ? { rejectedState: updates.reviewFlag === 'rejected' }
         : {}),
+    }
+  }
+
+  function patchBatchSummaryDescription(description?: string) {
+    if (detailsPanel.type !== 'batch' || batchSummary.value === null) {
+      return
+    }
+
+    batchSummary.value = {
+      ...batchSummary.value,
+      description: description ?? '',
     }
   }
 
@@ -344,7 +390,9 @@ export function createInteractionSlice(args: InteractionSliceArgs) {
     batchSummaryRequestVersion,
     patchAssetsReviewState,
     patchAssetDescription,
+    patchAssetsDescription,
     patchBatchSummaryReviewState,
+    patchBatchSummaryDescription,
     bumpAssetTagsVersion,
     beginBatchSummaryRefresh,
     finishBatchSummaryRefresh,

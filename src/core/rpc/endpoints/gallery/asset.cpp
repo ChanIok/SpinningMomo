@@ -232,6 +232,24 @@ auto handle_update_asset_description(
   co_return result.value();
 }
 
+auto handle_update_assets_description(
+    Core::State::AppState& app_state,
+    const Features::Gallery::Types::UpdateAssetsDescriptionParams& params)
+    -> RpcAwaitable<Features::Gallery::Types::OperationResult> {
+  auto result = Features::Gallery::Asset::Service::update_assets_description(app_state, params);
+
+  if (!result) {
+    co_return std::unexpected(RpcError{.code = static_cast<int>(ErrorCode::ServerError),
+                                       .message = "Service error: " + result.error()});
+  }
+
+  if (result->affected_count.value_or(0) > 0) {
+    Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
+  }
+
+  co_return result.value();
+}
+
 auto handle_check_asset_reachable(Core::State::AppState& app_state,
                                   const CheckAssetReachableParams& params)
     -> RpcAwaitable<CheckAssetReachableResult> {
@@ -370,6 +388,12 @@ auto register_all(Core::State::AppState& app_state) -> void {
       app_state, app_state.rpc->registry, "gallery.updateAssetDescription",
       handle_update_asset_description,
       "Update a single asset description in the gallery details panel");
+
+  register_method<Features::Gallery::Types::UpdateAssetsDescriptionParams,
+                  Features::Gallery::Types::OperationResult>(
+      app_state, app_state.rpc->registry, "gallery.updateAssetsDescription",
+      handle_update_assets_description,
+      "Batch update selected assets description in the gallery details panel");
 
   register_method<CheckAssetReachableParams, CheckAssetReachableResult>(
       app_state, app_state.rpc->registry, "gallery.checkAssetReachable",

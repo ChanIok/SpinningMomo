@@ -27,6 +27,7 @@ import type {
   UpdateAssetsReviewStateParams,
   MoveAssetsToFolderParams,
   UpdateAssetDescriptionParams,
+  UpdateAssetsDescriptionParams,
   AssetReachability,
   BatchSelectionSummary,
 } from './api/dto'
@@ -606,6 +607,19 @@ export async function updateAssetDescription(
   }
 }
 
+export async function updateAssetsDescription(
+  params: UpdateAssetsDescriptionParams
+): Promise<OperationResult> {
+  try {
+    const result = await call<OperationResult>('gallery.updateAssetsDescription', params)
+
+    return result
+  } catch (error) {
+    console.error('Failed to update assets description:', error)
+    throw new Error('批量更新资产描述失败')
+  }
+}
+
 /**
  * 批量获取多个资产的标签
  */
@@ -676,4 +690,5 @@ export const galleryApi = {
   checkAssetReachable,
   updateAssetsReviewState,
   updateAssetDescription,
+  updateAssetsDescription,
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { Button } from '@/components/ui/button'
+import { useI18n } from '@/composables/useI18n'
 import type { TagTreeNode } from '../../types'
 
 interface Props {
@@ -15,6 +16,8 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   toggle: [tagId: number]
 }>()
+
+const { t } = useI18n()
 
 // 标签展开状态
 const expandedTagIds = ref<Set<number>>(new Set())
@@ -49,9 +52,11 @@ function renderTagItem(tag: TagTreeNode, depth = 0) {
 </script>
 
 <template>
-  <div class="max-h-96 w-64 overflow-y-auto p-2">
+  <div class="max-h-96 w-full overflow-y-auto p-2">
     <!-- 标题 -->
-    <div class="mb-2 px-2 text-xs font-medium text-muted-foreground">选择标签</div>
+    <div class="mb-2 px-2 text-xs font-medium text-muted-foreground">
+      {{ t('gallery.details.tags.select') }}
+    </div>
 
     <!-- 标签列表 -->
     <div v-if="tags.length > 0" class="space-y-0.5">
@@ -271,6 +276,8 @@ function renderTagItem(tag: TagTreeNode, depth = 0) {
     </div>
 
     <!-- 空状态 -->
-    <div v-else class="py-8 text-center text-sm text-muted-foreground">暂无标签</div>
+    <div v-else class="py-8 text-center text-sm text-muted-foreground">
+      {{ t('gallery.details.tags.empty') }}
+    </div>
   </div>
 </template>

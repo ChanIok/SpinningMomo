@@ -108,7 +108,7 @@ async function handleCopyFileName() {
         <span class="text-muted-foreground">{{ t('gallery.details.asset.description') }}</span>
         <div class="min-w-0 flex-1">
           <slot name="description">
-            <p class="rounded bg-muted/50 px-2 py-1.5 text-xs break-words">
+            <p class="min-h-6 rounded bg-muted/50 px-2 py-1 text-xs break-words">
               {{ asset.description }}
             </p>
           </slot>

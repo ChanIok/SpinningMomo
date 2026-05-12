@@ -372,6 +372,33 @@ export function useGalleryAssetActions() {
     await updateSelectedAssetsReviewState({ rating: 0 })
   }
 
+  async function updateSelectedAssetsDescription(description?: string) {
+    const assetIds = [...new Set(selectedAssetIds.value)].filter((assetId) => assetId > 0)
+    if (assetIds.length === 0) {
+      return
+    }
+
+    try {
+      const result = await galleryApi.updateAssetsDescription({
+        assetIds,
+        description,
+      })
+
+      if (!result.success) {
+        throw new Error(result.message)
+      }
+
+      store.patchAssetsDescription(assetIds, description)
+      store.patchBatchSummaryDescription(description)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(t('gallery.details.asset.updateDescriptionFailed'), {
+        description: message,
+      })
+      throw error
+    }
+  }
+
   async function setSelectedAssetsReviewFlag(reviewFlag: ReviewFlag) {
     await updateSelectedAssetsReviewState({ reviewFlag })
   }
@@ -441,6 +468,7 @@ export function useGalleryAssetActions() {
     updateSelectedAssetsReviewState,
     setSelectedAssetsRating,
     clearSelectedAssetsRating,
+    updateSelectedAssetsDescription,
     setSelectedAssetsReviewFlag,
     clearSelectedAssetsReviewFlag,
     setSelectedAssetsRejected,

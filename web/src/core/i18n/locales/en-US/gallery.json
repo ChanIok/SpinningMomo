@@ -129,6 +129,7 @@
   "gallery.details.tagName": "Tag Name",
   "gallery.details.tags.add": "Add Tag",
   "gallery.details.tags.empty": "No tags yet",
+  "gallery.details.tags.select": "Select Tags",
   "gallery.details.tags.title": "Tags",
   "gallery.details.title": "Details",
   "gallery.guide.infinityNikki.actionFailedTitle": "Failed to apply gallery setup",

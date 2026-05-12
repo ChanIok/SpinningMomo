@@ -73,6 +73,10 @@ const batchFlagIndeterminate = computed(
     batchSummary.value === null ||
     batchSummary.value.rejectedState === null
 )
+const isSavingBatchDescription = ref(false)
+const batchDescriptionDisabled = computed(
+  () => batchSummaryLoading.value || batchSummary.value === null || isSavingBatchDescription.value
+)
 
 function findLoadedAssetById(id: number): Asset | null {
   for (const pageAssets of store.paginatedAssets.values()) {
@@ -164,6 +168,8 @@ const rootTagCount = computed(() => store.tags.length)
 const rootTagAssetTotalCount = computed(() => store.tagsAssetTotalCount)
 const assetDescriptionDraft = ref('')
 const isSavingAssetDescription = ref(false)
+const batchDescriptionDraft = ref('')
+const batchDescriptionDirty = ref(false)
 
 async function reloadBatchSummary() {
   if (detailsFocus.value.type !== 'batch') {
@@ -256,6 +262,24 @@ watch(
   () => activeAsset.value?.id,
   () => {
     assetDescriptionDraft.value = activeAsset.value?.description ?? ''
+  },
+  { immediate: true }
+)
+
+watch(
+  () => ({
+    type: detailsFocus.value.type,
+    description: batchSummary.value?.description,
+  }),
+  ({ type, description }) => {
+    if (type !== 'batch') {
+      batchDescriptionDraft.value = ''
+      batchDescriptionDirty.value = false
+      return
+    }
+
+    batchDescriptionDraft.value = description ?? ''
+    batchDescriptionDirty.value = false
   },
   { immediate: true }
 )
@@ -371,6 +395,16 @@ function resetAssetDescriptionDraft() {
   assetDescriptionDraft.value = activeAsset.value?.description ?? ''
 }
 
+function updateBatchDescriptionDraft(value: string | number) {
+  batchDescriptionDraft.value = String(value)
+  batchDescriptionDirty.value = true
+}
+
+function resetBatchDescriptionDraft() {
+  batchDescriptionDraft.value = batchSummary.value?.description ?? ''
+  batchDescriptionDirty.value = false
+}
+
 async function handleAssetDescriptionCommit() {
   if (!activeAsset.value || isSavingAssetDescription.value) {
     return
@@ -401,6 +435,40 @@ async function handleAssetDescriptionCommit() {
     })
   } finally {
     isSavingAssetDescription.value = false
+  }
+}
+
+async function handleBatchDescriptionCommit() {
+  if (detailsFocus.value.type !== 'batch' || batchDescriptionDisabled.value) {
+    return
+  }
+
+  if (batchSummary.value === null) {
+    return
+  }
+
+  const normalizedDescription = batchDescriptionDraft.value.trim()
+  const currentDescription = batchSummary.value.description
+  batchDescriptionDraft.value = normalizedDescription
+
+  if (!batchDescriptionDirty.value && currentDescription === null) {
+    return
+  }
+
+  if (currentDescription !== null && normalizedDescription === (currentDescription ?? '').trim()) {
+    batchDescriptionDirty.value = false
+    return
+  }
+
+  isSavingBatchDescription.value = true
+
+  try {
+    await assetActions.updateSelectedAssetsDescription(normalizedDescription || undefined)
+    batchDescriptionDirty.value = false
+  } catch {
+    resetBatchDescriptionDraft()
+  } finally {
+    isSavingBatchDescription.value = false
   }
 }
 
@@ -814,6 +882,20 @@ async function handleCopyColorHex(color: AssetMainColor) {
           <div v-else class="text-xs text-muted-foreground">
             {{ t('gallery.details.tags.empty') }}
           </div>
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="text-sm font-medium">{{ t('gallery.details.asset.description') }}</h4>
+          <Input
+            :model-value="batchDescriptionDraft"
+            :disabled="batchDescriptionDisabled"
+            :placeholder="t('gallery.details.asset.descriptionPlaceholder')"
+            class="h-6 px-2 text-xs md:text-xs"
+            @update:model-value="updateBatchDescriptionDraft"
+            @blur="handleBatchDescriptionCommit"
+            @keydown.enter.prevent="handleBatchDescriptionCommit"
+            @keydown.esc.prevent="resetBatchDescriptionDraft"
+          />
         </div>
 
         <template v-if="batchActiveAsset">
