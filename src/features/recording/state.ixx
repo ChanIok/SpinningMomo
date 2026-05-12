@@ -15,13 +15,13 @@ import <d3d11.h>;
 import <wil/com.h>;
 import <windows.h>;
 
-export namespace Features::Recording::State {
+namespace Features::Recording::State {
 
 // 录制几何计划：
 // source_* 表示 WGC 实际给到的源帧尺寸；
 // output_* 表示最终送给编码器的尺寸；
 // should_crop/region 描述是否需要先从源帧裁出一块再编码。
-struct CapturePlan {
+export struct CapturePlan {
   int source_width = 0;
   int source_height = 0;
   std::uint32_t output_width = 0;
@@ -30,9 +30,9 @@ struct CapturePlan {
   Utils::Graphics::CaptureRegion::CropRegion region{};
 };
 
-inline constexpr std::size_t k_max_audio_queue_size = 120;
+export inline constexpr std::size_t k_max_audio_queue_size = 120;
 
-enum class RecordingControlAction {
+export enum class RecordingControlAction {
   None,
   Toggle,
   RestartAfterResize,
@@ -40,7 +40,7 @@ enum class RecordingControlAction {
   ShutdownStop,
 };
 
-struct QueuedAudioPacket {
+export struct QueuedAudioPacket {
   std::vector<std::uint8_t> data;
   std::uint32_t num_frames = 0;
   std::uint32_t bytes_per_frame = 0;
@@ -51,7 +51,11 @@ struct QueuedAudioPacket {
 // 只描述“视频流时间线”，不持有真实画面。
 // WGC 停帧时，音频仍可能继续前进；这时用 SendStreamTick 标记缺失的视频帧，
 // 让 SinkWriter 知道视频流不是卡住或被遗漏，而是在这些时间点没有 sample。
-struct VideoTimelineState {
+export struct VideoTimelineState {
+  // 当前录制段的理论视频帧间隔；start() 按配置 fps 预先算好。
+  std::int64_t frame_interval_100ns = 10'000'000LL / 30;
+  // 半帧容忍窗口，用于判断是否需要给缺失视频帧发送 stream tick。
+  std::int64_t half_frame_100ns = (10'000'000LL / 30) / 2;
   // 下一帧视频理论上应该出现的时间；真实视频帧和 stream tick 都会推进它。
   std::int64_t next_expected_timestamp_100ns = 0;
   // 仅用于日志，方便确认最小化/停帧期间是否发过 tick。
@@ -61,7 +65,7 @@ struct VideoTimelineState {
 };
 
 // 录制完整状态
-struct RecordingState {
+export struct RecordingState {
   Features::Recording::Types::RecordingConfig config;
   std::filesystem::path working_output_path;
   HWND target_window = nullptr;
