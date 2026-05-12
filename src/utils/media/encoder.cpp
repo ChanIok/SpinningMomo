@@ -303,9 +303,9 @@ auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& 
     return std::unexpected("Failed to create MF attributes");
   }
 
-  // 启用硬件加速 (仅对编码,输入仍然是 CPU 内存)
-  if (FAILED(attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE))) {
-    Logger().warn("Failed to enable hardware transforms for encoder");
+  // CPU 路径：显式关闭硬件 MFT，避免 Sink Writer 选用硬件视频编码/变换（与「强制 CPU」语义一致）。
+  if (FAILED(attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, FALSE))) {
+    Logger().warn("Failed to disable hardware transforms for CPU encoder");
   }
 
   // 在创建 Sink Writer 前预设 Rate Control Mode
@@ -414,7 +414,13 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
       return std::unexpected(gpu_result.error());
     }
 
-    // Auto 模式，降级到 CPU
+    if (config.encoder_mode == Types::EncoderMode::Auto &&
+        config.codec == Types::VideoCodec::H265) {
+      // H.265 + Auto 仅尝试 GPU；失败不再落到 CPU（与前端「H.265 不选 CPU」一致）
+      return std::unexpected(gpu_result.error());
+    }
+
+    // Auto + H.264：GPU 失败时降级到 CPU
     Logger().info("Falling back to CPU encoder");
     ctx = std::make_unique<State::EncoderContext>();  // 重置 context
   }

@@ -107,6 +107,14 @@ const showExperimentalCaptureSettings = computed(() => {
   return Boolean(runtimeCapabilities.value?.isDebugBuild)
 })
 
+/** CPU 编码与 H.265 互斥：选 CPU 时前端禁用 H.265；选 H.265 时禁用 CPU。 */
+const recordingEncoderIsCpu = computed(
+  () => appSettings.value?.features?.recording?.encoderMode === 'cpu'
+)
+const recordingCodecIsH265 = computed(
+  () => appSettings.value?.features?.recording?.codec === 'h265'
+)
+
 const handleSelectOutputDir = async () => {
   isSelectingOutputDir.value = true
   try {
@@ -494,7 +502,9 @@ const handleResetSettings = async () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="h264">H.264 / AVC</SelectItem>
-                  <SelectItem value="h265">H.265 / HEVC</SelectItem>
+                  <SelectItem value="h265" :disabled="recordingEncoderIsCpu">
+                    H.265 / HEVC
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </ItemActions>
@@ -526,7 +536,7 @@ const handleResetSettings = async () => {
                   <SelectItem value="gpu">{{
                     t('settings.function.recording.encoderMode.gpu')
                   }}</SelectItem>
-                  <SelectItem value="cpu">{{
+                  <SelectItem value="cpu" :disabled="recordingCodecIsH265">{{
                     t('settings.function.recording.encoderMode.cpu')
                   }}</SelectItem>
                 </SelectContent>

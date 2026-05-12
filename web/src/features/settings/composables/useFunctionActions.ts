@@ -249,13 +249,19 @@ export const useFunctionActions = () => {
   }
 
   const updateRecordingEncoderMode = async (encoderMode: 'auto' | 'gpu' | 'cpu') => {
+    const rec = appSettings.value.features.recording
+    let codec = rec.codec
+    if (encoderMode === 'cpu' && codec === 'h265') {
+      codec = 'h264'
+    }
     await store.updateSettings({
       ...appSettings.value,
       features: {
         ...appSettings.value.features,
         recording: {
-          ...appSettings.value.features.recording,
+          ...rec,
           encoderMode,
+          codec,
         },
       },
     })
@@ -301,13 +307,19 @@ export const useFunctionActions = () => {
   }
 
   const updateRecordingCodec = async (codec: 'h264' | 'h265') => {
+    const rec = appSettings.value.features.recording
+    let encoderMode = rec.encoderMode
+    if (codec === 'h265' && encoderMode === 'cpu') {
+      encoderMode = 'auto'
+    }
     await store.updateSettings({
       ...appSettings.value,
       features: {
         ...appSettings.value.features,
         recording: {
-          ...appSettings.value.features.recording,
+          ...rec,
           codec,
+          encoderMode,
         },
       },
     })
