@@ -1,5 +1,19 @@
 import type { AssetFilter, QueryAssetsFilters } from './types'
 
+export function hasActiveAssetFilter(filter: AssetFilter): boolean {
+  return (
+    Boolean(filter.folderId?.trim()) ||
+    Boolean(filter.searchQuery?.trim()) ||
+    filter.createdAtFrom !== undefined ||
+    filter.createdAtTo !== undefined ||
+    filter.type !== undefined ||
+    (filter.ratings?.length ?? 0) > 0 ||
+    filter.reviewFlag !== undefined ||
+    (filter.tagIds?.length ?? 0) > 0 ||
+    Boolean(filter.colorHex)
+  )
+}
+
 export function toQueryAssetsFilters(
   filter: AssetFilter,
   _includeSubfolders: boolean

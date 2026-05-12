@@ -23,7 +23,6 @@ import {
 import {
   ArrowUpDown,
   CalendarClock,
-  Check,
   ChevronDown,
   Flag,
   Folder,
@@ -938,10 +937,6 @@ function onViewSizeSliderChange(value: number[] | undefined) {
           >
             <DropdownMenuRadioItem value="all">
               {{ t('gallery.toolbar.filter.flag.all') }}
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="picked">
-              <Check class="mr-2 h-4 w-4" />
-              {{ t('gallery.toolbar.filter.flag.picked') }}
             </DropdownMenuRadioItem>
             <DropdownMenuRadioItem value="rejected">
               <X class="mr-2 h-4 w-4" />

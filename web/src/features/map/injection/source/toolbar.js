@@ -3,6 +3,8 @@ export function buildToolbarSnippet() {
   const markerToggleHostSelector = '#infinitynikki-map-oversea + div > div > div:nth-child(2)';
   const markerToggleButtonId = 'spinning-momo-marker-toggle-button';
   const filterCountCardId = 'spinning-momo-filter-count-card';
+  const filterCountTextClass = 'spinning-momo-filter-count-text';
+  const filterCountClearButtonId = 'spinning-momo-filter-count-clear-button';
   const markerToggleVisibleBg = '#F5DCB1E6';
   const markerToggleHiddenBg = '#4D3E2AE6';
 
@@ -88,13 +90,69 @@ export function buildToolbarSnippet() {
     const cardText = typeof currentRuntimeOptions.filterCountCardText === 'string'
       ? currentRuntimeOptions.filterCountCardText
       : '';
+    const clearVisible = currentRuntimeOptions.filterCountCardClearVisible === true;
+    const clearText = typeof currentRuntimeOptions.filterCountCardClearText === 'string'
+      ? currentRuntimeOptions.filterCountCardClearText
+      : '清除筛选';
     const bgColor = currentRuntimeOptions.filterCountCardBgColor || '#39311E';
     const textColor = currentRuntimeOptions.filterCountCardTextColor || '#FFFFFF';
 
     card.style.display = cardVisible ? 'inline-flex' : 'none';
     card.style.backgroundColor = bgColor;
     card.style.color = textColor;
-    card.textContent = cardText || (cardLoading ? '正在同步照片坐标…' : '当前筛选下 0 张照片');
+    card.style.gap = clearVisible ? '8px' : '0';
+
+    let text = card.querySelector('.' + filterCountTextClass);
+    if (!text) {
+      card.textContent = '';
+      text = document.createElement('span');
+      text.className = filterCountTextClass;
+      text.style.minWidth = '0';
+      text.style.overflow = 'hidden';
+      text.style.textOverflow = 'ellipsis';
+      card.appendChild(text);
+    }
+    text.textContent = cardText || (cardLoading ? '' : '');
+
+    let clearButton = document.getElementById(filterCountClearButtonId);
+    if (clearVisible) {
+      if (!clearButton) {
+        clearButton = document.createElement('button');
+        clearButton.id = filterCountClearButtonId;
+        clearButton.type = 'button';
+        clearButton.style.flexShrink = '0';
+        clearButton.style.height = '22px';
+        clearButton.style.padding = '0 8px';
+        clearButton.style.border = '1px solid rgba(255, 255, 255, 0.38)';
+        clearButton.style.borderRadius = '999px';
+        clearButton.style.background = 'rgba(255, 255, 255, 0.16)';
+        clearButton.style.color = 'inherit';
+        clearButton.style.font = 'inherit';
+        clearButton.style.fontSize = '11px';
+        clearButton.style.lineHeight = '22px';
+        clearButton.style.pointerEvents = 'auto';
+        clearButton.style.setProperty('cursor', 'pointer', 'important');
+        clearButton.style.webkitTapHighlightColor = 'rgba(0, 0, 0, 0)';
+        clearButton.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(
+              {
+                action: 'SPINNING_MOMO_CLEAR_GALLERY_FILTERS',
+              },
+              '*'
+            );
+          }
+        });
+      }
+      clearButton.textContent = clearText;
+      if (clearButton.parentElement !== card) {
+        card.appendChild(clearButton);
+      }
+    } else if (clearButton && clearButton.parentElement === card) {
+      clearButton.remove();
+    }
   };
 
   const mountFilterCountCard = () => {
@@ -107,7 +165,7 @@ export function buildToolbarSnippet() {
       card.style.justifyContent = 'center';
       card.style.boxSizing = 'border-box';
       card.style.minHeight = '32px';
-      card.style.maxWidth = '220px';
+      card.style.maxWidth = '300px';
       card.style.padding = '6px 10px';
       card.style.margin = '0 8px 0 0';
       card.style.borderRadius = '8px';
@@ -117,7 +175,7 @@ export function buildToolbarSnippet() {
       card.style.fontSize = '12px';
       card.style.lineHeight = '1.2';
       card.style.fontWeight = '500';
-      card.style.pointerEvents = 'none';
+      card.style.pointerEvents = 'auto';
       card.style.position = 'fixed';
       card.style.top = '16px';
       card.style.right = '16px';

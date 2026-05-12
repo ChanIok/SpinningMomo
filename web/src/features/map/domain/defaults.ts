@@ -16,7 +16,11 @@ export function createDefaultMapRenderOptions(): MapRenderOptions {
   }
 }
 
-export function createDefaultMapRuntimeOptions(clusterTitleTemplate: string): MapRuntimeOptions {
+export function createDefaultMapRuntimeOptions(
+  clusterTitleTemplate: string,
+  filterCountCardText: string,
+  filterCountCardClearText: string
+): MapRuntimeOptions {
   return {
     clusterEnabled: true,
     clusterRadius: 44,
@@ -26,7 +30,9 @@ export function createDefaultMapRuntimeOptions(clusterTitleTemplate: string): Ma
     clusterTitleTemplate,
     filterCountCardVisible: true,
     filterCountCardLoading: false,
-    filterCountCardText: '当前筛选下 0 张照片',
+    filterCountCardText,
+    filterCountCardClearVisible: false,
+    filterCountCardClearText,
     filterCountCardBgColor: '#39311E',
     filterCountCardTextColor: '#FFFFFF',
   }

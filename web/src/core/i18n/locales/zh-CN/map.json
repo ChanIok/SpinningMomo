@@ -1,4 +1,9 @@
 {
   "map.popup.fallbackTitle": "照片",
-  "map.cluster.title": "{count} 张照片"
+  "map.cluster.title": "{count} 张照片",
+  "map.filterCount.loading": "正在同步照片坐标…",
+  "map.filterCount.waitingRegion": "等待地图区域就绪…",
+  "map.filterCount.currentRegion": "当前区域下 {count} 张照片",
+  "map.filterCount.currentFilter": "当前筛选下 {count} 张照片",
+  "map.filterCount.clearFilters": "清除筛选"
 }

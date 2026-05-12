@@ -1,6 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from '@/composables/useI18n'
-import { toQueryAssetsFilters } from '@/features/gallery/queryFilters'
+import { hasActiveAssetFilter, toQueryAssetsFilters } from '@/features/gallery/queryFilters'
 import { useGalleryStore } from '@/features/gallery/store'
 import type { PhotoMapPoint } from '@/extensions/infinity_nikki/types'
 import { queryPhotoMapPoints } from '@/features/map/api'
@@ -36,16 +36,22 @@ export function useMapScene() {
 
   function syncFilterCountCard(loading: boolean) {
     const currentWorldId = getCurrentWorldId()
+    const hasGalleryFilter = hasActiveAssetFilter(galleryStore.filter)
+    const count = mapPoints.value.length
     const countText = loading
-      ? '正在同步照片坐标…'
+      ? t('map.filterCount.loading')
       : currentWorldId
-        ? `当前区域下 ${mapPoints.value.length} 张照片`
-        : '等待地图区域就绪…'
+        ? hasGalleryFilter
+          ? t('map.filterCount.currentFilter', { count })
+          : t('map.filterCount.currentRegion', { count })
+        : t('map.filterCount.waitingRegion')
 
     mapStore.patchRuntimeOptions({
       filterCountCardVisible: true,
       filterCountCardLoading: loading,
       filterCountCardText: countText,
+      filterCountCardClearVisible: hasGalleryFilter,
+      filterCountCardClearText: t('map.filterCount.clearFilters'),
     })
   }
 
@@ -58,7 +64,13 @@ export function useMapScene() {
 
   function initializeMapDefaults() {
     mapStore.setRenderOptions(createDefaultMapRenderOptions())
-    mapStore.patchRuntimeOptions(createDefaultMapRuntimeOptions(t('map.cluster.title')))
+    mapStore.patchRuntimeOptions(
+      createDefaultMapRuntimeOptions(
+        t('map.cluster.title'),
+        t('map.filterCount.currentRegion', { count: 0 }),
+        t('map.filterCount.clearFilters')
+      )
+    )
     syncFilterCountCard(mapStore.isLoading)
   }
 

@@ -8,6 +8,7 @@ export const ACTION_SYNC_RUNTIME = 'SPINNING_MOMO_SYNC_RUNTIME'
 export const ACTION_EVAL_SCRIPT = 'EVAL_SCRIPT'
 export const ACTION_OPEN_GALLERY_ASSET = 'SPINNING_MOMO_OPEN_GALLERY_ASSET'
 export const ACTION_SET_MARKERS_VISIBLE = 'SPINNING_MOMO_SET_MARKERS_VISIBLE'
+export const ACTION_CLEAR_GALLERY_FILTERS = 'SPINNING_MOMO_CLEAR_GALLERY_FILTERS'
 export const ACTION_EXPORT_POLYGON = 'SPINNING_MOMO_EXPORT_POLYGON'
 /** iframe：地图 runtime 已挂载或 URL 中 world 已变化，payload 带当前 worldId */
 export const ACTION_MAP_SESSION_READY = 'SPINNING_MOMO_MAP_SESSION_READY'
@@ -36,6 +37,10 @@ export type SetMarkersVisibleMessage = {
   payload?: {
     markersVisible?: boolean
   }
+}
+
+export type ClearGalleryFiltersMessage = {
+  action: typeof ACTION_CLEAR_GALLERY_FILTERS
 }
 
 export type ExportPolygonMessage = {
@@ -67,5 +72,6 @@ export type MapSessionReadyMessage = {
 export type MapInboundMessage =
   | OpenGalleryAssetMessage
   | SetMarkersVisibleMessage
+  | ClearGalleryFiltersMessage
   | ExportPolygonMessage
   | MapSessionReadyMessage

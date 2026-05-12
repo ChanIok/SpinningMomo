@@ -1,4 +1,9 @@
 {
   "map.popup.fallbackTitle": "Photo",
-  "map.cluster.title": "{count} photos"
+  "map.cluster.title": "{count} photos",
+  "map.filterCount.loading": "Syncing photo coordinates...",
+  "map.filterCount.waitingRegion": "Waiting for map region...",
+  "map.filterCount.currentRegion": "{count} photos in current region",
+  "map.filterCount.currentFilter": "{count} photos in current filter",
+  "map.filterCount.clearFilters": "Clear Filters"
 }

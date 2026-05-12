@@ -42,6 +42,8 @@ export interface MapRuntimeOptions {
   filterCountCardVisible?: boolean
   filterCountCardLoading?: boolean
   filterCountCardText?: string
+  filterCountCardClearVisible?: boolean
+  filterCountCardClearText?: string
   filterCountCardBgColor?: string
   filterCountCardTextColor?: string
 }

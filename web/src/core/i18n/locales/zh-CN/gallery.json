@@ -53,7 +53,7 @@
   "gallery.details.batch.focusUnavailable": "当前焦点项不可用（可能尚未加载或已被筛选条件过滤）",
   "gallery.details.batch.helpTitle": "批量评分",
   "gallery.details.batch.placeholder": "敬请期待...",
-  "gallery.details.batch.reviewHint": "支持使用数字键 0~5、X、U 直接批量更新当前选中项。",
+  "gallery.details.batch.reviewHint": "支持使用数字键 0~5、X 直接批量更新当前选中项。",
   "gallery.details.batch.selectedCount": "已选中 {count} 项",
   "gallery.details.batch.title": "批量操作",
   "gallery.details.colors.copyFailed": "复制颜色失败",
