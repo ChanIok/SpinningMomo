@@ -183,6 +183,84 @@ auto create_capture_session(
   return session;
 }
 
+auto create_capture_session_with_frame_notification(
+    HWND target_window,
+    const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
+    int height, FrameArrivedCallback frame_arrived_callback, int frame_pool_size,
+    const CaptureSessionOptions& options) -> std::expected<CaptureSession, std::string> {
+  if (!target_window || !IsWindow(target_window)) {
+    return std::unexpected("Target window is invalid");
+  }
+
+  if (!frame_arrived_callback) {
+    return std::unexpected("Frame arrived callback is null");
+  }
+
+  CaptureSession session;
+  session.winrt_device = device;
+  session.frame_pool_size = std::max(frame_pool_size, 1);
+
+  auto capture_item_result = create_capture_item_for_window(target_window);
+  if (!capture_item_result) {
+    return std::unexpected(capture_item_result.error());
+  }
+  session.capture_item = std::move(*capture_item_result);
+
+  session.frame_pool =
+      winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
+          device, winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
+          session.frame_pool_size, {width, height});
+
+  if (!session.frame_pool) {
+    auto error_msg = "Failed to create frame pool";
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  }
+
+  // 这个入口故意不在 FrameArrived 回调里 TryGetNextFrame。
+  // WGC 的帧池由调用方线程主动 drain，避免回调线程参与后续 D3D/MF 编码工作。
+  session.frame_token = session.frame_pool.FrameArrived(
+      [frame_arrived_callback](auto&&, auto&&) { frame_arrived_callback(); });
+
+  session.session = session.frame_pool.CreateCaptureSession(session.capture_item);
+  if (!session.session) {
+    auto error_msg = "Failed to create capture session";
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  }
+
+  if (is_cursor_capture_control_supported()) {
+    session.session.IsCursorCaptureEnabled(options.capture_cursor);
+  } else if (!options.capture_cursor) {
+    session.need_hide_cursor = true;
+    Logger().warn(
+        "IsCursorCaptureEnabled is not available, cursor visibility cannot be controlled "
+        "without manual fallback");
+  }
+
+  if (is_border_control_supported()) {
+    session.session.IsBorderRequired(options.border_required);
+  }
+
+  return session;
+}
+
+auto try_get_next_frame(CaptureSession& session) -> Direct3D11CaptureFrame {
+  if (!session.frame_pool) {
+    return nullptr;
+  }
+
+  try {
+    return session.frame_pool.TryGetNextFrame();
+  } catch (const winrt::hresult_error& e) {
+    Logger().warn("Failed to get next capture frame: {}", winrt::to_string(e.message()));
+    return nullptr;
+  } catch (...) {
+    Logger().warn("Failed to get next capture frame: unknown error");
+    return nullptr;
+  }
+}
+
 auto start_capture(CaptureSession& session) -> std::expected<void, std::string> {
   if (!session.session) {
     return std::unexpected("Capture session is null");
@@ -203,11 +281,15 @@ auto start_capture(CaptureSession& session) -> std::expected<void, std::string> 
   }
 }
 
-auto stop_capture(CaptureSession& session) -> void {
+auto stop_capture_session(CaptureSession& session) -> void {
   if (session.session) {
     session.session.Close();
     session.session = nullptr;
   }
+}
+
+auto stop_capture(CaptureSession& session) -> void {
+  stop_capture_session(session);
 
   if (session.frame_pool) {
     session.frame_pool.FrameArrived(session.frame_token);

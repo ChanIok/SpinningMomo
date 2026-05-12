@@ -18,7 +18,7 @@ auto create_encoder(const Utils::Media::Encoder::Types::EncoderConfig& config, I
 // 编码视频帧
 auto encode_frame(Utils::Media::Encoder::State::EncoderContext& encoder,
                   ID3D11DeviceContext* context, ID3D11Texture2D* frame_texture,
-                  std::int64_t timestamp_100ns, std::uint32_t fps)
+                  std::int64_t timestamp_100ns, std::uint32_t fps, bool discontinuity = false)
     -> std::expected<void, std::string>;
 
 // 编码音频样本

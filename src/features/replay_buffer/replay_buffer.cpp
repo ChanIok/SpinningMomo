@@ -16,6 +16,7 @@ import Utils.Media.AudioCapture;
 import Utils.Media.RawEncoder;
 import Utils.Logger;
 import Utils.Path;
+import <audioclient.h>;
 import <d3d11_4.h>;
 import <mfapi.h>;
 import <wil/com.h>;
@@ -307,12 +308,6 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
   if (state.raw_encoder.has_audio) {
     Utils::Media::AudioCapture::start_capture_thread(
         state.audio,
-        // get_elapsed_100ns: 相对于开始时间
-        [&state]() -> std::int64_t {
-          auto now = std::chrono::steady_clock::now();
-          auto elapsed = now - state.start_time;
-          return std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
-        },
         // is_active
         [&state]() -> bool {
           return state.status.load(std::memory_order_acquire) ==
@@ -320,8 +315,15 @@ auto start_buffering(Features::ReplayBuffer::State::ReplayBufferState& state, HW
                  state.raw_encoder.has_audio;
         },
         // on_packet
-        [&state](const BYTE* data, UINT32 num_frames, UINT32 bytes_per_frame,
-                 std::int64_t timestamp_100ns) {
+        [&state](const BYTE* data, UINT32 num_frames, UINT32 bytes_per_frame, UINT64, DWORD flags) {
+          if (!data || (flags & AUDCLNT_BUFFERFLAGS_SILENT)) {
+            return;
+          }
+
+          auto now = std::chrono::steady_clock::now();
+          auto elapsed = now - state.start_time;
+          auto timestamp_100ns =
+              std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
           DWORD buffer_size = num_frames * bytes_per_frame;
 
           std::lock_guard write_lock(state.encoder_write_mutex);

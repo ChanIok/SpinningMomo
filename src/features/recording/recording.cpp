@@ -25,24 +25,23 @@ import <windows.h>;
 namespace Features::Recording {
 
 // 录制模块的大致数据流：
-// WGC 帧回调 / 音频采集线程只负责“把数据复制出来并入队”；
-// 编码线程是唯一写 SinkWriter 的地方；
+// WGC 帧回调只负责唤醒编码线程；音频采集线程只复制 PCM 数据并入队；
+// 编码线程主动排空 WGC frame pool，并且是唯一写 SinkWriter 的地方；
 // 控制线程负责把 start / stop / resize restart 串起来，避免多个重操作互相打架。
 constexpr std::uint64_t k_discard_video_frame_threshold = 3;
 
-enum class QueuedItemKind {
-  None,
-  Video,
-  Audio,
-};
-
-struct QueuedItem {
-  QueuedItemKind kind{QueuedItemKind::None};
-  State::QueuedVideoFrame video;
-  State::QueuedAudioPacket audio;
-};
-
 auto floor_to_even(int value) -> int { return (value / 2) * 2; }
+auto query_qpc_100ns() -> std::int64_t {
+  LARGE_INTEGER counter{};
+  LARGE_INTEGER frequency{};
+  if (!QueryPerformanceCounter(&counter) || !QueryPerformanceFrequency(&frequency)) {
+    return 0;
+  }
+
+  constexpr long double kHundredNsPerSecond = 10'000'000.0L;
+  return static_cast<std::int64_t>(counter.QuadPart * kHundredNsPerSecond / frequency.QuadPart);
+}
+
 auto start(Core::State::AppState& app_state, Features::Recording::State::RecordingState& state,
            HWND target_window, const Features::Recording::Types::RecordingConfig& config)
     -> std::expected<void, std::string>;
@@ -241,10 +240,10 @@ auto build_encoder_config(const State::RecordingState& state)
 }
 
 auto clear_queues(State::RecordingState& state) -> void {
-  // 队列只能在 queue_mutex 下动。视频回调、音频线程、编码线程都会碰它。
+  // 队列和通知标志只能在 queue_mutex 下动。音频线程、WGC 回调、编码线程都会碰它。
   std::lock_guard queue_lock(state.queue_mutex);
-  state.video_queue.clear();
   state.audio_queue.clear();
+  state.video_frame_pending = false;
 }
 
 auto clear_session_runtime_fields(State::RecordingState& state) -> void {
@@ -256,11 +255,11 @@ auto clear_session_runtime_fields(State::RecordingState& state) -> void {
   state.capture_session = {};
   state.cropped_texture = nullptr;
   state.encoder = {};
-  state.start_time = {};
+  state.start_qpc_100ns = 0;
+  state.video_timeline = {};
   state.last_frame_width = 0;
   state.last_frame_height = 0;
   clear_queues(state);
-  state.dropped_video_frames.store(0, std::memory_order_release);
   state.dropped_audio_packets.store(0, std::memory_order_release);
   state.encoded_video_frames = 0;
   state.encoded_audio_packets = 0;
@@ -361,54 +360,48 @@ auto ensure_d3d_resources_ready(State::RecordingState& state) -> std::expected<v
   return {};
 }
 
-auto pop_next_queued_item(State::RecordingState& state) -> QueuedItem {
-  QueuedItem item;
-
-  if (state.video_queue.empty() && state.audio_queue.empty()) {
-    return item;
-  }
-
-  // 音频和视频是两个生产者，入队时间可能交错。
-  // 这里按时间戳取更早的一个，让写入顺序尽量接近真实时间线。
-  if (!state.video_queue.empty() && !state.audio_queue.empty()) {
-    if (state.video_queue.front().timestamp_100ns <= state.audio_queue.front().timestamp_100ns) {
-      item.kind = QueuedItemKind::Video;
-      item.video = std::move(state.video_queue.front());
-      state.video_queue.pop_front();
-    } else {
-      item.kind = QueuedItemKind::Audio;
-      item.audio = std::move(state.audio_queue.front());
-      state.audio_queue.pop_front();
+auto mark_video_frame_pending(State::RecordingState& state) -> void {
+  {
+    std::lock_guard queue_lock(state.queue_mutex);
+    if (!state.accepting_input.load(std::memory_order_acquire)) {
+      return;
     }
-    return item;
+    state.video_frame_pending = true;
   }
-
-  if (!state.video_queue.empty()) {
-    item.kind = QueuedItemKind::Video;
-    item.video = std::move(state.video_queue.front());
-    state.video_queue.pop_front();
-    return item;
-  }
-
-  item.kind = QueuedItemKind::Audio;
-  item.audio = std::move(state.audio_queue.front());
-  state.audio_queue.pop_front();
-  return item;
+  state.queue_cv.notify_one();
 }
 
-auto wait_next_queued_item(State::RecordingState& state, std::stop_token stop_token) -> QueuedItem {
-  std::unique_lock queue_lock(state.queue_mutex);
-  // 编码线程平时睡在这里；有新帧、新音频，或 stop 要求收尾时被叫醒。
-  state.queue_cv.wait(queue_lock, [&state, stop_token]() {
-    return stop_token.stop_requested() || state.finish_requested.load(std::memory_order_acquire) ||
-           !state.video_queue.empty() || !state.audio_queue.empty();
-  });
+auto consume_video_frame_pending(State::RecordingState& state) -> bool {
+  std::lock_guard queue_lock(state.queue_mutex);
+  const bool pending = state.video_frame_pending;
+  state.video_frame_pending = false;
+  return pending;
+}
 
-  if (state.video_queue.empty() && state.audio_queue.empty()) {
-    return {};
+auto pop_next_audio_packet(State::RecordingState& state)
+    -> std::optional<State::QueuedAudioPacket> {
+  std::lock_guard queue_lock(state.queue_mutex);
+  if (state.audio_queue.empty()) {
+    return std::nullopt;
   }
 
-  return pop_next_queued_item(state);
+  auto packet = std::move(state.audio_queue.front());
+  state.audio_queue.pop_front();
+  return packet;
+}
+
+auto has_pending_encoder_work(State::RecordingState& state) -> bool {
+  std::lock_guard queue_lock(state.queue_mutex);
+  return state.video_frame_pending || !state.audio_queue.empty();
+}
+
+auto wait_for_encoder_work(State::RecordingState& state, std::stop_token stop_token) -> void {
+  std::unique_lock queue_lock(state.queue_mutex);
+  // 编码线程平时睡在这里；有新视频帧通知、新音频，或 stop 要求收尾时被叫醒。
+  state.queue_cv.wait(queue_lock, [&state, stop_token]() {
+    return stop_token.stop_requested() || state.finish_requested.load(std::memory_order_acquire) ||
+           state.video_frame_pending || !state.audio_queue.empty();
+  });
 }
 
 auto write_audio_packet(Utils::Media::Encoder::State::EncoderContext& encoder,
@@ -463,16 +456,195 @@ auto write_audio_packet(Utils::Media::Encoder::State::EncoderContext& encoder,
   return {};
 }
 
-auto encode_queued_video(State::RecordingState& state, State::QueuedVideoFrame& frame)
+// WGC 的 SystemRelativeTime 使用 QPC 时间基，WASAPI 的 qpc_position 也是同一时间基。
+// 这里减去录制开始时的 QPC，把视频帧时间转成“本段录制从 0 开始”的 100ns 时间戳。
+auto get_frame_timestamp_100ns(State::RecordingState& state,
+                               Utils::Graphics::Capture::Direct3D11CaptureFrame frame)
+    -> std::int64_t {
+  if (state.start_qpc_100ns <= 0) {
+    return 0;
+  }
+
+  return std::max<std::int64_t>(0, frame.SystemRelativeTime().count() - state.start_qpc_100ns);
+}
+
+auto video_frame_interval_100ns(const State::RecordingState& state) -> std::int64_t {
+  const auto fps = std::max<std::uint32_t>(state.config.fps, 1);
+  return std::max<std::int64_t>(1, 10'000'000LL / fps);
+}
+
+auto mark_missing_video_until(State::RecordingState& state, std::int64_t target_timestamp_100ns)
     -> std::expected<void, std::string> {
+  if (!state.encoder.sink_writer || target_timestamp_100ns < 0) {
+    return {};
+  }
+
+  const auto frame_interval_100ns = video_frame_interval_100ns(state);
+  const auto half_frame_100ns = frame_interval_100ns / 2;
+
+  // 这里不生成重复画面，只向 MF 声明 video stream 在这些帧点没有 sample。
+  // 这样音频继续写入时，SinkWriter 不会看到“音频时间线前进，视频流毫无交代地停住”。
+  // 保留半帧容忍，避免把正常调度抖动误判成缺帧，并避免 tick 紧贴真实帧。
+  while (state.video_timeline.next_expected_timestamp_100ns + half_frame_100ns <=
+         target_timestamp_100ns) {
+    const auto tick_timestamp = state.video_timeline.next_expected_timestamp_100ns;
+    HRESULT hr =
+        state.encoder.sink_writer->SendStreamTick(state.encoder.video_stream_index, tick_timestamp);
+    if (FAILED(hr)) {
+      return std::unexpected(
+          std::format("Failed to send video stream tick at {} (HRESULT: 0x{:08X})", tick_timestamp,
+                      static_cast<unsigned>(hr)));
+    }
+
+    state.video_timeline.next_expected_timestamp_100ns += frame_interval_100ns;
+    state.video_timeline.ticks_sent++;
+    state.video_timeline.sample_after_gap = true;
+  }
+
+  return {};
+}
+
+auto commit_video_sample_time(State::RecordingState& state, std::int64_t timestamp_100ns) -> void {
+  // 真实视频 sample 已经覆盖 timestamp_100ns，把“下一帧应出现时间”推进到后一帧。
+  // 如果前面发过 tick，这个 sample 写入成功后 gap 已结束。
+  const auto next_timestamp = timestamp_100ns + video_frame_interval_100ns(state);
+  if (next_timestamp > state.video_timeline.next_expected_timestamp_100ns) {
+    state.video_timeline.next_expected_timestamp_100ns = next_timestamp;
+  }
+  state.video_timeline.sample_after_gap = false;
+}
+
+auto encode_capture_frame(State::RecordingState& state,
+                          Utils::Graphics::Capture::Direct3D11CaptureFrame frame)
+    -> std::expected<void, std::string> {
+  if (!frame) {
+    return {};
+  }
+
+  auto content_size = frame.ContentSize();
+  if (content_size.Width > 0 && content_size.Height > 0) {
+    bool frame_size_changed = content_size.Width != state.last_frame_width ||
+                              content_size.Height != state.last_frame_height;
+
+    if (frame_size_changed) {
+      Utils::Graphics::Capture::recreate_frame_pool(state.capture_session, content_size.Width,
+                                                    content_size.Height);
+
+      auto capture_plan_result =
+          resolve_capture_plan(state.target_window, state.config.capture_client_area,
+                               content_size.Width, content_size.Height);
+      if (!capture_plan_result) {
+        return std::unexpected("Failed to resolve recording crop plan after resize: " +
+                               capture_plan_result.error());
+      }
+
+      state.last_frame_width = content_size.Width;
+      state.last_frame_height = content_size.Height;
+
+      if (state.status.load(std::memory_order_acquire) ==
+              Features::Recording::Types::RecordingStatus::Recording &&
+          state.config.auto_restart_on_resize &&
+          (capture_plan_result->output_width != state.config.width ||
+           capture_plan_result->output_height != state.config.height)) {
+        request_restart_after_resize(state);
+        return {};
+      }
+
+      state.capture_plan = *capture_plan_result;
+    }
+  }
+
+  auto texture =
+      Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(frame.Surface());
+  if (!texture) {
+    return std::unexpected("Failed to get texture from capture frame");
+  }
+
+  D3D11_TEXTURE2D_DESC source_desc{};
+  texture->GetDesc(&source_desc);
+  if (source_desc.Width == 0 || source_desc.Height == 0) {
+    return std::unexpected("Failed to resolve recording source texture size");
+  }
+
+  ID3D11Texture2D* current_texture = texture.get();
+  auto capture_plan = state.capture_plan;
+  if (capture_plan.output_width == 0 || capture_plan.output_height == 0) {
+    auto capture_plan_result = calculate_frame_crop_plan(state.target_window, state.config,
+                                                         static_cast<int>(source_desc.Width),
+                                                         static_cast<int>(source_desc.Height));
+    if (!capture_plan_result) {
+      return std::unexpected("Failed to resolve recording crop plan: " +
+                             capture_plan_result.error());
+    }
+    state.capture_plan = *capture_plan_result;
+    capture_plan = *capture_plan_result;
+  }
+
+  if (capture_plan.source_width != static_cast<int>(source_desc.Width) ||
+      capture_plan.source_height != static_cast<int>(source_desc.Height)) {
+    auto capture_plan_result = calculate_frame_crop_plan(state.target_window, state.config,
+                                                         static_cast<int>(source_desc.Width),
+                                                         static_cast<int>(source_desc.Height));
+    if (!capture_plan_result) {
+      return std::unexpected("Failed to refresh recording crop plan: " +
+                             capture_plan_result.error());
+    }
+    state.capture_plan = *capture_plan_result;
+    capture_plan = *capture_plan_result;
+  }
+
+  if (capture_plan.should_crop) {
+    auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
+        state.device.get(), state.context.get(), texture.get(), capture_plan.region,
+        state.cropped_texture);
+    if (!crop_result) {
+      return std::unexpected("Failed to crop recording frame: " + crop_result.error());
+    }
+    current_texture = *crop_result;
+  }
+
+  D3D11_TEXTURE2D_DESC current_desc{};
+  current_texture->GetDesc(&current_desc);
+  if (current_desc.Width != capture_plan.output_width ||
+      current_desc.Height != capture_plan.output_height) {
+    return std::unexpected(std::format(
+        "Recording frame size mismatch after crop: got {}x{}, expected {}x{}", current_desc.Width,
+        current_desc.Height, capture_plan.output_width, capture_plan.output_height));
+  }
+
+  const auto timestamp_100ns = get_frame_timestamp_100ns(state, frame);
+  if (state.encoded_video_frames > 0) {
+    // 两个真实 WGC 帧之间可能隔了很久；先把中间缺失的视频帧标成 stream tick。
+    auto tick_result = mark_missing_video_until(state, timestamp_100ns);
+    if (!tick_result) {
+      return tick_result;
+    }
+  }
+
+  const bool discontinuity = state.video_timeline.sample_after_gap;
   auto result =
-      Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(), frame.texture.get(),
-                                          frame.timestamp_100ns, state.config.fps);
+      Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(), current_texture,
+                                          timestamp_100ns, state.config.fps, discontinuity);
   if (!result) {
     return result;
   }
 
   state.encoded_video_frames++;
+  commit_video_sample_time(state, timestamp_100ns);
+  return {};
+}
+
+auto encode_available_video_frames(State::RecordingState& state)
+    -> std::expected<void, std::string> {
+  std::lock_guard frame_lock(state.frame_mutex);
+
+  while (auto frame = Utils::Graphics::Capture::try_get_next_frame(state.capture_session)) {
+    auto result = encode_capture_frame(state, frame);
+    if (!result) {
+      return result;
+    }
+  }
+
   return {};
 }
 
@@ -505,27 +677,45 @@ auto encoder_thread_proc(State::RecordingState& state, std::stop_token stop_toke
     state.has_audio.store(state.encoder.has_audio, std::memory_order_release);
     notify_encoder_ready(state, true);
 
-    // 主循环：不断从队列取视频帧或音频包，写给编码器。
-    // stop 时不会立刻丢掉队列，而是先把已经排队的数据写完，再 finalize。
+    // 主循环：视频从 WGC frame pool 主动拉取，音频从队列取包，然后写给编码器。
+    // stop 时不会立刻丢掉已到达的数据，而是先排空再 finalize。
     while (true) {
-      auto item = wait_next_queued_item(state, stop_token);
-      if (item.kind == QueuedItemKind::None) {
-        if (stop_token.stop_requested() || state.finish_requested.load(std::memory_order_acquire)) {
+      wait_for_encoder_work(state, stop_token);
+
+      const bool finishing =
+          stop_token.stop_requested() || state.finish_requested.load(std::memory_order_acquire);
+
+      if (consume_video_frame_pending(state) || finishing) {
+        auto video_result = encode_available_video_frames(state);
+        if (!video_result) {
+          state.encoder_error = video_result.error();
+          Logger().error("Recording encoder failed: {}", video_result.error());
           break;
         }
-        continue;
       }
 
-      std::expected<void, std::string> encode_result;
-      if (item.kind == QueuedItemKind::Video) {
-        encode_result = encode_queued_video(state, item.video);
-      } else {
-        encode_result = encode_queued_audio(state, item.audio);
+      while (auto audio_packet = pop_next_audio_packet(state)) {
+        // 音频可能在 WGC 停帧期间继续推进。写音频前先补 video tick，
+        // 避免 SinkWriter 内部等待一个一直没有到来的 video sample。
+        auto tick_result = mark_missing_video_until(state, audio_packet->timestamp_100ns);
+        if (!tick_result) {
+          state.encoder_error = tick_result.error();
+          Logger().error("Recording encoder failed: {}", tick_result.error());
+          break;
+        }
+
+        auto audio_result = encode_queued_audio(state, *audio_packet);
+        if (!audio_result) {
+          state.encoder_error = audio_result.error();
+          Logger().error("Recording encoder failed: {}", audio_result.error());
+          break;
+        }
+      }
+      if (!state.encoder_error.empty()) {
+        break;
       }
 
-      if (!encode_result) {
-        state.encoder_error = encode_result.error();
-        Logger().error("Recording encoder failed: {}", encode_result.error());
+      if (finishing && !has_pending_encoder_work(state)) {
         break;
       }
     }
@@ -564,50 +754,6 @@ auto encoder_thread_proc(State::RecordingState& state, std::stop_token stop_toke
     state.encoder_error = "Recording encoder thread exception: unknown";
     Logger().error("{}", state.encoder_error);
   }
-}
-
-auto enqueue_video_frame(State::RecordingState& state, State::QueuedVideoFrame frame) -> void {
-  {
-    std::lock_guard queue_lock(state.queue_mutex);
-    if (!state.accepting_input.load(std::memory_order_acquire)) {
-      return;
-    }
-
-    // 队列满了就丢最旧的视频帧，优先保证录制继续。
-    // 这里不阻塞 WGC 回调，否则帧池可能被堵住，反而更容易卡。
-    if (state.video_queue.size() >= State::k_max_video_queue_size) {
-      state.video_queue.pop_front();
-      state.dropped_video_frames.fetch_add(1, std::memory_order_relaxed);
-    }
-
-    state.video_queue.push_back(std::move(frame));
-  }
-  state.queue_cv.notify_one();
-}
-
-auto copy_texture_for_queue(State::RecordingState& state, ID3D11Texture2D* texture)
-    -> std::expected<wil::com_ptr<ID3D11Texture2D>, std::string> {
-  if (!texture) {
-    return std::unexpected("Recording frame texture is null");
-  }
-
-  D3D11_TEXTURE2D_DESC desc{};
-  texture->GetDesc(&desc);
-  desc.BindFlags = 0;
-  desc.MiscFlags = 0;
-  desc.Usage = D3D11_USAGE_DEFAULT;
-  desc.CPUAccessFlags = 0;
-
-  // WGC 的 frame 对象出了回调就不能继续依赖，所以这里复制一份纹理给编码线程慢慢用。
-  wil::com_ptr<ID3D11Texture2D> copied_texture;
-  HRESULT hr = state.device->CreateTexture2D(&desc, nullptr, copied_texture.put());
-  if (FAILED(hr)) {
-    return std::unexpected(std::format(
-        "Failed to create recording queue texture (HRESULT: 0x{:08X})", static_cast<unsigned>(hr)));
-  }
-
-  state.context->CopyResource(copied_texture.get(), texture);
-  return copied_texture;
 }
 
 auto request_control_action(Features::Recording::State::RecordingState& state,
@@ -838,158 +984,31 @@ auto initialize(Features::Recording::State::RecordingState& state)
   return {};
 }
 
-auto on_frame_arrived(Features::Recording::State::RecordingState& state,
-                      Utils::Graphics::Capture::Direct3D11CaptureFrame frame) -> void {
-  // stop 已经开始后，新来的帧直接不要了。
-  if (!state.accepting_input.load(std::memory_order_acquire) ||
-      state.status.load(std::memory_order_acquire) !=
-          Features::Recording::Types::RecordingStatus::Recording) {
-    return;
-  }
-
-  auto now = std::chrono::steady_clock::now();
-  auto elapsed = now - state.start_time;
-  auto timestamp_100ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
-
-  // 这里的锁不是为了“加速”，而是为了 stop/reset 时别把 D3D/WGC 资源清掉。
-  // stop_capture 后会拿同一把锁等这里退出。
-  std::lock_guard frame_lock(state.frame_mutex);
-  if (!state.accepting_input.load(std::memory_order_acquire) ||
-      state.status.load(std::memory_order_acquire) !=
-          Features::Recording::Types::RecordingStatus::Recording) {
-    return;
-  }
-
-  auto content_size = frame.ContentSize();
-  if (content_size.Width > 0 && content_size.Height > 0) {
-    bool frame_size_changed = content_size.Width != state.last_frame_width ||
-                              content_size.Height != state.last_frame_height;
-
-    if (frame_size_changed) {
-      // WGC 源尺寸变了，帧池也要跟着重建，否则后续拿到的帧尺寸会不对。
-      Utils::Graphics::Capture::recreate_frame_pool(state.capture_session, content_size.Width,
-                                                    content_size.Height);
-
-      auto capture_plan_result =
-          resolve_capture_plan(state.target_window, state.config.capture_client_area,
-                               content_size.Width, content_size.Height);
-      if (!capture_plan_result) {
-        Logger().error("Failed to resolve recording crop plan after resize: {}",
-                       capture_plan_result.error());
-        return;
-      }
-
-      state.last_frame_width = content_size.Width;
-      state.last_frame_height = content_size.Height;
-
-      if (state.config.auto_restart_on_resize &&
-          (capture_plan_result->output_width != state.config.width ||
-           capture_plan_result->output_height != state.config.height)) {
-        // 编码器的宽高启动后不能改。这里不直接 stop/start，只提交给控制线程处理。
-        request_restart_after_resize(state);
-        return;
-      }
-
-      state.capture_plan = *capture_plan_result;
-    }
-  }
-
-  auto texture =
-      Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(frame.Surface());
-  if (!texture) {
-    Logger().error("Failed to get texture from capture frame");
-    return;
-  }
-
-  D3D11_TEXTURE2D_DESC source_desc{};
-  texture->GetDesc(&source_desc);
-  if (source_desc.Width == 0 || source_desc.Height == 0) {
-    Logger().error("Failed to resolve recording source texture size");
-    return;
-  }
-
-  ID3D11Texture2D* current_texture = texture.get();
-  auto capture_plan = state.capture_plan;
-  if (capture_plan.output_width == 0 || capture_plan.output_height == 0) {
-    auto capture_plan_result = calculate_frame_crop_plan(state.target_window, state.config,
-                                                         static_cast<int>(source_desc.Width),
-                                                         static_cast<int>(source_desc.Height));
-    if (!capture_plan_result) {
-      Logger().error("Failed to resolve recording crop plan: {}", capture_plan_result.error());
-      return;
-    }
-    state.capture_plan = *capture_plan_result;
-    capture_plan = *capture_plan_result;
-  }
-
-  if (capture_plan.source_width != static_cast<int>(source_desc.Width) ||
-      capture_plan.source_height != static_cast<int>(source_desc.Height)) {
-    auto capture_plan_result = calculate_frame_crop_plan(state.target_window, state.config,
-                                                         static_cast<int>(source_desc.Width),
-                                                         static_cast<int>(source_desc.Height));
-    if (!capture_plan_result) {
-      Logger().error("Failed to refresh recording crop plan: {}", capture_plan_result.error());
-      return;
-    }
-    state.capture_plan = *capture_plan_result;
-    capture_plan = *capture_plan_result;
-  }
-
-  if (capture_plan.should_crop) {
-    // 只录客户区时，先把完整窗口纹理裁成客户区纹理，再交给编码线程。
-    auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
-        state.device.get(), state.context.get(), texture.get(), capture_plan.region,
-        state.cropped_texture);
-    if (!crop_result) {
-      Logger().error("Failed to crop recording frame: {}", crop_result.error());
-      return;
-    }
-    current_texture = *crop_result;
-  }
-
-  D3D11_TEXTURE2D_DESC current_desc{};
-  current_texture->GetDesc(&current_desc);
-  if (current_desc.Width != capture_plan.output_width ||
-      current_desc.Height != capture_plan.output_height) {
-    Logger().error("Recording frame size mismatch after crop: got {}x{}, expected {}x{}",
-                   current_desc.Width, current_desc.Height, capture_plan.output_width,
-                   capture_plan.output_height);
-    return;
-  }
-
-  auto copied_texture_result = copy_texture_for_queue(state, current_texture);
-  if (!copied_texture_result) {
-    Logger().error("Failed to copy recording frame: {}", copied_texture_result.error());
-    return;
-  }
-
-  enqueue_video_frame(state, State::QueuedVideoFrame{
-                                 .texture = std::move(*copied_texture_result),
-                                 .timestamp_100ns = timestamp_100ns,
-                             });
+auto on_frame_arrived(Features::Recording::State::RecordingState& state) -> void {
+  mark_video_frame_pending(state);
 }
 
 auto signal_encoder_finish(State::RecordingState& state) -> void {
   {
     std::lock_guard queue_lock(state.queue_mutex);
-    // 告诉编码线程：不会再有新数据了，把队列里剩下的写完就收尾。
+    // 告诉编码线程：不会再有新数据了，把音频队列和 WGC 帧池里剩下的数据写完就收尾。
     state.finish_requested.store(true, std::memory_order_release);
+    state.video_frame_pending = true;
   }
   state.queue_cv.notify_all();
 }
 
-auto wait_frame_callback_idle(State::RecordingState& state) -> void {
-  // stop_capture 已经阻止后续回调；这里等已经进入 on_frame_arrived 的回调退出。
+auto stop_capture_input(State::RecordingState& state) -> void {
+  // 编码线程可能正在从 frame pool 取帧并直接写 SinkWriter；先互斥地停止产帧。
   std::lock_guard frame_lock(state.frame_mutex);
+  Utils::Graphics::Capture::stop_capture_session(state.capture_session);
 }
 
 auto cleanup_failed_start(State::RecordingState& state, std::string_view reason) -> void {
-  // start 中途失败也走一遍“停输入 -> 等回调 -> 停编码线程 -> 清资源”。
+  // start 中途失败也走一遍“停输入 -> 停止产帧 -> 停编码线程 -> 清资源”。
   // 这样失败路径和正常 stop 的资源顺序保持一致。
   state.accepting_input.store(false, std::memory_order_release);
-  Utils::Graphics::Capture::stop_capture(state.capture_session);
-  wait_frame_callback_idle(state);
+  stop_capture_input(state);
   Features::Recording::AudioCapture::stop(state.audio);
   signal_encoder_finish(state);
 
@@ -1068,10 +1087,10 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
   capture_options.capture_cursor = config.capture_cursor;
   capture_options.border_required = false;
 
-  // WGC 回调只复制纹理并入队，不直接写编码器。
-  auto capture_result = Utils::Graphics::Capture::create_capture_session(
+  // WGC 回调只通知编码线程；真正取帧和写编码器都在编码线程里完成。
+  auto capture_result = Utils::Graphics::Capture::create_capture_session_with_frame_notification(
       target_window, state.winrt_device, state.capture_plan.source_width,
-      state.capture_plan.source_height, [&state](auto frame) { on_frame_arrived(state, frame); }, 2,
+      state.capture_plan.source_height, [&state]() { on_frame_arrived(state); }, 3,
       capture_options);
 
   if (!capture_result) {
@@ -1080,10 +1099,10 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
   }
   state.capture_session = std::move(*capture_result);
 
-  state.start_time = std::chrono::steady_clock::now();
+  state.start_qpc_100ns = query_qpc_100ns();
   state.accepting_input.store(true, std::memory_order_release);
 
-  // 从这里开始，WGC 可能随时回调 on_frame_arrived。
+  // 从这里开始，WGC 可能随时通知 on_frame_arrived。
   auto start_result = Utils::Graphics::Capture::start_capture(state.capture_session);
   if (!start_result) {
     cleanup_failed_start(state, "recording start failed");
@@ -1112,10 +1131,9 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
   // 先关输入入口。已经进入队列的数据会继续写完，新来的帧/音频会被拒绝。
   state.accepting_input.store(false, std::memory_order_release);
 
-  // 先停 WGC，再等已经进入的帧回调退出，之后才能清理 D3D/WGC 资源。
+  // 先停止 WGC 继续产帧，但保留 frame pool，让编码线程排空已经到达的帧。
   auto stop_capture_start = std::chrono::steady_clock::now();
-  Utils::Graphics::Capture::stop_capture(state.capture_session);
-  wait_frame_callback_idle(state);
+  stop_capture_input(state);
   Logger().debug("Recording capture stopped in {}ms",
                  std::chrono::duration_cast<std::chrono::milliseconds>(
                      std::chrono::steady_clock::now() - stop_capture_start)
@@ -1155,11 +1173,12 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
     delete_working_output_file(state.working_output_path, reason);
   }
 
-  auto dropped_video = state.dropped_video_frames.load(std::memory_order_relaxed);
   auto dropped_audio = state.dropped_audio_packets.load(std::memory_order_relaxed);
-  if (dropped_video > 0 || dropped_audio > 0) {
-    Logger().warn("Recording queue dropped packets: video={}, audio={}", dropped_video,
-                  dropped_audio);
+  if (dropped_audio > 0) {
+    Logger().warn("Recording queue dropped audio packets: {}", dropped_audio);
+  }
+  if (state.video_timeline.ticks_sent > 0) {
+    Logger().info("Recording sent video stream ticks: {}", state.video_timeline.ticks_sent);
   }
 
   clear_session_runtime_fields(state);

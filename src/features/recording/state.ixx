@@ -30,7 +30,6 @@ struct CapturePlan {
   Utils::Graphics::CaptureRegion::CropRegion region{};
 };
 
-inline constexpr std::size_t k_max_video_queue_size = 5;
 inline constexpr std::size_t k_max_audio_queue_size = 120;
 
 enum class RecordingControlAction {
@@ -41,17 +40,24 @@ enum class RecordingControlAction {
   ShutdownStop,
 };
 
-struct QueuedVideoFrame {
-  wil::com_ptr<ID3D11Texture2D> texture;
-  std::int64_t timestamp_100ns = 0;
-};
-
 struct QueuedAudioPacket {
   std::vector<std::uint8_t> data;
   std::uint32_t num_frames = 0;
   std::uint32_t bytes_per_frame = 0;
   std::uint32_t sample_rate = 0;
   std::int64_t timestamp_100ns = 0;
+};
+
+// 只描述“视频流时间线”，不持有真实画面。
+// WGC 停帧时，音频仍可能继续前进；这时用 SendStreamTick 标记缺失的视频帧，
+// 让 SinkWriter 知道视频流不是卡住或被遗漏，而是在这些时间点没有 sample。
+struct VideoTimelineState {
+  // 下一帧视频理论上应该出现的时间；真实视频帧和 stream tick 都会推进它。
+  std::int64_t next_expected_timestamp_100ns = 0;
+  // 仅用于日志，方便确认最小化/停帧期间是否发过 tick。
+  std::uint64_t ticks_sent = 0;
+  // 发过 tick 后，下一个真实视频 sample 是 gap 后恢复的第一帧。
+  bool sample_after_gap = false;
 };
 
 // 录制完整状态
@@ -76,12 +82,11 @@ struct RecordingState {
   Utils::Media::Encoder::State::EncoderContext encoder;
 
   // 帧和队列状态
-  std::chrono::steady_clock::time_point start_time;
+  std::int64_t start_qpc_100ns = 0;
+  VideoTimelineState video_timeline;
   int last_frame_width = 0;
   int last_frame_height = 0;
-  std::deque<QueuedVideoFrame> video_queue;
   std::deque<QueuedAudioPacket> audio_queue;
-  std::atomic<std::uint64_t> dropped_video_frames{0};
   std::atomic<std::uint64_t> dropped_audio_packets{0};
   std::uint64_t encoded_video_frames = 0;
   std::uint64_t encoded_audio_packets = 0;
@@ -94,6 +99,7 @@ struct RecordingState {
   bool encoder_ready = false;
   bool encoder_start_succeeded = false;
   bool finalize_succeeded = false;
+  bool video_frame_pending = false;
   std::string encoder_error;
 
   // 懒启动的录制控制线程：首次录制请求时启动，之后睡眠等待 toggle / resize / shutdown。
@@ -106,9 +112,9 @@ struct RecordingState {
   std::atomic<bool> shutdown_requested{false};
 
   // 线程同步
-  // frame_mutex: 让 WGC 回调和停止清理互斥，避免清理仍被回调使用的 D3D/WGC 状态。
+  // frame_mutex: 保护编码线程主动读取 WGC frame pool 与停止/清理流程。
   std::mutex frame_mutex;
-  // queue_mutex: 保护视频/音频队列和 finish 请求唤醒。
+  // queue_mutex: 保护音频队列、视频帧通知和 finish 请求唤醒。
   std::mutex queue_mutex;
   std::condition_variable queue_cv;
   std::mutex encoder_ready_mutex;

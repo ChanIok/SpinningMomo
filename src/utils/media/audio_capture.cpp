@@ -272,7 +272,6 @@ auto initialize_system_loopback(Utils::Media::AudioCapture::AudioCaptureContext&
 
 // 通用音频捕获循环
 auto audio_capture_loop(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
-                        std::function<std::int64_t()> get_elapsed_100ns,
                         std::function<bool()> is_active,
                         Utils::Media::AudioCapture::AudioPacketCallback on_packet) -> void {
   HRESULT hr = ctx.audio_client->Start();
@@ -312,11 +311,10 @@ auto audio_capture_loop(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
         break;
       }
 
-      if (!(flags & AUDCLNT_BUFFERFLAGS_SILENT) && frames_available > 0) {
+      if (frames_available > 0) {
         if (is_active()) {
-          auto timestamp_100ns = get_elapsed_100ns();
           UINT32 bytes_per_frame = ctx.wave_format->nBlockAlign;
-          on_packet(data, frames_available, bytes_per_frame, timestamp_100ns);
+          on_packet(data, frames_available, bytes_per_frame, qpc_position, flags);
         }
       }
 
@@ -378,14 +376,12 @@ auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32_t proc
   return initialize_system_loopback(ctx);
 }
 
-auto start_capture_thread(AudioCaptureContext& ctx, std::function<std::int64_t()> get_elapsed_100ns,
-                          std::function<bool()> is_active, AudioPacketCallback on_packet) -> void {
+auto start_capture_thread(AudioCaptureContext& ctx, std::function<bool()> is_active,
+                          AudioPacketCallback on_packet) -> void {
   ctx.should_stop = false;
-  ctx.capture_thread = std::jthread([&ctx, get_elapsed_100ns = std::move(get_elapsed_100ns),
-                                     is_active = std::move(is_active),
-                                     on_packet = std::move(on_packet)](std::stop_token) {
-    audio_capture_loop(ctx, get_elapsed_100ns, is_active, on_packet);
-  });
+  ctx.capture_thread =
+      std::jthread([&ctx, is_active = std::move(is_active), on_packet = std::move(on_packet)](
+                       std::stop_token) { audio_capture_loop(ctx, is_active, on_packet); });
 }
 
 auto stop(AudioCaptureContext& ctx) -> void {

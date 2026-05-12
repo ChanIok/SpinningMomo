@@ -34,6 +34,7 @@ export using Direct3D11CaptureFrame = winrt::Windows::Graphics::Capture::Direct3
 
 // 帧回调函数类型
 using FrameCallback = std::function<void(Direct3D11CaptureFrame)>;
+using FrameArrivedCallback = std::function<void()>;
 
 // 创建WinRT设备
 export auto create_winrt_device(ID3D11Device* d3d_device)
@@ -55,8 +56,23 @@ export auto create_capture_session(
     int height, FrameCallback frame_callback, int frame_pool_size = 1,
     const CaptureSessionOptions& options = {}) -> std::expected<CaptureSession, std::string>;
 
+// 创建捕获会话，但 FrameArrived 回调只负责通知，调用方稍后主动 try_get_next_frame。
+// 适合录制这类需要把 WGC frame pool 消费权交给专用线程的场景。
+// 注意：frame_arrived_callback 里不要取帧；消费者应在自己的线程里循环取空帧池。
+export auto create_capture_session_with_frame_notification(
+    HWND target_window,
+    const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,
+    int height, FrameArrivedCallback frame_arrived_callback, int frame_pool_size = 1,
+    const CaptureSessionOptions& options = {}) -> std::expected<CaptureSession, std::string>;
+
+// 主动从帧池取下一帧；如果帧池为空或已关闭，返回 null frame。
+export auto try_get_next_frame(CaptureSession& session) -> Direct3D11CaptureFrame;
+
 // 开始捕获
 export auto start_capture(CaptureSession& session) -> std::expected<void, std::string>;
+
+// 只关闭捕获会话，不关闭帧池；用于先停止产帧，再让消费者排空帧池。
+export auto stop_capture_session(CaptureSession& session) -> void;
 
 // 停止捕获
 export auto stop_capture(CaptureSession& session) -> void;

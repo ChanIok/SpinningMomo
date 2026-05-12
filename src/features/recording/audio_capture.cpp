@@ -7,11 +7,37 @@ import Features.Recording.State;
 import Features.Recording.Types;
 import Utils.Media.AudioCapture;
 import Utils.Logger;
+import <audioclient.h>;
 import <mfapi.h>;
 import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording::AudioCapture {
+
+auto query_qpc_100ns() -> std::int64_t {
+  LARGE_INTEGER counter{};
+  LARGE_INTEGER frequency{};
+  if (!QueryPerformanceCounter(&counter) || !QueryPerformanceFrequency(&frequency)) {
+    return 0;
+  }
+
+  constexpr long double kHundredNsPerSecond = 10'000'000.0L;
+  return static_cast<std::int64_t>(counter.QuadPart * kHundredNsPerSecond / frequency.QuadPart);
+}
+
+auto resolve_audio_timestamp_100ns(const Features::Recording::State::RecordingState& state,
+                                   UINT64 qpc_position_100ns, DWORD flags) -> std::int64_t {
+  if (state.start_qpc_100ns <= 0) {
+    return 0;
+  }
+
+  const bool timestamp_valid =
+      qpc_position_100ns > 0 && !(flags & AUDCLNT_BUFFERFLAGS_TIMESTAMP_ERROR);
+  const auto qpc_100ns =
+      timestamp_valid ? static_cast<std::int64_t>(qpc_position_100ns) : query_qpc_100ns();
+
+  return qpc_100ns > state.start_qpc_100ns ? qpc_100ns - state.start_qpc_100ns : 0;
+}
 
 auto initialize(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
                 Utils::Media::AudioCapture::AudioSource source, std::uint32_t process_id)
@@ -22,12 +48,6 @@ auto initialize(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
 auto start_capture_thread(Features::Recording::State::RecordingState& state) -> void {
   Utils::Media::AudioCapture::start_capture_thread(
       state.audio,
-      // get_elapsed_100ns
-      [&state]() -> std::int64_t {
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = now - state.start_time;
-        return std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count() / 100;
-      },
       // is_active
       [&state]() -> bool {
         return state.accepting_input.load(std::memory_order_acquire) &&
@@ -36,8 +56,8 @@ auto start_capture_thread(Features::Recording::State::RecordingState& state) -> 
       },
       // on_packet: 只复制音频数据并入队，SinkWriter 只在录制编码线程中使用。
       [&state](const BYTE* data, UINT32 num_frames, UINT32 bytes_per_frame,
-               std::int64_t timestamp_100ns) {
-        if (!data || num_frames == 0 || bytes_per_frame == 0 ||
+               UINT64 qpc_position_100ns, DWORD flags) {
+        if (num_frames == 0 || bytes_per_frame == 0 ||
             !state.accepting_input.load(std::memory_order_acquire)) {
           return;
         }
@@ -45,14 +65,16 @@ auto start_capture_thread(Features::Recording::State::RecordingState& state) -> 
         State::QueuedAudioPacket packet;
         packet.num_frames = num_frames;
         packet.bytes_per_frame = bytes_per_frame;
-        packet.timestamp_100ns = timestamp_100ns;
+        packet.timestamp_100ns = resolve_audio_timestamp_100ns(state, qpc_position_100ns, flags);
         if (state.audio.wave_format) {
           packet.sample_rate = state.audio.wave_format->nSamplesPerSec;
         }
 
         const auto byte_count = static_cast<std::size_t>(num_frames) * bytes_per_frame;
         packet.data.resize(byte_count);
-        std::memcpy(packet.data.data(), data, byte_count);
+        if (data && !(flags & AUDCLNT_BUFFERFLAGS_SILENT)) {
+          std::memcpy(packet.data.data(), data, byte_count);
+        }
 
         {
           std::lock_guard queue_lock(state.queue_mutex);

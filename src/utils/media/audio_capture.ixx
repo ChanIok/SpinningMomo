@@ -38,8 +38,10 @@ export struct AudioCaptureContext {
   std::atomic<bool> should_stop = false;  // 停止信号
 };
 
-// 音频数据包回调: (audio_data, num_frames, bytes_per_frame, timestamp_100ns)
-export using AudioPacketCallback = std::function<void(const BYTE*, UINT32, UINT32, std::int64_t)>;
+// 音频数据包回调:
+// (audio_data, num_frames, bytes_per_frame, qpc_position_100ns, flags)
+// qpc_position_100ns 是 WASAPI 给出的包首帧 QPC 时间，单位为 100ns。
+export using AudioPacketCallback = std::function<void(const BYTE*, UINT32, UINT32, UINT64, DWORD)>;
 
 // 是否支持 Process Loopback API（Windows 10 2004+）
 export auto is_process_loopback_supported() -> bool;
@@ -49,13 +51,10 @@ export auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32
     -> std::expected<void, std::string>;
 
 // 启动音频捕获线程（回调式）
-// get_elapsed_100ns: 获取当前经过时间（100ns 单位）
 // is_active: 判断调用方是否仍处于活跃状态
 // on_packet: 音频数据包回调
-export auto start_capture_thread(AudioCaptureContext& ctx,
-                                 std::function<std::int64_t()> get_elapsed_100ns,
-                                 std::function<bool()> is_active, AudioPacketCallback on_packet)
-    -> void;
+export auto start_capture_thread(AudioCaptureContext& ctx, std::function<bool()> is_active,
+                                 AudioPacketCallback on_packet) -> void;
 
 // 停止音频捕获
 export auto stop(AudioCaptureContext& ctx) -> void;

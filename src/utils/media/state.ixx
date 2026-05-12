@@ -29,7 +29,6 @@ struct EncoderContext {
   // GPU 编码模式
   wil::com_ptr<IMFDXGIDeviceManager> dxgi_manager;
   UINT reset_token = 0;
-  wil::com_ptr<ID3D11Texture2D> shared_texture;  // 编码器专用纹理
   bool gpu_encoding = false;
 
   // 音频流
