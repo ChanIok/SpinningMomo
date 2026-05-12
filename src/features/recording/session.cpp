@@ -212,7 +212,12 @@ auto clear_session_runtime_fields(State::RecordingState& state) -> void {
   state.cropped_texture = nullptr;
   state.encoder = {};
   state.start_qpc_100ns = 0;
-  state.video_timeline = {};
+  state.video_frame_interval_100ns = 10'000'000LL / 30;
+  state.next_video_timestamp_100ns = -1;
+  state.last_emitted_video_timestamp_100ns = -1;
+  state.max_seen_audio_timestamp_100ns = 0;
+  state.encoder_input_texture = nullptr;
+  state.has_encoder_input_texture = false;
   state.last_frame_width = 0;
   state.last_frame_height = 0;
   clear_queues(state);

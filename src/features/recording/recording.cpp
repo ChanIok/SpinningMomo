@@ -21,7 +21,7 @@ namespace Features::Recording {
 
 // 录制模块的大致数据流：
 // WGC 帧回调只负责唤醒编码线程；音频采集线程只复制 PCM 数据并入队；
-// 编码线程主动排空 WGC frame pool，并且是唯一写 SinkWriter 的地方；
+// 编码线程按固定 fps 消费捕获（每次最多取一帧 Copy 到自有纹理），是唯一写 SinkWriter 的地方；
 // 控制线程负责把 start / stop / resize restart 串起来，避免多个重操作互相打架。
 auto query_qpc_100ns() -> std::int64_t {
   LARGE_INTEGER counter{};
@@ -323,9 +323,9 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
   state.last_frame_height = capture_plan_result->source_height;
   state.config.width = static_cast<std::uint32_t>(capture_plan_result->output_width);
   state.config.height = static_cast<std::uint32_t>(capture_plan_result->output_height);
+  // 其余视频时钟 / 纹理初值由 clear_session_runtime_fields 已清空；这里只按本段 fps 覆盖帧间隔。
   const auto fps = std::max<std::uint32_t>(state.config.fps, 1);
-  state.video_timeline.frame_interval_100ns = std::max<std::int64_t>(1, 10'000'000LL / fps);
-  state.video_timeline.half_frame_100ns = state.video_timeline.frame_interval_100ns / 2;
+  state.video_frame_interval_100ns = std::max<std::int64_t>(1, 10'000'000LL / fps);
 
   // 录制内复用 D3D 设备，避免高频启停反复初始化。
   auto d3d_ready_result = Features::Recording::Session::ensure_d3d_resources_ready(state);
@@ -455,10 +455,6 @@ auto stop(Features::Recording::State::RecordingState& state) -> void {
   if (dropped_audio > 0) {
     Logger().warn("Recording queue dropped audio packets: {}", dropped_audio);
   }
-  if (state.video_timeline.ticks_sent > 0) {
-    Logger().info("Recording sent video stream ticks: {}", state.video_timeline.ticks_sent);
-  }
-
   Features::Recording::Session::clear_session_runtime_fields(state);
   state.status.store(Features::Recording::Types::RecordingStatus::Idle, std::memory_order_release);
   Features::Recording::Session::start_cleanup_timer(state, [&state]() {

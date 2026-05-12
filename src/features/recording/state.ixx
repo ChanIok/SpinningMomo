@@ -48,22 +48,6 @@ export struct QueuedAudioPacket {
   std::int64_t timestamp_100ns = 0;
 };
 
-// 只描述“视频流时间线”，不持有真实画面。
-// WGC 停帧时，音频仍可能继续前进；这时用 SendStreamTick 标记缺失的视频帧，
-// 让 SinkWriter 知道视频流不是卡住或被遗漏，而是在这些时间点没有 sample。
-export struct VideoTimelineState {
-  // 当前录制段的理论视频帧间隔；start() 按配置 fps 预先算好。
-  std::int64_t frame_interval_100ns = 10'000'000LL / 30;
-  // 半帧容忍窗口，用于判断是否需要给缺失视频帧发送 stream tick。
-  std::int64_t half_frame_100ns = (10'000'000LL / 30) / 2;
-  // 下一帧视频理论上应该出现的时间；真实视频帧和 stream tick 都会推进它。
-  std::int64_t next_expected_timestamp_100ns = 0;
-  // 仅用于日志，方便确认最小化/停帧期间是否发过 tick。
-  std::uint64_t ticks_sent = 0;
-  // 发过 tick 后，下一个真实视频 sample 是 gap 后恢复的第一帧。
-  bool sample_after_gap = false;
-};
-
 // 录制完整状态
 export struct RecordingState {
   Features::Recording::Types::RecordingConfig config;
@@ -87,7 +71,15 @@ export struct RecordingState {
 
   // 帧和队列状态
   std::int64_t start_qpc_100ns = 0;
-  VideoTimelineState video_timeline;
+  // 固定 fps 视频时钟与自有编码输入（Copy 自 WGC/crop，无新帧时重复此纹理输出）。
+  std::int64_t video_frame_interval_100ns = 10'000'000LL / 30;
+  std::int64_t next_video_timestamp_100ns = -1;
+  std::int64_t last_emitted_video_timestamp_100ns = -1;
+  // 本段录制中曾入队的最大音频时间戳（用于 stop 收尾时的视频目标，避免队列已空时低估）。
+  std::int64_t max_seen_audio_timestamp_100ns = 0;
+  wil::com_ptr<ID3D11Texture2D> encoder_input_texture;
+  bool has_encoder_input_texture = false;
+
   int last_frame_width = 0;
   int last_frame_height = 0;
   std::deque<QueuedAudioPacket> audio_queue;

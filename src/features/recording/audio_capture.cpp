@@ -86,6 +86,8 @@ auto start_capture_thread(Features::Recording::State::RecordingState& state) -> 
             state.dropped_audio_packets.fetch_add(1, std::memory_order_relaxed);
           }
           state.audio_queue.push_back(std::move(packet));
+          state.max_seen_audio_timestamp_100ns = std::max(state.max_seen_audio_timestamp_100ns,
+                                                          state.audio_queue.back().timestamp_100ns);
         }
         state.queue_cv.notify_one();
       });

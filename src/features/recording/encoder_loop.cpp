@@ -20,7 +20,170 @@ import <windows.h>;
 
 namespace Features::Recording::EncoderLoop {
 
+// 视频帧数太少就整段丢弃、不写最终 mp4，避免误触留下半截文件。
 constexpr std::uint64_t k_discard_video_frame_threshold = 3;
+
+// ---------------------------------------------------------------------------
+// 时间：全程用 QPC 转成「相对录制起点」的 100ns，和视频帧、音频时间戳一套数。
+// ---------------------------------------------------------------------------
+
+auto query_qpc_100ns() -> std::int64_t {
+  LARGE_INTEGER counter{};
+  LARGE_INTEGER frequency{};
+  if (!QueryPerformanceCounter(&counter) || !QueryPerformanceFrequency(&frequency)) {
+    return 0;
+  }
+  constexpr long double kHundredNsPerSecond = 10'000'000.0L;
+  return static_cast<std::int64_t>(counter.QuadPart * kHundredNsPerSecond / frequency.QuadPart);
+}
+
+auto elapsed_since_start_100ns(const State::RecordingState& state) -> std::int64_t {
+  if (state.start_qpc_100ns <= 0) {
+    return 0;
+  }
+  return std::max<std::int64_t>(0, query_qpc_100ns() - state.start_qpc_100ns);
+}
+
+auto get_frame_timestamp_100ns(State::RecordingState& state,
+                               Utils::Graphics::Capture::Direct3D11CaptureFrame frame)
+    -> std::int64_t {
+  if (state.start_qpc_100ns <= 0) {
+    return 0;
+  }
+  return std::max<std::int64_t>(0, frame.SystemRelativeTime().count() - state.start_qpc_100ns);
+}
+
+// stop 收尾时：视频至少要写到「当前已录了多久」和「曾经出现过的最晚一包音频时间」里较大的那个，
+// 否则会漏结尾声音；队列排空后单靠 elapsed 不够，所以 state 里还记了 max_seen_audio。
+auto finish_target_timestamp_100ns(State::RecordingState& state) -> std::int64_t {
+  const auto elapsed = elapsed_since_start_100ns(state);
+  return std::max(elapsed, state.max_seen_audio_timestamp_100ns);
+}
+
+// ---------------------------------------------------------------------------
+// 自有纹理：WGC 来的帧只用来拷进这张，给 MF 看的永远是我们的纹理；没新帧就反复编码它。
+// ---------------------------------------------------------------------------
+
+auto ensure_encoder_input_texture(State::RecordingState& state,
+                                  const D3D11_TEXTURE2D_DESC& src_desc)
+    -> std::expected<void, std::string> {
+  bool need_create = !state.encoder_input_texture;
+  if (!need_create) {
+    D3D11_TEXTURE2D_DESC existing{};
+    state.encoder_input_texture->GetDesc(&existing);
+    need_create = existing.Width != src_desc.Width || existing.Height != src_desc.Height ||
+                  existing.Format != src_desc.Format;
+  }
+  if (!need_create) {
+    return {};
+  }
+
+  D3D11_TEXTURE2D_DESC d = src_desc;
+  d.MipLevels = 1;
+  d.ArraySize = 1;
+  d.SampleDesc.Count = 1;
+  d.SampleDesc.Quality = 0;
+  d.Usage = D3D11_USAGE_DEFAULT;
+  d.BindFlags = 0;
+  d.CPUAccessFlags = 0;
+  d.MiscFlags = 0;
+
+  wil::com_ptr<ID3D11Texture2D> tex;
+  if (FAILED(state.device->CreateTexture2D(&d, nullptr, tex.put()))) {
+    return std::unexpected("Failed to create encoder input texture");
+  }
+  state.encoder_input_texture = std::move(tex);
+  return {};
+}
+
+auto write_current_video_sample(State::RecordingState& state, std::int64_t timestamp_100ns)
+    -> std::expected<void, std::string> {
+  if (!state.encoder_input_texture || !state.has_encoder_input_texture) {
+    return std::unexpected("Encoder input texture is not ready");
+  }
+  auto result = Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(),
+                                                    state.encoder_input_texture.get(),
+                                                    timestamp_100ns, state.config.fps);
+  if (!result) {
+    return result;
+  }
+  state.encoded_video_frames++;
+  state.last_emitted_video_timestamp_100ns = timestamp_100ns;
+  return {};
+}
+
+// 按配置 fps，从 next_video_timestamp 开始一路写到不晚于 target 为止（重复同一贴图也可以）。
+auto emit_video_samples_until(State::RecordingState& state, std::int64_t target_timestamp_100ns)
+    -> std::expected<void, std::string> {
+  if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0 ||
+      !state.encoder.sink_writer) {
+    return {};
+  }
+
+  while (state.next_video_timestamp_100ns <= target_timestamp_100ns) {
+    auto sample_result = write_current_video_sample(state, state.next_video_timestamp_100ns);
+    if (!sample_result) {
+      return sample_result;
+    }
+    state.next_video_timestamp_100ns += state.video_frame_interval_100ns;
+  }
+  return {};
+}
+
+// ---------------------------------------------------------------------------
+// 睡眠与收尾：编码线程在 condvar 上睡，除了「有新帧 / 有音 / 要停」以外，还要按 fps 自己醒。
+// ---------------------------------------------------------------------------
+
+// 固定帧率：到了「该出下一帧视频」的时间就应当醒来补帧（哪怕 WGC 没来）。
+auto encoder_needs_wake_for_fixed_fps(const State::RecordingState& state) -> bool {
+  if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0 ||
+      state.start_qpc_100ns <= 0) {
+    return false;
+  }
+  return elapsed_since_start_100ns(state) >= state.next_video_timestamp_100ns;
+}
+
+// 音频不能超前视频：队头时间戳只要已经不晚于「最后写出来的视频时间」就可以写。
+auto audio_ready_to_encode(const State::RecordingState& state) -> bool {
+  if (state.audio_queue.empty() || state.last_emitted_video_timestamp_100ns < 0) {
+    return false;
+  }
+  return state.audio_queue.front().timestamp_100ns <= state.last_emitted_video_timestamp_100ns;
+}
+
+// 离下一帧视频还有多久；没有可重复画面时就不用定时，一直睡到别的条件叫醒。
+auto compute_wake_timeout(const State::RecordingState& state) -> std::chrono::nanoseconds {
+  if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0 ||
+      state.start_qpc_100ns <= 0) {
+    return std::chrono::nanoseconds::max();
+  }
+  const auto now = elapsed_since_start_100ns(state);
+  if (state.next_video_timestamp_100ns <= now) {
+    return std::chrono::nanoseconds{0};
+  }
+  const std::int64_t diff_100ns = state.next_video_timestamp_100ns - now;
+  return std::chrono::nanoseconds{diff_100ns * 100};
+}
+
+// stop 之后：没 pending、音频也写光了，还要确认视频「该补的」都补到了目标时间线后面，才退主循环。
+auto should_exit_finished_segment(State::RecordingState& state, bool finishing) -> bool {
+  if (!finishing) {
+    return false;
+  }
+  std::lock_guard queue_lock(state.queue_mutex);
+  if (state.video_frame_pending || !state.audio_queue.empty()) {
+    return false;
+  }
+  if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0) {
+    return true;
+  }
+  const auto target = finish_target_timestamp_100ns(state);
+  return state.next_video_timestamp_100ns > target;
+}
+
+// ---------------------------------------------------------------------------
+// 与 recording 启动/对外 API 衔接的辅助
+// ---------------------------------------------------------------------------
 
 auto build_encoder_config(const State::RecordingState& state)
     -> Utils::Media::Encoder::Types::EncoderConfig {
@@ -45,7 +208,6 @@ auto build_encoder_config(const State::RecordingState& state)
 
 auto notify_encoder_ready(State::RecordingState& state, bool succeeded, std::string error = {})
     -> void {
-  // 编码器在编码线程里创建。start() 会等这个信号，确认能不能真正开始捕获。
   {
     std::lock_guard ready_lock(state.encoder_ready_mutex);
     state.encoder_start_succeeded = succeeded;
@@ -64,13 +226,17 @@ auto consume_video_frame_pending(State::RecordingState& state) -> bool {
   return pending;
 }
 
-auto pop_next_audio_packet(State::RecordingState& state)
+// 音频写入：永远不超过「已经落到文件里的最后一帧视频」的时间。
+auto pop_ready_audio_packet(State::RecordingState& state)
     -> std::optional<State::QueuedAudioPacket> {
-  std::lock_guard queue_lock(state.queue_mutex);
-  if (state.audio_queue.empty()) {
+  if (state.last_emitted_video_timestamp_100ns < 0) {
     return std::nullopt;
   }
-
+  std::lock_guard queue_lock(state.queue_mutex);
+  if (state.audio_queue.empty() ||
+      state.audio_queue.front().timestamp_100ns > state.last_emitted_video_timestamp_100ns) {
+    return std::nullopt;
+  }
   auto packet = std::move(state.audio_queue.front());
   state.audio_queue.pop_front();
   return packet;
@@ -83,7 +249,6 @@ auto write_audio_packet(Utils::Media::Encoder::State::EncoderContext& encoder,
     return {};
   }
 
-  // 音频线程只给我们原始字节；写入 SinkWriter 前要包装成 Media Foundation 的 sample。
   wil::com_ptr<IMFSample> sample;
   wil::com_ptr<IMFMediaBuffer> buffer;
   const auto buffer_size = static_cast<DWORD>(packet.data.size());
@@ -128,67 +293,26 @@ auto write_audio_packet(Utils::Media::Encoder::State::EncoderContext& encoder,
   return {};
 }
 
-// WGC 的 SystemRelativeTime 使用 QPC 时间基，WASAPI 的 qpc_position 也是同一时间基。
-// 这里减去录制开始时的 QPC，把视频帧时间转成“本段录制从 0 开始”的 100ns 时间戳。
-auto get_frame_timestamp_100ns(State::RecordingState& state,
-                               Utils::Graphics::Capture::Direct3D11CaptureFrame frame)
-    -> std::int64_t {
-  if (state.start_qpc_100ns <= 0) {
-    return 0;
-  }
-
-  return std::max<std::int64_t>(0, frame.SystemRelativeTime().count() - state.start_qpc_100ns);
-}
-
-auto ensure_video_timeline_until(State::RecordingState& state, std::int64_t target_timestamp_100ns)
+auto encode_queued_audio(State::RecordingState& state, const State::QueuedAudioPacket& packet)
     -> std::expected<void, std::string> {
-  if (!state.encoder.sink_writer || target_timestamp_100ns < 0) {
-    return {};
+  auto result = write_audio_packet(state.encoder, packet);
+  if (!result) {
+    return result;
   }
 
-  // 这里不生成重复画面，只向 MF 声明 video stream 在这些帧点没有 sample。
-  // 这样音频继续写入时，SinkWriter 不会看到“音频时间线前进，视频流毫无交代地停住”。
-  // 保留半帧容忍，避免把正常调度抖动误判成缺帧，并避免 tick 紧贴真实帧。
-  while (state.video_timeline.next_expected_timestamp_100ns +
-             state.video_timeline.half_frame_100ns <=
-         target_timestamp_100ns) {
-    const auto tick_timestamp = state.video_timeline.next_expected_timestamp_100ns;
-    HRESULT hr =
-        state.encoder.sink_writer->SendStreamTick(state.encoder.video_stream_index, tick_timestamp);
-    if (FAILED(hr)) {
-      return std::unexpected(
-          std::format("Failed to send video stream tick at {} (HRESULT: 0x{:08X})", tick_timestamp,
-                      static_cast<unsigned>(hr)));
-    }
-
-    state.video_timeline.next_expected_timestamp_100ns += state.video_timeline.frame_interval_100ns;
-    state.video_timeline.ticks_sent++;
-    state.video_timeline.sample_after_gap = true;
-  }
-
+  state.encoded_audio_packets++;
   return {};
 }
 
-auto commit_video_sample_time(State::RecordingState& state, std::int64_t timestamp_100ns) -> void {
-  // 真实视频 sample 已经覆盖 timestamp_100ns，把“下一帧应出现时间”推进到后一帧。
-  // 如果前面发过 tick，这个 sample 写入成功后 gap 已结束。
-  const auto next_timestamp = timestamp_100ns + state.video_timeline.frame_interval_100ns;
-  if (next_timestamp > state.video_timeline.next_expected_timestamp_100ns) {
-    state.video_timeline.next_expected_timestamp_100ns = next_timestamp;
-  }
-  state.video_timeline.sample_after_gap = false;
-}
-
-auto encode_capture_frame(State::RecordingState& state,
-                          Utils::Graphics::Capture::Direct3D11CaptureFrame frame,
-                          const std::function<void()>& request_resize_restart)
+// 捕获一帧：尺寸变化、裁剪、最后 Copy 到 encoder_input_texture；这里不写 MF。
+auto copy_one_capture_frame_to_encoder_input(State::RecordingState& state,
+                                             Utils::Graphics::Capture::Direct3D11CaptureFrame frame,
+                                             const std::function<void()>& request_resize_restart)
     -> std::expected<void, std::string> {
   if (!frame) {
     return {};
   }
 
-  // 先处理 WGC 报告的尺寸变化。输出尺寸变了就交给控制线程切段重启，
-  // 输出尺寸没变则只刷新 frame pool 和裁剪计划。
   auto content_size = frame.ContentSize();
   if (content_size.Width > 0 && content_size.Height > 0) {
     bool frame_size_changed = content_size.Width != state.last_frame_width ||
@@ -224,7 +348,6 @@ auto encode_capture_frame(State::RecordingState& state,
     }
   }
 
-  // WGC frame 的 Surface 是 WinRT 对象，编码前要取出底层 D3D11 texture。
   auto texture =
       Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(frame.Surface());
   if (!texture) {
@@ -239,8 +362,6 @@ auto encode_capture_frame(State::RecordingState& state,
 
   ID3D11Texture2D* current_texture = texture.get();
   auto capture_plan = state.capture_plan;
-  // 正常情况下 start() 已经准备好 capture_plan；这里保留兜底刷新，
-  // 防止 frame pool 重建或源尺寸变化后计划和实际纹理不一致。
   if (capture_plan.output_width == 0 || capture_plan.output_height == 0) {
     auto capture_plan_result = Features::Recording::Session::calculate_frame_crop_plan(
         state.target_window, state.config, static_cast<int>(source_desc.Width),
@@ -266,7 +387,6 @@ auto encode_capture_frame(State::RecordingState& state,
     capture_plan = *capture_plan_result;
   }
 
-  // 只录客户区或奇数尺寸修正时，需要先裁到编码器期望的输出尺寸。
   if (capture_plan.should_crop) {
     auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
         state.device.get(), state.context.get(), texture.get(), capture_plan.region,
@@ -277,7 +397,6 @@ auto encode_capture_frame(State::RecordingState& state,
     current_texture = *crop_result;
   }
 
-  // 编码器创建后宽高不能变；写入前最后确认一次实际纹理尺寸。
   D3D11_TEXTURE2D_DESC current_desc{};
   current_texture->GetDesc(&current_desc);
   if (current_desc.Width != capture_plan.output_width ||
@@ -287,54 +406,19 @@ auto encode_capture_frame(State::RecordingState& state,
         current_desc.Height, capture_plan.output_width, capture_plan.output_height));
   }
 
-  const auto timestamp_100ns = get_frame_timestamp_100ns(state, frame);
-  if (state.encoded_video_frames > 0) {
-    // 两个真实 WGC 帧之间可能隔了很久；先把中间缺失的视频帧标成 stream tick。
-    auto tick_result = ensure_video_timeline_until(state, timestamp_100ns);
-    if (!tick_result) {
-      return tick_result;
-    }
+  auto ensure_tex = ensure_encoder_input_texture(state, current_desc);
+  if (!ensure_tex) {
+    return ensure_tex;
   }
 
-  // 如果前面发过 stream tick，这一帧要标记 discontinuity，告诉编码器视频流从 gap 后恢复。
-  const bool discontinuity = state.video_timeline.sample_after_gap;
-  auto result =
-      Utils::Media::Encoder::encode_frame(state.encoder, state.context.get(), current_texture,
-                                          timestamp_100ns, state.config.fps, discontinuity);
-  if (!result) {
-    return result;
-  }
-
-  state.encoded_video_frames++;
-  commit_video_sample_time(state, timestamp_100ns);
+  state.context->CopyResource(state.encoder_input_texture.get(), current_texture);
+  state.has_encoder_input_texture = true;
   return {};
 }
 
-auto encode_available_video_frames(State::RecordingState& state,
-                                   const std::function<void()>& request_resize_restart)
-    -> std::expected<void, std::string> {
-  std::lock_guard frame_lock(state.frame_mutex);
-
-  while (auto frame = Utils::Graphics::Capture::try_get_next_frame(state.capture_session)) {
-    auto result = encode_capture_frame(state, frame, request_resize_restart);
-    if (!result) {
-      return result;
-    }
-  }
-
-  return {};
-}
-
-auto encode_queued_audio(State::RecordingState& state, const State::QueuedAudioPacket& packet)
-    -> std::expected<void, std::string> {
-  auto result = write_audio_packet(state.encoder, packet);
-  if (!result) {
-    return result;
-  }
-
-  state.encoded_audio_packets++;
-  return {};
-}
+// ---------------------------------------------------------------------------
+// 模块导出的入口（声明见 encoder_loop.ixx）
+// ---------------------------------------------------------------------------
 
 auto mark_video_frame_pending(State::RecordingState& state) -> void {
   {
@@ -355,7 +439,6 @@ auto wait_encoder_ready(State::RecordingState& state) -> void {
 auto signal_encoder_finish(State::RecordingState& state) -> void {
   {
     std::lock_guard queue_lock(state.queue_mutex);
-    // 告诉编码线程：不会再有新数据了，把音频队列和 WGC 帧池里剩下的数据写完就收尾。
     state.finish_requested.store(true, std::memory_order_release);
     state.video_frame_pending = true;
   }
@@ -367,8 +450,6 @@ auto encoder_thread_proc(State::RecordingState& state, std::stop_token stop_toke
   try {
     auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
 
-    // SinkWriter 在这个线程创建，也只在这个线程 WriteSample / Finalize。
-    // 这样可以避开 Media Foundation 编码器跨线程调用时的驱动兼容性问题。
     auto encoder_config = build_encoder_config(state);
     auto encoder_result = Utils::Media::Encoder::create_encoder(encoder_config, state.device.get(),
                                                                 state.audio.wave_format);
@@ -381,41 +462,101 @@ auto encoder_thread_proc(State::RecordingState& state, std::stop_token stop_toke
     state.has_audio.store(state.encoder.has_audio, std::memory_order_release);
     notify_encoder_ready(state, true);
 
-    // 主循环：视频从 WGC frame pool 主动拉取，音频从队列取包，然后写给编码器。
-    // stop 时不会立刻丢掉已到达的数据，而是先排空再 finalize。
     while (true) {
+      // 睡到有活干：停录、WGC 通知、下一轮固定 fps、或者音频已经可以跟着视频写了。
       {
         std::unique_lock queue_lock(state.queue_mutex);
-        // 编码线程平时睡在这里；有新视频帧通知、新音频，或 stop 要求收尾时被叫醒。
-        state.queue_cv.wait(queue_lock, [&state, stop_token]() {
-          return stop_token.stop_requested() ||
-                 state.finish_requested.load(std::memory_order_acquire) ||
-                 state.video_frame_pending || !state.audio_queue.empty();
-        });
+        while (true) {
+          // 下面这些成立就该起床干活；与下面 wait/wait_for 的条件一致。
+          auto should_wake_now = [&state, stop_token]() {
+            const bool finishing = stop_token.stop_requested() ||
+                                   state.finish_requested.load(std::memory_order_acquire);
+            return stop_token.stop_requested() || finishing || state.video_frame_pending ||
+                   encoder_needs_wake_for_fixed_fps(state) || audio_ready_to_encode(state);
+          };
+
+          if (should_wake_now()) {
+            break;
+          }
+
+          auto ns_until_next_video = compute_wake_timeout(state);
+          // 暂无「下一轮该出哪一拍视频」时钟（例如首帧没到）：只靠 WGC/音频/stop 的 notify → 无限
+          // wait。 已有时钟：本来可以睡到快到下一拍，但单次睡眠上限 50ms，到时睁眼再算
+          // elapsed/要不要补帧—— 停录一般用 notify_all 仍会立刻醒；上限只是防极端路径下卡住。（50ms
+          // 是经验值，非硬性理论）
+          constexpr auto k_wake_poll_cap_ns =
+              std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(50));
+          const bool no_video_clock_deadline =
+              ns_until_next_video >= std::chrono::nanoseconds::max() - std::chrono::nanoseconds{1};
+          if (no_video_clock_deadline) {
+            state.queue_cv.wait(queue_lock, should_wake_now);
+          } else {
+            std::chrono::nanoseconds sleep = ns_until_next_video;
+            if (sleep > k_wake_poll_cap_ns) {
+              sleep = k_wake_poll_cap_ns;
+            }
+            state.queue_cv.wait_for(queue_lock, sleep, should_wake_now);
+          }
+        }
       }
 
       const bool finishing =
           stop_token.stop_requested() || state.finish_requested.load(std::memory_order_acquire);
 
+      // 有通知或正在收尾时，从 WGC 最多取一帧：拷进自有纹理，并推进/对齐时间线。
       if (consume_video_frame_pending(state) || finishing) {
-        auto video_result = encode_available_video_frames(state, request_resize_restart);
-        if (!video_result) {
-          state.encoder_error = video_result.error();
-          Logger().error("Recording encoder failed: {}", video_result.error());
+        Utils::Graphics::Capture::Direct3D11CaptureFrame frame{nullptr};
+        {
+          std::lock_guard frame_lock(state.frame_mutex);
+          frame = Utils::Graphics::Capture::try_get_next_frame(state.capture_session);
+        }
+        if (frame) {
+          const auto frame_ts = get_frame_timestamp_100ns(state, frame);
+          if (state.next_video_timestamp_100ns < 0) {
+            // 第一段有效画面：从这一帧的采集时间开始排视频时钟。
+            auto copy_result =
+                copy_one_capture_frame_to_encoder_input(state, frame, request_resize_restart);
+            if (!copy_result) {
+              state.encoder_error = copy_result.error();
+              Logger().error("Recording encoder failed: {}", copy_result.error());
+              break;
+            }
+            if (state.has_encoder_input_texture) {
+              state.next_video_timestamp_100ns = frame_ts;
+            }
+          } else {
+            // 新画面到来前，先用旧画面把采集间隔里该给的 fps 格子填满。
+            const auto emit_limit = frame_ts > 0 ? frame_ts - 1 : frame_ts;
+            auto emit_before = emit_video_samples_until(state, emit_limit);
+            if (!emit_before) {
+              state.encoder_error = emit_before.error();
+              Logger().error("Recording encoder failed: {}", emit_before.error());
+              break;
+            }
+            auto copy_result =
+                copy_one_capture_frame_to_encoder_input(state, frame, request_resize_restart);
+            if (!copy_result) {
+              state.encoder_error = copy_result.error();
+              Logger().error("Recording encoder failed: {}", copy_result.error());
+              break;
+            }
+          }
+        }
+      }
+
+      // 把视频写到「现在该写到的时间」：正常录跟墙钟走，收尾时跟 finish_target 走。
+      if (state.has_encoder_input_texture) {
+        const auto target_ts =
+            finishing ? finish_target_timestamp_100ns(state) : elapsed_since_start_100ns(state);
+        auto emit_result = emit_video_samples_until(state, target_ts);
+        if (!emit_result) {
+          state.encoder_error = emit_result.error();
+          Logger().error("Recording encoder failed: {}", emit_result.error());
           break;
         }
       }
 
-      while (auto audio_packet = pop_next_audio_packet(state)) {
-        // 音频可能在 WGC 停帧期间继续推进。写音频前先补 video tick，
-        // 避免 SinkWriter 内部等待一个一直没有到来的 video sample。
-        auto tick_result = ensure_video_timeline_until(state, audio_packet->timestamp_100ns);
-        if (!tick_result) {
-          state.encoder_error = tick_result.error();
-          Logger().error("Recording encoder failed: {}", tick_result.error());
-          break;
-        }
-
+      while (auto audio_packet = pop_ready_audio_packet(state)) {
         auto audio_result = encode_queued_audio(state, *audio_packet);
         if (!audio_result) {
           state.encoder_error = audio_result.error();
@@ -427,16 +568,11 @@ auto encoder_thread_proc(State::RecordingState& state, std::stop_token stop_toke
         break;
       }
 
-      if (finishing) {
-        std::lock_guard queue_lock(state.queue_mutex);
-        if (!state.video_frame_pending && state.audio_queue.empty()) {
-          break;
-        }
+      if (finishing && should_exit_finished_segment(state, finishing)) {
+        break;
       }
     }
 
-    // 少于几个视频帧的片段大概率是误触或启动失败，直接丢弃。
-    // 真正可用的片段才执行 finalize，finalize 成功后外层 stop 再改名成 .mp4。
     if (state.encoded_video_frames > k_discard_video_frame_threshold &&
         state.encoder_error.empty()) {
       auto finalize_start = std::chrono::steady_clock::now();

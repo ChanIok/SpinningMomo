@@ -430,29 +430,11 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
   return std::move(*ctx);
 }
 
-auto set_sample_discontinuity(IMFSample* sample, bool discontinuity)
-    -> std::expected<void, std::string> {
-  if (!sample) {
-    return std::unexpected("Sample is null");
-  }
-
-  if (discontinuity) {
-    if (FAILED(sample->SetUINT32(MFSampleExtension_Discontinuity, TRUE))) {
-      return std::unexpected("Failed to set sample discontinuity");
-    }
-  } else {
-    sample->DeleteItem(MFSampleExtension_Discontinuity);
-  }
-
-  return {};
-}
-
 // GPU 编码帧（内部函数）
 // 直通 DXGI surface：调用方必须保证 frame_texture 在 WriteSample 返回前保持有效。
-// 录制路径会持有 Direct3D11CaptureFrame 到本函数返回，所以 WGC 帧池纹理不会提前回收。
 auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* context,
-                      ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps,
-                      bool discontinuity) -> std::expected<void, std::string> {
+                      ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
+    -> std::expected<void, std::string> {
   // GPU 直通路径不需要 D3D context；参数保留是为了和 CPU 路径共用 encode_frame 入口。
   (void)context;
 
@@ -478,10 +460,6 @@ auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* conte
   sample->AddBuffer(buffer.get());
   sample->SetSampleTime(timestamp_100ns);
   sample->SetSampleDuration(10'000'000 / fps);
-  auto discontinuity_result = set_sample_discontinuity(sample.get(), discontinuity);
-  if (!discontinuity_result) {
-    return discontinuity_result;
-  }
 
   if (FAILED(encoder.sink_writer->WriteSample(encoder.video_stream_index, sample.get()))) {
     return std::unexpected("Failed to write GPU sample");
@@ -492,8 +470,8 @@ auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* conte
 
 // CPU 编码帧（内部函数）
 auto encode_frame_cpu(State::EncoderContext& encoder, ID3D11DeviceContext* context,
-                      ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps,
-                      bool discontinuity) -> std::expected<void, std::string> {
+                      ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
+    -> std::expected<void, std::string> {
   // 1. 获取纹理描述
   D3D11_TEXTURE2D_DESC desc;
   frame_texture->GetDesc(&desc);
@@ -556,12 +534,6 @@ auto encode_frame_cpu(State::EncoderContext& encoder, ID3D11DeviceContext* conte
     // 7. 设置时间戳并写入
     encoder.reusable_sample->SetSampleTime(timestamp_100ns);
     encoder.reusable_sample->SetSampleDuration(10'000'000 / fps);
-    auto discontinuity_result =
-        set_sample_discontinuity(encoder.reusable_sample.get(), discontinuity);
-    if (!discontinuity_result) {
-      context->Unmap(encoder.staging_texture.get(), 0);
-      return discontinuity_result;
-    }
     hr =
         encoder.sink_writer->WriteSample(encoder.video_stream_index, encoder.reusable_sample.get());
   }
@@ -575,17 +547,17 @@ auto encode_frame_cpu(State::EncoderContext& encoder, ID3D11DeviceContext* conte
 }
 
 auto encode_frame(State::EncoderContext& encoder, ID3D11DeviceContext* context,
-                  ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps,
-                  bool discontinuity) -> std::expected<void, std::string> {
+                  ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
+    -> std::expected<void, std::string> {
   if (!encoder.sink_writer || !context || !frame_texture) {
     return std::unexpected("Invalid encoder state");
   }
 
   // 注：线程同步由调用方管理
   if (encoder.gpu_encoding) {
-    return encode_frame_gpu(encoder, context, frame_texture, timestamp_100ns, fps, discontinuity);
+    return encode_frame_gpu(encoder, context, frame_texture, timestamp_100ns, fps);
   } else {
-    return encode_frame_cpu(encoder, context, frame_texture, timestamp_100ns, fps, discontinuity);
+    return encode_frame_cpu(encoder, context, frame_texture, timestamp_100ns, fps);
   }
 }
 
