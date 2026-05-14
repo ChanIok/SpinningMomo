@@ -1,6 +1,7 @@
 module;
 
 #include <wil/result.h>
+#include <winrt/Windows.Graphics.Capture.h>
 
 module Features.Screenshot;
 
@@ -9,11 +10,13 @@ import Core.State;
 import Core.State.RuntimeInfo;
 import Features.Screenshot.State;
 import Features.Settings.State;
+import Features.Screenshot.HdrEncoder;
 import Utils.Logger;
 import Utils.Path;
 import Utils.String;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
+import Utils.Graphics.Hdr;
 import Utils.Image;
 import <d3d11.h>;
 import <wil/com.h>;
@@ -149,10 +152,17 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
           auto texture =
               Utils::Graphics::Capture::get_dxgi_interface_from_object<ID3D11Texture2D>(surface);
           if (texture) {
-            // 直接在回调中保存纹理
-            auto save_result = save_texture_with_wic(texture.get(), session_info.request.file_path,
-                                                     session_info.request.format,
-                                                     session_info.request.jpeg_quality);
+            // HDR：走 Ultra HDR JPEG（R16G16B16A16 浮点捕获）；否则走 WIC（PNG/JPEG 等）。
+            auto save_result =
+                session_info.request.use_hdr
+                    ? Features::Screenshot::HdrEncoder::save_texture_as_ultrahdr_jpeg(
+                          texture.get(), session_info.request.file_path,
+                          Features::Screenshot::HdrEncoder::UltraHdrEncodeOptions{
+                              .target_display_peak_nits =
+                                  session_info.request.hdr_target_peak_nits})
+                    : save_texture_with_wic(texture.get(), session_info.request.file_path,
+                                            session_info.request.format,
+                                            session_info.request.jpeg_quality);
             if (save_result) {
               success = true;
               Logger().debug("Screenshot saved successfully for session {}", session_id);
@@ -179,8 +189,16 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
     };
 
     // 创建捕获会话
+    Utils::Graphics::Capture::CaptureSessionOptions capture_options;
+    // 默认可捕获 8-bit BGRA；HDR 截图需要半精度浮点帧池才能保留高光动态范围。
+    if (request.use_hdr) {
+      capture_options.pixel_format =
+          winrt::Windows::Graphics::DirectX::DirectXPixelFormat::R16G16B16A16Float;
+    }
+
     auto session_result = Utils::Graphics::Capture::create_capture_session(
-        request.target_window, state.winrt_device, width, height, frame_callback);
+        request.target_window, state.winrt_device, width, height, frame_callback, 1,
+        capture_options);
     if (!session_result) {
       return std::unexpected("Failed to create capture session: " + session_result.error());
     }
@@ -459,8 +477,21 @@ auto take_screenshot(
   }
 
   auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
-  // Motion Photo 使用 JPEG 格式时替换扩展名
-  if (format == Utils::Image::ImageFormat::JPEG) {
+  // 用户打开「HDR 截图」且当前输出处于 HDR10 路径时，走 Ultra HDR；否则维持原有 8-bit 流程。
+  bool use_hdr = false;
+  float hdr_target_peak_nits = 1000.0f;
+  if (app_state.settings->raw.features.screenshot.enable_hdr) {
+    auto hdr_info = Utils::Graphics::Hdr::query_monitor_hdr_info(target_window);
+    if (hdr_info) {
+      use_hdr = hdr_info->hdr_active;
+      hdr_target_peak_nits = hdr_info->max_luminance_nits;
+    } else {
+      Logger().warn("Failed to query HDR monitor info: {}", hdr_info.error());
+    }
+  }
+
+  // Ultra HDR 仅 JPEG 容器；Motion Photo 也用 .jpg，统一在这里改扩展名。
+  if (use_hdr || format == Utils::Image::ImageFormat::JPEG) {
     auto dot_pos = filename.rfind('.');
     if (dot_pos != std::string::npos) {
       filename = filename.substr(0, dot_pos) + ".jpg";
@@ -504,8 +535,11 @@ auto take_screenshot(
   Features::Screenshot::State::ScreenshotRequest request;
   request.target_window = target_window;
   request.file_path = file_path.wstring();
-  request.format = format;
+  // 与落盘格式一致：HDR 路径实际为 JPEG，避免 request.format 仍为 PNG 导致语义错乱。
+  request.format = use_hdr ? Utils::Image::ImageFormat::JPEG : format;
   request.jpeg_quality = jpeg_quality;
+  request.use_hdr = use_hdr;
+  request.hdr_target_peak_nits = hdr_target_peak_nits;
   request.completion_callback = completion_callback;
   request.timestamp = std::chrono::steady_clock::now();
 

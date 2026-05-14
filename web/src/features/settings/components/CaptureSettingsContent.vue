@@ -46,6 +46,7 @@ const {
   updateRecordingAudioSource,
   updateRecordingAudioBitrate,
   updateScreenshotFileFormat,
+  updateScreenshotHdrEnabled,
   resetCaptureExportSettings,
 } = useFunctionActions()
 const { clearError } = store
@@ -271,6 +272,23 @@ const handleResetSettings = async () => {
                 <SelectItem value="jpeg">JPEG</SelectItem>
               </SelectContent>
             </Select>
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.capture.screenshotSettings.hdrLabel') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.capture.screenshotSettings.hdrDescription') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings?.features?.screenshot?.enableHdr ?? false"
+              @update:model-value="(value) => updateScreenshotHdrEnabled(Boolean(value))"
+            />
           </ItemActions>
         </Item>
       </div>

@@ -103,6 +103,19 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateScreenshotHdrEnabled = async (enableHdr: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        screenshot: {
+          ...(appSettings.value.features.screenshot ?? DEFAULT_APP_SETTINGS.features.screenshot),
+          enableHdr,
+        },
+      },
+    })
+  }
+
   const updateRecordingFps = async (fps: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -293,6 +306,7 @@ export const useFunctionActions = () => {
         screenshot: {
           ...appSettings.value.features.screenshot,
           fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
+          enableHdr: DEFAULT_APP_SETTINGS.features.screenshot.enableHdr,
         },
         letterbox: {
           ...appSettings.value.features.letterbox,
@@ -327,6 +341,7 @@ export const useFunctionActions = () => {
         screenshot: {
           ...appSettings.value.features.screenshot,
           fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
+          enableHdr: DEFAULT_APP_SETTINGS.features.screenshot.enableHdr,
         },
         recording: {
           ...appSettings.value.features.recording,
@@ -375,6 +390,7 @@ export const useFunctionActions = () => {
     updateOutputDir,
     updateGameAlbumPath,
     updateScreenshotFileFormat,
+    updateScreenshotHdrEnabled,
     resetFunctionSettings,
     updateRecordingFps,
     updateRecordingBitrate,

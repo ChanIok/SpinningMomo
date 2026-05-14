@@ -85,6 +85,8 @@
   "settings.capture.screenshotSettings.description": "与快捷键截图相关的选项。",
   "settings.capture.screenshotSettings.formatLabel": "保存格式",
   "settings.capture.screenshotSettings.formatDescription": "PNG 无损；JPEG 体积更小、保存更快。",
+  "settings.capture.screenshotSettings.hdrLabel": "HDR 截图",
+  "settings.capture.screenshotSettings.hdrDescription": "开启后，目标显示器处于 HDR 模式时强制保存为 Ultra HDR JPEG；关闭时继续使用当前 8-bit 截图路径。",
   "settings.error.retry": "重试",
   "settings.error.title": "加载设置失败",
   "settings.extensions.description": "配置内置游戏拓展与相关行为。",

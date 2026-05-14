@@ -18,6 +18,8 @@ struct ScreenshotRequest {
   std::wstring file_path;
   Utils::Image::ImageFormat format = Utils::Image::ImageFormat::PNG;
   float jpeg_quality = 1.0f;
+  bool use_hdr = false;
+  float hdr_target_peak_nits = 1000.0f;
   std::function<void(bool success, const std::wstring& path)> completion_callback;
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };

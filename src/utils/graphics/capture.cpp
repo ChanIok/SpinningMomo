@@ -6,6 +6,7 @@ module;
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
+#include <winrt/Windows.Graphics.DirectX.h>
 
 module Utils.Graphics.Capture;
 
@@ -129,6 +130,7 @@ auto create_capture_session(
 
   CaptureSession session;
   session.winrt_device = device;
+  session.pixel_format = options.pixel_format;
   session.frame_pool_size = std::max(frame_pool_size, 1);
 
   auto capture_item_result = create_capture_item_for_window(target_window);
@@ -140,8 +142,7 @@ auto create_capture_session(
   // 创建帧池
   session.frame_pool =
       winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
-          device, winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-          session.frame_pool_size, {width, height});
+          device, session.pixel_format, session.frame_pool_size, {width, height});
 
   if (!session.frame_pool) {
     auto error_msg = "Failed to create frame pool";
@@ -198,6 +199,7 @@ auto create_capture_session_with_frame_notification(
 
   CaptureSession session;
   session.winrt_device = device;
+  session.pixel_format = options.pixel_format;
   session.frame_pool_size = std::max(frame_pool_size, 1);
 
   auto capture_item_result = create_capture_item_for_window(target_window);
@@ -208,8 +210,7 @@ auto create_capture_session_with_frame_notification(
 
   session.frame_pool =
       winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
-          device, winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-          session.frame_pool_size, {width, height});
+          device, session.pixel_format, session.frame_pool_size, {width, height});
 
   if (!session.frame_pool) {
     auto error_msg = "Failed to create frame pool";
@@ -308,10 +309,8 @@ auto cleanup_capture_session(CaptureSession& session) -> void {
 
 auto recreate_frame_pool(CaptureSession& session, int width, int height) -> void {
   if (session.frame_pool) {
-    session.frame_pool.Recreate(
-        session.winrt_device,
-        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized,
-        std::max(session.frame_pool_size, 1), {width, height});
+    session.frame_pool.Recreate(session.winrt_device, session.pixel_format,
+                                std::max(session.frame_pool_size, 1), {width, height});
   }
 }
 

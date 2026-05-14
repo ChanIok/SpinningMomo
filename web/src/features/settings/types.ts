@@ -170,6 +170,7 @@ export interface AppSettings {
 
     screenshot: {
       fileFormat: 'png' | 'jpeg'
+      enableHdr: boolean
     }
 
     // 黑边模式设置
@@ -302,6 +303,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     externalAlbumPath: '',
     screenshot: {
       fileFormat: 'png',
+      enableHdr: false,
     },
     letterbox: {
       enabled: false,

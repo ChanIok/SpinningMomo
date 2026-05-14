@@ -3,6 +3,7 @@ module;
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
+#include <winrt/Windows.Graphics.DirectX.h>
 
 export module Utils.Graphics.Capture;
 
@@ -19,6 +20,8 @@ export struct CaptureSession {
   winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool frame_pool{nullptr};
   winrt::Windows::Graphics::Capture::GraphicsCaptureSession session{nullptr};
   winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};
+  winrt::Windows::Graphics::DirectX::DirectXPixelFormat pixel_format =
+      winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized;
   winrt::event_token frame_token;
   int frame_pool_size = 1;
   bool need_hide_cursor = false;
@@ -28,6 +31,8 @@ export struct CaptureSession {
 export struct CaptureSessionOptions {
   bool capture_cursor = false;
   bool border_required = false;
+  winrt::Windows::Graphics::DirectX::DirectXPixelFormat pixel_format =
+      winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized;
 };
 
 export using Direct3D11CaptureFrame = winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame;

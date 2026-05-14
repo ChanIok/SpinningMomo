@@ -18,7 +18,21 @@ set_policy("package.requires_lock", true)
 
 -- 添加vcpkg依赖包
 add_requires("vcpkg::uwebsockets", "vcpkg::spdlog", "vcpkg::asio", "vcpkg::reflectcpp", 
-             "vcpkg::webview2", "vcpkg::wil", "vcpkg::xxhash", "vcpkg::sqlitecpp", "vcpkg::libwebp", "vcpkg::zlib")
+             "vcpkg::webview2", "vcpkg::wil", "vcpkg::xxhash", "vcpkg::sqlitecpp", "vcpkg::libwebp", "vcpkg::zlib",
+             "vcpkg::libjpeg-turbo")
+
+target("uhdr")
+    set_kind("static")
+    set_languages("c++17")
+    add_defines("_CRT_SECURE_NO_WARNINGS", "UHDR_WRITE_XMP", "UHDR_WRITE_ISO")
+    add_includedirs("third_party/libultrahdr", {public = true})
+    add_includedirs("third_party/libultrahdr/lib/include")
+    add_includedirs("third_party/libultrahdr/third_party/image_io/includes")
+    add_includedirs("third_party/libultrahdr/third_party/image_io/src/modp_b64")
+    add_includedirs("third_party/libultrahdr/third_party/image_io/src/modp_b64/modp_b64")
+    add_files("third_party/libultrahdr/lib/src/*.cpp")
+    add_files("third_party/libultrahdr/third_party/image_io/src/**/*.cc")
+    add_packages("vcpkg::libjpeg-turbo")
 
 target("SpinningMomo")
     -- 设置为Windows可执行文件
@@ -44,6 +58,8 @@ target("SpinningMomo")
     -- 添加包含目录
     add_includedirs("src")
     add_includedirs("third_party/dkm/include")
+    add_includedirs("third_party/libultrahdr")
+    add_deps("uhdr")
     
     -- 添加源文件
     add_files("src/main.cpp")
@@ -52,7 +68,8 @@ target("SpinningMomo")
     
     -- 链接vcpkg包
     add_packages("vcpkg::uwebsockets", "vcpkg::spdlog", "vcpkg::asio", "vcpkg::reflectcpp", 
-                 "vcpkg::webview2", "vcpkg::wil", "vcpkg::xxhash", "vcpkg::sqlitecpp", "vcpkg::libwebp", "vcpkg::zlib")
+                 "vcpkg::webview2", "vcpkg::wil", "vcpkg::xxhash", "vcpkg::sqlitecpp", "vcpkg::libwebp", "vcpkg::zlib",
+                 "vcpkg::libjpeg-turbo")
     
     -- Windows系统库
     add_links("dwmapi", "dcomp", "windowsapp", "RuntimeObject", "d3d11", "dxgi", "d3dcompiler", 
