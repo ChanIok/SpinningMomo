@@ -26,9 +26,6 @@ import Features.Gallery.Watcher;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Recording;
-import Features.ReplayBuffer;
-import Features.ReplayBuffer.State;
-import Features.ReplayBuffer.UseCase;
 import Features.Update;
 import Features.Letterbox.State;
 import Features.WindowControl;
@@ -190,10 +187,6 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     if (auto result = Features::Recording::initialize(*state.recording); !result) {
       return std::unexpected(result.error());
-    }
-
-    if (auto result = Features::ReplayBuffer::initialize(*state.replay_buffer); !result) {
-      return std::unexpected("Failed to initialize replay buffer: " + result.error());
     }
 
     if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {

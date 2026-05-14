@@ -67,7 +67,7 @@ The frontend auto-detects its environment (`window.chrome.webview` presence) and
 The backend uses **C++23 modules** (`.ixx` interface files, `.cpp` implementation files). Module names follow a dotted hierarchy that mirrors the directory structure:
 
 - `Core.*` — framework infrastructure (async runtime, database, events, HTTP client, HTTP server, RPC, WebView, i18n, commands, migration, worker pool, tasks, runtime info, shutdown, state)
-- `Features.*` — business logic modules such as gallery, letterbox, notifications, overlay, preview, recording, replay_buffer, screenshot, settings, update, and window_control
+- `Features.*` — business logic modules such as gallery, letterbox, notifications, overlay, preview, recording, screenshot, settings, update, and window_control
 - `UI.*` — native Win32 UI (floating_window, tray_icon, context_menu, webview_window)
 - `Utils.*` — shared utilities such as logger, file, graphics, image, media, path, string, system, throttle, timer, dialog, crash_dump, and crypto
 - `Vendor.*` — thin wrappers re-exporting Win32 API and third-party types through the module system (e.g. `Vendor.Windows` wraps `<windows.h>`)
@@ -152,7 +152,7 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
 Endpoints live under `src/core/rpc/endpoints/<domain>/`, each domain exposes a `register_all(state)` called from `registry.cpp`. Current domains include file, clipboard, dialog, runtime_info, settings, tasks, update, webview, gallery, extensions, registry, and window_control. Game-specific adapters in `src/extensions/` (currently `infinity_nikki`) are exposed via `rpc/endpoints/extensions/`.
 
 ### Initialization Order
-Initialization still follows the top-level chain `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()`. In practice this sets up core infrastructure first (events, async/runtime, worker pool, RPC, HTTP, database, settings, update, commands), then native UI surfaces, then feature services such as recording/replay/gallery, then the Infinity Nikki extension, onboarding gate, hotkeys, and startup update checks.
+Initialization still follows the top-level chain `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()`. In practice this sets up core infrastructure first (events, async/runtime, worker pool, RPC, HTTP, database, settings, update, commands), then native UI surfaces, then feature services such as recording and gallery, then the Infinity Nikki extension, onboarding gate, hotkeys, and startup update checks.
 
 ## Build Output
 - Release: `build\windows\x64\release\`

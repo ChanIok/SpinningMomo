@@ -125,34 +125,13 @@ export struct AppSettings {
     std::string external_album_path = "";  // 外部游戏相册目录路径（为空时回退到输出目录）
 
     struct Screenshot {
-      std::string file_format =
-          "png";  // 静态截图保存格式: "png" | "jpeg"（Motion Photo 仍为 JPEG）
+      std::string file_format = "png";  // 静态截图保存格式: "png" | "jpeg"
     } screenshot;
 
     // 黑边模式设置
     struct Letterbox {
       bool enabled = false;  // 是否启用黑边模式
     } letterbox;
-
-    // 动态照片设置
-    struct MotionPhoto {
-      std::uint32_t duration = 3;             // 视频时长（秒）
-      std::uint32_t resolution = 0;           // 短边分辨率: 0=原始不缩放, 720/1080/1440/2160
-      std::uint32_t fps = 30;                 // 帧率
-      std::uint32_t bitrate = 10'000'000;     // 比特率 (10Mbps)，CBR 模式使用
-      std::uint32_t quality = 80;             // 质量值 (0-100)，VBR 模式使用
-      std::string rate_control = "vbr";       // 码率控制模式: "cbr" | "vbr"
-      std::string codec = "h264";             // 编码格式: "h264" | "h265"
-      std::string audio_source = "system";    // 音频源: "none" | "system" | "game_only"
-      std::uint32_t audio_bitrate = 192'000;  // 音频码率 (192kbps)
-    } motion_photo;
-
-    // 即时回放设置（录制参数继承自 recording）
-    struct ReplayBuffer {
-      std::uint32_t duration = 30;  // 回放时长（秒）
-      // enabled 不持久化，仅运行时状态
-      // 其他参数从 recording 继承
-    } replay_buffer;
 
     // 录制功能设置
     struct Recording {

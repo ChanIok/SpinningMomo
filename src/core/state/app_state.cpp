@@ -24,7 +24,6 @@ import Features.Preview.State;
 import Features.WindowControl.State;
 import Features.Screenshot.State;
 import Features.Recording.State;
-import Features.ReplayBuffer.State;
 import Features.Settings.State;
 import Features.Update.State;
 import UI.FloatingWindow.State;
@@ -59,8 +58,7 @@ AppState::AppState()
       preview(std::make_unique<Features::Preview::State::PreviewState>()),
       window_control(std::make_unique<Features::WindowControl::State::WindowControlState>()),
       screenshot(std::make_unique<Features::Screenshot::State::ScreenshotState>()),
-      recording(std::make_unique<Features::Recording::State::RecordingState>()),
-      replay_buffer(std::make_unique<Features::ReplayBuffer::State::ReplayBufferState>()) {}
+      recording(std::make_unique<Features::Recording::State::RecordingState>()) {}
 
 AppState::~AppState() = default;
 
