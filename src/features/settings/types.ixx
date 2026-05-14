@@ -124,6 +124,11 @@ export struct AppSettings {
     std::string output_dir_path = "";      // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
     std::string external_album_path = "";  // 外部游戏相册目录路径（为空时回退到输出目录）
 
+    struct Screenshot {
+      std::string file_format =
+          "png";  // 静态截图保存格式: "png" | "jpeg"（Motion Photo 仍为 JPEG）
+    } screenshot;
+
     // 黑边模式设置
     struct Letterbox {
       bool enabled = false;  // 是否启用黑边模式

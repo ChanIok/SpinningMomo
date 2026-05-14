@@ -168,6 +168,10 @@ export interface AppSettings {
     outputDirPath: string // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
     externalAlbumPath: string // 外部游戏相册目录路径（为空时回退到输出目录）
 
+    screenshot: {
+      fileFormat: 'png' | 'jpeg'
+    }
+
     // 黑边模式设置
     letterbox: {
       enabled: boolean // 是否启用黑边模式
@@ -314,6 +318,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   features: {
     outputDirPath: '',
     externalAlbumPath: '',
+    screenshot: {
+      fileFormat: 'png',
+    },
     letterbox: {
       enabled: false,
     },

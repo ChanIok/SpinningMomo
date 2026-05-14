@@ -55,6 +55,7 @@ const {
   updateRecordingAutoRestartOnResize,
   updateRecordingAudioSource,
   updateRecordingAudioBitrate,
+  updateScreenshotFileFormat,
   resetCaptureExportSettings,
 } = useFunctionActions()
 const { clearError } = store
@@ -295,6 +296,42 @@ const handleResetSettings = async () => {
                   : t('settings.function.outputDir.selectButton')
               }}
             </Button>
+          </ItemActions>
+        </Item>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.capture.screenshotSettings.title') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.capture.screenshotSettings.description') }}
+          </p>
+        </div>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.capture.screenshotSettings.formatLabel') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.capture.screenshotSettings.formatDescription') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="appSettings?.features?.screenshot?.fileFormat ?? 'png'"
+              @update:model-value="(value) => updateScreenshotFileFormat(value as 'png' | 'jpeg')"
+            >
+              <SelectTrigger class="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="png">PNG</SelectItem>
+                <SelectItem value="jpeg">JPEG</SelectItem>
+              </SelectContent>
+            </Select>
           </ItemActions>
         </Item>
       </div>

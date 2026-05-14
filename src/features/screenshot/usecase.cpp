@@ -106,10 +106,16 @@ auto capture(Core::State::AppState& state) -> void {
     }
   };
 
-  // 执行截图（Motion Photo 模式使用 JPEG 格式）
-  auto image_format =
-      motion_photo_enabled ? Utils::Image::ImageFormat::JPEG : Utils::Image::ImageFormat::PNG;
-  float jpeg_quality = 1.0f;  // 视觉无损
+  Utils::Image::ImageFormat image_format = Utils::Image::ImageFormat::PNG;
+  if (motion_photo_enabled) {
+    image_format = Utils::Image::ImageFormat::JPEG;
+  } else {
+    const auto& fmt = state.settings->raw.features.screenshot.file_format;
+    if (fmt == "jpeg" || fmt == "jpg") {
+      image_format = Utils::Image::ImageFormat::JPEG;
+    }
+  }
+  float jpeg_quality = 1.0f;
 
   std::optional<std::filesystem::path> output_dir_override;
   if (motion_photo_enabled) {

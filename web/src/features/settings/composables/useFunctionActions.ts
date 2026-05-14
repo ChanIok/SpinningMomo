@@ -90,6 +90,19 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateScreenshotFileFormat = async (fileFormat: 'png' | 'jpeg') => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        screenshot: {
+          ...(appSettings.value.features.screenshot ?? DEFAULT_APP_SETTINGS.features.screenshot),
+          fileFormat,
+        },
+      },
+    })
+  }
+
   // Motion Photo 设置
   const updateMotionPhotoDuration = async (duration: number) => {
     await store.updateSettings({
@@ -409,6 +422,10 @@ export const useFunctionActions = () => {
         ...appSettings.value.features,
         outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
         externalAlbumPath: DEFAULT_APP_SETTINGS.features.externalAlbumPath,
+        screenshot: {
+          ...appSettings.value.features.screenshot,
+          fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
+        },
         letterbox: {
           ...appSettings.value.features.letterbox,
           enabled: DEFAULT_APP_SETTINGS.features.letterbox.enabled,
@@ -455,6 +472,10 @@ export const useFunctionActions = () => {
         ...appSettings.value.features,
         outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
         externalAlbumPath: DEFAULT_APP_SETTINGS.features.externalAlbumPath,
+        screenshot: {
+          ...appSettings.value.features.screenshot,
+          fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
+        },
         motionPhoto: {
           ...appSettings.value.features.motionPhoto,
           duration: DEFAULT_APP_SETTINGS.features.motionPhoto.duration,
@@ -517,6 +538,7 @@ export const useFunctionActions = () => {
     updateWindowResetResolution,
     updateOutputDir,
     updateGameAlbumPath,
+    updateScreenshotFileFormat,
     // Motion Photo
     updateMotionPhotoDuration,
     updateMotionPhotoResolution,
