@@ -1,6 +1,6 @@
 module;
 
-#include <wil/result.h>
+#include <wil/com.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
 module Features.Screenshot;
@@ -19,7 +19,6 @@ import Utils.Graphics.D3D;
 import Utils.Graphics.Hdr;
 import Utils.Image;
 import <d3d11.h>;
-import <wil/com.h>;
 import <wincodec.h>;
 import <windows.h>;
 
@@ -167,10 +166,20 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
                                             session_info.request.jpeg_quality);
             if (save_result) {
               success = true;
-              Logger().debug("Screenshot saved successfully for session {}", session_id);
+              if (session_info.request.use_hdr) {
+                Logger().info("HDR screenshot saved for session {}: {}", session_id,
+                              Utils::String::ToUtf8(session_info.request.file_path));
+              } else {
+                Logger().debug("Screenshot saved successfully for session {}", session_id);
+              }
             } else {
-              Logger().error("Failed to save screenshot for session {}: {}", session_id,
-                             save_result.error());
+              if (session_info.request.use_hdr) {
+                Logger().error("HDR screenshot save failed for session {}: {}", session_id,
+                               save_result.error());
+              } else {
+                Logger().error("Failed to save screenshot for session {}: {}", session_id,
+                               save_result.error());
+              }
             }
           }
         }
@@ -554,6 +563,20 @@ auto take_screenshot(
   request.hdr_target_peak_nits = hdr_target_peak_nits;
   request.completion_callback = completion_callback;
   request.timestamp = std::chrono::steady_clock::now();
+
+  if (use_hdr) {
+    RECT window_rect{};
+    if (GetWindowRect(target_window, &window_rect)) {
+      const int capture_width = window_rect.right - window_rect.left;
+      const int capture_height = window_rect.bottom - window_rect.top;
+      Logger().info("HDR screenshot requested: {}x{}, target_peak={:.0f} nits, path={}",
+                    capture_width, capture_height, hdr_target_peak_nits,
+                    Utils::String::ToUtf8(file_path.wstring()));
+    } else {
+      Logger().info("HDR screenshot requested: target_peak={:.0f} nits, path={}",
+                    hdr_target_peak_nits, Utils::String::ToUtf8(file_path.wstring()));
+    }
+  }
 
   // 添加到队列并唤醒工作线程
   {

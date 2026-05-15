@@ -1,11 +1,10 @@
 module;
 
-#include <d3d11.h>
-#include <windows.h>
-
 export module Features.Screenshot.HdrEncoder;
 
 import std;
+import <d3d11.h>;
+import <windows.h>;
 
 // Ultra HDR（JPEG_R）编码：将捕获到的 R16G16B16A16_FLOAT 纹理写成带增益图的 JPEG。
 // 实现拆在多个 .cpp 中，本接口文件只保留调用方需要的类型与入口。
@@ -25,10 +24,11 @@ export struct UltraHdrEncodeOptions {
 struct UltraHdrPreparedImages {
   // 已经 tone-map 并做 sRGB OETF 的 SDR 兼容底图，格式为紧排 BGRA8888。
   std::vector<std::uint8_t> base_bgra8;
-  // 已量化好的单通道 gain map，格式为紧排 Gray8。
-  std::vector<std::uint8_t> gainmap_gray8;
-  // 量化 gain map 前的内容范围。metadata 与量化都必须基于同一对数值。
-  // 这里存 log2 域，是因为 Ultra HDR 语义本身就是“相对 SDR 的倍数”。
+  // 已量化好的多通道 gain map，格式为紧排 BGRA8888。
+  // GPU 侧按 BGRA 打包是为了让 D3D11/UAV/WIC 直接复用现有 4-byte 像素路径。
+  std::vector<std::uint8_t> gainmap_bgra8;
+  // metadata 仍然只写一套共享的 min/max 范围。
+  // 这里存的是那套共享范围在 log2 域里的值，和旧 libultrahdr 的 XMP/ISO 语义一致。
   float min_gain_log2 = 0.0f;
   float max_gain_log2 = 0.0f;
   std::uint32_t width = 0;
@@ -50,7 +50,8 @@ struct GainMapMetadata {
 
 // 以下函数仅在本模块各 .cpp 实现单元之间可见（未 export），外部 `import` 本模块时无法使用。
 // 原型集中放在接口单元，避免实现文件里手写前向声明。
-// GPU 预处理：从 WGC 的 R16G16B16A16_FLOAT 纹理生成 SDR base 和量化后的 gain map。
+// 预处理：GPU 先生成 SDR base 和 HDR half，再完成 gain 计算、tile 范围归约与量化。
+// CPU 只对归约后的全局 min/max 做 clamp 与最小范围展开。
 auto preprocess_texture_for_ultrahdr(ID3D11Texture2D* texture)
     -> std::expected<UltraHdrPreparedImages, std::string>;
 // 从 GPU 统计出的 gain 范围和用户目标显示峰值构造最终 metadata 语义。
@@ -63,7 +64,7 @@ auto encode_ultrahdr_jpeg(const UltraHdrPreparedImages& images,
 auto write_file(const std::wstring& file_path, const std::vector<std::uint8_t>& data)
     -> std::expected<void, std::string>;
 
-// GPU 生成 SDR 底图 + gain map → 编码为 Ultra HDR JPEG 并写入 path。
+// 生成 SDR 底图 + gain map → 编码为 Ultra HDR JPEG 并写入 path。
 export auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring& file_path,
                                           const UltraHdrEncodeOptions& options = {})
     -> std::expected<void, std::string>;

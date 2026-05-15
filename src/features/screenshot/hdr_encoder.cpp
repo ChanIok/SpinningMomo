@@ -2,6 +2,7 @@ module Features.Screenshot.HdrEncoder;
 
 import std;
 import Utils.Logger;
+import Utils.String;
 
 namespace Features::Screenshot::HdrEncoder {
 
@@ -13,7 +14,7 @@ auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring&
   auto total_start = std::chrono::steady_clock::now();
 
   // 旧路径会先把原始 half 纹理完整读回 CPU，再逐像素构造 SDR/HDR 图层。
-  // 现在这里直接调用 GPU 预处理，CPU 只拿最终的 SDR base 和 Gray8 gain map。
+  // 现在这里直接调用 GPU 预处理；gain 链路跑完后再读回 SDR base 与量化后的 gain map。
   auto preprocess_start = std::chrono::steady_clock::now();
   auto prepared_result = preprocess_texture_for_ultrahdr(texture);
   if (!prepared_result) {
@@ -48,8 +49,13 @@ auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring&
                       std::chrono::steady_clock::now() - total_start)
                       .count();
 
-  Logger().debug("HDR screenshot total: preprocess={} ms, encode={} ms, write={} ms, total={} ms",
-                 preprocess_ms, encode_ms, write_ms, total_ms);
+  const auto& prepared = prepared_result.value();
+  Logger().info(
+      "HDR screenshot encoded: {}x{}, path={}, preprocess={} ms, encode={} ms, write={} ms, "
+      "total={} ms, output={} bytes, gain_range=[{:.4f}, {:.4f}], target_peak={:.0f} nits",
+      prepared.width, prepared.height, Utils::String::ToUtf8(file_path), preprocess_ms, encode_ms,
+      write_ms, total_ms, encoded_result->size(), prepared.min_gain_log2, prepared.max_gain_log2,
+      options.target_display_peak_nits);
   return {};
 }
 

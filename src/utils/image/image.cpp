@@ -546,9 +546,7 @@ auto encode_pixel_data_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t*
                                                     const_cast<BYTE*>(pixel_data), bitmap.put()));
 
     // 这里总是把源像素如实声明给 WIC，再让 JPEG 编码器做必要的内部转换。
-    // 对 HDR 截图链路来说，两种输入足够：
-    // - 32bppBGRA：SDR base
-    // - 8bppGray：gain map
+    // Ultra HDR 截图的 base 与 gain map 均使用 32bppBGRA。
     WICPixelFormatGUID pixel_format = source_pixel_format;
     THROW_IF_FAILED(frame->SetPixelFormat(&pixel_format));
     THROW_IF_FAILED(frame->WriteSource(bitmap.get(), nullptr));
@@ -567,18 +565,9 @@ auto encode_bgra_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t* pixel
                                uint32_t width, uint32_t height, uint32_t row_pitch,
                                float jpeg_quality)
     -> std::expected<std::vector<uint8_t>, std::string> {
-  // SDR base 走这一层。
+  // SDR base 与 Ultra HDR gain map 走这一层。
   return encode_pixel_data_to_jpeg_bytes(factory, pixel_data, width, height, row_pitch,
                                          GUID_WICPixelFormat32bppBGRA, jpeg_quality);
-}
-
-auto encode_gray_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t* pixel_data,
-                               uint32_t width, uint32_t height, uint32_t row_pitch,
-                               float jpeg_quality)
-    -> std::expected<std::vector<uint8_t>, std::string> {
-  // Ultra HDR gain map 走这一层。WIC 会把 Gray8 直接编码成灰度 JPEG。
-  return encode_pixel_data_to_jpeg_bytes(factory, pixel_data, width, height, row_pitch,
-                                         GUID_WICPixelFormat8bppGray, jpeg_quality);
 }
 
 // 保存像素数据到文件

@@ -83,12 +83,6 @@ export auto encode_bgra_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t
                                       float jpeg_quality = 1.0f)
     -> std::expected<std::vector<uint8_t>, std::string>;
 
-// 将紧排 Gray8 像素编码成 JPEG 字节流。用于 Ultra HDR 的 gain map。
-export auto encode_gray_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t* pixel_data,
-                                      uint32_t width, uint32_t height, uint32_t row_pitch,
-                                      float jpeg_quality = 1.0f)
-    -> std::expected<std::vector<uint8_t>, std::string>;
-
 // 保存像素数据到文件
 export auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_data,
                                     uint32_t width, uint32_t height, uint32_t row_pitch,

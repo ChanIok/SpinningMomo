@@ -1,12 +1,10 @@
 module;
 
-#include <windows.h>
-
 module Features.Screenshot.HdrEncoder;
 
 import std;
 import Utils.Image;
-import Utils.Logger;
+import <windows.h>;
 
 namespace Features::Screenshot::HdrEncoder {
 
@@ -99,22 +97,6 @@ struct GainMapMetadataFractions {
   std::uint32_t alternate_hdr_headroom_d = 1;
   bool backward_direction = false;
   bool use_base_color_space = true;
-
-  auto all_channels_identical() const -> bool {
-    return gain_map_min_n[0] == gain_map_min_n[1] && gain_map_min_n[0] == gain_map_min_n[2] &&
-           gain_map_min_d[0] == gain_map_min_d[1] && gain_map_min_d[0] == gain_map_min_d[2] &&
-           gain_map_max_n[0] == gain_map_max_n[1] && gain_map_max_n[0] == gain_map_max_n[2] &&
-           gain_map_max_d[0] == gain_map_max_d[1] && gain_map_max_d[0] == gain_map_max_d[2] &&
-           gain_map_gamma_n[0] == gain_map_gamma_n[1] &&
-           gain_map_gamma_n[0] == gain_map_gamma_n[2] &&
-           gain_map_gamma_d[0] == gain_map_gamma_d[1] &&
-           gain_map_gamma_d[0] == gain_map_gamma_d[2] && base_offset_n[0] == base_offset_n[1] &&
-           base_offset_n[0] == base_offset_n[2] && base_offset_d[0] == base_offset_d[1] &&
-           base_offset_d[0] == base_offset_d[2] && alternate_offset_n[0] == alternate_offset_n[1] &&
-           alternate_offset_n[0] == alternate_offset_n[2] &&
-           alternate_offset_d[0] == alternate_offset_d[1] &&
-           alternate_offset_d[0] == alternate_offset_d[2];
-  }
 };
 
 auto app_segment_size(std::size_t payload_size) -> std::size_t { return 4 + payload_size; }
@@ -346,27 +328,37 @@ auto convert_metadata_to_fractions(const GainMapMetadata& metadata)
   const float log2_hdr_capacity_min = std::log2(metadata.hdr_capacity_min);
   const float log2_hdr_capacity_max = std::log2(metadata.hdr_capacity_max);
 
-  for (int i = 0; i < 3; ++i) {
-    if (!float_to_signed_fraction(log2_min_boost, &result.gain_map_min_n[i],
-                                  &result.gain_map_min_d[i])) {
-      return std::unexpected("Failed to encode gain map min boost as fraction");
-    }
-    if (!float_to_signed_fraction(log2_max_boost, &result.gain_map_max_n[i],
-                                  &result.gain_map_max_d[i])) {
-      return std::unexpected("Failed to encode gain map max boost as fraction");
-    }
-    if (!float_to_unsigned_fraction(metadata.gamma, &result.gain_map_gamma_n[i],
-                                    &result.gain_map_gamma_d[i])) {
-      return std::unexpected("Failed to encode gain map gamma as fraction");
-    }
-    if (!float_to_signed_fraction(metadata.offset_sdr, &result.base_offset_n[i],
-                                  &result.base_offset_d[i])) {
-      return std::unexpected("Failed to encode SDR offset as fraction");
-    }
-    if (!float_to_signed_fraction(metadata.offset_hdr, &result.alternate_offset_n[i],
-                                  &result.alternate_offset_d[i])) {
-      return std::unexpected("Failed to encode HDR offset as fraction");
-    }
+  if (!float_to_signed_fraction(log2_min_boost, &result.gain_map_min_n[0],
+                                &result.gain_map_min_d[0])) {
+    return std::unexpected("Failed to encode gain map min boost as fraction");
+  }
+  if (!float_to_signed_fraction(log2_max_boost, &result.gain_map_max_n[0],
+                                &result.gain_map_max_d[0])) {
+    return std::unexpected("Failed to encode gain map max boost as fraction");
+  }
+  if (!float_to_unsigned_fraction(metadata.gamma, &result.gain_map_gamma_n[0],
+                                  &result.gain_map_gamma_d[0])) {
+    return std::unexpected("Failed to encode gain map gamma as fraction");
+  }
+  if (!float_to_signed_fraction(metadata.offset_sdr, &result.base_offset_n[0],
+                                &result.base_offset_d[0])) {
+    return std::unexpected("Failed to encode SDR offset as fraction");
+  }
+  if (!float_to_signed_fraction(metadata.offset_hdr, &result.alternate_offset_n[0],
+                                &result.alternate_offset_d[0])) {
+    return std::unexpected("Failed to encode HDR offset as fraction");
+  }
+  for (int i = 1; i < 3; ++i) {
+    result.gain_map_min_n[i] = result.gain_map_min_n[0];
+    result.gain_map_min_d[i] = result.gain_map_min_d[0];
+    result.gain_map_max_n[i] = result.gain_map_max_n[0];
+    result.gain_map_max_d[i] = result.gain_map_max_d[0];
+    result.gain_map_gamma_n[i] = result.gain_map_gamma_n[0];
+    result.gain_map_gamma_d[i] = result.gain_map_gamma_d[0];
+    result.base_offset_n[i] = result.base_offset_n[0];
+    result.base_offset_d[i] = result.base_offset_d[0];
+    result.alternate_offset_n[i] = result.alternate_offset_n[0];
+    result.alternate_offset_d[i] = result.alternate_offset_d[0];
   }
 
   if (!float_to_unsigned_fraction(log2_hdr_capacity_min, &result.base_hdr_headroom_n,
@@ -381,14 +373,7 @@ auto convert_metadata_to_fractions(const GainMapMetadata& metadata)
   return result;
 }
 
-auto get_gainmap_channel_count(const GainMapMetadataFractions& metadata) -> std::uint8_t {
-  // 当前实现虽然只生成单通道 gain map，但序列化代码保留“1 或 3 通道”判断，
-  // 这样布局逻辑是完整的，不会把格式假设硬编码死在写入函数里。
-  return metadata.all_channels_identical() ? 1u : 3u;
-}
-
-auto should_use_common_denominator(const GainMapMetadataFractions& metadata,
-                                   std::uint8_t channel_count) -> bool {
+auto should_use_common_denominator(const GainMapMetadataFractions& metadata) -> bool {
   // 只有所有字段分母真的相同，才能写 compact/common-denominator 布局。
   // 这里必须数据驱动判断，不能拍脑袋固定某个 flag。
   const std::uint32_t denominator = metadata.base_hdr_headroom_d;
@@ -396,24 +381,18 @@ auto should_use_common_denominator(const GainMapMetadataFractions& metadata,
     return false;
   }
 
-  for (std::uint8_t channel = 0; channel < channel_count; ++channel) {
-    if (metadata.gain_map_min_d[channel] != denominator ||
-        metadata.gain_map_max_d[channel] != denominator ||
-        metadata.gain_map_gamma_d[channel] != denominator ||
-        metadata.base_offset_d[channel] != denominator ||
-        metadata.alternate_offset_d[channel] != denominator) {
-      return false;
-    }
-  }
-
-  return true;
+  return metadata.gain_map_min_d[0] == denominator && metadata.gain_map_max_d[0] == denominator &&
+         metadata.gain_map_gamma_d[0] == denominator && metadata.base_offset_d[0] == denominator &&
+         metadata.alternate_offset_d[0] == denominator;
 }
 
 auto serialize_iso21496_1_from_fractions(const GainMapMetadataFractions& metadata)
     -> std::vector<std::uint8_t> {
   // 这一步才真正把分数字段落成 ISO 21496-1 二进制。
-  const std::uint8_t channel_count = get_gainmap_channel_count(metadata);
-  const bool use_common_denominator = should_use_common_denominator(metadata, channel_count);
+  // 当前产品语义已经固定成“多通道 gain map + 共享一套 metadata 参数”。
+  // 所以这里直接写单套参数布局，不再保留历史上的 1/3 通道动态判断形状。
+  constexpr std::uint8_t channel_count = 1;
+  const bool use_common_denominator = should_use_common_denominator(metadata);
 
   std::vector<std::uint8_t> out;
   out.reserve(use_common_denominator ? 64 : 96);
@@ -697,10 +676,22 @@ auto build_gainmap_metadata(const UltraHdrPreparedImages& images,
   return metadata;
 }
 
+auto encode_bgra_layer_to_jpeg(const std::vector<std::uint8_t>& pixels, std::uint32_t width,
+                               std::uint32_t height, float jpeg_quality)
+    -> std::expected<std::vector<std::uint8_t>, std::string> {
+  auto factory_result = Utils::Image::get_thread_wic_factory();
+  if (!factory_result) {
+    return std::unexpected(factory_result.error());
+  }
+  return Utils::Image::encode_bgra_to_jpeg_bytes(factory_result->get(), pixels.data(), width,
+                                                 height, width * 4, jpeg_quality);
+}
+
 auto encode_ultrahdr_jpeg(const UltraHdrPreparedImages& images,
                           const UltraHdrEncodeOptions& options)
     -> std::expected<std::vector<std::uint8_t>, std::string> {
   constexpr std::size_t kBaseBytesPerPixel = 4;
+  constexpr std::size_t kGainMapBytesPerPixel = 4;
   const std::uint64_t pixel_count_u64 = static_cast<std::uint64_t>(images.width) * images.height;
   if (pixel_count_u64 == 0) {
     return std::unexpected("Ultra HDR prepared image dimensions are empty");
@@ -712,14 +703,11 @@ auto encode_ultrahdr_jpeg(const UltraHdrPreparedImages& images,
 
   const std::size_t expected_base_bytes =
       static_cast<std::size_t>(pixel_count_u64) * kBaseBytesPerPixel;
+  const std::size_t expected_gainmap_bytes =
+      static_cast<std::size_t>(pixel_count_u64) * kGainMapBytesPerPixel;
   if (images.base_bgra8.size() != expected_base_bytes ||
-      images.gainmap_gray8.size() != static_cast<std::size_t>(pixel_count_u64)) {
+      images.gainmap_bgra8.size() != expected_gainmap_bytes) {
     return std::unexpected("Ultra HDR prepared image buffer size mismatch");
-  }
-
-  auto factory_result = Utils::Image::create_factory();
-  if (!factory_result) {
-    return std::unexpected(factory_result.error());
   }
 
   // WIC 接口收的是 0..1，而外部选项更适合暴露成 0..100。
@@ -727,42 +715,27 @@ auto encode_ultrahdr_jpeg(const UltraHdrPreparedImages& images,
   const float gainmap_quality = std::clamp(options.gainmap_quality / 100.0f, 0.0f, 1.0f);
   const auto metadata = build_gainmap_metadata(images, options);
 
-  auto base_encode_start = std::chrono::steady_clock::now();
-  auto base_jpeg_result = Utils::Image::encode_bgra_to_jpeg_bytes(
-      factory_result->get(), images.base_bgra8.data(), images.width, images.height,
-      images.width * 4, base_quality);
-  if (!base_jpeg_result) {
-    return std::unexpected("Base JPEG encode failed: " + base_jpeg_result.error());
+  const std::uint32_t width = images.width;
+  const std::uint32_t height = images.height;
+
+  // base / gainmap 互不依赖，各在线程用 thread_local WIC 工厂并行编码。
+  auto base_future = std::async(std::launch::async, [&images, width, height, base_quality]() {
+    return encode_bgra_layer_to_jpeg(images.base_bgra8, width, height, base_quality);
+  });
+  auto gainmap_future = std::async(std::launch::async, [&images, width, height, gainmap_quality]() {
+    return encode_bgra_layer_to_jpeg(images.gainmap_bgra8, width, height, gainmap_quality);
+  });
+
+  auto base_jpeg = base_future.get();
+  auto gainmap_jpeg = gainmap_future.get();
+  if (!base_jpeg) {
+    return std::unexpected("Base JPEG encode failed: " + base_jpeg.error());
   }
-  auto base_encode_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::steady_clock::now() - base_encode_start)
-                            .count();
-
-  auto gainmap_encode_start = std::chrono::steady_clock::now();
-  auto gainmap_jpeg_result = Utils::Image::encode_gray_to_jpeg_bytes(
-      factory_result->get(), images.gainmap_gray8.data(), images.width, images.height, images.width,
-      gainmap_quality);
-  if (!gainmap_jpeg_result) {
-    return std::unexpected("Gain map JPEG encode failed: " + gainmap_jpeg_result.error());
+  if (!gainmap_jpeg) {
+    return std::unexpected("Gain map JPEG encode failed: " + gainmap_jpeg.error());
   }
-  auto gainmap_encode_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                               std::chrono::steady_clock::now() - gainmap_encode_start)
-                               .count();
 
-  auto mux_start = std::chrono::steady_clock::now();
-  auto assembled_result = LocalUltraHdr::assemble_ultrahdr_jpeg(
-      base_jpeg_result.value(), gainmap_jpeg_result.value(), metadata);
-  if (!assembled_result) {
-    return std::unexpected(assembled_result.error());
-  }
-  auto mux_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                    std::chrono::steady_clock::now() - mux_start)
-                    .count();
-
-  Logger().debug("HDR UHDR encode: base_wic={} ms, gainmap_wic={} ms, mux={} ms, output={} bytes",
-                 base_encode_ms, gainmap_encode_ms, mux_ms, assembled_result->size());
-
-  return assembled_result;
+  return LocalUltraHdr::assemble_ultrahdr_jpeg(base_jpeg.value(), gainmap_jpeg.value(), metadata);
 }
 
 auto write_file(const std::wstring& file_path, const std::vector<std::uint8_t>& data)
