@@ -10,6 +10,7 @@ import Features.Overlay.Rendering;
 import Features.Overlay.State;
 import Features.Overlay.Types;
 import Features.Overlay.Geometry;
+import Utils.DisplayGeometry;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
@@ -188,6 +189,27 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
       current_pos.x <= (overlay_left + overlay_state.window.window_width) &&
       current_pos.y >= overlay_top &&
       current_pos.y <= (overlay_top + overlay_state.window.window_height)) {
+    auto try_move_target = [&](const RECT& viewport_rect, double relative_x, double relative_y) {
+      auto new_game_pos = Utils::DisplayGeometry::calculate_window_position_for_viewport(
+          viewport_rect, overlay_state.window.cached_game_width,
+          overlay_state.window.cached_game_height, relative_x, relative_y);
+
+      if (overlay_state.interaction.is_game_focused) {
+        suppress_taskbar_redraw(state);
+      }
+
+      if (auto& last_pos = overlay_state.interaction.last_game_window_pos;
+          last_pos && last_pos->x == new_game_pos.x && last_pos->y == new_game_pos.y) {
+        return;
+      }
+
+      if (SetWindowPos(
+              overlay_state.window.target_window, nullptr, new_game_pos.x, new_game_pos.y, 0, 0,
+              SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING)) {
+        overlay_state.interaction.last_game_window_pos = new_game_pos;
+      }
+    };
+
     // 在黑边模式下，计算实际的游戏显示区域
     if (overlay_state.window.use_letterbox_mode) {
       // 使用工具函数计算黑边区域，与渲染部分保持一致
@@ -204,29 +226,13 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
         // 计算鼠标在游戏显示区域中的相对位置（0.0 到 1.0）
         double relative_x = (current_pos.x - content_left) / static_cast<double>(content_width);
         double relative_y = (current_pos.y - content_top) / static_cast<double>(content_height);
-
-        // 使用缓存的游戏窗口尺寸计算新位置
-        int new_game_x =
-            static_cast<int>(-relative_x * overlay_state.window.cached_game_width + current_pos.x);
-        int new_game_y =
-            static_cast<int>(-relative_y * overlay_state.window.cached_game_height + current_pos.y);
-
-        // 根据焦点状态禁用任务栏重绘
-        if (overlay_state.interaction.is_game_focused) {
-          suppress_taskbar_redraw(state);
-        }
-
-        POINT new_game_pos = {new_game_x, new_game_y};
-        if (auto& last_pos = overlay_state.interaction.last_game_window_pos;
-            last_pos && last_pos->x == new_game_pos.x && last_pos->y == new_game_pos.y) {
-          return;
-        }
-
-        if (SetWindowPos(
-                overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
-                SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING)) {
-          overlay_state.interaction.last_game_window_pos = new_game_pos;
-        }
+        const RECT viewport_rect{
+            .left = content_left,
+            .top = content_top,
+            .right = content_left + content_width,
+            .bottom = content_top + content_height,
+        };
+        try_move_target(viewport_rect, relative_x, relative_y);
       }
     } else {
       // 非黑边模式：整个 overlay 都是有效显示区，直接按整个 overlay 计算相对位置。
@@ -234,29 +240,13 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
           (current_pos.x - overlay_left) / static_cast<double>(overlay_state.window.window_width);
       double relative_y =
           (current_pos.y - overlay_top) / static_cast<double>(overlay_state.window.window_height);
-
-      // 使用缓存的游戏窗口尺寸计算新位置
-      int new_game_x =
-          static_cast<int>(-relative_x * overlay_state.window.cached_game_width + current_pos.x);
-      int new_game_y =
-          static_cast<int>(-relative_y * overlay_state.window.cached_game_height + current_pos.y);
-
-      // 根据焦点状态禁用任务栏重绘
-      if (overlay_state.interaction.is_game_focused) {
-        suppress_taskbar_redraw(state);
-      }
-
-      POINT new_game_pos = {new_game_x, new_game_y};
-      if (auto& last_pos = overlay_state.interaction.last_game_window_pos;
-          last_pos && last_pos->x == new_game_pos.x && last_pos->y == new_game_pos.y) {
-        return;
-      }
-
-      if (SetWindowPos(
-              overlay_state.window.target_window, nullptr, new_game_x, new_game_y, 0, 0,
-              SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOCOPYBITS | SWP_NOSENDCHANGING)) {
-        overlay_state.interaction.last_game_window_pos = new_game_pos;
-      }
+      const RECT viewport_rect{
+          .left = overlay_left,
+          .top = overlay_top,
+          .right = overlay_left + overlay_state.window.window_width,
+          .bottom = overlay_top + overlay_state.window.window_height,
+      };
+      try_move_target(viewport_rect, relative_x, relative_y);
     }
   }
 }

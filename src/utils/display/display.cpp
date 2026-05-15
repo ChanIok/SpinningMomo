@@ -1,9 +1,10 @@
 module;
 
+import <windows.h>;
+
 module Utils.Display;
 
 import std;
-import <windows.h>;
 
 namespace Utils::Display {
 

@@ -9,7 +9,7 @@ import Features.Preview.State;
 import Features.Preview.Types;
 import Features.Preview.Rendering;
 import Features.Preview.Window;
-import Utils.Display;
+import Utils.DisplayGeometry;
 import Utils.Logger;
 import Utils.Throttle;
 import <dwmapi.h>;
@@ -95,40 +95,17 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
   }
 
   const auto& screen_rect = state.preview->screen_rect;
-  int screenLeft = screen_rect.left;
-  int screenTop = screen_rect.top;
-  int screenWidth = Utils::Display::rect_width(screen_rect);
-  int screenHeight = Utils::Display::rect_height(screen_rect);
 
   // 获取游戏窗口尺寸
-  float gameWidth = static_cast<float>(state.preview->game_window_rect.right -
-                                       state.preview->game_window_rect.left);
-  float gameHeight = static_cast<float>(state.preview->game_window_rect.bottom -
-                                        state.preview->game_window_rect.top);
+  const int game_width =
+      state.preview->game_window_rect.right - state.preview->game_window_rect.left;
+  const int game_height =
+      state.preview->game_window_rect.bottom - state.preview->game_window_rect.top;
 
-  // 计算新位置
-  float targetX, targetY;
-
-  // 水平方向
-  if (gameWidth <= screenWidth) {
-    targetX = screenLeft + (screenWidth - gameWidth) / 2;  // 居中
-  } else {
-    targetX = screenLeft - relative_x * gameWidth + screenWidth / 2;
-    targetX = std::max(targetX, screenLeft - gameWidth + screenWidth);
-    targetX = std::min(targetX, static_cast<float>(screenLeft));
-  }
-
-  // 垂直方向
-  if (gameHeight <= screenHeight) {
-    targetY = screenTop + (screenHeight - gameHeight) / 2;  // 居中
-  } else {
-    targetY = screenTop - relative_y * gameHeight + screenHeight / 2;
-    targetY = std::max(targetY, screenTop - gameHeight + screenHeight);
-    targetY = std::min(targetY, static_cast<float>(screenTop));
-  }
+  auto newPos = Utils::DisplayGeometry::calculate_window_position_for_viewport(
+      screen_rect, game_width, game_height, relative_x, relative_y);
 
   // 跳过重复位置
-  POINT newPos = {static_cast<LONG>(targetX), static_cast<LONG>(targetY)};
   if (auto& lastPos = state.preview->interaction.last_game_window_pos;
       lastPos && lastPos->x == newPos.x && lastPos->y == newPos.y) {
     return;

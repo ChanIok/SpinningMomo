@@ -9,7 +9,6 @@ import Core.State;
 import Features.Overlay.Types;
 import Features.Overlay.Geometry;
 import Features.Overlay.Interaction;
-import Utils.Display;
 import <dwmapi.h>;
 import <windows.h>;
 
@@ -62,27 +61,11 @@ auto unregister_overlay_window_class(HINSTANCE instance) -> void {
   UnregisterClassW(L"OverlayWindowClass", instance);
 }
 
-auto update_screen_metrics_from_target(Core::State::AppState& state)
-    -> std::expected<void, std::string> {
-  auto& overlay_state = *state.overlay;
-  auto monitor_info = Utils::Display::get_monitor_for_window(overlay_state.window.target_window);
-  if (!monitor_info) {
-    return std::unexpected{monitor_info.error()};
-  }
-
-  const auto& rect = monitor_info->monitor_rect;
-  overlay_state.window.screen_left = rect.left;
-  overlay_state.window.screen_top = rect.top;
-  overlay_state.window.screen_width = Utils::Display::rect_width(rect);
-  overlay_state.window.screen_height = Utils::Display::rect_height(rect);
-  return {};
-}
-
 auto create_overlay_window(HINSTANCE instance, Core::State::AppState& state)
     -> std::expected<HWND, std::string> {
   auto& overlay_state = *state.overlay;
-  if (auto result = update_screen_metrics_from_target(state); !result) {
-    return std::unexpected{"Failed to resolve overlay monitor: " + result.error()};
+  if (overlay_state.window.screen_width <= 0 || overlay_state.window.screen_height <= 0) {
+    return std::unexpected{"Overlay screen metrics are not initialized."};
   }
 
   HWND hwnd = CreateWindowExW(WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE |
@@ -141,8 +124,8 @@ auto hide_overlay_window(Core::State::AppState& state) -> void {
 auto set_overlay_window_size(Core::State::AppState& state, int game_width, int game_height)
     -> void {
   auto& overlay_state = *state.overlay;
-  if (auto result = update_screen_metrics_from_target(state); !result) {
-    Logger().error("Failed to update overlay monitor: {}", result.error());
+  if (overlay_state.window.screen_width <= 0 || overlay_state.window.screen_height <= 0) {
+    Logger().error("Overlay screen metrics are not initialized");
     return;
   }
 
