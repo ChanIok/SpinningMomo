@@ -6,6 +6,7 @@ module;
 module Features.Screenshot.HdrEncoder;
 
 import std;
+import Utils.Logger;
 import Utils.Image.UhdrJpegRemux;
 
 namespace Features::Screenshot::HdrEncoder {
@@ -27,8 +28,8 @@ auto check_uhdr_status(const uhdr_error_info_t& status, std::string_view operati
 
 // Ultra HDR JPEG：同一张图需要「SDR 底图（8-bit sRGB）」+「HDR 线性半精度图层」，
 // 库根据两者生成 JPEG 主图 + 增益图并在容器里封装。
-auto encode_ultrahdr_jpeg(const std::vector<std::uint16_t>& source_pixels, std::uint32_t width,
-                          std::uint32_t height, const UltraHdrEncodeOptions& options)
+auto encode_ultrahdr_jpeg(const UltraHdrPreparedImages& images,
+                          const UltraHdrEncodeOptions& options)
     -> std::expected<std::vector<std::uint8_t>, std::string> {
   auto encoder = std::unique_ptr<uhdr_codec_private_t, decltype(&uhdr_release_encoder)>(
       uhdr_create_encoder(), uhdr_release_encoder);
@@ -37,41 +38,31 @@ auto encode_ultrahdr_jpeg(const std::vector<std::uint16_t>& source_pixels, std::
   }
 
   constexpr std::size_t kChannelsPerPixel = 4;
-  std::uint64_t pixel_count_u64 = static_cast<std::uint64_t>(width) * height;
+  std::uint64_t pixel_count_u64 = static_cast<std::uint64_t>(images.width) * images.height;
   if (pixel_count_u64 > std::numeric_limits<std::size_t>::max() / kChannelsPerPixel) {
     return std::unexpected("HDR image is too large");
   }
 
-  std::size_t expected_bytes = static_cast<std::size_t>(pixel_count_u64) * kChannelsPerPixel;
-  if (source_pixels.size() != expected_bytes) {
-    return std::unexpected("HDR pixel buffer size mismatch");
+  std::size_t expected_sdr_bytes = static_cast<std::size_t>(pixel_count_u64) * kChannelsPerPixel;
+  std::size_t expected_hdr_values = static_cast<std::size_t>(pixel_count_u64) * kChannelsPerPixel;
+  if (images.sdr_pixels.size() != expected_sdr_bytes ||
+      images.hdr_pixels.size() != expected_hdr_values) {
+    return std::unexpected("Ultra HDR prepared image buffer size mismatch");
   }
 
-  // SDR：对 HDR 场景做 tone map 后再 sRGB 编码；HDR：线性半精度，见
-  // pack_ultrahdr_hdr_rgb_half_plane。
-  auto sdr_pixels_result = build_sdr_base_pixels(source_pixels);
-  if (!sdr_pixels_result) {
-    return std::unexpected(sdr_pixels_result.error());
-  }
+  // 这里不再生成 SDR/HDR 像素，只校验 GPU 预处理结果并把指针传给 libultrahdr。
+  // 两个 vector 在 uhdr_encode() 返回前必须保持存活，因此都由 images 持有到函数结束。
 
-  auto hdr_pixels_result = pack_ultrahdr_hdr_rgb_half_plane(source_pixels);
-  if (!hdr_pixels_result) {
-    return std::unexpected(hdr_pixels_result.error());
-  }
-
-  auto& hdr_pixels = hdr_pixels_result.value();
-  auto& sdr_pixels = sdr_pixels_result.value();
-
-  // HDR 侧：scene-linear BT.709，全用 A 通道为 1.0（half 的 1.0）的典型写法。
+  // HDR 侧：GPU 已生成 scene-linear BT.709，A 通道为 1.0（half 的 1.0）。
   uhdr_raw_image_t hdr_image{};
   hdr_image.fmt = UHDR_IMG_FMT_64bppRGBAHalfFloat;
   hdr_image.cg = UHDR_CG_BT_709;
   hdr_image.ct = UHDR_CT_LINEAR;
   hdr_image.range = UHDR_CR_FULL_RANGE;
-  hdr_image.w = width;
-  hdr_image.h = height;
-  hdr_image.planes[UHDR_PLANE_PACKED] = hdr_pixels.data();
-  hdr_image.stride[UHDR_PLANE_PACKED] = width;
+  hdr_image.w = images.width;
+  hdr_image.h = images.height;
+  hdr_image.planes[UHDR_PLANE_PACKED] = const_cast<std::uint16_t*>(images.hdr_pixels.data());
+  hdr_image.stride[UHDR_PLANE_PACKED] = images.width;
 
   if (auto status =
           check_uhdr_status(uhdr_enc_set_raw_image(encoder.get(), &hdr_image, UHDR_HDR_IMG),
@@ -80,16 +71,16 @@ auto encode_ultrahdr_jpeg(const std::vector<std::uint16_t>& source_pixels, std::
     return std::unexpected(status.error());
   }
 
-  // SDR 侧：已将线性结果压到 0–1 并做 sRGB OETF，故这里标为 sRGB transfer。
+  // SDR 侧：GPU 已将线性结果压到 0–1 并做 sRGB OETF，故这里标为 sRGB transfer。
   uhdr_raw_image_t sdr_image{};
   sdr_image.fmt = UHDR_IMG_FMT_32bppRGBA8888;
   sdr_image.cg = UHDR_CG_BT_709;
   sdr_image.ct = UHDR_CT_SRGB;
   sdr_image.range = UHDR_CR_FULL_RANGE;
-  sdr_image.w = width;
-  sdr_image.h = height;
-  sdr_image.planes[UHDR_PLANE_PACKED] = sdr_pixels.data();
-  sdr_image.stride[UHDR_PLANE_PACKED] = width;
+  sdr_image.w = images.width;
+  sdr_image.h = images.height;
+  sdr_image.planes[UHDR_PLANE_PACKED] = const_cast<std::uint8_t*>(images.sdr_pixels.data());
+  sdr_image.stride[UHDR_PLANE_PACKED] = images.width;
 
   if (auto status =
           check_uhdr_status(uhdr_enc_set_raw_image(encoder.get(), &sdr_image, UHDR_SDR_IMG),
@@ -135,9 +126,14 @@ auto encode_ultrahdr_jpeg(const std::vector<std::uint16_t>& source_pixels, std::
     return std::unexpected(status.error());
   }
 
+  // 质量目标优先，继续使用 best quality；性能优化集中在 libultrahdr 前的 GPU 预处理。
+  auto encode_start = std::chrono::steady_clock::now();
   if (auto status = check_uhdr_status(uhdr_encode(encoder.get()), "uhdr_encode"); !status) {
     return std::unexpected(status.error());
   }
+  auto encode_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - encode_start)
+                       .count();
 
   // libultrahdr 把 ICC 写在 libjpeg 尾流里；按与 tools/remux_uhdr_app_order.py 相同规则重排 SOS 前
   // APP 并修正 MPF。
@@ -148,10 +144,17 @@ auto encode_ultrahdr_jpeg(const std::vector<std::uint16_t>& source_pixels, std::
 
   auto* output_bytes = static_cast<std::uint8_t*>(output->data);
   std::vector<std::uint8_t> raw(output_bytes, output_bytes + output->data_sz);
+
+  auto remux_start = std::chrono::steady_clock::now();
   auto remuxed = Utils::Image::remux_uhdr_jpeg_app_order(raw);
   if (!remuxed) {
     return std::unexpected(remuxed.error());
   }
+  auto remux_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::steady_clock::now() - remux_start)
+                      .count();
+  Logger().debug("HDR UHDR encode: libultrahdr={} ms, remux={} ms, output={} bytes", encode_ms,
+                 remux_ms, remuxed->size());
   return std::move(*remuxed);
 }
 
