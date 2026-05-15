@@ -8,10 +8,12 @@ namespace Features::Screenshot::HdrEncoder {
 auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring& file_path,
                                    const UltraHdrEncodeOptions& options)
     -> std::expected<void, std::string> {
+  // 这个函数故意保持很薄，只负责串起“预处理 -> 编码 -> 写盘”三段。
+  // 这样后面查性能或排错时，边界很清楚。
   auto total_start = std::chrono::steady_clock::now();
 
   // 旧路径会先把原始 half 纹理完整读回 CPU，再逐像素构造 SDR/HDR 图层。
-  // 现在这里直接调用 GPU 预处理，CPU 只拿最终两块紧排 raw image。
+  // 现在这里直接调用 GPU 预处理，CPU 只拿最终的 SDR base 和 Gray8 gain map。
   auto preprocess_start = std::chrono::steady_clock::now();
   auto prepared_result = preprocess_texture_for_ultrahdr(texture);
   if (!prepared_result) {
@@ -21,7 +23,10 @@ auto save_texture_as_ultrahdr_jpeg(ID3D11Texture2D* texture, const std::wstring&
                            std::chrono::steady_clock::now() - preprocess_start)
                            .count();
 
-  // libultrahdr 仍是最终容器和增益图生成者；GPU 只负责在它之前准备输入图。
+  // 编码阶段内部会完成：
+  // 1) WIC base JPEG
+  // 2) WIC gain map JPEG
+  // 3) 本地写 XMP / ISO 21496-1 / MPF
   auto encode_start = std::chrono::steady_clock::now();
   auto encoded_result = encode_ultrahdr_jpeg(prepared_result.value(), options);
   if (!encoded_result) {

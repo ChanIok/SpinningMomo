@@ -25,6 +25,8 @@ import <windows.h>;
 
 namespace Features::Screenshot {
 
+auto start_cleanup_timer(Features::Screenshot::State::ScreenshotState& state) -> void;
+
 // WIC 编码保存纹理
 auto save_texture_with_wic(ID3D11Texture2D* texture, const std::wstring& file_path,
                            Utils::Image::ImageFormat format = Utils::Image::ImageFormat::PNG,
@@ -186,6 +188,15 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
       // 从活跃会话中移除
       state.active_sessions.erase(it);
       Logger().debug("Session {} completed and removed", session_id);
+
+      // 仅在「保存完成且不再有排队请求、也不再有其它活跃会话」后启动空闲清理计时；
+      // 避免在 8K/HDR 等长耗时保存期间已与 5s 定时器竞态，导致工作线程忙等刷屏 defer。
+      {
+        std::lock_guard<std::mutex> lock(state.request_mutex);
+        if (state.pending_requests.empty() && state.active_sessions.empty()) {
+          start_cleanup_timer(state);
+        }
+      }
     };
 
     // 创建捕获会话
@@ -330,10 +341,11 @@ auto worker_thread_proc(Core::State::AppState& app_state) -> void {
     if (has_request) {
       process_single_request(request, app_state);
 
-      // 如果队列为空，启动清理定时器
+      // 只有「请求已发出但未形成活跃会话」时（例如启动捕获失败）才在这里启动定时器；
+      // 正常路径在帧回调保存完成后再启动，见 do_screenshot_capture 内 frame_callback。
       {
         std::lock_guard<std::mutex> req_lock(state.request_mutex);
-        if (state.pending_requests.empty()) {
+        if (state.pending_requests.empty() && state.active_sessions.empty()) {
           start_cleanup_timer(state);
         }
       }

@@ -458,6 +458,129 @@ auto generate_webp_thumbnail_from_bgra(IWICImagingFactory* factory,
   return encode_bgra_to_webp(scaled_result.value(), options);
 }
 
+auto read_stream_bytes(IStream* stream) -> std::expected<std::vector<uint8_t>, std::string> {
+  if (!stream) {
+    return std::unexpected("Stream is null");
+  }
+
+  try {
+    // 先用 Stat 取最终长度，再一次性读到 vector。
+    // 这里的 stream 既可能来自普通文件编码，也可能来自内存 JPEG 编码。
+    STATSTG stat{};
+    THROW_IF_FAILED(stream->Stat(&stat, STATFLAG_NONAME));
+
+    if (stat.cbSize.QuadPart < 0 || static_cast<std::uint64_t>(stat.cbSize.QuadPart) >
+                                        std::numeric_limits<std::size_t>::max()) {
+      return std::unexpected("Encoded stream is too large");
+    }
+
+    LARGE_INTEGER seek_origin{};
+    THROW_IF_FAILED(stream->Seek(seek_origin, STREAM_SEEK_SET, nullptr));
+
+    std::vector<uint8_t> bytes(static_cast<std::size_t>(stat.cbSize.QuadPart));
+    if (!bytes.empty()) {
+      ULONG bytes_read = 0;
+      THROW_IF_FAILED(stream->Read(bytes.data(), static_cast<ULONG>(bytes.size()), &bytes_read));
+      if (bytes_read != bytes.size()) {
+        return std::unexpected("Failed to read complete encoded stream");
+      }
+    }
+
+    return bytes;
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "Failed to read encoded stream"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
+auto encode_pixel_data_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t* pixel_data,
+                                     uint32_t width, uint32_t height, uint32_t row_pitch,
+                                     const GUID& source_pixel_format, float jpeg_quality)
+    -> std::expected<std::vector<uint8_t>, std::string> {
+  // 这是新加的“内存 JPEG 编码”公共实现：
+  // - 不直接写文件
+  // - 把编码结果留在内存里，供上层继续 mux / 拼容器
+  if (!factory) {
+    return std::unexpected("WIC factory is null");
+  }
+
+  if (!pixel_data) {
+    return std::unexpected("Pixel data is null");
+  }
+
+  if (width == 0 || height == 0 || row_pitch == 0) {
+    return std::unexpected("Pixel data dimensions are invalid");
+  }
+
+  try {
+    // 用 HGLOBAL-backed IStream 接住 WIC 输出，这样调用方能直接拿到 JPEG bytes。
+    wil::com_ptr<IStream> stream;
+    THROW_IF_FAILED(CreateStreamOnHGlobal(nullptr, TRUE, stream.put()));
+
+    wil::com_ptr<IWICBitmapEncoder> encoder;
+    THROW_IF_FAILED(factory->CreateEncoder(GUID_ContainerFormatJpeg, nullptr, encoder.put()));
+    THROW_IF_FAILED(encoder->Initialize(stream.get(), WICBitmapEncoderNoCache));
+
+    wil::com_ptr<IWICBitmapFrameEncode> frame;
+    wil::com_ptr<IPropertyBag2> property_bag;
+    THROW_IF_FAILED(encoder->CreateNewFrame(frame.put(), property_bag.put()));
+
+    if (property_bag) {
+      // WIC JPEG 质量参数是 0..1 浮点，不是 0..100。
+      PROPBAG2 quality_option = {};
+      quality_option.pstrName = const_cast<LPOLESTR>(L"ImageQuality");
+      VARIANT quality_value;
+      VariantInit(&quality_value);
+      quality_value.vt = VT_R4;
+      quality_value.fltVal = std::clamp(jpeg_quality, 0.0f, 1.0f);
+      property_bag->Write(1, &quality_option, &quality_value);
+    }
+
+    THROW_IF_FAILED(frame->Initialize(property_bag.get()));
+    THROW_IF_FAILED(frame->SetSize(width, height));
+
+    wil::com_ptr<IWICBitmap> bitmap;
+    THROW_IF_FAILED(factory->CreateBitmapFromMemory(width, height, source_pixel_format, row_pitch,
+                                                    row_pitch * height,
+                                                    const_cast<BYTE*>(pixel_data), bitmap.put()));
+
+    // 这里总是把源像素如实声明给 WIC，再让 JPEG 编码器做必要的内部转换。
+    // 对 HDR 截图链路来说，两种输入足够：
+    // - 32bppBGRA：SDR base
+    // - 8bppGray：gain map
+    WICPixelFormatGUID pixel_format = source_pixel_format;
+    THROW_IF_FAILED(frame->SetPixelFormat(&pixel_format));
+    THROW_IF_FAILED(frame->WriteSource(bitmap.get(), nullptr));
+    THROW_IF_FAILED(frame->Commit());
+    THROW_IF_FAILED(encoder->Commit());
+
+    return read_stream_bytes(stream.get());
+  } catch (const wil::ResultException& e) {
+    return std::unexpected(format_hresult(e.GetErrorCode(), "WIC JPEG encode failed"));
+  } catch (const std::exception& e) {
+    return std::unexpected(std::string("Exception: ") + e.what());
+  }
+}
+
+auto encode_bgra_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t* pixel_data,
+                               uint32_t width, uint32_t height, uint32_t row_pitch,
+                               float jpeg_quality)
+    -> std::expected<std::vector<uint8_t>, std::string> {
+  // SDR base 走这一层。
+  return encode_pixel_data_to_jpeg_bytes(factory, pixel_data, width, height, row_pitch,
+                                         GUID_WICPixelFormat32bppBGRA, jpeg_quality);
+}
+
+auto encode_gray_to_jpeg_bytes(IWICImagingFactory* factory, const uint8_t* pixel_data,
+                               uint32_t width, uint32_t height, uint32_t row_pitch,
+                               float jpeg_quality)
+    -> std::expected<std::vector<uint8_t>, std::string> {
+  // Ultra HDR gain map 走这一层。WIC 会把 Gray8 直接编码成灰度 JPEG。
+  return encode_pixel_data_to_jpeg_bytes(factory, pixel_data, width, height, row_pitch,
+                                         GUID_WICPixelFormat8bppGray, jpeg_quality);
+}
+
 // 保存像素数据到文件
 auto save_pixel_data_to_file(IWICImagingFactory* factory, const uint8_t* pixel_data, uint32_t width,
                              uint32_t height, uint32_t row_pitch, const std::wstring& file_path,

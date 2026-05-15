@@ -6,9 +6,6 @@
         ["vcpkg::asio#f56260b5"] = {
             version = "latest"
         },
-        ["vcpkg::libjpeg-turbo#f56260b5"] = {
-            version = "latest"
-        },
         ["vcpkg::libwebp#f56260b5"] = {
             version = "latest"
         },
