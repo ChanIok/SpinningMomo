@@ -18,6 +18,42 @@ import <windows.h>;
 
 namespace Utils::Graphics::Capture {
 
+constexpr int max_capture_dimension = 30720;
+
+auto validate_capture_extent(int width, int height) -> std::expected<void, std::string> {
+  if (width <= 0 || height <= 0) {
+    return std::unexpected(std::format("Invalid capture extent: {}x{}", width, height));
+  }
+  if (width > max_capture_dimension || height > max_capture_dimension) {
+    return std::unexpected(std::format("Capture extent exceeds limit ({}): {}x{}",
+                                       max_capture_dimension, width, height));
+  }
+  return {};
+}
+
+auto create_frame_pool_free_threaded(
+    const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device,
+    winrt::Windows::Graphics::DirectX::DirectXPixelFormat pixel_format, int frame_pool_size,
+    int width, int height)
+    -> std::expected<winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool, std::string> {
+  try {
+    auto pool = winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
+        device, pixel_format, frame_pool_size, {width, height});
+    if (!pool) {
+      return std::unexpected("Failed to create frame pool");
+    }
+    return pool;
+  } catch (const winrt::hresult_error& e) {
+    auto error_msg = std::format("CreateFreeThreaded failed: {}", winrt::to_string(e.message()));
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  } catch (...) {
+    auto error_msg = "CreateFreeThreaded failed: unknown error";
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  }
+}
+
 auto create_capture_item_for_window(HWND target_window)
     -> std::expected<winrt::Windows::Graphics::Capture::GraphicsCaptureItem, std::string> {
   if (!target_window || !IsWindow(target_window)) {
@@ -108,8 +144,8 @@ auto get_capture_item_size(HWND target_window) -> std::expected<std::pair<int, i
   }
 
   auto size = capture_item_result->Size();
-  if (size.Width <= 0 || size.Height <= 0) {
-    return std::unexpected("Capture item size is invalid");
+  if (auto extent_ok = validate_capture_extent(size.Width, size.Height); !extent_ok) {
+    return std::unexpected(extent_ok.error());
   }
 
   return std::make_pair(size.Width, size.Height);
@@ -128,6 +164,10 @@ auto create_capture_session(
     return std::unexpected("Frame callback is null");
   }
 
+  if (auto extent_ok = validate_capture_extent(width, height); !extent_ok) {
+    return std::unexpected(extent_ok.error());
+  }
+
   CaptureSession session;
   session.winrt_device = device;
   session.pixel_format = options.pixel_format;
@@ -139,16 +179,12 @@ auto create_capture_session(
   }
   session.capture_item = std::move(*capture_item_result);
 
-  // 创建帧池
-  session.frame_pool =
-      winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
-          device, session.pixel_format, session.frame_pool_size, {width, height});
-
-  if (!session.frame_pool) {
-    auto error_msg = "Failed to create frame pool";
-    Logger().error(error_msg);
-    return std::unexpected(error_msg);
+  auto pool_result = create_frame_pool_free_threaded(device, session.pixel_format,
+                                                     session.frame_pool_size, width, height);
+  if (!pool_result) {
+    return std::unexpected(pool_result.error());
   }
+  session.frame_pool = std::move(*pool_result);
 
   // 设置帧到达回调
   session.frame_token = session.frame_pool.FrameArrived([frame_callback](auto&& sender, auto&&) {
@@ -197,6 +233,10 @@ auto create_capture_session_with_frame_notification(
     return std::unexpected("Frame arrived callback is null");
   }
 
+  if (auto extent_ok = validate_capture_extent(width, height); !extent_ok) {
+    return std::unexpected(extent_ok.error());
+  }
+
   CaptureSession session;
   session.winrt_device = device;
   session.pixel_format = options.pixel_format;
@@ -208,15 +248,12 @@ auto create_capture_session_with_frame_notification(
   }
   session.capture_item = std::move(*capture_item_result);
 
-  session.frame_pool =
-      winrt::Windows::Graphics::Capture::Direct3D11CaptureFramePool::CreateFreeThreaded(
-          device, session.pixel_format, session.frame_pool_size, {width, height});
-
-  if (!session.frame_pool) {
-    auto error_msg = "Failed to create frame pool";
-    Logger().error(error_msg);
-    return std::unexpected(error_msg);
+  auto pool_result = create_frame_pool_free_threaded(device, session.pixel_format,
+                                                     session.frame_pool_size, width, height);
+  if (!pool_result) {
+    return std::unexpected(pool_result.error());
   }
+  session.frame_pool = std::move(*pool_result);
 
   // 这个入口故意不在 FrameArrived 回调里 TryGetNextFrame。
   // WGC 的帧池由调用方线程主动 drain，避免回调线程参与后续 D3D/MF 编码工作。
@@ -307,11 +344,28 @@ auto cleanup_capture_session(CaptureSession& session) -> void {
   session.winrt_device = nullptr;
 }
 
-auto recreate_frame_pool(CaptureSession& session, int width, int height) -> void {
-  if (session.frame_pool) {
+auto recreate_frame_pool(CaptureSession& session, int width, int height)
+    -> std::expected<void, std::string> {
+  if (auto extent_ok = validate_capture_extent(width, height); !extent_ok) {
+    return extent_ok;
+  }
+  if (!session.frame_pool) {
+    return std::unexpected("Frame pool is null");
+  }
+  try {
     session.frame_pool.Recreate(session.winrt_device, session.pixel_format,
                                 std::max(session.frame_pool_size, 1), {width, height});
+  } catch (const winrt::hresult_error& e) {
+    auto error_msg =
+        std::format("Failed to recreate frame pool: {}", winrt::to_string(e.message()));
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
+  } catch (...) {
+    auto error_msg = "Failed to recreate frame pool: unknown error";
+    Logger().error(error_msg);
+    return std::unexpected(error_msg);
   }
+  return {};
 }
 
 template <typename T>

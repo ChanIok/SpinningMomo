@@ -32,13 +32,17 @@ auto on_frame_arrived(Core::State::AppState& state,
   bool size_changed = (content_size.Width != last_width) || (content_size.Height != last_height);
 
   if (size_changed) {
-    // 更新记录的尺寸
+    auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
+        state.preview->capture_state.session, content_size.Width, content_size.Height);
+    if (!recreate_result) {
+      Logger().error("{}", recreate_result.error());
+      Utils::Graphics::Capture::stop_capture(state.preview->capture_state.session);
+      state.preview->running.store(false, std::memory_order_release);
+      return;
+    }
+
     last_width = content_size.Width;
     last_height = content_size.Height;
-
-    // 重建帧池
-    Utils::Graphics::Capture::recreate_frame_pool(state.preview->capture_state.session,
-                                                  content_size.Width, content_size.Height);
 
     state.preview->create_new_srv.store(true, std::memory_order_release);
 

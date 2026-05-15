@@ -319,8 +319,11 @@ auto copy_one_capture_frame_to_encoder_input(State::RecordingState& state,
                               content_size.Height != state.last_frame_height;
 
     if (frame_size_changed) {
-      Utils::Graphics::Capture::recreate_frame_pool(state.capture_session, content_size.Width,
-                                                    content_size.Height);
+      auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
+          state.capture_session, content_size.Width, content_size.Height);
+      if (!recreate_result) {
+        return std::unexpected(recreate_result.error());
+      }
 
       auto capture_plan_result = Features::Recording::Session::resolve_capture_plan(
           state.target_window, state.config.capture_client_area, content_size.Width,

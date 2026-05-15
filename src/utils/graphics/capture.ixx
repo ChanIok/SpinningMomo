@@ -86,7 +86,8 @@ export auto stop_capture(CaptureSession& session) -> void;
 export auto cleanup_capture_session(CaptureSession& session) -> void;
 
 // 重建帧池
-export auto recreate_frame_pool(CaptureSession& session, int width, int height) -> void;
+export auto recreate_frame_pool(CaptureSession& session, int width, int height)
+    -> std::expected<void, std::string>;
 
 // 从WinRT对象获取DXGI接口的辅助函数
 export template <typename T>
