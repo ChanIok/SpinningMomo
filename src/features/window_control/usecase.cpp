@@ -22,6 +22,7 @@ import Features.Preview;
 import Features.Preview.State;
 import Features.Overlay.Geometry;
 import Features.Overlay.Interaction;
+import Utils.Display;
 import Utils.Logger;
 import Utils.String;
 import Vendor.Windows;
@@ -29,15 +30,16 @@ import Vendor.Windows;
 namespace Features::WindowControl::UseCase {
 
 // 获取当前比例
-auto get_current_ratio(const Core::State::AppState& state) -> double {
+auto get_current_ratio(const Core::State::AppState& state,
+                       const Utils::Display::MonitorInfo& monitor_info) -> double {
   const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
   if (state.floating_window->ui.current_ratio_index < ratios.size()) {
     return ratios[state.floating_window->ui.current_ratio_index].ratio;
   }
 
-  // 默认使用屏幕比例
-  int screen_width = Vendor::Windows::GetScreenWidth();
-  int screen_height = Vendor::Windows::GetScreenHeight();
+  // 默认使用目标窗口当前显示器比例。
+  int screen_width = Utils::Display::rect_width(monitor_info.monitor_rect);
+  int screen_height = Utils::Display::rect_height(monitor_info.monitor_rect);
   return static_cast<double>(screen_width) / screen_height;
 }
 
@@ -78,34 +80,40 @@ auto get_resolution_preset_by_index(const Core::State::AppState& state, size_t r
 }
 
 // 只提取窗口尺寸计算需要的设置，避免 usecase 参与具体算法。
-auto get_resolution_calculation_options(const Core::State::AppState& state)
+auto get_resolution_calculation_options(const Core::State::AppState& state,
+                                        const Utils::Display::MonitorInfo& monitor_info)
     -> Features::WindowControl::ResolutionCalculationOptions {
   const auto& window_settings = state.settings->raw.window;
   return Features::WindowControl::ResolutionCalculationOptions{
       .align_to_8 = window_settings.align_window_size_to_8,
       .use_short_edge = window_settings.use_resolution_short_edge,
+      .screen_width = Utils::Display::rect_width(monitor_info.monitor_rect),
+      .screen_height = Utils::Display::rect_height(monitor_info.monitor_rect),
   };
 }
 
 // 悬浮窗/托盘菜单产生的尺寸统一从这里进入 WindowControl。
 auto calculate_menu_resolution(const Core::State::AppState& state, double ratio,
-                               const Features::WindowControl::ResolutionPresetInput& preset)
+                               const Features::WindowControl::ResolutionPresetInput& preset,
+                               const Utils::Display::MonitorInfo& monitor_info)
     -> Features::WindowControl::Resolution {
   // usecase 只负责把运行时设置和菜单预设翻译成窗口控制模块的输入；
   // Default、短边模式、8 对齐等尺寸规则统一由 Features.WindowControl 维护。
   return Features::WindowControl::calculate_resolution_from_preset(
-      ratio, preset, get_resolution_calculation_options(state));
+      ratio, preset, get_resolution_calculation_options(state, monitor_info));
 }
 
 // 变换前的准备
 // 返回值：是否需要等待 overlay 首帧
 auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window,
-                               int target_width, int target_height) -> bool {
+                               int target_width, int target_height,
+                               const Utils::Display::MonitorInfo& monitor_info) -> bool {
   if (!state.overlay->enabled) {
     return false;
   }
 
-  auto [screen_w, screen_h] = Features::Overlay::Geometry::get_screen_dimensions();
+  auto screen_w = Utils::Display::rect_width(monitor_info.monitor_rect);
+  auto screen_h = Utils::Display::rect_height(monitor_info.monitor_rect);
   bool will_need_overlay = Features::Overlay::Geometry::should_use_overlay(
       target_width, target_height, screen_w, screen_h);
 
@@ -132,11 +140,12 @@ auto prepare_transform_actions(Core::State::AppState& state, Vendor::Windows::HW
 }
 
 // 变换后的后续处理
-auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window)
-    -> void {
+auto post_transform_actions(Core::State::AppState& state, Vendor::Windows::HWND target_window,
+                            const Utils::Display::MonitorInfo& monitor_info) -> void {
   if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     auto dimensions = Features::Overlay::Geometry::get_window_dimensions(target_window);
-    auto [screen_w, screen_h] = Features::Overlay::Geometry::get_screen_dimensions();
+    auto screen_w = Utils::Display::rect_width(monitor_info.monitor_rect);
+    auto screen_h = Utils::Display::rect_height(monitor_info.monitor_rect);
     bool still_needs_overlay =
         dimensions && Features::Overlay::Geometry::should_use_overlay(
                           dimensions->first, dimensions->second, screen_w, screen_h);
@@ -179,15 +188,23 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
     co_return;
   }
 
+  auto monitor_info = Utils::Display::get_monitor_for_window(*target_window);
+  if (!monitor_info) {
+    Features::Notifications::show_notification(
+        state, state.i18n->texts["label.app_name"],
+        state.i18n->texts["message.window_adjust_failed"] + ": " + monitor_info.error());
+    co_return;
+  }
+
   // 计算目标分辨率
-  auto new_resolution =
-      calculate_menu_resolution(state, ratio_value, get_current_resolution_preset(state));
+  auto new_resolution = calculate_menu_resolution(
+      state, ratio_value, get_current_resolution_preset(state), *monitor_info);
   Logger().info("Window transform target (ratio change): {}x{}", new_resolution.width,
                 new_resolution.height);
 
   // 准备变换
-  bool needs_wait_first_frame =
-      prepare_transform_actions(state, *target_window, new_resolution.width, new_resolution.height);
+  bool needs_wait_first_frame = prepare_transform_actions(
+      state, *target_window, new_resolution.width, new_resolution.height, *monitor_info);
 
   // 如果需要等待 overlay 首帧（最多 500ms）
   if (needs_wait_first_frame) {
@@ -213,7 +230,7 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   // 后续处理：等待窗口稳定后决定 overlay 状态
   if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     co_await Core::Async::ui_delay{std::chrono::milliseconds(400)};
-    post_transform_actions(state, *target_window);
+    post_transform_actions(state, *target_window, *monitor_info);
   }
 
   // 更新当前比例索引
@@ -247,16 +264,24 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
     co_return;
   }
 
+  auto monitor_info = Utils::Display::get_monitor_for_window(*target_window);
+  if (!monitor_info) {
+    Features::Notifications::show_notification(
+        state, state.i18n->texts["label.app_name"],
+        state.i18n->texts["message.window_adjust_failed"] + ": " + monitor_info.error());
+    co_return;
+  }
+
   // 计算目标分辨率
-  double current_ratio = get_current_ratio(state);
+  double current_ratio = get_current_ratio(state, *monitor_info);
   auto new_resolution = calculate_menu_resolution(
-      state, current_ratio, get_resolution_preset_by_index(state, resolution_index));
+      state, current_ratio, get_resolution_preset_by_index(state, resolution_index), *monitor_info);
   Logger().info("Window transform target (resolution change): {}x{}", new_resolution.width,
                 new_resolution.height);
 
   // 准备变换
-  bool needs_wait_first_frame =
-      prepare_transform_actions(state, *target_window, new_resolution.width, new_resolution.height);
+  bool needs_wait_first_frame = prepare_transform_actions(
+      state, *target_window, new_resolution.width, new_resolution.height, *monitor_info);
 
   // 如果需要等待 overlay 首帧（最多 500ms）
   if (needs_wait_first_frame) {
@@ -282,7 +307,7 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
   // 后续处理：等待窗口稳定后决定 overlay 状态
   if (state.overlay->is_transforming.load(std::memory_order_acquire)) {
     co_await Core::Async::ui_delay{std::chrono::milliseconds(400)};
-    post_transform_actions(state, *target_window);
+    post_transform_actions(state, *target_window, *monitor_info);
   }
 
   // 更新当前分辨率索引
@@ -339,7 +364,10 @@ auto handle_window_selected(Core::State::AppState& state,
                                                state.i18n->texts["message.window_not_found"]);
     return;
   }
-  post_transform_actions(state, target_window.value());
+  auto monitor_info = Utils::Display::get_monitor_for_window(target_window.value());
+  if (monitor_info) {
+    post_transform_actions(state, target_window.value(), *monitor_info);
+  }
 
   // 发送通知给用户
   Features::Notifications::show_notification(

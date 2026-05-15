@@ -46,6 +46,8 @@ export struct ResolutionPresetInput {
 export struct ResolutionCalculationOptions {
   bool align_to_8 = false;
   bool use_short_edge = false;
+  int screen_width = 0;
+  int screen_height = 0;
 };
 
 // 查找目标窗口
@@ -60,10 +62,11 @@ export auto toggle_window_border(Vendor::Windows::HWND hwnd) -> std::expected<bo
 
 // 分辨率计算函数
 export auto calculate_resolution_by_area(double ratio, std::uint64_t total_area) -> Resolution;
-export auto calculate_resolution_by_screen(double ratio) -> Resolution;
+export auto calculate_resolution_by_screen(double ratio, int screen_width, int screen_height)
+    -> Resolution;
 export auto calculate_resolution_from_preset(double ratio,
                                              const ResolutionPresetInput& resolution_preset,
-                                             const ResolutionCalculationOptions& options = {})
+                                             const ResolutionCalculationOptions& options)
     -> Resolution;
 
 // 窗口变换操作

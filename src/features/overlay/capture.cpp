@@ -52,9 +52,9 @@ auto on_frame_arrived(Core::State::AppState& state,
       last_height = content_size.Height;
     } else {
       // 检查是否需要退出（非变换场景，如用户手动调整窗口）
-      auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
-      if (!Geometry::should_use_overlay(content_size.Width, content_size.Height, screen_width,
-                                        screen_height)) {
+      auto& window = state.overlay->window;
+      if (!Geometry::should_use_overlay(content_size.Width, content_size.Height,
+                                        window.screen_width, window.screen_height)) {
         stop_overlay(state);
         return;
       }

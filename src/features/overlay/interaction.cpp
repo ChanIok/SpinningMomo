@@ -177,8 +177,10 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
   }
 
   // 计算叠加层窗口的位置
-  int overlay_left = (overlay_state.window.screen_width - overlay_state.window.window_width) / 2;
-  int overlay_top = (overlay_state.window.screen_height - overlay_state.window.window_height) / 2;
+  int overlay_left = overlay_state.window.screen_left +
+                     (overlay_state.window.screen_width - overlay_state.window.window_width) / 2;
+  int overlay_top = overlay_state.window.screen_top +
+                    (overlay_state.window.screen_height - overlay_state.window.window_height) / 2;
 
   // 只有鼠标位于 overlay 显示区域内时，才根据鼠标位置“拖动”游戏窗口。
   // 这样用户把鼠标移到别处时，不会继续改游戏窗口位置。
@@ -193,6 +195,8 @@ auto update_game_window_position(Core::State::AppState& state) -> void {
           Geometry::calculate_letterbox_area(
               overlay_state.window.screen_width, overlay_state.window.screen_height,
               overlay_state.window.cached_game_width, overlay_state.window.cached_game_height);
+      content_left += overlay_state.window.screen_left;
+      content_top += overlay_state.window.screen_top;
 
       // 检查鼠标是否在游戏显示区域内
       if (current_pos.x >= content_left && current_pos.x < (content_left + content_width) &&

@@ -5,6 +5,7 @@ module Features.Letterbox;
 import std;
 import Core.State;
 import Features.Letterbox.State;
+import Utils.Display;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
@@ -25,8 +26,13 @@ auto needs_letterbox(HWND target_window) -> bool {
   int window_width = rect.right - rect.left;
   int window_height = rect.bottom - rect.top;
 
-  int screen_width = GetSystemMetrics(SM_CXSCREEN);
-  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
+  if (!monitor_info) {
+    return false;
+  }
+
+  int screen_width = Utils::Display::rect_width(monitor_info->monitor_rect);
+  int screen_height = Utils::Display::rect_height(monitor_info->monitor_rect);
 
   return ((window_width >= screen_width && window_height < screen_height) ||
           (window_height >= screen_height && window_width < screen_width));
@@ -51,13 +57,19 @@ auto update_position(Core::State::AppState& state, HWND target_window)
     return std::unexpected{"Target window is no longer valid"};
   }
 
-  // 获取屏幕尺寸
-  int screen_width = GetSystemMetrics(SM_CXSCREEN);
-  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  auto monitor_info = Utils::Display::get_monitor_for_window(letterbox.target_window);
+  if (!monitor_info) {
+    [[maybe_unused]] auto hide_result = hide(state);
+    return std::unexpected{"Failed to resolve target monitor: " + monitor_info.error()};
+  }
+
+  const auto& screen_rect = monitor_info->monitor_rect;
+  int screen_width = Utils::Display::rect_width(screen_rect);
+  int screen_height = Utils::Display::rect_height(screen_rect);
 
   // 设置letterbox窗口为全屏
-  SetWindowPos(letterbox.window_handle, letterbox.target_window, 0, 0, screen_width, screen_height,
-               SWP_NOACTIVATE);
+  SetWindowPos(letterbox.window_handle, letterbox.target_window, screen_rect.left, screen_rect.top,
+               screen_width, screen_height, SWP_NOACTIVATE);
 
   // 设置计时器处理任务栏置底
   SetTimer(letterbox.window_handle, State::TIMER_TASKBAR_ZORDER, 10, nullptr);

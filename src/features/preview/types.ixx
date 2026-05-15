@@ -41,6 +41,7 @@ struct ViewportVertex {
 // 视口状态
 struct ViewportState {
   RECT viewport_rect{};
+  RECT visible_game_area{};
   bool visible = true;
   bool game_window_fully_visible = false;
 };

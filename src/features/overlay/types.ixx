@@ -33,6 +33,8 @@ struct WindowState {
   HWND target_window = nullptr;
   HWND timer_window = nullptr;
 
+  int screen_left = 0;
+  int screen_top = 0;
   int screen_width = 0;
   int screen_height = 0;
   int window_width = 0;

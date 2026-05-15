@@ -12,6 +12,7 @@ import Features.Preview.Rendering;
 import Features.Preview.Capture;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
+import Utils.Display;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
@@ -87,6 +88,14 @@ auto setup_window_appearance(HWND hwnd) -> void {
 
 auto set_preview_window_size(Features::Preview::State::PreviewState& state, int capture_width,
                              int capture_height) -> void {
+  if (state.is_first_show && state.has_screen_rect) {
+    const int screen_width = Utils::Display::rect_width(state.screen_rect);
+    const int screen_height = Utils::Display::rect_height(state.screen_rect);
+    state.size.min_ideal_size = std::min(screen_width, screen_height) / 10;
+    state.size.max_ideal_size = std::max(screen_width, screen_height);
+    state.size.ideal_size = screen_height / 2;
+  }
+
   state.size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
 
   if (state.size.aspect_ratio >= 1.0f) {
@@ -101,7 +110,13 @@ auto set_preview_window_size(Features::Preview::State::PreviewState& state, int 
 
   if (state.is_first_show) {
     state.is_first_show = false;
-    SetWindowPos(state.hwnd, nullptr, 20, 20, state.size.window_width, state.size.window_height,
+    int left = 20;
+    int top = 20;
+    if (state.has_screen_rect) {
+      left = state.screen_rect.left + 20;
+      top = state.screen_rect.top + 20;
+    }
+    SetWindowPos(state.hwnd, nullptr, left, top, state.size.window_width, state.size.window_height,
                  SWP_NOZORDER | SWP_NOACTIVATE);
   } else {
     SetWindowPos(state.hwnd, nullptr, 0, 0, state.size.window_width, state.size.window_height,
@@ -116,11 +131,11 @@ auto create_window(HINSTANCE instance, Core::State::AppState& state)
     return std::unexpected("Failed to register preview window class");
   }
 
-  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-  int idealSize = static_cast<int>(screenHeight * 0.5);
+  constexpr int kInitialPreviewSize = 540;
 
   // 2. 创建窗口
-  HWND hwnd = create_preview_window(instance, idealSize, idealSize + 24, &state);
+  HWND hwnd =
+      create_preview_window(instance, kInitialPreviewSize, kInitialPreviewSize + 24, &state);
   if (!hwnd) {
     return std::unexpected("Failed to create preview window");
   }
@@ -148,12 +163,10 @@ auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
   ReleaseDC(nullptr, hdc);
   state.preview->dpi_sizes.update_dpi_scaling(dpi);
 
-  // 计算理想尺寸范围
-  int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-  state.preview->size.min_ideal_size = std::min(screenWidth, screenHeight) / 10;
-  state.preview->size.max_ideal_size = std::max(screenWidth, screenHeight);
-  state.preview->size.ideal_size = screenHeight / 2;
+  // 这些值会在 start_preview() 解析目标窗口显示器后按实际屏幕重写。
+  state.preview->size.min_ideal_size = 108;
+  state.preview->size.max_ideal_size = 1920;
+  state.preview->size.ideal_size = 540;
 
   return {};
 }

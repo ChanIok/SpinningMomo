@@ -13,6 +13,7 @@ import Features.Preview.Rendering;
 import Features.Preview.Capture;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
+import Utils.Display;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
@@ -55,12 +56,19 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Target window is minimized");
   }
 
+  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
+  if (!monitor_info) {
+    return std::unexpected("Failed to resolve target monitor: " + monitor_info.error());
+  }
+
   if (!send_preview_control_message(preview_state.hwnd, Types::WM_CANCEL_PREVIEW_CLEANUP)) {
     Logger().warn("Failed to cancel pending preview cleanup");
   }
 
   // 保存目标窗口
   preview_state.target_window = target_window;
+  preview_state.screen_rect = monitor_info->monitor_rect;
+  preview_state.has_screen_rect = true;
 
   // 计算捕获尺寸
   RECT clientRect;

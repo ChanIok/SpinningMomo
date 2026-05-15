@@ -27,8 +27,12 @@ auto get_game_window_screen_rect(const Core::State::AppState& state) -> RECT {
 }
 
 auto calculate_visible_game_area(const Core::State::AppState& state) -> RECT {
-  // 获取屏幕可见区域（即屏幕边界）
-  RECT screenRect = {0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)};
+  if (!state.preview->has_screen_rect) {
+    return RECT{0, 0, 0, 0};
+  }
+
+  // 获取目标窗口所在显示器可见区域（即显示器边界）
+  RECT screenRect = state.preview->screen_rect;
   RECT gameRect = get_game_window_screen_rect(state);
 
   // 计算游戏窗口与屏幕的交集（可见部分）
@@ -41,7 +45,8 @@ auto calculate_visible_game_area(const Core::State::AppState& state) -> RECT {
   return visibleRect;
 }
 
-auto calculate_viewport_position(const Core::State::AppState& state) -> RECT {
+auto calculate_viewport_position(const Core::State::AppState& state, const RECT& visibleArea)
+    -> RECT {
   RECT result = {0, 0, 0, 0};
 
   if (!state.preview->hwnd || !state.preview->target_window) {
@@ -61,8 +66,6 @@ auto calculate_viewport_position(const Core::State::AppState& state) -> RECT {
     return result;
   }
 
-  // 获取可见区域相对游戏窗口的比例
-  RECT visibleArea = calculate_visible_game_area(state);
   RECT gameRect = state.preview->game_window_rect;
 
   float gameWidth = static_cast<float>(gameRect.right - gameRect.left);
@@ -93,13 +96,15 @@ auto check_game_window_visibility(Core::State::AppState& state) -> bool {
 
   RECT gameRect = get_game_window_screen_rect(state);
 
-  // 获取屏幕尺寸
-  int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+  if (!state.preview->has_screen_rect) {
+    return false;
+  }
+
+  const auto& screen_rect = state.preview->screen_rect;
 
   // 检查游戏窗口是否完全在屏幕内
-  return (gameRect.left >= 0 && gameRect.top >= 0 && gameRect.right <= screenWidth &&
-          gameRect.bottom <= screenHeight);
+  return (gameRect.left >= screen_rect.left && gameRect.top >= screen_rect.top &&
+          gameRect.right <= screen_rect.right && gameRect.bottom <= screen_rect.bottom);
 }
 
 auto update_viewport_rect(Core::State::AppState& state) -> void {
@@ -109,6 +114,7 @@ auto update_viewport_rect(Core::State::AppState& state) -> void {
 
   // 更新游戏窗口位置信息
   state.preview->game_window_rect = get_game_window_screen_rect(state);
+  state.preview->viewport.visible_game_area = calculate_visible_game_area(state);
 
   // 检查游戏窗口是否完全可见
   state.preview->viewport.game_window_fully_visible = check_game_window_visibility(state);
@@ -121,7 +127,8 @@ auto update_viewport_rect(Core::State::AppState& state) -> void {
 
   // 游戏窗口超出屏幕，显示视口框
   state.preview->viewport.visible = true;
-  state.preview->viewport.viewport_rect = calculate_viewport_position(state);
+  state.preview->viewport.viewport_rect =
+      calculate_viewport_position(state, state.preview->viewport.visible_game_area);
 }
 
 auto create_viewport_vertices(const Core::State::AppState& state,
@@ -144,7 +151,7 @@ auto create_viewport_vertices(const Core::State::AppState& state,
   }
 
   // 计算可见区域在预览窗口中的相对位置
-  RECT visibleArea = calculate_visible_game_area(state);
+  RECT visibleArea = state.preview->viewport.visible_game_area;
   RECT gameRect = state.preview->game_window_rect;
 
   float gameWidth = static_cast<float>(gameRect.right - gameRect.left);

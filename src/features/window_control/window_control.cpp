@@ -6,6 +6,7 @@ import std;
 import Core.State;
 import Features.Settings.State;
 import Features.WindowControl.State;
+import Utils.Display;
 import Utils.Logger;
 import Utils.String;
 import <windows.h>;
@@ -110,15 +111,16 @@ auto release_layered_capture_workaround_if_owned(State::WindowControlState& wind
 }
 
 auto apply_layered_capture_workaround(Core::State::AppState& state, HWND hwnd, int width,
-                                      int height, DWORD ex_style)
+                                      int height, DWORD ex_style,
+                                      const Utils::Display::MonitorInfo& monitor_info)
     -> std::expected<DWORD, std::string> {
   auto* window_control = state.window_control.get();
   if (!window_control) {
     return ex_style;
   }
 
-  const int screen_w = GetSystemMetrics(SM_CXSCREEN);
-  const int screen_h = GetSystemMetrics(SM_CYSCREEN);
+  const int screen_w = Utils::Display::rect_width(monitor_info.monitor_rect);
+  const int screen_h = Utils::Display::rect_height(monitor_info.monitor_rect);
   const bool oversized = width > screen_w || height > screen_h;
   const bool workaround_enabled =
       state.settings && state.settings->raw.window.enable_layered_capture_workaround;
@@ -340,8 +342,14 @@ auto resize_and_center_window(Core::State::AppState& state, HWND hwnd, int width
     return std::unexpected{"Failed to resize window: Invalid window handle provided."};
   }
 
-  const int screen_w = GetSystemMetrics(SM_CXSCREEN);
-  const int screen_h = GetSystemMetrics(SM_CYSCREEN);
+  auto monitor_info = Utils::Display::get_monitor_for_window(hwnd);
+  if (!monitor_info) {
+    return std::unexpected{"Failed to resolve target monitor: " + monitor_info.error()};
+  }
+
+  const auto& screen_rect = monitor_info->monitor_rect;
+  const int screen_w = Utils::Display::rect_width(screen_rect);
+  const int screen_h = Utils::Display::rect_height(screen_rect);
 
   auto style_long = get_window_long_checked(hwnd, GWL_STYLE, "style");
   if (!style_long) {
@@ -355,7 +363,8 @@ auto resize_and_center_window(Core::State::AppState& state, HWND hwnd, int width
   }
   DWORD exStyle = static_cast<DWORD>(*ex_style_long);
 
-  auto ex_style_result = apply_layered_capture_workaround(state, hwnd, width, height, exStyle);
+  auto ex_style_result =
+      apply_layered_capture_workaround(state, hwnd, width, height, exStyle, *monitor_info);
   if (!ex_style_result) {
     return std::unexpected{ex_style_result.error()};
   }
@@ -395,8 +404,8 @@ auto resize_and_center_window(Core::State::AppState& state, HWND hwnd, int width
   int borderOffsetY = rect.top;   // 顶部边框的偏移量（负值）
 
   // 计算屏幕中心位置，考虑边框偏移
-  int newLeft = (screen_w - width) / 2 + borderOffsetX;
-  int newTop = (screen_h - height) / 2 + borderOffsetY;
+  int newLeft = screen_rect.left + (screen_w - width) / 2 + borderOffsetX;
+  int newTop = screen_rect.top + (screen_h - height) / 2 + borderOffsetY;
 
   UINT flags = SWP_NOZORDER;
   if (!activate) {
@@ -495,13 +504,7 @@ auto normalize_ratio(double ratio) -> double {
     return ratio;
   }
 
-  int screen_width = GetSystemMetrics(SM_CXSCREEN);
-  int screen_height = GetSystemMetrics(SM_CYSCREEN);
-  if (screen_width <= 0 || screen_height <= 0) {
-    return 16.0 / 9.0;
-  }
-
-  return static_cast<double>(screen_width) / screen_height;
+  return 16.0 / 9.0;
 }
 
 // Default 分辨率在菜单预设里表示 0x0，不是一个真实像素尺寸。
@@ -626,9 +629,10 @@ auto align_resolution_to_multiple(const Resolution& target, double ratio,
 }
 
 // 短边模式：分辨率预设的短边固定，长边根据当前比例反推。
-auto calculate_resolution_by_short_edge(double ratio, int short_edge) -> Resolution {
+auto calculate_resolution_by_short_edge(double ratio, int short_edge, int screen_width,
+                                        int screen_height) -> Resolution {
   if (short_edge <= 0) {
-    return calculate_resolution_by_screen(ratio);
+    return calculate_resolution_by_screen(ratio, screen_width, screen_height);
   }
 
   ratio = normalize_ratio(ratio);
@@ -658,10 +662,12 @@ auto calculate_resolution_by_area(double ratio, std::uint64_t total_area) -> Res
 }
 
 // 根据屏幕尺寸和比例计算分辨率
-auto calculate_resolution_by_screen(double ratio) -> Resolution {
+auto calculate_resolution_by_screen(double ratio, int screen_width, int screen_height)
+    -> Resolution {
   ratio = normalize_ratio(ratio);
-  int screen_width = GetSystemMetrics(SM_CXSCREEN);
-  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  if (screen_width <= 0 || screen_height <= 0) {
+    return {1920, 1080};
+  }
   double screen_ratio = static_cast<double>(screen_width) / screen_height;
 
   if (ratio > screen_ratio) {
@@ -685,11 +691,11 @@ auto calculate_resolution_from_preset(double ratio, const ResolutionPresetInput&
 
   if (is_default_resolution_preset(resolution_preset)) {
     // Default 保持“跟随屏幕可容纳尺寸”的语义，不参与 8 对齐。
-    return calculate_resolution_by_screen(ratio);
+    return calculate_resolution_by_screen(ratio, options.screen_width, options.screen_height);
   }
 
   if (resolution_preset.base_width <= 0 || resolution_preset.base_height <= 0) {
-    return calculate_resolution_by_screen(ratio);
+    return calculate_resolution_by_screen(ratio, options.screen_width, options.screen_height);
   }
 
   Resolution resolution;
@@ -697,7 +703,8 @@ auto calculate_resolution_from_preset(double ratio, const ResolutionPresetInput&
     // 短边模式把 1080P 理解为“短边为 1080”，适合录制构图：
     // 21:9 -> 2520x1080，3:4 -> 1080x1440。
     const int short_edge = std::min(resolution_preset.base_width, resolution_preset.base_height);
-    resolution = calculate_resolution_by_short_edge(ratio, short_edge);
+    resolution = calculate_resolution_by_short_edge(ratio, short_edge, options.screen_width,
+                                                    options.screen_height);
   } else {
     const auto total_area =
         static_cast<std::uint64_t>(resolution_preset.base_width) * resolution_preset.base_height;
@@ -726,8 +733,13 @@ auto apply_window_transform(Core::State::AppState& state, HWND target_window,
 // 重置窗口到屏幕尺寸
 auto reset_window_to_screen(Core::State::AppState& state, HWND target_window,
                             const TransformOptions& options) -> std::expected<void, std::string> {
-  const int screen_width = GetSystemMetrics(SM_CXSCREEN);
-  const int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
+  if (!monitor_info) {
+    return std::unexpected{"Failed to resolve target monitor: " + monitor_info.error()};
+  }
+
+  const int screen_width = Utils::Display::rect_width(monitor_info->monitor_rect);
+  const int screen_height = Utils::Display::rect_height(monitor_info->monitor_rect);
   return apply_window_transform(state, target_window, Resolution{screen_width, screen_height},
                                 options);
 }

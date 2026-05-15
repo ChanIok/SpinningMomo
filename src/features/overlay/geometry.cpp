@@ -11,10 +11,6 @@ import <windows.h>;
 
 namespace Features::Overlay::Geometry {
 
-auto get_screen_dimensions() -> std::pair<int, int> {
-  return {GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)};
-}
-
 auto calculate_overlay_dimensions(int game_width, int game_height, int screen_width,
                                   int screen_height) -> std::pair<int, int> {
   double aspect_ratio = static_cast<double>(game_width) / game_height;

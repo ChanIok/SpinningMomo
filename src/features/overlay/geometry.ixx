@@ -7,9 +7,6 @@ import <windows.h>;
 
 namespace Features::Overlay::Geometry {
 
-// 获取屏幕尺寸
-export auto get_screen_dimensions() -> std::pair<int, int>;
-
 // 计算窗口尺寸
 export auto calculate_overlay_dimensions(int game_width, int game_height, int screen_width,
                                          int screen_height) -> std::pair<int, int>;

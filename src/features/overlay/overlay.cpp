@@ -13,6 +13,7 @@ import Features.Overlay.Capture;
 import Features.Overlay.Interaction;
 import Features.Overlay.Threads;
 import Features.Overlay.Geometry;
+import Utils.Display;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
@@ -81,15 +82,6 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
     return std::unexpected("Capture not supported on this system");
   }
 
-  // 检查窗口是否已初始化，如果未初始化则进行初始化
-  if (!overlay_state.window.overlay_hwnd) {
-    HINSTANCE instance = GetModuleHandle(nullptr);
-
-    if (auto result = Window::initialize_overlay_window(state, instance); !result) {
-      return std::unexpected(result.error());
-    }
-  }
-
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
   }
@@ -99,6 +91,28 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
     return std::unexpected("Target window is minimized");
   }
 
+  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
+  if (!monitor_info) {
+    return std::unexpected("Failed to resolve target monitor: " + monitor_info.error());
+  }
+
+  overlay_state.window.target_window = target_window;
+  const auto& monitor_rect = monitor_info->monitor_rect;
+  overlay_state.window.screen_left = monitor_rect.left;
+  overlay_state.window.screen_top = monitor_rect.top;
+  overlay_state.window.screen_width = Utils::Display::rect_width(monitor_rect);
+  overlay_state.window.screen_height = Utils::Display::rect_height(monitor_rect);
+
+  // 检查窗口是否已初始化，如果未初始化则进行初始化
+  if (!overlay_state.window.overlay_hwnd) {
+    HINSTANCE instance = GetModuleHandle(nullptr);
+
+    if (auto result = Window::initialize_overlay_window(state, instance); !result) {
+      overlay_state.window.target_window = nullptr;
+      return std::unexpected(result.error());
+    }
+  }
+
   // 获取窗口尺寸
   auto dimensions_result = Geometry::get_window_dimensions(target_window);
   if (!dimensions_result) {
@@ -106,12 +120,13 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
   }
 
   auto [width, height] = dimensions_result.value();
-  auto [screen_width, screen_height] = Geometry::get_screen_dimensions();
+  auto screen_width = Utils::Display::rect_width(monitor_info->monitor_rect);
+  auto screen_height = Utils::Display::rect_height(monitor_info->monitor_rect);
 
   // 在非变换场景下，检查是否需要 overlay
   if (!freeze_after_first_frame &&
       !Geometry::should_use_overlay(width, height, screen_width, screen_height)) {
-    Window::restore_game_window(state);
+    overlay_state.window.target_window = nullptr;
     // 不返回错误，因为游戏窗口在屏幕内，不需要叠加层
     return {};
   }
@@ -125,9 +140,6 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
   }
 
   overlay_state.interaction.last_game_window_pos.reset();
-
-  // 设置目标窗口
-  overlay_state.window.target_window = target_window;
 
   // 更新窗口尺寸
   Window::set_overlay_window_size(state, width, height);

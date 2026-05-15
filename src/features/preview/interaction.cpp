@@ -9,6 +9,7 @@ import Features.Preview.State;
 import Features.Preview.Types;
 import Features.Preview.Rendering;
 import Features.Preview.Window;
+import Utils.Display;
 import Utils.Logger;
 import Utils.Throttle;
 import <dwmapi.h>;
@@ -88,9 +89,16 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
   Logger().debug("move_game_window_to_position: relative_x: {}, relative_y: {}", relative_x,
                  relative_y);
 
-  // 获取屏幕尺寸
-  int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-  int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+  if (!state.preview->has_screen_rect) {
+    Logger().error("Preview screen rect is not initialized");
+    return;
+  }
+
+  const auto& screen_rect = state.preview->screen_rect;
+  int screenLeft = screen_rect.left;
+  int screenTop = screen_rect.top;
+  int screenWidth = Utils::Display::rect_width(screen_rect);
+  int screenHeight = Utils::Display::rect_height(screen_rect);
 
   // 获取游戏窗口尺寸
   float gameWidth = static_cast<float>(state.preview->game_window_rect.right -
@@ -103,20 +111,20 @@ auto move_game_window_to_position(Core::State::AppState& state, float relative_x
 
   // 水平方向
   if (gameWidth <= screenWidth) {
-    targetX = (screenWidth - gameWidth) / 2;  // 居中
+    targetX = screenLeft + (screenWidth - gameWidth) / 2;  // 居中
   } else {
-    targetX = -relative_x * gameWidth + screenWidth / 2;
-    targetX = std::max(targetX, -gameWidth + screenWidth);
-    targetX = std::min(targetX, 0.0f);
+    targetX = screenLeft - relative_x * gameWidth + screenWidth / 2;
+    targetX = std::max(targetX, screenLeft - gameWidth + screenWidth);
+    targetX = std::min(targetX, static_cast<float>(screenLeft));
   }
 
   // 垂直方向
   if (gameHeight <= screenHeight) {
-    targetY = (screenHeight - gameHeight) / 2;  // 居中
+    targetY = screenTop + (screenHeight - gameHeight) / 2;  // 居中
   } else {
-    targetY = -relative_y * gameHeight + screenHeight / 2;
-    targetY = std::max(targetY, -gameHeight + screenHeight);
-    targetY = std::min(targetY, 0.0f);
+    targetY = screenTop - relative_y * gameHeight + screenHeight / 2;
+    targetY = std::max(targetY, screenTop - gameHeight + screenHeight);
+    targetY = std::min(targetY, static_cast<float>(screenTop));
   }
 
   // 跳过重复位置
