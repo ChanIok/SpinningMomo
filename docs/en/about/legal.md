@@ -26,7 +26,8 @@ By default, this project does not include an account system, does not bundle adv
 - "Infinity Nikki photo metadata extraction" is an optional online feature. You can skip it, and not enabling it does not affect other core features.
 - The software only contacts the related service when you enable this feature or manually start an extraction. Requests may include the UID, embedded photo parameters, and basic request information required for parsing; the full image file itself is not uploaded.
 - After you enable this feature, it may automatically run in the background when new related photos are detected.
-- When accessing the update source or the related service above, your request may be logged by the respective service provider (e.g., IP address, timestamp, User-Agent).
+- The map feature loads the official *Infinity Nikki* interactive map in an in-app page. When it loads, your network requests connect directly to the official map service and are governed by that service’s applicable terms. This software only overlays your photo coordinates on the map locally and does not send any additional data to the official map service.
+- When accessing the update source or the services above, your request may be logged by the respective service provider (e.g., IP address, timestamp, User-Agent).
 
 ### 4. Data Sharing & User Feedback
 
@@ -41,7 +42,7 @@ By default, this project does not include an account system, does not bundle adv
 
 ### 6. Permitted Use
 
-You may only use this software for lawful and legitimate purposes. Use for illegal, harmful, or malicious activities is strictly prohibited.
+You may only use this software within lawful and compliant bounds. You must not use it for illegal, destructive, or malicious purposes.
 
 ### 7. Changes & Support
 

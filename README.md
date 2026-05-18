@@ -1,4 +1,4 @@
-[English](https://spin.infinitymomo.com/en) | [简体中文](README.md)
+[English](README_EN.md) | [简体中文](README.md)
 <div align="center">
   <h1>
     <img src="./docs/public/logo.png" width="200" alt="SpinningMomo Logo">
@@ -16,7 +16,6 @@
     <img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue?style=flat-square" />
   </p>
 
-
   <img src="./docs/public/README.webp" alt="Screenshot" >
 </div>
 
@@ -30,13 +29,20 @@
 
 ▸ 专为《无限暖暖》优化，同时兼容多数窗口化运行的其他游戏
 
-> v2.0 正在翻工中，部分功能尚未就绪。
-> 如需稳定版，请下载 [v0.7.7 旧版本](https://github.com/ChanIok/SpinningMomo/releases/tag/v0.7.7)，使用说明见 [v0.7.7 文档](https://spin.infinitymomo.com/v0/)。
-
 ### 下载地址
 
 - **GitHub Release**：[点击下载最新版本](https://github.com/ChanIok/SpinningMomo/releases/latest)
 - **百度网盘**：[点击下载](https://pan.baidu.com/s/1UL9EJa2ogSZ4DcnGa2XcRQ?pwd=momo)（提取码：momo）
+
+### Code signing policy
+
+本项目已申请由 SignPath Foundation 提供证书、SignPath.io 提供服务的免费开源代码签名，当前状态为等待审核。
+
+审核通过后，官方 Windows 发布产物将通过仓库中记录的自动化发布流程从源码构建，并通过 SignPath 完成签名。发布签名请求由项目维护者审批。
+
+- Committers and reviewers: [ChanIok](https://github.com/ChanIok)
+- Approvers: [ChanIok](https://github.com/ChanIok)
+- Privacy policy: [法律与隐私说明](https://spin.infinitymomo.com/zh/about/legal)
 
 ### 使用指南
 
@@ -45,12 +51,6 @@
 ### 构建指南
 
 查看 [构建指南](https://spin.infinitymomo.com/zh/developer/architecture) 了解环境要求和构建步骤。
-
-## 开发状态
-
-**已完成**：录制功能、图库功能（基础）、地图功能
-
-**进行中**：UI优化、HDR支持
 
 ## 致谢
 
@@ -63,5 +63,3 @@
 本项目采用 [GPL 3.0 协议](LICENSE) 开源。
 
 使用前请阅读 [法律与隐私说明](https://spin.infinitymomo.com/zh/about/legal)。
-
-项目图标来自游戏《无限暖暖》，版权归属游戏开发商。

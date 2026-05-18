@@ -1,5 +1,12 @@
 # 架构与构建
 
+> [!NOTE]
+> 本项目更推荐先通过 Issue 讨论需求和方向，再提交 Pull Request。
+>
+> 对于新功能、行为调整或较大的重构，请先提交 Issue，说明要解决的问题、使用场景和预期效果。这样可以在开始编码前确认它是否符合项目定位。
+>
+> 已确认范围的 Issue、明确的 Bug 修复、文档改进，以及经过讨论的技术难题，都非常欢迎通过 PR 贡献。未经讨论的功能性 PR 可能会因为方向不一致而无法合并。
+
 ## 架构与代码规范说明
 
 本项目核心采用 C++23 Modules 与 Vue 3 混合双端架构。
@@ -106,8 +113,8 @@ wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 
 然后运行：
 
-```powershell
-.\scripts\build-msi.ps1 -Version "x.y.z"
+```bash
+npm run build:installer
 ```
 
 ---
@@ -117,7 +124,7 @@ wix extension add WixToolset.BootstrapperApplications.wixext/6.0.2 --global
 启动开发服务器（需 C++ 后端同时运行）：
 
 ```bash
-cd web && npm run dev
+npm run dev:web
 ```
 
 Vite 开发服务器会将 `/rpc` 和 `/static` 代理到 C++ 后端（`localhost:51206`）。
