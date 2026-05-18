@@ -37,7 +37,7 @@ auto get_current_ratio(const Core::State::AppState& state,
     return ratios[state.floating_window->ui.current_ratio_index].ratio;
   }
 
-  // 默认使用目标窗口当前显示器比例。
+  // 默认使用工作显示器比例。
   int screen_width = Utils::Display::rect_width(monitor_info.monitor_rect);
   int screen_height = Utils::Display::rect_height(monitor_info.monitor_rect);
   return static_cast<double>(screen_width) / screen_height;
@@ -188,7 +188,8 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
     co_return;
   }
 
-  auto monitor_info = Utils::Display::get_monitor_for_window(*target_window);
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
@@ -264,7 +265,8 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
     co_return;
   }
 
-  auto monitor_info = Utils::Display::get_monitor_for_window(*target_window);
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
     Features::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
@@ -364,7 +366,8 @@ auto handle_window_selected(Core::State::AppState& state,
                                                state.i18n->texts["message.window_not_found"]);
     return;
   }
-  auto monitor_info = Utils::Display::get_monitor_for_window(target_window.value());
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (monitor_info) {
     post_transform_actions(state, target_window.value(), *monitor_info);
   }

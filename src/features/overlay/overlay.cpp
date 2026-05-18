@@ -13,6 +13,7 @@ import Features.Overlay.Capture;
 import Features.Overlay.Interaction;
 import Features.Overlay.Threads;
 import Features.Overlay.Geometry;
+import UI.FloatingWindow.State;
 import Utils.Display;
 import Utils.Logger;
 import <dwmapi.h>;
@@ -91,9 +92,10 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
     return std::unexpected("Target window is minimized");
   }
 
-  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
-    return std::unexpected("Failed to resolve target monitor: " + monitor_info.error());
+    return std::unexpected("Failed to resolve working monitor: " + monitor_info.error());
   }
 
   overlay_state.window.target_window = target_window;

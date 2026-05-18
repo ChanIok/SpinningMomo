@@ -5,6 +5,7 @@ module Features.Letterbox;
 import std;
 import Core.State;
 import Features.Letterbox.State;
+import UI.FloatingWindow.State;
 import Utils.Display;
 import Utils.Logger;
 import <dwmapi.h>;
@@ -15,8 +16,9 @@ namespace Features::Letterbox {
 // 全局状态指针，用于钩子回调
 Core::State::AppState* g_app_state = nullptr;
 
-// 检查是否需要显示letterbox
-auto needs_letterbox(HWND target_window) -> bool {
+// 检查是否需要显示letterbox（相对工作显示器判断）
+auto needs_letterbox(HWND target_window, const Utils::Display::MonitorInfo& working_monitor)
+    -> bool {
   if (!target_window || !IsWindow(target_window)) {
     return false;
   }
@@ -26,21 +28,15 @@ auto needs_letterbox(HWND target_window) -> bool {
   int window_width = rect.right - rect.left;
   int window_height = rect.bottom - rect.top;
 
-  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
-  if (!monitor_info) {
-    return false;
-  }
-
-  int screen_width = Utils::Display::rect_width(monitor_info->monitor_rect);
-  int screen_height = Utils::Display::rect_height(monitor_info->monitor_rect);
+  int screen_width = Utils::Display::rect_width(working_monitor.monitor_rect);
+  int screen_height = Utils::Display::rect_height(working_monitor.monitor_rect);
 
   return ((window_width >= screen_width && window_height < screen_height) ||
           (window_height >= screen_height && window_width < screen_width));
 }
 
 // 更新位置
-auto update_position(Core::State::AppState& state, HWND target_window)
-    -> std::expected<void, std::string> {
+auto update_position(Core::State::AppState& state) -> std::expected<void, std::string> {
   auto& letterbox = *state.letterbox;
 
   if (!letterbox.is_initialized) {
@@ -57,10 +53,11 @@ auto update_position(Core::State::AppState& state, HWND target_window)
     return std::unexpected{"Target window is no longer valid"};
   }
 
-  auto monitor_info = Utils::Display::get_monitor_for_window(letterbox.target_window);
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
     [[maybe_unused]] auto hide_result = hide(state);
-    return std::unexpected{"Failed to resolve target monitor: " + monitor_info.error()};
+    return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
   }
 
   const auto& screen_rect = monitor_info->monitor_rect;
@@ -206,7 +203,7 @@ LRESULT CALLBACK message_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM
       if (!IsWindowVisible(hwnd)) {
         [[maybe_unused]] auto result = show(*state);
       } else {
-        [[maybe_unused]] auto result = update_position(*state, state->letterbox->target_window);
+        [[maybe_unused]] auto result = update_position(*state);
       }
       break;
     }
@@ -359,8 +356,14 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
     return std::unexpected{"Target window is not visible"};
   }
 
+  const auto& fw = *state.floating_window;
+  auto working_monitor = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
+  if (!working_monitor) {
+    return std::unexpected{"Failed to resolve working monitor: " + working_monitor.error()};
+  }
+
   // 检查是否真正需要显示letterbox
-  if (!needs_letterbox(letterbox.target_window)) {
+  if (!needs_letterbox(letterbox.target_window, *working_monitor)) {
     [[maybe_unused]] auto result = hide(state);
     return {};
   }
@@ -374,7 +377,7 @@ auto show(Core::State::AppState& state, HWND target_window) -> std::expected<voi
 
   ShowWindow(letterbox.window_handle, SW_SHOWNA);
 
-  if (auto result = update_position(state, letterbox.target_window); !result) {
+  if (auto result = update_position(state); !result) {
     return result;
   }
 

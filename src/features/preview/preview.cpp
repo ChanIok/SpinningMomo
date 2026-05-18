@@ -11,6 +11,7 @@ import Features.Preview.Window;
 import Features.Preview.Interaction;
 import Features.Preview.Rendering;
 import Features.Preview.Capture;
+import UI.FloatingWindow.State;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
 import Utils.Display;
@@ -56,9 +57,10 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Target window is minimized");
   }
 
-  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
-    return std::unexpected("Failed to resolve target monitor: " + monitor_info.error());
+    return std::unexpected("Failed to resolve working monitor: " + monitor_info.error());
   }
 
   if (!send_preview_control_message(preview_state.hwnd, Types::WM_CANCEL_PREVIEW_CLEANUP)) {

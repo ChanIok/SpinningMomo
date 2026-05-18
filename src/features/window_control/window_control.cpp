@@ -6,6 +6,7 @@ import std;
 import Core.State;
 import Features.Settings.State;
 import Features.WindowControl.State;
+import UI.FloatingWindow.State;
 import Utils.Display;
 import Utils.Logger;
 import Utils.String;
@@ -342,9 +343,10 @@ auto resize_and_center_window(Core::State::AppState& state, HWND hwnd, int width
     return std::unexpected{"Failed to resize window: Invalid window handle provided."};
   }
 
-  auto monitor_info = Utils::Display::get_monitor_for_window(hwnd);
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
-    return std::unexpected{"Failed to resolve target monitor: " + monitor_info.error()};
+    return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
   }
 
   const auto& screen_rect = monitor_info->monitor_rect;
@@ -733,9 +735,10 @@ auto apply_window_transform(Core::State::AppState& state, HWND target_window,
 // 重置窗口到屏幕尺寸
 auto reset_window_to_screen(Core::State::AppState& state, HWND target_window,
                             const TransformOptions& options) -> std::expected<void, std::string> {
-  auto monitor_info = Utils::Display::get_monitor_for_window(target_window);
+  const auto& fw = *state.floating_window;
+  auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
-    return std::unexpected{"Failed to resolve target monitor: " + monitor_info.error()};
+    return std::unexpected{"Failed to resolve working monitor: " + monitor_info.error()};
   }
 
   const int screen_width = Utils::Display::rect_width(monitor_info->monitor_rect);

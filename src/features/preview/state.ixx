@@ -36,7 +36,7 @@ struct PreviewState {
   // 游戏窗口缓存信息
   RECT game_window_rect{};
 
-  // 当前预览会话的基准显示器。启动预览时由目标窗口所在显示器确定。
+  // 当前预览会话的基准显示器。启动预览时由悬浮窗所在工作显示器确定。
   RECT screen_rect{};
   bool has_screen_rect = false;
 };

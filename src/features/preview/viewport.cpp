@@ -31,7 +31,7 @@ auto calculate_visible_game_area(const Core::State::AppState& state) -> RECT {
     return RECT{0, 0, 0, 0};
   }
 
-  // 获取目标窗口所在显示器可见区域（即显示器边界）
+  // 工作显示器边界（启动预览时缓存的 screen_rect）
   RECT screenRect = state.preview->screen_rect;
   RECT gameRect = get_game_window_screen_rect(state);
 

@@ -163,7 +163,7 @@ auto initialize_preview_window(Core::State::AppState& state, HINSTANCE instance)
   ReleaseDC(nullptr, hdc);
   state.preview->dpi_sizes.update_dpi_scaling(dpi);
 
-  // 这些值会在 start_preview() 解析目标窗口显示器后按实际屏幕重写。
+  // 这些值会在 start_preview() 解析工作显示器后按实际屏幕重写。
   state.preview->size.min_ideal_size = 108;
   state.preview->size.max_ideal_size = 1920;
   state.preview->size.ideal_size = 540;
