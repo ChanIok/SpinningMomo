@@ -187,6 +187,7 @@ export interface AppSettings {
       rateControl: 'cbr' | 'vbr' | 'manual_qp' // 码率控制模式（默认 VBR）
       encoderMode: 'auto' | 'gpu' | 'cpu' // 编码器模式
       codec: 'h264' | 'h265' // 视频编码格式
+      enableHdr: boolean // HDR10 录制，仅支持 GPU + H.265 Main10
       captureClientArea: boolean // 是否只捕获客户区（无边框）
       captureCursor: boolean // 是否捕获鼠标指针
       autoRestartOnResize: boolean // 尺寸变化时是否自动切段重启录制
@@ -316,6 +317,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       rateControl: 'vbr',
       encoderMode: 'auto',
       codec: 'h264',
+      enableHdr: false,
       captureClientArea: true,
       captureCursor: false,
       autoRestartOnResize: true,

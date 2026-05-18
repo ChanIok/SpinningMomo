@@ -148,6 +148,8 @@ export const useFunctionActions = () => {
     if (encoderMode === 'cpu' && codec === 'h265') {
       codec = 'h264'
     }
+    // HDR 录制只支持 GPU；切到 CPU 时同步关闭，避免保存出后端必然拒绝的配置。
+    const enableHdr = encoderMode === 'cpu' ? false : rec.enableHdr
     await store.updateSettings({
       ...appSettings.value,
       features: {
@@ -156,6 +158,7 @@ export const useFunctionActions = () => {
           ...rec,
           encoderMode,
           codec,
+          enableHdr,
         },
       },
     })
@@ -206,6 +209,8 @@ export const useFunctionActions = () => {
     if (codec === 'h265' && encoderMode === 'cpu') {
       encoderMode = 'auto'
     }
+    // HDR 输出是 HEVC Main10；切回 H.264 时必须关闭 HDR。
+    const enableHdr = codec === 'h264' ? false : rec.enableHdr
     await store.updateSettings({
       ...appSettings.value,
       features: {
@@ -214,6 +219,24 @@ export const useFunctionActions = () => {
           ...rec,
           codec,
           encoderMode,
+          enableHdr,
+        },
+      },
+    })
+  }
+
+  const updateRecordingHdrEnabled = async (enableHdr: boolean) => {
+    const rec = appSettings.value.features.recording
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        recording: {
+          ...rec,
+          enableHdr,
+          // 开启 HDR 时主动收敛到唯一支持组合：GPU + H.265。
+          codec: enableHdr ? 'h265' : rec.codec,
+          encoderMode: enableHdr ? 'gpu' : rec.encoderMode,
         },
       },
     })
@@ -321,6 +344,7 @@ export const useFunctionActions = () => {
           rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
           encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
+          enableHdr: DEFAULT_APP_SETTINGS.features.recording.enableHdr,
           captureClientArea: DEFAULT_APP_SETTINGS.features.recording.captureClientArea,
           captureCursor: DEFAULT_APP_SETTINGS.features.recording.captureCursor,
           autoRestartOnResize: DEFAULT_APP_SETTINGS.features.recording.autoRestartOnResize,
@@ -352,6 +376,7 @@ export const useFunctionActions = () => {
           rateControl: DEFAULT_APP_SETTINGS.features.recording.rateControl,
           encoderMode: DEFAULT_APP_SETTINGS.features.recording.encoderMode,
           codec: DEFAULT_APP_SETTINGS.features.recording.codec,
+          enableHdr: DEFAULT_APP_SETTINGS.features.recording.enableHdr,
           captureClientArea: DEFAULT_APP_SETTINGS.features.recording.captureClientArea,
           captureCursor: DEFAULT_APP_SETTINGS.features.recording.captureCursor,
           autoRestartOnResize: DEFAULT_APP_SETTINGS.features.recording.autoRestartOnResize,
@@ -399,6 +424,7 @@ export const useFunctionActions = () => {
     updateRecordingRateControl,
     updateRecordingEncoderMode,
     updateRecordingCodec,
+    updateRecordingHdrEnabled,
     updateRecordingCaptureClientArea,
     updateRecordingCaptureCursor,
     updateRecordingAutoRestartOnResize,

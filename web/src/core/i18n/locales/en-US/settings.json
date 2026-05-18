@@ -181,6 +181,8 @@
   "settings.function.recording.encoderMode.label": "Encoder Mode",
   "settings.function.recording.fps.description": "Recording frame rate (FPS).",
   "settings.function.recording.fps.label": "Frame Rate",
+  "settings.function.recording.hdr.description": "Record HEVC Main10 HDR10 video. Requires the target display to be in HDR mode and forces GPU + H.265.",
+  "settings.function.recording.hdr.label": "HDR Recording",
   "settings.function.recording.qp.description": "Target QP value for Manual QP mode (0-51, lower is better, requires hardware support).",
   "settings.function.recording.qp.label": "Quantization Parameter (QP)",
   "settings.function.recording.quality.description": "Quality level for VBR mode (0-100, higher is better).",

@@ -59,6 +59,8 @@ export struct EncoderConfig {
   RateControlMode rate_control = RateControlMode::CBR;  // 码率控制模式
   EncoderMode encoder_mode = EncoderMode::Auto;         // 编码器模式
   VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
+  bool enable_hdr = false;                              // HDR10 输出，仅支持 GPU + HEVC Main10
+  std::uint32_t hdr_target_peak_nits = 1000;            // HDR 静态元数据峰值亮度
 
   // 音频配置
   std::uint32_t audio_bitrate = 256'000;  // 音频码率 (默认 256kbps)

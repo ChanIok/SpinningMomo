@@ -40,6 +40,7 @@ const {
   updateRecordingRateControl,
   updateRecordingEncoderMode,
   updateRecordingCodec,
+  updateRecordingHdrEnabled,
   updateRecordingCaptureClientArea,
   updateRecordingCaptureCursor,
   updateRecordingAutoRestartOnResize,
@@ -83,12 +84,15 @@ const showGameOnlyAudioHint = computed(() => {
     : false
 })
 
-/** CPU 编码与 H.265 互斥：选 CPU 时前端禁用 H.265；选 H.265 时禁用 CPU。 */
+/** CPU 编码与 H.265/HDR 互斥：前端先禁用明显无效的组合，后端仍会做最终校验。 */
 const recordingEncoderIsCpu = computed(
   () => appSettings.value?.features?.recording?.encoderMode === 'cpu'
 )
 const recordingCodecIsH265 = computed(
   () => appSettings.value?.features?.recording?.codec === 'h265'
+)
+const recordingHdrEnabled = computed(
+  () => appSettings.value?.features?.recording?.enableHdr === true
 )
 
 const handleSelectOutputDir = async () => {
@@ -495,7 +499,9 @@ const handleResetSettings = async () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="h264">H.264 / AVC</SelectItem>
+                  <SelectItem value="h264" :disabled="recordingHdrEnabled">
+                    H.264 / AVC
+                  </SelectItem>
                   <SelectItem value="h265" :disabled="recordingEncoderIsCpu">
                     H.265 / HEVC
                   </SelectItem>
@@ -524,17 +530,34 @@ const handleResetSettings = async () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">{{
+                  <SelectItem value="auto" :disabled="recordingHdrEnabled">{{
                     t('settings.function.recording.encoderMode.auto')
                   }}</SelectItem>
                   <SelectItem value="gpu">{{
                     t('settings.function.recording.encoderMode.gpu')
                   }}</SelectItem>
-                  <SelectItem value="cpu" :disabled="recordingCodecIsH265">{{
+                  <SelectItem value="cpu" :disabled="recordingCodecIsH265 || recordingHdrEnabled">{{
                     t('settings.function.recording.encoderMode.cpu')
                   }}</SelectItem>
                 </SelectContent>
               </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.recording.hdr.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.recording.hdr.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.recording?.enableHdr ?? false"
+                @update:model-value="(value) => updateRecordingHdrEnabled(Boolean(value))"
+              />
             </ItemActions>
           </Item>
 

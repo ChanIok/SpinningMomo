@@ -7,6 +7,7 @@ module Utils.Media.Encoder;
 
 import std;
 import Utils.Logger;
+import Utils.Media.HdrConvert;
 import <d3d11.h>;
 import <mfapi.h>;
 import <mferror.h>;
@@ -17,10 +18,39 @@ import <strmif.h>;
 
 namespace Utils::Media::Encoder {
 
+// HDR10 静态元数据需要一个合理的 mastering display peak。DXGI 上报异常时回到常见 1000 nit。
+auto sanitize_hdr_peak_nits(std::uint32_t peak_nits) -> std::uint32_t {
+  return std::clamp<std::uint32_t>(peak_nits == 0 ? 1000 : peak_nits, 203, 10000);
+}
+
+// 屏幕录制并没有“片源在哪台母版监视器上做过调色”这种严格意义上的 mastering display。
+// 但很多平台是否把 HEVC Main10 + PQ 当作 HDR10，会看 ST.2086/CEA-861.3 这组静态元数据是否完整。
+// 这里选 HDR10 里最常见、也最接近 OBS 输出的 P3-D65 in BT.2020 mastering volume 作为稳定提示。
+constexpr MT_CUSTOM_VIDEO_PRIMARIES k_hdr10_mastering_display_primaries = {
+    .fRx = 0.6800f,
+    .fRy = 0.3200f,
+    .fGx = 0.2650f,
+    .fGy = 0.6900f,
+    .fBx = 0.1500f,
+    .fBy = 0.0600f,
+    .fWx = 0.3127f,
+    .fWy = 0.3290f,
+};
+
+// DXGI surface buffer 的 CurrentLength 仍要填真实图像大小；P010 不是 width * height * 4。
+auto calculate_video_buffer_size(GUID subtype, std::uint32_t width, std::uint32_t height)
+    -> std::expected<UINT32, std::string> {
+  UINT32 buffer_size = 0;
+  if (FAILED(MFCalculateImageSize(subtype, width, height, &buffer_size))) {
+    return std::unexpected("Failed to calculate video buffer size");
+  }
+  return buffer_size;
+}
+
 // 辅助函数：创建输出媒体类型
 auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uint32_t bitrate,
-                              uint32_t keyframe_interval, Types::VideoCodec codec)
-    -> wil::com_ptr<IMFMediaType> {
+                              uint32_t keyframe_interval, Types::VideoCodec codec, bool enable_hdr,
+                              std::uint32_t hdr_target_peak_nits) -> wil::com_ptr<IMFMediaType> {
   wil::com_ptr<IMFMediaType> media_type;
   if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
@@ -35,32 +65,67 @@ auto create_output_media_type(uint32_t width, uint32_t height, uint32_t fps, uin
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_FRAME_RATE, fps, 1))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1))) return nullptr;
 
-  // 颜色元数据 (BT.709 标准，与 NVIDIA APP / OBS 一致)
-  media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709);
-  media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709);
-  media_type->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT709);
-  media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235);  // TV / Limited Range
-
-  // 编码 Profile (H.264 High / H.265 Main，与 NVIDIA APP / OBS 一致)
-  if (codec == Types::VideoCodec::H265) {
-    media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH265VProfile_Main_420_8);
+  if (enable_hdr) {
+    const auto peak_nits = sanitize_hdr_peak_nits(hdr_target_peak_nits);
+    // 输出声明为 HEVC Main10 HDR10：BT.2020 容器 + PQ + limited range + 10-bit profile。
+    // 这些是写入编码器/MP4 muxer 的色彩与静态亮度元数据，不负责像素转换。
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT2020)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_2084)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT2020_10)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235)))
+      return nullptr;
+    if (FAILED(media_type->SetBlob(
+            MF_MT_CUSTOM_VIDEO_PRIMARIES,
+            reinterpret_cast<const UINT8*>(&k_hdr10_mastering_display_primaries),
+            sizeof(k_hdr10_mastering_display_primaries))))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_MAX_MASTERING_LUMINANCE, peak_nits))) return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_MIN_MASTERING_LUMINANCE, 0))) return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_MAX_LUMINANCE_LEVEL, peak_nits))) return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_MAX_FRAME_AVERAGE_LUMINANCE_LEVEL, peak_nits / 2)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH265VProfile_Main_420_10)))
+      return nullptr;
   } else {
-    media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High);
+    // 颜色元数据 (BT.709 标准，与 NVIDIA APP / OBS 一致)
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT709)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235)))
+      return nullptr;
+
+    // 编码 Profile (H.264 High / H.265 Main，与 NVIDIA APP / OBS 一致)
+    if (codec == Types::VideoCodec::H265) {
+      if (FAILED(media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH265VProfile_Main_420_8)))
+        return nullptr;
+    } else {
+      if (FAILED(media_type->SetUINT32(MF_MT_MPEG2_PROFILE, eAVEncH264VProfile_High)))
+        return nullptr;
+    }
   }
 
   // 关键帧间隔
-  media_type->SetUINT32(MF_MT_MAX_KEYFRAME_SPACING, fps * keyframe_interval);
+  if (FAILED(media_type->SetUINT32(MF_MT_MAX_KEYFRAME_SPACING, fps * keyframe_interval)))
+    return nullptr;
 
   return media_type;
 }
 
 // 辅助函数：创建输入媒体类型
-auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool set_stride)
-    -> wil::com_ptr<IMFMediaType> {
+auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool set_stride,
+                             bool enable_hdr) -> wil::com_ptr<IMFMediaType> {
   wil::com_ptr<IMFMediaType> media_type;
   if (FAILED(MFCreateMediaType(media_type.put()))) return nullptr;
   if (FAILED(media_type->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video))) return nullptr;
-  if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_ARGB32))) return nullptr;
+  if (FAILED(media_type->SetGUID(MF_MT_SUBTYPE,
+                                 enable_hdr ? MFVideoFormat_P010 : MFVideoFormat_ARGB32)))
+    return nullptr;
   if (FAILED(media_type->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive)))
     return nullptr;
   if (FAILED(MFSetAttributeSize(media_type.get(), MF_MT_FRAME_SIZE, width, height))) return nullptr;
@@ -74,10 +139,27 @@ auto create_input_media_type(uint32_t width, uint32_t height, uint32_t fps, bool
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_FRAME_RATE, fps, 1))) return nullptr;
   if (FAILED(MFSetAttributeRatio(media_type.get(), MF_MT_PIXEL_ASPECT_RATIO, 1, 1))) return nullptr;
 
-  // 输入颜色信息：屏幕捕获是 Full Range RGB，告知编码器以正确执行 RGB→YUV 转换
-  media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709);
-  media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709);
-  media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_0_255);  // Full Range (屏幕捕获)
+  if (enable_hdr) {
+    // 输入侧只声明这张未压缩 P010 帧本身的颜色语义：BT.2020 + PQ + limited range。
+    // HDR10 的 mastering metadata / chroma siting 属于输出码流声明，不放在输入类型上，
+    // 否则部分 HEVC MFT 会在 SetInputMediaType 阶段报 "Invalid Profile"。
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT2020)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_2084)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT2020_10)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235)))
+      return nullptr;
+  } else {
+    // 输入颜色信息：屏幕捕获是 Full Range RGB，告知编码器以正确执行 RGB→YUV 转换
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709)))
+      return nullptr;
+    if (FAILED(media_type->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_0_255)))
+      return nullptr;
+  }
 
   return media_type;
 }
@@ -235,9 +317,9 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
   }
 
   // 8. 创建输出媒体类型
-  auto media_type_out =
-      create_output_media_type(config.width, config.height, config.fps, config.bitrate,
-                               config.keyframe_interval, config.codec);
+  auto media_type_out = create_output_media_type(
+      config.width, config.height, config.fps, config.bitrate, config.keyframe_interval,
+      config.codec, config.enable_hdr, config.hdr_target_peak_nits);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -247,7 +329,8 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
   }
 
   // 9. 创建 GPU 输入媒体类型
-  auto media_type_in = create_input_media_type(config.width, config.height, config.fps, false);
+  auto media_type_in =
+      create_input_media_type(config.width, config.height, config.fps, false, config.enable_hdr);
   if (!media_type_in) {
     return std::unexpected("Failed to create GPU input media type");
   }
@@ -255,6 +338,15 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
   if (FAILED(ctx.sink_writer->SetInputMediaType(ctx.video_stream_index, media_type_in.get(),
                                                 nullptr))) {
     return std::unexpected("Failed to set GPU input media type");
+  }
+
+  if (config.enable_hdr) {
+    auto hdr_converter_result =
+        Utils::Media::HdrConvert::create_converter(device, config.width, config.height);
+    if (!hdr_converter_result) {
+      return std::unexpected(hdr_converter_result.error());
+    }
+    ctx.hdr_converter = std::move(*hdr_converter_result);
   }
 
   // 10. 如果有音频格式，添加音频流（必须在 BeginWriting 之前）
@@ -273,14 +365,24 @@ auto try_create_gpu_encoder(State::EncoderContext& ctx, const Types::EncoderConf
   // 缓存尺寸信息
   ctx.frame_width = config.width;
   ctx.frame_height = config.height;
-  ctx.buffer_size = config.width * config.height * 4;
+  auto buffer_size = calculate_video_buffer_size(
+      config.enable_hdr ? MFVideoFormat_P010 : MFVideoFormat_ARGB32, config.width, config.height);
+  if (!buffer_size) {
+    return std::unexpected(buffer_size.error());
+  }
+  ctx.buffer_size = *buffer_size;
   ctx.gpu_encoding = true;
+  ctx.hdr_encoding = config.enable_hdr;
   return {};
 }
 
 // 创建 CPU 编码器 (fallback)
 auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& config,
                         WAVEFORMATEX* wave_format) -> std::expected<void, std::string> {
+  if (config.enable_hdr) {
+    return std::unexpected("HDR recording requires GPU encoder");
+  }
+
   // 确保目录存在
   std::filesystem::create_directories(config.output_path.parent_path());
 
@@ -346,7 +448,7 @@ auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& 
   // 5. 创建输出媒体类型
   auto media_type_out =
       create_output_media_type(config.width, config.height, config.fps, config.bitrate,
-                               config.keyframe_interval, config.codec);
+                               config.keyframe_interval, config.codec, false, 0);
   if (!media_type_out) {
     return std::unexpected("Failed to create output media type");
   }
@@ -356,7 +458,8 @@ auto create_cpu_encoder(State::EncoderContext& ctx, const Types::EncoderConfig& 
   }
 
   // 6. 创建输入媒体类型
-  auto media_type_in = create_input_media_type(config.width, config.height, config.fps, true);
+  auto media_type_in =
+      create_input_media_type(config.width, config.height, config.fps, true, false);
   if (!media_type_in) {
     return std::unexpected("Failed to create input media type");
   }
@@ -392,6 +495,19 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
     -> std::expected<State::EncoderContext, std::string> {
   auto ctx = std::make_unique<State::EncoderContext>();
 
+  if (config.enable_hdr) {
+    // HDR 不允许走 CPU fallback；这里再次兜底，防止旧配置或手写配置绕过前端限制。
+    if (config.codec != Types::VideoCodec::H265) {
+      return std::unexpected("HDR recording requires H.265 codec");
+    }
+    if (config.encoder_mode == Types::EncoderMode::CPU) {
+      return std::unexpected("HDR recording requires GPU encoder");
+    }
+    if (!device) {
+      return std::unexpected("HDR recording requires a D3D device");
+    }
+  }
+
   bool try_gpu = (config.encoder_mode == Types::EncoderMode::Auto ||
                   config.encoder_mode == Types::EncoderMode::GPU) &&
                  device != nullptr;
@@ -401,15 +517,15 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
   if (try_gpu) {
     auto gpu_result = try_create_gpu_encoder(*ctx, config, device, wave_format);
     if (gpu_result) {
-      Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}", config.width,
-                    config.height, config.fps, config.bitrate, codec_name);
+      Logger().info("GPU encoder created: {}x{} @ {}fps, {} bps, codec: {}, HDR={}", config.width,
+                    config.height, config.fps, config.bitrate, codec_name, config.enable_hdr);
       return std::move(*ctx);
     }
 
     // GPU 失败
     Logger().warn("Failed to create GPU encoder: {}", gpu_result.error());
 
-    if (config.encoder_mode == Types::EncoderMode::GPU) {
+    if (config.encoder_mode == Types::EncoderMode::GPU || config.enable_hdr) {
       // 强制 GPU 模式，不降级
       return std::unexpected(gpu_result.error());
     }
@@ -436,18 +552,42 @@ auto create_encoder(const Types::EncoderConfig& config, ID3D11Device* device,
   return std::move(*ctx);
 }
 
+auto convert_scrgb_to_p010(State::EncoderContext& encoder, ID3D11DeviceContext* context,
+                           ID3D11Texture2D* frame_texture)
+    -> std::expected<ID3D11Texture2D*, std::string> {
+  auto convert_result =
+      Utils::Media::HdrConvert::convert_frame(encoder.hdr_converter, context, frame_texture);
+  if (!convert_result) {
+    return std::unexpected(convert_result.error());
+  }
+  return *convert_result;
+}
+
 // GPU 编码帧（内部函数）
 // 直通 DXGI surface：调用方必须保证 frame_texture 在 WriteSample 返回前保持有效。
 auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* context,
                       ID3D11Texture2D* frame_texture, int64_t timestamp_100ns, uint32_t fps)
     -> std::expected<void, std::string> {
-  // GPU 直通路径不需要 D3D context；参数保留是为了和 CPU 路径共用 encode_frame 入口。
-  (void)context;
+  ID3D11Texture2D* encoder_texture = frame_texture;
+  if (encoder.hdr_encoding) {
+    // HDR 帧每次写入前先在 GPU 上转换到 P010，再用原有 DXGI surface buffer 路径交给 MF。
+    if (!context) {
+      return std::unexpected("HDR encoding requires a D3D context");
+    }
+    auto convert_result = convert_scrgb_to_p010(encoder, context, frame_texture);
+    if (!convert_result) {
+      return std::unexpected(convert_result.error());
+    }
+    encoder_texture = *convert_result;
+  } else {
+    // SDR GPU 直通路径不需要 D3D context；参数保留是为了和 CPU 路径共用 encode_frame 入口。
+    (void)context;
+  }
 
   wil::com_ptr<IMFMediaBuffer> buffer;
   wil::com_ptr<IDXGISurface> surface;
 
-  if (FAILED(frame_texture->QueryInterface(IID_PPV_ARGS(surface.put())))) {
+  if (FAILED(encoder_texture->QueryInterface(IID_PPV_ARGS(surface.put())))) {
     return std::unexpected("Failed to query DXGI surface");
   }
 
@@ -626,6 +766,8 @@ auto finalize_encoder(State::EncoderContext& encoder) -> std::expected<void, std
   encoder.reusable_sample = nullptr;
   encoder.reusable_buffer = nullptr;
   encoder.dxgi_manager = nullptr;
+  encoder.hdr_converter = {};
+  encoder.hdr_encoding = false;
 
   return {};
 }

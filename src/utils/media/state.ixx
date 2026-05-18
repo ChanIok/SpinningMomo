@@ -8,6 +8,7 @@ export module Utils.Media.Encoder.State;
 import std;
 import <d3d11.h>;
 import <wil/com.h>;
+import Utils.Media.HdrConvert;
 
 export namespace Utils::Media::Encoder::State {
 
@@ -30,6 +31,8 @@ struct EncoderContext {
   wil::com_ptr<IMFDXGIDeviceManager> dxgi_manager;
   UINT reset_token = 0;
   bool gpu_encoding = false;
+  bool hdr_encoding = false;
+  Utils::Media::HdrConvert::ConverterContext hdr_converter;
 
   // 音频流
   DWORD audio_stream_index = 0;  // 音频流索引

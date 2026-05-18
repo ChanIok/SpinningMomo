@@ -181,6 +181,8 @@
   "settings.function.recording.encoderMode.label": "编码器模式",
   "settings.function.recording.fps.description": "录制的帧率（FPS）。",
   "settings.function.recording.fps.label": "帧率",
+  "settings.function.recording.hdr.description": "开启后录制 HEVC Main10 HDR10 视频；需要目标显示器处于 HDR 模式，并强制使用 GPU + H.265。",
+  "settings.function.recording.hdr.label": "HDR 录制",
   "settings.function.recording.qp.description": "手动 QP 模式下的目标 QP 值（0-51，值越小质量越好，需硬件支持）。",
   "settings.function.recording.qp.label": "量化参数 (QP)",
   "settings.function.recording.quality.description": "VBR 模式下的质量等级（0-100，值越高质量越好）。",

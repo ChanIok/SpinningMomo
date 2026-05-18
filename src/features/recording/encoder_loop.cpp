@@ -84,7 +84,8 @@ auto ensure_encoder_input_texture(State::RecordingState& state,
   d.SampleDesc.Count = 1;
   d.SampleDesc.Quality = 0;
   d.Usage = D3D11_USAGE_DEFAULT;
-  d.BindFlags = 0;
+  // HDR 输入纹理后面会作为 shader 输入纹理参与 scRGB->P010 转换，因此至少要能建 SRV。
+  d.BindFlags = src_desc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT ? D3D11_BIND_SHADER_RESOURCE : 0;
   d.CPUAccessFlags = 0;
   d.MiscFlags = 0;
 
@@ -202,6 +203,8 @@ auto build_encoder_config(const State::RecordingState& state)
       Features::Recording::Types::encoder_mode_to_string(state.config.encoder_mode));
   encoder_config.codec = Utils::Media::Encoder::Types::video_codec_from_string(
       Features::Recording::Types::video_codec_to_string(state.config.codec));
+  encoder_config.enable_hdr = state.config.enable_hdr;
+  encoder_config.hdr_target_peak_nits = state.config.hdr_target_peak_nits;
   encoder_config.audio_bitrate = state.config.audio_bitrate;
   return encoder_config;
 }

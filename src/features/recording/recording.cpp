@@ -364,6 +364,11 @@ auto start(Core::State::AppState& app_state, Features::Recording::State::Recordi
   Utils::Graphics::Capture::CaptureSessionOptions capture_options;
   capture_options.capture_cursor = config.capture_cursor;
   capture_options.border_required = false;
+  if (config.enable_hdr) {
+    // HDR 桌面捕获使用 scRGB 16-bit float。后续编码线程会把它转换成 HEVC 编码器需要的 P010。
+    capture_options.pixel_format =
+        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::R16G16B16A16Float;
+  }
 
   // WGC 回调只通知编码线程；真正取帧和写编码器都在编码线程里完成。
   auto capture_result = Utils::Graphics::Capture::create_capture_session_with_frame_notification(

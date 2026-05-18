@@ -13,6 +13,7 @@ import Features.Settings.Types;
 import Features.Settings.State;
 import Features.WindowControl;
 import UI.FloatingWindow.Events;
+import Utils.Graphics.Hdr;
 import Utils.Logger;
 import Utils.Media.AudioCapture;
 import Utils.Path;
@@ -112,12 +113,49 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
     config.encoder_mode =
         Features::Recording::Types::encoder_mode_from_string(recording_settings.encoder_mode);
     config.codec = Features::Recording::Types::video_codec_from_string(recording_settings.codec);
+    config.enable_hdr = recording_settings.enable_hdr;
     config.capture_client_area = recording_settings.capture_client_area;
     config.capture_cursor = recording_settings.capture_cursor;
     config.auto_restart_on_resize = recording_settings.auto_restart_on_resize;
     config.audio_source =
         Utils::Media::AudioCapture::audio_source_from_string(recording_settings.audio_source);
     config.audio_bitrate = recording_settings.audio_bitrate;
+
+    if (config.enable_hdr) {
+      // HDR 录制不是“打开一个标志”这么简单：输出必须是 HEVC Main10 HDR10。
+      // 因此这里在启动入口做硬约束，避免后面的编码层偷偷降级成 SDR/CPU 路径。
+      if (config.codec != Features::Recording::Types::VideoCodec::H265) {
+        std::string error = "HDR recording requires H.265 codec";
+        show_recording_notification(state,
+                                    state.i18n->texts["message.recording_start_failed"] + error);
+        return std::unexpected(error);
+      }
+      if (config.encoder_mode == Features::Recording::Types::EncoderMode::CPU) {
+        std::string error = "HDR recording requires GPU encoder";
+        show_recording_notification(state,
+                                    state.i18n->texts["message.recording_start_failed"] + error);
+        return std::unexpected(error);
+      }
+
+      // WGC 的 HDR 帧只有在目标显示器处于 Windows HDR 模式时才有意义；
+      // 否则即使请求 16-bit float，也录不到真正的 HDR 桌面内容。
+      auto hdr_info = Utils::Graphics::Hdr::query_monitor_hdr_info(target.value());
+      if (!hdr_info) {
+        std::string error = "Failed to query HDR monitor info: " + hdr_info.error();
+        show_recording_notification(state,
+                                    state.i18n->texts["message.recording_start_failed"] + error);
+        return std::unexpected(error);
+      }
+      if (!hdr_info->hdr_active) {
+        std::string error = "HDR recording requires the target monitor to be in HDR mode";
+        show_recording_notification(state,
+                                    state.i18n->texts["message.recording_start_failed"] + error);
+        return std::unexpected(error);
+      }
+      // 这个值只用于写 HDR10 静态元数据，不做 tone mapping；实际像素亮度来自 WGC scRGB 帧。
+      config.hdr_target_peak_nits = static_cast<std::uint32_t>(
+          std::lround(std::clamp(hdr_info->max_luminance_nits, 203.0f, 10000.0f)));
+    }
 
     // 3. 启动
     auto result = Features::Recording::start(state, *state.recording, target.value(), config);

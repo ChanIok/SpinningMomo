@@ -93,6 +93,8 @@ export struct RecordingConfig {
   RateControlMode rate_control = RateControlMode::CBR;  // 码率控制模式
   EncoderMode encoder_mode = EncoderMode::Auto;         // 编码器模式
   VideoCodec codec = VideoCodec::H264;                  // 视频编码格式 (默认 H.264)
+  bool enable_hdr = false;                              // HDR10 录制，仅支持 GPU + H.265 Main10
+  std::uint32_t hdr_target_peak_nits = 1000;            // HDR 静态元数据峰值亮度
   bool capture_client_area = true;                      // 是否只捕获客户区（无边框）
   bool capture_cursor = false;                          // 是否捕获鼠标指针
   bool auto_restart_on_resize = true;                   // 尺寸变化时是否自动切段重启录制
