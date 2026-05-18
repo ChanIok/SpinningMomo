@@ -154,15 +154,18 @@ export default defineConfig({
               items: [{ text: "Getting Started", link: "/en/guide/getting-started" }],
             },
             {
-              text: "FAQ",
-              items: [{ text: "FAQ", link: "/en/guide/faq" }],
-            },
-            {
               text: "Features",
               items: [
                 { text: "Window & Resolution", link: "/en/features/window" },
                 { text: "Screenshots", link: "/en/features/screenshot" },
                 { text: "Video Recording", link: "/en/features/recording" },
+              ],
+            },
+            {
+              text: "Help",
+              items: [
+                { text: "Tips", link: "/en/guide/tips" },
+                { text: "FAQ", link: "/en/guide/faq" },
               ],
             },
             {
@@ -193,7 +196,7 @@ export default defineConfig({
 
     // 导航栏
     nav: [
-      { text: "指南", link: "/zh/guide/getting-started" },
+      { text: "指南", link: "/guide/getting-started" },
       {
         text: "版本",
         items: [
@@ -208,39 +211,39 @@ export default defineConfig({
     ],
 
     sidebar: {
-      "/zh/": [
+      "/": [
         {
           text: "快速上手",
           items: [
-            { text: "安装与运行", link: "/zh/guide/getting-started" },
+            { text: "安装与运行", link: "/guide/getting-started" },
           ],
         },
         {
           text: "功能",
           items: [
-            { text: "比例与分辨率调整", link: "/zh/features/window" },
-            { text: "超清截图", link: "/zh/features/screenshot" },
-            { text: "视频录制", link: "/zh/features/recording" },
+            { text: "比例与分辨率调整", link: "/features/window" },
+            { text: "超清截图", link: "/features/screenshot" },
+            { text: "视频录制", link: "/features/recording" },
           ],
         },
         {
           text: "帮助",
           items: [
-            { text: "使用技巧", link: "/zh/guide/tips" },
-            { text: "常见问题", link: "/zh/guide/faq" },
+            { text: "使用技巧", link: "/guide/tips" },
+            { text: "常见问题", link: "/guide/faq" },
           ],
         },
         {
           text: "开发者指南",
           items: [
-            { text: "架构与构建", link: "/zh/developer/architecture" },
+            { text: "架构与构建", link: "/developer/architecture" },
           ],
         },
         {
           text: "关于",
           items: [
-            { text: "法律与隐私", link: "/zh/about/legal" },
-            { text: "开源鸣谢", link: "/zh/about/credits" },
+            { text: "法律与隐私", link: "/about/legal" },
+            { text: "开源鸣谢", link: "/about/credits" },
           ]
         },
       ],

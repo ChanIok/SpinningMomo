@@ -48,18 +48,17 @@ export function getBilingualPathnames(relativePath: string): {
   if (p === "en/index.md") {
     return { zhPathname: "/", enPathname: "/en/" };
   }
-  if (p.startsWith("zh/")) {
-    const rest = p.slice("zh/".length);
-    return {
-      zhPathname: mdRelativeToPathname(p),
-      enPathname: mdRelativeToPathname(`en/${rest}`),
-    };
-  }
   if (p.startsWith("en/")) {
     const rest = p.slice("en/".length);
     return {
-      zhPathname: mdRelativeToPathname(`zh/${rest}`),
+      zhPathname: mdRelativeToPathname(rest),
       enPathname: mdRelativeToPathname(p),
+    };
+  }
+  if (p.endsWith(".md")) {
+    return {
+      zhPathname: mdRelativeToPathname(p),
+      enPathname: mdRelativeToPathname(`en/${p}`),
     };
   }
   return null;
@@ -68,8 +67,6 @@ export function getBilingualPathnames(relativePath: string): {
 export function pageLocale(relativePath: string): "zh-CN" | "en-US" | null {
   const p = relativePath.replace(/\\/g, "/");
   if (isLegacyDocPath(p)) return null;
-  if (p === "index.md") return "zh-CN";
   if (p.startsWith("en/")) return "en-US";
-  if (p.startsWith("zh/")) return "zh-CN";
-  return null;
+  return "zh-CN";
 }
