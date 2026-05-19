@@ -13,22 +13,30 @@ This project uses a hybrid architecture with a **C++23 native backend** and a **
 
 | Tool | Requirement | Notes |
 |------|-------------|-------|
-| **Visual Studio 2022+** | "Desktop development with C++" workload | Also check "**C++ Modules for v143 (with the standard library)**" |
+| **Visual Studio 2022** | "Desktop development with C++" workload | Enable "**C++ Modules for v143 (with the standard library)**"; **do not use VS 2026** — compile errors occur |
 | **Windows SDK** | 10.0.22621.0+ (Windows 11 SDK) | |
-| **xmake** | Latest | C++ build system, manages vcpkg dependencies |
+| **Git** | Latest | Clone vcpkg and run `fetch-third-party.ps1` |
+| **xmake** | Latest | C++ build system |
 | **Node.js** | v20+ | Web frontend build and npm scripts |
 
 ### Install xmake
 
 ```powershell
 # PowerShell (recommended)
-iwr -useb https://xmake.io/psget.txt | iex
+irm https://xmake.io/psget.text | iex
 
 # Or download from the official site
 # https://xmake.io/#/getting_started?id=installation
 ```
 
-> xmake automatically pulls C++ dependencies via vcpkg using `xmake-requires.lock` — **no manual vcpkg setup needed**.
+### Set up vcpkg
+
+```powershell
+git clone https://github.com/microsoft/vcpkg.git D:\dev\vcpkg  # path is up to you
+cd D:\dev\vcpkg
+.\bootstrap-vcpkg.bat
+.\vcpkg.exe integrate install
+```
 
 ---
 

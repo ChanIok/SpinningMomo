@@ -16,22 +16,30 @@
 
 | 工具 | 要求 | 说明 |
 |------|------|------|
-| **Visual Studio 2022+** | 含「使用 C++ 的桌面开发」工作负载 | 需在工作负载中额外勾选「**C++ 模块（针对标准库的 MSVC v143）**」|
+| **Visual Studio 2022** | 含「使用 C++ 的桌面开发」工作负载 | 需勾选「**C++ 模块（针对标准库的 MSVC v143）**」；**不要使用 VS 2026**，会出现编译错误 |
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
-| **xmake** | 最新版 | C++ 构建系统，管理 vcpkg 依赖 |
+| **Git** | 最新版 | 克隆 vcpkg 与 `fetch-third-party.ps1` |
+| **xmake** | 最新版 | C++ 构建系统 |
 | **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
 
 ### 安装 xmake
 
 ```powershell
 # PowerShell（推荐）
-iwr -useb https://xmake.io/psget.txt | iex
+irm https://xmake.io/psget.text | iex
 
 # 或前往官网下载安装包
 # https://xmake.io/#/getting_started?id=installation
 ```
 
-> xmake 会通过 `xmake-requires.lock` 自动调用 vcpkg 下载和编译 C++ 依赖，**无需手动安装 vcpkg**。
+### 准备 vcpkg
+
+```powershell
+git clone https://github.com/microsoft/vcpkg.git D:\dev\vcpkg  # 路径自定
+cd D:\dev\vcpkg
+.\bootstrap-vcpkg.bat
+.\vcpkg.exe integrate install
+```
 
 ---
 
