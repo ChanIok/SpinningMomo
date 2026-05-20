@@ -1,15 +1,13 @@
 module;
 
-#include <d2d1.h>
-#include <windows.h>
-
-#include <iostream>
-
 export module UI.ContextMenu.Types;
 
 import std;
 import Features.WindowControl;
 import Features.Settings.Menu;
+import Features.Settings.Menu.Types;
+import <d2d1.h>;
+import <windows.h>;
 
 export namespace UI::ContextMenu::Types {
 

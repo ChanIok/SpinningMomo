@@ -3,32 +3,10 @@ module;
 export module Features.Settings.Menu;
 
 import std;
-
-namespace Features::Settings::State {
-export struct SettingsState;
-}
+import Features.Settings.State;
+import Features.Settings.Menu.Types;
 
 namespace Features::Settings::Menu {
-
-// === Types (Merged from menu_data/types.ixx) ===
-
-// 比例预设
-export struct RatioPreset {
-  std::wstring name;  // 比例名称
-  double ratio;       // 宽高比值
-
-  constexpr RatioPreset(const std::wstring& n, double r) noexcept : name(n), ratio(r) {}
-};
-
-// 分辨率预设
-export struct ResolutionPreset {
-  std::wstring name;  // 显示名称（如 "4K"）
-  int base_width;     // 基准宽度
-  int base_height;    // 基准高度
-
-  constexpr ResolutionPreset(const std::wstring& n, int w, int h) noexcept
-      : name(n), base_width(w), base_height(h) {}
-};
 
 // === Getters Interface ===
 

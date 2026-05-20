@@ -4,7 +4,7 @@ export module Features.Settings.State;
 
 import std;
 import Features.Settings.Types;
-import Features.Settings.Menu;
+import Features.Settings.Menu.Types;
 
 namespace Features::Settings::State {
 
