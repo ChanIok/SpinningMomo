@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Core.RPC.Endpoints.Gallery;
 
 import std;
@@ -18,6 +14,7 @@ import Core.RPC.Endpoints.Gallery.Asset;
 import Core.RPC.Endpoints.Gallery.Tag;
 import Core.RPC.Endpoints.Gallery.Folder;
 import Utils.Logger;
+import <asio.hpp>;
 import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Gallery {
@@ -79,7 +76,7 @@ auto launch_scan_directory_task(Core::State::AppState& app_state,
         Core::Tasks::complete_task_success(app_state, task_id);
         Core::RPC::NotificationHub::send_notification(app_state, "gallery.changed");
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // ============= 扫描和索引 RPC 处理函数 =============

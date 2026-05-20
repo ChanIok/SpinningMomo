@@ -1,12 +1,9 @@
-module;
-
-#include <asio.hpp>
-
 module Core.Async;
 
 import std;
 import Core.Async.State;
 import Utils.Logger;
+import <asio.hpp>;
 
 namespace Core::Async {
 
@@ -27,7 +24,7 @@ auto start(Core::Async::State::AsyncState& runtime, size_t thread_count)
     runtime.thread_count = thread_count;
 
     // 初始化io_context
-    runtime.io_context = std::make_unique<asio::io_context>();
+    runtime.io_context.emplace();
 
     Logger().info("Starting AsyncRuntime with {} threads", thread_count);
 
@@ -99,7 +96,10 @@ auto is_running(const Core::Async::State::AsyncState& runtime) -> bool {
 }
 
 auto get_io_context(Core::Async::State::AsyncState& runtime) -> asio::io_context* {
-  return runtime.io_context.get();
+  if (!runtime.io_context) {
+    return nullptr;
+  }
+  return std::addressof(*runtime.io_context);
 }
 
 }  // namespace Core::Async

@@ -1,12 +1,9 @@
-module;
-
-#include <asio.hpp>
-
 export module Extensions.InfinityNikki.PhotoExtract;
 
 import std;
 import Core.State;
 import Extensions.InfinityNikki.Types;
+import <asio.hpp>;
 
 namespace Extensions::InfinityNikki::PhotoExtract {
 

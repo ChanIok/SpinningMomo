@@ -1,11 +1,11 @@
 module;
 
 #include <uwebsockets/App.h>
-#include <asio.hpp>
 
 export module Core.HttpServer.Types;
 
 import std;
+import <asio.hpp>;
 
 export namespace Core::HttpServer::Types {
 

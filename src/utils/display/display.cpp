@@ -1,6 +1,6 @@
 module;
 
-import <windows.h>;
+#include <windows.h>
 
 module Utils.Display;
 

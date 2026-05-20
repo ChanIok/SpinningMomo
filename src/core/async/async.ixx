@@ -1,11 +1,8 @@
-module;
-
-#include <asio.hpp>
-
 export module Core.Async;
 
 import std;
 import Core.Async.State;
+import <asio.hpp>;
 
 namespace Core::Async {
 

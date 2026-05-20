@@ -1,0 +1,251 @@
+diff --git a/installed/x64-windows-static/include/asio/as_tuple.hpp b/installed/x64-windows-static/include/asio/as_tuple.hpp
+index ab1894e..93562ad 100644
+--- a/installed/x64-windows-static/include/asio/as_tuple.hpp
++++ b/installed/x64-windows-static/include/asio/as_tuple.hpp
+@@ -141,7 +141,7 @@ struct partial_as_tuple
+  * asynchronous operation's default completion token (or asio::deferred
+  * if no default is available).
+  */
+-ASIO_INLINE_VARIABLE constexpr partial_as_tuple as_tuple;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr partial_as_tuple as_tuple;
+ 
+ } // namespace asio
+ 
+diff --git a/installed/x64-windows-static/include/asio/deferred.hpp b/installed/x64-windows-static/include/asio/deferred.hpp
+index 3e608ad..3e848eb 100644
+--- a/installed/x64-windows-static/include/asio/deferred.hpp
++++ b/installed/x64-windows-static/include/asio/deferred.hpp
+@@ -708,7 +708,7 @@ inline auto operator|(Head head, Tail&& tail)
+ /**
+  * See the documentation for asio::deferred_t for a usage example.
+  */
+-ASIO_INLINE_VARIABLE constexpr deferred_t deferred;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr deferred_t deferred;
+ 
+ } // namespace asio
+ 
+diff --git a/installed/x64-windows-static/include/asio/detached.hpp b/installed/x64-windows-static/include/asio/detached.hpp
+index 001d355..cfd74e4 100644
+--- a/installed/x64-windows-static/include/asio/detached.hpp
++++ b/installed/x64-windows-static/include/asio/detached.hpp
+@@ -94,7 +94,7 @@ public:
+ /**
+  * See the documentation for asio::detached_t for a usage example.
+  */
+-ASIO_INLINE_VARIABLE constexpr detached_t detached;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr detached_t detached;
+ 
+ } // namespace asio
+ 
+diff --git a/installed/x64-windows-static/include/asio/detail/config.hpp b/installed/x64-windows-static/include/asio/detail/config.hpp
+index 4b9f0f0..0f7a000 100644
+--- a/installed/x64-windows-static/include/asio/detail/config.hpp
++++ b/installed/x64-windows-static/include/asio/detail/config.hpp
+@@ -378,6 +378,10 @@
+ #if !defined(ASIO_INLINE_VARIABLE)
+ # define ASIO_INLINE_VARIABLE
+ #endif // !defined(ASIO_INLINE_VARIABLE)
++
++#if !defined(ASIO_INLINE_VARIABLE_EXTERNAL)
++# define ASIO_INLINE_VARIABLE_EXTERNAL extern __declspec(selectany) ASIO_INLINE_VARIABLE
++#endif // !defined(ASIO_INLINE_VARIABLE_EXTERNAL)
+ 
+ // Default alignment.
+ #if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
+diff --git a/installed/x64-windows-static/include/asio/execution/allocator.hpp b/installed/x64-windows-static/include/asio/execution/allocator.hpp
+index 30daf38..b7150ed 100644
+--- a/installed/x64-windows-static/include/asio/execution/allocator.hpp
++++ b/installed/x64-windows-static/include/asio/execution/allocator.hpp
+@@ -225,7 +225,7 @@ const T allocator_t<void>::static_query_v;
+ #endif // defined(ASIO_HAS_DEDUCED_STATIC_QUERY_TRAIT)
+        //   && defined(ASIO_HAS_SFINAE_VARIABLE_TEMPLATES)
+ 
+-ASIO_INLINE_VARIABLE constexpr allocator_t<void> allocator;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr allocator_t<void> allocator;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/execution/blocking.hpp b/installed/x64-windows-static/include/asio/execution/blocking.hpp
+index 41135e0..4265c69 100644
+--- a/installed/x64-windows-static/include/asio/execution/blocking.hpp
++++ b/installed/x64-windows-static/include/asio/execution/blocking.hpp
+@@ -892,7 +892,7 @@ const T never_t<I>::static_query_v;
+ 
+ typedef detail::blocking_t<> blocking_t;
+ 
+-ASIO_INLINE_VARIABLE constexpr blocking_t blocking;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr blocking_t blocking;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/execution/blocking_adaptation.hpp b/installed/x64-windows-static/include/asio/execution/blocking_adaptation.hpp
+index 412fbaa..f5f6ceb 100644
+--- a/installed/x64-windows-static/include/asio/execution/blocking_adaptation.hpp
++++ b/installed/x64-windows-static/include/asio/execution/blocking_adaptation.hpp
+@@ -718,7 +718,7 @@ void blocking_execute(
+ 
+ typedef detail::blocking_adaptation_t<> blocking_adaptation_t;
+ 
+-ASIO_INLINE_VARIABLE constexpr blocking_adaptation_t blocking_adaptation;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr blocking_adaptation_t blocking_adaptation;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/execution/context.hpp b/installed/x64-windows-static/include/asio/execution/context.hpp
+index f624f89..75095cb 100644
+--- a/installed/x64-windows-static/include/asio/execution/context.hpp
++++ b/installed/x64-windows-static/include/asio/execution/context.hpp
+@@ -138,7 +138,7 @@ const T context_t<I>::static_query_v;
+ 
+ typedef detail::context_t<> context_t;
+ 
+-ASIO_INLINE_VARIABLE constexpr context_t context;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr context_t context;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/execution/mapping.hpp b/installed/x64-windows-static/include/asio/execution/mapping.hpp
+index 1156313..996d2c9 100644
+--- a/installed/x64-windows-static/include/asio/execution/mapping.hpp
++++ b/installed/x64-windows-static/include/asio/execution/mapping.hpp
+@@ -733,7 +733,7 @@ const T other_t<I>::static_query_v;
+ 
+ typedef detail::mapping_t<> mapping_t;
+ 
+-ASIO_INLINE_VARIABLE constexpr mapping_t mapping;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr mapping_t mapping;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/execution/occupancy.hpp b/installed/x64-windows-static/include/asio/execution/occupancy.hpp
+index 57042ce..9651da5 100644
+--- a/installed/x64-windows-static/include/asio/execution/occupancy.hpp
++++ b/installed/x64-windows-static/include/asio/execution/occupancy.hpp
+@@ -131,7 +131,7 @@ const T occupancy_t<I>::static_query_v;
+ 
+ typedef detail::occupancy_t<> occupancy_t;
+ 
+-ASIO_INLINE_VARIABLE constexpr occupancy_t occupancy;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr occupancy_t occupancy;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/execution/outstanding_work.hpp b/installed/x64-windows-static/include/asio/execution/outstanding_work.hpp
+index edcfd14..59c3051 100644
+--- a/installed/x64-windows-static/include/asio/execution/outstanding_work.hpp
++++ b/installed/x64-windows-static/include/asio/execution/outstanding_work.hpp
+@@ -544,7 +544,7 @@ const T tracked_t<I>::static_query_v;
+ 
+ typedef detail::outstanding_work_t<> outstanding_work_t;
+ 
+-ASIO_INLINE_VARIABLE constexpr outstanding_work_t outstanding_work;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr outstanding_work_t outstanding_work;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/execution/relationship.hpp b/installed/x64-windows-static/include/asio/execution/relationship.hpp
+index e15660d..f0268eb 100644
+--- a/installed/x64-windows-static/include/asio/execution/relationship.hpp
++++ b/installed/x64-windows-static/include/asio/execution/relationship.hpp
+@@ -542,7 +542,7 @@ const T continuation_t<I>::static_query_v;
+ 
+ typedef detail::relationship_t<> relationship_t;
+ 
+-ASIO_INLINE_VARIABLE constexpr relationship_t relationship;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr relationship_t relationship;
+ 
+ } // namespace execution
+ 
+diff --git a/installed/x64-windows-static/include/asio/experimental/use_coro.hpp b/installed/x64-windows-static/include/asio/experimental/use_coro.hpp
+index 409bf4b..4f4b460 100644
+--- a/installed/x64-windows-static/include/asio/experimental/use_coro.hpp
++++ b/installed/x64-windows-static/include/asio/experimental/use_coro.hpp
+@@ -173,9 +173,9 @@ private:
+  * See the documentation for asio::use_coro_t for a usage example.
+  */
+ #if defined(GENERATING_DOCUMENTATION)
+-ASIO_INLINE_VARIABLE constexpr use_coro_t<> use_coro;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr use_coro_t<> use_coro;
+ #else
+-ASIO_INLINE_VARIABLE constexpr use_coro_t<> use_coro(0, 0, 0);
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr use_coro_t<> use_coro(0, 0, 0);
+ #endif
+ 
+ } // namespace experimental
+diff --git a/installed/x64-windows-static/include/asio/experimental/use_promise.hpp b/installed/x64-windows-static/include/asio/experimental/use_promise.hpp
+index 721b89d..c5ac43b 100644
+--- a/installed/x64-windows-static/include/asio/experimental/use_promise.hpp
++++ b/installed/x64-windows-static/include/asio/experimental/use_promise.hpp
+@@ -99,7 +99,7 @@ private:
+   Allocator allocator_;
+ };
+ 
+-ASIO_INLINE_VARIABLE constexpr use_promise_t<> use_promise;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr use_promise_t<> use_promise;
+ 
+ } // namespace experimental
+ } // namespace asio
+diff --git a/installed/x64-windows-static/include/asio/this_coro.hpp b/installed/x64-windows-static/include/asio/this_coro.hpp
+index ff347e7..7797d8d 100644
+--- a/installed/x64-windows-static/include/asio/this_coro.hpp
++++ b/installed/x64-windows-static/include/asio/this_coro.hpp
+@@ -32,7 +32,7 @@ struct executor_t
+ };
+ 
+ /// Awaitable object that returns the executor of the current coroutine.
+-ASIO_INLINE_VARIABLE constexpr executor_t executor;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr executor_t executor;
+ 
+ /// Awaitable type that returns the cancellation state of the current coroutine.
+ struct cancellation_state_t
+@@ -57,7 +57,7 @@ struct cancellation_state_t
+  *     // ...
+  * } @endcode
+  */
+-ASIO_INLINE_VARIABLE constexpr cancellation_state_t cancellation_state;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr cancellation_state_t cancellation_state;
+ 
+ #if defined(GENERATING_DOCUMENTATION)
+ 
+diff --git a/installed/x64-windows-static/include/asio/use_awaitable.hpp b/installed/x64-windows-static/include/asio/use_awaitable.hpp
+index a775963..552f902 100644
+--- a/installed/x64-windows-static/include/asio/use_awaitable.hpp
++++ b/installed/x64-windows-static/include/asio/use_awaitable.hpp
+@@ -145,9 +145,9 @@ struct use_awaitable_t
+  * See the documentation for asio::use_awaitable_t for a usage example.
+  */
+ #if defined(GENERATING_DOCUMENTATION)
+-ASIO_INLINE_VARIABLE constexpr use_awaitable_t<> use_awaitable;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr use_awaitable_t<> use_awaitable;
+ #else
+-ASIO_INLINE_VARIABLE constexpr use_awaitable_t<> use_awaitable(0, 0, 0);
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr use_awaitable_t<> use_awaitable(0, 0, 0);
+ #endif
+ 
+ } // namespace asio
+diff --git a/installed/x64-windows-static/include/asio/use_future.hpp b/installed/x64-windows-static/include/asio/use_future.hpp
+index 9f136c7..76f1b53 100644
+--- a/installed/x64-windows-static/include/asio/use_future.hpp
++++ b/installed/x64-windows-static/include/asio/use_future.hpp
+@@ -145,7 +145,7 @@ private:
+ /**
+  * See the documentation for asio::use_future_t for a usage example.
+  */
+-ASIO_INLINE_VARIABLE constexpr use_future_t<> use_future;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr use_future_t<> use_future;
+ 
+ } // namespace asio
+ 
+diff --git a/installed/x64-windows-static/include/asio/uses_executor.hpp b/installed/x64-windows-static/include/asio/uses_executor.hpp
+index a1c976c..cb61607 100644
+--- a/installed/x64-windows-static/include/asio/uses_executor.hpp
++++ b/installed/x64-windows-static/include/asio/uses_executor.hpp
+@@ -45,7 +45,7 @@ struct executor_arg_t
+  * See asio::executor_arg_t and asio::uses_executor
+  * for more information.
+  */
+-ASIO_INLINE_VARIABLE constexpr executor_arg_t executor_arg;
++ASIO_INLINE_VARIABLE_EXTERNAL constexpr executor_arg_t executor_arg;
+ 
+ /// The uses_executor trait detects whether a type T has an associated executor
+ /// that is convertible from type Executor.

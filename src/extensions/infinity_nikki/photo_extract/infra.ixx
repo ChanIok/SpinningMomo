@@ -1,13 +1,10 @@
-module;
-
-#include <asio.hpp>
-
 export module Extensions.InfinityNikki.PhotoExtract.Infra;
 
 import std;
 import Core.State;
 import Extensions.InfinityNikki.PhotoExtract.Scan;
 import Extensions.InfinityNikki.Types;
+import <asio.hpp>;
 
 export namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 

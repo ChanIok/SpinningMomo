@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Features.Update;
 
 import std;
@@ -24,6 +20,7 @@ import Utils.Throttle;
 import Vendor.ShellApi;
 import Vendor.Version;
 import Vendor.Windows;
+import <asio.hpp>;
 
 namespace Features::Update {
 
@@ -580,7 +577,7 @@ auto start_download_update_task(Core::State::AppState& app_state, bool prepare_i
         co_await asio::post(asio::use_awaitable);
         co_await run_download_update_task(app_state, task_id, version, prepare_install_on_exit);
       },
-      asio::detached);
+      asio::detached_t{});
 
   co_return Types::StartDownloadUpdateResult{
       .task_id = task_id,
@@ -659,7 +656,7 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
         Logger().info("Startup auto update check completed: current version is up-to-date ({})",
                       check_result->current_version);
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 auto check_for_update(Core::State::AppState& app_state)
@@ -774,7 +771,7 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   sei.nShow = Vendor::ShellApi::kSW_HIDE;
   sei.hInstApp = nullptr;
 
-  const bool shell_execute_ok = Vendor::ShellApi::ShellExecuteExW(&sei) != FALSE;
+  const bool shell_execute_ok = Vendor::ShellApi::ShellExecuteExW(&sei) != 0;
 
   if (shell_execute_ok) {
     Logger().info("Update script launch accepted by shell");

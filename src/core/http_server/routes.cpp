@@ -2,8 +2,6 @@ module;
 
 #include <uwebsockets/App.h>
 
-#include <asio.hpp>
-
 module Core.HttpServer.Routes;
 
 import std;
@@ -15,6 +13,7 @@ import Core.Async;
 import Core.RPC;
 import Utils.Logger;
 import Vendor.BuildConfig;
+import <asio.hpp>;
 
 namespace Core::HttpServer::Routes {
 
@@ -115,7 +114,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
                   });
                 }
               },
-              asio::detached);
+              asio::detached_t{});
         });
       }
     });

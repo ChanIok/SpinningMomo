@@ -1,13 +1,10 @@
-module;
-
-#include <asio.hpp>
-
 export module Features.Update;
 
 import std;
 import Core.State;
 import Features.Update.State;
 import Features.Update.Types;
+import <asio.hpp>;
 
 namespace Features::Update {
 

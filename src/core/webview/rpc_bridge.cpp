@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Core.WebView.RpcBridge;
 
 import std;
@@ -13,6 +9,7 @@ import Core.RPC;
 import Core.Async;
 import Core.WebView.Events;
 import Utils.Logger;
+import <asio.hpp>;
 
 namespace Core::WebView::RpcBridge {
 
@@ -62,7 +59,7 @@ auto handle_webview_message(Core::State::AppState& state, const std::string& mes
 
     // 错误处理：直接投递错误响应字符串
     Core::Events::post(*state.events, Core::WebView::Events::WebViewResponseEvent{
-                                             create_generic_error_response(e.what())});
+                                          create_generic_error_response(e.what())});
 
     Logger().debug("WebView error response queued for UI thread processing");
   }
@@ -95,7 +92,7 @@ auto create_message_handler(Core::State::AppState& state)
         [&state, message]() -> asio::awaitable<void> {
           co_await handle_webview_message(state, message);
         },
-        asio::detached);
+        asio::detached_t{});
   };
 }
 

@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Extensions.InfinityNikki.PhotoExtract;
 
 import std;
@@ -11,6 +7,7 @@ import Extensions.InfinityNikki.PhotoExtract.Infra;
 import Extensions.InfinityNikki.PhotoExtract.Scan;
 import Extensions.InfinityNikki.Types;
 import Utils.Logger;
+import <asio.hpp>;
 
 namespace Extensions::InfinityNikki::PhotoExtract {
 

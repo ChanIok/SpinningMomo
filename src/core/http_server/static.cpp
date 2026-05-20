@@ -2,8 +2,6 @@ module;
 
 #include <uwebsockets/App.h>
 
-#include <asio.hpp>
-
 module Core.HttpServer.Static;
 
 import std;
@@ -15,6 +13,7 @@ import Utils.File.Mime;
 import Utils.Path;
 import Utils.Logger;
 import Utils.Time;
+import <asio.hpp>;
 
 namespace Core::HttpServer::Static {
 
@@ -617,7 +616,7 @@ auto serve_resolved_file_request(Core::State::AppState& state,
           });
         }
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // 处理静态文件请求

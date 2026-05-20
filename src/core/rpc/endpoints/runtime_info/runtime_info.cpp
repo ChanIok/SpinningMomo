@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Core.RPC.Endpoints.RuntimeInfo;
 
 import std;
@@ -10,6 +6,7 @@ import Core.State.RuntimeInfo;
 import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
+import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::RuntimeInfo {
 

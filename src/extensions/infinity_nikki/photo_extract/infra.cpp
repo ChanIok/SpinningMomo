@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Extensions.InfinityNikki.PhotoExtract.Infra;
 
 import std;
@@ -13,6 +9,7 @@ import Core.HttpClient.Types;
 import Features.Gallery.Folder.Repository;
 import Extensions.InfinityNikki.PhotoExtract.Scan;
 import Extensions.InfinityNikki.Types;
+import <asio.hpp>;
 import <rfl/json.hpp>;
 
 namespace Extensions::InfinityNikki::PhotoExtract::Infra {
