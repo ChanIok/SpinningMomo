@@ -67,7 +67,7 @@ struct AssetIdRow {
 
 auto read_user_record(Core::State::AppState& app_state, std::int64_t asset_id)
     -> std::expected<InfinityNikkiUserRecord, std::string> {
-  auto rows_result = Core::Database::query<InfinityNikkiUserRecordRow>(*app_state.database,
+  auto rows_result = Core::Database::query<InfinityNikkiUserRecordRow>(app_state,
                                                                        R"(
         SELECT record_key,
                record_value
@@ -140,7 +140,7 @@ auto upsert_user_record_key(Core::State::AppState& app_state, std::int64_t asset
                             std::string_view record_key, std::string_view record_value)
     -> std::expected<void, std::string> {
   auto result =
-      Core::Database::execute(*app_state.database,
+      Core::Database::execute(app_state,
                               R"(
       INSERT INTO asset_infinity_nikki_user_record (asset_id, record_key, record_value)
       VALUES (?, ?, ?)
@@ -159,7 +159,7 @@ auto delete_user_record_keys(Core::State::AppState& app_state, std::int64_t asse
     -> std::expected<void, std::string> {
   for (const auto& record_key : record_keys) {
     auto result = Core::Database::execute(
-        *app_state.database,
+        app_state,
         "DELETE FROM asset_infinity_nikki_user_record WHERE asset_id = ? AND record_key = ?",
         {asset_id, record_key});
     if (!result) {
@@ -179,9 +179,8 @@ auto db_param_from_optional_string(const std::optional<std::string>& value)
 
 auto read_source_outfit_dye_state(Core::State::AppState& app_state, std::int64_t asset_id)
     -> std::expected<std::optional<InfinityNikkiSourceOutfitDyeStateRow>, std::string> {
-  auto result =
-      Core::Database::query_single<InfinityNikkiSourceOutfitDyeStateRow>(*app_state.database,
-                                                                         R"(
+  auto result = Core::Database::query_single<InfinityNikkiSourceOutfitDyeStateRow>(app_state,
+                                                                                   R"(
         SELECT p.nikki_diy_json AS nikki_diy_json,
                (
                  SELECT COUNT(*)
@@ -191,7 +190,7 @@ auto read_source_outfit_dye_state(Core::State::AppState& app_state, std::int64_t
         FROM asset_infinity_nikki_params p
         WHERE p.asset_id = ?
       )",
-                                                                         {asset_id});
+                                                                                   {asset_id});
   if (!result) {
     return std::unexpected("Failed to query Infinity Nikki outfit and dye state: " +
                            result.error());
@@ -206,7 +205,7 @@ auto query_same_outfit_dye_code_fill_preview(
     -> std::expected<InfinityNikkiSameOutfitDyeCodeFillPreview, std::string> {
   const auto diy_json_param = db_param_from_optional_string(source_state.nikki_diy_json);
   auto stats_result = Core::Database::query_single<SameOutfitDyeCodeFillStatsRow>(
-      *app_state.database,
+      app_state,
       R"(
         SELECT COUNT(*) AS matched_count,
                COALESCE(SUM(
@@ -266,7 +265,7 @@ auto query_same_outfit_dye_code_target_asset_ids(
     -> std::expected<std::vector<std::int64_t>, std::string> {
   const auto diy_json_param = db_param_from_optional_string(source_state.nikki_diy_json);
   auto rows_result =
-      Core::Database::query<AssetIdRow>(*app_state.database,
+      Core::Database::query<AssetIdRow>(app_state,
                                         R"(
         SELECT p.asset_id AS asset_id
         FROM asset_infinity_nikki_params p
@@ -365,8 +364,7 @@ auto query_photo_map_points(Core::State::AppState& app_state,
   )",
                                 where_clause, order_config.indexed_order_clause);
 
-  auto result =
-      Core::Database::query<PhotoMapPointWithWorldRecord>(*app_state.database, sql, query_params);
+  auto result = Core::Database::query<PhotoMapPointWithWorldRecord>(app_state, sql, query_params);
   if (!result) {
     co_return std::unexpected("Failed to query photo map points: " + result.error());
   }
@@ -468,7 +466,7 @@ auto get_details(Core::State::AppState& app_state, const GetInfinityNikkiDetails
   )";
 
   auto extracted_result = Core::Database::query_single<InfinityNikkiExtractedParams>(
-      *app_state.database, extracted_sql, {params.asset_id});
+      app_state, extracted_sql, {params.asset_id});
   if (!extracted_result) {
     co_return std::unexpected("Failed to query Infinity Nikki extracted params: " +
                               extracted_result.error());
@@ -543,7 +541,7 @@ auto set_user_record(Core::State::AppState& app_state,
   }
 
   auto write_result = Core::Database::execute_transaction(
-      *app_state.database, [&](auto&) -> std::expected<void, std::string> {
+      app_state, [&](Core::State::AppState&) -> std::expected<void, std::string> {
         if (normalized_code_value.has_value()) {
           auto value_result = upsert_user_record_key(app_state, params.asset_id, "dye_code",
                                                      normalized_code_value.value());
@@ -660,7 +658,7 @@ auto fill_same_outfit_dye_code(Core::State::AppState& app_state,
 
   auto target_ids = std::move(target_ids_result.value());
   auto write_result = Core::Database::execute_transaction(
-      *app_state.database, [&](auto&) -> std::expected<void, std::string> {
+      app_state, [&](Core::State::AppState&) -> std::expected<void, std::string> {
         for (const auto asset_id : target_ids) {
           auto value_result =
               upsert_user_record_key(app_state, asset_id, "dye_code", normalized_code_value);

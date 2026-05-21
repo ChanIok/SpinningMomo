@@ -8,7 +8,7 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Core.Commands;
-import Core.Commands.State;
+import Core.Commands.Types;
 import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Registry {
@@ -17,14 +17,7 @@ auto handle_get_all_commands(Core::State::AppState& app_state,
                              const Core::Commands::GetAllCommandsParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Core::Commands::GetAllCommandsResult>> {
   try {
-    if (!app_state.commands) {
-      co_return std::unexpected(
-          Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                              .message = "Command registry not initialized"});
-    }
-
-    // 获取所有命令描述符
-    auto all_commands = Core::Commands::get_all_commands(app_state.commands->registry);
+    auto all_commands = Core::Commands::get_all_commands(app_state);
 
     // 转换为 RPC 传输格式
     Core::Commands::GetAllCommandsResult result;
@@ -51,19 +44,13 @@ auto handle_invoke_command(Core::State::AppState& app_state,
                            const Core::Commands::InvokeCommandParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Core::Commands::InvokeCommandResult>> {
   try {
-    if (!app_state.commands) {
-      co_return std::unexpected(
-          Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                              .message = "Command registry not initialized"});
-    }
-
     if (params.id.empty()) {
       co_return std::unexpected(
           Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::InvalidParams),
                               .message = "Command id cannot be empty"});
     }
 
-    const auto success = Core::Commands::invoke_command(app_state.commands->registry, params.id);
+    const auto success = Core::Commands::invoke_command(app_state, params.id);
 
     Core::Commands::InvokeCommandResult result{
         .success = success,

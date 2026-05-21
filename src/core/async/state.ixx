@@ -5,9 +5,9 @@ export module Core.Async.State;
 import std;
 import <asio.hpp>;
 
-export namespace Core::Async::State {
+namespace Core::Async::State {
 
-struct AsyncState {
+export struct AsyncState {
   // 核心asio状态
   std::optional<asio::io_context> io_context;
   std::vector<std::jthread> worker_threads;

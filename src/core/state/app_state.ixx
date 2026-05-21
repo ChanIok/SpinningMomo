@@ -32,6 +32,30 @@ namespace Core::State::RuntimeInfo {
 export struct RuntimeInfoState;
 }
 
+namespace Core::Database::State {
+export struct DatabaseState;
+}
+
+namespace Core::HttpServer::State {
+export struct HttpServerState;
+}
+
+namespace Core::HttpClient::State {
+export struct HttpClientState;
+}
+
+namespace Core::WorkerPool::State {
+export struct WorkerPoolState;
+}
+
+namespace Core::Commands::State {
+export struct CommandState;
+}
+
+namespace Core::Tasks::State {
+export struct TaskState;
+}
+
 namespace Features::Settings::State {
 export struct SettingsState;
 }
@@ -82,30 +106,6 @@ export struct ScreenshotState;
 
 namespace Features::Recording::State {
 export struct RecordingState;
-}
-
-namespace Core::HttpServer::State {
-export struct HttpServerState;
-}
-
-namespace Core::HttpClient::State {
-export struct HttpClientState;
-}
-
-namespace Core::Database::State {
-export struct DatabaseState;
-}
-
-namespace Core::WorkerPool::State {
-export struct WorkerPoolState;
-}
-
-namespace Core::Commands::State {
-export struct CommandState;
-}
-
-namespace Core::Tasks::State {
-export struct TaskState;
 }
 
 namespace Core::State {

@@ -30,7 +30,7 @@ auto initialize_rpc_bridge(Core::State::AppState& state) -> void {
   Logger().info("Initializing WebView RPC bridge");
 
   // 确保异步运行时已启动
-  if (!Core::Async::is_running(*state.async)) {
+  if (!Core::Async::is_running(state)) {
     Logger().warn("Async runtime not running when initializing RPC bridge");
   }
 
@@ -50,7 +50,7 @@ auto handle_webview_message(Core::State::AppState& state, const std::string& mes
     auto response = co_await Core::RPC::process_request(state, message);
 
     // 直接投递响应字符串到UI线程处理
-    Core::Events::post(*state.events, Core::WebView::Events::WebViewResponseEvent{response});
+    Core::Events::post(state, Core::WebView::Events::WebViewResponseEvent{response});
 
     Logger().debug("WebView response queued for UI thread processing");
 
@@ -58,8 +58,8 @@ auto handle_webview_message(Core::State::AppState& state, const std::string& mes
     Logger().error("Error handling WebView RPC message: {}", e.what());
 
     // 错误处理：直接投递错误响应字符串
-    Core::Events::post(*state.events, Core::WebView::Events::WebViewResponseEvent{
-                                          create_generic_error_response(e.what())});
+    Core::Events::post(state, Core::WebView::Events::WebViewResponseEvent{
+                                  create_generic_error_response(e.what())});
 
     Logger().debug("WebView error response queued for UI thread processing");
   }
@@ -88,7 +88,7 @@ auto create_message_handler(Core::State::AppState& state)
   return [&state](const std::string& message) {
     // 在异步运行时中处理消息
     asio::co_spawn(
-        *Core::Async::get_io_context(*state.async),
+        *Core::Async::get_io_context(state),
         [&state, message]() -> asio::awaitable<void> {
           co_await handle_webview_message(state, message);
         },

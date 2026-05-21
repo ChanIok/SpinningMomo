@@ -4,9 +4,9 @@ export module Core.WorkerPool.State;
 
 import std;
 
-export namespace Core::WorkerPool::State {
+namespace Core::WorkerPool::State {
 
-struct WorkerPoolState {
+export struct WorkerPoolState {
   // 工作线程池
   std::vector<std::jthread> worker_threads;
 

@@ -105,7 +105,7 @@ auto apply_runtime_language_from_settings(Core::State::AppState& state,
   }
 
   const auto& locale = settings.app.language.current;
-  if (auto result = Core::I18n::load_language_by_locale(*state.i18n, locale); !result) {
+  if (auto result = Core::I18n::load_language_by_locale(state, locale); !result) {
     Logger().warn("Failed to apply runtime language ('{}'): {}", locale, result.error());
     return;
   }
@@ -206,8 +206,7 @@ auto register_settings_handlers(Core::State::AppState& app_state) -> void {
 
   // 注册设置变更事件处理器
   subscribe<Features::Settings::Events::SettingsChangeEvent>(
-      *app_state.events,
-      [&app_state](const Features::Settings::Events::SettingsChangeEvent& event) {
+      app_state, [&app_state](const Features::Settings::Events::SettingsChangeEvent& event) {
         handle_settings_changed(app_state, event);
       });
 }

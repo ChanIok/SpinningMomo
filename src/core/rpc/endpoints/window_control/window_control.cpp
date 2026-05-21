@@ -6,6 +6,7 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Features.WindowControl;
+import Features.WindowControl.Types;
 import Utils.String;
 import <asio.hpp>;
 

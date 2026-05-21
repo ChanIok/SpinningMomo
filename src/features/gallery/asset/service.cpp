@@ -92,8 +92,7 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
 
   // 3. 获取总数（用于分页计算或前端显示）
   std::string count_sql = std::format("SELECT COUNT(*) FROM assets {}", where_clause);
-  auto total_count_result =
-      Core::Database::query_scalar<int>(*app_state.database, count_sql, where_params);
+  auto total_count_result = Core::Database::query_scalar<int>(app_state, count_sql, where_params);
   if (!total_count_result) {
     return std::unexpected("Failed to count assets: " + total_count_result.error());
   }
@@ -137,7 +136,7 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
   }
 
   // 6. 执行查询
-  auto assets_result = Core::Database::query<Types::Asset>(*app_state.database, sql, final_params);
+  auto assets_result = Core::Database::query<Types::Asset>(app_state, sql, final_params);
   if (!assets_result) {
     return std::unexpected("Failed to query assets: " + assets_result.error());
   }
@@ -189,8 +188,7 @@ auto query_asset_layout_meta(Core::State::AppState& app_state,
   auto order_config = QuerySupport::build_query_order_config(params.sort_by, params.sort_order);
 
   std::string count_sql = std::format("SELECT COUNT(*) FROM assets {}", where_clause);
-  auto total_count_result =
-      Core::Database::query_scalar<int>(*app_state.database, count_sql, where_params);
+  auto total_count_result = Core::Database::query_scalar<int>(app_state, count_sql, where_params);
   if (!total_count_result) {
     return std::unexpected("Failed to count assets for layout meta: " + total_count_result.error());
   }
@@ -204,7 +202,7 @@ auto query_asset_layout_meta(Core::State::AppState& app_state,
                                 where_clause, order_config.asset_order_clause);
 
   auto items_result =
-      Core::Database::query<Types::AssetLayoutMetaItem>(*app_state.database, sql, where_params);
+      Core::Database::query<Types::AssetLayoutMetaItem>(app_state, sql, where_params);
   if (!items_result) {
     return std::unexpected("Failed to query asset layout meta: " + items_result.error());
   }
@@ -256,8 +254,7 @@ auto get_timeline_buckets(Core::State::AppState& app_state,
   )",
                                 where_clause, order_config.sort_order);
 
-  auto result =
-      Core::Database::query<Types::TimelineBucket>(*app_state.database, sql, query_params);
+  auto result = Core::Database::query<Types::TimelineBucket>(app_state, sql, query_params);
 
   if (!result) {
     return std::unexpected("Failed to query timeline buckets: " + result.error());
@@ -362,7 +359,7 @@ auto get_home_stats(Core::State::AppState& app_state)
     FROM assets
   )";
 
-  auto result = Core::Database::query_single<Types::HomeStats>(*app_state.database, sql);
+  auto result = Core::Database::query_single<Types::HomeStats>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to query home stats: " + result.error());
   }
@@ -418,7 +415,7 @@ auto get_batch_selection_summary(Core::State::AppState& app_state,
   }
 
   auto aggregate_result = Core::Database::query_single<BatchReviewAggregate>(
-      *app_state.database, aggregate_sql, aggregate_params);
+      app_state, aggregate_sql, aggregate_params);
   if (!aggregate_result) {
     return std::unexpected("Failed to query batch selection summary: " + aggregate_result.error());
   }
@@ -465,7 +462,7 @@ auto get_batch_selection_summary(Core::State::AppState& app_state,
   tag_params.push_back(aggregate.matched_count);
 
   auto common_tags_result =
-      Core::Database::query<Types::Tag>(*app_state.database, common_tags_sql, tag_params);
+      Core::Database::query<Types::Tag>(app_state, common_tags_sql, tag_params);
   if (!common_tags_result) {
     return std::unexpected("Failed to query common tags for batch selection: " +
                            common_tags_result.error());
@@ -522,7 +519,7 @@ auto update_assets_review_state(Core::State::AppState& app_state,
     db_params.push_back(asset_id);
   }
 
-  auto result = Core::Database::execute(*app_state.database, sql, db_params);
+  auto result = Core::Database::execute(app_state, sql, db_params);
   if (!result) {
     return std::unexpected("Failed to update assets review state: " + result.error());
   }
@@ -566,8 +563,7 @@ auto update_asset_description(Core::State::AppState& app_state,
   db_params.push_back(params.asset_id);
 
   auto result = Core::Database::query_scalar<std::int64_t>(
-      *app_state.database, "UPDATE assets SET description = ? WHERE id = ? RETURNING id",
-      db_params);
+      app_state, "UPDATE assets SET description = ? WHERE id = ? RETURNING id", db_params);
   if (!result) {
     return std::unexpected("Failed to update asset description: " + result.error());
   }
@@ -617,7 +613,7 @@ auto update_assets_description(Core::State::AppState& app_state,
     std::int64_t id = 0;
   };
 
-  auto result = Core::Database::query<UpdatedAssetId>(*app_state.database, sql, db_params);
+  auto result = Core::Database::query<UpdatedAssetId>(app_state, sql, db_params);
   if (!result) {
     return std::unexpected("Failed to update assets description: " + result.error());
   }
@@ -647,7 +643,7 @@ auto load_asset_cache(Core::State::AppState& app_state)
     FROM assets
   )";
 
-  auto result = Core::Database::query<Types::Asset>(*app_state.database, sql);
+  auto result = Core::Database::query<Types::Asset>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to load asset cache: " + result.error());
   }

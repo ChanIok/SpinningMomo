@@ -84,7 +84,7 @@ auto create_asset(Core::State::AppState& app_state, const Types::Asset& item)
                        ? Core::Database::Types::DbParam{item.file_modified_at.value()}
                        : Core::Database::Types::DbParam{std::monostate{}});
 
-  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, params);
   if (!result || !result->has_value()) {
     return std::unexpected("Failed to insert asset item: " +
                            (result ? std::string("missing returned ID") : result.error()));
@@ -109,7 +109,7 @@ auto get_asset_by_id(Core::State::AppState& app_state, int64_t id)
 
   std::vector<Core::Database::Types::DbParam> params = {id};
 
-  auto result = Core::Database::query_single<Types::Asset>(*app_state.database, sql, params);
+  auto result = Core::Database::query_single<Types::Asset>(app_state, sql, params);
 
   if (!result) {
     return std::unexpected("Failed to get asset by id: " + result.error());
@@ -134,7 +134,7 @@ auto get_asset_by_path(Core::State::AppState& app_state, const std::string& path
 
   std::vector<Core::Database::Types::DbParam> params = {path};
 
-  auto result = Core::Database::query_single<Types::Asset>(*app_state.database, sql, params);
+  auto result = Core::Database::query_single<Types::Asset>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query asset item by path: " + result.error());
   }
@@ -165,7 +165,7 @@ auto has_assets_under_path_prefix(Core::State::AppState& app_state, const std::s
   // 不会把名称相似但不在该目录下的路径误算进去。
   std::vector<Core::Database::Types::DbParam> params = {escaped_prefix + "/%"};
 
-  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query assets by path prefix: " + result.error());
   }
@@ -223,7 +223,7 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
 
   params.push_back(item.id);
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
+  auto result = Core::Database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to update asset item: " + result.error());
   }
@@ -236,7 +236,7 @@ auto delete_asset(Core::State::AppState& app_state, int64_t id)
   std::string sql = "DELETE FROM assets WHERE id = ?";
   std::vector<Core::Database::Types::DbParam> params = {id};
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
+  auto result = Core::Database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to delete asset item: " + result.error());
   }
@@ -253,12 +253,11 @@ auto batch_delete_assets_by_ids(Core::State::AppState& app_state,
 
   std::unordered_set<std::int64_t> unique_ids(ids.begin(), ids.end());
   return Core::Database::execute_transaction(
-      *app_state.database,
-      [&unique_ids](
-          Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+      app_state,
+      [&unique_ids](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
         constexpr std::string_view sql = "DELETE FROM assets WHERE id = ?";
         for (auto id : unique_ids) {
-          auto result = Core::Database::execute(db_state, std::string(sql), {id});
+          auto result = Core::Database::execute(txn_app_state, std::string(sql), {id});
           if (!result) {
             return std::unexpected("Failed to delete asset item (id=" + std::to_string(id) +
                                    "): " + result.error());
@@ -331,8 +330,8 @@ auto batch_create_asset(Core::State::AppState& app_state, const std::vector<Type
   };
 
   // 使用批量插入接口，自动处理分批
-  return Core::Database::execute_batch_insert(*app_state.database, insert_prefix,
-                                              values_placeholder, items, param_extractor);
+  return Core::Database::execute_batch_insert(app_state, insert_prefix, values_placeholder, items,
+                                              param_extractor);
 }
 
 auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Types::Asset>& items)
@@ -343,8 +342,7 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
 
   // 使用事务批量执行update（SQLite不支持bulk update）
   return Core::Database::execute_transaction(
-      *app_state.database,
-      [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+      app_state, [&](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
         std::string sql = R"(
           UPDATE assets SET
             name = ?, path = ?, type = ?,
@@ -407,7 +405,7 @@ auto batch_update_asset(Core::State::AppState& app_state, const std::vector<Type
         // 执行批量更新
         for (const auto& item : items) {
           auto params = extract_params(item);
-          auto result = Core::Database::execute(db_state, sql, params);
+          auto result = Core::Database::execute(txn_app_state, sql, params);
           if (!result) {
             return std::unexpected("Failed to update asset item (id=" + std::to_string(item.id) +
                                    "): " + result.error());

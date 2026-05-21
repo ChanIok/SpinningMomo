@@ -5,7 +5,7 @@ module Core.Initializer;
 import std;
 import Core.Async;
 import Core.Commands;
-import Core.Commands.State;
+import Core.Commands.Types;
 import Core.DialogService;
 import Core.WorkerPool;
 import Core.State;
@@ -54,10 +54,10 @@ auto post_startup_notification(Core::State::AppState& state, const std::string& 
     return;
   }
 
-  Core::Events::post(*state.events, UI::FloatingWindow::Events::NotificationEvent{
-                                        .title = app_name_it->second,
-                                        .message = message,
-                                    });
+  Core::Events::post(state, UI::FloatingWindow::Events::NotificationEvent{
+                                .title = app_name_it->second,
+                                .message = message,
+                            });
 }
 
 auto apply_language_from_settings(Core::State::AppState& state) -> void {
@@ -67,7 +67,7 @@ auto apply_language_from_settings(Core::State::AppState& state) -> void {
   }
 
   const auto& locale = state.settings->raw.app.language.current;
-  if (auto result = Core::I18n::load_language_by_locale(*state.i18n, locale); !result) {
+  if (auto result = Core::I18n::load_language_by_locale(state, locale); !result) {
     Logger().warn("Failed to load runtime language from settings ('{}'): {}", locale,
                   result.error());
     return;
@@ -100,8 +100,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
 
     Core::Events::register_all_handlers(state);
 
-    if (auto result = Core::I18n::initialize(*state.i18n, Core::I18n::Types::Language::EnUS);
-        !result) {
+    if (auto result = Core::I18n::initialize(state, Core::I18n::Types::Language::EnUS); !result) {
       return std::unexpected("Failed to initialize i18n: " + result.error());
     }
 
@@ -116,7 +115,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
         !current_version.empty() && last_version != "0.0.0.0" &&
         Core::Migration::compare_versions(last_version, current_version) < 0;
 
-    if (auto result = Core::Async::start(*state.async); !result) {
+    if (auto result = Core::Async::start(state); !result) {
       return std::unexpected("Failed to start async runtime: " + result.error());
     }
 
@@ -124,11 +123,11 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize HTTP client: " + result.error());
     }
 
-    if (auto result = Core::WorkerPool::start(*state.worker_pool); !result) {
+    if (auto result = Core::WorkerPool::start(state); !result) {
       return std::unexpected("Failed to start worker pool: " + result.error());
     }
 
-    if (auto result = Core::DialogService::start(*state.dialog_service); !result) {
+    if (auto result = Core::DialogService::start(state); !result) {
       return std::unexpected("Failed to start dialog service: " + result.error());
     }
 
@@ -166,9 +165,9 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
     }
 
     // 初始化命令注册表
-    Core::Commands::register_builtin_commands(state, state.commands->registry);
+    Core::Commands::register_builtin_commands(state);
     Logger().info("Command registry initialized with {} commands",
-                  state.commands->registry.descriptors.size());
+                  Core::Commands::get_all_commands(state).size());
 
     if (auto result = UI::FloatingWindow::create_window(state); !result) {
       return std::unexpected("Failed to create app window: " + result.error());
@@ -185,7 +184,7 @@ auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINST
       return std::unexpected("Failed to initialize tray menu: " + result.error());
     }
 
-    if (auto result = Features::Recording::initialize(*state.recording); !result) {
+    if (auto result = Features::Recording::initialize(state); !result) {
       return std::unexpected(result.error());
     }
 

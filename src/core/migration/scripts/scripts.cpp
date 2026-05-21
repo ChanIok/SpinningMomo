@@ -17,9 +17,9 @@ namespace Core::Migration::Scripts {
 template <typename SchemaModule>
 auto execute_sql_schema(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   return Core::Database::execute_transaction(
-      *app_state.database, [](auto& db_state) -> std::expected<void, std::string> {
+      app_state, [](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
         for (const auto& sql : SchemaModule::statements) {
-          auto result = Core::Database::execute(db_state, std::string(sql));
+          auto result = Core::Database::execute(txn_app_state, std::string(sql));
           if (!result) {
             return std::unexpected(std::format("SQL execution failed: {}", result.error()));
           }

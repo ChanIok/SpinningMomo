@@ -422,7 +422,7 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
                         CacheValidators validators, size_t file_size,
                         std::optional<ByteRange> range, auto* res) -> void {
   auto* loop = uWS::Loop::get();
-  auto io_context = Core::Async::get_io_context(*state.async);
+  auto io_context = Core::Async::get_io_context(state);
 
   size_t range_start = range.has_value() ? range->start : 0;
   size_t range_end = range.has_value() ? range->end : (file_size - 1);
@@ -573,7 +573,7 @@ auto serve_resolved_file_request(Core::State::AppState& state,
 
   // 在异步运行时中处理文件读取
   asio::co_spawn(
-      *Core::Async::get_io_context(*state.async),
+      *Core::Async::get_io_context(state),
       [res, file_path, mime_type, cache_control = std::move(cache_control),
        validators = std::move(validators), loop, file_size,
        range = range_parse.range]() -> asio::awaitable<void> {

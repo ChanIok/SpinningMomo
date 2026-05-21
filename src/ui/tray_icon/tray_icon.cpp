@@ -1,15 +1,11 @@
 module;
 
-#include <windows.h>
-
-#include <string>
-
 module UI.TrayIcon;
 
 import std;
 import Core.State;
 import Core.Commands;
-import Core.Commands.State;
+import Core.Commands.Types;
 import Core.I18n.Types;
 import Core.I18n.State;
 import Features.Settings.Menu;
@@ -22,6 +18,7 @@ import UI.TrayIcon.Types;
 import Utils.String;
 import Vendor.Windows;
 import Vendor.ShellApi;
+import <windows.h>;
 
 namespace {
 
@@ -48,7 +45,7 @@ auto build_window_submenu(Core::State::AppState& state)
 auto build_ratio_submenu(Core::State::AppState& state)
     -> std::vector<UI::ContextMenu::Types::MenuItem> {
   std::vector<UI::ContextMenu::Types::MenuItem> items;
-  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
+  const auto& ratios = Features::Settings::Menu::get_ratios(state);
   for (size_t i = 0; i < ratios.size(); ++i) {
     items.emplace_back(UI::ContextMenu::Types::MenuItem::ratio_item(
         ratios[i], i, i == state.floating_window->ui.current_ratio_index));
@@ -59,7 +56,7 @@ auto build_ratio_submenu(Core::State::AppState& state)
 auto build_resolution_submenu(Core::State::AppState& state)
     -> std::vector<UI::ContextMenu::Types::MenuItem> {
   std::vector<UI::ContextMenu::Types::MenuItem> items;
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
   for (size_t i = 0; i < resolutions.size(); ++i) {
     items.emplace_back(UI::ContextMenu::Types::MenuItem::resolution_item(
         resolutions[i], i, i == state.floating_window->ui.current_resolution_index));

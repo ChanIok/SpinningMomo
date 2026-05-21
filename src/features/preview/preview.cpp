@@ -98,7 +98,7 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected(capture_result.error());
   }
   // 计算窗口尺寸和宽高比
-  Window::set_preview_window_size(preview_state, width, height);
+  Window::set_preview_window_size(state, width, height);
 
   Window::show_preview_window(state);
 

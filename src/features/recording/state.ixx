@@ -7,7 +7,6 @@ export module Features.Recording.State;
 import std;
 import Features.Recording.Types;
 import Utils.Graphics.Capture;
-import Utils.Graphics.CaptureRegion;
 import Utils.Media.AudioCapture;
 import Utils.Media.Encoder.State;
 import Utils.Timeout;
@@ -17,43 +16,12 @@ import <windows.h>;
 
 namespace Features::Recording::State {
 
-// 录制几何计划：
-// source_* 表示 WGC 实际给到的源帧尺寸；
-// output_* 表示最终送给编码器的尺寸；
-// should_crop/region 描述是否需要先从源帧裁出一块再编码。
-export struct CapturePlan {
-  int source_width = 0;
-  int source_height = 0;
-  std::uint32_t output_width = 0;
-  std::uint32_t output_height = 0;
-  bool should_crop = false;
-  Utils::Graphics::CaptureRegion::CropRegion region{};
-};
-
-export inline constexpr std::size_t k_max_audio_queue_size = 120;
-
-export enum class RecordingControlAction {
-  None,
-  Toggle,
-  RestartAfterResize,
-  CleanupD3D,
-  ShutdownStop,
-};
-
-export struct QueuedAudioPacket {
-  std::vector<std::uint8_t> data;
-  std::uint32_t num_frames = 0;
-  std::uint32_t bytes_per_frame = 0;
-  std::uint32_t sample_rate = 0;
-  std::int64_t timestamp_100ns = 0;
-};
-
 // 录制完整状态
 export struct RecordingState {
   Features::Recording::Types::RecordingConfig config;
   std::filesystem::path working_output_path;
   HWND target_window = nullptr;
-  CapturePlan capture_plan;
+  Features::Recording::Types::CapturePlan capture_plan;
 
   // 状态标志 - 使用 atomic 避免锁竞争
   std::atomic<Features::Recording::Types::RecordingStatus> status{
@@ -82,7 +50,7 @@ export struct RecordingState {
 
   int last_frame_width = 0;
   int last_frame_height = 0;
-  std::deque<QueuedAudioPacket> audio_queue;
+  std::deque<Features::Recording::Types::QueuedAudioPacket> audio_queue;
   std::atomic<std::uint64_t> dropped_audio_packets{0};
   std::uint64_t encoded_video_frames = 0;
   std::uint64_t encoded_audio_packets = 0;
@@ -103,7 +71,8 @@ export struct RecordingState {
   // 控制线程当前是否正在执行 start/stop/restart；用户 toggle 忙时会被忽略。
   std::atomic<bool> control_action_running{false};
   // 控制请求只用单槽合并，避免窗口拖拽时堆积 resize 重启任务。
-  RecordingControlAction pending_action{RecordingControlAction::None};
+  Features::Recording::Types::RecordingControlAction pending_action{
+      Features::Recording::Types::RecordingControlAction::None};
   // shutdown 开始后置为 true，阻止新的 toggle / resize restart 再抢控制权
   std::atomic<bool> shutdown_requested{false};
 

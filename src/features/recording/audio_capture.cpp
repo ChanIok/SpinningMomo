@@ -3,6 +3,7 @@ module;
 module Features.Recording.AudioCapture;
 
 import std;
+import Core.State;
 import Features.Recording.State;
 import Features.Recording.Types;
 import Utils.Media.AudioCapture;
@@ -45,7 +46,13 @@ auto initialize(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
   return Utils::Media::AudioCapture::initialize(ctx, source, process_id);
 }
 
-auto start_capture_thread(Features::Recording::State::RecordingState& state) -> void {
+auto start_capture_thread(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   Utils::Media::AudioCapture::start_capture_thread(
       state.audio,
       // is_active
@@ -62,7 +69,7 @@ auto start_capture_thread(Features::Recording::State::RecordingState& state) -> 
           return;
         }
 
-        State::QueuedAudioPacket packet;
+        Types::QueuedAudioPacket packet;
         packet.num_frames = num_frames;
         packet.bytes_per_frame = bytes_per_frame;
         packet.timestamp_100ns = resolve_audio_timestamp_100ns(state, qpc_position_100ns, flags);
@@ -81,7 +88,7 @@ auto start_capture_thread(Features::Recording::State::RecordingState& state) -> 
           if (!state.accepting_input.load(std::memory_order_acquire)) {
             return;
           }
-          if (state.audio_queue.size() >= State::k_max_audio_queue_size) {
+          if (state.audio_queue.size() >= Types::k_max_audio_queue_size) {
             state.audio_queue.pop_front();
             state.dropped_audio_packets.fetch_add(1, std::memory_order_relaxed);
           }

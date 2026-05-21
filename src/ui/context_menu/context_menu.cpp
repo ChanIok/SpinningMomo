@@ -9,7 +9,7 @@ import Core.I18n.Types;
 import Core.Events;
 import Features.Settings.Menu;
 import Core.Commands;
-import Core.Commands.State;
+import Core.Commands.Types;
 import UI.FloatingWindow.Types;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Events;
@@ -112,8 +112,8 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto window_info = std::any_cast<Features::WindowControl::WindowInfo>(action.data);
         // 使用新的事件系统发送窗口选择事件
-        Core::Events::send(*state.events, UI::FloatingWindow::Events::WindowSelectionEvent{
-                                              window_info.title, window_info.handle});
+        Core::Events::send(state, UI::FloatingWindow::Events::WindowSelectionEvent{
+                                      window_info.title, window_info.handle});
         Logger().info("Window selected: {}", Utils::String::ToUtf8(window_info.title));
       } catch (const std::bad_any_cast& e) {
         Logger().error("Failed to cast window selection data: {}", e.what());
@@ -125,8 +125,8 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto ratio_data = std::any_cast<UI::ContextMenu::Types::RatioData>(action.data);
         // 使用新的事件系统发送比例改变事件
-        Core::Events::send(*state.events, UI::FloatingWindow::Events::RatioChangeEvent{
-                                              ratio_data.index, ratio_data.name, ratio_data.ratio});
+        Core::Events::send(state, UI::FloatingWindow::Events::RatioChangeEvent{
+                                      ratio_data.index, ratio_data.name, ratio_data.ratio});
         Logger().info("Ratio selected: {} ({})", Utils::String::ToUtf8(ratio_data.name),
                       ratio_data.ratio);
       } catch (const std::bad_any_cast& e) {
@@ -139,8 +139,8 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto resolution_data = std::any_cast<UI::ContextMenu::Types::ResolutionData>(action.data);
         // 使用新的事件系统发送分辨率改变事件
-        Core::Events::send(*state.events, UI::FloatingWindow::Events::ResolutionChangeEvent{
-                                              resolution_data.index, resolution_data.name});
+        Core::Events::send(state, UI::FloatingWindow::Events::ResolutionChangeEvent{
+                                      resolution_data.index, resolution_data.name});
         Logger().info("Resolution selected: {}", Utils::String::ToUtf8(resolution_data.name));
       } catch (const std::bad_any_cast& e) {
         Logger().error("Failed to cast resolution selection data: {}", e.what());
@@ -153,10 +153,7 @@ void handle_menu_action(Core::State::AppState& state,
       try {
         auto action_id = std::any_cast<std::string>(action.data);
 
-        // 通过注册表调用命令
-        if (state.commands) {
-          Core::Commands::invoke_command(state.commands->registry, action_id);
-        }
+        Core::Commands::invoke_command(state, action_id);
 
         Logger().info("Feature action triggered: {}", action_id);
       } catch (const std::bad_any_cast& e) {

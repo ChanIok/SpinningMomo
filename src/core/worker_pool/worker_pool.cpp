@@ -4,12 +4,17 @@ module Core.WorkerPool;
 
 import std;
 import Core.WorkerPool.State;
+import Core.State;
 import Utils.Logger;
 
 namespace Core::WorkerPool {
 
-auto start(Core::WorkerPool::State::WorkerPoolState& pool, size_t thread_count)
-    -> std::expected<void, std::string> {
+auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<void, std::string> {
+  if (!state.worker_pool) {
+    return std::unexpected("WorkerPoolState is not initialized");
+  }
+  auto& pool = *state.worker_pool;
+
   // 检查是否已经运行
   if (pool.is_running.exchange(true)) {
     Logger().warn("WorkerPool already started");
@@ -84,7 +89,11 @@ auto start(Core::WorkerPool::State::WorkerPoolState& pool, size_t thread_count)
   }
 }
 
-auto stop(Core::WorkerPool::State::WorkerPoolState& pool) -> void {
+auto stop(Core::State::AppState& state) -> void {
+  if (!state.worker_pool) {
+    return;
+  }
+  auto& pool = *state.worker_pool;
   if (!pool.is_running.exchange(false)) {
     return;  // 已经停止
   }
@@ -122,12 +131,19 @@ auto stop(Core::WorkerPool::State::WorkerPoolState& pool) -> void {
   }
 }
 
-auto is_running(const Core::WorkerPool::State::WorkerPoolState& pool) -> bool {
+auto is_running(const Core::State::AppState& state) -> bool {
+  if (!state.worker_pool) {
+    return false;
+  }
+  const auto& pool = *state.worker_pool;
   return pool.is_running.load();
 }
 
-auto submit_task(Core::WorkerPool::State::WorkerPoolState& pool, std::function<void()> task)
-    -> bool {
+auto submit_task(Core::State::AppState& state, std::function<void()> task) -> bool {
+  if (!state.worker_pool) {
+    return false;
+  }
+  auto& pool = *state.worker_pool;
   if (!pool.is_running.load()) {
     return false;  // 线程池未运行
   }
@@ -149,11 +165,20 @@ auto submit_task(Core::WorkerPool::State::WorkerPoolState& pool, std::function<v
   }
 }
 
-auto get_thread_count(const Core::WorkerPool::State::WorkerPoolState& pool) -> size_t {
+auto get_thread_count(const Core::State::AppState& state) -> size_t {
+  if (!state.worker_pool) {
+    return 0;
+  }
+  const auto& pool = *state.worker_pool;
   return pool.worker_threads.size();
 }
 
-auto get_pending_tasks(Core::WorkerPool::State::WorkerPoolState& pool) -> size_t {
+auto get_pending_tasks(Core::State::AppState& state) -> size_t {
+  if (!state.worker_pool) {
+    return 0;
+  }
+  auto& pool = *state.worker_pool;
+
   std::lock_guard<std::mutex> lock(pool.queue_mutex);
   return pool.task_queue.size();
 }

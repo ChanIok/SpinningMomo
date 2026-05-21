@@ -99,7 +99,7 @@ auto launch_initial_scan_task(
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
@@ -159,7 +159,7 @@ auto launch_extract_photo_params_task(
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
@@ -239,7 +239,7 @@ auto schedule_silent_extract_photo_params(
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn(
         "Silent Infinity Nikki photo params extract skipped: async runtime is not available");
@@ -304,7 +304,7 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;

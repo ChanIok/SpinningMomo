@@ -326,8 +326,7 @@ auto load_candidate_assets(
 
     sql += " ORDER BY COALESCE(a.file_modified_at, a.created_at) DESC, a.id DESC";
 
-    auto query_result =
-        Core::Database::query<Scan::CandidateAssetRow>(*app_state.database, sql, params);
+    auto query_result = Core::Database::query<Scan::CandidateAssetRow>(app_state, sql, params);
     if (!query_result) {
       return std::unexpected("Failed to query manual extract candidate assets: " +
                              query_result.error());
@@ -354,7 +353,7 @@ auto load_candidate_assets(
 
   sql += " ORDER BY COALESCE(a.file_modified_at, a.created_at) DESC, a.id DESC";
 
-  auto query_result = Core::Database::query<Scan::CandidateAssetRow>(*app_state.database, sql, {});
+  auto query_result = Core::Database::query<Scan::CandidateAssetRow>(app_state, sql, {});
   if (!query_result) {
     return std::unexpected("Failed to query candidate assets: " + query_result.error());
   }
@@ -410,8 +409,7 @@ auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
     params.emplace_back(asset_id);
   }
 
-  auto query_result =
-      Core::Database::query<Scan::CandidateAssetRow>(*app_state.database, sql, params);
+  auto query_result = Core::Database::query<Scan::CandidateAssetRow>(app_state, sql, params);
   if (!query_result) {
     return std::unexpected("Failed to query incremental candidate assets: " + query_result.error());
   }
@@ -479,7 +477,8 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
   }
 
   auto transaction_result = Core::Database::execute_transaction(
-      *app_state.database, [&](auto& db_state) -> std::expected<std::int32_t, std::string> {
+      app_state,
+      [&](Core::State::AppState& txn_app_state) -> std::expected<std::int32_t, std::string> {
         // 这里故意使用“整个 batch 一个事务”。
         // 目标不是减少 SQL 条数到极致，而是先把最贵的事务提交次数降下来。
         std::string upsert_sql = R"(
@@ -563,14 +562,14 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
               to_db_param(record.nikki_diy_json),
           };
 
-          auto upsert_result = Core::Database::execute(db_state, upsert_sql, params);
+          auto upsert_result = Core::Database::execute(txn_app_state, upsert_sql, params);
           if (!upsert_result) {
             return std::unexpected("Failed to upsert Infinity Nikki params: " +
                                    upsert_result.error());
           }
 
           auto insert_cloth_result = Core::Database::execute(
-              db_state, "DELETE FROM asset_infinity_nikki_clothes WHERE asset_id = ?",
+              txn_app_state, "DELETE FROM asset_infinity_nikki_clothes WHERE asset_id = ?",
               {item.asset_id});
           if (!insert_cloth_result) {
             return std::unexpected("Failed to clear existing clothes: " +
@@ -579,7 +578,7 @@ auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::stri
 
           for (const auto cloth_id : record.nikki_clothes) {
             auto insert_cloth_result = Core::Database::execute(
-                db_state,
+                txn_app_state,
                 "INSERT INTO asset_infinity_nikki_clothes (asset_id, cloth_id) VALUES (?, ?)",
                 {item.asset_id, cloth_id});
             if (!insert_cloth_result) {

@@ -272,10 +272,11 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
                                const std::string& root_path)
     -> std::expected<std::int64_t, std::string> {
   return Core::Database::execute_transaction(
-      *app_state.database, [&](auto& db_state) -> std::expected<std::int64_t, std::string> {
+      app_state,
+      [&](Core::State::AppState& txn_app_state) -> std::expected<std::int64_t, std::string> {
         // 1. 基于路径匹配，删除该目录下及所有子目录内的资产记录
         auto delete_assets_result = Core::Database::query<Core::Database::ReturningIdRow>(
-            db_state, "DELETE FROM assets WHERE path = ? OR path LIKE ? RETURNING id",
+            txn_app_state, "DELETE FROM assets WHERE path = ? OR path LIKE ? RETURNING id",
             {root_path, root_path + "/%"});
         if (!delete_assets_result) {
           return std::unexpected("Failed to delete assets under root path: " +
@@ -299,7 +300,7 @@ auto cleanup_root_folder_index(Core::State::AppState& app_state, std::int64_t ro
         )";
 
         auto delete_folders_result = Core::Database::query<Core::Database::ReturningIdRow>(
-            db_state, delete_folders_sql, {root_folder_id});
+            txn_app_state, delete_folders_sql, {root_folder_id});
         if (!delete_folders_result) {
           return std::unexpected("Failed to delete folders under root: " +
                                  delete_folders_result.error());

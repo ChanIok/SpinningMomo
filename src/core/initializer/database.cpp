@@ -19,7 +19,7 @@ auto initialize_database(Core::State::AppState& state) -> std::expected<void, st
       return std::unexpected("Failed to get database path: " + path_result.error());
     }
     const auto db_path = path_result.value();
-    if (auto result = Core::Database::initialize(*state.database, db_path); !result) {
+    if (auto result = Core::Database::initialize(state, db_path); !result) {
       Logger().error("Failed to initialize database: {}", result.error());
       return std::unexpected("Failed to initialize database: " + result.error());
     }

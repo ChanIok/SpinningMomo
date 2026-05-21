@@ -304,7 +304,7 @@ auto extract_photo_params_from_candidates(
   report_processing_progress(progress_callback, progress, result, true,
                              std::format("Preparing {} candidate photos", result.candidate_count));
 
-  if (!app_state.worker_pool || !Core::WorkerPool::is_running(*app_state.worker_pool)) {
+  if (!Core::WorkerPool::is_running(app_state)) {
     co_return std::unexpected("Worker pool is not available for photo extract preparation");
   }
 
@@ -319,8 +319,8 @@ auto extract_photo_params_from_candidates(
   auto* slot_ready_ptr = slot_ready.get();
   for (std::size_t index = 0; index < candidate_count; ++index) {
     auto submitted = Core::WorkerPool::submit_task(
-        *app_state.worker_pool, [outcomes, completed_prepare, slot_ready_ptr,
-                                 candidate = candidates[index], uid_override, index]() mutable {
+        app_state, [outcomes, completed_prepare, slot_ready_ptr, candidate = candidates[index],
+                    uid_override, index]() mutable {
           auto prepared_result = Scan::prepare_photo_extract_entry(candidate, uid_override);
           if (prepared_result) {
             (*outcomes)[index].entry = std::move(prepared_result.value());

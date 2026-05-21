@@ -503,8 +503,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
   // 2. 并行处理批次
   for (const auto& batch : batches) {
     bool submitted = Core::WorkerPool::submit_task(
-        *app_state.worker_pool,
-        [&all_hashes, &results_mutex, &completion_latch, batch, &analysis_results]() {
+        app_state, [&all_hashes, &results_mutex, &completion_latch, batch, &analysis_results]() {
           auto batch_hashes =
               batch |
               std::views::transform(
@@ -755,9 +754,8 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
     size_t end = std::min(start + PROCESS_BATCH_SIZE, files_to_process.size());
 
     bool submitted = Core::WorkerPool::submit_task(
-        *app_state.worker_pool,
-        [&final_result, &results_mutex, &completion_latch, &app_state, &files_to_process, start,
-         end, &options, &folder_mapping, progress_tracker]() {
+        app_state, [&final_result, &results_mutex, &completion_latch, &app_state, &files_to_process,
+                    start, end, &options, &folder_mapping, progress_tracker]() {
           auto thread_wic_factory_result = Utils::Image::get_thread_wic_factory();
           if (!thread_wic_factory_result) {
             {

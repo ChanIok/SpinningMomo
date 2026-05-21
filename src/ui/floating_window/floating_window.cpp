@@ -7,7 +7,7 @@ import Features.Settings.Menu;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Core.Commands;
-import Core.Commands.State;
+import Core.Commands.Types;
 import Core.Events;
 import Core.State;
 import Core.I18n.Types;
@@ -77,7 +77,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   const auto window_pos = UI::FloatingWindow::Layout::calculate_center_position(window_size);
 
   // 发送DPI改变事件来更新渲染状态
-  Core::Events::send(*state.events, UI::FloatingWindow::Events::DpiChangeEvent{dpi, window_size});
+  Core::Events::send(state, UI::FloatingWindow::Events::DpiChangeEvent{dpi, window_size});
 
   register_window_class(state.floating_window->window.instance);
 
@@ -192,7 +192,7 @@ auto set_current_ratio(Core::State::AppState& state, size_t index) -> void {
 }
 
 auto set_current_resolution(Core::State::AppState& state, size_t index) -> void {
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
   if (index < resolutions.size()) {
     state.floating_window->ui.current_resolution_index = index;
     if (state.floating_window->window.hwnd) {
@@ -285,8 +285,8 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   state.floating_window->data.menu_items.clear();
 
   // 获取比例和分辨率预设
-  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  const auto& ratios = Features::Settings::Menu::get_ratios(state);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
 
   // 从配置获取功能项顺序
   const auto& feature_config = state.settings->raw.ui.app_menu.features;
@@ -306,18 +306,16 @@ auto initialize_menu_items(Core::State::AppState& state) -> void {
   }
 
   // 添加功能项（从命令注册表获取）
-  if (state.commands) {
-    for (size_t i = 0; i < feature_config.size(); ++i) {
-      const auto& command_id = feature_config[i];
-      // 从注册表获取命令描述
-      if (const auto* command = Core::Commands::get_command(state.commands->registry, command_id)) {
-        // 使用 i18n_key 获取文本
-        std::wstring text = get_text_by_i18n_key(command->i18n_key, texts);
-        state.floating_window->data.menu_items.emplace_back(
-            text, UI::FloatingWindow::MenuItemCategory::Feature, static_cast<int>(i), command_id);
-      } else {
-        Logger().warn("Command not found in registry: {}", command_id);
-      }
+  for (size_t i = 0; i < feature_config.size(); ++i) {
+    const auto& command_id = feature_config[i];
+    // 从注册表获取命令描述
+    if (const auto* command = Core::Commands::get_command(state, command_id)) {
+      // 使用 i18n_key 获取文本
+      std::wstring text = get_text_by_i18n_key(command->i18n_key, texts);
+      state.floating_window->data.menu_items.emplace_back(
+          text, UI::FloatingWindow::MenuItemCategory::Feature, static_cast<int>(i), command_id);
+    } else {
+      Logger().warn("Command not found in registry: {}", command_id);
     }
   }
 }

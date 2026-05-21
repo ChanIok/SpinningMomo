@@ -7,6 +7,7 @@ module Core.I18n;
 import std;
 import Core.I18n.Types;
 import Core.I18n.State;
+import Core.State;
 import Utils.Logger;
 
 // 导入生成的嵌入模块
@@ -35,23 +36,6 @@ auto load_embedded_language_data(Types::Language lang)
   }
 }
 
-auto initialize(State::I18nState& i18n_state, Types::Language default_lang)
-    -> std::expected<void, std::string> {
-  try {
-    // 加载默认语言到传入的状态
-    auto load_result = load_language(i18n_state, default_lang);
-    if (!load_result) {
-      return std::unexpected("Failed to load default language: " + load_result.error());
-    }
-
-    i18n_state.is_initialized = true;
-
-    return {};
-  } catch (const std::exception& e) {
-    return std::unexpected("Exception during I18n initialization: " + std::string(e.what()));
-  }
-}
-
 auto load_language(State::I18nState& i18n_state, Types::Language lang)
     -> std::expected<void, std::string> {
   try {
@@ -77,23 +61,61 @@ auto load_language(State::I18nState& i18n_state, Types::Language lang)
   }
 }
 
-auto load_language_by_locale(State::I18nState& i18n_state, std::string_view locale)
+auto initialize(Core::State::AppState& state, Types::Language default_lang)
+    -> std::expected<void, std::string> {
+  if (!state.i18n) {
+    return std::unexpected("I18nState is not initialized");
+  }
+  auto& i18n = *state.i18n;
+
+  try {
+    auto load_result = load_language(i18n, default_lang);
+    if (!load_result) {
+      return std::unexpected("Failed to load default language: " + load_result.error());
+    }
+
+    i18n.is_initialized = true;
+
+    return {};
+  } catch (const std::exception& e) {
+    return std::unexpected("Exception during I18n initialization: " + std::string(e.what()));
+  }
+}
+
+auto load_language(Core::State::AppState& state, Types::Language lang)
+    -> std::expected<void, std::string> {
+  if (!state.i18n) {
+    return std::unexpected("I18nState is not initialized");
+  }
+
+  return load_language(*state.i18n, lang);
+}
+
+auto load_language_by_locale(Core::State::AppState& state, std::string_view locale)
     -> std::expected<void, std::string> {
   if (locale == "zh-CN") {
-    return load_language(i18n_state, Types::Language::ZhCN);
+    return load_language(state, Types::Language::ZhCN);
   }
   if (locale == "en-US") {
-    return load_language(i18n_state, Types::Language::EnUS);
+    return load_language(state, Types::Language::EnUS);
   }
   return std::unexpected("Unsupported locale: " + std::string(locale));
 }
 
-auto get_current_language(const State::I18nState& i18n_state) -> Types::Language {
-  return i18n_state.current_language;
+auto get_current_language(const Core::State::AppState& state) -> Types::Language {
+  if (!state.i18n) {
+    return Types::Language::EnUS;
+  }
+  const auto& i18n = *state.i18n;
+  return i18n.current_language;
 }
 
-auto is_initialized(const State::I18nState& i18n_state) -> bool {
-  return i18n_state.is_initialized;
+auto is_initialized(const Core::State::AppState& state) -> bool {
+  if (!state.i18n) {
+    return false;
+  }
+  const auto& i18n = *state.i18n;
+  return i18n.is_initialized;
 }
 
 }  // namespace Core::I18n

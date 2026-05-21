@@ -3,7 +3,6 @@ module;
 module Core.State;
 
 import Core.Async.State;
-import Core.Commands;
 import Core.Commands.State;
 import Core.Database.State;
 import Core.DialogService.State;

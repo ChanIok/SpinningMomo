@@ -45,7 +45,7 @@ auto ensure_output_directory_media_source(Core::State::AppState& app_state,
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn("Skip output-directory gallery sync: async runtime is not available");
     return;

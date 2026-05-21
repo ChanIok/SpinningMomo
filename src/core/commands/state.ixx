@@ -3,13 +3,13 @@ module;
 export module Core.Commands.State;
 
 import std;
-import Core.Commands;
+import Core.Commands.Types;
 import Vendor.Windows;
 
 namespace Core::Commands::State {
 
 export struct CommandState {
-  CommandRegistry registry;
+  Core::Commands::CommandRegistry registry;
 
   // 常驻低级键盘钩子。
   // 它不负责业务按键处理，只用于维持进程级全局输入挂载。

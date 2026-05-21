@@ -28,9 +28,8 @@ auto show_recording_notification(Core::State::AppState& state, const std::string
     return;
   }
 
-  Core::Events::post(*state.events,
-                     UI::FloatingWindow::Events::NotificationEvent{
-                         .title = state.i18n->texts["label.app_name"], .message = message});
+  Core::Events::post(state, UI::FloatingWindow::Events::NotificationEvent{
+                                .title = state.i18n->texts["label.app_name"], .message = message});
 }
 
 auto notify_recording_toggled(Core::State::AppState& state, bool enabled) -> void {
@@ -38,8 +37,7 @@ auto notify_recording_toggled(Core::State::AppState& state, bool enabled) -> voi
     return;
   }
 
-  Core::Events::post(*state.events,
-                     UI::FloatingWindow::Events::RecordingToggleEvent{.enabled = enabled});
+  Core::Events::post(state, UI::FloatingWindow::Events::RecordingToggleEvent{.enabled = enabled});
 }
 
 // 生成输出文件路径
@@ -70,7 +68,7 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
   if (status == Features::Recording::Types::RecordingStatus::Recording) {
     // 停止录制前先保存目标路径，stop 会清理当前录制段状态。
     std::filesystem::path saved_path = state.recording->config.output_path;
-    Features::Recording::stop(*state.recording);
+    Features::Recording::stop(state);
     std::error_code ec;
     if (std::filesystem::exists(saved_path, ec) && !ec) {
       show_recording_notification(state, state.i18n->texts["message.recording_saved"] +
@@ -158,7 +156,7 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
     }
 
     // 3. 启动
-    auto result = Features::Recording::start(state, *state.recording, target.value(), config);
+    auto result = Features::Recording::start(state, target.value(), config);
     if (!result) {
       show_recording_notification(
           state, state.i18n->texts["message.recording_start_failed"] + result.error());
@@ -196,20 +194,19 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
           [&state]() {
             if (state.recording->status.load(std::memory_order_acquire) ==
                 Features::Recording::Types::RecordingStatus::Recording) {
-              Features::Recording::stop(*state.recording);
+              Features::Recording::stop(state);
               notify_recording_toggled(state, false);
             }
           },
   };
 
-  if (auto result = Features::Recording::ensure_control_thread_started(state, *state.recording,
-                                                                       std::move(handlers));
+  if (auto result = Features::Recording::ensure_control_thread_started(state, std::move(handlers));
       !result) {
     return result;
   }
 
   Features::Recording::request_control_action(
-      *state.recording, Features::Recording::State::RecordingControlAction::Toggle);
+      state, Features::Recording::Types::RecordingControlAction::Toggle);
 
   return {};
 }
@@ -225,14 +222,14 @@ auto stop_recording_if_running(Core::State::AppState& state) -> void {
 
   if (state.recording->control_thread.joinable()) {
     Features::Recording::request_control_action(
-        *state.recording, Features::Recording::State::RecordingControlAction::ShutdownStop);
-    Features::Recording::join_control_thread(*state.recording);
+        state, Features::Recording::Types::RecordingControlAction::ShutdownStop);
+    Features::Recording::join_control_thread(state);
   } else if (state.recording->status.load(std::memory_order_acquire) ==
              Features::Recording::Types::RecordingStatus::Recording) {
     // 控制线程是懒启动；没有消费者时不投递请求。此分支代表状态异常，直接兜底保存。
     Logger().warn(
         "Recording is active but control thread is not running during shutdown; stopping directly");
-    Features::Recording::stop(*state.recording);
+    Features::Recording::stop(state);
     notify_recording_toggled(state, false);
   }
 }

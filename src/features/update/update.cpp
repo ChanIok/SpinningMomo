@@ -37,10 +37,10 @@ auto post_update_notification(Core::State::AppState& app_state, const std::strin
     return;
   }
 
-  Core::Events::post(*app_state.events, UI::FloatingWindow::Events::NotificationEvent{
-                                            .title = app_name_it->second,
-                                            .message = message,
-                                        });
+  Core::Events::post(app_state, UI::FloatingWindow::Events::NotificationEvent{
+                                    .title = app_name_it->second,
+                                    .message = message,
+                                });
 }
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)
@@ -559,7 +559,7 @@ auto start_download_update_task(Core::State::AppState& app_state, bool prepare_i
     };
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     co_return std::unexpected("Async runtime is not available");
   }
@@ -596,7 +596,7 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn("Skip startup auto update check: async runtime is not ready");
     return;
@@ -850,7 +850,7 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
 
     if (params.restart) {
       Logger().info("Sending exit event for immediate update");
-      Core::Events::post(*app_state.events, UI::FloatingWindow::Events::ExitEvent{});
+      Core::Events::post(app_state, UI::FloatingWindow::Events::ExitEvent{});
       result.message = "Update will start immediately after application exits";
     } else {
       Logger().info("Update scheduled for program exit");

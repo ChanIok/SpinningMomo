@@ -3,18 +3,28 @@ module;
 module Features.Settings.Menu;
 
 import std;
+import Core.State;
 import Features.Settings.State;
 
 namespace Features::Settings::Menu {
 
-auto get_ratios(const Features::Settings::State::SettingsState& state)
-    -> const std::vector<RatioPreset>& {
-  return state.computed.aspect_ratios;
+auto get_ratios(const Core::State::AppState& app_state) -> const std::vector<RatioPreset>& {
+  static const std::vector<RatioPreset> kEmpty;
+  if (!app_state.settings) {
+    return kEmpty;
+  }
+  const auto& settings = *app_state.settings;
+  return settings.computed.aspect_ratios;
 }
 
-auto get_resolutions(const Features::Settings::State::SettingsState& state)
+auto get_resolutions(const Core::State::AppState& app_state)
     -> const std::vector<ResolutionPreset>& {
-  return state.computed.resolutions;
+  static const std::vector<ResolutionPreset> kEmpty;
+  if (!app_state.settings) {
+    return kEmpty;
+  }
+  const auto& settings = *app_state.settings;
+  return settings.computed.resolutions;
 }
 
 }  // namespace Features::Settings::Menu

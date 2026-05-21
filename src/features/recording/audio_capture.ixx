@@ -3,7 +3,7 @@ module;
 export module Features.Recording.AudioCapture;
 
 import std;
-import Features.Recording.State;
+import Core.State;
 import Features.Recording.Types;
 import Utils.Media.AudioCapture;
 
@@ -15,7 +15,7 @@ export auto initialize(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
     -> std::expected<void, std::string>;
 
 // 启动音频捕获线程，为当前录制段生产音频队列数据。
-export auto start_capture_thread(Features::Recording::State::RecordingState& state) -> void;
+export auto start_capture_thread(Core::State::AppState& app_state) -> void;
 
 // 停止音频捕获线程。
 export auto stop(Utils::Media::AudioCapture::AudioCaptureContext& ctx) -> void;

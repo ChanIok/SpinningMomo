@@ -86,7 +86,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
 
           // 在异步运行时中处理RPC请求
           asio::co_spawn(
-              *Core::Async::get_io_context(*state.async),
+              *Core::Async::get_io_context(state),
               [&state, buffer = std::move(buffer), origin = std::move(origin), res,
                loop]() -> asio::awaitable<void> {
                 try {

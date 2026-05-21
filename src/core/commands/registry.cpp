@@ -5,6 +5,7 @@ module Core.Commands;
 import std;
 import Core.State;
 import Core.Commands.State;
+import Core.Commands.Types;
 import Features.Settings.State;
 import Utils.Logger;
 import <windows.h>;
@@ -19,11 +20,6 @@ LRESULT CALLBACK keyboard_keepalive_proc(int code, WPARAM wParam, LPARAM lParam)
 }
 
 auto install_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
-  if (!state.commands) {
-    Logger().warn("Skip keyboard keepalive hook installation: command state is not ready");
-    return;
-  }
-
   auto& cmd_state = *state.commands;
   if (cmd_state.keyboard_keepalive_hook) {
     return;
@@ -43,10 +39,6 @@ auto install_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
 }
 
 auto uninstall_keyboard_keepalive_hook(Core::State::AppState& state) -> void {
-  if (!state.commands) {
-    return;
-  }
-
   auto& cmd_state = *state.commands;
   if (!cmd_state.keyboard_keepalive_hook) {
     return;
@@ -146,21 +138,8 @@ auto uninstall_mouse_hotkey_hook(Core::Commands::State::CommandState& cmd_state)
   }
 }
 
-auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -> void {
-  const std::string id = descriptor.id;
-
-  if (registry.descriptors.contains(id)) {
-    Logger().warn("Command already registered: {}", id);
-    return;
-  }
-
-  registry.descriptors.emplace(id, std::move(descriptor));
-  registry.registration_order.push_back(id);
-
-  Logger().debug("Registered command: {}", id);
-}
-
-auto invoke_command(CommandRegistry& registry, const std::string& id) -> bool {
+auto invoke_command(Core::State::AppState& state, const std::string& id) -> bool {
+  auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);
   if (it == registry.descriptors.end()) {
     Logger().warn("Command not found: {}", id);
@@ -182,8 +161,9 @@ auto invoke_command(CommandRegistry& registry, const std::string& id) -> bool {
   }
 }
 
-auto get_command(const CommandRegistry& registry, const std::string& id)
+auto get_command(const Core::State::AppState& state, const std::string& id)
     -> const CommandDescriptor* {
+  const auto& registry = state.commands->registry;
   auto it = registry.descriptors.find(id);
   if (it == registry.descriptors.end()) {
     return nullptr;
@@ -191,7 +171,8 @@ auto get_command(const CommandRegistry& registry, const std::string& id)
   return &it->second;
 }
 
-auto get_all_commands(const CommandRegistry& registry) -> std::vector<CommandDescriptor> {
+auto get_all_commands(const Core::State::AppState& state) -> std::vector<CommandDescriptor> {
+  const auto& registry = state.commands->registry;
   std::vector<CommandDescriptor> result;
   result.reserve(registry.registration_order.size());
 
@@ -203,6 +184,19 @@ auto get_all_commands(const CommandRegistry& registry) -> std::vector<CommandDes
   }
 
   return result;
+}
+
+auto is_toggle_on(const Core::State::AppState& state, const std::string& id) -> bool {
+  const auto& registry = state.commands->registry;
+  auto it = registry.descriptors.find(id);
+  if (it == registry.descriptors.end()) {
+    return false;
+  }
+  const auto& command = it->second;
+  if (!command.is_toggle || !command.get_state) {
+    return false;
+  }
+  return command.get_state();
 }
 
 // 从 settings 获取热键配置（根据 settings_path）
@@ -247,6 +241,7 @@ auto register_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
   Logger().debug("HWND for hotkey registration: {}", reinterpret_cast<void*>(hwnd));
 
   auto& cmd_state = *state.commands;
+
   uninstall_mouse_hotkey_hook(cmd_state);
   cmd_state.hotkey_to_command.clear();
   cmd_state.next_hotkey_id = 1;
@@ -314,6 +309,7 @@ auto register_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
 
 auto unregister_all_hotkeys(Core::State::AppState& state, HWND hwnd) -> void {
   auto& cmd_state = *state.commands;
+
   uninstall_mouse_hotkey_hook(cmd_state);
 
   if (hwnd) {
@@ -331,12 +327,11 @@ auto handle_hotkey(Core::State::AppState& state, int hotkey_id) -> std::optional
   Logger().debug("Received hotkey event, hotkey_id={}", hotkey_id);
 
   auto& cmd_state = *state.commands;
-
   auto it = cmd_state.hotkey_to_command.find(hotkey_id);
   if (it != cmd_state.hotkey_to_command.end()) {
     const auto& command_id = it->second;
     Logger().info("Hotkey {} mapped to command '{}', invoking...", hotkey_id, command_id);
-    invoke_command(cmd_state.registry, command_id);
+    invoke_command(state, command_id);
     return command_id;
   }
 

@@ -26,7 +26,7 @@ struct StartScanDirectoryResult {
 auto launch_scan_directory_task(Core::State::AppState& app_state,
                                 const Features::Gallery::Types::ScanOptions& options,
                                 const std::string& task_id) -> void {
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;

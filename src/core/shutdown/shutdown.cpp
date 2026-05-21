@@ -52,7 +52,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   // 先停止录制并等待录制切换线程结束，避免与后续 UI/核心清理并发
   Features::Recording::UseCase::stop_recording_if_running(state);
 
-  Core::DialogService::stop(*state.dialog_service);
+  Core::DialogService::stop(state);
 
   if (state.gallery) {
     state.gallery->shutdown_requested.store(true, std::memory_order_release);
@@ -88,13 +88,13 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   Core::HttpClient::shutdown(state);
 
   // 停止工作线程池（等待所有任务完成）
-  Core::WorkerPool::stop(*state.worker_pool);
+  Core::WorkerPool::stop(state);
 
   if (state.database) {
-    Core::Database::shutdown(*state.database);
+    Core::Database::shutdown(state);
   }
 
-  Core::Async::stop(*state.async);
+  Core::Async::stop(state);
 
   Logger().info("==================================================");
   Logger().info("SpinningMomo shutdown complete");

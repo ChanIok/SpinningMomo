@@ -32,8 +32,8 @@ auto batch_replace_asset_colors(Core::State::AppState& app_state,
   }
 
   return Core::Database::execute_transaction(
-      *app_state.database,
-      [&items](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+      app_state,
+      [&items](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
         static const std::string kDeleteSql = "DELETE FROM asset_colors WHERE asset_id = ?";
         static const std::string kInsertSql = R"(
           INSERT INTO asset_colors (
@@ -46,8 +46,9 @@ auto batch_replace_asset_colors(Core::State::AppState& app_state,
             return std::unexpected("Invalid asset_id in color replacement batch");
           }
 
-          auto delete_result = Core::Database::execute(
-              db_state, kDeleteSql, std::vector<Core::Database::Types::DbParam>{item.asset_id});
+          auto delete_result =
+              Core::Database::execute(txn_app_state, kDeleteSql,
+                                      std::vector<Core::Database::Types::DbParam>{item.asset_id});
           if (!delete_result) {
             return std::unexpected("Failed to delete existing asset colors for asset_id " +
                                    std::to_string(item.asset_id) + ": " + delete_result.error());
@@ -68,7 +69,7 @@ auto batch_replace_asset_colors(Core::State::AppState& app_state,
                 static_cast<int64_t>(color.b_bin),
             };
 
-            auto insert_result = Core::Database::execute(db_state, kInsertSql, params);
+            auto insert_result = Core::Database::execute(txn_app_state, kInsertSql, params);
             if (!insert_result) {
               return std::unexpected("Failed to insert asset color for asset_id " +
                                      std::to_string(item.asset_id) + ": " + insert_result.error());
@@ -94,7 +95,7 @@ auto get_asset_main_colors(Core::State::AppState& app_state, std::int64_t asset_
   )";
 
   auto result = Core::Database::query<Features::Gallery::Types::AssetMainColor>(
-      *app_state.database, kQuerySql, std::vector<Core::Database::Types::DbParam>{asset_id});
+      app_state, kQuerySql, std::vector<Core::Database::Types::DbParam>{asset_id});
   if (!result) {
     return std::unexpected("Failed to query asset main colors: " + result.error());
   }

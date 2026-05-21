@@ -3,9 +3,9 @@ module;
 export module UI.ContextMenu.Types;
 
 import std;
-import Features.WindowControl;
 import Features.Settings.Menu;
 import Features.Settings.Menu.Types;
+import Features.WindowControl.Types;
 import <d2d1.h>;
 import <windows.h>;
 
