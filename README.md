@@ -42,7 +42,7 @@
 
 - Committers and reviewers: [ChanIok](https://github.com/ChanIok)
 - Approvers: [ChanIok](https://github.com/ChanIok)
-- Privacy policy: [法律与隐私说明](https://spin.infinitymomo.com/zh/about/legal)
+- Privacy policy: [法律与隐私说明](https://spin.infinitymomo.com/about/legal)
 
 ### 使用指南
 
@@ -50,7 +50,7 @@
 
 ### 构建指南
 
-查看 [构建指南](https://spin.infinitymomo.com/zh/developer/architecture) 了解环境要求和构建步骤。
+查看 [构建指南](https://spin.infinitymomo.com/developer/architecture) 了解环境要求和构建步骤。
 
 ## 致谢
 
@@ -62,4 +62,4 @@
 
 本项目采用 [GPL 3.0 协议](LICENSE) 开源。
 
-使用前请阅读 [法律与隐私说明](https://spin.infinitymomo.com/zh/about/legal)。
+使用前请阅读 [法律与隐私说明](https://spin.infinitymomo.com/about/legal)。
