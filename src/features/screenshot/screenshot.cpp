@@ -1,6 +1,5 @@
 module;
 
-#include <wil/com.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
 module Features.Screenshot;
@@ -19,6 +18,7 @@ import Utils.Graphics.D3D;
 import Utils.Graphics.Hdr;
 import Utils.Image;
 import <d3d11.h>;
+import <wil/com.h>;
 import <wincodec.h>;
 import <windows.h>;
 

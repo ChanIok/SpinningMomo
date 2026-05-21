@@ -4,7 +4,6 @@ module;
 #include <audioclientactivationparams.h>
 #include <mmdeviceapi.h>
 #include <mmreg.h>
-#include <wil/result.h>
 
 module Utils.Media.AudioCapture;
 

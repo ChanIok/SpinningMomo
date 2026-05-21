@@ -4,13 +4,13 @@ export module Features.Preview.Capture;
 
 import std;
 import Core.State;
-import <windows.h>;
+import Vendor.Windows;
 
 export namespace Features::Preview::Capture {
 
 // 初始化捕获系统
-auto initialize_capture(Core::State::AppState& state, HWND target_window, int width, int height)
-    -> std::expected<void, std::string>;
+auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND target_window,
+                        int width, int height) -> std::expected<void, std::string>;
 
 // 开始捕获
 auto start_capture(Core::State::AppState& state) -> std::expected<void, std::string>;

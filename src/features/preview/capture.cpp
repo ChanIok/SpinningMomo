@@ -13,8 +13,8 @@ import Features.Preview.Rendering;
 import Features.Preview.Window;
 import Utils.Graphics.Capture;
 import Utils.Logger;
+import Vendor.Windows;
 import <d3d11.h>;
-import <windows.h>;
 
 namespace Features::Preview::Capture {
 
@@ -47,9 +47,10 @@ auto on_frame_arrived(Core::State::AppState& state,
     state.preview->create_new_srv.store(true, std::memory_order_release);
 
     // 捕获回调线程只负责发现尺寸变化；窗口尺寸状态与 SetWindowPos 统一收口到窗口线程。
-    if (!PostMessage(state.preview->hwnd, Features::Preview::Types::WM_APPLY_CAPTURE_SIZE,
-                     static_cast<WPARAM>(content_size.Width),
-                     static_cast<LPARAM>(content_size.Height))) {
+    if (!Vendor::Windows::PostMessageW(state.preview->hwnd,
+                                       Features::Preview::Types::WM_APPLY_CAPTURE_SIZE,
+                                       static_cast<Vendor::Windows::WPARAM>(content_size.Width),
+                                       static_cast<Vendor::Windows::LPARAM>(content_size.Height))) {
       Logger().warn("Failed to post preview capture size update message");
     }
 
@@ -67,9 +68,9 @@ auto on_frame_arrived(Core::State::AppState& state,
   }
 }
 
-auto initialize_capture(Core::State::AppState& state, HWND target_window, int width, int height)
-    -> std::expected<void, std::string> {
-  if (!target_window || !IsWindow(target_window)) {
+auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND target_window,
+                        int width, int height) -> std::expected<void, std::string> {
+  if (!target_window || !Vendor::Windows::IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
   }
 

@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 module Features.Recording.Session;
 
 import std;
@@ -14,6 +12,7 @@ import Utils.Graphics.D3D;
 import Utils.Logger;
 import Utils.String;
 import <d3d11_4.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording::Session {

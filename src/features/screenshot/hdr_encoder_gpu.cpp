@@ -1,13 +1,12 @@
 module;
 
-#include <wil/com.h>
-
 module Features.Screenshot.HdrEncoder;
 
 import std;
 import Utils.Graphics.D3D;
 import Utils.Logger;
 import <d3d11.h>;
+import <wil/com.h>;
 import <wil/result.h>;
 import <wil/resource.h>;
 import <windows.h>;

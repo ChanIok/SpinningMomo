@@ -1,10 +1,9 @@
 module;
 
-#include <windows.h>
-
 export module Core.Events.State;
 
 import std;
+import <windows.h>;
 
 namespace Core::Events::State {
 

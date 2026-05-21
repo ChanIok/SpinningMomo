@@ -1,7 +1,5 @@
 module;
 
-#include <rfl/json.hpp>
-
 module Core.I18n;
 
 import std;
@@ -13,6 +11,8 @@ import Utils.Logger;
 // 导入生成的嵌入模块
 import Core.I18n.Embedded.ZhCN;
 import Core.I18n.Embedded.EnUS;
+
+import <rfl/json.hpp>;
 
 namespace Core::I18n {
 

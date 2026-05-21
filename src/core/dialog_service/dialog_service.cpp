@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 module Core.DialogService;
 
 import std;
@@ -9,6 +7,7 @@ import Core.DialogService.State;
 import Core.State;
 import Utils.Dialog;
 import Utils.Logger;
+import <wil/com.h>;
 
 namespace Core::DialogService {
 

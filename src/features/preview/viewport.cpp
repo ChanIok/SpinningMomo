@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 module Features.Preview.Viewport;
 
 import std;
@@ -12,6 +10,7 @@ import Features.Preview.Types;
 import Features.Preview.Rendering;
 import Utils.Logger;
 import <d3d11.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Preview::Viewport {

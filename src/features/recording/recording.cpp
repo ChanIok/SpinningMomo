@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 module Features.Recording;
 
 import std;
@@ -15,6 +13,7 @@ import UI.FloatingWindow;
 import Utils.Graphics.Capture;
 import Utils.Logger;
 import <mfapi.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording {

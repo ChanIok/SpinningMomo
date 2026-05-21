@@ -3,12 +3,12 @@ module;
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <dxgi.h>
-#include <wil/com.h>
 #include <windows.h>
 
 export module Utils.Graphics.D3D;
 
 import std;
+import <wil/com.h>;
 
 namespace Utils::Graphics::D3D {
 

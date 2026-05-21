@@ -1,10 +1,9 @@
 module;
 
-#include <windows.h>
-
 export module Core.Async.UiAwaitable;
 
 import std;
+import <windows.h>;
 
 namespace Core::Async {
 

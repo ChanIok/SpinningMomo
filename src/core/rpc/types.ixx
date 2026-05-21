@@ -1,11 +1,10 @@
 module;
 
-#include <rfl.hpp>
-
 export module Core.RPC.Types;
 
 import std;
 import <asio.hpp>;
+import <rfl.hpp>;
 
 export namespace Core::RPC {
 

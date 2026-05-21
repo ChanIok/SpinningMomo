@@ -1,0 +1,96 @@
+diff --git a/installed/x64-windows-static-md/include/libusockets.h b/installed/x64-windows-static-md/include/libusockets.h
+index 332ed64d..355dbf6d 100644
+--- a/installed/x64-windows-static-md/include/libusockets.h
++++ b/installed/x64-windows-static-md/include/libusockets.h
+@@ -53,6 +53,7 @@ struct us_timer_t;
+ struct us_socket_context_t;
+ struct us_loop_t;
+ struct us_poll_t;
++struct us_listen_socket_t;
+ struct us_udp_socket_t;
+ struct us_udp_packet_buffer_t;
+ 
+diff --git a/installed/x64-windows-static-md/include/uwebsockets/ChunkedEncoding.h b/installed/x64-windows-static-md/include/uwebsockets/ChunkedEncoding.h
+index 9362280b..339c6437 100644
+--- a/installed/x64-windows-static-md/include/uwebsockets/ChunkedEncoding.h
++++ b/installed/x64-windows-static-md/include/uwebsockets/ChunkedEncoding.h
+@@ -101,7 +101,7 @@ namespace uWS {
+     }
+ 
+     /* Returns next chunk (empty or not), or if all data was consumed, nullopt is returned. */
+-    static std::optional<std::string_view> getNextChunk(std::string_view &data, uint64_t &state, bool trailer = false) {
++    inline std::optional<std::string_view> getNextChunk(std::string_view &data, uint64_t &state, bool trailer = false) {
+ 
+         while (data.length()) {
+ 
+diff --git a/installed/x64-windows-static-md/include/uwebsockets/HttpParser.h b/installed/x64-windows-static-md/include/uwebsockets/HttpParser.h
+index 06e43496..bc10b4a0 100644
+--- a/installed/x64-windows-static-md/include/uwebsockets/HttpParser.h
++++ b/installed/x64-windows-static-md/include/uwebsockets/HttpParser.h
+@@ -41,7 +41,7 @@ namespace uWS {
+ /* We require at least this much post padding */
+-static const unsigned int MINIMUM_HTTP_POST_PADDING = 32;
++inline constexpr unsigned int MINIMUM_HTTP_POST_PADDING = 32;
+ static void *FULLPTR = (void *)~(uintptr_t)0;
+ 
+ /* STL needs one of these */
+ template <typename T>
+ std::optional<T *> optional_ptr(T *ptr) {
+diff --git a/installed/x64-windows-static-md/include/uwebsockets/LoopData.h b/installed/x64-windows-static-md/include/uwebsockets/LoopData.h
+index 3d21f650..f36492df 100644
+--- a/installed/x64-windows-static-md/include/uwebsockets/LoopData.h
++++ b/installed/x64-windows-static-md/include/uwebsockets/LoopData.h
+@@ -53,11 +53,11 @@ public:
+     }
+ 
+     void updateDate() {
+-        cacheTimepoint = time(0);
++        cacheTimepoint = _time64(nullptr);
+         struct tm tstruct = {};
+ #ifdef _WIN32
+         /* Micro, fucking soft never follows spec. */
+-        gmtime_s(&tstruct, &cacheTimepoint);
++        _gmtime64_s(&tstruct, &cacheTimepoint);
+ #else
+         gmtime_r(&cacheTimepoint, &tstruct);
+ #endif
+diff --git a/installed/x64-windows-static-md/include/uwebsockets/Loop.h b/installed/x64-windows-static-md/include/uwebsockets/Loop.h
+index b924cf08..c4631fec 100644
+--- a/installed/x64-windows-static-md/include/uwebsockets/Loop.h
++++ b/installed/x64-windows-static-md/include/uwebsockets/Loop.h
+@@ -99,19 +99,14 @@ private:
+     }
+ 
+     /* What to do with loops created with existingNativeLoop? */
+-    struct LoopCleaner {
+-        ~LoopCleaner() {
+-            if(loop && cleanMe) {
+-                loop->free();
+-            }
+-        }
++    struct LazyLoopState {
+         Loop *loop = nullptr;
+         bool cleanMe = false;
+     };
+ 
+-    static LoopCleaner &getLazyLoop() {
+-        static thread_local LoopCleaner lazyLoop;
++    static LazyLoopState &getLazyLoop() {
++        static thread_local LazyLoopState lazyLoop;
+         return lazyLoop;
+     }
+ 
+ public:
+diff --git a/installed/x64-windows-static-md/include/uwebsockets/CachingApp.h b/installed/x64-windows-static-md/include/uwebsockets/CachingApp.h
+index 1fc2db83..f5e96b09 100644
+--- a/installed/x64-windows-static-md/include/uwebsockets/CachingApp.h
++++ b/installed/x64-windows-static-md/include/uwebsockets/CachingApp.h
+@@ -38,7 +38,7 @@ public:
+         // end for all queued up sockets also
+         res->end(buffer);
+ 
+-        created = time(0);
++        created = _time64(nullptr);
+ 
+         std::ignore = closeConnection;
+     }

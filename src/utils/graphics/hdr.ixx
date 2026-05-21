@@ -1,10 +1,9 @@
 module;
 
-#include <windows.h>
-
 export module Utils.Graphics.Hdr;
 
 import std;
+import <windows.h>;
 
 // 查询窗口所在 DXGI 输出的 HDR 描述：是否处于 HDR10/G2084 色彩空间、面板上报的峰值亮度等。
 

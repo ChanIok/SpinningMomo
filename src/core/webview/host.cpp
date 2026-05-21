@@ -17,7 +17,6 @@ import Utils.Path;
 import Utils.String;
 import Vendor.BuildConfig;
 import Vendor.ShellApi;
-import Vendor.WIL;
 import <d3d11.h>;
 import <dcomp.h>;
 import <dxgi.h>;
@@ -886,7 +885,7 @@ auto start_environment_creation(Core::State::AppState& state, HWND webview_hwnd)
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
         nullptr, state.webview->resources.user_data_folder.c_str(), nullptr,
         environment_handler.Get());
-    Vendor::WIL::throw_if_failed(hr);
+    THROW_IF_FAILED(hr);
 
     return {};
   } catch (const wil::ResultException& e) {

@@ -15,8 +15,8 @@ import Features.Overlay.Interaction;
 import Features.Overlay.Window;
 import Utils.Logger;
 import Utils.Graphics.Capture;
+import Vendor.Windows;
 import <d3d11.h>;
-import <windows.h>;
 
 namespace Features::Overlay::Capture {
 
@@ -126,9 +126,9 @@ auto on_frame_arrived(Core::State::AppState& state,
   }
 }
 
-auto initialize_capture(Core::State::AppState& state, HWND target_window, int width, int height)
-    -> std::expected<void, std::string> {
-  if (!target_window || !IsWindow(target_window)) {
+auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND target_window,
+                        int width, int height) -> std::expected<void, std::string> {
+  if (!target_window || !Vendor::Windows::IsWindow(target_window)) {
     return std::unexpected("Invalid target window");
   }
 

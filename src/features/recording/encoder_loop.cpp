@@ -1,6 +1,5 @@
 module;
 
-#include <wil/com.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
 module Features.Recording.EncoderLoop;
@@ -17,6 +16,7 @@ import Utils.Media.Encoder.Types;
 import Utils.Logger;
 import <d3d11_4.h>;
 import <mfapi.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording::EncoderLoop {

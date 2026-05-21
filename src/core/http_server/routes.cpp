@@ -1,7 +1,5 @@
 module;
 
-#include <uwebsockets/App.h>
-
 module Core.HttpServer.Routes;
 
 import std;
@@ -13,6 +11,7 @@ import Core.Async;
 import Core.RPC;
 import Utils.Logger;
 import Vendor.BuildConfig;
+import Vendor.UWebSockets;
 import <asio.hpp>;
 
 namespace Core::HttpServer::Routes {
@@ -56,7 +55,7 @@ auto reject_forbidden(auto* res) -> void {
   res->end("Forbidden");
 }
 
-auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
+auto register_routes(Core::State::AppState& state, Vendor::UWebSockets::App& app) -> void {
   // 检查状态是否已初始化
   if (!state.http_server) {
     Logger().error("HTTP server not initialized");
@@ -82,7 +81,7 @@ auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
         // 使用 cork 包裹整个异步操作，延长 res 的生命周期
         res->cork([&state, buffer = std::move(buffer), origin = std::move(origin), res]() {
           // 获取事件循环
-          auto* loop = uWS::Loop::get();
+          auto* loop = Vendor::UWebSockets::Loop::get();
 
           // 在异步运行时中处理RPC请求
           asio::co_spawn(

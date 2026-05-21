@@ -1,12 +1,11 @@
 module;
 
-#include <wil/com.h>
-
 export module Features.Preview.Rendering;
 
 import std;
 import Core.State;
 import <d3d11.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 export namespace Features::Preview::Rendering {

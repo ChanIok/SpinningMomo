@@ -16,6 +16,9 @@ set_runtimes(is_mode("debug") and "MD" or "MT")
 
 set_policy("package.requires_lock", true)
 
+-- 锁定 vcpkg 注册表快照（2026-05-21）
+add_requireconfs("vcpkg::*", {configs = {baseline = "1ea949145db9db7c9b254062f94acdaeed947767"}})
+
 -- 添加vcpkg依赖包
 add_requires("vcpkg::uwebsockets", "vcpkg::spdlog", "vcpkg::asio", "vcpkg::reflectcpp", 
              "vcpkg::webview2", "vcpkg::wil", "vcpkg::xxhash", "vcpkg::sqlitecpp", "vcpkg::libwebp", "vcpkg::zlib")

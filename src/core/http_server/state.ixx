@@ -1,11 +1,10 @@
 module;
 
-#include <uwebsockets/App.h>
-
 export module Core.HttpServer.State;
 
 import std;
 import Core.HttpServer.Types;
+import Vendor.UWebSockets;
 
 export namespace Core::HttpServer::State {
 
@@ -13,8 +12,8 @@ export namespace Core::HttpServer::State {
 struct HttpServerState {
   // 服务器核心
   std::jthread server_thread{};
-  us_listen_socket_t* listen_socket{nullptr};
-  uWS::Loop* loop{nullptr};
+  Vendor::UWebSockets::ListenSocket* listen_socket{nullptr};
+  Vendor::UWebSockets::Loop* loop{nullptr};
 
   // SSE连接管理
   std::vector<std::shared_ptr<Types::SseConnection>> sse_connections;

@@ -1,7 +1,5 @@
 module;
 
-#include <rfl/json.hpp>
-
 module Core.RPC.Endpoints.File;
 
 import std;
@@ -13,6 +11,7 @@ import Utils.File;
 import Utils.Path;
 import Utils.System;
 import <asio.hpp>;
+import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::File {
 

@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 module Extensions.InfinityNikki.GameDirectory;
 
 import std;
@@ -10,6 +8,7 @@ import Utils.Logger;
 import Utils.String;
 import Vendor.ShellApi;
 import Vendor.Windows;
+import <wil/com.h>;
 
 namespace Extensions::InfinityNikki::GameDirectory {
 

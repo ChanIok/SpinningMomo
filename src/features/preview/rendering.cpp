@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 module Features.Preview.Rendering;
 
 import std;
@@ -13,7 +11,9 @@ import Features.Preview.Types;
 import Features.Preview.Shaders;
 import Features.Preview.Viewport;
 import <d3d11.h>;
+import <wil/com.h>;
 import <windows.h>;
+import <winerror.h>;
 
 namespace Features::Preview::Rendering {
 
