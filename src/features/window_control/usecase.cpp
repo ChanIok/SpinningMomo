@@ -32,7 +32,7 @@ namespace Features::WindowControl::UseCase {
 // 获取当前比例
 auto get_current_ratio(const Core::State::AppState& state,
                        const Utils::Display::MonitorInfo& monitor_info) -> double {
-  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
+  const auto& ratios = Features::Settings::Menu::get_ratios(state);
   if (state.floating_window->ui.current_ratio_index < ratios.size()) {
     return ratios[state.floating_window->ui.current_ratio_index].ratio;
   }
@@ -59,7 +59,7 @@ auto to_resolution_preset_input(const Features::Settings::Menu::ResolutionPreset
 // 比例切换时沿用当前选中的分辨率预设。
 auto get_current_resolution_preset(const Core::State::AppState& state)
     -> Features::WindowControl::ResolutionPresetInput {
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
   if (state.floating_window->ui.current_resolution_index < resolutions.size()) {
     return to_resolution_preset_input(
         &resolutions[state.floating_window->ui.current_resolution_index]);
@@ -71,7 +71,7 @@ auto get_current_resolution_preset(const Core::State::AppState& state)
 // 分辨率切换时使用事件指定的预设；越界时回退为 Default。
 auto get_resolution_preset_by_index(const Core::State::AppState& state, size_t resolution_index)
     -> Features::WindowControl::ResolutionPresetInput {
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
   if (resolution_index < resolutions.size()) {
     return to_resolution_preset_input(&resolutions[resolution_index]);
   }
@@ -235,7 +235,7 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   }
 
   // 更新当前比例索引
-  const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
+  const auto& ratios = Features::Settings::Menu::get_ratios(state);
   if (ratio_index < ratios.size() || ratio_index == std::numeric_limits<size_t>::max()) {
     state.floating_window->ui.current_ratio_index = ratio_index;
   }
@@ -313,7 +313,7 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
   }
 
   // 更新当前分辨率索引
-  const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+  const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
   if (resolution_index < resolutions.size()) {
     state.floating_window->ui.current_resolution_index = resolution_index;
   }

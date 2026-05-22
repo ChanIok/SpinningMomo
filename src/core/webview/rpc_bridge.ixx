@@ -1,11 +1,8 @@
-module;
-
-#include <asio.hpp>
-
 export module Core.WebView.RpcBridge;
 
 import std;
 import Core.State;
+import <asio.hpp>;
 
 namespace Core::WebView::RpcBridge {
 

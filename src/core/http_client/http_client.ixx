@@ -1,12 +1,9 @@
-module;
-
-#include <asio.hpp>
-
 export module Core.HttpClient;
 
 import std;
 import Core.State;
 import Core.HttpClient.Types;
+import <asio.hpp>;
 
 namespace Core::HttpClient {
 

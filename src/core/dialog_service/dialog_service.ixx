@@ -4,16 +4,14 @@ export module Core.DialogService;
 
 import std;
 import Core.State;
-import Core.DialogService.State;
 import Utils.Dialog;
 import Vendor.Windows;
 
 namespace Core::DialogService {
 
-export auto start(Core::DialogService::State::DialogServiceState& service)
-    -> std::expected<void, std::string>;
+export auto start(Core::State::AppState& state) -> std::expected<void, std::string>;
 
-export auto stop(Core::DialogService::State::DialogServiceState& service) -> void;
+export auto stop(Core::State::AppState& state) -> void;
 
 export auto open_file(Core::State::AppState& state, const Utils::Dialog::FileSelectorParams& params,
                       Vendor::Windows::HWND hwnd = nullptr)

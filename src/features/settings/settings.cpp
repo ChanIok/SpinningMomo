@@ -172,8 +172,7 @@ auto notify_settings_changed(Core::State::AppState& app_state,
       .new_settings = app_state.settings->raw,
       .change_description = std::string(change_description),
   };
-  Core::Events::post(*app_state.events,
-                     Features::Settings::Events::SettingsChangeEvent{change_data});
+  Core::Events::post(app_state, Features::Settings::Events::SettingsChangeEvent{change_data});
 }
 
 auto merge_patch_object(rfl::Generic::Object& target, const rfl::Generic::Object& patch) -> void {

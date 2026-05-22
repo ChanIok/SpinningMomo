@@ -83,7 +83,7 @@ auto handle_system_method(Core::State::AppState& app_state, const JsonRpcRequest
 
 // 执行已注册的方法
 auto execute_registered_method(const MethodInfo& method_info, rfl::Generic params_generic,
-                               rfl::Generic request_id) -> asio::awaitable<std::string> {
+                               rfl::Generic request_id) -> RpcJsonAwaitable {
   try {
     auto response_json = co_await method_info.handler(params_generic, request_id);
     Logger().trace("Response: {}", response_json);
@@ -98,7 +98,7 @@ auto execute_registered_method(const MethodInfo& method_info, rfl::Generic param
 
 // 处理JSON-RPC 2.0协议请求 - 优化版本
 auto process_request(Core::State::AppState& app_state, const std::string& request_json)
-    -> asio::awaitable<std::string> {
+    -> RpcJsonAwaitable {
   try {
     // 解析JSON-RPC请求
     auto request_result = rfl::json::read<JsonRpcRequest, rfl::SnakeCaseToCamelCase>(request_json);

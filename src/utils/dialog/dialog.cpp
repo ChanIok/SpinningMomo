@@ -1,15 +1,14 @@
 module;
 
-#include <wil/com.h>
-
 module Utils.Dialog;
 
 import std;
 import Utils.Logger;
 import Utils.String;
-import Vendor.WIL;
 import Vendor.Windows;
 import <shobjidl.h>;
+import <wil/com.h>;
+import <wil/result.h>;
 
 namespace Utils::Dialog {
 
@@ -64,32 +63,32 @@ auto select_folder(const FolderSelectorParams& params, HWND hwnd)
 
     // 创建对话框 - 智能指针自动管理
     wil::com_ptr<IFileDialog> pFileDialog;
-    Vendor::WIL::throw_if_failed(
+    THROW_IF_FAILED(
         CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pFileDialog)));
 
     // 设置选项
     DWORD dwOptions;
-    Vendor::WIL::throw_if_failed(pFileDialog->GetOptions(&dwOptions));
-    Vendor::WIL::throw_if_failed(pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS));
+    THROW_IF_FAILED(pFileDialog->GetOptions(&dwOptions));
+    THROW_IF_FAILED(pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS));
 
     // 设置标题
     if (!params.title.empty()) {
       std::wstring title_wide = Utils::String::FromUtf8(params.title);
-      Vendor::WIL::throw_if_failed(pFileDialog->SetTitle(title_wide.c_str()));
+      THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
     } else {
-      Vendor::WIL::throw_if_failed(pFileDialog->SetTitle(L"选择文件夹"));
+      THROW_IF_FAILED(pFileDialog->SetTitle(L"选择文件夹"));
     }
 
     // 显示对话框
-    Vendor::WIL::throw_if_failed(pFileDialog->Show(hwnd));
+    THROW_IF_FAILED(pFileDialog->Show(hwnd));
 
     // 获取结果
     wil::com_ptr<IShellItem> pItem;
-    Vendor::WIL::throw_if_failed(pFileDialog->GetResult(&pItem));
+    THROW_IF_FAILED(pFileDialog->GetResult(&pItem));
 
     // 获取路径 - 自动内存管理
     wil::unique_cotaskmem_string file_path;
-    Vendor::WIL::throw_if_failed(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
+    THROW_IF_FAILED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
 
     // 返回结果
     std::filesystem::path result(file_path.get());
@@ -117,17 +116,17 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
 
     // 创建对话框 - 智能指针自动管理
     wil::com_ptr<IFileOpenDialog> pFileDialog;
-    Vendor::WIL::throw_if_failed(
+    THROW_IF_FAILED(
         CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&pFileDialog)));
 
     // 设置选项
     DWORD dwOptions;
-    Vendor::WIL::throw_if_failed(pFileDialog->GetOptions(&dwOptions));
+    THROW_IF_FAILED(pFileDialog->GetOptions(&dwOptions));
     dwOptions |= FOS_FILEMUSTEXIST;  // 文件必须存在
     if (params.allow_multiple) {
       dwOptions |= FOS_ALLOWMULTISELECT;  // 允许多选
     }
-    Vendor::WIL::throw_if_failed(pFileDialog->SetOptions(dwOptions));
+    THROW_IF_FAILED(pFileDialog->SetOptions(dwOptions));
 
     // 设置过滤器 - 使用修复后的解析逻辑
     if (!params.filter.empty()) {
@@ -156,11 +155,11 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
     // 设置标题
     if (!params.title.empty()) {
       std::wstring title_wide = Utils::String::FromUtf8(params.title);
-      Vendor::WIL::throw_if_failed(pFileDialog->SetTitle(title_wide.c_str()));
+      THROW_IF_FAILED(pFileDialog->SetTitle(title_wide.c_str()));
     }
 
     // 显示对话框
-    Vendor::WIL::throw_if_failed(pFileDialog->Show(hwnd));
+    THROW_IF_FAILED(pFileDialog->Show(hwnd));
 
     // 获取结果
     std::vector<std::filesystem::path> selected_paths;
@@ -168,11 +167,11 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
     if (params.allow_multiple) {
       // 多文件选择
       wil::com_ptr<IShellItemArray> pItemArray;
-      Vendor::WIL::throw_if_failed(pFileDialog->GetResults(&pItemArray));
+      THROW_IF_FAILED(pFileDialog->GetResults(&pItemArray));
 
       // 获取文件数量
       DWORD count = 0;
-      Vendor::WIL::throw_if_failed(pItemArray->GetCount(&count));
+      THROW_IF_FAILED(pItemArray->GetCount(&count));
       selected_paths.reserve(count);
 
       for (DWORD i = 0; i < count; ++i) {
@@ -191,10 +190,10 @@ auto select_file(const FileSelectorParams& params, HWND hwnd)
     } else {
       // 单文件选择
       wil::com_ptr<IShellItem> pItem;
-      Vendor::WIL::throw_if_failed(pFileDialog->GetResult(&pItem));
+      THROW_IF_FAILED(pFileDialog->GetResult(&pItem));
 
       wil::unique_cotaskmem_string file_path;
-      Vendor::WIL::throw_if_failed(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
+      THROW_IF_FAILED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &file_path));
       selected_paths.emplace_back(file_path.get());
     }
 

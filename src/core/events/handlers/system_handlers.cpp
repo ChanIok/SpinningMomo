@@ -64,20 +64,20 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
   using namespace Core::Events;
 
   subscribe<UI::FloatingWindow::Events::HideEvent>(
-      *app_state.events,
+      app_state,
       [&app_state](const UI::FloatingWindow::Events::HideEvent&) { handle_hide_event(app_state); });
 
   subscribe<UI::FloatingWindow::Events::ExitEvent>(
-      *app_state.events,
+      app_state,
       [&app_state](const UI::FloatingWindow::Events::ExitEvent&) { handle_exit_event(app_state); });
 
   subscribe<UI::FloatingWindow::Events::ToggleVisibilityEvent>(
-      *app_state.events, [&app_state](const UI::FloatingWindow::Events::ToggleVisibilityEvent&) {
+      app_state, [&app_state](const UI::FloatingWindow::Events::ToggleVisibilityEvent&) {
         handle_toggle_visibility_event(app_state);
       });
 
   subscribe<UI::FloatingWindow::Events::DpiChangeEvent>(
-      *app_state.events, [&app_state](const UI::FloatingWindow::Events::DpiChangeEvent& event) {
+      app_state, [&app_state](const UI::FloatingWindow::Events::DpiChangeEvent& event) {
         Logger().debug("DPI changed to: {}, window size: {}x{}", event.new_dpi,
                        event.window_size.cx, event.window_size.cy);
 
@@ -87,7 +87,7 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
       });
 
   subscribe<Core::WebView::Events::WebViewResponseEvent>(
-      *app_state.events, [&app_state](const Core::WebView::Events::WebViewResponseEvent& event) {
+      app_state, [&app_state](const Core::WebView::Events::WebViewResponseEvent& event) {
         try {
           // 在UI线程上安全调用WebView API
           Core::WebView::post_message(app_state, event.response);

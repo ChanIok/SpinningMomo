@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Core.RPC.Endpoints.Extensions;
 
 import std;
@@ -16,6 +12,7 @@ import Extensions.InfinityNikki.Types;
 import Extensions.InfinityNikki.GameDirectory;
 import Features.Gallery.Types;
 import Utils.Logger;
+import <asio.hpp>;
 import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Extensions {

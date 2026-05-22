@@ -49,7 +49,7 @@ auto create_ignore_rule(Core::State::AppState& app_state, const Types::IgnoreRul
       rule.description.has_value() ? Core::Database::Types::DbParam{rule.description.value()}
                                    : Core::Database::Types::DbParam{std::monostate{}}};
 
-  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, params);
   if (!result || !result->has_value()) {
     return std::unexpected("Failed to create ignore rule: " +
                            (result ? std::string("missing returned ID") : result.error()));
@@ -69,7 +69,7 @@ auto get_ignore_rule_by_id(Core::State::AppState& app_state, std::int64_t id)
     WHERE id = ?
   )";
 
-  auto result = Core::Database::query<Types::IgnoreRule>(*app_state.database, sql, {id});
+  auto result = Core::Database::query<Types::IgnoreRule>(app_state, sql, {id});
   if (!result) {
     return std::unexpected("Failed to query ignore rule: " + result.error());
   }
@@ -101,7 +101,7 @@ auto update_ignore_rule(Core::State::AppState& app_state, const Types::IgnoreRul
                                    : Core::Database::Types::DbParam{std::monostate{}},
       rule.id};
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
+  auto result = Core::Database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to update ignore rule: " + result.error());
   }
@@ -115,7 +115,7 @@ auto delete_ignore_rule(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<void, std::string> {
   std::string sql = "DELETE FROM ignore_rules WHERE id = ?";
 
-  auto result = Core::Database::execute(*app_state.database, sql, {id});
+  auto result = Core::Database::execute(app_state, sql, {id});
   if (!result) {
     return std::unexpected("Failed to delete ignore rule: " + result.error());
   }
@@ -137,7 +137,7 @@ auto get_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t folde
     ORDER BY created_at ASC
   )";
 
-  auto result = Core::Database::query<Types::IgnoreRule>(*app_state.database, sql, {folder_id});
+  auto result = Core::Database::query<Types::IgnoreRule>(app_state, sql, {folder_id});
   if (!result) {
     return std::unexpected("Failed to query rules by folder_id: " + result.error());
   }
@@ -151,7 +151,7 @@ auto get_rules_by_directory_path(Core::State::AppState& app_state,
   // 先查找folder_id
   std::string folder_sql = "SELECT id FROM folders WHERE path = ?";
   auto folder_result =
-      Core::Database::query_scalar<int64_t>(*app_state.database, folder_sql, {directory_path});
+      Core::Database::query_scalar<int64_t>(app_state, folder_sql, {directory_path});
 
   if (!folder_result) {
     return std::unexpected("Failed to query folder by path: " + folder_result.error());
@@ -174,7 +174,7 @@ auto get_global_rules(Core::State::AppState& app_state)
     ORDER BY created_at ASC
   )";
 
-  auto result = Core::Database::query<Types::IgnoreRule>(*app_state.database, sql);
+  auto result = Core::Database::query<Types::IgnoreRule>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to query global rules: " + result.error());
   }
@@ -188,11 +188,10 @@ auto replace_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t f
                                 const std::vector<Types::ScanIgnoreRule>& scan_rules)
     -> std::expected<void, std::string> {
   auto transaction_result = Core::Database::execute_transaction(
-      *app_state.database,
-      [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+      app_state, [&](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
         // 先删除该文件夹已有规则，再插入新的完整规则集
         auto delete_result = Core::Database::execute(
-            db_state, "DELETE FROM ignore_rules WHERE folder_id = ?", {folder_id});
+            txn_app_state, "DELETE FROM ignore_rules WHERE folder_id = ?", {folder_id});
         if (!delete_result) {
           return std::unexpected("Failed to delete existing rules: " + delete_result.error());
         }
@@ -222,7 +221,7 @@ auto replace_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t f
                   ? Core::Database::Types::DbParam{scan_rule.description.value()}
                   : Core::Database::Types::DbParam{std::monostate{}}};
 
-          auto insert_result = Core::Database::execute(db_state, insert_sql, params);
+          auto insert_result = Core::Database::execute(txn_app_state, insert_sql, params);
           if (!insert_result) {
             return std::unexpected("Failed to insert ignore rule: " + insert_result.error());
           }
@@ -249,8 +248,7 @@ auto batch_update_ignore_rules(Core::State::AppState& app_state,
   }
 
   return Core::Database::execute_transaction(
-      *app_state.database,
-      [&](Core::Database::State::DatabaseState& db_state) -> std::expected<void, std::string> {
+      app_state, [&](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
         for (const auto& rule : rules) {
           auto update_result = update_ignore_rule(app_state, rule);
           if (!update_result) {
@@ -267,8 +265,7 @@ auto delete_rules_by_folder_id(Core::State::AppState& app_state, std::int64_t fo
     -> std::expected<int, std::string> {
   std::string sql = "DELETE FROM ignore_rules WHERE folder_id = ? RETURNING id";
 
-  auto result =
-      Core::Database::query<Core::Database::ReturningIdRow>(*app_state.database, sql, {folder_id});
+  auto result = Core::Database::query<Core::Database::ReturningIdRow>(app_state, sql, {folder_id});
   if (!result) {
     return std::unexpected("Failed to delete rules by folder_id: " + result.error());
   }
@@ -292,7 +289,7 @@ auto toggle_rule_enabled(Core::State::AppState& app_state, std::int64_t id, bool
     WHERE id = ?
   )";
 
-  auto result = Core::Database::execute(*app_state.database, sql, {enabled ? 1 : 0, id});
+  auto result = Core::Database::execute(app_state, sql, {enabled ? 1 : 0, id});
   if (!result) {
     return std::unexpected("Failed to toggle rule enabled status: " + result.error());
   }
@@ -310,7 +307,7 @@ auto cleanup_orphaned_rules(Core::State::AppState& app_state) -> std::expected<i
     RETURNING id
   )";
 
-  auto result = Core::Database::query<Core::Database::ReturningIdRow>(*app_state.database, sql);
+  auto result = Core::Database::query<Core::Database::ReturningIdRow>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to cleanup orphaned rules: " + result.error());
   }
@@ -335,7 +332,7 @@ auto count_rules(Core::State::AppState& app_state, std::optional<std::int64_t> f
     params.push_back(folder_id.value());
   }
 
-  auto result = Core::Database::query_scalar<int>(*app_state.database, sql, params);
+  auto result = Core::Database::query_scalar<int>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to count ignore rules: " + result.error());
   }

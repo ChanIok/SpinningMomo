@@ -1,11 +1,11 @@
 module;
 
-#include <wil/com.h>
 #include <winrt/Windows.Graphics.Capture.h>
 
 module Features.Recording.EncoderLoop;
 
 import std;
+import Core.State;
 import Features.Recording.Session;
 import Features.Recording.State;
 import Features.Recording.Types;
@@ -16,6 +16,7 @@ import Utils.Media.Encoder.Types;
 import Utils.Logger;
 import <d3d11_4.h>;
 import <mfapi.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording::EncoderLoop {
@@ -231,7 +232,7 @@ auto consume_video_frame_pending(State::RecordingState& state) -> bool {
 
 // 音频写入：永远不超过「已经落到文件里的最后一帧视频」的时间。
 auto pop_ready_audio_packet(State::RecordingState& state)
-    -> std::optional<State::QueuedAudioPacket> {
+    -> std::optional<Types::QueuedAudioPacket> {
   if (state.last_emitted_video_timestamp_100ns < 0) {
     return std::nullopt;
   }
@@ -246,7 +247,7 @@ auto pop_ready_audio_packet(State::RecordingState& state)
 }
 
 auto write_audio_packet(Utils::Media::Encoder::State::EncoderContext& encoder,
-                        const State::QueuedAudioPacket& packet)
+                        const Types::QueuedAudioPacket& packet)
     -> std::expected<void, std::string> {
   if (!encoder.sink_writer || !encoder.has_audio || packet.data.empty()) {
     return {};
@@ -296,7 +297,7 @@ auto write_audio_packet(Utils::Media::Encoder::State::EncoderContext& encoder,
   return {};
 }
 
-auto encode_queued_audio(State::RecordingState& state, const State::QueuedAudioPacket& packet)
+auto encode_queued_audio(State::RecordingState& state, const Types::QueuedAudioPacket& packet)
     -> std::expected<void, std::string> {
   auto result = write_audio_packet(state.encoder, packet);
   if (!result) {
@@ -426,7 +427,13 @@ auto copy_one_capture_frame_to_encoder_input(State::RecordingState& state,
 // 模块导出的入口（声明见 encoder_loop.ixx）
 // ---------------------------------------------------------------------------
 
-auto mark_video_frame_pending(State::RecordingState& state) -> void {
+auto mark_video_frame_pending(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   {
     std::lock_guard queue_lock(state.queue_mutex);
     if (!state.accepting_input.load(std::memory_order_acquire)) {
@@ -437,12 +444,24 @@ auto mark_video_frame_pending(State::RecordingState& state) -> void {
   state.queue_cv.notify_one();
 }
 
-auto wait_encoder_ready(State::RecordingState& state) -> void {
+auto wait_encoder_ready(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   std::unique_lock ready_lock(state.encoder_ready_mutex);
   state.encoder_ready_cv.wait(ready_lock, [&state]() { return state.encoder_ready; });
 }
 
-auto signal_encoder_finish(State::RecordingState& state) -> void {
+auto signal_encoder_finish(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   {
     std::lock_guard queue_lock(state.queue_mutex);
     state.finish_requested.store(true, std::memory_order_release);
@@ -451,8 +470,14 @@ auto signal_encoder_finish(State::RecordingState& state) -> void {
   state.queue_cv.notify_all();
 }
 
-auto encoder_thread_proc(State::RecordingState& state, std::stop_token stop_token,
+auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_token,
                          std::function<void()> request_resize_restart) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   try {
     auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
 

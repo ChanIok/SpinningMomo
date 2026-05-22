@@ -1,7 +1,5 @@
 module;
 
-#include <asio.hpp>
-
 // TaskService 实现：把无限暖暖相关的重活挂到 Asio 协程上，并对接 Core::Tasks（前端「后台任务」）。
 // 约定：对外只暴露 start_* / schedule_silent_*；launch_* 为内部 co_spawn
 // 入口，不校验「是否已有同类任务」 （重复校验在各自的 start_* 里通过 has_active_task_of_type +
@@ -21,6 +19,7 @@ import Extensions.InfinityNikki.PhotoExtract;
 import Extensions.InfinityNikki.MediaHardlinks;
 import Extensions.InfinityNikki.Types;
 import Utils.Logger;
+import <asio.hpp>;
 
 namespace Extensions::InfinityNikki::TaskService {
 
@@ -100,7 +99,7 @@ auto launch_initial_scan_task(
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
@@ -146,7 +145,7 @@ auto launch_initial_scan_task(
           post_scan_callback(result);
         }
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // 走 PhotoExtract::extract_photo_params；有进度回调写任务；成功发
@@ -160,7 +159,7 @@ auto launch_extract_photo_params_task(
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
@@ -226,7 +225,7 @@ auto launch_extract_photo_params_task(
 
         Core::Tasks::complete_task_success(app_state, task_id);
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // 与 launch_extract_photo_params_task 共用同一套解析逻辑，但不绑定 task_id、无进度条；仅日志 +
@@ -240,7 +239,7 @@ auto schedule_silent_extract_photo_params(
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn(
         "Silent Infinity Nikki photo params extract skipped: async runtime is not available");
@@ -293,7 +292,7 @@ auto schedule_silent_extract_photo_params(
 
         co_return;
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // 全量建立/校正 Infinity Nikki 媒体硬链接；完成后可能把设置里 manage_media_hardlinks
@@ -305,7 +304,7 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Core::Tasks::complete_task_failed(app_state, task_id, "Async runtime is not available");
     return;
@@ -394,7 +393,7 @@ auto launch_initialize_media_hardlinks_task(Core::State::AppState& app_state,
 
         Core::Tasks::complete_task_success(app_state, task_id);
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // ---------------------------------------------------------------------------

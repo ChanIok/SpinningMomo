@@ -3,30 +3,18 @@ module;
 export module Core.Database;
 
 import std;
-import Core.Database.State;
+import Core.State;
 import Core.Database.Types;
 import Core.Database.DataMapper;
 import <SQLiteCpp/SQLiteCpp.h>;
 
 namespace Core::Database {
 
-// DB worker 线程内的当前连接。业务线程只投递任务，不直接持有 SQLite 连接。
-// 事务 lambda 内再次调用 execute/query 时会命中它并直接执行，避免任务重入死锁。
-thread_local SQLite::Database* current_connection = nullptr;
+using DatabaseJob = std::function<void(SQLite::Database&)>;
 
-auto submit_task(State::DatabaseState& state, std::function<void()> task)
+// 同步执行数据库任务。调用方会等待任务完成；事务内重入时由实现复用当前 worker 连接。
+auto run_database_job(Core::State::AppState& app_state, DatabaseJob job)
     -> std::expected<void, std::string>;
-
-// 初始化数据库连接
-export auto initialize(State::DatabaseState& state, const std::filesystem::path& db_path)
-    -> std::expected<void, std::string>;
-
-export auto shutdown(State::DatabaseState& state) -> void;
-
-// 用于 `... RETURNING id` 的通用单列行类型。多行返回时用 query<ReturningIdRow>() 计数。
-export struct ReturningIdRow {
-  std::int64_t id = 0;
-};
 
 template <typename Result>
 auto make_database_error(std::string error) -> Result {
@@ -34,64 +22,45 @@ auto make_database_error(std::string error) -> Result {
 }
 
 template <typename Result, typename Func>
-auto run_on_database(State::DatabaseState& state, Func&& func) -> Result {
-  // 已在 DB worker 内：直接使用当前连接。事务内部的所有 SQL 都靠这个分支保持在
-  // 同一连接、同一任务中执行。
-  if (current_connection) {
-    try {
-      return func(*current_connection);
-    } catch (const SQLite::Exception& e) {
-      return make_database_error<Result>("SQLite error: " + std::string(e.what()));
-    } catch (const std::exception& e) {
-      return make_database_error<Result>("Database task error: " + std::string(e.what()));
-    }
+auto run_on_database(Core::State::AppState& app_state, Func&& func) -> Result {
+  std::optional<Result> result;
+  auto job_result = run_database_job(
+      app_state, [&](SQLite::Database& connection) { result.emplace(func(connection)); });
+  if (!job_result) {
+    return make_database_error<Result>(job_result.error());
   }
 
-  if (!state.is_running.load(std::memory_order_acquire)) {
-    return make_database_error<Result>("Database executor is not running");
+  if (!result) {
+    return make_database_error<Result>("Database task did not produce a result");
   }
 
-  // 对外保持同步 API：调用线程等待 promise，实际 SQLite 操作在 DB worker 线程执行。
-  auto promise = std::make_shared<std::promise<Result>>();
-  auto future = promise->get_future();
-  auto task = [promise, fn = std::forward<Func>(func)]() mutable {
-    if (!current_connection) {
-      promise->set_value(make_database_error<Result>("Database worker connection is not ready"));
-      return;
-    }
-
-    try {
-      promise->set_value(fn(*current_connection));
-    } catch (const SQLite::Exception& e) {
-      promise->set_value(make_database_error<Result>("SQLite error: " + std::string(e.what())));
-    } catch (const std::exception& e) {
-      promise->set_value(
-          make_database_error<Result>("Database task error: " + std::string(e.what())));
-    } catch (...) {
-      promise->set_value(make_database_error<Result>("Database task error: unknown"));
-    }
-  };
-
-  if (auto submit_result = submit_task(state, std::move(task)); !submit_result) {
-    return make_database_error<Result>(submit_result.error());
-  }
-
-  return future.get();
+  return std::move(*result);
 }
 
-// 执行非查询操作 (INSERT, UPDATE, DELETE)
-export auto execute(State::DatabaseState& state, const std::string& sql)
+// 初始化数据库连接
+export auto initialize(Core::State::AppState& app_state, const std::filesystem::path& db_path)
     -> std::expected<void, std::string>;
-export auto execute(State::DatabaseState& state, const std::string& sql,
+
+export auto shutdown(Core::State::AppState& app_state) -> void;
+
+// 用于 `... RETURNING id` 的通用单列行类型。多行返回时用 query<ReturningIdRow>() 计数。
+export struct ReturningIdRow {
+  std::int64_t id = 0;
+};
+
+// 执行非查询操作 (INSERT, UPDATE, DELETE)
+export auto execute(Core::State::AppState& app_state, const std::string& sql)
+    -> std::expected<void, std::string>;
+export auto execute(Core::State::AppState& app_state, const std::string& sql,
                     const std::vector<Types::DbParam>& params) -> std::expected<void, std::string>;
 
 // 查询返回多个结果 (SELECT)
 export template <typename T>
-auto query(State::DatabaseState& state, const std::string& sql,
+auto query(Core::State::AppState& app_state, const std::string& sql,
            const std::vector<Types::DbParam>& params = {})
     -> std::expected<std::vector<T>, std::string> {
   return run_on_database<std::expected<std::vector<T>, std::string>>(
-      state,
+      app_state,
       [sql, params](SQLite::Database& connection) -> std::expected<std::vector<T>, std::string> {
         try {
           SQLite::Statement query(connection, sql);
@@ -103,12 +72,11 @@ auto query(State::DatabaseState& state, const std::string& sql,
 
             std::visit(
                 [&query, param_index](auto&& arg) {
-                  using T = std::decay_t<decltype(arg)>;
-                  if constexpr (std::is_same_v<T, std::monostate>) {
+                  using ParamT = std::decay_t<decltype(arg)>;
+                  if constexpr (std::is_same_v<ParamT, std::monostate>) {
                     query.bind(param_index);  // 绑定 NULL
-                  } else if constexpr (std::is_same_v<T, std::vector<std::uint8_t>>) {
-                    query.bind(param_index, arg.data(),
-                               static_cast<int>(arg.size()));  // 绑定 BLOB
+                  } else if constexpr (std::is_same_v<ParamT, std::vector<std::uint8_t>>) {
+                    query.bind(param_index, arg.data(), static_cast<int>(arg.size()));  // 绑定 BLOB
                   } else {
                     // 通过重载方法绑定 int64_t, double, std::string
                     query.bind(param_index, arg);
@@ -137,10 +105,10 @@ auto query(State::DatabaseState& state, const std::string& sql,
 
 // 查询返回单个结果 (SELECT)
 export template <typename T>
-auto query_single(State::DatabaseState& state, const std::string& sql,
+auto query_single(Core::State::AppState& app_state, const std::string& sql,
                   const std::vector<Types::DbParam>& params = {})
     -> std::expected<std::optional<T>, std::string> {
-  auto results = query<T>(state, sql, params);
+  auto results = query<T>(app_state, sql, params);
   if (!results) {
     return std::unexpected(results.error());
   }
@@ -156,11 +124,11 @@ auto query_single(State::DatabaseState& state, const std::string& sql,
 
 // 查询返回单个标量值
 export template <typename T>
-auto query_scalar(State::DatabaseState& state, const std::string& sql,
+auto query_scalar(Core::State::AppState& app_state, const std::string& sql,
                   const std::vector<Types::DbParam>& params = {})
     -> std::expected<std::optional<T>, std::string> {
   return run_on_database<std::expected<std::optional<T>, std::string>>(
-      state,
+      app_state,
       [sql, params](SQLite::Database& connection) -> std::expected<std::optional<T>, std::string> {
         try {
           SQLite::Statement query(connection, sql);
@@ -212,7 +180,7 @@ auto query_scalar(State::DatabaseState& state, const std::string& sql,
 
 // 批量INSERT操作（自动分批处理）
 export template <typename T, typename ParamExtractor>
-auto execute_batch_insert(State::DatabaseState& state, const std::string& insert_prefix,
+auto execute_batch_insert(Core::State::AppState& app_state, const std::string& insert_prefix,
                           const std::string& values_placeholder, const std::vector<T>& items,
                           ParamExtractor param_extractor, size_t max_params_per_batch = 999)
     -> std::expected<std::vector<int64_t>, std::string> {
@@ -233,8 +201,9 @@ auto execute_batch_insert(State::DatabaseState& state, const std::string& insert
   all_inserted_ids.reserve(items.size());
 
   return execute_transaction(
-      state,
-      [&](State::DatabaseState& db_state) -> std::expected<std::vector<int64_t>, std::string> {
+      app_state,
+      [&](Core::State::AppState& txn_app_state)
+          -> std::expected<std::vector<int64_t>, std::string> {
         for (size_t batch_start = 0; batch_start < items.size();
              batch_start += max_items_per_batch) {
           size_t batch_end = std::min(batch_start + max_items_per_batch, items.size());
@@ -261,7 +230,7 @@ auto execute_batch_insert(State::DatabaseState& state, const std::string& insert
           }
 
           batch_sql += " RETURNING id";
-          auto inserted_ids_result = query<ReturningIdRow>(db_state, batch_sql, all_params);
+          auto inserted_ids_result = query<ReturningIdRow>(txn_app_state, batch_sql, all_params);
           if (!inserted_ids_result) {
             return std::unexpected("Batch insert failed: " + inserted_ids_result.error());
           }
@@ -277,22 +246,22 @@ auto execute_batch_insert(State::DatabaseState& state, const std::string& insert
 
 // 事务管理：整个 lambda 会作为一个 DB task 执行；lambda 内的 execute/query 不会重新入队。
 export template <typename Func>
-auto execute_transaction(State::DatabaseState& state, Func&& func) -> decltype(auto) {
-  using ReturnType = std::decay_t<decltype(func(state))>;
+auto execute_transaction(Core::State::AppState& app_state, Func&& func)
+    -> std::invoke_result_t<Func, Core::State::AppState&> {
+  using ReturnType = std::decay_t<std::invoke_result_t<Func, Core::State::AppState&>>;
   return run_on_database<ReturnType>(
-      state,
-      [&state, fn = std::forward<Func>(func)](SQLite::Database& connection) mutable -> ReturnType {
+      app_state,
+      [&app_state,
+       fn = std::forward<Func>(func)](SQLite::Database& connection) mutable -> ReturnType {
         try {
           SQLite::Transaction transaction(connection);
-
           // 执行用户提供的事务逻辑。事务内的 execute/query 会检测当前 DB 线程并直接执行。
-          auto result = fn(state);
+          auto result = fn(app_state);
           if (!result) {
             // 如果函数返回错误，事务会在 transaction 析构时自动回滚。
             return result;
           }
-
-          // 提交事务
+          // 提交事务。如果提交失败，会抛出异常，导致整个事务回滚。
           transaction.commit();
           return result;
         } catch (const SQLite::Exception& e) {

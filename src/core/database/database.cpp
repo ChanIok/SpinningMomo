@@ -3,12 +3,17 @@ module;
 module Core.Database;
 
 import std;
+import Core.State;
 import Core.Database.State;
 import Core.Database.Types;
 import Utils.Logger;
 import <SQLiteCpp/SQLiteCpp.h>;
 
 namespace Core::Database {
+
+// DB worker 线程内的当前连接。业务线程只投递任务，不直接持有 SQLite 连接。
+// 事务 lambda 内再次调用 execute/query 时会命中它并直接执行，避免任务重入死锁。
+thread_local SQLite::Database* current_connection = nullptr;
 
 namespace Executor {
 
@@ -48,6 +53,43 @@ auto bind_params(SQLite::Statement& query, const std::vector<Types::DbParam>& pa
           }
         },
         param);
+  }
+}
+
+auto submit_task(State::DatabaseState& state, std::function<void()> task)
+    -> std::expected<void, std::string> {
+  if (!state.is_running.load(std::memory_order_acquire)) {
+    return std::unexpected("Database executor is not running");
+  }
+  if (state.shutdown_requested.load(std::memory_order_acquire)) {
+    return std::unexpected("Database executor is shutting down");
+  }
+  try {
+    {
+      std::lock_guard lock(state.queue_mutex);
+      if (state.shutdown_requested.load(std::memory_order_acquire)) {
+        return std::unexpected("Database executor is shutting down");
+      }
+      state.task_queue.push(std::move(task));
+    }
+    state.queue_cv.notify_one();
+    return {};
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to submit database task: " + std::string(e.what()));
+  }
+}
+
+auto execute_job(SQLite::Database& connection, const DatabaseJob& job)
+    -> std::expected<void, std::string> {
+  try {
+    job(connection);
+    return {};
+  } catch (const SQLite::Exception& e) {
+    return std::unexpected("SQLite error: " + std::string(e.what()));
+  } catch (const std::exception& e) {
+    return std::unexpected("Database task error: " + std::string(e.what()));
+  } catch (...) {
+    return std::unexpected("Database task error: unknown");
   }
 }
 
@@ -105,31 +147,71 @@ auto worker_loop(State::DatabaseState& state, std::size_t index) -> void {
 
 }  // namespace Executor
 
-auto submit_task(State::DatabaseState& state, std::function<void()> task)
+auto run_database_job(Core::State::AppState& app_state, DatabaseJob job)
     -> std::expected<void, std::string> {
+  if (current_connection) {
+    return Executor::execute_job(*current_connection, job);
+  }
+
+  if (!app_state.database) {
+    return std::unexpected("DatabaseState is not initialized");
+  }
+
+  auto& state = *app_state.database;
+
   if (!state.is_running.load(std::memory_order_acquire)) {
     return std::unexpected("Database executor is not running");
   }
-  if (state.shutdown_requested.load(std::memory_order_acquire)) {
-    return std::unexpected("Database executor is shutting down");
-  }
-  try {
-    {
-      std::lock_guard lock(state.queue_mutex);
-      if (state.shutdown_requested.load(std::memory_order_acquire)) {
-        return std::unexpected("Database executor is shutting down");
-      }
-      state.task_queue.push(std::move(task));
+
+  // 对外保持同步 API：调用线程等待 promise，实际 SQLite 操作在 DB worker 线程执行。
+  auto promise = std::make_shared<std::promise<std::expected<void, std::string>>>();
+  auto future = promise->get_future();
+  auto task = [promise, job = std::move(job)]() mutable {
+    if (!current_connection) {
+      promise->set_value(std::unexpected("Database worker connection is not ready"));
+      return;
     }
-    // 共享队列由所有 DB worker 竞争消费；不再维护调用线程到 worker 的亲和关系。
-    state.queue_cv.notify_one();
-    return {};
-  } catch (const std::exception& e) {
-    return std::unexpected("Failed to submit database task: " + std::string(e.what()));
+
+    promise->set_value(Executor::execute_job(*current_connection, job));
+  };
+
+  if (auto submit_result = Executor::submit_task(state, std::move(task)); !submit_result) {
+    return std::unexpected(submit_result.error());
   }
+
+  return future.get();
 }
 
-auto initialize(State::DatabaseState& state, const std::filesystem::path& db_path)
+auto shutdown_executor(State::DatabaseState& state) -> void {
+  if (!state.is_running.exchange(false, std::memory_order_acq_rel)) {
+    return;
+  }
+
+  Logger().info("Stopping database executor");
+  state.shutdown_requested.store(true, std::memory_order_release);
+  // 唤醒所有 worker；它们会先跑完队列中的任务，再在队列为空时退出。
+  state.queue_cv.notify_all();
+
+  for (auto& worker_thread : state.worker_threads) {
+    if (worker_thread.joinable()) {
+      worker_thread.join();
+    }
+  }
+
+  {
+    std::lock_guard lock(state.queue_mutex);
+    std::queue<std::function<void()>> empty;
+    state.task_queue.swap(empty);
+  }
+
+  state.worker_threads.clear();
+  state.thread_count = 0;
+  state.shutdown_requested.store(false, std::memory_order_release);
+
+  Logger().info("Database executor stopped");
+}
+
+auto initialize_executor(State::DatabaseState& state, const std::filesystem::path& db_path)
     -> std::expected<void, std::string> {
   if (state.is_running.exchange(true, std::memory_order_acq_rel)) {
     Logger().warn("Database executor already started");
@@ -160,48 +242,38 @@ auto initialize(State::DatabaseState& state, const std::filesystem::path& db_pat
     return {};
   } catch (const SQLite::Exception& e) {
     Logger().error("Cannot initialize database: {} - Error: {}", db_path.string(), e.what());
-    shutdown(state);
+    shutdown_executor(state);
     return std::unexpected(std::string("Cannot initialize database: ") + e.what());
   } catch (const std::exception& e) {
     Logger().error("Cannot initialize database: {} - Error: {}", db_path.string(), e.what());
-    shutdown(state);
+    shutdown_executor(state);
     return std::unexpected(std::string("Cannot initialize database: ") + e.what());
   }
 }
 
-auto shutdown(State::DatabaseState& state) -> void {
-  if (!state.is_running.exchange(false, std::memory_order_acq_rel)) {
+auto initialize(Core::State::AppState& app_state, const std::filesystem::path& db_path)
+    -> std::expected<void, std::string> {
+  auto* const state = app_state.database ? app_state.database.get() : nullptr;
+  if (!state) {
+    return std::unexpected("DatabaseState is not initialized");
+  }
+
+  return initialize_executor(*state, db_path);
+}
+
+auto shutdown(Core::State::AppState& app_state) -> void {
+  auto* const state = app_state.database ? app_state.database.get() : nullptr;
+  if (!state) {
     return;
   }
 
-  Logger().info("Stopping database executor");
-  state.shutdown_requested.store(true, std::memory_order_release);
-  // 唤醒所有 worker；它们会先跑完队列中的任务，再在队列为空时退出。
-  state.queue_cv.notify_all();
-
-  for (auto& worker_thread : state.worker_threads) {
-    if (worker_thread.joinable()) {
-      worker_thread.join();
-    }
-  }
-
-  {
-    std::lock_guard lock(state.queue_mutex);
-    std::queue<std::function<void()>> empty;
-    state.task_queue.swap(empty);
-  }
-
-  state.worker_threads.clear();
-  state.thread_count = 0;
-  state.shutdown_requested.store(false, std::memory_order_release);
-
-  Logger().info("Database executor stopped");
+  shutdown_executor(*state);
 }
 
-auto execute(State::DatabaseState& state, const std::string& sql)
+auto execute(Core::State::AppState& app_state, const std::string& sql)
     -> std::expected<void, std::string> {
   return run_on_database<std::expected<void, std::string>>(
-      state, [sql](SQLite::Database& connection) -> std::expected<void, std::string> {
+      app_state, [sql](SQLite::Database& connection) -> std::expected<void, std::string> {
         try {
           connection.exec(sql);
           return {};
@@ -212,10 +284,10 @@ auto execute(State::DatabaseState& state, const std::string& sql)
       });
 }
 
-auto execute(State::DatabaseState& state, const std::string& sql,
+auto execute(Core::State::AppState& app_state, const std::string& sql,
              const std::vector<Types::DbParam>& params) -> std::expected<void, std::string> {
   return run_on_database<std::expected<void, std::string>>(
-      state, [sql, params](SQLite::Database& connection) -> std::expected<void, std::string> {
+      app_state, [sql, params](SQLite::Database& connection) -> std::expected<void, std::string> {
         try {
           SQLite::Statement query(connection, sql);
           Executor::bind_params(query, params);

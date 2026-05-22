@@ -1062,9 +1062,8 @@ auto schedule_sync_task(Core::State::AppState& app_state,
     return;
   }
 
-  bool submitted = Core::WorkerPool::submit_task(*app_state.worker_pool, [&app_state, watcher]() {
-    process_pending_sync(app_state, watcher);
-  });
+  bool submitted = Core::WorkerPool::submit_task(
+      app_state, [&app_state, watcher]() { process_pending_sync(app_state, watcher); });
   if (!submitted) {
     watcher->scan_in_progress.store(false, std::memory_order_release);
     Logger().warn("Failed to submit gallery sync task for '{}'", watcher->root_path.string());
@@ -1681,7 +1680,7 @@ auto schedule_start_registered_watchers(Core::State::AppState& app_state) -> voi
   app_state.gallery->startup_watchers_future = promise->get_future();
 
   bool submitted = Core::WorkerPool::submit_task(
-      *app_state.worker_pool, [&app_state, promise = std::move(promise)]() mutable {
+      app_state, [&app_state, promise = std::move(promise)]() mutable {
         auto result = start_registered_watchers(app_state);
         if (!result && !is_shutdown_requested(app_state)) {
           Logger().warn("Gallery watcher startup recovery failed: {}", result.error());

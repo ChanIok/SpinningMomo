@@ -1,7 +1,5 @@
 module;
 
-#include <rfl/json.hpp>
-
 module Core.RPC.Endpoints.Dialog;
 
 import std;
@@ -14,6 +12,7 @@ import Core.RPC.Types;
 import Utils.Dialog;
 import Vendor.Windows;
 import <asio.hpp>;
+import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Dialog {
 

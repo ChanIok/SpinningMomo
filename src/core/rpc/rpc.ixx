@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 export module Core.RPC;
 
 import std;
@@ -9,21 +5,21 @@ import Core.State;
 import Core.RPC.Types;
 import Utils.Logger;
 import <rfl/json.hpp>;
+import <asio.hpp>;
 
 namespace Core::RPC {
 
 // 异步处理器签名
 template <typename Request, typename Response>
-using AsyncHandler =
-    std::function<asio::awaitable<RpcResult<Response>>(Core::State::AppState&, const Request&)>;
+using AsyncHandler = std::function<RpcAwaitable<Response>(Core::State::AppState&, const Request&)>;
 
 // 创建标准错误响应
 auto create_error_response(rfl::Generic request_id, ErrorCode error_code,
-                                  const std::string& message) -> std::string;
+                           const std::string& message) -> std::string;
 
 // 处理JSON-RPC请求
 export auto process_request(Core::State::AppState& app_state, const std::string& request_json)
-    -> asio::awaitable<std::string>;
+    -> RpcJsonAwaitable;
 
 // 注册RPC方法
 export template <typename Request, typename Response>
@@ -33,7 +29,7 @@ auto register_method(Core::State::AppState& app_state,
                      const std::string& description = "") -> void {
   // 创建类型擦除的处理器包装
   auto wrapped_handler = [handler, &app_state](rfl::Generic params_generic,
-                                               rfl::Generic id) -> asio::awaitable<std::string> {
+                                               rfl::Generic id) -> RpcJsonAwaitable {
     // 从 rfl::Generic 转换为 Request 类型
     auto request_result =
         rfl::from_generic<Request, rfl::SnakeCaseToCamelCase, rfl::DefaultIfMissing>(

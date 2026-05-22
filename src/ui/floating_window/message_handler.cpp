@@ -5,7 +5,7 @@ module UI.FloatingWindow.MessageHandler;
 import std;
 import Features.Settings.Menu;
 import Core.Commands;
-import Core.Commands.State;
+import Core.Commands.Types;
 import Core.Events;
 import Core.State;
 import UI.FloatingWindow;
@@ -71,28 +71,26 @@ auto dispatch_item_click_event(Core::State::AppState& state,
 
   switch (item.category) {
     case UI::FloatingWindow::MenuItemCategory::AspectRatio: {
-      const auto& ratios = Features::Settings::Menu::get_ratios(*state.settings);
+      const auto& ratios = Features::Settings::Menu::get_ratios(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < ratios.size()) {
         const auto& ratio_preset = ratios[item.index];
-        Core::Events::send(*state.events, RatioChangeEvent{static_cast<size_t>(item.index),
-                                                           ratio_preset.name, ratio_preset.ratio});
+        Core::Events::send(state, RatioChangeEvent{static_cast<size_t>(item.index),
+                                                   ratio_preset.name, ratio_preset.ratio});
       }
       break;
     }
     case UI::FloatingWindow::MenuItemCategory::Resolution: {
-      const auto& resolutions = Features::Settings::Menu::get_resolutions(*state.settings);
+      const auto& resolutions = Features::Settings::Menu::get_resolutions(state);
       if (item.index >= 0 && static_cast<size_t>(item.index) < resolutions.size()) {
         const auto& res_preset = resolutions[item.index];
-        Core::Events::send(*state.events,
+        Core::Events::send(state,
                            ResolutionChangeEvent{static_cast<size_t>(item.index), res_preset.name});
       }
       break;
     }
     case UI::FloatingWindow::MenuItemCategory::Feature: {
       // 通过注册表调用命令
-      if (state.commands) {
-        Core::Commands::invoke_command(state.commands->registry, item.action_id);
-      }
+      Core::Commands::invoke_command(state, item.action_id);
       break;
     }
   }
@@ -164,7 +162,7 @@ auto handle_left_click(Core::State::AppState& state, int x, int y) -> void {
   // 检查是否点击了关闭按钮
   if (is_mouse_on_close_button(state, x, y)) {
     // 发送隐藏事件而不是退出事件
-    Core::Events::send(*state.events, UI::FloatingWindow::Events::HideEvent{});
+    Core::Events::send(state, UI::FloatingWindow::Events::HideEvent{});
     return;
   }
 
@@ -195,8 +193,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       const auto window_size = UI::FloatingWindow::Layout::calculate_window_size(state);
 
       // 发送DPI改变事件来更新渲染状态
-      Core::Events::send(*state.events,
-                         UI::FloatingWindow::Events::DpiChangeEvent{dpi, window_size});
+      Core::Events::send(state, UI::FloatingWindow::Events::DpiChangeEvent{dpi, window_size});
 
       return 0;
     }
@@ -316,7 +313,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     }
 
     case WM_CLOSE:
-      Core::Events::send(*state.events, UI::FloatingWindow::Events::HideEvent{});
+      Core::Events::send(state, UI::FloatingWindow::Events::HideEvent{});
       return 0;
 
     case WM_DESTROY:
@@ -331,7 +328,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     // 处理异步事件队列 (WM_APP + 1)
     case Core::Events::kWM_APP_PROCESS_EVENTS:
-      Core::Events::process_events(*state.events);
+      Core::Events::process_events(state);
       return 0;
 
     // 处理通知动画定时器

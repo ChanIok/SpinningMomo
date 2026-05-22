@@ -1,11 +1,10 @@
 module;
 
-#include <asio.hpp>
-#include <rfl.hpp>
-
 export module Core.RPC.Types;
 
 import std;
+import <asio.hpp>;
+import <rfl.hpp>;
 
 export namespace Core::RPC {
 
@@ -32,6 +31,8 @@ using RpcResult = std::expected<T, RpcError>;
 
 template <typename T>
 using RpcAwaitable = asio::awaitable<RpcResult<T>>;
+
+using RpcJsonAwaitable = asio::awaitable<std::string>;
 
 struct MethodListItem {
   std::string name;
@@ -77,7 +78,7 @@ struct MethodInfo {
   std::string name;
   std::string description;
   std::string params_schema;  // 参数的JSON Schema
-  std::function<asio::awaitable<std::string>(rfl::Generic, rfl::Generic)> handler;
+  std::function<RpcJsonAwaitable(rfl::Generic, rfl::Generic)> handler;
 };
 
 // 空参数结构，用于不需要参数的RPC方法

@@ -23,15 +23,13 @@ jobs:
     env:
       # Keep xmake/vcpkg caches in workspace for reliable cache restore on GitHub runners.
       XMAKE_GLOBALDIR: ${{ github.workspace }}\.xmake-global
-      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\.vcpkg\archives
     
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Fetch third-party dependencies
-        shell: pwsh
-        run: .\scripts\fetch-third-party.ps1
+        run: node scripts/fetch-third-party.js
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -46,6 +44,9 @@ jobs:
         with:
           xmake-version: latest
 
+      - name: Patch xmake #7554
+        run: node scripts/patch-xmake-7554.js
+
       - name: Cache xmake/vcpkg dependencies
         id: cache_xmake_vcpkg
         uses: actions/cache@v4
@@ -53,8 +54,8 @@ jobs:
           path: |
             .xmake
             .xmake-global
-            .vcpkg/archives
-          key: ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock') }}
+            build/.packages/v
+          key: ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-${{ hashFiles('xmake.lua', 'xmake-requires.lock', 'scripts/patch-vcpkg.js') }}
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-xmake-vcpkg-
 
@@ -63,16 +64,15 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path ".xmake" | Out-Null
           New-Item -ItemType Directory -Force -Path ".xmake-global" | Out-Null
-          New-Item -ItemType Directory -Force -Path ".vcpkg/archives" | Out-Null
+          New-Item -ItemType Directory -Force -Path "build/.packages/v" | Out-Null
 
       - name: Cache diagnostics (concise)
         shell: pwsh
         run: |
           Write-Host "xmake/vcpkg cache hit: ${{ steps.cache_xmake_vcpkg.outputs.cache-hit }}"
-          Write-Host "binary cache dir: $env:VCPKG_DEFAULT_BINARY_CACHE"
           Write-Host ".xmake -> $((Test-Path '.xmake') ? 'exists' : 'missing')"
           Write-Host ".xmake-global -> $((Test-Path '.xmake-global') ? 'exists' : 'missing')"
-          Write-Host ".vcpkg/archives -> $((Test-Path '.vcpkg/archives') ? 'exists' : 'missing')"
+          Write-Host "build/.packages/v -> $((Test-Path 'build/.packages/v') ? 'exists' : 'missing')"
 
       - name: Setup .NET (for WiX)
         uses: actions/setup-dotnet@v4
@@ -112,17 +112,34 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          cd web && npm ci
+          npm ci --prefix web
 
-      - name: Build all (C++ + Web + Dist)
-        run: npm run build:ci
+      - name: Update preinstalled vcpkg
+        shell: pwsh
+        run: |
+          $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
+          git -C $vcpkgRoot pull --ff-only
+
+      - name: Prepare xmake release dependencies
+        run: xmake f -m release -y
+
+      - name: Patch vcpkg private cache
+        run: npm run patch:vcpkg
+
+      - name: Build C++ backend (Release)
+        run: xmake build -y
+
+      - name: Build Web frontend
+        run: npm run build:web
+
+      - name: Assemble dist
+        run: npm run build:dist
 
       - name: Create Portable ZIP
         run: npm run build:portable
 
       - name: Build MSI and Bundle Installer
-        shell: pwsh
-        run: .\scripts\build-msi.ps1 -Version "${{ steps.final_version.outputs.VERSION }}"
+        run: node scripts/build-msi.js --version "${{ steps.final_version.outputs.VERSION }}"
 
       - name: Generate checksums
         run: npm run build:checksums

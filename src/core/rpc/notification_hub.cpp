@@ -22,7 +22,7 @@ auto send_notification(Core::State::AppState& state, const std::string& method,
 
   if (state.events) {
     // watcher 可能在后台线程触发，这里先丢回主线程再发给 WebView。
-    Core::Events::post(*state.events, Core::WebView::Events::WebViewResponseEvent{payload});
+    Core::Events::post(state, Core::WebView::Events::WebViewResponseEvent{payload});
   }
 
   // 浏览器开发模式也用同一份通知（SSE）。

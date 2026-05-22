@@ -289,8 +289,7 @@ auto find_active_asset_index(Core::State::AppState& app_state,
 
   query_params.push_back(active_asset_id);
 
-  auto index_result =
-      Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, query_params);
+  auto index_result = Core::Database::query_scalar<std::int64_t>(app_state, sql, query_params);
   if (!index_result) {
     return std::unexpected("Failed to query active asset index: " + index_result.error());
   }

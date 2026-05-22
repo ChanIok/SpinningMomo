@@ -4,6 +4,8 @@ module UI.FloatingWindow.Painter;
 
 import std;
 import Core.State;
+import Core.Commands;
+import Core.Commands.Types;
 import UI.FloatingWindow.Layout;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
@@ -412,6 +414,20 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   }
 }
 
+auto is_item_selected(const UI::FloatingWindow::MenuItem& item,
+                      const Core::State::AppState& app_state) -> bool {
+  switch (item.category) {
+    case UI::FloatingWindow::MenuItemCategory::AspectRatio:
+      return item.index == static_cast<int>(app_state.floating_window->ui.current_ratio_index);
+    case UI::FloatingWindow::MenuItemCategory::Resolution:
+      return item.index == static_cast<int>(app_state.floating_window->ui.current_resolution_index);
+    case UI::FloatingWindow::MenuItemCategory::Feature:
+      return Core::Commands::is_toggle_on(app_state, item.action_id);
+    default:
+      return false;
+  }
+}
+
 // 绘制单个菜单项
 auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
                       const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
@@ -425,7 +441,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   }
 
   // 绘制选中指示器（保持完全不透明）
-  const bool is_selected = UI::FloatingWindow::State::is_item_selected(item, state);
+  const bool is_selected = is_item_selected(item, state);
   if (is_selected) {
     D2D1_RECT_F indicator_rect = UI::FloatingWindow::make_d2d_rect(
         item_rect.left, item_rect.top, item_rect.left + static_cast<float>(indicator_width),

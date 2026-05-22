@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Features.Update;
 
 import std;
@@ -24,6 +20,7 @@ import Utils.Throttle;
 import Vendor.ShellApi;
 import Vendor.Version;
 import Vendor.Windows;
+import <asio.hpp>;
 
 namespace Features::Update {
 
@@ -40,10 +37,10 @@ auto post_update_notification(Core::State::AppState& app_state, const std::strin
     return;
   }
 
-  Core::Events::post(*app_state.events, UI::FloatingWindow::Events::NotificationEvent{
-                                            .title = app_name_it->second,
-                                            .message = message,
-                                        });
+  Core::Events::post(app_state, UI::FloatingWindow::Events::NotificationEvent{
+                                    .title = app_name_it->second,
+                                    .message = message,
+                                });
 }
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)
@@ -562,7 +559,7 @@ auto start_download_update_task(Core::State::AppState& app_state, bool prepare_i
     };
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     co_return std::unexpected("Async runtime is not available");
   }
@@ -580,7 +577,7 @@ auto start_download_update_task(Core::State::AppState& app_state, bool prepare_i
         co_await asio::post(asio::use_awaitable);
         co_await run_download_update_task(app_state, task_id, version, prepare_install_on_exit);
       },
-      asio::detached);
+      asio::detached_t{});
 
   co_return Types::StartDownloadUpdateResult{
       .task_id = task_id,
@@ -599,7 +596,7 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn("Skip startup auto update check: async runtime is not ready");
     return;
@@ -659,7 +656,7 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
         Logger().info("Startup auto update check completed: current version is up-to-date ({})",
                       check_result->current_version);
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 auto check_for_update(Core::State::AppState& app_state)
@@ -774,7 +771,7 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   sei.nShow = Vendor::ShellApi::kSW_HIDE;
   sei.hInstApp = nullptr;
 
-  const bool shell_execute_ok = Vendor::ShellApi::ShellExecuteExW(&sei) != FALSE;
+  const bool shell_execute_ok = Vendor::ShellApi::ShellExecuteExW(&sei) != 0;
 
   if (shell_execute_ok) {
     Logger().info("Update script launch accepted by shell");
@@ -853,7 +850,7 @@ auto install_update(Core::State::AppState& app_state, const Types::InstallUpdate
 
     if (params.restart) {
       Logger().info("Sending exit event for immediate update");
-      Core::Events::post(*app_state.events, UI::FloatingWindow::Events::ExitEvent{});
+      Core::Events::post(app_state, UI::FloatingWindow::Events::ExitEvent{});
       result.message = "Update will start immediately after application exits";
     } else {
       Logger().info("Update scheduled for program exit");

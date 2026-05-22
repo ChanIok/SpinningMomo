@@ -38,7 +38,7 @@ auto create_folder(Core::State::AppState& app_state, const Types::Folder& folder
   params.push_back(static_cast<int64_t>(folder.sort_order));
   params.push_back(folder.is_hidden);
 
-  auto result = Core::Database::query_scalar<std::int64_t>(*app_state.database, sql, params);
+  auto result = Core::Database::query_scalar<std::int64_t>(app_state, sql, params);
   if (!result || !result->has_value()) {
     return std::unexpected("Failed to insert folder: " +
                            (result ? std::string("missing returned ID") : result.error()));
@@ -59,7 +59,7 @@ auto get_folder_by_path(Core::State::AppState& app_state, const std::string& pat
 
   std::vector<Core::Database::Types::DbParam> params = {path};
 
-  auto result = Core::Database::query_single<Types::Folder>(*app_state.database, sql, params);
+  auto result = Core::Database::query_single<Types::Folder>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query folder by path: " + result.error());
   }
@@ -79,7 +79,7 @@ auto get_folder_by_id(Core::State::AppState& app_state, std::int64_t id)
 
   std::vector<Core::Database::Types::DbParam> params = {id};
 
-  auto result = Core::Database::query_single<Types::Folder>(*app_state.database, sql, params);
+  auto result = Core::Database::query_single<Types::Folder>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to query folder by id: " + result.error());
   }
@@ -117,7 +117,7 @@ auto update_folder(Core::State::AppState& app_state, const Types::Folder& folder
   params.push_back(folder.is_hidden);
   params.push_back(folder.id);
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
+  auto result = Core::Database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to update folder: " + result.error());
   }
@@ -131,7 +131,7 @@ auto delete_folder(Core::State::AppState& app_state, std::int64_t id)
   std::string sql = "DELETE FROM folders WHERE id = ?";
   std::vector<Core::Database::Types::DbParam> params = {id};
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
+  auto result = Core::Database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to delete folder: " + result.error());
   }
@@ -149,7 +149,7 @@ auto list_all_folders(Core::State::AppState& app_state)
             ORDER BY path
         )";
 
-  auto result = Core::Database::query<Types::Folder>(*app_state.database, sql);
+  auto result = Core::Database::query<Types::Folder>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to list all folders: " + result.error());
   }
@@ -184,7 +184,7 @@ auto get_child_folders(Core::State::AppState& app_state, std::optional<std::int6
         )";
   }
 
-  auto result = Core::Database::query<Types::Folder>(*app_state.database, sql, params);
+  auto result = Core::Database::query<Types::Folder>(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to get child folders: " + result.error());
   }
@@ -217,7 +217,7 @@ auto get_folder_tree(Core::State::AppState& app_state)
     std::int64_t count;
   };
 
-  auto count_result = Core::Database::query<FolderAssetCount>(*app_state.database, count_sql);
+  auto count_result = Core::Database::query<FolderAssetCount>(app_state, count_sql);
   if (!count_result) {
     return std::unexpected("Failed to query asset counts: " + count_result.error());
   }

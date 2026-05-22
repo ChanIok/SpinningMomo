@@ -33,16 +33,14 @@ auto capture(Core::State::AppState& state) -> void {
       std::string path_str(path.begin(), path.end());
 
       Core::Events::post(
-          *state.events,
-          UI::FloatingWindow::Events::NotificationEvent{
-              .title = state.i18n->texts["label.app_name"],
-              .message = state.i18n->texts["message.screenshot_success"] + path_str});
+          state, UI::FloatingWindow::Events::NotificationEvent{
+                     .title = state.i18n->texts["label.app_name"],
+                     .message = state.i18n->texts["message.screenshot_success"] + path_str});
       Logger().info("Screenshot saved successfully: {}", path_str);
     } else {
-      Core::Events::post(*state.events,
-                         UI::FloatingWindow::Events::NotificationEvent{
-                             .title = state.i18n->texts["label.app_name"],
-                             .message = state.i18n->texts["message.screenshot_failed"]});
+      Core::Events::post(state, UI::FloatingWindow::Events::NotificationEvent{
+                                    .title = state.i18n->texts["label.app_name"],
+                                    .message = state.i18n->texts["message.screenshot_failed"]});
       Logger().error("Screenshot capture failed");
     }
   };

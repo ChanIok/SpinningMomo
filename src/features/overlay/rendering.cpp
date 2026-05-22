@@ -1,11 +1,5 @@
 module;
 
-#include <d3d11.h>
-#include <wil/com.h>
-#include <windows.h>
-
-#include <iostream>
-
 module Features.Overlay.Rendering;
 
 import std;
@@ -16,6 +10,9 @@ import Features.Overlay.Geometry;
 import Features.Overlay.Shaders;
 import Utils.Graphics.D3D;
 import Utils.Logger;
+import <d3d11.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 namespace Features::Overlay::Rendering {
 

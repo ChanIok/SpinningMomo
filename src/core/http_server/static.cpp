@@ -1,9 +1,5 @@
 module;
 
-#include <uwebsockets/App.h>
-
-#include <asio.hpp>
-
 module Core.HttpServer.Static;
 
 import std;
@@ -15,6 +11,8 @@ import Utils.File.Mime;
 import Utils.Path;
 import Utils.Logger;
 import Utils.Time;
+import Vendor.UWebSockets;
+import <asio.hpp>;
 
 namespace Core::HttpServer::Static {
 
@@ -422,8 +420,8 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
                         std::string mime_type, std::string cache_control,
                         CacheValidators validators, size_t file_size,
                         std::optional<ByteRange> range, auto* res) -> void {
-  auto* loop = uWS::Loop::get();
-  auto io_context = Core::Async::get_io_context(*state.async);
+  auto* loop = Vendor::UWebSockets::Loop::get();
+  auto io_context = Core::Async::get_io_context(state);
 
   size_t range_start = range.has_value() ? range->start : 0;
   size_t range_end = range.has_value() ? range->end : (file_size - 1);
@@ -570,11 +568,11 @@ auto serve_resolved_file_request(Core::State::AppState& state,
   Logger().debug("Using single-read for small resolved file: {} bytes", file_size);
 
   // 获取当前的事件循环
-  auto* loop = uWS::Loop::get();
+  auto* loop = Vendor::UWebSockets::Loop::get();
 
   // 在异步运行时中处理文件读取
   asio::co_spawn(
-      *Core::Async::get_io_context(*state.async),
+      *Core::Async::get_io_context(state),
       [res, file_path, mime_type, cache_control = std::move(cache_control),
        validators = std::move(validators), loop, file_size,
        range = range_parse.range]() -> asio::awaitable<void> {
@@ -617,7 +615,7 @@ auto serve_resolved_file_request(Core::State::AppState& state,
           });
         }
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // 处理静态文件请求
@@ -659,7 +657,7 @@ auto handle_static_request(Core::State::AppState& state, const std::string& url_
 }
 
 // 注册静态文件路由
-auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
+auto register_routes(Core::State::AppState& state, Vendor::UWebSockets::App& app) -> void {
   Logger().info("Registering static file routes");
 
   // 注册通用的GET路由处理所有静态文件请求

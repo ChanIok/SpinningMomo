@@ -3,6 +3,7 @@ module;
 export module Features.Recording.Types;
 
 import std;
+import Utils.Graphics.CaptureRegion;
 import Utils.Media.AudioCapture;
 
 namespace Features::Recording::Types {
@@ -112,5 +113,36 @@ export enum class RecordingStatus {
   Stopping,   // 正在停止
   Error       // 发生错误
 };
+
+// 录制几何计划：
+// source_* 表示 WGC 实际给到的源帧尺寸；
+// output_* 表示最终送给编码器的尺寸；
+// should_crop/region 描述是否需要先从源帧裁出一块再编码。
+export struct CapturePlan {
+  int source_width = 0;
+  int source_height = 0;
+  std::uint32_t output_width = 0;
+  std::uint32_t output_height = 0;
+  bool should_crop = false;
+  Utils::Graphics::CaptureRegion::CropRegion region{};
+};
+
+export enum class RecordingControlAction {
+  None,
+  Toggle,
+  RestartAfterResize,
+  CleanupD3D,
+  ShutdownStop,
+};
+
+export struct QueuedAudioPacket {
+  std::vector<std::uint8_t> data;
+  std::uint32_t num_frames = 0;
+  std::uint32_t bytes_per_frame = 0;
+  std::uint32_t sample_rate = 0;
+  std::int64_t timestamp_100ns = 0;
+};
+
+export inline constexpr std::size_t k_max_audio_queue_size = 120;
 
 }  // namespace Features::Recording::Types

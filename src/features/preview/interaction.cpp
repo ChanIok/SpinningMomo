@@ -507,7 +507,7 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
       return {true, 1};
 
     case Features::Preview::Types::WM_APPLY_CAPTURE_SIZE:
-      Features::Preview::Window::set_preview_window_size(*state.preview, static_cast<int>(wParam),
+      Features::Preview::Window::set_preview_window_size(state, static_cast<int>(wParam),
                                                          static_cast<int>(lParam));
       return {true, 0};
 

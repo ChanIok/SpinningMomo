@@ -19,8 +19,8 @@ auto get_state_by_root_path(Core::State::AppState& app_state, const std::string&
     WHERE root_path = ?
   )";
 
-  auto result = Core::Database::query_single<Types::WatchRootRecoveryState>(*app_state.database,
-                                                                            sql, {root_path});
+  auto result =
+      Core::Database::query_single<Types::WatchRootRecoveryState>(app_state, sql, {root_path});
   if (!result) {
     return std::unexpected("Failed to query watch root recovery state: " + result.error());
   }
@@ -54,7 +54,7 @@ auto upsert_state(Core::State::AppState& app_state, const Types::WatchRootRecove
       state.rule_fingerprint,
   };
 
-  auto result = Core::Database::execute(*app_state.database, sql, params);
+  auto result = Core::Database::execute(app_state, sql, params);
   if (!result) {
     return std::unexpected("Failed to upsert watch root recovery state: " + result.error());
   }
@@ -65,9 +65,8 @@ auto upsert_state(Core::State::AppState& app_state, const Types::WatchRootRecove
 auto delete_state_by_root_path(Core::State::AppState& app_state, const std::string& root_path)
     -> std::expected<void, std::string> {
   // root 被移除时清理对应的恢复状态。
-  auto result = Core::Database::execute(*app_state.database,
-                                        "DELETE FROM watch_root_recovery_state WHERE root_path = ?",
-                                        {root_path});
+  auto result = Core::Database::execute(
+      app_state, "DELETE FROM watch_root_recovery_state WHERE root_path = ?", {root_path});
   if (!result) {
     return std::unexpected("Failed to delete watch root recovery state: " + result.error());
   }

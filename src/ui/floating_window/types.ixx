@@ -3,8 +3,8 @@ module;
 export module UI.FloatingWindow.Types;
 
 import std;
-import Features.WindowControl;
 import Features.Settings.Menu;
+import Features.WindowControl.Types;
 import <d2d1_3.h>;
 import <dwrite_3.h>;
 import <windows.h>;

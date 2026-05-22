@@ -79,6 +79,7 @@ export auto DispatchWindowMessageW(const MSG* lpMsg) -> LRESULT {
 
 // Window operations
 export auto GetForegroundWindow() -> HWND { return ::GetForegroundWindow(); }
+export auto IsWindow(HWND hWnd) -> BOOL { return ::IsWindow(hWnd); }
 export auto GetWindowRect(HWND hWnd, RECT* lpRect) -> BOOL { return ::GetWindowRect(hWnd, lpRect); }
 export auto SetWindowPos(HWND hWnd, HWND hWndInsertAfter, int x, int y, int cx, int cy, UINT uFlags)
     -> BOOL {
@@ -86,6 +87,9 @@ export auto SetWindowPos(HWND hWnd, HWND hWndInsertAfter, int x, int y, int cx, 
 }
 export auto InvalidateRect(HWND hWnd, const RECT* lpRect, BOOL bErase) -> BOOL {
   return ::InvalidateRect(hWnd, lpRect, bErase);
+}
+export auto PostMessageW(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) -> BOOL {
+  return ::PostMessageW(hWnd, Msg, wParam, lParam);
 }
 
 // Application control

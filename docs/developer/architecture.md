@@ -16,9 +16,9 @@
 
 | 工具 | 要求 | 说明 |
 |------|------|------|
-| **Visual Studio 2022** | 含「使用 C++ 的桌面开发」工作负载 | 需勾选「**C++ 模块（针对标准库的 MSVC v143）**」；**不要使用 VS 2026**，会出现编译错误 |
+| **Visual Studio 2026** | 含「使用 C++ 的桌面开发」工作负载 | |
 | **Windows SDK** | 10.0.22621.0+（Windows 11 SDK） | |
-| **Git** | 最新版 | 克隆 vcpkg 与 `fetch-third-party.ps1` |
+| **Git** | 最新版 | 克隆 vcpkg 与获取第三方依赖 |
 | **xmake** | 最新版 | C++ 构建系统 |
 | **Node.js** | v20+ | Web 前端构建及 npm 脚本 |
 
@@ -47,8 +47,8 @@ cd D:\dev\vcpkg
 
 ### 1. 获取第三方依赖
 
-```powershell
-.\scripts\fetch-third-party.ps1
+```bash
+npm run fetch:third-party
 ```
 
 ### 2. 安装 npm 依赖
@@ -58,7 +58,15 @@ cd D:\dev\vcpkg
 npm install
 
 # Web 前端依赖
-cd web && npm ci
+npm ci --prefix web
+```
+
+### 3. 初始化 xmake 依赖并应用补丁
+
+```bash
+node scripts/patch-xmake-7554.js
+xmake f -m release -y && xmake f -m debug -y
+npm run patch:vcpkg
 ```
 
 ---
@@ -69,7 +77,7 @@ cd web && npm ci
 
 ```bash
 # 一键完成：C++ Release + Web 前端 + 打包 dist/
-npm run build:ci
+npm run build
 ```
 
 产物位于 `dist/` 目录。

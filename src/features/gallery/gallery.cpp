@@ -1,7 +1,6 @@
 module;
 
 #include <mfapi.h>
-#include <asio.hpp>
 
 module Features.Gallery;
 
@@ -28,6 +27,7 @@ import Utils.LRUCache;
 import Utils.Path;
 import Utils.String;
 import Utils.System;
+import <asio.hpp>;
 
 namespace Features::Gallery {
 
@@ -45,7 +45,7 @@ auto ensure_output_directory_media_source(Core::State::AppState& app_state,
     return;
   }
 
-  auto* io_context = Core::Async::get_io_context(*app_state.async);
+  auto* io_context = Core::Async::get_io_context(app_state);
   if (!io_context) {
     Logger().warn("Skip output-directory gallery sync: async runtime is not available");
     return;
@@ -74,7 +74,7 @@ auto ensure_output_directory_media_source(Core::State::AppState& app_state,
           }
         }
       },
-      asio::detached);
+      asio::detached_t{});
 }
 
 // ============= 初始化和清理 =============

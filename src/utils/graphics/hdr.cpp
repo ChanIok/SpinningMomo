@@ -1,13 +1,12 @@
 module;
 
-#include <dxgi1_6.h>
-#include <wil/com.h>
-#include <windows.h>
-
 module Utils.Graphics.Hdr;
 
 import std;
 import Utils.Logger;
+import <dxgi1_6.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 namespace Utils::Graphics::Hdr {
 

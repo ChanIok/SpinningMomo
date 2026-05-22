@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Core.HttpClient;
 
 import std;
@@ -11,6 +7,7 @@ import Core.HttpClient.Types;
 import Utils.Logger;
 import Utils.String;
 import Vendor.WinHttp;
+import <asio.hpp>;
 import <windows.h>;
 
 namespace Core::HttpClient::Detail {

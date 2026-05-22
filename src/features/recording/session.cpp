@@ -1,10 +1,9 @@
 module;
 
-#include <wil/com.h>
-
 module Features.Recording.Session;
 
 import std;
+import Core.State;
 import Features.Recording.State;
 import Features.Recording.Types;
 import Utils.Graphics.Capture;
@@ -13,6 +12,7 @@ import Utils.Graphics.D3D;
 import Utils.Logger;
 import Utils.String;
 import <d3d11_4.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace Features::Recording::Session {
@@ -35,12 +35,12 @@ auto clear_persistent_runtime_fields(State::RecordingState& state) -> void {
 
 auto resolve_capture_plan(HWND target_window, bool capture_client_area, int frame_width,
                           int frame_height)
-    -> std::expected<Features::Recording::State::CapturePlan, std::string> {
+    -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
   if (frame_width <= 0 || frame_height <= 0) {
     return std::unexpected("Invalid frame size");
   }
 
-  Features::Recording::State::CapturePlan plan;
+  Features::Recording::Types::CapturePlan plan;
   plan.source_width = frame_width;
   plan.source_height = frame_height;
 
@@ -93,7 +93,7 @@ auto resolve_capture_plan(HWND target_window, bool capture_client_area, int fram
 auto calculate_frame_crop_plan(HWND target_window,
                                const Features::Recording::Types::RecordingConfig& config,
                                int frame_width, int frame_height)
-    -> std::expected<Features::Recording::State::CapturePlan, std::string> {
+    -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
   auto capture_plan_result =
       resolve_capture_plan(target_window, config.capture_client_area, frame_width, frame_height);
   if (!capture_plan_result) {
@@ -114,7 +114,7 @@ auto calculate_frame_crop_plan(HWND target_window,
 }
 
 auto build_startup_capture_plan(HWND target_window, bool capture_client_area)
-    -> std::expected<Features::Recording::State::CapturePlan, std::string> {
+    -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
   // 启动时以 WGC 的真实尺寸为准，不用窗口矩形猜。
   // 窗口边框、DPI、奇偶像素都可能让窗口矩形和实际帧差 1px。
   auto capture_size_result = Utils::Graphics::Capture::get_capture_item_size(target_window);
@@ -202,7 +202,13 @@ auto delete_working_output_file(const std::filesystem::path& working_output_path
   Logger().info("Discarded recording file '{}': {}", working_output_path.string(), reason);
 }
 
-auto clear_session_runtime_fields(State::RecordingState& state) -> void {
+auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   // 清空一个录制段的会话态，不动可复用 D3D 设备。
   state.config = {};
   state.working_output_path.clear();
@@ -234,13 +240,26 @@ auto clear_session_runtime_fields(State::RecordingState& state) -> void {
   state.encoder_error.clear();
 }
 
-auto cancel_cleanup_timer(State::RecordingState& state) -> void {
+auto cancel_cleanup_timer(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   if (state.cleanup_timer && state.cleanup_timer->is_pending()) {
     state.cleanup_timer->cancel();
   }
 }
 
-auto start_cleanup_timer(State::RecordingState& state, std::function<void()> on_timeout) -> void {
+auto start_cleanup_timer(Core::State::AppState& app_state, std::function<void()> on_timeout)
+    -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   if (!state.d3d_initialized) {
     return;
   }
@@ -249,7 +268,7 @@ auto start_cleanup_timer(State::RecordingState& state, std::function<void()> on_
     state.cleanup_timer.emplace();
   }
 
-  cancel_cleanup_timer(state);
+  cancel_cleanup_timer(app_state);
   auto result =
       state.cleanup_timer->set_timeout(std::chrono::milliseconds(5000), std::move(on_timeout));
   if (!result) {
@@ -260,19 +279,32 @@ auto start_cleanup_timer(State::RecordingState& state, std::function<void()> on_
   Logger().debug("Recording D3D cleanup timer started (5 seconds)");
 }
 
-auto cleanup_d3d_resources(State::RecordingState& state) -> void {
-  cancel_cleanup_timer(state);
+auto cleanup_d3d_resources(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
+  cancel_cleanup_timer(app_state);
   clear_persistent_runtime_fields(state);
 }
 
-auto ensure_d3d_resources_ready(State::RecordingState& state) -> std::expected<void, std::string> {
+auto ensure_d3d_resources_ready(Core::State::AppState& app_state)
+    -> std::expected<void, std::string> {
+  if (!app_state.recording) {
+    return std::unexpected("RecordingState is not initialized");
+  }
+
+  auto& state = *app_state.recording;
+
   if (state.d3d_initialized && state.device && state.context && state.winrt_device) {
     return {};
   }
 
   auto d3d_result = Utils::Graphics::D3D::create_headless_d3d_device();
   if (!d3d_result) {
-    cleanup_d3d_resources(state);
+    cleanup_d3d_resources(app_state);
     return std::unexpected("Failed to create D3D device: " + d3d_result.error());
   }
   state.device = d3d_result->first;
@@ -285,7 +317,7 @@ auto ensure_d3d_resources_ready(State::RecordingState& state) -> std::expected<v
 
   auto winrt_device_result = Utils::Graphics::Capture::create_winrt_device(state.device.get());
   if (!winrt_device_result) {
-    cleanup_d3d_resources(state);
+    cleanup_d3d_resources(app_state);
     return std::unexpected("Failed to create WinRT device: " + winrt_device_result.error());
   }
 
@@ -294,13 +326,24 @@ auto ensure_d3d_resources_ready(State::RecordingState& state) -> std::expected<v
   return {};
 }
 
-auto stop_capture_input(State::RecordingState& state) -> void {
-  // 编码线程可能正在从 frame pool 取帧并直接写 SinkWriter；先互斥地停止产帧。
+auto stop_capture_input(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   std::lock_guard frame_lock(state.frame_mutex);
   Utils::Graphics::Capture::stop_capture_session(state.capture_session);
 }
 
-auto cleanup_capture_session(State::RecordingState& state) -> void {
+auto cleanup_capture_session(Core::State::AppState& app_state) -> void {
+  if (!app_state.recording) {
+    return;
+  }
+
+  auto& state = *app_state.recording;
+
   Utils::Graphics::Capture::cleanup_capture_session(state.capture_session);
 }
 

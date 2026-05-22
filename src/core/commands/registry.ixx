@@ -4,80 +4,28 @@ export module Core.Commands;
 
 import std;
 import Core.State;
+import Core.Commands.Types;
 import Vendor.Windows;
 
 namespace Core::Commands {
 
-// 热键绑定
-export struct HotkeyBinding {
-  Vendor::Windows::UINT modifiers = 0;  // MOD_CONTROL=1, MOD_ALT=2, MOD_SHIFT=4
-  Vendor::Windows::UINT key = 0;        // 虚拟键码 (VK_*)
-  std::string settings_path;            // 设置文件中的路径，如 "app.hotkey.floating_window"
-};
-
-// 命令描述符
-export struct CommandDescriptor {
-  std::string id;        // 唯一标识，如 "screenshot.capture"
-  std::string i18n_key;  // i18n 键，如 "menu.screenshot_capture"
-
-  bool is_toggle = false;  // 是否为切换类型
-
-  std::function<void()> action;               // 点击执行的动作
-  std::function<bool()> get_state = nullptr;  // toggle 类型：获取当前状态
-
-  std::optional<HotkeyBinding> hotkey;  // 热键绑定（可选）
-};
-
-// 运行时命令注册表
-export struct CommandRegistry {
-  std::unordered_map<std::string, CommandDescriptor> descriptors;
-  std::vector<std::string> registration_order;  // 保持注册顺序
-};
-
 // === API ===
 
-// 注册命令
-export auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -> void;
-
 // 调用命令
-export auto invoke_command(CommandRegistry& registry, const std::string& id) -> bool;
+export auto invoke_command(Core::State::AppState& state, const std::string& id) -> bool;
 
 // 获取单个命令描述符（零拷贝，只读）
-export auto get_command(const CommandRegistry& registry, const std::string& id)
+export auto get_command(const Core::State::AppState& state, const std::string& id)
     -> const CommandDescriptor*;
 
 // 获取所有命令描述符（按注册顺序）
-export auto get_all_commands(const CommandRegistry& registry) -> std::vector<CommandDescriptor>;
+export auto get_all_commands(const Core::State::AppState& state) -> std::vector<CommandDescriptor>;
 
-// === RPC Types ===
-
-// 用于 RPC 传输的命令描述符（不包含 function 字段）
-export struct CommandDescriptorData {
-  std::string id;
-  std::string i18n_key;
-  bool is_toggle;
-};
-
-export struct GetAllCommandsParams {
-  // 空结构体，未来可扩展
-};
-
-export struct GetAllCommandsResult {
-  std::vector<CommandDescriptorData> commands;
-};
-
-export struct InvokeCommandParams {
-  std::string id;
-};
-
-export struct InvokeCommandResult {
-  bool success = false;
-  std::string message;
-};
+// toggle 命令是否处于开启态（非 toggle / 未找到 / 无 get_state 时返回 false）
+export auto is_toggle_on(const Core::State::AppState& state, const std::string& id) -> bool;
 
 // 注册所有内置命令（需要在应用初始化时调用）
-export auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& registry)
-    -> void;
+export auto register_builtin_commands(Core::State::AppState& state) -> void;
 
 // 安装常驻全局键盘钩子
 export auto install_keyboard_keepalive_hook(Core::State::AppState& state) -> void;

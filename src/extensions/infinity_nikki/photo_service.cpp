@@ -97,26 +97,25 @@ auto on_gallery_scan_complete(Core::State::AppState& app_state,
     } else {
       // 扫描结果如何驱动硬链接同步，由 MediaHardlinks 自己解释；
       // PhotoService 只负责把 Gallery 的事实转发过去。
-      bool submitted = Core::WorkerPool::submit_task(
-          *app_state.worker_pool, [&app_state, scan_result = result]() {
-            Logger().info(
-                "InfinityNikki managed hardlink worker start: total={}, new={}, updated={}, "
-                "deleted={}, changes={}",
-                scan_result.total_files, scan_result.new_items, scan_result.updated_items,
-                scan_result.deleted_items, scan_result.changes.size());
-            auto sync_result = Extensions::InfinityNikki::MediaHardlinks::apply_scan_result(
-                app_state, scan_result);
-            if (!sync_result) {
-              Logger().warn("InfinityNikki managed hardlinks sync failed: {}", sync_result.error());
-            } else {
-              const auto& r = sync_result.value();
-              Logger().info(
-                  "InfinityNikki managed hardlinks synced: source={}, created={}, updated={}, "
-                  "removed={}, ignored={}",
-                  r.source_count, r.created_count, r.updated_count, r.removed_count,
-                  r.ignored_count);
-            }
-          });
+      bool submitted = Core::WorkerPool::submit_task(app_state, [&app_state,
+                                                                 scan_result = result]() {
+        Logger().info(
+            "InfinityNikki managed hardlink worker start: total={}, new={}, updated={}, "
+            "deleted={}, changes={}",
+            scan_result.total_files, scan_result.new_items, scan_result.updated_items,
+            scan_result.deleted_items, scan_result.changes.size());
+        auto sync_result =
+            Extensions::InfinityNikki::MediaHardlinks::apply_scan_result(app_state, scan_result);
+        if (!sync_result) {
+          Logger().warn("InfinityNikki managed hardlinks sync failed: {}", sync_result.error());
+        } else {
+          const auto& r = sync_result.value();
+          Logger().info(
+              "InfinityNikki managed hardlinks synced: source={}, created={}, updated={}, "
+              "removed={}, ignored={}",
+              r.source_count, r.created_count, r.updated_count, r.removed_count, r.ignored_count);
+        }
+      });
       if (!submitted) {
         Logger().warn("InfinityNikki hardlinks sync: failed to submit worker task");
       }

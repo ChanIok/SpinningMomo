@@ -64,7 +64,7 @@ auto query_thumbnail_candidates(Core::State::AppState& app_state)
       AND path != ''
   )";
 
-  auto result = Core::Database::query<Types::Asset>(*app_state.database, sql);
+  auto result = Core::Database::query<Types::Asset>(app_state, sql);
   if (!result) {
     return std::unexpected("Failed to query thumbnail candidates: " + result.error());
   }

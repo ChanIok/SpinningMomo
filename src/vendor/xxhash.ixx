@@ -2,11 +2,9 @@ module;
 
 #include <xxhash.h>
 
-#include <string>
-#include <vector>
-#include <format>
-
 export module Vendor.XXHash;
+
+import std;
 
 namespace Vendor::XXHash {
 

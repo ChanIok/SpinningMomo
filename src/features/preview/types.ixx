@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 export module Features.Preview.Types;
 
 import std;
@@ -9,6 +7,7 @@ import Utils.Throttle;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import <d3d11.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 export namespace Features::Preview::Types {

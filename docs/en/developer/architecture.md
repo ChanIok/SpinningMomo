@@ -13,9 +13,9 @@ This project uses a hybrid architecture with a **C++23 native backend** and a **
 
 | Tool | Requirement | Notes |
 |------|-------------|-------|
-| **Visual Studio 2022** | "Desktop development with C++" workload | Enable "**C++ Modules for v143 (with the standard library)**"; **do not use VS 2026** — compile errors occur |
+| **Visual Studio 2026** | "Desktop development with C++" workload | |
 | **Windows SDK** | 10.0.22621.0+ (Windows 11 SDK) | |
-| **Git** | Latest | Clone vcpkg and run `fetch-third-party.ps1` |
+| **Git** | Latest | Clone vcpkg and fetch third-party dependencies |
 | **xmake** | Latest | C++ build system |
 | **Node.js** | v20+ | Web frontend build and npm scripts |
 
@@ -44,8 +44,8 @@ cd D:\dev\vcpkg
 
 ### 1. Third-party dependencies
 
-```powershell
-.\scripts\fetch-third-party.ps1
+```bash
+npm run fetch:third-party
 ```
 
 ### 2. npm dependencies
@@ -55,7 +55,15 @@ cd D:\dev\vcpkg
 npm install
 
 # Web frontend
-cd web && npm ci
+npm ci --prefix web
+```
+
+### 3. Initialize xmake deps and apply patches
+
+```bash
+node scripts/patch-xmake-7554.js
+xmake f -m release -y && xmake f -m debug -y
+npm run patch:vcpkg
 ```
 
 ---
@@ -66,7 +74,7 @@ cd web && npm ci
 
 ```bash
 # One command: C++ Release + Web frontend + assemble dist/
-npm run build:ci
+npm run build
 ```
 
 Output goes to `dist/`.

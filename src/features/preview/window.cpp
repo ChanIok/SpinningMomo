@@ -86,40 +86,47 @@ auto setup_window_appearance(HWND hwnd) -> void {
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
 }
 
-auto set_preview_window_size(Features::Preview::State::PreviewState& state, int capture_width,
+auto set_preview_window_size(Core::State::AppState& app_state, int capture_width,
                              int capture_height) -> void {
-  if (state.is_first_show && state.has_screen_rect) {
-    const int screen_width = Utils::Display::rect_width(state.screen_rect);
-    const int screen_height = Utils::Display::rect_height(state.screen_rect);
-    state.size.min_ideal_size = std::min(screen_width, screen_height) / 10;
-    state.size.max_ideal_size = std::max(screen_width, screen_height);
-    state.size.ideal_size = screen_height / 2;
+  auto* const state = app_state.preview ? app_state.preview.get() : nullptr;
+  if (!state) {
+    return;
   }
 
-  state.size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
+  if (state->is_first_show && state->has_screen_rect) {
+    const int screen_width = Utils::Display::rect_width(state->screen_rect);
+    const int screen_height = Utils::Display::rect_height(state->screen_rect);
+    state->size.min_ideal_size = std::min(screen_width, screen_height) / 10;
+    state->size.max_ideal_size = std::max(screen_width, screen_height);
+    state->size.ideal_size = screen_height / 2;
+  }
 
-  if (state.size.aspect_ratio >= 1.0f) {
+  state->size.aspect_ratio = static_cast<float>(capture_height) / capture_width;
+
+  if (state->size.aspect_ratio >= 1.0f) {
     // 高度大于等于宽度
-    state.size.window_height = state.size.ideal_size;
-    state.size.window_width = static_cast<int>(state.size.window_height / state.size.aspect_ratio);
+    state->size.window_height = state->size.ideal_size;
+    state->size.window_width =
+        static_cast<int>(state->size.window_height / state->size.aspect_ratio);
   } else {
     // 宽度大于高度
-    state.size.window_width = state.size.ideal_size;
-    state.size.window_height = static_cast<int>(state.size.window_width * state.size.aspect_ratio);
+    state->size.window_width = state->size.ideal_size;
+    state->size.window_height =
+        static_cast<int>(state->size.window_width * state->size.aspect_ratio);
   }
 
-  if (state.is_first_show) {
-    state.is_first_show = false;
+  if (state->is_first_show) {
+    state->is_first_show = false;
     int left = 20;
     int top = 20;
-    if (state.has_screen_rect) {
-      left = state.screen_rect.left + 20;
-      top = state.screen_rect.top + 20;
+    if (state->has_screen_rect) {
+      left = state->screen_rect.left + 20;
+      top = state->screen_rect.top + 20;
     }
-    SetWindowPos(state.hwnd, nullptr, left, top, state.size.window_width, state.size.window_height,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
+    SetWindowPos(state->hwnd, nullptr, left, top, state->size.window_width,
+                 state->size.window_height, SWP_NOZORDER | SWP_NOACTIVATE);
   } else {
-    SetWindowPos(state.hwnd, nullptr, 0, 0, state.size.window_width, state.size.window_height,
+    SetWindowPos(state->hwnd, nullptr, 0, 0, state->size.window_width, state->size.window_height,
                  SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
   }
 }

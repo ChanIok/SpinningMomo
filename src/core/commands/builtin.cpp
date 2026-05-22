@@ -4,7 +4,8 @@ module Core.Commands;
 
 import std;
 import Core.State;
-import Core.Commands;
+import Core.Commands.State;
+import Core.Commands.Types;
 import Features.Settings.State;
 import Features.Screenshot.UseCase;
 import Features.Recording.UseCase;
@@ -25,8 +26,23 @@ import Vendor.Windows;
 
 namespace Core::Commands {
 
+auto register_command(CommandRegistry& registry, CommandDescriptor descriptor) -> void {
+  const std::string id = descriptor.id;
+
+  if (registry.descriptors.contains(id)) {
+    Logger().warn("Command already registered: {}", id);
+    return;
+  }
+
+  registry.descriptors.emplace(id, std::move(descriptor));
+  registry.registration_order.push_back(id);
+
+  Logger().debug("Registered command: {}", id);
+}
+
 // 注册所有内置命令
-auto register_builtin_commands(Core::State::AppState& state, CommandRegistry& registry) -> void {
+auto register_builtin_commands(Core::State::AppState& state) -> void {
+  auto& registry = state.commands->registry;
   Logger().info("Registering builtin commands...");
 
   // === 应用层命令 ===

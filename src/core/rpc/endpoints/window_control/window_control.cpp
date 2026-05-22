@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Core.RPC.Endpoints.WindowControl;
 
 import std;
@@ -10,7 +6,9 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Features.WindowControl;
+import Features.WindowControl.Types;
 import Utils.String;
+import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::WindowControl {
 

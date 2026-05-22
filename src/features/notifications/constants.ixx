@@ -1,9 +1,9 @@
 module;
 
-#include <windows.h>
-#include <chrono>
-
 export module Features.Notifications.Constants;
+
+import std;
+import <windows.h>;
 
 export namespace Features::Notifications::Constants {
 

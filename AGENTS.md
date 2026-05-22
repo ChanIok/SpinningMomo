@@ -16,13 +16,9 @@ SpinningMomo (旋转吧大喵) is a Windows-only desktop tool for the game "Infi
 
 ## Build & Development
 
-### Prerequisites
-- Visual Studio 2022+ with Windows SDK 10.0.22621.0+
-- xmake (primary build system)
-- Node.js / npm (for web frontend and docs)
-- .NET SDK 8.0+ and WiX v5+ when building installers locally
+Full setup steps live in `docs/developer/architecture.md`.
 
-### Build Commands
+Common commands:
 ```
 # C++ backend — debug
 xmake build
@@ -30,29 +26,12 @@ xmake build
 # C++ backend — release
 xmake release
 
-# Web frontend (in web/ directory)
-cd web && npx vue-tsc -b
-cd web && npm run build
-
-# Full build: C++ release + web + assemble dist/
-npm run build
-
-# Packaging
-npm run build:portable
-npm run build:installer
+# Web frontend
+npm run build --prefix web
 ```
 
-### Web Frontend Dev Server
-```
-cd web && npm run dev
-```
-Vite dev server proxies `/rpc` and `/static` to the C++ backend at `localhost:51206`.
-
-### Docs Dev Server
-```
-cd docs && npm run dev
-```
-`docs/` is a separate VitePress documentation site and is not part of the runtime app bundle.
+`web/` uses a Vite dev server and proxies `/rpc` and `/static` to the backend at `localhost:51206`.
+`docs/` is a separate VitePress site and is not part of the runtime bundle.
 
 ## Architecture
 
@@ -111,48 +90,13 @@ The main frontend lives in `web/` and uses Vue 3 + TypeScript + Pinia + Tailwind
 - `installer/` — WiX source files for MSI and bundle installer generation
 - `tasks/` — custom xmake tasks such as `build-all`, `release`, and `vs`
 
-### Gallery Module
-`gallery` is one of the core vertical slices of the project. It is not just a page: it spans backend indexing/scanning/watchers/static file serving and frontend browsing/filtering/lightbox/detail workflows.
-
-- **Backend entry points**:
-  - `src/features/gallery/gallery.ixx/.cpp` is the orchestration layer for initialization, cleanup, scanning, thumbnail maintenance, file actions, and watcher registration.
-  - `src/features/gallery/state.ixx` holds gallery runtime state such as thumbnail directory, asset path LRU cache, and per-root folder watcher state.
-  - `src/features/gallery/scanner.*` handles full scans and index updates.
-  - `src/features/gallery/watcher.*` restores folder watchers from DB, starts/stops them, and keeps the index in sync after startup.
-  - `src/features/gallery/static_resolver.*` exposes thumbnails and original files to both HTTP dev mode and embedded WebView mode via `/static/assets/thumbnails/...` and `/static/assets/originals/<assetId>`.
-- **Backend subdomains**:
-  - `asset/` is the largest data domain and owns querying, timeline views, home stats, review state, descriptions, color extraction, thumbnails, and Infinity Nikki metadata access.
-  - `folder/` owns folder tree persistence, display names, and root watch management.
-  - `tag/` owns tag tree CRUD and asset-tag relations.
-  - `ignore/` contains ignore-rule matching and persistence used by scans.
-  - `color/` contains extracted main-color models and filtering support.
-- **RPC shape**:
-  - Gallery RPC is split by concern under `src/core/rpc/endpoints/gallery/`: `gallery.cpp` for scanning/maintenance, `asset.cpp` for asset queries and actions, `folder.cpp` for folder tree/navigation actions, and `tag.cpp` for tag management.
-  - Frontend code should usually enter gallery through RPC methods prefixed with `gallery.*`.
-  - Backend sends `gallery.changed` notifications after scan/index mutations; the frontend listens to this event and refreshes folder tree plus current asset view.
-- **Startup behavior**:
-  - During app initialization, the gallery module is initialized first, then watcher registrations are restored from DB, then Infinity Nikki photo-source registration runs, and finally all registered gallery watchers are started near the end of startup.
-- **Frontend entry points**:
-  - `web/src/features/gallery/api.ts` is the RPC facade and static URL helper layer.
-- `web/src/features/gallery/store/index.ts` is the single source of truth for gallery UI state. Store internals are split into `store/querySlice.ts`, `store/navigationSlice.ts`, `store/interactionSlice.ts`, and shared helpers in `store/persistence.ts`.
-  - `web/src/features/gallery/composables/` coordinates behavior around data loading, selection, layout, sidebar, lightbox, virtualized grids, and asset actions.
-  - `web/src/features/gallery/pages/GalleryPage.vue` hosts the three-pane shell (sidebar, viewer, details); child views live under `web/src/features/gallery/components/` in subfolders: `shell/` (sidebar, viewer, details, toolbar, content), `viewer/` (grid/list/masonry/adaptive), `asset/`, `tags/`, `folders/`, `dialogs/`, `menus/`, `infinity_nikki/`, and `lightbox/`.
-  - `web/src/features/gallery/routes.ts` defines the `/gallery` route; `web/src/router/index.ts` spreads it so there is a single source of truth for path, name (`gallery`), and meta.
-- **Frontend data flow**:
-  - Prefer the existing pattern `component -> composable -> api -> RPC` and let components read state directly from the Pinia store.
-  - `useGalleryData()` loads data and writes into store state.
-  - `useGallerySelection()` and `useGalleryAssetActions()` implement higher-level UI behaviors on top of the store instead of duplicating state in components.
-- When changing filters/sort/view mode, check `store/index.ts` plus related slices under `store/` and `queryFilters.ts`; when changing visible behavior, check the relevant composable before editing large Vue components.
-- **Domain model summary**:
-  - The gallery centers on `Asset`, `FolderTreeNode`, `TagTreeNode`, scan/task progress, and flexible `QueryAssetsFilters`.
-  - The same conceptual model exists on both sides: C++ types in `src/features/gallery/types.ixx`, mirrored by TS types in `web/src/features/gallery/types.ts`.
-  - Infinity Nikki-specific enrichments such as photo params and map points are exposed as part of gallery asset queries rather than as a completely separate frontend feature.
-
 ### RPC Endpoint Organization
-Endpoints live under `src/core/rpc/endpoints/<domain>/`, each domain exposes a `register_all(state)` called from `registry.cpp`. Current domains include file, clipboard, dialog, runtime_info, settings, tasks, update, webview, gallery, extensions, registry, and window_control. Game-specific adapters in `src/extensions/` (currently `infinity_nikki`) are exposed via `rpc/endpoints/extensions/`.
+Endpoints live under `src/core/rpc/endpoints/<domain>/`. Each domain exposes a `register_all(state)` called from `registry.cpp`.
+Game-specific adapters live under `src/extensions/` and are exposed via `rpc/endpoints/extensions/`.
 
 ### Initialization Order
-Initialization still follows the top-level chain `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()`. In practice this sets up core infrastructure first (events, async/runtime, worker pool, RPC, HTTP, database, settings, update, commands), then native UI surfaces, then feature services such as recording and gallery, then the Infinity Nikki extension, onboarding gate, hotkeys, and startup update checks.
+Initialization still follows `main.cpp` → `Application::Initialize()` → `Core::Initializer::initialize_application()`.
+The rough order is: core infrastructure first, then native UI, then feature services, then extensions and startup tasks.
 
 ## Build Output
 - Release: `build\windows\x64\release\`
@@ -160,7 +104,7 @@ Initialization still follows the top-level chain `main.cpp` → `Application::In
 - Distribution: `dist/` (exe + web resources)
 
 ## Installer
-Installers are built via `scripts/build-msi.ps1`. The script builds an MSI package and, by default, a WiX bundle-based setup `.exe`, both under `dist/`.
+Installers are built via `node scripts/build-msi.js` (or `npm run build:installer`). The script builds an MSI package and, by default, a WiX bundle-based setup `.exe`, both under `dist/`. Use `--msi-only` to skip the bundle; use `--version X.Y.Z` to override `version.json`.
 
 ## Code Generation Scripts
 These must be re-run when their source files change:

@@ -1,12 +1,11 @@
 module;
 
-#include <dkm.hpp>
-
 module Features.Gallery.Color.Extractor;
 
 import std;
 import Utils.Image;
 import Features.Gallery.Color.Types;
+import <dkm.hpp>;
 
 namespace Features::Gallery::Color::Extractor {
 

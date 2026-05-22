@@ -1,7 +1,5 @@
 module;
 
-#include <wil/com.h>
-
 module Core.DialogService;
 
 import std;
@@ -9,6 +7,7 @@ import Core.DialogService.State;
 import Core.State;
 import Utils.Dialog;
 import Utils.Logger;
+import <wil/com.h>;
 
 namespace Core::DialogService {
 
@@ -93,8 +92,12 @@ auto submit_dialog_task(Core::DialogService::State::DialogServiceState& service,
 
 }  // namespace Detail
 
-auto start(Core::DialogService::State::DialogServiceState& service)
-    -> std::expected<void, std::string> {
+auto start(Core::State::AppState& state) -> std::expected<void, std::string> {
+  if (!state.dialog_service) {
+    return std::unexpected("DialogServiceState is not initialized");
+  }
+  auto& service = *state.dialog_service;
+
   if (service.is_running.exchange(true)) {
     Logger().warn("DialogService already started");
     return std::unexpected("DialogService already started");
@@ -114,7 +117,11 @@ auto start(Core::DialogService::State::DialogServiceState& service)
   }
 }
 
-auto stop(Core::DialogService::State::DialogServiceState& service) -> void {
+auto stop(Core::State::AppState& state) -> void {
+  if (!state.dialog_service) {
+    return;
+  }
+  auto& service = *state.dialog_service;
   if (!service.is_running.exchange(false)) {
     return;
   }

@@ -6,7 +6,6 @@ module;
 #include <mfobjects.h>
 #include <mfreadwrite.h>
 #include <propvarutil.h>
-#include <wil/com.h>
 
 module Utils.Media.VideoAsset;
 
@@ -14,6 +13,7 @@ import std;
 import Utils.File.Mime;
 import Utils.Image;
 import Utils.Logger;
+import <wil/com.h>;
 
 namespace Utils::Media::VideoAsset {
 

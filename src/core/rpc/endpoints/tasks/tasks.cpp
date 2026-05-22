@@ -1,7 +1,3 @@
-module;
-
-#include <asio.hpp>
-
 module Core.RPC.Endpoints.Tasks;
 
 import std;
@@ -10,6 +6,7 @@ import Core.RPC;
 import Core.RPC.State;
 import Core.RPC.Types;
 import Core.Tasks;
+import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Tasks {
 
