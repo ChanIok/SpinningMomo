@@ -16,14 +16,22 @@ namespace Extensions::InfinityNikki::WorldArea {
 // 远端地图配置的来源地址和内存缓存有效期。
 // 配置包含所有世界的 polygon 区域、坐标变换参数和官方 world_id 映射，
 // 替代原先硬编码在源码中的规则。
-constexpr std::string_view kMapConfigUrl = "https://api.infinitymomo.com/api/v1/map.json";
+constexpr std::string_view kMapConfigUrl = "https://api2.infinitymomo.com/api/v1/map.json";
 constexpr auto kMapConfigTtl = std::chrono::hours(6);
+// 远端刷新失败后，在该时长内不再发起 HTTP（直接返回错误或旧缓存）。
+constexpr auto kMapConfigRefreshSuppressDuration = std::chrono::minutes(5);
+constexpr int kMapConfigConnectTimeoutMs = 3'000;
+constexpr int kMapConfigReceiveTimeoutMs = 5'000;
 
 // 进程级单例缓存。首次加载失败时返回错误；后续刷新失败时回退到上一次成功缓存。
 struct MapConfigCache {
   std::mutex mutex;
   std::optional<InfinityNikkiMapConfig> cached_config;
   std::chrono::steady_clock::time_point last_updated = std::chrono::steady_clock::time_point::min();
+  bool refresh_failed = false;
+  std::chrono::steady_clock::time_point refresh_failed_at =
+      std::chrono::steady_clock::time_point::min();
+  std::string last_refresh_error;
 };
 
 auto map_config_cache() -> MapConfigCache& {
@@ -36,6 +44,14 @@ auto is_cached_config_fresh(const MapConfigCache& cache) -> bool {
     return false;
   }
   return (std::chrono::steady_clock::now() - cache.last_updated) < kMapConfigTtl;
+}
+
+auto is_refresh_suppressed(const MapConfigCache& cache) -> bool {
+  if (!cache.refresh_failed) {
+    return false;
+  }
+  return (std::chrono::steady_clock::now() - cache.refresh_failed_at) <
+         kMapConfigRefreshSuppressDuration;
 }
 
 auto trim_ascii_copy(std::string_view value) -> std::string {
@@ -226,6 +242,8 @@ auto fetch_and_parse_map_config(Core::State::AppState& app_state)
       .method = "GET",
       .url = std::string(kMapConfigUrl),
       .headers = {Core::HttpClient::Types::Header{.name = "Accept", .value = "application/json"}},
+      .connect_timeout_ms = kMapConfigConnectTimeoutMs,
+      .receive_timeout_ms = kMapConfigReceiveTimeoutMs,
   };
 
   auto response = co_await Core::HttpClient::fetch(app_state, request);
@@ -243,7 +261,8 @@ auto fetch_and_parse_map_config(Core::State::AppState& app_state)
 
 // 带 TTL 缓存的地图配置加载入口。
 // 缓存命中直接返回；未命中则拉取远端配置；
-// 拉取失败时若有旧缓存则回退使用（降级），否则返回错误。
+// 拉取失败时标记 refresh_failed，抑制期内跳过后续 HTTP；
+// 若有旧缓存则回退使用（降级），否则返回错误。
 auto load_map_config(Core::State::AppState& app_state)
     -> asio::awaitable<std::expected<InfinityNikkiMapConfig, std::string>> {
   auto& cache = map_config_cache();
@@ -253,21 +272,34 @@ auto load_map_config(Core::State::AppState& app_state)
     if (is_cached_config_fresh(cache)) {
       co_return *cache.cached_config;
     }
+    if (is_refresh_suppressed(cache)) {
+      if (cache.cached_config.has_value()) {
+        co_return *cache.cached_config;
+      }
+      co_return std::unexpected(cache.last_refresh_error.empty()
+                                    ? "Infinity Nikki map config refresh is suppressed"
+                                    : cache.last_refresh_error);
+    }
   }
 
   auto fetched = co_await fetch_and_parse_map_config(app_state);
   if (!fetched) {
     std::lock_guard<std::mutex> lock(cache.mutex);
+    cache.refresh_failed = true;
+    cache.refresh_failed_at = std::chrono::steady_clock::now();
+    cache.last_refresh_error = fetched.error();
     if (cache.cached_config.has_value()) {
       Logger().warn("Use stale Infinity Nikki map config because refresh failed: {}",
                     fetched.error());
       co_return *cache.cached_config;
     }
-    co_return std::unexpected(fetched.error());
+    co_return std::unexpected(cache.last_refresh_error);
   }
 
   {
     std::lock_guard<std::mutex> lock(cache.mutex);
+    cache.refresh_failed = false;
+    cache.last_refresh_error.clear();
     cache.cached_config = fetched.value();
     cache.last_updated = std::chrono::steady_clock::now();
     co_return *cache.cached_config;
