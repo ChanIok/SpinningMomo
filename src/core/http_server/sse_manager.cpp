@@ -7,7 +7,7 @@ import Core.State;
 import Core.HttpServer.State;
 import Core.HttpServer.Types;
 import Utils.Logger;
-import Vendor.UWebSockets;
+import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::SseManager {
 
@@ -15,9 +15,8 @@ auto format_sse_message(const std::string& event_data) -> std::string {
   return std::format("data: {}\n\n", event_data);
 }
 
-auto add_connection(Core::State::AppState& state,
-                    Vendor::UWebSockets::HttpResponse<false>* response, std::string allowed_origin)
-    -> void {
+auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* response,
+                    std::string allowed_origin) -> void {
   if (!state.http_server || !response) {
     Logger().error("Cannot add SSE connection: invalid state or response");
     return;

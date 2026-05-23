@@ -1,5 +1,7 @@
 module;
 
+#include <uwebsockets/App.h>
+
 module Core.HttpServer;
 
 import std;
@@ -8,7 +10,6 @@ import Core.HttpServer.State;
 import Core.HttpServer.Routes;
 import Core.HttpServer.SseManager;
 import Utils.Logger;
-import Vendor.UWebSockets;
 
 namespace Core::HttpServer {
 
@@ -20,7 +21,7 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
       Logger().info("Starting HTTP server thread");
 
       // 在线程中创建uWS::App实例，生命周期由线程管理
-      Vendor::UWebSockets::App app;
+      uWS::App app;
 
       Core::HttpServer::Routes::register_routes(state, app);
 
@@ -38,7 +39,7 @@ auto initialize(Core::State::AppState& state) -> std::expected<void, std::string
 
       // 运行事件循环
       if (state.http_server->is_running) {
-        state.http_server->loop = Vendor::UWebSockets::Loop::get();
+        state.http_server->loop = uWS::Loop::get();
         app.run();
         state.http_server->loop->free();
         state.http_server->loop = nullptr;
@@ -75,7 +76,7 @@ auto shutdown(Core::State::AppState& state) -> void {
       Core::HttpServer::SseManager::close_all_connections(state);
 
       if (listen_socket) {
-        Vendor::UWebSockets::close_listen_socket(listen_socket);
+        us_listen_socket_close(0, listen_socket);
         Logger().info("Listen socket closed");
       }
     });

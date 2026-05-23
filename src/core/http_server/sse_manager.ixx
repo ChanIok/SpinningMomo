@@ -4,12 +4,11 @@ export module Core.HttpServer.SseManager;
 
 import std;
 import Core.State;
-import Vendor.UWebSockets;
+import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::SseManager {
 // 添加 SSE 连接
-export auto add_connection(Core::State::AppState& state,
-                           Vendor::UWebSockets::HttpResponse<false>* response,
+export auto add_connection(Core::State::AppState& state, uWS::HttpResponse<false>* response,
                            std::string allowed_origin = "") -> void;
 
 // 移除 SSE 连接

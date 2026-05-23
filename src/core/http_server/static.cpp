@@ -11,8 +11,8 @@ import Utils.File.Mime;
 import Utils.Path;
 import Utils.Logger;
 import Utils.Time;
-import Vendor.UWebSockets;
 import <asio.hpp>;
+import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::Static {
 
@@ -420,7 +420,7 @@ auto handle_file_stream(Core::State::AppState& state, std::filesystem::path file
                         std::string mime_type, std::string cache_control,
                         CacheValidators validators, size_t file_size,
                         std::optional<ByteRange> range, auto* res) -> void {
-  auto* loop = Vendor::UWebSockets::Loop::get();
+  auto* loop = uWS::Loop::get();
   auto io_context = Core::Async::get_io_context(state);
 
   size_t range_start = range.has_value() ? range->start : 0;
@@ -568,7 +568,7 @@ auto serve_resolved_file_request(Core::State::AppState& state,
   Logger().debug("Using single-read for small resolved file: {} bytes", file_size);
 
   // 获取当前的事件循环
-  auto* loop = Vendor::UWebSockets::Loop::get();
+  auto* loop = uWS::Loop::get();
 
   // 在异步运行时中处理文件读取
   asio::co_spawn(
@@ -657,7 +657,7 @@ auto handle_static_request(Core::State::AppState& state, const std::string& url_
 }
 
 // 注册静态文件路由
-auto register_routes(Core::State::AppState& state, Vendor::UWebSockets::App& app) -> void {
+auto register_routes(Core::State::AppState& state, uWS::App& app) -> void {
   Logger().info("Registering static file routes");
 
   // 注册通用的GET路由处理所有静态文件请求

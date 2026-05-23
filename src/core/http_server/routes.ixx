@@ -4,9 +4,9 @@ export module Core.HttpServer.Routes;
 
 import std;
 import Core.State;
-import Vendor.UWebSockets;
+import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::Routes {
 // 注册所有路由
-export auto register_routes(Core::State::AppState& state, Vendor::UWebSockets::App& app) -> void;
+export auto register_routes(Core::State::AppState& state, uWS::App& app) -> void;
 }  // namespace Core::HttpServer::Routes

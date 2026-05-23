@@ -4,7 +4,7 @@ export module Core.HttpServer.Types;
 
 import std;
 import <asio.hpp>;
-import Vendor.UWebSockets;
+import <uwebsockets/App.h>;
 
 export namespace Core::HttpServer::Types {
 
@@ -36,8 +36,8 @@ struct StreamContext {
   std::optional<std::string> content_range_header;
 
   // 运行时
-  Vendor::UWebSockets::Loop* loop;
-  Vendor::UWebSockets::HttpResponse<false>* res;
+  uWS::Loop* loop;
+  uWS::HttpResponse<false>* res;
   std::vector<char> buffer;
 
   // 状态
@@ -72,7 +72,7 @@ struct ResolverRegistry {
 
 // SSE连接信息结构
 struct SseConnection {
-  Vendor::UWebSockets::HttpResponse<false>* response = nullptr;
+  uWS::HttpResponse<false>* response = nullptr;
   std::string client_id;
   std::chrono::system_clock::time_point connected_at;
   bool is_closed = false;
