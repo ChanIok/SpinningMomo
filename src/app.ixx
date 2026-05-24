@@ -2,11 +2,9 @@ module;
 
 export module App;
 
-import std;
-import Vendor.Windows;
 import Core.Events;
 import Core.State;
-import UI.FloatingWindow;
+import Vendor.Windows;
 
 // 主应用程序类
 export class Application {
@@ -20,7 +18,7 @@ export class Application {
   Application(Application&&) = delete;
   auto operator=(Application&&) -> Application& = delete;
 
-  // 现代C++风格的初始化
+  // 初始化
   [[nodiscard]] auto Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool;
 
   // 运行应用程序
@@ -28,7 +26,5 @@ export class Application {
 
  private:
   // 应用状态
-  std::unique_ptr<Core::State::AppState> m_app_state;
-
-  Vendor::Windows::HINSTANCE m_h_instance = nullptr;
+  Core::State::AppState m_app_state{};
 };

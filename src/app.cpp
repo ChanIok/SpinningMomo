@@ -12,26 +12,18 @@ import Utils.Logger;
 import Vendor.Windows;
 
 Application::Application() = default;
-Application::~Application() {
-  if (m_app_state) {
-    Core::Shutdown::shutdown_application(*m_app_state);
-  }
-}
+
+Application::~Application() { Core::Shutdown::shutdown_application(m_app_state); }
 
 auto Application::Initialize(Vendor::Windows::HINSTANCE hInstance) -> bool {
-  m_h_instance = hInstance;
-
   try {
     // 创建 AppState, 其构造函数会自动初始化所有子状态
-    m_app_state = std::make_unique<Core::State::AppState>();
+    m_app_state.floating_window->window.instance = hInstance;
 
-    m_app_state->floating_window->window.instance = m_h_instance;
-
-    Core::RuntimeInfo::collect(*m_app_state);
+    Core::RuntimeInfo::collect(m_app_state);
 
     // 调用统一的初始化器
-    if (auto result = Core::Initializer::initialize_application(*m_app_state, m_h_instance);
-        !result) {
+    if (auto result = Core::Initializer::initialize_application(m_app_state); !result) {
       Logger().error("Failed to initialize application: {}", result.error());
       return false;
     }

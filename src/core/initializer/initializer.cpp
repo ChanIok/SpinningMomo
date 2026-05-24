@@ -5,7 +5,6 @@ module Core.Initializer;
 import std;
 import Core.Async;
 import Core.Commands;
-import Core.Commands.Types;
 import Core.DialogService;
 import Core.WorkerPool;
 import Core.State;
@@ -38,7 +37,6 @@ import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
 import Utils.Logger;
-import Vendor.Windows;
 
 namespace Core::Initializer {
 
@@ -91,8 +89,7 @@ auto apply_logger_level_from_settings(Core::State::AppState& state) -> void {
   Logger().debug("Runtime logger level loaded from settings: {}", level);
 }
 
-auto initialize_application(Core::State::AppState& state, Vendor::Windows::HINSTANCE instance)
-    -> std::expected<void, std::string> {
+auto initialize_application(Core::State::AppState& state) -> std::expected<void, std::string> {
   try {
     Logger().info("==================================================");
     Logger().info("SpinningMomo startup begin");
