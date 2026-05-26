@@ -1,10 +1,9 @@
 module;
 
-#include <d3d11.h>
-
 module Utils.Graphics.CaptureRegion;
 
 import std;
+import <d3d11.h>;
 import <dwmapi.h>;
 import <windows.h>;
 

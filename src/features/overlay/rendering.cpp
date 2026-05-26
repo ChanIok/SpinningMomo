@@ -54,9 +54,9 @@ auto initialize_rendering(Core::State::AppState& state) -> std::expected<void, s
   auto& overlay_state = *state.overlay;
 
   // 创建D3D上下文
-  auto d3d_result = Utils::Graphics::D3D::create_d3d_context(overlay_state.window.overlay_hwnd,
-                                                             overlay_state.window.window_width,
-                                                             overlay_state.window.window_height);
+  auto d3d_result = Utils::Graphics::D3D::create_d3d_context(
+      overlay_state.window.overlay_hwnd, overlay_state.window.window_width,
+      overlay_state.window.window_height, overlay_state.enable_hdr);
 
   if (!d3d_result) {
     auto error_msg = std::format("Failed to initialize D3D rendering: {}", d3d_result.error());

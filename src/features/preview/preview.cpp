@@ -14,6 +14,7 @@ import Features.Preview.Capture;
 import UI.FloatingWindow.State;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
+import Utils.Graphics.HDR;
 import Utils.Display;
 import Utils.Logger;
 import <dwmapi.h>;
@@ -57,6 +58,12 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
     return std::unexpected("Target window is minimized");
   }
 
+  auto hdr_info = Utils::Graphics::HDR::query_monitor_hdr_info(target_window);
+  if (!hdr_info) {
+    return std::unexpected("Failed to query HDR monitor info: " + hdr_info.error());
+  }
+  const bool enable_hdr = hdr_info->hdr_active;
+
   const auto& fw = *state.floating_window;
   auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
@@ -71,6 +78,12 @@ auto start_preview(Core::State::AppState& state, HWND target_window)
   preview_state.target_window = target_window;
   preview_state.screen_rect = monitor_info->monitor_rect;
   preview_state.has_screen_rect = true;
+
+  if (preview_state.rendering_resources.initialized.load(std::memory_order_acquire) &&
+      preview_state.rendering_resources.d3d_context.enable_hdr != enable_hdr) {
+    Rendering::cleanup_rendering(state);
+  }
+  preview_state.enable_hdr = enable_hdr;
 
   // 计算捕获尺寸
   RECT clientRect;

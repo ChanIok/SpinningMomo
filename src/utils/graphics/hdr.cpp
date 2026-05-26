@@ -1,6 +1,6 @@
 module;
 
-module Utils.Graphics.Hdr;
+module Utils.Graphics.HDR;
 
 import std;
 import Utils.Logger;
@@ -8,7 +8,7 @@ import <dxgi1_6.h>;
 import <wil/com.h>;
 import <windows.h>;
 
-namespace Utils::Graphics::Hdr {
+namespace Utils::Graphics::HDR {
 
 namespace Detail {
 
@@ -105,4 +105,4 @@ auto query_monitor_hdr_info(HWND target_window) -> std::expected<HdrMonitorInfo,
   return std::unexpected("Failed to match target monitor to a DXGI output");
 }
 
-}  // namespace Utils::Graphics::Hdr
+}  // namespace Utils::Graphics::HDR

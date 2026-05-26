@@ -14,6 +14,7 @@ struct OverlayState {
   Types::CaptureState capture_state;
   Types::InteractionState interaction;
   Types::ThreadState threads;
+  bool enable_hdr = false;
 
   std::condition_variable frame_available;
 

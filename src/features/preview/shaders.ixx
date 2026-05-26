@@ -25,7 +25,7 @@ PS_INPUT main(VS_INPUT input) {
 )";
 
 const std::string BASIC_PIXEL_SHADER = R"(
-Texture2D tex : register(t0);
+Texture2D<float4> tex : register(t0);
 SamplerState samp : register(s0);
 float4 main(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD) : SV_Target {
     return tex.Sample(samp, texCoord);

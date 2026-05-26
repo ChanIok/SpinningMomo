@@ -1,13 +1,9 @@
 module;
 
-#include <d3d11.h>
-#include <d3dcompiler.h>
-#include <dxgi.h>
-#include <windows.h>
-
 export module Utils.Graphics.D3D;
 
 import std;
+import <d3d11.h>;
 import <wil/com.h>;
 
 namespace Utils::Graphics::D3D {
@@ -18,6 +14,8 @@ export struct D3DContext {
   wil::com_ptr<ID3D11DeviceContext> context;
   wil::com_ptr<IDXGISwapChain> swap_chain;
   wil::com_ptr<ID3D11RenderTargetView> render_target;
+  DXGI_FORMAT swap_chain_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  bool enable_hdr = false;
 };
 
 // 着色器资源
@@ -31,7 +29,7 @@ export struct ShaderResources {
 };
 
 // 创建D3D设备和交换链
-export auto create_d3d_context(HWND hwnd, int width, int height)
+export auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr = false)
     -> std::expected<D3DContext, std::string>;
 
 // 创建无头D3D设备（仅设备和上下文，无交换链）

@@ -15,6 +15,7 @@ import Features.Overlay.Threads;
 import Features.Overlay.Geometry;
 import UI.FloatingWindow.State;
 import Utils.Display;
+import Utils.Graphics.HDR;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
@@ -92,6 +93,12 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
     return std::unexpected("Target window is minimized");
   }
 
+  auto hdr_info = Utils::Graphics::HDR::query_monitor_hdr_info(target_window);
+  if (!hdr_info) {
+    return std::unexpected("Failed to query HDR monitor info: " + hdr_info.error());
+  }
+  const bool enable_hdr = hdr_info->hdr_active;
+
   const auto& fw = *state.floating_window;
   auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
@@ -99,6 +106,12 @@ auto start_overlay(Core::State::AppState& state, HWND target_window, bool freeze
   }
 
   overlay_state.window.target_window = target_window;
+  if (overlay_state.rendering.d3d_initialized &&
+      overlay_state.rendering.d3d_context.enable_hdr != enable_hdr) {
+    Rendering::cleanup_rendering(state);
+  }
+  overlay_state.enable_hdr = enable_hdr;
+
   const auto& monitor_rect = monitor_info->monitor_rect;
   overlay_state.window.screen_left = monitor_rect.left;
   overlay_state.window.screen_top = monitor_rect.top;

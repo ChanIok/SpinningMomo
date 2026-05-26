@@ -13,7 +13,7 @@ import Features.Settings.Types;
 import Features.Settings.State;
 import Features.WindowControl;
 import UI.FloatingWindow.Events;
-import Utils.Graphics.Hdr;
+import Utils.Graphics.HDR;
 import Utils.Logger;
 import Utils.Media.AudioCapture;
 import Utils.Path;
@@ -137,7 +137,7 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
 
       // WGC 的 HDR 帧只有在目标显示器处于 Windows HDR 模式时才有意义；
       // 否则即使请求 16-bit float，也录不到真正的 HDR 桌面内容。
-      auto hdr_info = Utils::Graphics::Hdr::query_monitor_hdr_info(target.value());
+      auto hdr_info = Utils::Graphics::HDR::query_monitor_hdr_info(target.value());
       if (!hdr_info) {
         std::string error = "Failed to query HDR monitor info: " + hdr_info.error();
         show_recording_notification(state,

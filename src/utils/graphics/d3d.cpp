@@ -1,30 +1,61 @@
 module;
 
-#include <d3d11.h>
-#include <d3dcompiler.h>
-#include <dxgi.h>
-#include <windows.h>
-
-#include <iostream>
-
 module Utils.Graphics.D3D;
 
 import std;
 import Utils.Logger;
+import <d3d11.h>;
+import <d3dcompiler.h>;
+import <dxgi.h>;
+import <dxgi1_4.h>;
+import <windows.h>;
 import <wil/com.h>;
 
 namespace Utils::Graphics::D3D {
 
-auto create_d3d_context(HWND hwnd, int width, int height)
+// d3d11.h 宏在头文件单元 import 后不可见，取值与 Windows SDK 一致
+constexpr UINT k_d3d11_sdk_version = 7;
+constexpr float k_d3d11_float32_max = 3.402823466e+38f;
+
+auto resolve_swap_chain_format(bool enable_hdr) -> DXGI_FORMAT {
+  return enable_hdr ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM;
+}
+
+auto configure_swap_chain_color_space(const D3DContext& context)
+    -> std::expected<void, std::string> {
+  if (!context.enable_hdr) {
+    return {};
+  }
+
+  wil::com_ptr<IDXGISwapChain3> swap_chain3;
+  HRESULT hr = context.swap_chain->QueryInterface(IID_PPV_ARGS(swap_chain3.put()));
+  if (FAILED(hr) || !swap_chain3) {
+    return std::unexpected(std::format("HDR swap chain requires IDXGISwapChain3, HRESULT: 0x{:08X}",
+                                       static_cast<unsigned>(hr)));
+  }
+
+  hr = swap_chain3->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to set HDR swap chain scRGB color space, HRESULT: 0x{:08X}",
+                    static_cast<unsigned>(hr)));
+  }
+
+  return {};
+}
+
+auto create_d3d_context(HWND hwnd, int width, int height, bool enable_hdr)
     -> std::expected<D3DContext, std::string> {
   D3DContext context;
+  context.enable_hdr = enable_hdr;
+  context.swap_chain_format = resolve_swap_chain_format(enable_hdr);
 
   // 创建交换链描述
   DXGI_SWAP_CHAIN_DESC scd = {};
   scd.BufferCount = 2;
   scd.BufferDesc.Width = width;
   scd.BufferDesc.Height = height;
-  scd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  scd.BufferDesc.Format = context.swap_chain_format;
   scd.BufferDesc.RefreshRate.Numerator = 0;
   scd.BufferDesc.RefreshRate.Denominator = 1;
   scd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -42,15 +73,21 @@ auto create_d3d_context(HWND hwnd, int width, int height)
   createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-  HRESULT hr = D3D11CreateDeviceAndSwapChain(
-      nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags, nullptr, 0, D3D11_SDK_VERSION,
-      &scd, context.swap_chain.put(), context.device.put(), &featureLevel, context.context.put());
+  HRESULT hr =
+      D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, createDeviceFlags,
+                                    nullptr, 0, k_d3d11_sdk_version, &scd, context.swap_chain.put(),
+                                    context.device.put(), &featureLevel, context.context.put());
 
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to create D3D device and swap chain, HRESULT: 0x{:08X}",
                                  static_cast<unsigned int>(hr));
     Logger().error(error_msg);
     return std::unexpected(error_msg);
+  }
+
+  if (auto color_space_result = configure_swap_chain_color_space(context); !color_space_result) {
+    Logger().error("{}", color_space_result.error());
+    return std::unexpected(color_space_result.error());
   }
 
   // 创建渲染目标
@@ -79,10 +116,10 @@ auto create_headless_d3d_device()
                                  createDeviceFlags,         // 创建标志
                                  nullptr,                   // 功能级别数组
                                  0,                         // 功能级别数组大小
-                                 D3D11_SDK_VERSION,         // SDK版本
-                                 device.put(),              // 输出设备
-                                 nullptr,                   // 输出功能级别
-                                 context.put()              // 输出设备上下文
+                                 k_d3d11_sdk_version,
+                                 device.put(),  // 输出设备
+                                 nullptr,       // 输出功能级别
+                                 context.put()  // 输出设备上下文
   );
 
   if (FAILED(hr)) {
@@ -297,7 +334,7 @@ auto create_linear_sampler(ID3D11Device* device)
   samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
   samplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
   samplerDesc.MinLOD = 0;
-  samplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
+  samplerDesc.MaxLOD = k_d3d11_float32_max;
 
   wil::com_ptr<ID3D11SamplerState> sampler;
   HRESULT hr = device->CreateSamplerState(&samplerDesc, &sampler);
@@ -339,12 +376,17 @@ auto resize_swap_chain(D3DContext& context, int width, int height)
   context.render_target.reset();
 
   // 调整交换链大小
-  HRESULT hr = context.swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
+  HRESULT hr = context.swap_chain->ResizeBuffers(0, width, height, context.swap_chain_format, 0);
   if (FAILED(hr)) {
     auto error_msg = std::format("Failed to resize swap chain, HRESULT: 0x{:08X}",
                                  static_cast<unsigned int>(hr));
     Logger().error(error_msg);
     return std::unexpected(error_msg);
+  }
+
+  if (auto color_space_result = configure_swap_chain_color_space(context); !color_space_result) {
+    Logger().error("{}", color_space_result.error());
+    return std::unexpected(color_space_result.error());
   }
 
   // 重新创建渲染目标
@@ -361,6 +403,8 @@ auto cleanup_d3d_context(D3DContext& context) -> void {
   context.swap_chain.reset();
   context.context.reset();
   context.device.reset();
+  context.swap_chain_format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  context.enable_hdr = false;
 }
 
 auto cleanup_shader_resources(ShaderResources& resources) -> void {

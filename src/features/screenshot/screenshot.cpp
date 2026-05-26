@@ -15,7 +15,7 @@ import Utils.Path;
 import Utils.String;
 import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
-import Utils.Graphics.Hdr;
+import Utils.Graphics.HDR;
 import Utils.Image;
 import <d3d11.h>;
 import <wil/com.h>;
@@ -502,7 +502,7 @@ auto take_screenshot(
   bool use_hdr = false;
   float hdr_target_peak_nits = 1000.0f;
   if (app_state.settings->raw.features.screenshot.enable_hdr) {
-    auto hdr_info = Utils::Graphics::Hdr::query_monitor_hdr_info(target_window);
+    auto hdr_info = Utils::Graphics::HDR::query_monitor_hdr_info(target_window);
     if (hdr_info) {
       use_hdr = hdr_info->hdr_active;
       hdr_target_peak_nits = hdr_info->max_luminance_nits;

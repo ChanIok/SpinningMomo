@@ -156,9 +156,16 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
     on_frame_arrived(state, frame);
   };
 
+  Utils::Graphics::Capture::CaptureSessionOptions capture_options;
+  if (overlay_state.enable_hdr) {
+    capture_options.pixel_format =
+        winrt::Windows::Graphics::DirectX::DirectXPixelFormat::R16G16B16A16Float;
+  }
+
   // 创建捕获会话
   auto session_result = Utils::Graphics::Capture::create_capture_session(
-      target_window, winrt_device_result.value(), width, height, frame_callback);
+      target_window, winrt_device_result.value(), width, height, frame_callback, 1,
+      capture_options);
 
   if (!session_result) {
     Logger().error("Failed to create capture session");

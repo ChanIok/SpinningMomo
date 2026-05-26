@@ -42,7 +42,8 @@ auto initialize_rendering(Core::State::AppState& state, HWND hwnd, int width, in
   auto& resources = state.preview->rendering_resources;
 
   // 创建D3D上下文
-  auto d3d_result = Utils::Graphics::D3D::create_d3d_context(hwnd, width, height);
+  auto d3d_result =
+      Utils::Graphics::D3D::create_d3d_context(hwnd, width, height, state.preview->enable_hdr);
   if (!d3d_result) {
     Logger().error("Failed to create D3D context for preview rendering: {}", d3d_result.error());
     return std::unexpected(d3d_result.error().find("device") != std::string::npos

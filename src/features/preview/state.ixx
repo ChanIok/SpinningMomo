@@ -28,6 +28,7 @@ struct PreviewState {
   // 渲染状态
   std::atomic<bool> running = false;
   std::atomic<bool> create_new_srv = true;
+  bool enable_hdr = false;
   Features::Preview::Types::RenderingResources rendering_resources;
 
   // 捕获状态

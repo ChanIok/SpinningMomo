@@ -278,23 +278,6 @@ const handleResetSettings = async () => {
             </Select>
           </ItemActions>
         </Item>
-
-        <Item variant="surface" size="sm">
-          <ItemContent>
-            <ItemTitle>
-              {{ t('settings.capture.screenshotSettings.hdrLabel') }}
-            </ItemTitle>
-            <ItemDescription>
-              {{ t('settings.capture.screenshotSettings.hdrDescription') }}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Switch
-              :model-value="appSettings?.features?.screenshot?.enableHdr ?? false"
-              @update:model-value="(value) => updateScreenshotHdrEnabled(Boolean(value))"
-            />
-          </ItemActions>
-        </Item>
       </div>
 
       <div class="space-y-4">
@@ -547,23 +530,6 @@ const handleResetSettings = async () => {
           <Item variant="surface" size="sm">
             <ItemContent>
               <ItemTitle>
-                {{ t('settings.function.recording.hdr.label') }}
-              </ItemTitle>
-              <ItemDescription>
-                {{ t('settings.function.recording.hdr.description') }}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Switch
-                :model-value="appSettings?.features?.recording?.enableHdr ?? false"
-                @update:model-value="(value) => updateRecordingHdrEnabled(Boolean(value))"
-              />
-            </ItemActions>
-          </Item>
-
-          <Item variant="surface" size="sm">
-            <ItemContent>
-              <ItemTitle>
                 {{ t('settings.function.recording.captureClientArea.label') }}
               </ItemTitle>
               <ItemDescription>
@@ -689,6 +655,53 @@ const handleResetSettings = async () => {
                 @keydown.enter="handleAudioBitrateChange"
               />
               <span class="text-sm text-muted-foreground">kbps</span>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-semibold text-foreground">
+            {{ t('settings.capture.hdrSettings.title') }}
+          </h3>
+          <p class="mt-1 text-sm text-muted-foreground">
+            {{ t('settings.capture.hdrSettings.description') }}
+          </p>
+        </div>
+
+        <ItemGroup>
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.capture.hdrSettings.screenshotLabel') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.capture.hdrSettings.screenshotDescription') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.screenshot?.enableHdr ?? false"
+                @update:model-value="(value) => updateScreenshotHdrEnabled(Boolean(value))"
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.capture.hdrSettings.recordingLabel') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.capture.hdrSettings.recordingDescription') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.recording?.enableHdr ?? false"
+                @update:model-value="(value) => updateRecordingHdrEnabled(Boolean(value))"
+              />
             </ItemActions>
           </Item>
         </ItemGroup>
