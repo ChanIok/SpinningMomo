@@ -12,7 +12,7 @@ import Features.Gallery.State;
 import Utils.Logger;
 import Utils.Time;
 import Utils.LRUCache;
-import <rfl.hpp>;
+import <rfl/json.hpp>;
 
 namespace Features::Gallery::Asset::Repository::Detail {
 

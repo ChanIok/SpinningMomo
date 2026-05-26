@@ -28,9 +28,9 @@ export module Extensions.InfinityNikki.Generated.MapInjectionScript;
 
 import std;
 
-export namespace Extensions::InfinityNikki::Generated {
+namespace Extensions::InfinityNikki::Generated {
 
-constexpr std::wstring_view map_bridge_script =
+export constexpr std::wstring_view map_bridge_script =
     ${literalExpression};
 
 }  // namespace Extensions::InfinityNikki::Generated

@@ -15,7 +15,6 @@ import Core.RPC.Endpoints.Gallery.Tag;
 import Core.RPC.Endpoints.Gallery.Folder;
 import Utils.Logger;
 import <asio.hpp>;
-import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Gallery {
 

@@ -4,11 +4,11 @@ export module Features.Gallery.Types;
 
 import std;
 
-export namespace Features::Gallery::Types {
+namespace Features::Gallery::Types {
 
 // ============= 核心数据类型 =============
 
-struct Asset {
+export struct Asset {
   std::int64_t id;
   std::string name;
   std::string path;
@@ -35,7 +35,7 @@ struct Asset {
   std::int64_t updated_at;
 };
 
-struct Folder {
+export struct Folder {
   std::int64_t id;
   std::string path;
   std::optional<std::int64_t> parent_id;
@@ -48,7 +48,7 @@ struct Folder {
   std::int64_t updated_at;
 };
 
-struct FolderTreeNode {
+export struct FolderTreeNode {
   std::int64_t id;
   std::string path;
   std::optional<std::int64_t> parent_id;
@@ -63,7 +63,7 @@ struct FolderTreeNode {
   std::vector<FolderTreeNode> children;
 };
 
-struct IgnoreRule {
+export struct IgnoreRule {
   std::int64_t id;
   std::optional<std::int64_t> folder_id;
   std::string rule_pattern;
@@ -75,7 +75,7 @@ struct IgnoreRule {
   std::int64_t updated_at;
 };
 
-struct Tag {
+export struct Tag {
   std::int64_t id;
   std::string name;
   std::optional<std::int64_t> parent_id;
@@ -84,7 +84,7 @@ struct Tag {
   std::int64_t updated_at;
 };
 
-struct BatchSelectionSummary {
+export struct BatchSelectionSummary {
   std::int64_t selected_count = 0;
   std::optional<int> rating;
   std::optional<bool> rejected_state;
@@ -92,7 +92,7 @@ struct BatchSelectionSummary {
   std::vector<Tag> common_tags;
 };
 
-struct TagTreeNode {
+export struct TagTreeNode {
   std::int64_t id;
   std::string name;
   std::optional<std::int64_t> parent_id;
@@ -103,13 +103,13 @@ struct TagTreeNode {
   std::vector<TagTreeNode> children;
 };
 
-struct AssetTag {
+export struct AssetTag {
   std::int64_t asset_id;
   std::int64_t tag_id;
   std::int64_t created_at;
 };
 
-struct AssetMainColor {
+export struct AssetMainColor {
   std::int64_t r = 0;
   std::int64_t g = 0;
   std::int64_t b = 0;
@@ -118,7 +118,7 @@ struct AssetMainColor {
 
 // ============= 辅助数据类型 =============
 
-struct Info {
+export struct Info {
   std::uint32_t width;
   std::uint32_t height;
   std::int64_t size;
@@ -126,7 +126,7 @@ struct Info {
   std::string detected_type;
 };
 
-struct Stats {
+export struct Stats {
   int total_count = 0;
   int photo_count = 0;
   int video_count = 0;
@@ -136,7 +136,7 @@ struct Stats {
   std::string newest_item_date;
 };
 
-struct HomeStats {
+export struct HomeStats {
   int total_count = 0;
   int photo_count = 0;
   int video_count = 0;
@@ -145,18 +145,18 @@ struct HomeStats {
   int today_added_count = 0;
 };
 
-struct TagStats {
+export struct TagStats {
   std::int64_t tag_id;
   std::string tag_name;
   std::int64_t asset_count;  // 使用该标签的资产数量
 };
 
-struct TypeCountResult {
+export struct TypeCountResult {
   std::string type;
   int count;
 };
 
-struct FolderHierarchy {
+export struct FolderHierarchy {
   std::string path;
   std::optional<std::string> parent_path;
   std::string name;
@@ -166,14 +166,14 @@ struct FolderHierarchy {
 // ============= 扫描相关类型 =============
 
 //  忽略规则（用于前端请求）
-struct ScanIgnoreRule {
+export struct ScanIgnoreRule {
   std::string pattern;
   std::string pattern_type = "glob";  // "glob" 或 "regex"
   std::string rule_type = "exclude";  // "exclude" 或 "include"
   std::optional<std::string> description;
 };
 
-struct ScanOptions {
+export struct ScanOptions {
   std::string directory;
   std::optional<bool> generate_thumbnails = true;
   std::optional<std::uint32_t> thumbnail_short_edge = 480;
@@ -184,7 +184,7 @@ struct ScanOptions {
   std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };
 
-struct ScanProgress {
+export struct ScanProgress {
   std::string stage;
   std::int64_t current = 0;
   std::int64_t total = 0;
@@ -192,7 +192,7 @@ struct ScanProgress {
   std::optional<std::string> message;
 };
 
-enum class ScanChangeAction {
+export enum class ScanChangeAction {
   UPSERT,
   REMOVE,
 };
@@ -201,12 +201,12 @@ enum class ScanChangeAction {
 // 供运行时增量消费者（如 Infinity Nikki ScreenShot 硬链接同步）直接复用，
 // 避免再次全量遍历文件系统推导“这次到底哪些文件变了”。
 // REMOVE 表示监视根下该路径对应的文件已从磁盘消失；与索引中是否仍能删到一行资产无关。
-struct ScanChange {
+export struct ScanChange {
   std::string path;
   ScanChangeAction action = ScanChangeAction::UPSERT;
 };
 
-struct ScanResult {
+export struct ScanResult {
   int total_files = 0;
   int new_items = 0;
   int updated_items = 0;
@@ -218,9 +218,9 @@ struct ScanResult {
   std::vector<ScanChange> changes = {};
 };
 
-enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
+export enum class FileStatus { NEW, UNCHANGED, MODIFIED, NEEDS_HASH_CHECK, DELETED };
 
-struct Metadata {
+export struct Metadata {
   std::int64_t id;
   std::string path;
   std::int64_t size;
@@ -228,7 +228,7 @@ struct Metadata {
   std::string hash;
 };
 
-struct FileSystemInfo {
+export struct FileSystemInfo {
   std::filesystem::path path;
   std::int64_t size;
   std::int64_t file_modified_millis;
@@ -236,7 +236,7 @@ struct FileSystemInfo {
   std::string hash;
 };
 
-struct FileAnalysisResult {
+export struct FileAnalysisResult {
   FileSystemInfo file_info;
   FileStatus status;
   std::optional<Metadata> existing_metadata;
@@ -244,7 +244,7 @@ struct FileAnalysisResult {
 
 // ============= RPC参数类型 =============
 
-struct ListResponse {
+export struct ListResponse {
   std::vector<Asset> items;
   std::int32_t total_count;
   std::int32_t current_page;
@@ -253,31 +253,31 @@ struct ListResponse {
   std::optional<std::int64_t> active_asset_index;
 };
 
-struct GetParams {
+export struct GetParams {
   std::int64_t id;
 };
 
-struct GetAssetMainColorsParams {
+export struct GetAssetMainColorsParams {
   std::int64_t asset_id;
 };
 
-struct AssetIdsParams {
+export struct AssetIdsParams {
   std::vector<std::int64_t> ids;
 };
 
-struct MoveAssetsToFolderParams {
+export struct MoveAssetsToFolderParams {
   std::vector<std::int64_t> ids;
   std::int64_t target_folder_id = 0;
 };
 
-struct DeleteParams {
+export struct DeleteParams {
   std::int64_t id;
   std::optional<bool> delete_file = false;
 };
 
-struct GetStatsParams {};
+export struct GetStatsParams {};
 
-struct ListAssetsParams {
+export struct ListAssetsParams {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
   // 分页和排序参数（复用ListParams的逻辑）
@@ -287,7 +287,7 @@ struct ListAssetsParams {
   std::optional<std::string> sort_order = "desc";
 };
 
-struct OperationResult {
+export struct OperationResult {
   bool success;
   std::string message;
   std::optional<std::int64_t> affected_count;
@@ -298,12 +298,12 @@ struct OperationResult {
 
 // ============= 时间线相关类型 =============
 
-struct TimelineBucket {
+export struct TimelineBucket {
   std::string month;  // "2024-10" 格式
   int count;          // 该月照片数量
 };
 
-struct TimelineBucketsParams {
+export struct TimelineBucketsParams {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
   std::optional<std::string> sort_order = "desc";  // "asc" | "desc"
@@ -321,13 +321,13 @@ struct TimelineBucketsParams {
   std::optional<double> color_distance = 18.0;
 };
 
-struct TimelineBucketsResponse {
+export struct TimelineBucketsResponse {
   std::vector<TimelineBucket> buckets;
   int total_count;  // 总照片数
   std::optional<std::int64_t> active_asset_index;
 };
 
-struct GetAssetsByMonthParams {
+export struct GetAssetsByMonthParams {
   std::string month;  // "2024-10" 格式
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
@@ -345,7 +345,7 @@ struct GetAssetsByMonthParams {
   std::optional<double> color_distance = 18.0;
 };
 
-struct GetAssetsByMonthResponse {
+export struct GetAssetsByMonthResponse {
   std::string month;
   std::vector<Asset> assets;
   int count;
@@ -353,7 +353,7 @@ struct GetAssetsByMonthResponse {
 
 // ============= 统一查询相关类型 =============
 
-struct QueryAssetsFilters {
+export struct QueryAssetsFilters {
   std::optional<std::int64_t> folder_id;
   std::optional<bool> include_subfolders = false;
   std::optional<std::string> month;  // "2024-10" 格式
@@ -371,7 +371,7 @@ struct QueryAssetsFilters {
   std::optional<double> color_distance = 18.0;
 };
 
-struct QueryAssetsParams {
+export struct QueryAssetsParams {
   QueryAssetsFilters filters;
   std::optional<std::string> sort_by = "created_at";
   std::optional<std::string> sort_order = "desc";
@@ -381,82 +381,82 @@ struct QueryAssetsParams {
   std::optional<std::int32_t> per_page;
 };
 
-struct AssetLayoutMetaItem {
+export struct AssetLayoutMetaItem {
   std::int64_t id;
   std::optional<std::int32_t> width;
   std::optional<std::int32_t> height;
 };
 
-struct QueryAssetLayoutMetaParams {
+export struct QueryAssetLayoutMetaParams {
   QueryAssetsFilters filters;
   std::optional<std::string> sort_by = "created_at";
   std::optional<std::string> sort_order = "desc";
 };
 
-struct QueryAssetLayoutMetaResponse {
+export struct QueryAssetLayoutMetaResponse {
   std::vector<AssetLayoutMetaItem> items;
   std::int32_t total_count;
 };
 
 // ============= 标签相关参数 =============
 
-struct CreateTagParams {
+export struct CreateTagParams {
   std::string name;
   std::optional<std::int64_t> parent_id;
   std::optional<int> sort_order = 0;
 };
 
-struct UpdateTagParams {
+export struct UpdateTagParams {
   std::int64_t id;
   std::optional<std::string> name;
   std::optional<std::int64_t> parent_id;
   std::optional<int> sort_order;
 };
 
-struct AddTagsToAssetParams {
+export struct AddTagsToAssetParams {
   std::int64_t asset_id;
   std::vector<std::int64_t> tag_ids;
 };
 
-struct AddTagToAssetsParams {
+export struct AddTagToAssetsParams {
   std::vector<std::int64_t> asset_ids;
   std::int64_t tag_id = 0;
 };
 
-struct RemoveTagFromAssetsParams {
+export struct RemoveTagFromAssetsParams {
   std::vector<std::int64_t> asset_ids;
   std::int64_t tag_id = 0;
 };
 
-struct RemoveTagsFromAssetParams {
+export struct RemoveTagsFromAssetParams {
   std::int64_t asset_id;
   std::vector<std::int64_t> tag_ids;
 };
 
-struct GetAssetTagsParams {
+export struct GetAssetTagsParams {
   std::int64_t asset_id;
 };
 
-struct BatchSelectionSummaryParams {
+export struct BatchSelectionSummaryParams {
   std::vector<std::int64_t> asset_ids;
 };
 
-struct UpdateAssetsReviewStateParams {
+export struct UpdateAssetsReviewStateParams {
   std::vector<std::int64_t> asset_ids;
   std::optional<int> rating;
   std::optional<std::string> review_flag;
 };
 
-struct UpdateAssetDescriptionParams {
+export struct UpdateAssetDescriptionParams {
   std::int64_t asset_id;
   std::optional<std::string> description;
 };
 
-struct UpdateAssetsDescriptionParams {
+export struct UpdateAssetsDescriptionParams {
   std::vector<std::int64_t> asset_ids;
   std::optional<std::string> description;
 };
 
-struct GetTagStatsParams {};
+export struct GetTagStatsParams {};
 
 }  // namespace Features::Gallery::Types

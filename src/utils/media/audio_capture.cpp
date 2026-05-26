@@ -1,14 +1,15 @@
 module;
 
-#include <audioclient.h>
 #include <audioclientactivationparams.h>
-#include <mmdeviceapi.h>
 #include <mmreg.h>
+#include "AudioSessionTypes.h"
 
 module Utils.Media.AudioCapture;
 
 import std;
 import Utils.Logger;
+import <audioclient.h>;
+import <mmdeviceapi.h>;
 import <wil/com.h>;
 import <windows.h>;
 import <wrl/implements.h>;

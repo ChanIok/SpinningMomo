@@ -6,10 +6,10 @@ import std;
 import Features.Preview.Types;
 import <windows.h>;
 
-export namespace Features::Preview::State {
+namespace Features::Preview::State {
 
 // 预览窗口完整状态
-struct PreviewState {
+export struct PreviewState {
   // 窗口句柄
   HWND hwnd = nullptr;
   HWND target_window = nullptr;

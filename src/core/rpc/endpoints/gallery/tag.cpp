@@ -11,7 +11,6 @@ import Core.RPC.NotificationHub;
 import Features.Gallery.Types;
 import Features.Gallery.Tag.Repository;
 import <asio.hpp>;
-import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Gallery::Tag {
 

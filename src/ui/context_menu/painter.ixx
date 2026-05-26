@@ -1,8 +1,5 @@
 module;
 
-#include <d2d1.h>
-#include <windows.h>
-
 export module UI.ContextMenu.Painter;
 
 import std;
@@ -10,16 +7,16 @@ import Core.State;
 import UI.FloatingWindow.Types;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
+import <d2d1.h>;
+import <windows.h>;
 
-export namespace UI::ContextMenu::Painter {
-
-using State::ContextMenuState;
+namespace UI::ContextMenu::Painter {
 
 // 主菜单绘制
-auto paint_context_menu(Core::State::AppState& app_state, const RECT& client_rect) -> void;
+export auto paint_context_menu(Core::State::AppState& app_state, const RECT& client_rect) -> void;
 
 // 子菜单绘制
-auto paint_submenu(Core::State::AppState& app_state, const RECT& client_rect) -> void;
+export auto paint_submenu(Core::State::AppState& app_state, const RECT& client_rect) -> void;
 
 // 内部绘制函数
 auto draw_menu_background(Core::State::AppState& app_state, const D2D1_RECT_F& rect) -> void;

@@ -1,16 +1,15 @@
 module;
 
-#include <windows.h>
-
 export module UI.ContextMenu.Interaction;
 
 import Core.State;
+import <windows.h>;
 
-export namespace UI::ContextMenu::Interaction {
+namespace UI::ContextMenu::Interaction {
 
-enum class TimerActionType { None, ShowSubmenu, HideSubmenu };
+export enum class TimerActionType { None, ShowSubmenu, HideSubmenu };
 
-struct TimerAction {
+export struct TimerAction {
   TimerActionType type = TimerActionType::None;
   int parent_index = -1;
   bool invalidate_main = false;

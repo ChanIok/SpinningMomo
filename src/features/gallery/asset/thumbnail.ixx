@@ -7,11 +7,11 @@ import Core.State;
 import Features.Gallery.Types;
 import Utils.Image;
 
-export namespace Features::Gallery::Asset::Thumbnail {
+namespace Features::Gallery::Asset::Thumbnail {
 
 // 仅用于“补缺失缩略图”场景的统计。
 // 这里不关心孤儿缩略图，因为局部修复不会删除它们。
-struct ThumbnailRepairStats {
+export struct ThumbnailRepairStats {
   // 去重后的候选 hash 数；不是资产条数。
   int candidate_hashes = 0;
   // 期望存在但当前磁盘上不存在的缩略图数。
@@ -26,7 +26,7 @@ struct ThumbnailRepairStats {
 
 // 用于“全局缓存对账”场景的统计。
 // 启动时会同时关注：缺失缩略图补回 + 孤儿缩略图清理。
-struct ThumbnailCacheReconcileStats {
+export struct ThumbnailCacheReconcileStats {
   // DB 中“理论上应当存在缩略图”的去重 hash 总数。
   int expected_hashes = 0;
   // 缩略图目录里实际扫描到的 .webp 文件数（按 hash 去重后）。
@@ -48,51 +48,53 @@ struct ThumbnailCacheReconcileStats {
 };
 
 // 缩略图生成
-auto generate_thumbnail(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
-                        const std::filesystem::path& source_file, const std::string& file_hash,
-                        std::uint32_t short_edge_size, bool force_overwrite = false)
+export auto generate_thumbnail(Core::State::AppState& app_state,
+                               Utils::Image::WICFactory& wic_factory,
+                               const std::filesystem::path& source_file,
+                               const std::string& file_hash, std::uint32_t short_edge_size,
+                               bool force_overwrite = false)
     -> std::expected<std::filesystem::path, std::string>;
 
-auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::string& file_hash,
-                              const Utils::Image::BGRABitmapData& bitmap_data,
-                              bool force_overwrite = false)
+export auto save_thumbnail_from_bgra(Core::State::AppState& app_state, const std::string& file_hash,
+                                     const Utils::Image::BGRABitmapData& bitmap_data,
+                                     bool force_overwrite = false)
     -> std::expected<std::filesystem::path, std::string>;
 
 // 落盘内存中的 WebP（视频封面帧等）；路径规则与 generate_thumbnail 一致。
-auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
-                         const Utils::Image::WebPEncodedResult& webp_data,
-                         bool force_overwrite = false)
+export auto save_thumbnail_data(Core::State::AppState& app_state, const std::string& file_hash,
+                                const Utils::Image::WebPEncodedResult& webp_data,
+                                bool force_overwrite = false)
     -> std::expected<std::filesystem::path, std::string>;
 
 // 路径管理
-auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
+export auto ensure_thumbnails_directory_exists(Core::State::AppState& app_state)
     -> std::expected<void, std::string>;
 
-auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash)
+export auto ensure_thumbnail_path(Core::State::AppState& app_state, const std::string& file_hash)
     -> std::expected<std::filesystem::path, std::string>;
 
-auto repair_missing_thumbnails(Core::State::AppState& app_state,
-                               std::optional<std::filesystem::path> root_directory = std::nullopt,
-                               std::uint32_t short_edge_size = 480)
-    -> std::expected<ThumbnailRepairStats, std::string>;
+export auto repair_missing_thumbnails(
+    Core::State::AppState& app_state,
+    std::optional<std::filesystem::path> root_directory = std::nullopt,
+    std::uint32_t short_edge_size = 480) -> std::expected<ThumbnailRepairStats, std::string>;
 
 // 启动后的全局缓存对账：
 // 1. 用 DB 推导“应存在的缩略图集合”
 // 2. 用磁盘枚举“实际存在的缩略图集合”
 // 3. 补 missing，删 orphan
-auto reconcile_thumbnail_cache(Core::State::AppState& app_state,
-                               std::uint32_t short_edge_size = 480)
+export auto reconcile_thumbnail_cache(Core::State::AppState& app_state,
+                                      std::uint32_t short_edge_size = 480)
     -> std::expected<ThumbnailCacheReconcileStats, std::string>;
 
 // 清理功能
-auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
+export auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
     -> std::expected<int, std::string>;
 
-auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
+export auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
     -> std::expected<void, std::string>;
 
 // 统计信息
-struct AssetThumbnailStats {
+export struct AssetThumbnailStats {
   int total_thumbnails;
   std::int64_t total_size;
   int orphaned_thumbnails;
@@ -100,7 +102,7 @@ struct AssetThumbnailStats {
   std::string thumbnails_directory;
 };
 
-auto get_thumbnail_stats(Core::State::AppState& app_state)
+export auto get_thumbnail_stats(Core::State::AppState& app_state)
     -> std::expected<AssetThumbnailStats, std::string>;
 
 }  // namespace Features::Gallery::Asset::Thumbnail

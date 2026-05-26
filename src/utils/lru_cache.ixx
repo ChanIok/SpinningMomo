@@ -4,7 +4,7 @@ export module Utils.LRUCache;
 
 import std;
 
-export namespace Utils::LRUCache {
+namespace Utils::LRUCache {
 
 // 缓存节点
 template <typename Key, typename Value>
@@ -14,7 +14,7 @@ struct CacheNode {
 };
 
 // LRU 缓存状态
-template <typename Key, typename Value>
+export template <typename Key, typename Value>
 struct LRUCacheState {
   size_t capacity;
   std::unordered_map<Key, typename std::list<CacheNode<Key, Value>>::iterator> map;
@@ -23,13 +23,13 @@ struct LRUCacheState {
 };
 
 // 创建缓存
-template <typename Key, typename Value>
+export template <typename Key, typename Value>
 auto create(size_t capacity) -> LRUCacheState<Key, Value> {
   return LRUCacheState<Key, Value>{.capacity = capacity, .map = {}, .list = {}};
 }
 
 // 查询缓存
-template <typename Key, typename Value>
+export template <typename Key, typename Value>
 auto get(LRUCacheState<Key, Value>& cache, const Key& key) -> std::optional<Value> {
   std::unique_lock lock(cache.mutex);
 
@@ -48,7 +48,7 @@ auto get(LRUCacheState<Key, Value>& cache, const Key& key) -> std::optional<Valu
 }
 
 // 插入缓存（写操作）
-template <typename Key, typename Value>
+export template <typename Key, typename Value>
 auto put(LRUCacheState<Key, Value>& cache, const Key& key, Value value) -> void {
   std::unique_lock lock(cache.mutex);
 
@@ -76,7 +76,7 @@ auto put(LRUCacheState<Key, Value>& cache, const Key& key, Value value) -> void 
 }
 
 // 批量预热（高效插入多个）
-template <typename Key, typename Value>
+export template <typename Key, typename Value>
 auto warm_up(LRUCacheState<Key, Value>& cache, const std::vector<std::pair<Key, Value>>& items)
     -> void {
   std::unique_lock lock(cache.mutex);
@@ -101,7 +101,7 @@ auto warm_up(LRUCacheState<Key, Value>& cache, const std::vector<std::pair<Key, 
 }
 
 // 清空缓存
-template <typename Key, typename Value>
+export template <typename Key, typename Value>
 auto clear(LRUCacheState<Key, Value>& cache) -> void {
   std::unique_lock lock(cache.mutex);
   cache.map.clear();
@@ -109,7 +109,7 @@ auto clear(LRUCacheState<Key, Value>& cache) -> void {
 }
 
 // 获取统计信息
-template <typename Key, typename Value>
+export template <typename Key, typename Value>
 auto get_stats(const LRUCacheState<Key, Value>& cache)
     -> std::tuple<size_t, size_t> {  // (current_size, capacity)
   std::shared_lock lock(cache.mutex);

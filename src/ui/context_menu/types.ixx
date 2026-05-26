@@ -9,33 +9,33 @@ import Features.WindowControl.Types;
 import <d2d1.h>;
 import <windows.h>;
 
-export namespace UI::ContextMenu::Types {
+namespace UI::ContextMenu::Types {
 
-enum class CursorZone { MainMenu, Submenu, Outside };
+export enum class CursorZone { MainMenu, Submenu, Outside };
 
-enum class PendingIntentType { None, OpenSubmenu, SwitchSubmenu, HideSubmenu };
+export enum class PendingIntentType { None, OpenSubmenu, SwitchSubmenu, HideSubmenu };
 
 // 菜单项类型枚举
-enum class MenuItemType {
+export enum class MenuItemType {
   Normal,     // 普通菜单项
   Separator,  // 分隔线
   Submenu     // 子菜单（暂时不实现）
 };
 
 // 菜单动作数据结构
-struct RatioData {
+export struct RatioData {
   size_t index;
   std::wstring name;
   double ratio;
 };
 
-struct ResolutionData {
+export struct ResolutionData {
   size_t index;
   std::wstring name;
 };
 
 // 业务动作类型 - 类型安全的菜单动作表示
-struct MenuAction {
+export struct MenuAction {
   enum class Type {
     WindowSelection,      // 窗口选择
     RatioSelection,       // 比例选择
@@ -70,7 +70,7 @@ struct MenuAction {
 };
 
 // 菜单项结构 - 重构为数据驱动设计
-struct MenuItem {
+export struct MenuItem {
   std::wstring text;
   MenuItemType type = MenuItemType::Normal;
   bool is_checked = false;
@@ -143,7 +143,7 @@ struct MenuItem {
 };
 
 // 布局配置
-struct LayoutConfig {
+export struct LayoutConfig {
   // 基础尺寸（96 DPI）
   static constexpr int BASE_ITEM_HEIGHT = 28;
   static constexpr int BASE_SEPARATOR_HEIGHT = 1;
@@ -177,7 +177,7 @@ struct LayoutConfig {
 };
 
 // 交互状态（状态机驱动，统一意图定时器）
-struct InteractionState {
+export struct InteractionState {
   int hover_index = -1;
   int submenu_hover_index = -1;
   bool is_mouse_tracking = false;

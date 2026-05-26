@@ -8,9 +8,9 @@ import <d2d1.h>;
 import <dwrite.h>;
 import <windows.h>;
 
-export namespace UI::ContextMenu::State {
+namespace UI::ContextMenu::State {
 
-struct RenderSurface {
+export struct RenderSurface {
   ID2D1DCRenderTarget* render_target = nullptr;
   HDC memory_dc = nullptr;
   HBITMAP dib_bitmap = nullptr;
@@ -27,7 +27,7 @@ struct RenderSurface {
   bool is_ready = false;
 };
 
-struct ContextMenuState {
+export struct ContextMenuState {
   // 窗口句柄
   HWND hwnd = nullptr;
   HWND submenu_hwnd = nullptr;

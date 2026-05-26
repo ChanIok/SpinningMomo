@@ -5,10 +5,10 @@ export module Features.Overlay.State;
 import std;
 import Features.Overlay.Types;
 
-export namespace Features::Overlay::State {
+namespace Features::Overlay::State {
 
 // 叠加层完整状态
-struct OverlayState {
+export struct OverlayState {
   Types::WindowState window;
   Types::RenderingState rendering;
   Types::CaptureState capture_state;

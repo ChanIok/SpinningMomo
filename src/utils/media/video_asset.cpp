@@ -1,7 +1,5 @@
 module;
 
-#include <mfapi.h>
-#include <mferror.h>
 #include <mfidl.h>
 #include <mfobjects.h>
 #include <mfreadwrite.h>
@@ -13,6 +11,8 @@ import std;
 import Utils.File.Mime;
 import Utils.Image;
 import Utils.Logger;
+import <mfapi.h>;
+import <mferror.h>;
 import <wil/com.h>;
 
 namespace Utils::Media::VideoAsset {

@@ -5,9 +5,9 @@ export module Features.Letterbox.State;
 import std;
 import <windows.h>;
 
-export namespace Features::Letterbox::State {
+namespace Features::Letterbox::State {
 
-struct LetterboxState {
+export struct LetterboxState {
   // 状态标志
   bool enabled{false};  // 用户是否启用黑边模式
 
@@ -24,7 +24,7 @@ struct LetterboxState {
   DWORD target_process_id{0};
 };
 
-struct LetterboxConfig {
+export struct LetterboxConfig {
   bool auto_hide_on_minimize{true};
   bool auto_show_on_foreground{true};
   bool manage_taskbar_order{true};
@@ -32,12 +32,12 @@ struct LetterboxConfig {
 };
 
 // 自定义消息定义
-constexpr UINT WM_TARGET_WINDOW_FOREGROUND = WM_USER + 100;
-constexpr UINT WM_HIDE_LETTERBOX = WM_USER + 101;
-constexpr UINT WM_SHOW_LETTERBOX = WM_USER + 102;
-constexpr UINT WM_UPDATE_TASKBAR_ZORDER = WM_USER + 103;
+export constexpr UINT WM_TARGET_WINDOW_FOREGROUND = WM_USER + 100;
+export constexpr UINT WM_HIDE_LETTERBOX = WM_USER + 101;
+export constexpr UINT WM_SHOW_LETTERBOX = WM_USER + 102;
+export constexpr UINT WM_UPDATE_TASKBAR_ZORDER = WM_USER + 103;
 
 // 计时器ID定义
-constexpr UINT TIMER_TASKBAR_ZORDER = 1001;
+export constexpr UINT TIMER_TASKBAR_ZORDER = 1001;
 
 }  // namespace Features::Letterbox::State

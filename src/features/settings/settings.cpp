@@ -9,7 +9,6 @@ import Features.Settings.Events;
 import Features.Settings.Types;
 import Features.Settings.State;
 import Features.Settings.Compute;
-import Features.Settings.Menu;
 import Features.Settings.Background;
 import Utils.Path;
 import Utils.Logger;

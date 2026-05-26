@@ -10,7 +10,7 @@ import Core.RPC.Types;
 import Features.Update;
 import Features.Update.Types;
 import <asio.hpp>;
-import <rfl.hpp>;
+import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Update {
 

@@ -6,7 +6,6 @@ import std;
 import <audioclient.h>;
 import <mmdeviceapi.h>;
 import <wil/com.h>;
-import <windows.h>;
 
 namespace Utils::Media::AudioCapture {
 

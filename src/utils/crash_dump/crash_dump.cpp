@@ -1,11 +1,8 @@
 module;
 
-#include <Windows.h>
+#include <windows.h>
 
 #include <DbgHelp.h>
-
-#include <cctype>
-#include <cstdlib>
 
 module Utils.CrashDump;
 

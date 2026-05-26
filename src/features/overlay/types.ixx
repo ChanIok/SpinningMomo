@@ -9,26 +9,26 @@ import <d3d11.h>;
 import <wil/com.h>;
 import <windows.h>;
 
-export namespace Features::Overlay::Types {
+namespace Features::Overlay::Types {
 
 // 消息常量
-constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
-constexpr UINT WM_WINDOW_EVENT = WM_USER + 2;
-constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 3;
-constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 4;
-constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 5;
-constexpr UINT WM_TARGET_WINDOW_DESTROYED = WM_USER + 6;
+export constexpr UINT WM_GAME_WINDOW_FOREGROUND = WM_USER + 1;
+export constexpr UINT WM_WINDOW_EVENT = WM_USER + 2;
+export constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 3;
+export constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 4;
+export constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 5;
+export constexpr UINT WM_TARGET_WINDOW_DESTROYED = WM_USER + 6;
 
-constexpr UINT_PTR OVERLAY_CLEANUP_TIMER_ID = 1;
+export constexpr UINT_PTR OVERLAY_CLEANUP_TIMER_ID = 1;
 
 // 顶点结构体
-struct Vertex {
+export struct Vertex {
   float x, y;
   float u, v;
 };
 
 // 窗口状态
-struct WindowState {
+export struct WindowState {
   HWND overlay_hwnd = nullptr;
   HWND target_window = nullptr;
   HWND timer_window = nullptr;
@@ -49,7 +49,7 @@ struct WindowState {
 };
 
 // 渲染状态
-struct RenderingState {
+export struct RenderingState {
   Utils::Graphics::D3D::D3DContext d3d_context;
   Utils::Graphics::D3D::ShaderResources shader_resources;
   wil::com_ptr<ID3D11Texture2D> frame_texture;
@@ -62,14 +62,14 @@ struct RenderingState {
 };
 
 // 捕获状态
-struct CaptureState {
+export struct CaptureState {
   Utils::Graphics::Capture::CaptureSession session;
   int last_frame_width = 0;
   int last_frame_height = 0;
 };
 
 // 交互状态
-struct InteractionState {
+export struct InteractionState {
   HWINEVENTHOOK foreground_event_hook = nullptr;
   HWINEVENTHOOK target_window_event_hook = nullptr;
   std::optional<POINT> last_game_window_pos;
@@ -79,7 +79,7 @@ struct InteractionState {
 };
 
 // 线程状态
-struct ThreadState {
+export struct ThreadState {
   std::jthread hook_thread;
   std::jthread window_manager_thread;
 

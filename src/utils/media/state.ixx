@@ -10,10 +10,10 @@ import <d3d11.h>;
 import <wil/com.h>;
 import Utils.Media.HdrConvert;
 
-export namespace Utils::Media::Encoder::State {
+namespace Utils::Media::Encoder::State {
 
 // 编码器上下文
-struct EncoderContext {
+export struct EncoderContext {
   wil::com_ptr<IMFSinkWriter> sink_writer;
   DWORD video_stream_index = 0;
 

@@ -11,10 +11,10 @@ export module Core.I18n.Embedded.ZhCN;
 
 import std;
 
-export namespace EmbeddedLocales {
+namespace EmbeddedLocales {
 // Embedded Chinese JSON content as string_view
 // Size: 3415 bytes
-constexpr std::string_view zh_cn_json = R"EmbeddedJson({
+export constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
   "menu.app_main": "主界面",

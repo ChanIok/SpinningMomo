@@ -7,11 +7,11 @@ import Core.HttpClient.Types;
 import Vendor.WinHttp;
 import <asio.hpp>;
 
-export namespace Core::HttpClient::State {
+namespace Core::HttpClient::State {
 
 // 单次异步 HTTP 请求的完整运行时上下文。对象由协程侧创建，通过 keepalive 自引用延长生命周期，
 // 确保在 WinHTTP 后台回调结束前不被析构。
-struct RequestOperation {
+export struct RequestOperation {
   // 自引用保活指针：在请求投递后置为自身，待操作彻底完成（包括句柄关闭回调）后清除。
   std::shared_ptr<RequestOperation> keepalive;
   std::mutex keepalive_mutex;
@@ -60,7 +60,7 @@ struct RequestOperation {
   std::atomic<bool> close_requested{false};  // WinHttpCloseHandle 是否已调用（防止重复关闭）
 };
 
-struct HttpClientState {
+export struct HttpClientState {
   Vendor::WinHttp::UniqueHInternet session;
   std::wstring user_agent = L"SpinningMomo/1.0";
 

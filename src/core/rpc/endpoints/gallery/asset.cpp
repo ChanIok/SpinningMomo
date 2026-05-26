@@ -13,7 +13,6 @@ import Features.Gallery.Types;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Repository;
 import <asio.hpp>;
-import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Gallery::Asset {
 

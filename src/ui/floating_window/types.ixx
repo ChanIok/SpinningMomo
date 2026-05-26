@@ -9,22 +9,22 @@ import <d2d1_3.h>;
 import <dwrite_3.h>;
 import <windows.h>;
 
-export namespace UI::FloatingWindow {
+namespace UI::FloatingWindow {
 
 // 用于 Windows 11 TopMost Z 序失效 workaround 的自定义消息
-constexpr UINT WM_REFRESH_TOPMOST = WM_USER + 10;
+export constexpr UINT WM_REFRESH_TOPMOST = WM_USER + 10;
 
 // 菜单布局模式
-enum class MenuLayoutMode {
+export enum class MenuLayoutMode {
   AutoHeight,  // 自适应高度：高度由最大列决定
   Paged        // 翻页模式：固定高度 + 独立列翻页
 };
 
 // 菜单项类别枚举（简化版本）
-enum class MenuItemCategory { AspectRatio, Resolution, Feature };
+export enum class MenuItemCategory { AspectRatio, Resolution, Feature };
 
 // 菜单项结构
-struct MenuItem {
+export struct MenuItem {
   std::wstring text;
   MenuItemCategory category;
   int index;              // 在对应类别中的索引
@@ -36,7 +36,7 @@ struct MenuItem {
 };
 
 // 窗口系统状态
-struct WindowInfo {
+export struct WindowInfo {
   HWND hwnd = nullptr;
   HINSTANCE instance = nullptr;
   SIZE size{};
@@ -48,7 +48,7 @@ struct WindowInfo {
 };
 
 // UI交互状态
-struct InteractionState {
+export struct InteractionState {
   int hover_index = -1;
   size_t current_ratio_index = std::numeric_limits<size_t>::max();
   size_t current_resolution_index = 0;
@@ -62,14 +62,14 @@ struct InteractionState {
 };
 
 // 数据状态（拥有或引用外部数据）
-struct DataState {
+export struct DataState {
   std::vector<MenuItem> menu_items;  // 从settings计算生成的菜单项
   std::vector<Features::WindowControl::WindowInfo> windows;
   std::vector<std::wstring> menu_items_to_show;
 };
 
 // 渲染相关状态（实际渲染尺寸）
-struct LayoutConfig {
+export struct LayoutConfig {
   // 实际渲染尺寸（基于DPI缩放和配置）
   int item_height = 24;
   int title_height = 26;
@@ -93,14 +93,14 @@ struct LayoutConfig {
 };
 
 // 浮窗专用的Direct2D渲染状态
-struct TextMeasureCacheEntry {
+export struct TextMeasureCacheEntry {
   std::wstring text;
   int width_key = 0;
   int base_font_key = 0;
   int resolved_font_key = 0;
 };
 
-struct RenderContext {
+export struct RenderContext {
   // Direct2D 1.3资源句柄
   ID2D1Factory7* factory = nullptr;               // Direct2D 1.3 工厂
   ID2D1DCRenderTarget* render_target = nullptr;   // DC渲染目标（兼容性）
@@ -137,13 +137,13 @@ struct RenderContext {
 };
 
 // 辅助函数：将RECT转换为D2D1_RECT_F
-inline auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
+export inline auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
   return D2D1::RectF(static_cast<float>(rect.left), static_cast<float>(rect.top),
                      static_cast<float>(rect.right), static_cast<float>(rect.bottom));
 }
 
 // 辅助函数：创建D2D矩形
-inline auto make_d2d_rect(float left, float top, float right, float bottom) -> D2D1_RECT_F {
+export inline auto make_d2d_rect(float left, float top, float right, float bottom) -> D2D1_RECT_F {
   return D2D1::RectF(left, top, right, bottom);
 }
 

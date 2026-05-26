@@ -5,7 +5,7 @@ export module Core.Database.DataMapper;
 import std;
 import Core.Database.Types;
 import <SQLiteCpp/SQLiteCpp.h>;
-import <rfl.hpp>;
+import <rfl/json.hpp>;
 
 namespace Core::Database::DataMapper {
 

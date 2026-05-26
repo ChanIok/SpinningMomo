@@ -11,10 +11,10 @@ export module Core.I18n.Embedded.EnUS;
 
 import std;
 
-export namespace EmbeddedLocales {
+namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
 // Size: 3572 bytes
-constexpr std::string_view en_us_json = R"EmbeddedJson({
+export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
   "menu.app_main": "Main",

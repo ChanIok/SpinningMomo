@@ -8,7 +8,7 @@ import Core.Database;
 import Core.Database.Types;
 import Features.Gallery.Types;
 import Utils.Logger;
-import <rfl.hpp>;
+import <rfl/json.hpp>;
 
 namespace Features::Gallery::Folder::Repository {
 

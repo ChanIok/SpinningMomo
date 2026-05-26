@@ -3,7 +3,7 @@ module;
 export module Features.Settings.Types;
 
 import std;
-import <rfl.hpp>;
+import <rfl/json.hpp>;
 
 namespace Features::Settings::Types {
 

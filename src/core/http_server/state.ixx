@@ -6,10 +6,10 @@ import std;
 import Core.HttpServer.Types;
 import <uwebsockets/App.h>;
 
-export namespace Core::HttpServer::State {
+namespace Core::HttpServer::State {
 
 // HTTP服务器状态
-struct HttpServerState {
+export struct HttpServerState {
   // 服务器核心
   std::jthread server_thread{};
   us_listen_socket_t* listen_socket{nullptr};

@@ -10,25 +10,25 @@ import <d3d11.h>;
 import <wil/com.h>;
 import <windows.h>;
 
-export namespace Features::Preview::Types {
+namespace Features::Preview::Types {
 
 // 窗口类名
-constexpr wchar_t PREVIEW_WINDOW_CLASS[] = L"SpinningMomoPreviewWindowClass";
+export constexpr wchar_t PREVIEW_WINDOW_CLASS[] = L"SpinningMomoPreviewWindowClass";
 
 // 内部消息常量
-constexpr UINT WM_SCHEDULE_PREVIEW_CLEANUP = WM_USER + 1;
-constexpr UINT WM_CANCEL_PREVIEW_CLEANUP = WM_USER + 2;
-constexpr UINT WM_IMMEDIATE_PREVIEW_CLEANUP = WM_USER + 3;
-constexpr UINT WM_APPLY_CAPTURE_SIZE = WM_USER + 4;
+export constexpr UINT WM_SCHEDULE_PREVIEW_CLEANUP = WM_USER + 1;
+export constexpr UINT WM_CANCEL_PREVIEW_CLEANUP = WM_USER + 2;
+export constexpr UINT WM_IMMEDIATE_PREVIEW_CLEANUP = WM_USER + 3;
+export constexpr UINT WM_APPLY_CAPTURE_SIZE = WM_USER + 4;
 
 // 顶点结构体
-struct Vertex {
+export struct Vertex {
   float x, y;
   float u, v;
 };
 
 // 视口框顶点结构体
-struct ViewportVertex {
+export struct ViewportVertex {
   struct Position {
     float x, y;
   } pos;
@@ -38,7 +38,7 @@ struct ViewportVertex {
 };
 
 // 视口状态
-struct ViewportState {
+export struct ViewportState {
   RECT viewport_rect{};
   RECT visible_game_area{};
   bool visible = true;
@@ -46,14 +46,14 @@ struct ViewportState {
 };
 
 // 定时器 ID 常量
-constexpr UINT_PTR TIMER_ID_TASKBAR_REDRAW = 1;
-constexpr UINT_PTR TIMER_ID_PREVIEW_CLEANUP = 2;
+export constexpr UINT_PTR TIMER_ID_TASKBAR_REDRAW = 1;
+export constexpr UINT_PTR TIMER_ID_PREVIEW_CLEANUP = 2;
 
 // 任务栏重绘延迟时间（毫秒）
-constexpr UINT TASKBAR_REDRAW_DELAY_MS = 200;
+export constexpr UINT TASKBAR_REDRAW_DELAY_MS = 200;
 
 // 交互状态
-struct InteractionState {
+export struct InteractionState {
   bool is_dragging = false;
   bool viewport_dragging = false;
   POINT drag_start{};
@@ -67,7 +67,7 @@ struct InteractionState {
 };
 
 // DPI相关尺寸
-struct DpiDependentSizes {
+export struct DpiDependentSizes {
   static constexpr int BASE_TITLE_HEIGHT = 24;
   static constexpr int BASE_FONT_SIZE = 12;
   static constexpr int BASE_BORDER_WIDTH = 8;
@@ -90,7 +90,7 @@ struct DpiDependentSizes {
 };
 
 // 窗口尺寸状态
-struct WindowSizeState {
+export struct WindowSizeState {
   int window_width = 0;
   int window_height = 0;
   float aspect_ratio = 1.0f;
@@ -100,7 +100,7 @@ struct WindowSizeState {
 };
 
 // 渲染相关资源
-struct RenderingResources {
+export struct RenderingResources {
   std::atomic<bool> initialized = false;
   std::atomic<bool> resources_busy = false;  // 标记渲染资源是否正忙（如尺寸调整等）
   Utils::Graphics::D3D::D3DContext d3d_context;
@@ -112,7 +112,7 @@ struct RenderingResources {
 };
 
 // 捕获会话（业务层封装）
-struct CaptureState {
+export struct CaptureState {
   Utils::Graphics::Capture::CaptureSession session;
   int last_frame_width = 0;
   int last_frame_height = 0;

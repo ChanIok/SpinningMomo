@@ -1,9 +1,10 @@
 module;
 
+#include <spdlog/spdlog.h>
+
 export module Utils.Logger;
 
 import std;
-import <spdlog/spdlog.h>;
 
 namespace Utils::Logging {
 

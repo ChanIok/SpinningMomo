@@ -8,9 +8,9 @@ export module Core.Migration.Schema.V004;
 
 import std;
 
-export namespace Core::Migration::Schema {
+namespace Core::Migration::Schema {
 
-struct V004 {
+export struct V004 {
   static constexpr std::array<std::string_view, 9> statements = {
       R"SQL(
 DROP TABLE IF EXISTS asset_infinity_nikki_user_record_v2

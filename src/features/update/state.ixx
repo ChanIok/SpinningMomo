@@ -5,9 +5,9 @@ export module Features.Update.State;
 import std;
 import Features.Update.Types;
 
-export namespace Features::Update::State {
+namespace Features::Update::State {
 
-struct PendingUpdateContext {
+export struct PendingUpdateContext {
   std::filesystem::path package_path;              // 待执行更新包路径
   std::filesystem::path target_install_directory;  // 待更新目标目录
   std::filesystem::path install_log_path;          // 安装器日志路径
@@ -16,7 +16,7 @@ struct PendingUpdateContext {
   bool is_portable = true;                         // 待执行更新是否为便携版流程
 };
 
-struct UpdateState {
+export struct UpdateState {
   // 运行时状态
   bool is_checking = false;        // 是否正在检查更新
   bool update_available = false;   // 是否有可用更新
@@ -37,7 +37,7 @@ struct UpdateState {
 };
 
 // 创建默认的更新状态
-inline auto create_default_update_state() -> UpdateState {
+export inline auto create_default_update_state() -> UpdateState {
   UpdateState state;
   state.is_initialized = false;
   return state;

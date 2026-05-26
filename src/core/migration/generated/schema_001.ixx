@@ -7,9 +7,9 @@ export module Core.Migration.Schema.V001;
 
 import std;
 
-export namespace Core::Migration::Schema {
+namespace Core::Migration::Schema {
 
-struct V001 {
+export struct V001 {
   static constexpr std::array<std::string_view, 39> statements = {
       R"SQL(
 CREATE TABLE assets (

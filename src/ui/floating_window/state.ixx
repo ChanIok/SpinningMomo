@@ -5,10 +5,10 @@ export module UI.FloatingWindow.State;
 import std;
 import UI.FloatingWindow.Types;
 
-export namespace UI::FloatingWindow::State {
+namespace UI::FloatingWindow::State {
 
 // 主窗口聚合状态
-struct FloatingWindowState {
+export struct FloatingWindowState {
   FloatingWindow::WindowInfo window;
   FloatingWindow::InteractionState ui;
   FloatingWindow::DataState data;

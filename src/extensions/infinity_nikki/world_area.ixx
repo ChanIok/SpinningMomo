@@ -7,17 +7,17 @@ import Core.State;
 import Extensions.InfinityNikki.Types;
 import <asio.hpp>;
 
-export namespace Extensions::InfinityNikki::WorldArea {
+namespace Extensions::InfinityNikki::WorldArea {
 
 // 游戏内原始坐标（来自照片 EXIF 提取）。
-struct GamePoint {
+export struct GamePoint {
   double x = 0.0;
   double y = 0.0;
   std::optional<double> z;
 };
 
 // 经过坐标变换后的地图经纬度，可直接用于 Leaflet 等地图引擎。
-struct MapCoordinate {
+export struct MapCoordinate {
   double lat = 0.0;
   double lng = 0.0;
 };

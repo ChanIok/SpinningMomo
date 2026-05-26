@@ -1,7 +1,5 @@
 module;
 
-#include <windows.h>
-
 module Utils.File;
 
 import std;
@@ -10,6 +8,7 @@ import Utils.File.Mime;
 import Utils.String;
 import Utils.Time;
 import <asio.hpp>;
+import <windows.h>;
 
 namespace Utils::File {
 

@@ -10,10 +10,10 @@ import Utils.Graphics.Capture;
 import <d3d11.h>;
 import <windows.h>;
 
-export namespace Features::Screenshot::State {
+namespace Features::Screenshot::State {
 
 // 截图请求结构体
-struct ScreenshotRequest {
+export struct ScreenshotRequest {
   HWND target_window = nullptr;
   std::wstring file_path;
   Utils::Image::ImageFormat format = Utils::Image::ImageFormat::PNG;
@@ -25,14 +25,14 @@ struct ScreenshotRequest {
 };
 
 // 会话信息结构体
-struct SessionInfo {
+export struct SessionInfo {
   Utils::Graphics::Capture::CaptureSession session;
   ScreenshotRequest request;
   std::chrono::steady_clock::time_point created_time = std::chrono::steady_clock::now();
 };
 
 // 截图系统状态
-struct ScreenshotState {
+export struct ScreenshotState {
   // D3D资源
   std::optional<Utils::Graphics::D3D::D3DContext> d3d_context;
   winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice winrt_device{nullptr};

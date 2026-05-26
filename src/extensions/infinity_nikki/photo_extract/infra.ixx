@@ -6,9 +6,9 @@ import Extensions.InfinityNikki.PhotoExtract.Scan;
 import Extensions.InfinityNikki.Types;
 import <asio.hpp>;
 
-export namespace Extensions::InfinityNikki::PhotoExtract::Infra {
+namespace Extensions::InfinityNikki::PhotoExtract::Infra {
 
-struct ParsedPhotoParamsRecord {
+export struct ParsedPhotoParamsRecord {
   std::optional<std::string> camera_params;
   std::optional<std::int64_t> time_hour;
   std::optional<std::int64_t> time_min;
@@ -39,31 +39,31 @@ struct ParsedPhotoParamsRecord {
   std::vector<std::int64_t> nikki_clothes;
 };
 
-struct ParsedPhotoParamsBatchItem {
+export struct ParsedPhotoParamsBatchItem {
   std::int64_t asset_id;
   ParsedPhotoParamsRecord record;
 };
 
-struct ExtractBatchPhotoParamsRecord {
+export struct ExtractBatchPhotoParamsRecord {
   std::optional<ParsedPhotoParamsRecord> record;
   std::optional<std::string> error_message;
 };
 
-auto load_candidate_assets(
+export auto load_candidate_assets(
     Core::State::AppState& app_state,
     const Extensions::InfinityNikki::InfinityNikkiExtractPhotoParamsRequest& request)
     -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
 
-auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
-                                  const std::vector<std::int64_t>& candidate_asset_ids)
+export auto load_candidate_assets_by_ids(Core::State::AppState& app_state,
+                                         const std::vector<std::int64_t>& candidate_asset_ids)
     -> std::expected<std::vector<Scan::CandidateAssetRow>, std::string>;
 
-auto extract_batch_photo_params(Core::State::AppState& app_state,
-                                const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
+export auto extract_batch_photo_params(Core::State::AppState& app_state,
+                                       const std::vector<Scan::PreparedPhotoExtractEntry>& entries)
     -> asio::awaitable<std::expected<std::vector<ExtractBatchPhotoParamsRecord>, std::string>>;
 
-auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::string& uid,
-                               const std::vector<ParsedPhotoParamsBatchItem>& items)
+export auto upsert_photo_params_batch(Core::State::AppState& app_state, const std::string& uid,
+                                      const std::vector<ParsedPhotoParamsBatchItem>& items)
     -> std::expected<std::int32_t, std::string>;
 
 }  // namespace Extensions::InfinityNikki::PhotoExtract::Infra

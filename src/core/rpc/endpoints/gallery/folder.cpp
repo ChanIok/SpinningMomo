@@ -12,7 +12,6 @@ import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import <asio.hpp>;
-import <rfl/json.hpp>;
 
 namespace Core::RPC::Endpoints::Gallery::Folder {
 

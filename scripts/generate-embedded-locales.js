@@ -66,10 +66,10 @@ export module ${moduleName};
 
 import std;
 
-export namespace EmbeddedLocales {
+namespace EmbeddedLocales {
     // Embedded ${languageComment} JSON content as string_view
     // Size: ${fileSize} bytes
-    constexpr std::string_view ${variableName} = R"EmbeddedJson(${jsonContent})EmbeddedJson";
+    export constexpr std::string_view ${variableName} = R"EmbeddedJson(${jsonContent})EmbeddedJson";
 }
 `;
 }

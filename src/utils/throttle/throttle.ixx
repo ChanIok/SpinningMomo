@@ -4,10 +4,10 @@ export module Utils.Throttle;
 
 import std;
 
-export namespace Utils::Throttle {
+namespace Utils::Throttle {
 
 // 节流状态（带参数版本）
-template <typename... Args>
+export template <typename... Args>
 struct ThrottleState {
   std::chrono::milliseconds interval{16};                // 节流间隔，默认约60fps
   std::chrono::steady_clock::time_point last_call_time;  // 上次执行时间
@@ -17,7 +17,7 @@ struct ThrottleState {
 };
 
 // 节流状态（无参数特化版本）
-template <>
+export template <>
 struct ThrottleState<void> {
   std::chrono::milliseconds interval{16};
   std::chrono::steady_clock::time_point last_call_time;
@@ -26,7 +26,7 @@ struct ThrottleState<void> {
 };
 
 // 创建节流状态
-template <typename... Args>
+export template <typename... Args>
 auto create(std::chrono::milliseconds interval) -> std::unique_ptr<ThrottleState<Args...>> {
   auto state = std::make_unique<ThrottleState<Args...>>();
   state->interval = interval;
@@ -35,7 +35,7 @@ auto create(std::chrono::milliseconds interval) -> std::unique_ptr<ThrottleState
 }
 
 // 创建节流状态（无参数版本）
-template <>
+export template <>
 auto create<void>(std::chrono::milliseconds interval) -> std::unique_ptr<ThrottleState<void>> {
   auto state = std::make_unique<ThrottleState<void>>();
   state->interval = interval;
@@ -44,7 +44,7 @@ auto create<void>(std::chrono::milliseconds interval) -> std::unique_ptr<Throttl
 }
 
 // 检查是否可以立即执行（仅检查时间，不修改状态）
-template <typename... Args>
+export template <typename... Args>
 auto can_call(const ThrottleState<Args...>& state) -> bool {
   // 注意：这里读取不是线程安全的，仅用于快速检查
   auto now = std::chrono::steady_clock::now();
@@ -53,7 +53,7 @@ auto can_call(const ThrottleState<Args...>& state) -> bool {
 }
 
 // 重置节流状态
-template <typename... Args>
+export template <typename... Args>
 auto reset(ThrottleState<Args...>& state) -> void {
   std::lock_guard lock(state.mutex);
   state.has_pending = false;
@@ -62,7 +62,7 @@ auto reset(ThrottleState<Args...>& state) -> void {
 
 // 节流调用（带参数版本）
 // 返回 true 表示本次调用被执行，false 表示被节流跳过（已缓存参数）
-template <typename Func, typename... Args>
+export template <typename Func, typename... Args>
 auto call(ThrottleState<Args...>& state, Func&& func, Args... args) -> bool {
   std::lock_guard lock(state.mutex);
 
@@ -84,7 +84,7 @@ auto call(ThrottleState<Args...>& state, Func&& func, Args... args) -> bool {
 }
 
 // 节流调用（无参数版本）
-template <typename Func>
+export template <typename Func>
 auto call(ThrottleState<void>& state, Func&& func) -> bool {
   std::lock_guard lock(state.mutex);
 
@@ -105,7 +105,7 @@ auto call(ThrottleState<void>& state, Func&& func) -> bool {
 // 强制执行待处理的调用 (Trailing Edge)
 // 如果有 pending 调用，则执行它并清空 pending 标志
 // 返回 true 表示执行了 pending 调用，false 表示没有 pending
-template <typename Func, typename... Args>
+export template <typename Func, typename... Args>
 auto flush(ThrottleState<Args...>& state, Func&& func) -> bool {
   std::lock_guard lock(state.mutex);
 
@@ -122,7 +122,7 @@ auto flush(ThrottleState<Args...>& state, Func&& func) -> bool {
 }
 
 // 强制执行待处理的调用（无参数版本）
-template <typename Func>
+export template <typename Func>
 auto flush(ThrottleState<void>& state, Func&& func) -> bool {
   std::lock_guard lock(state.mutex);
 

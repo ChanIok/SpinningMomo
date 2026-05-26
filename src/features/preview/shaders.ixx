@@ -4,10 +4,10 @@ export module Features.Preview.Shaders;
 
 import std;
 
-export namespace Features::Preview::Shaders {
+namespace Features::Preview::Shaders {
 
 // 基本渲染着色器（用于显示捕获的游戏画面）
-const std::string BASIC_VERTEX_SHADER = R"(
+export const std::string BASIC_VERTEX_SHADER = R"(
 struct VS_INPUT {
     float2 pos : POSITION;
     float2 tex : TEXCOORD;
@@ -24,7 +24,7 @@ PS_INPUT main(VS_INPUT input) {
 }
 )";
 
-const std::string BASIC_PIXEL_SHADER = R"(
+export const std::string BASIC_PIXEL_SHADER = R"(
 Texture2D<float4> tex : register(t0);
 SamplerState samp : register(s0);
 float4 main(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD) : SV_Target {
@@ -33,7 +33,7 @@ float4 main(float4 pos : SV_POSITION, float2 texCoord : TEXCOORD) : SV_Target {
 )";
 
 // 视口框渲染着色器（用于显示当前可视区域框架）
-const std::string VIEWPORT_VERTEX_SHADER = R"(
+export const std::string VIEWPORT_VERTEX_SHADER = R"(
 struct VS_INPUT {
     float2 pos : POSITION;
     float4 color : COLOR;
@@ -52,7 +52,7 @@ PS_INPUT main(VS_INPUT input) {
 }
 )";
 
-const std::string VIEWPORT_PIXEL_SHADER = R"(
+export const std::string VIEWPORT_PIXEL_SHADER = R"(
 struct PS_INPUT {
     float4 pos : SV_POSITION;
     float4 color : COLOR;

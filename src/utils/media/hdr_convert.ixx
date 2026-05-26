@@ -7,7 +7,7 @@ import <d3d11.h>;
 import <d3d11_4.h>;
 import <wil/com.h>;
 
-export namespace Utils::Media::HdrConvert {
+namespace Utils::Media::HdrConvert {
 
 // HDR 录制转换器：把 WGC 的 scRGB FP16 帧渲染成单张 P010 纹理的 Y/UV 两个 plane。
 export struct ConverterContext {

@@ -1,13 +1,14 @@
 module;
 
+#include <spdlog/sinks/msvc_sink.h>
+#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/spdlog.h>
+
 module Utils.Logger;
 
 import std;
 import Utils.Path;
 import Vendor.BuildConfig;
-import <spdlog/sinks/msvc_sink.h>;
-import <spdlog/sinks/rotating_file_sink.h>;
-import <spdlog/spdlog.h>;
 
 namespace Utils::Logging::Detail {
 

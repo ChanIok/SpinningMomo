@@ -172,9 +172,9 @@ export module ${moduleName};
 
 import std;
 
-export namespace Core::Migration::Schema {
+namespace Core::Migration::Schema {
 
-struct ${structName} {
+export struct ${structName} {
   static constexpr std::array<std::string_view, ${sqlStatements.length}> statements = {
 ${statementsArray}
   };

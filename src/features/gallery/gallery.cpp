@@ -1,7 +1,5 @@
 module;
 
-#include <mfapi.h>
-
 module Features.Gallery;
 
 import std;
@@ -28,6 +26,7 @@ import Utils.Path;
 import Utils.String;
 import Utils.System;
 import <asio.hpp>;
+import <mfapi.h>;
 
 namespace Features::Gallery {
 
