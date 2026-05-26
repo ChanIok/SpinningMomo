@@ -24,19 +24,19 @@
 
 ## 前端目录职责
 
-| 路径                              | 作用                                                                                                                         |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `pages/MapPage.vue`               | 挂载时 `initializeMapDefaults()`                                                                                             |
-| `store.ts`                        | `markers`、`renderOptions`、`runtimeOptions`、`iframeSessionReady`                                                           |
-| `composables/useMapScene.ts`      | 图库筛选/排序/语言 + 地图 session/world 就绪后拉点、写 markers、flush                                                        |
-| `composables/useMapBridge.ts`     | 出站 `postMessage`（prod `SYNC_RUNTIME`，dev `EVAL_SCRIPT`）；入站处理；`SESSION_READY` 写 world、标记 session，并立即 flush |
-| `composables/mapIframeRuntime.ts` | 注册宿主 → iframe 的 flush 实现                                                                                              |
-| `domain/officialWorldId.ts`       | 规范化 iframe 传来的 world 字符串（如去掉包裹 `"`）；不保存区域列表或版本映射                                                |
-| `bridge/protocol.ts`              | action 常量与 payload 类型                                                                                                   |
-| `injection/mapDevEvalScript.ts`   | **仅 dev**：把 store 快照拼成 iframe 内 eval 脚本                                                                            |
-| `domain/*`                        | 默认展示配置、远端坐标配置下的 polygon 导出反算、`PhotoMapPoint` → `MapMarker`                                               |
-| `api.ts`                          | 对 `extensions.infinityNikki.queryPhotoMapPoints` 的门面                                                                     |
-| `components/MapIframeHost.vue`    | 全局 iframe 容器、`registerMapIframeFlush`、监听 `message`                                                                   |
+| 路径                              | 作用                                                                                                                             |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/MapPage.vue`               | 挂载时 `initializeMapDefaults()`                                                                                                 |
+| `store.ts`                        | `markers`、`renderOptions`、`runtimeOptions`、`iframeSessionReady`                                                               |
+| `composables/useMapScene.ts`      | 图库筛选/排序/语言 + 地图 session/world 就绪后拉点、写 markers、flush                                                            |
+| `composables/useMapBridge.ts`     | 出站 `postMessage`（prod `SYNC_RUNTIME`，dev `EVAL_SCRIPT`）；入站处理；`SESSION_READY` 写 world、标记 session，并立即 flush     |
+| `composables/mapIframeRuntime.ts` | 注册宿主 → iframe 的 flush 实现                                                                                                  |
+| `domain/officialWorldId.ts`       | 规范化 iframe 传来的 world 字符串（如去掉包裹 `"`）；不保存区域列表或版本映射                                                    |
+| `bridge/protocol.ts`              | action 常量与 payload 类型                                                                                                       |
+| `injection/mapDevEvalScript.ts`   | **仅 dev**：把 store 快照拼成 iframe 内 eval 脚本                                                                                |
+| `domain/*`                        | 默认展示配置、远端坐标配置下的 polygon 导出反算、`PhotoMapPoint` → `MapMarker`                                                   |
+| `api.ts`                          | 对 `extensions.infinityNikki.queryPhotoMapPoints` 的门面                                                                         |
+| `components/MapIframeHost.vue`    | 全局 iframe 容器：首次进入 `/map` 设 `hostActivated` 并挂载 iframe，之后 `v-show` 保活；`registerMapIframeFlush`、监听 `message` |
 
 ## 数据模型（宿主 → iframe，须可结构化克隆）
 

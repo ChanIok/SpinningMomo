@@ -16,7 +16,7 @@ namespace Extensions::InfinityNikki::WorldArea {
 // 远端地图配置的来源地址和内存缓存有效期。
 // 配置包含所有世界的 polygon 区域、坐标变换参数和官方 world_id 映射，
 // 替代原先硬编码在源码中的规则。
-constexpr std::string_view kMapConfigUrl = "https://api2.infinitymomo.com/api/v1/map.json";
+constexpr std::string_view kMapConfigUrl = "https://api.infinitymomo.com/api/v1/map.json";
 constexpr auto kMapConfigTtl = std::chrono::hours(6);
 // 远端刷新失败后，在该时长内不再发起 HTTP（直接返回错误或旧缓存）。
 constexpr auto kMapConfigRefreshSuppressDuration = std::chrono::minutes(5);
