@@ -4,6 +4,7 @@ import std;
 import Core.State;
 import Core.RPC.Types;
 import Utils.Logger;
+import Vendor.BuildConfig;
 import <rfl/json.hpp>;
 import <asio.hpp>;
 
@@ -57,13 +58,16 @@ auto register_method(Core::State::AppState& app_state,
     }
   };
 
-  // 自动生成参数的 JSON Schema
-  auto params_schema = rfl::json::to_schema<Request, rfl::SnakeCaseToCamelCase>();
+  // Playground 仅在 Debug 构建中需要参数 JSON Schema；Release 跳过编译期 to_schema。
+  std::string params_schema;
+  if constexpr (Vendor::BuildConfig::is_debug_build()) {
+    params_schema = rfl::json::to_schema<Request, rfl::SnakeCaseToCamelCase>();
+  }
 
   // 存储到注册表
   registry[method_name] = MethodInfo{.name = method_name,
                                      .description = description,
-                                     .params_schema = params_schema,
+                                     .params_schema = std::move(params_schema),
                                      .handler = std::move(wrapped_handler)};
 }
 
