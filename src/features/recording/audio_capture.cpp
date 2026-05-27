@@ -55,17 +55,13 @@ auto start_capture_thread(Core::State::AppState& app_state) -> void {
 
   Utils::Media::AudioCapture::start_capture_thread(
       state.audio,
-      // is_active
-      [&state]() -> bool {
-        return state.accepting_input.load(std::memory_order_acquire) &&
-               !state.finish_requested.load(std::memory_order_acquire) &&
-               state.has_audio.load(std::memory_order_acquire);
-      },
       // on_packet: 只复制音频数据并入队，SinkWriter 只在录制编码线程中使用。
       [&state](const BYTE* data, UINT32 num_frames, UINT32 bytes_per_frame,
                UINT64 qpc_position_100ns, DWORD flags) {
         if (num_frames == 0 || bytes_per_frame == 0 ||
-            !state.accepting_input.load(std::memory_order_acquire)) {
+            !state.accepting_input.load(std::memory_order_acquire) ||
+            state.finish_requested.load(std::memory_order_acquire) ||
+            !state.has_audio.load(std::memory_order_acquire)) {
           return;
         }
 

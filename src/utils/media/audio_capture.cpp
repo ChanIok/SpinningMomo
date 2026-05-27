@@ -11,6 +11,7 @@ import Utils.Logger;
 import <audioclient.h>;
 import <mmdeviceapi.h>;
 import <wil/com.h>;
+import <wil/resource.h>;
 import <windows.h>;
 import <wrl/implements.h>;
 
@@ -57,14 +58,75 @@ class ProcessLoopbackActivator
   }
 };
 
+auto create_capture_events(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
+                           std::string_view mode_name) -> std::expected<void, std::string> {
+  ctx.audio_event.reset(CreateEventW(nullptr, FALSE, FALSE, nullptr));
+  ctx.stop_event.reset(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+  if (!ctx.audio_event || !ctx.stop_event) {
+    return std::unexpected(std::format("Failed to create audio capture events for {}", mode_name));
+  }
+  return {};
+}
+
+auto finish_audio_client_setup(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
+                               WAVEFORMATEX* format, DWORD stream_flags)
+    -> std::expected<void, std::string> {
+  constexpr REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms
+
+  HRESULT hr = ctx.audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED, stream_flags, buffer_duration,
+                                            0, format, nullptr);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to initialize audio client: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  hr = ctx.audio_client->SetEventHandle(ctx.audio_event.get());
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to set audio event handle: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  hr = ctx.audio_client->GetService(__uuidof(IAudioCaptureClient),
+                                    reinterpret_cast<void**>(ctx.capture_client.put()));
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to get capture client: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  hr = ctx.audio_client->GetBufferSize(&ctx.buffer_frame_count);
+  if (FAILED(hr)) {
+    return std::unexpected(
+        std::format("Failed to get buffer size: {:08X}", static_cast<uint32_t>(hr)));
+  }
+
+  return {};
+}
+
+auto create_pcm_wave_format(std::uint16_t channels, std::uint32_t sample_rate,
+                            std::uint16_t bits_per_sample)
+    -> std::expected<wil::unique_cotaskmem_ptr<WAVEFORMATEX>, std::string> {
+  wil::unique_cotaskmem_ptr<WAVEFORMATEX> format{
+      reinterpret_cast<WAVEFORMATEX*>(CoTaskMemAlloc(sizeof(WAVEFORMATEX)))};
+  if (!format) {
+    return std::unexpected("Failed to allocate memory for wave format");
+  }
+
+  format->wFormatTag = WAVE_FORMAT_PCM;
+  format->nChannels = channels;
+  format->nSamplesPerSec = sample_rate;
+  format->wBitsPerSample = bits_per_sample;
+  format->nBlockAlign = format->nChannels * format->wBitsPerSample / 8;
+  format->nAvgBytesPerSec = format->nSamplesPerSec * format->nBlockAlign;
+  format->cbSize = 0;
+  return format;
+}
+
 // Process Loopback 初始化
 auto initialize_process_loopback(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
                                  std::uint32_t process_id) -> std::expected<void, std::string> {
-  HRESULT hr;
-
-  ctx.audio_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!ctx.audio_event) {
-    return std::unexpected("Failed to create audio event for process loopback");
+  auto event_result = create_capture_events(ctx, "process loopback");
+  if (!event_result) {
+    return event_result;
   }
 
   AUDIOCLIENT_ACTIVATION_PARAMS activation_params = {};
@@ -84,9 +146,9 @@ auto initialize_process_loopback(Utils::Media::AudioCapture::AudioCaptureContext
   }
 
   wil::com_ptr<IActivateAudioInterfaceAsyncOperation> async_op;
-  hr = ActivateAudioInterfaceAsync(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, __uuidof(IAudioClient),
-                                   &activate_params, activator.Get(), &async_op);
-
+  HRESULT hr =
+      ActivateAudioInterfaceAsync(VIRTUAL_AUDIO_DEVICE_PROCESS_LOOPBACK, __uuidof(IAudioClient),
+                                  &activate_params, activator.Get(), &async_op);
   if (FAILED(hr)) {
     return std::unexpected(
         std::format("Failed to activate audio interface async: {:08X}", static_cast<uint32_t>(hr)));
@@ -98,52 +160,24 @@ auto initialize_process_loopback(Utils::Media::AudioCapture::AudioCaptureContext
   }
   ctx.audio_client = *client_result;
 
-  // 硬编码格式 (GetMixFormat 在此模式不可用)
-  ctx.wave_format = reinterpret_cast<WAVEFORMATEX*>(CoTaskMemAlloc(sizeof(WAVEFORMATEX)));
-  if (!ctx.wave_format) {
-    return std::unexpected("Failed to allocate memory for wave format");
+  // 进程 loopback 的激活目标是虚拟设备，不通过默认播放设备协商格式。
+  // 这里固定成 AAC 编码链路稳定支持的 48kHz / stereo / 16-bit PCM。
+  auto wave_format_result = create_pcm_wave_format(2, 48000, 16);
+  if (!wave_format_result) {
+    return std::unexpected(wave_format_result.error());
   }
-
-  ctx.wave_format->wFormatTag = WAVE_FORMAT_PCM;
-  ctx.wave_format->nChannels = 2;
-  ctx.wave_format->nSamplesPerSec = 48000;
-  ctx.wave_format->wBitsPerSample = 16;
-  ctx.wave_format->nBlockAlign = ctx.wave_format->nChannels * ctx.wave_format->wBitsPerSample / 8;
-  ctx.wave_format->nAvgBytesPerSec = ctx.wave_format->nSamplesPerSec * ctx.wave_format->nBlockAlign;
-  ctx.wave_format->cbSize = 0;
+  ctx.wave_format = std::move(*wave_format_result);
 
   Logger().info("Process Loopback audio format: {} Hz, {} channels, {} bits",
                 ctx.wave_format->nSamplesPerSec, ctx.wave_format->nChannels,
                 ctx.wave_format->wBitsPerSample);
 
-  REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms
-  hr = ctx.audio_client->Initialize(AUDCLNT_SHAREMODE_SHARED,
-                                    AUDCLNT_STREAMFLAGS_LOOPBACK |
-                                        AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
-                                        AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-                                    buffer_duration, 0, ctx.wave_format, nullptr);
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to initialize audio client: {:08X}", static_cast<uint32_t>(hr)));
-  }
-
-  hr = ctx.audio_client->SetEventHandle(ctx.audio_event);
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to set audio event handle: {:08X}", static_cast<uint32_t>(hr)));
-  }
-
-  hr = ctx.audio_client->GetService(__uuidof(IAudioCaptureClient),
-                                    reinterpret_cast<void**>(ctx.capture_client.put()));
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to get capture client: {:08X}", static_cast<uint32_t>(hr)));
-  }
-
-  hr = ctx.audio_client->GetBufferSize(&ctx.buffer_frame_count);
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to get buffer size: {:08X}", static_cast<uint32_t>(hr)));
+  auto setup_result =
+      finish_audio_client_setup(ctx, ctx.wave_format.get(),
+                                AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
+                                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK);
+  if (!setup_result) {
+    return setup_result;
   }
 
   Logger().info("Process Loopback audio capture initialized: buffer size = {} frames",
@@ -154,16 +188,14 @@ auto initialize_process_loopback(Utils::Media::AudioCapture::AudioCaptureContext
 // System Loopback 初始化
 auto initialize_system_loopback(Utils::Media::AudioCapture::AudioCaptureContext& ctx)
     -> std::expected<void, std::string> {
-  HRESULT hr;
-
-  ctx.audio_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!ctx.audio_event) {
-    return std::unexpected("Failed to create audio event for system loopback");
+  auto event_result = create_capture_events(ctx, "system loopback");
+  if (!event_result) {
+    return event_result;
   }
 
   wil::com_ptr<IMMDeviceEnumerator> enumerator;
-  hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
-                        IID_PPV_ARGS(enumerator.put()));
+  HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
+                                IID_PPV_ARGS(enumerator.put()));
   if (FAILED(hr)) {
     return std::unexpected(
         std::format("Failed to create device enumerator: {:08X}", static_cast<uint32_t>(hr)));
@@ -182,87 +214,22 @@ auto initialize_system_loopback(Utils::Media::AudioCapture::AudioCaptureContext&
         std::format("Failed to activate audio client: {:08X}", static_cast<uint32_t>(hr)));
   }
 
-  WAVEFORMATEX* device_format = nullptr;
-  hr = ctx.audio_client->GetMixFormat(&device_format);
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to get mix format: {:08X}", static_cast<uint32_t>(hr)));
+  auto wave_format_result = create_pcm_wave_format(2, 48000, 16);
+  if (!wave_format_result) {
+    return std::unexpected(wave_format_result.error());
   }
+  ctx.wave_format = std::move(*wave_format_result);
 
-  Logger().info("Device audio format: {} Hz, {} channels, {} bits, format tag: {}",
-                device_format->nSamplesPerSec, device_format->nChannels,
-                device_format->wBitsPerSample, device_format->wFormatTag);
+  Logger().info("System Loopback target audio format: {} Hz, {} channels, {} bits",
+                ctx.wave_format->nSamplesPerSec, ctx.wave_format->nChannels,
+                ctx.wave_format->wBitsPerSample);
 
-  // 创建 16-bit PCM 格式（用于 AAC 编码器兼容性）
-  WAVEFORMATEX pcm_format = {};
-  pcm_format.wFormatTag = WAVE_FORMAT_PCM;
-  pcm_format.nChannels = device_format->nChannels;
-  pcm_format.nSamplesPerSec = device_format->nSamplesPerSec;
-  pcm_format.wBitsPerSample = 16;
-  pcm_format.nBlockAlign = pcm_format.nChannels * pcm_format.wBitsPerSample / 8;
-  pcm_format.nAvgBytesPerSec = pcm_format.nSamplesPerSec * pcm_format.nBlockAlign;
-  pcm_format.cbSize = 0;
-
-  WAVEFORMATEX* closest_match = nullptr;
-  hr = ctx.audio_client->IsFormatSupported(AUDCLNT_SHAREMODE_SHARED, &pcm_format, &closest_match);
-
-  WAVEFORMATEX* format_to_use = nullptr;
-  if (hr == S_OK) {
-    Logger().info("Device supports 16-bit PCM format directly");
-    ctx.wave_format = reinterpret_cast<WAVEFORMATEX*>(CoTaskMemAlloc(sizeof(WAVEFORMATEX)));
-    if (!ctx.wave_format) {
-      CoTaskMemFree(device_format);
-      if (closest_match) CoTaskMemFree(closest_match);
-      return std::unexpected("Failed to allocate memory for wave format");
-    }
-    std::memcpy(ctx.wave_format, &pcm_format, sizeof(WAVEFORMATEX));
-    format_to_use = ctx.wave_format;
-  } else if (hr == S_FALSE && closest_match) {
-    Logger().info("Using closest match format: {} Hz, {} channels, {} bits",
-                  closest_match->nSamplesPerSec, closest_match->nChannels,
-                  closest_match->wBitsPerSample);
-    ctx.wave_format = closest_match;
-    format_to_use = closest_match;
-    closest_match = nullptr;
-  } else {
-    Logger().warn("Device does not support 16-bit PCM, using device format (may need conversion)");
-    ctx.wave_format = device_format;
-    format_to_use = device_format;
-    device_format = nullptr;
-  }
-
-  if (device_format) CoTaskMemFree(device_format);
-  if (closest_match) CoTaskMemFree(closest_match);
-
-  Logger().info("Final audio format: {} Hz, {} channels, {} bits", ctx.wave_format->nSamplesPerSec,
-                ctx.wave_format->nChannels, ctx.wave_format->wBitsPerSample);
-
-  REFERENCE_TIME buffer_duration = 1'000'000;  // 100ms
-  hr = ctx.audio_client->Initialize(
-      AUDCLNT_SHAREMODE_SHARED, AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
-      buffer_duration, 0, format_to_use, nullptr);
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to initialize audio client: {:08X}", static_cast<uint32_t>(hr)));
-  }
-
-  hr = ctx.audio_client->SetEventHandle(ctx.audio_event);
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to set audio event handle: {:08X}", static_cast<uint32_t>(hr)));
-  }
-
-  hr = ctx.audio_client->GetService(__uuidof(IAudioCaptureClient),
-                                    reinterpret_cast<void**>(ctx.capture_client.put()));
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to get capture client: {:08X}", static_cast<uint32_t>(hr)));
-  }
-
-  hr = ctx.audio_client->GetBufferSize(&ctx.buffer_frame_count);
-  if (FAILED(hr)) {
-    return std::unexpected(
-        std::format("Failed to get buffer size: {:08X}", static_cast<uint32_t>(hr)));
+  auto setup_result =
+      finish_audio_client_setup(ctx, ctx.wave_format.get(),
+                                AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
+                                    AUDCLNT_STREAMFLAGS_EVENTCALLBACK);
+  if (!setup_result) {
+    return setup_result;
   }
 
   Logger().info("System Loopback audio capture initialized: buffer size = {} frames",
@@ -272,67 +239,92 @@ auto initialize_system_loopback(Utils::Media::AudioCapture::AudioCaptureContext&
 
 // 通用音频捕获循环
 auto audio_capture_loop(Utils::Media::AudioCapture::AudioCaptureContext& ctx,
-                        std::function<bool()> is_active,
+                        std::stop_token stop_token,
                         Utils::Media::AudioCapture::AudioPacketCallback on_packet) -> void {
-  HRESULT hr = ctx.audio_client->Start();
-  if (FAILED(hr)) {
-    Logger().error("Failed to start audio client: {:08X}", static_cast<uint32_t>(hr));
-    return;
-  }
+  try {
+    auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    std::stop_callback wake_on_stop(stop_token, [&ctx]() {
+      if (ctx.stop_event) {
+        SetEvent(ctx.stop_event.get());
+      }
+    });
 
-  Logger().info("Audio capture thread started");
-
-  while (!ctx.should_stop.load()) {
-    if (ctx.audio_event) {
-      WaitForSingleObject(ctx.audio_event, 100);
-    } else {
-      Sleep(10);
+    if (!ctx.audio_client || !ctx.capture_client || !ctx.wave_format || !ctx.audio_event ||
+        !ctx.stop_event) {
+      Logger().error("Audio capture loop started with incomplete context");
+      return;
     }
 
-    UINT32 packet_length = 0;
-    hr = ctx.capture_client->GetNextPacketSize(&packet_length);
+    HRESULT hr = ctx.audio_client->Start();
     if (FAILED(hr)) {
-      Logger().error("GetNextPacketSize failed: {:08X}", static_cast<uint32_t>(hr));
-      break;
+      Logger().error("Failed to start audio client: {:08X}", static_cast<uint32_t>(hr));
+      return;
     }
 
-    while (packet_length > 0) {
-      BYTE* data = nullptr;
-      UINT32 frames_available = 0;
-      DWORD flags = 0;
-      UINT64 device_position = 0;
-      UINT64 qpc_position = 0;
+    Logger().info("Audio capture thread started");
 
-      hr = ctx.capture_client->GetBuffer(&data, &frames_available, &flags, &device_position,
-                                         &qpc_position);
-
-      if (FAILED(hr)) {
-        Logger().error("GetBuffer failed: {:08X}", static_cast<uint32_t>(hr));
+    HANDLE wait_handles[] = {ctx.stop_event.get(), ctx.audio_event.get()};
+    while (!stop_token.stop_requested()) {
+      DWORD wait_result = WaitForMultipleObjects(static_cast<DWORD>(std::size(wait_handles)),
+                                                 wait_handles, FALSE, INFINITE);
+      if (wait_result == WAIT_OBJECT_0) {
+        break;
+      }
+      if (wait_result != WAIT_OBJECT_0 + 1) {
+        Logger().error("Audio capture wait failed: {}", static_cast<unsigned>(GetLastError()));
         break;
       }
 
-      if (frames_available > 0) {
-        if (is_active()) {
+      UINT32 packet_length = 0;
+      hr = ctx.capture_client->GetNextPacketSize(&packet_length);
+      if (FAILED(hr)) {
+        Logger().error("GetNextPacketSize failed: {:08X}", static_cast<uint32_t>(hr));
+        break;
+      }
+
+      while (packet_length > 0) {
+        BYTE* data = nullptr;
+        UINT32 frames_available = 0;
+        DWORD flags = 0;
+        UINT64 device_position = 0;
+        UINT64 qpc_position = 0;
+
+        hr = ctx.capture_client->GetBuffer(&data, &frames_available, &flags, &device_position,
+                                           &qpc_position);
+        if (FAILED(hr)) {
+          Logger().error("GetBuffer failed: {:08X}", static_cast<uint32_t>(hr));
+          break;
+        }
+
+        if (frames_available > 0) {
           UINT32 bytes_per_frame = ctx.wave_format->nBlockAlign;
           on_packet(data, frames_available, bytes_per_frame, qpc_position, flags);
         }
-      }
 
-      hr = ctx.capture_client->ReleaseBuffer(frames_available);
-      if (FAILED(hr)) {
-        Logger().error("ReleaseBuffer failed: {:08X}", static_cast<uint32_t>(hr));
-        break;
-      }
+        hr = ctx.capture_client->ReleaseBuffer(frames_available);
+        if (FAILED(hr)) {
+          Logger().error("ReleaseBuffer failed: {:08X}", static_cast<uint32_t>(hr));
+          break;
+        }
 
-      hr = ctx.capture_client->GetNextPacketSize(&packet_length);
-      if (FAILED(hr)) {
-        break;
+        hr = ctx.capture_client->GetNextPacketSize(&packet_length);
+        if (FAILED(hr)) {
+          Logger().error("GetNextPacketSize failed: {:08X}", static_cast<uint32_t>(hr));
+          break;
+        }
       }
     }
-  }
 
-  ctx.audio_client->Stop();
-  Logger().info("Audio capture thread stopped");
+    ctx.audio_client->Stop();
+    Logger().info("Audio capture thread stopped");
+  } catch (const wil::ResultException& e) {
+    Logger().error("Audio capture thread COM initialization failed: {} (HRESULT: 0x{:08X})",
+                   e.what(), static_cast<unsigned>(e.GetErrorCode()));
+  } catch (const std::exception& e) {
+    Logger().error("Audio capture thread exception: {}", e.what());
+  } catch (...) {
+    Logger().error("Audio capture thread exception: unknown");
+  }
 }
 
 }  // namespace
@@ -361,31 +353,39 @@ auto initialize(AudioCaptureContext& ctx, AudioSource source, std::uint32_t proc
   }
 
   if (source == AudioSource::GameOnly) {
-    if (!is_process_loopback_supported()) {
-      Logger().warn(
-          "Process Loopback API not supported (requires Windows 10 2004+), falling back to "
-          "System Loopback");
-      source = AudioSource::System;
-    } else {
-      Logger().info("Using Process Loopback mode (Game audio only)");
-      return initialize_process_loopback(ctx, process_id);
-    }
+    Logger().info("Using Process Loopback mode (Game audio only)");
+    return initialize_process_loopback(ctx, process_id);
   }
 
   Logger().info("Using System Loopback mode (All system audio)");
   return initialize_system_loopback(ctx);
 }
 
-auto start_capture_thread(AudioCaptureContext& ctx, std::function<bool()> is_active,
-                          AudioPacketCallback on_packet) -> void {
-  ctx.should_stop = false;
+auto start_capture_thread(AudioCaptureContext& ctx, AudioPacketCallback on_packet) -> void {
+  if (!ctx.audio_client || !ctx.capture_client || !ctx.wave_format || !ctx.audio_event ||
+      !ctx.stop_event) {
+    Logger().error("Cannot start audio capture thread: context is not initialized");
+    return;
+  }
+
+  if (ctx.capture_thread.joinable()) {
+    stop(ctx);
+  }
+
+  ResetEvent(ctx.stop_event.get());
   ctx.capture_thread =
-      std::jthread([&ctx, is_active = std::move(is_active), on_packet = std::move(on_packet)](
-                       std::stop_token) { audio_capture_loop(ctx, is_active, on_packet); });
+      std::jthread([&ctx, on_packet = std::move(on_packet)](std::stop_token stop_token) {
+        audio_capture_loop(ctx, stop_token, on_packet);
+      });
 }
 
 auto stop(AudioCaptureContext& ctx) -> void {
-  ctx.should_stop = true;
+  if (ctx.capture_thread.joinable()) {
+    ctx.capture_thread.request_stop();
+  }
+  if (ctx.stop_event) {
+    SetEvent(ctx.stop_event.get());
+  }
   if (ctx.capture_thread.joinable()) {
     ctx.capture_thread.join();
   }
@@ -397,17 +397,9 @@ auto cleanup(AudioCaptureContext& ctx) -> void {
   ctx.capture_client = nullptr;
   ctx.audio_client = nullptr;
   ctx.device = nullptr;
-
-  if (ctx.wave_format) {
-    CoTaskMemFree(ctx.wave_format);
-    ctx.wave_format = nullptr;
-  }
-
-  if (ctx.audio_event) {
-    CloseHandle(ctx.audio_event);
-    ctx.audio_event = nullptr;
-  }
-
+  ctx.wave_format.reset();
+  ctx.audio_event.reset();
+  ctx.stop_event.reset();
   ctx.buffer_frame_count = 0;
 }
 

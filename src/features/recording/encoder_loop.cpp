@@ -483,7 +483,7 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
 
     auto encoder_config = build_encoder_config(state);
     auto encoder_result = Utils::Media::Encoder::create_encoder(encoder_config, state.device.get(),
-                                                                state.audio.wave_format);
+                                                                state.audio.wave_format.get());
     if (!encoder_result) {
       notify_encoder_ready(state, false, "Failed to create encoder: " + encoder_result.error());
       return;

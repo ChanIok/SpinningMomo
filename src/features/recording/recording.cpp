@@ -12,6 +12,7 @@ import Features.Recording.Types;
 import UI.FloatingWindow;
 import Utils.Graphics.Capture;
 import Utils.Logger;
+import Utils.Media.AudioCapture;
 import <mfapi.h>;
 import <wil/com.h>;
 import <windows.h>;
@@ -378,8 +379,18 @@ auto start(Core::State::AppState& app_state, HWND target_window,
   DWORD process_id = 0;
   GetWindowThreadProcessId(target_window, &process_id);
 
+  auto audio_source_to_use = config.audio_source;
   auto audio_result =
-      Features::Recording::AudioCapture::initialize(state.audio, config.audio_source, process_id);
+      Features::Recording::AudioCapture::initialize(state.audio, audio_source_to_use, process_id);
+  if (!audio_result && audio_source_to_use == Utils::Media::AudioCapture::AudioSource::GameOnly) {
+    Logger().warn("GameOnly audio capture initialization failed: {}, falling back to System",
+                  audio_result.error());
+    Features::Recording::AudioCapture::cleanup(state.audio);
+    audio_source_to_use = Utils::Media::AudioCapture::AudioSource::System;
+    audio_result =
+        Features::Recording::AudioCapture::initialize(state.audio, audio_source_to_use, process_id);
+  }
+
   if (!audio_result) {
     Logger().warn("Audio capture initialization failed: {}, continuing without audio",
                   audio_result.error());
