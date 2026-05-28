@@ -1,5 +1,7 @@
 module;
 
+#include <uwebsockets/App.h>
+
 module Core.HttpServer.Routes;
 
 import std;
@@ -12,7 +14,6 @@ import Core.RPC;
 import Utils.Logger;
 import Vendor.BuildConfig;
 import <asio.hpp>;
-import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::Routes {
 

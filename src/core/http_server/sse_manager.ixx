@@ -1,10 +1,11 @@
 module;
 
+#include <uwebsockets/App.h>
+
 export module Core.HttpServer.SseManager;
 
 import std;
 import Core.State;
-import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::SseManager {
 // 添加 SSE 连接

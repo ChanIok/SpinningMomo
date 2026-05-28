@@ -1,5 +1,7 @@
 module;
 
+#include <uwebsockets/App.h>
+
 module Core.HttpServer.SseManager;
 
 import std;
@@ -7,7 +9,6 @@ import Core.State;
 import Core.HttpServer.State;
 import Core.HttpServer.Types;
 import Utils.Logger;
-import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::SseManager {
 

@@ -1,5 +1,7 @@
 module;
 
+#include <uwebsockets/App.h>
+
 module Core.HttpServer.Static;
 
 import std;
@@ -12,7 +14,6 @@ import Utils.Path;
 import Utils.Logger;
 import Utils.Time;
 import <asio.hpp>;
-import <uwebsockets/App.h>;
 
 namespace Core::HttpServer::Static {
 
