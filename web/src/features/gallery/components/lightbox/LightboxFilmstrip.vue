@@ -184,7 +184,7 @@ function handleWheel(event: WheelEvent) {
               v-if="item.asset"
               class="filmstrip-thumbnail group relative h-full w-full cursor-pointer overflow-hidden rounded transition-all duration-200 select-none"
               :class="{
-                'scale-110 ring-2 ring-primary ring-offset-4': item.isCurrent,
+                'scale-110 ring-2 ring-primary': item.isCurrent,
                 'bg-foreground/20': item.isSelected,
               }"
               @click="handleThumbnailClick(item.index, $event)"

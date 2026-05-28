@@ -727,11 +727,12 @@ defineExpose({
           @pointercancel="handleStagePointerCancel"
           @lostpointercapture="handleStageLostPointerCapture"
         >
+          <!-- 盒子由元数据宽高决定；object-fill 避免缩略图像素比例与元数据不一致时在切换原图时跳动 -->
           <img
             :src="thumbnailUrl"
             :alt="displayAsset.name"
             :style="imageLayerStyle"
-            class="absolute top-1/2 left-1/2 max-w-none object-contain select-none"
+            class="absolute top-1/2 left-1/2 max-w-none object-fill select-none"
             draggable="false"
             @dragstart.prevent
           />
@@ -740,7 +741,7 @@ defineExpose({
             :src="originalUrl"
             :alt="displayAsset.name"
             :style="originalLayerStyle"
-            class="absolute top-1/2 left-1/2 max-w-none object-contain select-none"
+            class="absolute top-1/2 left-1/2 max-w-none object-fill select-none"
             draggable="false"
             @dragstart.prevent
             @load="handleOriginalLoad"

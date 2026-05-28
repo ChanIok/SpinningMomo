@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { call } from '@/core/rpc'
 import { useTaskStore } from '@/core/tasks/store'
+import { useSettingsStore } from '@/features/settings/store'
 import { useI18n } from '@/composables/useI18n'
 import { useToast } from '@/composables/useToast'
 import { copyToClipboard } from '@/lib/utils'
@@ -50,8 +51,8 @@ interface OpenLogDirectoryResult {
 const { t, locale } = useI18n()
 const { toast } = useToast()
 const taskStore = useTaskStore()
+const settingsStore = useSettingsStore()
 
-const scrollAreaRef = ref<InstanceType<typeof ScrollArea>>()
 const runtimeInfo = ref<RuntimeInfo | null>(null)
 const currentVersionFromUpdate = ref<string | null>(null)
 const isLoading = ref(false)
@@ -72,9 +73,9 @@ let updateCheckedTimer: ReturnType<typeof setTimeout> | null = null
 const issuesUrl = 'https://github.com/ChanIok/SpinningMomo/issues'
 const feedbackEmail = 'hello@infinitymomo.com'
 const licenseUrl = 'https://github.com/ChanIok/SpinningMomo/blob/main/LICENSE'
-const legalNoticeZhUrl = 'https://spin.infinitymomo.com/zh/about/legal'
+const legalNoticeZhUrl = 'https://spin.infinitymomo.com/about/legal'
 const legalNoticeEnUrl = 'https://spin.infinitymomo.com/en/about/legal'
-const creditsZhUrl = 'https://spin.infinitymomo.com/zh/about/credits'
+const creditsZhUrl = 'https://spin.infinitymomo.com/about/credits'
 const creditsEnUrl = 'https://spin.infinitymomo.com/en/about/credits'
 const nuan5Url = 'https://NUAN5.PRO'
 
@@ -86,6 +87,15 @@ const creditsUrl = computed(() => (locale.value === 'en-US' ? creditsEnUrl : cre
 
 const appVersionText = computed(
   () => runtimeInfo.value?.version || currentVersionFromUpdate.value || '-'
+)
+
+const isVersionBusy = computed(
+  () =>
+    isLoading.value ||
+    isCheckingUpdate.value ||
+    isStartingDownload.value ||
+    isInstallingUpdate.value ||
+    isDownloadingUpdate.value
 )
 
 const currentUpdateTask = computed(() => {
@@ -100,6 +110,8 @@ const isDownloadingUpdate = computed(() => {
 const isDownloadedUpdateReady = computed(
   () => currentUpdateTask.value?.status === 'succeeded' && hasUpdate.value !== false
 )
+
+const isConfirmedUpToDate = computed(() => hasUpdate.value === false)
 
 const toErrorMessage = (value: unknown): string => {
   if (value instanceof Error) {
@@ -237,7 +249,9 @@ const openLogDirectory = async () => {
 
 onMounted(() => {
   void loadRuntimeInfo()
-  void checkForUpdate(true)
+  if (settingsStore.appSettings.update.autoCheck) {
+    void checkForUpdate(true)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -265,36 +279,21 @@ onBeforeUnmount(() => {
             />
           </div>
           <h1
-            class="mb-[clamp(0.25rem,1.5vh,0.75rem)] text-3xl font-bold tracking-tight text-foreground"
+            class="mb-[clamp(0.5rem,2vh,1.5rem)] text-2xl font-bold tracking-tight text-foreground"
           >
             {{ t('app.name') }}
           </h1>
           <button
-            v-if="appVersionText !== '-'"
+            type="button"
+            class="surface-top flex h-8 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium text-card-foreground transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+            :disabled="isVersionBusy || appVersionText === '-'"
             @click="handleUpdateAction"
-            :disabled="
-              isCheckingUpdate || isStartingDownload || isInstallingUpdate || isDownloadingUpdate
-            "
-            class="group/badge flex items-center gap-2 rounded-full border border-border/50 px-3 py-1 transition-all duration-300 disabled:opacity-80"
-            :class="[
-              hasUpdate || isDownloadedUpdateReady
-                ? 'border-primary bg-primary text-sm text-primary-foreground shadow-sm hover:opacity-90'
-                : 'bg-secondary/50 text-sm font-medium text-muted-foreground hover:border-border hover:bg-secondary',
-            ]"
           >
             <!-- Status Icon -->
-            <Loader2
-              v-if="
-                isCheckingUpdate || isStartingDownload || isInstallingUpdate || isDownloadingUpdate
-              "
-              class="h-3.5 w-3.5 animate-spin"
-            />
-            <Package v-else-if="isDownloadedUpdateReady" class="h-3.5 w-3.5" />
-            <Download v-else-if="hasUpdate" class="h-3.5 w-3.5" />
-            <Check
-              v-else
-              class="h-3.5 w-3.5 text-green-500 transition-transform group-hover/badge:scale-110"
-            />
+            <Loader2 v-if="isVersionBusy" class="h-4 w-4 shrink-0 animate-spin" />
+            <Package v-else-if="isDownloadedUpdateReady" class="h-4 w-4 shrink-0" />
+            <Download v-else-if="hasUpdate" class="h-4 w-4 shrink-0" />
+            <Check v-else-if="isConfirmedUpToDate" class="h-4 w-4 shrink-0" />
 
             <!-- Status Text -->
             <span>
@@ -308,15 +307,16 @@ onBeforeUnmount(() => {
               <template v-else-if="hasUpdate">{{
                 t('about.actions.downloadUpdate', { version: latestVersion || '' })
               }}</template>
-              <template v-else>{{ t('about.runtime.version') }} {{ appVersionText }}</template>
+              <template v-else>
+                {{ t('about.runtime.version') }}
+                {{ isLoading ? '…' : appVersionText === '-' ? '—' : appVersionText }}
+              </template>
             </span>
           </button>
         </div>
 
         <!-- Actions Card -->
-        <div
-          class="surface-top mb-[clamp(1.5rem,6vh,3rem)] w-full overflow-hidden rounded-md shadow-md"
-        >
+        <div class="surface-top mb-[clamp(1.5rem,6vh,3rem)] w-full overflow-hidden rounded-md">
           <!-- Official Website Row -->
           <a
             href="https://spin.infinitymomo.com"
