@@ -112,6 +112,10 @@ These must be re-run when their source files change:
 - `node scripts/generate-embedded-locales.js` — after modifying `src/locales/*.json` (zh-CN / en-US)
 - `node scripts/generate-map-injection-cpp.js` — after modifying `web/src/features/map/injection/source/*.js` (regenerates minified JS and C++ map injection module)
 
+## Comments
+- Comments should describe intent and logic (why / what), not restate what the code already shows (how).
+- When changing code, update related comments so they stay in sync with the implementation.
+
 ## Naming Conventions
 - **C++ module names**: PascalCase with dots — `Features.Gallery`, `Core.RPC.Types`
 - **C++ files/functions**: snake_case — `gallery.ixx`, `initialize()`

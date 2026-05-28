@@ -26,7 +26,7 @@ export enum class DirectoryWatchBackend {
 };
 
 export struct FolderWatcherState {
-  // 监听的根目录（已规范化）
+  // 监听的根目录（Gallery 内部规范路径：absolute + lexical normal + generic slash）
   std::filesystem::path root_path;
   // watcher 同步时使用的运行时扫描选项（不包含 ignore_rules）。
   Types::ScanOptions scan_options{};
@@ -77,7 +77,7 @@ export struct GalleryState {
   // 后台 watcher 启动恢复任务的 future，shutdown 时等待其结束。
   std::optional<std::future<void>> startup_watchers_future;
 
-  // 根目录 watcher 状态（key = 规范化路径字符串）
+  // 根目录 watcher 状态（key = Gallery 内部规范路径字符串）
   std::unordered_map<std::string, std::shared_ptr<FolderWatcherState>> folder_watchers;
   std::mutex folder_watchers_mutex;
 

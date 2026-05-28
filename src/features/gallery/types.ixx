@@ -11,6 +11,9 @@ namespace Features::Gallery::Types {
 export struct Asset {
   std::int64_t id;
   std::string name;
+  // Gallery 内部路径不变量：
+  // 一旦进入 DB / watcher / scan change 链路，path 就应当已经是
+  // “absolute + lexical normal + generic slash”的内部路径语义。
   std::string path;
   std::string type;  // photo, video, live_photo, unknown
   std::optional<std::string> dominant_color_hex;
@@ -37,6 +40,7 @@ export struct Asset {
 
 export struct Folder {
   std::int64_t id;
+  // 与 Asset.path 相同，Folder.path 也统一保存为 Gallery 内部规范路径。
   std::string path;
   std::optional<std::int64_t> parent_id;
   std::string name;
@@ -202,6 +206,7 @@ export enum class ScanChangeAction {
 // 避免再次全量遍历文件系统推导“这次到底哪些文件变了”。
 // REMOVE 表示监视根下该路径对应的文件已从磁盘消失；与索引中是否仍能删到一行资产无关。
 export struct ScanChange {
+  // Gallery 内部规范路径：absolute + lexical normal + generic slash。
   std::string path;
   ScanChangeAction action = ScanChangeAction::UPSERT;
 };
@@ -229,6 +234,7 @@ export struct Metadata {
 };
 
 export struct FileSystemInfo {
+  // 扫描阶段产出的内部规范路径；后续 folder / cache / cleanup 链路都依赖它。
   std::filesystem::path path;
   std::int64_t size;
   std::int64_t file_modified_millis;
@@ -282,7 +288,7 @@ export struct ListAssetsParams {
   std::optional<bool> include_subfolders = false;
   // 分页和排序参数（复用ListParams的逻辑）
   std::optional<std::int32_t> page = 1;
-  std::optional<std::int32_t> per_page = 50;
+  std::optional<std::int32_t> per_page = 500;
   std::optional<std::string> sort_by = "created_at";
   std::optional<std::string> sort_order = "desc";
 };

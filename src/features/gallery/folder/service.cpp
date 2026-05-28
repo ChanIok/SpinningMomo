@@ -62,35 +62,33 @@ auto extract_unique_folder_paths(const std::vector<std::filesystem::path>& file_
   std::string scan_root_str = normalized_scan_root.string();
 
   for (const auto& file_path : file_paths) {
-    auto current_path = file_path.parent_path();
+    // 调用方传入的 file_paths 已遵守 Gallery 内部路径不变量；
+    // 这里初始化一次即可，后续 parent_path() 递推不再重复做 lexical 归一化。
+    auto current_path_result = Utils::Path::NormalizePath(file_path.parent_path());
+    if (!current_path_result) {
+      Logger().warn("Failed to normalize parent path '{}': {}", file_path.parent_path().string(),
+                    current_path_result.error());
+      continue;
+    }
+    auto current_path = current_path_result.value();
 
     // 从文件的父目录开始，递归向上直到扫描根目录
     while (!current_path.empty()) {
-      auto normalized_result = Utils::Path::NormalizePath(current_path);
-      if (!normalized_result) {
-        Logger().warn("Failed to normalize path '{}': {}", current_path.string(),
-                      normalized_result.error());
+      // 如果已经超出扫描根目录，停止
+      if (!Utils::Path::IsPathWithinBase(current_path, normalized_scan_root)) {
         break;
       }
 
-      auto normalized = normalized_result.value();
-      std::string path_str = normalized.string();
-
-      // 如果已经到达或超出扫描根目录，停止
-      if (path_str == scan_root_str) {
+      // 如果已经到达扫描根目录，停止
+      if (current_path == normalized_scan_root) {
         break;
       }
 
-      // 检查是否是扫描根目录的子路径
-      if (path_str.size() < scan_root_str.size() ||
-          path_str.substr(0, scan_root_str.size()) != scan_root_str) {
-        // 已经超出扫描根目录范围，停止
-        break;
-      }
+      std::string path_str = current_path.string();
 
       // 添加到结果集
       if (unique_paths.insert(path_str).second) {
-        result.push_back(normalized);
+        result.push_back(current_path);
       }
 
       // 继续向上遍历

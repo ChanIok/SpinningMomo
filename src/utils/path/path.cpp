@@ -160,9 +160,11 @@ auto Utils::Path::EnsureDirectoryExists(const std::filesystem::path& dir)
   }
 }
 
-// 规范化路径为绝对路径，默认相对于程序目录
-auto Utils::Path::NormalizePath(const std::filesystem::path& path,
-                                std::optional<std::filesystem::path> base)
+// 解析边界输入路径为绝对路径，默认相对于程序目录。
+// 会访问文件系统以解析现有路径段；适用于用户输入、配置输入、
+// watcher/recovery root 等需要拿到真实文件系统语义的入口。
+auto Utils::Path::ResolvePath(const std::filesystem::path& path,
+                              std::optional<std::filesystem::path> base)
     -> std::expected<std::filesystem::path, std::string> {
   try {
     std::filesystem::path base_path;
@@ -195,6 +197,43 @@ auto Utils::Path::NormalizePath(const std::filesystem::path& path,
     return std::filesystem::path(normalized_path.generic_string());
 
   } catch (const std::filesystem::filesystem_error& e) {
+    return std::unexpected(std::string(e.what()));
+  }
+}
+
+// 纯 lexical 路径规范化：不访问文件系统，统一为正斜杠绝对路径。
+// 适用于图库内部已知路径语义（DB path / watcher path / scan change path /
+// relative 推导等）；需要解析 symlink / 盘符映射时请用 ResolvePath。
+auto Utils::Path::NormalizePath(const std::filesystem::path& path,
+                                std::optional<std::filesystem::path> base)
+    -> std::expected<std::filesystem::path, std::string> {
+  try {
+    std::filesystem::path base_path;
+
+    if (base.has_value()) {
+      base_path = base.value();
+    } else if (path.is_absolute()) {
+      base_path = std::filesystem::path{};
+    } else {
+      auto exe_dir_result = GetExecutableDirectory();
+      if (!exe_dir_result) {
+        return std::unexpected("Failed to get executable directory: " + exe_dir_result.error());
+      }
+      base_path = exe_dir_result.value();
+    }
+
+    std::filesystem::path combined_path;
+    if (path.is_absolute()) {
+      combined_path = path;
+    } else {
+      if (!base_path.is_absolute()) {
+        return std::unexpected("Base path must be an absolute path.");
+      }
+      combined_path = base_path / path;
+    }
+
+    return std::filesystem::path(combined_path.lexically_normal().generic_string());
+  } catch (const std::exception& e) {
     return std::unexpected(std::string(e.what()));
   }
 }

@@ -42,7 +42,16 @@ export auto GetEmbeddedWebRootDirectory() -> std::expected<std::filesystem::path
 export auto EnsureDirectoryExists(const std::filesystem::path& dir)
     -> std::expected<void, std::string>;
 
-// 规范化路径为绝对路径，默认相对于程序目录
+// 解析边界输入路径为绝对路径，默认相对于程序目录。
+// 会访问文件系统以解析现有路径段；适用于用户输入、配置输入、
+// watcher/recovery root 等需要拿到真实文件系统语义的入口。
+export auto ResolvePath(const std::filesystem::path& path,
+                        std::optional<std::filesystem::path> base = std::nullopt)
+    -> std::expected<std::filesystem::path, std::string>;
+
+// 纯 lexical 路径规范化：不访问文件系统，统一为正斜杠绝对路径。
+// 适用于图库内部已知路径语义（DB path / watcher path / scan change path /
+// relative 推导等）；需要解析 symlink/盘符映射时请用 ResolvePath。
 export auto NormalizePath(const std::filesystem::path& path,
                           std::optional<std::filesystem::path> base = std::nullopt)
     -> std::expected<std::filesystem::path, std::string>;

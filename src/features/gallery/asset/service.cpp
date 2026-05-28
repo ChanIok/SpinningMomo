@@ -123,7 +123,7 @@ auto query_assets(Core::State::AppState& app_state, const Types::QueryAssetsPara
 
   // 5. 如果需要分页，添加 LIMIT/OFFSET
   int page = 1;
-  int per_page = 50;
+  int per_page = 500;
   bool has_pagination = params.page.has_value() && params.per_page.has_value();
 
   if (has_pagination) {

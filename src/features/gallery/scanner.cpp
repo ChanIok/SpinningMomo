@@ -472,10 +472,10 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
   return results;
 }
 
-// 并行校检：对变动文件计算哈希，精准识别内容变化
+// 并行校检：对变动文件计算哈希，精准识别内容变化；返回成功算出 hash 的文件数。
 auto calculate_hash_for_targets(Core::State::AppState& app_state,
                                 std::vector<Types::FileAnalysisResult>& analysis_results)
-    -> std::expected<void, std::string> {
+    -> std::expected<std::size_t, std::string> {
   // 1. 使用 C++20 ranges 枚举并过滤出所有状态为 NEW 或 NEEDS_HASH_CHECK 的待处理文件。
   // 保留了原始索引(idx)，这是为了在并发算完哈希后能无缝写回原数组。
   auto targets_with_index = analysis_results | std::views::enumerate |
@@ -487,7 +487,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
                             std::ranges::to<std::vector>();
 
   if (targets_with_index.empty()) {
-    return {};
+    return 0;
   }
 
   // 使用 batches 把超大文件列表切分成每个容量32的小块，以供线程池粗粒度分发。
@@ -557,7 +557,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
     }
   });
 
-  return {};
+  return all_hashes.size();
 }
 
 struct ProcessedAssetEntry {
@@ -854,7 +854,7 @@ struct CleanupPhaseResult {
 // 准备阶段：规范化路径并加载缓存
 auto prepare_scan_context(Core::State::AppState& app_state, const Types::ScanOptions& options)
     -> std::expected<ScanPreparationContext, std::string> {
-  auto normalized_scan_root_result = Utils::Path::NormalizePath(options.directory);
+  auto normalized_scan_root_result = Utils::Path::ResolvePath(options.directory);
   if (!normalized_scan_root_result) {
     return std::unexpected("Failed to normalize scan root path: " +
                            normalized_scan_root_result.error());
@@ -934,13 +934,23 @@ auto run_hash_analysis_phase(
   auto analysis_results =
       analyze_file_changes(file_infos, asset_cache, options.force_reanalyze.value_or(false));
 
-  report_scan_progress(progress_callback, "hashing", 0,
-                       static_cast<std::int64_t>(analysis_results.size()), kHashingStartPercent,
-                       "Calculating file hashes");
+  const auto hash_candidate_count = static_cast<std::size_t>(
+      std::ranges::count_if(analysis_results, [](const Types::FileAnalysisResult& analysis) {
+        return analysis.status == Types::FileStatus::NEW ||
+               analysis.status == Types::FileStatus::NEEDS_HASH_CHECK;
+      }));
+  const auto metadata_unchanged_skip_count = analysis_results.size() - hash_candidate_count;
 
-  if (auto hash_phase = calculate_hash_for_targets(app_state, analysis_results); !hash_phase) {
+  report_scan_progress(
+      progress_callback, "hashing", 0, static_cast<std::int64_t>(hash_candidate_count),
+      kHashingStartPercent,
+      hash_candidate_count == 0 ? "No files require hash calculation" : "Calculating file hashes");
+
+  auto hash_phase = calculate_hash_for_targets(app_state, analysis_results);
+  if (!hash_phase) {
     return std::unexpected("Hash calculation failed: " + hash_phase.error());
   }
+  const std::size_t hashed_count = hash_phase.value();
 
   if (options.force_reanalyze.value_or(false)) {
     for (auto& analysis : analysis_results) {
@@ -950,12 +960,25 @@ auto run_hash_analysis_phase(
     }
   }
 
-  report_scan_progress(progress_callback, "hashing",
-                       static_cast<std::int64_t>(analysis_results.size()),
-                       static_cast<std::int64_t>(analysis_results.size()), kHashingEndPercent,
+  report_scan_progress(progress_callback, "hashing", static_cast<std::int64_t>(hashed_count),
+                       static_cast<std::int64_t>(hash_candidate_count), kHashingEndPercent,
                        "Hash calculation completed");
 
-  Logger().info("Calculated hashes for {} files", analysis_results.size());
+  if (hash_candidate_count == 0) {
+    Logger().info("Hash calculation skipped for all {} files (size and mtime match cache)",
+                  analysis_results.size());
+  } else {
+    const auto hash_failures = hash_candidate_count - hashed_count;
+    if (hash_failures == 0) {
+      Logger().info("Calculated hashes for {} of {} files ({} skipped by unchanged size/mtime)",
+                    hashed_count, analysis_results.size(), metadata_unchanged_skip_count);
+    } else {
+      Logger().warn(
+          "Calculated hashes for {} of {} candidate files ({} skipped by unchanged size/mtime, "
+          "{} failed)",
+          hashed_count, analysis_results.size(), metadata_unchanged_skip_count, hash_failures);
+    }
+  }
 
   std::vector<Types::FileAnalysisResult> files_to_process;
   std::ranges::copy_if(analysis_results, std::back_inserter(files_to_process),

@@ -50,7 +50,7 @@ auto make_infinity_nikki_ignore_rules() -> std::vector<Features::Gallery::Types:
 auto ensure_watch_root_ignore_rules(Core::State::AppState& app_state,
                                     const std::filesystem::path& watch_root)
     -> std::expected<void, std::string> {
-  auto normalized_watch_root_result = Utils::Path::NormalizePath(watch_root);
+  auto normalized_watch_root_result = Utils::Path::ResolvePath(watch_root);
   if (!normalized_watch_root_result) {
     return std::unexpected("Failed to normalize GamePlayPhotos root folder: " +
                            normalized_watch_root_result.error());

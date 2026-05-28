@@ -24,7 +24,7 @@ export function createQuerySlice() {
   const paginatedAssets = ref<Map<number, Asset[]>>(new Map()) // key: pageNumber
   // 显式 version 用于触发依赖 Map 结构变化的更新（Map 原地改动不总能被外层感知）。
   const paginatedAssetsVersion = ref(0)
-  const perPage = ref(100) // 每页数量
+  const perPage = ref(500) // 每页数量
   // 可见区由虚拟列表回传，用于决定“优先加载哪些页”。
   const visibleRange = reactive<{
     startIndex?: number

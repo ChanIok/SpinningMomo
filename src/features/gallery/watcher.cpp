@@ -1351,7 +1351,7 @@ auto start_watcher_if_needed(Core::State::AppState& app_state,
 // 规范化需要监听的根目录路径，检查是否存在且是目录
 auto normalize_root_directory(const std::filesystem::path& root_directory)
     -> std::expected<std::filesystem::path, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(root_directory);
+  auto normalized_result = Utils::Path::ResolvePath(root_directory);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize root directory: " + normalized_result.error());
   }
@@ -1458,7 +1458,7 @@ auto start_watcher_for_directory(Core::State::AppState& app_state,
 auto remove_watcher_for_directory(Core::State::AppState& app_state,
                                   const std::filesystem::path& root_directory)
     -> std::expected<bool, std::string> {
-  auto normalized_result = Utils::Path::NormalizePath(root_directory);
+  auto normalized_result = Utils::Path::ResolvePath(root_directory);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize root directory: " + normalized_result.error());
   }

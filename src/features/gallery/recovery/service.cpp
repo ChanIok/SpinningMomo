@@ -551,7 +551,7 @@ auto prepare_startup_recovery(Core::State::AppState& app_state,
   // 返回启动恢复决策：当前 root 应走 USN 增量还是 FullScan？
   // 只做决策，不启动 watcher。
 
-  auto normalized_root_result = Utils::Path::NormalizePath(root_path);
+  auto normalized_root_result = Utils::Path::ResolvePath(root_path);
   if (!normalized_root_result) {
     return std::unexpected("Failed to normalize root path: " + normalized_root_result.error());
   }
@@ -646,7 +646,7 @@ auto persist_recovery_checkpoint(Core::State::AppState& app_state,
     -> std::expected<void, std::string> {
   // 正常退出时保存检查点。需查询当前 journal 快照和规则指纹。
   // 启动恢复路径应使用轻量的 persist_recovery_state。
-  auto normalized_root_result = Utils::Path::NormalizePath(root_path);
+  auto normalized_root_result = Utils::Path::ResolvePath(root_path);
   if (!normalized_root_result) {
     return std::unexpected("Failed to normalize root path: " + normalized_root_result.error());
   }

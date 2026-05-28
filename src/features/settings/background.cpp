@@ -167,8 +167,7 @@ auto resolve_managed_background_file(const std::filesystem::path& file_name)
                            backgrounds_dir_result.error());
   }
 
-  auto resolved_path_result =
-      Utils::Path::NormalizePath(backgrounds_dir_result.value() / file_name);
+  auto resolved_path_result = Utils::Path::ResolvePath(backgrounds_dir_result.value() / file_name);
   if (!resolved_path_result) {
     return std::unexpected("Failed to resolve managed background file path: " +
                            resolved_path_result.error());
@@ -642,7 +641,7 @@ auto import_background_image(const Types::BackgroundImportParams& params)
   try {
     // 导入阶段把用户原始文件复制到 app data 托管目录，
     // 设置里只保存逻辑路径，不直接保存物理文件系统路径。
-    auto source_path_result = Utils::Path::NormalizePath(std::filesystem::path(params.source_path));
+    auto source_path_result = Utils::Path::ResolvePath(std::filesystem::path(params.source_path));
     if (!source_path_result) {
       return std::unexpected("Failed to resolve source background path: " +
                              source_path_result.error());
