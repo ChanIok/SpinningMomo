@@ -4,6 +4,7 @@ import { useElementSize } from '@vueuse/core'
 import { galleryApi } from '../../api'
 import { useGalleryData, useGalleryLightbox } from '../../composables'
 import { useGalleryStore } from '../../store'
+import type { Asset } from '../../types'
 import { useI18n } from '@/composables/useI18n'
 import { heroAnimating } from '../../composables/useHeroTransition'
 
@@ -29,13 +30,12 @@ const galleryData = useGalleryData()
 
 const imageError = ref(false)
 const originalLoaded = ref(false)
+// 仅在同一张图原图 load 完成淡入时启用；切图隐藏原图时不做过渡，避免叠帧。
+const originalOpacityTransition = ref(false)
 const autoRecovering = ref(false)
-const switchingFrame = ref(false)
-const previousFrame = ref<{
-  id: number
-  name: string
-  thumbnailUrl: string
-} | null>(null)
+// 实际渲染的资产 id；切图时滞后于 selection，直到目标缩略图 decode 完成再切换。
+const displayAssetId = ref<number | null>(null)
+let displaySwapToken = 0
 const viewportRef = ref<HTMLElement | null>(null)
 const stageRef = ref<HTMLElement | null>(null)
 const activePointerId = ref<number | null>(null)
@@ -63,17 +63,34 @@ const currentAsset = computed(() => {
     return null
   }
 
-  return store.getAssetsInRange(currentIdx, currentIdx)[0]
+  return store.getAssetsInRange(currentIdx, currentIdx)[0] ?? null
+})
+
+function findLoadedAssetById(assetId: number): Asset | null {
+  for (const pageAssets of store.paginatedAssets.values()) {
+    const found = pageAssets.find((asset) => asset.id === assetId)
+    if (found) {
+      return found
+    }
+  }
+  return null
+}
+
+const displayAsset = computed(() => {
+  if (displayAssetId.value === null) {
+    return null
+  }
+  return findLoadedAssetById(displayAssetId.value)
 })
 
 const thumbnailUrl = computed(() => {
-  if (!currentAsset.value) return ''
-  return galleryApi.getAssetThumbnailUrl(currentAsset.value)
+  if (!displayAsset.value) return ''
+  return galleryApi.getAssetThumbnailUrl(displayAsset.value)
 })
 
 const originalUrl = computed(() => {
-  if (!currentAsset.value) return ''
-  return galleryData.getAssetUrl(currentAsset.value)
+  if (!displayAsset.value) return ''
+  return galleryData.getAssetUrl(displayAsset.value)
 })
 
 const canGoToPrevious = computed(() => (store.selection.activeIndex ?? 0) > 0)
@@ -82,8 +99,8 @@ const fitMode = computed(() => store.lightbox.fitMode)
 const actualZoom = computed(() => store.lightbox.zoom)
 const rotationDegrees = computed(() => store.lightbox.rotationDegrees)
 
-const imageWidth = computed(() => currentAsset.value?.width || 0)
-const imageHeight = computed(() => currentAsset.value?.height || 0)
+const imageWidth = computed(() => displayAsset.value?.width || 0)
+const imageHeight = computed(() => displayAsset.value?.height || 0)
 const hasImageDimensions = computed(() => imageWidth.value > 0 && imageHeight.value > 0)
 const normalizedRotationDegrees = computed(() => ((rotationDegrees.value % 360) + 360) % 360)
 const isQuarterTurn = computed(() => normalizedRotationDegrees.value % 180 !== 0)
@@ -156,7 +173,7 @@ const isPannable = computed(
 const isDragging = computed(() => activePointerId.value !== null)
 
 const stageCursor = computed(() => {
-  if (!currentAsset.value || imageError.value) {
+  if (!displayAsset.value || imageError.value) {
     return 'default'
   }
 
@@ -193,6 +210,12 @@ const imageLayerStyle = computed(() => {
   }
 })
 
+const originalLayerStyle = computed(() => ({
+  ...imageLayerStyle.value,
+  opacity: originalLoaded.value ? 1 : 0,
+  transition: originalOpacityTransition.value ? 'opacity 200ms' : 'none',
+}))
+
 const zoomIndicator = computed(() => {
   if (fitMode.value === 'contain') {
     return t('gallery.lightbox.image.fitIndicator', { percent: Math.round(fitScale.value * 100) })
@@ -201,37 +224,74 @@ const zoomIndicator = computed(() => {
   return `${Math.round(actualZoom.value * 100)}%`
 })
 
-function finishFrameSwitch() {
-  if (!switchingFrame.value) {
-    return
+function preloadThumbnailForAsset(asset: Asset): Promise<void> {
+  const url = galleryApi.getAssetThumbnailUrl(asset)
+  if (!url) {
+    return Promise.resolve()
   }
 
-  switchingFrame.value = false
-  previousFrame.value = null
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve()
+    img.onerror = () => resolve()
+    img.src = url
+    if (img.complete) {
+      resolve()
+    }
+  })
+}
+
+async function commitDisplayAsset(assetId: number) {
+  originalOpacityTransition.value = false
+  displayAssetId.value = assetId
+  originalLoaded.value = false
+  imageError.value = false
+  resetPointerState()
+  suppressClick.value = false
+
+  await nextTick()
+  syncViewportPosition()
 }
 
 watch(
-  () => currentAsset.value,
-  async (newAsset, oldAsset) => {
-    if (oldAsset && newAsset && oldAsset.id !== newAsset.id && !imageError.value) {
-      previousFrame.value = {
-        id: oldAsset.id,
-        name: oldAsset.name,
-        thumbnailUrl: galleryApi.getAssetThumbnailUrl(oldAsset),
-      }
-      switchingFrame.value = true
-    } else if (!newAsset || !oldAsset) {
-      previousFrame.value = null
-      switchingFrame.value = false
+  () => ({
+    targetId: currentAsset.value?.id,
+    activeIndex: store.selection.activeIndex,
+  }),
+  async ({ targetId, activeIndex }) => {
+    if (activeIndex === undefined) {
+      displayAssetId.value = null
+      return
     }
 
-    originalLoaded.value = false
-    imageError.value = false
-    resetPointerState()
-    suppressClick.value = false
+    if (targetId === undefined) {
+      return
+    }
 
-    await nextTick()
-    syncViewportPosition()
+    if (displayAssetId.value === null) {
+      await commitDisplayAsset(targetId)
+      return
+    }
+
+    if (displayAssetId.value === targetId) {
+      return
+    }
+
+    const asset = currentAsset.value
+    if (!asset) {
+      return
+    }
+
+    const token = ++displaySwapToken
+    await preloadThumbnailForAsset(asset)
+    if (token !== displaySwapToken) {
+      return
+    }
+    if (currentAsset.value?.id !== targetId) {
+      return
+    }
+
+    await commitDisplayAsset(targetId)
   },
   { immediate: true, flush: 'post' }
 )
@@ -392,7 +452,7 @@ async function zoomToScaleAtPoint(
   clientY: number,
   options: { snapToFit?: boolean } = {}
 ) {
-  if (!currentAsset.value || imageError.value || !hasImageDimensions.value) {
+  if (!displayAsset.value || imageError.value || !hasImageDimensions.value) {
     return
   }
 
@@ -470,12 +530,8 @@ function resetPointerState(pointerId?: number) {
 }
 
 function handleOriginalLoad() {
+  originalOpacityTransition.value = true
   originalLoaded.value = true
-  finishFrameSwitch()
-}
-
-function handleThumbnailLoad() {
-  finishFrameSwitch()
 }
 
 function isRootMappedOriginalUrl(url: string): boolean {
@@ -487,7 +543,7 @@ async function tryAutoRecoverByReload() {
     return
   }
 
-  const asset = currentAsset.value
+  const asset = displayAsset.value
   if (!asset) {
     return
   }
@@ -515,7 +571,6 @@ async function tryAutoRecoverByReload() {
 
 function handleImageError() {
   imageError.value = true
-  finishFrameSwitch()
 
   void tryAutoRecoverByReload().catch((error) => {
     console.warn('Failed to recover lightbox image:', error)
@@ -536,7 +591,7 @@ async function handleStageClick(event: MouseEvent) {
     return
   }
 
-  if (!currentAsset.value || imageError.value) {
+  if (!displayAsset.value || imageError.value) {
     return
   }
 
@@ -612,7 +667,7 @@ function handleStageLostPointerCapture(event: PointerEvent) {
 }
 
 function handleViewportWheel(event: WheelEvent) {
-  if (!currentAsset.value || imageError.value) {
+  if (!displayAsset.value || imageError.value) {
     return
   }
 
@@ -660,8 +715,7 @@ defineExpose({
     >
       <div class="box-border grid min-h-full min-w-full" :style="canvasStyle">
         <div
-          v-if="currentAsset && !imageError"
-          :key="currentAsset.id"
+          v-if="displayAsset && !imageError"
           ref="stageRef"
           class="relative col-start-1 row-start-1 self-center justify-self-center select-none"
           :style="stageStyle"
@@ -674,30 +728,19 @@ defineExpose({
           @lostpointercapture="handleStageLostPointerCapture"
         >
           <img
-            v-if="switchingFrame && previousFrame"
-            :src="previousFrame.thumbnailUrl"
-            :alt="previousFrame.name"
-            :style="imageLayerStyle"
-            class="absolute top-1/2 left-1/2 max-w-none object-contain select-none"
-            draggable="false"
-            @dragstart.prevent
-          />
-
-          <img
             :src="thumbnailUrl"
-            :alt="currentAsset.name"
+            :alt="displayAsset.name"
             :style="imageLayerStyle"
             class="absolute top-1/2 left-1/2 max-w-none object-contain select-none"
             draggable="false"
             @dragstart.prevent
-            @load="handleThumbnailLoad"
           />
 
           <img
             :src="originalUrl"
-            :alt="currentAsset.name"
-            :style="[imageLayerStyle, { opacity: originalLoaded ? 1 : 0 }]"
-            class="absolute top-1/2 left-1/2 max-w-none object-contain transition-opacity duration-200 select-none"
+            :alt="displayAsset.name"
+            :style="originalLayerStyle"
+            class="absolute top-1/2 left-1/2 max-w-none object-contain select-none"
             draggable="false"
             @dragstart.prevent
             @load="handleOriginalLoad"
@@ -718,7 +761,7 @@ defineExpose({
             />
           </svg>
           <p class="text-lg">{{ t('gallery.lightbox.image.loadFailed') }}</p>
-          <p class="mt-2 text-sm text-muted-foreground/70">{{ currentAsset?.name }}</p>
+          <p class="mt-2 text-sm text-muted-foreground/70">{{ displayAsset?.name }}</p>
         </div>
       </div>
     </div>

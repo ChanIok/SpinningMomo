@@ -352,6 +352,7 @@ async function handleCodeValueAction() {
   }
 
   codeValueDraft.value = normalizedClipboardText
+  await handleUserRecordCommit()
 }
 
 async function handleSelectWorldId(nextWorldId: string | undefined) {
