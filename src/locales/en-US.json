@@ -49,6 +49,8 @@
   "message.recording_start_failed": "Failed to start recording: ",
   "message.recording_stop_failed": "Failed to stop recording: ",
 
+  "notification.action.view": "View",
+
   "message.settings_hotkey_prompt": "Please press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys",
   "message.settings_hotkey_success": "Hotkey set to: ",
   "message.settings_hotkey_failed": "Hotkey setting failed, restored to default.",

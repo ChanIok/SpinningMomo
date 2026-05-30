@@ -13,7 +13,7 @@ import std;
 
 namespace EmbeddedLocales {
 // Embedded Chinese JSON content as string_view
-// Size: 3415 bytes
+// Size: 3456 bytes
 export constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -64,6 +64,8 @@ export constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.recording_saved": "录制已保存，输出文件: ",
   "message.recording_start_failed": "录制启动失败: ",
   "message.recording_stop_failed": "录制停止失败: ",
+
+  "notification.action.view": "查看",
 
   "message.settings_hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
   "message.settings_hotkey_success": "热键已设置为：",

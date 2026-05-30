@@ -9,27 +9,47 @@ import Core.I18n.State;
 import Features.Recording;
 import Features.Recording.Types;
 import Features.Recording.State;
+import Features.Notifications;
+import Features.Notifications.Types;
 import Features.Settings.Types;
 import Features.Settings.State;
-import Features.WindowControl;
 import UI.FloatingWindow.Events;
+import Features.WindowControl;
 import Utils.Graphics.HDR;
 import Utils.Logger;
 import Utils.Media.AudioCapture;
 import Utils.Path;
 import Utils.String;
+import Utils.System;
 import <windows.h>;
 
 namespace Features::Recording::UseCase {
 
 auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
-  if (!state.events || !state.i18n) {
-    Logger().warn("Skip recording notification because events/i18n state is not initialized");
-    return;
-  }
+  Features::Notifications::Types::NotificationOptions options;
+  options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+  options.message = Utils::String::FromUtf8(message);
+  Features::Notifications::post_notification_request(state, std::move(options));
+}
 
-  Core::Events::post(state, UI::FloatingWindow::Events::NotificationEvent{
-                                .title = state.i18n->texts["label.app_name"], .message = message});
+auto show_recording_saved_notification(Core::State::AppState& state,
+                                       const std::filesystem::path& saved_path) -> void {
+  Features::Notifications::Types::NotificationOptions options;
+  options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+  options.message =
+      Utils::String::FromUtf8(state.i18n->texts["message.recording_saved"]) + saved_path.wstring();
+
+  Features::Notifications::Types::NotificationAction view_action;
+  view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
+  view_action.callback = [saved_path](Core::State::AppState&) {
+    auto open_result = Utils::System::open_file_with_default_app(saved_path);
+    if (!open_result) {
+      Logger().warn("Failed to open recording: {}", open_result.error());
+    }
+  };
+  options.action = std::move(view_action);
+
+  Features::Notifications::post_notification_request(state, std::move(options));
 }
 
 auto notify_recording_toggled(Core::State::AppState& state, bool enabled) -> void {
@@ -71,8 +91,7 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
     Features::Recording::stop(state);
     std::error_code ec;
     if (std::filesystem::exists(saved_path, ec) && !ec) {
-      show_recording_notification(state, state.i18n->texts["message.recording_saved"] +
-                                             Utils::String::ToUtf8(saved_path.wstring()));
+      show_recording_saved_notification(state, saved_path);
     } else {
       show_recording_notification(state, state.i18n->texts["message.recording_stop_failed"] +
                                              Utils::String::ToUtf8(saved_path.wstring()));

@@ -4,16 +4,17 @@ module Features.Screenshot.UseCase;
 
 import std;
 import Core.State;
-import Core.Events;
 import Core.I18n.State;
 import UI.FloatingWindow.Events;
 import Features.Screenshot;
 import Features.Settings.State;
 import Features.WindowControl;
 import Features.Notifications;
+import Features.Notifications.Types;
 import Utils.Image;
 import Utils.Logger;
 import Utils.String;
+import Utils.System;
 
 namespace Features::Screenshot::UseCase {
 
@@ -30,17 +31,32 @@ auto capture(Core::State::AppState& state) -> void {
   // 截图完成回调在截图工作线程的帧回调中执行，必须快速返回；通知通过事件系统发送到 UI 线程
   auto completion_callback = [&state](bool success, const std::wstring& path) {
     if (success) {
-      std::string path_str(path.begin(), path.end());
+      const std::filesystem::path screenshot_path(path);
+      const auto path_str = Utils::String::ToUtf8(path);
 
-      Core::Events::post(
-          state, UI::FloatingWindow::Events::NotificationEvent{
-                     .title = state.i18n->texts["label.app_name"],
-                     .message = state.i18n->texts["message.screenshot_success"] + path_str});
+      Features::Notifications::Types::NotificationOptions options;
+      options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+      options.message =
+          Utils::String::FromUtf8(state.i18n->texts["message.screenshot_success"]) + path;
+
+      Features::Notifications::Types::NotificationAction view_action;
+      view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
+      view_action.callback = [screenshot_path](Core::State::AppState&) {
+        auto open_result = Utils::System::open_file_with_default_app(screenshot_path);
+        if (!open_result) {
+          Logger().warn("Failed to open screenshot: {}", open_result.error());
+        }
+      };
+      options.action = std::move(view_action);
+
+      Features::Notifications::post_notification_request(state, std::move(options));
       Logger().info("Screenshot saved successfully: {}", path_str);
     } else {
-      Core::Events::post(state, UI::FloatingWindow::Events::NotificationEvent{
-                                    .title = state.i18n->texts["label.app_name"],
-                                    .message = state.i18n->texts["message.screenshot_failed"]});
+      Features::Notifications::Types::NotificationOptions fail_options;
+      fail_options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+      fail_options.message =
+          Utils::String::FromUtf8(state.i18n->texts["message.screenshot_failed"]);
+      Features::Notifications::post_notification_request(state, std::move(fail_options));
       Logger().error("Screenshot capture failed");
     }
   };

@@ -46,12 +46,18 @@ Core::State::AppState&        // 或 const AppState&
 
 ## 实现侧访问子 state
 
+`AppState` 在 `app_state.cpp` 构造时即 `make_unique` 全部子 state；**应用完成初始化后的正常运行路径下，各 `state.xxx` 成员均非空，不必对每个子 state 做 null 检查**。
+
 | 场景 | 做法 |
 |------|------|
-| 模块 **.cpp** 实现 | `import Core.State` + 对应 `X.State`，空检查后用 `auto& foo = *state.foo` 访问字段；只有调用指针 API 时才用 `.get()` |
+| 模块 **.cpp** 实现 | `import Core.State` + 对应 `X.State`，通过 `state.xxx->field` 直接访问；只有调用指针 API 时才用 `.get()` |
 | **.ixx** 里的 export 模板会调用到的 helper | 优先让模板只做类型相关工作，把访问子 state、调度线程、持锁等逻辑下沉到 `.cpp` 的非模板函数 |
 | **.ixx** 内联模板若必须碰子 state 成员 | 先重新评估边界；确实无法下沉时，helper 才和模板放在同一个 `.ixx`，并通常标 `inline` |
 | 只读访问子模块聚合数据（如命令表） | 在所属模块提供 `foo(AppState&)` 业务能力（如 `invoke_command`），勿让外部 `state.commands->registry` |
+
+`auto& foo = *state.foo` 仅在同一函数内重复访问很多字段、且希望缩短写法时**可选**使用，不是规范要求。
+
+范例：`Features.Recording.UseCase`（`usecase.cpp`）中 `state.recording->status`、`state.settings->raw`、`state.i18n->texts` 均为直接访问，无子 state 空检查。
 
 `app_state.cpp` 是唯一集中 `make_unique` 的地方；新增子 state 时在此 `import` 对应 `X.State`。
 
@@ -99,15 +105,12 @@ Core::State::AppState&        // 或 const AppState&
 
 ## 跨模块 export API 约定
 
-对外 **export** 的入口函数统一使用 `Core::State::AppState&`（或 `const` 重载）。取子 state：
-
-- 非模板实现：在对应模块 **`.cpp`** 空检查后用 `auto& xxx = *state.xxx`；只有传给指针 API 时才用 `.get()`。
-- export 模板：模板体不要穿透 `AppState` 访问子 state；需要访问时委托给同模块 `.cpp` 的非模板函数。
+对外 **export** 的入口函数统一使用 `Core::State::AppState&`（或 `const` 重载）。实现里通过 `state.xxx->…` 直接访问子 state；export 模板仍不要穿透 `AppState` 访问子 state，需要时委托给同模块 `.cpp` 的非模板函数。
 
 已对齐示例：
 
 - `Core.Database`：对外 API 与 `query` / `execute_transaction` 等模板在 `database.ixx`；模板只做类型映射并调用非模板 `run_database_job()`；`DatabaseState` 访问、`current_connection`、任务入队和等待逻辑都在 `database.cpp`。
-- `Features.Recording`：对外 `recording.ixx` 仅 `AppState&`；`Session` / `EncoderLoop` / `AudioCapture` 的 export API 也统一为 `AppState&`（实现里经 `Features.Recording.Accessor::recording_state()` 取子 state）。**仅模块内** `.cpp` 私有 helper 可继续用 `RecordingState&`。
+- `Features.Recording`：对外 `recording.ixx` 与各子模块 export API 均用 `AppState&`；实现见 `Features.Recording.UseCase`（`usecase.cpp`）等 `.cpp` 中的直接 `state.recording->…` 访问。
 - `Features.Settings.Menu`、`Features.Preview.Window`：菜单预设与预览窗口尺寸 API 已改为 `AppState&`。
 
 **不要**为修链接或图省事，在 `app_state.ixx` 恢复 `import` 各 `X.State`——会重新接上雪崩重编链。
@@ -115,4 +118,4 @@ Core::State::AppState&        // 或 const AppState&
 ## 参考
 
 - 项目根目录 `AGENTS.md`：架构与 `AppState` 角色
-- 范例模块：`Core.Async`、`Core.I18n`（`AppState&` + `.cpp` 取子 state）；`Core.Events`（模板 + `.cpp` 非模板）；`Core.Database`（模板映射 + `.cpp` 非模板执行器）
+- 范例模块：`Core.Async`、`Core.I18n`（`AppState&` + `.cpp` 里 `state.xxx->…`）；`Core.Events`（模板 + `.cpp` 非模板）；`Core.Database`（模板映射 + `.cpp` 非模板执行器）；`Features.Recording.UseCase`（feature 侧直接访问范例）

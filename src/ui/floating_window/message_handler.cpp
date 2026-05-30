@@ -19,8 +19,6 @@ import UI.TrayIcon.Types;
 import UI.ContextMenu;
 import UI.ContextMenu.Types;
 import UI.FloatingWindow.D2DContext;
-import Features.Notifications;
-import Features.Notifications.Constants;
 import Utils.Logger;
 import <windows.h>;
 import <windowsx.h>;
@@ -329,13 +327,6 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     // 处理异步事件队列 (WM_APP + 1)
     case Core::Events::kWM_APP_PROCESS_EVENTS:
       Core::Events::process_events(state);
-      return 0;
-
-    // 处理通知动画定时器
-    case WM_TIMER:
-      if (wParam == Features::Notifications::Constants::ANIMATION_TIMER_ID) {
-        Features::Notifications::update_notifications(state);
-      }
       return 0;
 
     // Windows 11 TopMost Z 序失效 workaround：重新应用置顶以恢复视觉层级

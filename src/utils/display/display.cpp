@@ -23,7 +23,7 @@ auto query_monitor_info(HMONITOR monitor) -> std::expected<MonitorInfo, std::str
         std::format("Failed to query monitor info (GetMonitorInfoW), error: {}", GetLastError())};
   }
 
-  return MonitorInfo{.monitor_rect = monitor_info.rcMonitor};
+  return MonitorInfo{.monitor_rect = monitor_info.rcMonitor, .work_rect = monitor_info.rcWork};
 }
 
 auto get_monitor_for_window(HWND hwnd) -> std::expected<MonitorInfo, std::string> {

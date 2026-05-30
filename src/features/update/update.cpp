@@ -6,6 +6,8 @@ import Core.Async;
 import Core.Tasks;
 import UI.FloatingWindow.Events;
 import Core.State;
+import Features.Notifications;
+import Features.Notifications.Types;
 import Core.I18n.State;
 import Core.HttpClient;
 import Core.HttpClient.Types;
@@ -26,21 +28,16 @@ namespace Features::Update {
 
 auto post_update_notification(Core::State::AppState& app_state, const std::string& message)
     -> void {
-  if (!app_state.events || !app_state.i18n) {
-    Logger().warn("Skip update notification: state is not ready");
-    return;
-  }
-
   auto app_name_it = app_state.i18n->texts.find("label.app_name");
   if (app_name_it == app_state.i18n->texts.end()) {
     Logger().warn("Skip update notification: app name text is missing");
     return;
   }
 
-  Core::Events::post(app_state, UI::FloatingWindow::Events::NotificationEvent{
-                                    .title = app_name_it->second,
-                                    .message = message,
-                                });
+  Features::Notifications::Types::NotificationOptions options;
+  options.title = Utils::String::FromUtf8(app_name_it->second);
+  options.message = Utils::String::FromUtf8(message);
+  Features::Notifications::post_notification_request(app_state, std::move(options));
 }
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)

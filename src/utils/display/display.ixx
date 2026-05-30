@@ -9,6 +9,7 @@ namespace Utils::Display {
 
 export struct MonitorInfo {
   RECT monitor_rect{};
+  RECT work_rect{};
 };
 
 export auto rect_width(const RECT& rect) -> int;

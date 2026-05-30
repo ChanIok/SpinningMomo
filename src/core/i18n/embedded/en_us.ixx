@@ -13,7 +13,7 @@ import std;
 
 namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3572 bytes
+// Size: 3611 bytes
 export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -64,6 +64,8 @@ export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.recording_saved": "Recording saved to: ",
   "message.recording_start_failed": "Failed to start recording: ",
   "message.recording_stop_failed": "Failed to stop recording: ",
+
+  "notification.action.view": "View",
 
   "message.settings_hotkey_prompt": "Please press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys",
   "message.settings_hotkey_success": "Hotkey set to: ",
