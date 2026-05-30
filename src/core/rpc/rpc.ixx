@@ -58,9 +58,8 @@ auto register_method(Core::State::AppState& app_state,
     }
   };
 
-  // Playground 仅在 Debug 构建中需要参数 JSON Schema；Release 跳过编译期 to_schema。
   std::string params_schema;
-  if constexpr (Vendor::BuildConfig::is_debug_build()) {
+  if constexpr (Vendor::BuildConfig::rpc_json_schema_enabled()) {
     params_schema = rfl::json::to_schema<Request, rfl::SnakeCaseToCamelCase>();
   }
 

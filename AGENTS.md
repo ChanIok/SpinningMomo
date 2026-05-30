@@ -64,7 +64,7 @@ The C++ backend does **NOT** use OOP class hierarchies. Instead it follows:
 - **Error handling**: `std::expected<T, std::string>` throughout; no exception-based control flow.
 - **Async**: Asio-based coroutine runtime (`Core::Async`). RPC handlers return `asio::awaitable<RpcResult<T>>`.
 - **Events**: Type-erased event bus (`Core::Events`) with sync `send()` and async `post()` (wakes the Win32 message loop via `PostMessageW`).
-- **RPC registration**: `Core::RPC::register_method<Req, Res>()` auto-generates JSON Schema from C++ types via reflect-cpp. Field names are auto-converted between `snake_case` (C++) and `camelCase` (JSON).
+- **RPC registration**: `Core::RPC::register_method<Req, Res>()` registers handlers with reflect-cpp for request/response (de)serialization. Field names are auto-converted between `snake_case` (C++) and `camelCase` (JSON).
 - **Commands**: `Core::Commands` registry binds actions, toggle states, i18n keys, and optional hotkeys. Context menu and tray icon are driven by this registry.
 - **Database**: SQLite via SQLiteCpp with thread-local connections, a `DataMapper` for ORM-like row mapping, and an auto-generated migration system (`scripts/generate-migrations.js`).
 - **Vendor wrappers**: Win32 macros/functions are re-exported as proper C++ functions/constants in `Vendor::Windows` to stay compatible with the module system.
