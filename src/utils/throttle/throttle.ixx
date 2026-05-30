@@ -17,7 +17,7 @@ struct ThrottleState {
 };
 
 // 节流状态（无参数特化版本）
-export template <>
+template <>
 struct ThrottleState<void> {
   std::chrono::milliseconds interval{16};
   std::chrono::steady_clock::time_point last_call_time;
@@ -35,7 +35,7 @@ auto create(std::chrono::milliseconds interval) -> std::unique_ptr<ThrottleState
 }
 
 // 创建节流状态（无参数版本）
-export template <>
+template <>
 auto create<void>(std::chrono::milliseconds interval) -> std::unique_ptr<ThrottleState<void>> {
   auto state = std::make_unique<ThrottleState<void>>();
   state->interval = interval;
