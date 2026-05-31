@@ -61,6 +61,55 @@ auto finish_target_timestamp_100ns(State::RecordingState& state) -> std::int64_t
   return std::max(elapsed, state.max_seen_audio_timestamp_100ns);
 }
 
+struct FinishProgressSnapshot {
+  bool video_frame_pending = false;
+  std::size_t audio_queue_size = 0;
+  std::int64_t elapsed_100ns = 0;
+  std::int64_t finish_target_100ns = 0;
+  std::int64_t next_video_timestamp_100ns = -1;
+  std::int64_t last_emitted_video_timestamp_100ns = -1;
+  std::int64_t max_seen_audio_timestamp_100ns = 0;
+  std::uint64_t encoded_video_frames = 0;
+  std::uint64_t encoded_audio_packets = 0;
+  bool has_encoder_input_texture = false;
+};
+
+auto capture_finish_progress_snapshot(State::RecordingState& state, bool finishing)
+    -> FinishProgressSnapshot {
+  FinishProgressSnapshot snapshot;
+  {
+    std::lock_guard queue_lock(state.queue_mutex);
+    snapshot.video_frame_pending = state.video_frame_pending;
+    snapshot.audio_queue_size = state.audio_queue.size();
+  }
+
+  snapshot.elapsed_100ns = elapsed_since_start_100ns(state);
+  snapshot.finish_target_100ns =
+      finishing ? finish_target_timestamp_100ns(state) : snapshot.elapsed_100ns;
+  snapshot.next_video_timestamp_100ns = state.next_video_timestamp_100ns;
+  snapshot.last_emitted_video_timestamp_100ns = state.last_emitted_video_timestamp_100ns;
+  snapshot.max_seen_audio_timestamp_100ns = state.max_seen_audio_timestamp_100ns;
+  snapshot.encoded_video_frames = state.encoded_video_frames;
+  snapshot.encoded_audio_packets = state.encoded_audio_packets;
+  snapshot.has_encoder_input_texture = state.has_encoder_input_texture;
+  return snapshot;
+}
+
+auto log_finish_progress(std::string_view stage, State::RecordingState& state, bool finishing)
+    -> void {
+  const auto snapshot = capture_finish_progress_snapshot(state, finishing);
+  Logger().debug(
+      "Recording finish {}: finishing={}, elapsed_100ns={}, finish_target_100ns={}, "
+      "next_video_timestamp_100ns={}, last_emitted_video_timestamp_100ns={}, "
+      "max_seen_audio_timestamp_100ns={}, audio_queue_size={}, video_frame_pending={}, "
+      "has_encoder_input_texture={}, encoded_video_frames={}, encoded_audio_packets={}",
+      stage, finishing, snapshot.elapsed_100ns, snapshot.finish_target_100ns,
+      snapshot.next_video_timestamp_100ns, snapshot.last_emitted_video_timestamp_100ns,
+      snapshot.max_seen_audio_timestamp_100ns, snapshot.audio_queue_size,
+      snapshot.video_frame_pending, snapshot.has_encoder_input_texture,
+      snapshot.encoded_video_frames, snapshot.encoded_audio_packets);
+}
+
 // ---------------------------------------------------------------------------
 // 自有纹理：WGC 来的帧只用来拷进这张，给 MF 看的永远是我们的纹理；没新帧就反复编码它。
 // ---------------------------------------------------------------------------
@@ -462,6 +511,7 @@ auto signal_encoder_finish(Core::State::AppState& app_state) -> void {
 
   auto& state = *app_state.recording;
 
+  log_finish_progress("requested", state, true);
   {
     std::lock_guard queue_lock(state.queue_mutex);
     state.finish_requested.store(true, std::memory_order_release);
@@ -480,6 +530,7 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
 
   try {
     auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
+    auto last_finish_progress_log = std::chrono::steady_clock::time_point{};
 
     auto encoder_config = build_encoder_config(state);
     auto encoder_result = Utils::Media::Encoder::create_encoder(encoder_config, state.device.get(),
@@ -533,6 +584,9 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
 
       const bool finishing =
           stop_token.stop_requested() || state.finish_requested.load(std::memory_order_acquire);
+      if (finishing && last_finish_progress_log == std::chrono::steady_clock::time_point{}) {
+        last_finish_progress_log = std::chrono::steady_clock::now();
+      }
 
       // 有通知或正在收尾时，从 WGC 最多取一帧：拷进自有纹理，并推进/对齐时间线。
       if (consume_video_frame_pending(state) || finishing) {
@@ -599,6 +653,14 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
         break;
       }
 
+      if (finishing) {
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_finish_progress_log >= std::chrono::seconds(1)) {
+          log_finish_progress("waiting", state, true);
+          last_finish_progress_log = now;
+        }
+      }
+
       if (finishing && should_exit_finished_segment(state, finishing)) {
         break;
       }
@@ -606,6 +668,7 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
 
     if (state.encoded_video_frames > k_discard_video_frame_threshold &&
         state.encoder_error.empty()) {
+      log_finish_progress("finalize-begin", state, true);
       auto finalize_start = std::chrono::steady_clock::now();
       auto finalize_result = Utils::Media::Encoder::finalize_encoder(state.encoder);
       auto finalize_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

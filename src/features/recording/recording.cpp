@@ -492,9 +492,15 @@ auto stop(Core::State::AppState& app_state) -> void {
   // 通知编码线程收尾。它会把队列里剩下的数据写完，然后 finalize。
   Features::Recording::EncoderLoop::signal_encoder_finish(app_state);
 
-  // 不 detach。stop 等编码线程自然结束，这样 MF/SinkWriter 的生命周期是明确的。
+  // stop 等编码线程自然结束，这样 MF/SinkWriter 的生命周期是明确的。
   if (state.encoder_thread.joinable()) {
+    Logger().debug("Waiting for recording encoder thread to finish");
+    auto join_start = std::chrono::steady_clock::now();
     state.encoder_thread.join();
+    Logger().debug("Recording encoder thread joined in {}ms",
+                   std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - join_start)
+                       .count());
   }
 
   Features::Recording::AudioCapture::cleanup(state.audio);
