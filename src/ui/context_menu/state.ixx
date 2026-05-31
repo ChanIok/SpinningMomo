@@ -4,25 +4,28 @@ export module UI.ContextMenu.State;
 
 import std;
 import UI.ContextMenu.Types;
-import <d2d1.h>;
-import <dwrite.h>;
+import <d2d1_3.h>;
+import <dcomp.h>;
+import <dwrite_3.h>;
+import <dxgi1_2.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace UI::ContextMenu::State {
 
 export struct RenderSurface {
-  ID2D1DCRenderTarget* render_target = nullptr;
-  HDC memory_dc = nullptr;
-  HBITMAP dib_bitmap = nullptr;
-  HGDIOBJ old_bitmap = nullptr;
-  void* bitmap_bits = nullptr;
-  SIZE bitmap_size{};
+  wil::com_ptr<IDXGISwapChain1> swap_chain;
+  wil::com_ptr<IDCompositionTarget> composition_target;
+  wil::com_ptr<IDCompositionVisual> composition_visual;
+  wil::com_ptr<ID2D1DeviceContext6> device_context;
+  wil::com_ptr<ID2D1Bitmap1> target_bitmap;
+  SIZE surface_size{};
 
-  ID2D1SolidColorBrush* background_brush = nullptr;
-  ID2D1SolidColorBrush* text_brush = nullptr;
-  ID2D1SolidColorBrush* separator_brush = nullptr;
-  ID2D1SolidColorBrush* hover_brush = nullptr;
-  ID2D1SolidColorBrush* indicator_brush = nullptr;
+  wil::com_ptr<ID2D1SolidColorBrush> background_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> text_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> separator_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> hover_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> indicator_brush;
 
   bool is_ready = false;
 };
@@ -37,7 +40,7 @@ export struct ContextMenuState {
   RenderSurface submenu_surface;
 
   // 独立的文本格式（DPI 缩放后的字号，不依赖浮窗）
-  IDWriteTextFormat* text_format = nullptr;
+  wil::com_ptr<IDWriteTextFormat> text_format;
 
   // 菜单数据和布局
   std::vector<Types::MenuItem> items;

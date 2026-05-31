@@ -61,7 +61,7 @@ auto register_context_menu_class(HINSTANCE instance, WNDPROC wnd_proc) -> bool {
 auto create_context_menu_window(HINSTANCE instance, Core::State::AppState* app_state, HWND owner,
                                 const POINT& position, const SIZE& size) -> HWND {
   HWND hwnd = CreateWindowExW(
-      WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_LAYERED, L"SpinningMomoContextMenuClass",
+      WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOPMOST | WS_EX_TOOLWINDOW, L"SpinningMomoContextMenuClass",
       L"ContextMenu",  // 窗口标题不重要
       WS_POPUP, position.x, position.y, size.cx, size.cy, owner, nullptr, instance,
       app_state  // 将AppState指针作为创建参数传递

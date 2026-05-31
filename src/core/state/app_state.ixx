@@ -64,6 +64,10 @@ namespace Features::Update::State {
 export struct UpdateState;
 }
 
+namespace UI::SharedRenderResources::State {
+export struct SharedRenderResourcesState;
+}
+
 namespace UI::FloatingWindow::State {
 export struct FloatingWindowState;
 }
@@ -136,6 +140,8 @@ export struct AppState {
   std::unique_ptr<Features::Update::State::UpdateState> update;
 
   // UI状态
+  std::unique_ptr<UI::SharedRenderResources::State::SharedRenderResourcesState>
+      shared_render_resources;
   std::unique_ptr<UI::FloatingWindow::State::FloatingWindowState> floating_window;
   std::unique_ptr<UI::TrayIcon::State::TrayIconState> tray_icon;
   std::unique_ptr<UI::ContextMenu::State::ContextMenuState> context_menu;

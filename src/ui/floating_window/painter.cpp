@@ -6,6 +6,7 @@ import std;
 import Core.State;
 import Core.Commands;
 import Core.Commands.Types;
+import UI.SharedRenderResources.State;
 import UI.FloatingWindow.Layout;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
@@ -65,7 +66,8 @@ auto store_text_measure_cache(UI::FloatingWindow::RenderContext& d2d, std::wstri
   });
 }
 
-auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderContext& d2d, int font_key)
+auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderContext& d2d,
+                                        IDWriteFactory7* write_factory, int font_key)
     -> IDWriteTextFormat* {
   if (auto it = d2d.adjusted_text_formats.find(font_key); it != d2d.adjusted_text_formats.end()) {
     return it->second.get();
@@ -76,8 +78,8 @@ auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderContext& d2d, 
   }
 
   const float font_size = static_cast<float>(font_key) / kFontCacheScale;
-  auto text_format = UI::FloatingWindow::D2DContext::create_text_format_with_size(
-      d2d.write_factory.get(), font_size);
+  auto text_format =
+      UI::FloatingWindow::D2DContext::create_text_format_with_size(write_factory, font_size);
   if (!text_format) {
     return nullptr;
   }
@@ -442,12 +444,13 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
     d2d.device_context->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
                                  d2d.text_format.get(), text_rect, d2d.text_brush.get());
   };
+  auto* write_factory = state.shared_render_resources->write_factory.get();
 
   // 计算可用于文本的宽度
   const float available_width = text_rect.right - text_rect.left;
 
   // 如果文本为空或宽度无效，则直接使用默认字体绘制
-  if (item.text.empty() || available_width <= 0.0f || !d2d.text_format || !d2d.write_factory) {
+  if (item.text.empty() || available_width <= 0.0f || !d2d.text_format || !write_factory) {
     draw_default_text();
     return;
   }
@@ -460,7 +463,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
     resolved_font_key = *cached_font_key;
   } else {
     float text_width = UI::FloatingWindow::D2DContext::measure_text_width(
-        item.text, d2d.text_format.get(), d2d.write_factory.get());
+        item.text, d2d.text_format.get(), write_factory);
 
     if (text_width > available_width) {
       float adjusted_font_size = render.font_size;
@@ -472,13 +475,14 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
             std::max(adjusted_font_size, UI::FloatingWindow::LayoutConfig::MIN_FONT_SIZE);
 
         const int adjusted_font_key = to_cache_key(clamped_font_size, kFontCacheScale);
-        auto* adjusted_text_format = get_or_create_adjusted_text_format(d2d, adjusted_font_key);
+        auto* adjusted_text_format =
+            get_or_create_adjusted_text_format(d2d, write_factory, adjusted_font_key);
         if (!adjusted_text_format) {
           break;
         }
 
         text_width = UI::FloatingWindow::D2DContext::measure_text_width(
-            item.text, adjusted_text_format, d2d.write_factory.get());
+            item.text, adjusted_text_format, write_factory);
         if (text_width <= available_width) {
           resolved_font_key = adjusted_font_key;
           break;
@@ -494,7 +498,8 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
     return;
   }
 
-  if (auto* adjusted_text_format = get_or_create_adjusted_text_format(d2d, resolved_font_key)) {
+  if (auto* adjusted_text_format =
+          get_or_create_adjusted_text_format(d2d, write_factory, resolved_font_key)) {
     d2d.device_context->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
                                  adjusted_text_format, text_rect, d2d.text_brush.get());
     return;

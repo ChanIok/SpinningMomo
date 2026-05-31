@@ -13,7 +13,7 @@ export struct FloatingWindowState {
   FloatingWindow::InteractionState ui;
   FloatingWindow::DataState data;
   FloatingWindow::LayoutConfig layout;
-  FloatingWindow::RenderContext d2d_context;  // 私有的D2D渲染上下文
+  FloatingWindow::RenderContext d2d_context;  // 浮窗私有的窗口级渲染上下文
 };
 
 }  // namespace UI::FloatingWindow::State

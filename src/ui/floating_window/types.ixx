@@ -5,7 +5,6 @@ export module UI.FloatingWindow.Types;
 import std;
 import Features.Settings.Menu;
 import <d2d1_3.h>;
-import <d3d11.h>;
 import <dcomp.h>;
 import <dwrite_3.h>;
 import <dxgi1_2.h>;
@@ -93,23 +92,14 @@ export struct TextMeasureCacheEntry {
 };
 
 export struct RenderContext {
-  // 浮窗改为 DirectComposition 托管：
-  // D3D11 提供底层设备和 composition swap chain，
-  // D2D/DirectWrite 继续负责 2D 文字与形状绘制。
-  wil::com_ptr<ID3D11Device> d3d_device;
-  wil::com_ptr<ID3D11DeviceContext> d3d_device_context;
+  // 设备级资源已上收至 UI.SharedRenderResources。
+  // 这里仅保留浮窗自己的 composition surface 和绘制缓存。
   wil::com_ptr<IDXGISwapChain1> swap_chain;
-  wil::com_ptr<IDCompositionDevice> composition_device;
   wil::com_ptr<IDCompositionTarget> composition_target;
   wil::com_ptr<IDCompositionVisual> composition_visual;
 
-  // D2D 现在直接画到 swap chain back buffer 对应的 DXGI surface，
-  // 不再经过 HDC / DIB / UpdateLayeredWindow。
-  wil::com_ptr<ID2D1Factory7> factory;
-  wil::com_ptr<ID2D1Device> d2d_device;
   wil::com_ptr<ID2D1DeviceContext6> device_context;
   wil::com_ptr<ID2D1Bitmap1> target_bitmap;
-  wil::com_ptr<IDWriteFactory7> write_factory;
 
   // 当前 back buffer 尺寸缓存；resize 只在尺寸变化时重建目标位图。
   SIZE surface_size = {0, 0};

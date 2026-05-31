@@ -5,6 +5,8 @@ module UI.FloatingWindow.D2DContext;
 import Core.State;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
+import UI.SharedRenderResources;
+import UI.SharedRenderResources.State;
 import Features.Settings.State;
 import <d2d1_3.h>;
 import <d3d11.h>;
@@ -19,19 +21,19 @@ namespace UI::FloatingWindow::D2DContext {
 constexpr const char* kRecordingIndicatorColor = "#ED4C4CFF";
 constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
-// 浮窗渲染后端已切到：
-//   D3D11 device -> composition swap chain -> DirectComposition visual tree
-//   -> D2D device context 直接绘制到 DXGI surface
-// 这样可以彻底绕开旧的 DCRenderTarget + HDC + UpdateLayeredWindow 路径。
+// 浮窗现在只保留自己的窗口级 surface；
+// D3D11 / D2D factory / DWrite factory 统一来自共享设备级状态。
 
-// 辅助函数：从包含透明度的十六进制颜色字符串创建 D2D1_COLOR_F
 auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
   std::string color_str = hex_color;
   if (color_str.starts_with("#")) {
     color_str = color_str.substr(1);
   }
 
-  float r = 0.0f, g = 0.0f, b = 0.0f, a = 1.0f;
+  float r = 0.0f;
+  float g = 0.0f;
+  float b = 0.0f;
+  float a = 1.0f;
 
   if (color_str.length() == 8) {
     r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
@@ -45,6 +47,11 @@ auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
   }
 
   return D2D1::ColorF(r, g, b, a);
+}
+
+auto shared_resources(Core::State::AppState& state)
+    -> UI::SharedRenderResources::State::SharedRenderResourcesState& {
+  return *state.shared_render_resources;
 }
 
 auto create_brush_from_hex(ID2D1DeviceContext6* target, const std::string& hex_color,
@@ -102,52 +109,21 @@ auto get_client_size(HWND hwnd) -> SIZE {
   return {rc.right - rc.left, rc.bottom - rc.top};
 }
 
-// D2D/DirectWrite 工厂在浮窗生命周期内复用；它们负责 2D 绘制和文本排版。
-auto create_factories(UI::FloatingWindow::RenderContext& d2d) -> bool {
-  HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory7),
-                                 nullptr, reinterpret_cast<void**>(d2d.factory.put()));
-  if (FAILED(hr)) {
-    return false;
-  }
-
-  hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory7),
-                           reinterpret_cast<IUnknown**>(d2d.write_factory.put()));
-  return SUCCEEDED(hr);
-}
-
-// composition swap chain 需要 BGRA 的 D3D11 设备，D2D 也依赖这台设备创建自己的 device。
-auto create_d3d_device(UI::FloatingWindow::RenderContext& d2d) -> bool {
-  UINT create_device_flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-#ifdef _DEBUG
-  create_device_flags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-
-  return SUCCEEDED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr,
-                                     create_device_flags, nullptr, 0, D3D11_SDK_VERSION,
-                                     d2d.d3d_device.put(), nullptr, d2d.d3d_device_context.put()));
-}
-
-// D2D device context 才是后续 painter 的真正绘制目标。
-auto create_d2d_device_context(UI::FloatingWindow::RenderContext& d2d) -> bool {
-  wil::com_ptr<IDXGIDevice> dxgi_device;
-  if (FAILED(d2d.d3d_device->QueryInterface(IID_PPV_ARGS(dxgi_device.put()))) || !dxgi_device) {
-    return false;
-  }
-
-  const HRESULT device_hr = d2d.factory->CreateDevice(dxgi_device.get(), d2d.d2d_device.put());
-  if (FAILED(device_hr) || !d2d.d2d_device) {
+auto create_device_context(ID2D1Device* shared_device, UI::FloatingWindow::RenderContext& d2d)
+    -> bool {
+  if (!shared_device) {
     return false;
   }
 
   wil::com_ptr<ID2D1DeviceContext> base_context;
-  const HRESULT context_hr =
-      d2d.d2d_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, base_context.put());
-  if (FAILED(context_hr) || !base_context) {
+  if (FAILED(shared_device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE,
+                                                base_context.put())) ||
+      !base_context) {
     return false;
   }
 
-  const HRESULT query_hr = base_context->QueryInterface(IID_PPV_ARGS(d2d.device_context.put()));
-  if (FAILED(query_hr) || !d2d.device_context) {
+  if (FAILED(base_context->QueryInterface(IID_PPV_ARGS(d2d.device_context.put()))) ||
+      !d2d.device_context) {
     return false;
   }
 
@@ -158,7 +134,12 @@ auto create_d2d_device_context(UI::FloatingWindow::RenderContext& d2d) -> bool {
 
 // 浮窗是透明 popup，不再自己持有一张 CPU DIB。
 // swap chain 直接作为 DirectComposition visual 的内容，由 DWM 负责合成。
-auto create_swap_chain(UI::FloatingWindow::RenderContext& d2d, const SIZE& size) -> bool {
+auto create_swap_chain(ID3D11Device* shared_d3d_device, UI::FloatingWindow::RenderContext& d2d,
+                       const SIZE& size) -> bool {
+  if (!shared_d3d_device) {
+    return false;
+  }
+
   wil::com_ptr<IDXGIFactory2> dxgi_factory;
   if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(dxgi_factory.put()))) || !dxgi_factory) {
     return false;
@@ -176,44 +157,43 @@ auto create_swap_chain(UI::FloatingWindow::RenderContext& d2d, const SIZE& size)
   desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
   desc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
 
-  const HRESULT hr = dxgi_factory->CreateSwapChainForComposition(d2d.d3d_device.get(), &desc,
-                                                                 nullptr, d2d.swap_chain.put());
-  return SUCCEEDED(hr) && d2d.swap_chain;
+  return SUCCEEDED(dxgi_factory->CreateSwapChainForComposition(shared_d3d_device, &desc, nullptr,
+                                                               d2d.swap_chain.put())) &&
+         d2d.swap_chain;
 }
 
 // DirectComposition tree 只需要一层 root visual：
 // visual.content = swap chain，target.root = visual。
-// 这样浮窗仍然是普通 Win32 窗口，但像素内容由 composition 路径提交。
-auto create_composition_tree(UI::FloatingWindow::RenderContext& d2d, HWND hwnd) -> bool {
+auto create_composition_tree(ID3D11Device* shared_d3d_device,
+                             UI::FloatingWindow::RenderContext& d2d, HWND hwnd) -> bool {
+  if (!shared_d3d_device || !d2d.swap_chain) {
+    return false;
+  }
+
   wil::com_ptr<IDXGIDevice> dxgi_device;
-  if (FAILED(d2d.d3d_device->QueryInterface(IID_PPV_ARGS(dxgi_device.put()))) || !dxgi_device) {
+  if (FAILED(shared_d3d_device->QueryInterface(IID_PPV_ARGS(dxgi_device.put()))) || !dxgi_device) {
     return false;
   }
 
-  const HRESULT device_hr =
-      DCompositionCreateDevice(dxgi_device.get(), IID_PPV_ARGS(d2d.composition_device.put()));
-  if (FAILED(device_hr) || !d2d.composition_device) {
+  wil::com_ptr<IDCompositionDevice> composition_device;
+  if (FAILED(DCompositionCreateDevice(dxgi_device.get(), IID_PPV_ARGS(composition_device.put()))) ||
+      !composition_device) {
     return false;
   }
 
-  if (FAILED(
-          d2d.composition_device->CreateTargetForHwnd(hwnd, TRUE, d2d.composition_target.put())) ||
+  if (FAILED(composition_device->CreateTargetForHwnd(hwnd, TRUE, d2d.composition_target.put())) ||
       !d2d.composition_target) {
     return false;
   }
 
-  if (FAILED(d2d.composition_device->CreateVisual(d2d.composition_visual.put())) ||
+  if (FAILED(composition_device->CreateVisual(d2d.composition_visual.put())) ||
       !d2d.composition_visual) {
     return false;
   }
 
-  if (FAILED(d2d.composition_visual->SetContent(d2d.swap_chain.get())) ||
-      FAILED(d2d.composition_target->SetRoot(d2d.composition_visual.get())) ||
-      FAILED(d2d.composition_device->Commit())) {
-    return false;
-  }
-
-  return true;
+  return SUCCEEDED(d2d.composition_visual->SetContent(d2d.swap_chain.get())) &&
+         SUCCEEDED(d2d.composition_target->SetRoot(d2d.composition_visual.get())) &&
+         SUCCEEDED(composition_device->Commit());
 }
 
 // 每次 resize 或 target 丢失后，都要重新从 back buffer 包一层 D2D bitmap，
@@ -229,9 +209,9 @@ auto create_target_bitmap(UI::FloatingWindow::RenderContext& d2d, const SIZE& si
   D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
       D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
       D2D1::PixelFormat(kSurfaceFormat, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
-  const HRESULT hr = d2d.device_context->CreateBitmapFromDxgiSurface(
-      dxgi_surface.get(), &properties, d2d.target_bitmap.put());
-  if (FAILED(hr) || !d2d.target_bitmap) {
+  if (FAILED(d2d.device_context->CreateBitmapFromDxgiSurface(dxgi_surface.get(), &properties,
+                                                             d2d.target_bitmap.put())) ||
+      !d2d.target_bitmap) {
     return false;
   }
 
@@ -240,7 +220,6 @@ auto create_target_bitmap(UI::FloatingWindow::RenderContext& d2d, const SIZE& si
   return true;
 }
 
-// 辅助函数：测量文本宽度
 auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format,
                         IDWriteFactory7* write_factory) -> float {
   if (text.empty() || !text_format || !write_factory) {
@@ -248,20 +227,16 @@ auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format
   }
 
   wil::com_ptr<IDWriteTextLayout> text_layout;
-  const HRESULT hr =
-      write_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.length()), text_format,
-                                      10000.0f, 10000.0f, text_layout.put());
-
-  if (FAILED(hr) || !text_layout) {
+  if (FAILED(write_factory->CreateTextLayout(text.c_str(), static_cast<UINT32>(text.length()),
+                                             text_format, 10000.0f, 10000.0f, text_layout.put())) ||
+      !text_layout) {
     return 0.0f;
   }
 
   DWRITE_TEXT_METRICS metrics{};
-  const HRESULT metrics_hr = text_layout->GetMetrics(&metrics);
-  return SUCCEEDED(metrics_hr) ? metrics.width : 0.0f;
+  return SUCCEEDED(text_layout->GetMetrics(&metrics)) ? metrics.width : 0.0f;
 }
 
-// 更新所有画刷颜色
 auto update_all_brush_colors(Core::State::AppState& state) -> void {
   const auto& colors = state.settings->raw.ui.floating_window_colors;
   auto& d2d = state.floating_window->d2d_context;
@@ -292,7 +267,6 @@ auto update_all_brush_colors(Core::State::AppState& state) -> void {
   }
 }
 
-// 创建具有指定字体大小的文本格式
 auto create_text_format_with_size(IDWriteFactory7* write_factory, float font_size)
     -> wil::com_ptr<IDWriteTextFormat> {
   if (!write_factory) {
@@ -313,9 +287,9 @@ auto create_text_format_with_size(IDWriteFactory7* write_factory, float font_siz
   return text_format;
 }
 
-// 初始化Direct2D资源
 auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
   auto& d2d = state.floating_window->d2d_context;
+  auto& shared = shared_resources(state);
   const SIZE size = get_client_size(hwnd);
   if (size.cx <= 0 || size.cy <= 0) {
     return false;
@@ -323,16 +297,21 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
 
   cleanup_d2d(state);
 
-  // 初始化按“工厂 -> D3D -> D2D context -> swap chain -> composition tree -> target bitmap”
-  // 的顺序推进；任一步失败都整体回滚，保持下次可从干净状态重建。
-  if (!create_factories(d2d) || !create_d3d_device(d2d) || !create_d2d_device_context(d2d) ||
-      !create_swap_chain(d2d, size) || !create_composition_tree(d2d, hwnd) ||
+  if (!UI::SharedRenderResources::ensure_initialized(state)) {
+    return false;
+  }
+
+  // 初始化按“共享设备级资源 -> 窗口级 device context -> swap chain -> composition tree
+  // -> target bitmap”的顺序推进；任一步失败都整体回滚。
+  if (!create_device_context(shared.d2d_device.get(), d2d) ||
+      !create_swap_chain(shared.d3d_device.get(), d2d, size) ||
+      !create_composition_tree(shared.d3d_device.get(), d2d, hwnd) ||
       !create_target_bitmap(d2d, size) || !create_all_brushes_simple(state, d2d)) {
     cleanup_d2d(state);
     return false;
   }
 
-  d2d.text_format = create_text_format_with_size(d2d.write_factory.get(),
+  d2d.text_format = create_text_format_with_size(shared.write_factory.get(),
                                                  state.floating_window->layout.font_size);
   if (!d2d.text_format) {
     cleanup_d2d(state);
@@ -343,35 +322,26 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
   return true;
 }
 
-// 清理Direct2D资源
 auto cleanup_d2d(Core::State::AppState& state) -> void {
   auto& d2d = state.floating_window->d2d_context;
 
-  // 先清掉依赖 device context 的缓存和 brush，再按 target -> device -> composition -> D3D
-  // 的反向顺序释放，避免留下悬空的 target 绑定。
+  // 先清掉依赖 device context 的缓存和 brush，再按 target -> surface 的反向顺序释放，
+  // 避免留下悬空的 target 绑定。
   clear_text_caches(d2d);
   release_brushes(d2d);
   d2d.text_format.reset();
   release_target_bitmap(d2d);
 
   d2d.device_context.reset();
-  d2d.d2d_device.reset();
-  d2d.write_factory.reset();
-  d2d.factory.reset();
-
   d2d.composition_visual.reset();
   d2d.composition_target.reset();
-  d2d.composition_device.reset();
   d2d.swap_chain.reset();
-  d2d.d3d_device_context.reset();
-  d2d.d3d_device.reset();
 
   d2d.surface_size = {0, 0};
   d2d.is_initialized = false;
   d2d.is_rendering = false;
 }
 
-// 调整渲染目标大小
 auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
   auto& d2d = state.floating_window->d2d_context;
   if (!d2d.is_initialized || !d2d.swap_chain || !d2d.device_context || new_size.cx <= 0 ||
@@ -396,18 +366,22 @@ auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
   return true;
 }
 
-// 更新文本格式（DPI变化时）
 auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
   auto& d2d = state.floating_window->d2d_context;
   auto& layout = state.floating_window->layout;
+  auto& shared = shared_resources(state);
 
-  if (!d2d.needs_font_update || !d2d.write_factory) {
+  if (!d2d.needs_font_update) {
     return true;
+  }
+
+  if (!shared.is_initialized && !UI::SharedRenderResources::ensure_initialized(state)) {
+    return false;
   }
 
   // 字体更新只重建 text format 和测量缓存，不触碰底层 composition / swap chain 资源。
   d2d.text_format.reset();
-  d2d.text_format = create_text_format_with_size(d2d.write_factory.get(), layout.font_size);
+  d2d.text_format = create_text_format_with_size(shared.write_factory.get(), layout.font_size);
   if (!d2d.text_format) {
     return false;
   }

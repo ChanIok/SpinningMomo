@@ -4,32 +4,30 @@ module UI.ContextMenu.Layout;
 
 import std;
 import Core.State;
+import UI.SharedRenderResources.State;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
-import UI.FloatingWindow.State;
-import UI.FloatingWindow.Types;
 import Vendor.Windows;
-import <d2d1.h>;
-import <dwrite.h>;
+import <dwrite_3.h>;
+import <wil/com.h>;
 import <windows.h>;
-import <wrl/client.h>;
 
 namespace UI::ContextMenu::Layout {
 
 auto calculate_text_width(const Core::State::AppState& state, const std::wstring& text) -> int {
   const auto& menu_state = *state.context_menu;
-  if (!state.floating_window) {
+  if (!state.shared_render_resources) {
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
-  const auto& d2d = state.floating_window->d2d_context;
-  if (!d2d.is_initialized || !d2d.write_factory || !menu_state.text_format) {
+  const auto& shared = *state.shared_render_resources;
+  if (!shared.is_initialized || !shared.write_factory || !menu_state.text_format) {
     return static_cast<int>(text.length() * menu_state.layout.font_size * 0.6);
   }
 
-  Microsoft::WRL::ComPtr<IDWriteTextLayout> text_layout;
-  HRESULT hr = d2d.write_factory->CreateTextLayout(
-      text.c_str(), static_cast<UINT32>(text.length()), menu_state.text_format, 1000.0f,
-      static_cast<float>(menu_state.layout.item_height), &text_layout);
+  wil::com_ptr<IDWriteTextLayout> text_layout;
+  HRESULT hr = shared.write_factory->CreateTextLayout(
+      text.c_str(), static_cast<UINT32>(text.length()), menu_state.text_format.get(), 1000.0f,
+      static_cast<float>(menu_state.layout.item_height), text_layout.put());
 
   if (SUCCEEDED(hr)) {
     DWRITE_TEXT_METRICS metrics;

@@ -25,6 +25,7 @@ import Features.Screenshot.State;
 import Features.Recording.State;
 import Features.Settings.State;
 import Features.Update.State;
+import UI.SharedRenderResources.State;
 import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import UI.TrayIcon.State;
@@ -47,6 +48,8 @@ AppState::AppState()
       tasks(std::make_unique<Core::Tasks::State::TaskState>()),
       settings(std::make_unique<Features::Settings::State::SettingsState>()),
       update(std::make_unique<Features::Update::State::UpdateState>()),
+      shared_render_resources(
+          std::make_unique<UI::SharedRenderResources::State::SharedRenderResourcesState>()),
       floating_window(std::make_unique<UI::FloatingWindow::State::FloatingWindowState>()),
       tray_icon(std::make_unique<UI::TrayIcon::State::TrayIconState>()),
       context_menu(std::make_unique<UI::ContextMenu::State::ContextMenuState>()),
