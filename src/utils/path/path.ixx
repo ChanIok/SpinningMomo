@@ -13,6 +13,11 @@ export enum class AppMode {
   Installed,
 };
 
+export enum class PathStorageKind {
+  Local,
+  RemoteUnc,
+};
+
 // 获取当前程序所在的目录路径
 export auto GetExecutableDirectory() -> std::expected<std::filesystem::path, std::string>;
 
@@ -55,6 +60,12 @@ export auto ResolvePath(const std::filesystem::path& path,
 export auto NormalizePath(const std::filesystem::path& path,
                           std::optional<std::filesystem::path> base = std::nullopt)
     -> std::expected<std::filesystem::path, std::string>;
+
+// 纯字符串判断路径存储类型，不访问文件系统。
+export auto ClassifyPathStorageKind(const std::filesystem::path& path) -> PathStorageKind;
+
+// 从 UNC 路径中提取 server 名称；支持 \\server\share 与 \\?\UNC\server\share。
+export auto TryParseUncServer(const std::filesystem::path& path) -> std::optional<std::wstring>;
 
 // 获取用户视频文件夹路径 (FOLDERID_Videos)
 export auto GetUserVideosDirectory() -> std::expected<std::filesystem::path, std::string>;

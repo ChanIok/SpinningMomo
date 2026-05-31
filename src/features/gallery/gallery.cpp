@@ -16,6 +16,7 @@ import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Service;
+import Features.Gallery.RootAvailability;
 import Features.Gallery.StaticResolver;
 import Features.Gallery.Watcher;
 import Utils.File;
@@ -93,6 +94,12 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       Logger().error("Failed to ensure thumbnails directory exists: {}", ensure_dir_result.error());
       return std::unexpected("Failed to ensure thumbnails directory exists: " +
                              ensure_dir_result.error());
+    }
+
+    if (auto availability_result = Features::Gallery::RootAvailability::initialize(app_state);
+        !availability_result) {
+      return std::unexpected("Failed to initialize gallery root availability: " +
+                             availability_result.error());
     }
 
     // 注册静态服务解析器

@@ -94,8 +94,8 @@ auto load_all_folders(Core::State::AppState& app_state)
 }
 
 // 给单个 asset 填 root_id、relative_path（仅改内存，不写库）；失败则字段留空并打日志。
-auto try_assign_locator(const LocatorContext& context, Types::Asset& asset)
-    -> std::expected<void, std::string> {
+auto try_assign_locator(Core::State::AppState& app_state, const LocatorContext& context,
+                        Types::Asset& asset) -> std::expected<void, std::string> {
   asset.root_id.reset();
   asset.relative_path.reset();
 
@@ -174,7 +174,7 @@ auto populate_asset_locators(Core::State::AppState& app_state, std::vector<Types
 
   // 按 folder_id 为每条 asset 算 root_id、relative_path
   for (auto& asset : assets) {
-    auto assign_result = Detail::try_assign_locator(context_result.value(), asset);
+    auto assign_result = Detail::try_assign_locator(app_state, context_result.value(), asset);
     if (!assign_result) {
       return std::unexpected(assign_result.error());
     }

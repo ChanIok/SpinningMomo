@@ -25,6 +25,12 @@ export enum class DirectoryWatchBackend {
   Disabled,
 };
 
+export enum class RootAvailability {
+  Local,
+  RemoteReachable,
+  RemoteUnreachable,
+};
+
 export struct FolderWatcherState {
   // 监听的根目录（Gallery 内部规范路径：absolute + lexical normal + generic slash）
   std::filesystem::path root_path;
@@ -80,6 +86,11 @@ export struct GalleryState {
   // 根目录 watcher 状态（key = Gallery 内部规范路径字符串）
   std::unordered_map<std::string, std::shared_ptr<FolderWatcherState>> folder_watchers;
   std::mutex folder_watchers_mutex;
+
+  // 本次运行期的 root 可达性快照。UNC 只在启动时探测一次，不做运行中重连刷新。
+  std::unordered_map<std::int64_t, RootAvailability> root_availability_by_id;
+  std::unordered_map<std::string, RootAvailability> root_availability_by_path;
+  std::mutex root_availability_mutex;
 
   // 手动 move 操作的 watcher 去重表（key 为大小写归一化后的路径比较键）。
   std::unordered_map<std::wstring, ManualMoveIgnoreEntry> manual_move_ignore_paths;

@@ -10,6 +10,7 @@ import Core.Database;
 import Features.Gallery.Types;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.OriginalLocator;
+import Features.Gallery.RootAvailability;
 import Features.Gallery.Watcher;
 import Features.Gallery.Asset.Thumbnail;
 import Utils.Logger;
@@ -23,6 +24,12 @@ namespace Features::Gallery::Folder::Service {
 auto ensure_root_folder_webview_mapping(Core::State::AppState& app_state,
                                         const Types::Folder& folder) -> void {
   if (folder.parent_id.has_value()) {
+    return;
+  }
+
+  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state, folder.id)) {
+    Logger().warn("Skip WebView original host mapping for unreachable remote root: id={}, path={}",
+                  folder.id, folder.path);
     return;
   }
 

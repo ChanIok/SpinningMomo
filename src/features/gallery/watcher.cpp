@@ -16,6 +16,7 @@ import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Service;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.RootAvailability;
 import Features.Gallery.Color.Types;
 import Features.Gallery.Color.Extractor;
 import Features.Gallery.Color.Repository;
@@ -1348,23 +1349,27 @@ auto start_watcher_if_needed(Core::State::AppState& app_state,
   return true;
 }
 
-// 规范化需要监听的根目录路径，检查是否存在且是目录
+// Gallery root 的运行时 key 只做 lexical 规范化，不解析 symlink/网络路径。
 auto normalize_root_directory(const std::filesystem::path& root_directory)
     -> std::expected<std::filesystem::path, std::string> {
-  auto normalized_result = Utils::Path::ResolvePath(root_directory);
+  auto normalized_result = Utils::Path::NormalizePath(root_directory);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize root directory: " + normalized_result.error());
   }
 
-  auto normalized = normalized_result.value();
-  if (!std::filesystem::exists(normalized)) {
-    return std::unexpected("Root directory does not exist: " + normalized.string());
+  return normalized_result.value();
+}
+
+auto validate_root_directory_accessible(const std::filesystem::path& root_directory)
+    -> std::expected<void, std::string> {
+  if (!std::filesystem::exists(root_directory)) {
+    return std::unexpected("Root directory does not exist: " + root_directory.string());
   }
-  if (!std::filesystem::is_directory(normalized)) {
-    return std::unexpected("Root path is not a directory: " + normalized.string());
+  if (!std::filesystem::is_directory(root_directory)) {
+    return std::unexpected("Root path is not a directory: " + root_directory.string());
   }
 
-  return normalized;
+  return {};
 }
 
 // 注册一个根目录 watcher；若已存在则更新扫描参数。
@@ -1435,6 +1440,11 @@ auto start_watcher_for_directory(Core::State::AppState& app_state,
     return std::unexpected(normalized_result.error());
   }
 
+  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state,
+                                                                 normalized_result.value())) {
+    return std::unexpected("Remote root is unavailable: " + normalized_result->string());
+  }
+
   std::shared_ptr<State::FolderWatcherState> watcher;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
@@ -1458,7 +1468,7 @@ auto start_watcher_for_directory(Core::State::AppState& app_state,
 auto remove_watcher_for_directory(Core::State::AppState& app_state,
                                   const std::filesystem::path& root_directory)
     -> std::expected<bool, std::string> {
-  auto normalized_result = Utils::Path::ResolvePath(root_directory);
+  auto normalized_result = normalize_root_directory(root_directory);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize root directory: " + normalized_result.error());
   }
@@ -1541,6 +1551,16 @@ auto start_registered_watchers(Core::State::AppState& app_state)
       return false;
     }
 
+    auto validate_result = validate_root_directory_accessible(w->root_path);
+    if (!validate_result) {
+      Logger().warn("Skip watcher start for unreachable root '{}': {}", w->root_path.string(),
+                    validate_result.error());
+      if (!first_error.has_value()) {
+        first_error = validate_result.error();
+      }
+      return false;
+    }
+
     auto result = start_watcher_if_needed(app_state, w, false);
     if (!result) {
       Logger().warn("Skip watcher start for '{}': {}", w->root_path.string(), result.error());
@@ -1566,6 +1586,12 @@ auto start_registered_watchers(Core::State::AppState& app_state)
     startup_thumbnail_short_edge =
         std::max(startup_thumbnail_short_edge,
                  get_watcher_scan_options(watcher).thumbnail_short_edge.value_or(480));
+
+    if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state, watcher->root_path)) {
+      Logger().warn("Skip gallery startup recovery for unavailable remote root '{}'",
+                    watcher->root_path.string());
+      continue;
+    }
 
     // 每个 root 的启动流程：
     // 1. 查询恢复决策（USN 增量 or 全量）

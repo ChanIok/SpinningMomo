@@ -238,6 +238,38 @@ auto Utils::Path::NormalizePath(const std::filesystem::path& path,
   }
 }
 
+auto Utils::Path::TryParseUncServer(const std::filesystem::path& path)
+    -> std::optional<std::wstring> {
+  auto value = path.wstring();
+  std::ranges::replace(value, L'\\', L'/');
+
+  std::wstring_view view(value);
+  if (view.starts_with(L"//?/UNC/")) {
+    view.remove_prefix(std::wstring_view(L"//?/UNC/").size());
+  } else if (view.starts_with(L"//./UNC/")) {
+    view.remove_prefix(std::wstring_view(L"//./UNC/").size());
+  } else if (view.starts_with(L"//")) {
+    view.remove_prefix(2);
+  } else {
+    return std::nullopt;
+  }
+
+  auto separator = view.find(L'/');
+  if (separator == std::wstring_view::npos || separator == 0) {
+    return std::nullopt;
+  }
+
+  auto server = std::wstring(view.substr(0, separator));
+  if (server == L"." || server == L"?") {
+    return std::nullopt;
+  }
+  return server;
+}
+
+auto Utils::Path::ClassifyPathStorageKind(const std::filesystem::path& path) -> PathStorageKind {
+  return TryParseUncServer(path).has_value() ? PathStorageKind::RemoteUnc : PathStorageKind::Local;
+}
+
 // 把路径转成适合比较的统一形式：先 lexically_normal 消除冗余分隔符，
 // 再转小写、统一为正斜杠。用于 Windows 大小写不敏感的前缀匹配场景。
 auto Utils::Path::NormalizeForComparison(const std::filesystem::path& path) -> std::wstring {

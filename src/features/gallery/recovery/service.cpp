@@ -12,6 +12,7 @@ import Features.Gallery.Types;
 import Features.Gallery.Recovery.Types;
 import Features.Gallery.Recovery.Repository;
 import Features.Gallery.Ignore.Repository;
+import Features.Gallery.RootAvailability;
 import Features.Gallery.ScanCommon;
 import Features.Gallery.Asset.Repository;
 import Utils.Logger;
@@ -101,6 +102,11 @@ auto is_path_under_root(const std::string& path_key, const std::string& root_key
   return path_key.size() > root_key.size() && path_key[root_key.size()] == '/';
 }
 
+auto is_unc_root(const std::filesystem::path& root_path) -> bool {
+  // USN 是本地 NTFS 卷语义；UNC 的结论可由路径形态直接决定，不能先碰卷 API。
+  return Utils::Path::ClassifyPathStorageKind(root_path) == Utils::Path::PathStorageKind::RemoteUnc;
+}
+
 auto strip_extended_path_prefix(std::wstring value) -> std::wstring {
   // GetFinalPathNameByHandleW 返回的路径常带 \\?\ 或 \\?\UNC\ 前缀，去掉以保持一致。
   constexpr std::wstring_view extended_prefix = L"\\\\?\\";
@@ -149,6 +155,12 @@ auto open_volume_handle(const std::wstring& volume_device_path)
 auto query_journal_snapshot(const std::filesystem::path& root_path)
     -> std::expected<JournalSnapshot, std::string> {
   JournalSnapshot snapshot;
+
+  if (is_unc_root(root_path)) {
+    // GetVolumePathNameW 对不可达 UNC 也可能阻塞；这里必须在卷查询前短路。
+    snapshot.reason = "UNC roots do not expose a local USN journal";
+    return snapshot;
+  }
 
   auto volume_root_result = get_volume_root_for_path(root_path);
   if (!volume_root_result) {
@@ -551,11 +563,24 @@ auto prepare_startup_recovery(Core::State::AppState& app_state,
   // 返回启动恢复决策：当前 root 应走 USN 增量还是 FullScan？
   // 只做决策，不启动 watcher。
 
-  auto normalized_root_result = Utils::Path::ResolvePath(root_path);
+  auto normalized_root_result = Utils::Path::NormalizePath(root_path);
   if (!normalized_root_result) {
     return std::unexpected("Failed to normalize root path: " + normalized_root_result.error());
   }
   plan.root_path = normalized_root_result->string();
+
+  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state,
+                                                                 *normalized_root_result)) {
+    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.reason = "remote root is unavailable in this session";
+    return plan;
+  }
+
+  if (Detail::is_unc_root(*normalized_root_result)) {
+    plan.mode = Types::StartupRecoveryMode::FullScan;
+    plan.reason = "UNC roots do not use USN startup recovery";
+    return plan;
+  }
 
   auto journal_snapshot_result = Detail::query_journal_snapshot(*normalized_root_result);
   if (!journal_snapshot_result) {
@@ -646,9 +671,18 @@ auto persist_recovery_checkpoint(Core::State::AppState& app_state,
     -> std::expected<void, std::string> {
   // 正常退出时保存检查点。需查询当前 journal 快照和规则指纹。
   // 启动恢复路径应使用轻量的 persist_recovery_state。
-  auto normalized_root_result = Utils::Path::ResolvePath(root_path);
+  auto normalized_root_result = Utils::Path::NormalizePath(root_path);
   if (!normalized_root_result) {
     return std::unexpected("Failed to normalize root path: " + normalized_root_result.error());
+  }
+
+  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state,
+                                                                 *normalized_root_result)) {
+    return {};
+  }
+
+  if (Detail::is_unc_root(*normalized_root_result)) {
+    return {};
   }
 
   auto journal_snapshot_result = Detail::query_journal_snapshot(*normalized_root_result);

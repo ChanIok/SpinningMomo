@@ -18,6 +18,15 @@
  *    这里通过 patch 把这些变量改成带外部链接语义的定义，
  *    规避 header unit 导入时的链接问题。
  *
+ *    Asio socket/reactor 路径还会触发另一类 MSVC header unit 链接问题：
+ *    当代码首次使用 `asio::ip::tcp::socket` / `async_connect` 时，
+ *    `select_reactor` 会实例化 `reactor_op_queue<socket_type>`。在普通头文件
+ *    include 路径下它的隐式析构可以正常内联，但在当前 header unit + C++ modules
+ *    组合下，MSVC 可能只留下对析构符号的外部引用，表现为：
+ *      - `asio::detail::reactor_op_queue<unsigned __int64>::~reactor_op_queue()`
+ *    因此这里给 `reactor_op_queue` 补一个空的类内析构定义，让析构语义保持不变，
+ *    同时强制它在 header unit 中拥有可用的 inline 定义。
+ *
  * 2. WIL / strsafe / memcpy_s
  *    `import <wil/com.h>;` 目前也会触发 header unit 兼容问题，但性质不同：
  *    它会先后炸在 Windows SDK / UCRT 的 `strsafe.h`、`corecrt_memcpy_s.h`
@@ -70,6 +79,36 @@ const rules = [
               "#endif // !defined(ASIO_INLINE_VARIABLE_EXTERNAL)",
               "",
               "// Default alignment.",
+            ].join("\n"),
+          },
+        ],
+      },
+      {
+        file: "include/asio/detail/reactor_op_queue.hpp",
+        replacements: [
+          {
+            before: [
+              "  // Constructor.",
+              "  reactor_op_queue()",
+              "    : operations_()",
+              "  {",
+              "  }",
+              "",
+              "  // Obtain iterators to all registered descriptors.",
+            ].join("\n"),
+            after: [
+              "  // Constructor.",
+              "  reactor_op_queue()",
+              "    : operations_()",
+              "  {",
+              "  }",
+              "",
+              "  // Destructor.",
+              "  ~reactor_op_queue()",
+              "  {",
+              "  }",
+              "",
+              "  // Obtain iterators to all registered descriptors.",
             ].join("\n"),
           },
         ],

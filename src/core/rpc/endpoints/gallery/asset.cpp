@@ -12,6 +12,8 @@ import Features.Gallery;
 import Features.Gallery.Types;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Asset.Repository;
+import Features.Gallery.OriginalLocator;
+import Features.Gallery.RootAvailability;
 import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Gallery::Asset {
@@ -277,7 +279,24 @@ auto handle_check_asset_reachable(Core::State::AppState& app_state,
     };
   }
 
-  const auto& asset = asset_result->value();
+  auto asset = asset_result->value();
+  std::vector<Features::Gallery::Types::Asset> assets{asset};
+  auto locator_result =
+      Features::Gallery::OriginalLocator::populate_asset_locators(app_state, assets);
+  if (locator_result && !assets.empty()) {
+    asset = std::move(assets.front());
+  }
+
+  if (asset.root_id.has_value() &&
+      Features::Gallery::RootAvailability::is_remote_unreachable(app_state, *asset.root_id)) {
+    co_return CheckAssetReachableResult{
+        .exists = false,
+        .readable = false,
+        .path = asset.path,
+        .reason = std::string("Remote root is unavailable"),
+    };
+  }
+
   std::filesystem::path file_path(asset.path);
   std::error_code ec;
   const bool exists = std::filesystem::exists(file_path, ec) && !ec;
