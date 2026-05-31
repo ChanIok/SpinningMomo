@@ -555,7 +555,16 @@ auto apply_registered_document_created_scripts(Core::State::AppState& state, ICo
   return S_OK;
 }
 
-auto select_initial_url(Core::WebView::State::WebViewConfig& config) -> void {
+auto select_initial_url(Core::WebView::State::WebViewState& webview_state) -> void {
+  auto& config = webview_state.config;
+  if (!webview_state.pending_initial_url.empty()) {
+    config.initial_url = std::move(webview_state.pending_initial_url);
+    webview_state.pending_initial_url.clear();
+    Logger().info("Using pending WebView initial URL: {}",
+                  Utils::String::ToUtf8(config.initial_url));
+    return;
+  }
+
   if (Vendor::BuildConfig::is_debug_build()) {
     config.initial_url = config.dev_server_url;
     Logger().info("Debug mode: Using Vite dev server at {}",
@@ -715,7 +724,7 @@ auto finalize_controller_initialization(Core::State::AppState* state,
     Logger().warn("Document-created script registration failed: {}", hr);
   }
 
-  select_initial_url(webview_state.config);
+  select_initial_url(webview_state);
 
   auto non_client_enabled = enable_non_client_region_support(webview);
   if (composition_controller && non_client_enabled) {

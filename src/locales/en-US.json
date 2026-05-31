@@ -39,13 +39,13 @@
   "message.window_reset_success": "Window has been reset to screen size.",
   "message.window_reset_failed": "Failed to reset window size.",
 
-  "message.screenshot_success": "Screenshot saved to: ",
+  "message.screenshot_success": "Screenshot saved: ",
   "message.screenshot_failed": "Screenshot failed",
   "message.preview_overlay_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
   "message.preview_start_failed": "Failed to start preview window: ",
   "message.overlay_start_failed": "Failed to start overlay window: ",
   "message.recording_started": "Recording started.",
-  "message.recording_saved": "Recording saved to: ",
+  "message.recording_saved": "Recording saved: ",
   "message.recording_start_failed": "Failed to start recording: ",
   "message.recording_stop_failed": "Failed to stop recording: ",
 
@@ -60,7 +60,7 @@
   "message.settings_format_error": "Format error: ",
   "message.settings_ratio_format_example": "Please use correct format, e.g.: 16:10,17:10",
   "message.settings_resolution_format_example": "Please use correct format, e.g.: 3840x2160,7680x4320",
-  "message.update_available_about_prefix": "A new version is available. Install it from the About page: ",
+  "message.update_available_about_prefix": "v{0} is available. Install from the About page.",
   "message.app_updated_to_prefix": "Successfully updated to version ",
 
   "label.app_name": "SpinningMomo",

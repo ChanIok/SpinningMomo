@@ -12,6 +12,7 @@ import Features.Settings.Types;
 import UI.FloatingWindow.State;
 import UI.TrayIcon.Types;
 import Utils.Logger;
+import Vendor.BuildConfig;
 import Vendor.Windows;
 import Vendor.ShellApi;
 import Core.State.RuntimeInfo;
@@ -155,24 +156,71 @@ auto hide(Core::State::AppState& state) -> void {
   }
 }
 
-auto activate_window(Core::State::AppState& state) -> void {
+auto append_hash_route(std::wstring url, std::wstring_view route) -> std::wstring {
+  if (route.empty()) {
+    return url;
+  }
+
+  std::wstring hash_route(route);
+  if (hash_route.front() != L'#') {
+    if (hash_route.front() != L'/') {
+      hash_route.insert(hash_route.begin(), L'/');
+    }
+    hash_route = L"#" + hash_route;
+  }
+
+  if (auto hash_pos = url.find(L'#'); hash_pos != std::wstring::npos) {
+    url.erase(hash_pos);
+  }
+  url += hash_route;
+  return url;
+}
+
+auto make_webview_url(Core::State::AppState& state, std::wstring_view route) -> std::wstring {
+  std::wstring url = Vendor::BuildConfig::is_debug_build()
+                         ? state.webview->config.dev_server_url
+                         : L"https://" + state.webview->config.virtual_host_name + L"/index.html";
+  return append_hash_route(std::move(url), route);
+}
+
+auto make_browser_url(Core::State::AppState& state, std::wstring_view route) -> std::wstring {
+  std::string url = std::format("http://localhost:{}/", state.http_server->port);
+  return append_hash_route(std::wstring(url.begin(), url.end()), route);
+}
+
+auto open_in_browser(Core::State::AppState& state, std::wstring_view route) -> void {
+  auto url = make_browser_url(state, route);
+  Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{.cbSize = sizeof(exec_info),
+                                                .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
+                                                .lpVerb = L"open",
+                                                .lpFile = url.c_str(),
+                                                .nShow = Vendor::ShellApi::kSW_SHOWNORMAL};
+  Vendor::ShellApi::ShellExecuteExW(&exec_info);
+}
+
+auto activate_window(Core::State::AppState& state, std::wstring_view route) -> void {
   if (state.runtime_info && !state.runtime_info->is_webview2_available) {
     Logger().warn("WebView2 runtime is unavailable. Opening in browser.");
-    std::string url = std::format("http://localhost:{}/", state.http_server->port);
-    std::wstring wurl(url.begin(), url.end());  // URL is ASCII
-
-    Vendor::ShellApi::SHELLEXECUTEINFOW exec_info{.cbSize = sizeof(exec_info),
-                                                  .fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC,
-                                                  .lpVerb = L"open",
-                                                  .lpFile = wurl.c_str(),
-                                                  .nShow = Vendor::ShellApi::kSW_SHOWNORMAL};
-    Vendor::ShellApi::ShellExecuteExW(&exec_info);
+    open_in_browser(state, route);
     return;
+  }
+
+  if (route.empty()) {
+    state.webview->pending_initial_url.clear();
+  } else if (!state.webview->is_ready) {
+    state.webview->pending_initial_url = make_webview_url(state, route);
   }
 
   if (auto result = show(state); !result) {
     Logger().error("Failed to activate WebView window: {}", result.error());
     return;
+  }
+
+  if (!route.empty() && state.webview->is_ready) {
+    if (auto result = Core::WebView::navigate_to_url(state, make_webview_url(state, route));
+        !result) {
+      Logger().warn("Failed to navigate WebView to route: {}", result.error());
+    }
   }
 
   auto hwnd = state.webview->window.webview_hwnd;

@@ -122,6 +122,7 @@ export struct WebViewState {
   CoreResources resources;
   MessageState messaging;
   WebViewConfig config;
+  std::wstring pending_initial_url;
 
   bool is_initialized = false;
   bool is_ready = false;

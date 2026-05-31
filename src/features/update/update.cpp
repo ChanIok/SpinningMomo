@@ -5,6 +5,7 @@ import Core.Events;
 import Core.Async;
 import Core.Tasks;
 import UI.FloatingWindow.Events;
+import UI.WebViewWindow;
 import Core.State;
 import Features.Notifications;
 import Features.Notifications.Types;
@@ -37,6 +38,20 @@ auto post_update_notification(Core::State::AppState& app_state, const std::strin
   Features::Notifications::Types::NotificationOptions options;
   options.title = Utils::String::FromUtf8(app_name_it->second);
   options.message = Utils::String::FromUtf8(message);
+
+  auto action_label_it = app_state.i18n->texts.find("notification.action.view");
+  if (action_label_it != app_state.i18n->texts.end()) {
+    options.action = Features::Notifications::Types::NotificationAction{
+        .label = Utils::String::FromUtf8(action_label_it->second),
+        .callback =
+            [](Core::State::AppState& state) {
+              UI::WebViewWindow::activate_window(state, L"/about");
+            },
+    };
+  } else {
+    Logger().warn("Skip update notification action: view action text is missing");
+  }
+
   Features::Notifications::post_notification_request(app_state, std::move(options));
 }
 
@@ -625,7 +640,9 @@ auto schedule_startup_auto_update_check(Core::State::AppState& app_state) -> voi
             if (app_state.i18n) {
               auto text_it = app_state.i18n->texts.find("message.update_available_about_prefix");
               if (text_it != app_state.i18n->texts.end()) {
-                post_update_notification(app_state, text_it->second + check_result->latest_version);
+                post_update_notification(
+                    app_state, std::vformat(text_it->second,
+                                            std::make_format_args(check_result->latest_version)));
               } else {
                 Logger().warn("Skip update available notification: i18n text is missing");
               }

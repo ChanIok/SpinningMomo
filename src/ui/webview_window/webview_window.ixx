@@ -13,8 +13,8 @@ export auto initialize(Core::State::AppState& state) -> std::expected<void, std:
 export auto recreate_webview_host(Core::State::AppState& state) -> std::expected<void, std::string>;
 export auto cleanup(Core::State::AppState& state) -> void;
 
-// 窗口显示控制
-export auto activate_window(Core::State::AppState& state) -> void;
+// 窗口显示控制；route 为空时打开默认首页，非空时打开对应前端 hash 路由。
+export auto activate_window(Core::State::AppState& state, std::wstring_view route = {}) -> void;
 
 // 窗口控制功能
 export auto minimize_window(Core::State::AppState& state) -> std::expected<void, std::string>;
