@@ -346,6 +346,10 @@ auto start(Core::State::AppState& app_state, HWND target_window,
     return std::unexpected("Recording is not idle");
   }
 
+  if (IsIconic(target_window)) {
+    return std::unexpected("Target window is minimized");
+  }
+
   Features::Recording::Session::clear_session_runtime_fields(app_state);
   Features::Recording::Session::cancel_cleanup_timer(app_state);
 

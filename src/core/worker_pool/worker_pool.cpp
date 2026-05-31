@@ -24,8 +24,8 @@ auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<v
   try {
     // 确定线程数
     if (thread_count == 0) {
-      thread_count = std::thread::hardware_concurrency();
-      if (thread_count == 0) thread_count = 2;  // 备用值
+      thread_count = std::thread::hardware_concurrency() / 2;
+      if (thread_count < 2) thread_count = 2;  // 最少 2 条
     }
 
     Logger().info("Starting WorkerPool with {} threads", thread_count);
