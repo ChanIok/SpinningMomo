@@ -29,7 +29,6 @@ struct ColumnDrawParams {
   float x_right;
   size_t scroll_offset;
   size_t max_visible;
-  bool is_paged;
 };
 
 constexpr float kWidthCacheScale = 10.0f;
@@ -69,27 +68,23 @@ auto store_text_measure_cache(UI::FloatingWindow::RenderContext& d2d, std::wstri
 auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderContext& d2d, int font_key)
     -> IDWriteTextFormat* {
   if (auto it = d2d.adjusted_text_formats.find(font_key); it != d2d.adjusted_text_formats.end()) {
-    return it->second;
+    return it->second.get();
   }
 
   if (d2d.adjusted_text_formats.size() >= kMaxAdjustedFormatEntries) {
-    for (auto& [_, text_format] : d2d.adjusted_text_formats) {
-      if (text_format) {
-        text_format->Release();
-      }
-    }
     d2d.adjusted_text_formats.clear();
   }
 
   const float font_size = static_cast<float>(font_key) / kFontCacheScale;
-  auto* text_format =
-      UI::FloatingWindow::D2DContext::create_text_format_with_size(d2d.write_factory, font_size);
+  auto text_format = UI::FloatingWindow::D2DContext::create_text_format_with_size(
+      d2d.write_factory.get(), font_size);
   if (!text_format) {
     return nullptr;
   }
 
-  d2d.adjusted_text_formats.emplace(font_key, text_format);
-  return text_format;
+  auto* text_format_ptr = text_format.get();
+  d2d.adjusted_text_formats.emplace(font_key, std::move(text_format));
+  return text_format_ptr;
 }
 
 // 按类别分组菜单项
@@ -123,11 +118,8 @@ auto draw_single_column(Core::State::AppState& state, const D2D1_RECT_F& rect,
   const auto& render = state.floating_window->layout;
   float y = rect.top + static_cast<float>(render.title_height + render.separator_height);
 
-  // 确定可见范围
-  const size_t start_index = params.is_paged ? params.scroll_offset : 0;
-  const size_t end_index = params.is_paged
-                               ? std::min(start_index + params.max_visible, column.items.size())
-                               : column.items.size();
+  const size_t start_index = params.scroll_offset;
+  const size_t end_index = std::min(start_index + params.max_visible, column.items.size());
 
   // 绘制可见项
   for (size_t i = start_index; i < end_index; ++i) {
@@ -186,26 +178,18 @@ auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F
   // 绘制滑块
   D2D1_RECT_F thumb_rect = UI::FloatingWindow::make_d2d_rect(
       indicator_left, thumb_top, indicator_right, thumb_top + thumb_height);
-  d2d.render_target->FillRectangle(thumb_rect, d2d.scroll_indicator_brush);
+  d2d.device_context->FillRectangle(thumb_rect, d2d.scroll_indicator_brush.get());
 }
 
 // 主绘制函数实现
 auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
   auto& d2d = state.floating_window->d2d_context;
 
-  if (!d2d.is_initialized || !d2d.render_target) {
+  if (!d2d.is_initialized || !d2d.device_context) {
     return;
   }
 
-  // 1. 先处理渲染目标resize（如果需要）
-  if (d2d.needs_resize) {
-    if (!UI::FloatingWindow::D2DContext::resize_d2d(
-            state, {client_rect.right - client_rect.left, client_rect.bottom - client_rect.top})) {
-      return;  // resize失败，无法继续绘制
-    }
-  }
-
-  // 2. 再处理字体更新（如果需要）
+  // 先处理字体更新（如果需要）
   if (d2d.needs_font_update) {
     if (!UI::FloatingWindow::D2DContext::update_text_format_if_needed(state)) {
       return;  // 字体更新失败，无法继续绘制
@@ -218,37 +202,38 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
 
   d2d.is_rendering = true;
 
-  d2d.render_target->BeginDraw();
+  d2d.device_context->BeginDraw();
 
   // 清空背景为完全透明
-  d2d.render_target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+  d2d.device_context->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
 
   // 全局设置替换混合模式，避免所有颜色叠加
-  if (d2d.device_context) {
-    d2d.device_context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
-  }
+  d2d.device_context->SetPrimitiveBlend(D2D1_PRIMITIVE_BLEND_COPY);
 
   const auto rect_f = UI::FloatingWindow::rect_to_d2d(client_rect);
 
-  // 4. 绘制各个部分
+  // 绘制各个部分
   draw_background(state, rect_f);
   draw_title_bar(state, rect_f);
   draw_separators(state, rect_f);
   draw_items(state, rect_f);
 
-  HRESULT hr = d2d.render_target->EndDraw();
+  HRESULT hr = d2d.device_context->EndDraw();
 
   // 处理设备丢失等错误
   if (hr == D2DERR_RECREATE_TARGET) {
-    // 设备丢失，标记需要重新创建渲染目标
-    d2d.needs_resize = true;
+    // composition back buffer 已失效时，直接重建整套后端比局部修补更可靠，
+    // 上层布局和交互状态保持不动。
+    UI::FloatingWindow::D2DContext::initialize_d2d(state, hwnd);
+    d2d.is_rendering = false;
+    return;
   }
 
   d2d.is_rendering = false;
 
-  // 5. 更新分层窗口
-  if (SUCCEEDED(hr)) {
-    update_layered_window(state, hwnd);
+  // 提交到 composition swap chain；DWM 会在下一轮合成中显示最新内容。
+  if (SUCCEEDED(hr) && d2d.swap_chain) {
+    d2d.swap_chain->Present(0, 0);
   }
 }
 
@@ -256,7 +241,7 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
 auto draw_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   const auto& d2d = state.floating_window->d2d_context;
   // 使用半透明白色背景
-  d2d.render_target->FillRectangle(rect, d2d.background_brush);
+  d2d.device_context->FillRectangle(rect, d2d.background_brush.get());
 }
 
 // 绘制关闭按钮
@@ -276,7 +261,7 @@ auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& ti
 
   // 绘制悬停背景（如果需要）
   if (state.floating_window->ui.close_button_hovered) {
-    d2d.render_target->FillRectangle(button_rect, d2d.hover_brush);
+    d2d.device_context->FillRectangle(button_rect, d2d.hover_brush.get());
   }
 
   // 计算"X"图标尺寸和位置
@@ -290,13 +275,13 @@ auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& ti
 
   // 绘制"X"图标
   const float pen_width = 1.5f;
-  d2d.render_target->DrawLine(D2D1::Point2F(icon_left, icon_top),
-                              D2D1::Point2F(icon_right, icon_bottom), d2d.text_brush, pen_width,
-                              nullptr);
+  d2d.device_context->DrawLine(D2D1::Point2F(icon_left, icon_top),
+                               D2D1::Point2F(icon_right, icon_bottom), d2d.text_brush.get(),
+                               pen_width, nullptr);
 
-  d2d.render_target->DrawLine(D2D1::Point2F(icon_right, icon_top),
-                              D2D1::Point2F(icon_left, icon_bottom), d2d.text_brush, pen_width,
-                              nullptr);
+  d2d.device_context->DrawLine(D2D1::Point2F(icon_right, icon_top),
+                               D2D1::Point2F(icon_left, icon_bottom), d2d.text_brush.get(),
+                               pen_width, nullptr);
 }
 
 // 绘制标题栏
@@ -307,16 +292,16 @@ auto draw_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect)
   // 绘制标题栏背景
   D2D1_RECT_F title_rect = UI::FloatingWindow::make_d2d_rect(
       rect.left, rect.top, rect.right, rect.top + static_cast<float>(render.title_height));
-  d2d.render_target->FillRectangle(title_rect, d2d.title_brush);
+  d2d.device_context->FillRectangle(title_rect, d2d.title_brush.get());
 
   // 绘制标题文本（保持完全不透明）
   D2D1_RECT_F text_rect = UI::FloatingWindow::make_d2d_rect(
       rect.left + static_cast<float>(render.text_padding), rect.top, rect.right,
       rect.top + static_cast<float>(render.title_height));
 
-  d2d.render_target->DrawText(L"SpinningMomo",
-                              12,  // 文本长度
-                              d2d.text_format, text_rect, d2d.text_brush);
+  d2d.device_context->DrawText(L"SpinningMomo",
+                               12,  // 文本长度
+                               d2d.text_format.get(), text_rect, d2d.text_brush.get());
 
   // 绘制关闭按钮
   draw_close_button(state, title_rect);
@@ -334,21 +319,21 @@ auto draw_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect
   D2D1_RECT_F h_sep_rect = UI::FloatingWindow::make_d2d_rect(
       rect.left, rect.top + static_cast<float>(render.title_height), rect.right,
       rect.top + static_cast<float>(render.title_height + render.separator_height));
-  d2d.render_target->FillRectangle(h_sep_rect, d2d.separator_brush);
+  d2d.device_context->FillRectangle(h_sep_rect, d2d.separator_brush.get());
 
   // 绘制垂直分隔线1（使用半透明画刷）
   D2D1_RECT_F v_sep_rect1 = UI::FloatingWindow::make_d2d_rect(
       static_cast<float>(bounds.ratio_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.bottom);
-  d2d.render_target->FillRectangle(v_sep_rect1, d2d.separator_brush);
+  d2d.device_context->FillRectangle(v_sep_rect1, d2d.separator_brush.get());
 
   // 绘制垂直分隔线2（使用半透明画刷）
   D2D1_RECT_F v_sep_rect2 = UI::FloatingWindow::make_d2d_rect(
       static_cast<float>(bounds.resolution_column_right),
       rect.top + static_cast<float>(render.title_height),
       static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.bottom);
-  d2d.render_target->FillRectangle(v_sep_rect2, d2d.separator_brush);
+  d2d.device_context->FillRectangle(v_sep_rect2, d2d.separator_brush.get());
 }
 
 // 绘制所有菜单项
@@ -361,7 +346,6 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
   // 按类别分组
   auto [ratio_col, resolution_col, feature_col] = group_items_by_column(items);
 
-  const bool is_paged = (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged);
   const size_t max_visible = static_cast<size_t>(render.max_visible_rows);
 
   // 绘制比例列
@@ -369,8 +353,7 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
                      {.x_left = rect.left,
                       .x_right = static_cast<float>(bounds.ratio_column_right),
                       .scroll_offset = ui.ratio_scroll_offset,
-                      .max_visible = max_visible,
-                      .is_paged = is_paged});
+                      .max_visible = max_visible});
 
   // 绘制分辨率列
   draw_single_column(
@@ -378,8 +361,7 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
       {.x_left = static_cast<float>(bounds.ratio_column_right + render.separator_height),
        .x_right = static_cast<float>(bounds.resolution_column_right),
        .scroll_offset = ui.resolution_scroll_offset,
-       .max_visible = max_visible,
-       .is_paged = is_paged});
+       .max_visible = max_visible});
 
   // 绘制功能列
   draw_single_column(
@@ -387,31 +369,27 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
       {.x_left = static_cast<float>(bounds.resolution_column_right + render.separator_height),
        .x_right = rect.right,
        .scroll_offset = ui.feature_scroll_offset,
-       .max_visible = max_visible,
-       .is_paged = is_paged});
+       .max_visible = max_visible});
 
-  // 绘制滚动条指示器（仅在翻页模式下）
-  if (is_paged) {
-    // 比例列滚动条
-    D2D1_RECT_F ratio_column_rect = UI::FloatingWindow::make_d2d_rect(
-        rect.left, rect.top, static_cast<float>(bounds.ratio_column_right), rect.bottom);
-    draw_scroll_indicator(state, ratio_column_rect, ratio_col.items.size(), ui.ratio_scroll_offset,
-                          ui.hovered_column == 0, false);
+  // 比例列滚动条
+  D2D1_RECT_F ratio_column_rect = UI::FloatingWindow::make_d2d_rect(
+      rect.left, rect.top, static_cast<float>(bounds.ratio_column_right), rect.bottom);
+  draw_scroll_indicator(state, ratio_column_rect, ratio_col.items.size(), ui.ratio_scroll_offset,
+                        ui.hovered_column == 0, false);
 
-    // 分辨率列滚动条
-    D2D1_RECT_F resolution_column_rect = UI::FloatingWindow::make_d2d_rect(
-        static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.top,
-        static_cast<float>(bounds.resolution_column_right), rect.bottom);
-    draw_scroll_indicator(state, resolution_column_rect, resolution_col.items.size(),
-                          ui.resolution_scroll_offset, ui.hovered_column == 1, false);
+  // 分辨率列滚动条
+  D2D1_RECT_F resolution_column_rect = UI::FloatingWindow::make_d2d_rect(
+      static_cast<float>(bounds.ratio_column_right + render.separator_height), rect.top,
+      static_cast<float>(bounds.resolution_column_right), rect.bottom);
+  draw_scroll_indicator(state, resolution_column_rect, resolution_col.items.size(),
+                        ui.resolution_scroll_offset, ui.hovered_column == 1, false);
 
-    // 功能列滚动条
-    D2D1_RECT_F feature_column_rect = UI::FloatingWindow::make_d2d_rect(
-        static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.top,
-        rect.right, rect.bottom);
-    draw_scroll_indicator(state, feature_column_rect, feature_col.items.size(),
-                          ui.feature_scroll_offset, ui.hovered_column == 2, true);
-  }
+  // 功能列滚动条
+  D2D1_RECT_F feature_column_rect = UI::FloatingWindow::make_d2d_rect(
+      static_cast<float>(bounds.resolution_column_right + render.separator_height), rect.top,
+      rect.right, rect.bottom);
+  draw_scroll_indicator(state, feature_column_rect, feature_col.items.size(),
+                        ui.feature_scroll_offset, ui.hovered_column == 2, true);
 }
 
 auto is_item_selected(const UI::FloatingWindow::MenuItem& item,
@@ -437,7 +415,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
 
   // 绘制悬停背景
   if (is_hovered) {
-    d2d.render_target->FillRectangle(item_rect, d2d.hover_brush);
+    d2d.device_context->FillRectangle(item_rect, d2d.hover_brush.get());
   }
 
   // 绘制选中指示器（保持完全不透明）
@@ -446,13 +424,13 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
     D2D1_RECT_F indicator_rect = UI::FloatingWindow::make_d2d_rect(
         item_rect.left, item_rect.top, item_rect.left + static_cast<float>(indicator_width),
         item_rect.bottom);
-    ID2D1SolidColorBrush* indicator_brush = d2d.indicator_brush;
+    ID2D1SolidColorBrush* indicator_brush = d2d.indicator_brush.get();
     if (item.category == UI::FloatingWindow::MenuItemCategory::Feature &&
         item.action_id == "recording.toggle" && d2d.recording_indicator_brush) {
-      indicator_brush = d2d.recording_indicator_brush;
+      indicator_brush = d2d.recording_indicator_brush.get();
     }
     if (indicator_brush) {
-      d2d.render_target->FillRectangle(indicator_rect, indicator_brush);
+      d2d.device_context->FillRectangle(indicator_rect, indicator_brush);
     }
   }
 
@@ -461,8 +439,8 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
       item_rect.left + static_cast<float>(render.text_padding + indicator_width), item_rect.top,
       item_rect.right - static_cast<float>(render.text_padding / 2), item_rect.bottom);
   const auto draw_default_text = [&]() -> void {
-    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
-                                d2d.text_format, text_rect, d2d.text_brush);
+    d2d.device_context->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
+                                 d2d.text_format.get(), text_rect, d2d.text_brush.get());
   };
 
   // 计算可用于文本的宽度
@@ -482,7 +460,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
     resolved_font_key = *cached_font_key;
   } else {
     float text_width = UI::FloatingWindow::D2DContext::measure_text_width(
-        item.text, d2d.text_format, d2d.write_factory);
+        item.text, d2d.text_format.get(), d2d.write_factory.get());
 
     if (text_width > available_width) {
       float adjusted_font_size = render.font_size;
@@ -500,7 +478,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
         }
 
         text_width = UI::FloatingWindow::D2DContext::measure_text_width(
-            item.text, adjusted_text_format, d2d.write_factory);
+            item.text, adjusted_text_format, d2d.write_factory.get());
         if (text_width <= available_width) {
           resolved_font_key = adjusted_font_key;
           break;
@@ -517,45 +495,13 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   }
 
   if (auto* adjusted_text_format = get_or_create_adjusted_text_format(d2d, resolved_font_key)) {
-    d2d.render_target->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
-                                adjusted_text_format, text_rect, d2d.text_brush);
+    d2d.device_context->DrawText(item.text.c_str(), static_cast<UINT32>(item.text.length()),
+                                 adjusted_text_format, text_rect, d2d.text_brush.get());
     return;
   }
 
   // 缓存命中但创建失败时，回退默认字体绘制
   draw_default_text();
-}
-
-// UpdateLayeredWindow函数 - 将内存DC更新到分层窗口
-auto update_layered_window(const Core::State::AppState& state, HWND hwnd) -> void {
-  const auto& d2d = state.floating_window->d2d_context;
-
-  if (!d2d.memory_dc || !d2d.is_initialized) {
-    return;
-  }
-
-  // 配置Alpha混合
-  BLENDFUNCTION blend_func = {};
-  blend_func.BlendOp = AC_SRC_OVER;
-  blend_func.BlendFlags = 0;
-  blend_func.SourceConstantAlpha = 255;
-  blend_func.AlphaFormat = AC_SRC_ALPHA;
-
-  // 源点和窗口大小
-  POINT src_point = {0, 0};
-  SIZE window_size = d2d.bitmap_size;
-
-  // 更新分层窗口
-  UpdateLayeredWindow(hwnd,           // 目标窗口
-                      nullptr,        // 桌面DC（使用默认）
-                      nullptr,        // 窗口位置（不改变）
-                      &window_size,   // 窗口大小
-                      d2d.memory_dc,  // 源DC
-                      &src_point,     // 源起始点
-                      0,              // 颜色键（不使用）
-                      &blend_func,    // Alpha混合函数
-                      ULW_ALPHA       // 使用Alpha通道
-  );
 }
 
 }  // namespace UI::FloatingWindow::Painter

@@ -81,10 +81,12 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 
   register_window_class(state.floating_window->window.instance);
 
+  // 由 DirectComposition 托管像素内容时，窗口本身不再走 DWM 的 redirection bitmap。
   state.floating_window->window.hwnd = CreateWindowExW(
-      WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_TOPMOST, L"SpinningMomoFloatingWindowClass",
-      L"SpinningMomo", WS_POPUP | WS_CLIPCHILDREN, window_pos.x, window_pos.y, window_size.cx,
-      window_size.cy, nullptr, nullptr, state.floating_window->window.instance, &state);
+      WS_EX_NOREDIRECTIONBITMAP | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+      L"SpinningMomoFloatingWindowClass", L"SpinningMomo", WS_POPUP | WS_CLIPCHILDREN, window_pos.x,
+      window_pos.y, window_size.cx, window_size.cy, nullptr, nullptr,
+      state.floating_window->window.instance, &state);
 
   if (!state.floating_window->window.hwnd) {
     return std::unexpected("Failed to create window");
@@ -207,11 +209,6 @@ auto update_menu_items(Core::State::AppState& state) -> void {
   if (state.floating_window->window.hwnd) {
     request_repaint(state);
   }
-}
-
-auto set_menu_items_to_show(Core::State::AppState& state, std::span<const std::wstring> items)
-    -> void {
-  state.floating_window->data.menu_items_to_show.assign(items.begin(), items.end());
 }
 
 // 内部辅助函数实现

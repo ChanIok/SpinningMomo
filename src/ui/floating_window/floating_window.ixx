@@ -24,8 +24,6 @@ export auto set_current_resolution(Core::State::AppState& state, size_t index) -
 
 // 更新菜单项
 export auto update_menu_items(Core::State::AppState& state) -> void;
-export auto set_menu_items_to_show(Core::State::AppState& state,
-                                   std::span<const std::wstring> items) -> void;
 
 // 渲染触发
 export auto request_repaint(Core::State::AppState& state) -> void;

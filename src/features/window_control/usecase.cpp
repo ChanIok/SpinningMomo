@@ -15,6 +15,7 @@ import Features.Settings.State;
 import Features.Letterbox;
 import Features.Letterbox.State;
 import Features.WindowControl;
+import Features.WindowControl.Types;
 import Features.Notifications;
 import Features.Overlay;
 import Features.Overlay.State;

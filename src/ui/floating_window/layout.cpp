@@ -36,7 +36,8 @@ auto update_layout(Core::State::AppState& state) -> void {
   layout.ratio_column_width = static_cast<int>(layout_settings.base_ratio_column_width * scale);
   layout.resolution_column_width =
       static_cast<int>(layout_settings.base_resolution_column_width * scale);
-  layout.settings_column_width =
+  // 设置项配置名仍沿用历史字段名，内部状态统一收敛到 feature column。
+  layout.feature_column_width =
       static_cast<int>(layout_settings.base_settings_column_width * scale);
   layout.scroll_indicator_width =
       static_cast<int>(layout_settings.base_scroll_indicator_width * scale);
@@ -46,7 +47,7 @@ auto update_layout(Core::State::AppState& state) -> void {
 auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
   const auto& render = state.floating_window->layout;
   const int total_width =
-      render.ratio_column_width + render.resolution_column_width + render.settings_column_width;
+      render.ratio_column_width + render.resolution_column_width + render.feature_column_width;
   const int window_height = calculate_window_height(state);
 
   return {total_width, window_height};
@@ -54,26 +55,8 @@ auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
 
 auto calculate_window_height(const Core::State::AppState& state) -> int {
   const auto& render = state.floating_window->layout;
-
-  // 翻页模式：返回固定高度
-  if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
-    return render.title_height + render.separator_height +
-           render.item_height * render.max_visible_rows;
-  }
-
-  // 自适应高度模式：由最大列决定高度
-  const auto counts = count_items_per_column(state.floating_window->data.menu_items);
-
-  // 计算每列的高度
-  const int ratio_height = counts.ratio_count * render.item_height;
-  const int resolution_height = counts.resolution_count * render.item_height;
-  const int settings_height = counts.settings_count * render.item_height;
-
-  // 找出最大高度
-  const int max_column_height = std::max({ratio_height, resolution_height, settings_height});
-
-  // 返回总高度
-  return render.title_height + render.separator_height + max_column_height;
+  return render.title_height + render.separator_height +
+         render.item_height * render.max_visible_rows;
 }
 
 auto calculate_center_position(const SIZE& window_size) -> POINT {
@@ -108,17 +91,13 @@ auto get_item_index_from_point(const Core::State::AppState& state, int x, int y)
 
   if (x < bounds.ratio_column_right) {
     target_category = UI::FloatingWindow::MenuItemCategory::AspectRatio;
-    if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
-      scroll_offset = ui.ratio_scroll_offset;
-    }
+    scroll_offset = ui.ratio_scroll_offset;
   } else if (x < bounds.resolution_column_right) {
     target_category = UI::FloatingWindow::MenuItemCategory::Resolution;
-    if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
-      scroll_offset = ui.resolution_scroll_offset;
-    }
+    scroll_offset = ui.resolution_scroll_offset;
   } else {
-    // 设置列的特殊处理
-    return get_settings_item_index(state, y);
+    // 功能列的特殊处理
+    return get_feature_item_index(state, y);
   }
 
   // 处理比例和分辨率列
@@ -158,7 +137,7 @@ auto count_items_per_column(const std::vector<UI::FloatingWindow::MenuItem>& ite
         ++counts.resolution_count;
         break;
       case UI::FloatingWindow::MenuItemCategory::Feature:
-        ++counts.settings_count;
+        ++counts.feature_count;
         break;
     }
   }
@@ -170,23 +149,20 @@ auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds {
   const auto& render = state.floating_window->layout;
   const int ratio_column_right = render.ratio_column_width;
   const int resolution_column_right = ratio_column_right + render.resolution_column_width;
-  const int settings_column_left = resolution_column_right + render.separator_height;
+  const int feature_column_left = resolution_column_right + render.separator_height;
 
-  return {ratio_column_right, resolution_column_right, settings_column_left};
+  return {ratio_column_right, resolution_column_right, feature_column_left};
 }
 
-auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
+auto get_feature_item_index(const Core::State::AppState& state, int y) -> int {
   const auto& render = state.floating_window->layout;
   const auto& items = state.floating_window->data.menu_items;
   const auto& ui = state.floating_window->ui;
 
-  size_t scroll_offset = 0;
-  if (render.layout_mode == UI::FloatingWindow::MenuLayoutMode::Paged) {
-    scroll_offset = ui.feature_scroll_offset;
-  }
+  const size_t scroll_offset = ui.feature_scroll_offset;
 
   size_t visible_index = 0;
-  int settings_y = render.title_height + render.separator_height;
+  int feature_y = render.title_height + render.separator_height;
 
   for (size_t i = 0; i < items.size(); ++i) {
     const auto& item = items[i];
@@ -199,10 +175,10 @@ auto get_settings_item_index(const Core::State::AppState& state, int y) -> int {
         continue;
       }
 
-      if (y >= settings_y && y < settings_y + render.item_height) {
+      if (y >= feature_y && y < feature_y + render.item_height) {
         return static_cast<int>(i);
       }
-      settings_y += render.item_height;
+      feature_y += render.item_height;
       visible_index++;
     }
   }

@@ -25,18 +25,6 @@ import <windowsx.h>;
 
 namespace UI::FloatingWindow::MessageHandler {
 
-// 统计指定列的项目数量
-auto count_column_items(const std::vector<UI::FloatingWindow::MenuItem>& items,
-                        UI::FloatingWindow::MenuItemCategory category) -> size_t {
-  size_t count = 0;
-  for (const auto& item : items) {
-    if (item.category == category) {
-      count++;
-    }
-  }
-  return count;
-}
-
 // 确保窗口能接收到WM_MOUSELEAVE消息
 auto ensure_mouse_tracking(HWND hwnd) -> void {
   TRACKMOUSEEVENT tme{};
@@ -223,11 +211,6 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     }
 
     case WM_MOUSEWHEEL: {
-      // 只在翻页模式下处理滚轮
-      if (state.floating_window->layout.layout_mode != UI::FloatingWindow::MenuLayoutMode::Paged) {
-        return 0;
-      }
-
       // 将屏幕坐标转换为客户端坐标
       POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
       ScreenToClient(hwnd, &pt);
@@ -236,6 +219,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       const auto& render = state.floating_window->layout;
       const auto bounds = UI::FloatingWindow::Layout::get_column_bounds(state);
       const auto& items = state.floating_window->data.menu_items;
+      const auto counts = UI::FloatingWindow::Layout::count_items_per_column(items);
       auto& ui = state.floating_window->ui;
 
       size_t* target_offset = nullptr;
@@ -244,19 +228,16 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
       if (pt.x < bounds.ratio_column_right) {
         // 比例列
         target_offset = &ui.ratio_scroll_offset;
-        column_item_count =
-            count_column_items(items, UI::FloatingWindow::MenuItemCategory::AspectRatio);
+        column_item_count = static_cast<size_t>(counts.ratio_count);
       } else if (pt.x >= bounds.ratio_column_right + render.separator_height &&
                  pt.x < bounds.resolution_column_right) {
         // 分辨率列（排除第一条分隔线）
         target_offset = &ui.resolution_scroll_offset;
-        column_item_count =
-            count_column_items(items, UI::FloatingWindow::MenuItemCategory::Resolution);
+        column_item_count = static_cast<size_t>(counts.resolution_count);
       } else if (pt.x >= bounds.resolution_column_right + render.separator_height) {
         // 功能列（排除第二条分隔线）
         target_offset = &ui.feature_scroll_offset;
-        column_item_count =
-            count_column_items(items, UI::FloatingWindow::MenuItemCategory::Feature);
+        column_item_count = static_cast<size_t>(counts.feature_count);
       } else {
         // 在分隔线上，不处理
         return 0;

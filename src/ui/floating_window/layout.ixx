@@ -16,14 +16,14 @@ namespace UI::FloatingWindow::Layout {
 export struct ColumnCounts {
   int ratio_count = 0;
   int resolution_count = 0;
-  int settings_count = 0;
+  int feature_count = 0;
 };
 
 // 列边界结构
 export struct ColumnBounds {
   int ratio_column_right;
   int resolution_column_right;
-  int settings_column_left;
+  int feature_column_left;
 };
 
 // 更新布局配置
@@ -52,7 +52,7 @@ export auto get_column_bounds(const Core::State::AppState& state) -> ColumnBound
 export auto get_indicator_width(const UI::FloatingWindow::MenuItem& item,
                                 const Core::State::AppState& state) -> int;
 
-// 获取设置列中的项目索引
-auto get_settings_item_index(const Core::State::AppState& state, int y) -> int;
+// 获取功能列中的项目索引
+auto get_feature_item_index(const Core::State::AppState& state, int y) -> int;
 
 }  // namespace UI::FloatingWindow::Layout

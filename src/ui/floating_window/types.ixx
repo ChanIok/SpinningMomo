@@ -4,21 +4,18 @@ export module UI.FloatingWindow.Types;
 
 import std;
 import Features.Settings.Menu;
-import Features.WindowControl.Types;
 import <d2d1_3.h>;
+import <d3d11.h>;
+import <dcomp.h>;
 import <dwrite_3.h>;
+import <dxgi1_2.h>;
+import <wil/com.h>;
 import <windows.h>;
 
 namespace UI::FloatingWindow {
 
 // 用于 Windows 11 TopMost Z 序失效 workaround 的自定义消息
 export constexpr UINT WM_REFRESH_TOPMOST = WM_USER + 10;
-
-// 菜单布局模式
-export enum class MenuLayoutMode {
-  AutoHeight,  // 自适应高度：高度由最大列决定
-  Paged        // 翻页模式：固定高度 + 独立列翻页
-};
 
 // 菜单项类别枚举（简化版本）
 export enum class MenuItemCategory { AspectRatio, Resolution, Feature };
@@ -64,8 +61,6 @@ export struct InteractionState {
 // 数据状态（拥有或引用外部数据）
 export struct DataState {
   std::vector<MenuItem> menu_items;  // 从settings计算生成的菜单项
-  std::vector<Features::WindowControl::WindowInfo> windows;
-  std::vector<std::wstring> menu_items_to_show;
 };
 
 // 渲染相关状态（实际渲染尺寸）
@@ -80,16 +75,13 @@ export struct LayoutConfig {
   int ratio_indicator_width = 4;
   int ratio_column_width = 60;
   int resolution_column_width = 120;
-  int settings_column_width = 120;
+  int feature_column_width = 120;
   int scroll_indicator_width = 2;  // 滚动条宽度
   int max_visible_rows = 7;        // 翻页模式下每列最大可见行数，下限 1
 
   // 字体大小调整相关常量
   static constexpr float MIN_FONT_SIZE = 8.0f;   // 最小字体大小
   static constexpr float FONT_SIZE_STEP = 0.5f;  // 字体大小调整步长
-
-  // 翻页模式配置
-  MenuLayoutMode layout_mode = MenuLayoutMode::Paged;
 };
 
 // 浮窗专用的Direct2D渲染状态
@@ -101,38 +93,46 @@ export struct TextMeasureCacheEntry {
 };
 
 export struct RenderContext {
-  // Direct2D 1.3资源句柄
-  ID2D1Factory7* factory = nullptr;               // Direct2D 1.3 工厂
-  ID2D1DCRenderTarget* render_target = nullptr;   // DC渲染目标（兼容性）
-  ID2D1DeviceContext6* device_context = nullptr;  // Direct2D 1.3 设备上下文
-  IDWriteFactory7* write_factory = nullptr;       // DirectWrite 1.3 工厂
+  // 浮窗改为 DirectComposition 托管：
+  // D3D11 提供底层设备和 composition swap chain，
+  // D2D/DirectWrite 继续负责 2D 文字与形状绘制。
+  wil::com_ptr<ID3D11Device> d3d_device;
+  wil::com_ptr<ID3D11DeviceContext> d3d_device_context;
+  wil::com_ptr<IDXGISwapChain1> swap_chain;
+  wil::com_ptr<IDCompositionDevice> composition_device;
+  wil::com_ptr<IDCompositionTarget> composition_target;
+  wil::com_ptr<IDCompositionVisual> composition_visual;
 
-  // 内存DC和位图资源
-  HDC memory_dc = nullptr;
-  HBITMAP dib_bitmap = nullptr;
-  HGDIOBJ old_bitmap = nullptr;
-  void* bitmap_bits = nullptr;
-  SIZE bitmap_size = {0, 0};
+  // D2D 现在直接画到 swap chain back buffer 对应的 DXGI surface，
+  // 不再经过 HDC / DIB / UpdateLayeredWindow。
+  wil::com_ptr<ID2D1Factory7> factory;
+  wil::com_ptr<ID2D1Device> d2d_device;
+  wil::com_ptr<ID2D1DeviceContext6> device_context;
+  wil::com_ptr<ID2D1Bitmap1> target_bitmap;
+  wil::com_ptr<IDWriteFactory7> write_factory;
+
+  // 当前 back buffer 尺寸缓存；resize 只在尺寸变化时重建目标位图。
+  SIZE surface_size = {0, 0};
 
   // 缓存的画刷（简单的固定数组，避免动态分配）
-  ID2D1SolidColorBrush* background_brush = nullptr;
-  ID2D1SolidColorBrush* title_brush = nullptr;
-  ID2D1SolidColorBrush* separator_brush = nullptr;
-  ID2D1SolidColorBrush* text_brush = nullptr;
-  ID2D1SolidColorBrush* indicator_brush = nullptr;
-  ID2D1SolidColorBrush* recording_indicator_brush = nullptr;
-  ID2D1SolidColorBrush* hover_brush = nullptr;
-  ID2D1SolidColorBrush* scroll_indicator_brush = nullptr;  // 滚动条画刷
+  wil::com_ptr<ID2D1SolidColorBrush> background_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> title_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> separator_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> text_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> indicator_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> recording_indicator_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> hover_brush;
+  wil::com_ptr<ID2D1SolidColorBrush> scroll_indicator_brush;  // 滚动条画刷
 
   // 文本格式
-  IDWriteTextFormat* text_format = nullptr;
-  std::unordered_map<int, IDWriteTextFormat*> adjusted_text_formats;  // 按字号缓存文本格式
-  std::vector<TextMeasureCacheEntry> text_measure_cache;              // 文本测量结果缓存
+  wil::com_ptr<IDWriteTextFormat> text_format;
+  std::unordered_map<int, wil::com_ptr<IDWriteTextFormat>>
+      adjusted_text_formats;                              // 按字号缓存文本格式
+  std::vector<TextMeasureCacheEntry> text_measure_cache;  // 文本测量结果缓存
 
   // 状态标志
   bool is_initialized = false;
   bool is_rendering = false;
-  bool needs_resize = false;
   bool needs_font_update = false;
 };
 

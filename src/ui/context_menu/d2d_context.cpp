@@ -210,7 +210,7 @@ auto initialize_surface(Core::State::AppState& state, RenderSurface& surface, co
 
   cleanup_surface(surface);
 
-  if (!create_render_target(state.floating_window->d2d_context.factory, surface)) {
+  if (!create_render_target(state.floating_window->d2d_context.factory.get(), surface)) {
     cleanup_surface(surface);
     return false;
   }

@@ -1,13 +1,13 @@
 module;
 
-#include <d2d1_3.h>
-#include <dwrite_3.h>
-#include <windows.h>
-
 export module UI.FloatingWindow.D2DContext;
 
 import std;
 import Core.State;
+import <d2d1_3.h>;
+import <dwrite_3.h>;
+import <wil/com.h>;
+import <windows.h>;
 
 namespace UI::FloatingWindow::D2DContext {
 
@@ -29,7 +29,7 @@ export auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text
 
 // 创建具有指定字体大小的文本格式
 export auto create_text_format_with_size(IDWriteFactory7* write_factory, float font_size)
-    -> IDWriteTextFormat*;
+    -> wil::com_ptr<IDWriteTextFormat>;
 
 // 更新所有画刷颜色
 export auto update_all_brush_colors(Core::State::AppState& state) -> void;

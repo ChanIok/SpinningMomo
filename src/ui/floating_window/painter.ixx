@@ -18,10 +18,8 @@ auto draw_items(Core::State::AppState& state, const D2D1_RECT_F& rect) -> void;
 auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
                       const D2D1_RECT_F& item_rect, bool is_hovered) -> void;
 auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F& column_rect,
-                           size_t total_items, size_t scroll_offset, bool is_hovered) -> void;
-
-// 分层窗口更新函数
-export auto update_layered_window(const Core::State::AppState& state, HWND hwnd) -> void;
+                           size_t total_items, size_t scroll_offset, bool is_hovered,
+                           bool is_last_column) -> void;
 
 // 主绘制函数
 export auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void;
