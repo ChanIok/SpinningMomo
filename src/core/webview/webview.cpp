@@ -158,10 +158,6 @@ auto initialize(Core::State::AppState& state, HWND webview_hwnd)
   }
 
   try {
-    // 使用 wil RAII 初始化 COM，static 确保整个应用生命周期内有效
-    static auto coinit = wil::CoInitializeEx(COINIT_APARTMENTTHREADED);
-    (void)coinit;
-
     auto init_result = Core::WebView::Host::start_environment_creation(state, webview_hwnd);
     if (!init_result) {
       return std::unexpected(init_result.error());

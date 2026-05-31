@@ -5,11 +5,14 @@ import Utils.Logger;
 import Utils.System;
 import Features.Settings;
 import Vendor.Windows;
+import <wil/com.h>;
 
 // Win32 入口
 auto __stdcall wWinMain(Vendor::Windows::HINSTANCE hInstance,
                         [[maybe_unused]] Vendor::Windows::HINSTANCE hPrevInstance,
                         Vendor::Windows::LPWSTR lpCmdLine, [[maybe_unused]] int nCmdShow) -> int {
+  auto ui_com_init = wil::CoInitializeEx(COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+
   // 尽早安装崩溃转储处理器
   Utils::CrashDump::install();
 
