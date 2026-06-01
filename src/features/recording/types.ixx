@@ -111,7 +111,6 @@ export enum class RecordingStatus {
   Idle,       // 空闲
   Recording,  // 正在录制
   Stopping,   // 正在停止
-  Error       // 发生错误
 };
 
 // 录制几何计划：
@@ -129,7 +128,6 @@ export struct CapturePlan {
 
 export enum class RecordingControlAction {
   None,
-  Toggle,
   AbortWithError,
   RestartAfterResize,
   CleanupD3D,

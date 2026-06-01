@@ -43,8 +43,8 @@ export struct RecordingState {
   std::int64_t video_frame_interval_100ns = 10'000'000LL / 30;
   std::int64_t next_video_timestamp_100ns = -1;
   std::int64_t last_emitted_video_timestamp_100ns = -1;
-  // 本段录制中曾入队的最大音频时间戳（用于 stop 收尾时的视频目标，避免队列已空时低估）。
-  std::int64_t max_seen_audio_timestamp_100ns = 0;
+  // stop 一旦开始，就把本段最终要补到的视频时间线冻结下来，避免收尾目标继续跟着墙钟增长。
+  std::atomic<std::int64_t> frozen_finish_target_100ns{-1};
   wil::com_ptr<ID3D11Texture2D> encoder_input_texture;
   bool has_encoder_input_texture = false;
 

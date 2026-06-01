@@ -9,6 +9,7 @@ import Core.State;
 import Features.Recording;
 import Features.Recording.Session;
 import Features.Recording.State;
+import Features.Recording.Time;
 import Features.Recording.Types;
 import Utils.Graphics.Capture;
 import Utils.Graphics.CaptureRegion;
@@ -38,41 +39,17 @@ auto fail_recording_encoder(Core::State::AppState& app_state, State::RecordingSt
       app_state, Features::Recording::Types::RecordingControlAction::AbortWithError);
 }
 
-// ---------------------------------------------------------------------------
-// 时间：全程用 QPC 转成「相对录制起点」的 100ns，和视频帧、音频时间戳一套数。
-// ---------------------------------------------------------------------------
-
-auto query_qpc_100ns() -> std::int64_t {
-  LARGE_INTEGER counter{};
-  LARGE_INTEGER frequency{};
-  if (!QueryPerformanceCounter(&counter) || !QueryPerformanceFrequency(&frequency)) {
-    return 0;
+// stop 收尾时的时间线终点在外层 stop() 里冻结。这里只有兜底：
+// 如果异常路径直接请求 finish、还没来得及冻结，就按当前状态补一个固定目标。
+auto resolve_finish_target_timestamp_100ns(State::RecordingState& state) -> std::int64_t {
+  auto frozen_target = state.frozen_finish_target_100ns.load(std::memory_order_acquire);
+  if (frozen_target >= 0) {
+    return frozen_target;
   }
-  constexpr long double kHundredNsPerSecond = 10'000'000.0L;
-  return static_cast<std::int64_t>(counter.QuadPart * kHundredNsPerSecond / frequency.QuadPart);
-}
 
-auto elapsed_since_start_100ns(const State::RecordingState& state) -> std::int64_t {
-  if (state.start_qpc_100ns <= 0) {
-    return 0;
-  }
-  return std::max<std::int64_t>(0, query_qpc_100ns() - state.start_qpc_100ns);
-}
-
-auto get_frame_timestamp_100ns(State::RecordingState& state,
-                               Utils::Graphics::Capture::Direct3D11CaptureFrame frame)
-    -> std::int64_t {
-  if (state.start_qpc_100ns <= 0) {
-    return 0;
-  }
-  return std::max<std::int64_t>(0, frame.SystemRelativeTime().count() - state.start_qpc_100ns);
-}
-
-// stop 收尾时：视频至少要写到「当前已录了多久」和「曾经出现过的最晚一包音频时间」里较大的那个，
-// 否则会漏结尾声音；队列排空后单靠 elapsed 不够，所以 state 里还记了 max_seen_audio。
-auto finish_target_timestamp_100ns(State::RecordingState& state) -> std::int64_t {
-  const auto elapsed = elapsed_since_start_100ns(state);
-  return std::max(elapsed, state.max_seen_audio_timestamp_100ns);
+  frozen_target = Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
+  state.frozen_finish_target_100ns.store(frozen_target, std::memory_order_release);
+  return frozen_target;
 }
 
 struct FinishProgressSnapshot {
@@ -82,7 +59,6 @@ struct FinishProgressSnapshot {
   std::int64_t finish_target_100ns = 0;
   std::int64_t next_video_timestamp_100ns = -1;
   std::int64_t last_emitted_video_timestamp_100ns = -1;
-  std::int64_t max_seen_audio_timestamp_100ns = 0;
   std::uint64_t encoded_video_frames = 0;
   std::uint64_t encoded_audio_packets = 0;
   bool has_encoder_input_texture = false;
@@ -97,12 +73,12 @@ auto capture_finish_progress_snapshot(State::RecordingState& state, bool finishi
     snapshot.audio_queue_size = state.audio_queue.size();
   }
 
-  snapshot.elapsed_100ns = elapsed_since_start_100ns(state);
+  snapshot.elapsed_100ns =
+      Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
   snapshot.finish_target_100ns =
-      finishing ? finish_target_timestamp_100ns(state) : snapshot.elapsed_100ns;
+      finishing ? resolve_finish_target_timestamp_100ns(state) : snapshot.elapsed_100ns;
   snapshot.next_video_timestamp_100ns = state.next_video_timestamp_100ns;
   snapshot.last_emitted_video_timestamp_100ns = state.last_emitted_video_timestamp_100ns;
-  snapshot.max_seen_audio_timestamp_100ns = state.max_seen_audio_timestamp_100ns;
   snapshot.encoded_video_frames = state.encoded_video_frames;
   snapshot.encoded_audio_packets = state.encoded_audio_packets;
   snapshot.has_encoder_input_texture = state.has_encoder_input_texture;
@@ -115,12 +91,11 @@ auto log_finish_progress(std::string_view stage, State::RecordingState& state, b
   Logger().debug(
       "Recording finish {}: finishing={}, elapsed_100ns={}, finish_target_100ns={}, "
       "next_video_timestamp_100ns={}, last_emitted_video_timestamp_100ns={}, "
-      "max_seen_audio_timestamp_100ns={}, audio_queue_size={}, video_frame_pending={}, "
-      "has_encoder_input_texture={}, encoded_video_frames={}, encoded_audio_packets={}",
+      "audio_queue_size={}, video_frame_pending={}, has_encoder_input_texture={}, "
+      "encoded_video_frames={}, encoded_audio_packets={}",
       stage, finishing, snapshot.elapsed_100ns, snapshot.finish_target_100ns,
       snapshot.next_video_timestamp_100ns, snapshot.last_emitted_video_timestamp_100ns,
-      snapshot.max_seen_audio_timestamp_100ns, snapshot.audio_queue_size,
-      snapshot.video_frame_pending, snapshot.has_encoder_input_texture,
+      snapshot.audio_queue_size, snapshot.video_frame_pending, snapshot.has_encoder_input_texture,
       snapshot.encoded_video_frames, snapshot.encoded_audio_packets);
 }
 
@@ -205,7 +180,8 @@ auto encoder_needs_wake_for_fixed_fps(const State::RecordingState& state) -> boo
       state.start_qpc_100ns <= 0) {
     return false;
   }
-  return elapsed_since_start_100ns(state) >= state.next_video_timestamp_100ns;
+  return Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns) >=
+         state.next_video_timestamp_100ns;
 }
 
 // 音频不能超前视频：队头时间戳只要已经不晚于「最后写出来的视频时间」就可以写。
@@ -222,7 +198,7 @@ auto compute_wake_timeout(const State::RecordingState& state) -> std::chrono::na
       state.start_qpc_100ns <= 0) {
     return std::chrono::nanoseconds::max();
   }
-  const auto now = elapsed_since_start_100ns(state);
+  const auto now = Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
   if (state.next_video_timestamp_100ns <= now) {
     return std::chrono::nanoseconds{0};
   }
@@ -242,7 +218,7 @@ auto should_exit_finished_segment(State::RecordingState& state, bool finishing) 
   if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0) {
     return true;
   }
-  const auto target = finish_target_timestamp_100ns(state);
+  const auto target = resolve_finish_target_timestamp_100ns(state);
   return state.next_video_timestamp_100ns > target;
 }
 
@@ -490,6 +466,7 @@ auto copy_one_capture_frame_to_encoder_input(State::RecordingState& state,
 // 模块导出的入口（声明见 encoder_loop.ixx）
 // ---------------------------------------------------------------------------
 
+// WGC 帧回调入口：仅标记 pending 并唤醒编码线程，不在这里取帧
 auto mark_video_frame_pending(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -507,6 +484,7 @@ auto mark_video_frame_pending(Core::State::AppState& app_state) -> void {
   state.queue_cv.notify_one();
 }
 
+// start() 里阻塞等待：编码线程创建好 SinkWriter 后才允许开始 WGC 捕获
 auto wait_encoder_ready(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -518,6 +496,7 @@ auto wait_encoder_ready(Core::State::AppState& app_state) -> void {
   state.encoder_ready_cv.wait(ready_lock, [&state]() { return state.encoder_ready; });
 }
 
+// stop() 调用：通知编码线程别再接新数据，把队列里剩的写完再 finalize
 auto signal_encoder_finish(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -526,6 +505,7 @@ auto signal_encoder_finish(Core::State::AppState& app_state) -> void {
   auto& state = *app_state.recording;
 
   log_finish_progress("requested", state, true);
+  resolve_finish_target_timestamp_100ns(state);
   {
     std::lock_guard queue_lock(state.queue_mutex);
     state.finish_requested.store(true, std::memory_order_release);
@@ -534,6 +514,7 @@ auto signal_encoder_finish(Core::State::AppState& app_state) -> void {
   state.queue_cv.notify_all();
 }
 
+// 编码线程主循环：唯一接触 MF SinkWriter 的线程，写视频帧+音频包→finalize
 auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_token,
                          std::function<void()> request_resize_restart) -> void {
   if (!app_state.recording) {
@@ -610,7 +591,8 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
           frame = Utils::Graphics::Capture::try_get_next_frame(state.capture_session);
         }
         if (frame) {
-          const auto frame_ts = get_frame_timestamp_100ns(state, frame);
+          const auto frame_ts = Features::Recording::Time::relative_timestamp_100ns(
+              state.start_qpc_100ns, frame.SystemRelativeTime().count());
           if (state.next_video_timestamp_100ns < 0) {
             // 第一段有效画面：从这一帧的采集时间开始排视频时钟。
             auto copy_result =
@@ -643,7 +625,8 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
       // 把视频写到「现在该写到的时间」：正常录跟墙钟走，收尾时跟 finish_target 走。
       if (state.has_encoder_input_texture) {
         const auto target_ts =
-            finishing ? finish_target_timestamp_100ns(state) : elapsed_since_start_100ns(state);
+            finishing ? resolve_finish_target_timestamp_100ns(state)
+                      : Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
         auto emit_result = emit_video_samples_until(state, target_ts);
         if (!emit_result) {
           fail_recording_encoder(app_state, state, emit_result.error());

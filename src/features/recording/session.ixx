@@ -28,8 +28,8 @@ export auto build_startup_capture_plan(HWND target_window, bool capture_client_a
 export auto build_working_output_path(const std::filesystem::path& final_output_path)
     -> std::filesystem::path;
 
-// 根据参考路径所在目录生成一个新的时间戳 MP4 路径，用于 resize 自动切段。
-export auto build_timestamp_output_path(const std::filesystem::path& reference_output_path)
+// 在指定输出目录里生成一个时间戳 MP4 路径；首次录制和 resize 自动切段共用这套命名规则。
+export auto build_output_path_in_directory(const std::filesystem::path& output_directory)
     -> std::filesystem::path;
 
 // finalize 成功后把临时文件发布为最终 .mp4 文件。

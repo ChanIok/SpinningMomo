@@ -26,6 +26,7 @@ auto clear_queues(State::RecordingState& state) -> void {
   state.video_frame_pending = false;
 }
 
+// 清空 D3D 等持久资源（录制段间不复用）
 auto clear_persistent_runtime_fields(State::RecordingState& state) -> void {
   state.winrt_device = nullptr;
   state.context = nullptr;
@@ -33,6 +34,7 @@ auto clear_persistent_runtime_fields(State::RecordingState& state) -> void {
   state.d3d_initialized = false;
 }
 
+// 根据源帧尺寸和目标窗口算出输出尺寸和裁剪区域
 auto resolve_capture_plan(HWND target_window, bool capture_client_area, int frame_width,
                           int frame_height)
     -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
@@ -113,6 +115,7 @@ auto calculate_frame_crop_plan(HWND target_window,
   return capture_plan_result;
 }
 
+// 录制启动时以 WGC 真实尺寸计算捕获计划，不用窗口矩形猜
 auto build_startup_capture_plan(HWND target_window, bool capture_client_area)
     -> std::expected<Features::Recording::Types::CapturePlan, std::string> {
   // 启动时以 WGC 的真实尺寸为准，不用窗口矩形猜。
@@ -135,7 +138,7 @@ auto build_working_output_path(const std::filesystem::path& final_output_path)
   return working_output_path;
 }
 
-auto build_timestamp_output_path(const std::filesystem::path& reference_output_path)
+auto build_output_path_in_directory(const std::filesystem::path& output_directory)
     -> std::filesystem::path {
   auto filename = Utils::String::FormatTimestamp(std::chrono::system_clock::now());
   auto dot_pos = filename.rfind('.');
@@ -144,9 +147,10 @@ auto build_timestamp_output_path(const std::filesystem::path& reference_output_p
   } else {
     filename += ".mp4";
   }
-  return reference_output_path.parent_path() / filename;
+  return output_directory / filename;
 }
 
+// finalize 成功后把临时文件 rename 为 .mp4，比复制更快
 auto rename_working_output_to_final(const std::filesystem::path& working_output_path,
                                     const std::filesystem::path& final_output_path)
     -> std::expected<void, std::string> {
@@ -202,6 +206,7 @@ auto delete_working_output_file(const std::filesystem::path& working_output_path
   Logger().info("Discarded recording file '{}': {}", working_output_path.string(), reason);
 }
 
+// 清空单段录制的会话态，但保留可复用的 D3D 设备，支持高频启停
 auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -221,7 +226,7 @@ auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
   state.video_frame_interval_100ns = 10'000'000LL / 30;
   state.next_video_timestamp_100ns = -1;
   state.last_emitted_video_timestamp_100ns = -1;
-  state.max_seen_audio_timestamp_100ns = 0;
+  state.frozen_finish_target_100ns.store(-1, std::memory_order_release);
   state.encoder_input_texture = nullptr;
   state.has_encoder_input_texture = false;
   state.last_frame_width = 0;
@@ -240,6 +245,7 @@ auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
   state.encoder_error.clear();
 }
 
+// 取消 D3D 延迟释放定时器（比如新的录制马上要开始，就不等了）
 auto cancel_cleanup_timer(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -252,6 +258,7 @@ auto cancel_cleanup_timer(Core::State::AppState& app_state) -> void {
   }
 }
 
+// 高频启停时延迟 5 秒释放 D3D 资源，避免反复创建的损耗
 auto start_cleanup_timer(Core::State::AppState& app_state, std::function<void()> on_timeout)
     -> void {
   if (!app_state.recording) {
@@ -279,6 +286,7 @@ auto start_cleanup_timer(Core::State::AppState& app_state, std::function<void()>
   Logger().debug("Recording D3D cleanup timer started (5 seconds)");
 }
 
+// 立即释放 D3D 设备（清理定时器 + 清空持久字段）
 auto cleanup_d3d_resources(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -290,6 +298,7 @@ auto cleanup_d3d_resources(Core::State::AppState& app_state) -> void {
   clear_persistent_runtime_fields(state);
 }
 
+// 确保录制所需 D3D device/context 和 WinRT device 已创建，没有就新建
 auto ensure_d3d_resources_ready(Core::State::AppState& app_state)
     -> std::expected<void, std::string> {
   if (!app_state.recording) {
@@ -326,6 +335,7 @@ auto ensure_d3d_resources_ready(Core::State::AppState& app_state)
   return {};
 }
 
+// 停止 WGC 继续产新帧，但保留 frame pool 供编码线程排空已到达的帧
 auto stop_capture_input(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -337,6 +347,7 @@ auto stop_capture_input(Core::State::AppState& app_state) -> void {
   Utils::Graphics::Capture::stop_capture_session(state.capture_session);
 }
 
+// 完全清理 WGC 捕获会话（释放所有关联资源）
 auto cleanup_capture_session(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;

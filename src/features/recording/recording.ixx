@@ -9,18 +9,11 @@ import <windows.h>;
 
 namespace Features::Recording {
 
-export struct RecordingControlHandlers {
-  std::function<void()> on_toggle;
-  std::function<void()> on_abort_with_error;
-  std::function<void()> on_shutdown_stop;
-};
-
 // 初始化录制模块依赖的 Media Foundation 运行时。
 export auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string>;
 
 // 首次需要录制控制面时启动常驻控制线程，后续复用同一个线程处理请求。
-export auto ensure_control_thread_started(Core::State::AppState& app_state,
-                                          RecordingControlHandlers handlers)
+export auto ensure_control_thread_started(Core::State::AppState& app_state)
     -> std::expected<void, std::string>;
 
 // 提交录制控制请求；真正的 start/stop/restart 只在控制线程执行。
