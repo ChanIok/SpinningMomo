@@ -6,6 +6,7 @@ module Features.Recording.EncoderLoop;
 
 import std;
 import Core.State;
+import Features.Recording;
 import Features.Recording.Session;
 import Features.Recording.State;
 import Features.Recording.Types;
@@ -23,6 +24,19 @@ namespace Features::Recording::EncoderLoop {
 
 // 视频帧数太少就整段丢弃、不写最终 mp4，避免误触留下半截文件。
 constexpr std::uint64_t k_discard_video_frame_threshold = 3;
+
+// 编码线程里的致命错误统一走这里：
+// 立刻关掉新的输入、触发收尾，并把“本段录制已经失败”上报给控制线程。
+// 不能在编码线程里直接 stop()，因为 stop() 会 join 编码线程自身。
+auto fail_recording_encoder(Core::State::AppState& app_state, State::RecordingState& state,
+                            std::string error) -> void {
+  state.encoder_error = std::move(error);
+  state.accepting_input.store(false, std::memory_order_release);
+  state.finish_requested.store(true, std::memory_order_release);
+  Logger().error("Recording encoder failed: {}", state.encoder_error);
+  Features::Recording::request_control_action(
+      app_state, Features::Recording::Types::RecordingControlAction::AbortWithError);
+}
 
 // ---------------------------------------------------------------------------
 // 时间：全程用 QPC 转成「相对录制起点」的 100ns，和视频帧、音频时间戳一套数。
@@ -602,8 +616,7 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
             auto copy_result =
                 copy_one_capture_frame_to_encoder_input(state, frame, request_resize_restart);
             if (!copy_result) {
-              state.encoder_error = copy_result.error();
-              Logger().error("Recording encoder failed: {}", copy_result.error());
+              fail_recording_encoder(app_state, state, copy_result.error());
               break;
             }
             if (state.has_encoder_input_texture) {
@@ -614,15 +627,13 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
             const auto emit_limit = frame_ts > 0 ? frame_ts - 1 : frame_ts;
             auto emit_before = emit_video_samples_until(state, emit_limit);
             if (!emit_before) {
-              state.encoder_error = emit_before.error();
-              Logger().error("Recording encoder failed: {}", emit_before.error());
+              fail_recording_encoder(app_state, state, emit_before.error());
               break;
             }
             auto copy_result =
                 copy_one_capture_frame_to_encoder_input(state, frame, request_resize_restart);
             if (!copy_result) {
-              state.encoder_error = copy_result.error();
-              Logger().error("Recording encoder failed: {}", copy_result.error());
+              fail_recording_encoder(app_state, state, copy_result.error());
               break;
             }
           }
@@ -635,8 +646,7 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
             finishing ? finish_target_timestamp_100ns(state) : elapsed_since_start_100ns(state);
         auto emit_result = emit_video_samples_until(state, target_ts);
         if (!emit_result) {
-          state.encoder_error = emit_result.error();
-          Logger().error("Recording encoder failed: {}", emit_result.error());
+          fail_recording_encoder(app_state, state, emit_result.error());
           break;
         }
       }
@@ -644,8 +654,7 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
       while (auto audio_packet = pop_ready_audio_packet(state)) {
         auto audio_result = encode_queued_audio(state, *audio_packet);
         if (!audio_result) {
-          state.encoder_error = audio_result.error();
-          Logger().error("Recording encoder failed: {}", audio_result.error());
+          fail_recording_encoder(app_state, state, audio_result.error());
           break;
         }
       }

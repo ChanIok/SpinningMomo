@@ -37,7 +37,7 @@ auto query_qpc_100ns() -> std::int64_t {
 auto start(Core::State::AppState& app_state, HWND target_window,
            const Features::Recording::Types::RecordingConfig& config)
     -> std::expected<void, std::string>;
-auto stop(Core::State::AppState& app_state) -> void;
+auto stop(Core::State::AppState& app_state) -> Features::Recording::Types::StopResult;
 auto request_control_action(Core::State::AppState& app_state,
                             Features::Recording::Types::RecordingControlAction action) -> bool;
 
@@ -77,10 +77,21 @@ auto request_control_action(Core::State::AppState& app_state,
       return true;
     }
 
+    if (action == Types::RecordingControlAction::AbortWithError) {
+      if (state.pending_action == Types::RecordingControlAction::ShutdownStop) {
+        return false;
+      }
+
+      state.pending_action = action;
+      state.control_cv.notify_one();
+      return true;
+    }
+
     // resize restart 可以被后来的 resize 覆盖，但不能插到 shutdown 或用户 toggle 前面。
     if (action == Types::RecordingControlAction::RestartAfterResize) {
       if (state.pending_action == Types::RecordingControlAction::ShutdownStop ||
-          state.pending_action == Types::RecordingControlAction::Toggle) {
+          state.pending_action == Types::RecordingControlAction::Toggle ||
+          state.pending_action == Types::RecordingControlAction::AbortWithError) {
         return false;
       }
 
@@ -91,6 +102,7 @@ auto request_control_action(Core::State::AppState& app_state,
 
     if (action == Types::RecordingControlAction::CleanupD3D) {
       if (state.pending_action == Types::RecordingControlAction::ShutdownStop ||
+          state.pending_action == Types::RecordingControlAction::AbortWithError ||
           state.pending_action == Types::RecordingControlAction::Toggle ||
           state.pending_action == Types::RecordingControlAction::RestartAfterResize) {
         return false;
@@ -113,6 +125,12 @@ auto handle_control_action(Core::State::AppState& app_state,
     case Types::RecordingControlAction::Toggle:
       if (handlers.on_toggle) {
         handlers.on_toggle();
+      }
+      return true;
+
+    case Types::RecordingControlAction::AbortWithError:
+      if (handlers.on_abort_with_error) {
+        handlers.on_abort_with_error();
       }
       return true;
 
@@ -459,18 +477,21 @@ auto start(Core::State::AppState& app_state, HWND target_window,
   return {};
 }
 
-auto stop(Core::State::AppState& app_state) -> void {
+auto stop(Core::State::AppState& app_state) -> Features::Recording::Types::StopResult {
+  Features::Recording::Types::StopResult result;
+
   if (!app_state.recording) {
-    return;
+    return result;
   }
 
   auto& state = *app_state.recording;
+  result.output_path = state.config.output_path;
 
   auto expected = Features::Recording::Types::RecordingStatus::Recording;
   if (!state.status.compare_exchange_strong(expected,
                                             Features::Recording::Types::RecordingStatus::Stopping,
                                             std::memory_order_acq_rel)) {
-    return;
+    return result;
   }
 
   // 先关输入入口。已经进入队列的数据会继续写完，新来的帧/音频会被拒绝。
@@ -517,11 +538,17 @@ auto stop(Core::State::AppState& app_state) -> void {
     if (!rename_result) {
       Logger().error("Failed to publish finalized recording '{}': {}",
                      state.config.output_path.string(), rename_result.error());
+      result.kind = Features::Recording::Types::StopResultKind::PublishFailed;
+      result.error = rename_result.error();
+    } else {
+      result.kind = Features::Recording::Types::StopResultKind::Saved;
     }
   } else {
     auto reason = state.encoder_error.empty() ? "too few video frames or finalize skipped"
                                               : state.encoder_error;
     Features::Recording::Session::delete_working_output_file(state.working_output_path, reason);
+    result.kind = Features::Recording::Types::StopResultKind::Discarded;
+    result.error = reason;
   }
 
   auto dropped_audio = state.dropped_audio_packets.load(std::memory_order_relaxed);
@@ -534,10 +561,11 @@ auto stop(Core::State::AppState& app_state) -> void {
     request_control_action(app_state, Types::RecordingControlAction::CleanupD3D);
   });
   Logger().info("Recording stopped");
+  return result;
 }
 
 auto cleanup(Core::State::AppState& app_state) -> void {
-  stop(app_state);
+  (void)stop(app_state);
   if (!app_state.recording) {
     MFShutdown();
     return;

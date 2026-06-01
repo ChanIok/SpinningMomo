@@ -47,6 +47,7 @@
   "message.recording_started": "录制已开始。",
   "message.recording_saved": "录制已保存：",
   "message.recording_start_failed": "录制启动失败: ",
+  "message.recording_failed": "录制失败: ",
   "message.recording_stop_failed": "录制停止失败: ",
 
   "notification.action.view": "查看",

@@ -130,9 +130,23 @@ export struct CapturePlan {
 export enum class RecordingControlAction {
   None,
   Toggle,
+  AbortWithError,
   RestartAfterResize,
   CleanupD3D,
   ShutdownStop,
+};
+
+export enum class StopResultKind {
+  NotRecording,
+  Saved,
+  Discarded,
+  PublishFailed,
+};
+
+export struct StopResult {
+  StopResultKind kind = StopResultKind::NotRecording;
+  std::filesystem::path output_path;
+  std::string error;
 };
 
 export struct QueuedAudioPacket {

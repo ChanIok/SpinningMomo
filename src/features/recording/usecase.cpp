@@ -52,6 +52,41 @@ auto show_recording_saved_notification(Core::State::AppState& state,
   Core::Notifications::post_notification_request(state, std::move(options));
 }
 
+// stop() 现在返回“本次录制段的真实结论”，这里统一把它翻译成用户提示。
+// 这样手动停止和运行中断都走同一套提示逻辑，不再靠文件是否存在来猜结果。
+auto show_recording_stop_result_notification(
+    Core::State::AppState& state, const Features::Recording::Types::StopResult& stop_result)
+    -> void {
+  using Features::Recording::Types::StopResultKind;
+
+  switch (stop_result.kind) {
+    case StopResultKind::Saved:
+      show_recording_saved_notification(state, stop_result.output_path);
+      return;
+
+    case StopResultKind::Discarded: {
+      auto detail = stop_result.error.empty()
+                        ? Utils::String::ToUtf8(stop_result.output_path.wstring())
+                        : stop_result.error;
+      show_recording_notification(state, state.i18n->texts["message.recording_failed"] + detail);
+      return;
+    }
+
+    case StopResultKind::PublishFailed: {
+      auto detail = stop_result.error.empty()
+                        ? Utils::String::ToUtf8(stop_result.output_path.wstring())
+                        : stop_result.error;
+      show_recording_notification(state,
+                                  state.i18n->texts["message.recording_stop_failed"] + detail);
+      return;
+    }
+
+    case StopResultKind::NotRecording:
+    default:
+      return;
+  }
+}
+
 auto notify_recording_toggled(Core::State::AppState& state, bool enabled) -> void {
   if (!state.events) {
     return;
@@ -87,15 +122,8 @@ auto toggle_recording_impl(Core::State::AppState& state) -> std::expected<void, 
 
   if (status == Features::Recording::Types::RecordingStatus::Recording) {
     // 停止录制前先保存目标路径，stop 会清理当前录制段状态。
-    std::filesystem::path saved_path = state.recording->config.output_path;
-    Features::Recording::stop(state);
-    std::error_code ec;
-    if (std::filesystem::exists(saved_path, ec) && !ec) {
-      show_recording_saved_notification(state, saved_path);
-    } else {
-      show_recording_notification(state, state.i18n->texts["message.recording_stop_failed"] +
-                                             Utils::String::ToUtf8(saved_path.wstring()));
-    }
+    auto stop_result = Features::Recording::stop(state);
+    show_recording_stop_result_notification(state, stop_result);
     notify_recording_toggled(state, false);
   } else if (status == Features::Recording::Types::RecordingStatus::Idle) {
     // 开始录制
@@ -205,11 +233,19 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
               Logger().error("Recording toggle failed: {}", result.error());
             }
           },
+      .on_abort_with_error =
+          [&state]() {
+            auto stop_result = Features::Recording::stop(state);
+            if (stop_result.kind != Features::Recording::Types::StopResultKind::NotRecording) {
+              show_recording_stop_result_notification(state, stop_result);
+              notify_recording_toggled(state, false);
+            }
+          },
       .on_shutdown_stop =
           [&state]() {
             if (state.recording->status.load(std::memory_order_acquire) ==
                 Features::Recording::Types::RecordingStatus::Recording) {
-              Features::Recording::stop(state);
+              (void)Features::Recording::stop(state);
               notify_recording_toggled(state, false);
             }
           },
@@ -244,7 +280,7 @@ auto stop_recording_if_running(Core::State::AppState& state) -> void {
     // 控制线程是懒启动；没有消费者时不投递请求。此分支代表状态异常，直接兜底保存。
     Logger().warn(
         "Recording is active but control thread is not running during shutdown; stopping directly");
-    Features::Recording::stop(state);
+    (void)Features::Recording::stop(state);
     notify_recording_toggled(state, false);
   }
 }

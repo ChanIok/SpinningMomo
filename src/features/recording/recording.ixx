@@ -11,6 +11,7 @@ namespace Features::Recording {
 
 export struct RecordingControlHandlers {
   std::function<void()> on_toggle;
+  std::function<void()> on_abort_with_error;
   std::function<void()> on_shutdown_stop;
 };
 
@@ -36,7 +37,7 @@ export auto start(Core::State::AppState& app_state, HWND target_window,
     -> std::expected<void, std::string>;
 
 // 停止当前录制段，排空输入、finalize 编码器并发布或删除临时文件。
-export auto stop(Core::State::AppState& app_state) -> void;
+export auto stop(Core::State::AppState& app_state) -> Features::Recording::Types::StopResult;
 
 // 请求一次尺寸变化后的自动切段重启；只提交请求，不直接执行重操作。
 export auto request_restart_after_resize(Core::State::AppState& app_state) -> void;
