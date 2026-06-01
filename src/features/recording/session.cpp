@@ -233,6 +233,7 @@ auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
   state.last_frame_height = 0;
   clear_queues(state);
   state.dropped_audio_packets.store(0, std::memory_order_release);
+  state.skipped_video_frames_due_to_encoding_lag = 0;
   state.encoded_video_frames = 0;
   state.encoded_audio_packets = 0;
   state.encoder_thread = {};

@@ -25,6 +25,9 @@ namespace Features::Recording::EncoderLoop {
 
 // 视频帧数太少就整段丢弃、不写最终 mp4，避免误触留下半截文件。
 constexpr std::uint64_t k_discard_video_frame_threshold = 3;
+// 编码线程如果落后太多，就直接跳过旧的视频格子，只保留少量 backlog 继续编码。
+constexpr std::int64_t k_encoding_overload_drop_threshold_frames = 6;
+constexpr std::int64_t k_encoding_overload_keep_backlog_frames = 2;
 
 // 编码线程里的致命错误统一走这里：
 // 立刻关掉新的输入、触发收尾，并把“本段录制已经失败”上报给控制线程。
@@ -153,11 +156,26 @@ auto write_current_video_sample(State::RecordingState& state, std::int64_t times
 }
 
 // 按配置 fps，从 next_video_timestamp 开始一路写到不晚于 target 为止（重复同一贴图也可以）。
+// 如果发现编码已经明显落后，就直接跳过一批旧时间格，让时间线先追近 target。
 auto emit_video_samples_until(State::RecordingState& state, std::int64_t target_timestamp_100ns)
     -> std::expected<void, std::string> {
   if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0 ||
       !state.encoder.sink_writer) {
     return {};
+  }
+
+  if (state.video_frame_interval_100ns > 0 &&
+      target_timestamp_100ns >= state.next_video_timestamp_100ns) {
+    const auto frames_due = (target_timestamp_100ns - state.next_video_timestamp_100ns) /
+                                state.video_frame_interval_100ns +
+                            1;
+    if (frames_due >= k_encoding_overload_drop_threshold_frames) {
+      const auto skip_frames = frames_due - k_encoding_overload_keep_backlog_frames;
+      if (skip_frames > 0) {
+        state.next_video_timestamp_100ns += skip_frames * state.video_frame_interval_100ns;
+        state.skipped_video_frames_due_to_encoding_lag += static_cast<std::uint64_t>(skip_frames);
+      }
+    }
   }
 
   while (state.next_video_timestamp_100ns <= target_timestamp_100ns) {
@@ -631,6 +649,31 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
         if (!emit_result) {
           fail_recording_encoder(app_state, state, emit_result.error());
           break;
+        }
+      }
+
+      // stop 可能落在两帧视频之间：此时正常按 finish_target 补帧后，仍会剩下一小截尾音
+      // 卡在「last_emitted_video_timestamp 与 next_video_timestamp 之间」。
+      // 这里补一帧静止画面，把最后半帧时间补满，让尾音可以自然排空。
+      if (finishing && state.has_encoder_input_texture && state.next_video_timestamp_100ns >= 0) {
+        bool has_tail_audio_between_frames = false;
+        {
+          std::lock_guard queue_lock(state.queue_mutex);
+          has_tail_audio_between_frames =
+              !state.audio_queue.empty() &&
+              state.audio_queue.front().timestamp_100ns >
+                  state.last_emitted_video_timestamp_100ns &&
+              state.audio_queue.front().timestamp_100ns <= state.next_video_timestamp_100ns;
+        }
+
+        if (has_tail_audio_between_frames) {
+          auto emit_tail_result =
+              write_current_video_sample(state, state.next_video_timestamp_100ns);
+          if (!emit_tail_result) {
+            fail_recording_encoder(app_state, state, emit_tail_result.error());
+            break;
+          }
+          state.next_video_timestamp_100ns += state.video_frame_interval_100ns;
         }
       }
 

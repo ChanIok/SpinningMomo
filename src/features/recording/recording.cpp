@@ -656,6 +656,10 @@ auto stop(Core::State::AppState& app_state) -> Features::Recording::Types::StopR
   if (dropped_audio > 0) {
     Logger().warn("Recording queue dropped audio packets: {}", dropped_audio);
   }
+  if (state.skipped_video_frames_due_to_encoding_lag > 0) {
+    Logger().warn("Recording skipped video frames due to encoding lag: {}",
+                  state.skipped_video_frames_due_to_encoding_lag);
+  }
 
   // 第八步：清空会话态，状态改回 Idle，启动延迟 5 秒的 D3D 清理定时器
   Features::Recording::Session::clear_session_runtime_fields(app_state);
