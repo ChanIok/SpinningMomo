@@ -5,6 +5,7 @@ module Features.Letterbox.UseCase;
 import std;
 import Core.State;
 import Core.I18n.State;
+import Core.Notifications;
 import Features.Letterbox;
 import Features.Letterbox.State;
 import Features.Overlay;
@@ -12,7 +13,6 @@ import Features.Overlay.State;
 import Features.Settings;
 import Features.Settings.State;
 import Features.WindowControl;
-import Features.Notifications;
 import Utils.Logger;
 import Utils.String;
 
@@ -69,8 +69,8 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
         state.settings->raw.features.letterbox.enabled = is_enabled;
         std::string error_message =
             state.i18n->texts["message.overlay_start_failed"] + start_result.error();
-        Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                                   error_message);
+        Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               error_message);
       }
     }
   } else {
@@ -85,8 +85,8 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
           state.settings->raw.features.letterbox.enabled = false;
           std::string error_message =
               state.i18n->texts["message.overlay_start_failed"] + result.error();
-          Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                                     error_message);
+          Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                                 error_message);
         }
       }
     } else {
@@ -95,8 +95,8 @@ auto toggle_letterbox(Core::State::AppState& state) -> void {
         Logger().error("Failed to shutdown letterbox: {}", result.error());
         std::string error_message =
             state.i18n->texts["message.overlay_start_failed"] + result.error();
-        Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                                   error_message);
+        Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               error_message);
       }
     }
   }

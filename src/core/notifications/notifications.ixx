@@ -1,12 +1,12 @@
 module;
 
-export module Features.Notifications;
+export module Core.Notifications;
 
 import std;
 import Core.State;
-import Features.Notifications.Types;
+import Core.Notifications.Types;
 
-namespace Features::Notifications {
+namespace Core::Notifications {
 
 // UI 线程、无 action 的简单 toast（i18n UTF-8 文本）
 export auto show_notification(Core::State::AppState& state, const std::string& title,
@@ -20,4 +20,4 @@ export auto post_notification_request(Core::State::AppState& state,
 export auto show_notification(Core::State::AppState& state, Types::NotificationOptions options)
     -> void;
 
-}  // namespace Features::Notifications
+}  // namespace Core::Notifications

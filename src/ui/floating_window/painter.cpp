@@ -10,7 +10,7 @@ import UI.SharedRenderResources.State;
 import UI.FloatingWindow.Layout;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
-import UI.FloatingWindow.D2DContext;
+import UI.FloatingWindow.RenderContext;
 import Features.Settings.Menu;
 import <d2d1_3.h>;
 import <dwrite_3.h>;
@@ -41,7 +41,7 @@ auto to_cache_key(float value, float scale) -> int {
   return static_cast<int>(std::lround(value * scale));
 }
 
-auto find_cached_font_key(const UI::FloatingWindow::RenderContext& d2d, std::wstring_view text,
+auto find_cached_font_key(const UI::FloatingWindow::RenderResources& d2d, std::wstring_view text,
                           int width_key, int base_font_key) -> std::optional<int> {
   for (const auto& entry : d2d.text_measure_cache) {
     if (entry.width_key == width_key && entry.base_font_key == base_font_key &&
@@ -52,7 +52,7 @@ auto find_cached_font_key(const UI::FloatingWindow::RenderContext& d2d, std::wst
   return std::nullopt;
 }
 
-auto store_text_measure_cache(UI::FloatingWindow::RenderContext& d2d, std::wstring_view text,
+auto store_text_measure_cache(UI::FloatingWindow::RenderResources& d2d, std::wstring_view text,
                               int width_key, int base_font_key, int resolved_font_key) -> void {
   if (d2d.text_measure_cache.size() >= kMaxTextMeasureCacheEntries) {
     d2d.text_measure_cache.clear();
@@ -66,7 +66,7 @@ auto store_text_measure_cache(UI::FloatingWindow::RenderContext& d2d, std::wstri
   });
 }
 
-auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderContext& d2d,
+auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderResources& d2d,
                                         IDWriteFactory7* write_factory, int font_key)
     -> IDWriteTextFormat* {
   if (auto it = d2d.adjusted_text_formats.find(font_key); it != d2d.adjusted_text_formats.end()) {
@@ -79,7 +79,7 @@ auto get_or_create_adjusted_text_format(UI::FloatingWindow::RenderContext& d2d,
 
   const float font_size = static_cast<float>(font_key) / kFontCacheScale;
   auto text_format =
-      UI::FloatingWindow::D2DContext::create_text_format_with_size(write_factory, font_size);
+      UI::FloatingWindow::RenderContext::create_text_format_with_size(write_factory, font_size);
   if (!text_format) {
     return nullptr;
   }
@@ -148,7 +148,7 @@ auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F
     return;  // 不需要显示滚动条
   }
 
-  const auto& d2d = state.floating_window->d2d_context;
+  const auto& d2d = state.floating_window->render_resources;
 
   // 计算轨道高度
   const float track_height = static_cast<float>(render.item_height * render.max_visible_rows);
@@ -185,7 +185,7 @@ auto draw_scroll_indicator(const Core::State::AppState& state, const D2D1_RECT_F
 
 // 主绘制函数实现
 auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> void {
-  auto& d2d = state.floating_window->d2d_context;
+  auto& d2d = state.floating_window->render_resources;
 
   if (!d2d.is_initialized || !d2d.device_context) {
     return;
@@ -193,7 +193,7 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
 
   // 先处理字体更新（如果需要）
   if (d2d.needs_font_update) {
-    if (!UI::FloatingWindow::D2DContext::update_text_format_if_needed(state)) {
+    if (!UI::FloatingWindow::RenderContext::update_text_format_if_needed(state)) {
       return;  // 字体更新失败，无法继续绘制
     }
   }
@@ -226,7 +226,7 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
   if (hr == D2DERR_RECREATE_TARGET) {
     // composition back buffer 已失效时，直接重建整套后端比局部修补更可靠，
     // 上层布局和交互状态保持不动。
-    UI::FloatingWindow::D2DContext::initialize_d2d(state, hwnd);
+    UI::FloatingWindow::RenderContext::initialize_render_context(state, hwnd);
     d2d.is_rendering = false;
     return;
   }
@@ -241,14 +241,14 @@ auto paint(Core::State::AppState& state, HWND hwnd, const RECT& client_rect) -> 
 
 // 绘制背景
 auto draw_background(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& d2d = state.floating_window->d2d_context;
+  const auto& d2d = state.floating_window->render_resources;
   // 使用半透明白色背景
   d2d.device_context->FillRectangle(rect, d2d.background_brush.get());
 }
 
 // 绘制关闭按钮
 auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& title_rect) -> void {
-  const auto& d2d = state.floating_window->d2d_context;
+  const auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
 
   // 计算按钮尺寸（正方形，与标题栏高度一致）
@@ -288,7 +288,7 @@ auto draw_close_button(const Core::State::AppState& state, const D2D1_RECT_F& ti
 
 // 绘制标题栏
 auto draw_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& d2d = state.floating_window->d2d_context;
+  const auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
 
   // 绘制标题栏背景
@@ -311,7 +311,7 @@ auto draw_title_bar(const Core::State::AppState& state, const D2D1_RECT_F& rect)
 
 // 绘制分隔线
 auto draw_separators(const Core::State::AppState& state, const D2D1_RECT_F& rect) -> void {
-  const auto& d2d = state.floating_window->d2d_context;
+  const auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
 
   // 使用简单的列边界计算
@@ -411,7 +411,7 @@ auto is_item_selected(const UI::FloatingWindow::MenuItem& item,
 // 绘制单个菜单项
 auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::MenuItem& item,
                       const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
-  auto& d2d = state.floating_window->d2d_context;
+  auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
   const int indicator_width = UI::FloatingWindow::Layout::get_indicator_width(item, state);
 
@@ -462,7 +462,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   if (const auto cached_font_key = find_cached_font_key(d2d, item.text, width_key, base_font_key)) {
     resolved_font_key = *cached_font_key;
   } else {
-    float text_width = UI::FloatingWindow::D2DContext::measure_text_width(
+    float text_width = UI::FloatingWindow::RenderContext::measure_text_width(
         item.text, d2d.text_format.get(), write_factory);
 
     if (text_width > available_width) {
@@ -481,7 +481,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
           break;
         }
 
-        text_width = UI::FloatingWindow::D2DContext::measure_text_width(
+        text_width = UI::FloatingWindow::RenderContext::measure_text_width(
             item.text, adjusted_text_format, write_factory);
         if (text_width <= available_width) {
           resolved_font_key = adjusted_font_key;

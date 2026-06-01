@@ -18,7 +18,7 @@ import UI.TrayIcon;
 import UI.TrayIcon.Types;
 import UI.ContextMenu;
 import UI.ContextMenu.Types;
-import UI.FloatingWindow.D2DContext;
+import UI.FloatingWindow.RenderContext;
 import Utils.Logger;
 import <windows.h>;
 import <windowsx.h>;
@@ -287,7 +287,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
     case WM_SIZE: {
       SIZE new_size = {LOWORD(lParam), HIWORD(lParam)};
       // 调整Direct2D渲染上下文以适应新的窗口大小
-      UI::FloatingWindow::D2DContext::resize_d2d(state, new_size);
+      UI::FloatingWindow::RenderContext::resize_render_context(state, new_size);
       return 0;
     }
 

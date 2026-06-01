@@ -17,6 +17,7 @@ import Core.HttpClient;
 import Core.Events;
 import Core.Events.State;
 import Core.Events.Registrar;
+import Core.Notifications;
 import Core.RPC.Registry;
 import Core.Initializer.Database;
 import Core.Migration;
@@ -30,9 +31,9 @@ import Features.Letterbox.State;
 import Features.WindowControl;
 import Extensions.InfinityNikki.MapService;
 import Extensions.InfinityNikki.PhotoService;
-import Features.Notifications;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
+import UI.NotificationWindow;
 import UI.WebViewWindow;
 import UI.TrayIcon;
 import UI.ContextMenu;
@@ -164,6 +165,10 @@ auto initialize_application(Core::State::AppState& state) -> std::expected<void,
       return std::unexpected("Failed to initialize tray menu: " + result.error());
     }
 
+    if (auto result = UI::NotificationWindow::initialize(state); !result) {
+      return std::unexpected("Failed to initialize notification window: " + result.error());
+    }
+
     if (auto result = Features::Recording::initialize(state); !result) {
       return std::unexpected(result.error());
     }
@@ -195,8 +200,8 @@ auto initialize_application(Core::State::AppState& state) -> std::expected<void,
     if (should_notify_upgrade) {
       auto text_it = state.i18n->texts.find("message.app_updated_to_prefix");
       if (text_it != state.i18n->texts.end()) {
-        Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                                   text_it->second + current_version);
+        Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               text_it->second + current_version);
       } else {
         Logger().warn("Skip upgrade notification: i18n text is missing");
       }

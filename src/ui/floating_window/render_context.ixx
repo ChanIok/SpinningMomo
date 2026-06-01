@@ -1,6 +1,6 @@
 module;
 
-export module UI.FloatingWindow.D2DContext;
+export module UI.FloatingWindow.RenderContext;
 
 import std;
 import Core.State;
@@ -9,16 +9,16 @@ import <dwrite_3.h>;
 import <wil/com.h>;
 import <windows.h>;
 
-namespace UI::FloatingWindow::D2DContext {
+namespace UI::FloatingWindow::RenderContext {
 
-// 初始化Direct2D资源
-export auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool;
+// 初始化窗口级渲染上下文
+export auto initialize_render_context(Core::State::AppState& state, HWND hwnd) -> bool;
 
-// 清理Direct2D资源
-export auto cleanup_d2d(Core::State::AppState& state) -> void;
+// 清理窗口级渲染上下文
+export auto cleanup_render_context(Core::State::AppState& state) -> void;
 
 // 调整渲染目标大小
-export auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool;
+export auto resize_render_context(Core::State::AppState& state, const SIZE& new_size) -> bool;
 
 // 更新文本格式（DPI变化时）
 export auto update_text_format_if_needed(Core::State::AppState& state) -> bool;
@@ -34,4 +34,4 @@ export auto create_text_format_with_size(IDWriteFactory7* write_factory, float f
 // 更新所有画刷颜色
 export auto update_all_brush_colors(Core::State::AppState& state) -> void;
 
-}  // namespace UI::FloatingWindow::D2DContext
+}  // namespace UI::FloatingWindow::RenderContext

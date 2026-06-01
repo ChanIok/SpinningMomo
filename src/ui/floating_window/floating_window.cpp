@@ -15,7 +15,7 @@ import Core.I18n.State;
 import UI.FloatingWindow.Events;
 import UI.FloatingWindow.MessageHandler;
 import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.D2DContext;
+import UI.FloatingWindow.RenderContext;
 import UI.FloatingWindow.Painter;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
@@ -104,7 +104,8 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
   create_window_attributes(state.floating_window->window.hwnd);
 
   // 初始化Direct2D渲染
-  if (!UI::FloatingWindow::D2DContext::initialize_d2d(state, state.floating_window->window.hwnd)) {
+  if (!UI::FloatingWindow::RenderContext::initialize_render_context(
+          state, state.floating_window->window.hwnd)) {
     Logger().error("Failed to initialize Direct2D rendering");
   }
 
@@ -176,7 +177,7 @@ auto toggle_visibility(Core::State::AppState& state) -> void {
 
 auto destroy_window(Core::State::AppState& state) -> void {
   // 清理Direct2D资源
-  UI::FloatingWindow::D2DContext::cleanup_d2d(state);
+  UI::FloatingWindow::RenderContext::cleanup_render_context(state);
 
   if (state.floating_window->window.hwnd) {
     uninstall_topmost_refresh_hook(state);
@@ -334,7 +335,7 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
   normalize_scroll_offsets(state);
 
   // 更新颜色配置
-  UI::FloatingWindow::D2DContext::update_all_brush_colors(state);
+  UI::FloatingWindow::RenderContext::update_all_brush_colors(state);
 
   // 重新计算窗口大小
   const auto new_size = UI::FloatingWindow::Layout::calculate_window_size(state);
@@ -347,7 +348,7 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
     Logger().info("Window size updated: {}x{}", new_size.cx, new_size.cy);
   }
 
-  state.floating_window->d2d_context.needs_font_update = true;
+  state.floating_window->render_resources.needs_font_update = true;
 
   // 请求重绘
   request_repaint(state);

@@ -91,7 +91,7 @@ export struct TextMeasureCacheEntry {
   int resolved_font_key = 0;
 };
 
-export struct RenderContext {
+export struct RenderResources {
   // 设备级资源已上收至 UI.SharedRenderResources。
   // 这里仅保留浮窗自己的 composition surface 和绘制缓存。
   wil::com_ptr<IDXGISwapChain1> swap_chain;

@@ -6,11 +6,11 @@ import std;
 import Core.Events;
 import Core.State;
 import Core.I18n.State;
+import Core.Notifications;
+import Core.Notifications.Types;
 import Features.Recording;
 import Features.Recording.Types;
 import Features.Recording.State;
-import Features.Notifications;
-import Features.Notifications.Types;
 import Features.Settings.Types;
 import Features.Settings.State;
 import UI.FloatingWindow.Events;
@@ -26,20 +26,20 @@ import <windows.h>;
 namespace Features::Recording::UseCase {
 
 auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
-  Features::Notifications::Types::NotificationOptions options;
+  Core::Notifications::Types::NotificationOptions options;
   options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
   options.message = Utils::String::FromUtf8(message);
-  Features::Notifications::post_notification_request(state, std::move(options));
+  Core::Notifications::post_notification_request(state, std::move(options));
 }
 
 auto show_recording_saved_notification(Core::State::AppState& state,
                                        const std::filesystem::path& saved_path) -> void {
-  Features::Notifications::Types::NotificationOptions options;
+  Core::Notifications::Types::NotificationOptions options;
   options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
   options.message =
       Utils::String::FromUtf8(state.i18n->texts["message.recording_saved"]) + saved_path.wstring();
 
-  Features::Notifications::Types::NotificationAction view_action;
+  Core::Notifications::Types::NotificationAction view_action;
   view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
   view_action.callback = [saved_path](Core::State::AppState&) {
     auto open_result = Utils::System::open_file_with_default_app(saved_path);
@@ -49,7 +49,7 @@ auto show_recording_saved_notification(Core::State::AppState& state,
   };
   options.action = std::move(view_action);
 
-  Features::Notifications::post_notification_request(state, std::move(options));
+  Core::Notifications::post_notification_request(state, std::move(options));
 }
 
 auto notify_recording_toggled(Core::State::AppState& state, bool enabled) -> void {

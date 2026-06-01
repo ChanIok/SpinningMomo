@@ -5,12 +5,12 @@ module Features.Screenshot.UseCase;
 import std;
 import Core.State;
 import Core.I18n.State;
+import Core.Notifications;
+import Core.Notifications.Types;
 import UI.FloatingWindow.Events;
 import Features.Screenshot;
 import Features.Settings.State;
 import Features.WindowControl;
-import Features.Notifications;
-import Features.Notifications.Types;
 import Utils.Image;
 import Utils.Logger;
 import Utils.String;
@@ -23,8 +23,8 @@ auto capture(Core::State::AppState& state) -> void {
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                               state.i18n->texts["message.window_not_found"]);
+    Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.window_not_found"]);
     return;
   }
 
@@ -34,12 +34,12 @@ auto capture(Core::State::AppState& state) -> void {
       const std::filesystem::path screenshot_path(path);
       const auto path_str = Utils::String::ToUtf8(path);
 
-      Features::Notifications::Types::NotificationOptions options;
+      Core::Notifications::Types::NotificationOptions options;
       options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
       options.message =
           Utils::String::FromUtf8(state.i18n->texts["message.screenshot_success"]) + path;
 
-      Features::Notifications::Types::NotificationAction view_action;
+      Core::Notifications::Types::NotificationAction view_action;
       view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
       view_action.callback = [screenshot_path](Core::State::AppState&) {
         auto open_result = Utils::System::open_file_with_default_app(screenshot_path);
@@ -49,14 +49,14 @@ auto capture(Core::State::AppState& state) -> void {
       };
       options.action = std::move(view_action);
 
-      Features::Notifications::post_notification_request(state, std::move(options));
+      Core::Notifications::post_notification_request(state, std::move(options));
       Logger().info("Screenshot saved successfully: {}", path_str);
     } else {
-      Features::Notifications::Types::NotificationOptions fail_options;
+      Core::Notifications::Types::NotificationOptions fail_options;
       fail_options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
       fail_options.message =
           Utils::String::FromUtf8(state.i18n->texts["message.screenshot_failed"]);
-      Features::Notifications::post_notification_request(state, std::move(fail_options));
+      Core::Notifications::post_notification_request(state, std::move(fail_options));
       Logger().error("Screenshot capture failed");
     }
   };
@@ -71,7 +71,7 @@ auto capture(Core::State::AppState& state) -> void {
   auto result = Features::Screenshot::take_screenshot(state, *target_window, completion_callback,
                                                       image_format, jpeg_quality, std::nullopt);
   if (!result) {
-    Features::Notifications::show_notification(
+    Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.screenshot_failed"] + ": " + result.error());
     Logger().error("Failed to start screenshot: {}", result.error());

@@ -19,7 +19,7 @@ import UI.ContextMenu.Layout;
 import UI.ContextMenu.MessageHandler;
 import UI.ContextMenu.Interaction;
 import UI.ContextMenu.Painter;
-import UI.ContextMenu.D2DContext;
+import UI.ContextMenu.RenderContext;
 import Utils.Logger;
 import Utils.String;
 import Vendor.Windows;
@@ -81,7 +81,7 @@ void hide_and_destroy_menu(Core::State::AppState& state) {
     DestroyWindow(state.context_menu->submenu_hwnd);
     state.context_menu->submenu_hwnd = nullptr;
     // 确保清理子菜单D2D资源
-    D2DContext::cleanup_submenu(state);
+    RenderContext::cleanup_submenu(state);
   }
 
   // 再销毁主菜单
@@ -89,7 +89,7 @@ void hide_and_destroy_menu(Core::State::AppState& state) {
     DestroyWindow(state.context_menu->hwnd);
     state.context_menu->hwnd = nullptr;
     // 确保清理主菜单D2D资源
-    D2DContext::cleanup_context_menu(state);
+    RenderContext::cleanup_context_menu(state);
   }
 
   // 重置交互状态，避免旧菜单残留的hover/定时意图影响下一次显示。
@@ -172,7 +172,7 @@ void handle_menu_action(Core::State::AppState& state,
 auto hide_submenu(Core::State::AppState& state) -> void {
   if (state.context_menu->submenu_hwnd) {
     DestroyWindow(state.context_menu->submenu_hwnd);
-    D2DContext::cleanup_submenu(state);
+    RenderContext::cleanup_submenu(state);
     state.context_menu->submenu_hwnd = nullptr;
     state.context_menu->submenu_parent_index = -1;
     state.context_menu->interaction.submenu_hover_index = -1;
@@ -221,7 +221,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
   Logger().debug("Created submenu window: {}", (void*)menu_state.submenu_hwnd);
 
   // 初始化D2D资源
-  if (!UI::ContextMenu::D2DContext::initialize_submenu(state, menu_state.submenu_hwnd)) {
+  if (!UI::ContextMenu::RenderContext::initialize_submenu(state, menu_state.submenu_hwnd)) {
     Logger().error("Failed to initialize D2D for submenu.");
     DestroyWindow(menu_state.submenu_hwnd);
     menu_state.submenu_hwnd = nullptr;
@@ -275,8 +275,8 @@ auto cleanup(Core::State::AppState& app_state) -> void {
     }
 
     // 清理D2D资源
-    D2DContext::cleanup_submenu(app_state);
-    D2DContext::cleanup_context_menu(app_state);
+    RenderContext::cleanup_submenu(app_state);
+    RenderContext::cleanup_context_menu(app_state);
     UI::ContextMenu::Interaction::reset(app_state);
     app_state.context_menu->submenu_parent_index = -1;
   }
@@ -307,7 +307,7 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
   UINT dpi = app_state.floating_window->window.dpi;
   menu_state.layout.update_dpi_scaling(dpi);
 
-  if (!D2DContext::initialize_text_format(app_state)) {
+  if (!RenderContext::initialize_text_format(app_state)) {
     Logger().error("Failed to initialize text format for context menu.");
     return;
   }
@@ -327,7 +327,7 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
   }
 
   // 5. 初始化D2D资源
-  if (!D2DContext::initialize_context_menu(app_state, menu_state.hwnd)) {
+  if (!RenderContext::initialize_context_menu(app_state, menu_state.hwnd)) {
     Logger().error("Failed to initialize D2D for context menu.");
     DestroyWindow(menu_state.hwnd);
     menu_state.hwnd = nullptr;

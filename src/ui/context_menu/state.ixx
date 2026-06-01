@@ -13,7 +13,7 @@ import <windows.h>;
 
 namespace UI::ContextMenu::State {
 
-export struct RenderSurface {
+export struct RenderResources {
   wil::com_ptr<IDXGISwapChain1> swap_chain;
   wil::com_ptr<IDCompositionTarget> composition_target;
   wil::com_ptr<IDCompositionVisual> composition_visual;
@@ -36,8 +36,8 @@ export struct ContextMenuState {
   HWND submenu_hwnd = nullptr;
 
   // D2D资源
-  RenderSurface main_surface;
-  RenderSurface submenu_surface;
+  RenderResources main_render_resources;
+  RenderResources submenu_render_resources;
 
   // 独立的文本格式（DPI 缩放后的字号，不依赖浮窗）
   wil::com_ptr<IDWriteTextFormat> text_format;

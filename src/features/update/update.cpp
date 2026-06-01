@@ -1,14 +1,16 @@
+module;
+
 module Features.Update;
 
 import std;
 import Core.Events;
 import Core.Async;
+import Core.Notifications;
+import Core.Notifications.Types;
 import Core.Tasks;
 import UI.FloatingWindow.Events;
 import UI.WebViewWindow;
 import Core.State;
-import Features.Notifications;
-import Features.Notifications.Types;
 import Core.I18n.State;
 import Core.HttpClient;
 import Core.HttpClient.Types;
@@ -35,13 +37,13 @@ auto post_update_notification(Core::State::AppState& app_state, const std::strin
     return;
   }
 
-  Features::Notifications::Types::NotificationOptions options;
+  Core::Notifications::Types::NotificationOptions options;
   options.title = Utils::String::FromUtf8(app_name_it->second);
   options.message = Utils::String::FromUtf8(message);
 
   auto action_label_it = app_state.i18n->texts.find("notification.action.view");
   if (action_label_it != app_state.i18n->texts.end()) {
-    options.action = Features::Notifications::Types::NotificationAction{
+    options.action = Core::Notifications::Types::NotificationAction{
         .label = Utils::String::FromUtf8(action_label_it->second),
         .callback =
             [](Core::State::AppState& state) {
@@ -52,7 +54,7 @@ auto post_update_notification(Core::State::AppState& app_state, const std::strin
     Logger().warn("Skip update notification action: view action text is missing");
   }
 
-  Features::Notifications::post_notification_request(app_state, std::move(options));
+  Core::Notifications::post_notification_request(app_state, std::move(options));
 }
 
 auto is_update_needed(const std::string& current_version, const std::string& latest_version)

@@ -1,6 +1,6 @@
 module;
 
-module UI.ContextMenu.D2DContext;
+module UI.ContextMenu.RenderContext;
 
 import Core.State;
 import UI.SharedRenderResources;
@@ -16,7 +16,7 @@ import <dxgi1_2.h>;
 import <wil/com.h>;
 import <windows.h>;
 
-namespace UI::ContextMenu::D2DContext {
+namespace UI::ContextMenu::RenderContext {
 
 constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 
@@ -73,45 +73,48 @@ auto create_brush_from_hex(ID2D1DeviceContext6* target, const std::string& hex_c
                                                            brush.put()));
 }
 
-auto release_brushes(State::RenderSurface& surface) -> void {
-  surface.background_brush.reset();
-  surface.text_brush.reset();
-  surface.separator_brush.reset();
-  surface.hover_brush.reset();
-  surface.indicator_brush.reset();
+auto release_brushes(State::RenderResources& render_resources) -> void {
+  render_resources.background_brush.reset();
+  render_resources.text_brush.reset();
+  render_resources.separator_brush.reset();
+  render_resources.hover_brush.reset();
+  render_resources.indicator_brush.reset();
 }
 
-auto release_target_bitmap(State::RenderSurface& surface) -> void {
-  if (surface.device_context) {
-    surface.device_context->SetTarget(nullptr);
+auto release_target_bitmap(State::RenderResources& render_resources) -> void {
+  if (render_resources.device_context) {
+    render_resources.device_context->SetTarget(nullptr);
   }
-  surface.target_bitmap.reset();
+  render_resources.target_bitmap.reset();
 }
 
-auto cleanup_surface(State::RenderSurface& surface) -> void {
-  release_brushes(surface);
-  release_target_bitmap(surface);
-  surface.device_context.reset();
-  surface.composition_visual.reset();
-  surface.composition_target.reset();
-  surface.swap_chain.reset();
-  surface.surface_size = {0, 0};
-  surface.is_ready = false;
+auto cleanup_surface(State::RenderResources& render_resources) -> void {
+  release_brushes(render_resources);
+  release_target_bitmap(render_resources);
+  render_resources.device_context.reset();
+  render_resources.composition_visual.reset();
+  render_resources.composition_target.reset();
+  render_resources.swap_chain.reset();
+  render_resources.surface_size = {0, 0};
+  render_resources.is_ready = false;
 }
 
-auto create_brushes_for_surface(Core::State::AppState& state, State::RenderSurface& surface)
-    -> bool {
+auto create_brushes_for_surface(Core::State::AppState& state,
+                                State::RenderResources& render_resources) -> bool {
   const auto& colors = state.settings->raw.ui.floating_window_colors;
-  return create_brush_from_hex(surface.device_context.get(),
+  return create_brush_from_hex(render_resources.device_context.get(),
                                force_opaque_hex_color(colors.background),
-                               surface.background_brush) &&
-         create_brush_from_hex(surface.device_context.get(), colors.text, surface.text_brush) &&
-         create_brush_from_hex(surface.device_context.get(),
-                               force_opaque_hex_color(colors.separator), surface.separator_brush) &&
-         create_brush_from_hex(surface.device_context.get(), force_opaque_hex_color(colors.hover),
-                               surface.hover_brush) &&
-         create_brush_from_hex(surface.device_context.get(), colors.indicator,
-                               surface.indicator_brush);
+                               render_resources.background_brush) &&
+         create_brush_from_hex(render_resources.device_context.get(), colors.text,
+                               render_resources.text_brush) &&
+         create_brush_from_hex(render_resources.device_context.get(),
+                               force_opaque_hex_color(colors.separator),
+                               render_resources.separator_brush) &&
+         create_brush_from_hex(render_resources.device_context.get(),
+                               force_opaque_hex_color(colors.hover),
+                               render_resources.hover_brush) &&
+         create_brush_from_hex(render_resources.device_context.get(), colors.indicator,
+                               render_resources.indicator_brush);
 }
 
 auto create_text_format(IDWriteFactory7* write_factory, float font_size)
@@ -133,7 +136,8 @@ auto create_text_format(IDWriteFactory7* write_factory, float font_size)
   return text_format;
 }
 
-auto create_device_context(ID2D1Device* shared_device, State::RenderSurface& surface) -> bool {
+auto create_device_context(ID2D1Device* shared_device, State::RenderResources& render_resources)
+    -> bool {
   if (!shared_device) {
     return false;
   }
@@ -145,17 +149,17 @@ auto create_device_context(ID2D1Device* shared_device, State::RenderSurface& sur
     return false;
   }
 
-  if (FAILED(base_context->QueryInterface(IID_PPV_ARGS(surface.device_context.put()))) ||
-      !surface.device_context) {
+  if (FAILED(base_context->QueryInterface(IID_PPV_ARGS(render_resources.device_context.put()))) ||
+      !render_resources.device_context) {
     return false;
   }
 
-  surface.device_context->SetUnitMode(D2D1_UNIT_MODE_PIXELS);
-  surface.device_context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+  render_resources.device_context->SetUnitMode(D2D1_UNIT_MODE_PIXELS);
+  render_resources.device_context->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
   return true;
 }
 
-auto create_swap_chain(ID3D11Device* shared_d3d_device, State::RenderSurface& surface,
+auto create_swap_chain(ID3D11Device* shared_d3d_device, State::RenderResources& render_resources,
                        const SIZE& size) -> bool {
   if (!shared_d3d_device) {
     return false;
@@ -178,14 +182,14 @@ auto create_swap_chain(ID3D11Device* shared_d3d_device, State::RenderSurface& su
   desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
   desc.AlphaMode = DXGI_ALPHA_MODE_PREMULTIPLIED;
 
-  return SUCCEEDED(dxgi_factory->CreateSwapChainForComposition(shared_d3d_device, &desc, nullptr,
-                                                               surface.swap_chain.put())) &&
-         surface.swap_chain;
+  return SUCCEEDED(dxgi_factory->CreateSwapChainForComposition(
+             shared_d3d_device, &desc, nullptr, render_resources.swap_chain.put())) &&
+         render_resources.swap_chain;
 }
 
-auto create_composition_tree(ID3D11Device* shared_d3d_device, State::RenderSurface& surface,
-                             HWND hwnd) -> bool {
-  if (!shared_d3d_device || !surface.swap_chain) {
+auto create_composition_tree(ID3D11Device* shared_d3d_device,
+                             State::RenderResources& render_resources, HWND hwnd) -> bool {
+  if (!shared_d3d_device || !render_resources.swap_chain) {
     return false;
   }
 
@@ -200,84 +204,89 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device, State::RenderSurfa
     return false;
   }
 
-  if (FAILED(
-          composition_device->CreateTargetForHwnd(hwnd, TRUE, surface.composition_target.put())) ||
-      !surface.composition_target) {
+  if (FAILED(composition_device->CreateTargetForHwnd(hwnd, TRUE,
+                                                     render_resources.composition_target.put())) ||
+      !render_resources.composition_target) {
     return false;
   }
 
-  if (FAILED(composition_device->CreateVisual(surface.composition_visual.put())) ||
-      !surface.composition_visual) {
+  if (FAILED(composition_device->CreateVisual(render_resources.composition_visual.put())) ||
+      !render_resources.composition_visual) {
     return false;
   }
 
-  return SUCCEEDED(surface.composition_visual->SetContent(surface.swap_chain.get())) &&
-         SUCCEEDED(surface.composition_target->SetRoot(surface.composition_visual.get())) &&
+  return SUCCEEDED(
+             render_resources.composition_visual->SetContent(render_resources.swap_chain.get())) &&
+         SUCCEEDED(render_resources.composition_target->SetRoot(
+             render_resources.composition_visual.get())) &&
          SUCCEEDED(composition_device->Commit());
 }
 
-auto create_target_bitmap(State::RenderSurface& surface, const SIZE& size) -> bool {
-  release_target_bitmap(surface);
+auto create_target_bitmap(State::RenderResources& render_resources, const SIZE& size) -> bool {
+  release_target_bitmap(render_resources);
 
   wil::com_ptr<IDXGISurface> dxgi_surface;
-  if (FAILED(surface.swap_chain->GetBuffer(0, IID_PPV_ARGS(dxgi_surface.put()))) || !dxgi_surface) {
+  if (FAILED(render_resources.swap_chain->GetBuffer(0, IID_PPV_ARGS(dxgi_surface.put()))) ||
+      !dxgi_surface) {
     return false;
   }
 
   D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
       D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
       D2D1::PixelFormat(kSurfaceFormat, D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
-  if (FAILED(surface.device_context->CreateBitmapFromDxgiSurface(dxgi_surface.get(), &properties,
-                                                                 surface.target_bitmap.put())) ||
-      !surface.target_bitmap) {
+  if (FAILED(render_resources.device_context->CreateBitmapFromDxgiSurface(
+          dxgi_surface.get(), &properties, render_resources.target_bitmap.put())) ||
+      !render_resources.target_bitmap) {
     return false;
   }
 
-  surface.device_context->SetTarget(surface.target_bitmap.get());
-  surface.surface_size = size;
+  render_resources.device_context->SetTarget(render_resources.target_bitmap.get());
+  render_resources.surface_size = size;
   return true;
 }
 
-auto initialize_surface(Core::State::AppState& state, State::RenderSurface& surface, HWND hwnd,
-                        const SIZE& size) -> bool {
+auto initialize_surface(Core::State::AppState& state, State::RenderResources& render_resources,
+                        HWND hwnd, const SIZE& size) -> bool {
   auto& shared = shared_resources(state);
   if (!UI::SharedRenderResources::ensure_initialized(state) || size.cx <= 0 || size.cy <= 0) {
     return false;
   }
 
-  if (surface.is_ready && surface.surface_size.cx == size.cx &&
-      surface.surface_size.cy == size.cy) {
+  if (render_resources.is_ready && render_resources.surface_size.cx == size.cx &&
+      render_resources.surface_size.cy == size.cy) {
     return true;
   }
 
-  cleanup_surface(surface);
+  cleanup_surface(render_resources);
 
-  if (!create_device_context(shared.d2d_device.get(), surface) ||
-      !create_swap_chain(shared.d3d_device.get(), surface, size) ||
-      !create_composition_tree(shared.d3d_device.get(), surface, hwnd) ||
-      !create_target_bitmap(surface, size) || !create_brushes_for_surface(state, surface)) {
-    cleanup_surface(surface);
+  if (!create_device_context(shared.d2d_device.get(), render_resources) ||
+      !create_swap_chain(shared.d3d_device.get(), render_resources, size) ||
+      !create_composition_tree(shared.d3d_device.get(), render_resources, hwnd) ||
+      !create_target_bitmap(render_resources, size) ||
+      !create_brushes_for_surface(state, render_resources)) {
+    cleanup_surface(render_resources);
     return false;
   }
 
-  surface.is_ready = true;
+  render_resources.is_ready = true;
   return true;
 }
 
-auto resize_surface(State::RenderSurface& surface, const SIZE& new_size) -> bool {
-  if (!surface.is_ready || !surface.swap_chain || !surface.device_context || new_size.cx <= 0 ||
-      new_size.cy <= 0) {
+auto resize_surface(State::RenderResources& render_resources, const SIZE& new_size) -> bool {
+  if (!render_resources.is_ready || !render_resources.swap_chain ||
+      !render_resources.device_context || new_size.cx <= 0 || new_size.cy <= 0) {
     return false;
   }
 
-  if (surface.surface_size.cx == new_size.cx && surface.surface_size.cy == new_size.cy) {
+  if (render_resources.surface_size.cx == new_size.cx &&
+      render_resources.surface_size.cy == new_size.cy) {
     return true;
   }
 
-  release_target_bitmap(surface);
-  if (FAILED(surface.swap_chain->ResizeBuffers(
+  release_target_bitmap(render_resources);
+  if (FAILED(render_resources.swap_chain->ResizeBuffers(
           0, static_cast<UINT>(new_size.cx), static_cast<UINT>(new_size.cy), kSurfaceFormat, 0)) ||
-      !create_target_bitmap(surface, new_size)) {
+      !create_target_bitmap(render_resources, new_size)) {
     return false;
   }
 
@@ -308,11 +317,11 @@ auto initialize_context_menu(Core::State::AppState& state, HWND hwnd) -> bool {
     return false;
   }
 
-  return initialize_surface(state, menu_state.main_surface, hwnd, get_client_size(hwnd));
+  return initialize_surface(state, menu_state.main_render_resources, hwnd, get_client_size(hwnd));
 }
 
 auto cleanup_context_menu(Core::State::AppState& state) -> void {
-  cleanup_surface(state.context_menu->main_surface);
+  cleanup_surface(state.context_menu->main_render_resources);
   state.context_menu->text_format.reset();
 }
 
@@ -322,19 +331,20 @@ auto initialize_submenu(Core::State::AppState& state, HWND hwnd) -> bool {
     return false;
   }
 
-  return initialize_surface(state, menu_state.submenu_surface, hwnd, get_client_size(hwnd));
+  return initialize_surface(state, menu_state.submenu_render_resources, hwnd,
+                            get_client_size(hwnd));
 }
 
 auto cleanup_submenu(Core::State::AppState& state) -> void {
-  cleanup_surface(state.context_menu->submenu_surface);
+  cleanup_surface(state.context_menu->submenu_render_resources);
 }
 
 auto resize_context_menu(Core::State::AppState& state, const SIZE& new_size) -> bool {
-  return resize_surface(state.context_menu->main_surface, new_size);
+  return resize_surface(state.context_menu->main_render_resources, new_size);
 }
 
 auto resize_submenu(Core::State::AppState& state, const SIZE& new_size) -> bool {
-  return resize_surface(state.context_menu->submenu_surface, new_size);
+  return resize_surface(state.context_menu->submenu_render_resources, new_size);
 }
 
-}  // namespace UI::ContextMenu::D2DContext
+}  // namespace UI::ContextMenu::RenderContext

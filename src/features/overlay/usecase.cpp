@@ -5,6 +5,7 @@ module Features.Overlay.UseCase;
 import std;
 import Core.State;
 import Core.I18n.State;
+import Core.Notifications;
 import Features.Overlay;
 import Features.Preview;
 import Features.Preview.State;
@@ -12,7 +13,6 @@ import Features.Letterbox;
 import Features.Letterbox.State;
 import Features.Settings.State;
 import Features.WindowControl;
-import Features.Notifications;
 import Features.Overlay.State;
 import Utils.Logger;
 import Utils.String;
@@ -31,9 +31,8 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
     // 预览窗与叠加层互斥，若预览窗运行则先关闭
     if (state.preview && state.preview->running.load(std::memory_order_acquire)) {
       Features::Preview::stop_preview(state);
-      Features::Notifications::show_notification(
-          state, state.i18n->texts["label.app_name"],
-          state.i18n->texts["message.preview_overlay_conflict"]);
+      Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                             state.i18n->texts["message.preview_overlay_conflict"]);
     }
     // 如果启用了黑边模式，关闭黑边窗口
     if (state.letterbox->enabled) {
@@ -53,15 +52,15 @@ auto toggle_overlay(Core::State::AppState& state) -> void {
         // 使用新的消息定义并附加错误详情
         std::string error_message =
             state.i18n->texts["message.overlay_start_failed"] + result.error();
-        Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                                   error_message);
+        Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                               error_message);
       }
     } else {
       // 找不到目标窗口
       Logger().warn("No target window found for overlay");
       state.overlay->enabled = false;
-      Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                                 state.i18n->texts["message.window_not_found"]);
+      Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                             state.i18n->texts["message.window_not_found"]);
     }
   } else {
     // 用户想停用叠加层

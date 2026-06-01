@@ -4,8 +4,9 @@ module Features.WindowControl.UseCase;
 
 import std;
 import Features.Settings.Menu;
-import Core.State;
 import Core.Async.UiAwaitable;
+import Core.Notifications;
+import Core.State;
 import Core.I18n.State;
 import UI.FloatingWindow;
 import UI.FloatingWindow.Events;
@@ -16,7 +17,6 @@ import Features.Letterbox;
 import Features.Letterbox.State;
 import Features.WindowControl;
 import Features.WindowControl.Types;
-import Features.Notifications;
 import Features.Overlay;
 import Features.Overlay.State;
 import Features.Preview;
@@ -184,15 +184,15 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                               state.i18n->texts["message.window_not_found"]);
+    Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.window_not_found"]);
     co_return;
   }
 
   const auto& fw = *state.floating_window;
   auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
-    Features::Notifications::show_notification(
+    Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + monitor_info.error());
     co_return;
@@ -223,7 +223,7 @@ auto transform_ratio_async(Core::State::AppState& state, size_t ratio_index, dou
                                                                 new_resolution, options);
   if (!result) {
     state.overlay->is_transforming.store(false, std::memory_order_release);
-    Features::Notifications::show_notification(
+    Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
     co_return;
@@ -261,15 +261,15 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target_window = Features::WindowControl::find_target_window(window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                               state.i18n->texts["message.window_not_found"]);
+    Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.window_not_found"]);
     co_return;
   }
 
   const auto& fw = *state.floating_window;
   auto monitor_info = Utils::Display::get_working_monitor(fw.window.hwnd, fw.window.is_visible);
   if (!monitor_info) {
-    Features::Notifications::show_notification(
+    Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + monitor_info.error());
     co_return;
@@ -301,7 +301,7 @@ auto transform_resolution_async(Core::State::AppState& state, size_t resolution_
                                                                 new_resolution, options);
   if (!result) {
     state.overlay->is_transforming.store(false, std::memory_order_release);
-    Features::Notifications::show_notification(
+    Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],
         state.i18n->texts["message.window_adjust_failed"] + ": " + result.error());
     co_return;
@@ -363,8 +363,8 @@ auto handle_window_selected(Core::State::AppState& state,
 
   auto target_window = Features::WindowControl::find_target_window(event.window_title);
   if (!target_window) {
-    Features::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
-                                               state.i18n->texts["message.window_not_found"]);
+    Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
+                                           state.i18n->texts["message.window_not_found"]);
     return;
   }
   const auto& fw = *state.floating_window;
@@ -374,7 +374,7 @@ auto handle_window_selected(Core::State::AppState& state,
   }
 
   // 发送通知给用户
-  Features::Notifications::show_notification(
+  Core::Notifications::show_notification(
       state, state.i18n->texts["label.app_name"],
       std::format("{}: {}", state.i18n->texts["message.window_selected"],
                   Utils::String::ToUtf8(event.window_title)));

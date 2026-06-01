@@ -4,13 +4,13 @@ module Core.Events.Handlers.Feature;
 
 import std;
 import Core.Events;
+import Core.Notifications;
+import Core.Notifications.Events;
 import Core.State;
 import UI.FloatingWindow;
 import UI.FloatingWindow.Events;
 import Features.Screenshot.UseCase;
 import Features.WindowControl.UseCase;
-import Features.Notifications;
-import Features.Notifications.Events;
 
 namespace Core::Events::Handlers {
 
@@ -53,10 +53,9 @@ auto register_feature_handlers(Core::State::AppState& app_state) -> void {
 
   // === 通知功能 ===
   // 非 UI 线程或有 action 的通知经 post_notification_request 投递，在此统一转到 UI 线程显示。
-  subscribe<Features::Notifications::Events::NotificationRequestEvent>(
-      app_state,
-      [&app_state](const Features::Notifications::Events::NotificationRequestEvent& event) {
-        Features::Notifications::show_notification(app_state, event.options);
+  subscribe<Core::Notifications::Events::NotificationRequestEvent>(
+      app_state, [&app_state](const Core::Notifications::Events::NotificationRequestEvent& event) {
+        Core::Notifications::show_notification(app_state, event.options);
       });
 }
 

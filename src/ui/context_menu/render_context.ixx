@@ -1,13 +1,13 @@
 module;
 
-export module UI.ContextMenu.D2DContext;
+export module UI.ContextMenu.RenderContext;
 
 import std;
 import Core.State;
 import UI.ContextMenu.State;
 import <windows.h>;
 
-namespace UI::ContextMenu::D2DContext {
+namespace UI::ContextMenu::RenderContext {
 
 export auto initialize_text_format(Core::State::AppState& app_state) -> bool;
 
@@ -23,4 +23,4 @@ export auto cleanup_submenu(Core::State::AppState& app_state) -> void;
 export auto resize_context_menu(Core::State::AppState& app_state, const SIZE& new_size) -> bool;
 export auto resize_submenu(Core::State::AppState& app_state, const SIZE& new_size) -> bool;
 
-}  // namespace UI::ContextMenu::D2DContext
+}  // namespace UI::ContextMenu::RenderContext

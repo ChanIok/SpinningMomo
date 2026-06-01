@@ -7,7 +7,7 @@ import Core.State;
 import UI.ContextMenu;
 import UI.ContextMenu.Layout;
 import UI.ContextMenu.Painter;
-import UI.ContextMenu.D2DContext;
+import UI.ContextMenu.RenderContext;
 import UI.ContextMenu.State;
 import UI.ContextMenu.Types;
 import UI.ContextMenu.Interaction;
@@ -129,12 +129,12 @@ auto handle_size(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   SIZE new_size = {rc.right - rc.left, rc.bottom - rc.top};
   if (hwnd == menu_state.submenu_hwnd) {
     Logger().debug("Resizing submenu to size: {}x{}", new_size.cx, new_size.cy);
-    if (UI::ContextMenu::D2DContext::resize_submenu(state, new_size)) {
+    if (UI::ContextMenu::RenderContext::resize_submenu(state, new_size)) {
       UI::ContextMenu::Painter::paint_submenu(state, rc);
     }
   } else if (hwnd == menu_state.hwnd) {
     Logger().debug("Resizing context menu to size: {}x{}", new_size.cx, new_size.cy);
-    if (UI::ContextMenu::D2DContext::resize_context_menu(state, new_size)) {
+    if (UI::ContextMenu::RenderContext::resize_context_menu(state, new_size)) {
       UI::ContextMenu::Painter::paint_context_menu(state, rc);
     }
   }

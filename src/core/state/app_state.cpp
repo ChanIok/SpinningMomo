@@ -16,7 +16,6 @@ import Core.WebView.State;
 import Core.WorkerPool.State;
 import Core.Tasks.State;
 import Features.Letterbox.State;
-import Features.Notifications.State;
 import Features.Gallery.State;
 import Features.Overlay.State;
 import Features.Preview.State;
@@ -28,6 +27,7 @@ import Features.Update.State;
 import UI.SharedRenderResources.State;
 import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
+import UI.NotificationWindow.State;
 import UI.TrayIcon.State;
 
 namespace Core::State {
@@ -53,8 +53,9 @@ AppState::AppState()
       floating_window(std::make_unique<UI::FloatingWindow::State::FloatingWindowState>()),
       tray_icon(std::make_unique<UI::TrayIcon::State::TrayIconState>()),
       context_menu(std::make_unique<UI::ContextMenu::State::ContextMenuState>()),
+      notification_window(
+          std::make_unique<UI::NotificationWindow::State::NotificationWindowState>()),
       letterbox(std::make_unique<Features::Letterbox::State::LetterboxState>()),
-      notifications(std::make_unique<Features::Notifications::State::NotificationSystemState>()),
       gallery(std::make_unique<Features::Gallery::State::GalleryState>()),
       overlay(std::make_unique<Features::Overlay::State::OverlayState>()),
       preview(std::make_unique<Features::Preview::State::PreviewState>()),

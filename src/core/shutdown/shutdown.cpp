@@ -28,6 +28,7 @@ import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.ContextMenu;
+import UI.NotificationWindow;
 import UI.TrayIcon;
 import UI.WebViewWindow;
 import Utils.Logger;
@@ -62,6 +63,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   // 1. UI 清理
   UI::ContextMenu::cleanup(state);
   UI::TrayIcon::destroy(state);
+  UI::NotificationWindow::cleanup(state);
   UI::FloatingWindow::destroy_window(state);
   UI::WebViewWindow::cleanup(state);
 

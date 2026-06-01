@@ -1,6 +1,6 @@
 module;
 
-module UI.FloatingWindow.D2DContext;
+module UI.FloatingWindow.RenderContext;
 
 import Core.State;
 import UI.FloatingWindow.State;
@@ -16,7 +16,7 @@ import <dxgi1_2.h>;
 import <wil/com.h>;
 import <windows.h>;
 
-namespace UI::FloatingWindow::D2DContext {
+namespace UI::FloatingWindow::RenderContext {
 
 constexpr const char* kRecordingIndicatorColor = "#ED4C4CFF";
 constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -60,8 +60,8 @@ auto create_brush_from_hex(ID2D1DeviceContext6* target, const std::string& hex_c
                                                            brush.put()));
 }
 
-auto create_all_brushes_simple(Core::State::AppState& state, UI::FloatingWindow::RenderContext& d2d)
-    -> bool {
+auto create_all_brushes_simple(Core::State::AppState& state,
+                               UI::FloatingWindow::RenderResources& d2d) -> bool {
   const auto& colors = state.settings->raw.ui.floating_window_colors;
 
   return create_brush_from_hex(d2d.device_context.get(), colors.background, d2d.background_brush) &&
@@ -76,14 +76,14 @@ auto create_all_brushes_simple(Core::State::AppState& state, UI::FloatingWindow:
                                d2d.scroll_indicator_brush);
 }
 
-auto clear_text_caches(UI::FloatingWindow::RenderContext& d2d) -> void {
+auto clear_text_caches(UI::FloatingWindow::RenderResources& d2d) -> void {
   d2d.adjusted_text_formats.clear();
   d2d.text_measure_cache.clear();
 }
 
 // 画刷仍按固定槽位缓存，保持和原先 painter 的调用方式一致，
 // 避免为了切换后端而扩散到上层绘制逻辑。
-auto release_brushes(UI::FloatingWindow::RenderContext& d2d) -> void {
+auto release_brushes(UI::FloatingWindow::RenderResources& d2d) -> void {
   d2d.background_brush.reset();
   d2d.title_brush.reset();
   d2d.separator_brush.reset();
@@ -96,7 +96,7 @@ auto release_brushes(UI::FloatingWindow::RenderContext& d2d) -> void {
 
 // target bitmap 来自 swap chain 当前 back buffer。
 // resize 或重建时必须先从 device context 上解绑旧 target，再释放位图。
-auto release_target_bitmap(UI::FloatingWindow::RenderContext& d2d) -> void {
+auto release_target_bitmap(UI::FloatingWindow::RenderResources& d2d) -> void {
   if (d2d.device_context) {
     d2d.device_context->SetTarget(nullptr);
   }
@@ -109,7 +109,7 @@ auto get_client_size(HWND hwnd) -> SIZE {
   return {rc.right - rc.left, rc.bottom - rc.top};
 }
 
-auto create_device_context(ID2D1Device* shared_device, UI::FloatingWindow::RenderContext& d2d)
+auto create_device_context(ID2D1Device* shared_device, UI::FloatingWindow::RenderResources& d2d)
     -> bool {
   if (!shared_device) {
     return false;
@@ -134,7 +134,7 @@ auto create_device_context(ID2D1Device* shared_device, UI::FloatingWindow::Rende
 
 // 浮窗是透明 popup，不再自己持有一张 CPU DIB。
 // swap chain 直接作为 DirectComposition visual 的内容，由 DWM 负责合成。
-auto create_swap_chain(ID3D11Device* shared_d3d_device, UI::FloatingWindow::RenderContext& d2d,
+auto create_swap_chain(ID3D11Device* shared_d3d_device, UI::FloatingWindow::RenderResources& d2d,
                        const SIZE& size) -> bool {
   if (!shared_d3d_device) {
     return false;
@@ -165,7 +165,7 @@ auto create_swap_chain(ID3D11Device* shared_d3d_device, UI::FloatingWindow::Rend
 // DirectComposition tree 只需要一层 root visual：
 // visual.content = swap chain，target.root = visual。
 auto create_composition_tree(ID3D11Device* shared_d3d_device,
-                             UI::FloatingWindow::RenderContext& d2d, HWND hwnd) -> bool {
+                             UI::FloatingWindow::RenderResources& d2d, HWND hwnd) -> bool {
   if (!shared_d3d_device || !d2d.swap_chain) {
     return false;
   }
@@ -198,7 +198,7 @@ auto create_composition_tree(ID3D11Device* shared_d3d_device,
 
 // 每次 resize 或 target 丢失后，都要重新从 back buffer 包一层 D2D bitmap，
 // 然后把它设成当前 device context 的 target。
-auto create_target_bitmap(UI::FloatingWindow::RenderContext& d2d, const SIZE& size) -> bool {
+auto create_target_bitmap(UI::FloatingWindow::RenderResources& d2d, const SIZE& size) -> bool {
   release_target_bitmap(d2d);
 
   wil::com_ptr<IDXGISurface> dxgi_surface;
@@ -239,7 +239,7 @@ auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format
 
 auto update_all_brush_colors(Core::State::AppState& state) -> void {
   const auto& colors = state.settings->raw.ui.floating_window_colors;
-  auto& d2d = state.floating_window->d2d_context;
+  auto& d2d = state.floating_window->render_resources;
 
   if (d2d.background_brush) {
     d2d.background_brush->SetColor(hex_with_alpha_to_color_f(colors.background));
@@ -287,15 +287,15 @@ auto create_text_format_with_size(IDWriteFactory7* write_factory, float font_siz
   return text_format;
 }
 
-auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
-  auto& d2d = state.floating_window->d2d_context;
+auto initialize_render_context(Core::State::AppState& state, HWND hwnd) -> bool {
+  auto& d2d = state.floating_window->render_resources;
   auto& shared = shared_resources(state);
   const SIZE size = get_client_size(hwnd);
   if (size.cx <= 0 || size.cy <= 0) {
     return false;
   }
 
-  cleanup_d2d(state);
+  cleanup_render_context(state);
 
   if (!UI::SharedRenderResources::ensure_initialized(state)) {
     return false;
@@ -307,14 +307,14 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
       !create_swap_chain(shared.d3d_device.get(), d2d, size) ||
       !create_composition_tree(shared.d3d_device.get(), d2d, hwnd) ||
       !create_target_bitmap(d2d, size) || !create_all_brushes_simple(state, d2d)) {
-    cleanup_d2d(state);
+    cleanup_render_context(state);
     return false;
   }
 
   d2d.text_format = create_text_format_with_size(shared.write_factory.get(),
                                                  state.floating_window->layout.font_size);
   if (!d2d.text_format) {
-    cleanup_d2d(state);
+    cleanup_render_context(state);
     return false;
   }
 
@@ -322,8 +322,8 @@ auto initialize_d2d(Core::State::AppState& state, HWND hwnd) -> bool {
   return true;
 }
 
-auto cleanup_d2d(Core::State::AppState& state) -> void {
-  auto& d2d = state.floating_window->d2d_context;
+auto cleanup_render_context(Core::State::AppState& state) -> void {
+  auto& d2d = state.floating_window->render_resources;
 
   // 先清掉依赖 device context 的缓存和 brush，再按 target -> surface 的反向顺序释放，
   // 避免留下悬空的 target 绑定。
@@ -342,8 +342,8 @@ auto cleanup_d2d(Core::State::AppState& state) -> void {
   d2d.is_rendering = false;
 }
 
-auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
-  auto& d2d = state.floating_window->d2d_context;
+auto resize_render_context(Core::State::AppState& state, const SIZE& new_size) -> bool {
+  auto& d2d = state.floating_window->render_resources;
   if (!d2d.is_initialized || !d2d.swap_chain || !d2d.device_context || new_size.cx <= 0 ||
       new_size.cy <= 0) {
     return false;
@@ -367,7 +367,7 @@ auto resize_d2d(Core::State::AppState& state, const SIZE& new_size) -> bool {
 }
 
 auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
-  auto& d2d = state.floating_window->d2d_context;
+  auto& d2d = state.floating_window->render_resources;
   auto& layout = state.floating_window->layout;
   auto& shared = shared_resources(state);
 
@@ -391,4 +391,4 @@ auto update_text_format_if_needed(Core::State::AppState& state) -> bool {
   return true;
 }
 
-}  // namespace UI::FloatingWindow::D2DContext
+}  // namespace UI::FloatingWindow::RenderContext

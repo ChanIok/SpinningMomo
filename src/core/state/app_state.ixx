@@ -80,12 +80,12 @@ namespace UI::ContextMenu::State {
 export struct ContextMenuState;
 }
 
-namespace Features::Letterbox::State {
-export struct LetterboxState;
+namespace UI::NotificationWindow::State {
+export struct NotificationWindowState;
 }
 
-namespace Features::Notifications::State {
-export struct NotificationSystemState;
+namespace Features::Letterbox::State {
+export struct LetterboxState;
 }
 
 namespace Features::Gallery::State {
@@ -145,10 +145,10 @@ export struct AppState {
   std::unique_ptr<UI::FloatingWindow::State::FloatingWindowState> floating_window;
   std::unique_ptr<UI::TrayIcon::State::TrayIconState> tray_icon;
   std::unique_ptr<UI::ContextMenu::State::ContextMenuState> context_menu;
+  std::unique_ptr<UI::NotificationWindow::State::NotificationWindowState> notification_window;
 
   // 功能模块状态
   std::unique_ptr<Features::Letterbox::State::LetterboxState> letterbox;
-  std::unique_ptr<Features::Notifications::State::NotificationSystemState> notifications;
   std::unique_ptr<Features::Gallery::State::GalleryState> gallery;
   std::unique_ptr<Features::Overlay::State::OverlayState> overlay;
   std::unique_ptr<Features::Preview::State::PreviewState> preview;

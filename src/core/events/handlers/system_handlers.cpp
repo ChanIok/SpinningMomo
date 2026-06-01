@@ -9,7 +9,7 @@ import Core.WebView;
 import Core.WebView.Events;
 import UI.FloatingWindow;
 import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.D2DContext;
+import UI.FloatingWindow.RenderContext;
 import UI.FloatingWindow.State;
 import UI.FloatingWindow.Events;
 import UI.WebViewWindow;
@@ -22,7 +22,7 @@ namespace Core::Events::Handlers {
 auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_dpi,
                        const Vendor::Windows::SIZE& window_size) -> void {
   state.floating_window->window.dpi = new_dpi;
-  state.floating_window->d2d_context.needs_font_update = true;
+  state.floating_window->render_resources.needs_font_update = true;
 
   // 更新布局配置（基于新的DPI）
   UI::FloatingWindow::Layout::update_layout(state);
@@ -38,8 +38,8 @@ auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_d
         Vendor::Windows::kSWP_NOZORDER | Vendor::Windows::kSWP_NOACTIVATE);
 
     // 如果Direct2D已初始化，调整渲染目标大小
-    if (state.floating_window->d2d_context.is_initialized) {
-      UI::FloatingWindow::D2DContext::resize_d2d(state, window_size);
+    if (state.floating_window->render_resources.is_initialized) {
+      UI::FloatingWindow::RenderContext::resize_render_context(state, window_size);
     }
   }
 }
