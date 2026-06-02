@@ -28,6 +28,8 @@ export struct CaptureSession {
 export struct CaptureSessionOptions {
   bool capture_cursor = false;
   bool border_required = false;
+  // 仅在需要突破 WGC 默认 60Hz 节流时显式设置；未设置时保持系统默认行为。
+  std::optional<std::chrono::milliseconds> min_update_interval;
   winrt::Windows::Graphics::DirectX::DirectXPixelFormat pixel_format =
       winrt::Windows::Graphics::DirectX::DirectXPixelFormat::B8G8R8A8UIntNormalized;
 };
@@ -45,6 +47,7 @@ export auto create_winrt_device(ID3D11Device* d3d_device)
 // 检测 WGC 会话属性支持能力
 export auto is_cursor_capture_control_supported() -> bool;
 export auto is_border_control_supported() -> bool;
+export auto is_min_update_interval_supported() -> bool;
 
 // 获取目标窗口对应的 WGC 实际捕获尺寸。
 // 录制模块用它作为“源帧真相”，避免只靠窗口矩形推算导致差 1px 的错配。

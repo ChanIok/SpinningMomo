@@ -529,6 +529,10 @@ auto start(Core::State::AppState& app_state, HWND target_window,
   Utils::Graphics::Capture::CaptureSessionOptions capture_options;
   capture_options.capture_cursor = config.capture_cursor;
   capture_options.border_required = false;
+  if (fps > 60) {
+    // 高帧率录制显式请求更短的 WGC 更新间隔，绕开部分系统版本默认 60Hz 节流。
+    capture_options.min_update_interval = std::chrono::milliseconds(1);
+  }
   if (config.enable_hdr) {
     // HDR 桌面捕获使用 scRGB 16-bit float，后续编码线程会转成 HEVC 需要的 P010
     capture_options.pixel_format =

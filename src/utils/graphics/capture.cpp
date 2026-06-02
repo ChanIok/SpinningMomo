@@ -99,6 +99,16 @@ auto is_border_control_supported() -> bool {
   }
 }
 
+auto is_min_update_interval_supported() -> bool {
+  try {
+    return winrt::Windows::Foundation::Metadata::ApiInformation::IsPropertyPresent(
+        winrt::name_of<winrt::Windows::Graphics::Capture::GraphicsCaptureSession>(),
+        L"MinUpdateInterval");
+  } catch (...) {
+    return false;
+  }
+}
+
 auto create_winrt_device(ID3D11Device* d3d_device)
     -> std::expected<winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice, std::string> {
   if (!d3d_device) {
@@ -217,6 +227,11 @@ auto create_capture_session(
     session.session.IsBorderRequired(options.border_required);
   }
 
+  // Win11 24H2 上高帧率捕获可能需要显式给一个非零间隔，避免默认 60Hz 节流。
+  if (options.min_update_interval && is_min_update_interval_supported()) {
+    session.session.MinUpdateInterval(*options.min_update_interval);
+  }
+
   return session;
 }
 
@@ -278,6 +293,11 @@ auto create_capture_session_with_frame_notification(
 
   if (is_border_control_supported()) {
     session.session.IsBorderRequired(options.border_required);
+  }
+
+  // 录制路径走这个入口；高帧率目标时显式拉低最小更新间隔，避免系统先卡到 60Hz。
+  if (options.min_update_interval && is_min_update_interval_supported()) {
+    session.session.MinUpdateInterval(*options.min_update_interval);
   }
 
   return session;
