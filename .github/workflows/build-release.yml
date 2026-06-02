@@ -15,6 +15,7 @@ on:
         type: string
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
@@ -109,6 +110,39 @@ jobs:
           Write-Host "Final version: $version"
           echo "VERSION=$version" >> $env:GITHUB_OUTPUT
 
+      - name: Validate SignPath configuration
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          SIGNPATH_ARTIFACT_CONFIG_APP_EXE: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_APP_EXE }}
+          SIGNPATH_ARTIFACT_CONFIG_MSI: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_MSI }}
+          SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE }}
+        run: |
+          $required = @(
+            "SIGNPATH_API_TOKEN",
+            "SIGNPATH_ORGANIZATION_ID",
+            "SIGNPATH_PROJECT_SLUG",
+            "SIGNPATH_SIGNING_POLICY_SLUG",
+            "SIGNPATH_ARTIFACT_CONFIG_APP_EXE",
+            "SIGNPATH_ARTIFACT_CONFIG_MSI",
+            "SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE"
+          )
+
+          $missing = @()
+          foreach ($name in $required) {
+            if ([string]::IsNullOrWhiteSpace((Get-Item "env:$name").Value)) {
+              $missing += $name
+            }
+          }
+
+          if ($missing.Count -gt 0) {
+            Write-Error ("Missing SignPath GitHub secret/variable(s): " + ($missing -join ", "))
+            exit 1
+          }
+
       - name: Install dependencies
         run: |
           npm install
@@ -135,11 +169,95 @@ jobs:
       - name: Assemble dist
         run: npm run build:dist
 
+      - name: Upload unsigned app executable
+        id: upload_unsigned_app_exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-app-exe-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/SpinningMomo.exe
+          if-no-files-found: error
+
+      - name: Sign app executable
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_APP_EXE }}
+          github-artifact-id: ${{ steps.upload_unsigned_app_exe.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signpath-output/app-exe
+
+      - name: Replace dist executable with signed executable
+        shell: pwsh
+        run: |
+          Copy-Item "signpath-output/app-exe/SpinningMomo.exe" "dist/SpinningMomo.exe" -Force
+
       - name: Create Portable ZIP
         run: npm run build:portable
 
-      - name: Build MSI and Bundle Installer
-        run: node scripts/build-msi.js --version "${{ steps.final_version.outputs.VERSION }}"
+      - name: Build MSI package
+        run: node scripts/build-installer.js --msi-only --version "${{ steps.final_version.outputs.VERSION }}"
+
+      - name: Upload unsigned MSI
+        id: upload_unsigned_msi
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-msi-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/SpinningMomo-${{ steps.final_version.outputs.VERSION }}-x64.msi
+          if-no-files-found: error
+
+      - name: Sign MSI
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_MSI }}
+          github-artifact-id: ${{ steps.upload_unsigned_msi.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signpath-output/msi
+          parameters: |
+            version: "${{ steps.final_version.outputs.VERSION }}"
+
+      - name: Replace dist MSI with signed MSI
+        shell: pwsh
+        run: |
+          $version = "${{ steps.final_version.outputs.VERSION }}"
+          Copy-Item "signpath-output/msi/SpinningMomo-$version-x64.msi" "dist/SpinningMomo-$version-x64.msi" -Force
+
+      - name: Build setup bundle
+        run: node scripts/build-installer.js --bundle-only --version "${{ steps.final_version.outputs.VERSION }}"
+
+      - name: Upload unsigned setup executable
+        id: upload_unsigned_setup_exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-setup-exe-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist/SpinningMomo-${{ steps.final_version.outputs.VERSION }}-x64-Setup.exe
+          if-no-files-found: error
+
+      - name: Sign setup executable
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE }}
+          github-artifact-id: ${{ steps.upload_unsigned_setup_exe.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signpath-output/setup-exe
+          parameters: |
+            version: "${{ steps.final_version.outputs.VERSION }}"
+
+      - name: Replace dist setup executable with signed executable
+        shell: pwsh
+        run: |
+          $version = "${{ steps.final_version.outputs.VERSION }}"
+          Copy-Item "signpath-output/setup-exe/SpinningMomo-$version-x64-Setup.exe" "dist/SpinningMomo-$version-x64-Setup.exe" -Force
 
       - name: Generate checksums
         run: npm run build:checksums

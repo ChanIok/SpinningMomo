@@ -1,4 +1,4 @@
-// Build MSI and Bundle installer locally.
+// Build the WiX-based installer artifacts locally.
 // Prerequisites:
 //   - .NET SDK 8.0+
 //   - WiX: dotnet tool install --global wix
@@ -16,11 +16,14 @@ const projectDir = path.join(__dirname, "..");
 function parseArgs(argv) {
   let version = "";
   let msiOnly = false;
+  let bundleOnly = false;
 
   for (let i = 2; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--msi-only") {
       msiOnly = true;
+    } else if (arg === "--bundle-only") {
+      bundleOnly = true;
     } else if (arg === "--version") {
       const next = argv[++i];
       if (!next) {
@@ -32,7 +35,11 @@ function parseArgs(argv) {
     }
   }
 
-  return { version, msiOnly };
+  if (msiOnly && bundleOnly) {
+    throw new Error("--msi-only and --bundle-only cannot be used together");
+  }
+
+  return { version, msiOnly, bundleOnly };
 }
 
 function getVersionFromFile() {
@@ -70,27 +77,7 @@ function runWixBuild(args) {
   }
 }
 
-function main() {
-  if (process.platform !== "win32") {
-    console.error("build-msi.js only supports Windows.");
-    process.exit(1);
-  }
-
-  const { version: cliVersion, msiOnly } = parseArgs(process.argv);
-  const version = resolveVersion(cliVersion);
-
-  console.log(`Building SpinningMomo v${version} MSI...`);
-  ensureWix();
-
-  const distDir = path.join(projectDir, "dist");
-  const exePath = path.join(distDir, "SpinningMomo.exe");
-  if (!fs.existsSync(exePath)) {
-    console.log("Building project...");
-    execSync("npm run build", { stdio: "inherit", cwd: projectDir });
-  }
-
-  const outputMsi = path.join(distDir, `SpinningMomo-${version}-x64.msi`);
-
+function buildMsi({ version, projectDir, distDir, outputMsi }) {
   console.log("Building MSI...");
   runWixBuild([
     "-arch",
@@ -113,15 +100,9 @@ function main() {
     outputMsi,
     "installer/Package.wxs",
   ]);
+}
 
-  console.log(`Success! Created: ${outputMsi}`);
-
-  if (msiOnly) {
-    return;
-  }
-
-  const outputExe = path.join(distDir, `SpinningMomo-${version}-x64-Setup.exe`);
-
+function buildBundle({ version, projectDir, outputMsi, outputExe }) {
   console.log("\nBuilding Bundle installer...");
   runWixBuild([
     "-arch",
@@ -142,6 +123,48 @@ function main() {
     outputExe,
     "installer/Bundle.wxs",
   ]);
+}
+
+function main() {
+  if (process.platform !== "win32") {
+    console.error("build-installer.js only supports Windows.");
+    process.exit(1);
+  }
+
+  const { version: cliVersion, msiOnly, bundleOnly } = parseArgs(process.argv);
+  const version = resolveVersion(cliVersion);
+
+  console.log(`Building SpinningMomo v${version} MSI...`);
+  ensureWix();
+
+  const distDir = path.join(projectDir, "dist");
+  const exePath = path.join(distDir, "SpinningMomo.exe");
+  if (!fs.existsSync(exePath)) {
+    console.log("Building project...");
+    execSync("npm run build", { stdio: "inherit", cwd: projectDir });
+  }
+
+  const outputMsi = path.join(distDir, `SpinningMomo-${version}-x64.msi`);
+  const outputExe = path.join(distDir, `SpinningMomo-${version}-x64-Setup.exe`);
+
+  if (bundleOnly) {
+    if (!fs.existsSync(outputMsi)) {
+      throw new Error(`MSI not found: ${outputMsi}. Build or restore the signed MSI first.`);
+    }
+    buildBundle({ version, projectDir, outputMsi, outputExe });
+    console.log("\nSuccess! Created:");
+    console.log(`  Bundle: ${outputExe}`);
+    return;
+  }
+
+  buildMsi({ version, projectDir, distDir, outputMsi });
+  console.log(`Success! Created: ${outputMsi}`);
+
+  if (msiOnly) {
+    return;
+  }
+
+  buildBundle({ version, projectDir, outputMsi, outputExe });
 
   console.log("\nSuccess! Created:");
   console.log(`  MSI:    ${outputMsi}`);

@@ -104,7 +104,7 @@ The rough order is: core infrastructure first, then native UI, then feature serv
 - Distribution: `dist/` (exe + web resources)
 
 ## Installer
-Installers are built via `node scripts/build-msi.js` (or `npm run build:installer`). The script builds an MSI package and, by default, a WiX bundle-based setup `.exe`, both under `dist/`. Use `--msi-only` to skip the bundle; use `--version X.Y.Z` to override `version.json`.
+Installers are built via `node scripts/build-installer.js` (or `npm run build:installer`). The script builds an MSI package and, by default, a WiX bundle-based setup `.exe`, both under `dist/`. Use `--msi-only` to skip the bundle; use `--version X.Y.Z` to override `version.json`.
 
 ## Code Generation Scripts
 These must be re-run when their source files change:
