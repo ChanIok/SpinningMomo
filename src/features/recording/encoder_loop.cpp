@@ -5,6 +5,9 @@ module;
 module Features.Recording.EncoderLoop;
 
 import std;
+import Core.I18n.State;
+import Core.Notifications;
+import Core.Notifications.Types;
 import Core.State;
 import Features.Recording;
 import Features.Recording.Session;
@@ -16,6 +19,7 @@ import Utils.Graphics.CaptureRegion;
 import Utils.Media.Encoder;
 import Utils.Media.Encoder.Types;
 import Utils.Logger;
+import Utils.String;
 import <d3d11_4.h>;
 import <mfapi.h>;
 import <wil/com.h>;
@@ -28,6 +32,7 @@ constexpr std::uint64_t k_discard_video_frame_threshold = 3;
 // 编码线程如果落后太多，就直接跳过旧的视频格子，只保留少量 backlog 继续编码。
 constexpr std::int64_t k_encoding_overload_drop_threshold_frames = 6;
 constexpr std::int64_t k_encoding_overload_keep_backlog_frames = 2;
+constexpr std::int64_t k_stale_video_frame_threshold_multiplier = 2;
 
 // 编码线程里的致命错误统一走这里：
 // 立刻关掉新的输入、触发收尾，并把“本段录制已经失败”上报给控制线程。
@@ -53,53 +58,6 @@ auto resolve_finish_target_timestamp_100ns(State::RecordingState& state) -> std:
   frozen_target = Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
   state.frozen_finish_target_100ns.store(frozen_target, std::memory_order_release);
   return frozen_target;
-}
-
-struct FinishProgressSnapshot {
-  bool video_frame_pending = false;
-  std::size_t audio_queue_size = 0;
-  std::int64_t elapsed_100ns = 0;
-  std::int64_t finish_target_100ns = 0;
-  std::int64_t next_video_timestamp_100ns = -1;
-  std::int64_t last_emitted_video_timestamp_100ns = -1;
-  std::uint64_t encoded_video_frames = 0;
-  std::uint64_t encoded_audio_packets = 0;
-  bool has_encoder_input_texture = false;
-};
-
-auto capture_finish_progress_snapshot(State::RecordingState& state, bool finishing)
-    -> FinishProgressSnapshot {
-  FinishProgressSnapshot snapshot;
-  {
-    std::lock_guard queue_lock(state.queue_mutex);
-    snapshot.video_frame_pending = state.video_frame_pending;
-    snapshot.audio_queue_size = state.audio_queue.size();
-  }
-
-  snapshot.elapsed_100ns =
-      Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
-  snapshot.finish_target_100ns =
-      finishing ? resolve_finish_target_timestamp_100ns(state) : snapshot.elapsed_100ns;
-  snapshot.next_video_timestamp_100ns = state.next_video_timestamp_100ns;
-  snapshot.last_emitted_video_timestamp_100ns = state.last_emitted_video_timestamp_100ns;
-  snapshot.encoded_video_frames = state.encoded_video_frames;
-  snapshot.encoded_audio_packets = state.encoded_audio_packets;
-  snapshot.has_encoder_input_texture = state.has_encoder_input_texture;
-  return snapshot;
-}
-
-auto log_finish_progress(std::string_view stage, State::RecordingState& state, bool finishing)
-    -> void {
-  const auto snapshot = capture_finish_progress_snapshot(state, finishing);
-  Logger().debug(
-      "Recording finish {}: finishing={}, elapsed_100ns={}, finish_target_100ns={}, "
-      "next_video_timestamp_100ns={}, last_emitted_video_timestamp_100ns={}, "
-      "audio_queue_size={}, video_frame_pending={}, has_encoder_input_texture={}, "
-      "encoded_video_frames={}, encoded_audio_packets={}",
-      stage, finishing, snapshot.elapsed_100ns, snapshot.finish_target_100ns,
-      snapshot.next_video_timestamp_100ns, snapshot.last_emitted_video_timestamp_100ns,
-      snapshot.audio_queue_size, snapshot.video_frame_pending, snapshot.has_encoder_input_texture,
-      snapshot.encoded_video_frames, snapshot.encoded_audio_packets);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,10 +113,19 @@ auto write_current_video_sample(State::RecordingState& state, std::int64_t times
   return {};
 }
 
+auto show_recording_overload_notification(Core::State::AppState& app_state) -> void {
+  Core::Notifications::Types::NotificationOptions options;
+  options.title = Utils::String::FromUtf8(app_state.i18n->texts["label.app_name"]);
+  options.message = Utils::String::FromUtf8(app_state.i18n->texts["message.recording_overload"]);
+  options.duration = std::chrono::milliseconds(5000);
+  Core::Notifications::post_notification_request(app_state, std::move(options));
+}
+
 // 按配置 fps，从 next_video_timestamp 开始一路写到不晚于 target 为止（重复同一贴图也可以）。
 // 如果发现编码已经明显落后，就直接跳过一批旧时间格，让时间线先追近 target。
-auto emit_video_samples_until(State::RecordingState& state, std::int64_t target_timestamp_100ns)
+auto emit_video_samples_until(Core::State::AppState& app_state, std::int64_t target_timestamp_100ns)
     -> std::expected<void, std::string> {
+  auto& state = *app_state.recording;
   if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0 ||
       !state.encoder.sink_writer) {
     return {};
@@ -174,6 +141,10 @@ auto emit_video_samples_until(State::RecordingState& state, std::int64_t target_
       if (skip_frames > 0) {
         state.next_video_timestamp_100ns += skip_frames * state.video_frame_interval_100ns;
         state.skipped_video_frames_due_to_encoding_lag += static_cast<std::uint64_t>(skip_frames);
+        if (!state.encoder_overload_notified) {
+          state.encoder_overload_notified = true;
+          show_recording_overload_notification(app_state);
+        }
       }
     }
   }
@@ -230,7 +201,7 @@ auto should_exit_finished_segment(State::RecordingState& state, bool finishing) 
     return false;
   }
   std::lock_guard queue_lock(state.queue_mutex);
-  if (state.video_frame_pending || !state.audio_queue.empty()) {
+  if (state.pending_video_frame_count > 0 || !state.audio_queue.empty()) {
     return false;
   }
   if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0) {
@@ -280,11 +251,64 @@ auto notify_encoder_ready(State::RecordingState& state, bool succeeded, std::str
   state.encoder_ready_cv.notify_all();
 }
 
-auto consume_video_frame_pending(State::RecordingState& state) -> bool {
-  std::lock_guard queue_lock(state.queue_mutex);
-  const bool pending = state.video_frame_pending;
-  state.video_frame_pending = false;
-  return pending;
+struct PendingVideoFrame {
+  Utils::Graphics::Capture::Direct3D11CaptureFrame frame{nullptr};
+  std::int64_t timestamp_100ns = 0;
+};
+
+// 从 WGC 帧队列里取下一帧仍有实时价值的画面，跳过已过期的旧帧前缀。
+auto try_take_next_usable_video_frame(State::RecordingState& state)
+    -> std::optional<PendingVideoFrame> {
+  // 超过这个年龄就算”过期”，但只有后面还有更新帧时才丢
+  const auto stale_threshold_100ns = std::max<std::int64_t>(1, state.video_frame_interval_100ns) *
+                                     k_stale_video_frame_threshold_multiplier;
+
+  while (true) {
+    {
+      std::lock_guard queue_lock(state.queue_mutex);
+      if (state.pending_video_frame_count == 0) {
+        return std::nullopt;
+      }
+    }
+
+    Utils::Graphics::Capture::Direct3D11CaptureFrame frame{nullptr};
+    {
+      std::lock_guard frame_lock(state.frame_mutex);
+      frame = Utils::Graphics::Capture::try_get_next_frame(state.capture_session);
+    }
+
+    // WGC 返回空说明帧池已耗尽，清零计数退出
+    if (!frame) {
+      std::lock_guard queue_lock(state.queue_mutex);
+      state.pending_video_frame_count = 0;
+      return std::nullopt;
+    }
+
+    std::uint32_t remaining_pending_frames = 0;
+    {
+      std::lock_guard queue_lock(state.queue_mutex);
+      if (state.pending_video_frame_count > 0) {
+        state.pending_video_frame_count--;
+      }
+      remaining_pending_frames = state.pending_video_frame_count;
+    }
+
+    const auto frame_ts = Features::Recording::Time::relative_timestamp_100ns(
+        state.start_qpc_100ns, frame.SystemRelativeTime().count());
+    const auto now_elapsed =
+        Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
+    const auto frame_age_100ns = std::max<std::int64_t>(0, now_elapsed - frame_ts);
+
+    // 只丢”后面确认还有更新帧”的过期前缀；低源帧率时最后一帧虽旧但无更新，不能丢
+    if (frame_age_100ns > stale_threshold_100ns && remaining_pending_frames > 0) {
+      continue;
+    }
+
+    return PendingVideoFrame{
+        .frame = std::move(frame),
+        .timestamp_100ns = frame_ts,
+    };
+  }
 }
 
 // 音频写入：永远不超过「已经落到文件里的最后一帧视频」的时间。
@@ -497,7 +521,11 @@ auto mark_video_frame_pending(Core::State::AppState& app_state) -> void {
     if (!state.accepting_input.load(std::memory_order_acquire)) {
       return;
     }
-    state.video_frame_pending = true;
+    const auto max_pending_frames =
+        static_cast<std::uint32_t>(std::max(state.capture_session.frame_pool_size, 1));
+    if (state.pending_video_frame_count < max_pending_frames) {
+      state.pending_video_frame_count++;
+    }
   }
   state.queue_cv.notify_one();
 }
@@ -522,12 +550,10 @@ auto signal_encoder_finish(Core::State::AppState& app_state) -> void {
 
   auto& state = *app_state.recording;
 
-  log_finish_progress("requested", state, true);
   resolve_finish_target_timestamp_100ns(state);
   {
     std::lock_guard queue_lock(state.queue_mutex);
     state.finish_requested.store(true, std::memory_order_release);
-    state.video_frame_pending = true;
   }
   state.queue_cv.notify_all();
 }
@@ -543,7 +569,6 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
 
   try {
     auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
-    auto last_finish_progress_log = std::chrono::steady_clock::time_point{};
 
     auto encoder_config = build_encoder_config(state);
     auto encoder_result = Utils::Media::Encoder::create_encoder(encoder_config, state.device.get(),
@@ -566,8 +591,9 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
           auto should_wake_now = [&state, stop_token]() {
             const bool finishing = stop_token.stop_requested() ||
                                    state.finish_requested.load(std::memory_order_acquire);
-            return stop_token.stop_requested() || finishing || state.video_frame_pending ||
-                   encoder_needs_wake_for_fixed_fps(state) || audio_ready_to_encode(state);
+            return stop_token.stop_requested() || finishing ||
+                   state.pending_video_frame_count > 0 || encoder_needs_wake_for_fixed_fps(state) ||
+                   audio_ready_to_encode(state);
           };
 
           if (should_wake_now()) {
@@ -597,45 +623,35 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
 
       const bool finishing =
           stop_token.stop_requested() || state.finish_requested.load(std::memory_order_acquire);
-      if (finishing && last_finish_progress_log == std::chrono::steady_clock::time_point{}) {
-        last_finish_progress_log = std::chrono::steady_clock::now();
-      }
 
-      // 有通知或正在收尾时，从 WGC 最多取一帧：拷进自有纹理，并推进/对齐时间线。
-      if (consume_video_frame_pending(state) || finishing) {
-        Utils::Graphics::Capture::Direct3D11CaptureFrame frame{nullptr};
-        {
-          std::lock_guard frame_lock(state.frame_mutex);
-          frame = Utils::Graphics::Capture::try_get_next_frame(state.capture_session);
-        }
-        if (frame) {
-          const auto frame_ts = Features::Recording::Time::relative_timestamp_100ns(
-              state.start_qpc_100ns, frame.SystemRelativeTime().count());
-          if (state.next_video_timestamp_100ns < 0) {
-            // 第一段有效画面：从这一帧的采集时间开始排视频时钟。
-            auto copy_result =
-                copy_one_capture_frame_to_encoder_input(state, frame, request_resize_restart);
-            if (!copy_result) {
-              fail_recording_encoder(app_state, state, copy_result.error());
-              break;
-            }
-            if (state.has_encoder_input_texture) {
-              state.next_video_timestamp_100ns = frame_ts;
-            }
-          } else {
-            // 新画面到来前，先用旧画面把采集间隔里该给的 fps 格子填满。
-            const auto emit_limit = frame_ts > 0 ? frame_ts - 1 : frame_ts;
-            auto emit_before = emit_video_samples_until(state, emit_limit);
-            if (!emit_before) {
-              fail_recording_encoder(app_state, state, emit_before.error());
-              break;
-            }
-            auto copy_result =
-                copy_one_capture_frame_to_encoder_input(state, frame, request_resize_restart);
-            if (!copy_result) {
-              fail_recording_encoder(app_state, state, copy_result.error());
-              break;
-            }
+      // WGC 通知到来后，连续丢掉过期前缀帧，只接受第一张仍有实时价值的画面。
+      if (auto pending_frame = try_take_next_usable_video_frame(state)) {
+        if (state.next_video_timestamp_100ns < 0) {
+          // 第一段有效画面：从这一帧的采集时间开始排视频时钟。
+          auto copy_result = copy_one_capture_frame_to_encoder_input(state, pending_frame->frame,
+                                                                     request_resize_restart);
+          if (!copy_result) {
+            fail_recording_encoder(app_state, state, copy_result.error());
+            break;
+          }
+          if (state.has_encoder_input_texture) {
+            state.next_video_timestamp_100ns = pending_frame->timestamp_100ns;
+          }
+        } else {
+          // 新画面到来前，先用旧画面把采集间隔里该给的 fps 格子填满。
+          const auto emit_limit = pending_frame->timestamp_100ns > 0
+                                      ? pending_frame->timestamp_100ns - 1
+                                      : pending_frame->timestamp_100ns;
+          auto emit_before = emit_video_samples_until(app_state, emit_limit);
+          if (!emit_before) {
+            fail_recording_encoder(app_state, state, emit_before.error());
+            break;
+          }
+          auto copy_result = copy_one_capture_frame_to_encoder_input(state, pending_frame->frame,
+                                                                     request_resize_restart);
+          if (!copy_result) {
+            fail_recording_encoder(app_state, state, copy_result.error());
+            break;
           }
         }
       }
@@ -645,7 +661,7 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
         const auto target_ts =
             finishing ? resolve_finish_target_timestamp_100ns(state)
                       : Features::Recording::Time::elapsed_since_start_100ns(state.start_qpc_100ns);
-        auto emit_result = emit_video_samples_until(state, target_ts);
+        auto emit_result = emit_video_samples_until(app_state, target_ts);
         if (!emit_result) {
           fail_recording_encoder(app_state, state, emit_result.error());
           break;
@@ -688,14 +704,6 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
         break;
       }
 
-      if (finishing) {
-        auto now = std::chrono::steady_clock::now();
-        if (now - last_finish_progress_log >= std::chrono::seconds(1)) {
-          log_finish_progress("waiting", state, true);
-          last_finish_progress_log = now;
-        }
-      }
-
       if (finishing && should_exit_finished_segment(state, finishing)) {
         break;
       }
@@ -703,7 +711,6 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
 
     if (state.encoded_video_frames > k_discard_video_frame_threshold &&
         state.encoder_error.empty()) {
-      log_finish_progress("finalize-begin", state, true);
       auto finalize_start = std::chrono::steady_clock::now();
       auto finalize_result = Utils::Media::Encoder::finalize_encoder(state.encoder);
       auto finalize_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(

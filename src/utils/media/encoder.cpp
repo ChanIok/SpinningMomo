@@ -607,7 +607,8 @@ auto encode_frame_gpu(State::EncoderContext& encoder, ID3D11DeviceContext* conte
   sample->SetSampleTime(timestamp_100ns);
   sample->SetSampleDuration(10'000'000 / fps);
 
-  if (FAILED(encoder.sink_writer->WriteSample(encoder.video_stream_index, sample.get()))) {
+  HRESULT write_hr = encoder.sink_writer->WriteSample(encoder.video_stream_index, sample.get());
+  if (FAILED(write_hr)) {
     return std::unexpected("Failed to write GPU sample");
   }
 

@@ -206,29 +206,34 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
 
   // 切换录制
   register_command(
-      registry,
-      {
-          .id = "recording.toggle",
-          .i18n_key = "menu.recording_toggle",
-          .is_toggle = true,
-          .action =
-              [&state]() {
-                if (auto result = Features::Recording::UseCase::toggle_recording(state); !result) {
-                  Logger().error("Recording toggle failed: {}", result.error());
-                }
-                UI::FloatingWindow::request_repaint(state);
-              },
-          .get_state = [&state]() -> bool {
-            return state.recording && state.recording->status ==
-                                          Features::Recording::Types::RecordingStatus::Recording;
-          },
-          .hotkey =
-              HotkeyBinding{
-                  .modifiers = 0,  // 无修饰键
-                  .key = 0x77,     // VK_F8 (F8)
-                  .settings_path = "app.hotkey.recording",
-              },
-      });
+      registry, {
+                    .id = "recording.toggle",
+                    .i18n_key = "menu.recording_toggle",
+                    .is_toggle = true,
+                    .action =
+                        [&state]() {
+                          if (auto result = Features::Recording::UseCase::toggle_recording(state);
+                              !result) {
+                            Logger().error("Recording toggle failed: {}", result.error());
+                          }
+                          UI::FloatingWindow::request_repaint(state);
+                        },
+                    .get_state = [&state]() -> bool {
+                      if (!state.recording) {
+                        return false;
+                      }
+
+                      const auto status = state.recording->status.load(std::memory_order_acquire);
+                      return status == Features::Recording::Types::RecordingStatus::Recording ||
+                             status == Features::Recording::Types::RecordingStatus::Stopping;
+                    },
+                    .hotkey =
+                        HotkeyBinding{
+                            .modifiers = 0,  // 无修饰键
+                            .key = 0x77,     // VK_F8 (F8)
+                            .settings_path = "app.hotkey.recording",
+                        },
+                });
 
   // === 窗口操作 ===
 

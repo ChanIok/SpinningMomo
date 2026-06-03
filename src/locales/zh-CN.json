@@ -48,6 +48,8 @@
   "message.recording_saved": "录制已保存：",
   "message.recording_start_failed": "录制启动失败: ",
   "message.recording_failed": "录制失败: ",
+  "message.recording_stopping": "录制正在停止并封装，请稍候。",
+  "message.recording_overload": "编码过载，建议降低分辨率或帧率。",
   "message.recording_stop_failed": "录制停止失败: ",
 
   "notification.action.view": "查看",

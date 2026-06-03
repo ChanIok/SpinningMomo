@@ -271,7 +271,7 @@ auto create_capture_session_with_frame_notification(
   session.frame_pool = std::move(*pool_result);
 
   // 这个入口故意不在 FrameArrived 回调里 TryGetNextFrame。
-  // WGC 的帧池由调用方线程主动 drain，避免回调线程参与后续 D3D/MF 编码工作。
+  // WGC 的帧池由调用方线程按需主动消费，避免回调线程参与后续 D3D/MF 编码工作。
   session.frame_token = session.frame_pool.FrameArrived(
       [frame_arrived_callback](auto&&, auto&&) { frame_arrived_callback(); });
 

@@ -53,6 +53,7 @@ export struct RecordingState {
   std::deque<Features::Recording::Types::QueuedAudioPacket> audio_queue;
   std::atomic<std::uint64_t> dropped_audio_packets{0};
   std::uint64_t skipped_video_frames_due_to_encoding_lag = 0;
+  bool encoder_overload_notified = false;
   std::uint64_t encoded_video_frames = 0;
   std::uint64_t encoded_audio_packets = 0;
 
@@ -64,7 +65,7 @@ export struct RecordingState {
   bool encoder_ready = false;
   bool encoder_start_succeeded = false;
   bool finalize_succeeded = false;
-  bool video_frame_pending = false;
+  std::uint32_t pending_video_frame_count = 0;
   std::string encoder_error;
 
   // 懒启动的录制控制线程：首次录制请求时启动，之后睡眠等待 toggle / resize / shutdown。
@@ -80,7 +81,7 @@ export struct RecordingState {
   // 线程同步
   // frame_mutex: 保护编码线程主动读取 WGC frame pool 与停止/清理流程。
   std::mutex frame_mutex;
-  // queue_mutex: 保护音频队列、视频帧通知和 finish 请求唤醒。
+  // queue_mutex: 保护音频队列、待消费视频帧计数和 finish 请求唤醒。
   std::mutex queue_mutex;
   std::condition_variable queue_cv;
   std::mutex encoder_ready_mutex;

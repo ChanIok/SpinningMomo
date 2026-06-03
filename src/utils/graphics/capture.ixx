@@ -63,7 +63,7 @@ export auto create_capture_session(
 
 // 创建捕获会话，但 FrameArrived 回调只负责通知，调用方稍后主动 try_get_next_frame。
 // 适合录制这类需要把 WGC frame pool 消费权交给专用线程的场景。
-// 注意：frame_arrived_callback 里不要取帧；消费者应在自己的线程里循环取空帧池。
+// 注意：frame_arrived_callback 里不要取帧；消费者应在自己的线程里按需主动取帧。
 export auto create_capture_session_with_frame_notification(
     HWND target_window,
     const winrt::Windows::Graphics::DirectX::Direct3D11::IDirect3DDevice& device, int width,

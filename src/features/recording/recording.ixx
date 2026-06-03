@@ -21,6 +21,9 @@ export auto request_control_action(Core::State::AppState& app_state,
                                    Features::Recording::Types::RecordingControlAction action)
     -> bool;
 
+// 抢占当前录制段的停止权；成功后状态立即切到 Stopping。
+export auto enter_stopping(Core::State::AppState& app_state) -> bool;
+
 // 等待录制控制线程退出，用于应用关闭阶段完成录制收尾。
 export auto join_control_thread(Core::State::AppState& app_state) -> void;
 
@@ -31,12 +34,6 @@ export auto start(Core::State::AppState& app_state, HWND target_window,
 
 // 停止当前录制段，排空输入、finalize 编码器并发布或删除临时文件。
 export auto stop(Core::State::AppState& app_state) -> Features::Recording::Types::StopResult;
-
-// 请求一次尺寸变化后的自动切段重启；只提交请求，不直接执行重操作。
-export auto request_restart_after_resize(Core::State::AppState& app_state) -> void;
-
-// 执行尺寸变化后的自动切段重启；只能由录制控制线程调用。
-export auto restart_after_resize(Core::State::AppState& app_state) -> void;
 
 // 清理录制模块资源，并关闭 Media Foundation 运行时。
 export auto cleanup(Core::State::AppState& app_state) -> void;

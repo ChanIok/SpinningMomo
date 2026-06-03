@@ -23,7 +23,7 @@ auto clear_queues(State::RecordingState& state) -> void {
   // 队列和通知标志只能在 queue_mutex 下动。音频线程、WGC 回调、编码线程都会碰它。
   std::lock_guard queue_lock(state.queue_mutex);
   state.audio_queue.clear();
-  state.video_frame_pending = false;
+  state.pending_video_frame_count = 0;
 }
 
 // 清空 D3D 等持久资源（录制段间不复用）
@@ -234,6 +234,7 @@ auto clear_session_runtime_fields(Core::State::AppState& app_state) -> void {
   clear_queues(state);
   state.dropped_audio_packets.store(0, std::memory_order_release);
   state.skipped_video_frames_due_to_encoding_lag = 0;
+  state.encoder_overload_notified = false;
   state.encoded_video_frames = 0;
   state.encoded_audio_packets = 0;
   state.encoder_thread = {};

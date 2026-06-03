@@ -48,6 +48,8 @@
   "message.recording_saved": "Recording saved: ",
   "message.recording_start_failed": "Failed to start recording: ",
   "message.recording_failed": "Recording failed: ",
+  "message.recording_stopping": "Recording is stopping and finalizing. Please wait.",
+  "message.recording_overload": "Encoder overloaded. Reduce the resolution or frame rate.",
   "message.recording_stop_failed": "Failed to stop recording: ",
 
   "notification.action.view": "View",

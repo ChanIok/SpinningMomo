@@ -128,6 +128,7 @@ export struct CapturePlan {
 
 export enum class RecordingControlAction {
   None,
+  UserStop,
   AbortWithError,
   RestartAfterResize,
   CleanupD3D,

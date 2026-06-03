@@ -33,6 +33,14 @@ auto show_recording_notification(Core::State::AppState& state, const std::string
   Core::Notifications::post_notification_request(state, std::move(options));
 }
 
+auto show_recording_stopping_notification(Core::State::AppState& state) -> void {
+  Core::Notifications::Types::NotificationOptions options;
+  options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+  options.message = Utils::String::FromUtf8(state.i18n->texts["message.recording_stopping"]);
+  options.duration = std::chrono::milliseconds(1500);
+  Core::Notifications::post_notification_request(state, std::move(options));
+}
+
 auto show_recording_saved_notification(Core::State::AppState& state,
                                        const std::filesystem::path& saved_path) -> void {
   // 保存成功的通知，多一个"查看"按钮，点击就用系统默认应用打开文件
@@ -107,15 +115,27 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   // 当前正在录制 → 按一下就是停止
   auto status = state.recording->status.load(std::memory_order_acquire);
   if (status == Features::Recording::Types::RecordingStatus::Recording) {
-    auto stop_result = Features::Recording::stop(state);
-    show_recording_stop_result_notification(state, stop_result);
-    Core::Events::post(state, UI::FloatingWindow::Events::RecordingToggleEvent{.enabled = false});
+    if (!Features::Recording::enter_stopping(state)) {
+      return std::unexpected("Failed to enter recording stopping state");
+    }
+    if (!Features::Recording::request_control_action(
+            state, Features::Recording::Types::RecordingControlAction::UserStop)) {
+      state.recording->status.store(Features::Recording::Types::RecordingStatus::Recording,
+                                    std::memory_order_release);
+      return std::unexpected("Failed to queue recording stop request");
+    }
     return {};
   }
 
-  // 不是 Idle（例如正在 Stopping）→ 不接受新操作
+  // 正在停止时不再重复发 stop，请直接告知用户当前仍在封装
+  if (status == Features::Recording::Types::RecordingStatus::Stopping) {
+    show_recording_stopping_notification(state);
+    return {};
+  }
+
+  // 不是 Idle 的其他瞬态状态也直接忽略，避免 toggle 抢状态机
   if (status != Features::Recording::Types::RecordingStatus::Idle) {
-    return std::unexpected("Recording is in a transitional state");
+    return {};
   }
 
   // --- 以下是启动流程 ---
