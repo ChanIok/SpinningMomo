@@ -20,10 +20,29 @@ import UI.ContextMenu;
 import UI.ContextMenu.Types;
 import UI.FloatingWindow.RenderContext;
 import Utils.Logger;
+import <dwmapi.h>;
 import <windows.h>;
 import <windowsx.h>;
 
 namespace UI::FloatingWindow::MessageHandler {
+
+auto apply_dpi_change(Core::State::AppState& state, HWND hwnd, UINT new_dpi,
+                      const RECT& suggested_rect) -> void {
+  const auto metrics = UI::FloatingWindow::Layout::calculate_window_metrics(state, new_dpi);
+
+  state.floating_window->window.dpi = new_dpi;
+  state.floating_window->layout = metrics.layout;
+  state.floating_window->window.size = metrics.size;
+  state.floating_window->window.position = {suggested_rect.left, suggested_rect.top};
+  state.floating_window->render_resources.needs_font_update = true;
+
+  Logger().debug("Applying floating window DPI change: dpi={}, position=({}, {}), size={}x{}",
+                 new_dpi, suggested_rect.left, suggested_rect.top, metrics.size.cx,
+                 metrics.size.cy);
+
+  SetWindowPos(hwnd, nullptr, suggested_rect.left, suggested_rect.top, metrics.size.cx,
+               metrics.size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
+}
 
 // 确保窗口能接收到WM_MOUSELEAVE消息
 auto ensure_mouse_tracking(HWND hwnd) -> void {
@@ -176,10 +195,12 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
 
     case WM_DPICHANGED: {
       const UINT dpi = HIWORD(wParam);
-      const auto window_size = UI::FloatingWindow::Layout::calculate_window_size(state);
+      const auto* suggested_rect = reinterpret_cast<const RECT*>(lParam);
+      if (!suggested_rect) {
+        return 0;
+      }
 
-      // 发送DPI改变事件来更新渲染状态
-      Core::Events::send(state, UI::FloatingWindow::Events::DpiChangeEvent{dpi, window_size});
+      apply_dpi_change(state, hwnd, dpi, *suggested_rect);
 
       return 0;
     }

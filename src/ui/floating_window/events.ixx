@@ -7,14 +7,6 @@ import Vendor.Windows;
 
 namespace UI::FloatingWindow::Events {
 
-// DPI改变事件
-export struct DpiChangeEvent {
-  Vendor::Windows::UINT new_dpi;
-  Vendor::Windows::SIZE window_size;
-
-  std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
-};
-
 // 比例改变事件
 export struct RatioChangeEvent {
   size_t index;

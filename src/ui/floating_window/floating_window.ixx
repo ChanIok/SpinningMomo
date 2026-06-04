@@ -4,7 +4,6 @@ export module UI.FloatingWindow;
 
 import std;
 import Core.State;
-import UI.FloatingWindow.Layout;
 import Vendor.Windows;
 
 namespace UI::FloatingWindow {

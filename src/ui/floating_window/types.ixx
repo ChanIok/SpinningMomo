@@ -83,6 +83,11 @@ export struct LayoutConfig {
   static constexpr float FONT_SIZE_STEP = 0.5f;  // 字体大小调整步长
 };
 
+export struct WindowMetrics {
+  LayoutConfig layout;
+  SIZE size{};
+};
+
 // 浮窗专用的Direct2D渲染状态
 export struct TextMeasureCacheEntry {
   std::wstring text;

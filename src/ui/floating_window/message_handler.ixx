@@ -1,11 +1,8 @@
 module;
 
-#include <windows.h>
-
 export module UI.FloatingWindow.MessageHandler;
 
-import Core.State;
-import UI.FloatingWindow.State;
+import <windows.h>;
 
 namespace UI::FloatingWindow::MessageHandler {
 

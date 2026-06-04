@@ -1,14 +1,11 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-
 export module UI.FloatingWindow.Layout;
 
 import std;
 import Core.State;
-import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
+import <windows.h>;
 
 namespace UI::FloatingWindow::Layout {
 
@@ -26,14 +23,9 @@ export struct ColumnBounds {
   int feature_column_left;
 };
 
-// 更新布局配置
-export auto update_layout(Core::State::AppState& state) -> void;
-
-// 计算窗口尺寸
-export auto calculate_window_size(const Core::State::AppState& state) -> SIZE;
-
-// 计算窗口高度
-export auto calculate_window_height(const Core::State::AppState& state) -> int;
+// 基于指定 DPI 计算布局与窗口尺寸
+export auto calculate_window_metrics(const Core::State::AppState& state, UINT dpi)
+    -> UI::FloatingWindow::WindowMetrics;
 
 // 计算窗口居中位置
 export auto calculate_center_position(const SIZE& window_size) -> POINT;

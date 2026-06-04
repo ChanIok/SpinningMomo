@@ -12,7 +12,6 @@ import Core.Events;
 import Core.State;
 import Core.I18n.Types;
 import Core.I18n.State;
-import UI.FloatingWindow.Events;
 import UI.FloatingWindow.MessageHandler;
 import UI.FloatingWindow.Layout;
 import UI.FloatingWindow.RenderContext;
@@ -65,19 +64,15 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 
   // 保存DPI到状态中
   state.floating_window->window.dpi = dpi;
-
-  // 应用布局配置（基于应用状态）
-  UI::FloatingWindow::Layout::update_layout(state);
+  const auto metrics = UI::FloatingWindow::Layout::calculate_window_metrics(state, dpi);
+  state.floating_window->layout = metrics.layout;
 
   // 初始化菜单项
   initialize_menu_items(state);
 
   // 计算窗口尺寸和位置
-  const auto window_size = UI::FloatingWindow::Layout::calculate_window_size(state);
+  const auto window_size = metrics.size;
   const auto window_pos = UI::FloatingWindow::Layout::calculate_center_position(window_size);
-
-  // 发送DPI改变事件来更新渲染状态
-  Core::Events::send(state, UI::FloatingWindow::Events::DpiChangeEvent{dpi, window_size});
 
   register_window_class(state.floating_window->window.instance);
 
@@ -328,8 +323,9 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
   // 更新菜单项
   update_menu_items(state);
 
-  // 更新布局配置（基于应用状态）
-  UI::FloatingWindow::Layout::update_layout(state);
+  const auto metrics = UI::FloatingWindow::Layout::calculate_window_metrics(
+      state, state.floating_window->window.dpi);
+  state.floating_window->layout = metrics.layout;
 
   // 行数配置变化后，确保翻页偏移仍落在有效页
   normalize_scroll_offsets(state);
@@ -337,8 +333,7 @@ auto refresh_from_settings(Core::State::AppState& state) -> void {
   // 更新颜色配置
   UI::FloatingWindow::RenderContext::update_all_brush_colors(state);
 
-  // 重新计算窗口大小
-  const auto new_size = UI::FloatingWindow::Layout::calculate_window_size(state);
+  const auto new_size = metrics.size;
   if (state.floating_window->window.hwnd) {
     // 调整窗口大小
     SetWindowPos(state.floating_window->window.hwnd, nullptr, 0, 0, new_size.cx, new_size.cy,

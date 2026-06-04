@@ -8,41 +8,12 @@ import Core.State;
 import Core.WebView;
 import Core.WebView.Events;
 import UI.FloatingWindow;
-import UI.FloatingWindow.Layout;
-import UI.FloatingWindow.RenderContext;
-import UI.FloatingWindow.State;
 import UI.FloatingWindow.Events;
 import UI.WebViewWindow;
 import Utils.Logger;
 import Vendor.Windows;
 
 namespace Core::Events::Handlers {
-
-// 从 app_state.ixx 迁移的 DPI 更新函数
-auto update_render_dpi(Core::State::AppState& state, Vendor::Windows::UINT new_dpi,
-                       const Vendor::Windows::SIZE& window_size) -> void {
-  state.floating_window->window.dpi = new_dpi;
-  state.floating_window->render_resources.needs_font_update = true;
-
-  // 更新布局配置（基于新的DPI）
-  UI::FloatingWindow::Layout::update_layout(state);
-
-  // 更新窗口尺寸
-  if (state.floating_window->window.hwnd) {
-    Vendor::Windows::RECT currentRect{};
-    Vendor::Windows::GetWindowRect(state.floating_window->window.hwnd, &currentRect);
-
-    Vendor::Windows::SetWindowPos(
-        state.floating_window->window.hwnd, nullptr, currentRect.left, currentRect.top,
-        window_size.cx, window_size.cy,
-        Vendor::Windows::kSWP_NOZORDER | Vendor::Windows::kSWP_NOACTIVATE);
-
-    // 如果Direct2D已初始化，调整渲染目标大小
-    if (state.floating_window->render_resources.is_initialized) {
-      UI::FloatingWindow::RenderContext::resize_render_context(state, window_size);
-    }
-  }
-}
 
 // 处理 hide 命令
 auto handle_hide_event(Core::State::AppState& state) -> void {
@@ -74,16 +45,6 @@ auto register_system_handlers(Core::State::AppState& app_state) -> void {
   subscribe<UI::FloatingWindow::Events::ToggleVisibilityEvent>(
       app_state, [&app_state](const UI::FloatingWindow::Events::ToggleVisibilityEvent&) {
         handle_toggle_visibility_event(app_state);
-      });
-
-  subscribe<UI::FloatingWindow::Events::DpiChangeEvent>(
-      app_state, [&app_state](const UI::FloatingWindow::Events::DpiChangeEvent& event) {
-        Logger().debug("DPI changed to: {}, window size: {}x{}", event.new_dpi,
-                       event.window_size.cx, event.window_size.cy);
-
-        update_render_dpi(app_state, event.new_dpi, event.window_size);
-
-        Logger().info("DPI update completed successfully");
       });
 
   subscribe<Core::WebView::Events::WebViewResponseEvent>(

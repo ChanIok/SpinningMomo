@@ -1,28 +1,23 @@
 module;
 
-#include <dwmapi.h>
-#include <windows.h>
-
-#include <string>
-
 module UI.FloatingWindow.Layout;
 
 import std;
 import Core.State;
 import UI.FloatingWindow.State;
 import Features.Settings.State;
-import Features.Settings.Types;
-import Utils.Logger;
+import <dwmapi.h>;
+import <windows.h>;
 
 namespace UI::FloatingWindow::Layout {
 
-auto update_layout(Core::State::AppState& state) -> void {
+auto calculate_layout_config(const Core::State::AppState& state, UINT dpi)
+    -> UI::FloatingWindow::LayoutConfig {
   const auto& settings = state.settings->raw;
   const auto& layout_settings = settings.ui.floating_window_layout;
-  const UINT dpi = state.floating_window->window.dpi;
   const double scale = static_cast<double>(dpi) / 96.0;
 
-  auto& layout = state.floating_window->layout;
+  UI::FloatingWindow::LayoutConfig layout;
 
   // 直接从配置计算实际渲染尺寸
   layout.item_height = static_cast<int>(layout_settings.base_item_height * scale);
@@ -42,21 +37,25 @@ auto update_layout(Core::State::AppState& state) -> void {
   layout.scroll_indicator_width =
       static_cast<int>(layout_settings.base_scroll_indicator_width * scale);
   layout.max_visible_rows = std::max(layout_settings.max_visible_rows, 1);
+  return layout;
 }
 
-auto calculate_window_size(const Core::State::AppState& state) -> SIZE {
-  const auto& render = state.floating_window->layout;
+auto calculate_window_size(const UI::FloatingWindow::LayoutConfig& layout) -> SIZE {
   const int total_width =
-      render.ratio_column_width + render.resolution_column_width + render.feature_column_width;
-  const int window_height = calculate_window_height(state);
+      layout.ratio_column_width + layout.resolution_column_width + layout.feature_column_width;
+  const int window_height =
+      layout.title_height + layout.separator_height + layout.item_height * layout.max_visible_rows;
 
   return {total_width, window_height};
 }
 
-auto calculate_window_height(const Core::State::AppState& state) -> int {
-  const auto& render = state.floating_window->layout;
-  return render.title_height + render.separator_height +
-         render.item_height * render.max_visible_rows;
+auto calculate_window_metrics(const Core::State::AppState& state, UINT dpi)
+    -> UI::FloatingWindow::WindowMetrics {
+  auto layout = calculate_layout_config(state, dpi);
+  return UI::FloatingWindow::WindowMetrics{
+      .layout = std::move(layout),
+      .size = calculate_window_size(layout),
+  };
 }
 
 auto calculate_center_position(const SIZE& window_size) -> POINT {
