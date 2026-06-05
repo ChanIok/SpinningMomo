@@ -123,6 +123,7 @@ export struct WebViewState {
   MessageState messaging;
   WebViewConfig config;
   std::wstring pending_initial_url;
+  std::function<void()> reveal_after_initial_navigation;
 
   bool is_initialized = false;
   bool is_ready = false;

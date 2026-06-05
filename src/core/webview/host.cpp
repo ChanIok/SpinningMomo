@@ -632,6 +632,19 @@ auto initialize_navigation(ICoreWebView2* webview, const std::wstring& initial_u
   return S_OK;
 }
 
+auto consume_initial_navigation_reveal(Core::WebView::State::WebViewState& webview_state) -> void {
+  auto reveal = std::exchange(webview_state.reveal_after_initial_navigation, {});
+  if (!reveal) {
+    return;
+  }
+
+  try {
+    reveal();
+  } catch (const std::exception& e) {
+    Logger().error("Failed to reveal WebView window after initial navigation: {}", e.what());
+  }
+}
+
 auto finalize_controller_initialization(Core::State::AppState* state,
                                         ICoreWebView2Controller* controller,
                                         ICoreWebView2CompositionController* composition_controller)
@@ -738,6 +751,7 @@ auto finalize_controller_initialization(Core::State::AppState* state,
 
   webview_state.is_ready = true;
   Core::WebView::RpcBridge::initialize_rpc_bridge(*state);
+  consume_initial_navigation_reveal(webview_state);
 
   return S_OK;
 }

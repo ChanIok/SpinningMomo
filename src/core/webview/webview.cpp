@@ -229,6 +229,7 @@ auto shutdown(Core::State::AppState& state) -> void {
   webview_state.is_ready = false;
   webview_state.has_initial_content = false;
   webview_state.window.is_visible = false;
+  webview_state.reveal_after_initial_navigation = {};
 
   Logger().info("WebView shutdown completed");
 }
