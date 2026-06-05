@@ -9,8 +9,12 @@ import Features.Gallery.Types;
 namespace Features::Gallery {
 
 // 初始化与清理
-export auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string>;
-export auto cleanup(Core::State::AppState& app_state) -> void;
+export auto initialize(Core::State::AppState& app_state,
+                       std::function<void(Core::State::AppState&)> after_ready = nullptr)
+    -> std::expected<void, std::string>;
+export auto cleanup(Core::State::AppState& app_state,
+                    std::function<void(Core::State::AppState&)> before_watchers_shutdown = nullptr)
+    -> void;
 
 // 资产管理
 export auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& params)

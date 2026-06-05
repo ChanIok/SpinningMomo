@@ -21,9 +21,6 @@ import Features.Recording.UseCase;
 import Features.Update;
 import Features.Update.State;
 import Features.Gallery;
-import Features.Gallery.State;
-import Features.Gallery.Watcher;
-import Features.Gallery.Recovery.Service;
 import Extensions.InfinityNikki.PhotoService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
@@ -35,6 +32,7 @@ import Utils.Logger;
 
 namespace Core::Shutdown {
 
+// 按初始化的反向依赖关闭应用，先收敛后台任务再释放 UI 和核心服务。
 auto shutdown_application(Core::State::AppState& state) -> void {
   Logger().info("==================================================");
   Logger().info("SpinningMomo shutdown begin");
@@ -43,9 +41,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   // 先卸载键盘、鼠标钩子，避免后续清理过程输入事件被拦截
   Core::Commands::uninstall_keyboard_keepalive_hook(state);
 
-  if (state.floating_window) {
-    Core::Commands::unregister_all_hotkeys(state, state.floating_window->window.hwnd);
-  }
+  Core::Commands::unregister_all_hotkeys(state, state.floating_window->window.hwnd);
 
   Features::WindowControl::stop_center_lock_monitor(state);
 
@@ -55,10 +51,10 @@ auto shutdown_application(Core::State::AppState& state) -> void {
 
   Core::DialogService::stop(state);
 
-  if (state.gallery) {
-    state.gallery->shutdown_requested.store(true, std::memory_order_release);
-    Features::Gallery::Watcher::wait_for_start_registered_watchers(state);
-  }
+  auto shutdown_gallery_extensions = [](Core::State::AppState& app_state) {
+    Extensions::InfinityNikki::PhotoService::shutdown(app_state);
+  };
+  Features::Gallery::cleanup(state, std::move(shutdown_gallery_extensions));
 
   // 1. UI 清理
   UI::ContextMenu::cleanup(state);
@@ -69,7 +65,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
 
   // 2. 功能模块清理
   // 检查是否有待处理的更新
-  if (state.update && state.update->pending_update) {
+  if (state.update->pending_update) {
     Logger().info("Executing pending update on program exit");
     Features::Update::execute_pending_update(state);
   }
@@ -77,10 +73,6 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   Features::Preview::cleanup_preview(state);
   Features::Overlay::stop_overlay(state);
   Features::Overlay::cleanup_overlay(state);
-  Features::Gallery::Recovery::Service::persist_registered_root_checkpoints(state);
-  Extensions::InfinityNikki::PhotoService::shutdown(state);
-  Features::Gallery::Watcher::shutdown_watchers(state);
-  Features::Gallery::cleanup(state);
   if (auto result = Features::Letterbox::shutdown(state); !result) {
     Logger().error("Failed to shutdown Letterbox: {}", result.error());
   }
@@ -92,9 +84,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   // 停止工作线程池（等待所有任务完成）
   Core::WorkerPool::stop(state);
 
-  if (state.database) {
-    Core::Database::shutdown(state);
-  }
+  Core::Database::shutdown(state);
 
   Core::Async::stop(state);
 

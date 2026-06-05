@@ -19,6 +19,7 @@ import Features.Gallery.Ignore.Service;
 import Features.Gallery.RootAvailability;
 import Features.Gallery.StaticResolver;
 import Features.Gallery.Watcher;
+import Features.Gallery.Recovery.Service;
 import Utils.File;
 import Utils.Image;
 import Utils.Logger;
@@ -79,7 +80,9 @@ auto ensure_output_directory_media_source(Core::State::AppState& app_state,
 
 // ============= 初始化和清理 =============
 
-auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
+// 准备 Gallery 运行资源：媒体运行时、缩略图目录、根可达性和静态映射。
+auto prepare_runtime_resources(Core::State::AppState& app_state)
+    -> std::expected<void, std::string> {
   try {
     Logger().info("Initializing gallery module...");
 
@@ -124,9 +127,89 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   }
 }
 
-auto cleanup(Core::State::AppState& app_state) -> void {
+// 执行 Gallery 后台启动任务：准备资源后恢复 watcher，并让外部扩展接入。
+auto run_startup_task(Core::State::AppState& app_state,
+                      std::function<void(Core::State::AppState&)> after_ready,
+                      std::stop_token stop_token) -> void {
+  try {
+    Logger().info("Gallery startup initialization started");
+
+    auto init_result = prepare_runtime_resources(app_state);
+    if (!init_result) {
+      Logger().warn("Gallery startup initialization failed: {}", init_result.error());
+      return;
+    }
+
+    // 退出已开始时不再注册 watcher 和扩展回调，避免和清理流程交错。
+    if (stop_token.stop_requested()) {
+      Logger().info("Stop Gallery startup initialization: shutdown has been requested");
+      return;
+    }
+
+    if (auto watcher_restore_result =
+            Features::Gallery::Watcher::restore_watchers_from_db(app_state);
+        !watcher_restore_result) {
+      Logger().warn("Gallery watcher registration restore failed: {}",
+                    watcher_restore_result.error());
+    }
+
+    // Gallery 根状态就绪后再通知外部扩展接入同一套 watcher。
+    if (after_ready) {
+      after_ready(app_state);
+    }
+
+    if (!stop_token.stop_requested()) {
+      Features::Gallery::Watcher::schedule_start_registered_watchers(app_state);
+    }
+
+    Logger().info("Gallery startup initialization completed");
+  } catch (const std::exception& e) {
+    Logger().warn("Gallery startup initialization crashed: {}", e.what());
+  } catch (...) {
+    Logger().warn("Gallery startup initialization crashed with unknown error");
+  }
+}
+
+// 启动 Gallery 模块；慢启动链路在模块自己的后台线程中继续推进。
+auto initialize(Core::State::AppState& app_state,
+                std::function<void(Core::State::AppState&)> after_ready)
+    -> std::expected<void, std::string> {
+  try {
+    app_state.gallery->shutdown_requested.store(false, std::memory_order_release);
+    app_state.gallery->startup_initialization_thread = std::jthread(
+        [&app_state, after_ready = std::move(after_ready)](std::stop_token stop_token) mutable {
+          run_startup_task(app_state, std::move(after_ready), stop_token);
+        });
+    return {};
+  } catch (const std::exception& e) {
+    return std::unexpected("Failed to start Gallery startup initialization thread: " +
+                           std::string(e.what()));
+  }
+}
+
+// 清理 Gallery 模块：先收敛后台启动和 watcher，再释放资源。
+auto cleanup(Core::State::AppState& app_state,
+             std::function<void(Core::State::AppState&)> before_watchers_shutdown) -> void {
   try {
     Logger().info("Cleaning up gallery module resources...");
+
+    // 先等待启动线程结束，避免它继续注册 WebView 映射或 watcher。
+    app_state.gallery->shutdown_requested.store(true, std::memory_order_release);
+    app_state.gallery->startup_initialization_thread.request_stop();
+    if (app_state.gallery->startup_initialization_thread.joinable()) {
+      app_state.gallery->startup_initialization_thread.join();
+    }
+
+    Features::Gallery::Watcher::wait_for_start_registered_watchers(app_state);
+
+    // watcher 停止前保存检查点，避免下次启动恢复丢失退出前状态。
+    Features::Gallery::Recovery::Service::persist_registered_root_checkpoints(app_state);
+
+    // 外部扩展先解绑自己的 watcher，再由 Gallery 统一关闭剩余 watcher。
+    if (before_watchers_shutdown) {
+      before_watchers_shutdown(app_state);
+    }
+    Features::Gallery::Watcher::shutdown_watchers(app_state);
 
     // 注销静态服务解析器
     StaticResolver::unregister_all_resolvers(app_state);

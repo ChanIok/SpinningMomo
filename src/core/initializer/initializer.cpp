@@ -22,7 +22,6 @@ import Core.RPC.Registry;
 import Core.Initializer.Database;
 import Core.Migration;
 import Features.Gallery;
-import Features.Gallery.Watcher;
 import Features.Settings;
 import Features.Settings.State;
 import Features.Recording;
@@ -73,6 +72,7 @@ auto apply_logger_level_from_settings(Core::State::AppState& state) -> void {
   Logger().debug("Runtime logger level loaded from settings: {}", level);
 }
 
+// 初始化应用主流程：核心服务先就绪，UI 首屏显示后再启动非首屏功能。
 auto initialize_application(Core::State::AppState& state) -> std::expected<void, std::string> {
   try {
     Logger().info("==================================================");
@@ -201,26 +201,18 @@ auto initialize_application(Core::State::AppState& state) -> std::expected<void,
       return std::unexpected(result.error());
     }
 
-    if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {
-      return std::unexpected("Failed to initialize gallery: " + gallery_result.error());
+    auto register_gallery_extensions = [](Core::State::AppState& app_state) {
+      Extensions::InfinityNikki::MapService::register_from_settings(app_state);
+      Extensions::InfinityNikki::PhotoService::register_from_settings(app_state);
+    };
+    if (auto result = Features::Gallery::initialize(state, std::move(register_gallery_extensions));
+        !result) {
+      return std::unexpected("Failed to initialize gallery: " + result.error());
     }
-
-    if (auto watcher_restore_result = Features::Gallery::Watcher::restore_watchers_from_db(state);
-        !watcher_restore_result) {
-      Logger().warn("Gallery watcher registration restore failed: {}",
-                    watcher_restore_result.error());
-    }
-
-    // Gallery 初始化完成后，先注册无限暖暖目录监听，统一在末尾启动
-    Extensions::InfinityNikki::MapService::register_from_settings(state);
-    Extensions::InfinityNikki::PhotoService::register_from_settings(state);
 
     Logger().info("==================================================");
     Logger().info("SpinningMomo startup ready");
     Logger().info("==================================================");
-
-    // 启动后的后台恢复任务不应阻塞 UI 首屏显示。
-    Features::Gallery::Watcher::schedule_start_registered_watchers(state);
 
     // 按设置自动检查更新（异步，不阻塞启动）
     Features::Update::schedule_startup_auto_update_check(state);

@@ -80,6 +80,9 @@ export struct GalleryState {
   // 不需要监听具体哪条规则变了。
   std::atomic<std::uint64_t> ignore_rules_version{0};
 
+  // 后台 Gallery 启动初始化线程；cleanup 会先 join，避免和资源释放并发。
+  std::jthread startup_initialization_thread;
+
   // 后台 watcher 启动恢复任务的 future，shutdown 时等待其结束。
   std::optional<std::future<void>> startup_watchers_future;
 
