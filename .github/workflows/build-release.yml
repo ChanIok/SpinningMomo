@@ -118,7 +118,7 @@ jobs:
           SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           SIGNPATH_ARTIFACT_CONFIG_APP_EXE: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_APP_EXE }}
-          SIGNPATH_ARTIFACT_CONFIG_MSI: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_MSI }}
+          SIGNPATH_ARTIFACT_CONFIG_BUNDLE_ENGINE: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_BUNDLE_ENGINE }}
           SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE }}
         run: |
           $required = @(
@@ -127,7 +127,7 @@ jobs:
             "SIGNPATH_PROJECT_SLUG",
             "SIGNPATH_SIGNING_POLICY_SLUG",
             "SIGNPATH_ARTIFACT_CONFIG_APP_EXE",
-            "SIGNPATH_ARTIFACT_CONFIG_MSI",
+            "SIGNPATH_ARTIFACT_CONFIG_BUNDLE_ENGINE",
             "SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE"
           )
 
@@ -200,42 +200,50 @@ jobs:
       - name: Build MSI package
         run: node scripts/build-installer.js --msi-only --version "${{ steps.final_version.outputs.VERSION }}"
 
-      - name: Upload unsigned MSI
-        id: upload_unsigned_msi
+      - name: Build setup bundle
+        run: node scripts/build-installer.js --bundle-only --version "${{ steps.final_version.outputs.VERSION }}"
+
+      - name: Detach Burn engine
+        shell: pwsh
+        run: |
+          $version = "${{ steps.final_version.outputs.VERSION }}"
+          New-Item -ItemType Directory -Force -Path "signpath-input/bundle-engine" | Out-Null
+          wix burn detach "dist/SpinningMomo-$version-x64-Setup.exe" -engine "signpath-input/bundle-engine/SpinningMomo-BurnEngine.exe"
+
+      - name: Upload unsigned Burn engine
+        id: upload_unsigned_bundle_engine
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-msi-${{ github.run_id }}-${{ github.run_attempt }}
-          path: dist/SpinningMomo-${{ steps.final_version.outputs.VERSION }}-x64.msi
+          name: unsigned-bundle-engine-${{ github.run_id }}-${{ github.run_attempt }}
+          path: signpath-input/bundle-engine/SpinningMomo-BurnEngine.exe
           if-no-files-found: error
 
-      - name: Sign MSI
+      - name: Sign Burn engine
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_MSI }}
-          github-artifact-id: ${{ steps.upload_unsigned_msi.outputs.artifact-id }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_BUNDLE_ENGINE }}
+          github-artifact-id: ${{ steps.upload_unsigned_bundle_engine.outputs.artifact-id }}
           wait-for-completion: true
-          output-artifact-directory: signpath-output/msi
-          parameters: |
-            version: "${{ steps.final_version.outputs.VERSION }}"
+          output-artifact-directory: signpath-output/bundle-engine
 
-      - name: Replace dist MSI with signed MSI
+      - name: Reattach signed Burn engine
         shell: pwsh
         run: |
           $version = "${{ steps.final_version.outputs.VERSION }}"
-          Copy-Item "signpath-output/msi/SpinningMomo-$version-x64.msi" "dist/SpinningMomo-$version-x64.msi" -Force
+          $setupPath = "dist/SpinningMomo-$version-x64-Setup.exe"
+          $reattachedPath = "$env:RUNNER_TEMP/SpinningMomo-$version-x64-Setup.engine-signed.exe"
+          wix burn reattach $setupPath -engine "signpath-output/bundle-engine/SpinningMomo-BurnEngine.exe" -o $reattachedPath
+          Move-Item $reattachedPath $setupPath -Force
 
-      - name: Build setup bundle
-        run: node scripts/build-installer.js --bundle-only --version "${{ steps.final_version.outputs.VERSION }}"
-
-      - name: Upload unsigned setup executable
-        id: upload_unsigned_setup_exe
+      - name: Upload engine-signed setup executable
+        id: upload_engine_signed_setup_exe
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-setup-exe-${{ github.run_id }}-${{ github.run_attempt }}
+          name: engine-signed-setup-exe-${{ github.run_id }}-${{ github.run_attempt }}
           path: dist/SpinningMomo-${{ steps.final_version.outputs.VERSION }}-x64-Setup.exe
           if-no-files-found: error
 
@@ -247,7 +255,7 @@ jobs:
           project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
           signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
           artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIG_SETUP_EXE }}
-          github-artifact-id: ${{ steps.upload_unsigned_setup_exe.outputs.artifact-id }}
+          github-artifact-id: ${{ steps.upload_engine_signed_setup_exe.outputs.artifact-id }}
           wait-for-completion: true
           output-artifact-directory: signpath-output/setup-exe
           parameters: |
