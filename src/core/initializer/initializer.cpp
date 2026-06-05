@@ -169,24 +169,8 @@ auto initialize_application(Core::State::AppState& state) -> std::expected<void,
       return std::unexpected("Failed to initialize notification window: " + result.error());
     }
 
-    if (auto result = Features::Recording::initialize(state); !result) {
-      return std::unexpected(result.error());
-    }
-
-    if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {
-      return std::unexpected("Failed to initialize gallery: " + gallery_result.error());
-    }
-
-    if (auto watcher_restore_result = Features::Gallery::Watcher::restore_watchers_from_db(state);
-        !watcher_restore_result) {
-      Logger().warn("Gallery watcher registration restore failed: {}",
-                    watcher_restore_result.error());
-    }
-
-    // Gallery 初始化完成后，先注册无限暖暖目录监听，统一在末尾启动
-    Extensions::InfinityNikki::MapService::register_from_settings(state);
-    Extensions::InfinityNikki::PhotoService::register_from_settings(state);
-
+    // 到这里为止，悬浮窗首绘所需的配置、文案、命令和原生 UI 资源都已就绪。
+    // 先显示启动 UI，避免 Gallery 目录探测、远程根检查等非首屏工作阻塞用户看到窗口。
     const bool should_open_onboarding =
         Features::Settings::should_show_onboarding(state.settings->raw);
     if (should_open_onboarding) {
@@ -211,6 +195,25 @@ auto initialize_application(Core::State::AppState& state) -> std::expected<void,
 
     // 注册所有命令的热键
     Core::Commands::register_all_hotkeys(state, state.floating_window->window.hwnd);
+
+    // 以下功能服务影响具体能力是否可用，但不应阻塞首屏出现。
+    if (auto result = Features::Recording::initialize(state); !result) {
+      return std::unexpected(result.error());
+    }
+
+    if (auto gallery_result = Features::Gallery::initialize(state); !gallery_result) {
+      return std::unexpected("Failed to initialize gallery: " + gallery_result.error());
+    }
+
+    if (auto watcher_restore_result = Features::Gallery::Watcher::restore_watchers_from_db(state);
+        !watcher_restore_result) {
+      Logger().warn("Gallery watcher registration restore failed: {}",
+                    watcher_restore_result.error());
+    }
+
+    // Gallery 初始化完成后，先注册无限暖暖目录监听，统一在末尾启动
+    Extensions::InfinityNikki::MapService::register_from_settings(state);
+    Extensions::InfinityNikki::PhotoService::register_from_settings(state);
 
     Logger().info("==================================================");
     Logger().info("SpinningMomo startup ready");

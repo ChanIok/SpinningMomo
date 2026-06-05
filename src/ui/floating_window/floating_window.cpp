@@ -143,14 +143,14 @@ auto uninstall_topmost_refresh_hook(Core::State::AppState& state) -> void {
 auto show_window(Core::State::AppState& state) -> void {
   if (state.floating_window->window.hwnd) {
     ShowWindow(state.floating_window->window.hwnd, SW_SHOWNA);
-    UpdateWindow(state.floating_window->window.hwnd);
     state.floating_window->window.is_visible = true;
 
     // Windows 11 TopMost Z 序失效 workaround：显示时安装前台变化监听
     install_topmost_refresh_hook(state);
 
-    // 触发初始绘制（使用标准InvalidateRect机制）
+    // 先标记脏区再同步 UpdateWindow，确保启动后续初始化继续执行前完成首绘。
     request_repaint(state);
+    UpdateWindow(state.floating_window->window.hwnd);
   }
 }
 
