@@ -81,7 +81,7 @@ const handleMenuClick = (key: SettingsPageKey) => {
 
 <template>
   <div class="flex h-full w-48 flex-col lg:w-56 2xl:w-64">
-    <div class="h-full p-4">
+    <div class="h-full p-4 pr-0">
       <nav class="flex-1">
         <div class="space-y-1">
           <div v-for="item in settingsMenus" :key="item.key" class="group">

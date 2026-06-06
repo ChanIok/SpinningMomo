@@ -71,13 +71,23 @@
   --surface-opacity: 1;
   --surface-bottom: #efefef;
   --surface-middle: rgb(255 255 255 / 0.56);
-  --surface-top: #fefefe;
+  --surface-middle-mixed: color-mix(
+    in srgb,
+    var(--surface-middle) calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
+    transparent
+  );
+  --surface-top: rgb(255 255 255);
+  --surface-top-mixed: color-mix(
+    in srgb,
+    var(--surface-top) calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
+    transparent
+  );
   /* Light Modern */
   --background: #ffffff;
   --foreground: #1b1b1b;
-  --card: var(--surface-middle);
+  --card: var(--surface-middle-mixed);
   --card-foreground: #3b3b3b;
-  --popover: var(--surface-top);
+  --popover: var(--surface-top-mixed);
   --popover-foreground: #3b3b3b;
   --primary: #f59e0b;
   --primary-foreground: #ffffff;
@@ -96,7 +106,7 @@
   --sidebar-foreground: #2e2e2e;
   --sidebar-primary: #f59e0b;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: var(--surface-top);
+  --sidebar-accent: var(--surface-top-mixed);
   --sidebar-accent-foreground: #000000;
   --sidebar-hover: rgb(0 0 0 / 0.04);
   --sidebar-border: #e5e5e5;
@@ -115,10 +125,20 @@
   /* Dark Modern */
   --surface-bottom: #191919;
   --surface-middle: rgb(255 255 255 / 0.06);
+  --surface-middle-mixed: color-mix(
+    in srgb,
+    var(--surface-middle) calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
+    transparent
+  );
   --surface-top: rgb(255 255 255 / 0.1);
+  --surface-top-mixed: color-mix(
+    in srgb,
+    var(--surface-top) calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
+    transparent
+  );
   --background: var(--surface-bottom);
   --foreground: #ececec;
-  --card: var(--surface-middle);
+  --card: var(--surface-middle-mixed);
   --card-foreground: #ececec;
   --popover: #303030;
   --popover-foreground: #ececec;
@@ -139,7 +159,7 @@
   --sidebar-foreground: #ececec;
   --sidebar-primary: #fbbf24;
   --sidebar-primary-foreground: #18181b;
-  --sidebar-accent: var(--surface-top);
+  --sidebar-accent: var(--surface-top-mixed);
   --sidebar-accent-foreground: #ececec;
   --sidebar-hover: rgb(255 255 255 / 0.06);
   --sidebar-border: #ffffff1a;

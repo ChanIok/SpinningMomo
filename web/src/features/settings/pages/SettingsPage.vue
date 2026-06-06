@@ -34,7 +34,7 @@ watch(activePage, () => {
     <SettingsSidebar v-model:activePage="activePage" />
     <div class="flex h-full flex-1 flex-col overflow-hidden">
       <ScrollArea ref="scrollAreaRef" class="h-full w-full flex-1">
-        <div class="mx-auto max-w-4xl p-8">
+        <div class="mx-auto max-w-[1200px] p-8">
           <GeneralSettingsContent v-if="activePage === 'general'" />
           <HotkeySettingsContent v-if="activePage === 'hotkeys'" />
           <CaptureSettingsContent v-if="activePage === 'capture'" />

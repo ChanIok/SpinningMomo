@@ -102,15 +102,10 @@ function handlePrevious() {
 <template>
   <div class="flex h-full w-full items-center justify-center overflow-y-auto p-6">
     <!-- 卡片主体 -->
-    <div class="surface-top flex w-full max-w-2xl flex-col rounded-md border shadow-sm">
+    <div class="surface-top flex w-full max-w-2xl flex-col rounded-md border">
       <!-- Header：说明来源 + 步骤进度 -->
       <div class="flex shrink-0 items-center justify-between px-6 py-4">
-        <div class="flex items-center gap-3">
-          <div
-            class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
-          >
-            <Sparkles class="size-4" />
-          </div>
+        <div class="flex items-center">
           <div>
             <p class="text-sm leading-tight font-semibold text-foreground">
               {{ t('gallery.guide.infinityNikki.header.title') }}

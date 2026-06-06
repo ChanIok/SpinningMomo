@@ -283,36 +283,38 @@ onBeforeUnmount(() => {
           >
             {{ t('app.name') }}
           </h1>
-          <button
-            type="button"
-            class="surface-top flex h-8 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium text-card-foreground transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
-            :disabled="isVersionBusy || appVersionText === '-'"
-            @click="handleUpdateAction"
-          >
-            <!-- Status Icon -->
-            <Loader2 v-if="isVersionBusy" class="h-4 w-4 shrink-0 animate-spin" />
-            <Package v-else-if="isDownloadedUpdateReady" class="h-4 w-4 shrink-0" />
-            <Download v-else-if="hasUpdate" class="h-4 w-4 shrink-0" />
-            <Check v-else-if="isConfirmedUpToDate" class="h-4 w-4 shrink-0" />
+          <div class="surface-top inline-flex rounded-md">
+            <button
+              type="button"
+              class="flex h-8 cursor-pointer items-center gap-2 rounded-md px-3 text-sm font-medium text-card-foreground transition-colors hover:bg-accent/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+              :disabled="isVersionBusy || appVersionText === '-'"
+              @click="handleUpdateAction"
+            >
+              <!-- Status Icon -->
+              <Loader2 v-if="isVersionBusy" class="h-4 w-4 shrink-0 animate-spin" />
+              <Package v-else-if="isDownloadedUpdateReady" class="h-4 w-4 shrink-0" />
+              <Download v-else-if="hasUpdate" class="h-4 w-4 shrink-0" />
+              <Check v-else-if="isConfirmedUpToDate" class="h-4 w-4 shrink-0" />
 
-            <!-- Status Text -->
-            <span>
-              <template v-if="isCheckingUpdate">{{ t('about.actions.checkingUpdate') }}</template>
-              <template v-else-if="isInstallingUpdate">{{
-                t('about.actions.installingUpdate')
-              }}</template>
-              <template v-else-if="isDownloadedUpdateReady">{{
-                t('about.actions.installDownloadedUpdate', { version: latestVersion || '' })
-              }}</template>
-              <template v-else-if="hasUpdate">{{
-                t('about.actions.downloadUpdate', { version: latestVersion || '' })
-              }}</template>
-              <template v-else>
-                {{ t('about.runtime.version') }}
-                {{ isLoading ? '…' : appVersionText === '-' ? '—' : appVersionText }}
-              </template>
-            </span>
-          </button>
+              <!-- Status Text -->
+              <span>
+                <template v-if="isCheckingUpdate">{{ t('about.actions.checkingUpdate') }}</template>
+                <template v-else-if="isInstallingUpdate">{{
+                  t('about.actions.installingUpdate')
+                }}</template>
+                <template v-else-if="isDownloadedUpdateReady">{{
+                  t('about.actions.installDownloadedUpdate', { version: latestVersion || '' })
+                }}</template>
+                <template v-else-if="hasUpdate">{{
+                  t('about.actions.downloadUpdate', { version: latestVersion || '' })
+                }}</template>
+                <template v-else>
+                  {{ t('about.runtime.version') }}
+                  {{ isLoading ? '…' : appVersionText === '-' ? '—' : appVersionText }}
+                </template>
+              </span>
+            </button>
+          </div>
         </div>
 
         <!-- Actions Card -->
