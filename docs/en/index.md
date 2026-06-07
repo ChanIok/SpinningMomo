@@ -26,4 +26,7 @@ features:
   - icon: 🎬
     title: Adaptive Recording
     details: Built-in recording seamlessly adapts to custom window ratios without tedious settings.
+  - icon: 🖼️
+    title: Game Photography Gallery
+    details: Index photos and videos automatically, then organize them with tags, ratings, timelines, color filters, and batch actions.
 ---

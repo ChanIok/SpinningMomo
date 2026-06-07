@@ -27,6 +27,8 @@ SpinningMomo is a Windows desktop tool built for *Infinity Nikki* (and other win
 
 ▸ Bypass built-in resolution limits — capture screenshots and recordings at up to 8K–12K
 
+▸ Built-in game photography gallery — index photos and videos automatically, then organize them with tags, ratings, timelines, color filters, and batch actions
+
 ▸ Optimized for *Infinity Nikki*, works with most modern games in windowed mode
 
 ### Download

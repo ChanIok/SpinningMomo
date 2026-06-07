@@ -39,6 +39,46 @@
   --vp-c-brand-active: var(--vp-c-brand);
 }
 
+/* ===== Nav Logo Enhancement ===== */
+.VPNavBar .VPNavBarTitle .logo {
+  filter: drop-shadow(0 2px 8px rgba(255, 159, 79, 0.25));
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.VPNavBar .VPNavBarTitle:hover .logo {
+  filter: drop-shadow(0 4px 14px rgba(255, 159, 79, 0.4));
+  transform: scale(1.06);
+}
+
+/* ===== Hero Image Enhancement ===== */
+:root {
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    rgba(255, 159, 79, 0.25) 50%,
+    rgba(255, 192, 136, 0.25) 50%
+  );
+  --vp-home-hero-image-filter: blur(44px);
+}
+
+@keyframes hero-float {
+  0%, 100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -8px;
+  }
+}
+
+.VPHero .image-container .image-src {
+  animation: hero-float 6s ease-in-out infinite;
+  transform-origin: 0 0;
+  transition: rotate 1.5s ease-out;
+}
+
+.VPHero .image-container:hover .image-src {
+  rotate: 360deg;
+}
+
 :root.dark {
   --vp-c-text-1: #f0f0f0;
   --vp-c-text-2: #e0e0e0;
@@ -61,4 +101,13 @@
   --vp-code-block-bg: #242424;
 
   --vp-nav-bg-color: rgba(26, 26, 26, 0.95);
+}
+
+/* Dark mode hero background adjustment */
+:root.dark {
+  --vp-home-hero-image-background-image: linear-gradient(
+    -45deg,
+    rgba(255, 159, 79, 0.15) 50%,
+    rgba(255, 192, 136, 0.15) 50%
+  );
 } 

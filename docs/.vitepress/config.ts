@@ -136,6 +136,10 @@ export default defineConfig({
       description: SITE_DESCRIPTION_EN,
       themeConfig: {
         siteTitle: SITE_NAME_EN,
+        footer: {
+          message: `Released under GPL-3.0 · <a href="${withBasePath("/en/about/legal")}">Legal & Privacy</a> · <a href="${withBasePath("/en/about/credits")}">Open Source Credits</a>`,
+          copyright: "Copyright © 2026 InfinityMomo",
+        },
         nav: [
           { text: "Guide", link: "/en/guide/getting-started" },
           { text: "Legal", link: "/en/about/legal" },
@@ -188,6 +192,10 @@ export default defineConfig({
   themeConfig: {
     logo: withBasePath("/logo.png"),
     siteTitle: SITE_NAME,
+    footer: {
+      message: `GPL-3.0 开源 · <a href="${withBasePath("/about/legal")}">法律与隐私</a> · <a href="${withBasePath("/about/credits")}">开源鸣谢</a>`,
+      copyright: "Copyright © 2026 InfinityMomo",
+    },
 
     // 社交链接
     socialLinks: [
