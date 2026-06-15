@@ -1,5 +1,7 @@
 module;
 
+#include <dkm.hpp>
+
 module Utils.Image;
 
 import std;
@@ -14,6 +16,264 @@ import <windows.h>;
 import <winerror.h>;
 
 namespace Utils::Image {
+
+auto mix_kmeans_seed(std::uint64_t hash, std::uint64_t value) -> std::uint64_t {
+  hash ^= value + 0x9E3779B97F4A7C15ull + (hash << 6) + (hash >> 2);
+  return hash;
+}
+
+auto build_kmeans_seed(const std::vector<std::array<float, 3>>& points, std::size_t cluster_count)
+    -> std::uint64_t {
+  std::uint64_t hash = 0xCBF29CE484222325ull;
+  hash = mix_kmeans_seed(hash, static_cast<std::uint64_t>(points.size()));
+  hash = mix_kmeans_seed(hash, static_cast<std::uint64_t>(cluster_count));
+
+  for (const auto& point : points) {
+    for (float component : point) {
+      hash = mix_kmeans_seed(hash,
+                             static_cast<std::uint64_t>(std::bit_cast<std::uint32_t>(component)));
+    }
+  }
+
+  return hash == 0 ? 1 : hash;
+}
+
+// 用输入点集派生固定随机种子跑 K-Means，避免 dkm 默认 random_device 导致同图多次取色结果漂移
+auto run_deterministic_kmeans(const std::vector<std::array<float, 3>>& points,
+                              std::size_t cluster_count)
+    -> std::expected<std::vector<std::size_t>, std::string> {
+  if (points.empty()) {
+    return std::unexpected("KMeans input has no points");
+  }
+
+  if (cluster_count == 0) {
+    return std::unexpected("KMeans cluster count must be greater than zero");
+  }
+
+  auto effective_cluster_count = std::min(cluster_count, points.size());
+  if (effective_cluster_count > std::numeric_limits<std::uint32_t>::max()) {
+    return std::unexpected("KMeans cluster count is too large");
+  }
+
+  try {
+    dkm::clustering_parameters<float> parameters(
+        static_cast<std::uint32_t>(effective_cluster_count));
+    parameters.set_random_seed(build_kmeans_seed(points, effective_cluster_count));
+
+    auto [means, raw_labels] = dkm::kmeans_lloyd(points, parameters);
+    // 最终颜色由簇内像素均值决定，簇心坐标仅用于分组
+    (void)means;
+
+    std::vector<std::size_t> labels;
+    labels.reserve(raw_labels.size());
+    for (const auto& label : raw_labels) {
+      labels.push_back(static_cast<std::size_t>(label));
+    }
+
+    return labels;
+  } catch (const std::exception& e) {
+    return std::unexpected("Deterministic KMeans failed: " + std::string(e.what()));
+  }
+}
+
+auto srgb_to_linear(float value) -> float {
+  float normalized = value / 255.0f;
+  if (normalized <= 0.04045f) {
+    return normalized / 12.92f;
+  }
+  return std::pow((normalized + 0.055f) / 1.055f, 2.4f);
+}
+
+auto lab_f(float value) -> float {
+  constexpr float epsilon = 216.0f / 24389.0f;
+  constexpr float kappa = 24389.0f / 27.0f;
+  if (value > epsilon) {
+    return std::cbrt(value);
+  }
+  return (kappa * value + 16.0f) / 116.0f;
+}
+
+// 将 sRGB 字节值转换到 CIE Lab，供感知距离计算与 Lab 空间聚类使用
+auto rgb_to_lab_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) -> LabColor {
+  float lr = srgb_to_linear(static_cast<float>(r));
+  float lg = srgb_to_linear(static_cast<float>(g));
+  float lb = srgb_to_linear(static_cast<float>(b));
+
+  float x = lr * 0.4124564f + lg * 0.3575761f + lb * 0.1804375f;
+  float y = lr * 0.2126729f + lg * 0.7151522f + lb * 0.0721750f;
+  float z = lr * 0.0193339f + lg * 0.1191920f + lb * 0.9503041f;
+
+  constexpr float ref_x = 0.95047f;
+  constexpr float ref_y = 1.00000f;
+  constexpr float ref_z = 1.08883f;
+
+  float fx = lab_f(x / ref_x);
+  float fy = lab_f(y / ref_y);
+  float fz = lab_f(z / ref_z);
+
+  return LabColor{
+      .l = 116.0f * fy - 16.0f,
+      .a = 500.0f * (fx - fy),
+      .b = 200.0f * (fy - fz),
+  };
+}
+
+// 从 BGRA 矩形区域采样 → Lab 聚类 → 按簇内像素均值生成权重排序的调色板
+auto extract_lab_palette_from_bgra_rect(const BGRABitmapData& bitmap_data, int x0, int y0, int x1,
+                                        int y1, const PaletteExtractOptions& options)
+    -> std::expected<std::vector<PaletteColor>, std::string> {
+  if (bitmap_data.width == 0 || bitmap_data.height == 0 || bitmap_data.stride == 0) {
+    return std::unexpected("Bitmap data is empty");
+  }
+
+  if (bitmap_data.pixels.empty()) {
+    return std::unexpected("Bitmap pixels are empty");
+  }
+
+  auto minimum_stride =
+      static_cast<std::uint64_t>(bitmap_data.width) * static_cast<std::uint64_t>(4);
+  if (bitmap_data.stride < minimum_stride) {
+    return std::unexpected("Bitmap stride is smaller than width * 4");
+  }
+
+  auto required_bytes = static_cast<std::uint64_t>(bitmap_data.stride) *
+                        static_cast<std::uint64_t>(bitmap_data.height);
+  if (required_bytes > bitmap_data.pixels.size()) {
+    return std::unexpected("Bitmap pixel buffer is smaller than stride * height");
+  }
+
+  int width = static_cast<int>(bitmap_data.width);
+  int height = static_cast<int>(bitmap_data.height);
+  x0 = std::clamp(x0, 0, width);
+  y0 = std::clamp(y0, 0, height);
+  x1 = std::clamp(x1, 0, width);
+  y1 = std::clamp(y1, 0, height);
+  if (x0 >= x1 || y0 >= y1) {
+    return std::unexpected("Palette sample rect is empty");
+  }
+
+  struct SampledPalettePixel {
+    RgbColor rgb;
+    LabColor lab;
+  };
+
+  std::uint64_t area = static_cast<std::uint64_t>(x1 - x0) * static_cast<std::uint64_t>(y1 - y0);
+  std::uint32_t max_samples = std::max<std::uint32_t>(1, options.max_samples);
+  int pixel_step = 1;
+  // 二维网格步进，在空间上均匀覆盖且总采样数不超过上限
+  if (area > max_samples) {
+    pixel_step = std::max(1, static_cast<int>(std::ceil(std::sqrt(
+                                 static_cast<double>(area) / static_cast<double>(max_samples)))));
+  }
+
+  std::vector<SampledPalettePixel> samples;
+  samples.reserve(static_cast<std::size_t>(std::min<std::uint64_t>(area, max_samples)));
+  for (int y = y0; y < y1; y += pixel_step) {
+    for (int x = x0; x < x1; x += pixel_step) {
+      std::uint64_t offset =
+          static_cast<std::uint64_t>(y) * bitmap_data.stride + static_cast<std::uint64_t>(x) * 4;
+      std::uint8_t b = bitmap_data.pixels[offset + 0];
+      std::uint8_t g = bitmap_data.pixels[offset + 1];
+      std::uint8_t r = bitmap_data.pixels[offset + 2];
+      std::uint8_t a = bitmap_data.pixels[offset + 3];
+      // 近透明像素不参与统计，避免透明区域拉偏主色
+      if (a < options.min_alpha) continue;
+
+      RgbColor rgb{.r = r, .g = g, .b = b};
+      samples.push_back(SampledPalettePixel{
+          .rgb = rgb,
+          .lab = rgb_to_lab_color(rgb.r, rgb.g, rgb.b),
+      });
+    }
+  }
+
+  if (samples.empty()) {
+    return std::unexpected("No valid pixels found for palette extraction");
+  }
+
+  std::vector<std::array<float, 3>> points;
+  points.reserve(samples.size());
+  for (const auto& sample : samples) {
+    points.push_back({sample.lab.l, sample.lab.a, sample.lab.b});
+  }
+
+  auto cluster_count =
+      std::clamp(static_cast<std::size_t>(options.cluster_count), std::size_t{1}, points.size());
+  // 在 Lab 空间聚类，比 RGB 更符合人眼对"相近色"的感知
+  auto labels_result = run_deterministic_kmeans(points, cluster_count);
+  if (!labels_result) {
+    return std::unexpected(labels_result.error());
+  }
+
+  struct ClusterAccumulator {
+    std::size_t count = 0;
+    double r = 0.0;
+    double g = 0.0;
+    double b = 0.0;
+    double lab_l = 0.0;
+    double lab_a = 0.0;
+    double lab_b = 0.0;
+  };
+
+  std::vector<ClusterAccumulator> clusters(cluster_count);
+  for (std::size_t i = 0; i < samples.size() && i < labels_result->size(); ++i) {
+    auto label = (*labels_result)[i];
+    if (label >= clusters.size()) {
+      continue;
+    }
+
+    auto& cluster = clusters[label];
+    const auto& sample = samples[i];
+    cluster.count += 1;
+    cluster.r += sample.rgb.r;
+    cluster.g += sample.rgb.g;
+    cluster.b += sample.rgb.b;
+    cluster.lab_l += sample.lab.l;
+    cluster.lab_a += sample.lab.a;
+    cluster.lab_b += sample.lab.b;
+  }
+
+  auto to_channel = [](double value, std::size_t count) -> std::uint8_t {
+    long rounded = std::lround(value / static_cast<double>(count));
+    return static_cast<std::uint8_t>(std::clamp(rounded, 0l, 255l));
+  };
+
+  std::vector<PaletteColor> palette;
+  palette.reserve(clusters.size());
+  const auto total_weight = static_cast<float>(samples.size());
+  for (const auto& cluster : clusters) {
+    if (cluster.count == 0) {
+      continue;
+    }
+
+    auto count = static_cast<double>(cluster.count);
+    palette.push_back(PaletteColor{
+        .rgb =
+            RgbColor{
+                .r = to_channel(cluster.r, cluster.count),
+                .g = to_channel(cluster.g, cluster.count),
+                .b = to_channel(cluster.b, cluster.count),
+            },
+        .lab =
+            LabColor{
+                .l = static_cast<float>(cluster.lab_l / count),
+                .a = static_cast<float>(cluster.lab_a / count),
+                .b = static_cast<float>(cluster.lab_b / count),
+            },
+        .weight = static_cast<float>(cluster.count) / total_weight,
+    });
+  }
+
+  // 权重降序，调用方取 front() 即画面占比最大的主色
+  std::ranges::sort(palette, [](const PaletteColor& lhs, const PaletteColor& rhs) {
+    if (lhs.weight != rhs.weight) return lhs.weight > rhs.weight;
+    if (lhs.rgb.r != rhs.rgb.r) return lhs.rgb.r < rhs.rgb.r;
+    if (lhs.rgb.g != rhs.rgb.g) return lhs.rgb.g < rhs.rgb.g;
+    return lhs.rgb.b < rhs.rgb.b;
+  });
+
+  return palette;
+}
 
 // 格式化HRESULT错误信息
 auto format_hresult(HRESULT hr, const std::string& context) -> std::string {

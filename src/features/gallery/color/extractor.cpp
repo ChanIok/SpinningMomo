@@ -5,7 +5,6 @@ module Features.Gallery.Color.Extractor;
 import std;
 import Utils.Image;
 import Features.Gallery.Color.Types;
-import <dkm.hpp>;
 
 namespace Features::Gallery::Color::Extractor {
 
@@ -49,73 +48,26 @@ auto parse_hex_color(std::string_view hex) -> std::expected<std::array<uint8_t, 
   return std::array<uint8_t, 3>{*r, *g, *b};
 }
 
-auto srgb_to_linear(float value) -> float {
-  float normalized = value / 255.0f;
-  if (normalized <= 0.04045f) {
-    return normalized / 12.92f;
-  }
-  return std::pow((normalized + 0.055f) / 1.055f, 2.4f);
-}
-
-auto lab_f(float value) -> float {
-  constexpr float epsilon = 216.0f / 24389.0f;
-  constexpr float kappa = 24389.0f / 27.0f;
-  if (value > epsilon) {
-    return std::cbrt(value);
-  }
-  return (kappa * value + 16.0f) / 116.0f;
-}
-
-auto rgb_to_lab_color(uint8_t r, uint8_t g, uint8_t b, float l_bin_size, float ab_bin_size)
+// 将 Lab 坐标量化到 bin，供按色筛选 SQL 做粗匹配
+auto bin_lab_color(const Utils::Image::LabColor& lab, float l_bin_size, float ab_bin_size)
     -> Types::LabColor {
-  float lr = srgb_to_linear(static_cast<float>(r));
-  float lg = srgb_to_linear(static_cast<float>(g));
-  float lb = srgb_to_linear(static_cast<float>(b));
-
-  float x = lr * 0.4124564f + lg * 0.3575761f + lb * 0.1804375f;
-  float y = lr * 0.2126729f + lg * 0.7151522f + lb * 0.0721750f;
-  float z = lr * 0.0193339f + lg * 0.1191920f + lb * 0.9503041f;
-
-  constexpr float ref_x = 0.95047f;
-  constexpr float ref_y = 1.00000f;
-  constexpr float ref_z = 1.08883f;
-
-  float fx = lab_f(x / ref_x);
-  float fy = lab_f(y / ref_y);
-  float fz = lab_f(z / ref_z);
-
-  float l = 116.0f * fy - 16.0f;
-  float a = 500.0f * (fx - fy);
-  float lab_b = 200.0f * (fy - fz);
-
-  int l_bin = std::max(0, static_cast<int>(std::floor(l / l_bin_size)));
-  int a_bin = std::max(0, static_cast<int>(std::floor((a + 128.0f) / ab_bin_size)));
-  int b_bin = std::max(0, static_cast<int>(std::floor((lab_b + 128.0f) / ab_bin_size)));
+  int l_bin = std::max(0, static_cast<int>(std::floor(lab.l / l_bin_size)));
+  int a_bin = std::max(0, static_cast<int>(std::floor((lab.a + 128.0f) / ab_bin_size)));
+  int b_bin = std::max(0, static_cast<int>(std::floor((lab.b + 128.0f) / ab_bin_size)));
 
   return Types::LabColor{
-      .l = l,
-      .a = a,
-      .b = lab_b,
+      .l = lab.l,
+      .a = lab.a,
+      .b = lab.b,
       .l_bin = l_bin,
       .a_bin = a_bin,
       .b_bin = b_bin,
   };
 }
 
-auto run_kmeans(const std::vector<std::array<float, 3>>& points, size_t k)
-    -> std::expected<std::pair<std::vector<std::array<float, 3>>, std::vector<size_t>>,
-                     std::string> {
-  try {
-    auto [means, labels] = dkm::kmeans_lloyd(points, k);
-    std::vector<size_t> normalized_labels;
-    normalized_labels.reserve(labels.size());
-    for (const auto& label : labels) {
-      normalized_labels.push_back(static_cast<size_t>(label));
-    }
-    return std::make_pair(std::move(means), std::move(normalized_labels));
-  } catch (const std::exception& e) {
-    return std::unexpected("DKM kmeans failed: " + std::string(e.what()));
-  }
+auto rgb_to_lab_color(uint8_t r, uint8_t g, uint8_t b, float l_bin_size, float ab_bin_size)
+    -> Types::LabColor {
+  return bin_lab_color(Utils::Image::rgb_to_lab_color(r, g, b), l_bin_size, ab_bin_size);
 }
 
 auto delta_e_76(const Types::ExtractedColor& lhs, const Types::ExtractedColor& rhs) -> float {
@@ -125,93 +77,46 @@ auto delta_e_76(const Types::ExtractedColor& lhs, const Types::ExtractedColor& r
   return std::sqrt(dl * dl + da * da + db * db);
 }
 
+// 从 BGRA 位图提取入库主色：聚类 → 合并相近色 → 按覆盖率筛选
 auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_data,
                                    const Types::MainColorExtractOptions& options)
     -> std::expected<std::vector<Types::ExtractedColor>, std::string> {
-  uint64_t total_pixels = static_cast<uint64_t>(bitmap_data.width) * bitmap_data.height;
-  if (total_pixels == 0) {
-    return std::unexpected("Image has no pixels");
-  }
-
-  uint32_t max_samples = options.max_samples;
-  uint64_t sample_step = std::max<uint64_t>(1, total_pixels / max_samples);
-  std::vector<std::array<float, 3>> points;
-  points.reserve(static_cast<size_t>(std::min<uint64_t>(total_pixels, max_samples)));
-
-  for (uint64_t index = 0; index < total_pixels; index += sample_step) {
-    uint32_t y = static_cast<uint32_t>(index / bitmap_data.width);
-    uint32_t x = static_cast<uint32_t>(index % bitmap_data.width);
-    uint64_t offset = static_cast<uint64_t>(y) * bitmap_data.stride + static_cast<uint64_t>(x) * 4;
-    if (offset + 3 >= bitmap_data.pixels.size()) {
-      continue;
-    }
-
-    uint8_t b = bitmap_data.pixels[offset + 0];
-    uint8_t g = bitmap_data.pixels[offset + 1];
-    uint8_t r = bitmap_data.pixels[offset + 2];
-    uint8_t a = bitmap_data.pixels[offset + 3];
-    if (a < 16) {
-      continue;
-    }
-
-    points.push_back({static_cast<float>(r), static_cast<float>(g), static_cast<float>(b)});
-  }
-
-  if (points.empty()) {
-    return std::unexpected("No valid pixels found for color extraction");
-  }
-
-  size_t cluster_count =
-      std::clamp(static_cast<size_t>(options.cluster_count), size_t{1}, points.size());
-  auto kmeans_result = run_kmeans(points, cluster_count);
-  if (!kmeans_result) {
-    return std::unexpected("Color clustering failed: " + kmeans_result.error());
-  }
-
-  auto [means, labels] = std::move(kmeans_result.value());
-  std::vector<size_t> cluster_counts(means.size(), 0);
-  for (auto label : labels) {
-    if (label < cluster_counts.size()) {
-      cluster_counts[label] += 1;
-    }
+  auto palette_result = Utils::Image::extract_lab_palette_from_bgra_rect(
+      bitmap_data, 0, 0, static_cast<int>(bitmap_data.width), static_cast<int>(bitmap_data.height),
+      Utils::Image::PaletteExtractOptions{
+          .max_samples = options.max_samples,
+          .cluster_count = options.cluster_count,
+      });
+  if (!palette_result) {
+    return std::unexpected("Color clustering failed: " + palette_result.error());
   }
 
   std::vector<Types::ExtractedColor> palette;
-  palette.reserve(means.size());
-  float total_weight = static_cast<float>(labels.size());
+  palette.reserve(palette_result->size());
 
-  for (size_t cluster = 0; cluster < means.size(); ++cluster) {
-    if (cluster_counts[cluster] == 0) {
-      continue;
-    }
-    uint8_t r = static_cast<uint8_t>(std::clamp(std::lround(means[cluster][0]), 0l, 255l));
-    uint8_t g = static_cast<uint8_t>(std::clamp(std::lround(means[cluster][1]), 0l, 255l));
-    uint8_t b = static_cast<uint8_t>(std::clamp(std::lround(means[cluster][2]), 0l, 255l));
-    auto lab = rgb_to_lab_color(r, g, b, options.l_bin_size, options.ab_bin_size);
+  // 将通用调色板转为 Gallery 入库结构，并量化 Lab bin 供按色筛选
+  for (const auto& color : palette_result.value()) {
+    auto lab = bin_lab_color(color.lab, options.l_bin_size, options.ab_bin_size);
 
     palette.push_back(Types::ExtractedColor{
-        .r = r,
-        .g = g,
-        .b = b,
+        .r = color.rgb.r,
+        .g = color.rgb.g,
+        .b = color.rgb.b,
         .lab_l = lab.l,
         .lab_a = lab.a,
         .lab_b = lab.b,
-        .weight = static_cast<float>(cluster_counts[cluster]) / total_weight,
+        .weight = color.weight,
         .l_bin = lab.l_bin,
         .a_bin = lab.a_bin,
         .b_bin = lab.b_bin,
     });
   }
 
-  std::ranges::sort(palette,
-                    [](const Types::ExtractedColor& lhs, const Types::ExtractedColor& rhs) {
-                      return lhs.weight > rhs.weight;
-                    });
-
   std::vector<Types::ExtractedColor> merged_palette;
   for (const auto& color : palette) {
     bool merged = false;
     for (auto& existing : merged_palette) {
+      // 感知距离足够近则合并，减少入库的近似重复色
       if (delta_e_76(existing, color) < options.merge_delta_e) {
         float new_weight = existing.weight + color.weight;
         if (new_weight > 0.0f) {
@@ -229,6 +134,7 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
           uint8_t mixed_b = static_cast<uint8_t>(std::clamp(
               std::lround(mixed_channel(existing.b, existing.weight, color.b, color.weight)), 0l,
               255l));
+          // Lab 从混合后的 RGB 重算，保证展示色与按色筛选坐标一致
           auto lab =
               rgb_to_lab_color(mixed_r, mixed_g, mixed_b, options.l_bin_size, options.ab_bin_size);
 
@@ -264,6 +170,7 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
   for (const auto& color : merged_palette) {
     merged_weight_sum += color.weight;
   }
+  // 合并后归一化权重，coverage 筛选基于 0-1 占比
   if (merged_weight_sum > 0.0f) {
     for (auto& color : merged_palette) {
       color.weight /= merged_weight_sum;
@@ -278,17 +185,20 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
     }
 
     bool require_for_minimum = selected_palette.size() < options.min_colors;
+    // 已满足最少色数后，跳过占比过低的次要色
     if (!require_for_minimum && color.weight < options.min_weight) {
       continue;
     }
 
     selected_palette.push_back(color);
     cumulative_weight += color.weight;
+    // 达到最少色数且累计覆盖率达标即可提前结束
     if (selected_palette.size() >= options.min_colors && cumulative_weight >= options.coverage) {
       break;
     }
   }
 
+  // 兜底：至少保留权重最高的一色，避免空结果
   if (selected_palette.empty() && !merged_palette.empty()) {
     selected_palette.push_back(merged_palette.front());
   }
@@ -306,6 +216,7 @@ auto extract_main_colors_from_bgra(const Utils::Image::BGRABitmapData& bitmap_da
   return selected_palette;
 }
 
+// 缩放解码后提取主色；无现成 bitmap 时按 sample_short_edge 加载
 auto extract_main_colors(Utils::Image::WICFactory& factory, const std::filesystem::path& path,
                          const Types::MainColorExtractOptions& options)
     -> std::expected<std::vector<Types::ExtractedColor>, std::string> {

@@ -44,6 +44,39 @@ export struct BGRABitmapData {
   std::vector<uint8_t> pixels;
 };
 
+export struct RgbColor {
+  std::uint8_t r = 0;
+  std::uint8_t g = 0;
+  std::uint8_t b = 0;
+};
+
+export struct LabColor {
+  float l = 0.0f;
+  float a = 0.0f;
+  float b = 0.0f;
+};
+
+export struct PaletteColor {
+  RgbColor rgb;
+  LabColor lab;
+  float weight = 0.0f;
+};
+
+export struct PaletteExtractOptions {
+  std::uint32_t max_samples = 8000;
+  std::uint32_t cluster_count = 8;
+  std::uint8_t min_alpha = 16;
+};
+
+// sRGB 转 CIE Lab，供按色筛选与 Lab 空间聚类共用
+export auto rgb_to_lab_color(std::uint8_t r, std::uint8_t g, std::uint8_t b) -> LabColor;
+
+// 从 BGRA 矩形区域提取 Lab 聚类调色板，结果按权重降序
+export auto extract_lab_palette_from_bgra_rect(const BGRABitmapData& bitmap_data, int x0, int y0,
+                                               int x1, int y1,
+                                               const PaletteExtractOptions& options = {})
+    -> std::expected<std::vector<PaletteColor>, std::string>;
+
 // 创建WIC工厂
 export auto create_factory() -> std::expected<WICFactory, std::string>;
 

@@ -1,7 +1,5 @@
 module;
 
-#include <dkm.hpp>
-
 module Features.Settings.Background;
 
 import std;
@@ -17,12 +15,6 @@ import Utils.Logger;
 import Utils.Path;
 
 namespace Features::Settings::Background {
-
-struct RgbColor {
-  std::uint8_t r = 0;
-  std::uint8_t g = 0;
-  std::uint8_t b = 0;
-};
 
 struct HslColor {
   double h = 0.0;
@@ -222,7 +214,7 @@ auto generate_background_filename(const std::filesystem::path& source_path) -> s
 }
 
 // 将 RGB 颜色转换为十六进制字符串格式
-auto rgb_to_hex(const RgbColor& color) -> std::string {
+auto rgb_to_hex(const Utils::Image::RgbColor& color) -> std::string {
   return std::format("#{:02X}{:02X}{:02X}", color.r, color.g, color.b);
 }
 
@@ -237,7 +229,7 @@ auto srgb_channel_to_linear(double channel) -> double {
 }
 
 // WCAG 2.x 相对亮度公式，系数来自 BT.709 标准（人眼对绿色最敏感）
-auto relative_luminance(const RgbColor& color) -> double {
+auto relative_luminance(const Utils::Image::RgbColor& color) -> double {
   double r = srgb_channel_to_linear(static_cast<double>(color.r));
   double g = srgb_channel_to_linear(static_cast<double>(color.g));
   double b = srgb_channel_to_linear(static_cast<double>(color.b));
@@ -245,7 +237,7 @@ auto relative_luminance(const RgbColor& color) -> double {
 }
 
 // 将 RGB 颜色转换为 HSL 颜色空间
-auto rgb_to_hsl(const RgbColor& color) -> HslColor {
+auto rgb_to_hsl(const Utils::Image::RgbColor& color) -> HslColor {
   double r = static_cast<double>(color.r) / 255.0;
   double g = static_cast<double>(color.g) / 255.0;
   double b = static_cast<double>(color.b) / 255.0;
@@ -283,7 +275,7 @@ auto rgb_to_hsl(const RgbColor& color) -> HslColor {
 }
 
 // 将 HSL 颜色转换回 RGB 颜色空间
-auto hsl_to_rgb(const HslColor& hsl) -> RgbColor {
+auto hsl_to_rgb(const HslColor& hsl) -> Utils::Image::RgbColor {
   double saturation = std::clamp(hsl.s, 0.0, 100.0) / 100.0;
   double lightness = std::clamp(hsl.l, 0.0, 100.0) / 100.0;
   double chroma = (1.0 - std::abs(2.0 * lightness - 1.0)) * saturation;
@@ -321,7 +313,7 @@ auto hsl_to_rgb(const HslColor& hsl) -> RgbColor {
     return static_cast<std::uint8_t>(std::clamp(rounded, 0l, 255l));
   };
 
-  return RgbColor{
+  return Utils::Image::RgbColor{
       .r = to_channel(r + m),
       .g = to_channel(g + m),
       .b = to_channel(b + m),
@@ -337,8 +329,8 @@ auto saturation_cap_for_lightness(double l) -> double {
 
 // 将输入颜色的亮度钳制到目标区间，饱和度由目标亮度决定上限（只降不升）。
 // 低饱和输入（S<12）视为灰色系，保持低饱和不推高色调。
-auto compensate_for_theme(const RgbColor& color, std::string_view theme_mode, bool primary)
-    -> RgbColor {
+auto compensate_for_theme(const Utils::Image::RgbColor& color, std::string_view theme_mode,
+                          bool primary) -> Utils::Image::RgbColor {
   auto hsl = rgb_to_hsl(color);
 
   double l_min, l_max;
@@ -398,99 +390,31 @@ auto load_wallpaper_bitmap(const std::filesystem::path& path)
   return bitmap_data_result.value();
 }
 
-// 从矩形区域内均匀采样像素点（RGB 三元组）。
-// pixel_step 由区域面积与最大采样数的比值开方得出，保证空间覆盖均匀且总量不超限。
-// alpha < 16 的近透明像素被跳过，避免影响颜色统计。
-auto collect_points_in_rect(const Utils::Image::BGRABitmapData& bitmap, int x0, int y0, int x1,
-                            int y1, std::uint32_t max_samples)
-    -> std::vector<std::array<float, 3>> {
-  std::vector<std::array<float, 3>> points;
-  if (x0 >= x1 || y0 >= y1) {
-    return points;
+// 在 Lab 感知空间聚类后取权重最高的颜色，作为背景区域主色。
+auto dominant_color_from_rect(const Utils::Image::BGRABitmapData& bitmap, int x0, int y0, int x1,
+                              int y1, std::uint32_t max_samples)
+    -> std::expected<Utils::Image::RgbColor, std::string> {
+  auto palette_result = Utils::Image::extract_lab_palette_from_bgra_rect(
+      bitmap, x0, y0, x1, y1,
+      Utils::Image::PaletteExtractOptions{
+          .max_samples = max_samples,
+          .cluster_count = static_cast<std::uint32_t>(kRegionClusterCount),
+      });
+  if (!palette_result) {
+    return std::unexpected(palette_result.error());
   }
 
-  std::uint64_t area = static_cast<std::uint64_t>(x1 - x0) * static_cast<std::uint64_t>(y1 - y0);
-  int pixel_step =
-      std::max(1, static_cast<int>(std::sqrt(static_cast<double>(area) / max_samples)));
-
-  points.reserve(static_cast<std::size_t>(std::min<std::uint64_t>(area, max_samples)));
-  for (int y = y0; y < y1; y += pixel_step) {
-    for (int x = x0; x < x1; x += pixel_step) {
-      std::uint64_t offset =
-          static_cast<std::uint64_t>(y) * bitmap.stride + static_cast<std::uint64_t>(x) * 4;
-      std::uint8_t b = bitmap.pixels[offset + 0];
-      std::uint8_t g = bitmap.pixels[offset + 1];
-      std::uint8_t r = bitmap.pixels[offset + 2];
-      std::uint8_t a = bitmap.pixels[offset + 3];
-      if (a < 16) continue;
-
-      points.push_back({static_cast<float>(r), static_cast<float>(g), static_cast<float>(b)});
-    }
-  }
-
-  return points;
-}
-
-// 从像素点集合计算平均颜色
-auto average_color_from_points(const std::vector<std::array<float, 3>>& points) -> RgbColor {
-  if (points.empty()) {
-    return RgbColor{};
-  }
-
-  double sum_r = 0.0;
-  double sum_g = 0.0;
-  double sum_b = 0.0;
-  for (const auto& point : points) {
-    sum_r += point[0];
-    sum_g += point[1];
-    sum_b += point[2];
-  }
-
-  auto to_channel = [count = static_cast<double>(points.size())](double value) -> std::uint8_t {
-    long rounded = std::lround(value / count);
-    return static_cast<std::uint8_t>(std::clamp(rounded, 0l, 255l));
-  };
-
-  return RgbColor{
-      .r = to_channel(sum_r),
-      .g = to_channel(sum_g),
-      .b = to_channel(sum_b),
-  };
-}
-
-// 使用 K-Means（Lloyd 算法）对像素点聚类，返回像素数最多的簇的中心色作为主色。
-// 当点集过少无法聚类，或 K-Means 抛出异常时，回退到简单算术平均色。
-auto dominant_color_from_points(const std::vector<std::array<float, 3>>& points)
-    -> std::expected<RgbColor, std::string> {
-  if (points.empty()) {
+  if (palette_result->empty()) {
     return std::unexpected("No valid pixels found in analysis region");
   }
 
-  std::size_t cluster_count = std::clamp(kRegionClusterCount, std::size_t{1}, points.size());
-  try {
-    auto [means, labels] = dkm::kmeans_lloyd(points, cluster_count);
-    std::vector<std::size_t> counts(means.size(), 0);
-    for (const auto& label : labels) {
-      counts[static_cast<std::size_t>(label)] += 1;
-    }
-
-    auto max_it = std::ranges::max_element(counts);
-    std::size_t dominant_index = static_cast<std::size_t>(std::distance(counts.begin(), max_it));
-    auto mean = means[dominant_index];
-
-    return RgbColor{
-        .r = static_cast<std::uint8_t>(std::clamp(std::lround(mean[0]), 0l, 255l)),
-        .g = static_cast<std::uint8_t>(std::clamp(std::lround(mean[1]), 0l, 255l)),
-        .b = static_cast<std::uint8_t>(std::clamp(std::lround(mean[2]), 0l, 255l)),
-    };
-  } catch (...) {
-    return average_color_from_points(points);
-  }
+  // 调色板已按权重降序，front 即该区域占比最大的主色
+  return palette_result->front().rgb;
 }
 
 // 在图像指定相对坐标位置采样区域主色
 auto sample_region_color(const Utils::Image::BGRABitmapData& bitmap, float x_ratio, float y_ratio)
-    -> std::expected<RgbColor, std::string> {
+    -> std::expected<Utils::Image::RgbColor, std::string> {
   int width = static_cast<int>(bitmap.width);
   int height = static_cast<int>(bitmap.height);
   if (width <= 0 || height <= 0) {
@@ -507,16 +431,14 @@ auto sample_region_color(const Utils::Image::BGRABitmapData& bitmap, float x_rat
   int x1 = std::clamp(x0 + region_width, 1, width);
   int y1 = std::clamp(y0 + region_height, 1, height);
 
-  auto points = collect_points_in_rect(bitmap, x0, y0, x1, y1, kMaxRegionSamples);
-  return dominant_color_from_points(points);
+  return dominant_color_from_rect(bitmap, x0, y0, x1, y1, kMaxRegionSamples);
 }
 
 // 估算全图主色
 auto estimate_primary_color(const Utils::Image::BGRABitmapData& bitmap)
-    -> std::expected<RgbColor, std::string> {
-  auto points = collect_points_in_rect(bitmap, 0, 0, static_cast<int>(bitmap.width),
-                                       static_cast<int>(bitmap.height), kMaxPrimarySamples);
-  return dominant_color_from_points(points);
+    -> std::expected<Utils::Image::RgbColor, std::string> {
+  return dominant_color_from_rect(bitmap, 0, 0, static_cast<int>(bitmap.width),
+                                  static_cast<int>(bitmap.height), kMaxPrimarySamples);
 }
 
 // 计算壁纸的平均相对亮度，以 alpha 通道作为加权系数，忽略完全透明像素。
@@ -539,7 +461,7 @@ auto compute_wallpaper_brightness(const Utils::Image::BGRABitmapData& bitmap) ->
     double alpha = static_cast<double>(bitmap.pixels[offset + 3]) / 255.0;
     if (alpha <= 0.0) continue;
 
-    RgbColor color{
+    Utils::Image::RgbColor color{
         .r = bitmap.pixels[offset + 2],
         .g = bitmap.pixels[offset + 1],
         .b = bitmap.pixels[offset + 0],

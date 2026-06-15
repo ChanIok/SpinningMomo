@@ -669,11 +669,15 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
       }
     }
 
-    auto color_result =
-        thumbnail_bitmap_data.has_value()
-            ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
-                  thumbnail_bitmap_data.value())
-            : Features::Gallery::Color::Extractor::extract_main_colors(wic_factory, file_path);
+    // 回退读文件时与缩略图短边对齐，避免二次解码分辨率不一致
+    const Features::Gallery::Color::Types::MainColorExtractOptions color_extract_options{
+        .sample_short_edge = options.thumbnail_short_edge.value_or(480),
+    };
+    auto color_result = thumbnail_bitmap_data.has_value()
+                            ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
+                                  thumbnail_bitmap_data.value(), color_extract_options)
+                            : Features::Gallery::Color::Extractor::extract_main_colors(
+                                  wic_factory, file_path, color_extract_options);
     if (color_result) {
       processed.colors = std::move(color_result.value());
     } else {
