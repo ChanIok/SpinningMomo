@@ -16,6 +16,7 @@ import Extensions.InfinityNikki.PhotoService;
 import Extensions.InfinityNikki.TaskService;
 import UI.FloatingWindow;
 import UI.FloatingWindow.State;
+import UI.PhotographyPanel;
 import UI.WebViewWindow;
 import Utils.Logger;
 
@@ -141,8 +142,9 @@ auto handle_settings_changed(Core::State::AppState& state,
       apply_runtime_logger_level_from_settings(state, event.data.new_settings);
     }
 
-    // 通知浮窗刷新UI以反映设置变更
+    // 原生浮层统一走同一轮刷新
     UI::FloatingWindow::refresh_from_settings(state);
+    UI::PhotographyPanel::refresh_from_settings(state);
 
     if (!event.data.old_settings.app.onboarding.completed &&
         event.data.new_settings.app.onboarding.completed) {

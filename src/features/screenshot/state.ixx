@@ -7,6 +7,7 @@ import Utils.Timeout;
 import Utils.Image;
 import Utils.Graphics.D3D;
 import Utils.Graphics.Capture;
+import Utils.Graphics.PhotoProcessing;
 import <d3d11.h>;
 import <windows.h>;
 
@@ -20,6 +21,7 @@ export struct ScreenshotRequest {
   float jpeg_quality = 1.0f;
   bool use_hdr = false;
   float hdr_target_peak_nits = 1000.0f;
+  int shutter_frames = 0;
   std::function<void(bool success, const std::wstring& path)> completion_callback;
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };
@@ -28,6 +30,7 @@ export struct ScreenshotRequest {
 export struct SessionInfo {
   Utils::Graphics::Capture::CaptureSession session;
   ScreenshotRequest request;
+  std::optional<Utils::Graphics::PhotoProcessing::AverageAccumulator> average_accumulator;
   std::chrono::steady_clock::time_point created_time = std::chrono::steady_clock::now();
 };
 
@@ -65,6 +68,10 @@ export struct ScreenshotState {
   // 清理活跃的捕获会话
   auto cleanup_active_sessions() -> void {
     for (auto& [session_id, session_info] : active_sessions) {
+      if (session_info.session.need_hide_cursor) {
+        ShowCursor(TRUE);
+      }
+
       Utils::Graphics::Capture::stop_capture(session_info.session);
       Utils::Graphics::Capture::cleanup_capture_session(session_info.session);
 

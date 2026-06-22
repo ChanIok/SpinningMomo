@@ -84,6 +84,10 @@ namespace UI::NotificationWindow::State {
 export struct NotificationWindowState;
 }
 
+namespace UI::PhotographyPanel::State {
+export struct PhotographyPanelState;
+}
+
 namespace Features::Letterbox::State {
 export struct LetterboxState;
 }
@@ -110,6 +114,10 @@ export struct ScreenshotState;
 
 namespace Features::Recording::State {
 export struct RecordingState;
+}
+
+namespace Features::Photography::State {
+export struct PhotographyState;
 }
 
 namespace Core::State {
@@ -146,6 +154,7 @@ export struct AppState {
   std::unique_ptr<UI::TrayIcon::State::TrayIconState> tray_icon;
   std::unique_ptr<UI::ContextMenu::State::ContextMenuState> context_menu;
   std::unique_ptr<UI::NotificationWindow::State::NotificationWindowState> notification_window;
+  std::unique_ptr<UI::PhotographyPanel::State::PhotographyPanelState> photography_panel;
 
   // 功能模块状态
   std::unique_ptr<Features::Letterbox::State::LetterboxState> letterbox;
@@ -155,6 +164,7 @@ export struct AppState {
   std::unique_ptr<Features::WindowControl::State::WindowControlState> window_control;
   std::unique_ptr<Features::Screenshot::State::ScreenshotState> screenshot;
   std::unique_ptr<Features::Recording::State::RecordingState> recording;
+  std::unique_ptr<Features::Photography::State::PhotographyState> photography;
 };
 
 }  // namespace Core::State

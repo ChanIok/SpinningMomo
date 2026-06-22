@@ -22,12 +22,14 @@ import Features.Preview.State;
 import Features.WindowControl.State;
 import Features.Screenshot.State;
 import Features.Recording.State;
+import Features.Photography.State;
 import Features.Settings.State;
 import Features.Update.State;
 import UI.SharedRenderResources.State;
 import UI.FloatingWindow.State;
 import UI.ContextMenu.State;
 import UI.NotificationWindow.State;
+import UI.PhotographyPanel.State;
 import UI.TrayIcon.State;
 
 namespace Core::State {
@@ -55,13 +57,15 @@ AppState::AppState()
       context_menu(std::make_unique<UI::ContextMenu::State::ContextMenuState>()),
       notification_window(
           std::make_unique<UI::NotificationWindow::State::NotificationWindowState>()),
+      photography_panel(std::make_unique<UI::PhotographyPanel::State::PhotographyPanelState>()),
       letterbox(std::make_unique<Features::Letterbox::State::LetterboxState>()),
       gallery(std::make_unique<Features::Gallery::State::GalleryState>()),
       overlay(std::make_unique<Features::Overlay::State::OverlayState>()),
       preview(std::make_unique<Features::Preview::State::PreviewState>()),
       window_control(std::make_unique<Features::WindowControl::State::WindowControlState>()),
       screenshot(std::make_unique<Features::Screenshot::State::ScreenshotState>()),
-      recording(std::make_unique<Features::Recording::State::RecordingState>()) {}
+      recording(std::make_unique<Features::Recording::State::RecordingState>()),
+      photography(std::make_unique<Features::Photography::State::PhotographyState>()) {}
 
 AppState::~AppState() = default;
 

@@ -13,7 +13,7 @@ import std;
 
 namespace EmbeddedLocales {
 // Embedded Chinese JSON content as string_view
-// Size: 3646 bytes
+// Size: 3870 bytes
 export constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -36,6 +36,7 @@ export constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "menu.output_open_folder": "输出目录",
   "menu.external_album_open_folder": "游戏相册",
   "menu.overlay_toggle": "叠加层",
+  "menu.photography_toggle": "高级摄影",
   "menu.preview_toggle": "预览窗",
   "menu.recording_toggle": "录制",
   "menu.letterbox_toggle": "黑边模式",
@@ -60,6 +61,7 @@ export constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.preview_overlay_conflict": "预览窗和叠加层功能冲突，已自动关闭另一功能",
   "message.preview_start_failed": "预览窗启动失败: ",
   "message.overlay_start_failed": "叠加层启动失败: ",
+  "message.photography_start_failed": "高级摄影启动失败: ",
   "message.recording_started": "录制已开始。",
   "message.recording_saved": "录制已保存：",
   "message.recording_start_failed": "录制启动失败: ",
@@ -69,6 +71,9 @@ export constexpr std::string_view zh_cn_json = R"EmbeddedJson({
   "message.recording_stop_failed": "录制停止失败: ",
 
   "notification.action.view": "查看",
+
+  "photography.long_exposure_off": "长曝光 关",
+  "photography.long_exposure_frames": "长曝光 {} 帧",
 
   "message.settings_hotkey_prompt": "请按下新的热键组合...\n支持 Ctrl、Shift、Alt 组合其他按键",
   "message.settings_hotkey_success": "热键已设置为：",

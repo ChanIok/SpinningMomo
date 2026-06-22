@@ -11,6 +11,8 @@ import Features.Screenshot.UseCase;
 import Features.Recording.UseCase;
 import Features.Letterbox.UseCase;
 import Features.Overlay.UseCase;
+import Features.Photography.UseCase;
+import Features.Photography.State;
 import Features.Preview.UseCase;
 import Features.Letterbox.State;
 import Features.Recording.State;
@@ -188,6 +190,20 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                                    return state.overlay && state.overlay->enabled;
                                  },
                              });
+
+  // 切换高级摄影
+  register_command(registry,
+                   {
+                       .id = "photography.toggle",
+                       .i18n_key = "menu.photography_toggle",
+                       .is_toggle = true,
+                       .action =
+                           [&state]() {
+                             Features::Photography::UseCase::toggle(state);
+                             UI::FloatingWindow::request_repaint(state);
+                           },
+                       .get_state = [&state]() -> bool { return state.photography->enabled; },
+                   });
 
   // 切换黑边模式
   register_command(registry, {

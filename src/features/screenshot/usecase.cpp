@@ -9,6 +9,7 @@ import Core.Notifications;
 import Core.Notifications.Types;
 import UI.FloatingWindow.Events;
 import Features.Screenshot;
+import Features.Photography.State;
 import Features.Settings.State;
 import Features.WindowControl;
 import Utils.Image;
@@ -68,8 +69,15 @@ auto capture(Core::State::AppState& state) -> void {
   }
   float jpeg_quality = 1.0f;
 
+  // 若高级摄影模式开启，将帧数传入截图管道以启用长曝光累积
+  int shutter_frames = 0;
+  if (state.photography->enabled.load(std::memory_order_acquire)) {
+    shutter_frames = std::max(0, state.photography->shutter_frames.load(std::memory_order_acquire));
+  }
+
   auto result = Features::Screenshot::take_screenshot(state, *target_window, completion_callback,
-                                                      image_format, jpeg_quality, std::nullopt);
+                                                      image_format, jpeg_quality, std::nullopt,
+                                                      shutter_frames);
   if (!result) {
     Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],

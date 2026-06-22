@@ -355,6 +355,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
         'recording.toggle',
         'preview.toggle',
         'overlay.toggle',
+        'photography.toggle',
         'window.reset',
         'app.main',
         'app.exit',

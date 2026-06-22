@@ -7,6 +7,7 @@ import UI.FloatingWindow.State;
 import UI.FloatingWindow.Types;
 import UI.SharedRenderResources;
 import UI.SharedRenderResources.State;
+import UI.SharedTheme;
 import Features.Settings.State;
 import <d2d1_3.h>;
 import <d3d11.h>;
@@ -24,29 +25,8 @@ constexpr DXGI_FORMAT kSurfaceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
 // 浮窗现在只保留自己的窗口级 surface；
 // D3D11 / D2D factory / DWrite factory 统一来自共享设备级状态。
 
-auto hex_with_alpha_to_color_f(const std::string& hex_color) -> D2D1_COLOR_F {
-  std::string color_str = hex_color;
-  if (color_str.starts_with("#")) {
-    color_str = color_str.substr(1);
-  }
-
-  float r = 0.0f;
-  float g = 0.0f;
-  float b = 0.0f;
-  float a = 1.0f;
-
-  if (color_str.length() == 8) {
-    r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
-    g = std::stoi(color_str.substr(2, 2), nullptr, 16) / 255.0f;
-    b = std::stoi(color_str.substr(4, 2), nullptr, 16) / 255.0f;
-    a = std::stoi(color_str.substr(6, 2), nullptr, 16) / 255.0f;
-  } else if (color_str.length() == 6) {
-    r = std::stoi(color_str.substr(0, 2), nullptr, 16) / 255.0f;
-    g = std::stoi(color_str.substr(2, 2), nullptr, 16) / 255.0f;
-    b = std::stoi(color_str.substr(4, 2), nullptr, 16) / 255.0f;
-  }
-
-  return D2D1::ColorF(r, g, b, a);
+auto recording_indicator_color() -> D2D1_COLOR_F {
+  return D2D1::ColorF(0.9294f, 0.2980f, 0.2980f, 1.0f);
 }
 
 auto shared_resources(Core::State::AppState& state)
@@ -54,26 +34,27 @@ auto shared_resources(Core::State::AppState& state)
   return *state.shared_render_resources;
 }
 
-auto create_brush_from_hex(ID2D1DeviceContext6* target, const std::string& hex_color,
-                           wil::com_ptr<ID2D1SolidColorBrush>& brush) -> bool {
-  return target && SUCCEEDED(target->CreateSolidColorBrush(hex_with_alpha_to_color_f(hex_color),
-                                                           brush.put()));
+auto create_brush_from_color(ID2D1DeviceContext6* target, const D2D1_COLOR_F& color,
+                             wil::com_ptr<ID2D1SolidColorBrush>& brush) -> bool {
+  return target && SUCCEEDED(target->CreateSolidColorBrush(color, brush.put()));
 }
 
+// 用共享 theme token 创建浮窗画刷，让其他窗口也能复用同一套颜色来源
 auto create_all_brushes_simple(Core::State::AppState& state,
                                UI::FloatingWindow::RenderResources& d2d) -> bool {
-  const auto& colors = state.settings->raw.ui.floating_window_colors;
+  const auto colors = UI::SharedTheme::resolve_floating_window_theme_colors(state);
 
-  return create_brush_from_hex(d2d.device_context.get(), colors.background, d2d.background_brush) &&
-         create_brush_from_hex(d2d.device_context.get(), colors.separator, d2d.separator_brush) &&
-         create_brush_from_hex(d2d.device_context.get(), colors.text, d2d.text_brush) &&
-         create_brush_from_hex(d2d.device_context.get(), colors.indicator, d2d.indicator_brush) &&
-         create_brush_from_hex(d2d.device_context.get(), kRecordingIndicatorColor,
-                               d2d.recording_indicator_brush) &&
-         create_brush_from_hex(d2d.device_context.get(), colors.title_bar, d2d.title_brush) &&
-         create_brush_from_hex(d2d.device_context.get(), colors.hover, d2d.hover_brush) &&
-         create_brush_from_hex(d2d.device_context.get(), colors.scroll_indicator,
-                               d2d.scroll_indicator_brush);
+  return create_brush_from_color(d2d.device_context.get(), colors.background,
+                                 d2d.background_brush) &&
+         create_brush_from_color(d2d.device_context.get(), colors.separator, d2d.separator_brush) &&
+         create_brush_from_color(d2d.device_context.get(), colors.text, d2d.text_brush) &&
+         create_brush_from_color(d2d.device_context.get(), colors.indicator, d2d.indicator_brush) &&
+         create_brush_from_color(d2d.device_context.get(), recording_indicator_color(),
+                                 d2d.recording_indicator_brush) &&
+         create_brush_from_color(d2d.device_context.get(), colors.title_bar, d2d.title_brush) &&
+         create_brush_from_color(d2d.device_context.get(), colors.hover, d2d.hover_brush) &&
+         create_brush_from_color(d2d.device_context.get(), colors.scroll_indicator,
+                                 d2d.scroll_indicator_brush);
 }
 
 auto clear_text_caches(UI::FloatingWindow::RenderResources& d2d) -> void {
@@ -237,33 +218,34 @@ auto measure_text_width(const std::wstring& text, IDWriteTextFormat* text_format
   return SUCCEEDED(text_layout->GetMetrics(&metrics)) ? metrics.width : 0.0f;
 }
 
+// 设置换肤时原地更新浮窗画刷，避免重建设备资源导致闪烁或状态抖动
 auto update_all_brush_colors(Core::State::AppState& state) -> void {
-  const auto& colors = state.settings->raw.ui.floating_window_colors;
+  const auto colors = UI::SharedTheme::resolve_floating_window_theme_colors(state);
   auto& d2d = state.floating_window->render_resources;
 
   if (d2d.background_brush) {
-    d2d.background_brush->SetColor(hex_with_alpha_to_color_f(colors.background));
+    d2d.background_brush->SetColor(colors.background);
   }
   if (d2d.title_brush) {
-    d2d.title_brush->SetColor(hex_with_alpha_to_color_f(colors.title_bar));
+    d2d.title_brush->SetColor(colors.title_bar);
   }
   if (d2d.separator_brush) {
-    d2d.separator_brush->SetColor(hex_with_alpha_to_color_f(colors.separator));
+    d2d.separator_brush->SetColor(colors.separator);
   }
   if (d2d.text_brush) {
-    d2d.text_brush->SetColor(hex_with_alpha_to_color_f(colors.text));
+    d2d.text_brush->SetColor(colors.text);
   }
   if (d2d.indicator_brush) {
-    d2d.indicator_brush->SetColor(hex_with_alpha_to_color_f(colors.indicator));
+    d2d.indicator_brush->SetColor(colors.indicator);
   }
   if (d2d.recording_indicator_brush) {
-    d2d.recording_indicator_brush->SetColor(hex_with_alpha_to_color_f(kRecordingIndicatorColor));
+    d2d.recording_indicator_brush->SetColor(recording_indicator_color());
   }
   if (d2d.hover_brush) {
-    d2d.hover_brush->SetColor(hex_with_alpha_to_color_f(colors.hover));
+    d2d.hover_brush->SetColor(colors.hover);
   }
   if (d2d.scroll_indicator_brush) {
-    d2d.scroll_indicator_brush->SetColor(hex_with_alpha_to_color_f(colors.scroll_indicator));
+    d2d.scroll_indicator_brush->SetColor(colors.scroll_indicator);
   }
 }
 

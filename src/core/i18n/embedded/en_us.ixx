@@ -13,7 +13,7 @@ import std;
 
 namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 3822 bytes
+// Size: 4077 bytes
 export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -36,6 +36,7 @@ export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "menu.output_open_folder": "Output Folder",
   "menu.external_album_open_folder": "Game Album",
   "menu.overlay_toggle": "Overlay",
+  "menu.photography_toggle": "Advanced Photography",
   "menu.preview_toggle": "Preview",
   "menu.recording_toggle": "Record",
   "menu.letterbox_toggle": "Letterbox",
@@ -60,6 +61,7 @@ export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.preview_overlay_conflict": "Preview Window and Overlay Window cannot be used simultaneously, and one of the functions has been automatically disabled.",
   "message.preview_start_failed": "Failed to start preview window: ",
   "message.overlay_start_failed": "Failed to start overlay window: ",
+  "message.photography_start_failed": "Failed to start advanced photography: ",
   "message.recording_started": "Recording started.",
   "message.recording_saved": "Recording saved: ",
   "message.recording_start_failed": "Failed to start recording: ",
@@ -69,6 +71,9 @@ export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.recording_stop_failed": "Failed to stop recording: ",
 
   "notification.action.view": "View",
+
+  "photography.long_exposure_off": "Long Exposure Off",
+  "photography.long_exposure_frames": "Long Exposure {} Frames",
 
   "message.settings_hotkey_prompt": "Please press new hotkey combination...\nSupports Ctrl, Shift, Alt with other keys",
   "message.settings_hotkey_success": "Hotkey set to: ",

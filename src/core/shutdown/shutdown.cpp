@@ -14,6 +14,7 @@ import Core.Database;
 import Core.State;
 import Features.Letterbox;
 import Features.Overlay;
+import Features.Photography.UseCase;
 import Features.Preview;
 import Features.Screenshot;
 import Features.WindowControl;
@@ -26,6 +27,7 @@ import UI.FloatingWindow;
 import UI.FloatingWindow.State;
 import UI.ContextMenu;
 import UI.NotificationWindow;
+import UI.PhotographyPanel;
 import UI.TrayIcon;
 import UI.WebViewWindow;
 import Utils.Logger;
@@ -60,6 +62,7 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   UI::ContextMenu::cleanup(state);
   UI::TrayIcon::destroy(state);
   UI::NotificationWindow::cleanup(state);
+  UI::PhotographyPanel::cleanup(state);
   UI::FloatingWindow::destroy_window(state);
   UI::WebViewWindow::cleanup(state);
 
@@ -71,6 +74,8 @@ auto shutdown_application(Core::State::AppState& state) -> void {
   }
   Features::Preview::stop_preview(state);
   Features::Preview::cleanup_preview(state);
+  Features::Photography::UseCase::stop(state);
+  Features::Photography::UseCase::cleanup(state);
   Features::Overlay::stop_overlay(state);
   Features::Overlay::cleanup_overlay(state);
   if (auto result = Features::Letterbox::shutdown(state); !result) {

@@ -5,11 +5,11 @@ module UI.NotificationWindow.Painter;
 import std;
 import Core.State;
 import Core.Notifications.Types;
-import Features.Settings.State;
 import UI.NotificationWindow.RenderContext;
 import UI.NotificationWindow.State;
 import UI.NotificationWindow.Types;
 import UI.SharedRenderResources.State;
+import UI.SharedTheme;
 import UI.FloatingWindow.State;
 import Utils.Logger;
 import Utils.System;
@@ -73,59 +73,15 @@ auto resolve_visual_style(int dpi) -> NotificationVisualStyle {
   };
 }
 
-auto hex_char_to_int(char c) -> int {
-  if (c >= '0' && c <= '9') return c - '0';
-  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-  return -1;
-}
-
-auto parse_hex_color(std::string_view hex_color, D2D1_COLOR_F fallback) -> D2D1_COLOR_F {
-  if (hex_color.empty()) return fallback;
-  if (hex_color.starts_with('#')) {
-    hex_color.remove_prefix(1);
-  }
-  if (hex_color.size() < 6) return fallback;
-
-  const int r_hi = hex_char_to_int(hex_color[0]);
-  const int r_lo = hex_char_to_int(hex_color[1]);
-  const int g_hi = hex_char_to_int(hex_color[2]);
-  const int g_lo = hex_char_to_int(hex_color[3]);
-  const int b_hi = hex_char_to_int(hex_color[4]);
-  const int b_lo = hex_char_to_int(hex_color[5]);
-  if (r_hi < 0 || r_lo < 0 || g_hi < 0 || g_lo < 0 || b_hi < 0 || b_lo < 0) {
-    return fallback;
-  }
-
-  float alpha = fallback.a;
-  if (hex_color.size() >= 8) {
-    const int a_hi = hex_char_to_int(hex_color[6]);
-    const int a_lo = hex_char_to_int(hex_color[7]);
-    if (a_hi >= 0 && a_lo >= 0) {
-      alpha = static_cast<float>((a_hi << 4) | a_lo) / 255.0f;
-    }
-  } else {
-    alpha = 1.0f;
-  }
-
-  return D2D1::ColorF(static_cast<float>((r_hi << 4) | r_lo) / 255.0f,
-                      static_cast<float>((g_hi << 4) | g_lo) / 255.0f,
-                      static_cast<float>((b_hi << 4) | b_lo) / 255.0f, alpha);
-}
-
+// 通知只复用浮窗的基础配色，不复用布局和边框策略，避免把两种窗口结构绑死
 auto resolve_notification_theme_colors(const Core::State::AppState& state)
     -> NotificationWindow::NotificationThemeColors {
-  NotificationWindow::NotificationThemeColors colors{
-      .background = D2D1::ColorF(0.12f, 0.12f, 0.12f, 0.82f),
-      .text = D2D1::ColorF(0.85f, 0.85f, 0.85f, 1.0f),
-      .hover = D2D1::ColorF(0.31f, 0.31f, 0.31f, 0.80f),
+  const auto colors = UI::SharedTheme::resolve_floating_window_theme_colors(state);
+  return NotificationWindow::NotificationThemeColors{
+      .background = colors.background,
+      .text = colors.text,
+      .hover = colors.hover,
   };
-
-  const auto& settings_colors = state.settings->raw.ui.floating_window_colors;
-  colors.background = parse_hex_color(settings_colors.background, colors.background);
-  colors.text = parse_hex_color(settings_colors.text, colors.text);
-  colors.hover = parse_hex_color(settings_colors.hover, colors.hover);
-  return colors;
 }
 
 auto get_current_dpi(const Core::State::AppState& state) -> int {
