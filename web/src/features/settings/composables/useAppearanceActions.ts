@@ -196,6 +196,19 @@ export const useAppearanceActions = () => {
     })
   }
 
+  const updateMenuBlur = async (menuBlur: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      ui: {
+        ...appSettings.value.ui,
+        webTheme: {
+          ...appSettings.value.ui.webTheme,
+          menuBlur,
+        },
+      },
+    })
+  }
+
   const applyWallpaperAnalysis = async (imageFileName: string, persistImage = false) => {
     const currentBackground = appSettings.value.ui.background
     const overlayMode = getOverlayPaletteFromBackground(currentBackground).mode
@@ -276,6 +289,7 @@ export const useAppearanceActions = () => {
     applyOverlayPalettePreset,
     updateWebViewTransparentBackground,
     updateCustomCss,
+    updateMenuBlur,
     updateSurfaceOpacity,
     handleBackgroundImageSelect,
     handleBackgroundImageRemove,

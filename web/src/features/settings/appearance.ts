@@ -32,6 +32,10 @@ const applyTheme = (mode: WebThemeMode): void => {
   }
 }
 
+const applyMenuBlur = (enabled: boolean): void => {
+  document.documentElement.toggleAttribute('data-menu-blur', enabled)
+}
+
 const applyCustomUserCss = (cssText: string): void => {
   if (typeof document === 'undefined') return
 
@@ -184,6 +188,7 @@ export const applyAppearanceToDocument = (settings: AppSettings): void => {
   if (typeof document === 'undefined') return
 
   applyTheme(settings.ui.webTheme.mode)
+  applyMenuBlur(settings.ui.webTheme.menuBlur !== false)
   applyBackground(settings)
   applyCustomUserCss(settings.ui.webTheme.customCss ?? '')
 }

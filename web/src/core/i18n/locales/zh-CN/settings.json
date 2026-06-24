@@ -65,6 +65,8 @@
   "settings.appearance.theme.dark": "深色",
   "settings.appearance.theme.description": "Web 界面高级自定义选项。",
   "settings.appearance.theme.light": "浅色",
+  "settings.appearance.theme.menuBlur.description": "为弹出菜单和面板启用毛玻璃模糊效果。",
+  "settings.appearance.theme.menuBlur.label": "弹出层毛玻璃",
   "settings.appearance.theme.mode.description": "控制文字和界面元素的明暗配色，不影响背景叠加色。",
   "settings.appearance.theme.mode.label": "UI 配色模式",
   "settings.appearance.theme.primaryColor.description": "用于按钮、选中态和焦点高亮颜色。",

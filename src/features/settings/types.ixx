@@ -16,6 +16,7 @@ export constexpr int CURRENT_ONBOARDING_FLOW_VERSION = 1;
 export struct WebThemeSettings {
   std::string mode = "light";  // "light" | "dark"（历史配置可能仍为 system，前端按亮色解析）
   std::string custom_css = "";
+  bool menu_blur = false;  // 弹出菜单和面板毛玻璃模糊效果
 };
 
 // Web 背景设置

@@ -82,12 +82,14 @@
     var(--surface-top) calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
     transparent
   );
+  --popover-glass: rgb(255 255 255 / 0.86);
+  --popover-glass-blur: 16px;
   /* Light Modern */
   --background: #ffffff;
   --foreground: #1b1b1b;
   --card: var(--surface-middle-mixed);
   --card-foreground: #3b3b3b;
-  --popover: var(--surface-top-mixed);
+  --popover: #ffffff;
   --popover-foreground: #3b3b3b;
   --primary: #f59e0b;
   --primary-foreground: #ffffff;
@@ -136,6 +138,7 @@
     var(--surface-top) calc(var(--surface-opacity, 1) * var(--surface-opacity-scale, 1) * 100%),
     transparent
   );
+  --popover-glass: rgb(32 32 32 / 0.8);
   --background: var(--surface-bottom);
   --foreground: #ececec;
   --card: var(--surface-middle-mixed);
@@ -195,6 +198,16 @@
 
 .surface-top {
   --surface-layer-color: var(--surface-top);
+}
+
+.menu-blur-surface {
+  background-color: var(--popover);
+}
+
+:root[data-menu-blur] .menu-blur-surface {
+  background-color: var(--popover-glass);
+  -webkit-backdrop-filter: blur(var(--popover-glass-blur));
+  backdrop-filter: blur(var(--popover-glass-blur));
 }
 
 .app-background-image {

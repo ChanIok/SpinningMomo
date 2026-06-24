@@ -65,6 +65,8 @@
   "settings.appearance.theme.dark": "Dark",
   "settings.appearance.theme.description": "Advanced customization options for the web interface.",
   "settings.appearance.theme.light": "Light",
+  "settings.appearance.theme.menuBlur.description": "Enable frosted glass blur for pop-up menus and panels.",
+  "settings.appearance.theme.menuBlur.label": "Pop-up Glass Effect",
   "settings.appearance.theme.mode.description": "Controls text and UI element color scheme - does not affect background overlay colors.",
   "settings.appearance.theme.mode.label": "UI Color Mode",
   "settings.appearance.theme.primaryColor.description": "Used for buttons, selected states, and focus highlights.",

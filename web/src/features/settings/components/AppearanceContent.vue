@@ -52,6 +52,7 @@ const {
   applyOverlayPalettePreset,
   updateWebViewTransparentBackground,
   updateCustomCss,
+  updateMenuBlur,
   updateSurfaceOpacity,
   handleBackgroundImageSelect,
   handleBackgroundImageRemove,
@@ -180,6 +181,14 @@ const handleWebViewTransparentBackgroundChange = async (enabled: boolean) => {
     await updateWebViewTransparentBackground(enabled)
   } catch (error) {
     console.error('Failed to update WebView transparent background setting:', error)
+  }
+}
+
+const handleMenuBlurChange = async (enabled: boolean) => {
+  try {
+    await updateMenuBlur(enabled)
+  } catch (error) {
+    console.error('Failed to update menu blur setting:', error)
   }
 }
 
@@ -470,6 +479,23 @@ const handleClearError = () => {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.appearance.theme.menuBlur.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.appearance.theme.menuBlur.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Switch
+              :model-value="appSettings.ui.webTheme.menuBlur !== false"
+              @update:model-value="(value) => handleMenuBlurChange(Boolean(value))"
+            />
           </ItemActions>
         </Item>
 

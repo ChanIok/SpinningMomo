@@ -68,6 +68,7 @@ export interface WebBackgroundSettings {
 export interface WebThemeSettings {
   mode: WebThemeMode
   customCss: string
+  menuBlur: boolean
 }
 
 // 深色主题颜色配置
@@ -394,6 +395,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
     webTheme: {
       mode: 'light',
       customCss: '',
+      menuBlur: false,
     },
     background: {
       type: 'none',
