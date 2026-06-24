@@ -102,6 +102,7 @@ function main() {
   console.log("- Review the diff and commit it");
   console.log(`- Create tag: git tag ${tagName}`);
   console.log(`- Push branch and tag: git push origin HEAD ${tagName}`);
+  console.log(`- Manually run the Build Release workflow from tag: ${tagName}`);
 }
 
 try {
