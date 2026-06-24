@@ -6,8 +6,6 @@ import std;
 import Core.Events;
 import Core.State;
 import Core.I18n.State;
-import Core.Notifications;
-import Core.Notifications.Types;
 import Features.Recording;
 import Features.Recording.Session;
 import Features.Recording.Types;
@@ -20,86 +18,9 @@ import Utils.Logger;
 import Utils.Media.AudioCapture;
 import Utils.Path;
 import Utils.String;
-import Utils.System;
 import <windows.h>;
 
 namespace Features::Recording::UseCase {
-
-auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
-  // 纯文字通知，例如"录制已开始"、"窗口未找到"等简单消息
-  Core::Notifications::Types::NotificationOptions options;
-  options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
-  options.message = Utils::String::FromUtf8(message);
-  Core::Notifications::post_notification_request(state, std::move(options));
-}
-
-auto show_recording_stopping_notification(Core::State::AppState& state) -> void {
-  Core::Notifications::Types::NotificationOptions options;
-  options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
-  options.message = Utils::String::FromUtf8(state.i18n->texts["message.recording_stopping"]);
-  options.duration = std::chrono::milliseconds(1500);
-  Core::Notifications::post_notification_request(state, std::move(options));
-}
-
-auto show_recording_saved_notification(Core::State::AppState& state,
-                                       const std::filesystem::path& saved_path) -> void {
-  // 保存成功的通知，多一个"查看"按钮，点击就用系统默认应用打开文件
-  Core::Notifications::Types::NotificationOptions options;
-  options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
-  options.message =
-      Utils::String::FromUtf8(state.i18n->texts["message.recording_saved"]) + saved_path.wstring();
-
-  Core::Notifications::Types::NotificationAction view_action;
-  view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
-  view_action.callback = [saved_path](Core::State::AppState&) {
-    auto open_result = Utils::System::open_file_with_default_app(saved_path);
-    if (!open_result) {
-      Logger().warn("Failed to open recording: {}", open_result.error());
-    }
-  };
-  options.action = std::move(view_action);
-
-  Core::Notifications::post_notification_request(state, std::move(options));
-}
-
-auto show_recording_stop_result_notification(
-    Core::State::AppState& state, const Features::Recording::Types::StopResult& stop_result)
-    -> void {
-  // 根据 stop() 的三种结果分别显示不同通知
-  using Features::Recording::Types::StopResultKind;
-
-  switch (stop_result.kind) {
-    case StopResultKind::Saved:
-      // 录制成功保存，附带"查看文件"按钮
-      show_recording_saved_notification(state, stop_result.output_path);
-      return;
-
-    case StopResultKind::Discarded:
-      // 视频太短或编码失败，已丢弃不保存
-      {
-        auto detail = stop_result.error.empty()
-                          ? Utils::String::ToUtf8(stop_result.output_path.wstring())
-                          : stop_result.error;
-        show_recording_notification(state, state.i18n->texts["message.recording_failed"] + detail);
-        return;
-      }
-
-    case StopResultKind::PublishFailed:
-      // 编码成功了但临时文件改名为 .mp4 时失败
-      {
-        auto detail = stop_result.error.empty()
-                          ? Utils::String::ToUtf8(stop_result.output_path.wstring())
-                          : stop_result.error;
-        show_recording_notification(state,
-                                    state.i18n->texts["message.recording_stop_failed"] + detail);
-        return;
-      }
-
-    case StopResultKind::NotRecording:
-    default:
-      return;
-  }
-}
 
 // 录制开关：正在录就停止，空闲就启动。启动前校验窗口、配置、HDR 条件
 auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::string> {
@@ -129,7 +50,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
 
   // 正在停止时不再重复发 stop，请直接告知用户当前仍在封装
   if (status == Features::Recording::Types::RecordingStatus::Stopping) {
-    show_recording_stopping_notification(state);
+    Features::Recording::notify_stopping(state);
     return {};
   }
 
@@ -144,7 +65,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
   auto target = Features::WindowControl::find_target_window(window_title);
   if (!target) {
-    show_recording_notification(state, state.i18n->texts["message.window_not_found"]);
+    Features::Recording::notify_message(state, state.i18n->texts["message.window_not_found"]);
     return std::unexpected("Target window not found");
   }
 
@@ -152,7 +73,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   auto output_dir_result =
       Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
   if (!output_dir_result) {
-    show_recording_notification(
+    Features::Recording::notify_message(
         state, state.i18n->texts["message.recording_start_failed"] + output_dir_result.error());
     return std::unexpected("Failed to get output directory: " + output_dir_result.error());
   }
@@ -198,14 +119,14 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   if (config.enable_hdr) {
     if (config.codec != Features::Recording::Types::VideoCodec::H265) {
       std::string error = "HDR recording requires H.265 codec";
-      show_recording_notification(state,
-                                  state.i18n->texts["message.recording_start_failed"] + error);
+      Features::Recording::notify_message(
+          state, state.i18n->texts["message.recording_start_failed"] + error);
       return std::unexpected(error);
     }
     if (config.encoder_mode == Features::Recording::Types::EncoderMode::CPU) {
       std::string error = "HDR recording requires GPU encoder";
-      show_recording_notification(state,
-                                  state.i18n->texts["message.recording_start_failed"] + error);
+      Features::Recording::notify_message(
+          state, state.i18n->texts["message.recording_start_failed"] + error);
       return std::unexpected(error);
     }
   }
@@ -218,13 +139,13 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
   // 提交给录制模块执行真正的 start
   auto result = Features::Recording::start(state, *target, config);
   if (!result) {
-    show_recording_notification(
+    Features::Recording::notify_message(
         state, state.i18n->texts["message.recording_start_failed"] + result.error());
     return result;
   }
 
   // 启动成功：发通知 + 更新 UI
-  show_recording_notification(state, state.i18n->texts["message.recording_started"]);
+  Features::Recording::notify_message(state, state.i18n->texts["message.recording_started"]);
   Core::Events::post(state, UI::FloatingWindow::Events::RecordingToggleEvent{.enabled = true});
   return {};
 }

@@ -123,6 +123,8 @@ export struct AppSettings {
   struct Features {
     std::string output_dir_path = "";      // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
     std::string external_album_path = "";  // 外部游戏相册目录路径（为空时回退到输出目录）
+    std::string saved_file_view_action =
+        "default_app";  // 保存成功通知点击“查看”后的行为: "default_app" | "reveal_in_explorer"
 
     struct Screenshot {
       std::string file_format = "png";  // 静态截图保存格式: "png" | "jpeg"

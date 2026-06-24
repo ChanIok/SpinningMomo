@@ -90,6 +90,18 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateSavedFileViewAction = async (
+    savedFileViewAction: 'default_app' | 'reveal_in_explorer'
+  ) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        savedFileViewAction,
+      },
+    })
+  }
+
   const updateScreenshotFileFormat = async (fileFormat: 'png' | 'jpeg') => {
     await store.updateSettings({
       ...appSettings.value,
@@ -326,6 +338,7 @@ export const useFunctionActions = () => {
         ...appSettings.value.features,
         outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
         externalAlbumPath: DEFAULT_APP_SETTINGS.features.externalAlbumPath,
+        savedFileViewAction: DEFAULT_APP_SETTINGS.features.savedFileViewAction,
         screenshot: {
           ...appSettings.value.features.screenshot,
           fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
@@ -362,6 +375,7 @@ export const useFunctionActions = () => {
         ...appSettings.value.features,
         outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
         externalAlbumPath: DEFAULT_APP_SETTINGS.features.externalAlbumPath,
+        savedFileViewAction: DEFAULT_APP_SETTINGS.features.savedFileViewAction,
         screenshot: {
           ...appSettings.value.features.screenshot,
           fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
@@ -414,6 +428,7 @@ export const useFunctionActions = () => {
     updateWindowResetResolution,
     updateOutputDir,
     updateGameAlbumPath,
+    updateSavedFileViewAction,
     updateScreenshotFileFormat,
     updateScreenshotHdrEnabled,
     resetFunctionSettings,

@@ -19,6 +19,18 @@ import Utils.System;
 
 namespace Features::Screenshot::UseCase {
 
+auto handle_saved_file_view_action(Core::State::AppState& state, const std::filesystem::path& path,
+                                   std::string_view file_kind) -> void {
+  const auto& action = state.settings->raw.features.saved_file_view_action;
+  auto action_result = action == "reveal_in_explorer"
+                           ? Utils::System::reveal_file_in_explorer(path)
+                           : Utils::System::open_file_with_default_app(path);
+  if (!action_result) {
+    Logger().warn("Failed to handle {} view action '{}': {}", file_kind, action,
+                  action_result.error());
+  }
+}
+
 // 截图
 auto capture(Core::State::AppState& state) -> void {
   std::wstring window_title = Utils::String::FromUtf8(state.settings->raw.window.target_title);
@@ -42,11 +54,8 @@ auto capture(Core::State::AppState& state) -> void {
 
       Core::Notifications::Types::NotificationAction view_action;
       view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
-      view_action.callback = [screenshot_path](Core::State::AppState&) {
-        auto open_result = Utils::System::open_file_with_default_app(screenshot_path);
-        if (!open_result) {
-          Logger().warn("Failed to open screenshot: {}", open_result.error());
-        }
+      view_action.callback = [screenshot_path](Core::State::AppState& app_state) {
+        handle_saved_file_view_action(app_state, screenshot_path, "screenshot");
       };
       options.action = std::move(view_action);
 

@@ -27,6 +27,12 @@ export auto enter_stopping(Core::State::AppState& app_state) -> bool;
 // 等待录制控制线程退出，用于应用关闭阶段完成录制收尾。
 export auto join_control_thread(Core::State::AppState& app_state) -> void;
 
+// 发送一条录制相关的纯文字通知，例如“录制已开始”或启动前校验失败。
+export auto notify_message(Core::State::AppState& app_state, const std::string& message) -> void;
+
+// 当录制正在停止并封装输出文件时，提示用户当前仍在收尾阶段。
+export auto notify_stopping(Core::State::AppState& app_state) -> void;
+
 // 开始一个新的录制段，负责准备资源、启动编码线程、启动 WGC 和音频采集。
 export auto start(Core::State::AppState& app_state, HWND target_window,
                   const Features::Recording::Types::RecordingConfig& config)

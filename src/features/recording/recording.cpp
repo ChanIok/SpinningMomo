@@ -11,6 +11,7 @@ import Core.State;
 import Features.Recording.EncoderLoop;
 import Features.Recording.Session;
 import Features.Recording.State;
+import Features.Settings.State;
 import Features.Recording.Time;
 import Features.Recording.Types;
 import UI.FloatingWindow;
@@ -31,10 +32,30 @@ namespace Features::Recording {
 // 编码线程按固定 fps 消费捕获（每次最多取一帧 Copy 到自有纹理），是唯一写 SinkWriter 的地方；
 // 控制线程负责把 start / stop / resize restart 串起来，避免多个重操作互相打架。
 
-auto show_recording_notification(Core::State::AppState& state, const std::string& message) -> void {
+auto handle_saved_file_view_action(Core::State::AppState& state, const std::filesystem::path& path,
+                                   std::string_view file_kind) -> void {
+  const auto& action = state.settings->raw.features.saved_file_view_action;
+  auto action_result = action == "reveal_in_explorer"
+                           ? Utils::System::reveal_file_in_explorer(path)
+                           : Utils::System::open_file_with_default_app(path);
+  if (!action_result) {
+    Logger().warn("Failed to handle {} view action '{}': {}", file_kind, action,
+                  action_result.error());
+  }
+}
+
+auto notify_message(Core::State::AppState& state, const std::string& message) -> void {
   Core::Notifications::Types::NotificationOptions options;
   options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
   options.message = Utils::String::FromUtf8(message);
+  Core::Notifications::post_notification_request(state, std::move(options));
+}
+
+auto notify_stopping(Core::State::AppState& state) -> void {
+  Core::Notifications::Types::NotificationOptions options;
+  options.title = Utils::String::FromUtf8(state.i18n->texts["label.app_name"]);
+  options.message = Utils::String::FromUtf8(state.i18n->texts["message.recording_stopping"]);
+  options.duration = std::chrono::milliseconds(1500);
   Core::Notifications::post_notification_request(state, std::move(options));
 }
 
@@ -47,11 +68,8 @@ auto show_recording_saved_notification(Core::State::AppState& state,
 
   Core::Notifications::Types::NotificationAction view_action;
   view_action.label = Utils::String::FromUtf8(state.i18n->texts["notification.action.view"]);
-  view_action.callback = [saved_path](Core::State::AppState&) {
-    auto open_result = Utils::System::open_file_with_default_app(saved_path);
-    if (!open_result) {
-      Logger().warn("Failed to open recording: {}", open_result.error());
-    }
+  view_action.callback = [saved_path](Core::State::AppState& app_state) {
+    handle_saved_file_view_action(app_state, saved_path, "recording");
   };
   options.action = std::move(view_action);
 
@@ -72,7 +90,7 @@ auto show_recording_stop_result_notification(
       auto detail = stop_result.error.empty()
                         ? Utils::String::ToUtf8(stop_result.output_path.wstring())
                         : stop_result.error;
-      show_recording_notification(state, state.i18n->texts["message.recording_failed"] + detail);
+      notify_message(state, state.i18n->texts["message.recording_failed"] + detail);
       return;
     }
 
@@ -80,8 +98,7 @@ auto show_recording_stop_result_notification(
       auto detail = stop_result.error.empty()
                         ? Utils::String::ToUtf8(stop_result.output_path.wstring())
                         : stop_result.error;
-      show_recording_notification(state,
-                                  state.i18n->texts["message.recording_stop_failed"] + detail);
+      notify_message(state, state.i18n->texts["message.recording_stop_failed"] + detail);
       return;
     }
 

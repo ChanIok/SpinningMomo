@@ -167,6 +167,7 @@ export interface AppSettings {
   features: {
     outputDirPath: string // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
     externalAlbumPath: string // 外部游戏相册目录路径（为空时回退到输出目录）
+    savedFileViewAction: 'default_app' | 'reveal_in_explorer' // 保存成功通知点击“查看”后的行为
 
     screenshot: {
       fileFormat: 'png' | 'jpeg'
@@ -302,6 +303,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   features: {
     outputDirPath: '',
     externalAlbumPath: '',
+    savedFileViewAction: 'default_app',
     screenshot: {
       fileFormat: 'png',
       enableHdr: false,

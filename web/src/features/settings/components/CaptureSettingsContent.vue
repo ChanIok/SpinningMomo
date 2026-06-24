@@ -33,6 +33,7 @@ const { appSettings, runtimeCapabilities, error, isInitialized } = storeToRefs(s
 const {
   updateOutputDir,
   updateGameAlbumPath,
+  updateSavedFileViewAction,
   updateRecordingFps,
   updateRecordingBitrate,
   updateRecordingQuality,
@@ -240,6 +241,37 @@ const handleResetSettings = async () => {
                   : t('settings.function.outputDir.selectButton')
               }}
             </Button>
+          </ItemActions>
+        </Item>
+
+        <Item variant="surface" size="sm">
+          <ItemContent>
+            <ItemTitle>
+              {{ t('settings.capture.savedFileViewAction.label') }}
+            </ItemTitle>
+            <ItemDescription>
+              {{ t('settings.capture.savedFileViewAction.description') }}
+            </ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Select
+              :model-value="appSettings?.features?.savedFileViewAction ?? 'default_app'"
+              @update:model-value="
+                (value) => updateSavedFileViewAction(value as 'default_app' | 'reveal_in_explorer')
+              "
+            >
+              <SelectTrigger class="w-[220px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default_app">
+                  {{ t('settings.capture.savedFileViewAction.defaultApp') }}
+                </SelectItem>
+                <SelectItem value="reveal_in_explorer">
+                  {{ t('settings.capture.savedFileViewAction.revealInExplorer') }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </ItemActions>
         </Item>
       </div>
