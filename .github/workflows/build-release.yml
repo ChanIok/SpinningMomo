@@ -1,15 +1,20 @@
 # Build and Release workflow
-# Manually builds and publishes an existing release tag.
+# Manually builds release artifacts, and optionally publishes an existing tag.
 
 name: Build Release
 
 on:
   workflow_dispatch:
     inputs:
+      publish_release:
+        description: 'Publish GitHub Release and mirrors'
+        required: true
+        default: false
+        type: boolean
       code_signing:
         description: 'Use SignPath code signing'
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -89,13 +94,6 @@ jobs:
         id: final_version
         shell: pwsh
         run: |
-          $ref = "${{ github.ref }}"
-          $tag = "${{ github.ref_name }}"
-          if ($ref -notmatch '^refs/tags/v\d+\.\d+\.\d+$') {
-            Write-Error "Build Release must be manually run from an existing vX.Y.Z tag. Current ref: $ref"
-            exit 1
-          }
-
           $versionJson = Get-Content "version.json" -Raw | ConvertFrom-Json
           $version = $versionJson.version
           if ($version -notmatch '^\d+\.\d+\.\d+$') {
@@ -107,6 +105,21 @@ jobs:
           if ($tag -ne $expectedTag) {
             Write-Error "Release tag ($tag) does not match version.json ($expectedTag)"
             exit 1
+          }
+
+          if ("${{ inputs.publish_release }}" -eq "true") {
+            $ref = "${{ github.ref }}"
+            $tag = "${{ github.ref_name }}"
+            if ($ref -notmatch '^refs/tags/v\d+\.\d+\.\d+$') {
+              Write-Error "Publishing must be manually run from an existing vX.Y.Z tag. Current ref: $ref"
+              exit 1
+            }
+
+            $expectedTag = "v$version"
+            if ($tag -ne $expectedTag) {
+              Write-Error "Release tag ($tag) does not match version.json ($expectedTag)"
+              exit 1
+            }
           }
 
           Write-Host "Final version: $version"
@@ -295,6 +308,7 @@ jobs:
           if-no-files-found: error
 
       - name: Create GitHub Release
+        if: ${{ inputs.publish_release }}
         uses: softprops/action-gh-release@v1
         with:
           files: |
@@ -308,6 +322,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload release files to Cloudflare R2
+        if: ${{ inputs.publish_release }}
         shell: pwsh
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -325,6 +340,7 @@ jobs:
           Write-Host "Uploaded release files to R2: $dest"
 
       - name: Trigger CNB api_trigger_release
+        if: ${{ inputs.publish_release }}
         shell: pwsh
         env:
           CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
