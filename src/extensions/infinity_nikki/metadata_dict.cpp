@@ -15,20 +15,26 @@ namespace Extensions::InfinityNikki::MetadataDict {
 
 // 远端在线字典地址：不随客户端打包发布。
 constexpr std::string_view kDictionaryUrl =
-    "https://api.infinitymomo.com/api/v1/camera-spinning-momo.json";
+    "https://nuan5.pro/assets/data/spinning-momo-camera.json";
 // 字典在内存中的有效期，过期后会尝试后台刷新。
 constexpr auto kDictionaryTtl = std::chrono::hours(6);
 
 struct MetadataItem {
+  std::optional<std::string> icon;
   std::optional<std::string> zh;
   std::optional<std::string> en;
 };
 
-struct MetadataPayload {
-  // 与远端 JSON 顶层键保持一致（poses / filters / lights）
+struct MetadataPayloadData {
+  // 与远端 JSON 的 d 字段保持一致；当前只消费详情页会展示的三类元数据。
   std::optional<std::unordered_map<std::string, MetadataItem>> poses;
   std::optional<std::unordered_map<std::string, MetadataItem>> filters;
   std::optional<std::unordered_map<std::string, MetadataItem>> lights;
+};
+
+struct MetadataPayload {
+  std::optional<std::string> v;
+  std::optional<MetadataPayloadData> d;
 };
 
 struct MetadataDictionary {
@@ -95,15 +101,19 @@ auto parse_dictionary_payload(const std::string& body)
   if (!parsed) {
     return std::unexpected("Failed to parse camera metadata dictionary: " + parsed.error().what());
   }
+  if (!parsed->d.has_value()) {
+    return std::unexpected("Failed to parse camera metadata dictionary: missing data field");
+  }
 
   MetadataDictionary dictionary;
+  auto data = std::move(parsed->d.value());
   // 使用空 map 兜底，保证下游 lookup 总是可执行。
   dictionary.poses =
-      std::move(parsed->poses.value_or(std::unordered_map<std::string, MetadataItem>{}));
+      std::move(data.poses.value_or(std::unordered_map<std::string, MetadataItem>{}));
   dictionary.filters =
-      std::move(parsed->filters.value_or(std::unordered_map<std::string, MetadataItem>{}));
+      std::move(data.filters.value_or(std::unordered_map<std::string, MetadataItem>{}));
   dictionary.lights =
-      std::move(parsed->lights.value_or(std::unordered_map<std::string, MetadataItem>{}));
+      std::move(data.lights.value_or(std::unordered_map<std::string, MetadataItem>{}));
   return dictionary;
 }
 
