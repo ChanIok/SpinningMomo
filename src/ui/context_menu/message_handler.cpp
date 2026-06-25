@@ -15,9 +15,42 @@ import Utils.Logger;
 import <windows.h>;
 import <windowsx.h>;
 
-namespace {
+namespace UI::ContextMenu::MessageHandler {
 
-using UI::ContextMenu::State::ContextMenuState;
+// 三次缓出曲线：t=0→0, t=1→1, 前段快后段慢
+auto ease_out_cubic(float t) -> float {
+  const float ft = 1.0f - t;
+  return 1.0f - ft * ft * ft;
+}
+
+// 推进一帧：用已过时间 / 总时长算出 opacity，到期则停用
+auto update_open_animation(UI::ContextMenu::Types::MenuOpenAnimation& animation,
+                           std::chrono::steady_clock::time_point now) -> bool {
+  if (!animation.active) {
+    return false;
+  }
+
+  const auto elapsed = now - animation.start_time;
+  const auto elapsed_ms =
+      static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
+  const auto duration_ms =
+      static_cast<float>(std::max<std::int64_t>(1, animation.duration.count()));
+  const float raw_progress = std::clamp(elapsed_ms / duration_ms, 0.0f, 1.0f);
+  const float eased = ease_out_cubic(raw_progress);
+
+  animation.opacity = eased;
+
+  if (raw_progress >= 1.0f) {
+    animation.active = false;
+    animation.opacity = 1.0f;
+  }
+
+  return true;
+}
+
+auto get_timer_owner_hwnd(const State::ContextMenuState& menu_state, HWND fallback) -> HWND {
+  return menu_state.hwnd ? menu_state.hwnd : fallback;
+}
 
 auto get_submenu_item_at_point(Core::State::AppState& state, const POINT& pt) -> int;
 auto handle_paint(Core::State::AppState& state, HWND hwnd) -> LRESULT;
@@ -30,12 +63,9 @@ auto handle_left_button_down(Core::State::AppState& state, HWND hwnd, WPARAM wPa
 auto handle_key_down(Core::State::AppState& state, HWND hwnd, WPARAM wParam, LPARAM lParam)
     -> LRESULT;
 auto handle_kill_focus(Core::State::AppState& state, HWND hwnd) -> LRESULT;
+auto handle_open_animation_timer(Core::State::AppState& state, HWND hwnd) -> LRESULT;
 auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM timer_id) -> LRESULT;
 auto handle_destroy(Core::State::AppState& state, HWND hwnd) -> LRESULT;
-
-auto get_timer_owner_hwnd(const ContextMenuState& menu_state, HWND fallback) -> HWND {
-  return menu_state.hwnd ? menu_state.hwnd : fallback;
-}
 
 auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM wParam,
                       LPARAM lParam) -> LRESULT {
@@ -62,10 +92,7 @@ auto window_procedure(Core::State::AppState& state, HWND hwnd, UINT msg, WPARAM 
   return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-}  // anonymous namespace
-
-namespace UI::ContextMenu::MessageHandler {
-
+// Win32 回调入口：从 GWLP_USERDATA 取出 AppState 并分派
 auto CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) -> LRESULT {
   Core::State::AppState* app_state = nullptr;
 
@@ -83,10 +110,6 @@ auto CALLBACK static_window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
   return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
-
-}  // namespace UI::ContextMenu::MessageHandler
-
-namespace {
 
 auto get_submenu_item_at_point(Core::State::AppState& state, const POINT& pt) -> int {
   const auto& menu_state = *state.context_menu;
@@ -235,9 +258,41 @@ auto handle_kill_focus(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   return 0;
 }
 
+// 动画帧回调：推进主菜单/子菜单动画并重绘，全部结束后关定时器
+auto handle_open_animation_timer(Core::State::AppState& state, HWND hwnd) -> LRESULT {
+  auto& menu_state = *state.context_menu;
+  const auto now = std::chrono::steady_clock::now();
+  const bool main_changed = update_open_animation(menu_state.main_animation, now);
+  const bool submenu_changed = update_open_animation(menu_state.submenu_animation, now);
+
+  if (main_changed && menu_state.hwnd) {
+    RECT rect{};
+    GetClientRect(menu_state.hwnd, &rect);
+    UI::ContextMenu::Painter::paint_context_menu(state, rect);
+  }
+
+  if (submenu_changed && menu_state.submenu_hwnd) {
+    RECT rect{};
+    GetClientRect(menu_state.submenu_hwnd, &rect);
+    UI::ContextMenu::Painter::paint_submenu(state, rect);
+  }
+
+  if (!menu_state.main_animation.active && !menu_state.submenu_animation.active) {
+    KillTimer(get_timer_owner_hwnd(menu_state, hwnd),
+              UI::ContextMenu::Types::OPEN_ANIMATION_TIMER_ID);
+  }
+
+  return 0;
+}
+
 auto handle_timer(Core::State::AppState& state, HWND hwnd, WPARAM timer_id) -> LRESULT {
   auto& menu_state = *state.context_menu;
   const HWND timer_owner = get_timer_owner_hwnd(menu_state, hwnd);
+
+  // 动画定时器与交互定时器 ID 不同，分开处理
+  if (timer_id == UI::ContextMenu::Types::OPEN_ANIMATION_TIMER_ID) {
+    return handle_open_animation_timer(state, hwnd);
+  }
 
   const auto action = UI::ContextMenu::Interaction::on_timer(state, timer_owner, timer_id);
   switch (action.type) {
@@ -267,4 +322,4 @@ auto handle_destroy(Core::State::AppState& state, HWND hwnd) -> LRESULT {
   return 0;
 }
 
-}  // anonymous namespace
+}  // namespace UI::ContextMenu::MessageHandler

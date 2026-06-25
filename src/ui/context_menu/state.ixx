@@ -46,6 +46,8 @@ export struct ContextMenuState {
   std::vector<Types::MenuItem> items;
   Types::LayoutConfig layout;
   Types::InteractionState interaction;
+  Types::MenuOpenAnimation main_animation;
+  Types::MenuOpenAnimation submenu_animation;
   SIZE menu_size{};
   POINT position{};
 

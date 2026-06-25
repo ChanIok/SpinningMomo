@@ -15,11 +15,21 @@ export enum class CursorZone { MainMenu, Submenu, Outside };
 
 export enum class PendingIntentType { None, OpenSubmenu, SwitchSubmenu, HideSubmenu };
 
+export struct MenuOpenAnimation {
+  bool active = false;
+  std::chrono::steady_clock::time_point start_time{};
+  std::chrono::milliseconds duration{120};
+  float opacity = 1.0f;
+};
+
+export constexpr UINT_PTR OPEN_ANIMATION_TIMER_ID = 2;
+export constexpr UINT OPEN_ANIMATION_FRAME_INTERVAL = 16;
+export constexpr auto OPEN_ANIMATION_DURATION = std::chrono::milliseconds(120);
+
 // 菜单项类型枚举
 export enum class MenuItemType {
   Normal,     // 普通菜单项
   Separator,  // 分隔线
-  Submenu     // 子菜单（暂时不实现）
 };
 
 // 菜单动作数据结构
@@ -151,7 +161,6 @@ export struct LayoutConfig {
   static constexpr int BASE_TEXT_PADDING = 12;
   static constexpr int BASE_MIN_WIDTH = 140;
   static constexpr int BASE_FONT_SIZE = 12;
-  static constexpr int BASE_BORDER_RADIUS = 6;
 
   // DPI缩放后的尺寸
   UINT dpi = 96;
@@ -161,7 +170,6 @@ export struct LayoutConfig {
   int text_padding = BASE_TEXT_PADDING;
   int min_width = BASE_MIN_WIDTH;
   int font_size = BASE_FONT_SIZE;
-  int border_radius = BASE_BORDER_RADIUS;
 
   auto update_dpi_scaling(UINT new_dpi) -> void {
     dpi = new_dpi;
@@ -172,7 +180,6 @@ export struct LayoutConfig {
     text_padding = static_cast<int>(BASE_TEXT_PADDING * scale);
     min_width = static_cast<int>(BASE_MIN_WIDTH * scale);
     font_size = static_cast<int>(BASE_FONT_SIZE * scale);
-    border_radius = static_cast<int>(BASE_BORDER_RADIUS * scale);
   }
 };
 
@@ -180,7 +187,6 @@ export struct LayoutConfig {
 export struct InteractionState {
   int hover_index = -1;
   int submenu_hover_index = -1;
-  bool is_mouse_tracking = false;
   CursorZone cursor_zone = CursorZone::Outside;
   PendingIntentType pending_intent = PendingIntentType::None;
   int pending_parent_index = -1;

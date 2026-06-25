@@ -32,6 +32,26 @@ import <wrl/client.h>;
 
 namespace UI::ContextMenu {
 
+auto cancel_open_animation_timer(Core::State::AppState& state) -> void {
+  if (state.context_menu->hwnd) {
+    KillTimer(state.context_menu->hwnd, Types::OPEN_ANIMATION_TIMER_ID);
+  }
+}
+
+// 启动淡入动画：将 opacity 置零并启动帧定时器驱动后续渐变
+auto start_open_animation(Core::State::AppState& state, Types::MenuOpenAnimation& animation,
+                          std::chrono::milliseconds duration) -> void {
+  animation.active = true;
+  animation.start_time = std::chrono::steady_clock::now();
+  animation.duration = duration;
+  animation.opacity = 0.0f;
+
+  if (state.context_menu->hwnd) {
+    SetTimer(state.context_menu->hwnd, Types::OPEN_ANIMATION_TIMER_ID,
+             Types::OPEN_ANIMATION_FRAME_INTERVAL, nullptr);
+  }
+}
+
 auto apply_corner_preference(HWND hwnd) -> void {
   DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_ROUNDSMALL;
   DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
@@ -76,6 +96,8 @@ auto create_context_menu_window(HINSTANCE instance, Core::State::AppState* app_s
 
 // 隐藏并销毁菜单窗口
 void hide_and_destroy_menu(Core::State::AppState& state) {
+  cancel_open_animation_timer(state);
+
   // 先销毁子菜单
   if (state.context_menu->submenu_hwnd) {
     DestroyWindow(state.context_menu->submenu_hwnd);
@@ -94,6 +116,9 @@ void hide_and_destroy_menu(Core::State::AppState& state) {
 
   // 重置交互状态，避免旧菜单残留的hover/定时意图影响下一次显示。
   UI::ContextMenu::Interaction::reset(state);
+  // 动画一并归零，否则下次 Show 会残留上次的 opacity
+  state.context_menu->main_animation = {};
+  state.context_menu->submenu_animation = {};
   state.context_menu->submenu_parent_index = -1;
 }
 
@@ -150,6 +175,7 @@ void handle_menu_action(Core::State::AppState& state,
 
     case UI::ContextMenu::Types::MenuAction::Type::FeatureToggle:
     case UI::ContextMenu::Types::MenuAction::Type::SystemCommand: {
+      // 两者都携带 action_id 字符串，走 Commands 注册表统一派发
       try {
         auto action_id = std::any_cast<std::string>(action.data);
 
@@ -171,6 +197,7 @@ void handle_menu_action(Core::State::AppState& state,
 // 隐藏子菜单
 auto hide_submenu(Core::State::AppState& state) -> void {
   if (state.context_menu->submenu_hwnd) {
+    state.context_menu->submenu_animation = {};
     DestroyWindow(state.context_menu->submenu_hwnd);
     RenderContext::cleanup_submenu(state);
     state.context_menu->submenu_hwnd = nullptr;
@@ -229,6 +256,8 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
     return;
   }
 
+  // 先绘制 opacity=0 的首帧再 ShowWindow，防止透明窗口闪一帧空白
+  start_open_animation(state, menu_state.submenu_animation, Types::OPEN_ANIMATION_DURATION);
   RECT client_rect{0, 0, menu_state.submenu_size.cx, menu_state.submenu_size.cy};
   UI::ContextMenu::Painter::paint_submenu(state, client_rect);
 
@@ -240,6 +269,7 @@ auto show_submenu(Core::State::AppState& state, int index) -> void {
   Logger().debug("Submenu window shown successfully");
 }
 
+// 注册菜单窗口类，应用启动时调用一次
 auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string> {
   try {
     // 初始化上下文菜单状态
@@ -260,10 +290,13 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
   }
 }
 
+// 释放菜单子系统全部资源，应用退出时调用
 auto cleanup(Core::State::AppState& app_state) -> void {
   // 清理上下文菜单资源
   if (app_state.context_menu) {
     // 销毁任何可能存在的窗口
+    cancel_open_animation_timer(app_state);
+
     if (app_state.context_menu->hwnd) {
       DestroyWindow(app_state.context_menu->hwnd);
       app_state.context_menu->hwnd = nullptr;
@@ -278,10 +311,13 @@ auto cleanup(Core::State::AppState& app_state) -> void {
     RenderContext::cleanup_submenu(app_state);
     RenderContext::cleanup_context_menu(app_state);
     UI::ContextMenu::Interaction::reset(app_state);
+    app_state.context_menu->main_animation = {};
+    app_state.context_menu->submenu_animation = {};
     app_state.context_menu->submenu_parent_index = -1;
   }
 }
 
+// 主入口：回收旧实例 → 布局计算 → 创建窗口 → D2D 初始化 → 淡入 → 显示
 auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
           const Vendor::Windows::POINT& position) -> void {
   // 若已有菜单实例，先回收，确保状态机从干净状态重新开始。
@@ -334,6 +370,8 @@ auto Show(Core::State::AppState& app_state, std::vector<Types::MenuItem> items,
     return;
   }
 
+  // 先绘制 opacity=0 的首帧再 ShowWindow，防止透明窗口闪一帧空白
+  start_open_animation(app_state, menu_state.main_animation, Types::OPEN_ANIMATION_DURATION);
   RECT client_rect{0, 0, menu_state.menu_size.cx, menu_state.menu_size.cy};
   Painter::paint_context_menu(app_state, client_rect);
 

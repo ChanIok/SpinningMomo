@@ -14,6 +14,70 @@ import <windows.h>;
 
 namespace UI::ContextMenu::Painter {
 
+struct AnimationAlphaState {
+  State::RenderResources* resources = nullptr;
+  float original_alpha = 1.0f;
+  bool applied = false;
+};
+
+// 临时将所有 brush 的 alpha 乘以动画 opacity，返回可恢复的快照
+auto apply_animation_alpha(State::RenderResources& resources,
+                           const Types::MenuOpenAnimation& animation) -> AnimationAlphaState {
+  if (!resources.device_context) {
+    return {};
+  }
+
+  const bool needs_animation = animation.active || animation.opacity < 0.999f;
+  if (!needs_animation) {
+    return {};
+  }
+
+  const float opacity = std::clamp(animation.opacity, 0.0f, 1.0f);
+  float original_alpha = 1.0f;
+
+  ID2D1SolidColorBrush* brushes[] = {
+      resources.background_brush.get(), resources.text_brush.get(),
+      resources.separator_brush.get(),  resources.hover_brush.get(),
+      resources.indicator_brush.get(),
+  };
+
+  for (auto* brush : brushes) {
+    if (!brush) {
+      continue;
+    }
+    auto color = brush->GetColor();
+    if (original_alpha == 1.0f) {
+      original_alpha = color.a;
+    }
+    color.a *= opacity;
+    brush->SetColor(color);
+  }
+
+  return {&resources, original_alpha, true};
+}
+
+// 将 brush alpha 恢复到动画前的值，使后续正常绘制不受影响
+auto restore_animation_alpha(const AnimationAlphaState& state) -> void {
+  if (!state.applied || !state.resources) {
+    return;
+  }
+
+  ID2D1SolidColorBrush* brushes[] = {
+      state.resources->background_brush.get(), state.resources->text_brush.get(),
+      state.resources->separator_brush.get(),  state.resources->hover_brush.get(),
+      state.resources->indicator_brush.get(),
+  };
+
+  for (auto* brush : brushes) {
+    if (!brush) {
+      continue;
+    }
+    auto color = brush->GetColor();
+    color.a = state.original_alpha;
+    brush->SetColor(color);
+  }
+}
+
 auto rect_to_d2d(const RECT& rect) -> D2D1_RECT_F {
   return D2D1::RectF(static_cast<float>(rect.left), static_cast<float>(rect.top),
                      static_cast<float>(rect.right), static_cast<float>(rect.bottom));
@@ -30,6 +94,7 @@ auto present_surface(State::RenderResources& render_resources, const char* label
   }
 }
 
+// 绘制主菜单一帧：透明清屏 → 叠动画 alpha → 背景+菜单项 → 恢复 alpha → 提交
 auto paint_context_menu(Core::State::AppState& state, const RECT& client_rect) -> void {
   auto& menu_state = *state.context_menu;
   auto& render_resources = menu_state.main_render_resources;
@@ -40,11 +105,16 @@ auto paint_context_menu(Core::State::AppState& state, const RECT& client_rect) -
   render_resources.device_context->BeginDraw();
   render_resources.device_context->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
 
-  const auto rect_f = rect_to_d2d(client_rect);
-  draw_menu_background(state, rect_f);
-  draw_menu_items(state, rect_f);
+  {
+    const auto rect_f = rect_to_d2d(client_rect);
+    auto alpha_state = apply_animation_alpha(render_resources, menu_state.main_animation);
+    draw_menu_background(state, rect_f);
+    draw_menu_items(state, rect_f);
+    restore_animation_alpha(alpha_state);
+  }
 
   const HRESULT hr = render_resources.device_context->EndDraw();
+  // GPU 设备丢失时重建 D2D 资源，下次 paint 会正常
   if (hr == D2DERR_RECREATE_TARGET) {
     Logger().warn("Main menu render target needs recreation");
     UI::ContextMenu::RenderContext::initialize_context_menu(state, menu_state.hwnd);
@@ -139,6 +209,7 @@ auto draw_separator(Core::State::AppState& state, const D2D1_RECT_F& separator_r
                                                  render_resources.separator_brush.get());
 }
 
+// 绘制子菜单一帧，流程与 paint_context_menu 对称
 auto paint_submenu(Core::State::AppState& state, const RECT& client_rect) -> void {
   auto& menu_state = *state.context_menu;
   auto& render_resources = menu_state.submenu_render_resources;
@@ -149,9 +220,13 @@ auto paint_submenu(Core::State::AppState& state, const RECT& client_rect) -> voi
   render_resources.device_context->BeginDraw();
   render_resources.device_context->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
 
-  const auto rect_f = rect_to_d2d(client_rect);
-  draw_submenu_background(state, rect_f);
-  draw_submenu_items(state, rect_f);
+  {
+    const auto rect_f = rect_to_d2d(client_rect);
+    auto alpha_state = apply_animation_alpha(render_resources, menu_state.submenu_animation);
+    draw_submenu_background(state, rect_f);
+    draw_submenu_items(state, rect_f);
+    restore_animation_alpha(alpha_state);
+  }
 
   const HRESULT hr = render_resources.device_context->EndDraw();
   if (hr == D2DERR_RECREATE_TARGET) {
