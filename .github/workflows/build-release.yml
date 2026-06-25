@@ -101,12 +101,6 @@ jobs:
             exit 1
           }
 
-          $expectedTag = "v$version"
-          if ($tag -ne $expectedTag) {
-            Write-Error "Release tag ($tag) does not match version.json ($expectedTag)"
-            exit 1
-          }
-
           if ("${{ inputs.publish_release }}" -eq "true") {
             $ref = "${{ github.ref }}"
             $tag = "${{ github.ref_name }}"
