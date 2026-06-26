@@ -195,20 +195,37 @@ auto compute_wake_timeout(const State::RecordingState& state) -> std::chrono::na
   return std::chrono::nanoseconds{diff_100ns * 100};
 }
 
-// stop 之后：没 pending、音频也写光了，还要确认视频「该补的」都补到了目标时间线后面，才退主循环。
-auto should_exit_finished_segment(State::RecordingState& state, bool finishing) -> bool {
-  if (!finishing) {
-    return false;
-  }
+// 丢弃视频时间线之后的音频包，使编码线程可以正常退出。
+auto discard_orphaned_audio(State::RecordingState& state) -> void {
   std::lock_guard queue_lock(state.queue_mutex);
-  if (state.pending_video_frame_count > 0 || !state.audio_queue.empty()) {
-    return false;
+  if (state.audio_queue.empty()) {
+    return;
   }
-  if (!state.has_encoder_input_texture || state.next_video_timestamp_100ns < 0) {
-    return true;
+
+  if (state.last_emitted_video_timestamp_100ns < 0) {
+    state.discarded_tail_audio_packets += state.audio_queue.size();
+    state.audio_queue.clear();
+    return;
   }
-  const auto target = resolve_finish_target_timestamp_100ns(state);
-  return state.next_video_timestamp_100ns > target;
+
+  while (!state.audio_queue.empty() &&
+         state.audio_queue.front().timestamp_100ns > state.last_emitted_video_timestamp_100ns) {
+    state.audio_queue.pop_front();
+    state.discarded_tail_audio_packets++;
+  }
+}
+
+// stop 之后，视频已补到冻结目标、无 pending 帧、无残留音频时退出。
+auto should_exit_finished_segment(State::RecordingState& state) -> bool {
+  if (state.has_encoder_input_texture && state.next_video_timestamp_100ns >= 0) {
+    const auto target = resolve_finish_target_timestamp_100ns(state);
+    if (state.next_video_timestamp_100ns <= target) {
+      return false;
+    }
+  }
+
+  std::lock_guard queue_lock(state.queue_mutex);
+  return state.pending_video_frame_count == 0 && state.audio_queue.empty();
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +559,7 @@ auto wait_encoder_ready(Core::State::AppState& app_state) -> void {
   state.encoder_ready_cv.wait(ready_lock, [&state]() { return state.encoder_ready; });
 }
 
-// stop() 调用：通知编码线程别再接新数据，把队列里剩的写完再 finalize
+// stop() 调用：通知编码线程别再接新数据，视频补到冻结目标后 finalize；超出视频尾部的音频会丢弃。
 auto signal_encoder_finish(Core::State::AppState& app_state) -> void {
   if (!app_state.recording) {
     return;
@@ -668,31 +685,6 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
         }
       }
 
-      // stop 可能落在两帧视频之间：此时正常按 finish_target 补帧后，仍会剩下一小截尾音
-      // 卡在「last_emitted_video_timestamp 与 next_video_timestamp 之间」。
-      // 这里补一帧静止画面，把最后半帧时间补满，让尾音可以自然排空。
-      if (finishing && state.has_encoder_input_texture && state.next_video_timestamp_100ns >= 0) {
-        bool has_tail_audio_between_frames = false;
-        {
-          std::lock_guard queue_lock(state.queue_mutex);
-          has_tail_audio_between_frames =
-              !state.audio_queue.empty() &&
-              state.audio_queue.front().timestamp_100ns >
-                  state.last_emitted_video_timestamp_100ns &&
-              state.audio_queue.front().timestamp_100ns <= state.next_video_timestamp_100ns;
-        }
-
-        if (has_tail_audio_between_frames) {
-          auto emit_tail_result =
-              write_current_video_sample(state, state.next_video_timestamp_100ns);
-          if (!emit_tail_result) {
-            fail_recording_encoder(app_state, state, emit_tail_result.error());
-            break;
-          }
-          state.next_video_timestamp_100ns += state.video_frame_interval_100ns;
-        }
-      }
-
       while (auto audio_packet = pop_ready_audio_packet(state)) {
         auto audio_result = encode_queued_audio(state, *audio_packet);
         if (!audio_result) {
@@ -704,8 +696,11 @@ auto encoder_thread_proc(Core::State::AppState& app_state, std::stop_token stop_
         break;
       }
 
-      if (finishing && should_exit_finished_segment(state, finishing)) {
-        break;
+      if (finishing) {
+        discard_orphaned_audio(state);
+        if (should_exit_finished_segment(state)) {
+          break;
+        }
       }
     }
 

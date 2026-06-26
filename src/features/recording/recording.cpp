@@ -325,6 +325,10 @@ auto perform_stop(Core::State::AppState& app_state) -> Features::Recording::Type
     Logger().warn("Recording skipped video frames due to encoding lag: {}",
                   state.skipped_video_frames_due_to_encoding_lag);
   }
+  if (state.discarded_tail_audio_packets > 0) {
+    Logger().info("Recording discarded tail audio packets outside video timeline: {}",
+                  state.discarded_tail_audio_packets);
+  }
 
   // 第八步：清空会话态，状态改回 Idle，启动延迟 5 秒的 D3D 清理定时器
   Features::Recording::Session::clear_session_runtime_fields(app_state);

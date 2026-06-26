@@ -52,6 +52,7 @@ export struct RecordingState {
   int last_frame_height = 0;
   std::deque<Features::Recording::Types::QueuedAudioPacket> audio_queue;
   std::atomic<std::uint64_t> dropped_audio_packets{0};
+  std::uint64_t discarded_tail_audio_packets = 0;
   std::uint64_t skipped_video_frames_due_to_encoding_lag = 0;
   bool encoder_overload_notified = false;
   std::uint64_t encoded_video_frames = 0;

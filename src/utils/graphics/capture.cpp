@@ -341,7 +341,13 @@ auto start_capture(CaptureSession& session) -> std::expected<void, std::string> 
 
 auto stop_capture_session(CaptureSession& session) -> void {
   if (session.session) {
-    session.session.Close();
+    try {
+      session.session.Close();
+    } catch (const winrt::hresult_error& e) {
+      Logger().warn("Failed to close capture session: {}", winrt::to_string(e.message()));
+    } catch (...) {
+      Logger().warn("Failed to close capture session: unknown error");
+    }
     session.session = nullptr;
   }
 }
@@ -350,8 +356,21 @@ auto stop_capture(CaptureSession& session) -> void {
   stop_capture_session(session);
 
   if (session.frame_pool) {
-    session.frame_pool.FrameArrived(session.frame_token);
-    session.frame_pool.Close();
+    try {
+      session.frame_pool.FrameArrived(session.frame_token);
+    } catch (const winrt::hresult_error& e) {
+      Logger().warn("Failed to remove capture frame handler: {}", winrt::to_string(e.message()));
+    } catch (...) {
+      Logger().warn("Failed to remove capture frame handler: unknown error");
+    }
+
+    try {
+      session.frame_pool.Close();
+    } catch (const winrt::hresult_error& e) {
+      Logger().warn("Failed to close capture frame pool: {}", winrt::to_string(e.message()));
+    } catch (...) {
+      Logger().warn("Failed to close capture frame pool: unknown error");
+    }
     session.frame_pool = nullptr;
   }
 
