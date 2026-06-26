@@ -59,6 +59,18 @@ auto notify_stopping(Core::State::AppState& state) -> void {
   Core::Notifications::post_notification_request(state, std::move(options));
 }
 
+auto take_pending_start_request(State::RecordingState& state)
+    -> std::optional<Features::Recording::Types::StartRequest> {
+  std::lock_guard request_lock(state.control_request_mutex);
+  if (!state.pending_start_request) {
+    return std::nullopt;
+  }
+
+  auto request = std::move(state.pending_start_request);
+  state.pending_start_request.reset();
+  return request;
+}
+
 auto show_recording_saved_notification(Core::State::AppState& state,
                                        const std::filesystem::path& saved_path) -> void {
   Core::Notifications::Types::NotificationOptions options;
@@ -176,6 +188,20 @@ auto request_control_action(Core::State::AppState& app_state,
 
   {
     std::lock_guard request_lock(state.control_request_mutex);
+
+    // UserStart 只允许覆盖空槽或 CleanupD3D，避免 UI 线程直接执行 start。
+    if (action == Types::RecordingControlAction::UserStart) {
+      if (state.pending_action == Types::RecordingControlAction::ShutdownStop ||
+          state.pending_action == Types::RecordingControlAction::AbortWithError ||
+          state.pending_action == Types::RecordingControlAction::UserStop ||
+          state.pending_action == Types::RecordingControlAction::RestartAfterResize) {
+        return false;
+      }
+
+      state.pending_action = action;
+      state.control_cv.notify_one();
+      return true;
+    }
 
     // shutdown 优先级最高，直接覆盖一切 pending 请求
     if (action == Types::RecordingControlAction::ShutdownStop) {
@@ -385,6 +411,31 @@ auto handle_control_action(Core::State::AppState& app_state,
                            Features::Recording::State::RecordingState& state,
                            Features::Recording::Types::RecordingControlAction action) -> bool {
   switch (action) {
+    case Types::RecordingControlAction::UserStart: {
+      auto start_request = take_pending_start_request(state);
+      if (!start_request) {
+        state.status.store(Features::Recording::Types::RecordingStatus::Idle,
+                           std::memory_order_release);
+        UI::FloatingWindow::request_repaint(app_state);
+        Logger().warn("Recording start request is missing");
+        return true;
+      }
+
+      auto start_result = start(app_state, start_request->target_window, start_request->config);
+      if (!start_result) {
+        state.status.store(Features::Recording::Types::RecordingStatus::Idle,
+                           std::memory_order_release);
+        UI::FloatingWindow::request_repaint(app_state);
+        notify_message(app_state, app_state.i18n->texts["message.recording_start_failed"] +
+                                      start_result.error());
+      } else {
+        notify_message(app_state, app_state.i18n->texts["message.recording_started"]);
+        Core::Events::post(app_state,
+                           UI::FloatingWindow::Events::RecordingToggleEvent{.enabled = true});
+      }
+      return true;
+    }
+
     case Types::RecordingControlAction::UserStop: {
       auto stop_result = perform_stop(app_state);
       if (stop_result.kind != Features::Recording::Types::StopResultKind::NotRecording) {
@@ -607,9 +658,10 @@ auto start(Core::State::AppState& app_state, HWND target_window,
 
   auto& state = *app_state.recording;
 
-  // 只接受 Idle 状态，避免重复 start
+  // 用户主动启动会先把状态切到 Starting；自动重启仍从 Idle 开始。
   auto current_status = state.status.load(std::memory_order_acquire);
-  if (current_status != Features::Recording::Types::RecordingStatus::Idle) {
+  if (current_status != Features::Recording::Types::RecordingStatus::Idle &&
+      current_status != Features::Recording::Types::RecordingStatus::Starting) {
     return std::unexpected("Recording is not idle");
   }
 

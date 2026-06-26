@@ -54,7 +54,7 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     return {};
   }
 
-  // 不是 Idle 的其他瞬态状态也直接忽略，避免 toggle 抢状态机
+  // 不是 Idle 的其他瞬态状态（例如 Starting）也直接忽略，避免 toggle 抢状态机
   if (status != Features::Recording::Types::RecordingStatus::Idle) {
     return {};
   }
@@ -136,17 +136,30 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     return result;
   }
 
-  // 提交给录制模块执行真正的 start
-  auto result = Features::Recording::start(state, *target, config);
-  if (!result) {
-    Features::Recording::notify_message(
-        state, state.i18n->texts["message.recording_start_failed"] + result.error());
-    return result;
+  auto expected_status = Features::Recording::Types::RecordingStatus::Idle;
+  if (!state.recording->status.compare_exchange_strong(
+          expected_status, Features::Recording::Types::RecordingStatus::Starting,
+          std::memory_order_acq_rel)) {
+    return std::unexpected("Recording is not idle");
   }
 
-  // 启动成功：发通知 + 更新 UI
-  Features::Recording::notify_message(state, state.i18n->texts["message.recording_started"]);
-  Core::Events::post(state, UI::FloatingWindow::Events::RecordingToggleEvent{.enabled = true});
+  {
+    std::lock_guard request_lock(state.recording->control_request_mutex);
+    state.recording->pending_start_request =
+        Features::Recording::Types::StartRequest{.target_window = *target, .config = config};
+  }
+
+  if (!Features::Recording::request_control_action(
+          state, Features::Recording::Types::RecordingControlAction::UserStart)) {
+    std::lock_guard request_lock(state.recording->control_request_mutex);
+    state.recording->pending_start_request.reset();
+    state.recording->status.store(Features::Recording::Types::RecordingStatus::Idle,
+                                  std::memory_order_release);
+    std::string error = "Failed to queue recording start request";
+    Features::Recording::notify_message(
+        state, state.i18n->texts["message.recording_start_failed"] + error);
+    return std::unexpected(error);
+  }
   return {};
 }
 

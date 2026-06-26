@@ -5,6 +5,7 @@ export module Features.Recording.Types;
 import std;
 import Utils.Graphics.CaptureRegion;
 import Utils.Media.AudioCapture;
+import <windows.h>;
 
 namespace Features::Recording::Types {
 
@@ -109,6 +110,7 @@ export struct RecordingConfig {
 // 录制状态枚举
 export enum class RecordingStatus {
   Idle,       // 空闲
+  Starting,   // 正在启动
   Recording,  // 正在录制
   Stopping,   // 正在停止
 };
@@ -126,8 +128,14 @@ export struct CapturePlan {
   Utils::Graphics::CaptureRegion::CropRegion region{};
 };
 
+export struct StartRequest {
+  HWND target_window = nullptr;
+  RecordingConfig config;
+};
+
 export enum class RecordingControlAction {
   None,
+  UserStart,
   UserStop,
   AbortWithError,
   RestartAfterResize,

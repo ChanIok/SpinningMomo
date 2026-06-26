@@ -240,7 +240,8 @@ auto register_builtin_commands(Core::State::AppState& state) -> void {
                       }
 
                       const auto status = state.recording->status.load(std::memory_order_acquire);
-                      return status == Features::Recording::Types::RecordingStatus::Recording ||
+                      return status == Features::Recording::Types::RecordingStatus::Starting ||
+                             status == Features::Recording::Types::RecordingStatus::Recording ||
                              status == Features::Recording::Types::RecordingStatus::Stopping;
                     },
                     .hotkey =

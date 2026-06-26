@@ -73,9 +73,10 @@ export struct RecordingState {
   std::jthread control_thread;
   // 控制线程当前是否正在执行 start/stop/restart；用户 toggle 忙时会被忽略。
   std::atomic<bool> control_action_running{false};
-  // 控制请求只用单槽合并，避免窗口拖拽时堆积 resize 重启任务。
+  // 控制请求只用单槽合并；用户 start 请求的参数也挂在这里，避免窗口拖拽时堆积任务。
   Features::Recording::Types::RecordingControlAction pending_action{
       Features::Recording::Types::RecordingControlAction::None};
+  std::optional<Features::Recording::Types::StartRequest> pending_start_request;
   // shutdown 开始后置为 true，阻止新的 toggle / resize restart 再抢控制权
   std::atomic<bool> shutdown_requested{false};
 
@@ -87,7 +88,7 @@ export struct RecordingState {
   std::condition_variable queue_cv;
   std::mutex encoder_ready_mutex;
   std::condition_variable encoder_ready_cv;
-  // control_request_mutex: 只保护 pending_action，不包住真正的 start/stop。
+  // control_request_mutex: 保护 pending_action / pending_start_request，不包住真正的 start/stop。
   std::mutex control_request_mutex;
   std::condition_variable control_cv;
 
