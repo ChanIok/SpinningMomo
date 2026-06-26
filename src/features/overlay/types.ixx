@@ -18,6 +18,7 @@ export constexpr UINT WM_SCHEDULE_OVERLAY_CLEANUP = WM_USER + 3;
 export constexpr UINT WM_CANCEL_OVERLAY_CLEANUP = WM_USER + 4;
 export constexpr UINT WM_IMMEDIATE_OVERLAY_CLEANUP = WM_USER + 5;
 export constexpr UINT WM_TARGET_WINDOW_DESTROYED = WM_USER + 6;
+export constexpr UINT WM_APPLY_CAPTURE_SIZE = WM_USER + 7;
 
 export constexpr UINT_PTR OVERLAY_CLEANUP_TIMER_ID = 1;
 
@@ -64,8 +65,8 @@ export struct RenderingState {
 // 捕获状态
 export struct CaptureState {
   Utils::Graphics::Capture::CaptureSession session;
-  int last_frame_width = 0;
-  int last_frame_height = 0;
+  std::atomic<int> last_frame_width = 0;
+  std::atomic<int> last_frame_height = 0;
 };
 
 // 交互状态

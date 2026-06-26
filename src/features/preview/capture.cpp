@@ -26,27 +26,15 @@ auto on_frame_arrived(Core::State::AppState& state,
 
   // 检查帧大小是否发生变化
   auto content_size = frame.ContentSize();
-  auto& last_width = state.preview->capture_state.last_frame_width;
-  auto& last_height = state.preview->capture_state.last_frame_height;
+  const auto last_width =
+      state.preview->capture_state.last_frame_width.load(std::memory_order_acquire);
+  const auto last_height =
+      state.preview->capture_state.last_frame_height.load(std::memory_order_acquire);
 
   bool size_changed = (content_size.Width != last_width) || (content_size.Height != last_height);
 
   if (size_changed) {
-    auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
-        state.preview->capture_state.session, content_size.Width, content_size.Height);
-    if (!recreate_result) {
-      Logger().error("{}", recreate_result.error());
-      Utils::Graphics::Capture::stop_capture(state.preview->capture_state.session);
-      state.preview->running.store(false, std::memory_order_release);
-      return;
-    }
-
-    last_width = content_size.Width;
-    last_height = content_size.Height;
-
-    state.preview->create_new_srv.store(true, std::memory_order_release);
-
-    // 捕获回调线程只负责发现尺寸变化；窗口尺寸状态与 SetWindowPos 统一收口到窗口线程。
+    // 捕获回调线程只负责发现尺寸变化；帧池重建与窗口尺寸应用统一收口到窗口线程。
     if (!Vendor::Windows::PostMessageW(state.preview->hwnd,
                                        Features::Preview::Types::WM_APPLY_CAPTURE_SIZE,
                                        static_cast<Vendor::Windows::WPARAM>(content_size.Width),
@@ -115,6 +103,8 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
   }
 
   state.preview->capture_state.session = std::move(session_result.value());
+  state.preview->capture_state.last_frame_width.store(width, std::memory_order_release);
+  state.preview->capture_state.last_frame_height.store(height, std::memory_order_release);
 
   Logger().info("Capture system initialized successfully");
   return {};

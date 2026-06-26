@@ -10,6 +10,8 @@ import Features.Overlay.Rendering;
 import Features.Overlay.State;
 import Features.Overlay.Types;
 import Features.Overlay.Geometry;
+import Features.Overlay.Window;
+import Utils.Graphics.Capture;
 import Utils.Logger;
 import <dwmapi.h>;
 import <windows.h>;
@@ -310,6 +312,35 @@ auto handle_overlay_message(Core::State::AppState& state, HWND hwnd, UINT messag
       Features::Overlay::stop_overlay(state, false);
 
       return {true, 1};
+    }
+
+    case Types::WM_APPLY_CAPTURE_SIZE: {
+      const int capture_width = static_cast<int>(wParam);
+      const int capture_height = static_cast<int>(lParam);
+      auto& window = overlay_state.window;
+
+      if (!Geometry::should_use_overlay(capture_width, capture_height, window.screen_width,
+                                        window.screen_height)) {
+        Features::Overlay::stop_overlay(state);
+        return {true, 0};
+      }
+
+      if (auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
+              state.overlay->capture_state.session, capture_width, capture_height);
+          !recreate_result) {
+        Logger().error("{}", recreate_result.error());
+        Features::Overlay::stop_overlay(state);
+        return {true, 0};
+      }
+
+      state.overlay->capture_state.last_frame_width.store(capture_width, std::memory_order_release);
+      state.overlay->capture_state.last_frame_height.store(capture_height,
+                                                           std::memory_order_release);
+      state.overlay->rendering.create_new_srv = true;
+
+      Window::set_overlay_window_size(state, capture_width, capture_height);
+
+      return {true, 0};
     }
 
     case WM_SIZE: {

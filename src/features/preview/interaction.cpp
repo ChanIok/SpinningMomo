@@ -10,6 +10,7 @@ import Features.Preview.Types;
 import Features.Preview.Rendering;
 import Features.Preview.Window;
 import Utils.DisplayGeometry;
+import Utils.Graphics.Capture;
 import Utils.Logger;
 import Utils.Throttle;
 import <dwmapi.h>;
@@ -507,6 +508,23 @@ auto handle_preview_message(Core::State::AppState& state, HWND hwnd, UINT messag
       return {true, 1};
 
     case Features::Preview::Types::WM_APPLY_CAPTURE_SIZE:
+      if (auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
+              state.preview->capture_state.session, static_cast<int>(wParam),
+              static_cast<int>(lParam));
+          !recreate_result) {
+        Logger().error("{}", recreate_result.error());
+        state.preview->running.store(false, std::memory_order_release);
+        Features::Preview::Window::hide_preview_window(state);
+        Features::Preview::Capture::cleanup_capture(state);
+        Features::Preview::Rendering::cleanup_rendering(state);
+        return {true, 0};
+      }
+
+      state.preview->capture_state.last_frame_width.store(static_cast<int>(wParam),
+                                                          std::memory_order_release);
+      state.preview->capture_state.last_frame_height.store(static_cast<int>(lParam),
+                                                           std::memory_order_release);
+      state.preview->create_new_srv.store(true, std::memory_order_release);
       Features::Preview::Window::set_preview_window_size(state, static_cast<int>(wParam),
                                                          static_cast<int>(lParam));
       return {true, 0};

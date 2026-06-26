@@ -28,8 +28,10 @@ auto on_frame_arrived(Core::State::AppState& state,
 
   // 检查帧大小是否发生变化
   auto content_size = frame.ContentSize();
-  auto& last_width = state.overlay->capture_state.last_frame_width;
-  auto& last_height = state.overlay->capture_state.last_frame_height;
+  const auto last_width =
+      state.overlay->capture_state.last_frame_width.load(std::memory_order_acquire);
+  const auto last_height =
+      state.overlay->capture_state.last_frame_height.load(std::memory_order_acquire);
   bool is_transforming = state.overlay->is_transforming.load(std::memory_order_acquire);
   bool overlay_window_shown = state.overlay->window.overlay_window_shown;
 
@@ -48,38 +50,18 @@ auto on_frame_arrived(Core::State::AppState& state,
     // 否则 freeze_after_first_frame 永远不会生效，窗口变换协程也无法正常收口。
     // 因此这里只更新 last_frame_*，把真正的显示与冻结交给下面的渲染路径。
     if (is_transforming && !overlay_window_shown) {
-      last_width = content_size.Width;
-      last_height = content_size.Height;
+      state.overlay->capture_state.last_frame_width.store(content_size.Width,
+                                                          std::memory_order_release);
+      state.overlay->capture_state.last_frame_height.store(content_size.Height,
+                                                           std::memory_order_release);
     } else {
-      // 检查是否需要退出（非变换场景，如用户手动调整窗口）
-      auto& window = state.overlay->window;
-      if (!Geometry::should_use_overlay(content_size.Width, content_size.Height,
-                                        window.screen_width, window.screen_height)) {
-        stop_overlay(state);
-        return;
+      // 捕获回调线程只负责上报尺寸变化；帧池重建与窗口尺寸应用统一收口到 overlay 窗口线程。
+      if (!Vendor::Windows::PostMessageW(
+              state.overlay->window.overlay_hwnd, Types::WM_APPLY_CAPTURE_SIZE,
+              static_cast<Vendor::Windows::WPARAM>(content_size.Width),
+              static_cast<Vendor::Windows::LPARAM>(content_size.Height))) {
+        Logger().warn("Failed to post overlay capture size update message");
       }
-
-      auto recreate_result = Utils::Graphics::Capture::recreate_frame_pool(
-          state.overlay->capture_state.session, content_size.Width, content_size.Height);
-      if (!recreate_result) {
-        Logger().error("{}", recreate_result.error());
-        stop_overlay(state);
-        return;
-      }
-
-      last_width = content_size.Width;
-      last_height = content_size.Height;
-
-      state.overlay->rendering.create_new_srv = true;
-
-      Window::set_overlay_window_size(state, content_size.Width, content_size.Height);
-
-      // 延迟防止闪烁
-      if (state.overlay->window.overlay_window_shown) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(400));
-        Logger().debug("Capture size changed, sleeping for 400ms");
-      }
-
       return;
     }
   }
@@ -173,6 +155,8 @@ auto initialize_capture(Core::State::AppState& state, Vendor::Windows::HWND targ
   }
 
   overlay_state.capture_state.session = std::move(session_result.value());
+  overlay_state.capture_state.last_frame_width.store(width, std::memory_order_release);
+  overlay_state.capture_state.last_frame_height.store(height, std::memory_order_release);
 
   Logger().info("Capture system initialized successfully");
   return {};
