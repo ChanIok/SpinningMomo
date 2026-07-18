@@ -7,6 +7,8 @@ interface UseSplitResizeOptions {
   min: Ref<number | string>
   max: Ref<number | string>
   reverse: Ref<boolean>
+  containerRef: Ref<HTMLElement | undefined>
+  dividerRef: Ref<HTMLElement | undefined>
   onUpdate: (size: number | string) => void
   onDrag?: (e: MouseEvent) => void
   onDragStart?: (e: MouseEvent) => void
@@ -14,11 +16,20 @@ interface UseSplitResizeOptions {
 }
 
 export function useSplitResize(options: UseSplitResizeOptions) {
-  const { direction, dividerSize, min, max, reverse, onUpdate, onDrag, onDragStart, onDragEnd } =
-    options
+  const {
+    direction,
+    dividerSize,
+    min,
+    max,
+    reverse,
+    containerRef,
+    dividerRef,
+    onUpdate,
+    onDrag,
+    onDragStart,
+    onDragEnd,
+  } = options
 
-  const containerRef = ref<HTMLElement>()
-  const dividerRef = ref<HTMLElement>()
   const isDragging = ref(false)
   let startOffset = 0
 

@@ -135,9 +135,10 @@ watch(
 )
 
 // 使用拖拽逻辑
+const containerRef = ref<HTMLElement>()
+const dividerRef = ref<HTMLElement>()
+
 const {
-  containerRef,
-  dividerRef,
   isDragging,
   dividerStyle,
   dividerCursor,
@@ -150,6 +151,8 @@ const {
   min: toRef(props, 'min'),
   max: toRef(props, 'max'),
   reverse: toRef(props, 'reverse'),
+  containerRef,
+  dividerRef,
   onUpdate: (size) => {
     internalSize.value = size
   },
