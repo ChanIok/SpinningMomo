@@ -22,6 +22,7 @@ export struct ScreenshotRequest {
   bool use_hdr = false;
   float hdr_target_peak_nits = 1000.0f;
   int shutter_frames = 0;
+  bool capture_client_area = true;
   std::function<void(bool success, const std::wstring& path)> completion_callback;
   std::chrono::steady_clock::time_point timestamp = std::chrono::steady_clock::now();
 };

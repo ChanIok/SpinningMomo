@@ -128,6 +128,19 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateScreenshotCaptureClientArea = async (captureClientArea: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        screenshot: {
+          ...(appSettings.value.features.screenshot ?? DEFAULT_APP_SETTINGS.features.screenshot),
+          captureClientArea,
+        },
+      },
+    })
+  }
+
   const updateRecordingFps = async (fps: number) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -343,6 +356,7 @@ export const useFunctionActions = () => {
           ...appSettings.value.features.screenshot,
           fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
           enableHdr: DEFAULT_APP_SETTINGS.features.screenshot.enableHdr,
+          captureClientArea: DEFAULT_APP_SETTINGS.features.screenshot.captureClientArea,
         },
         letterbox: {
           ...appSettings.value.features.letterbox,
@@ -380,6 +394,7 @@ export const useFunctionActions = () => {
           ...appSettings.value.features.screenshot,
           fileFormat: DEFAULT_APP_SETTINGS.features.screenshot.fileFormat,
           enableHdr: DEFAULT_APP_SETTINGS.features.screenshot.enableHdr,
+          captureClientArea: DEFAULT_APP_SETTINGS.features.screenshot.captureClientArea,
         },
         recording: {
           ...appSettings.value.features.recording,
@@ -431,6 +446,7 @@ export const useFunctionActions = () => {
     updateSavedFileViewAction,
     updateScreenshotFileFormat,
     updateScreenshotHdrEnabled,
+    updateScreenshotCaptureClientArea,
     resetFunctionSettings,
     updateRecordingFps,
     updateRecordingBitrate,

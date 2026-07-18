@@ -49,6 +49,7 @@ const {
   updateRecordingAudioBitrate,
   updateScreenshotFileFormat,
   updateScreenshotHdrEnabled,
+  updateScreenshotCaptureClientArea,
   resetCaptureExportSettings,
 } = useFunctionActions()
 const { clearError } = store
@@ -325,30 +326,49 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <Item variant="surface" size="sm">
-          <ItemContent>
-            <ItemTitle>
-              {{ t('settings.capture.screenshotSettings.formatLabel') }}
-            </ItemTitle>
-            <ItemDescription>
-              {{ t('settings.capture.screenshotSettings.formatDescription') }}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Select
-              :model-value="appSettings?.features?.screenshot?.fileFormat ?? 'png'"
-              @update:model-value="(value) => updateScreenshotFileFormat(value as 'png' | 'jpeg')"
-            >
-              <SelectTrigger class="w-[140px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="png">PNG</SelectItem>
-                <SelectItem value="jpeg">JPEG</SelectItem>
-              </SelectContent>
-            </Select>
-          </ItemActions>
-        </Item>
+        <ItemGroup>
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.capture.screenshotSettings.formatLabel') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.capture.screenshotSettings.formatDescription') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.screenshot?.fileFormat ?? 'png'"
+                @update:model-value="(value) => updateScreenshotFileFormat(value as 'png' | 'jpeg')"
+              >
+                <SelectTrigger class="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="png">PNG</SelectItem>
+                  <SelectItem value="jpeg">JPEG</SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.capture.screenshotSettings.captureClientArea.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.capture.screenshotSettings.captureClientArea.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.screenshot?.captureClientArea ?? true"
+                @update:model-value="(value) => updateScreenshotCaptureClientArea(Boolean(value))"
+              />
+            </ItemActions>
+          </Item>
+        </ItemGroup>
       </div>
 
       <div class="space-y-4">

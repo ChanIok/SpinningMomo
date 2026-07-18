@@ -87,6 +87,8 @@
   "settings.capture.screenshotSettings.description": "与快捷键截图相关的选项。",
   "settings.capture.screenshotSettings.formatLabel": "保存格式",
   "settings.capture.screenshotSettings.formatDescription": "PNG 无损；JPEG 体积更小、保存更快。",
+  "settings.capture.screenshotSettings.captureClientArea.label": "无边框捕获",
+  "settings.capture.screenshotSettings.captureClientArea.description": "仅捕获目标窗口客户区，不包含标题栏和窗口边框。",
   "settings.capture.savedFileViewAction.label": "“查看”按钮行为",
   "settings.capture.savedFileViewAction.description": "控制截图或录制保存成功后，通知中“查看”按钮如何打开文件。",
   "settings.capture.savedFileViewAction.defaultApp": "默认应用打开",

@@ -130,6 +130,7 @@ export struct AppSettings {
     struct Screenshot {
       std::string file_format = "png";  // 静态截图保存格式: "png" | "jpeg"
       bool enable_hdr = false;          // 目标屏为 HDR 时保存 Ultra HDR JPEG
+      bool capture_client_area = true;  // 是否只捕获客户区（无边框）
     } screenshot;
 
     // 黑边模式设置

@@ -17,6 +17,7 @@ import Utils.Graphics.Capture;
 import Utils.Graphics.D3D;
 import Utils.Graphics.HDR;
 import Utils.Graphics.PhotoProcessing;
+import Utils.Graphics.CaptureRegion;
 import Utils.Image;
 import <d3d11.h>;
 import <wil/com.h>;
@@ -157,12 +158,15 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
       return std::unexpected("Target window is minimized");
     }
 
-    // 获取窗口大小
-    RECT rect;
-    THROW_IF_WIN32_BOOL_FALSE(GetWindowRect(request.target_window, &rect));
+    // 获取 WGC 真实的捕获宽高以消除阴影引起的黑边
+    auto capture_size_result =
+        Utils::Graphics::Capture::get_capture_item_size(request.target_window);
+    if (!capture_size_result) {
+      return std::unexpected("Failed to get capture item size: " + capture_size_result.error());
+    }
 
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top;
+    int width = capture_size_result->first;
+    int height = capture_size_result->second;
     if (width <= 0 || height <= 0) {
       return std::unexpected("Invalid window size");
     }
@@ -223,6 +227,38 @@ auto do_screenshot_capture(const Features::Screenshot::State::ScreenshotRequest&
 
               // 累积完成，用混合后的均值纹理替换原始帧
               texture_to_save = session_info.average_accumulator->current_average.get();
+            }
+
+            // 若开启了无边框捕获（仅捕获客户区），则在保存前裁剪纹理
+            wil::com_ptr<ID3D11Texture2D> cropped_texture;
+            if (session_info.request.capture_client_area) {
+              D3D11_TEXTURE2D_DESC desc;
+              texture_to_save->GetDesc(&desc);
+
+              auto crop_region_result =
+                  Utils::Graphics::CaptureRegion::calculate_client_crop_region(
+                      session_info.request.target_window, desc.Width, desc.Height);
+              if (crop_region_result) {
+                wil::com_ptr<ID3D11Device> device;
+                texture_to_save->GetDevice(device.put());
+                wil::com_ptr<ID3D11DeviceContext> context;
+                if (device) {
+                  device->GetImmediateContext(context.put());
+                }
+                if (device && context) {
+                  auto crop_result = Utils::Graphics::CaptureRegion::crop_texture_to_region(
+                      device.get(), context.get(), texture_to_save, *crop_region_result,
+                      cropped_texture);
+                  if (crop_result) {
+                    texture_to_save = crop_result.value();
+                  } else {
+                    Logger().warn("Failed to crop texture for screenshot: {}", crop_result.error());
+                  }
+                }
+              } else {
+                Logger().warn("Failed to calculate client crop region for screenshot: {}",
+                              crop_region_result.error());
+              }
             }
 
             auto save_result = save_capture_texture(texture_to_save, session_info.request);
@@ -517,8 +553,8 @@ auto take_screenshot(
     Core::State::AppState& app_state, HWND target_window,
     std::function<void(bool success, const std::wstring& path)> completion_callback,
     Utils::Image::ImageFormat format, float jpeg_quality,
-    std::optional<std::filesystem::path> output_dir_override, int shutter_frames)
-    -> std::expected<void, std::string> {
+    std::optional<std::filesystem::path> output_dir_override, int shutter_frames,
+    bool capture_client_area) -> std::expected<void, std::string> {
   auto& state = *app_state.screenshot;
   if (!target_window || !IsWindow(target_window)) {
     return std::unexpected("Invalid target window handle");
@@ -612,6 +648,7 @@ auto take_screenshot(
   request.completion_callback = completion_callback;
   request.timestamp = std::chrono::steady_clock::now();
   request.shutter_frames = std::max(0, shutter_frames);
+  request.capture_client_area = capture_client_area;
 
   if (use_hdr) {
     RECT window_rect{};
