@@ -35,16 +35,6 @@ SpinningMomo is a Windows desktop tool built for *Infinity Nikki* (and other win
 
 - **GitHub Releases**: [Download the latest version](https://github.com/ChanIok/SpinningMomo/releases/latest)
 
-### Code signing policy
-
-This project has applied for free code signing provided by SignPath.io, certificate by SignPath Foundation. The application is currently pending review.
-
-After approval, official Windows release artifacts will be built from source through the automated release workflow documented in this repository and signed through SignPath. Release signing requests are approved by the project maintainer.
-
-- Committers and reviewers: [ChanIok](https://github.com/ChanIok)
-- Approvers: [ChanIok](https://github.com/ChanIok)
-- Privacy policy: [Legal & Privacy notice](https://spin.infinitymomo.com/en/about/legal)
-
 ### Getting Started
 
 See the [documentation site](https://spin.infinitymomo.com/en) for setup guides and feature details.
@@ -54,6 +44,9 @@ See the [documentation site](https://spin.infinitymomo.com/en) for setup guides 
 Check the [build guide](https://spin.infinitymomo.com/en/developer/architecture) for prerequisites and step-by-step instructions.
 
 ## Credits
+
+Free code signing on Windows provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).<br>
+&emsp;Committer & approver: [ChanIok](https://github.com/ChanIok)
 
 Thanks to [NUAN5.PRO](https://NUAN5.PRO) for photo data parsing services.
 

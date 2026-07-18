@@ -19,7 +19,6 @@ Two package types are available:
 ## First Launch
 
 The first time you run the program, Windows may show:
-- **SmartScreen**: Click **More info** → **Run anyway** (open-source software doesn't have a code signing certificate)
 - **UAC prompt**: Click **Yes** to grant admin privileges (required for resizing the game window)
 
 ## Setup Wizard
