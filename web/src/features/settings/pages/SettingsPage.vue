@@ -9,6 +9,7 @@ import GeneralSettingsContent from '../components/GeneralSettingsContent.vue'
 import HotkeySettingsContent from '../components/HotkeySettingsContent.vue'
 import WindowSceneContent from '../components/WindowSceneContent.vue'
 import FloatingWindowContent from '../components/FloatingWindowContent.vue'
+import BackupSettingsContent from '../components/BackupSettingsContent.vue'
 import { useSettingsStore } from '../store'
 
 const activePage = ref<SettingsPageKey>('general')
@@ -42,6 +43,7 @@ watch(activePage, () => {
           <WindowSceneContent v-if="activePage === 'windowScene'" />
           <FloatingWindowContent v-if="activePage === 'floatingWindow'" />
           <AppearanceContent v-if="activePage === 'webAppearance'" />
+          <BackupSettingsContent v-if="activePage === 'backup'" />
         </div>
       </ScrollArea>
     </div>

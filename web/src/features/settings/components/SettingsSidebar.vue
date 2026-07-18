@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
-import { Settings, Keyboard, Camera, Blocks, Monitor, Menu, Palette } from 'lucide-vue-next'
+import {
+  Settings,
+  Keyboard,
+  Camera,
+  Blocks,
+  Monitor,
+  Menu,
+  Palette,
+  DatabaseBackup,
+} from 'lucide-vue-next'
 import { useI18n } from '@/composables/useI18n'
 
 export type SettingsPageKey =
@@ -11,6 +20,7 @@ export type SettingsPageKey =
   | 'windowScene'
   | 'floatingWindow'
   | 'webAppearance'
+  | 'backup'
 
 interface SettingsMenuItem {
   key: SettingsPageKey
@@ -71,6 +81,12 @@ const settingsMenus: SettingsMenuItem[] = [
     label: 'settings.layout.extensions.title',
     icon: Blocks,
     description: 'settings.layout.extensions.description',
+  },
+  {
+    key: 'backup',
+    label: 'settings.layout.backup.title',
+    icon: DatabaseBackup,
+    description: 'settings.layout.backup.description',
   },
 ]
 

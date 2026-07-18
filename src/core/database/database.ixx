@@ -43,6 +43,11 @@ export auto initialize(Core::State::AppState& app_state, const std::filesystem::
 
 export auto shutdown(Core::State::AppState& app_state) -> void;
 
+// 从运行中的数据库生成一致快照，避免直接复制 WAL 数据库得到不完整文件。
+export auto backup_to(Core::State::AppState& app_state,
+                      const std::filesystem::path& destination_path)
+    -> std::expected<void, std::string>;
+
 // 用于 `... RETURNING id` 的通用单列行类型。多行返回时用 query<ReturningIdRow>() 计数。
 export struct ReturningIdRow {
   std::int64_t id = 0;

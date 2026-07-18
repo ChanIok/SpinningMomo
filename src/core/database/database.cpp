@@ -270,6 +270,41 @@ auto shutdown(Core::State::AppState& app_state) -> void {
   shutdown_executor(*state);
 }
 
+// 从运行中的数据库生成一致快照，避免直接复制 WAL 数据库得到不完整文件。
+auto backup_to(Core::State::AppState& app_state, const std::filesystem::path& destination_path)
+    -> std::expected<void, std::string> {
+  if (destination_path.empty()) {
+    return std::unexpected("Database backup destination is empty");
+  }
+
+  std::expected<void, std::string> backup_result{};
+  auto job_result = run_database_job(app_state, [&](SQLite::Database& source) {
+    try {
+      // 先移除旧快照，避免目标文件中的历史页面残留到本次导出。
+      std::error_code remove_error;
+      std::filesystem::remove(destination_path, remove_error);
+      if (remove_error) {
+        backup_result =
+            std::unexpected("Failed to remove old database snapshot: " + remove_error.message());
+        return;
+      }
+
+      // 交给 SQLiteCpp 的在线备份封装生成包含当前 WAL 状态的一致快照。
+      source.backup(destination_path.string().c_str(), SQLite::Database::Save);
+      backup_result = {};
+    } catch (const SQLite::Exception& e) {
+      backup_result = std::unexpected("SQLite backup failed: " + std::string(e.what()));
+    } catch (const std::exception& e) {
+      backup_result = std::unexpected("Database backup failed: " + std::string(e.what()));
+    }
+  });
+
+  if (!job_result) {
+    return std::unexpected(job_result.error());
+  }
+  return backup_result;
+}
+
 auto execute(Core::State::AppState& app_state, const std::string& sql)
     -> std::expected<void, std::string> {
   return run_on_database<std::expected<void, std::string>>(

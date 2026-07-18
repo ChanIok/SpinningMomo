@@ -5,6 +5,7 @@ module Core.RPC.Registry;
 import std;
 import Core.State;
 import Core.RPC.Endpoints.Clipboard;
+import Core.RPC.Endpoints.Backup;
 import Core.RPC.Endpoints.Dialog;
 import Core.RPC.Endpoints.File;
 import Core.RPC.Endpoints.RuntimeInfo;
@@ -26,6 +27,9 @@ auto register_all_endpoints(Core::State::AppState& state) -> void {
 
   // 注册文件操作端点
   Endpoints::File::register_all(state);
+
+  // 注册数据备份与恢复端点
+  Endpoints::Backup::register_all(state);
 
   // 注册剪贴板端点
   Endpoints::Clipboard::register_all(state);

@@ -20,9 +20,9 @@ import Features.Settings.State;
 import Utils.Crypto;
 import Utils.Logger;
 import Utils.Path;
+import Utils.PowerShell;
 import Utils.String;
 import Utils.Throttle;
-import Vendor.ShellApi;
 import Vendor.Version;
 import Vendor.Windows;
 import <asio.hpp>;
@@ -753,47 +753,40 @@ auto execute_pending_update(Core::State::AppState& app_state) -> void {
   Logger().info("Executing pending update script: {}",
                 Utils::String::ToUtf8(script_path.wstring()));
 
-  const auto script_directory = script_path.parent_path();
   const auto update_mode =
       pending_update.is_portable ? std::wstring(L"portable") : std::wstring(L"installed");
 
-  std::wstring command_parameters = std::format(
-      L"-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden "
-      L"-File {} -PidToWait {} -Mode {} -PackagePath {} "
-      L"-TargetInstallDirectory {}",
-      std::format(L"\"{}\"", script_path.wstring()), Vendor::Windows::GetCurrentProcessId(),
-      std::format(L"\"{}\"", update_mode), std::format(L"\"{}\"", package_path.wstring()),
-      std::format(L"\"{}\"", target_install_directory.wstring()));
+  // 所有业务路径都作为独立参数交给统一执行器，避免手工拼接命令行。
+  std::vector<std::wstring> arguments{
+      L"-PidToWait",
+      std::to_wstring(Vendor::Windows::GetCurrentProcessId()),
+      L"-Mode",
+      update_mode,
+      L"-PackagePath",
+      package_path.wstring(),
+      L"-TargetInstallDirectory",
+      target_install_directory.wstring(),
+  };
 
   if (!install_log_path.empty()) {
-    command_parameters += std::format(L" -InstallLogPath \"{}\"", install_log_path.wstring());
+    arguments.emplace_back(L"-InstallLogPath");
+    arguments.emplace_back(install_log_path.wstring());
   }
 
   if (pending_update.restart) {
-    command_parameters += L" -Restart";
+    arguments.emplace_back(L"-Restart");
   }
   if (pending_update.quiet_install) {
-    command_parameters += L" -QuietInstall";
+    arguments.emplace_back(L"-QuietInstall");
   }
 
-  // 启动更新脚本
-  Vendor::ShellApi::SHELLEXECUTEINFOW sei = {sizeof(sei)};
-  sei.fMask = Vendor::ShellApi::kSEE_MASK_NOASYNC;
-  sei.hwnd = nullptr;
-  sei.lpVerb = L"open";
-  sei.lpFile = L"powershell.exe";
-  sei.lpParameters = command_parameters.c_str();
-  sei.lpDirectory = script_directory.empty() ? nullptr : script_directory.c_str();
-  sei.nShow = Vendor::ShellApi::kSW_HIDE;
-  sei.hInstApp = nullptr;
-
-  const bool shell_execute_ok = Vendor::ShellApi::ShellExecuteExW(&sei) != 0;
-
-  if (shell_execute_ok) {
-    Logger().info("Update script launch accepted by shell");
+  // 更新与恢复共享同一个隐藏 PowerShell 启动入口。
+  auto launch_result = Utils::PowerShell::launch_script(script_path, arguments);
+  if (launch_result) {
+    Logger().info("Update PowerShell script started");
   } else {
-    Logger().error("Failed to execute update script: last_error={}, script_path={}",
-                   Vendor::Windows::GetLastError(), Utils::String::ToUtf8(script_path.wstring()));
+    Logger().error("Failed to execute update script: error={}, script_path={}",
+                   launch_result.error(), Utils::String::ToUtf8(script_path.wstring()));
   }
 
   // 清除待处理更新标志
