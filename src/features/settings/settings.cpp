@@ -73,14 +73,14 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
     if (!std::filesystem::exists(settings_path.value())) {
       Logger().info("Settings file not found, creating default configuration");
 
-      auto default_state = State::create_default_settings_state();
-      default_state.raw.app.language.current = detect_default_locale();
+      Types::AppSettings config;
+      config.app.language.current = detect_default_locale();
       // 新安装用户首次启动应进入欢迎流程
-      default_state.raw.app.onboarding.completed = false;
-      default_state.raw.app.onboarding.flow_version = Types::CURRENT_ONBOARDING_FLOW_VERSION;
-      default_state.raw.extensions.infinity_nikki.enable = false;
+      config.app.onboarding.completed = false;
+      config.app.onboarding.flow_version = Types::CURRENT_ONBOARDING_FLOW_VERSION;
+      config.extensions.infinity_nikki.enable = false;
 
-      auto json_str = rfl::json::write(default_state.raw, rfl::json::pretty);
+      auto json_str = rfl::json::write(config, rfl::json::pretty);
       std::ofstream file(settings_path.value());
       if (!file) {
         return std::unexpected("Failed to create settings file");
@@ -88,7 +88,7 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       file << json_str;
 
       // 计算预设并初始化内存状态
-      *app_state.settings = default_state;
+      app_state.settings->raw = std::move(config);
       Compute::trigger_compute(app_state);
       app_state.settings->is_initialized = true;
       Background::register_static_resolvers(app_state);
@@ -110,62 +110,26 @@ auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::st
       return std::unexpected("Failed to parse settings: " + config_result.error().what());
     }
 
-    auto config = config_result.value();
-
-    // 创建完整状态
-    State::SettingsState state;
-    state.raw = config;
-
-    // 先设置到app_state，然后计算预设
-    *app_state.settings = state;
+    app_state.settings->raw = std::move(config_result.value());
     Compute::trigger_compute(app_state);
     app_state.settings->is_initialized = true;
     Background::register_static_resolvers(app_state);
 
-    Logger().info("Settings loaded successfully (version {})", config.version);
+    Logger().info("Settings loaded successfully (version {})", app_state.settings->raw.version);
     return {};
   } catch (const std::exception& e) {
     return std::unexpected("Failed to initialize settings: " + std::string(e.what()));
   }
 }
 
-auto get_settings(const Types::GetSettingsParams& params)
-    -> std::expected<Types::GetSettingsResult, std::string> {
-  try {
-    auto settings_path = get_settings_path();
-    if (!settings_path) {
-      return std::unexpected(settings_path.error());
-    }
-
-    if (!std::filesystem::exists(settings_path.value())) {
-      return std::unexpected("Settings file does not exist");
-    }
-
-    std::ifstream file(settings_path.value());
-    if (!file) {
-      return std::unexpected("Failed to open settings file");
-    }
-
-    std::string json_str((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-    auto result = rfl::json::read<Types::AppSettings, rfl::DefaultIfMissing>(json_str);
-    if (!result) {
-      return std::unexpected("Failed to parse settings: " + result.error().what());
-    }
-
-    return result.value();
-  } catch (const std::exception& e) {
-    return std::unexpected("Failed to read settings: " + std::string(e.what()));
-  }
+auto get_settings(Core::State::AppState& app_state) -> Types::GetSettingsResult {
+  std::scoped_lock lock(app_state.settings->mutation_mutex);
+  return app_state.settings->raw;
 }
 
 auto notify_settings_changed(Core::State::AppState& app_state,
                              const Types::AppSettings& old_settings,
                              std::string_view change_description) -> void {
-  if (!app_state.events || !app_state.settings) {
-    return;
-  }
-
   Types::SettingsChangeData change_data{
       .old_settings = old_settings,
       .new_settings = app_state.settings->raw,
@@ -195,17 +159,13 @@ auto merge_patch_object(rfl::Generic::Object& target, const rfl::Generic::Object
   }
 }
 
-auto apply_settings_and_persist(Core::State::AppState& app_state,
-                                const Types::AppSettings& next_settings,
-                                std::string_view change_description)
+auto apply_settings_and_persist_locked(Core::State::AppState& app_state,
+                                       const Types::AppSettings& next_settings,
+                                       std::string_view change_description)
     -> std::expected<Types::UpdateSettingsResult, std::string> {
   auto settings_path = get_settings_path();
   if (!settings_path) {
     return std::unexpected(settings_path.error());
-  }
-
-  if (!app_state.settings) {
-    return std::unexpected("Settings not initialized");
   }
 
   Types::AppSettings old_settings = app_state.settings->raw;
@@ -230,7 +190,8 @@ auto apply_settings_and_persist(Core::State::AppState& app_state,
 auto update_settings(Core::State::AppState& app_state, const Types::UpdateSettingsParams& params)
     -> std::expected<Types::UpdateSettingsResult, std::string> {
   try {
-    return apply_settings_and_persist(app_state, params, "Settings updated via RPC");
+    std::scoped_lock lock(app_state.settings->mutation_mutex);
+    return apply_settings_and_persist_locked(app_state, params, "Settings updated via RPC");
   } catch (const std::exception& e) {
     return std::unexpected("Failed to save settings: " + std::string(e.what()));
   }
@@ -246,17 +207,10 @@ auto patch_settings(Core::State::AppState& app_state, const Types::PatchSettings
       };
     }
 
-    if (!app_state.settings) {
-      return std::unexpected("Settings not initialized");
-    }
+    std::scoped_lock lock(app_state.settings->mutation_mutex);
 
-    auto current_generic = rfl::to_generic<rfl::SnakeCaseToCamelCase>(app_state.settings->raw);
-    auto current_object = current_generic.to_object();
-    if (!current_object) {
-      return std::unexpected("Current settings is not an object");
-    }
-
-    auto merged_object = current_object.value();
+    auto merged_object =
+        rfl::to_generic<rfl::SnakeCaseToCamelCase>(app_state.settings->raw).to_object().value();
     merge_patch_object(merged_object, params.patch);
 
     // 经 JSON 再反序列化，与「从文件读设置」同路径，避免 from_generic 对 double 字段
@@ -269,8 +223,8 @@ auto patch_settings(Core::State::AppState& app_state, const Types::PatchSettings
       return std::unexpected("Invalid settings patch: " + merged_settings_result.error().what());
     }
 
-    return apply_settings_and_persist(app_state, merged_settings_result.value(),
-                                      "Settings patched via RPC");
+    return apply_settings_and_persist_locked(app_state, merged_settings_result.value(),
+                                             "Settings patched via RPC");
   } catch (const std::exception& e) {
     return std::unexpected("Failed to patch settings: " + std::string(e.what()));
   }

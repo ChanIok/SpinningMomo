@@ -17,8 +17,7 @@ export struct StartupSettings {
 
 export auto initialize(Core::State::AppState& app_state) -> std::expected<void, std::string>;
 
-export auto get_settings(const Types::GetSettingsParams& params)
-    -> std::expected<Types::GetSettingsResult, std::string>;
+export auto get_settings(Core::State::AppState& app_state) -> Types::GetSettingsResult;
 
 export auto update_settings(Core::State::AppState& app_state,
                             const Types::UpdateSettingsParams& params)

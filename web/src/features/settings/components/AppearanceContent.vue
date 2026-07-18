@@ -32,6 +32,7 @@ import type { WebThemeMode } from '../types'
 import type { OverlayPalette, OverlayPalettePreset } from '../overlayPalette'
 import { getOverlayPaletteFromBackground } from '../overlayPalette'
 import { resolveBackgroundImageUrl } from '../backgroundPath'
+import { applyPrimaryColorToDocument } from '../appearance'
 import {
   SURFACE_OPACITY_RANGE,
   BACKGROUND_BLUR_RANGE,
@@ -71,11 +72,21 @@ const webThemeSelectValue = computed(() => {
   return m === 'dark' ? 'dark' : 'light'
 })
 const customCssDraft = ref('')
+const primaryColorDraft = ref(appSettings.value.ui.background.primaryColor)
+const primaryColorPopoverOpen = ref(false)
 
 watch(
   () => appSettings.value.ui.webTheme.customCss,
   (v) => {
     customCssDraft.value = v ?? ''
+  },
+  { immediate: true }
+)
+
+watch(
+  () => appSettings.value.ui.background.primaryColor,
+  (value) => {
+    primaryColorDraft.value = value
   },
   { immediate: true }
 )
@@ -168,11 +179,28 @@ const handleCustomCssBlur = async () => {
   }
 }
 
-const handlePrimaryColorChange = async (primaryColor: string) => {
+const handlePrimaryColorPreview = (primaryColor: string) => {
+  primaryColorDraft.value = primaryColor
+  applyPrimaryColorToDocument(primaryColor, appSettings.value.ui.webTheme.mode)
+}
+
+const handlePrimaryColorCommit = async (primaryColor: string) => {
+  if (primaryColor === appSettings.value.ui.background.primaryColor) return
+
   try {
     await updatePrimaryColor(primaryColor)
   } catch (error) {
+    const persistedColor = appSettings.value.ui.background.primaryColor
+    primaryColorDraft.value = persistedColor
+    applyPrimaryColorToDocument(persistedColor, appSettings.value.ui.webTheme.mode)
     console.error('Failed to update primary color:', error)
+  }
+}
+
+const handlePrimaryColorPopoverOpenChange = (open: boolean) => {
+  primaryColorPopoverOpen.value = open
+  if (!open) {
+    void handlePrimaryColorCommit(primaryColorDraft.value)
   }
 }
 
@@ -277,7 +305,10 @@ const handleClearError = () => {
               </ItemDescription>
             </ItemContent>
             <ItemActions>
-              <Popover>
+              <Popover
+                :open="primaryColorPopoverOpen"
+                @update:open="handlePrimaryColorPopoverOpenChange"
+              >
                 <PopoverTrigger as-child>
                   <Button
                     variant="outline"
@@ -286,17 +317,18 @@ const handleClearError = () => {
                   >
                     <div
                       class="h-5 w-8 shrink-0 rounded-sm border border-border/70"
-                      :style="{ backgroundColor: appSettings.ui.background.primaryColor }"
+                      :style="{ backgroundColor: primaryColorDraft }"
                     />
                     <span class="text-muted-foreground">
-                      {{ appSettings.ui.background.primaryColor }}
+                      {{ primaryColorDraft }}
                     </span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" class="w-auto p-3">
                   <ColorPicker
-                    :model-value="appSettings.ui.background.primaryColor"
-                    @update:model-value="handlePrimaryColorChange"
+                    :model-value="primaryColorDraft"
+                    @update:model-value="handlePrimaryColorPreview"
+                    @commit="handlePrimaryColorCommit"
                   />
                 </PopoverContent>
               </Popover>

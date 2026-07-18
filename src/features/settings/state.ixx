@@ -16,6 +16,9 @@ export struct ComputedPresets {
 
 // Settings 模块的完整运行时状态 (Vue/Pinia Style)
 export struct SettingsState {
+  // 设置可能由多个 RPC 工作线程同时更新；一次合并、计算和落盘必须作为完整事务执行。
+  std::mutex mutation_mutex;
+
   // [Raw State] 原始配置数据 (Source of Truth)
   Types::AppSettings raw;
 
@@ -24,15 +27,5 @@ export struct SettingsState {
 
   bool is_initialized = false;
 };
-
-// === 状态管理函数 ===
-
-// 创建默认的设置状态
-export auto create_default_settings_state() -> SettingsState {
-  SettingsState state;
-  state.raw = Types::AppSettings{};
-  state.is_initialized = false;
-  return state;
-}
 
 }  // namespace Features::Settings::State

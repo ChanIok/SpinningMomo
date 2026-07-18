@@ -77,6 +77,31 @@ const resolvePrimaryForeground = (primaryColor: string): string => {
   return luminance >= 0.45 ? '#18181B' : '#FFFFFF'
 }
 
+const applyPrimaryColor = (
+  root: HTMLElement,
+  primaryColorValue: string,
+  themeMode: WebThemeMode
+): void => {
+  const resolvedTheme = resolveTheme(themeMode)
+  const primaryFallback = resolvedTheme === 'light' ? '#F59E0B' : '#FBBF24'
+  const primaryColor = normalizeHexColor(primaryColorValue, primaryFallback)
+  const primaryForeground = resolvePrimaryForeground(primaryColor)
+
+  root.style.setProperty('--primary', primaryColor)
+  root.style.setProperty('--ring', primaryColor)
+  root.style.setProperty('--sidebar-primary', primaryColor)
+  root.style.setProperty('--primary-foreground', primaryForeground)
+  root.style.setProperty('--sidebar-primary-foreground', primaryForeground)
+}
+
+export const applyPrimaryColorToDocument = (
+  primaryColor: string,
+  themeMode: WebThemeMode
+): void => {
+  if (typeof document === 'undefined') return
+  applyPrimaryColor(document.documentElement, primaryColor, themeMode)
+}
+
 let backgroundRequestToken = 0
 let appliedBackgroundUrl: string | null = null
 
@@ -157,10 +182,6 @@ const applyBackground = (settings: AppSettings): void => {
   const root = document.documentElement
   const background = settings.ui.background
   const imageUrl = resolveBackgroundImageUrl(background)
-  const resolvedTheme = resolveTheme(settings.ui.webTheme.mode)
-  const primaryFallback = resolvedTheme === 'light' ? '#F59E0B' : '#FBBF24'
-  const primaryColor = normalizeHexColor(background.primaryColor, primaryFallback)
-  const primaryForeground = resolvePrimaryForeground(primaryColor)
 
   const backgroundOpacity = clamp(background.backgroundOpacity, 0, 1)
   const backgroundBlur = clamp(background.backgroundBlurAmount, 0, 100)
@@ -175,11 +196,7 @@ const applyBackground = (settings: AppSettings): void => {
   root.style.setProperty('--app-background-overlay-opacity', String(overlayOpacity))
 
   root.style.setProperty('--surface-opacity', String(clamp(background.surfaceOpacity, 0, 1)))
-  root.style.setProperty('--primary', primaryColor)
-  root.style.setProperty('--ring', primaryColor)
-  root.style.setProperty('--sidebar-primary', primaryColor)
-  root.style.setProperty('--primary-foreground', primaryForeground)
-  root.style.setProperty('--sidebar-primary-foreground', primaryForeground)
+  applyPrimaryColor(root, background.primaryColor, settings.ui.webTheme.mode)
 
   updateBackgroundImage(root, imageUrl)
 }

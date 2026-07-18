@@ -15,6 +15,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
+  (e: 'commit', value: string): void
 }>()
 
 const hsv = ref(hexToHsv(props.modelValue))
@@ -34,6 +35,10 @@ const emitColor = () => {
   emit('update:modelValue', hsvToHex(hsv.value))
 }
 
+const commitColor = () => {
+  emit('commit', hsvToHex(hsv.value))
+}
+
 const handleHexInput = (e: Event) => {
   const target = e.target as HTMLInputElement
   const newHex = target.value
@@ -42,6 +47,10 @@ const handleHexInput = (e: Event) => {
     hsv.value = hexToHsv(normalizedHex)
     emitColor()
   }
+}
+
+const handleHexCommit = () => {
+  commitColor()
 }
 
 // --- Saturation & Brightness Board ---
@@ -62,8 +71,10 @@ const handleBoardPointerMove = (e: PointerEvent) => {
 
 const handleBoardPointerUp = (e: PointerEvent) => {
   if (!boardRef.value) return
+  updateBoardPosition(e)
   isDraggingBoard.value = false
   boardRef.value.releasePointerCapture(e.pointerId)
+  commitColor()
 }
 
 const updateBoardPosition = (e: PointerEvent) => {
@@ -78,7 +89,6 @@ const updateBoardPosition = (e: PointerEvent) => {
 
   hsv.value.s = (x / rect.width) * 100
   hsv.value.v = 100 - (y / rect.height) * 100
-
   emitColor()
 }
 
@@ -100,8 +110,10 @@ const handleHuePointerMove = (e: PointerEvent) => {
 
 const handleHuePointerUp = (e: PointerEvent) => {
   if (!hueRef.value) return
+  updateHuePosition(e)
   isDraggingHue.value = false
   hueRef.value.releasePointerCapture(e.pointerId)
+  commitColor()
 }
 
 const updateHuePosition = (e: PointerEvent) => {
@@ -189,6 +201,8 @@ const currentColorRender = computed(() => hsvToHex(hsv.value))
       <Input
         :model-value="currentColorRender"
         @input="handleHexInput"
+        @keydown.enter.prevent="handleHexCommit"
+        @blur="handleHexCommit"
         class="h-7 flex-1 font-mono text-xs uppercase"
         placeholder="#000000"
       />

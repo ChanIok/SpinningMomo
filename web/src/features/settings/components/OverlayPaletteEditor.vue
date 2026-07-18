@@ -101,14 +101,17 @@ const updateMode = (mode: OverlayColorMode) => {
   })
 }
 
-const updateColor = (index: number, color: string) => {
+const updateColor = (index: number, color: string, emitUpdate = true) => {
   const normalizedColor = normalizeHexColor(color, currentColor.value)
   const nextColors = [...localPalette.value.colors] as OverlayPalette['colors']
   nextColors[index] = normalizedColor
-  setPalette({
-    mode: localPalette.value.mode,
-    colors: nextColors,
-  })
+  setPalette(
+    {
+      mode: localPalette.value.mode,
+      colors: nextColors,
+    },
+    emitUpdate
+  )
 }
 
 const handleModeChange = (value: unknown) => {
@@ -245,7 +248,8 @@ const handleSampleFromWallpaper = () => {
               <ColorPicker
                 :model-value="currentColor"
                 :show-hex-input="false"
-                @update:model-value="(color) => updateColor(activeColorIndex, color)"
+                @update:model-value="(color) => updateColor(activeColorIndex, color, false)"
+                @commit="(color) => updateColor(activeColorIndex, color)"
               />
             </PopoverContent>
           </Popover>

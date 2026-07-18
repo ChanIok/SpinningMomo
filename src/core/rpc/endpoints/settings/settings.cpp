@@ -14,18 +14,11 @@ import <asio.hpp>;
 
 namespace Core::RPC::Endpoints::Settings {
 
-auto handle_get_settings([[maybe_unused]] Core::State::AppState& app_state,
-                         const Features::Settings::Types::GetSettingsParams& params)
+auto handle_get_settings(
+    Core::State::AppState& app_state,
+    [[maybe_unused]] const Features::Settings::Types::GetSettingsParams& params)
     -> asio::awaitable<Core::RPC::RpcResult<Features::Settings::Types::GetSettingsResult>> {
-  auto result = Features::Settings::get_settings(params);
-
-  if (!result) {
-    co_return std::unexpected(
-        Core::RPC::RpcError{.code = static_cast<int>(Core::RPC::ErrorCode::ServerError),
-                            .message = "Service error: " + result.error()});
-  }
-
-  co_return result.value();
+  co_return Features::Settings::get_settings(app_state);
 }
 
 auto handle_update_settings(Core::State::AppState& app_state,
