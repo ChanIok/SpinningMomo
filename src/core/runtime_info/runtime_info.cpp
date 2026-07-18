@@ -10,6 +10,7 @@ import Utils.Graphics.Capture;
 import Utils.Logger;
 import Utils.Media.AudioCapture;
 import Utils.System;
+import Utils.Path;
 import Vendor.BuildConfig;
 import Vendor.Version;
 
@@ -97,6 +98,10 @@ auto collect(Core::State::AppState& app_state) -> void {
   Detail::collect_app_version(runtime_info);
   Detail::collect_os_and_capabilities(runtime_info);
   Detail::collect_webview_info(runtime_info);
+
+  if (auto app_data_result = Utils::Path::GetAppDataDirectory()) {
+    runtime_info.app_data_dir = app_data_result.value().string();
+  }
 }
 
 }  // namespace Core::RuntimeInfo

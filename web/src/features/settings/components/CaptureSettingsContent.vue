@@ -54,11 +54,32 @@ const {
 const { clearError } = store
 const { t } = useI18n()
 const { toast } = useToast()
-
 /** 是否为 Windows 盘符根路径（如 C:\\、D:/），用于避免将输出目录设为整盘根。 */
 const isWindowsDriveRoot = (raw: string) => {
   const normalized = raw.trim().replace(/\\/g, '/')
   return /^[A-Za-z]:\/?$/.test(normalized)
+}
+
+/** 判断 target 路径是否在 base 路径内部（不敏感大小写，支持斜杠归一化） */
+const isPathWithinBase = (target: string, base: string): boolean => {
+  let normTarget = target.replace(/\\/g, '/').toLowerCase()
+  let normBase = base.replace(/\\/g, '/').toLowerCase()
+
+  if (normTarget.endsWith('/') && normTarget.length > 3) {
+    normTarget = normTarget.slice(0, -1)
+  }
+  if (normBase.endsWith('/') && normBase.length > 3) {
+    normBase = normBase.slice(0, -1)
+  }
+
+  if (!normTarget.startsWith(normBase)) {
+    return false
+  }
+  if (normTarget.length === normBase.length) {
+    return true
+  }
+
+  return normTarget[normBase.length] === '/' || normBase.endsWith('/')
 }
 
 const isSelectingOutputDir = ref(false)
@@ -108,15 +129,32 @@ const handleSelectOutputDir = async () => {
       },
       0
     )
+
+    // 1. 磁盘根目录校验
     if (isWindowsDriveRoot(result.path)) {
       toast.warning(t('settings.function.outputDir.driveRootNotAllowedTitle'), {
         description: t('settings.function.outputDir.driveRootNotAllowedDescription'),
       })
       return
     }
+
+    // 2. 程序数据目录校验 (防止 Thumbnails 循环监听)
+    const appDataDir = runtimeCapabilities.value?.appDataDir
+    if (appDataDir && isPathWithinBase(appDataDir, result.path)) {
+      toast.warning(t('settings.function.outputDir.invalidDirTitle'), {
+        description: t('settings.function.outputDir.appDataNotAllowedDescription'),
+      })
+      return
+    }
+
     await updateOutputDir(result.path)
   } catch (error) {
     console.error('Failed to select output directory:', error)
+    toast.error(t('settings.function.error.title'), {
+      description:
+        (error as Error).message || t('settings.function.outputDir.invalidDirDescription'),
+    })
+    clearError()
   } finally {
     isSelectingOutputDir.value = false
   }
@@ -137,6 +175,7 @@ const handleSelectGameAlbumDir = async () => {
     await updateGameAlbumPath(result.path)
   } catch (error) {
     console.error('Failed to select game album directory:', error)
+    clearError()
   } finally {
     isSelectingGameAlbumDir.value = false
   }

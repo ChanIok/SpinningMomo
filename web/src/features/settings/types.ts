@@ -30,6 +30,7 @@ export interface RuntimeCapabilities {
   isCursorCaptureControlSupported: boolean
   isBorderControlSupported: boolean
   isProcessLoopbackAudioSupported: boolean
+  appDataDir: string
 }
 
 // 当前欢迎流程版本

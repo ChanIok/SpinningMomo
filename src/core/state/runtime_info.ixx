@@ -33,6 +33,9 @@ export struct RuntimeInfoState {
 
   // Process Loopback 支持状态 (Windows 10 2004 build 19041 or later)
   bool is_process_loopback_audio_supported = false;
+
+  // 应用运行数据目录
+  std::string app_data_dir;
 };
 
 }  // namespace Core::State::RuntimeInfo
