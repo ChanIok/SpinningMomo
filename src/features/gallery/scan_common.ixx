@@ -15,6 +15,7 @@ export auto is_photo_file(const std::filesystem::path& file_path) -> bool;
 
 export auto detect_asset_type(const std::filesystem::path& file_path) -> std::string;
 
+// 计算文件标识：Debug 使用路径哈希，Release 分块计算内容的 XXH3 哈希
 export auto calculate_file_hash(const std::filesystem::path& file_path)
     -> std::expected<std::string, std::string>;
 

@@ -65,26 +65,29 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   return "unknown";
 }
 
+// 计算文件标识：Debug 使用路径哈希，Release 分块计算内容的 XXH3 哈希
 auto calculate_file_hash(const std::filesystem::path& file_path)
     -> std::expected<std::string, std::string> {
+  // Debug 保留轻量路径哈希，避免开发时为大文件读取完整内容
   if (Vendor::BuildConfig::is_debug_build()) {
     auto path_str = file_path.string();
     auto hash = std::hash<std::string>{}(path_str);
     return std::format("{:016x}", hash);
   }
 
+  // Release 以二进制流打开文件，交给 XXH3 按固定缓冲区分块处理
   std::ifstream file(file_path, std::ios::binary);
   if (!file) {
     return std::unexpected("Cannot open file for hashing: " + file_path.string());
   }
 
-  std::vector<char> buffer((std::istreambuf_iterator<char>(file)),
-                           std::istreambuf_iterator<char>());
-  if (buffer.empty()) {
-    return std::unexpected("File is empty: " + file_path.string());
+  auto hash_result = Vendor::XXHash::hash_stream_to_hex(file);
+  if (!hash_result) {
+    return std::unexpected(
+        std::format("Failed to hash file '{}': {}", file_path.string(), hash_result.error()));
   }
 
-  return Vendor::XXHash::HashCharVectorToHex(buffer);
+  return hash_result;
 }
 
 }  // namespace Features::Gallery::ScanCommon
