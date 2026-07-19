@@ -451,19 +451,18 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
       analysis.existing_metadata = cached_metadata;
 
       if (force_reanalyze) {
-        // 强制重分析也先走哈希计算，避免后续缩略图流程拿到空 hash。
+        // 强制重分析也先算内容指纹，避免后续缩略图流程拿到空 hash。
         analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
         results.push_back(std::move(analysis));
         continue;
       }
 
-      // 快速比较法：检查文件大小和系统修改时间。
-      // 因为计算文件 Hash 代价昂贵，所以仅当尺寸或修改时间改变时才触发 NEEDS_HASH_CHECK。
-      if (cached_metadata.size != file_info.size ||
+      // 缺少指纹或文件状态变化时才重算，正常扫描避免重复读取媒体内容。
+      if (cached_metadata.hash.empty() || cached_metadata.size != file_info.size ||
           cached_metadata.file_modified_at != file_info.file_modified_millis) {
         analysis.status = Types::FileStatus::NEEDS_HASH_CHECK;
       } else {
-        // 大小和修改时间均一致，极大可能未发生内容改变，跳过 Hash 计算直接标记为完毕。
+        // 大小和修改时间均一致时跳过内容指纹计算，避免重复读取媒体文件。
         analysis.status = Types::FileStatus::UNCHANGED;
       }
     }
@@ -474,7 +473,7 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
   return results;
 }
 
-// 并行校检：对变动文件计算哈希，精准识别内容变化；返回成功算出 hash 的文件数。
+// 并行计算待检查文件的内容指纹，并返回成功完成的文件数
 auto calculate_hash_for_targets(Core::State::AppState& app_state,
                                 std::vector<Types::FileAnalysisResult>& analysis_results,
                                 std::stop_token stop_token)
@@ -513,7 +512,7 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
       // 无论正常结束、取消还是异常，本批次都必须释放 latch 计数。
       auto finish_batch = wil::scope_exit([&completion_latch] { completion_latch.count_down(); });
 
-      // 每个文件开始前检查停止；单个大文件内部由流式 XXHash 继续响应。
+      // 每个文件开始前检查停止；单个大文件内部在采样块边界继续响应。
       auto batch_hashes =
           batch | std::views::take_while([stop_token](const auto&) {
             return !stop_token.stop_requested();
@@ -521,8 +520,8 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
           std::views::transform(
               [stop_token](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
                 const auto& [idx, analysis] = pair;
-                auto hash_result =
-                    ScanCommon::calculate_file_hash(analysis.file_info.path, stop_token);
+                auto hash_result = ScanCommon::calculate_content_fingerprint(
+                    analysis.file_info.path, analysis.file_info.size, stop_token);
                 if (hash_result) {
                   return std::make_pair(static_cast<size_t>(idx), std::move(hash_result.value()));
                 }
@@ -560,21 +559,31 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
     return std::unexpected("Gallery scan cancelled");
   }
 
-  // 3. 更新分析结果
-  std::ranges::for_each(all_hashes, [&analysis_results](const auto& hash_pair) {
+  // 3. 更新分析结果，并同步仅发生文件系统状态变化的记录。
+  for (const auto& hash_pair : all_hashes) {
     const auto& [idx, hash] = hash_pair;
     auto& analysis = analysis_results[idx];
     analysis.file_info.hash = hash;
 
-    // 根据哈希结果更新状态
+    // 根据内容指纹结果更新状态
     if (analysis.status == Types::FileStatus::NEEDS_HASH_CHECK) {
       const bool hash_unchanged = analysis.existing_metadata &&
                                   !analysis.existing_metadata->hash.empty() &&
                                   analysis.existing_metadata->hash == hash;
 
+      if (hash_unchanged) {
+        // 内容未变也要写回最新 size/mtime，否则下次扫描会再次计算同一指纹。
+        auto update_result = Asset::Repository::update_asset_file_state(
+            app_state, analysis.existing_metadata->id, analysis.file_info.size,
+            analysis.file_info.file_modified_millis);
+        if (!update_result) {
+          return std::unexpected(update_result.error());
+        }
+      }
+
       analysis.status = hash_unchanged ? Types::FileStatus::UNCHANGED : Types::FileStatus::MODIFIED;
     }
-  });
+  }
 
   return all_hashes.size();
 }
@@ -975,14 +984,14 @@ auto run_hash_analysis_phase(
       }));
   const auto metadata_unchanged_skip_count = analysis_results.size() - hash_candidate_count;
 
-  report_scan_progress(
-      progress_callback, "hashing", 0, static_cast<std::int64_t>(hash_candidate_count),
-      kHashingStartPercent,
-      hash_candidate_count == 0 ? "No files require hash calculation" : "Calculating file hashes");
+  report_scan_progress(progress_callback, "hashing", 0,
+                       static_cast<std::int64_t>(hash_candidate_count), kHashingStartPercent,
+                       hash_candidate_count == 0 ? "No files require fingerprint calculation"
+                                                 : "Calculating file fingerprints");
 
   auto hash_phase = calculate_hash_for_targets(app_state, analysis_results, stop_token);
   if (!hash_phase) {
-    return std::unexpected("Hash calculation failed: " + hash_phase.error());
+    return std::unexpected("Fingerprint calculation failed: " + hash_phase.error());
   }
   const std::size_t hashed_count = hash_phase.value();
 
@@ -996,10 +1005,10 @@ auto run_hash_analysis_phase(
 
   report_scan_progress(progress_callback, "hashing", static_cast<std::int64_t>(hashed_count),
                        static_cast<std::int64_t>(hash_candidate_count), kHashingEndPercent,
-                       "Hash calculation completed");
+                       "Fingerprint calculation completed");
 
   if (hash_candidate_count == 0) {
-    Logger().info("Hash calculation skipped for all {} files (size and mtime match cache)",
+    Logger().info("Fingerprint calculation skipped for all {} files (size and mtime match cache)",
                   analysis_results.size());
   } else {
     const auto hash_failures = hash_candidate_count - hashed_count;
@@ -1243,12 +1252,12 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
   auto file_infos = std::move(file_infos_result.value());
 
-  // 目录发现完成后再次响应停止，避免继续提交哈希任务。
+  // 目录发现完成后再次响应停止，避免继续提交内容指纹任务。
   if (stop_token.stop_requested()) {
     return std::unexpected("Gallery scan cancelled");
   }
 
-  // 步骤 3: 哈希分析阶段 (对比缓存，对于变动的文件进行哈希校检来确定状态)
+  // 步骤 3: 指纹分析阶段 (先比较 size/mtime，再为候选文件计算内容指纹)
   auto files_to_process_result = run_hash_analysis_phase(app_state, file_infos, context.asset_cache,
                                                          options, progress_callback, stop_token);
   if (!files_to_process_result) {

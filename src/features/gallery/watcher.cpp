@@ -607,20 +607,27 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     return 0;
   }
 
-  // 增量同步与全量扫描共用停止源，退出后不再继续读取大文件。
-  auto hash_result = ScanCommon::calculate_file_hash(normalized, stop_token);
+  // 增量同步与全量扫描共用停止源，退出后不再继续计算内容指纹。
+  auto hash_result = ScanCommon::calculate_content_fingerprint(
+      normalized, static_cast<std::int64_t>(file_size), stop_token);
   if (!hash_result) {
     return std::unexpected(hash_result.error());
   }
   auto hash = hash_result.value();
 
-  // 哈希期间收到停止后不再进入媒体分析和缩略图生成。
+  // 指纹计算期间收到停止后不再进入媒体分析和缩略图生成。
   if (stop_token.stop_requested()) {
     return std::unexpected("Gallery scan cancelled");
   }
 
   if (existing_asset && existing_asset->hash.has_value() && !existing_asset->hash->empty() &&
       existing_asset->hash.value() == hash) {
+    // 内容未变也要写回最新 size/mtime，否则后续事件会反复计算同一指纹。
+    auto update_result = Features::Gallery::Asset::Repository::update_asset_file_state(
+        app_state, existing_asset->id, static_cast<std::int64_t>(file_size), file_modified_millis);
+    if (!update_result) {
+      return std::unexpected(update_result.error());
+    }
     return 0;
   }
 

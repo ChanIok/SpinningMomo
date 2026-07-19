@@ -231,6 +231,24 @@ auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
   return {};
 }
 
+// 同步内容未变资产的文件状态，避免后续扫描重复计算指纹
+auto update_asset_file_state(Core::State::AppState& app_state, std::int64_t asset_id,
+                             std::int64_t size, std::int64_t file_modified_at)
+    -> std::expected<void, std::string> {
+  std::string sql = R"(
+    UPDATE assets
+    SET size = ?, file_modified_at = ?
+    WHERE id = ?
+  )";
+
+  auto result = Core::Database::execute(app_state, sql, {size, file_modified_at, asset_id});
+  if (!result) {
+    return std::unexpected("Failed to update asset file state: " + result.error());
+  }
+
+  return {};
+}
+
 auto delete_asset(Core::State::AppState& app_state, int64_t id)
     -> std::expected<void, std::string> {
   std::string sql = "DELETE FROM assets WHERE id = ?";

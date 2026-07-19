@@ -26,6 +26,11 @@ export auto has_assets_under_path_prefix(Core::State::AppState& app_state,
 export auto update_asset(Core::State::AppState& app_state, const Types::Asset& item)
     -> std::expected<void, std::string>;
 
+// 同步内容未变资产的文件状态，避免后续扫描重复计算指纹
+export auto update_asset_file_state(Core::State::AppState& app_state, std::int64_t asset_id,
+                                    std::int64_t size, std::int64_t file_modified_at)
+    -> std::expected<void, std::string>;
+
 export auto delete_asset(Core::State::AppState& app_state, std::int64_t id)
     -> std::expected<void, std::string>;
 export auto batch_delete_assets_by_ids(Core::State::AppState& app_state,

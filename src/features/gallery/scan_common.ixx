@@ -15,8 +15,9 @@ export auto is_photo_file(const std::filesystem::path& file_path) -> bool;
 
 export auto detect_asset_type(const std::filesystem::path& file_path) -> std::string;
 
-// 计算文件标识：Debug 使用路径哈希，Release 分块计算内容的 XXH3 哈希，并响应停止请求
-export auto calculate_file_hash(const std::filesystem::path& file_path, std::stop_token stop_token)
+// 计算素材内容指纹：Debug 使用路径哈希，Release 对图片完整哈希、对大视频组合元数据与五点采样
+export auto calculate_content_fingerprint(const std::filesystem::path& file_path,
+                                          std::int64_t file_size, std::stop_token stop_token)
     -> std::expected<std::string, std::string>;
 
 }  // namespace Features::Gallery::ScanCommon
