@@ -10,8 +10,9 @@ namespace Vendor::XXHash {
 
 constexpr std::size_t kReadBufferSize = 1024 * 1024;
 
-// 分块读取输入流并计算 XXH3 哈希，避免按输入总大小占用内存
-export auto hash_stream_to_hex(std::istream& stream) -> std::expected<std::string, std::string> {
+// 分块读取输入流并计算 XXH3 哈希，在块边界响应停止且不按输入总大小占用内存
+export auto hash_stream_to_hex(std::istream& stream, std::stop_token stop_token)
+    -> std::expected<std::string, std::string> {
   // 每次只保留 1 MiB 输入，限制单个哈希任务的内存上限
   std::vector<char> buffer(kReadBufferSize);
 
@@ -30,6 +31,11 @@ export auto hash_stream_to_hex(std::istream& stream) -> std::expected<std::strin
   bool has_data = false;
 
   for (;;) {
+    // 停止后不再发起下一次同步读取，退出延迟最多受当前读取块影响
+    if (stop_token.stop_requested()) {
+      return std::unexpected("Hash calculation cancelled");
+    }
+
     stream.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
     const auto bytes_read = stream.gcount();
 

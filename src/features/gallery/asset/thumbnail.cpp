@@ -175,14 +175,19 @@ auto scan_existing_thumbnail_files(Core::State::AppState& app_state)
 auto repair_expected_thumbnail_entries(
     Core::State::AppState& app_state,
     const std::unordered_map<std::string, ExpectedThumbnailEntry>& expected_entries,
-    const std::unordered_set<std::string>* existing_hashes, std::uint32_t short_edge_size)
-    -> MissingThumbnailRepairSummary {
+    const std::unordered_set<std::string>* existing_hashes, std::uint32_t short_edge_size,
+    std::stop_token stop_token) -> MissingThumbnailRepairSummary {
   MissingThumbnailRepairSummary stats;
   stats.candidate_hashes = static_cast<int>(expected_entries.size());
 
   std::optional<Utils::Image::WICFactory> wic_factory;
 
   for (const auto& [hash, entry] : expected_entries) {
+    // 当前文件自然完成，停止后不再开始修复下一个缩略图。
+    if (stop_token.stop_requested()) {
+      break;
+    }
+
     bool thumbnail_exists = false;
 
     if (existing_hashes != nullptr) {
@@ -371,8 +376,13 @@ auto repair_missing_thumbnails(Core::State::AppState& app_state,
     return std::unexpected(expected_entries_result.error());
   }
 
+  auto stop_token = app_state.gallery->scan_stop_source.get_token();
   auto summary = repair_expected_thumbnail_entries(app_state, expected_entries_result.value(),
-                                                   nullptr, short_edge_size);
+                                                   nullptr, short_edge_size, stop_token);
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Thumbnail repair cancelled");
+  }
+
   return ThumbnailRepairStats{.candidate_hashes = summary.candidate_hashes,
                               .missing_thumbnails = summary.missing_thumbnails,
                               .repaired_thumbnails = summary.repaired_thumbnails,
@@ -414,8 +424,13 @@ auto reconcile_thumbnail_cache(Core::State::AppState& app_state, std::uint32_t s
 
   // 先补 missing，再删 orphan。
   // 对用户体验来说，先恢复可见内容比先回收磁盘空间更重要。
-  auto repair_summary = repair_expected_thumbnail_entries(app_state, expected_entries,
-                                                          &existing_hashes, short_edge_size);
+  auto stop_token = app_state.gallery->scan_stop_source.get_token();
+  auto repair_summary = repair_expected_thumbnail_entries(
+      app_state, expected_entries, &existing_hashes, short_edge_size, stop_token);
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Thumbnail reconcile cancelled");
+  }
+
   stats.missing_thumbnails = repair_summary.missing_thumbnails;
   stats.repaired_thumbnails = repair_summary.repaired_thumbnails;
   stats.failed_repairs = repair_summary.failed_repairs;

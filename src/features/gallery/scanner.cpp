@@ -5,6 +5,7 @@ module Features.Gallery.Scanner;
 import std;
 import Core.State;
 import Core.WorkerPool;
+import Features.Gallery.State;
 import Features.Gallery.Types;
 import Features.Gallery.ScanCommon;
 import Features.Gallery.Asset.Repository;
@@ -23,6 +24,7 @@ import Utils.Logger;
 import Utils.Path;
 import Utils.String;
 import Utils.Time;
+import <wil/resource.h>;
 
 namespace Features::Gallery::Scanner {
 
@@ -474,7 +476,8 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
 
 // 并行校检：对变动文件计算哈希，精准识别内容变化；返回成功算出 hash 的文件数。
 auto calculate_hash_for_targets(Core::State::AppState& app_state,
-                                std::vector<Types::FileAnalysisResult>& analysis_results)
+                                std::vector<Types::FileAnalysisResult>& analysis_results,
+                                std::stop_token stop_token)
     -> std::expected<std::size_t, std::string> {
   // 1. 使用 C++20 ranges 枚举并过滤出所有状态为 NEW 或 NEEDS_HASH_CHECK 的待处理文件。
   // 保留了原始索引(idx)，这是为了在并发算完哈希后能无缝写回原数组。
@@ -500,46 +503,62 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
   std::vector<std::pair<size_t, std::string>> all_hashes;
   std::mutex results_mutex;
 
-  // 2. 并行处理批次
+  std::size_t submitted_batches = 0;
+
+  // 2. 并行处理批次，每个文件和每个读取块都会观察同一个停止信号。
   for (const auto& batch : batches) {
-    bool submitted = Core::WorkerPool::submit_task(
-        app_state, [&all_hashes, &results_mutex, &completion_latch, batch, &analysis_results]() {
-          auto batch_hashes =
-              batch |
-              std::views::transform(
-                  [](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
-                    const auto& [idx, analysis] = pair;
+    bool submitted = Core::WorkerPool::submit_task(app_state, [&all_hashes, &results_mutex,
+                                                               &completion_latch, batch,
+                                                               &analysis_results, stop_token]() {
+      // 无论正常结束、取消还是异常，本批次都必须释放 latch 计数。
+      auto finish_batch = wil::scope_exit([&completion_latch] { completion_latch.count_down(); });
 
-                    auto hash_result = ScanCommon::calculate_file_hash(analysis.file_info.path);
-                    if (hash_result) {
-                      return std::make_pair(idx, std::move(hash_result.value()));
-                    } else {
-                      Logger().warn("Failed to calculate hash for {}: {}",
-                                    analysis.file_info.path.string(), hash_result.error());
-                      return std::nullopt;
-                    }
-                  }) |
-              std::views::filter([](const auto& opt) { return opt.has_value(); }) |
-              std::views::transform([](auto&& opt) { return std::move(opt.value()); }) |
-              std::ranges::to<std::vector>();
+      // 每个文件开始前检查停止；单个大文件内部由流式 XXHash 继续响应。
+      auto batch_hashes =
+          batch | std::views::take_while([stop_token](const auto&) {
+            return !stop_token.stop_requested();
+          }) |
+          std::views::transform(
+              [stop_token](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
+                const auto& [idx, analysis] = pair;
+                auto hash_result =
+                    ScanCommon::calculate_file_hash(analysis.file_info.path, stop_token);
+                if (hash_result) {
+                  return std::make_pair(static_cast<size_t>(idx), std::move(hash_result.value()));
+                }
+                if (!stop_token.stop_requested()) {
+                  Logger().warn("Failed to calculate hash for {}: {}",
+                                analysis.file_info.path.string(), hash_result.error());
+                }
+                return std::nullopt;
+              }) |
+          std::views::filter([](const auto& result) { return result.has_value(); }) |
+          std::views::transform([](auto&& result) { return std::move(result.value()); }) |
+          std::ranges::to<std::vector>();
 
-          // 合并结果
-          if (!batch_hashes.empty()) {
-            std::lock_guard<std::mutex> lock(results_mutex);
-            all_hashes.insert(all_hashes.end(), std::make_move_iterator(batch_hashes.begin()),
-                              std::make_move_iterator(batch_hashes.end()));
-          }
-
-          completion_latch.count_down();
-        });
+      // 单次加锁合并本批结果，避免多个工作线程交错修改结果数组。
+      if (!batch_hashes.empty()) {
+        std::lock_guard<std::mutex> lock(results_mutex);
+        all_hashes.insert(all_hashes.end(), std::make_move_iterator(batch_hashes.begin()),
+                          std::make_move_iterator(batch_hashes.end()));
+      }
+    });
 
     if (!submitted) {
+      // 已提交批次仍持有局部引用，必须等它们收尾后才能返回。
+      completion_latch.count_down(static_cast<std::ptrdiff_t>(batches.size() - submitted_batches));
+      completion_latch.wait();
       return std::unexpected("Failed to submit hash calculation task to worker pool");
     }
+    submitted_batches++;
   }
 
   // 等待所有批次完成
   completion_latch.wait();
+
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
 
   // 3. 更新分析结果
   std::ranges::for_each(all_hashes, [&analysis_results](const auto& hash_pair) {
@@ -738,7 +757,8 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
                                const std::vector<Types::FileAnalysisResult>& files_to_process,
                                const Types::ScanOptions& options,
                                const std::unordered_map<std::string, std::int64_t>& folder_mapping,
-                               ProcessingProgressTracker* progress_tracker)
+                               ProcessingProgressTracker* progress_tracker,
+                               std::stop_token stop_token)
     -> std::expected<FileProcessingBatchResult, std::string> {
   if (files_to_process.empty()) {
     return FileProcessingBatchResult{};
@@ -751,6 +771,7 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
 
   FileProcessingBatchResult final_result;
   std::mutex results_mutex;
+  std::size_t submitted_batches = 0;
 
   // 提交所有批次任务
   for (size_t batch_idx = 0; batch_idx < total_batches; ++batch_idx) {
@@ -759,15 +780,16 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
 
     bool submitted = Core::WorkerPool::submit_task(
         app_state, [&final_result, &results_mutex, &completion_latch, &app_state, &files_to_process,
-                    start, end, &options, &folder_mapping, progress_tracker]() {
+                    start, end, &options, &folder_mapping, progress_tracker, stop_token]() {
+          // 无论正常结束、取消还是异常，本批次都必须释放 latch 计数。
+          auto finish_batch =
+              wil::scope_exit([&completion_latch] { completion_latch.count_down(); });
+
           auto thread_wic_factory_result = Utils::Image::get_thread_wic_factory();
           if (!thread_wic_factory_result) {
-            {
-              std::lock_guard<std::mutex> lock(results_mutex);
-              final_result.errors.push_back("Failed to get thread WIC factory: " +
-                                            thread_wic_factory_result.error());
-            }
-            completion_latch.count_down();
+            std::lock_guard<std::mutex> lock(results_mutex);
+            final_result.errors.push_back("Failed to get thread WIC factory: " +
+                                          thread_wic_factory_result.error());
             return;
           }
           auto thread_wic_factory = std::move(thread_wic_factory_result.value());
@@ -776,8 +798,12 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
           FileProcessingBatchResult batch_result;
 
           for (size_t idx = start; idx < end; ++idx) {
-            const auto& analysis = files_to_process[idx];
+            // 已开始的单文件媒体调用自然收尾，下一文件开始前响应停止。
+            if (stop_token.stop_requested()) {
+              return;
+            }
 
+            const auto& analysis = files_to_process[idx];
             auto asset_result = process_single_file(app_state, thread_wic_factory, analysis,
                                                     options, folder_mapping, progress_tracker);
             if (asset_result) {
@@ -797,33 +823,36 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
           }
 
           // 合并批次结果到最终结果
-          {
-            std::lock_guard<std::mutex> lock(results_mutex);
+          std::lock_guard<std::mutex> lock(results_mutex);
+          final_result.new_assets.insert(final_result.new_assets.end(),
+                                         std::make_move_iterator(batch_result.new_assets.begin()),
+                                         std::make_move_iterator(batch_result.new_assets.end()));
 
-            final_result.new_assets.insert(final_result.new_assets.end(),
-                                           std::make_move_iterator(batch_result.new_assets.begin()),
-                                           std::make_move_iterator(batch_result.new_assets.end()));
+          final_result.updated_assets.insert(
+              final_result.updated_assets.end(),
+              std::make_move_iterator(batch_result.updated_assets.begin()),
+              std::make_move_iterator(batch_result.updated_assets.end()));
 
-            final_result.updated_assets.insert(
-                final_result.updated_assets.end(),
-                std::make_move_iterator(batch_result.updated_assets.begin()),
-                std::make_move_iterator(batch_result.updated_assets.end()));
-
-            final_result.errors.insert(final_result.errors.end(),
-                                       std::make_move_iterator(batch_result.errors.begin()),
-                                       std::make_move_iterator(batch_result.errors.end()));
-          }
-
-          completion_latch.count_down();
+          final_result.errors.insert(final_result.errors.end(),
+                                     std::make_move_iterator(batch_result.errors.begin()),
+                                     std::make_move_iterator(batch_result.errors.end()));
         });
 
     if (!submitted) {
+      // 已提交批次仍持有局部引用，必须等它们收尾后才能返回。
+      completion_latch.count_down(static_cast<std::ptrdiff_t>(total_batches - submitted_batches));
+      completion_latch.wait();
       return std::unexpected("Failed to submit file processing task to worker pool");
     }
+    submitted_batches++;
   }
 
   // 等待所有批次完成
   completion_latch.wait();
+
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
 
   return final_result;
 }
@@ -933,7 +962,8 @@ auto run_hash_analysis_phase(
     Core::State::AppState& app_state, const std::vector<Types::FileSystemInfo>& file_infos,
     const std::unordered_map<std::string, Types::Metadata>& asset_cache,
     const Types::ScanOptions& options,
-    const std::function<void(const Types::ScanProgress&)>& progress_callback)
+    const std::function<void(const Types::ScanProgress&)>& progress_callback,
+    std::stop_token stop_token)
     -> std::expected<std::vector<Types::FileAnalysisResult>, std::string> {
   auto analysis_results =
       analyze_file_changes(file_infos, asset_cache, options.force_reanalyze.value_or(false));
@@ -950,7 +980,7 @@ auto run_hash_analysis_phase(
       kHashingStartPercent,
       hash_candidate_count == 0 ? "No files require hash calculation" : "Calculating file hashes");
 
-  auto hash_phase = calculate_hash_for_targets(app_state, analysis_results);
+  auto hash_phase = calculate_hash_for_targets(app_state, analysis_results, stop_token);
   if (!hash_phase) {
     return std::unexpected("Hash calculation failed: " + hash_phase.error());
   }
@@ -998,8 +1028,13 @@ auto run_hash_analysis_phase(
 auto run_processing_phase(Core::State::AppState& app_state, const std::filesystem::path& directory,
                           const std::vector<Types::FileAnalysisResult>& files_to_process,
                           const Types::ScanOptions& options,
-                          const std::function<void(const Types::ScanProgress&)>& progress_callback)
+                          const std::function<void(const Types::ScanProgress&)>& progress_callback,
+                          std::stop_token stop_token)
     -> std::expected<ProcessingPhaseResult, std::string> {
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
+
   std::int64_t thumbnail_targets = 0;
   if (options.generate_thumbnails.value_or(true)) {
     thumbnail_targets = static_cast<std::int64_t>(
@@ -1057,7 +1092,7 @@ auto run_processing_phase(Core::State::AppState& app_state, const std::filesyste
 
   auto processing_result =
       process_files_in_parallel(app_state, files_to_process, options, path_to_folder_id,
-                                processing_tracker ? &(*processing_tracker) : nullptr);
+                                processing_tracker ? &(*processing_tracker) : nullptr, stop_token);
   if (!processing_result) {
     return std::unexpected("File processing failed: " + processing_result.error());
   }
@@ -1180,6 +1215,11 @@ auto run_cleanup_phase(Core::State::AppState& app_state,
 auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
                           std::function<void(const Types::ScanProgress&)> progress_callback)
     -> std::expected<Types::ScanResult, std::string> {
+  auto stop_token = app_state.gallery->scan_stop_source.get_token();
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
+
   auto start_time = std::chrono::steady_clock::now();
   report_scan_progress(progress_callback, "preparing", 0, 1, kPreparingPercent,
                        "Preparing gallery scan context");
@@ -1191,6 +1231,11 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
   auto context = std::move(context_result.value());
 
+  // 准备期间收到停止后不再开始目录发现。
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
+
   // 步骤 2: 发现阶段 (遍历磁盘系统，按照扩展名和忽略规则筛选文件)
   auto file_infos_result = run_discovery_phase(app_state, context, options, progress_callback);
   if (!file_infos_result) {
@@ -1198,9 +1243,14 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   }
   auto file_infos = std::move(file_infos_result.value());
 
+  // 目录发现完成后再次响应停止，避免继续提交哈希任务。
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
+
   // 步骤 3: 哈希分析阶段 (对比缓存，对于变动的文件进行哈希校检来确定状态)
   auto files_to_process_result = run_hash_analysis_phase(app_state, file_infos, context.asset_cache,
-                                                         options, progress_callback);
+                                                         options, progress_callback, stop_token);
   if (!files_to_process_result) {
     return std::unexpected(files_to_process_result.error());
   }
@@ -1208,11 +1258,16 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
 
   // 步骤 4: 处理阶段 (提取全新或发生修改的文件的元信息，并生成缩略图)
   auto processing_result = run_processing_phase(app_state, context.directory, files_to_process,
-                                                options, progress_callback);
+                                                options, progress_callback, stop_token);
   if (!processing_result) {
     return std::unexpected(processing_result.error());
   }
   auto processing_phase = std::move(processing_result.value());
+
+  // 取消后不能进入删除对账，否则不完整的扫描快照可能被当成真实磁盘状态。
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
 
   // 步骤 5: 清理阶段 (从数据库中移除那些在本次磁盘扫描中已经不存在的资产)
   auto cleanup_phase = run_cleanup_phase(app_state, context.normalized_scan_root, file_infos,

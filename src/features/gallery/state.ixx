@@ -75,6 +75,12 @@ export struct GalleryState {
   // 应用关闭时置为 true，用于阻止后台启动恢复继续推进。
   std::atomic<bool> shutdown_requested{false};
 
+  // Gallery 关闭时通知所有扫描尽快停止，避免继续读取大文件或生成缩略图。
+  std::stop_source scan_stop_source;
+
+  // 扫描持有共享锁，cleanup 持有独占锁后才能安全释放扫描依赖的运行资源。
+  std::shared_mutex scan_lifetime_mutex;
+
   // 忽略规则变更版本：
   // Repository 每次成功修改 ignore_rules 表后递增；watcher 只比较版本号，
   // 不需要监听具体哪条规则变了。

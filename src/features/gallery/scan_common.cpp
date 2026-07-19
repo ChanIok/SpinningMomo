@@ -65,9 +65,14 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   return "unknown";
 }
 
-// 计算文件标识：Debug 使用路径哈希，Release 分块计算内容的 XXH3 哈希
-auto calculate_file_hash(const std::filesystem::path& file_path)
+// 计算文件标识：Debug 使用路径哈希，Release 分块计算内容的 XXH3 哈希，并响应停止请求
+auto calculate_file_hash(const std::filesystem::path& file_path, std::stop_token stop_token)
     -> std::expected<std::string, std::string> {
+  // 停止后不再打开文件，避免退出阶段继续产生磁盘访问
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Hash calculation cancelled");
+  }
+
   // Debug 保留轻量路径哈希，避免开发时为大文件读取完整内容
   if (Vendor::BuildConfig::is_debug_build()) {
     auto path_str = file_path.string();
@@ -81,7 +86,7 @@ auto calculate_file_hash(const std::filesystem::path& file_path)
     return std::unexpected("Cannot open file for hashing: " + file_path.string());
   }
 
-  auto hash_result = Vendor::XXHash::hash_stream_to_hex(file);
+  auto hash_result = Vendor::XXHash::hash_stream_to_hex(file, stop_token);
   if (!hash_result) {
     return std::unexpected(
         std::format("Failed to hash file '{}': {}", file_path.string(), hash_result.error()));

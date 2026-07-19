@@ -33,6 +33,7 @@ compile_commands.json
 # Xmake generated files
 .xmake/
 vsxmake2022/
+vsxmake2026/
 
 # WiX generated files
 *.msi

@@ -35,8 +35,8 @@ auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<v
     for (size_t i = 0; i < thread_count; ++i) {
       pool.worker_threads.emplace_back([&pool, i]() {
         try {
-          // 工作线程主循环
-          while (!pool.shutdown_requested.load()) {
+          // 工作线程主循环：关闭后继续排空已接收任务，避免遗弃任务持有的同步计数。
+          while (true) {
             std::function<void()> task;
 
             // 从任务队列获取任务
@@ -46,7 +46,7 @@ auto start(Core::State::AppState& state, size_t thread_count) -> std::expected<v
                 return pool.shutdown_requested.load() || !pool.task_queue.empty();
               });
 
-              // 如果收到关闭信号且队列为空，退出线程
+              // 关闭且队列已经排空后再退出，保证每个已接收任务都有机会完成收尾。
               if (pool.shutdown_requested.load() && pool.task_queue.empty()) {
                 break;
               }

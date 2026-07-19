@@ -550,7 +550,8 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
                           const std::vector<Types::IgnoreRule>& ignore_rules,
                           const std::unordered_map<std::string, std::int64_t>& folder_mapping,
                           std::optional<Utils::Image::WICFactory>& wic_factory,
-                          const std::filesystem::path& path) -> std::expected<int, std::string> {
+                          const std::filesystem::path& path, std::stop_token stop_token)
+    -> std::expected<int, std::string> {
   auto normalized_result = Utils::Path::NormalizePath(path);
   if (!normalized_result) {
     return std::unexpected("Failed to normalize path: " + normalized_result.error());
@@ -606,11 +607,17 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     return 0;
   }
 
-  auto hash_result = ScanCommon::calculate_file_hash(normalized);
+  // 增量同步与全量扫描共用停止源，退出后不再继续读取大文件。
+  auto hash_result = ScanCommon::calculate_file_hash(normalized, stop_token);
   if (!hash_result) {
     return std::unexpected(hash_result.error());
   }
   auto hash = hash_result.value();
+
+  // 哈希期间收到停止后不再进入媒体分析和缩略图生成。
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
 
   if (existing_asset && existing_asset->hash.has_value() && !existing_asset->hash->empty() &&
       existing_asset->hash.value() == hash) {
@@ -742,6 +749,11 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     extracted_colors.clear();
   }
 
+  // 单文件媒体调用完成后再停止，避免退出阶段继续写数据库。
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
+
   if (existing_asset) {
     auto update_result = Features::Gallery::Asset::Repository::update_asset(app_state, asset);
     if (!update_result) {
@@ -776,6 +788,12 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
     -> std::expected<Types::ScanResult, std::string> {
   Types::ScanResult result{};
   auto options = get_watcher_scan_options(watcher);
+  auto stop_token = app_state.gallery->scan_stop_source.get_token();
+  // 增量同步同样使用媒体和缩略图资源，cleanup 会等待这段共享区自然结束。
+  std::shared_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
 
   auto root_folder_result = Features::Gallery::Folder::Repository::get_folder_by_path(
       app_state, watcher->root_path.string());
@@ -836,6 +854,10 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
   std::optional<Utils::Image::WICFactory> wic_factory;
 
   for (const auto& [path, action] : snapshot.file_changes) {
+    if (stop_token.stop_requested()) {
+      return std::unexpected("Gallery scan cancelled");
+    }
+
     if (action != State::PendingFileChangeAction::REMOVE) {
       continue;
     }
@@ -858,13 +880,17 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
   }
 
   for (const auto& [path, action] : snapshot.file_changes) {
+    if (stop_token.stop_requested()) {
+      return std::unexpected("Gallery scan cancelled");
+    }
+
     if (action != State::PendingFileChangeAction::UPSERT) {
       continue;
     }
 
     auto upsert_result =
         upsert_asset_by_path(app_state, watcher->root_path, options, ignore_rules, folder_mapping,
-                             wic_factory, std::filesystem::path(path));
+                             wic_factory, std::filesystem::path(path), stop_token);
     if (!upsert_result) {
       result.errors.push_back(upsert_result.error());
       continue;
@@ -895,10 +921,21 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
 auto apply_full_rescan(Core::State::AppState& app_state,
                        const std::shared_ptr<State::FolderWatcherState>& watcher)
     -> std::expected<Types::ScanResult, std::string> {
+  auto stop_token = app_state.gallery->scan_stop_source.get_token();
+  // 一次全量同步全程持有共享锁，cleanup 会在释放媒体资源前等待它结束。
+  std::shared_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
+  }
+
   auto options = get_watcher_scan_options(watcher);
   auto scan_result = Features::Gallery::Scanner::scan_asset_directory(app_state, options);
   if (!scan_result) {
     return std::unexpected(scan_result.error());
+  }
+
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Gallery scan cancelled");
   }
 
   auto thumbnail_repair_result = Features::Gallery::Asset::Thumbnail::repair_missing_thumbnails(
@@ -1381,6 +1418,11 @@ auto register_watcher_for_directory(Core::State::AppState& app_state,
                                     const std::filesystem::path& root_directory,
                                     const std::optional<Types::ScanOptions>& scan_options)
     -> std::expected<void, std::string> {
+  // shutdown 开始后不再接受新 watcher，避免清空 watcher 表后又被并发写回。
+  if (is_shutdown_requested(app_state)) {
+    return std::unexpected("Gallery shutdown has been requested");
+  }
+
   auto normalized_result = normalize_root_directory(root_directory);
   if (!normalized_result) {
     return std::unexpected(normalized_result.error());
@@ -1392,6 +1434,11 @@ auto register_watcher_for_directory(Core::State::AppState& app_state,
   bool watcher_created = false;
   {
     std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
+    // 与 shutdown_watchers 使用同一把锁，再检查一次以关闭检查与插入之间的竞态窗口。
+    if (is_shutdown_requested(app_state)) {
+      return std::unexpected("Gallery shutdown has been requested");
+    }
+
     if (auto it = app_state.gallery->folder_watchers.find(key);
         it != app_state.gallery->folder_watchers.end()) {
       watcher = it->second;
@@ -1667,6 +1714,12 @@ auto start_registered_watchers(Core::State::AppState& app_state)
       Logger().warn("Startup full scan failed for '{}': {}", watcher->root_path.string(),
                     startup_full_scan_result.error());
     }
+  }
+
+  // 退出阶段不再启动全局缩略图对账，让启动恢复任务尽快结束。
+  if (is_shutdown_requested(app_state)) {
+    Logger().info("Stop gallery watcher startup recovery before thumbnail reconcile");
+    return {};
   }
 
   // 所有 root 的启动恢复都完成后，统一做一次全局缩略图缓存对账：补 missing、删 orphan。

@@ -176,6 +176,8 @@ auto initialize(Core::State::AppState& app_state,
     -> std::expected<void, std::string> {
   try {
     app_state.gallery->shutdown_requested.store(false, std::memory_order_release);
+    // 每次初始化创建新的停止源，保证本轮 Gallery 扫描拿到未停止的 token。
+    app_state.gallery->scan_stop_source = std::stop_source{};
     app_state.gallery->startup_initialization_thread = std::jthread(
         [&app_state, after_ready = std::move(after_ready)](std::stop_token stop_token) mutable {
           run_startup_task(app_state, std::move(after_ready), stop_token);
@@ -193,8 +195,11 @@ auto cleanup(Core::State::AppState& app_state,
   try {
     Logger().info("Cleaning up gallery module resources...");
 
-    // 先等待启动线程结束，避免它继续注册 WebView 映射或 watcher。
+    // 先通知所有扫描停止，避免退出阶段继续读取文件或生成缩略图。
     app_state.gallery->shutdown_requested.store(true, std::memory_order_release);
+    app_state.gallery->scan_stop_source.request_stop();
+
+    // 等待启动线程结束，避免它继续注册 WebView 映射或 watcher。
     app_state.gallery->startup_initialization_thread.request_stop();
     if (app_state.gallery->startup_initialization_thread.joinable()) {
       app_state.gallery->startup_initialization_thread.join();
@@ -210,6 +215,9 @@ auto cleanup(Core::State::AppState& app_state,
       before_watchers_shutdown(app_state);
     }
     Features::Gallery::Watcher::shutdown_watchers(app_state);
+
+    // 等所有扫描离开共享区后再释放 Media Foundation 和缩略图路径等运行资源。
+    std::unique_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
 
     // 注销静态服务解析器
     StaticResolver::unregister_all_resolvers(app_state);
@@ -851,9 +859,17 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
 
 // ============= 扫描和索引 =============
 
+// 扫描指定目录并补齐缺失缩略图，成功后确保对应 watcher 已注册
 auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& options,
                     std::function<void(const Types::ScanProgress&)> progress_callback)
     -> std::expected<Types::ScanResult, std::string> {
+  auto stop_token = app_state.gallery->scan_stop_source.get_token();
+  // 一个业务扫描全程持有共享锁，cleanup 会在释放媒体资源前等待它结束。
+  std::shared_lock<std::shared_mutex> scan_lifetime_lock(app_state.gallery->scan_lifetime_mutex);
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Asset scan cancelled");
+  }
+
   auto scan_result =
       Scanner::scan_asset_directory(app_state, options, std::move(progress_callback));
   if (!scan_result) {
@@ -864,6 +880,10 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
   auto result = scan_result.value();
   Logger().info("Asset scan completed. Total: {}, New: {}, Updated: {}, Errors: {}",
                 result.total_files, result.new_items, result.updated_items, result.errors.size());
+
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Asset scan cancelled");
+  }
 
   // 手动/显式扫描后只做当前目录的“缺失缩略图补回”，
   // 不在这里顺手做全局孤儿清理，避免把启动级别的缓存对账混进日常扫描。
@@ -882,6 +902,11 @@ auto scan_directory(Core::State::AppState& app_state, const Types::ScanOptions& 
           stats.candidate_hashes, stats.missing_thumbnails, stats.repaired_thumbnails,
           stats.failed_repairs, stats.skipped_missing_sources);
     }
+  }
+
+  // 退出已开始时不再注册新的 watcher，避免与 shutdown_watchers 交错。
+  if (stop_token.stop_requested()) {
+    return std::unexpected("Asset scan cancelled");
   }
 
   auto watcher_result = Watcher::register_watcher_for_directory(
