@@ -317,11 +317,17 @@ auto calculate_thumbnail_timestamp_hns(std::optional<std::int64_t> duration_mill
   }
 
   auto duration_hns = duration_millis.value() * kHundredNanosecondsPerMillisecond;
-  auto target = duration_hns / 10;
-  // 上限不超过「最后一帧之前」，避免 seek 到 EOF 导致读不到样本。
-  return std::clamp(
-      target, kMinThumbnailTimestampHns,
-      std::max(duration_hns - kHundredNanosecondsPerMillisecond, kMinThumbnailTimestampHns));
+  auto safe_end = duration_hns - kHundredNanosecondsPerMillisecond;
+  if (safe_end <= 0) {
+    return 0;
+  }
+
+  // 极短视频使用中点作为动态下限，避免固定 0.2 秒落到 EOF 之后。
+  auto minimum_target = std::min(kMinThumbnailTimestampHns, duration_hns / 2);
+  auto target = std::max(duration_hns / 10, minimum_target);
+
+  // 长视频最多取 3 秒处，同时始终保留 1ms 的结尾安全余量。
+  return std::min({target, kMaxThumbnailTimestampHns, safe_end});
 }
 
 // 引擎层：Flush 清空队列后 SetCurrentPosition。STREAMTICK / 类型切换等在
@@ -463,6 +469,18 @@ auto read_first_thumbnail_bgra_frame(IMFSourceReader* reader)
   return std::unexpected("Failed to decode a video frame for thumbnail generation");
 }
 
+// 跳转到指定时间并读取第一张有效 BGRA 帧
+auto read_thumbnail_bgra_frame_at(IMFSourceReader* reader, std::int64_t position_hns)
+    -> std::expected<Utils::Image::BGRABitmapData, std::string> {
+  auto seek_result = seek_source_reader(reader, position_hns);
+  if (!seek_result) {
+    return std::unexpected(seek_result.error());
+  }
+
+  return read_first_thumbnail_bgra_frame(reader);
+}
+
+// 读取视频元数据，并按需抽取单帧编码为 WebP 缩略图
 auto analyze_video_file(const std::filesystem::path& path,
                         std::optional<std::uint32_t> thumbnail_short_edge)
     -> std::expected<VideoAnalysis, std::string> {
@@ -529,22 +547,12 @@ auto analyze_video_file(const std::filesystem::path& path,
 
   auto seek_hns = calculate_thumbnail_timestamp_hns(duration_millis);
 
-  auto seek_result = seek_source_reader(reader.get(), seek_hns);
-  if (!seek_result) {
-    Logger().warn("Video analysis failed while seeking thumbnail frame. path='{}', error={}",
-                  path.string(), seek_result.error());
-    return std::unexpected(seek_result.error());
-  }
-
-  auto bitmap_result = read_first_thumbnail_bgra_frame(reader.get());
-  if (!bitmap_result) {
-    auto fallback_seek = seek_source_reader(reader.get(), kMinThumbnailTimestampHns);
-    if (!fallback_seek) {
-      Logger().warn("Video analysis failed while seeking thumbnail fallback. path='{}', error={}",
-                    path.string(), fallback_seek.error());
-      return std::unexpected(fallback_seek.error());
-    }
-    bitmap_result = read_first_thumbnail_bgra_frame(reader.get());
+  auto bitmap_result = read_thumbnail_bgra_frame_at(reader.get(), seek_hns);
+  if (!bitmap_result && seek_hns != 0) {
+    // 目标位置无论 seek 还是解码失败，都回到所有正常视频都支持的起点再试一次。
+    Logger().debug("Retry video thumbnail from start. path='{}', target_hns={}, error={}",
+                   path.string(), seek_hns, bitmap_result.error());
+    bitmap_result = read_thumbnail_bgra_frame_at(reader.get(), 0);
   }
   if (!bitmap_result) {
     Logger().warn("Video analysis failed while decoding thumbnail bitmap. path='{}', error={}",
