@@ -168,6 +168,7 @@ export interface AppSettings {
   // features 分组 - 功能特性设置
   features: {
     outputDirPath: string // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
+    organizeOutputByWindowTitle: boolean // 按目标窗口标题创建输出子目录
     externalAlbumPath: string // 外部游戏相册目录路径（为空时回退到输出目录）
     savedFileViewAction: 'default_app' | 'reveal_in_explorer' // 保存成功通知点击“查看”后的行为
 
@@ -305,6 +306,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   // features 设置
   features: {
     outputDirPath: '',
+    organizeOutputByWindowTitle: false,
     externalAlbumPath: '',
     savedFileViewAction: 'default_app',
     screenshot: {

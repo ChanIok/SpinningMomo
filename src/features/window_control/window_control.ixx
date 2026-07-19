@@ -9,6 +9,9 @@ import Vendor.Windows;
 
 namespace Features::WindowControl {
 
+export auto get_window_title(Vendor::Windows::HWND hwnd)
+    -> std::expected<std::wstring, std::string>;
+
 export auto find_target_window(const std::wstring& configured_title)
     -> std::expected<Vendor::Windows::HWND, std::string>;
 

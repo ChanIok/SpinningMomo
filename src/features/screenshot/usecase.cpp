@@ -14,6 +14,7 @@ import Features.Settings.State;
 import Features.WindowControl;
 import Utils.Image;
 import Utils.Logger;
+import Utils.Path;
 import Utils.String;
 import Utils.System;
 
@@ -39,6 +40,28 @@ auto capture(Core::State::AppState& state) -> void {
     Core::Notifications::show_notification(state, state.i18n->texts["label.app_name"],
                                            state.i18n->texts["message.window_not_found"]);
     return;
+  }
+
+  std::optional<std::filesystem::path> output_dir_override;
+  if (state.settings->raw.features.organize_output_by_window_title) {
+    auto actual_title = Features::WindowControl::get_window_title(*target_window);
+    if (!actual_title) {
+      Logger().warn("Failed to read current screenshot target title, using configured title: {}",
+                    actual_title.error());
+    }
+
+    const auto title = actual_title.value_or(window_title);
+    auto output_dir_result = Utils::Path::GetOutputDirectoryForWindowTitle(
+        state.settings->raw.features.output_dir_path, title);
+    if (!output_dir_result) {
+      Core::Notifications::show_notification(
+          state, state.i18n->texts["label.app_name"],
+          state.i18n->texts["message.screenshot_failed"] + ": " + output_dir_result.error());
+      Logger().error("Failed to resolve screenshot output directory: {}",
+                     output_dir_result.error());
+      return;
+    }
+    output_dir_override = *output_dir_result;
   }
 
   // 截图完成回调在截图工作线程的帧回调中执行，必须快速返回；通知通过事件系统发送到 UI 线程
@@ -86,9 +109,9 @@ auto capture(Core::State::AppState& state) -> void {
 
   const auto capture_client_area = state.settings->raw.features.screenshot.capture_client_area;
 
-  auto result = Features::Screenshot::take_screenshot(state, *target_window, completion_callback,
-                                                      image_format, jpeg_quality, std::nullopt,
-                                                      shutter_frames, capture_client_area);
+  auto result = Features::Screenshot::take_screenshot(
+      state, *target_window, completion_callback, image_format, jpeg_quality, output_dir_override,
+      shutter_frames, capture_client_area);
   if (!result) {
     Core::Notifications::show_notification(
         state, state.i18n->texts["label.app_name"],

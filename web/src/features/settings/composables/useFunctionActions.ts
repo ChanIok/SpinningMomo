@@ -80,6 +80,16 @@ export const useFunctionActions = () => {
     })
   }
 
+  const updateOrganizeOutputByWindowTitle = async (enabled: boolean) => {
+    await store.updateSettings({
+      ...appSettings.value,
+      features: {
+        ...appSettings.value.features,
+        organizeOutputByWindowTitle: enabled,
+      },
+    })
+  }
+
   const updateGameAlbumPath = async (dirPath: string) => {
     await store.updateSettings({
       ...appSettings.value,
@@ -350,6 +360,7 @@ export const useFunctionActions = () => {
       features: {
         ...appSettings.value.features,
         outputDirPath: DEFAULT_APP_SETTINGS.features.outputDirPath,
+        organizeOutputByWindowTitle: DEFAULT_APP_SETTINGS.features.organizeOutputByWindowTitle,
         externalAlbumPath: DEFAULT_APP_SETTINGS.features.externalAlbumPath,
         savedFileViewAction: DEFAULT_APP_SETTINGS.features.savedFileViewAction,
         screenshot: {
@@ -442,6 +453,7 @@ export const useFunctionActions = () => {
     updateWindowUseResolutionShortEdge,
     updateWindowResetResolution,
     updateOutputDir,
+    updateOrganizeOutputByWindowTitle,
     updateGameAlbumPath,
     updateSavedFileViewAction,
     updateScreenshotFileFormat,

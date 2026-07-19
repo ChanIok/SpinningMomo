@@ -69,9 +69,18 @@ auto toggle_recording(Core::State::AppState& state) -> std::expected<void, std::
     return std::unexpected("Target window not found");
   }
 
-  // 确定输出目录
+  // 输出目录在录制开始时确定，后续自动切段沿用同一个窗口目录。
   auto output_dir_result =
       Utils::Path::GetOutputDirectory(state.settings->raw.features.output_dir_path);
+  if (state.settings->raw.features.organize_output_by_window_title) {
+    auto actual_title = Features::WindowControl::get_window_title(*target);
+    if (!actual_title) {
+      Logger().warn("Failed to read current recording target title, using configured title: {}",
+                    actual_title.error());
+    }
+    output_dir_result = Utils::Path::GetOutputDirectoryForWindowTitle(
+        state.settings->raw.features.output_dir_path, actual_title.value_or(window_title));
+  }
   if (!output_dir_result) {
     Features::Recording::notify_message(
         state, state.i18n->texts["message.recording_start_failed"] + output_dir_result.error());

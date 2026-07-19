@@ -32,6 +32,7 @@ const store = useSettingsStore()
 const { appSettings, runtimeCapabilities, error, isInitialized } = storeToRefs(store)
 const {
   updateOutputDir,
+  updateOrganizeOutputByWindowTitle,
   updateGameAlbumPath,
   updateSavedFileViewAction,
   updateRecordingFps,
@@ -259,61 +260,81 @@ const handleResetSettings = async () => {
           </p>
         </div>
 
-        <Item variant="surface" size="sm">
-          <ItemContent>
-            <ItemTitle>
-              {{ t('settings.function.outputDir.label') }}
-            </ItemTitle>
-            <ItemDescription>
-              <template v-if="appSettings?.features?.outputDirPath">
-                {{ appSettings.features.outputDirPath }}
-              </template>
-              <template v-else>
-                {{ t('settings.function.outputDir.default') }}
-              </template>
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Button @click="handleSelectOutputDir" :disabled="isSelectingOutputDir" size="sm">
-              {{
-                isSelectingOutputDir
-                  ? t('settings.function.outputDir.selecting')
-                  : t('settings.function.outputDir.selectButton')
-              }}
-            </Button>
-          </ItemActions>
-        </Item>
+        <ItemGroup>
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.outputDir.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                <template v-if="appSettings?.features?.outputDirPath">
+                  {{ appSettings.features.outputDirPath }}
+                </template>
+                <template v-else>
+                  {{ t('settings.function.outputDir.default') }}
+                </template>
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Button @click="handleSelectOutputDir" :disabled="isSelectingOutputDir" size="sm">
+                {{
+                  isSelectingOutputDir
+                    ? t('settings.function.outputDir.selecting')
+                    : t('settings.function.outputDir.selectButton')
+                }}
+              </Button>
+            </ItemActions>
+          </Item>
 
-        <Item variant="surface" size="sm">
-          <ItemContent>
-            <ItemTitle>
-              {{ t('settings.capture.savedFileViewAction.label') }}
-            </ItemTitle>
-            <ItemDescription>
-              {{ t('settings.capture.savedFileViewAction.description') }}
-            </ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Select
-              :model-value="appSettings?.features?.savedFileViewAction ?? 'default_app'"
-              @update:model-value="
-                (value) => updateSavedFileViewAction(value as 'default_app' | 'reveal_in_explorer')
-              "
-            >
-              <SelectTrigger class="w-[220px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default_app">
-                  {{ t('settings.capture.savedFileViewAction.defaultApp') }}
-                </SelectItem>
-                <SelectItem value="reveal_in_explorer">
-                  {{ t('settings.capture.savedFileViewAction.revealInExplorer') }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </ItemActions>
-        </Item>
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.function.outputDir.organizeByWindowTitle.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.function.outputDir.organizeByWindowTitle.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Switch
+                :model-value="appSettings?.features?.organizeOutputByWindowTitle ?? false"
+                @update:model-value="(value) => updateOrganizeOutputByWindowTitle(Boolean(value))"
+              />
+            </ItemActions>
+          </Item>
+
+          <Item variant="surface" size="sm">
+            <ItemContent>
+              <ItemTitle>
+                {{ t('settings.capture.savedFileViewAction.label') }}
+              </ItemTitle>
+              <ItemDescription>
+                {{ t('settings.capture.savedFileViewAction.description') }}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Select
+                :model-value="appSettings?.features?.savedFileViewAction ?? 'default_app'"
+                @update:model-value="
+                  (value) =>
+                    updateSavedFileViewAction(value as 'default_app' | 'reveal_in_explorer')
+                "
+              >
+                <SelectTrigger class="w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default_app">
+                    {{ t('settings.capture.savedFileViewAction.defaultApp') }}
+                  </SelectItem>
+                  <SelectItem value="reveal_in_explorer">
+                    {{ t('settings.capture.savedFileViewAction.revealInExplorer') }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </ItemActions>
+          </Item>
+        </ItemGroup>
       </div>
 
       <div class="space-y-4">

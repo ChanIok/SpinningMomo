@@ -321,6 +321,25 @@ auto center_lock_monitor_thread_proc(Core::State::AppState& state, std::stop_tok
   }
 }
 
+auto get_window_title(HWND hwnd) -> std::expected<std::wstring, std::string> {
+  if (!hwnd || !IsWindow(hwnd)) {
+    return std::unexpected{"Failed to read title: Invalid window handle."};
+  }
+
+  const int title_length = GetWindowTextLengthW(hwnd);
+  if (title_length <= 0) {
+    return std::unexpected{"Failed to read title: Target window has no title."};
+  }
+
+  std::vector<wchar_t> buffer(static_cast<std::size_t>(title_length) + 1);
+  const int copied = GetWindowTextW(hwnd, buffer.data(), static_cast<int>(buffer.size()));
+  if (copied <= 0) {
+    return std::unexpected{"Failed to read target window title."};
+  }
+
+  return std::wstring(buffer.data(), static_cast<std::size_t>(copied));
+}
+
 // 查找目标窗口
 auto find_target_window(const std::wstring& configured_title) -> std::expected<HWND, std::string> {
   if (configured_title.empty()) {

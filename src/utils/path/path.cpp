@@ -11,6 +11,95 @@ namespace Utils::Path::Detail {
 constexpr std::wstring_view kPortableMarker = L"portable";
 constexpr std::wstring_view kAppName = L"SpinningMomo";
 
+// 判断路径段是否命中 Windows 设备保留名
+auto is_reserved_windows_name(std::wstring_view value) -> bool {
+  // Windows 只检查首个点号前的主名称，并且不区分大小写
+  auto base_name = std::wstring(value.substr(0, value.find(L'.')));
+  std::ranges::transform(base_name, base_name.begin(), [](wchar_t character) {
+    return static_cast<wchar_t>(std::towupper(character));
+  });
+
+  // 先处理不带编号的固定设备名
+  if (base_name == L"CON" || base_name == L"PRN" || base_name == L"AUX" || base_name == L"NUL") {
+    return true;
+  }
+
+  // 再处理 COM1-COM9 和 LPT1-LPT9
+  if (base_name.size() == 4 && base_name.back() >= L'1' && base_name.back() <= L'9') {
+    const auto prefix = std::wstring_view(base_name).substr(0, 3);
+    return prefix == L"COM" || prefix == L"LPT";
+  }
+
+  return false;
+}
+
+// 把窗口标题转换为可辨认、可复用的 Windows 目录名
+auto sanitize_window_title(std::wstring_view title) -> std::wstring {
+  std::wstring result;
+  result.reserve(title.size());
+
+  // 保留正常字符，把控制字符和 Windows 禁用字符转换为安全字符
+  for (wchar_t character : title) {
+    if (character < 32) {
+      result.push_back(L'_');
+      continue;
+    }
+
+    switch (character) {
+      case L'<':
+        result.push_back(L'＜');
+        break;
+      case L'>':
+        result.push_back(L'＞');
+        break;
+      case L':':
+        result.push_back(L'：');
+        break;
+      case L'"':
+        result.push_back(L'＂');
+        break;
+      case L'/':
+        result.push_back(L'／');
+        break;
+      case L'\\':
+        result.push_back(L'＼');
+        break;
+      case L'|':
+        result.push_back(L'｜');
+        break;
+      case L'?':
+        result.push_back(L'？');
+        break;
+      case L'*':
+        result.push_back(L'＊');
+        break;
+      default:
+        result.push_back(character);
+        break;
+    }
+  }
+
+  // 去掉 Windows 会忽略或拒绝的首尾空白与结尾句点
+  while (!result.empty() && std::iswspace(result.front())) {
+    result.erase(result.begin());
+  }
+  while (!result.empty() && (std::iswspace(result.back()) || result.back() == L'.')) {
+    result.pop_back();
+  }
+
+  // 标题清洗后为空时使用固定名称，避免目录名受界面语言影响
+  if (result.empty()) {
+    result = L"Unknown Window";
+  }
+
+  // 保留设备名追加后缀，使最终路径段可被 Windows 创建
+  if (is_reserved_windows_name(result)) {
+    result += L'_';
+  }
+
+  return result;
+}
+
 auto ensure_path_exists(const std::filesystem::path& path)
     -> std::expected<std::filesystem::path, std::string> {
   auto ensure_result = Utils::Path::EnsureDirectoryExists(path);
@@ -346,4 +435,26 @@ auto Utils::Path::GetOutputDirectory(const std::string& configured_output_dir_pa
   }
 
   return fallback_output_dir;
+}
+
+// 解析根输出目录 → 清洗窗口标题 → 创建对应子目录
+auto Utils::Path::GetOutputDirectoryForWindowTitle(const std::string& configured_output_dir_path,
+                                                   std::wstring_view window_title)
+    -> std::expected<std::filesystem::path, std::string> {
+  // 先沿用统一规则解析用户配置或默认根输出目录
+  auto output_dir_result = GetOutputDirectory(configured_output_dir_path);
+  if (!output_dir_result) {
+    return std::unexpected(output_dir_result.error());
+  }
+
+  // 标题只作为一个路径段，清洗后再拼接，不能改变根目录结构
+  auto output_dir = *output_dir_result / Detail::sanitize_window_title(window_title);
+  // 捕获开始前确保目标目录可写入，失败时交给上层明确中止
+  auto ensure_result = EnsureDirectoryExists(output_dir);
+  if (!ensure_result) {
+    return std::unexpected("Failed to create window title output directory: " +
+                           ensure_result.error());
+  }
+
+  return output_dir;
 }

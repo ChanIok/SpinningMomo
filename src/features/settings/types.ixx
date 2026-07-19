@@ -122,8 +122,9 @@ export struct AppSettings {
 
   // features 分组 - 功能特性设置
   struct Features {
-    std::string output_dir_path = "";      // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
-    std::string external_album_path = "";  // 外部游戏相册目录路径（为空时回退到输出目录）
+    std::string output_dir_path = "";  // 统一输出目录（截图+录制），空=默认 Videos/SpinningMomo
+    bool organize_output_by_window_title = false;  // 按目标窗口标题创建输出子目录
+    std::string external_album_path = "";          // 外部游戏相册目录路径（为空时回退到输出目录）
     std::string saved_file_view_action =
         "default_app";  // 保存成功通知点击“查看”后的行为: "default_app" | "reveal_in_explorer"
 
