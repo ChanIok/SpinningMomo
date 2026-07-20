@@ -240,6 +240,81 @@ struct ProcessingProgressTracker {
   }
 };
 
+// 进度追踪器：指纹计算阶段进度汇报与节流
+struct HashProgressTracker {
+  static constexpr std::int64_t kMinReportIntervalMillis = 200;
+
+  const std::function<void(const Types::ScanProgress&)>& progress_callback;
+  const std::int64_t total_candidates;
+  const double percent_start;
+  const double percent_end;
+
+  std::atomic<std::int64_t> completed_candidates = 0;
+
+  std::mutex report_mutex;
+  int last_reported_percent = -1;
+  std::int64_t last_report_millis = 0;
+
+  HashProgressTracker(const std::function<void(const Types::ScanProgress&)>& callback,
+                      std::int64_t candidates, double start_percent, double end_percent)
+      : progress_callback(callback),
+        total_candidates(candidates),
+        percent_start(start_percent),
+        percent_end(end_percent) {}
+
+  auto report(bool force = false) -> void {
+    if (!progress_callback || total_candidates <= 0) {
+      return;
+    }
+
+    auto done = std::min(completed_candidates.load(std::memory_order_relaxed), total_candidates);
+    if (force) {
+      done = total_candidates;
+    }
+
+    const auto ratio = static_cast<double>(done) / static_cast<double>(total_candidates);
+    auto percent = percent_start + (percent_end - percent_start) * ratio;
+    percent = std::clamp(percent, percent_start, percent_end);
+
+    auto now = steady_clock_millis();
+
+    {
+      std::lock_guard<std::mutex> lock(report_mutex);
+      auto rounded_percent = static_cast<int>(std::floor(percent));
+
+      if (!force) {
+        if (rounded_percent <= last_reported_percent) {
+          return;
+        }
+
+        if (now - last_report_millis < kMinReportIntervalMillis) {
+          return;
+        }
+      }
+
+      if (rounded_percent > last_reported_percent) {
+        last_reported_percent = rounded_percent;
+      }
+
+      if (force && last_reported_percent >= 0 &&
+          percent < static_cast<double>(last_reported_percent)) {
+        percent = static_cast<double>(last_reported_percent);
+      }
+
+      last_report_millis = now;
+    }
+
+    auto message = std::format("Calculating file fingerprints ({} / {})", done, total_candidates);
+    report_scan_progress(progress_callback, "hashing", done, total_candidates, percent,
+                         std::move(message));
+  }
+
+  auto mark_item_hashed() -> void {
+    completed_candidates.fetch_add(1, std::memory_order_relaxed);
+    report();
+  }
+};
+
 auto is_path_under_root(const std::string& candidate_path, const std::string& root_path) -> bool {
   if (candidate_path.size() < root_path.size()) {
     return false;
@@ -494,7 +569,7 @@ auto analyze_file_changes(const std::vector<Types::FileSystemInfo>& file_infos,
 // 并行计算待检查文件的内容指纹，并返回成功完成的文件数
 auto calculate_hash_for_targets(Core::State::AppState& app_state,
                                 std::vector<Types::FileAnalysisResult>& analysis_results,
-                                std::stop_token stop_token)
+                                HashProgressTracker* progress_tracker, std::stop_token stop_token)
     -> std::expected<std::size_t, std::string> {
   // 1. 使用 C++20 ranges 枚举并过滤出所有状态为 NEW 或 NEEDS_HASH_CHECK 的待处理文件。
   // 保留了原始索引(idx)，这是为了在并发算完哈希后能无缝写回原数组。
@@ -524,22 +599,26 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
 
   // 2. 并行处理批次，每个文件和每个读取块都会观察同一个停止信号。
   for (const auto& batch : batches) {
-    bool submitted = Core::WorkerPool::submit_task(app_state, [&all_hashes, &results_mutex,
-                                                               &completion_latch, batch,
-                                                               &analysis_results, stop_token]() {
-      // 无论正常结束、取消还是异常，本批次都必须释放 latch 计数。
-      auto finish_batch = wil::scope_exit([&completion_latch] { completion_latch.count_down(); });
+    bool submitted = Core::WorkerPool::submit_task(
+        app_state, [&all_hashes, &results_mutex, &completion_latch, batch, &analysis_results,
+                    progress_tracker, stop_token]() {
+          // 无论正常结束、取消还是异常，本批次都必须释放 latch 计数。
+          auto finish_batch =
+              wil::scope_exit([&completion_latch] { completion_latch.count_down(); });
 
-      // 每个文件开始前检查停止；单个大文件内部在采样块边界继续响应。
-      auto batch_hashes =
-          batch | std::views::take_while([stop_token](const auto&) {
-            return !stop_token.stop_requested();
-          }) |
-          std::views::transform(
-              [stop_token](const auto& pair) -> std::optional<std::pair<size_t, std::string>> {
+          // 每个文件开始前检查停止；单个大文件内部在采样块边界继续响应。
+          auto batch_hashes =
+              batch | std::views::take_while([stop_token](const auto&) {
+                return !stop_token.stop_requested();
+              }) |
+              std::views::transform([progress_tracker, stop_token](const auto& pair)
+                                        -> std::optional<std::pair<size_t, std::string>> {
                 const auto& [idx, analysis] = pair;
                 auto hash_result = ScanCommon::calculate_content_fingerprint(
                     analysis.file_info.path, analysis.file_info.size, stop_token);
+                if (progress_tracker) {
+                  progress_tracker->mark_item_hashed();
+                }
                 if (hash_result) {
                   return std::make_pair(static_cast<size_t>(idx), std::move(hash_result.value()));
                 }
@@ -549,17 +628,17 @@ auto calculate_hash_for_targets(Core::State::AppState& app_state,
                 }
                 return std::nullopt;
               }) |
-          std::views::filter([](const auto& result) { return result.has_value(); }) |
-          std::views::transform([](auto&& result) { return std::move(result.value()); }) |
-          std::ranges::to<std::vector>();
+              std::views::filter([](const auto& result) { return result.has_value(); }) |
+              std::views::transform([](auto&& result) { return std::move(result.value()); }) |
+              std::ranges::to<std::vector>();
 
-      // 单次加锁合并本批结果，避免多个工作线程交错修改结果数组。
-      if (!batch_hashes.empty()) {
-        std::lock_guard<std::mutex> lock(results_mutex);
-        all_hashes.insert(all_hashes.end(), std::make_move_iterator(batch_hashes.begin()),
-                          std::make_move_iterator(batch_hashes.end()));
-      }
-    });
+          // 单次加锁合并本批结果，避免多个工作线程交错修改结果数组。
+          if (!batch_hashes.empty()) {
+            std::lock_guard<std::mutex> lock(results_mutex);
+            all_hashes.insert(all_hashes.end(), std::make_move_iterator(batch_hashes.begin()),
+                              std::make_move_iterator(batch_hashes.end()));
+          }
+        });
 
     if (!submitted) {
       // 已提交批次仍持有局部引用，必须等它们收尾后才能返回。
@@ -1002,12 +1081,18 @@ auto run_hash_analysis_phase(
       }));
   const auto metadata_unchanged_skip_count = analysis_results.size() - hash_candidate_count;
 
-  report_scan_progress(progress_callback, "hashing", 0,
-                       static_cast<std::int64_t>(hash_candidate_count), kHashingStartPercent,
-                       hash_candidate_count == 0 ? "No files require fingerprint calculation"
-                                                 : "Calculating file fingerprints");
+  std::optional<HashProgressTracker> hash_tracker;
+  if (hash_candidate_count > 0) {
+    hash_tracker.emplace(progress_callback, static_cast<std::int64_t>(hash_candidate_count),
+                         kHashingStartPercent, kHashingEndPercent);
+    hash_tracker->report(false);
+  } else {
+    report_scan_progress(progress_callback, "hashing", 0, 0, kHashingStartPercent,
+                         "No files require fingerprint calculation");
+  }
 
-  auto hash_phase = calculate_hash_for_targets(app_state, analysis_results, stop_token);
+  auto hash_phase = calculate_hash_for_targets(
+      app_state, analysis_results, hash_tracker ? &(*hash_tracker) : nullptr, stop_token);
   if (!hash_phase) {
     return std::unexpected("Fingerprint calculation failed: " + hash_phase.error());
   }
@@ -1021,9 +1106,13 @@ auto run_hash_analysis_phase(
     }
   }
 
-  report_scan_progress(progress_callback, "hashing", static_cast<std::int64_t>(hashed_count),
-                       static_cast<std::int64_t>(hash_candidate_count), kHashingEndPercent,
-                       "Fingerprint calculation completed");
+  if (hash_tracker) {
+    hash_tracker->report(true);
+  } else {
+    report_scan_progress(progress_callback, "hashing", static_cast<std::int64_t>(hashed_count),
+                         static_cast<std::int64_t>(hash_candidate_count), kHashingEndPercent,
+                         "Fingerprint calculation completed");
+  }
 
   if (hash_candidate_count == 0) {
     Logger().info("Fingerprint calculation skipped for all {} files (size and mtime match cache)",
