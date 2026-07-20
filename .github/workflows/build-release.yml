@@ -158,12 +158,6 @@ jobs:
           npm install
           npm ci --prefix web
 
-      - name: Update preinstalled vcpkg
-        shell: pwsh
-        run: |
-          $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
-          git -C $vcpkgRoot pull --ff-only
-
       - name: Prepare xmake release dependencies
         run: xmake f -m release -y
 
