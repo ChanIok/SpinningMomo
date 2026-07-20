@@ -26,8 +26,6 @@ auto calculate_layout_config(const Core::State::AppState& state, UINT dpi)
   layout.font_size = static_cast<float>(layout_settings.base_font_size * scale);
   layout.text_padding = static_cast<int>(layout_settings.base_text_padding * scale);
   layout.indicator_width = static_cast<int>(layout_settings.base_indicator_width * scale);
-  layout.ratio_indicator_width =
-      static_cast<int>(layout_settings.base_ratio_indicator_width * scale);
   layout.ratio_column_width = static_cast<int>(layout_settings.base_ratio_column_width * scale);
   layout.resolution_column_width =
       static_cast<int>(layout_settings.base_resolution_column_width * scale);
@@ -182,13 +180,6 @@ auto get_feature_item_index(const Core::State::AppState& state, int y) -> int {
     }
   }
   return -1;
-}
-
-auto get_indicator_width(const UI::FloatingWindow::MenuItem& item,
-                         const Core::State::AppState& state) -> int {
-  return (item.category == UI::FloatingWindow::MenuItemCategory::AspectRatio)
-             ? state.floating_window->layout.ratio_indicator_width
-             : state.floating_window->layout.indicator_width;
 }
 
 }  // namespace UI::FloatingWindow::Layout

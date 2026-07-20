@@ -38,8 +38,6 @@
   "settings.appearance.layout.baseItemHeight.label": "项高度",
   "settings.appearance.layout.baseRatioColumnWidth.description": "基础比例列宽度。",
   "settings.appearance.layout.baseRatioColumnWidth.label": "比例列宽度",
-  "settings.appearance.layout.baseRatioIndicatorWidth.description": "基础比例指示器宽度。",
-  "settings.appearance.layout.baseRatioIndicatorWidth.label": "比例指示器宽度",
   "settings.appearance.layout.baseResolutionColumnWidth.description": "基础分辨率列宽度。",
   "settings.appearance.layout.baseResolutionColumnWidth.label": "分辨率列宽度",
   "settings.appearance.layout.baseSeparatorHeight.description": "基础分隔符高度。",

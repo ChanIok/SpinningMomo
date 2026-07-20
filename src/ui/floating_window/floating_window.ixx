@@ -27,6 +27,9 @@ export auto update_menu_items(Core::State::AppState& state) -> void;
 // 渲染触发
 export auto request_repaint(Core::State::AppState& state) -> void;
 
+// 刷新 DWM 实际绘制的窗口边框宽度
+export auto refresh_visible_frame_border_thickness(Core::State::AppState& state) -> void;
+
 // 设置变更响应
 export auto refresh_from_settings(Core::State::AppState& state) -> void;
 

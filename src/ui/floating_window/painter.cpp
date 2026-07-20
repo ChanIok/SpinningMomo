@@ -413,7 +413,7 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
                       const D2D1_RECT_F& item_rect, bool is_hovered) -> void {
   auto& d2d = state.floating_window->render_resources;
   const auto& render = state.floating_window->layout;
-  const int indicator_width = UI::FloatingWindow::Layout::get_indicator_width(item, state);
+  const int indicator_width = render.indicator_width;
 
   // 绘制悬停背景
   if (is_hovered) {
@@ -423,8 +423,14 @@ auto draw_single_item(Core::State::AppState& state, const UI::FloatingWindow::Me
   // 绘制选中指示器（保持完全不透明）
   const bool is_selected = is_item_selected(item, state);
   if (is_selected) {
+    float indicator_left = item_rect.left;
+    if (item.category == UI::FloatingWindow::MenuItemCategory::AspectRatio) {
+      // 比例列贴着窗口左沿，需避开 DWM 覆盖在客户区上的系统描边。
+      indicator_left +=
+          static_cast<float>(state.floating_window->window.visible_frame_border_thickness);
+    }
     D2D1_RECT_F indicator_rect = UI::FloatingWindow::make_d2d_rect(
-        item_rect.left, item_rect.top, item_rect.left + static_cast<float>(indicator_width),
+        indicator_left, item_rect.top, indicator_left + static_cast<float>(indicator_width),
         item_rect.bottom);
     ID2D1SolidColorBrush* indicator_brush = d2d.indicator_brush.get();
     if (item.category == UI::FloatingWindow::MenuItemCategory::Feature &&

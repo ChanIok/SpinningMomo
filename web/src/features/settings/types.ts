@@ -102,7 +102,6 @@ export interface FloatingWindowLayout {
   baseFontSize: number
   baseTextPadding: number
   baseIndicatorWidth: number
-  baseRatioIndicatorWidth: number
   baseRatioColumnWidth: number
   baseResolutionColumnWidth: number
   baseSettingsColumnWidth: number
@@ -380,7 +379,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
       baseFontSize: 12,
       baseTextPadding: 12,
       baseIndicatorWidth: 3,
-      baseRatioIndicatorWidth: 4,
       baseRatioColumnWidth: 60,
       baseResolutionColumnWidth: 70,
       baseSettingsColumnWidth: 80,

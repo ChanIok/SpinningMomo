@@ -42,6 +42,8 @@ auto apply_dpi_change(Core::State::AppState& state, HWND hwnd, UINT new_dpi,
 
   SetWindowPos(hwnd, nullptr, suggested_rect.left, suggested_rect.top, metrics.size.cx,
                metrics.size.cy, SWP_NOZORDER | SWP_NOACTIVATE);
+  UI::FloatingWindow::refresh_visible_frame_border_thickness(state);
+  UI::FloatingWindow::request_repaint(state);
 }
 
 // 确保窗口能接收到WM_MOUSELEAVE消息

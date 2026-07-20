@@ -203,7 +203,6 @@ export struct AppSettings {
       int base_font_size = 12;
       int base_text_padding = 12;
       int base_indicator_width = 3;
-      int base_ratio_indicator_width = 4;
       int base_ratio_column_width = 60;
       int base_resolution_column_width = 70;
       int base_settings_column_width = 80;

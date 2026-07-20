@@ -97,6 +97,7 @@ auto create_window(Core::State::AppState& state) -> std::expected<void, std::str
 
   // 创建窗口属性
   create_window_attributes(state.floating_window->window.hwnd);
+  refresh_visible_frame_border_thickness(state);
 
   // 初始化Direct2D渲染
   if (!UI::FloatingWindow::RenderContext::initialize_render_context(
@@ -112,6 +113,16 @@ auto request_repaint(Core::State::AppState& state) -> void {
   if (state.floating_window->window.hwnd && state.floating_window->window.is_visible) {
     InvalidateRect(state.floating_window->window.hwnd, nullptr, FALSE);
   }
+}
+
+auto refresh_visible_frame_border_thickness(Core::State::AppState& state) -> void {
+  auto& window = state.floating_window->window;
+  UINT thickness = 0;
+  if (window.hwnd) {
+    DwmGetWindowAttribute(window.hwnd, DWMWA_VISIBLE_FRAME_BORDER_THICKNESS, &thickness,
+                          sizeof(thickness));
+  }
+  window.visible_frame_border_thickness = thickness;
 }
 
 auto install_topmost_refresh_hook(Core::State::AppState& state) -> void {
@@ -144,6 +155,7 @@ auto show_window(Core::State::AppState& state) -> void {
   if (state.floating_window->window.hwnd) {
     ShowWindow(state.floating_window->window.hwnd, SW_SHOWNA);
     state.floating_window->window.is_visible = true;
+    refresh_visible_frame_border_thickness(state);
 
     // Windows 11 TopMost Z 序失效 workaround：显示时安装前台变化监听
     install_topmost_refresh_hook(state);

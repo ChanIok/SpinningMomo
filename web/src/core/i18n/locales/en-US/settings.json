@@ -38,8 +38,6 @@
   "settings.appearance.layout.baseItemHeight.label": "Item Height",
   "settings.appearance.layout.baseRatioColumnWidth.description": "Base ratio column width.",
   "settings.appearance.layout.baseRatioColumnWidth.label": "Ratio Column Width",
-  "settings.appearance.layout.baseRatioIndicatorWidth.description": "Base ratio indicator width.",
-  "settings.appearance.layout.baseRatioIndicatorWidth.label": "Ratio Indicator Width",
   "settings.appearance.layout.baseResolutionColumnWidth.description": "Base resolution column width.",
   "settings.appearance.layout.baseResolutionColumnWidth.label": "Resolution Column Width",
   "settings.appearance.layout.baseSeparatorHeight.description": "Base separator height.",

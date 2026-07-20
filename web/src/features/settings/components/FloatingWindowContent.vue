@@ -111,7 +111,6 @@ const layoutKeys = [
   'baseFontSize',
   'baseTextPadding',
   'baseIndicatorWidth',
-  'baseRatioIndicatorWidth',
   'baseRatioColumnWidth',
   'baseResolutionColumnWidth',
   'baseSettingsColumnWidth',

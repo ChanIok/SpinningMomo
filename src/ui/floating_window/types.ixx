@@ -38,6 +38,7 @@ export struct WindowInfo {
   SIZE size{};
   POINT position{};
   UINT dpi = 96;
+  UINT visible_frame_border_thickness = 0;
   bool is_visible = false;
   bool is_tracking_mouse = false;
   HWINEVENTHOOK topmost_refresh_hook = nullptr;  // 用于 Windows 11 TopMost workaround
@@ -71,7 +72,6 @@ export struct LayoutConfig {
   float font_size = 12.0f;  // 改为float，DirectWrite使用浮点数
   int text_padding = 12;
   int indicator_width = 3;
-  int ratio_indicator_width = 4;
   int ratio_column_width = 60;
   int resolution_column_width = 120;
   int feature_column_width = 120;

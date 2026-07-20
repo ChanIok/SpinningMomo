@@ -40,10 +40,6 @@ export auto count_items_per_column(const std::vector<UI::FloatingWindow::MenuIte
 // 获取列边界
 export auto get_column_bounds(const Core::State::AppState& state) -> ColumnBounds;
 
-// 获取指示器宽度
-export auto get_indicator_width(const UI::FloatingWindow::MenuItem& item,
-                                const Core::State::AppState& state) -> int;
-
 // 获取功能列中的项目索引
 auto get_feature_item_index(const Core::State::AppState& state, int y) -> int;
 
