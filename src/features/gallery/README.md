@@ -13,7 +13,7 @@
 
 - `src/features/gallery/gallery.ixx/.cpp`：模块编排入口，负责初始化、清理、扫描、缩略图维护、文件动作、watcher 注册。
 - `src/features/gallery/state.ixx`：gallery 运行时状态，例如缩略图目录、资产路径 LRU 缓存、每个根目录的 watcher 状态。
-- `src/features/gallery/scanner.*`：全量扫描与索引更新。
+- `src/features/gallery/scanner/`：全量扫描与索引更新（编排 + Common/Progress/Discovery/Analysis/Process/Cleanup）。
 - `src/features/gallery/watcher.*`：目录监听、增量同步、启动后恢复 watcher。
 - `src/features/gallery/static_resolver.*`：对外暴露缩略图与原图静态路径。
 - `src/features/gallery/asset/`：资产查询、时间线、描述、颜色、缩略图、无限暖暖扩展元数据。
@@ -46,7 +46,7 @@
 
 - `src/features/gallery/gallery.cpp`：模块编排入口与资产动作主流程。
 - `src/features/gallery/watcher.cpp`：目录监听、增量同步、扫描后回调。
-- `src/features/gallery/scanner.cpp`：全量扫描主逻辑。
+- `src/features/gallery/scanner/scanner.cpp`：全量扫描编排入口（五阶段伪代码级流程）。
 - `src/features/gallery/types.ixx`：`ScanResult` / `ScanChange` / `OperationResult` 等稳定语义。
 - `src/core/rpc/endpoints/gallery/asset.cpp`：前端资产动作 RPC 入口。
 - `web/src/features/gallery/store/index.ts`：前端状态入口。

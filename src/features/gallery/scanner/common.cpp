@@ -1,6 +1,6 @@
 module;
 
-module Features.Gallery.ScanCommon;
+module Features.Gallery.Scanner.Common;
 
 import std;
 import Vendor.BuildConfig;
@@ -8,7 +8,7 @@ import Vendor.XXHash;
 import Utils.Media.VideoAsset;
 import Utils.String;
 
-namespace Features::Gallery::ScanCommon {
+namespace Features::Gallery::Scanner::Common {
 
 auto default_supported_extensions() -> const std::vector<std::string>& {
   // 与 web GalleryScanDialog 默认列表、RPC 扫描选项保持一致，避免前后端可扫范围不一致。
@@ -160,4 +160,4 @@ auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::
   return hash_result;
 }
 
-}  // namespace Features::Gallery::ScanCommon
+}  // namespace Features::Gallery::Scanner::Common

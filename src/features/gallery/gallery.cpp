@@ -11,7 +11,7 @@ import Features.Gallery.Types;
 import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Service;
 import Features.Gallery.Scanner;
-import Features.Gallery.ScanCommon;
+import Features.Gallery.Scanner.Common;
 import Features.Gallery.Asset.Thumbnail;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
@@ -35,7 +35,7 @@ namespace Features::Gallery {
 auto make_bootstrap_scan_options(const std::filesystem::path& directory) -> Types::ScanOptions {
   Types::ScanOptions options;
   options.directory = directory.string();
-  options.supported_extensions = ScanCommon::default_supported_extensions();
+  options.supported_extensions = Scanner::Common::default_supported_extensions();
   return options;
 }
 

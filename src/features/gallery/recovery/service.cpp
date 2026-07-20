@@ -13,7 +13,7 @@ import Features.Gallery.Recovery.Types;
 import Features.Gallery.Recovery.Repository;
 import Features.Gallery.Ignore.Repository;
 import Features.Gallery.RootAvailability;
-import Features.Gallery.ScanCommon;
+import Features.Gallery.Scanner.Common;
 import Features.Gallery.Asset.Repository;
 import Utils.Logger;
 import Utils.Path;
@@ -245,9 +245,10 @@ auto make_rule_fingerprint(Core::State::AppState& app_state, const std::filesyst
   // v1 不需要加密哈希，稳定排序后拼为文本即可。目标是检测扫描规则是否变化。
   std::vector<std::string> lines;
 
-  auto supported_extensions = scan_options.supported_extensions.has_value()
-                                  ? *scan_options.supported_extensions
-                                  : Features::Gallery::ScanCommon::default_supported_extensions();
+  auto supported_extensions =
+      scan_options.supported_extensions.has_value()
+          ? *scan_options.supported_extensions
+          : Features::Gallery::Scanner::Common::default_supported_extensions();
   for (auto& extension : supported_extensions) {
     extension = Utils::String::ToLowerAscii(extension);
   }

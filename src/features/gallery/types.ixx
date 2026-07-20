@@ -183,7 +183,7 @@ export struct ScanOptions {
   std::optional<std::uint32_t> thumbnail_short_edge = 480;
   std::optional<bool> force_reanalyze = false;
   std::optional<bool> rebuild_thumbnails = false;
-  // 留空时统一回落到 ScanCommon::default_supported_extensions()，避免多处维护默认列表。
+  // 留空时统一回落到 Scanner::Common::default_supported_extensions()，避免多处维护默认列表。
   std::optional<std::vector<std::string>> supported_extensions;
   std::optional<std::vector<ScanIgnoreRule>> ignore_rules;
 };

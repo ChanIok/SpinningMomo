@@ -10,7 +10,7 @@ import Features.Gallery.State;
 import Features.Gallery.Types;
 import Features.Gallery.Recovery.Service;
 import Features.Gallery.Scanner;
-import Features.Gallery.ScanCommon;
+import Features.Gallery.Scanner.Common;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import Features.Gallery.Ignore.Service;
@@ -569,8 +569,8 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
   }
 
   const auto supported_extensions =
-      options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
-  if (!ScanCommon::is_supported_file(normalized, supported_extensions)) {
+      options.supported_extensions.value_or(Scanner::Common::default_supported_extensions());
+  if (!Scanner::Common::is_supported_file(normalized, supported_extensions)) {
     return 0;
   }
 
@@ -608,7 +608,7 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
   }
 
   // 增量同步与全量扫描共用停止源，退出后不再继续计算内容指纹。
-  auto hash_result = ScanCommon::calculate_content_fingerprint(
+  auto hash_result = Scanner::Common::calculate_content_fingerprint(
       normalized, static_cast<std::int64_t>(file_size), stop_token);
   if (!hash_result) {
     return std::unexpected(hash_result.error());
@@ -631,7 +631,7 @@ auto upsert_asset_by_path(Core::State::AppState& app_state, const std::filesyste
     return 0;
   }
 
-  auto asset_type = ScanCommon::detect_asset_type(normalized);
+  auto asset_type = Scanner::Common::detect_asset_type(normalized);
 
   Types::Asset asset{
       .id = existing_asset ? existing_asset->id : 0,
@@ -820,7 +820,7 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
   }
   auto ignore_rules = std::move(rules_result.value());
   const auto supported_extensions =
-      options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
+      options.supported_extensions.value_or(Scanner::Common::default_supported_extensions());
 
   std::vector<std::filesystem::path> upsert_paths;
   upsert_paths.reserve(snapshot.file_changes.size());
@@ -832,7 +832,7 @@ auto apply_incremental_sync(Core::State::AppState& app_state,
     }
 
     auto candidate_path = std::filesystem::path(path);
-    if (!ScanCommon::is_supported_file(candidate_path, supported_extensions)) {
+    if (!Scanner::Common::is_supported_file(candidate_path, supported_extensions)) {
       continue;
     }
 
@@ -1196,7 +1196,7 @@ auto process_watch_notifications(Core::State::AppState& app_state,
 
   auto options = get_watcher_scan_options(watcher);
   const auto supported_extensions =
-      options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
+      options.supported_extensions.value_or(Scanner::Common::default_supported_extensions());
   std::optional<std::vector<Types::IgnoreRule>> ignore_rules;
   bool ignore_rules_load_failed = false;
   bool queued_changes = false;
@@ -1216,7 +1216,7 @@ auto process_watch_notifications(Core::State::AppState& app_state,
 
         const auto candidate_path = std::filesystem::path(normalized_path);
         // 扩展名过滤比 ignore rules 便宜，先用它拦住 .tmp/.bin 等一定不会入库的文件。
-        if (!ScanCommon::is_supported_file(candidate_path, supported_extensions)) {
+        if (!Scanner::Common::is_supported_file(candidate_path, supported_extensions)) {
           break;
         }
 

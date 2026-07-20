@@ -1,10 +1,10 @@
 module;
 
-export module Features.Gallery.ScanCommon;
+export module Features.Gallery.Scanner.Common;
 
 import std;
 
-namespace Features::Gallery::ScanCommon {
+namespace Features::Gallery::Scanner::Common {
 
 export auto default_supported_extensions() -> const std::vector<std::string>&;
 
@@ -20,4 +20,4 @@ export auto calculate_content_fingerprint(const std::filesystem::path& file_path
                                           std::int64_t file_size, std::stop_token stop_token)
     -> std::expected<std::string, std::string>;
 
-}  // namespace Features::Gallery::ScanCommon
+}  // namespace Features::Gallery::Scanner::Common
