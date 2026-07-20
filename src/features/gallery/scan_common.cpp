@@ -66,9 +66,28 @@ auto detect_asset_type(const std::filesystem::path& file_path) -> std::string {
   return "unknown";
 }
 
-constexpr std::uint64_t kVideoSampleSize = 1024 * 1024;
-constexpr std::size_t kVideoSampleCount = 5;
-constexpr std::uint64_t kVideoFullHashThreshold = kVideoSampleSize * kVideoSampleCount;
+constexpr std::uint64_t kMediaSampleSize = 1024 * 1024;
+constexpr std::size_t kMediaSampleCount = 5;
+constexpr std::uint64_t kMediaFullHashThreshold = kMediaSampleSize * kMediaSampleCount;
+
+// 使用固定元数据和五个均匀内容切片计算大媒体文件的内容指纹
+auto calculate_sampled_media_fingerprint(std::uint64_t file_size, std::ifstream& file,
+                                         std::span<const std::byte> metadata,
+                                         std::stop_token stop_token)
+    -> std::expected<std::string, std::string> {
+  // 以合法起点范围均分五处，让首尾采样块严格覆盖文件边界
+  auto last_offset = file_size - kMediaSampleSize;
+  const std::array<Vendor::XXHash::StreamRange, kMediaSampleCount> ranges{
+      Vendor::XXHash::StreamRange{.offset = 0, .size = kMediaSampleSize},
+      Vendor::XXHash::StreamRange{.offset = last_offset / 4, .size = kMediaSampleSize},
+      Vendor::XXHash::StreamRange{.offset = last_offset / 2, .size = kMediaSampleSize},
+      Vendor::XXHash::StreamRange{.offset = last_offset - last_offset / 4,
+                                  .size = kMediaSampleSize},
+      Vendor::XXHash::StreamRange{.offset = last_offset, .size = kMediaSampleSize},
+  };
+
+  return Vendor::XXHash::hash_stream_ranges_to_hex(file, metadata, ranges, stop_token);
+}
 
 // 为大视频计算“稳定媒体元数据 + 五个均匀采样块”的内容指纹
 auto calculate_sampled_video_fingerprint(const std::filesystem::path& file_path,
@@ -87,23 +106,11 @@ auto calculate_sampled_video_fingerprint(const std::filesystem::path& file_path,
   }
 
   const std::array<std::uint64_t, 4> metadata{file_size, width, height, duration_millis};
-  auto metadata_bytes = std::as_bytes(std::span{metadata});
-
-  // 以合法起点范围均分五处，确保最后一个采样块正好覆盖文件尾部。
-  auto last_offset = file_size - kVideoSampleSize;
-  const std::array<Vendor::XXHash::StreamRange, kVideoSampleCount> ranges{
-      Vendor::XXHash::StreamRange{.offset = 0, .size = kVideoSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset / 4, .size = kVideoSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset / 2, .size = kVideoSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset - last_offset / 4,
-                                  .size = kVideoSampleSize},
-      Vendor::XXHash::StreamRange{.offset = last_offset, .size = kVideoSampleSize},
-  };
-
-  return Vendor::XXHash::hash_stream_ranges_to_hex(file, metadata_bytes, ranges, stop_token);
+  return calculate_sampled_media_fingerprint(file_size, file, std::as_bytes(std::span{metadata}),
+                                             stop_token);
 }
 
-// 计算素材内容指纹：Debug 使用路径哈希，Release 对图片完整哈希、对大视频组合元数据与五点采样
+// 计算素材内容指纹：Debug 使用路径哈希，Release 对小媒体完整哈希、对大媒体五点采样
 auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::int64_t file_size,
                                    std::stop_token stop_token)
     -> std::expected<std::string, std::string> {
@@ -123,7 +130,7 @@ auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::
     return std::unexpected("Cannot fingerprint a file with negative size: " + file_path.string());
   }
 
-  // Release 以二进制流打开文件，小文件和图片继续使用完整内容哈希。
+  // Release 以二进制流打开文件，小媒体完整读取，大媒体只读取固定采样区间
   std::ifstream file(file_path, std::ios::binary);
   if (!file) {
     return std::unexpected("Cannot open file for fingerprinting: " + file_path.string());
@@ -131,11 +138,17 @@ auto calculate_content_fingerprint(const std::filesystem::path& file_path, std::
 
   std::expected<std::string, std::string> hash_result;
   auto unsigned_size = static_cast<std::uint64_t>(file_size);
-  if (detect_asset_type(file_path) == "video" && unsigned_size > kVideoFullHashThreshold) {
-    // 大视频只读取五个 1 MiB 区间，避免素材导入量随视频总大小线性增长。
+  auto asset_type = detect_asset_type(file_path);
+  if (unsigned_size > kMediaFullHashThreshold && asset_type == "photo") {
+    // 大图片使用文件大小和固定采样，避免完整指纹读取量随文件大小线性增长
+    const std::array<std::uint64_t, 1> metadata{unsigned_size};
+    hash_result = calculate_sampled_media_fingerprint(
+        unsigned_size, file, std::as_bytes(std::span{metadata}), stop_token);
+  } else if (unsigned_size > kMediaFullHashThreshold && asset_type == "video") {
+    // 大视频保留媒体元数据参与指纹，降低不同视频命中相同采样内容的概率
     hash_result = calculate_sampled_video_fingerprint(file_path, unsigned_size, file, stop_token);
   } else {
-    // 小于等于 5 MiB 的视频直接完整哈希，避免采样区间重叠规则。
+    // 小媒体直接完整哈希，避免五个采样区间互相重叠
     hash_result = Vendor::XXHash::hash_stream_to_hex(file, stop_token);
   }
 

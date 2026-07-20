@@ -26,7 +26,7 @@ export struct Asset {
   std::optional<std::int64_t> size;
   std::optional<std::string> extension;
   std::string mime_type;
-  std::optional<std::string> hash;  // XXH3 内容指纹
+  std::optional<std::string> hash;  // XXH3 内容指纹，大媒体使用固定区间采样
   std::optional<std::int64_t> root_id;
   std::optional<std::string> relative_path;
   std::optional<std::int64_t> folder_id;
