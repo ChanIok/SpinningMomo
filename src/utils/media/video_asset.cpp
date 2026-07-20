@@ -17,11 +17,8 @@ import <wil/com.h>;
 
 namespace Utils::Media::VideoAsset {
 
-// MF 时长为 100ns 单位；封面时间点取「约 10%
-// 时长」并夹在下面两常量之间，减少片头黑场又避免拖到过久才解码。
+// Media Foundation 使用 100ns 作为时长单位。
 constexpr std::int64_t kHundredNanosecondsPerMillisecond = 10'000;
-constexpr std::int64_t kMinThumbnailTimestampHns = 2'000'000;
-constexpr std::int64_t kMaxThumbnailTimestampHns = 30'000'000;
 constexpr std::uint32_t kBgraBytesPerPixel = 4;
 
 // Media Foundation 返回的视频帧并不总是“画面宽高 = 内存宽高”。
@@ -309,59 +306,6 @@ auto configure_rgb32_output(IMFSourceReader* reader) -> std::expected<void, std:
   return {};
 }
 
-// 策略层：仅用于 seek 目标时间（约 10% 时长等）；不参与「是否接受某一帧」的判断。
-auto calculate_thumbnail_timestamp_hns(std::optional<std::int64_t> duration_millis)
-    -> std::int64_t {
-  if (!duration_millis.has_value() || duration_millis.value() <= 0) {
-    return 0;
-  }
-
-  auto duration_hns = duration_millis.value() * kHundredNanosecondsPerMillisecond;
-  auto safe_end = duration_hns - kHundredNanosecondsPerMillisecond;
-  if (safe_end <= 0) {
-    return 0;
-  }
-
-  // 极短视频使用中点作为动态下限，避免固定 0.2 秒落到 EOF 之后。
-  auto minimum_target = std::min(kMinThumbnailTimestampHns, duration_hns / 2);
-  auto target = std::max(duration_hns / 10, minimum_target);
-
-  // 长视频最多取 3 秒处，同时始终保留 1ms 的结尾安全余量。
-  return std::min({target, kMaxThumbnailTimestampHns, safe_end});
-}
-
-// 引擎层：Flush 清空队列后 SetCurrentPosition。STREAMTICK / 类型切换等在
-// read_first_thumbnail_bgra_frame 里跳过。 调用方用 calculate_thumbnail_timestamp_hns 等只决定
-// position_hns；不在此用 PTS 过滤帧。
-auto seek_source_reader(IMFSourceReader* reader, std::int64_t position_hns)
-    -> std::expected<void, std::string> {
-  HRESULT flush_hr = reader->Flush(MF_SOURCE_READER_ALL_STREAMS);
-  if (FAILED(flush_hr)) {
-    return std::unexpected(format_hresult(flush_hr, "Failed to flush source reader before seek"));
-  }
-
-  PROPVARIANT position;
-  PropVariantInit(&position);
-
-  auto init_hr = InitPropVariantFromInt64(position_hns, &position);
-  if (FAILED(init_hr)) {
-    PropVariantClear(&position);
-    return std::unexpected(format_hresult(init_hr, "Failed to build seek position"));
-  }
-
-  HRESULT hr = reader->SetCurrentPosition(GUID_NULL, position);
-  PropVariantClear(&position);
-  if (FAILED(hr)) {
-    return std::unexpected(format_hresult(hr, "Failed to seek source reader"));
-  }
-
-  return {};
-}
-
-auto is_transitional_thumbnail_sample(DWORD stream_flags) -> bool {
-  return (stream_flags & MF_SOURCE_READERF_CURRENTMEDIATYPECHANGED) != 0;
-}
-
 auto read_current_video_frame_layout(IMFSourceReader* reader)
     -> std::expected<VideoFrameLayout, std::string> {
   wil::com_ptr<IMFMediaType> media_type;
@@ -373,111 +317,44 @@ auto read_current_video_frame_layout(IMFSourceReader* reader)
   return resolve_video_frame_layout(media_type.get());
 }
 
-// 引擎层：在已有 seek 的前提下，取第一条可解码的 RGB32 帧（不按 PTS 与 seek 目标对齐）。
+// 从视频起点读取第一张 RGB32 画面。
 auto read_first_thumbnail_bgra_frame(IMFSourceReader* reader)
     -> std::expected<Utils::Image::BGRABitmapData, std::string> {
-  constexpr DWORD kReadFlags = 0;
-  constexpr int kMaxReadAttempts = 96;
-
-  bool ended_by_eos = false;
-  LONGLONG last_timestamp_hns = 0;
-  DWORD last_stream_flags = 0;
-
-  for (int attempt = 0; attempt < kMaxReadAttempts; ++attempt) {
-    DWORD actual_stream_index = 0;
-    DWORD stream_flags = 0;
-    LONGLONG timestamp = 0;
-    wil::com_ptr<IMFSample> sample;
-
-    HRESULT hr = reader->ReadSample(MF_SOURCE_READER_FIRST_VIDEO_STREAM, kReadFlags,
-                                    &actual_stream_index, &stream_flags, &timestamp, sample.put());
-    if (FAILED(hr)) {
-      return std::unexpected(format_hresult(hr, "Failed to read video sample"));
-    }
-
-    last_timestamp_hns = timestamp;
-    last_stream_flags = stream_flags;
-
-    if ((stream_flags & MF_SOURCE_READERF_ENDOFSTREAM) != 0) {
-      ended_by_eos = true;
-      break;
-    }
-
-    if ((stream_flags & MF_SOURCE_READERF_STREAMTICK) != 0) {
-      continue;
-    }
-
-    if (!sample) {
-      continue;
-    }
-
-    if (is_transitional_thumbnail_sample(stream_flags)) {
-      continue;
-    }
-
-    // 读取当前帧对应的 surface 布局与可见区域。
-    auto layout_result = read_current_video_frame_layout(reader);
-    if (!layout_result) {
-      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1,
-                    layout_result.error());
-      return std::unexpected(layout_result.error());
-    }
-    const auto& layout = layout_result.value();
-
-    // 锁定 sample 的线性内存。
-    wil::com_ptr<IMFMediaBuffer> media_buffer;
-    hr = sample->GetBufferByIndex(0, media_buffer.put());
-    if (FAILED(hr) || !media_buffer) {
-      auto error = format_hresult(hr, "Failed to get video buffer");
-      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1, error);
-      return std::unexpected(error);
-    }
-
-    DWORD current_length = 0;
-    auto current_length_hr = media_buffer->GetCurrentLength(&current_length);
-
-    BYTE* buffer_start = nullptr;
-    hr = media_buffer->Lock(&buffer_start, nullptr, &current_length);
-    if (FAILED(hr)) {
-      auto error = format_hresult(hr, "Failed to lock video buffer");
-      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1, error);
-      return std::unexpected(error);
-    }
-
-    auto unlock_guard = std::unique_ptr<void, std::function<void(void*)>>(
-        media_buffer.get(), [&media_buffer](void*) { media_buffer->Unlock(); });
-
-    if (!buffer_start || current_length == 0) {
-      continue;
-    }
-
-    // 按 stride 逐行拷贝，并裁出真正可见的画面区域。
-    auto copy_result = copy_bitmap_data_from_linear_buffer(buffer_start, current_length, layout);
-    if (!copy_result) {
-      Logger().warn("Video thumbnail decode failed. attempt={}, error={}", attempt + 1,
-                    copy_result.error());
-      return std::unexpected(copy_result.error());
-    }
-
-    return copy_result;
+  DWORD stream_flags = 0;
+  wil::com_ptr<IMFSample> sample;
+  auto hr = reader->ReadSample(MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, nullptr, &stream_flags,
+                               nullptr, sample.put());
+  if (FAILED(hr)) {
+    return std::unexpected(format_hresult(hr, "Failed to read first video sample"));
+  }
+  if (!sample) {
+    return std::unexpected("Video source did not return a first frame");
   }
 
-  Logger().warn(
-      "Video thumbnail read exhausted. max_reads={}, eos={}, last_ts_hns={}, last_flags=0x{:08X}",
-      kMaxReadAttempts, ended_by_eos, last_timestamp_hns, last_stream_flags);
-
-  return std::unexpected("Failed to decode a video frame for thumbnail generation");
-}
-
-// 跳转到指定时间并读取第一张有效 BGRA 帧
-auto read_thumbnail_bgra_frame_at(IMFSourceReader* reader, std::int64_t position_hns)
-    -> std::expected<Utils::Image::BGRABitmapData, std::string> {
-  auto seek_result = seek_source_reader(reader, position_hns);
-  if (!seek_result) {
-    return std::unexpected(seek_result.error());
+  auto layout_result = read_current_video_frame_layout(reader);
+  if (!layout_result) {
+    return std::unexpected(layout_result.error());
   }
 
-  return read_first_thumbnail_bgra_frame(reader);
+  wil::com_ptr<IMFMediaBuffer> media_buffer;
+  hr = sample->GetBufferByIndex(0, media_buffer.put());
+  if (FAILED(hr) || !media_buffer) {
+    return std::unexpected(format_hresult(hr, "Failed to get first video frame buffer"));
+  }
+
+  BYTE* buffer_start = nullptr;
+  DWORD current_length = 0;
+  hr = media_buffer->Lock(&buffer_start, nullptr, &current_length);
+  if (FAILED(hr)) {
+    return std::unexpected(format_hresult(hr, "Failed to lock first video frame buffer"));
+  }
+  auto unlock_guard = wil::scope_exit([&media_buffer] { media_buffer->Unlock(); });
+
+  if (!buffer_start || current_length == 0) {
+    return std::unexpected("First video frame buffer is empty");
+  }
+
+  return copy_bitmap_data_from_linear_buffer(buffer_start, current_length, layout_result.value());
 }
 
 // 读取视频元数据，并按需抽取单帧编码为 WebP 缩略图
@@ -488,20 +365,7 @@ auto analyze_video_file(const std::filesystem::path& path,
     return std::unexpected("Video file does not exist: " + path.string());
   }
 
-  // 分析可能在 worker 线程调用；与已以别种模式初始化的 COM 线程共存时返回
-  // RPC_E_CHANGED_MODE，此时不得 CoUninitialize。
-  HRESULT coinit_hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-  bool need_uninitialize = SUCCEEDED(coinit_hr);
-  if (FAILED(coinit_hr) && coinit_hr != RPC_E_CHANGED_MODE) {
-    return std::unexpected(format_hresult(coinit_hr, "Failed to initialize COM"));
-  }
-
-  auto uninitialize_guard =
-      std::unique_ptr<void, std::function<void(void*)>>(nullptr, [need_uninitialize](void*) {
-        if (need_uninitialize) {
-          CoUninitialize();
-        }
-      });
+  auto com_init = wil::CoInitializeEx(COINIT_MULTITHREADED);
 
   auto reader_result = create_source_reader(path);
   if (!reader_result) {
@@ -539,21 +403,13 @@ auto analyze_video_file(const std::filesystem::path& path,
     return result;
   }
 
-  // Step 1: 要求 reader 输出 RGB32，后续就能直接交给 WIC 生成缩略图。
+  // 要求 reader 输出 RGB32，后续直接交给 WIC 生成缩略图。
   auto output_result = configure_rgb32_output(reader.get());
   if (!output_result) {
     return std::unexpected(output_result.error());
   }
 
-  auto seek_hns = calculate_thumbnail_timestamp_hns(duration_millis);
-
-  auto bitmap_result = read_thumbnail_bgra_frame_at(reader.get(), seek_hns);
-  if (!bitmap_result && seek_hns != 0) {
-    // 目标位置无论 seek 还是解码失败，都回到所有正常视频都支持的起点再试一次。
-    Logger().debug("Retry video thumbnail from start. path='{}', target_hns={}, error={}",
-                   path.string(), seek_hns, bitmap_result.error());
-    bitmap_result = read_thumbnail_bgra_frame_at(reader.get(), 0);
-  }
+  auto bitmap_result = read_first_thumbnail_bgra_frame(reader.get());
   if (!bitmap_result) {
     Logger().warn("Video analysis failed while decoding thumbnail bitmap. path='{}', error={}",
                   path.string(), bitmap_result.error());
@@ -572,7 +428,7 @@ auto analyze_video_file(const std::filesystem::path& path,
   Utils::Image::WebPEncodeOptions webp_options;
   webp_options.quality = 80.0f;
 
-  // Step 3: 把 BGRA 位图缩放并编码成 WebP，供图库缩略图直接使用。
+  // 把 BGRA 位图缩放并编码成 WebP，供图库缩略图直接使用。
   auto thumbnail_result = Utils::Image::generate_webp_thumbnail_from_bgra(
       wic_factory_result->get(), bitmap_result.value(), thumbnail_short_edge.value(), webp_options);
   if (!thumbnail_result) {
