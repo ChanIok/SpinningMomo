@@ -30,7 +30,7 @@ namespace Features::Gallery::Scanner {
 
 // 核心逻辑：扫描路径并应用过滤规则
 auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& directory,
-                const Types::ScanOptions& options, std::optional<std::int64_t> folder_id)
+                const Types::ScanOptions& options, std::int64_t folder_id)
     -> std::expected<std::vector<std::filesystem::path>, std::string> {
   if (!std::filesystem::exists(directory)) {
     return std::unexpected("Directory does not exist: " + directory.string());
@@ -41,12 +41,30 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
   }
 
   try {
-    // 加载并合并忽略规则
+    // 扫描范围可以是子目录，但规则始终以其所属的顶层监听目录为匹配基准。
+    auto root_folder_id_result = Ignore::Service::resolve_root_folder_id(app_state, folder_id);
+    if (!root_folder_id_result) {
+      return std::unexpected("Failed to resolve ignore rule base folder: " +
+                             root_folder_id_result.error());
+    }
+
+    auto root_folder_result =
+        Folder::Repository::get_folder_by_id(app_state, root_folder_id_result.value());
+    if (!root_folder_result) {
+      return std::unexpected("Failed to load ignore rule base folder: " +
+                             root_folder_result.error());
+    }
+    if (!root_folder_result->has_value()) {
+      return std::unexpected("Ignore rule base folder not found: " +
+                             std::to_string(root_folder_id_result.value()));
+    }
+    auto ignore_base_path = std::filesystem::path(root_folder_result->value().path);
+
     auto rules_result = Ignore::Service::load_ignore_rules(app_state, folder_id);
     if (!rules_result) {
-      Logger().warn("Failed to load ignore rules: {}", rules_result.error());
+      return std::unexpected("Failed to load ignore rules: " + rules_result.error());
     }
-    auto combined_rules = rules_result.value_or(std::vector<Types::IgnoreRule>{});
+    auto combined_rules = std::move(rules_result.value());
     auto supported_extensions =
         options.supported_extensions.value_or(ScanCommon::default_supported_extensions());
 
@@ -69,12 +87,12 @@ auto scan_paths(Core::State::AppState& app_state, const std::filesystem::path& d
           return ScanCommon::is_supported_file(entry.path(), supported_extensions);
         }) |
         // 步骤 3: 结合 .ignore 规则（类似 .gitignore）进行深层次忽略检查。
-        std::views::filter(
-            [&directory, &combined_rules](const std::filesystem::directory_entry& entry) {
-              bool should_ignore =
-                  Ignore::Service::apply_ignore_rules(entry.path(), directory, combined_rules);
-              return !should_ignore;
-            }) |
+        std::views::filter([&ignore_base_path,
+                            &combined_rules](const std::filesystem::directory_entry& entry) {
+          bool should_ignore =
+              Ignore::Service::apply_ignore_rules(entry.path(), ignore_base_path, combined_rules);
+          return !should_ignore;
+        }) |
         // 步骤 4: 提取符合条件的 std::filesystem::path 用于后续处理。
         std::views::transform(
             [](const std::filesystem::directory_entry& entry) { return entry.path(); }) |
@@ -381,7 +399,7 @@ auto cleanup_missing_folders(Core::State::AppState& app_state,
 
 // 扫描目录并获取文件信息
 auto scan_file_info(Core::State::AppState& app_state, const std::filesystem::path& directory,
-                    const Types::ScanOptions& options, std::optional<std::int64_t> folder_id)
+                    const Types::ScanOptions& options, std::int64_t folder_id)
     -> std::expected<std::vector<Types::FileSystemInfo>, std::string> {
   auto files_result = scan_paths(app_state, directory, options, folder_id);
   if (!files_result) {
