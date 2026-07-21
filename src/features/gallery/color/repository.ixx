@@ -9,17 +9,10 @@ import Features.Gallery.Types;
 
 namespace Features::Gallery::Color::Repository {
 
-export struct ColorReplaceBatchItem {
-  std::int64_t asset_id = 0;
-  std::vector<Types::ExtractedColor> colors;
-};
-
-export auto replace_asset_colors(Core::State::AppState& app_state, std::int64_t asset_id,
-                                 const std::vector<Types::ExtractedColor>& colors)
-    -> std::expected<void, std::string>;
-
-export auto batch_replace_asset_colors(Core::State::AppState& app_state,
-                                       const std::vector<ColorReplaceBatchItem>& items)
+// 在调用方已经建立的事务中替换颜色；本函数不单独提交，供资产聚合写入复用。
+export auto replace_asset_colors_in_transaction(Core::State::AppState& app_state,
+                                                std::int64_t asset_id,
+                                                const std::vector<Types::ExtractedColor>& colors)
     -> std::expected<void, std::string>;
 
 export auto get_asset_main_colors(Core::State::AppState& app_state, std::int64_t asset_id)

@@ -185,10 +185,6 @@ auto scan_asset_directory(Core::State::AppState& app_state, const Types::ScanOpt
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
   result.scan_duration = std::format("{}ms", duration.count());
 
-  if (!processing_phase.all_db_success) {
-    result.errors.push_back("Some database operations failed");
-  }
-
   Logger().info(
       "Folder-aware asset scan completed. Total: {}, New: {}, Updated: {}, Deleted: {}, Errors: "
       "{}, Duration: {}",

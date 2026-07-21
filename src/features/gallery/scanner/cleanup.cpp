@@ -6,8 +6,7 @@ import std;
 import Core.State;
 import Features.Gallery.Types;
 import Features.Gallery.Scanner.Progress;
-import Features.Gallery.Asset.Repository;
-import Features.Gallery.Asset.Thumbnail;
+import Features.Gallery.Scanner.AssetPipeline;
 import Features.Gallery.Folder.Repository;
 import Features.Gallery.Folder.Service;
 import Utils.Logger;
@@ -69,22 +68,14 @@ auto cleanup_removed_assets(Core::State::AppState& app_state,
   }
 
   for (const auto& metadata : removed_assets) {
-    auto asset_result = Asset::Repository::get_asset_by_id(app_state, metadata.id);
-    if (asset_result && asset_result->has_value()) {
-      auto thumbnail_result = Asset::Thumbnail::delete_thumbnail(app_state, asset_result->value());
-      if (!thumbnail_result) {
-        Logger().debug("Thumbnail cleanup skipped for removed asset {}: {}", metadata.id,
-                       thumbnail_result.error());
-      }
-    }
-
-    auto delete_result = Asset::Repository::delete_asset(app_state, metadata.id);
+    auto delete_result = AssetPipeline::remove_asset_at_path(app_state, metadata.path);
     if (!delete_result) {
       Logger().warn("Failed to delete removed asset {}: {}", metadata.id, delete_result.error());
       continue;
     }
-
-    result.deleted_count++;
+    if (delete_result.value()) {
+      result.deleted_count++;
+    }
   }
 
   if (result.deleted_count > 0) {

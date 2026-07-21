@@ -24,7 +24,7 @@ export auto set_post_scan_callback_for_directory(
     std::function<void(const Types::ScanResult&)> post_scan_callback)
     -> std::expected<void, std::string>;
 
-// 启动一个已注册的 watcher，可选是否在启动后立即全量扫描一次。
+// 启动一个已注册的 root 监听线程，可选是否调度一次全量扫描。
 export auto start_watcher_for_directory(Core::State::AppState& app_state,
                                         const std::filesystem::path& root_directory,
                                         bool bootstrap_full_scan = true)
@@ -34,18 +34,12 @@ export auto start_watcher_for_directory(Core::State::AppState& app_state,
 export auto start_registered_watchers(Core::State::AppState& app_state)
     -> std::expected<void, std::string>;
 
-// 启动后在后台线程中恢复并启动所有已注册 watcher。
-export auto schedule_start_registered_watchers(Core::State::AppState& app_state) -> void;
-
-// 等待后台 watcher 启动恢复任务结束。
-export auto wait_for_start_registered_watchers(Core::State::AppState& app_state) -> void;
-
 // 停止并移除某个目录 watcher。返回 true 表示实际移除了 watcher。
 export auto remove_watcher_for_directory(Core::State::AppState& app_state,
                                          const std::filesystem::path& root_directory)
     -> std::expected<bool, std::string>;
 
-// 退出时停掉所有 watcher 线程。
+// 退出时停掉所有 root 监听线程和 Gallery 全局同步编排线程。
 export auto shutdown_watchers(Core::State::AppState& app_state) -> void;
 
 // 标记某条手动 move 的源/目标路径进入 watcher 忽略集合（in-flight 阶段）。

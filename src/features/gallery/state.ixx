@@ -31,17 +31,37 @@ export enum class RootAvailability {
   RemoteUnreachable,
 };
 
+// 每个 root 独立维护同步状态；Faulted 只暂停该 root，等待用户手动重试。
+export enum class WatcherSyncState {
+  Healthy,
+  Recovering,
+  Faulted,
+};
+
 export struct FolderWatcherState {
   // 监听的根目录（Gallery 内部规范路径：absolute + lexical normal + generic slash）
   std::filesystem::path root_path;
   // watcher 同步时使用的运行时扫描选项（不包含 ignore_rules）。
   Types::ScanOptions scan_options{};
+  // 监听线程只读取该 root 的文件系统通知。
   std::jthread watch_thread;
-  std::atomic<bool> scan_in_progress{false};
-  std::atomic<bool> pending_rescan{false};
+  // 串行监听线程的启动与停止，避免运行时移除和启动同时改写 jthread。
+  std::mutex watch_lifecycle_mutex;
+  // stop_requested 关闭该 root 的事件接收与同步；handle 用于取消阻塞的目录读取。
   std::atomic<bool> stop_requested{false};
   std::atomic<void*> directory_handle{nullptr};
+  // 置位后拒绝重新配置或启动，直到 stop/join 后从 map 删除。
+  std::atomic<bool> removal_in_progress{false};
+  // pending_mutex 统一保护待处理队列、调度期限、同步状态和最近错误。
   std::mutex pending_mutex;
+  // 可执行变更的防抖截止时间；文件稳定候选各自保存探测期限。
+  std::optional<std::chrono::steady_clock::time_point> sync_not_before;
+  // 启动恢复期间实时通知只入队，待 USN/全量基线完成后再由全局编排线程消费。
+  bool startup_recovery_in_progress = false;
+  WatcherSyncState sync_state{WatcherSyncState::Healthy};
+  std::optional<std::string> last_sync_error;
+  // 启动恢复可能在 Gallery 启动线程中直接执行全量扫描，与全局编排线程串行。
+  std::mutex sync_execution_mutex;
   std::atomic<DirectoryWatchBackend> watch_backend{DirectoryWatchBackend::Extended};
 
   // true 表示要做全量扫描（会清空增量列表）
@@ -89,12 +109,16 @@ export struct GalleryState {
   // 后台 Gallery 启动初始化线程；cleanup 会先 join，避免和资源释放并发。
   std::jthread startup_initialization_thread;
 
-  // 后台 watcher 启动恢复任务的 future，shutdown 时等待其结束。
-  std::optional<std::future<void>> startup_watchers_future;
-
-  // 根目录 watcher 状态（key = Gallery 内部规范路径字符串）
-  std::unordered_map<std::string, std::shared_ptr<FolderWatcherState>> folder_watchers;
+  // 根目录 watcher 状态直接由 GalleryState 持有（key = Gallery 内部规范路径字符串）。
+  std::unordered_map<std::string, FolderWatcherState> folder_watchers;
   std::mutex folder_watchers_mutex;
+
+  // Gallery 只使用一条同步编排线程，依次消费所有 root 的待处理事实。
+  std::jthread watcher_sync_thread;
+  // 调度代数和条件变量只负责唤醒全局编排线程，不保存具体任务。
+  std::mutex watcher_sync_mutex;
+  std::condition_variable_any watcher_sync_condition;
+  std::uint64_t watcher_sync_generation = 0;
 
   // 本次运行期的 root 可达性快照。UNC 只在启动时探测一次，不做运行中重连刷新。
   std::unordered_map<std::int64_t, RootAvailability> root_availability_by_id;

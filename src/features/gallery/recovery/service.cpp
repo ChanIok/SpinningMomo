@@ -665,85 +665,11 @@ auto prepare_startup_recovery(Core::State::AppState& app_state,
   return plan;
 }
 
-auto persist_recovery_checkpoint(Core::State::AppState& app_state,
-                                 const std::filesystem::path& root_path,
-                                 const Features::Gallery::Types::ScanOptions& scan_options,
-                                 std::optional<std::int64_t> checkpoint_usn)
-    -> std::expected<void, std::string> {
-  // 正常退出时保存检查点。需查询当前 journal 快照和规则指纹。
-  // 启动恢复路径应使用轻量的 persist_recovery_state。
-  auto normalized_root_result = Utils::Path::NormalizePath(root_path);
-  if (!normalized_root_result) {
-    return std::unexpected("Failed to normalize root path: " + normalized_root_result.error());
-  }
-
-  if (Features::Gallery::RootAvailability::is_remote_unreachable(app_state,
-                                                                 *normalized_root_result)) {
-    return {};
-  }
-
-  if (Detail::is_unc_root(*normalized_root_result)) {
-    return {};
-  }
-
-  auto journal_snapshot_result = Detail::query_journal_snapshot(*normalized_root_result);
-  if (!journal_snapshot_result) {
-    return std::unexpected(journal_snapshot_result.error());
-  }
-
-  const auto& snapshot = journal_snapshot_result.value();
-  if (!snapshot.available) {
-    return {};
-  }
-
-  auto fingerprint_result =
-      Detail::make_rule_fingerprint(app_state, *normalized_root_result, scan_options);
-  if (!fingerprint_result) {
-    return std::unexpected(fingerprint_result.error());
-  }
-
-  Types::WatchRootRecoveryState state{
-      .root_path = normalized_root_result->string(),
-      .volume_identity = snapshot.volume_identity,
-      .journal_id = snapshot.journal_id,
-      .checkpoint_usn = checkpoint_usn.has_value() ? checkpoint_usn
-                                                   : std::optional<std::int64_t>{snapshot.next_usn},
-      .rule_fingerprint = *fingerprint_result,
-  };
-
-  return Repository::upsert_state(app_state, state);
-}
-
+// 保存已经成功应用的启动恢复边界，避免 checkpoint 越过尚未消费的实时事件。
 auto persist_recovery_state(Core::State::AppState& app_state,
                             const Types::WatchRootRecoveryState& state)
     -> std::expected<void, std::string> {
   return Repository::upsert_state(app_state, state);
-}
-
-auto persist_registered_root_checkpoints(Core::State::AppState& app_state) -> void {
-  if (!app_state.gallery) {
-    return;
-  }
-
-  // 先复制 root 列表再逐个 persist，避免在持久化期间长时间占用 watcher 全局锁。
-
-  std::vector<std::pair<std::filesystem::path, Features::Gallery::Types::ScanOptions>> roots;
-  {
-    std::lock_guard<std::mutex> lock(app_state.gallery->folder_watchers_mutex);
-    roots.reserve(app_state.gallery->folder_watchers.size());
-    for (const auto& [_, watcher] : app_state.gallery->folder_watchers) {
-      std::lock_guard<std::mutex> pending_lock(watcher->pending_mutex);
-      roots.emplace_back(watcher->root_path, watcher->scan_options);
-    }
-  }
-
-  for (const auto& [root_path, scan_options] : roots) {
-    auto persist_result = persist_recovery_checkpoint(app_state, root_path, scan_options);
-    if (!persist_result) {
-      Logger().warn("Failed to persist gallery recovery checkpoint for '{}': {}",
-                    root_path.string(), persist_result.error());
-    }
-  }
 }
 
 }  // namespace Features::Gallery::Recovery::Service

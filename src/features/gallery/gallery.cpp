@@ -19,7 +19,6 @@ import Features.Gallery.Ignore.Service;
 import Features.Gallery.RootAvailability;
 import Features.Gallery.StaticResolver;
 import Features.Gallery.Watcher;
-import Features.Gallery.Recovery.Service;
 import Utils.File;
 import Utils.Image;
 import Utils.Logger;
@@ -159,7 +158,11 @@ auto run_startup_task(Core::State::AppState& app_state,
     }
 
     if (!stop_token.stop_requested()) {
-      Features::Gallery::Watcher::schedule_start_registered_watchers(app_state);
+      // 复用 Gallery 启动线程串行恢复，避免占用并等待扫描内部使用的 WorkerPool。
+      auto watcher_start_result = Features::Gallery::Watcher::start_registered_watchers(app_state);
+      if (!watcher_start_result && !stop_token.stop_requested()) {
+        Logger().warn("Gallery watcher startup recovery failed: {}", watcher_start_result.error());
+      }
     }
 
     Logger().info("Gallery startup initialization completed");
@@ -204,11 +207,6 @@ auto cleanup(Core::State::AppState& app_state,
     if (app_state.gallery->startup_initialization_thread.joinable()) {
       app_state.gallery->startup_initialization_thread.join();
     }
-
-    Features::Gallery::Watcher::wait_for_start_registered_watchers(app_state);
-
-    // watcher 停止前保存检查点，避免下次启动恢复丢失退出前状态。
-    Features::Gallery::Recovery::Service::persist_registered_root_checkpoints(app_state);
 
     // 外部扩展先解绑自己的 watcher，再由 Gallery 统一关闭剩余 watcher。
     if (before_watchers_shutdown) {
@@ -255,13 +253,6 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
 
     auto asset = asset_result->value();
 
-    // 删除缩略图
-    auto delete_thumbnail_result = Asset::Thumbnail::delete_thumbnail(app_state, asset);
-    if (!delete_thumbnail_result) {
-      Logger().warn("Failed to delete thumbnail for asset item {}: {}", params.id,
-                    delete_thumbnail_result.error());
-    }
-
     // 删除物理文件（如果请求）
     if (params.delete_file.value_or(false)) {
       std::filesystem::path file_path(asset.path);
@@ -276,7 +267,7 @@ auto delete_asset(Core::State::AppState& app_state, const Types::DeleteParams& p
       }
     }
 
-    // 从数据库删除
+    // 仅删除资产索引；按 hash 共享的缩略图由缓存对账确认无引用后统一回收。
     auto delete_result = Asset::Repository::delete_asset(app_state, params.id);
 
     Types::OperationResult result;
@@ -586,15 +577,10 @@ auto move_assets_to_trash(Core::State::AppState& app_state, const std::vector<st
     if (failed_recycle_ids.contains(candidate.asset.id)) {
       continue;
     }
-    if (auto delete_thumbnail_result =
-            Asset::Thumbnail::delete_thumbnail(app_state, candidate.asset);
-        !delete_thumbnail_result) {
-      Logger().warn("Failed to delete thumbnail for asset {}: {}", candidate.asset.id,
-                    delete_thumbnail_result.error());
-    }
     delete_ids.push_back(candidate.asset.id);
   }
 
+  // 批量只删除资产索引，共享缩略图由缓存对账确认成为孤儿后统一回收。
   auto delete_result = Asset::Repository::batch_delete_assets_by_ids(app_state, delete_ids);
   if (!delete_result) {
     errors.push_back("Failed to delete asset indexes: " + delete_result.error());
@@ -799,11 +785,10 @@ auto move_assets_to_folder(Core::State::AppState& app_state,
       continue;
     }
 
-    asset.path = normalized_destination_path.generic_string();
-    asset.name = normalized_destination_path.filename().string();
-    asset.folder_id = params.target_folder_id;
     // 文件系统移动成功后再更新索引，保证 DB 记录与磁盘最终位置保持一致。
-    auto update_result = Asset::Repository::update_asset(app_state, asset);
+    auto update_result = Asset::Repository::update_asset_location(
+        app_state, asset.id, normalized_destination_path.filename().string(),
+        normalized_destination_path.generic_string(), params.target_folder_id);
     if (!update_result) {
       complete_manual_ignore();
       errors.push_back("Failed to update asset index " + std::to_string(asset.id) + ": " +

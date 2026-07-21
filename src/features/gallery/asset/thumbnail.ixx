@@ -90,9 +90,6 @@ export auto reconcile_thumbnail_cache(Core::State::AppState& app_state,
 export auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
     -> std::expected<int, std::string>;
 
-export auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
-    -> std::expected<void, std::string>;
-
 // 统计信息
 export struct AssetThumbnailStats {
   int total_thumbnails;

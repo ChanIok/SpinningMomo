@@ -13,7 +13,7 @@ import std;
 
 namespace EmbeddedLocales {
 // Embedded English JSON content as string_view
-// Size: 4077 bytes
+// Size: 4249 bytes
 export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "version": "1.0",
 
@@ -69,8 +69,10 @@ export constexpr std::string_view en_us_json = R"EmbeddedJson({
   "message.recording_stopping": "Recording is stopping and finalizing. Please wait.",
   "message.recording_overload": "Encoder overloaded. Reduce the resolution or frame rate.",
   "message.recording_stop_failed": "Failed to stop recording: ",
+  "message.gallery_folder_sync_failed": "Automatic gallery sync for this folder has been paused. Resolve the problem, then retry.",
 
   "notification.action.view": "View",
+  "notification.action.retry": "Retry",
 
   "photography.long_exposure_off": "Long Exposure Off",
   "photography.long_exposure_frames": "Long Exposure {} Frames",

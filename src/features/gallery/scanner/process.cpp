@@ -3,27 +3,23 @@ module;
 module Features.Gallery.Scanner.Process;
 
 import std;
+import Core.Database;
 import Core.State;
 import Core.WorkerPool;
 import Features.Gallery.Types;
 import Features.Gallery.Scanner.Common;
 import Features.Gallery.Scanner.Progress;
+import Features.Gallery.Scanner.AssetPipeline;
 import Features.Gallery.Asset.Repository;
-import Features.Gallery.Asset.Thumbnail;
-import Features.Gallery.Color.Types;
-import Features.Gallery.Color.Extractor;
 import Features.Gallery.Color.Repository;
 import Features.Gallery.Folder.Service;
-import Utils.Media.VideoAsset;
-import Utils.Image;
 import Utils.Logger;
-import Utils.String;
 import <wil/resource.h>;
 
 namespace Features::Gallery::Scanner::Process {
 
-// 处理单个文件：填 Asset 骨架 → 照片/视频元数据与缩略图 → 主色（仅照片）
-auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFactory& wic_factory,
+// 处理单个文件：通过 AssetPipeline 物化媒体，并推进缩略图进度
+auto process_single_file(Core::State::AppState& app_state,
                          const Types::FileAnalysisResult& analysis,
                          const Types::ScanOptions& options,
                          const std::unordered_map<std::string, std::int64_t>& folder_mapping,
@@ -32,146 +28,41 @@ auto process_single_file(Core::State::AppState& app_state, Utils::Image::WICFact
   const auto& file_info = analysis.file_info;
   const auto& file_path = file_info.path;
 
-  auto asset_type = Common::detect_asset_type(file_path);
-
-  ProcessedAssetEntry processed;
-  auto& asset = processed.asset;
-
-  // 更新时保留原有 ID
-  if (analysis.status == Types::FileStatus::MODIFIED && analysis.existing_metadata) {
-    asset.id = analysis.existing_metadata->id;
-  }
-
-  asset.name = file_path.filename().string();
-  asset.path = file_path.string();
-  asset.type = asset_type;
-  asset.size = file_info.size;
-
-  if (file_path.has_extension()) {
-    auto extension = Utils::String::ToLowerAscii(file_path.extension().string());
-    asset.extension = extension;
-  } else {
-    asset.extension = std::nullopt;
-  }
-
-  asset.hash = file_info.hash.empty() ? std::nullopt : std::optional<std::string>{file_info.hash};
-  asset.file_created_at = file_info.file_created_millis;
-  asset.file_modified_at = file_info.file_modified_millis;
-
-  // 父目录路径映射到 folder_id
+  std::optional<std::int64_t> folder_id;
   if (!folder_mapping.empty()) {
     auto parent_path = file_path.parent_path().string();
     if (auto it = folder_mapping.find(parent_path); it != folder_mapping.end()) {
-      asset.folder_id = it->second;
+      folder_id = it->second;
     }
   }
 
-  if (asset_type == "photo") {
-    // 宽高 / mime
-    auto image_info_result = Utils::Image::get_image_info(wic_factory.get(), file_path);
-    if (image_info_result) {
-      auto image_info = std::move(*image_info_result);
-      asset.width = image_info.width;
-      asset.height = image_info.height;
-      asset.mime_type = std::move(image_info.mime_type);
-    } else {
-      Logger().warn("Could not extract image info from {}: {}", file_path.string(),
-                    image_info_result.error());
-      asset.width = 0;
-      asset.height = 0;
-      asset.mime_type = "application/octet-stream";
-    }
+  AssetPipeline::MediaPrepareInput input{
+      .hash = file_info.hash,
+      .size = file_info.size,
+      .file_created_millis = file_info.file_created_millis,
+      .file_modified_millis = file_info.file_modified_millis,
+      .folder_id = folder_id,
+      // metadata cache 已有更新定位所需的 ID，不再逐文件回读完整 Asset。
+      .existing_asset_id = analysis.existing_metadata
+                               ? std::optional<std::int64_t>{analysis.existing_metadata->id}
+                               : std::nullopt,
+  };
 
-    std::optional<Utils::Image::BGRABitmapData> thumbnail_bitmap_data;
-
-    // 缩略图像素同时供主色复用，避免同一照片重复解码缩放
-    if (options.generate_thumbnails.value_or(true)) {
-      auto bitmap_data_result = Utils::Image::load_scaled_bgra_bitmap_data(
-          wic_factory.get(), file_path, options.thumbnail_short_edge.value_or(480));
-      if (!bitmap_data_result) {
-        Logger().warn("Failed to load thumbnail bitmap data for {}: {}", file_path.string(),
-                      bitmap_data_result.error());
-      } else {
-        thumbnail_bitmap_data = std::move(bitmap_data_result.value());
-
-        if (file_info.hash.empty()) {
-          Logger().warn("Skip thumbnail generation for {}: empty hash", file_path.string());
-        } else {
-          auto thumbnail_result = Asset::Thumbnail::save_thumbnail_from_bgra(
-              app_state, file_info.hash, thumbnail_bitmap_data.value(),
-              options.rebuild_thumbnails.value_or(false));
-          if (!thumbnail_result) {
-            Logger().warn("Failed to generate thumbnail for {}: {}", file_path.string(),
-                          thumbnail_result.error());
-          }
-        }
-      }
-
-      if (progress_tracker) {
-        progress_tracker->mark_thumbnail_processed();
-      }
-    }
-
-    const Features::Gallery::Color::Types::MainColorExtractOptions color_extract_options{
-        .sample_short_edge = options.thumbnail_short_edge.value_or(480),
-    };
-    auto color_result = thumbnail_bitmap_data.has_value()
-                            ? Features::Gallery::Color::Extractor::extract_main_colors_from_bgra(
-                                  thumbnail_bitmap_data.value(), color_extract_options)
-                            : Features::Gallery::Color::Extractor::extract_main_colors(
-                                  wic_factory, file_path, color_extract_options);
-    if (color_result) {
-      processed.colors = std::move(color_result.value());
-    } else {
-      Logger().warn("Failed to extract main colors for {}: {}", file_path.string(),
-                    color_result.error());
-      processed.colors.clear();
-    }
-  } else if (asset_type == "video") {
-    // MF：分辨率/时长 + 可选封面 WebP；视频不做主色
-    auto video_result = Utils::Media::VideoAsset::analyze_video_file(
-        file_path, options.generate_thumbnails.value_or(true)
-                       ? std::optional<std::uint32_t>{options.thumbnail_short_edge.value_or(480)}
-                       : std::nullopt);
-    if (video_result) {
-      asset.width = static_cast<std::int32_t>(video_result->width);
-      asset.height = static_cast<std::int32_t>(video_result->height);
-      asset.mime_type = video_result->mime_type;
-
-      if (video_result->thumbnail.has_value()) {
-        if (file_info.hash.empty()) {
-          Logger().warn("Skip video thumbnail save for {}: empty hash", file_path.string());
-        } else {
-          auto save_result = Asset::Thumbnail::save_thumbnail_data(
-              app_state, file_info.hash, *video_result->thumbnail,
-              options.rebuild_thumbnails.value_or(false));
-          if (!save_result) {
-            Logger().warn("Failed to save video thumbnail for {}: {}", file_path.string(),
-                          save_result.error());
-          }
-        }
-      }
-    } else {
-      Logger().warn("Could not analyze video file {}: {}", file_path.string(),
-                    video_result.error());
-      asset.width = 0;
-      asset.height = 0;
-      asset.mime_type = "application/octet-stream";
-    }
-
-    if (options.generate_thumbnails.value_or(true) && progress_tracker) {
-      progress_tracker->mark_thumbnail_processed();
-    }
-
-    processed.colors.clear();
-  } else {
-    asset.width = 0;
-    asset.height = 0;
-    asset.mime_type = "application/octet-stream";
-    processed.colors.clear();
+  auto prepared_result = AssetPipeline::prepare_media_asset(app_state, file_path, options, input);
+  if (!prepared_result) {
+    return std::unexpected(prepared_result.error());
   }
 
-  return processed;
+  auto asset_type = Common::detect_asset_type(file_path);
+  if (options.generate_thumbnails.value_or(true) && progress_tracker &&
+      (asset_type == "photo" || asset_type == "video")) {
+    progress_tracker->mark_thumbnail_processed();
+  }
+
+  return ProcessedAssetEntry{
+      .asset = std::move(prepared_result->asset),
+      .colors = std::move(prepared_result->colors),
+  };
 }
 
 // 线程池分批并行处理文件，合并 NEW/MODIFIED 结果
@@ -204,15 +95,6 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
           auto finish_batch =
               wil::scope_exit([&completion_latch] { completion_latch.count_down(); });
 
-          auto thread_wic_factory_result = Utils::Image::get_thread_wic_factory();
-          if (!thread_wic_factory_result) {
-            std::lock_guard<std::mutex> lock(results_mutex);
-            final_result.errors.push_back("Failed to get thread WIC factory: " +
-                                          thread_wic_factory_result.error());
-            return;
-          }
-          auto thread_wic_factory = std::move(thread_wic_factory_result.value());
-
           FileProcessingBatchResult batch_result;
 
           for (size_t idx = start; idx < end; ++idx) {
@@ -222,8 +104,8 @@ auto process_files_in_parallel(Core::State::AppState& app_state,
             }
 
             const auto& analysis = files_to_process[idx];
-            auto asset_result = process_single_file(app_state, thread_wic_factory, analysis,
-                                                    options, folder_mapping, progress_tracker);
+            auto asset_result =
+                process_single_file(app_state, analysis, options, folder_mapping, progress_tracker);
             if (asset_result) {
               if (analysis.status == Types::FileStatus::NEW) {
                 batch_result.new_assets.push_back(std::move(asset_result.value()));
@@ -347,86 +229,55 @@ auto run_processing_phase(Core::State::AppState& app_state, const std::filesyste
 
   result.batch_result = std::move(processing_result.value());
 
-  // 批量插入新资产，并按插入 ID 写颜色
-  if (!result.batch_result.new_assets.empty()) {
-    std::vector<Types::Asset> new_assets_to_create;
-    new_assets_to_create.reserve(result.batch_result.new_assets.size());
-    for (const auto& entry : result.batch_result.new_assets) {
-      new_assets_to_create.push_back(entry.asset);
-    }
+  // 新建、更新与颜色替换共用一个事务，任一颜色写入失败都会回滚对应资产指纹。
+  if (!result.batch_result.new_assets.empty() || !result.batch_result.updated_assets.empty()) {
+    auto persist_result = Core::Database::execute_transaction(
+        app_state,
+        [&result](Core::State::AppState& txn_app_state) -> std::expected<void, std::string> {
+          for (auto& entry : result.batch_result.new_assets) {
+            auto create_result = Asset::Repository::create_asset(txn_app_state, entry.asset);
+            if (!create_result) {
+              return std::unexpected("Failed to create asset: " + create_result.error());
+            }
+            entry.asset.id = create_result.value();
 
-    auto create_result = Asset::Repository::batch_create_asset(app_state, new_assets_to_create);
-    if (create_result) {
-      Logger().info("Successfully created {} new asset items",
-                    result.batch_result.new_assets.size());
+            auto color_result =
+                Features::Gallery::Color::Repository::replace_asset_colors_in_transaction(
+                    txn_app_state, entry.asset.id, entry.colors);
+            if (!color_result) {
+              return std::unexpected("Failed to create asset colors: " + color_result.error());
+            }
+          }
 
-      const auto& inserted_ids = create_result.value();
-      if (inserted_ids.size() != result.batch_result.new_assets.size()) {
-        Logger().error("Inserted asset count mismatch when replacing colors. assets={}, ids={}",
-                       result.batch_result.new_assets.size(), inserted_ids.size());
-        result.all_db_success = false;
-      } else {
-        std::vector<Features::Gallery::Color::Repository::ColorReplaceBatchItem> color_items;
-        color_items.reserve(result.batch_result.new_assets.size());
+          for (const auto& entry : result.batch_result.updated_assets) {
+            if (entry.asset.id <= 0) {
+              return std::unexpected("Invalid asset id while updating: " + entry.asset.path);
+            }
 
-        for (size_t i = 0; i < inserted_ids.size(); ++i) {
-          color_items.push_back(Features::Gallery::Color::Repository::ColorReplaceBatchItem{
-              .asset_id = inserted_ids[i],
-              .colors = result.batch_result.new_assets[i].colors,
-          });
-        }
+            auto update_result =
+                Asset::Repository::update_asset_scanner_fields(txn_app_state, entry.asset);
+            if (!update_result) {
+              return std::unexpected("Failed to update asset: " + update_result.error());
+            }
 
-        auto color_result = Features::Gallery::Color::Repository::batch_replace_asset_colors(
-            app_state, color_items);
-        if (!color_result) {
-          Logger().error("Failed to batch replace colors for new assets: {}", color_result.error());
-          result.all_db_success = false;
-        }
-      }
-    } else {
-      Logger().error("Failed to batch create asset items: {}", create_result.error());
-      result.all_db_success = false;
-    }
-  }
-
-  // 批量更新已有资产与颜色
-  if (!result.batch_result.updated_assets.empty()) {
-    std::vector<Types::Asset> updated_assets_to_save;
-    updated_assets_to_save.reserve(result.batch_result.updated_assets.size());
-    for (const auto& entry : result.batch_result.updated_assets) {
-      updated_assets_to_save.push_back(entry.asset);
-    }
-
-    auto update_result = Asset::Repository::batch_update_asset(app_state, updated_assets_to_save);
-    if (update_result) {
-      Logger().info("Successfully updated {} asset items",
-                    result.batch_result.updated_assets.size());
-
-      std::vector<Features::Gallery::Color::Repository::ColorReplaceBatchItem> color_items;
-      color_items.reserve(result.batch_result.updated_assets.size());
-      for (const auto& entry : result.batch_result.updated_assets) {
-        if (entry.asset.id <= 0) {
-          Logger().warn("Skip replacing colors for updated asset with invalid id: {}",
-                        entry.asset.path);
-          continue;
-        }
-        color_items.push_back(Features::Gallery::Color::Repository::ColorReplaceBatchItem{
-            .asset_id = entry.asset.id,
-            .colors = entry.colors,
+            auto color_result =
+                Features::Gallery::Color::Repository::replace_asset_colors_in_transaction(
+                    txn_app_state, entry.asset.id, entry.colors);
+            if (!color_result) {
+              return std::unexpected("Failed to update asset colors: " + color_result.error());
+            }
+          }
+          return {};
         });
-      }
 
-      auto color_result =
-          Features::Gallery::Color::Repository::batch_replace_asset_colors(app_state, color_items);
-      if (!color_result) {
-        Logger().error("Failed to batch replace colors for updated assets: {}",
-                       color_result.error());
-        result.all_db_success = false;
-      }
-    } else {
-      Logger().error("Failed to batch update asset items: {}", update_result.error());
-      result.all_db_success = false;
+    if (!persist_result) {
+      // 原子写入失败后立即终止全量扫描，避免继续清理或发布并未落库的变化。
+      return std::unexpected("Failed to persist scanned assets and colors atomically: " +
+                             persist_result.error());
     }
+
+    Logger().info("Successfully created {} and updated {} asset items with colors",
+                  result.batch_result.new_assets.size(), result.batch_result.updated_assets.size());
   }
 
   if (processing_tracker) {

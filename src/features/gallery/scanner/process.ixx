@@ -22,7 +22,6 @@ export struct FileProcessingBatchResult {
 
 export struct ProcessingPhaseResult {
   FileProcessingBatchResult batch_result;
-  bool all_db_success = true;
 };
 
 // 处理阶段：建 folder 映射 → 并行抽元数据/缩略图/主色 → 批量写库与颜色

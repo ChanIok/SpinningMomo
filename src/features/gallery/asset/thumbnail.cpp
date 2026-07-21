@@ -6,7 +6,6 @@ import std;
 import Core.State;
 import Features.Gallery.Types;
 import Features.Gallery.State;
-import Features.Gallery.Asset.Repository;
 import Features.Gallery.Asset.Service;
 import Core.Database;
 import Utils.Image;
@@ -459,36 +458,6 @@ auto reconcile_thumbnail_cache(Core::State::AppState& app_state, std::uint32_t s
 }
 
 // ============= 缩略图清理功能 =============
-
-auto delete_thumbnail(Core::State::AppState& app_state, const Types::Asset& asset)
-    -> std::expected<void, std::string> {
-  if (app_state.gallery->thumbnails_directory.empty()) {
-    return std::unexpected("Thumbnails directory not initialized");
-  }
-
-  if (!asset.hash || asset.hash->empty()) {
-    return std::unexpected("Asset has no file hash, cannot determine thumbnail files");
-  }
-
-  const std::string& file_hash = asset.hash.value();
-  auto thumbnail_path = build_thumbnail_path(app_state.gallery->thumbnails_directory, file_hash);
-  std::error_code ec;
-
-  bool exists = std::filesystem::exists(thumbnail_path, ec);
-  if (ec) {
-    return std::unexpected("Failed to check thumbnail existence: " + ec.message());
-  }
-  if (!exists) {
-    return {};
-  }
-
-  if (!std::filesystem::remove(thumbnail_path, ec)) {
-    return std::unexpected("Failed to delete thumbnail: " + ec.message());
-  }
-
-  Logger().debug("Deleted thumbnail: {}", thumbnail_path.string());
-  return {};
-}
 
 auto cleanup_orphaned_thumbnails(Core::State::AppState& app_state)
     -> std::expected<int, std::string> {

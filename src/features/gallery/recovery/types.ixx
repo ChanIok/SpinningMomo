@@ -12,7 +12,7 @@ export struct WatchRootRecoveryState {
   std::string root_path;                       // 监视的根目录路径
   std::string volume_identity;                 // 卷标识（如 "ntfs:ABCD1234"），用于检测磁盘更换
   std::optional<std::int64_t> journal_id;      // USN Journal ID，Journal 被重建时会变化
-  std::optional<std::int64_t> checkpoint_usn;  // 上次读到的 USN 位置
+  std::optional<std::int64_t> checkpoint_usn;  // 上次成功建立索引基线的 USN 边界
   std::string rule_fingerprint;                // 扫描规则指纹，规则变化时需要全量重扫
   std::int64_t updated_at = 0;
 };
